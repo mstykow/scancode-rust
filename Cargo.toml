@@ -3,6 +3,13 @@ name = "scancode-rust"
 version = "0.0.1"
 edition = "2024"
 repository = "https://github.com/mstykow/scancode-rust"
+description = "A Rust-based tool for scanning and analyzing code."
+license = "MIT"
+license-file = "LICENSE"
+keywords = ["scancode", "license", "analysis", "rust"]
+categories = ["command-line-utilities", "development-tools::build-utilities"]
+readme = "README.md"
+authors = ["Maxim Stykow"]
 
 [dependencies]
 askalono = "0.5.0"

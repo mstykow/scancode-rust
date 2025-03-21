@@ -11,7 +11,7 @@ pub struct Cli {
     pub output_file: String,
 
     /// Maximum recursion depth (0 means no recursion)
-    #[arg(short, long, default_value = "100")]
+    #[arg(short, long, default_value = "50")]
     pub max_depth: usize,
 
     /// Exclude patterns (glob patterns like "*.tmp" or "node_modules")
