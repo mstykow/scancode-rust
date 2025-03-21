@@ -1,18 +1,18 @@
-use askalono::Store;
+use askalono::{Store, TextData};
 use chrono::Utc;
 use clap::Parser;
 use glob::Pattern;
+use include_dir::{Dir, include_dir};
 use indicatif::{ProgressBar, ProgressStyle};
-use serde_json::to_string_pretty;
+use serde_json::{Value, from_str, to_string_pretty};
 use std::env;
 use std::error::Error;
 use std::fs::File;
 use std::io::Write;
-use std::path::Path;
 use std::sync::Arc;
 
 use crate::cli::Cli;
-use crate::models::{ExtraData, Header, Output, SystemEnvironment, SCANCODE_OUTPUT_FORMAT_VERSION};
+use crate::models::{ExtraData, Header, Output, SCANCODE_OUTPUT_FORMAT_VERSION, SystemEnvironment};
 use crate::scanner::{count, process};
 
 mod cli;
@@ -69,16 +69,32 @@ fn compile_exclude_patterns(patterns: &[String]) -> Vec<Pattern> {
         .collect()
 }
 
+// Embed the license files into the binary
+const LICENSES_DIR: Dir = include_dir!("resources/licenses/json/details");
+
 fn load_license_database() -> Result<Store, Box<dyn Error>> {
     println!("Loading SPDX data, this may take a while...");
     let mut store = Store::new();
 
-    // TODO: Make this configurable via CLI
-    let license_path = std::env::var("LICENSE_DATA_PATH").unwrap_or_else(|_| {
-        "/Users/maximstykow/Documents/license-list-data/json/details".to_string()
-    });
+    for file in LICENSES_DIR.files() {
+        let string_content = file.contents_utf8().ok_or("Failed to read file as UTF-8")?;
+        let value: Value = from_str(&string_content)?;
 
-    store.load_spdx(Path::new(&license_path), false)?;
+        if value["isDeprecatedLicenseId"].as_bool().unwrap_or(false) {
+            continue;
+        }
+
+        let name = value["licenseId"]
+            .as_str()
+            .ok_or("Missing license ID")?
+            .to_string();
+        let text = value["licenseText"]
+            .as_str()
+            .ok_or("Missing license text")?;
+
+        store.add_license(name, TextData::new(text));
+    }
+
     Ok(store)
 }
 
@@ -128,7 +144,7 @@ fn create_output(
             output_format_version: SCANCODE_OUTPUT_FORMAT_VERSION.to_string(),
         }],
         files: scan_result.files,
-        license_references: Vec::new(), // TODO: implement
+        license_references: Vec::new(),      // TODO: implement
         license_rule_references: Vec::new(), // TODO: implement
     }
 }

@@ -39,6 +39,7 @@ curl -sSfL https://github.com/mstykow/scancode-rust/releases/latest/download/sca
 ```sh
 git clone https://github.com/yourusername/scancode-rust.git
 cd scancode-rust
+./setup.sh  # Initialize the submodule and configure sparse checkout
 cargo build --release
 ```
 
@@ -106,26 +107,49 @@ To contribute to `scancode-rust`, follow these steps to set up the repository fo
    cd scancode-rust
    ```
 
-3. **Install Dependencies**  
+3. **Initialize the License Submodule**  
+   Use the following script to initialize the submodule and configure sparse checkout:
+
+   ```sh
+   ./setup.sh
+   ```
+
+4. **Install Dependencies**  
    Install the required Rust dependencies using `cargo`:
 
    ```sh
    cargo build
    ```
 
-4. **Run Tests**  
+5. **Run Tests**  
    Run the test suite to ensure everything is working correctly:
 
    ```sh
    cargo test
    ```
 
-5. **Start Developing**  
+6. **Start Developing**  
    You can now make changes and test them locally. Use `cargo run` to execute the tool:
 
    ```sh
    cargo run -- [OPTIONS] <DIR_PATH>
    ```
+
+## Updating the License Data
+
+If you want to update the embedded license data, simply run the `setup.sh` script:
+
+```sh
+./setup.sh
+```
+
+This will reconfigure the sparse checkout and fetch the latest changes. After updating the license data, rebuild the binary:
+
+```sh
+cargo build --release
+```
+
+This will embed the latest changes from the `license-list-data` repository into the binary.
 
 ## License
 

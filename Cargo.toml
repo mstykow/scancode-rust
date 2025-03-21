@@ -1,13 +1,12 @@
 [package]
 name = "scancode-rust"
-version = "0.0.1"
+version = "0.0.2"
 edition = "2024"
 repository = "https://github.com/mstykow/scancode-rust"
 description = "A Rust-based tool for scanning and analyzing code."
-license = "MIT"
-license-file = "LICENSE"
+license = "Apache-2.0"
 keywords = ["scancode", "license", "analysis", "rust"]
-categories = ["command-line-utilities", "development-tools::build-utilities"]
+categories = ["command-line-utilities", "development-tools"]
 readme = "README.md"
 authors = ["Maxim Stykow"]
 
@@ -27,6 +26,7 @@ serde_json = "1.0.140"
 sha1 = "0.10.6"
 sha2 = "0.10.8"
 sys-info = "0.9.1"
+include_dir = "0.7"
 
 [profile.release]
 # Enable link-time optimization for better cross-module optimizations
@@ -45,3 +45,7 @@ strip = true
 [profile.dist]
 inherits = "release"
 lto = "thin"
+
+[[bin]]
+name = "scancode-rust"
+path = "src/main.rs"
