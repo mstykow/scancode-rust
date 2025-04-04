@@ -67,7 +67,7 @@ pub struct Match {
     pub end_line: usize,
     #[serde(rename = "license_expression_spdx")] // name used by ScanCode
     pub license_expression: String,
-    pub rule_identifier: String,
+    pub rule_identifier: Option<String>,
     pub matched_text: Option<String>,
 }
 

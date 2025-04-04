@@ -8,7 +8,7 @@ license = "Apache-2.0"
 keywords = ["scancode", "license", "analysis", "rust"]
 categories = ["command-line-utilities", "development-tools"]
 readme = "README.md"
-authors = ["Maxim Stykow"]
+authors = ["Maxim Stykow", "Adrian Braemer"]
 
 [dependencies]
 chrono = "0.4.40"

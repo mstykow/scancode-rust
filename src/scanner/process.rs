@@ -189,7 +189,7 @@ fn extract_license_information(
                 end_line: detection.line_range.1,
                 license_expression: detection.license.name.to_string(),
                 matched_text: None, //TODO
-                rule_identifier: "".to_string(),
+                rule_identifier: None,
             }],
         })
         .collect::<Vec<_>>();
