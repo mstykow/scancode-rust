@@ -109,7 +109,9 @@ fn process_file(path: &Path, metadata: &fs::Metadata, scan_strategy: &ScanStrate
     };
     file_info_builder.scan_errors(scan_errors);
 
-    return file_info_builder.build().expect("");
+    return file_info_builder
+        .build()
+        .expect("FileInformationBuild not completely initialized");
 }
 
 fn add_path_information(file_info_builder: &mut FileInfoBuilder, path: &Path) -> () {
