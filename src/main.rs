@@ -19,6 +19,7 @@ use crate::scanner::{count, process};
 mod askalono;
 mod cli;
 mod models;
+mod parsers;
 mod scanner;
 mod utils;
 
