@@ -1,4 +1,3 @@
-use askalono::{Store, TextData};
 use chrono::Utc;
 use clap::Parser;
 use glob::Pattern;
@@ -11,6 +10,7 @@ use std::fs::File;
 use std::io::Write;
 use std::sync::Arc;
 
+use crate::askalono::{Store, TextData};
 use crate::cli::Cli;
 use crate::models::{ExtraData, Header, Output, SCANCODE_OUTPUT_FORMAT_VERSION, SystemEnvironment};
 use crate::scanner::{count, process};
@@ -19,6 +19,7 @@ mod cli;
 mod models;
 mod scanner;
 mod utils;
+mod askalono;
 
 fn main() -> std::io::Result<()> {
     if let Err(err) = run() {

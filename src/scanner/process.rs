@@ -3,7 +3,7 @@ use crate::scanner::ProcessResult;
 use crate::utils::file::{get_creation_date, is_path_excluded};
 use crate::utils::hash::{calculate_md5, calculate_sha1, calculate_sha256};
 use crate::utils::language::detect_language;
-use askalono::{Store, TextData};
+use crate::askalono::{Store, TextData};
 use content_inspector::{ContentType, inspect};
 use glob::Pattern;
 use indicatif::ProgressBar;
