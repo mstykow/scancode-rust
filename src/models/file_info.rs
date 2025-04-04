@@ -15,6 +15,7 @@ pub struct FileInfo {
     pub md5: Option<String>,
     pub sha256: Option<String>,
     pub programming_language: Option<String>,
+    pub package_data: Vec<PackageData>,
     #[serde(rename = "detected_license_expression_spdx")] // name used by ScanCode
     pub license_expression: Option<String>,
     pub license_detections: Vec<LicenseDetection>,

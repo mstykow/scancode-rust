@@ -136,6 +136,7 @@ fn process_file(path: &Path, metadata: &fs::Metadata, store: &Store) -> FileInfo
         md5,
         sha256,
         programming_language,
+        package_data: Vec::new(), // TODO: implement
         license_expression: license_result,
         copyrights: Vec::new(), // TODO: implement
         license_detections: Vec::new(), // TODO: implement
@@ -204,6 +205,7 @@ fn process_directory(path: &Path, metadata: &fs::Metadata) -> FileInfo {
         md5: None,
         sha256: None,
         programming_language: None,
+        package_data: Vec::new(), // TODO: implement
         license_expression: None,
         copyrights: Vec::new(), // TODO: implement
         license_detections: Vec::new(), // TODO: implement
