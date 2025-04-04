@@ -1,3 +1,4 @@
+use askalono::ScanStrategy;
 use chrono::Utc;
 use clap::Parser;
 use glob::Pattern;
@@ -15,11 +16,13 @@ use crate::cli::Cli;
 use crate::models::{ExtraData, Header, Output, SCANCODE_OUTPUT_FORMAT_VERSION, SystemEnvironment};
 use crate::scanner::{count, process};
 
+mod askalono;
 mod cli;
 mod models;
 mod scanner;
 mod utils;
-mod askalono;
+
+const LICENSE_DETECTION_THRESHOLD: f32 = 0.9;
 
 fn main() -> std::io::Result<()> {
     if let Err(err) = run() {
@@ -37,6 +40,9 @@ fn run() -> Result<(), Box<dyn Error>> {
     println!("Exclusion patterns: {:?}", cli.exclude);
 
     let store = load_license_database()?;
+    let strategy = ScanStrategy::new(&store)
+        .optimize(true)
+        .confidence_threshold(LICENSE_DETECTION_THRESHOLD);
 
     let (total_files, total_dirs, excluded_count) =
         count(&cli.dir_path, cli.max_depth, &exclude_patterns)?;
@@ -51,7 +57,7 @@ fn run() -> Result<(), Box<dyn Error>> {
         cli.max_depth,
         Arc::clone(&progress_bar),
         &exclude_patterns,
-        &store,
+        &strategy,
     )?;
     progress_bar.finish_with_message("Scan complete!");
 

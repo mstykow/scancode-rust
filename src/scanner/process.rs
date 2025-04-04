@@ -1,29 +1,28 @@
-use crate::models::{FileInfo, FileType};
+use crate::askalono::{ScanStrategy, TextData};
+use crate::models::{FileInfo, FileInfoBuilder, FileType, LicenseDetection, Match};
 use crate::scanner::ProcessResult;
 use crate::utils::file::{get_creation_date, is_path_excluded};
 use crate::utils::hash::{calculate_md5, calculate_sha1, calculate_sha256};
 use crate::utils::language::detect_language;
-use crate::askalono::{Store, TextData};
+use anyhow::Error;
 use content_inspector::{ContentType, inspect};
 use glob::Pattern;
 use indicatif::ProgressBar;
 use mime_guess::from_path;
 use rayon::prelude::*;
-use std::fs::{self, File};
-use std::io::Read;
+use std::fs::{self};
 use std::path::Path;
 use std::sync::Arc;
 
 // License detection threshold - scores above this value are considered a match
-const LICENSE_DETECTION_THRESHOLD: f32 = 0.9;
 
 pub fn process<P: AsRef<Path>>(
     path: P,
     max_depth: usize,
     progress_bar: Arc<ProgressBar>,
     exclude_patterns: &[Pattern],
-    store: &Store,
-) -> std::io::Result<ProcessResult> {
+    scan_strategy: &ScanStrategy,
+) -> Result<ProcessResult, Error> {
     let path = path.as_ref();
 
     if is_path_excluded(path, exclude_patterns) {
@@ -63,7 +62,7 @@ pub fn process<P: AsRef<Path>>(
         &mut file_entries
             .par_iter()
             .map(|(path, metadata)| {
-                let file_entry = process_file(path, metadata, store);
+                let file_entry = process_file(path, metadata, scan_strategy);
                 progress_bar.inc(1);
                 file_entry
             })
@@ -80,7 +79,7 @@ pub fn process<P: AsRef<Path>>(
                 max_depth - 1,
                 progress_bar.clone(),
                 exclude_patterns,
-                store,
+                scan_strategy,
             ) {
                 Ok(mut result) => {
                     all_files.append(&mut result.files);
@@ -97,91 +96,107 @@ pub fn process<P: AsRef<Path>>(
     })
 }
 
-fn process_file(path: &Path, metadata: &fs::Metadata, store: &Store) -> FileInfo {
-    let size = metadata.len();
-    let mut scan_errors = Vec::new();
+fn process_file(path: &Path, metadata: &fs::Metadata, scan_strategy: &ScanStrategy) -> FileInfo {
+    let mut scan_errors: Vec<String> = vec![];
 
-    let (sha1, md5, sha256, programming_language, license_result) =
-        match read_file_data(path, size, store) {
-            Ok((sha1, md5, sha256, lang, license)) => {
-                (Some(sha1), Some(md5), Some(sha256), Some(lang), license)
-            }
-            Err(e) => {
-                scan_errors.push(e.to_string());
-                (None, None, None, None, None)
-            }
-        };
+    let mut file_info_builder = FileInfoBuilder::default();
+    file_info_builder
+        .size(metadata.len())
+        .date(get_creation_date(metadata));
+    add_path_information(&mut file_info_builder, path);
+    if let Err(e) = extract_information_from_content(&mut file_info_builder, path, scan_strategy) {
+        scan_errors.push(e.to_string());
+    };
+    file_info_builder.scan_errors(scan_errors);
 
-    FileInfo {
-        name: path.file_name().unwrap().to_string_lossy().to_string(),
-        base_name: path
-            .file_stem()
-            .unwrap_or_default()
-            .to_string_lossy()
-            .to_string(),
-        extension: path
-            .extension()
-            .map_or("".to_string(), |ext| format!(".{}", ext.to_string_lossy())),
-        path: path.to_string_lossy().to_string(),
-        file_type: FileType::File,
-        mime_type: Some(
+    return file_info_builder.build().expect("");
+}
+
+fn add_path_information(file_info_builder: &mut FileInfoBuilder, path: &Path) -> () {
+    file_info_builder
+        .name(path.file_name().unwrap().to_string_lossy().to_string())
+        .base_name(
+            path.file_stem()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .to_string(),
+        )
+        .extension(
+            path.extension()
+                .map_or("".to_string(), |ext| format!(".{}", ext.to_string_lossy())),
+        )
+        .path(path.to_string_lossy().to_string())
+        .file_type(FileType::File)
+        .mime_type(Some(
             from_path(path)
                 .first_or_octet_stream()
                 .essence_str()
                 .to_string(),
-        ),
-        size,
-        date: get_creation_date(metadata),
-        sha1,
-        md5,
-        sha256,
-        programming_language,
-        package_data: Vec::new(), // TODO: implement
-        license_expression: license_result,
-        copyrights: Vec::new(), // TODO: implement
-        license_detections: Vec::new(), // TODO: implement
-        urls: Vec::new(), // TODO: implement
-        scan_errors,
-    }
+        ));
 }
 
-fn read_file_data(
+fn extract_information_from_content(
+    file_info_builder: &mut FileInfoBuilder,
     path: &Path,
-    size: u64,
-    store: &Store,
-) -> std::io::Result<(String, String, String, String, Option<String>)> {
-    let mut file = File::open(path)?;
-    let mut buffer = Vec::with_capacity(size as usize);
-    file.read_to_end(&mut buffer)?;
+    scan_strategy: &ScanStrategy,
+) -> Result<(), Error> {
+    let buffer = fs::read(path)?;
+
+    file_info_builder
+        .sha1(Some(calculate_sha1(&buffer)))
+        .md5(Some(calculate_md5(&buffer)))
+        .sha256(Some(calculate_sha256(&buffer)))
+        .programming_language(Some(detect_language(path, &buffer)));
 
     // Convert Vec<u8> to String only if it's valid UTF-8
-    let text_content = if inspect(&buffer) == ContentType::UTF_8 {
-        String::from_utf8_lossy(&buffer).into_owned()
+    if inspect(&buffer) == ContentType::UTF_8 {
+        extract_license_information(
+            file_info_builder,
+            String::from_utf8_lossy(&buffer).into_owned(),
+            scan_strategy,
+        )?;
+        return Ok(());
     } else {
-        String::new() // Empty string for binary files
+        return Ok(());
     };
+}
 
+fn extract_license_information(
+    file_info_builder: &mut FileInfoBuilder,
+    text_content: String,
+    scan_strategy: &ScanStrategy,
+) -> Result<(), Error> {
     // Analyze license with the text content
-    let license_result = if !text_content.is_empty() {
-        let result = store.analyze(&TextData::from(text_content.as_str()));
-        if result.score > LICENSE_DETECTION_THRESHOLD {
-            Some(result.name.to_owned())
-        } else {
-            None
-        }
-    } else {
-        None
-    };
+    if text_content.is_empty() {
+        return Ok(());
+    }
 
-    let language = detect_language(path, &buffer);
+    let license_result = scan_strategy.scan(&TextData::from(text_content.as_str()))?;
+    let license_expr = license_result
+        .license
+        .and_then(|x| Some(x.name.to_string()));
 
-    Ok((
-        calculate_sha1(&buffer),
-        calculate_md5(&buffer),
-        calculate_sha256(&buffer),
-        language,
-        license_result,
-    ))
+    let license_detections = license_result
+        .containing
+        .iter()
+        .map(|detection| LicenseDetection {
+            license_expression: detection.license.name.to_string(),
+            matches: vec![Match {
+                score: detection.score as f64,
+                start_line: detection.line_range.0,
+                end_line: detection.line_range.1,
+                license_expression: detection.license.name.to_string(),
+                matched_text: None, //TODO
+                rule_identifier: "".to_string(),
+            }],
+        })
+        .collect::<Vec<_>>();
+
+    file_info_builder
+        .license_expression(license_expr)
+        .license_detections(license_detections);
+
+    Ok(())
 }
 
 fn process_directory(path: &Path, metadata: &fs::Metadata) -> FileInfo {
@@ -207,9 +222,9 @@ fn process_directory(path: &Path, metadata: &fs::Metadata) -> FileInfo {
         programming_language: None,
         package_data: Vec::new(), // TODO: implement
         license_expression: None,
-        copyrights: Vec::new(), // TODO: implement
+        copyrights: Vec::new(),         // TODO: implement
         license_detections: Vec::new(), // TODO: implement
-        urls: Vec::new(), // TODO: implement
+        urls: Vec::new(),               // TODO: implement
         scan_errors: Vec::new(),
     }
 }
