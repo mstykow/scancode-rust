@@ -8,7 +8,7 @@ license = "Apache-2.0"
 keywords = ["scancode", "license", "analysis", "rust"]
 categories = ["command-line-utilities", "development-tools"]
 readme = "README.md"
-authors = ["Maxim Stykow"]
+authors = ["Maxim Stykow", "Adrian Braemer"]
 
 [dependencies]
 chrono = "0.4.40"
@@ -42,6 +42,7 @@ unicode-normalization = "0.1.8"
 
 zstd = "0.13"
 flate2 = { version = "1.0.14", optional = true }
+derive_builder = "0.20.2"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 flate2 = "1.0.14"
