@@ -49,7 +49,7 @@ impl fmt::Display for LicenseType {
 /// Basic scoring of two texts:
 ///
 /// ```
-/// use askalono::TextData;
+/// use scancode_rust::askalono::TextData;
 ///
 /// let license = TextData::from("My First License");
 /// let sample = TextData::from("copyright 20xx me irl\n\n //  my   first license");
@@ -64,7 +64,7 @@ impl fmt::Display for LicenseType {
 ///
 /// ```
 /// # use std::error::Error;
-/// # use askalono::TextData;
+/// # use scancode_rust::askalono::TextData;
 /// # fn main() -> Result<(), Box<dyn Error>> {
 /// # let license = TextData::from("My First License");
 /// let sample = TextData::from("copyright 20xx me irl\n// My First License\nfn hello() {\n ...");

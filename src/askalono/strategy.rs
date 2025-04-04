@@ -72,7 +72,7 @@ pub struct ContainedResult<'a> {
 ///
 /// ```rust,should_panic
 /// # use std::error::Error;
-/// use askalono::{ScanStrategy, Store};
+/// use scancode_rust::askalono::{ScanStrategy, Store};
 ///
 /// # fn main() -> Result<(), Box<dyn Error>> {
 /// let store = Store::new();
