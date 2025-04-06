@@ -1,5 +1,6 @@
 use crate::askalono::{ScanStrategy, TextData};
 use crate::models::{FileInfo, FileInfoBuilder, FileType, LicenseDetection, Match};
+use crate::parsers::{NpmParser, PackageParser};
 use crate::scanner::ProcessResult;
 use crate::utils::file::{get_creation_date, is_path_excluded};
 use crate::utils::hash::{calculate_md5, calculate_sha1, calculate_sha256};
@@ -98,24 +99,13 @@ pub fn process<P: AsRef<Path>>(
 
 fn process_file(path: &Path, metadata: &fs::Metadata, scan_strategy: &ScanStrategy) -> FileInfo {
     let mut scan_errors: Vec<String> = vec![];
-
     let mut file_info_builder = FileInfoBuilder::default();
-    file_info_builder
-        .size(metadata.len())
-        .date(get_creation_date(metadata));
-    add_path_information(&mut file_info_builder, path);
+
     if let Err(e) = extract_information_from_content(&mut file_info_builder, path, scan_strategy) {
         scan_errors.push(e.to_string());
     };
-    file_info_builder.scan_errors(scan_errors);
 
     return file_info_builder
-        .build()
-        .expect("FileInformationBuild not completely initialized");
-}
-
-fn add_path_information(file_info_builder: &mut FileInfoBuilder, path: &Path) -> () {
-    file_info_builder
         .name(path.file_name().unwrap().to_string_lossy().to_string())
         .base_name(
             path.file_stem()
@@ -134,7 +124,12 @@ fn add_path_information(file_info_builder: &mut FileInfoBuilder, path: &Path) ->
                 .first_or_octet_stream()
                 .essence_str()
                 .to_string(),
-        ));
+        ))
+        .size(metadata.len())
+        .date(get_creation_date(metadata))
+        .scan_errors(scan_errors)
+        .build()
+        .expect("FileInformationBuild not completely initialized");
 }
 
 fn extract_information_from_content(
@@ -150,17 +145,19 @@ fn extract_information_from_content(
         .sha256(Some(calculate_sha256(&buffer)))
         .programming_language(Some(detect_language(path, &buffer)));
 
-    // Convert Vec<u8> to String only if it's valid UTF-8
-    if inspect(&buffer) == ContentType::UTF_8 {
+    if NpmParser::is_match(path) {
+        let package_data = vec![NpmParser::extract_package_data(path)];
+        file_info_builder.package_data(package_data);
+        Ok(())
+    } else if inspect(&buffer) == ContentType::UTF_8 {
         extract_license_information(
             file_info_builder,
             String::from_utf8_lossy(&buffer).into_owned(),
             scan_strategy,
-        )?;
-        return Ok(());
+        )
     } else {
-        return Ok(());
-    };
+        Ok(())
+    }
 }
 
 fn extract_license_information(
