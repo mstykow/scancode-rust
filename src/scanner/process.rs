@@ -1,6 +1,6 @@
 use crate::askalono::{ScanStrategy, TextData};
 use crate::models::{FileInfo, FileInfoBuilder, FileType, LicenseDetection, Match};
-use crate::parsers::{NpmParser, PackageParser};
+use crate::parsers::{CargoParser, NpmParser, PythonParser, PackageParser};
 use crate::scanner::ProcessResult;
 use crate::utils::file::{get_creation_date, is_path_excluded};
 use crate::utils::hash::{calculate_md5, calculate_sha1, calculate_sha256};
@@ -147,6 +147,14 @@ fn extract_information_from_content(
 
     if NpmParser::is_match(path) {
         let package_data = vec![NpmParser::extract_package_data(path)];
+        file_info_builder.package_data(package_data);
+        Ok(())
+    } else if CargoParser::is_match(path) {
+        let package_data = vec![CargoParser::extract_package_data(path)];
+        file_info_builder.package_data(package_data);
+        Ok(())
+    } else if PythonParser::is_match(path) {
+        let package_data = vec![PythonParser::extract_package_data(path)];
         file_info_builder.package_data(package_data);
         Ok(())
     } else if inspect(&buffer) == ContentType::UTF_8 {

@@ -1,4 +1,12 @@
 mod npm;
+mod cargo;
+mod python;
+#[cfg(test)]
+mod cargo_test;
+#[cfg(test)]
+mod python_test;
+#[cfg(test)]
+mod npm_test;
 
 use std::path::Path;
 
@@ -12,3 +20,5 @@ pub trait PackageParser {
 }
 
 pub use self::npm::NpmParser;
+pub use self::cargo::CargoParser;
+pub use self::python::PythonParser;
