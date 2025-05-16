@@ -154,8 +154,17 @@ fn create_package_url(
     namespace: &Option<String>,
 ) -> Option<String> {
     name.as_ref().map(|name| {
-        let mut package_url =
-            PackageUrl::new(NpmParser::PACKAGE_TYPE, name).expect("Failed to create PackageUrl");
+        // For npm, the package URL format is different based on if it's a scoped package
+        let mut package_url = if name.starts_with('@') && namespace.is_some() {
+            // For scoped packages (@namespace/name), we need to include the namespace in the name
+            // but also put it in the URL parameters
+            let name_without_at = name.trim_start_matches('@');
+            PackageUrl::new(NpmParser::PACKAGE_TYPE, name_without_at)
+                .expect("Failed to create PackageUrl")
+        } else {
+            PackageUrl::new(NpmParser::PACKAGE_TYPE, name)
+                .expect("Failed to create PackageUrl")
+        };
 
         if let Some(v) = version {
             package_url.with_version(v);
@@ -288,10 +297,24 @@ fn extract_parties(json: &Value) -> Vec<Party> {
     parties
 }
 
+/// Extracts email from a string in the format "Name <email@example.com>".
+fn extract_email_from_string(author_str: &str) -> Option<String> {
+    if let Some(email_start) = author_str.find('<') {
+        if let Some(email_end) = author_str.find('>') {
+            if email_start < email_end {
+                return Some(author_str[email_start + 1..email_end].to_string());
+            }
+        }
+    }
+    None
+}
+
 /// Extracts a single email from a JSON field, which can be a string or an object with an "email" field.
 fn extract_email_from_field(field: &Value) -> Option<String> {
     match field {
-        Value::String(s) => Some(s.clone()),
+        Value::String(s) => {
+            extract_email_from_string(s).or_else(|| Some(s.clone()))
+        }
         Value::Object(obj) => obj.get("email").and_then(|v| v.as_str()).map(String::from),
         _ => None,
     }
