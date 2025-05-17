@@ -128,7 +128,21 @@ To contribute to `scancode-rust`, follow these steps to set up the repository fo
    cargo test
    ```
 
-6. **Start Developing**  
+6. **Set Up Pre-commit Hooks**  
+   This repository uses [pre-commit](https://pre-commit.com/) to run checks before each commit:
+
+   ```sh
+   # Using pip
+   pip install pre-commit
+
+   # Or using brew on macOS
+   brew install pre-commit
+
+   # Install the hooks
+   pre-commit install
+   ```
+
+7. **Start Developing**  
    You can now make changes and test them locally. Use `cargo run` to execute the tool:
 
    ```sh

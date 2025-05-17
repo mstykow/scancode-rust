@@ -50,7 +50,7 @@ impl FileInfoBuilder {
             self.path.clone().ok_or("Missing field: path")?,
             self.file_type.clone().ok_or("Missing field: file_type")?,
             self.mime_type.clone().flatten(),
-            self.size.clone().ok_or("Missing field: size")?,
+            self.size.ok_or("Missing field: size")?,
             self.date.clone().flatten(),
             self.sha1.clone().flatten(),
             self.md5.clone().flatten(),
@@ -67,6 +67,7 @@ impl FileInfoBuilder {
 }
 
 impl FileInfo {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         name: String,
         base_name: String,

@@ -33,24 +33,24 @@ impl PackageParser for CargoParser {
         };
 
         let package = toml_content.get(FIELD_PACKAGE).and_then(|v| v.as_table());
-        
+
         let name = package
             .and_then(|p| p.get(FIELD_NAME))
             .and_then(|v| v.as_str())
             .map(String::from);
-        
+
         let version = package
             .and_then(|p| p.get(FIELD_VERSION))
             .and_then(|v| v.as_str())
             .map(String::from);
-        
+
         let license_detections = extract_license_info(&toml_content);
-        
+
         let dependencies = extract_dependencies(&toml_content, false);
         let dev_dependencies = extract_dependencies(&toml_content, true);
-        
+
         let purl = create_package_url(&name, &version);
-        
+
         PackageData {
             package_type: Some(Self::PACKAGE_TYPE.to_string()),
             namespace: None, // Cargo doesn't use namespaces like npm
@@ -73,8 +73,7 @@ impl PackageParser for CargoParser {
     }
 
     fn is_match(path: &Path) -> bool {
-        path.file_name()
-            .map_or(false, |name| name == "Cargo.toml")
+        path.file_name().is_some_and(|name| name == "Cargo.toml")
     }
 }
 

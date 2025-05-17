@@ -86,7 +86,7 @@ fn load_license_database() -> Result<Store, Box<dyn Error>> {
 
     for file in LICENSES_DIR.files() {
         let string_content = file.contents_utf8().ok_or("Failed to read file as UTF-8")?;
-        let value: Value = from_str(&string_content)?;
+        let value: Value = from_str(string_content)?;
 
         if value["isDeprecatedLicenseId"].as_bool().unwrap_or(false) {
             continue;
@@ -160,7 +160,7 @@ fn create_output(
 fn write_output(output_file: &str, output: &Output) -> std::io::Result<()> {
     let json_output = match to_string_pretty(output) {
         Ok(json) => json,
-        Err(err) => return Err(std::io::Error::new(std::io::ErrorKind::Other, err)),
+        Err(err) => return Err(std::io::Error::other(err)),
     };
     let mut file = File::create(output_file)?;
     file.write_all(json_output.as_bytes())?;

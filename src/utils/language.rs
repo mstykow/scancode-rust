@@ -84,9 +84,7 @@ pub fn detect_language(path: &Path, content: &[u8]) -> String {
         return "Dockerfile".to_string();
     } else if file_name == "makefile" {
         return "Makefile".to_string();
-    } else if file_name == "gemfile" {
-        return "Ruby".to_string();
-    } else if file_name == "rakefile" {
+    } else if file_name == "gemfile" || file_name == "rakefile" {
         return "Ruby".to_string();
     }
 

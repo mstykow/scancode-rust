@@ -68,8 +68,7 @@ impl PackageParser for NpmParser {
     }
 
     fn is_match(path: &Path) -> bool {
-        path.file_name()
-            .map_or(false, |name| name == "package.json")
+        path.file_name().is_some_and(|name| name == "package.json")
     }
 }
 
@@ -162,8 +161,7 @@ fn create_package_url(
             PackageUrl::new(NpmParser::PACKAGE_TYPE, name_without_at)
                 .expect("Failed to create PackageUrl")
         } else {
-            PackageUrl::new(NpmParser::PACKAGE_TYPE, name)
-                .expect("Failed to create PackageUrl")
+            PackageUrl::new(NpmParser::PACKAGE_TYPE, name).expect("Failed to create PackageUrl")
         };
 
         if let Some(v) = version {
@@ -312,9 +310,7 @@ fn extract_email_from_string(author_str: &str) -> Option<String> {
 /// Extracts a single email from a JSON field, which can be a string or an object with an "email" field.
 fn extract_email_from_field(field: &Value) -> Option<String> {
     match field {
-        Value::String(s) => {
-            extract_email_from_string(s).or_else(|| Some(s.clone()))
-        }
+        Value::String(s) => extract_email_from_string(s).or_else(|| Some(s.clone())),
         Value::Object(obj) => obj.get("email").and_then(|v| v.as_str()).map(String::from),
         _ => None,
     }
@@ -325,7 +321,7 @@ fn extract_emails_from_array(array: &Value) -> Option<Vec<String>> {
     if let Value::Array(items) = array {
         let emails = items
             .iter()
-            .filter_map(|item| extract_email_from_field(item))
+            .filter_map(extract_email_from_field)
             .collect::<Vec<_>>();
         if !emails.is_empty() {
             return Some(emails);
@@ -367,8 +363,7 @@ fn extract_dependencies(json: &Value, is_optional: bool) -> Vec<Dependency> {
                     let stripped_version = strip_version_modifier(version_str);
                     let encoded_version = urlencoding::encode(&stripped_version).to_string();
 
-                    let mut package_url =
-                        PackageUrl::new(NpmParser::PACKAGE_TYPE, name).ok()?;
+                    let mut package_url = PackageUrl::new(NpmParser::PACKAGE_TYPE, name).ok()?;
                     package_url.with_version(&encoded_version);
 
                     Some(Dependency {
@@ -383,5 +378,5 @@ fn extract_dependencies(json: &Value, is_optional: bool) -> Vec<Dependency> {
 
 /// Strips version modifiers (e.g., ~, ^, >=) from a version string.
 fn strip_version_modifier(version: &str) -> String {
-    version.trim_start_matches(|c| c == '~' || c == '^' || c == '>' || c == '=').to_string()
+    version.trim_start_matches(['~', '^', '>', '=']).to_string()
 }

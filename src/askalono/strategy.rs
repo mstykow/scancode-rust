@@ -24,7 +24,7 @@ pub struct IdentifiedLicense<'a> {
     pub data: &'a TextData,
 }
 
-impl<'a> fmt::Debug for IdentifiedLicense<'a> {
+impl fmt::Debug for IdentifiedLicense<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("IdentifiedLicense")
             .field("name", &self.name)
@@ -326,9 +326,7 @@ impl<'a> ScanStrategy<'a> {
                     hit_threshold = true;
                     trace!(
                         "hit_threshold at ({}, {}) with score {}",
-                        start,
-                        end,
-                        analysis.score
+                        start, end, analysis.score
                     );
                 }
 
@@ -337,9 +335,7 @@ impl<'a> ScanStrategy<'a> {
                         // exiting threshold
                         trace!(
                             "exiting threshold at ({}, {}) with score {}",
-                            start,
-                            end,
-                            analysis.score
+                            start, end, analysis.score
                         );
                         break 'start;
                     } else {
@@ -352,10 +348,7 @@ impl<'a> ScanStrategy<'a> {
 
         // at this point we have a *rough* bounds for a match.
         // now we can optimize to find the best one
-        let matched = match found.2 {
-            Some(m) => m,
-            None => return None,
-        };
+        let matched = found.2?;
         let check = matched.data;
         let view = text.with_view(found.0, found.1);
         let (optimized, optimized_score) = view.optimize_bounds(check);
@@ -431,8 +424,9 @@ mod tests {
         let store = create_dummy_store();
         // this TextData matches license-2 with an overall score of ~0.46 and optimized
         // score of ~0.57
-        let test_data =
-            TextData::new("lorem\nipsum abc def ghi jkl\n1234 5678 1234\n0000\n1010101010\n\n8888 9999\nwhatsit hello\narst neio qwfp colemak is the best keyboard layout");
+        let test_data = TextData::new(
+            "lorem\nipsum abc def ghi jkl\n1234 5678 1234\n0000\n1010101010\n\n8888 9999\nwhatsit hello\narst neio qwfp colemak is the best keyboard layout",
+        );
 
         // check that we can spot the gibberish license in the sea of other gibberish
         let strategy = ScanStrategy::new(&store)
@@ -455,8 +449,9 @@ mod tests {
         let store = create_dummy_store();
         // this TextData matches license-2 with an overall score of ~0.46 and optimized
         // score of ~0.57
-        let test_data =
-            TextData::new("lorem\nipsum abc def ghi jkl\n1234 5678 1234\n0000\n1010101010\n\n8888 9999\nwhatsit hello\narst neio qwfp colemak is the best keyboard layout\naaaaa\nbbbbb\nccccc");
+        let test_data = TextData::new(
+            "lorem\nipsum abc def ghi jkl\n1234 5678 1234\n0000\n1010101010\n\n8888 9999\nwhatsit hello\narst neio qwfp colemak is the best keyboard layout\naaaaa\nbbbbb\nccccc",
+        );
 
         // check that we can spot the gibberish license in the sea of other gibberish
         let strategy = ScanStrategy::new(&store)
@@ -471,7 +466,7 @@ mod tests {
         // inspect the array and ensure we got both licenses
         let mut found1 = 0;
         let mut found2 = 0;
-        for (_, contained) in result.containing.iter().enumerate() {
+        for contained in result.containing.iter() {
             match contained.license.name {
                 "license-1" => {
                     assert!(contained.score > 0.5, "license-1 score meets threshold");
@@ -500,8 +495,9 @@ mod tests {
         let store = create_dummy_store();
         // this TextData matches license-2 with an overall score of ~0.46 and optimized
         // score of ~0.57
-        let test_data =
-            TextData::new("lorem\nipsum abc def ghi jkl\n1234 5678 1234\n0000\n1010101010\n\n8888 9999\nwhatsit hello\narst neio qwfp colemak is the best keyboard layout\naaaaa\nbbbbb\nccccc");
+        let test_data = TextData::new(
+            "lorem\nipsum abc def ghi jkl\n1234 5678 1234\n0000\n1010101010\n\n8888 9999\nwhatsit hello\narst neio qwfp colemak is the best keyboard layout\naaaaa\nbbbbb\nccccc",
+        );
 
         // check that we can spot the gibberish license in the sea of other gibberish
         let strategy = ScanStrategy::new(&store)
@@ -516,7 +512,7 @@ mod tests {
         // inspect the array and ensure we got both licenses
         let mut found1 = 0;
         let mut found2 = 0;
-        for (_, contained) in result.containing.iter().enumerate() {
+        for contained in result.containing.iter() {
             match contained.license.name {
                 "license-1" => {
                     assert!(contained.score > 0.5, "license-1 score meets threshold");

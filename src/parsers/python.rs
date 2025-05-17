@@ -50,28 +50,32 @@ fn extract_from_pyproject_toml(path: &Path) -> PackageData {
     let toml_content = match read_toml_file(path) {
         Ok(content) => content,
         Err(e) => {
-            warn!("Failed to read or parse pyproject.toml at {:?}: {}", path, e);
+            warn!(
+                "Failed to read or parse pyproject.toml at {:?}: {}",
+                path, e
+            );
             return default_package_data();
         }
     };
 
     // Handle both PEP 621 (project table) and poetry formats
-    let project_table = if let Some(project) = toml_content.get(FIELD_PROJECT).and_then(|v| v.as_table()) {
-        // Standard PEP 621 format with [project] table
-        project.clone()
-    } else if toml_content.get(FIELD_NAME).is_some() {
-        // Poetry or other format with top-level fields
-        match toml_content.as_table() {
-            Some(table) => table.clone(),
-            None => {
-                warn!("Failed to convert TOML content to table in {:?}", path);
-                return default_package_data();
+    let project_table =
+        if let Some(project) = toml_content.get(FIELD_PROJECT).and_then(|v| v.as_table()) {
+            // Standard PEP 621 format with [project] table
+            project.clone()
+        } else if toml_content.get(FIELD_NAME).is_some() {
+            // Poetry or other format with top-level fields
+            match toml_content.as_table() {
+                Some(table) => table.clone(),
+                None => {
+                    warn!("Failed to convert TOML content to table in {:?}", path);
+                    return default_package_data();
+                }
             }
-        }
-    } else {
-        warn!("No project data found in pyproject.toml at {:?}", path);
-        return default_package_data();
-    };
+        } else {
+            warn!("No project data found in pyproject.toml at {:?}", path);
+            return default_package_data();
+        };
 
     let name = project_table
         .get(FIELD_NAME)
@@ -84,7 +88,7 @@ fn extract_from_pyproject_toml(path: &Path) -> PackageData {
         .map(String::from);
 
     let license_detections = extract_license_info(&project_table);
-    
+
     // URLs can be in different formats depending on the tool (poetry, flit, etc.)
     let (homepage_url, repository_url) = extract_urls(&project_table);
 
@@ -155,9 +159,7 @@ fn create_license_detection(license_str: &str) -> LicenseDetection {
     }
 }
 
-fn extract_urls(
-    project: &TomlMap<String, TomlValue>,
-) -> (Option<String>, Option<String>) {
+fn extract_urls(project: &TomlMap<String, TomlValue>) -> (Option<String>, Option<String>) {
     let mut homepage_url = None;
     let mut repository_url = None;
 
@@ -198,8 +200,9 @@ fn extract_parties(project: &TomlMap<String, TomlValue>) -> Vec<Party> {
     if let Some(authors) = project.get(FIELD_AUTHORS).and_then(|v| v.as_array()) {
         for author in authors {
             if let Some(author_str) = author.as_str() {
-                extract_email_from_author_string(author_str)
-                    .map(|email| parties.push(Party { email }));
+                if let Some(email) = extract_email_from_author_string(author_str) {
+                    parties.push(Party { email })
+                }
             }
         }
     }
@@ -208,8 +211,9 @@ fn extract_parties(project: &TomlMap<String, TomlValue>) -> Vec<Party> {
     if let Some(maintainers) = project.get(FIELD_MAINTAINERS).and_then(|v| v.as_array()) {
         for maintainer in maintainers {
             if let Some(maintainer_str) = maintainer.as_str() {
-                extract_email_from_author_string(maintainer_str)
-                    .map(|email| parties.push(Party { email }));
+                if let Some(email) = extract_email_from_author_string(maintainer_str) {
+                    parties.push(Party { email })
+                }
             }
         }
     }
@@ -264,12 +268,12 @@ fn parse_dependency_array(array: &[TomlValue], is_optional: bool) -> Vec<Depende
 
             // Basic parsing of PEP 508 dependency specifications
             // For example "requests>=2.0.0", "django==3.2.1", "flask"
-            let mut parts = dep_str.split(|c| c == '>' || c == '=' || c == '<' || c == '~');
+            let mut parts = dep_str.split(['>', '=', '<', '~']);
             let name = parts.next()?.trim().to_string();
-            
+
             // Extract version if present
             let version = parts.next().map(|v| v.trim().to_string());
-            
+
             let mut package_url = match PackageUrl::new(PythonParser::PACKAGE_TYPE, &name) {
                 Ok(purl) => purl,
                 Err(_) => return None,
@@ -303,7 +307,7 @@ fn extract_from_setup_py(path: &Path) -> PackageData {
     let name = extract_setup_value(&content, "name");
     let version = extract_setup_value(&content, "version");
     let license_expression = extract_setup_value(&content, "license");
-    
+
     // Create license detection if we found a license
     let license_detections = license_expression.as_ref().map_or(Vec::new(), |license| {
         vec![LicenseDetection {
@@ -350,23 +354,23 @@ fn extract_setup_value(content: &str, key: &str) -> Option<String> {
     // This is a very basic parser that looks for patterns like:
     // name="package_name", or name = "package_name"
     let patterns = vec![
-        format!("{}=\"", key),  // name="value"
-        format!("{} =\"", key), // name ="value"
-        format!("{}= \"", key), // name= "value"
+        format!("{}=\"", key),   // name="value"
+        format!("{} =\"", key),  // name ="value"
+        format!("{}= \"", key),  // name= "value"
         format!("{} = \"", key), // name = "value"
-        format!("{}='", key),   // name='value'
-        format!("{} ='", key),  // name ='value'
-        format!("{}= '", key),  // name= 'value'
-        format!("{} = '", key), // name = 'value'
+        format!("{}='", key),    // name='value'
+        format!("{} ='", key),   // name ='value'
+        format!("{}= '", key),   // name= 'value'
+        format!("{} = '", key),  // name = 'value'
     ];
 
     for pattern in patterns {
         if let Some(start_idx) = content.find(&pattern) {
             let value_start = start_idx + pattern.len();
             let remaining = &content[value_start..];
-            
+
             // Find closing quote
-            if let Some(end_idx) = remaining.find(|c| c == '"' || c == '\'') {
+            if let Some(end_idx) = remaining.find(['"', '\'']) {
                 return Some(remaining[..end_idx].to_string());
             }
         }

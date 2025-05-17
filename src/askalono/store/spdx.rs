@@ -3,12 +3,12 @@
 
 use std::{
     ffi::OsStr,
-    fs::{read_dir, File},
+    fs::{File, read_dir},
     io::prelude::*,
     path::Path,
 };
 
-use anyhow::{format_err, Error};
+use anyhow::{Error, format_err};
 use log::{debug, info};
 
 use crate::askalono::{
@@ -32,7 +32,7 @@ impl Store {
     /// benefit of allowing you to diff your result against what askalono has
     /// stored.
     pub fn load_spdx(&mut self, dir: &Path, include_texts: bool) -> Result<(), Error> {
-        use serde_json::{from_str, Value};
+        use serde_json::{Value, from_str};
 
         // locate all json files in the directory
         let mut paths: Vec<_> = read_dir(dir)?

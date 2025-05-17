@@ -3,7 +3,7 @@
 
 use std::collections::HashMap;
 
-use anyhow::{format_err, Error};
+use anyhow::{Error, format_err};
 use serde::{Deserialize, Serialize};
 
 use crate::askalono::{license::LicenseType, license::TextData};
