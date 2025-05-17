@@ -135,6 +135,63 @@ To contribute to `scancode-rust`, follow these steps to set up the repository fo
    cargo run -- [OPTIONS] <DIR_PATH>
    ```
 
+## Publishing a Release
+
+This project uses [cargo-dist](https://github.com/axodotdev/cargo-dist) to automate the release process for both GitHub releases and crates.io.
+
+### Prerequisites
+
+1. Install cargo-dist:
+
+   ```sh
+   cargo install cargo-dist
+   ```
+
+2. Ensure you have the necessary permissions on the GitHub repository and for crates.io.
+
+3. Authenticate with GitHub CLI (`gh`) and ensure you're logged in to crates.io:
+
+   ```sh
+   gh auth login
+   cargo login
+   ```
+
+### Release Process
+
+1. Update version in `Cargo.toml`:
+
+   ```sh
+   # Edit Cargo.toml to bump the version number
+   vim Cargo.toml
+   ```
+
+2. Create a new git tag matching the version:
+
+   ```sh
+   git add Cargo.toml
+   git commit -m "Bump version to x.y.z"
+   git tag -a vx.y.z -m "Release version x.y.z"
+   ```
+
+3. Push the tag to trigger the release workflow:
+
+   ```sh
+   git push origin main --tags
+   ```
+
+4. The GitHub Actions workflow will:
+
+   - Build binaries for all supported platforms
+   - Create a GitHub release with the binaries
+
+5. Monitor the GitHub Actions workflow to ensure the GitHub release completes successfully.
+
+6. Publish to crates.io manually:
+
+   ```sh
+   cargo publish
+   ```
+
 ## Updating the License Data
 
 If you want to update the embedded license data, simply run the `setup.sh` script:
