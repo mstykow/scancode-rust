@@ -2,7 +2,9 @@ use std::collections::HashSet;
 
 /// Combines multiple license expressions into a single SPDX expression.
 /// Deduplicates, sorts, and combines the expressions with " AND ".
-pub fn combine_license_expressions(expressions: impl IntoIterator<Item = String>) -> Option<String> {
+pub fn combine_license_expressions(
+    expressions: impl IntoIterator<Item = String>,
+) -> Option<String> {
     let unique_expressions: HashSet<String> = expressions.into_iter().collect();
     if unique_expressions.is_empty() {
         return None;

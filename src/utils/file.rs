@@ -13,7 +13,7 @@ pub fn get_creation_date(metadata: &fs::Metadata) -> Option<String> {
 
         Utc.timestamp_opt(seconds_since_epoch, 0)
             .single()
-            .unwrap_or_else(|| Utc::now())
+            .unwrap_or_else(Utc::now)
             .to_rfc3339()
     })
 }

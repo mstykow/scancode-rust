@@ -3,7 +3,7 @@
 
 use std::{
     cmp::min,
-    collections::{hash_map::Iter, HashMap, VecDeque},
+    collections::{HashMap, VecDeque, hash_map::Iter},
 };
 
 use serde::{Deserialize, Serialize};

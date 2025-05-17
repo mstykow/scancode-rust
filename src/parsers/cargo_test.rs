@@ -12,12 +12,12 @@ mod tests {
         temp_file
             .write_all(content.as_bytes())
             .expect("Failed to write to temp file");
-        
+
         // Rename the file to Cargo.toml so that is_match works correctly
         let dir = temp_file.path().parent().unwrap();
         let cargo_path = dir.join("Cargo.toml");
         fs::rename(temp_file.path(), &cargo_path).expect("Failed to rename temp file");
-        
+
         (temp_file, cargo_path)
     }
 
@@ -25,7 +25,7 @@ mod tests {
     fn test_is_match() {
         let valid_path = PathBuf::from("/some/path/Cargo.toml");
         let invalid_path = PathBuf::from("/some/path/not_cargo.toml");
-        
+
         assert!(CargoParser::is_match(&valid_path));
         assert!(!CargoParser::is_match(&invalid_path));
     }
@@ -41,23 +41,32 @@ repository = "https://github.com/user/test-package"
 homepage = "https://example.com"
 authors = ["Test User <test@example.com>"]
         "#;
-        
+
         let (_temp_file, cargo_path) = create_temp_cargo_toml(content);
         let package_data = CargoParser::extract_package_data(&cargo_path);
-        
+
         assert_eq!(package_data.package_type, Some("cargo".to_string()));
         assert_eq!(package_data.name, Some("test-package".to_string()));
         assert_eq!(package_data.version, Some("0.1.0".to_string()));
-        assert_eq!(package_data.homepage_url, Some("https://example.com".to_string()));
-        assert_eq!(package_data.download_url, Some("https://github.com/user/test-package".to_string()));
-        
+        assert_eq!(
+            package_data.homepage_url,
+            Some("https://example.com".to_string())
+        );
+        assert_eq!(
+            package_data.download_url,
+            Some("https://github.com/user/test-package".to_string())
+        );
+
         // Check license detection
         assert_eq!(package_data.license_detections.len(), 1);
         assert_eq!(package_data.license_detections[0].license_expression, "MIT");
-        
+
         // Check purl
-        assert_eq!(package_data.purl, Some("pkg:cargo/test-package@0.1.0".to_string()));
-        
+        assert_eq!(
+            package_data.purl,
+            Some("pkg:cargo/test-package@0.1.0".to_string())
+        );
+
         // Check authors extraction
         assert_eq!(package_data.parties.len(), 1);
         assert_eq!(package_data.parties[0].email, "test@example.com");
@@ -78,26 +87,30 @@ log = { version = "0.4", features = ["std"] }
 [dev-dependencies]
 tokio = { version = "1.0", features = ["full"] }
 "#;
-        
+
         let (_temp_file, cargo_path) = create_temp_cargo_toml(content);
         let package_data = CargoParser::extract_package_data(&cargo_path);
-        
+
         // We should have 3 dependencies in total (2 regular, 1 dev)
         assert_eq!(package_data.dependencies.len(), 3);
-        
+
         // Find the regular dependency "serde"
-        let serde_dep = package_data.dependencies.iter()
+        let serde_dep = package_data
+            .dependencies
+            .iter()
             .find(|dep| dep.purl.as_ref().unwrap().contains("serde"))
             .expect("Should find serde dependency");
-        
+
         assert_eq!(serde_dep.purl, Some("pkg:cargo/serde@1.0".to_string()));
         assert!(!serde_dep.is_optional);
-        
+
         // Find the dev dependency "tokio"
-        let tokio_dep = package_data.dependencies.iter()
+        let tokio_dep = package_data
+            .dependencies
+            .iter()
             .find(|dep| dep.purl.as_ref().unwrap().contains("tokio"))
             .expect("Should find tokio dependency");
-        
+
         assert_eq!(tokio_dep.purl, Some("pkg:cargo/tokio@1.0".to_string()));
         assert!(tokio_dep.is_optional);
     }
@@ -118,25 +131,29 @@ reqwest = { version = "0.11", optional = true }
 [dev-dependencies]
 mockito = "0.31.0"
 "#;
-        
+
         let (_temp_file, cargo_path) = create_temp_cargo_toml(content);
         let package_data = CargoParser::extract_package_data(&cargo_path);
-        
+
         // Check we have all dependencies extracted (3 regular + 1 dev)
         assert_eq!(package_data.dependencies.len(), 4);
-        
+
         // Verify regex dependency
-        let regex_dep = package_data.dependencies.iter()
+        let regex_dep = package_data
+            .dependencies
+            .iter()
             .find(|dep| dep.purl.as_ref().unwrap().contains("regex"))
             .expect("Should find regex dependency");
-        
+
         assert_eq!(regex_dep.purl, Some("pkg:cargo/regex@1.5.4".to_string()));
-        
+
         // Verify serde dependency with specific version
-        let serde_dep = package_data.dependencies.iter()
+        let serde_dep = package_data
+            .dependencies
+            .iter()
             .find(|dep| dep.purl.as_ref().unwrap().contains("serde"))
             .expect("Should find serde dependency");
-        
+
         assert_eq!(serde_dep.purl, Some("pkg:cargo/serde@1.0.136".to_string()));
     }
 
@@ -146,17 +163,17 @@ mockito = "0.31.0"
         let content = "";
         let (_temp_file, cargo_path) = create_temp_cargo_toml(content);
         let package_data = CargoParser::extract_package_data(&cargo_path);
-        
+
         // Should return default/empty package data
         assert_eq!(package_data.name, None);
         assert_eq!(package_data.version, None);
         assert!(package_data.dependencies.is_empty());
-        
+
         // Test with invalid TOML
         let content = "this is not valid TOML";
         let (_temp_file, cargo_path) = create_temp_cargo_toml(content);
         let package_data = CargoParser::extract_package_data(&cargo_path);
-        
+
         // Should return default/empty package data
         assert_eq!(package_data.name, None);
         assert_eq!(package_data.version, None);

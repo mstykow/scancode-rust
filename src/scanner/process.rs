@@ -1,6 +1,6 @@
 use crate::askalono::{ScanStrategy, TextData};
 use crate::models::{FileInfo, FileInfoBuilder, FileType, LicenseDetection, Match};
-use crate::parsers::{CargoParser, NpmParser, PythonParser, PackageParser};
+use crate::parsers::{CargoParser, NpmParser, PackageParser, PythonParser};
 use crate::scanner::ProcessResult;
 use crate::utils::file::{get_creation_date, is_path_excluded};
 use crate::utils::hash::{calculate_md5, calculate_sha1, calculate_sha256};
@@ -105,7 +105,7 @@ fn process_file(path: &Path, metadata: &fs::Metadata, scan_strategy: &ScanStrate
         scan_errors.push(e.to_string());
     };
 
-    return file_info_builder
+    file_info_builder
         .name(path.file_name().unwrap().to_string_lossy().to_string())
         .base_name(
             path.file_stem()
@@ -129,7 +129,7 @@ fn process_file(path: &Path, metadata: &fs::Metadata, scan_strategy: &ScanStrate
         .date(get_creation_date(metadata))
         .scan_errors(scan_errors)
         .build()
-        .expect("FileInformationBuild not completely initialized");
+        .expect("FileInformationBuild not completely initialized")
 }
 
 fn extract_information_from_content(
@@ -179,9 +179,7 @@ fn extract_license_information(
     }
 
     let license_result = scan_strategy.scan(&TextData::from(text_content.as_str()))?;
-    let license_expr = license_result
-        .license
-        .and_then(|x| Some(x.name.to_string()));
+    let license_expr = license_result.license.map(|x| x.name.to_string());
 
     let license_detections = license_result
         .containing

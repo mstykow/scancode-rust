@@ -39,13 +39,13 @@ struct PartialMatch<'a> {
     pub data: &'a TextData,
 }
 
-impl<'a> PartialOrd for PartialMatch<'a> {
+impl PartialOrd for PartialMatch<'_> {
     fn partial_cmp(&self, other: &PartialMatch<'_>) -> Option<Ordering> {
         self.score.partial_cmp(&other.score)
     }
 }
 
-impl<'a> PartialEq for PartialMatch<'a> {
+impl PartialEq for PartialMatch<'_> {
     fn eq(&self, other: &PartialMatch<'_>) -> bool {
         self.score.eq(&other.score)
             && self.name == other.name
@@ -53,7 +53,7 @@ impl<'a> PartialEq for PartialMatch<'a> {
     }
 }
 
-impl<'a> fmt::Debug for Match<'a> {
+impl fmt::Debug for Match<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
