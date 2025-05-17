@@ -1,0 +1,26 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    ":dependencyDashboard",
+    ":automergeTypes",
+    ":automergeLinters",
+    ":automergeTesters"
+  ],
+  "addLabels": ["dependencies"],
+  "automergeType": "branch",
+  "prConcurrentLimit": 5,
+  "prCreation": "not-pending",
+  "rangeStrategy": "bump",
+  "minimumReleaseAge": "1 day",
+  "packageRules": [
+    {
+      "updateTypes": ["minor", "patch"],
+      "automerge": true
+    },
+    {
+      "matchPaths": [".github/workflows/**"],
+      "enabled": false
+    }
+  ]
+}
