@@ -1,6 +1,9 @@
 mod cargo;
 #[cfg(test)]
 mod cargo_test;
+mod maven;
+#[cfg(test)]
+mod maven_test;
 mod npm;
 #[cfg(test)]
 mod npm_test;
@@ -20,5 +23,6 @@ pub trait PackageParser {
 }
 
 pub use self::cargo::CargoParser;
+pub use self::maven::MavenParser;
 pub use self::npm::NpmParser;
 pub use self::python::PythonParser;
