@@ -150,28 +150,14 @@ fn extract_namespace(name: &Option<String>) -> Option<String> {
 fn create_package_url(
     name: &Option<String>,
     version: &Option<String>,
-    namespace: &Option<String>,
+    _namespace: &Option<String>,
 ) -> Option<String> {
     name.as_ref().map(|name| {
-        // For npm, the package URL format is different based on if it's a scoped package
-        let mut package_url = if name.starts_with('@') && namespace.is_some() {
-            // For scoped packages (@namespace/name), we need to include the namespace in the name
-            // but also put it in the URL parameters
-            let name_without_at = name.trim_start_matches('@');
-            PackageUrl::new(NpmParser::PACKAGE_TYPE, name_without_at)
-                .expect("Failed to create PackageUrl")
-        } else {
-            PackageUrl::new(NpmParser::PACKAGE_TYPE, name).expect("Failed to create PackageUrl")
-        };
-
+        let mut package_url =
+            PackageUrl::new(NpmParser::PACKAGE_TYPE, name).expect("Failed to create PackageUrl");
         if let Some(v) = version {
             package_url.with_version(v);
         }
-
-        if let Some(n) = namespace {
-            package_url.with_namespace(n);
-        }
-
         package_url.to_string()
     })
 }
