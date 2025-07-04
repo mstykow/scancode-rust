@@ -80,13 +80,9 @@ mod tests {
 
     #[test]
     fn test_extract_from_npm_testdata() {
-<<<<<<< HEAD
         let package_path = PathBuf::from("testdata/npm/package.json")
             .canonicalize()
             .unwrap();
-=======
-        let package_path = PathBuf::from("testdata/npm/package.json").canonicalize().unwrap();
->>>>>>> 1fd9aee (fix: correct package URL handling and dependency parsing)
         let package_data = NpmParser::extract_package_data(&package_path);
 
         assert_eq!(package_data.package_type, Some("npm".to_string()));

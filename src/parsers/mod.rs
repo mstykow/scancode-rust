@@ -1,15 +1,15 @@
 mod cargo;
 #[cfg(test)]
 mod cargo_test;
+mod maven;
+#[cfg(test)]
+mod maven_test;
 mod npm;
 #[cfg(test)]
 mod npm_test;
 mod python;
 #[cfg(test)]
 mod python_test;
-mod maven;
-#[cfg(test)]
-mod maven_test;
 
 use std::path::Path;
 
@@ -23,6 +23,6 @@ pub trait PackageParser {
 }
 
 pub use self::cargo::CargoParser;
+pub use self::maven::MavenParser;
 pub use self::npm::NpmParser;
 pub use self::python::PythonParser;
-pub use self::maven::MavenParser;

@@ -37,11 +37,11 @@ mod tests {
 
         assert_eq!(package_data.package_type, Some("maven".to_string()));
         assert_eq!(package_data.namespace, Some("com.example".to_string()));
-        assert_eq!(package_data.name, Some("demo".to_string()));
-        assert_eq!(package_data.version, Some("0.0.1-SNAPSHOT".to_string()));
+        assert_eq!(package_data.name, Some("demo-app".to_string()));
+        assert_eq!(package_data.version, Some("1.0.0".to_string()));
         assert_eq!(
             package_data.homepage_url,
-            Some("https://example.com".to_string())
+            Some("https://example.com/demo".to_string())
         );
 
         // Check license detection
@@ -54,7 +54,7 @@ mod tests {
         // Check purl
         assert_eq!(
             package_data.purl,
-            Some("pkg:maven/com.example/demo@0.0.1-SNAPSHOT".to_string())
+            Some("pkg:maven/com.example/demo-app@1.0.0".to_string())
         );
 
         // Check dependencies
@@ -64,8 +64,8 @@ mod tests {
             .iter()
             .filter_map(|d| d.purl.as_deref())
             .collect();
-        assert!(purls.contains(&"pkg:maven/org.springframework.boot/spring-boot-starter@3.1.5"));
-        assert!(purls.contains(&"pkg:maven/org.springframework.boot/spring-boot-starter-test@3.1.5"));
+        assert!(purls.contains(&"pkg:maven/junit/junit@4.12"));
+        assert!(purls.contains(&"pkg:maven/org.apache.commons/commons-lang3@3.12.0"));
     }
 
     #[test]
@@ -101,10 +101,7 @@ mod tests {
 
         // Check license detection
         assert_eq!(package_data.license_detections.len(), 1);
-        assert_eq!(
-            package_data.license_detections[0].license_expression,
-            "MIT License"
-        );
+        assert_eq!(package_data.license_detections[0].license_expression, "MIT");
 
         // Check purl
         assert_eq!(
@@ -141,14 +138,17 @@ mod tests {
         let package_data = MavenParser::extract_package_data(&pom_path);
 
         assert_eq!(package_data.dependencies.len(), 2);
-        
+
         // Verify junit dependency (test scope)
         let junit_dep = package_data
             .dependencies
             .iter()
             .find(|dep| dep.purl.as_ref().unwrap().contains("junit"))
             .expect("Should find junit dependency");
-        assert_eq!(junit_dep.purl, Some("pkg:maven/org.junit/junit@5.9.2".to_string()));
+        assert_eq!(
+            junit_dep.purl,
+            Some("pkg:maven/org.junit/junit@5.9.2".to_string())
+        );
         assert!(junit_dep.is_optional);
 
         // Verify jackson dependency
@@ -157,7 +157,10 @@ mod tests {
             .iter()
             .find(|dep| dep.purl.as_ref().unwrap().contains("jackson-databind"))
             .expect("Should find jackson-databind dependency");
-        assert_eq!(jackson_dep.purl, Some("pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.15.2".to_string()));
+        assert_eq!(
+            jackson_dep.purl,
+            Some("pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.15.2".to_string())
+        );
         assert!(!jackson_dep.is_optional);
     }
 

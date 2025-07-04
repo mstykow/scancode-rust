@@ -1,16 +1,13 @@
-use crate::models::{Dependency, LicenseDetection, Match, PackageData, Party};
+use crate::models::{Dependency, LicenseDetection, Match, PackageData};
 use log::warn;
 use packageurl::PackageUrl;
-use quick_xml::events::Event;
 use quick_xml::Reader;
-use std::collections::HashMap;
+use quick_xml::events::Event;
 use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
 
 use super::PackageParser;
-
-const POM_NS: &str = "http://maven.apache.org/POM/4.0.0";
 
 pub struct MavenParser;
 
@@ -32,7 +29,7 @@ impl PackageParser for MavenParser {
         let mut buf = Vec::new();
         let mut package_data = default_package_data();
         package_data.package_type = Some(Self::PACKAGE_TYPE.to_string());
-        
+
         let mut current_element = Vec::new();
         let mut in_dependencies = false;
         let mut current_dependency: Option<Dependency> = None;
@@ -41,10 +38,10 @@ impl PackageParser for MavenParser {
         loop {
             match reader.read_event_into(&mut buf) {
                 Ok(Event::Start(e)) => {
-                    let element_name = e.name();
-                    current_element.push(element_name.as_ref().to_vec());
-                    
-                    match element_name.as_ref() {
+                    let element_name = e.name().as_ref().to_vec();
+                    current_element.push(element_name.clone());
+
+                    match element_name.as_slice() {
                         b"dependencies" => in_dependencies = true,
                         b"dependency" if in_dependencies => {
                             current_dependency = Some(Dependency {
@@ -68,17 +65,12 @@ impl PackageParser for MavenParser {
                             Some(b"groupId") => dep.scope = Some(text),
                             Some(b"artifactId") => {
                                 if let Some(group_id) = &dep.scope {
-                                    dep.scope = Some(format!("{}:{}", group_id, text));
+                                    dep.purl = Some(format!("pkg:maven/{}/{}", group_id, text));
                                 }
                             }
                             Some(b"version") => {
-                                if let Some(scope) = &dep.scope {
-                                    if let Some((group_id, artifact_id)) = scope.split_once(':') {
-                                        dep.purl = Some(format!(
-                                            "pkg:maven/{}/{}@{}",
-                                            group_id, artifact_id, text
-                                        ));
-                                    }
+                                if let Some(purl) = &mut dep.purl {
+                                    *purl = format!("{}@{}", purl, text);
                                 }
                             }
                             Some(b"scope") => dep.is_optional = text == "test",
@@ -90,9 +82,15 @@ impl PackageParser for MavenParser {
                             Some(b"groupId") => package_data.namespace = Some(text),
                             Some(b"artifactId") => package_data.name = Some(text),
                             Some(b"version") => package_data.version = Some(text),
-                            Some(b"url") => package_data.homepage_url = Some(text),
-                            Some(b"name") if current_element.ends_with(&[b"license".to_vec()]) => {
-                                package_data.license_detections = extract_license_info(&text, license_line);
+                            Some(b"url") if current_element.len() == 2 => {
+                                package_data.homepage_url = Some(text)
+                            }
+                            Some(b"name")
+                                if current_element.len() >= 2
+                                    && current_element[current_element.len() - 2] == b"license" =>
+                            {
+                                package_data.license_detections =
+                                    extract_license_info(&text, license_line);
                             }
                             _ => {}
                         }
@@ -102,7 +100,7 @@ impl PackageParser for MavenParser {
                     if !current_element.is_empty() {
                         current_element.pop();
                     }
-                    
+
                     match e.name().as_ref() {
                         b"dependencies" => in_dependencies = false,
                         b"dependency" => {
@@ -129,10 +127,10 @@ impl PackageParser for MavenParser {
             &package_data.name,
             &package_data.version,
         ) {
-            package_data.purl = PackageUrl::new("maven", &format!("{}/{}", group_id, artifact_id))
-                .and_then(|mut purl| {
+            package_data.purl = PackageUrl::new("maven", format!("{}/{}", group_id, artifact_id))
+                .map(|mut purl| {
                     purl.with_version(version);
-                    Ok(purl.to_string())
+                    purl.to_string()
                 })
                 .ok();
         }
@@ -141,26 +139,33 @@ impl PackageParser for MavenParser {
     }
 
     fn is_match(path: &Path) -> bool {
-        path.file_name()
-            .and_then(|name| name.to_str())
-            .map_or(false, |name| name == "pom.xml")
+        path.file_name().and_then(|name| name.to_str()) == Some("pom.xml")
     }
 }
 
 fn extract_license_info(license_text: &str, line: usize) -> Vec<LicenseDetection> {
-    let mut detections = Vec::new();
-    detections.push(LicenseDetection {
-        license_expression: license_text.to_string(),
+    let spdx_id = map_license_name_to_spdx(license_text);
+    vec![LicenseDetection {
+        license_expression: spdx_id.to_string(),
         matches: vec![Match {
             score: 100.0,
             start_line: line,
             end_line: line,
-            license_expression: license_text.to_string(),
+            license_expression: spdx_id.to_string(),
             rule_identifier: None,
             matched_text: None,
         }],
-    });
-    detections
+    }]
+}
+
+fn map_license_name_to_spdx(name: &str) -> &str {
+    match name {
+        "Apache License, Version 2.0" => "Apache-2.0",
+        "MIT License" => "MIT",
+        "GNU General Public License v3.0" => "GPL-3.0",
+        "BSD 3-Clause License" => "BSD-3-Clause",
+        _ => name,
+    }
 }
 
 fn default_package_data() -> PackageData {
