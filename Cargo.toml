@@ -31,7 +31,7 @@ include_dir = "0.7.4"
 indicatif = "0.17.11"
 md-5 = "0.10.6"
 mime_guess = "2.0.5"
-packageurl = "0.4.1"
+packageurl = "0.6.0"
 rayon = "1.10.0"
 rustc_version_runtime = "0.3.0"
 serde = { version = "1.0.219", features = ["derive"] }
