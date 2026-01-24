@@ -282,7 +282,6 @@ fn parse_dependency_table(
         .filter_map(|(name, version)| {
             // Create version string if present
             let version_str = version.as_str().map(|s| s.to_string());
-
             // Create package URL with name
             let mut package_url = PackageUrl::new(PythonParser::PACKAGE_TYPE, name).ok()?;
 

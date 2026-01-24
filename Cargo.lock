@@ -729,6 +729,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "quick-xml"
+version = "0.31.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1004a344b30a54e2ee58d66a71b32d2db2feb0a31f9a2d302bf0536f15de2a33"
+dependencies = [
+ "memchr",
+]
+
+[[package]]
 name = "quote"
 version = "1.0.40"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -876,6 +885,7 @@ dependencies = [
  "md-5",
  "mime_guess",
  "packageurl",
+ "quick-xml",
  "rayon",
  "regex",
  "rmp-serde",
@@ -889,6 +899,7 @@ dependencies = [
  "toml",
  "unicode-normalization",
  "urlencoding",
+ "xml-rs",
  "zstd",
 ]
 
@@ -1382,6 +1393,12 @@ checksum = "6f42320e61fe2cfd34354ecb597f86f413484a798ba44a8ca1165c58d42da6c1"
 dependencies = [
  "bitflags",
 ]
+
+[[package]]
+name = "xml-rs"
+version = "0.8.26"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a62ce76d9b56901b19a74f19431b0d8b3bc7ca4ad685a746dfd78ca8f4fc6bda"
 
 [[package]]
 name = "zstd"
