@@ -93,7 +93,7 @@ fn create_package_url(name: &Option<String>, version: &Option<String>) -> Option
             PackageUrl::new(CargoParser::PACKAGE_TYPE, name).expect("Failed to create PackageUrl");
 
         if let Some(v) = version {
-            package_url.with_version(v);
+            package_url.with_version(v).expect("Failed to set version");
         }
 
         package_url.to_string()
@@ -172,7 +172,9 @@ fn extract_dependencies(toml_content: &Value, is_optional: bool) -> Vec<Dependen
             if let Some(version) = version {
                 let mut package_url = PackageUrl::new(CargoParser::PACKAGE_TYPE, name)
                     .expect("Failed to create PackageUrl");
-                package_url.with_version(&version);
+                package_url
+                    .with_version(&version)
+                    .expect("Failed to set version");
 
                 dependencies.push(Dependency {
                     purl: Some(package_url.to_string()),
