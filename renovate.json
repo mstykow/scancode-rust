@@ -3,24 +3,68 @@
   "extends": [
     "config:recommended",
     ":dependencyDashboard",
-    ":automergeTypes",
-    ":automergeLinters",
-    ":automergeTesters"
+    ":semanticCommits",
+    "helpers:pinGitHubActionDigests"
   ],
   "addLabels": ["dependencies"],
   "automergeType": "branch",
+  "platformAutomerge": true,
+  "gitIgnoredAuthors": ["github-actions[bot] <github-actions[bot]@users.noreply.github.com>"],
   "prConcurrentLimit": 5,
   "prCreation": "not-pending",
   "rangeStrategy": "bump",
-  "minimumReleaseAge": "1 day",
+  "minimumReleaseAge": "3 days",
+  "vulnerabilityAlerts": {
+    "enabled": true,
+    "labels": ["security"],
+    "automerge": false,
+    "minimumReleaseAge": null
+  },
+  "osvVulnerabilityAlerts": true,
+  "cargo": {
+    "enabled": true
+  },
   "packageRules": [
     {
-      "updateTypes": ["minor", "patch"],
+      "description": "Automerge non-major updates after release age",
+      "matchUpdateTypes": ["minor", "patch"],
       "automerge": true
     },
     {
-      "matchPaths": [".github/workflows/**"],
-      "enabled": false
+      "description": "Group all Rust workspace dependencies",
+      "matchManagers": ["cargo"],
+      "matchDepTypes": ["workspace.dependencies"],
+      "groupName": "Rust workspace dependencies"
+    },
+    {
+      "description": "Group Rust dev dependencies",
+      "matchManagers": ["cargo"],
+      "matchDepTypes": ["dev-dependencies"],
+      "groupName": "Rust dev dependencies",
+      "automerge": true
+    },
+    {
+      "description": "Security updates have priority and shorter release age",
+      "matchDepTypes": ["dependencies"],
+      "matchCurrentVersion": "!/^0/",
+      "matchUpdateTypes": ["patch"],
+      "matchPackagePatterns": ["*"],
+      "minimumReleaseAge": "1 day",
+      "labels": ["dependencies", "security-patch"]
+    },
+    {
+      "description": "GitHub Actions updates enabled with caution",
+      "matchManagers": ["github-actions"],
+      "enabled": true,
+      "groupName": "GitHub Actions",
+      "automerge": false,
+      "minimumReleaseAge": "7 days"
+    },
+    {
+      "description": "Major updates require manual review",
+      "matchUpdateTypes": ["major"],
+      "automerge": false,
+      "labels": ["dependencies", "major-update"]
     }
   ]
 }
