@@ -24,7 +24,18 @@
   "cargo": {
     "enabled": true
   },
+  "rust": {
+    "enabled": true
+  },
   "packageRules": [
+    {
+      "description": "Rust toolchain updates require testing",
+      "matchDatasources": ["rust-version"],
+      "enabled": true,
+      "automerge": false,
+      "labels": ["dependencies", "rust-toolchain"],
+      "minimumReleaseAge": "7 days"
+    },
     {
       "description": "Automerge non-major updates after release age",
       "matchUpdateTypes": ["minor", "patch"],

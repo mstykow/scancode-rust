@@ -104,20 +104,20 @@ fn extract_license_info(toml_content: &Value) -> Vec<LicenseDetection> {
     let mut detections = Vec::new();
 
     // Check for license field within the package table
-    if let Some(package) = toml_content.get(FIELD_PACKAGE).and_then(|v| v.as_table()) {
-        if let Some(license_str) = package.get(FIELD_LICENSE).and_then(|v| v.as_str()) {
-            detections.push(LicenseDetection {
+    if let Some(package) = toml_content.get(FIELD_PACKAGE).and_then(|v| v.as_table())
+        && let Some(license_str) = package.get(FIELD_LICENSE).and_then(|v| v.as_str())
+    {
+        detections.push(LicenseDetection {
+            license_expression: license_str.to_string(),
+            matches: vec![Match {
+                score: 100.0,
+                start_line: 0, // We don't track exact line numbers with the toml parser
+                end_line: 0,
                 license_expression: license_str.to_string(),
-                matches: vec![Match {
-                    score: 100.0,
-                    start_line: 0, // We don't track exact line numbers with the toml parser
-                    end_line: 0,
-                    license_expression: license_str.to_string(),
-                    rule_identifier: None,
-                    matched_text: None,
-                }],
-            });
-        }
+                rule_identifier: None,
+                matched_text: None,
+            }],
+        });
     }
 
     detections
@@ -127,21 +127,20 @@ fn extract_license_info(toml_content: &Value) -> Vec<LicenseDetection> {
 fn extract_parties(toml_content: &Value) -> Vec<Party> {
     let mut parties = Vec::new();
 
-    if let Some(package) = toml_content.get(FIELD_PACKAGE).and_then(|v| v.as_table()) {
-        if let Some(authors) = package.get(FIELD_AUTHORS).and_then(|v| v.as_array()) {
-            for author in authors {
-                if let Some(author_str) = author.as_str() {
-                    // Look for email addresses in the format: "Name <email@example.com>"
-                    if let Some(email_start) = author_str.find('<') {
-                        if let Some(email_end) = author_str.find('>') {
-                            if email_start < email_end {
-                                let email = &author_str[email_start + 1..email_end];
-                                parties.push(Party {
-                                    email: email.to_string(),
-                                });
-                            }
-                        }
-                    }
+    if let Some(package) = toml_content.get(FIELD_PACKAGE).and_then(|v| v.as_table())
+        && let Some(authors) = package.get(FIELD_AUTHORS).and_then(|v| v.as_array())
+    {
+        for author in authors {
+            if let Some(author_str) = author.as_str() {
+                // Look for email addresses in the format: "Name <email@example.com>"
+                if let Some(email_start) = author_str.find('<')
+                    && let Some(email_end) = author_str.find('>')
+                    && email_start < email_end
+                {
+                    let email = &author_str[email_start + 1..email_end];
+                    parties.push(Party {
+                        email: email.to_string(),
+                    });
                 }
             }
         }

@@ -196,14 +196,14 @@ impl<'a> ScanStrategy<'a> {
     /// preferences.
     ///
     /// Returns a `ScanResult` containing all discovered information.
-    pub fn scan(&self, text: &TextData) -> Result<ScanResult, Error> {
+    pub fn scan(&self, text: &TextData) -> Result<ScanResult<'_>, Error> {
         match self.mode {
             ScanMode::Elimination => Ok(self.scan_elimination(text)),
             ScanMode::TopDown => Ok(self.scan_topdown(text)),
         }
     }
 
-    fn scan_elimination(&self, text: &TextData) -> ScanResult {
+    fn scan_elimination(&self, text: &TextData) -> ScanResult<'_> {
         let mut analysis = self.store.analyze(text);
         let score = analysis.score;
         let mut license = None;
@@ -270,7 +270,7 @@ impl<'a> ScanStrategy<'a> {
         }
     }
 
-    fn scan_topdown(&self, text: &TextData) -> ScanResult {
+    fn scan_topdown(&self, text: &TextData) -> ScanResult<'_> {
         let (_, text_end) = text.lines_view();
         let mut containing = Vec::new();
 
@@ -299,7 +299,7 @@ impl<'a> ScanStrategy<'a> {
         &self,
         text: &TextData,
         starting_at: usize,
-    ) -> Option<ContainedResult> {
+    ) -> Option<ContainedResult<'_>> {
         let (_, text_end) = text.lines_view();
         let mut found: (usize, usize, Option<Match<'_>>) = (0, 0, None);
 

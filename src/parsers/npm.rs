@@ -200,22 +200,22 @@ fn extract_license_info(
     }
 
     // Check for license object
-    if let Some(license_obj) = json.get(FIELD_LICENSE).and_then(|v| v.as_object()) {
-        if let Some(license_type) = license_obj.get("type").and_then(|v| v.as_str()) {
-            let line = field_lines.get(FIELD_LICENSE).copied().unwrap_or(0);
-            detections.push(LicenseDetection {
+    if let Some(license_obj) = json.get(FIELD_LICENSE).and_then(|v| v.as_object())
+        && let Some(license_type) = license_obj.get("type").and_then(|v| v.as_str())
+    {
+        let line = field_lines.get(FIELD_LICENSE).copied().unwrap_or(0);
+        detections.push(LicenseDetection {
+            license_expression: license_type.to_string(),
+            matches: vec![Match {
+                score: 100.0,
+                start_line: line,
+                end_line: line,
                 license_expression: license_type.to_string(),
-                matches: vec![Match {
-                    score: 100.0,
-                    start_line: line,
-                    end_line: line,
-                    license_expression: license_type.to_string(),
-                    rule_identifier: None,
-                    matched_text: None,
-                }],
-            });
-            return detections;
-        }
+                rule_identifier: None,
+                matched_text: None,
+            }],
+        });
+        return detections;
     }
 
     // Check for deprecated licenses array
@@ -272,24 +272,24 @@ fn extract_parties(json: &Value) -> Vec<Party> {
     let mut parties = Vec::new();
 
     // Extract author field
-    if let Some(author) = json.get(FIELD_AUTHOR) {
-        if let Some(email) = extract_email_from_field(author) {
-            parties.push(Party { email });
-        }
+    if let Some(author) = json.get(FIELD_AUTHOR)
+        && let Some(email) = extract_email_from_field(author)
+    {
+        parties.push(Party { email });
     }
 
     // Extract contributors field
-    if let Some(contributors) = json.get(FIELD_CONTRIBUTORS) {
-        if let Some(emails) = extract_emails_from_array(contributors) {
-            parties.extend(emails.into_iter().map(|email| Party { email }));
-        }
+    if let Some(contributors) = json.get(FIELD_CONTRIBUTORS)
+        && let Some(emails) = extract_emails_from_array(contributors)
+    {
+        parties.extend(emails.into_iter().map(|email| Party { email }));
     }
 
     // Extract maintainers field
-    if let Some(maintainers) = json.get(FIELD_MAINTAINERS) {
-        if let Some(emails) = extract_emails_from_array(maintainers) {
-            parties.extend(emails.into_iter().map(|email| Party { email }));
-        }
+    if let Some(maintainers) = json.get(FIELD_MAINTAINERS)
+        && let Some(emails) = extract_emails_from_array(maintainers)
+    {
+        parties.extend(emails.into_iter().map(|email| Party { email }));
     }
 
     parties
@@ -297,12 +297,11 @@ fn extract_parties(json: &Value) -> Vec<Party> {
 
 /// Extracts email from a string in the format "Name <email@example.com>".
 fn extract_email_from_string(author_str: &str) -> Option<String> {
-    if let Some(email_start) = author_str.find('<') {
-        if let Some(email_end) = author_str.find('>') {
-            if email_start < email_end {
-                return Some(author_str[email_start + 1..email_end].to_string());
-            }
-        }
+    if let Some(email_start) = author_str.find('<')
+        && let Some(email_end) = author_str.find('>')
+        && email_start < email_end
+    {
+        return Some(author_str[email_start + 1..email_end].to_string());
     }
     None
 }

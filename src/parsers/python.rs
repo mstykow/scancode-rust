@@ -199,10 +199,10 @@ fn extract_parties(project: &TomlMap<String, TomlValue>) -> Vec<Party> {
     // Extract authors
     if let Some(authors) = project.get(FIELD_AUTHORS).and_then(|v| v.as_array()) {
         for author in authors {
-            if let Some(author_str) = author.as_str() {
-                if let Some(email) = extract_email_from_author_string(author_str) {
-                    parties.push(Party { email })
-                }
+            if let Some(author_str) = author.as_str()
+                && let Some(email) = extract_email_from_author_string(author_str)
+            {
+                parties.push(Party { email })
             }
         }
     }
@@ -210,10 +210,10 @@ fn extract_parties(project: &TomlMap<String, TomlValue>) -> Vec<Party> {
     // Extract maintainers
     if let Some(maintainers) = project.get(FIELD_MAINTAINERS).and_then(|v| v.as_array()) {
         for maintainer in maintainers {
-            if let Some(maintainer_str) = maintainer.as_str() {
-                if let Some(email) = extract_email_from_author_string(maintainer_str) {
-                    parties.push(Party { email })
-                }
+            if let Some(maintainer_str) = maintainer.as_str()
+                && let Some(email) = extract_email_from_author_string(maintainer_str)
+            {
+                parties.push(Party { email })
             }
         }
     }
@@ -223,12 +223,11 @@ fn extract_parties(project: &TomlMap<String, TomlValue>) -> Vec<Party> {
 
 fn extract_email_from_author_string(author_str: &str) -> Option<String> {
     // Look for email addresses in the format: "Name <email@example.com>"
-    if let Some(email_start) = author_str.find('<') {
-        if let Some(email_end) = author_str.find('>') {
-            if email_start < email_end {
-                return Some(author_str[email_start + 1..email_end].to_string());
-            }
-        }
+    if let Some(email_start) = author_str.find('<')
+        && let Some(email_end) = author_str.find('>')
+        && email_start < email_end
+    {
+        return Some(author_str[email_start + 1..email_end].to_string());
     }
 
     None
