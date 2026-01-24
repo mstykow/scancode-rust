@@ -15,7 +15,7 @@ authors = ["Maxim Stykow", "Adrian Braemer"]
 anyhow = "1.0.98"
 flate2 = { version = "1.1.2", optional = true }
 lazy_static = "1.5.0"
-log = "0.4.6"
+log = "0.4.29"
 regex = "1.1.7"
 rmp-serde = "1.1.1"
 unicode-normalization = "0.1.8"
