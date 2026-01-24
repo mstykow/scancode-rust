@@ -2,23 +2,16 @@
 mod tests {
     use crate::parsers::{NpmParser, PackageParser};
     use std::fs;
-    use std::io::Write;
     use std::path::PathBuf;
-    use tempfile::NamedTempFile;
+    use tempfile::TempDir;
 
     // Helper function to create a temporary package.json file with the given content
-    fn create_temp_package_json(content: &str) -> (NamedTempFile, PathBuf) {
-        let mut temp_file = NamedTempFile::new().expect("Failed to create temp file");
-        temp_file
-            .write_all(content.as_bytes())
-            .expect("Failed to write to temp file");
+    fn create_temp_package_json(content: &str) -> (TempDir, PathBuf) {
+        let temp_dir = TempDir::new().expect("Failed to create temp dir");
+        let package_path = temp_dir.path().join("package.json");
+        fs::write(&package_path, content).expect("Failed to write package.json");
 
-        // Rename the file to package.json so that is_match works correctly
-        let dir = temp_file.path().parent().unwrap();
-        let package_path = dir.join("package.json");
-        fs::rename(temp_file.path(), &package_path).expect("Failed to rename temp file");
-
-        (temp_file, package_path)
+        (temp_dir, package_path)
     }
 
     #[test]
@@ -237,7 +230,7 @@ mod tests {
                 .collect();
 
             // Should have some dependencies if extraction is working
-            assert!(purls.len() >= 1);
+            assert!(!purls.is_empty());
 
             // Check for expected packages if they exist
             let expected_packages = ["express", "lodash", "jest", "eslint"];
@@ -250,7 +243,7 @@ mod tests {
             if let Some(express_dep) = package_data
                 .dependencies
                 .iter()
-                .find(|dep| dep.purl.as_ref().map_or(false, |p| p.contains("express")))
+                .find(|dep| dep.purl.as_ref().is_some_and(|p| p.contains("express")))
             {
                 assert!(!express_dep.is_optional);
             }
@@ -258,7 +251,7 @@ mod tests {
             if let Some(jest_dep) = package_data
                 .dependencies
                 .iter()
-                .find(|dep| dep.purl.as_ref().map_or(false, |p| p.contains("jest")))
+                .find(|dep| dep.purl.as_ref().is_some_and(|p| p.contains("jest")))
             {
                 assert!(jest_dep.is_optional);
             }
@@ -306,7 +299,7 @@ mod tests {
                 .collect();
 
             // Should have at least the author if parties are supported
-            assert!(emails.len() >= 1);
+            assert!(!emails.is_empty());
 
             // Check for expected emails if they exist
             let expected_emails = [

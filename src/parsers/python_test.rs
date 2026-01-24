@@ -2,22 +2,16 @@
 mod tests {
     use crate::parsers::{PackageParser, PythonParser};
     use std::fs;
-    use std::io::Write;
     use std::path::PathBuf;
-    use tempfile::NamedTempFile;
+    use tempfile::TempDir;
 
     // Helper function to create a temporary test file with the given content and name
-    fn create_temp_file(content: &str, filename: &str) -> (NamedTempFile, PathBuf) {
-        let mut temp_file = NamedTempFile::new().expect("Failed to create temp file");
-        temp_file
-            .write_all(content.as_bytes())
-            .expect("Failed to write to temp file");
+    fn create_temp_file(content: &str, filename: &str) -> (TempDir, PathBuf) {
+        let temp_dir = TempDir::new().expect("Failed to create temp dir");
+        let file_path = temp_dir.path().join(filename);
+        fs::write(&file_path, content).expect("Failed to write file");
 
-        let dir = temp_file.path().parent().unwrap();
-        let file_path = dir.join(filename);
-        fs::rename(temp_file.path(), &file_path).expect("Failed to rename temp file");
-
-        (temp_file, file_path)
+        (temp_dir, file_path)
     }
 
     #[test]

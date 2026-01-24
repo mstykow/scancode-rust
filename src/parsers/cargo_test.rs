@@ -2,23 +2,16 @@
 mod tests {
     use crate::parsers::{CargoParser, PackageParser};
     use std::fs;
-    use std::io::Write;
     use std::path::PathBuf;
-    use tempfile::NamedTempFile;
+    use tempfile::TempDir;
 
     // Helper function to create a temporary Cargo.toml file with the given content
-    fn create_temp_cargo_toml(content: &str) -> (NamedTempFile, PathBuf) {
-        let mut temp_file = NamedTempFile::new().expect("Failed to create temp file");
-        temp_file
-            .write_all(content.as_bytes())
-            .expect("Failed to write to temp file");
+    fn create_temp_cargo_toml(content: &str) -> (TempDir, PathBuf) {
+        let temp_dir = TempDir::new().expect("Failed to create temp dir");
+        let cargo_path = temp_dir.path().join("Cargo.toml");
+        fs::write(&cargo_path, content).expect("Failed to write Cargo.toml");
 
-        // Rename the file to Cargo.toml so that is_match works correctly
-        let dir = temp_file.path().parent().unwrap();
-        let cargo_path = dir.join("Cargo.toml");
-        fs::rename(temp_file.path(), &cargo_path).expect("Failed to rename temp file");
-
-        (temp_file, cargo_path)
+        (temp_dir, cargo_path)
     }
 
     #[test]
