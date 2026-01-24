@@ -24,6 +24,99 @@ mod tests {
     }
 
     #[test]
+    fn test_extract_from_testdata() {
+        let package_path = PathBuf::from("testdata/npm/package.json")
+            .canonicalize()
+            .unwrap();
+        let package_data = NpmParser::extract_package_data(&package_path);
+
+        assert_eq!(package_data.package_type, Some("npm".to_string()));
+        assert_eq!(package_data.name, Some("@example/test-package".to_string()));
+        assert_eq!(package_data.version, Some("1.0.0".to_string()));
+        assert_eq!(
+            package_data.homepage_url,
+            Some("https://example.com".to_string())
+        );
+        assert_eq!(
+            package_data.download_url,
+            Some("https://github.com/example/test-package".to_string())
+        );
+
+        // Check license detection
+        assert_eq!(package_data.license_detections.len(), 1);
+        assert_eq!(package_data.license_detections[0].license_expression, "MIT");
+
+        // Check purl
+        // The PURL should include the scoped package name properly URL-encoded
+        // The PURL should include the scoped package name properly URL-encoded
+        // PURL should be based on package name only
+        assert_eq!(
+            package_data.purl,
+            Some("pkg:npm/%40example/test-package@1.0.0".to_string())
+        );
+
+        // Check author extraction
+        assert_eq!(package_data.parties.len(), 1);
+        assert_eq!(package_data.parties[0].email, "test@example.com");
+
+        // Check dependencies via PURLs
+        assert_eq!(package_data.dependencies.len(), 3);
+        let purls: Vec<&str> = package_data
+            .dependencies
+            .iter()
+            .filter_map(|d| d.purl.as_deref())
+            .collect();
+        assert!(purls.iter().any(|p| p.contains("express")));
+        assert!(purls.iter().any(|p| p.contains("lodash")));
+        assert!(purls.iter().any(|p| p.contains("jest")));
+    }
+
+    #[test]
+    fn test_extract_from_npm_testdata() {
+        let package_path = PathBuf::from("testdata/npm/package.json")
+            .canonicalize()
+            .unwrap();
+        let package_data = NpmParser::extract_package_data(&package_path);
+
+        assert_eq!(package_data.package_type, Some("npm".to_string()));
+        assert_eq!(package_data.name, Some("@example/test-package".to_string()));
+        assert_eq!(package_data.version, Some("1.0.0".to_string()));
+        assert_eq!(
+            package_data.homepage_url,
+            Some("https://example.com".to_string())
+        );
+        assert_eq!(
+            package_data.download_url,
+            Some("https://github.com/example/test-package".to_string())
+        );
+
+        // Check license detection
+        assert_eq!(package_data.license_detections.len(), 1);
+        assert_eq!(package_data.license_detections[0].license_expression, "MIT");
+
+        // Check purl - should be pkg:npm/%40example/test-package@1.0.0 without namespace
+        assert_eq!(
+            package_data.purl,
+            Some("pkg:npm/%40example/test-package@1.0.0".to_string())
+        );
+
+        // Check author extraction
+        assert_eq!(package_data.parties.len(), 1);
+        assert_eq!(package_data.parties[0].email, "test@example.com");
+
+        // Check dependencies
+        assert_eq!(package_data.dependencies.len(), 3);
+        let purls: Vec<&str> = package_data
+            .dependencies
+            .iter()
+            .filter_map(|d| d.purl.as_deref())
+            .collect();
+        assert!(purls.iter().any(|p| p.contains("express")));
+        assert!(purls.iter().any(|p| p.contains("lodash")));
+        assert!(purls.iter().any(|p| p.contains("jest")));
+    }
+
+    #[test]
     fn test_extract_basic_package_info() {
         let content = r#"
 {

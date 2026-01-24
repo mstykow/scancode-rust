@@ -24,6 +24,52 @@ mod tests {
     }
 
     #[test]
+    fn test_extract_from_testdata() {
+        let cargo_path = PathBuf::from("testdata/cargo/Cargo.toml");
+        let package_data = CargoParser::extract_package_data(&cargo_path);
+
+        assert_eq!(package_data.package_type, Some("cargo".to_string()));
+        assert_eq!(package_data.name, Some("test-cargo".to_string()));
+        assert_eq!(package_data.version, Some("1.2.3".to_string()));
+        assert_eq!(
+            package_data.homepage_url,
+            Some("https://example.com".to_string())
+        );
+        assert_eq!(
+            package_data.download_url,
+            Some("https://github.com/example/test-cargo".to_string())
+        );
+
+        // Check license detection
+        assert_eq!(package_data.license_detections.len(), 1);
+        assert_eq!(
+            package_data.license_detections[0].license_expression,
+            "MIT OR Apache-2.0"
+        );
+
+        // Check purl
+        assert_eq!(
+            package_data.purl,
+            Some("pkg:cargo/test-cargo@1.2.3".to_string())
+        );
+
+        // Check authors extraction
+        assert_eq!(package_data.parties.len(), 1);
+        assert_eq!(package_data.parties[0].email, "test@example.com");
+
+        // Check dependencies via PURLs
+        assert_eq!(package_data.dependencies.len(), 3);
+        let purls: Vec<&str> = package_data
+            .dependencies
+            .iter()
+            .filter_map(|d| d.purl.as_deref())
+            .collect();
+        assert!(purls.iter().any(|p| p.contains("serde")));
+        assert!(purls.iter().any(|p| p.contains("tokio")));
+        assert!(purls.iter().any(|p| p.contains("mockito")));
+    }
+
+    #[test]
     fn test_extract_basic_package_info() {
         let content = r#"
 [package]

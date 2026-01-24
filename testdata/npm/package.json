@@ -1,0 +1,15 @@
+{
+  "name": "@example/test-package",
+  "version": "1.0.0",
+  "license": "MIT",
+  "homepage": "https://example.com",
+  "repository": "https://github.com/example/test-package",
+  "author": "Test User <test@example.com>",
+  "dependencies": {
+    "express": "^4.17.1",
+    "lodash": "~4.17.20"
+  },
+  "devDependencies": {
+    "jest": "^27.0.0"
+  }
+}

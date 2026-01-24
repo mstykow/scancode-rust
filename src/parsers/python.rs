@@ -239,24 +239,65 @@ fn extract_dependencies(
     let mut dependencies = Vec::new();
     let mut optional_dependencies = Vec::new();
 
-    // Regular dependencies
-    if let Some(deps) = project.get(FIELD_DEPENDENCIES).and_then(|v| v.as_array()) {
-        dependencies = parse_dependency_array(deps, false);
+    // Handle dependencies - can be array or table format
+    if let Some(deps_value) = project.get(FIELD_DEPENDENCIES) {
+        match deps_value {
+            TomlValue::Array(arr) => {
+                dependencies = parse_dependency_array(arr, false);
+            }
+            TomlValue::Table(table) => {
+                dependencies = parse_dependency_table(table, false);
+            }
+            _ => {}
+        }
     }
 
-    // Optional dependencies (often grouped by feature)
+    // Handle optional dependencies
     if let Some(opt_deps_table) = project
         .get(FIELD_OPTIONAL_DEPENDENCIES)
         .and_then(|v| v.as_table())
     {
         for (_feature, deps) in opt_deps_table {
-            if let Some(deps_array) = deps.as_array() {
-                optional_dependencies.extend(parse_dependency_array(deps_array, true));
+            match deps {
+                TomlValue::Array(arr) => {
+                    optional_dependencies.extend(parse_dependency_array(arr, true));
+                }
+                TomlValue::Table(table) => {
+                    optional_dependencies.extend(parse_dependency_table(table, true));
+                }
+                _ => {}
             }
         }
     }
 
     (dependencies, optional_dependencies)
+}
+
+fn parse_dependency_table(
+    table: &TomlMap<String, TomlValue>,
+    is_optional: bool,
+) -> Vec<Dependency> {
+    table
+        .iter()
+        .filter_map(|(name, version)| {
+            // Create version string if present
+            let version_str = version.as_str().map(|s| s.to_string());
+
+            // Create package URL with name
+            let mut package_url = PackageUrl::new(PythonParser::PACKAGE_TYPE, name).ok()?;
+
+            // Add version if present
+            if let Some(v) = &version_str {
+                package_url.with_version(v).ok()?;
+            }
+
+            Some(Dependency {
+                purl: Some(package_url.to_string()),
+                scope: None,
+                is_optional,
+            })
+        })
+        .collect()
 }
 
 fn parse_dependency_array(array: &[TomlValue], is_optional: bool) -> Vec<Dependency> {

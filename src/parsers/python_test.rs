@@ -72,6 +72,40 @@ numpy = ">=1.20.0"
     }
 
     #[test]
+    fn test_extract_from_python_testdata() {
+        let file_path = PathBuf::from("testdata/python/pyproject.toml");
+        let package_data = PythonParser::extract_package_data(&file_path);
+
+        assert_eq!(package_data.package_type, Some("pypi".to_string()));
+        assert_eq!(package_data.name, Some("test-package".to_string()));
+        assert_eq!(package_data.version, Some("0.1.0".to_string()));
+        assert_eq!(
+            package_data.homepage_url,
+            Some("https://example.com".to_string())
+        );
+
+        // Check license detection
+        assert_eq!(package_data.license_detections.len(), 1);
+        assert_eq!(package_data.license_detections[0].license_expression, "MIT");
+
+        // Check purl
+        assert_eq!(
+            package_data.purl,
+            Some("pkg:pypi/test-package@0.1.0".to_string())
+        );
+
+        // Check dependencies - should have 2 regular dependencies
+        assert_eq!(package_data.dependencies.len(), 2);
+        let purls: Vec<&str> = package_data
+            .dependencies
+            .iter()
+            .filter_map(|d| d.purl.as_deref())
+            .collect();
+        assert!(purls.contains(&"pkg:pypi/requests@%3E%3D2.25.0"));
+        assert!(purls.contains(&"pkg:pypi/numpy@%3E%3D1.20.0"));
+    }
+
+    #[test]
     fn test_extract_from_setup_py() {
         let content = r#"
 from setuptools import setup, find_packages

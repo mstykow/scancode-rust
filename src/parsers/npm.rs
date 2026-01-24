@@ -150,31 +150,40 @@ fn extract_namespace(name: &Option<String>) -> Option<String> {
 fn create_package_url(
     name: &Option<String>,
     version: &Option<String>,
-    namespace: &Option<String>,
+    _namespace: &Option<String>,
 ) -> Option<String> {
     name.as_ref().map(|name| {
-        // For npm, the package URL format is different based on if it's a scoped package
-        let mut package_url = if name.starts_with('@') && namespace.is_some() {
-            // For scoped packages (@namespace/name), we need to include the namespace in the name
-            // but also put it in the URL parameters
-            let name_without_at = name.trim_start_matches('@');
-            PackageUrl::new(NpmParser::PACKAGE_TYPE, name_without_at)
-                .expect("Failed to create PackageUrl")
+        // Note: We extract and store namespace in PackageData for metadata purposes,
+        // but cannot use it with PackageUrl library for scoped packages.
+        //
+        // The PackageURL spec requires scoped npm packages to be formatted as:
+        //   pkg:npm/%40scope/package@version
+        // where only the @ is encoded as %40, but the / remains unencoded.
+        //
+        // The PackageUrl library cannot produce this format:
+        // - with_namespace("scope") produces: pkg:npm/scope/package (missing %40)
+        // - with_namespace("%40scope") produces: pkg:npm/%2540scope/package (double-encoded)
+        // - PackageUrl::new("npm", "@scope/package") produces: pkg:npm/%40scope%2Fpackage (encodes /)
+        //
+        // Therefore, we must manually construct the PURL for scoped packages.
+
+        if name.starts_with('@') && name.contains('/') {
+            // Manual construction for scoped packages
+            let encoded_name = name.replace('@', "%40");
+            let version_part = version
+                .as_ref()
+                .map(|v| format!("@{}", v))
+                .unwrap_or_default();
+            format!("pkg:npm/{}{}", encoded_name, version_part)
         } else {
-            PackageUrl::new(NpmParser::PACKAGE_TYPE, name).expect("Failed to create PackageUrl")
-        };
-
-        if let Some(v) = version {
-            package_url.with_version(v).expect("Failed to set version");
+            // Use PackageUrl library for non-scoped packages
+            let mut package_url = PackageUrl::new(NpmParser::PACKAGE_TYPE, name)
+                .expect("Failed to create PackageUrl");
+            if let Some(v) = version {
+                package_url.with_version(v).expect("Failed to set version");
+            }
+            package_url.to_string()
         }
-
-        if let Some(n) = namespace {
-            package_url
-                .with_namespace(n)
-                .expect("Failed to set namespace");
-        }
-
-        package_url.to_string()
     })
 }
 
