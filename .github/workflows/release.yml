@@ -41,8 +41,6 @@ permissions:
 on:
   pull_request:
   push:
-    branches:
-      - 'renovate/*'
     tags:
       - '**[0-9]+.[0-9]+.[0-9]+*'
 
