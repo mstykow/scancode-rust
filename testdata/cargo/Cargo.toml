@@ -7,7 +7,7 @@ homepage = "https://example.com"
 authors = ["Test User <test@example.com>"]
 
 [dependencies]
-serde = "1.0"
+serde = "1.0.228"
 tokio = { version = "1.0", features = ["full"] }
 
 [dev-dependencies]
