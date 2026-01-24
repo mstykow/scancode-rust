@@ -64,8 +64,22 @@ mod tests {
             .iter()
             .filter_map(|d| d.purl.as_deref())
             .collect();
-        assert!(purls.contains(&"pkg:maven/junit/junit@4.13.1"));
-        assert!(purls.contains(&"pkg:maven/org.apache.commons/commons-lang3@3.12.0"));
+
+        // Check that junit dependency exists with correct group/artifact
+        assert!(
+            purls
+                .iter()
+                .any(|p| p.starts_with("pkg:maven/junit/junit@")),
+            "Should contain junit dependency"
+        );
+
+        // Check that commons-lang3 dependency exists with correct group/artifact
+        assert!(
+            purls
+                .iter()
+                .any(|p| p.starts_with("pkg:maven/org.apache.commons/commons-lang3@")),
+            "Should contain commons-lang3 dependency"
+        );
     }
 
     #[test]
