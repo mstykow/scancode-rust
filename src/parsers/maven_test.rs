@@ -65,7 +65,7 @@ mod tests {
             .filter_map(|d| d.purl.as_deref())
             .collect();
         assert!(purls.contains(&"pkg:maven/junit/junit@4.12"));
-        assert!(purls.contains(&"pkg:maven/org.apache.commons/commons-lang3@3.12.0"));
+        assert!(purls.contains(&"pkg:maven/org.apache.commons/commons-lang3@3.18.0"));
     }
 
     #[test]
