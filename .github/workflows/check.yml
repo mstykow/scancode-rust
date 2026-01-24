@@ -1,11 +1,12 @@
 name: Code Check
 
 on:
-  pull_request:
-    types: [opened, reopened, synchronize]
   push:
     branches:
       - main
+      - 'renovate/*'
+  pull_request:
+    types: [opened, reopened, synchronize]
 
 env:
   CARGO_TERM_COLOR: always
@@ -14,6 +15,8 @@ jobs:
   check:
     name: Check
     runs-on: ubuntu-latest
+    if: |
+      !(github.event_name == 'pull_request' && startsWith(github.head_ref, 'renovate/'))
     steps:
       - uses: actions/checkout@v4
         with:
