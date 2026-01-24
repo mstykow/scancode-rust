@@ -100,7 +100,7 @@ fn extract_from_pyproject_toml(path: &Path) -> PackageData {
             PackageUrl::new(PythonParser::PACKAGE_TYPE, n).expect("Failed to create PackageUrl");
 
         if let Some(v) = &version {
-            package_url.with_version(v);
+            package_url.with_version(v).expect("Failed to set version");
         }
 
         package_url.to_string()
@@ -279,7 +279,7 @@ fn parse_dependency_array(array: &[TomlValue], is_optional: bool) -> Vec<Depende
             };
 
             if let Some(ref v) = version {
-                package_url.with_version(v);
+                package_url.with_version(v).ok()?;
             }
 
             Some(Dependency {
@@ -328,7 +328,7 @@ fn extract_from_setup_py(path: &Path) -> PackageData {
             PackageUrl::new(PythonParser::PACKAGE_TYPE, n).expect("Failed to create PackageUrl");
 
         if let Some(v) = &version {
-            package_url.with_version(v);
+            package_url.with_version(v).expect("Failed to set version");
         }
 
         package_url.to_string()

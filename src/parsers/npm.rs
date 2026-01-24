@@ -165,11 +165,13 @@ fn create_package_url(
         };
 
         if let Some(v) = version {
-            package_url.with_version(v);
+            package_url.with_version(v).expect("Failed to set version");
         }
 
         if let Some(n) = namespace {
-            package_url.with_namespace(n);
+            package_url
+                .with_namespace(n)
+                .expect("Failed to set namespace");
         }
 
         package_url.to_string()
@@ -363,7 +365,7 @@ fn extract_dependencies(json: &Value, is_optional: bool) -> Vec<Dependency> {
                     let encoded_version = urlencoding::encode(&stripped_version).to_string();
 
                     let mut package_url = PackageUrl::new(NpmParser::PACKAGE_TYPE, name).ok()?;
-                    package_url.with_version(&encoded_version);
+                    package_url.with_version(&encoded_version).ok()?;
 
                     Some(Dependency {
                         purl: Some(package_url.to_string()),
