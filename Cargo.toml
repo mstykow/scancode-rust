@@ -1,6 +1,6 @@
 [package]
 name = "scancode-rust"
-version = "0.0.4"
+version = "0.0.5"
 edition = "2024"
 repository = "https://github.com/mstykow/scancode-rust"
 description = "A Rust-based tool for scanning and analyzing code."
