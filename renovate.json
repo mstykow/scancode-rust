@@ -9,7 +9,8 @@
   "ignorePaths": [
     "**/testdata/**",
     "**/test/**/*.xml",
-    "**/test/**/*.json"
+    "**/test/**/*.json",
+    ".github/workflows/release.yml"
   ],
   "addLabels": ["dependencies"],
   "automergeType": "branch",
