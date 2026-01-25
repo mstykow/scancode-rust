@@ -26,15 +26,17 @@
     "minimumReleaseAge": null
   },
   "osvVulnerabilityAlerts": true,
-  "regexManagers": [
+  "customManagers": [
     {
+      "customType": "regex",
       "fileMatch": ["\\.github/workflows/.+\\.ya?ml$"],
       "matchStrings": [
-        "uses: dtolnay/rust-toolchain@(?<currentValue>\\d+\\.\\d+(?:\\.\\d+)?)"
+        "uses: dtolnay/rust-toolchain@(?<currentValue>\\d+\\.\\d+\\.\\d+)"
       ],
       "depNameTemplate": "rust",
-      "datasourceTemplate": "rust-version",
-      "versioningTemplate": "cargo"
+      "packageNameTemplate": "rust-lang/rust",
+      "datasourceTemplate": "github-tags",
+      "extractVersionTemplate": "^(?<version>\\d+\\.\\d+\\.\\d+)$"
     }
   ],
   "lockFileMaintenance": {
@@ -47,7 +49,7 @@
   "packageRules": [
     {
       "description": "Rust toolchain updates require testing",
-      "matchDatasources": ["rust-version"],
+      "matchDatasources": ["rust-version", "github-tags"],
       "matchDepNames": ["rust"],
       "enabled": true,
       "automerge": false,
@@ -57,7 +59,7 @@
     },
     {
       "description": "Automerge minor Rust toolchain updates after release age",
-      "matchDatasources": ["rust-version"],
+      "matchDatasources": ["rust-version", "github-tags"],
       "matchDepNames": ["rust"],
       "matchUpdateTypes": ["minor"],
       "automerge": true,
@@ -99,13 +101,6 @@
       "groupName": "GitHub Actions",
       "automerge": false,
       "minimumReleaseAge": "7 days"
-    },
-    {
-      "description": "Pin ubuntu-latest to specific version for stability",
-      "matchManagers": ["github-actions"],
-      "matchDepNames": ["ubuntu"],
-      "enabled": true,
-      "versioning": "ubuntu"
     },
     {
       "description": "Major updates require manual review",
