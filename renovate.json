@@ -1,6 +1,7 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
+    "mergeConfidence:all-badges",
     "config:recommended",
     ":dependencyDashboard",
     ":semanticCommits",
@@ -29,7 +30,7 @@
   "customManagers": [
     {
       "customType": "regex",
-      "fileMatch": ["\\.github/workflows/.+\\.ya?ml$"],
+      "managerFilePatterns": ["/.github/workflows/.+\\.ya?ml$/"],
       "matchStrings": [
         "uses: dtolnay/rust-toolchain@(?<currentValue>\\d+\\.\\d+\\.\\d+)"
       ],
@@ -90,7 +91,7 @@
       "matchDepTypes": ["dependencies"],
       "matchCurrentVersion": "!/^0/",
       "matchUpdateTypes": ["patch"],
-      "matchPackagePatterns": ["*"],
+      "matchPackageNames": ["*"],
       "minimumReleaseAge": "1 day",
       "labels": ["dependencies", "security-patch"]
     },
