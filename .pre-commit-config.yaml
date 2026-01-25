@@ -1,9 +1,17 @@
 repos:
-- repo: https://github.com/doublify/pre-commit-rust
-  rev: v1.0
+- repo: local
   hooks:
   - id: fmt
-    name: cargo fmt
+    name: Format Rust code and stage changes
+    entry: bash -c 'cargo fmt --all && git add -u :/*.rs'
+    language: system
+    types: [rust]
+    pass_filenames: false
+  
   - id: clippy
-    name: cargo clippy
-    args: ['--', '-D', 'warnings']
+    name: Run clippy
+    entry: cargo clippy
+    args: ['--all-targets', '--all-features', '--', '-D', 'warnings']
+    language: system
+    types: [rust]
+    pass_filenames: false
