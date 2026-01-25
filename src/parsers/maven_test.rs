@@ -2,23 +2,18 @@
 mod tests {
     use crate::parsers::{MavenParser, PackageParser};
     use std::fs;
-    use std::io::Write;
     use std::path::PathBuf;
-    use tempfile::NamedTempFile;
+    use tempfile::TempDir;
 
     // Helper function to create a temporary pom.xml file with the given content
-    fn create_temp_pom_xml(content: &str) -> (NamedTempFile, PathBuf) {
-        let mut temp_file = NamedTempFile::new().expect("Failed to create temp file");
-        temp_file
-            .write_all(content.as_bytes())
-            .expect("Failed to write to temp file");
+    // Returns a TempDir (which must be kept alive) and the path to pom.xml
+    fn create_temp_pom_xml(content: &str) -> (TempDir, PathBuf) {
+        let temp_dir = TempDir::new().expect("Failed to create temp directory");
+        let pom_path = temp_dir.path().join("pom.xml");
 
-        // Rename the file to pom.xml so that is_match works correctly
-        let dir = temp_file.path().parent().unwrap();
-        let pom_path = dir.join("pom.xml");
-        fs::rename(temp_file.path(), &pom_path).expect("Failed to rename temp file");
+        fs::write(&pom_path, content).expect("Failed to write pom.xml");
 
-        (temp_file, pom_path)
+        (temp_dir, pom_path)
     }
 
     #[test]
@@ -101,7 +96,7 @@ mod tests {
 </project>
         "#;
 
-        let (_temp_file, pom_path) = create_temp_pom_xml(content);
+        let (_temp_dir, pom_path) = create_temp_pom_xml(content);
         let package_data = MavenParser::extract_package_data(&pom_path);
 
         assert_eq!(package_data.package_type, Some("maven".to_string()));
@@ -148,7 +143,7 @@ mod tests {
 </project>
         "#;
 
-        let (_temp_file, pom_path) = create_temp_pom_xml(content);
+        let (_temp_dir, pom_path) = create_temp_pom_xml(content);
         let package_data = MavenParser::extract_package_data(&pom_path);
 
         assert_eq!(package_data.dependencies.len(), 2);
@@ -182,7 +177,7 @@ mod tests {
     fn test_empty_or_invalid_pom_xml() {
         // Test with empty content
         let content = "";
-        let (_temp_file, pom_path) = create_temp_pom_xml(content);
+        let (_temp_dir, pom_path) = create_temp_pom_xml(content);
         let package_data = MavenParser::extract_package_data(&pom_path);
 
         // Should return default/empty package data
@@ -192,8 +187,8 @@ mod tests {
 
         // Test with invalid XML
         let content = "this is not valid XML";
-        let (_temp_file, pom_path) = create_temp_pom_xml(content);
-        let package_data = MavenParser::extract_package_data(&pom_path);
+        let (_temp_dir2, pom_path2) = create_temp_pom_xml(content);
+        let package_data = MavenParser::extract_package_data(&pom_path2);
 
         // Should return default/empty package data
         assert_eq!(package_data.name, None);
