@@ -27,12 +27,11 @@ jobs:
             archive_format: tar.gz
             use_cross: true
           
-          - target: x86_64-apple-darwin
-            os: macos-15-large  # macOS-13 is retired, use macos-15-large for Intel
-            archive_format: tar.gz
+          # x86_64-apple-darwin removed: macos-15-large requires paid plan
+          # Intel Mac users can use Rosetta 2 to run ARM builds
           
           - target: aarch64-apple-darwin
-            os: macos-14
+            os: macos-latest
             archive_format: tar.gz
           
           - target: x86_64-pc-windows-msvc

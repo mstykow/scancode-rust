@@ -34,8 +34,8 @@ Download the appropriate binary for your platform from the [GitHub Releases](htt
 
 - **Linux (x64)**: `scancode-rust-x86_64-unknown-linux-gnu.tar.gz`
 - **Linux (ARM64)**: `scancode-rust-aarch64-unknown-linux-gnu.tar.gz`
-- **macOS (Intel)**: `scancode-rust-x86_64-apple-darwin.tar.gz`
-- **macOS (Apple Silicon)**: `scancode-rust-aarch64-apple-darwin.tar.gz`
+- **macOS (Apple Silicon & Intel)**: `scancode-rust-aarch64-apple-darwin.tar.gz`
+  - Intel Macs: Use Rosetta 2 for native-like performance
 - **Windows**: `scancode-rust-x86_64-pc-windows-msvc.zip`
 
 Extract and place the binary in your system's PATH:
@@ -211,7 +211,10 @@ Available release types:
 6. Publishes to crates.io
 7. Pushes commits and tag to GitHub
 8. GitHub Actions workflow is triggered by the tag
-9. Builds binaries for all platforms (Linux, macOS, Windows on x64 and ARM64)
+9. Builds binaries for all platforms:
+   - Linux: x64 and ARM64
+   - macOS: ARM64 (Apple Silicon, works on Intel via Rosetta 2)
+   - Windows: x64
 10. Creates archives (.tar.gz/.zip) and SHA256 checksums
 11. Creates a GitHub Release with all artifacts and auto-generated release notes
 
