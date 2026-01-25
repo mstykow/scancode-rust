@@ -33,6 +33,19 @@
   "rust": {
     "enabled": true
   },
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Update cargo-dist version in dist-workspace.toml",
+      "fileMatch": ["^dist-workspace\\.toml$"],
+      "matchStrings": [
+        "cargo-dist-version\\s*=\\s*\"(?<currentValue>[^\"]+)\""
+      ],
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "axodotdev/cargo-dist",
+      "extractVersionTemplate": "^v(?<version>.+)$"
+    }
+  ],
   "packageRules": [
     {
       "description": "Rust toolchain updates require testing",
@@ -82,6 +95,23 @@
       "matchUpdateTypes": ["major"],
       "automerge": false,
       "labels": ["dependencies", "major-update"]
+    },
+    {
+      "description": "cargo-dist updates need manual review and regeneration",
+      "matchDatasources": ["github-releases"],
+      "matchPackageNames": ["axodotdev/cargo-dist"],
+      "automerge": false,
+      "labels": ["dependencies", "cargo-dist"],
+      "minimumReleaseAge": "7 days",
+      "prBodyNotes": [
+        "⚠️ After updating cargo-dist version, you must run:",
+        "```bash",
+        "cargo install cargo-dist --version {{{newVersion}}}",
+        "cargo dist init",
+        "cargo dist generate",
+        "```",
+        "This will regenerate `.github/workflows/release.yml` with the correct GitHub Actions versions."
+      ]
     }
   ]
 }
