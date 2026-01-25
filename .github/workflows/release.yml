@@ -12,30 +12,8 @@ permissions:
   contents: write
 
 jobs:
-  create-release:
-    name: Create Release
-    runs-on: ubuntu-latest
-    outputs:
-      upload_url: ${{ steps.create_release.outputs.upload_url }}
-      version: ${{ steps.get_version.outputs.version }}
-    steps:
-      - name: Get version from tag
-        id: get_version
-        run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
-
-      - name: Create Release
-        id: create_release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.ref }}
-          name: v${{ steps.get_version.outputs.version }}
-          draft: false
-          prerelease: ${{ contains(github.ref, '-') }}
-          generate_release_notes: true
-
   build:
     name: Build ${{ matrix.target }}
-    needs: create-release
     strategy:
       fail-fast: false
       matrix:
@@ -113,9 +91,32 @@ jobs:
           certutil -hashfile scancode-rust-${{ matrix.target }}.zip SHA256 > scancode-rust-${{ matrix.target }}.zip.sha256
         shell: pwsh
 
-      - name: Upload release assets
-        uses: softprops/action-gh-release@v2
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
         with:
-          files: |
+          name: scancode-rust-${{ matrix.target }}
+          path: |
             target/${{ matrix.target }}/release/scancode-rust-${{ matrix.target }}.${{ matrix.archive_format }}
             target/${{ matrix.target }}/release/scancode-rust-${{ matrix.target }}.${{ matrix.archive_format }}.sha256
+          if-no-files-found: error
+
+  create-release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Display structure of downloaded files
+        run: ls -R artifacts
+
+      - name: Create Release with all assets
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: false
+          prerelease: ${{ contains(github.ref, '-') }}
+          generate_release_notes: true
+          files: artifacts/*/*.{tar.gz,zip,sha256}
