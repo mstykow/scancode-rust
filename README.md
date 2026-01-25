@@ -22,16 +22,28 @@ More ScanCode features coming soon!
 
 ## Installation
 
-### Download Precompiled Binary
-
-You can download the appropriate binary for your platform from the [GitHub Releases](https://github.com/mstykow/scancode-rust/releases) page. Simply extract the binary and place it in your system's PATH.
-
-### Use the Installer Script
-
-Alternatively, you can use the `scancode-rust-installer.sh` script to automatically download and install the correct binary for your architecture and platform:
+### From Crates.io (Recommended)
 
 ```sh
-curl -sSfL https://github.com/mstykow/scancode-rust/releases/latest/download/scancode-rust-installer.sh | sh
+cargo install scancode-rust
+```
+
+### Download Precompiled Binary
+
+Download the appropriate binary for your platform from the [GitHub Releases](https://github.com/mstykow/scancode-rust/releases) page:
+
+- **Linux (x64)**: `scancode-rust-x86_64-unknown-linux-gnu.tar.gz`
+- **Linux (ARM64)**: `scancode-rust-aarch64-unknown-linux-gnu.tar.gz`
+- **macOS (Intel)**: `scancode-rust-x86_64-apple-darwin.tar.gz`
+- **macOS (Apple Silicon)**: `scancode-rust-aarch64-apple-darwin.tar.gz`
+- **Windows**: `scancode-rust-x86_64-pc-windows-msvc.zip`
+
+Extract and place the binary in your system's PATH:
+
+```sh
+# Example for Linux/macOS
+tar xzf scancode-rust-*.tar.gz
+sudo mv scancode-rust /usr/local/bin/
 ```
 
 ### Build from Source
@@ -149,78 +161,106 @@ To contribute to `scancode-rust`, follow these steps to set up the repository fo
    cargo run -- [OPTIONS] <DIR_PATH>
    ```
 
-## Publishing a Release
+## Publishing a Release (Maintainers Only)
 
-This project uses [cargo-dist](https://github.com/axodotdev/cargo-dist) to automate the release process for both GitHub releases and crates.io.
+Releases are automated using [`cargo-release`](https://github.com/crate-ci/cargo-release) and GitHub Actions.
 
 ### Prerequisites
 
-1. Install cargo-dist:
+**One-time setup:**
+
+1. Install `cargo-release` CLI tool:
 
    ```sh
-   cargo install cargo-dist
+   cargo install cargo-release
    ```
 
-2. Ensure you have the necessary permissions on the GitHub repository and for crates.io.
-
-3. Authenticate with GitHub CLI (`gh`) and ensure you're logged in to crates.io:
+2. Authenticate with crates.io (one-time only):
 
    ```sh
-   gh auth login
    cargo login
    ```
 
+   Enter your [crates.io API token](https://crates.io/me) when prompted. This is stored in `~/.cargo/credentials.toml` and persists across sessions.
+
 ### Release Process
 
-1. Update version in `Cargo.toml`:
-
-   ```sh
-   # Edit Cargo.toml to bump the version number
-   vim Cargo.toml
-   ```
-
-2. Create a new git tag matching the version:
-
-   ```sh
-   git add Cargo.toml
-   git commit -m "Bump version to x.y.z"
-   git tag -a vx.y.z -m "Release version x.y.z"
-   ```
-
-3. Push the tag to trigger the release workflow:
-
-   ```sh
-   git push origin main --tags
-   ```
-
-4. The GitHub Actions workflow will:
-
-   - Build binaries for all supported platforms
-   - Create a GitHub release with the binaries
-
-5. Monitor the GitHub Actions workflow to ensure the GitHub release completes successfully.
-
-6. Publish to crates.io manually:
-
-   ```sh
-   cargo publish
-   ```
-
-## Updating the License Data
-
-If you want to update the embedded license data, simply run the `setup.sh` script:
+Use the `release.sh` script:
 
 ```sh
-./setup.sh
+# Dry-run first (recommended)
+./release.sh patch
+
+# Then execute the actual release
+./release.sh patch --execute
 ```
 
-This will reconfigure the sparse checkout and fetch the latest changes. After updating the license data, rebuild the binary:
+Available release types:
+
+- `patch`: Increments the patch version (0.0.4 → 0.0.5)
+- `minor`: Increments the minor version (0.0.4 → 0.1.0)
+- `major`: Increments the major version (0.0.4 → 1.0.0)
+
+**What happens automatically:**
+
+1. **Updates SPDX license data** to the latest version from upstream
+2. Commits the license data update (if changes detected)
+3. `cargo-release` updates the version in `Cargo.toml` and `Cargo.lock`
+4. Creates a git commit: `chore: release vX.Y.Z`
+5. Creates a GPG-signed git tag: `vX.Y.Z`
+6. Publishes to crates.io
+7. Pushes commits and tag to GitHub
+8. GitHub Actions workflow is triggered by the tag
+9. Builds binaries for all platforms (Linux, macOS, Windows on x64 and ARM64)
+10. Creates archives (.tar.gz/.zip) and SHA256 checksums
+11. Creates a GitHub Release with all artifacts and auto-generated release notes
+
+> **Note**: The release script ensures every release ships with the latest SPDX license definitions. It also handles a sparse checkout workaround for `cargo-release`.
+
+Monitor the [GitHub Actions workflow](https://github.com/mstykow/scancode-rust/actions) to verify completion.
+
+## License Data Architecture
+
+### How License Detection Works
+
+This tool uses the [SPDX License List Data](https://github.com/spdx/license-list-data) for license detection. The license data is:
+
+1. **Stored in a Git submodule** at `resources/licenses/` (sparse checkout of `json/details/` only)
+2. **Embedded at compile time** using Rust's `include_dir!` macro (see `src/main.rs`)
+3. **Built into the binary** - no runtime dependencies on external files
+
+This means:
+
+- **For users**: The binary is self-contained and portable
+- **For developers**: The submodule must be initialized before building
+- **Package size**: Only the needed JSON files are included in the published crate
+
+### Updating the License Data
+
+**For Releases:** The `release.sh` script automatically updates the license data to the latest version before publishing. No manual action needed.
+
+**For Development:**
+
+To initialize or update to the latest SPDX license definitions:
 
 ```sh
-cargo build --release
+./setup.sh                  # Initialize/update license data to latest
+cargo build --release       # Rebuild with updated data
 ```
 
-This will embed the latest changes from the `license-list-data` repository into the binary.
+The script will show if the license data was updated. If so, commit the change:
+
+```sh
+git add resources/licenses
+git commit -m "chore: update SPDX license data"
+```
+
+The `setup.sh` script:
+
+- Initializes the submodule with shallow clone (`--depth=1`)
+- Configures sparse checkout to only include `json/details/` (saves ~90% disk space)
+- Updates to the latest upstream version
+- The build process then embeds these files directly into the compiled binary
 
 ## License
 

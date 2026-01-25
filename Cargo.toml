@@ -9,6 +9,28 @@ keywords = ["scancode", "license", "analysis", "rust"]
 categories = ["command-line-utilities", "development-tools"]
 readme = "README.md"
 authors = ["Maxim Stykow", "Adrian Braemer"]
+# Include only files needed to build from source
+# See "License Data Architecture" section in README.md for details on how license data is embedded
+include = [
+    "src/**/*",
+    "resources/licenses/json/details/**/*.json",
+    "Cargo.toml",
+    "Cargo.lock",
+    "README.md",
+    "LICENSE",
+]
+
+[package.metadata.release]
+# Sign git tags with GPG
+sign-tag = true
+# Push automatically
+push = true
+# Commit message template
+pre-release-commit-message = "chore: release v{{version}}"
+# Tag message template
+tag-message = "Release v{{version}}"
+# Publish to crates.io automatically
+publish = true
 
 [dependencies]
 # askalono
@@ -66,11 +88,6 @@ opt-level = 3
 
 # Strip debug symbols to reduce binary size
 strip = true
-
-# The profile that 'dist' will build with
-[profile.dist]
-inherits = "release"
-lto = "thin"
 
 [[bin]]
 name = "scancode-rust"

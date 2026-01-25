@@ -32,6 +32,13 @@
   "rust": {
     "enabled": true
   },
+  "lockfileMaintenance": {
+    "enabled": true,
+    "schedule": ["before 6am on monday"],
+    "automerge": true,
+    "automergeType": "branch",
+    "platformAutomerge": true
+  },
   "packageRules": [
     {
       "description": "Rust toolchain updates require testing",
