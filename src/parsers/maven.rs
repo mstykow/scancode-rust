@@ -23,7 +23,7 @@ impl PackageParser for MavenParser {
         };
 
         let mut reader = Reader::from_reader(BufReader::new(file));
-        reader.trim_text(true);
+        reader.config_mut().trim_text(true);
 
         let mut buf = Vec::new();
         let mut package_data = default_package_data();
@@ -56,7 +56,7 @@ impl PackageParser for MavenParser {
                     }
                 }
                 Ok(Event::Text(e)) => {
-                    let text = e.unescape().unwrap_or_default().to_string();
+                    let text = e.decode().unwrap_or_default().to_string();
                     let current_path = current_element.last().map(|v| v.as_slice());
 
                     if let Some(dep) = &mut current_dependency {
