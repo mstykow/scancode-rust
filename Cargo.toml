@@ -45,7 +45,7 @@ zstd = "0.13.3"
 
 # own
 chrono = "0.4.43"
-clap = { version = "4.5.55", features = ["derive"] }
+clap = { version = "4.5.56", features = ["derive"] }
 content_inspector = "0.2.4"
 derive_builder = "0.20.2"
 glob = "0.3.3"
