@@ -44,7 +44,7 @@ unicode-normalization = "0.1.25"
 zstd = "0.13.3"
 
 # own
-base64 = "0.22"
+base64 = "0.22.1"
 chrono = "0.4.43"
 clap = { version = "4.5.56", features = ["derive"] }
 content_inspector = "0.2.4"
