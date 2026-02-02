@@ -1,0 +1,28 @@
+{
+  "name": "@example/test-package",
+  "version": "1.0.0",
+  "lockfileVersion": 2,
+  "requires": true,
+  "packages": {
+    "": {
+      "name": "@example/test-package",
+      "version": "1.0.0",
+      "license": "MIT",
+      "dependencies": {
+        "@types/node": "^18.0.0",
+        "express": "^4.18.0"
+      }
+    },
+    "node_modules/@types/node": {
+      "version": "18.19.0",
+      "resolved": "https://registry.npmjs.org/@types/node/-/node-18.19.0.tgz",
+      "integrity": "sha512-4iTyjAkBk5bBRt1J/h3z1hSHK12VPnOFaAzrDZaHOa2Ix4RZqDTZ5iXFgMqq+8jCYC3/XnKZiKWt3V9oQ+C9cA==",
+      "dev": true
+    },
+    "node_modules/express": {
+      "version": "4.18.2",
+      "resolved": "https://registry.npmjs.org/express/-/express-4.18.2.tgz",
+      "integrity": "sha512-5/PsL6iGPdfQ/lKM1UuielYgv3BUoJfz1aUwU9vHZ+J7gyvwdQXFEBIEIaxeGf0GIcreATNyBExtalisDbuMqQ=="
+    }
+  }
+}

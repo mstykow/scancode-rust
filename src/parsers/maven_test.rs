@@ -158,7 +158,7 @@ mod tests {
             junit_dep.purl,
             Some("pkg:maven/org.junit/junit@5.9.2".to_string())
         );
-        assert!(junit_dep.is_optional);
+        assert_eq!(junit_dep.is_optional, Some(true));
 
         // Verify jackson dependency
         let jackson_dep = package_data
@@ -170,7 +170,7 @@ mod tests {
             jackson_dep.purl,
             Some("pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.15.2".to_string())
         );
-        assert!(!jackson_dep.is_optional);
+        assert_eq!(jackson_dep.is_optional, Some(false));
     }
 
     #[test]

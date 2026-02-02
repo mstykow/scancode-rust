@@ -338,7 +338,7 @@ mod tests {
                 .iter()
                 .find(|dep| dep.purl.as_ref().is_some_and(|p| p.contains("express")))
             {
-                assert!(!express_dep.is_optional);
+                assert_eq!(express_dep.is_optional, Some(false));
             }
 
             if let Some(jest_dep) = package_data
@@ -346,7 +346,7 @@ mod tests {
                 .iter()
                 .find(|dep| dep.purl.as_ref().is_some_and(|p| p.contains("jest")))
             {
-                assert!(jest_dep.is_optional);
+                assert_eq!(jest_dep.is_optional, Some(true));
             }
         } else {
             // If no dependencies extracted, just verify the test doesn't crash

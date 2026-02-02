@@ -45,8 +45,13 @@ impl PackageParser for MavenParser {
                         b"dependency" if in_dependencies => {
                             current_dependency = Some(Dependency {
                                 purl: None,
+                                extracted_requirement: None,
                                 scope: None,
-                                is_optional: false,
+                                is_runtime: None,
+                                is_optional: Some(false),
+                                is_pinned: None,
+                                is_direct: None,
+                                resolved_package: None,
                             });
                         }
                         b"license" => {
@@ -72,8 +77,8 @@ impl PackageParser for MavenParser {
                                     *purl = format!("{}@{}", purl, text);
                                 }
                             }
-                            Some(b"scope") => dep.is_optional = text == "test",
-                            Some(b"optional") => dep.is_optional = text == "true",
+                            Some(b"scope") => dep.is_optional = Some(text == "test"),
+                            Some(b"optional") => dep.is_optional = Some(text == "true"),
                             _ => {}
                         }
                     } else {

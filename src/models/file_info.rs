@@ -194,8 +194,38 @@ pub struct Copyright {
 #[derive(Serialize, Debug, Clone)]
 pub struct Dependency {
     pub purl: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub extracted_requirement: Option<String>,
     pub scope: Option<String>,
-    pub is_optional: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub is_runtime: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub is_optional: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub is_pinned: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub is_direct: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub resolved_package: Option<Box<ResolvedPackage>>,
+}
+
+#[derive(Serialize, Debug, Clone)]
+pub struct ResolvedPackage {
+    #[serde(rename = "type")]
+    pub package_type: String,
+    pub namespace: String,
+    pub name: String,
+    pub version: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub primary_language: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub download_url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sha1: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sha512: Option<String>,
+    pub is_virtual: bool,
+    pub dependencies: Vec<Dependency>,
 }
 
 #[derive(Serialize, Debug, Clone)]

@@ -141,7 +141,7 @@ tokio = { version = "1.0", features = ["full"] }
             .expect("Should find serde dependency");
 
         assert_eq!(serde_dep.purl, Some("pkg:cargo/serde@1.0".to_string()));
-        assert!(!serde_dep.is_optional);
+        assert_eq!(serde_dep.is_optional, Some(false));
 
         // Find the dev dependency "tokio"
         let tokio_dep = package_data
@@ -151,7 +151,7 @@ tokio = { version = "1.0", features = ["full"] }
             .expect("Should find tokio dependency");
 
         assert_eq!(tokio_dep.purl, Some("pkg:cargo/tokio@1.0".to_string()));
-        assert!(tokio_dep.is_optional);
+        assert_eq!(tokio_dep.is_optional, Some(true));
     }
 
     #[test]

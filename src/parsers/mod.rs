@@ -5,6 +5,9 @@ mod maven;
 #[cfg(test)]
 mod maven_test;
 mod npm;
+mod npm_lock;
+#[cfg(test)]
+mod npm_lock_test;
 #[cfg(test)]
 mod npm_test;
 mod python;
@@ -25,4 +28,5 @@ pub trait PackageParser {
 pub use self::cargo::CargoParser;
 pub use self::maven::MavenParser;
 pub use self::npm::NpmParser;
+pub use self::npm_lock::NpmLockParser;
 pub use self::python::PythonParser;

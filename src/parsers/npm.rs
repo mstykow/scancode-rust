@@ -378,8 +378,13 @@ fn extract_dependencies(json: &Value, is_optional: bool) -> Vec<Dependency> {
 
                     Some(Dependency {
                         purl: Some(package_url.to_string()),
+                        extracted_requirement: None,
                         scope: None,
-                        is_optional,
+                        is_runtime: None,
+                        is_optional: Some(is_optional),
+                        is_pinned: None,
+                        is_direct: None,
+                        resolved_package: None,
                     })
                 })
                 .collect()

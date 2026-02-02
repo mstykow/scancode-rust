@@ -178,8 +178,13 @@ fn extract_dependencies(toml_content: &Value, is_optional: bool) -> Vec<Dependen
 
                 dependencies.push(Dependency {
                     purl: Some(package_url.to_string()),
+                    extracted_requirement: None,
                     scope: None,
-                    is_optional,
+                    is_runtime: None,
+                    is_optional: Some(is_optional),
+                    is_pinned: None,
+                    is_direct: None,
+                    resolved_package: None,
                 });
             }
         }

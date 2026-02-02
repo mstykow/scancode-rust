@@ -292,8 +292,13 @@ fn parse_dependency_table(
 
             Some(Dependency {
                 purl: Some(package_url.to_string()),
+                extracted_requirement: None,
                 scope: None,
-                is_optional,
+                is_runtime: None,
+                is_optional: Some(is_optional),
+                is_pinned: None,
+                is_direct: None,
+                resolved_package: None,
             })
         })
         .collect()
@@ -324,8 +329,13 @@ fn parse_dependency_array(array: &[TomlValue], is_optional: bool) -> Vec<Depende
 
             Some(Dependency {
                 purl: Some(package_url.to_string()),
+                extracted_requirement: None,
                 scope: None,
-                is_optional,
+                is_runtime: None,
+                is_optional: Some(is_optional),
+                is_pinned: None,
+                is_direct: None,
+                resolved_package: None,
             })
         })
         .collect()
