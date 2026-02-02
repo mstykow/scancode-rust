@@ -1,3 +1,6 @@
 [submodule "resources/licenses"]
 	path = resources/licenses
 	url = https://github.com/spdx/license-list-data.git
+[submodule "reference/scancode-toolkit"]
+	path = reference/scancode-toolkit
+	url = git@github.com:aboutcode-org/scancode-toolkit.git
