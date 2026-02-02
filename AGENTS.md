@@ -2,11 +2,26 @@
 
 This guide provides essential information for AI coding agents working on the `scancode-rust` codebase - a high-performance Rust tool for detecting licenses, copyrights, and package metadata in source code.
 
+## Project Context
+
+**scancode-rust** is a complete rewrite of [ScanCode Toolkit](https://github.com/aboutcode-org/scancode-toolkit) in Rust, designed to be faster, more reliable, and bug-free. The original Python codebase is available as a reference submodule at `reference/scancode-toolkit/`.
+
+### Using the Reference Submodule
+
+The `reference/scancode-toolkit/` submodule contains the original Python implementation and serves as:
+
+- **Inspiration for porting features**: When implementing new functionality, examine the original code to understand the logic and edge cases
+- **Reference for behavior**: Verify expected behavior and output formats against the original implementation
+- **Bug avoidance**: Identify known issues in the original and implement cleaner solutions in Rust
+
+⚠️ **Important**: This is a *rewrite*, not a port. Use the original code as reference only. Do not replicate its bugs, architectural issues, or outdated patterns. Focus on clean, idiomatic Rust code that improves upon the original.
+
 ## Quick Start
 
 ```bash
 # Setup (first time only)
-./setup.sh                    # Initialize SPDX license data submodule
+./setup.sh                    # Initialize git submodules (SPDX license data)
+git submodule update --init   # Ensure all submodules are initialized
 
 # Build & Test
 cargo build                   # Development build
@@ -240,12 +255,39 @@ mod tests {
 4. **Unwrap in library code**: Use `?` or `match` instead
 5. **Breaking parallel processing**: Ensure modifications maintain thread safety
 
+## Porting Features from Original ScanCode
+
+When implementing features inspired by the original Python codebase at `reference/scancode-toolkit/`:
+
+1. **Research first**: Read the original implementation to understand the problem and approach
+2. **Don't copy blindly**: The original has known bugs, performance issues, and technical debt
+3. **Rethink the design**: Leverage Rust's type system, ownership model, and modern patterns
+4. **Improve error handling**: Use `Result<T, E>` instead of exception-based control flow
+5. **Add comprehensive tests**: Include test cases that cover bugs present in the original
+6. **Document deviations**: If you intentionally differ from the original behavior, document why
+
+### Example Workflow
+
+```bash
+# Explore the original implementation
+cd reference/scancode-toolkit/
+grep -r "relevant_function_name" src/
+
+# Understand the data structures and logic
+cat src/packagedcode/npm.py
+
+# Return to main project and implement in Rust
+cd ../..
+# Implement in src/parsers/npm.rs with improvements
+```
+
 ## Additional Notes
 
 - **Rust toolchain**: Version pinned in `rust-toolchain.toml` (currently 1.93.0)
 - **Output format**: ScanCode Toolkit-compatible JSON with `SCANCODE_OUTPUT_FORMAT_VERSION`
 - **License detection**: Uses SPDX license data, threshold of 0.9 confidence
 - **Exclusion patterns**: Supports glob patterns (e.g., `*.git*`, `node_modules/*`)
+- **Git submodules**: Two submodules - `resources/licenses/` (SPDX data) and `reference/scancode-toolkit/` (original Python codebase for reference)
 
 ## Useful References
 
