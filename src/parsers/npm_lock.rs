@@ -28,7 +28,12 @@ impl PackageParser for NpmLockParser {
     fn is_match(path: &Path) -> bool {
         path.file_name()
             .and_then(|name| name.to_str())
-            .map(|name| name == "package-lock.json" || name == ".package-lock.json")
+            .map(|name| {
+                name == "package-lock.json"
+                    || name == ".package-lock.json"
+                    || name == "npm-shrinkwrap.json"
+                    || name == ".npm-shrinkwrap.json"
+            })
             .unwrap_or(false)
     }
 

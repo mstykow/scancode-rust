@@ -35,6 +35,18 @@ mod tests {
     }
 
     #[test]
+    fn test_is_match_npm_shrinkwrap() {
+        let valid_path = PathBuf::from("/some/path/npm-shrinkwrap.json");
+        assert!(NpmLockParser::is_match(&valid_path));
+    }
+
+    #[test]
+    fn test_is_match_hidden_npm_shrinkwrap() {
+        let valid_path = PathBuf::from("/some/path/.npm-shrinkwrap.json");
+        assert!(NpmLockParser::is_match(&valid_path));
+    }
+
+    #[test]
     fn test_is_not_match_package_json() {
         let invalid_path = PathBuf::from("/some/path/package.json");
         assert!(!NpmLockParser::is_match(&invalid_path));
@@ -129,6 +141,37 @@ mod tests {
         let resolved = types_node.resolved_package.as_ref().unwrap();
         assert_eq!(resolved.namespace, "@types");
         assert_eq!(resolved.name, "node");
+    }
+
+    #[test]
+    fn test_parse_npm_shrinkwrap() {
+        let lock_path = load_testdata_file("npm-shrinkwrap.json");
+        let package_data = NpmLockParser::extract_package_data(&lock_path);
+
+        assert_eq!(package_data.package_type, Some("npm".to_string()));
+        assert_eq!(package_data.name, Some("shrinkwrap-test".to_string()));
+        assert_eq!(package_data.version, Some("2.0.0".to_string()));
+
+        // Should have lodash dependency
+        assert!(!package_data.dependencies.is_empty());
+        let lodash_dep = package_data
+            .dependencies
+            .iter()
+            .find(|d| {
+                d.purl
+                    .as_ref()
+                    .map(|p| p.contains("lodash"))
+                    .unwrap_or(false)
+            })
+            .expect("Should have lodash dependency");
+
+        assert_eq!(lodash_dep.is_pinned, Some(true));
+        assert!(lodash_dep.resolved_package.is_some());
+
+        let resolved = lodash_dep.resolved_package.as_ref().unwrap();
+        assert_eq!(resolved.name, "lodash");
+        assert_eq!(resolved.version, "4.17.21");
+        assert!(resolved.download_url.is_some());
     }
 
     #[test]
