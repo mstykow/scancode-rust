@@ -1,0 +1,3 @@
+# Main requirements with constraints
+requests
+-c constraints.txt

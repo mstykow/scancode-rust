@@ -1,0 +1,3 @@
+# Requirements B - includes A (circular!)
+pytest>=7.0
+-r requirements-a.txt

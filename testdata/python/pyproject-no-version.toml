@@ -1,0 +1,8 @@
+[project]
+name = "numpy"
+license = "BSD-3-Clause"
+authors = [
+    "Travis Oliphant <oliphant@enthought.com>"
+]
+
+[project.dependencies]

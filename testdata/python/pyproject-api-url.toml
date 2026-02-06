@@ -1,0 +1,11 @@
+[project]
+name = "requests"
+version = "2.31.0"
+license = "Apache-2.0"
+authors = [
+    "Kenneth Reitz <me@kennethreitz.com>"
+]
+
+[project.dependencies]
+urllib3 = ">=1.21.1,<2"
+chardet = ">=3.0.2,<5"
