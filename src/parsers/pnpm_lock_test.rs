@@ -343,3 +343,58 @@ resolution:
     assert_eq!(dep.is_runtime, Some(false));
     assert_eq!(dep.is_optional, Some(false));
 }
+
+#[test]
+fn test_clean_purl_fields_v5_package_with_underscore() {
+    let purl_fields = "/string_decoder/1.3.0";
+    let result = clean_purl_fields(purl_fields, "5.0");
+    assert_eq!(result, "string_decoder/1.3.0");
+}
+
+#[test]
+fn test_clean_purl_fields_v5_safe_buffer_with_underscore() {
+    let purl_fields = "/safe_buffer/5.2.1_xyz789abc";
+    let result = clean_purl_fields(purl_fields, "5.0");
+    assert_eq!(result, "safe_buffer/5.2.1");
+}
+
+#[test]
+fn test_clean_purl_fields_v5_scoped_package_with_underscore() {
+    let purl_fields = "/@babel/helper_string_parser/7.24.8_abc123";
+    let result = clean_purl_fields(purl_fields, "5.0");
+    assert_eq!(result, "@babel/helper_string_parser/7.24.8");
+}
+
+#[test]
+fn test_parse_purl_fields_v5_string_decoder_with_underscore() {
+    let (namespace, name, version) = parse_purl_fields("string_decoder/1.3.0", "5.0").unwrap();
+    assert_eq!(namespace, None);
+    assert_eq!(name, "string_decoder".to_string());
+    assert_eq!(version, "1.3.0".to_string());
+}
+
+#[test]
+fn test_parse_purl_fields_v5_scoped_with_underscore() {
+    let (namespace, name, version) =
+        parse_purl_fields("@babel/helper_string_parser/7.24.8", "5.0").unwrap();
+    assert_eq!(namespace, Some("@babel".to_string()));
+    assert_eq!(name, "helper_string_parser".to_string());
+    assert_eq!(version, "7.24.8".to_string());
+}
+
+#[test]
+fn test_parse_purl_fields_v6_package_with_underscore() {
+    let (namespace, name, version) = parse_purl_fields("string_decoder@1.3.0", "6.0").unwrap();
+    assert_eq!(namespace, None);
+    assert_eq!(name, "string_decoder".to_string());
+    assert_eq!(version, "1.3.0".to_string());
+}
+
+#[test]
+fn test_parse_purl_fields_v6_scoped_with_underscore() {
+    let (namespace, name, version) =
+        parse_purl_fields("@babel/helper_string_parser@7.24.8", "6.0").unwrap();
+    assert_eq!(namespace, Some("@babel".to_string()));
+    assert_eq!(name, "helper_string_parser".to_string());
+    assert_eq!(version, "7.24.8".to_string());
+}
