@@ -317,9 +317,39 @@ pub fn clean_purl_fields(purl_fields: &str, lockfile_version: &str) -> String {
             .unwrap_or(purl_fields)
             .to_string()
     } else if lockfile_version.starts_with('5') {
-        let parts: Vec<&str> = purl_fields.rsplitn(2, '_').collect();
-        if parts.len() == 2 {
-            parts[1].to_string()
+        // v5 format: /<name>/<version>_<peer_hash> or /@scope/name/version_<peer_hash>
+        // _<peer_hash> is optional
+        let components: Vec<&str> = purl_fields.split('/').collect();
+
+        if let Some(last_component) = components.last() {
+            if last_component.contains('_') {
+                // Need to determine where version ends and peer hash begins
+                // Strategy: Find the first underscore that comes AFTER a valid semver pattern
+                // Semver pattern: digits.digits.digits (possibly with -prerelease or +build)
+
+                // Try to find version pattern: look for pattern like "1.2.3" followed by underscore
+                // We'll iterate through possible split points and check if the left part looks like a version
+                let parts: Vec<&str> = last_component.split('_').collect();
+                for i in 1..=parts.len() {
+                    let potential_version = parts[..i].join("_");
+
+                    if is_likely_version(&potential_version) {
+                        // Found the version, reconstruct path without peer hash
+                        let mut result_components = components[..components.len() - 1].to_vec();
+                        result_components.push(&potential_version);
+                        return result_components
+                            .join("/")
+                            .strip_prefix('/')
+                            .unwrap_or(&result_components.join("/"))
+                            .to_string();
+                    }
+                }
+
+                // Fallback: if no version pattern found, assume no peer hash (keep everything)
+                purl_fields.to_string()
+            } else {
+                purl_fields.to_string()
+            }
         } else {
             purl_fields.to_string()
         }
@@ -328,6 +358,53 @@ pub fn clean_purl_fields(purl_fields: &str, lockfile_version: &str) -> String {
     };
 
     cleaned.strip_prefix('/').unwrap_or(&cleaned).to_string()
+}
+
+/// Check if a string looks like a semantic version
+///
+/// A version typically:
+/// - Contains at least one dot (e.g., "1.0", "1.2.3")
+/// - Starts with a digit
+/// - May contain hyphens for prerelease (e.g., "1.0.0-alpha")
+/// - May contain plus for build metadata (e.g., "1.0.0+build")
+fn is_likely_version(s: &str) -> bool {
+    if s.is_empty() {
+        return false;
+    }
+
+    // Must start with a digit
+    if !s
+        .chars()
+        .next()
+        .map(|c| c.is_ascii_digit())
+        .unwrap_or(false)
+    {
+        return false;
+    }
+
+    // Must contain at least one dot (for major.minor or major.minor.patch)
+    if !s.contains('.') {
+        return false;
+    }
+
+    // Check if it matches a basic version pattern
+    // Split by '-' or '+' to get the core version part
+    let core_version = s.split(&['-', '+'][..]).next().unwrap_or(s);
+
+    // Core version should be digits separated by dots
+    let parts: Vec<&str> = core_version.split('.').collect();
+    if parts.is_empty() {
+        return false;
+    }
+
+    // Each part should be numeric (allowing leading zeros)
+    for part in parts {
+        if part.is_empty() || !part.chars().all(|c| c.is_ascii_digit()) {
+            return false;
+        }
+    }
+
+    true
 }
 
 fn parse_nested_dependencies(data: &Value) -> Vec<Dependency> {
