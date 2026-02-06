@@ -1,7 +1,9 @@
 use crate::askalono::{ScanStrategy, TextData};
 use crate::models::{FileInfo, FileInfoBuilder, FileType, LicenseDetection, Match};
 use crate::parsers::{
-    CargoParser, MavenParser, NpmLockParser, NpmParser, PackageParser, PythonParser,
+    CargoParser, MavenParser, NpmLockParser, NpmParser, NpmWorkspaceParser, PackageParser,
+    PipfileLockParser, PnpmLockParser, PoetryLockParser, PythonParser, RequirementsTxtParser,
+    YarnLockParser,
 };
 use crate::scanner::ProcessResult;
 use crate::utils::file::{get_creation_date, is_path_excluded};
@@ -155,6 +157,30 @@ fn extract_information_from_content(
         let package_data = vec![NpmLockParser::extract_package_data(path)];
         file_info_builder.package_data(package_data);
         Ok(())
+    } else if YarnLockParser::is_match(path) {
+        let package_data = vec![YarnLockParser::extract_package_data(path)];
+        file_info_builder.package_data(package_data);
+        Ok(())
+    } else if PnpmLockParser::is_match(path) {
+        let package_data = vec![PnpmLockParser::extract_package_data(path)];
+        file_info_builder.package_data(package_data);
+        Ok(())
+    } else if PoetryLockParser::is_match(path) {
+        let package_data = vec![PoetryLockParser::extract_package_data(path)];
+        file_info_builder.package_data(package_data);
+        Ok(())
+    } else if PipfileLockParser::is_match(path) {
+        let package_data = vec![PipfileLockParser::extract_package_data(path)];
+        file_info_builder.package_data(package_data);
+        Ok(())
+    } else if RequirementsTxtParser::is_match(path) {
+        let package_data = vec![RequirementsTxtParser::extract_package_data(path)];
+        file_info_builder.package_data(package_data);
+        Ok(())
+    } else if NpmWorkspaceParser::is_match(path) {
+        let package_data = vec![NpmWorkspaceParser::extract_package_data(path)];
+        file_info_builder.package_data(package_data);
+        Ok(())
     } else if CargoParser::is_match(path) {
         let package_data = vec![CargoParser::extract_package_data(path)];
         file_info_builder.package_data(package_data);
@@ -194,16 +220,28 @@ fn extract_license_information(
     let license_detections = license_result
         .containing
         .iter()
-        .map(|detection| LicenseDetection {
-            license_expression: detection.license.name.to_string(),
-            matches: vec![Match {
-                score: detection.score as f64,
-                start_line: detection.line_range.0,
-                end_line: detection.line_range.1,
-                license_expression: detection.license.name.to_string(),
-                matched_text: None, //TODO
-                rule_identifier: None,
-            }],
+        .map(|detection| {
+            let license_lower = detection.license.name.to_lowercase();
+            LicenseDetection {
+                license_expression: license_lower.clone(),
+                license_expression_spdx: detection.license.name.to_string(),
+                matches: vec![Match {
+                    license_expression: license_lower.clone(),
+                    license_expression_spdx: detection.license.name.to_string(),
+                    from_file: None,
+                    score: detection.score as f64,
+                    start_line: detection.line_range.0,
+                    end_line: detection.line_range.1,
+                    matcher: Some("2-aho".to_string()),
+                    matched_length: None,
+                    match_coverage: None,
+                    rule_relevance: None,
+                    rule_identifier: None,
+                    rule_url: None,
+                    matched_text: None,
+                }],
+                identifier: None,
+            }
         })
         .collect::<Vec<_>>();
 

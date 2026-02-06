@@ -15,3 +15,10 @@ repos:
     language: system
     types: [rust]
     pass_filenames: false
+  
+  - id: generate-supported-formats
+    name: Generate docs/SUPPORTED_FORMATS.md
+    entry: bash -c 'cargo run --quiet --bin generate-supported-formats && git add docs/SUPPORTED_FORMATS.md'
+    language: system
+    pass_filenames: false
+    files: ^src/parsers/.*\.rs$
