@@ -1,0 +1,8 @@
+{
+  "name": "test-package-scoped",
+  "version": "1.0.0",
+  "dependencies": {
+    "my-alias": "npm:@scope/actual-package@^1.0.0",
+    "@scoped/regular-dep": "^2.0.0"
+  }
+}

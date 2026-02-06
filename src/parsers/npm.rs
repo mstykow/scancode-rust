@@ -1,10 +1,32 @@
+//! Parser for npm package.json manifests.
+//!
+//! Extracts package metadata, dependencies, and license information from
+//! package.json files used by Node.js/npm projects.
+//!
+//! # Supported Formats
+//! - package.json (manifest)
+//!
+//! # Key Features
+//! - Full dependency extraction (dependencies, devDependencies, peerDependencies, optionalDependencies, bundledDependencies)
+//! - License declaration normalization using askalono
+//! - Package URL (purl) generation for scoped and unscoped packages
+//! - VCS repository URL extraction
+//! - Distribution integrity hash extraction (sha1, sha512)
+//! - Support for legacy formats (licenses array, license objects)
+//!
+//! # Implementation Notes
+//! - Uses serde_json for JSON parsing
+//! - Namespace format: `@org` for scoped packages (e.g., `@babel/core`)
+//! - Graceful error handling: logs warnings and returns default on parse failure
+
+use crate::askalono::Store;
 use crate::models::{Dependency, LicenseDetection, Match, PackageData, Party};
+use crate::parsers::utils::{normalize_license, npm_purl, parse_sri};
 use log::warn;
 use packageurl::PackageUrl;
 use serde_json::Value;
 use std::collections::HashMap;
-use std::fs::File;
-use std::io::{BufRead, BufReader};
+use std::fs;
 use std::path::Path;
 
 use super::PackageParser;
@@ -20,7 +42,26 @@ const FIELD_CONTRIBUTORS: &str = "contributors";
 const FIELD_MAINTAINERS: &str = "maintainers";
 const FIELD_DEPENDENCIES: &str = "dependencies";
 const FIELD_DEV_DEPENDENCIES: &str = "devDependencies";
+const FIELD_PEER_DEPENDENCIES: &str = "peerDependencies";
+const FIELD_OPTIONAL_DEPENDENCIES: &str = "optionalDependencies";
+const FIELD_BUNDLED_DEPENDENCIES: &str = "bundledDependencies";
+const FIELD_BUNDLE_DEPENDENCIES: &str = "bundleDependencies";
+const FIELD_RESOLUTIONS: &str = "resolutions";
+const FIELD_DESCRIPTION: &str = "description";
+const FIELD_KEYWORDS: &str = "keywords";
+const FIELD_ENGINES: &str = "engines";
+const FIELD_PACKAGE_MANAGER: &str = "packageManager";
+const FIELD_WORKSPACES: &str = "workspaces";
+const FIELD_PRIVATE: &str = "private";
+const FIELD_BUGS: &str = "bugs";
+const FIELD_DIST: &str = "dist";
+const FIELD_PEER_DEPENDENCIES_META: &str = "peerDependenciesMeta";
+const FIELD_DEPENDENCIES_META: &str = "dependenciesMeta";
 
+/// npm package parser for package.json manifests.
+///
+/// Supports all npm dependency types (dependencies, devDependencies, peerDependencies,
+/// optionalDependencies, bundledDependencies) and workspace configurations.
 pub struct NpmParser;
 
 impl PackageParser for NpmParser {
@@ -44,25 +85,146 @@ impl PackageParser for NpmParser {
             .and_then(|v| v.as_str())
             .map(String::from);
         let namespace = extract_namespace(&name);
+        let package_name = extract_package_name(&name);
+        let description = extract_description(&json);
+
+        let extracted_license_statement = extract_license_statement(&json);
+        let raw_license = extract_raw_license_string(&json);
+        let store = Store::new();
+        let (declared_license_expression, declared_license_expression_spdx) =
+            if let Some(raw) = &raw_license {
+                let (expr, spdx) = normalize_license(raw, &store);
+                // Fallback to raw license string if store is empty or normalization fails
+                if store.is_empty() {
+                    (Some(raw.to_lowercase()), Some(raw.clone()))
+                } else {
+                    (expr, spdx)
+                }
+            } else {
+                (None, None)
+            };
+
         let license_detections = extract_license_info(&json, &field_lines);
+        let peer_dependencies_meta = extract_peer_dependencies_meta(&json);
         let dependencies = extract_dependencies(&json, false);
         let dev_dependencies = extract_dependencies(&json, true);
+        let peer_dependencies = extract_peer_dependencies(&json, &peer_dependencies_meta);
+        let optional_dependencies = extract_optional_dependencies(&json);
+        let bundled_dependencies = extract_bundled_dependencies(&json);
         let purl = create_package_url(&name, &version, &namespace);
+        let keywords_vec = extract_keywords_as_vec(&json);
+
+        let mut extra_data_map = HashMap::new();
+
+        if let Some(resolutions) = extract_resolutions(&json) {
+            extra_data_map = combine_extra_data(Some(extra_data_map), resolutions);
+        }
+
+        if let Some(engines) = extract_engines(&json) {
+            extra_data_map.insert("engines".to_string(), engines);
+        }
+
+        if let Some(package_manager) = extract_package_manager(&json) {
+            extra_data_map.insert(
+                "packageManager".to_string(),
+                serde_json::Value::String(package_manager),
+            );
+        }
+
+        if let Some(workspaces) = extract_workspaces(&json) {
+            extra_data_map.insert("workspaces".to_string(), workspaces);
+        }
+
+        if let Some(private) = extract_private(&json) {
+            extra_data_map.insert("private".to_string(), serde_json::Value::Bool(private));
+        }
+
+        if let Some(dependencies_meta) = extract_dependencies_meta(&json) {
+            extra_data_map.insert("dependenciesMeta".to_string(), dependencies_meta);
+        }
+
+        let extra_data = if extra_data_map.is_empty() {
+            None
+        } else {
+            Some(extra_data_map)
+        };
+
+        let (dist_sha256, dist_sha512) = match json.get(FIELD_DIST) {
+            Some(dist) => extract_dist_integrity(dist),
+            None => (None, None),
+        };
+
+        let download_url = json
+            .get(FIELD_DIST)
+            .and_then(extract_dist_tarball)
+            .or_else(|| {
+                if let (Some(n), Some(v)) = (&name, &version) {
+                    Some(format!(
+                        "https://registry.npmjs.org/{}/-/{}-{}.tgz",
+                        n, n, v
+                    ))
+                } else {
+                    None
+                }
+            });
+
+        let api_data_url = generate_npm_api_url(&namespace, &package_name, &version);
+        let repository_homepage_url = generate_repository_homepage_url(&package_name);
+        let repository_download_url = generate_repository_download_url(&package_name, &version);
+        let vcs_url = extract_vcs_url(&json);
 
         PackageData {
             package_type: Some(Self::PACKAGE_TYPE.to_string()),
             namespace,
             name,
             version,
+            qualifiers: None,
+            subpath: None,
+            primary_language: Some("JavaScript".to_string()),
+            description,
+            release_date: None,
+            parties: extract_parties(&json),
+            keywords: keywords_vec,
             homepage_url: json
                 .get(FIELD_HOMEPAGE)
                 .and_then(|v| v.as_str())
                 .map(String::from),
-            download_url: extract_repository_url(&json),
-            copyright: None, // Not typically present in package.json
+            download_url,
+            size: None,
+            sha1: None,
+            md5: None,
+            sha256: dist_sha256,
+            sha512: dist_sha512,
+            bug_tracking_url: extract_bugs(&json),
+            code_view_url: None,
+            vcs_url,
+            copyright: None,
+            holder: None,
+            declared_license_expression,
+            declared_license_expression_spdx,
             license_detections,
-            dependencies: [dependencies, dev_dependencies].concat(),
-            parties: extract_parties(&json),
+            other_license_expression: None,
+            other_license_expression_spdx: None,
+            other_license_detections: Vec::new(),
+            extracted_license_statement,
+            notice_text: None,
+            source_packages: Vec::new(),
+            file_references: Vec::new(),
+            is_private: false,
+            is_virtual: false,
+            extra_data,
+            dependencies: [
+                dependencies,
+                dev_dependencies,
+                peer_dependencies,
+                optional_dependencies,
+                bundled_dependencies,
+            ]
+            .concat(),
+            repository_homepage_url,
+            repository_download_url,
+            api_data_url,
+            datasource_id: Some("npm_package_json".to_string()),
             purl,
         }
     }
@@ -74,25 +236,19 @@ impl PackageParser for NpmParser {
 
 /// Reads and parses a JSON file while tracking line numbers of fields
 fn read_and_parse_json_with_lines(path: &Path) -> Result<(Value, HashMap<String, usize>), String> {
-    // Read the file line by line to track line numbers
-    let file = File::open(path).map_err(|e| format!("Failed to open file: {}", e))?;
-    let reader = BufReader::new(file);
-    let lines: Vec<String> = reader
-        .lines()
-        .collect::<Result<_, _>>()
-        .map_err(|e| format!("Error reading file: {}", e))?;
+    // Read file once into string
+    let content = fs::read_to_string(path).map_err(|e| format!("Failed to read file: {}", e))?;
 
-    // Parse the content as JSON
-    let content = lines.join("\n");
+    // Parse JSON
     let json: Value =
         serde_json::from_str(&content).map_err(|e| format!("Failed to parse JSON: {}", e))?;
 
-    // Track line numbers for each field in the JSON
+    // Track line numbers for each field by iterating over lines
     let mut field_lines = HashMap::new();
-    for (line_num, line) in lines.iter().enumerate() {
-        let line = line.trim();
+    for (line_num, line) in content.lines().enumerate() {
+        let trimmed = line.trim();
         // Look for field names in the format: "field": value
-        if let Some(field_name) = extract_field_name(line) {
+        if let Some(field_name) = extract_field_name(trimmed) {
             field_lines.insert(field_name, line_num + 1); // 1-based line numbers
         }
     }
@@ -129,20 +285,20 @@ fn extract_field_name(line: &str) -> Option<String> {
 
 fn extract_namespace(name: &Option<String>) -> Option<String> {
     name.as_ref().and_then(|n| {
-        if n.starts_with('@') && n.contains('/') {
-            // Handle scoped package (@namespace/name)
-            Some(
-                n.split('/')
-                    .next()
-                    .unwrap()
-                    .trim_start_matches('@')
-                    .to_string(),
-            )
-        } else if n.contains('/') {
-            // Handle regular namespaced package (namespace/name)
+        if n.contains('/') {
             n.split('/').next().map(String::from)
         } else {
             None
+        }
+    })
+}
+
+fn extract_package_name(name: &Option<String>) -> Option<String> {
+    name.as_ref().map(|n| {
+        if n.contains('/') {
+            n.split('/').nth(1).unwrap_or(n).to_string()
+        } else {
+            n.clone()
         }
     })
 }
@@ -152,39 +308,49 @@ fn create_package_url(
     version: &Option<String>,
     _namespace: &Option<String>,
 ) -> Option<String> {
-    name.as_ref().map(|name| {
-        // Note: We extract and store namespace in PackageData for metadata purposes,
-        // but cannot use it with PackageUrl library for scoped packages.
-        //
-        // The PackageURL spec requires scoped npm packages to be formatted as:
-        //   pkg:npm/%40scope/package@version
-        // where only the @ is encoded as %40, but the / remains unencoded.
-        //
-        // The PackageUrl library cannot produce this format:
-        // - with_namespace("scope") produces: pkg:npm/scope/package (missing %40)
-        // - with_namespace("%40scope") produces: pkg:npm/%2540scope/package (double-encoded)
-        // - PackageUrl::new("npm", "@scope/package") produces: pkg:npm/%40scope%2Fpackage (encodes /)
-        //
-        // Therefore, we must manually construct the PURL for scoped packages.
+    // Note: We extract and store namespace in PackageData for metadata purposes,
+    // but the full package name (e.g., "@babel/core") is used for PURL generation.
+    let name = name.as_ref()?;
+    npm_purl(name, version.as_deref())
+}
 
-        if name.starts_with('@') && name.contains('/') {
-            // Manual construction for scoped packages
-            let encoded_name = name.replace('@', "%40");
-            let version_part = version
-                .as_ref()
-                .map(|v| format!("@{}", v))
-                .unwrap_or_default();
-            format!("pkg:npm/{}{}", encoded_name, version_part)
-        } else {
-            // Use PackageUrl library for non-scoped packages
-            let mut package_url = PackageUrl::new(NpmParser::PACKAGE_TYPE, name)
-                .expect("Failed to create PackageUrl");
-            if let Some(v) = version {
-                package_url.with_version(v).expect("Failed to set version");
-            }
-            package_url.to_string()
-        }
-    })
+fn extract_raw_license_string(json: &Value) -> Option<String> {
+    json.get(FIELD_LICENSE)
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string())
+        .or_else(|| {
+            json.get(FIELD_LICENSE)
+                .and_then(|v| v.as_object())
+                .and_then(|obj| obj.get("type"))
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string())
+        })
+        .or_else(|| {
+            json.get(FIELD_LICENSES)
+                .and_then(|v| v.as_array())
+                .and_then(|arr| arr.first())
+                .and_then(|obj| obj.get("type"))
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string())
+        })
+}
+
+fn create_license_match(license_str: &str, line: usize) -> Match {
+    Match {
+        license_expression: license_str.to_lowercase(),
+        license_expression_spdx: license_str.to_string(),
+        score: 100.0,
+        start_line: line,
+        end_line: line,
+        from_file: None,
+        matcher: None,
+        matched_length: None,
+        match_coverage: None,
+        rule_relevance: None,
+        rule_identifier: None,
+        rule_url: None,
+        matched_text: None,
+    }
 }
 
 fn extract_license_info(
@@ -197,17 +363,11 @@ fn extract_license_info(
     if let Some(license_str) = json.get(FIELD_LICENSE).and_then(|v| v.as_str()) {
         let line = field_lines.get(FIELD_LICENSE).copied().unwrap_or(0);
         detections.push(LicenseDetection {
-            license_expression: license_str.to_string(),
-            matches: vec![Match {
-                score: 100.0,
-                start_line: line,
-                end_line: line,
-                license_expression: license_str.to_string(),
-                rule_identifier: None,
-                matched_text: None,
-            }],
+            license_expression: license_str.to_lowercase(),
+            license_expression_spdx: license_str.to_string(),
+            identifier: None,
+            matches: vec![create_license_match(license_str, line)],
         });
-        return detections;
     }
 
     // Check for license object
@@ -216,17 +376,11 @@ fn extract_license_info(
     {
         let line = field_lines.get(FIELD_LICENSE).copied().unwrap_or(0);
         detections.push(LicenseDetection {
-            license_expression: license_type.to_string(),
-            matches: vec![Match {
-                score: 100.0,
-                start_line: line,
-                end_line: line,
-                license_expression: license_type.to_string(),
-                rule_identifier: None,
-                matched_text: None,
-            }],
+            license_expression: license_type.to_lowercase(),
+            license_expression_spdx: license_type.to_string(),
+            identifier: None,
+            matches: vec![create_license_match(license_type, line)],
         });
-        return detections;
     }
 
     // Check for deprecated licenses array
@@ -235,15 +389,10 @@ fn extract_license_info(
         for (index, license) in licenses.iter().enumerate() {
             if let Some(license_type) = license.get("type").and_then(|v| v.as_str()) {
                 detections.push(LicenseDetection {
-                    license_expression: license_type.to_string(),
-                    matches: vec![Match {
-                        score: 100.0,
-                        start_line: base_line + index,
-                        end_line: base_line + index,
-                        license_expression: license_type.to_string(),
-                        rule_identifier: None,
-                        matched_text: None,
-                    }],
+                    license_expression: license_type.to_lowercase(),
+                    license_expression_spdx: license_type.to_string(),
+                    identifier: None,
+                    matches: vec![create_license_match(license_type, base_line + index)],
                 });
             }
         }
@@ -252,27 +401,150 @@ fn extract_license_info(
     detections
 }
 
-fn extract_repository_url(json: &Value) -> Option<String> {
-    match json.get(FIELD_REPOSITORY) {
-        Some(Value::String(url)) => Some(normalize_repo_url(url)),
-        Some(Value::Object(obj)) => obj
-            .get("url")
-            .and_then(|u| u.as_str())
-            .map(normalize_repo_url),
-        _ => None,
+fn extract_license_statement(json: &Value) -> Option<String> {
+    let mut statements = Vec::new();
+
+    if let Some(license_value) = json.get(FIELD_LICENSE) {
+        if let Some(license_str) = license_value.as_str() {
+            statements.push(format!("- {}", license_str));
+        } else if let Some(license_obj) = license_value.as_object()
+            && let Some(type_val) = license_obj.get("type").and_then(|v| v.as_str())
+        {
+            statements.push(format!("- type: {}", type_val));
+            if let Some(url_val) = license_obj.get("url").and_then(|v| v.as_str()) {
+                statements.push(format!("  url: {}", url_val));
+            }
+        }
+    }
+
+    if let Some(licenses) = json.get(FIELD_LICENSES).and_then(|v| v.as_array()) {
+        for license in licenses {
+            if let Some(license_obj) = license.as_object()
+                && let Some(type_val) = license_obj.get("type").and_then(|v| v.as_str())
+            {
+                statements.push(format!("- type: {}", type_val));
+                if let Some(url_val) = license_obj.get("url").and_then(|v| v.as_str()) {
+                    statements.push(format!("  url: {}", url_val));
+                }
+            }
+        }
+    }
+
+    if statements.is_empty() {
+        None
+    } else {
+        Some(format!("{}\n", statements.join("\n")))
     }
 }
 
+/// Extracts the repository URL from the repository field.
+/// Extracts and normalizes VCS URL from the repository field.
+/// Supports both string and object formats with optional 'type' and 'directory' fields.
+fn extract_vcs_url(json: &Value) -> Option<String> {
+    let (vcs_tool, vcs_repository) = match json.get(FIELD_REPOSITORY) {
+        Some(Value::String(url)) => {
+            let normalized = normalize_repo_url(url);
+            if normalized.is_empty() {
+                return None;
+            }
+            (None, normalized)
+        }
+        Some(Value::Object(obj)) => {
+            let repo_url = obj.get("url").and_then(|u| u.as_str()).unwrap_or("");
+            let normalized = normalize_repo_url(repo_url);
+            if normalized.is_empty() {
+                return None;
+            }
+            let tool = obj
+                .get("type")
+                .and_then(|t| t.as_str())
+                .unwrap_or("git")
+                .to_string();
+            let tool_for_prefix = if normalized.starts_with("git://")
+                || normalized.starts_with("git+")
+                || normalized.starts_with("hg://")
+                || normalized.starts_with("hg+")
+                || normalized.starts_with("svn://")
+                || normalized.starts_with("svn+")
+            {
+                None
+            } else {
+                Some(tool)
+            };
+            (tool_for_prefix, normalized)
+        }
+        _ => return None,
+    };
+
+    if vcs_repository.is_empty() {
+        return None;
+    }
+
+    let mut vcs_url = vcs_tool.map_or_else(
+        || vcs_repository.clone(),
+        |tool| format!("{}+{}", tool, vcs_repository),
+    );
+
+    if let Some(Value::Object(obj)) = json.get(FIELD_REPOSITORY)
+        && let Some(directory) = obj.get("directory").and_then(|d| d.as_str())
+    {
+        vcs_url.push('#');
+        vcs_url.push_str(directory);
+    }
+
+    Some(vcs_url)
+}
+
 /// Normalizes repository URLs by converting various formats to a standard HTTPS URL.
+/// Based on normalize_vcs_url() from Python reference.
 fn normalize_repo_url(url: &str) -> String {
     let url = url.trim();
 
-    if url.starts_with("git://") {
-        return url.replace("git://", "https://");
-    } else if url.starts_with("git+https://") {
-        return url.replace("git+https://", "https://");
-    } else if url.starts_with("git@github.com:") {
-        return url.replace("git@github.com:", "https://github.com/");
+    if url.is_empty() {
+        return String::new();
+    }
+
+    let normalized_schemes = [
+        "https://",
+        "http://",
+        "git://",
+        "git+git://",
+        "git+https://",
+        "git+http://",
+        "hg://",
+        "hg+http://",
+        "hg+https://",
+        "svn://",
+        "svn+http://",
+        "svn+https://",
+    ];
+    if normalized_schemes
+        .iter()
+        .any(|scheme| url.starts_with(scheme))
+    {
+        return url.to_string();
+    }
+
+    if let Some((host, repo)) = url
+        .strip_prefix("git@")
+        .and_then(|rest| rest.split_once(':'))
+    {
+        return format!("https://{}/{}", host, repo);
+    }
+
+    if let Some((platform, repo)) = url.split_once(':') {
+        let host_url = match platform {
+            "github" => "https://github.com/",
+            "gitlab" => "https://gitlab.com/",
+            "bitbucket" => "https://bitbucket.org/",
+            "gist" => "https://gist.github.com/",
+            _ => return url.to_string(),
+        };
+        return format!("{}{}", host_url, repo);
+    }
+
+    if !url.contains(':') && url.chars().filter(|&c| c == '/').count() == 1 {
+        return format!("https://github.com/{}", url);
     }
 
     url.to_string()
@@ -282,28 +554,106 @@ fn normalize_repo_url(url: &str) -> String {
 fn extract_parties(json: &Value) -> Vec<Party> {
     let mut parties = Vec::new();
 
-    // Extract author field
-    if let Some(author) = json.get(FIELD_AUTHOR)
-        && let Some(email) = extract_email_from_field(author)
-    {
-        parties.push(Party { email });
+    // Extract author field (can be single value or array)
+    if let Some(author) = json.get(FIELD_AUTHOR) {
+        if let Some(author_list) = extract_parties_from_array(author) {
+            // Author is an array
+            for mut party in author_list {
+                if party.role.is_none() {
+                    party.role = Some("author".to_string());
+                }
+                parties.push(party);
+            }
+        } else if let Some(mut party) = extract_party_from_field(author) {
+            // Author is a single value
+            party.role = Some("author".to_string());
+            parties.push(party);
+        }
     }
 
     // Extract contributors field
     if let Some(contributors) = json.get(FIELD_CONTRIBUTORS)
-        && let Some(emails) = extract_emails_from_array(contributors)
+        && let Some(mut party_list) = extract_parties_from_array(contributors)
     {
-        parties.extend(emails.into_iter().map(|email| Party { email }));
+        for party in &mut party_list {
+            if party.role.is_none() {
+                party.role = Some("contributor".to_string());
+            }
+        }
+        parties.extend(party_list);
     }
 
     // Extract maintainers field
     if let Some(maintainers) = json.get(FIELD_MAINTAINERS)
-        && let Some(emails) = extract_emails_from_array(maintainers)
+        && let Some(mut party_list) = extract_parties_from_array(maintainers)
     {
-        parties.extend(emails.into_iter().map(|email| Party { email }));
+        for party in &mut party_list {
+            if party.role.is_none() {
+                party.role = Some("maintainer".to_string());
+            }
+        }
+        parties.extend(party_list);
     }
 
     parties
+}
+
+/// Extracts a party from a JSON field, which can be a string or an object with name/email fields.
+fn extract_party_from_field(field: &Value) -> Option<Party> {
+    match field {
+        Value::String(s) => {
+            // Try to extract email from "Name <email>" format
+            if let Some(email) = extract_email_from_string(s) {
+                Some(Party {
+                    r#type: Some("person".to_string()),
+                    role: None,
+                    name: extract_name_from_author_string(s),
+                    email: Some(email),
+                    url: None,
+                    organization: None,
+                    organization_url: None,
+                    timezone: None,
+                })
+            } else {
+                // Treat the string as name if no email found
+                Some(Party {
+                    r#type: Some("person".to_string()),
+                    role: None,
+                    name: Some(s.clone()),
+                    email: None,
+                    url: None,
+                    organization: None,
+                    organization_url: None,
+                    timezone: None,
+                })
+            }
+        }
+        Value::Object(obj) => Some(Party {
+            r#type: Some("person".to_string()),
+            role: obj.get("role").and_then(|v| v.as_str()).map(String::from),
+            name: obj.get("name").and_then(|v| v.as_str()).map(String::from),
+            email: obj.get("email").and_then(|v| v.as_str()).map(String::from),
+            url: obj.get("url").and_then(|v| v.as_str()).map(String::from),
+            organization: None,
+            organization_url: None,
+            timezone: None,
+        }),
+        _ => None,
+    }
+}
+
+/// Extracts multiple parties from a JSON array.
+fn extract_parties_from_array(array: &Value) -> Option<Vec<Party>> {
+    if let Value::Array(items) = array {
+        let parties = items
+            .iter()
+            .filter_map(extract_party_from_field)
+            .collect::<Vec<_>>();
+        if !parties.is_empty() {
+            return Some(parties);
+        }
+    }
+    None
 }
 
 /// Extracts email from a string in the format "Name <email@example.com>".
@@ -317,25 +667,15 @@ fn extract_email_from_string(author_str: &str) -> Option<String> {
     None
 }
 
-/// Extracts a single email from a JSON field, which can be a string or an object with an "email" field.
-fn extract_email_from_field(field: &Value) -> Option<String> {
-    match field {
-        Value::String(s) => extract_email_from_string(s).or_else(|| Some(s.clone())),
-        Value::Object(obj) => obj.get("email").and_then(|v| v.as_str()).map(String::from),
-        _ => None,
-    }
-}
-
-/// Extracts multiple emails from a JSON array, where each element can be a string or an object with an "email" field.
-fn extract_emails_from_array(array: &Value) -> Option<Vec<String>> {
-    if let Value::Array(items) = array {
-        let emails = items
-            .iter()
-            .filter_map(extract_email_from_field)
-            .collect::<Vec<_>>();
-        if !emails.is_empty() {
-            return Some(emails);
+/// Extracts name from a string in the format "Name <email@example.com>" or returns full string as name.
+fn extract_name_from_author_string(author_str: &str) -> Option<String> {
+    if let Some(end_idx) = author_str.find('<') {
+        let name = author_str[..end_idx].trim();
+        if !name.is_empty() {
+            return Some(name.to_string());
         }
+    } else {
+        return Some(author_str.trim().to_string());
     }
     None
 }
@@ -346,14 +686,167 @@ fn default_package_data() -> PackageData {
         namespace: None,
         name: None,
         version: None,
+        qualifiers: None,
+        subpath: None,
+        primary_language: Some("JavaScript".to_string()),
+        description: None,
+        release_date: None,
+        parties: Vec::new(),
+        keywords: Vec::new(),
         homepage_url: None,
         download_url: None,
+        size: None,
+        sha1: None,
+        md5: None,
+        sha256: None,
+        sha512: None,
+        bug_tracking_url: None,
+        code_view_url: None,
+        vcs_url: None,
         copyright: None,
+        holder: None,
+        declared_license_expression: None,
+        declared_license_expression_spdx: None,
         license_detections: Vec::new(),
+        other_license_expression: None,
+        other_license_expression_spdx: None,
+        other_license_detections: Vec::new(),
+        extracted_license_statement: None,
+        notice_text: None,
+        source_packages: Vec::new(),
+        file_references: Vec::new(),
+        is_private: false,
+        is_virtual: false,
+        extra_data: None,
         dependencies: Vec::new(),
-        parties: Vec::new(),
+        repository_homepage_url: None,
+        repository_download_url: None,
+        api_data_url: None,
+        datasource_id: None,
         purl: None,
     }
+}
+
+fn parse_alias_adapter(version_str: &str) -> Option<(&str, &str)> {
+    if version_str.contains(':') && version_str.contains('@') {
+        let (aliased_package_part, constraint) = version_str.rsplit_once('@')?;
+        let (_, actual_package_name) = aliased_package_part.rsplit_once(':')?;
+        return Some((actual_package_name, constraint));
+    }
+    None
+}
+
+fn generate_npm_api_url(
+    namespace: &Option<String>,
+    name: &Option<String>,
+    version: &Option<String>,
+) -> Option<String> {
+    const REGISTRY: &str = "https://registry.npmjs.org";
+    name.as_ref()?;
+
+    let ns_name = if let Some(ns) = namespace {
+        format!("{}/{}", ns, name.as_ref()?).replace('/', "%2f")
+    } else {
+        name.as_ref()?.clone()
+    };
+
+    let url = if let Some(ver) = version {
+        format!("{}/{}/{}", REGISTRY, ns_name, ver)
+    } else {
+        format!("{}/{}", REGISTRY, ns_name)
+    };
+
+    Some(url)
+}
+
+fn generate_repository_homepage_url(name: &Option<String>) -> Option<String> {
+    name.as_ref()
+        .map(|n| format!("https://www.npmjs.com/package/{}", n))
+}
+
+fn generate_repository_download_url(
+    name: &Option<String>,
+    version: &Option<String>,
+) -> Option<String> {
+    match (name.as_ref(), version.as_ref()) {
+        (Some(n), Some(v)) => Some(format!(
+            "https://registry.npmjs.org/{}/-/{}-{}.tgz",
+            n, n, v
+        )),
+        _ => None,
+    }
+}
+
+fn extract_dependency_group(
+    json: &Value,
+    field: &str,
+    scope: &str,
+    is_runtime: bool,
+    is_optional: bool,
+    optional_meta: Option<&HashMap<String, bool>>,
+) -> Vec<Dependency> {
+    json.get(field)
+        .and_then(|deps| deps.as_object())
+        .map_or_else(Vec::new, |deps| {
+            deps.iter()
+                .filter_map(|(name, version)| {
+                    let version_str = version.as_str()?;
+
+                    if version_str.starts_with("workspace:") {
+                        let is_opt = if let Some(meta) = optional_meta {
+                            meta.get(name).copied()
+                        } else {
+                            Some(is_optional)
+                        };
+                        return Some(Dependency {
+                            purl: None,
+                            extracted_requirement: Some(version_str.to_string()),
+                            scope: Some(scope.to_string()),
+                            is_runtime: Some(is_runtime),
+                            is_optional: is_opt,
+                            is_pinned: None,
+                            is_direct: Some(true),
+                            resolved_package: None,
+                            extra_data: None,
+                        });
+                    }
+
+                    let (actual_package_name, constraint) =
+                        if let Some(parsed) = parse_alias_adapter(version_str) {
+                            parsed
+                        } else {
+                            (name.as_str(), version_str)
+                        };
+
+                    let mut package_url =
+                        PackageUrl::new(NpmParser::PACKAGE_TYPE, actual_package_name).ok()?;
+
+                    let stripped_version = strip_version_modifier(constraint);
+                    let is_pinned_version = is_exact_version(constraint);
+                    if is_pinned_version {
+                        package_url.with_version(&stripped_version).ok()?;
+                    }
+
+                    let is_opt = if let Some(meta) = optional_meta {
+                        meta.get(name).copied()
+                    } else {
+                        Some(is_optional)
+                    };
+
+                    Some(Dependency {
+                        purl: Some(package_url.to_string()),
+                        extracted_requirement: Some(version_str.to_string()),
+                        scope: Some(scope.to_string()),
+                        is_runtime: Some(is_runtime),
+                        is_optional: is_opt,
+                        is_pinned: Some(is_pinned_version),
+                        is_direct: Some(true),
+                        resolved_package: None,
+                        extra_data: None,
+                    })
+                })
+                .collect()
+        })
 }
 
 /// Extracts dependencies from the `dependencies` or `devDependencies` field in the JSON.
@@ -364,34 +857,239 @@ fn extract_dependencies(json: &Value, is_optional: bool) -> Vec<Dependency> {
         FIELD_DEPENDENCIES
     };
 
-    json.get(field)
-        .and_then(|deps| deps.as_object())
-        .map_or_else(Vec::new, |deps| {
-            deps.iter()
-                .filter_map(|(name, version)| {
-                    let version_str = version.as_str()?;
-                    let stripped_version = strip_version_modifier(version_str);
-                    let encoded_version = urlencoding::encode(&stripped_version).to_string();
+    let scope = if is_optional {
+        "devDependencies"
+    } else {
+        "dependencies"
+    };
 
-                    let mut package_url = PackageUrl::new(NpmParser::PACKAGE_TYPE, name).ok()?;
-                    package_url.with_version(&encoded_version).ok()?;
+    extract_dependency_group(json, field, scope, !is_optional, is_optional, None)
+}
 
-                    Some(Dependency {
-                        purl: Some(package_url.to_string()),
-                        extracted_requirement: None,
-                        scope: None,
-                        is_runtime: None,
-                        is_optional: Some(is_optional),
-                        is_pinned: None,
-                        is_direct: None,
-                        resolved_package: None,
+fn extract_peer_dependencies(json: &Value, meta: &HashMap<String, bool>) -> Vec<Dependency> {
+    extract_dependency_group(
+        json,
+        FIELD_PEER_DEPENDENCIES,
+        "peerDependencies",
+        true,
+        false,
+        Some(meta),
+    )
+}
+
+/// Extracts optional dependencies from the `optionalDependencies` field in the JSON.
+/// Optional dependencies are marked with is_optional: true, is_runtime: true, and scope "optionalDependencies".
+fn extract_optional_dependencies(json: &Value) -> Vec<Dependency> {
+    extract_dependency_group(
+        json,
+        FIELD_OPTIONAL_DEPENDENCIES,
+        "optionalDependencies",
+        true,
+        true,
+        None,
+    )
+}
+
+/// Extracts bundled dependencies from `bundledDependencies` or `bundleDependencies` field.
+/// Bundled dependencies are arrays of package names without versions.
+fn extract_bundled_dependencies(json: &Value) -> Vec<Dependency> {
+    let mut bundled_deps = Vec::new();
+
+    // First try bundledDependencies (preferred spelling)
+    if let Some(bundled) = json
+        .get(FIELD_BUNDLED_DEPENDENCIES)
+        .and_then(|v| v.as_array())
+    {
+        bundled_deps.extend(extract_bundled_list(bundled));
+    }
+
+    // Then try bundleDependencies (alternative spelling)
+    if let Some(bundled) = json
+        .get(FIELD_BUNDLE_DEPENDENCIES)
+        .and_then(|v| v.as_array())
+    {
+        bundled_deps.extend(extract_bundled_list(bundled));
+    }
+
+    bundled_deps
+}
+
+/// Helper function to extract bundled dependencies from an array of package names.
+fn extract_bundled_list(bundled_array: &[Value]) -> Vec<Dependency> {
+    bundled_array
+        .iter()
+        .filter_map(|value| {
+            let name = value.as_str()?;
+            // Create PURL without version for bundled dependencies
+            let package_url = PackageUrl::new(NpmParser::PACKAGE_TYPE, name).ok()?;
+
+            Some(Dependency {
+                purl: Some(package_url.to_string()),
+                extracted_requirement: None,
+                scope: Some("bundledDependencies".to_string()),
+                is_runtime: Some(true),
+                is_optional: Some(false),
+                is_pinned: Some(false),
+                is_direct: Some(true),
+                resolved_package: None,
+                extra_data: None,
+            })
+        })
+        .collect()
+}
+
+/// Extracts Yarn resolutions from the `resolutions` field.
+/// Returns resolutions as a HashMap to be stored in extra_data.
+fn extract_resolutions(json: &Value) -> Option<HashMap<String, serde_json::Value>> {
+    json.get(FIELD_RESOLUTIONS)
+        .and_then(|resolutions| resolutions.as_object())
+        .map(|resolutions_obj| {
+            let mut extra_data = HashMap::new();
+            extra_data.insert(
+                "resolutions".to_string(),
+                serde_json::Value::Object(resolutions_obj.clone()),
+            );
+            extra_data
+        })
+}
+
+fn extract_peer_dependencies_meta(json: &Value) -> HashMap<String, bool> {
+    json.get(FIELD_PEER_DEPENDENCIES_META)
+        .and_then(|meta| meta.as_object())
+        .map_or_else(HashMap::new, |meta_obj| {
+            meta_obj
+                .iter()
+                .filter_map(|(package_name, meta_value)| {
+                    meta_value.as_object().and_then(|obj| {
+                        obj.get("optional")
+                            .and_then(|opt| opt.as_bool())
+                            .map(|optional| (package_name.clone(), optional))
                     })
                 })
                 .collect()
         })
 }
 
+fn extract_dependencies_meta(json: &Value) -> Option<serde_json::Value> {
+    json.get(FIELD_DEPENDENCIES_META).cloned()
+}
+
+fn extract_description(json: &Value) -> Option<String> {
+    json.get(FIELD_DESCRIPTION)
+        .and_then(|v| v.as_str())
+        .map(String::from)
+}
+
+fn extract_keywords_as_vec(json: &Value) -> Vec<String> {
+    json.get(FIELD_KEYWORDS)
+        .and_then(|v| {
+            if let Some(str) = v.as_str() {
+                Some(vec![str.to_string()])
+            } else if let Some(arr) = v.as_array() {
+                let keywords: Vec<String> = arr
+                    .iter()
+                    .filter_map(|kw| kw.as_str())
+                    .map(String::from)
+                    .collect();
+                if keywords.is_empty() {
+                    None
+                } else {
+                    Some(keywords)
+                }
+            } else {
+                None
+            }
+        })
+        .unwrap_or_default()
+}
+
+fn extract_engines(json: &Value) -> Option<serde_json::Value> {
+    json.get(FIELD_ENGINES).cloned()
+}
+
+fn extract_package_manager(json: &Value) -> Option<String> {
+    json.get(FIELD_PACKAGE_MANAGER)
+        .and_then(|v| v.as_str())
+        .map(String::from)
+}
+
+fn extract_workspaces(json: &Value) -> Option<serde_json::Value> {
+    json.get(FIELD_WORKSPACES).cloned()
+}
+
+fn extract_private(json: &Value) -> Option<bool> {
+    json.get(FIELD_PRIVATE).and_then(|v| v.as_bool())
+}
+
+fn extract_bugs(json: &Value) -> Option<String> {
+    match json.get(FIELD_BUGS) {
+        Some(bugs) => {
+            if let Some(url) = bugs.as_str() {
+                Some(url.to_string())
+            } else if let Some(obj) = bugs.as_object() {
+                obj.get("url").and_then(|v| v.as_str()).map(String::from)
+            } else {
+                None
+            }
+        }
+        None => None,
+    }
+}
+
+fn extract_dist_integrity(dist: &Value) -> (Option<String>, Option<String>) {
+    let integrity = match dist.get("integrity").and_then(|v| v.as_str()) {
+        Some(i) => i,
+        None => return (None, None),
+    };
+
+    match parse_sri(integrity) {
+        Some((algo, hex_digest)) => match algo.as_str() {
+            "sha256" => (Some(hex_digest), None),
+            "sha512" => (None, Some(hex_digest)),
+            _ => (None, None),
+        },
+        None => (None, None),
+    }
+}
+
+fn extract_dist_tarball(dist: &Value) -> Option<String> {
+    dist.get("tarball")
+        .or_else(|| dist.get("dnl_url"))
+        .and_then(|v| v.as_str())
+        .map(String::from)
+}
+
+fn combine_extra_data(
+    extra_data: Option<HashMap<String, serde_json::Value>>,
+    additional_data: HashMap<String, serde_json::Value>,
+) -> HashMap<String, serde_json::Value> {
+    let mut combined = extra_data.unwrap_or_default();
+    for (key, value) in additional_data {
+        combined.insert(key, value);
+    }
+    combined
+}
+
 /// Strips version modifiers (e.g., ~, ^, >=) from a version string.
 fn strip_version_modifier(version: &str) -> String {
     version.trim_start_matches(['~', '^', '>', '=']).to_string()
 }
+
+fn is_exact_version(version: &str) -> bool {
+    !version.starts_with('~')
+        && !version.starts_with('^')
+        && !version.starts_with('>')
+        && !version.starts_with('<')
+        && !version.starts_with('=')
+        && !version.starts_with('*')
+        && !version.contains("||")
+        && !version.contains(" - ")
+}
+
+crate::register_parser!(
+    "npm package.json manifest",
+    &["**/package.json"],
+    "npm",
+    "JavaScript",
+    Some("https://docs.npmjs.com/cli/v10/configuring-npm/package-json"),
+);

@@ -1,0 +1,14 @@
+{
+  "name": "test-package-all-metadata",
+  "version": "1.0.0",
+  "description": "A package with all metadata fields",
+  "bugs": "https://github.com/user/repo/issues",
+  "keywords": ["javascript", "npm", "metadata", "test"],
+  "engines": {
+    "node": ">=14.0.0",
+    "npm": ">=6.0.0"
+  },
+  "packageManager": "pnpm@8.6.0",
+  "workspaces": ["packages/*"],
+  "private": true
+}

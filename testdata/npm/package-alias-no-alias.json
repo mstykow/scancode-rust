@@ -1,0 +1,8 @@
+{
+  "name": "test-package-no-alias",
+  "version": "1.0.0",
+  "dependencies": {
+    "regular-dep": "^1.0.0",
+    "@scoped/dep": "^2.0.0"
+  }
+}

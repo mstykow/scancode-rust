@@ -1,0 +1,13 @@
+{
+  "name": "test-package-metadata-all",
+  "version": "1.0.0",
+  "description": "A package with all metadata fields",
+  "keywords": ["javascript", "npm", "metadata", "test"],
+  "engines": {
+    "node": ">=14.0.0",
+    "npm": ">=6.0.0"
+  },
+  "packageManager": "pnpm@8.6.0",
+  "workspaces": ["packages/*"],
+  "private": false
+}

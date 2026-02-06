@@ -1,0 +1,6 @@
+{
+  "name": "@example/test-bundle-deps",
+  "version": "1.0.0",
+  "license": "MIT",
+  "bundleDependencies": ["lodash", "moment", "axios"]
+}

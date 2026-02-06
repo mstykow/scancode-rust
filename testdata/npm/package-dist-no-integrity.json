@@ -1,0 +1,7 @@
+{
+  "name": "test-package-dist-no-integrity",
+  "version": "1.0.0",
+  "dist": {
+    "tarball": "https://registry.npmjs.org/test-package-dist-no-integrity/-/test-package-dist-no-integrity-1.0.0.tgz"
+  }
+}

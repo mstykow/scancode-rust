@@ -1,0 +1,13 @@
+{
+  "name": "test-workspaces-multi",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "apps/*",
+    "tools/*"
+  ],
+  "dependencies": {
+    "pkg-shared": "workspace:^"
+  }
+}

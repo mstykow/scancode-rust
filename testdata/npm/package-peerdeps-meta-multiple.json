@@ -1,0 +1,20 @@
+{
+  "name": "test-peer-deps-meta-multiple",
+  "version": "1.0.0",
+  "peerDependencies": {
+    "react": "^18.0.0",
+    "react-dom": "^18.0.0",
+    "typescript": ">=4.0.0"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    },
+    "react-dom": {
+      "optional": false
+    },
+    "typescript": {
+      "optional": true
+    }
+  }
+}

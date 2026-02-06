@@ -1,0 +1,12 @@
+{
+  "name": "test-scoped-deps",
+  "version": "1.0.0",
+  "dependencies": {
+    "@types/node": "18.0.0",
+    "@babel/core": "7.20.0",
+    "lodash": "4.17.21"
+  },
+  "devDependencies": {
+    "@types/jest": "29.0.0"
+  }
+}

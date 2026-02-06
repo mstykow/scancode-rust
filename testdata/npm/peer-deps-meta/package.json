@@ -1,0 +1,13 @@
+{
+  "name": "test-peer-deps-meta",
+  "version": "1.0.0",
+  "peerDependencies": {
+    "debug": "*",
+    "lodash": "^4.0.0"
+  },
+  "peerDependenciesMeta": {
+    "debug": {
+      "optional": true
+    }
+  }
+}

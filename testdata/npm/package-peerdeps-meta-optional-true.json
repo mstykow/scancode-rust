@@ -1,0 +1,13 @@
+{
+  "name": "test-peer-deps-meta-optional-true-only",
+  "version": "1.0.0",
+  "peerDependencies": {
+    "react": "^18.0.0",
+    "react-dom": "^18.0.0"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    }
+  }
+}

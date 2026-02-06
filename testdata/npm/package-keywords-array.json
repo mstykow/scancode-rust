@@ -1,0 +1,5 @@
+{
+  "name": "test-package-keywords-array",
+  "version": "1.0.0",
+  "keywords": ["javascript", "npm", "package", "metadata"]
+}

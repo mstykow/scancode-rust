@@ -1,0 +1,9 @@
+{
+  "name": "@example/test-peer-deps",
+  "version": "1.0.0",
+  "license": "MIT",
+  "peerDependencies": {
+    "react": ">=16.0.0",
+    "react-dom": ">=16.0.0"
+  }
+}
