@@ -1,0 +1,4 @@
+packages:
+  - "**/packages/*"
+  - "!**/node_modules"
+  - "!**/dist"

@@ -1,0 +1,505 @@
+[
+  {
+    "type": "npm",
+    "namespace": null,
+    "name": "chartist",
+    "version": "0.11.0",
+    "qualifiers": {},
+    "subpath": null,
+    "primary_language": "JavaScript",
+    "description": "Simple, responsive charts",
+    "release_date": null,
+    "parties": [
+      {
+        "type": "person",
+        "role": "author",
+        "name": "Gion Kunz",
+        "email": null,
+        "url": null
+      }
+    ],
+    "keywords": [
+      "chartist",
+      "responsive charts",
+      "charts",
+      "charting"
+    ],
+    "homepage_url": "https://gionkunz.github.io/chartist-js",
+    "download_url": "https://registry.npmjs.org/chartist/-/chartist-0.11.0.tgz",
+    "size": null,
+    "sha1": null,
+    "md5": null,
+    "sha256": null,
+    "sha512": null,
+    "bug_tracking_url": "https://github.com/gionkunz/chartist-js/issues",
+    "code_view_url": null,
+    "vcs_url": "git+https://github.com/gionkunz/chartist-js.git",
+    "copyright": null,
+    "holder": null,
+    "declared_license_expression": "(mit OR wtfpl-2.0) AND wtfpl-2.0 AND mit",
+    "declared_license_expression_spdx": "(MIT OR WTFPL) AND WTFPL AND MIT",
+    "license_detections": [
+      {
+        "license_expression": "mit OR wtfpl-2.0",
+        "license_expression_spdx": "MIT OR WTFPL",
+        "matches": [
+          {
+            "license_expression": "mit OR wtfpl-2.0",
+            "license_expression_spdx": "MIT OR WTFPL",
+            "from_file": null,
+            "start_line": 1,
+            "end_line": 1,
+            "matcher": "1-spdx-id",
+            "score": 100.0,
+            "matched_length": 3,
+            "match_coverage": 100.0,
+            "rule_relevance": 100,
+            "rule_identifier": "spdx-license-identifier-mit_or_wtfpl_2_0-a3a16f7e12d6ecec29951dd1a41d0d4dbd91e112",
+            "rule_url": null,
+            "matched_text": "MIT OR WTFPL"
+          }
+        ],
+        "identifier": "mit_or_wtfpl_2_0-6e79a0d6-24d4-17b2-ba10-09867c90eb5b"
+      },
+      {
+        "license_expression": "wtfpl-2.0",
+        "license_expression_spdx": "WTFPL",
+        "matches": [
+          {
+            "license_expression": "wtfpl-2.0",
+            "license_expression_spdx": "WTFPL",
+            "from_file": null,
+            "start_line": 1,
+            "end_line": 1,
+            "matcher": "1-hash",
+            "score": 50.0,
+            "matched_length": 1,
+            "match_coverage": 100.0,
+            "rule_relevance": 50,
+            "rule_identifier": "spdx_license_id_wtfpl_for_wtfpl-2.0.RULE",
+            "rule_url": "https://github.com/nexB/scancode-toolkit/tree/develop/src/licensedcode/data/rules/spdx_license_id_wtfpl_for_wtfpl-2.0.RULE",
+            "matched_text": "WTFPL"
+          }
+        ],
+        "identifier": "wtfpl_2_0-830d3dd8-9412-f474-ee4c-06156f50d2c9"
+      },
+      {
+        "license_expression": "wtfpl-2.0",
+        "license_expression_spdx": "WTFPL",
+        "matches": [
+          {
+            "license_expression": "wtfpl-2.0",
+            "license_expression_spdx": "WTFPL",
+            "from_file": null,
+            "start_line": 1,
+            "end_line": 1,
+            "matcher": "2-aho",
+            "score": 100.0,
+            "matched_length": 2,
+            "match_coverage": 100.0,
+            "rule_relevance": 100,
+            "rule_identifier": "wtfpl-2.0_33.RULE",
+            "rule_url": "https://github.com/nexB/scancode-toolkit/tree/develop/src/licensedcode/data/rules/wtfpl-2.0_33.RULE",
+            "matched_text": "https://github.com/gionkunz/chartist-js/blob/master/LICENSE-WTFPL"
+          }
+        ],
+        "identifier": "wtfpl_2_0-6bb91b8f-711e-123e-f214-718d6541cd9d"
+      },
+      {
+        "license_expression": "mit",
+        "license_expression_spdx": "MIT",
+        "matches": [
+          {
+            "license_expression": "mit",
+            "license_expression_spdx": "MIT",
+            "from_file": null,
+            "start_line": 1,
+            "end_line": 1,
+            "matcher": "1-spdx-id",
+            "score": 100.0,
+            "matched_length": 1,
+            "match_coverage": 100.0,
+            "rule_relevance": 100,
+            "rule_identifier": "spdx-license-identifier-mit-5da48780aba670b0860c46d899ed42a0f243ff06",
+            "rule_url": null,
+            "matched_text": "MIT"
+          }
+        ],
+        "identifier": "mit-a822f434-d61f-f2b1-c792-8b8cb9e7b9bf"
+      },
+      {
+        "license_expression": "mit",
+        "license_expression_spdx": "MIT",
+        "matches": [
+          {
+            "license_expression": "mit",
+            "license_expression_spdx": "MIT",
+            "from_file": null,
+            "start_line": 1,
+            "end_line": 1,
+            "matcher": "2-aho",
+            "score": 100.0,
+            "matched_length": 2,
+            "match_coverage": 100.0,
+            "rule_relevance": 100,
+            "rule_identifier": "mit_30.RULE",
+            "rule_url": "https://github.com/nexB/scancode-toolkit/tree/develop/src/licensedcode/data/rules/mit_30.RULE",
+            "matched_text": "https://github.com/gionkunz/chartist-js/blob/master/LICENSE-MIT"
+          }
+        ],
+        "identifier": "mit-3fce6ea2-8abd-6c6b-3ede-a37af7c6efee"
+      }
+    ],
+    "other_license_expression": null,
+    "other_license_expression_spdx": null,
+    "other_license_detections": [],
+    "extracted_license_statement": "- MIT OR WTFPL\n- type: WTFPL\n  url: https://github.com/gionkunz/chartist-js/blob/master/LICENSE-WTFPL\n- type: MIT\n  url: https://github.com/gionkunz/chartist-js/blob/master/LICENSE-MIT\n",
+    "notice_text": null,
+    "source_packages": [],
+    "file_references": [],
+    "is_private": false,
+    "is_virtual": false,
+    "extra_data": {
+      "engines": {
+        "node": ">=4.6.0"
+      }
+    },
+    "dependencies": [
+      {
+        "purl": "pkg:npm/assemble-dox",
+        "extracted_requirement": "0.0.2",
+        "scope": "devDependencies",
+        "is_runtime": false,
+        "is_optional": true,
+        "is_pinned": false,
+        "is_direct": true,
+        "resolved_package": {},
+        "extra_data": {}
+      },
+      {
+        "purl": "pkg:npm/grunt",
+        "extracted_requirement": "^1.0.1",
+        "scope": "devDependencies",
+        "is_runtime": false,
+        "is_optional": true,
+        "is_pinned": false,
+        "is_direct": true,
+        "resolved_package": {},
+        "extra_data": {}
+      },
+      {
+        "purl": "pkg:npm/grunt-assemble",
+        "extracted_requirement": "^0.4.0",
+        "scope": "devDependencies",
+        "is_runtime": false,
+        "is_optional": true,
+        "is_pinned": false,
+        "is_direct": true,
+        "resolved_package": {},
+        "extra_data": {}
+      },
+      {
+        "purl": "pkg:npm/grunt-concurrent",
+        "extracted_requirement": "^2.3.0",
+        "scope": "devDependencies",
+        "is_runtime": false,
+        "is_optional": true,
+        "is_pinned": false,
+        "is_direct": true,
+        "resolved_package": {},
+        "extra_data": {}
+      },
+      {
+        "purl": "pkg:npm/grunt-contrib-clean",
+        "extracted_requirement": "^1.0.0",
+        "scope": "devDependencies",
+        "is_runtime": false,
+        "is_optional": true,
+        "is_pinned": false,
+        "is_direct": true,
+        "resolved_package": {},
+        "extra_data": {}
+      },
+      {
+        "purl": "pkg:npm/grunt-contrib-concat",
+        "extracted_requirement": "^1.0.1",
+        "scope": "devDependencies",
+        "is_runtime": false,
+        "is_optional": true,
+        "is_pinned": false,
+        "is_direct": true,
+        "resolved_package": {},
+        "extra_data": {}
+      },
+      {
+        "purl": "pkg:npm/grunt-contrib-connect",
+        "extracted_requirement": "^1.0.2",
+        "scope": "devDependencies",
+        "is_runtime": false,
+        "is_optional": true,
+        "is_pinned": false,
+        "is_direct": true,
+        "resolved_package": {},
+        "extra_data": {}
+      },
+      {
+        "purl": "pkg:npm/grunt-contrib-copy",
+        "extracted_requirement": "^1.0.0",
+        "scope": "devDependencies",
+        "is_runtime": false,
+        "is_optional": true,
+        "is_pinned": false,
+        "is_direct": true,
+        "resolved_package": {},
+        "extra_data": {}
+      },
+      {
+        "purl": "pkg:npm/grunt-contrib-cssmin",
+        "extracted_requirement": "^1.0.1",
+        "scope": "devDependencies",
+        "is_runtime": false,
+        "is_optional": true,
+        "is_pinned": false,
+        "is_direct": true,
+        "resolved_package": {},
+        "extra_data": {}
+      },
+      {
+        "purl": "pkg:npm/grunt-contrib-htmlmin",
+        "extracted_requirement": "^1.4.0",
+        "scope": "devDependencies",
+        "is_runtime": false,
+        "is_optional": true,
+        "is_pinned": false,
+        "is_direct": true,
+        "resolved_package": {},
+        "extra_data": {}
+      },
+      {
+        "purl": "pkg:npm/grunt-contrib-imagemin",
+        "extracted_requirement": "^1.0.0",
+        "scope": "devDependencies",
+        "is_runtime": false,
+        "is_optional": true,
+        "is_pinned": false,
+        "is_direct": true,
+        "resolved_package": {},
+        "extra_data": {}
+      },
+      {
+        "purl": "pkg:npm/grunt-contrib-jasmine",
+        "extracted_requirement": "^1.0.3",
+        "scope": "devDependencies",
+        "is_runtime": false,
+        "is_optional": true,
+        "is_pinned": false,
+        "is_direct": true,
+        "resolved_package": {},
+        "extra_data": {}
+      },
+      {
+        "purl": "pkg:npm/grunt-contrib-jshint",
+        "extracted_requirement": "^1.0.0",
+        "scope": "devDependencies",
+        "is_runtime": false,
+        "is_optional": true,
+        "is_pinned": false,
+        "is_direct": true,
+        "resolved_package": {},
+        "extra_data": {}
+      },
+      {
+        "purl": "pkg:npm/grunt-contrib-uglify",
+        "extracted_requirement": "^1.0.1",
+        "scope": "devDependencies",
+        "is_runtime": false,
+        "is_optional": true,
+        "is_pinned": false,
+        "is_direct": true,
+        "resolved_package": {},
+        "extra_data": {}
+      },
+      {
+        "purl": "pkg:npm/grunt-contrib-watch",
+        "extracted_requirement": "^1.0.0",
+        "scope": "devDependencies",
+        "is_runtime": false,
+        "is_optional": true,
+        "is_pinned": false,
+        "is_direct": true,
+        "resolved_package": {},
+        "extra_data": {}
+      },
+      {
+        "purl": "pkg:npm/grunt-critical",
+        "extracted_requirement": "^0.2.1",
+        "scope": "devDependencies",
+        "is_runtime": false,
+        "is_optional": true,
+        "is_pinned": false,
+        "is_direct": true,
+        "resolved_package": {},
+        "extra_data": {}
+      },
+      {
+        "purl": "pkg:npm/grunt-newer",
+        "extracted_requirement": "^1.1.0",
+        "scope": "devDependencies",
+        "is_runtime": false,
+        "is_optional": true,
+        "is_pinned": false,
+        "is_direct": true,
+        "resolved_package": {},
+        "extra_data": {}
+      },
+      {
+        "purl": "pkg:npm/grunt-sass",
+        "extracted_requirement": "^1.1.0",
+        "scope": "devDependencies",
+        "is_runtime": false,
+        "is_optional": true,
+        "is_pinned": false,
+        "is_direct": true,
+        "resolved_package": {},
+        "extra_data": {}
+      },
+      {
+        "purl": "pkg:npm/grunt-svgmin",
+        "extracted_requirement": "^3.2.0",
+        "scope": "devDependencies",
+        "is_runtime": false,
+        "is_optional": true,
+        "is_pinned": false,
+        "is_direct": true,
+        "resolved_package": {},
+        "extra_data": {}
+      },
+      {
+        "purl": "pkg:npm/grunt-template",
+        "extracted_requirement": "^0.2.3",
+        "scope": "devDependencies",
+        "is_runtime": false,
+        "is_optional": true,
+        "is_pinned": false,
+        "is_direct": true,
+        "resolved_package": {},
+        "extra_data": {}
+      },
+      {
+        "purl": "pkg:npm/grunt-umd",
+        "extracted_requirement": "^2.3.1",
+        "scope": "devDependencies",
+        "is_runtime": false,
+        "is_optional": true,
+        "is_pinned": false,
+        "is_direct": true,
+        "resolved_package": {},
+        "extra_data": {}
+      },
+      {
+        "purl": "pkg:npm/grunt-usemin",
+        "extracted_requirement": "^3.1.1",
+        "scope": "devDependencies",
+        "is_runtime": false,
+        "is_optional": true,
+        "is_pinned": false,
+        "is_direct": true,
+        "resolved_package": {},
+        "extra_data": {}
+      },
+      {
+        "purl": "pkg:npm/handlebars-helpers",
+        "extracted_requirement": "^0.6.1",
+        "scope": "devDependencies",
+        "is_runtime": false,
+        "is_optional": true,
+        "is_pinned": false,
+        "is_direct": true,
+        "resolved_package": {},
+        "extra_data": {}
+      },
+      {
+        "purl": "pkg:npm/jasmine-jquery",
+        "extracted_requirement": "^2.1.1",
+        "scope": "devDependencies",
+        "is_runtime": false,
+        "is_optional": true,
+        "is_pinned": false,
+        "is_direct": true,
+        "resolved_package": {},
+        "extra_data": {}
+      },
+      {
+        "purl": "pkg:npm/jquery",
+        "extracted_requirement": "^3.0.0",
+        "scope": "devDependencies",
+        "is_runtime": false,
+        "is_optional": true,
+        "is_pinned": false,
+        "is_direct": true,
+        "resolved_package": {},
+        "extra_data": {}
+      },
+      {
+        "purl": "pkg:npm/jshint-stylish",
+        "extracted_requirement": "^2.2.0",
+        "scope": "devDependencies",
+        "is_runtime": false,
+        "is_optional": true,
+        "is_pinned": false,
+        "is_direct": true,
+        "resolved_package": {},
+        "extra_data": {}
+      },
+      {
+        "purl": "pkg:npm/load-grunt-config",
+        "extracted_requirement": "^0.19.2",
+        "scope": "devDependencies",
+        "is_runtime": false,
+        "is_optional": true,
+        "is_pinned": false,
+        "is_direct": true,
+        "resolved_package": {},
+        "extra_data": {}
+      },
+      {
+        "purl": "pkg:npm/lodash",
+        "extracted_requirement": "^4.13.1",
+        "scope": "devDependencies",
+        "is_runtime": false,
+        "is_optional": true,
+        "is_pinned": false,
+        "is_direct": true,
+        "resolved_package": {},
+        "extra_data": {}
+      },
+      {
+        "purl": "pkg:npm/seed-random",
+        "extracted_requirement": "^2.2.0",
+        "scope": "devDependencies",
+        "is_runtime": false,
+        "is_optional": true,
+        "is_pinned": false,
+        "is_direct": true,
+        "resolved_package": {},
+        "extra_data": {}
+      },
+      {
+        "purl": "pkg:npm/time-grunt",
+        "extracted_requirement": "^1.0.0",
+        "scope": "devDependencies",
+        "is_runtime": false,
+        "is_optional": true,
+        "is_pinned": false,
+        "is_direct": true,
+        "resolved_package": {},
+        "extra_data": {}
+      }
+    ],
+    "repository_homepage_url": "https://www.npmjs.com/package/chartist",
+    "repository_download_url": "https://registry.npmjs.org/chartist/-/chartist-0.11.0.tgz",
+    "api_data_url": "https://registry.npmjs.org/chartist/0.11.0",
+    "datasource_id": "npm_package_json",
+    "purl": "pkg:npm/chartist@0.11.0"
+  }
+]

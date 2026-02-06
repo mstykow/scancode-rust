@@ -506,7 +506,6 @@ mod tests {
             .step_size(1);
         let result = strategy.scan(&test_data).unwrap();
         assert!(result.license.is_none(), "result license is None");
-        println!("{:?}", result);
         assert_eq!(2, result.containing.len());
 
         // inspect the array and ensure we got both licenses

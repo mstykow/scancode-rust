@@ -1,0 +1,10 @@
+<project>
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>com.example</groupId>
+  <artifactId>nested-props</artifactId>
+  <properties>
+    <inner>x</inner>
+    <outer.x>SUCCESS</outer.x>
+  </properties>
+  <version>${outer.${inner}}</version>
+</project>

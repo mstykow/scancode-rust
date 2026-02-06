@@ -1,0 +1,3 @@
+# Requirements A - includes B
+requests>=2.25.0
+-r requirements-b.txt

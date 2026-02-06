@@ -1,0 +1,12 @@
+{
+  "name": "test-workspace-asterisk",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "modules/*"
+  ],
+  "dependencies": {
+    "module-a": "workspace:*",
+    "module-b": "workspace:*"
+  }
+}

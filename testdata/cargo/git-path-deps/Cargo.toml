@@ -1,0 +1,8 @@
+[package]
+name = "test-git-deps"
+version = "0.1.0"
+
+[dependencies]
+local-crate = { path = "../local" }
+remote-crate = { git = "https://github.com/org/repo", branch = "main" }
+registry-crate = "1.0.0"

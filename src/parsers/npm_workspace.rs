@@ -1,0 +1,304 @@
+use crate::models::PackageData;
+use serde_yaml::Value;
+use std::fs;
+use std::path::Path;
+
+use super::PackageParser;
+
+/// npm workspace parser for pnpm-workspace.yaml files.
+///
+/// Extracts workspace package patterns for monorepo configurations.
+pub struct NpmWorkspaceParser;
+
+impl PackageParser for NpmWorkspaceParser {
+    const PACKAGE_TYPE: &'static str = "npm-workspace";
+
+    fn is_match(path: &Path) -> bool {
+        path.file_name()
+            .and_then(|name| name.to_str())
+            .map(|name| name == "pnpm-workspace.yaml")
+            .unwrap_or(false)
+    }
+
+    fn extract_package_data(path: &Path) -> PackageData {
+        let content = match fs::read_to_string(path) {
+            Ok(content) => content,
+            Err(e) => {
+                log::warn!("Failed to read npm workspace file at {:?}: {}", path, e);
+                return default_package_data();
+            }
+        };
+
+        let workspace_data: Value = match serde_yaml::from_str(&content) {
+            Ok(data) => data,
+            Err(e) => {
+                log::warn!("Failed to parse npm workspace file at {:?}: {}", path, e);
+                return default_package_data();
+            }
+        };
+
+        parse_workspace_file(&workspace_data)
+    }
+}
+
+/// Returns a default empty PackageData for error cases
+fn default_package_data() -> PackageData {
+    PackageData {
+        package_type: Some("npm-workspace".to_string()),
+        namespace: None,
+        name: None,
+        version: None,
+        qualifiers: None,
+        subpath: None,
+        primary_language: None,
+        description: None,
+        release_date: None,
+        parties: Vec::new(),
+        keywords: Vec::new(),
+        homepage_url: None,
+        download_url: None,
+        size: None,
+        sha1: None,
+        md5: None,
+        sha256: None,
+        sha512: None,
+        bug_tracking_url: None,
+        code_view_url: None,
+        vcs_url: None,
+        copyright: None,
+        holder: None,
+        declared_license_expression: None,
+        declared_license_expression_spdx: None,
+        license_detections: Vec::new(),
+        other_license_expression: None,
+        other_license_expression_spdx: None,
+        other_license_detections: Vec::new(),
+        extracted_license_statement: None,
+        notice_text: None,
+        source_packages: Vec::new(),
+        file_references: Vec::new(),
+        is_private: false,
+        is_virtual: false,
+        extra_data: None,
+        dependencies: Vec::new(),
+        repository_homepage_url: None,
+        repository_download_url: None,
+        api_data_url: None,
+        datasource_id: None,
+        purl: None,
+    }
+}
+
+/// Parse a pnpm-workspace.yaml file and extract workspace configuration
+fn parse_workspace_file(workspace_data: &Value) -> PackageData {
+    // Extract the `packages` field which contains workspace patterns
+    let workspaces = workspace_data.get("packages").and_then(|v| v.as_sequence());
+
+    match workspaces {
+        Some(workspace_patterns) => {
+            let workspaces_vec: Vec<String> = workspace_patterns
+                .iter()
+                .filter_map(|v| v.as_str())
+                .map(|s| s.to_string())
+                .collect();
+
+            PackageData {
+                package_type: Some("npm-workspace".to_string()),
+                extra_data: if workspaces_vec.is_empty() {
+                    None
+                } else {
+                    let mut extra = std::collections::HashMap::new();
+                    extra.insert(
+                        "datasource_id".to_string(),
+                        serde_json::Value::String("pnpm_workspace_yaml".to_string()),
+                    );
+                    extra.insert(
+                        "workspaces".to_string(),
+                        serde_json::Value::Array(
+                            workspaces_vec
+                                .into_iter()
+                                .map(serde_json::Value::String)
+                                .collect(),
+                        ),
+                    );
+                    Some(extra)
+                },
+                ..default_package_data()
+            }
+        }
+        None => {
+            // No workspaces found, return basic package data
+            PackageData {
+                package_type: Some("npm-workspace".to_string()),
+                extra_data: {
+                    let mut extra = std::collections::HashMap::new();
+                    extra.insert(
+                        "datasource_id".to_string(),
+                        serde_json::Value::String("pnpm_workspace_yaml".to_string()),
+                    );
+                    Some(extra)
+                },
+                ..default_package_data()
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_is_match() {
+        assert!(NpmWorkspaceParser::is_match(Path::new(
+            "pnpm-workspace.yaml"
+        )));
+        assert!(!NpmWorkspaceParser::is_match(Path::new("package.json")));
+        assert!(!NpmWorkspaceParser::is_match(Path::new("pnpm-lock.yaml")));
+        assert!(!NpmWorkspaceParser::is_match(Path::new("README.md")));
+    }
+
+    #[test]
+    fn test_parse_workspace_with_single_package() {
+        let yaml_content = r#"
+packages:
+  - "packages/*"
+"#;
+
+        let workspace_data: Value = serde_yaml::from_str(yaml_content).unwrap();
+        let result = parse_workspace_file(&workspace_data);
+
+        assert_eq!(result.package_type, Some("npm-workspace".to_string()));
+
+        let extra_data = result.extra_data.unwrap();
+        assert_eq!(
+            extra_data.get("datasource_id").unwrap().as_str().unwrap(),
+            "pnpm_workspace_yaml"
+        );
+        let workspaces = extra_data.get("workspaces").unwrap().as_array().unwrap();
+        assert_eq!(workspaces.len(), 1);
+        assert_eq!(workspaces[0], "packages/*");
+    }
+
+    #[test]
+    fn test_parse_workspace_with_multiple_packages() {
+        let yaml_content = r#"
+packages:
+  - "packages/*"
+  - "apps/*"
+  - "tools/*"
+"#;
+
+        let workspace_data: Value = serde_yaml::from_str(yaml_content).unwrap();
+        let result = parse_workspace_file(&workspace_data);
+
+        let extra_data = result.extra_data.unwrap();
+        let workspaces = extra_data.get("workspaces").unwrap().as_array().unwrap();
+        assert_eq!(workspaces.len(), 3);
+        assert_eq!(workspaces[0], "packages/*");
+        assert_eq!(workspaces[1], "apps/*");
+        assert_eq!(workspaces[2], "tools/*");
+    }
+
+    #[test]
+    fn test_parse_workspace_with_wildcard_pattern() {
+        let yaml_content = r#"
+packages:
+  - "*"
+"#;
+
+        let workspace_data: Value = serde_yaml::from_str(yaml_content).unwrap();
+        let result = parse_workspace_file(&workspace_data);
+
+        let extra_data = result.extra_data.unwrap();
+        let workspaces = extra_data.get("workspaces").unwrap().as_array().unwrap();
+        assert_eq!(workspaces.len(), 1);
+        assert_eq!(workspaces[0], "*");
+    }
+
+    #[test]
+    fn test_parse_workspace_with_negated_pattern() {
+        let yaml_content = r#"
+packages:
+  - "packages/*"
+  - "!packages/dont-scan-me"
+"#;
+
+        let workspace_data: Value = serde_yaml::from_str(yaml_content).unwrap();
+        let result = parse_workspace_file(&workspace_data);
+
+        let extra_data = result.extra_data.unwrap();
+        let workspaces = extra_data.get("workspaces").unwrap().as_array().unwrap();
+        assert_eq!(workspaces.len(), 2);
+        assert_eq!(workspaces[0], "packages/*");
+        assert_eq!(workspaces[1], "!packages/dont-scan-me");
+    }
+
+    #[test]
+    fn test_parse_workspace_with_depth_pattern() {
+        let yaml_content = r#"
+packages:
+  - "**/components/*"
+"#;
+
+        let workspace_data: Value = serde_yaml::from_str(yaml_content).unwrap();
+        let result = parse_workspace_file(&workspace_data);
+
+        let extra_data = result.extra_data.unwrap();
+        let workspaces = extra_data.get("workspaces").unwrap().as_array().unwrap();
+        assert_eq!(workspaces.len(), 1);
+        assert_eq!(workspaces[0], "**/components/*");
+    }
+
+    #[test]
+    fn test_parse_workspace_with_no_packages() {
+        let yaml_content = r#"
+name: my-workspace
+"#;
+
+        let workspace_data: Value = serde_yaml::from_str(yaml_content).unwrap();
+        let result = parse_workspace_file(&workspace_data);
+
+        assert_eq!(result.package_type, Some("npm-workspace".to_string()));
+        assert!(result.extra_data.is_some());
+        let extra_data = result.extra_data.unwrap();
+        assert_eq!(
+            extra_data.get("datasource_id").unwrap().as_str().unwrap(),
+            "pnpm_workspace_yaml"
+        );
+        assert!(!extra_data.contains_key("workspaces"));
+    }
+
+    #[test]
+    fn test_parse_workspace_with_empty_packages_array() {
+        let yaml_content = r#"
+packages: []
+"#;
+
+        let workspace_data: Value = serde_yaml::from_str(yaml_content).unwrap();
+        let result = parse_workspace_file(&workspace_data);
+
+        assert_eq!(result.package_type, Some("npm-workspace".to_string()));
+        assert!(
+            result.extra_data.is_none() || !result.extra_data.unwrap().contains_key("workspaces")
+        );
+    }
+
+    #[test]
+    fn test_default_package_data() {
+        let result = default_package_data();
+
+        assert_eq!(result.package_type, Some("npm-workspace".to_string()));
+        assert!(result.name.is_none());
+        assert!(result.version.is_none());
+        assert!(result.extra_data.is_none());
+    }
+}
+
+crate::register_parser!(
+    "pnpm workspace yaml file",
+    &["**/pnpm-workspace.yaml"],
+    "npm",
+    "JavaScript",
+    Some("https://pnpm.io/pnpm-workspace_yaml"),
+);

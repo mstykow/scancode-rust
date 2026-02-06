@@ -1,7 +1,27 @@
+//! Parser for npm package-lock.json and npm-shrinkwrap.json lockfiles.
+//!
+//! Extracts resolved dependency information including exact versions, integrity hashes,
+//! and dependency trees from npm lockfile formats (v1, v2, v3).
+//!
+//! # Supported Formats
+//! - package-lock.json (lockfile v1, v2, v3)
+//! - npm-shrinkwrap.json
+//!
+//! # Key Features
+//! - Lockfile version detection (v1, v2, v3)
+//! - Direct vs transitive dependency tracking (`is_direct`)
+//! - Integrity hash extraction (sha512, sha256, sha1, md5)
+//! - Package URL (purl) generation
+//! - Dependency graph traversal with proper nesting
+//!
+//! # Implementation Notes
+//! - v1: Dependencies nested in `dependencies` objects
+//! - v2+: Flat dependency structure with `node_modules/` prefix for nesting
+//! - Direct dependencies determined by top-level `dependencies` and `devDependencies`
+
 use crate::models::{Dependency, PackageData, ResolvedPackage};
-use base64::prelude::*;
+use crate::parsers::utils::{npm_purl, parse_sri};
 use log::warn;
-use packageurl::PackageUrl;
 use serde_json::Value;
 use std::fs;
 use std::path::Path;
@@ -20,6 +40,10 @@ const FIELD_DEV: &str = "dev";
 const FIELD_OPTIONAL: &str = "optional";
 const FIELD_DEV_OPTIONAL: &str = "devOptional";
 
+/// npm lockfile parser supporting package-lock.json v1, v2, and v3 formats.
+///
+/// Extracts pinned dependency versions with integrity hashes from lockfiles
+/// including npm-shrinkwrap.json variants.
 pub struct NpmLockParser;
 
 impl PackageParser for NpmLockParser {
@@ -86,12 +110,43 @@ fn default_package_data() -> PackageData {
         namespace: None,
         name: None,
         version: None,
+        qualifiers: None,
+        subpath: None,
+        primary_language: None,
+        description: None,
+        release_date: None,
+        parties: Vec::new(),
+        keywords: Vec::new(),
         homepage_url: None,
         download_url: None,
+        size: None,
+        sha1: None,
+        md5: None,
+        sha256: None,
+        sha512: None,
+        bug_tracking_url: None,
+        code_view_url: None,
+        vcs_url: None,
         copyright: None,
+        holder: None,
+        declared_license_expression: None,
+        declared_license_expression_spdx: None,
         license_detections: Vec::new(),
+        other_license_expression: None,
+        other_license_expression_spdx: None,
+        other_license_detections: Vec::new(),
+        extracted_license_statement: None,
+        notice_text: None,
+        source_packages: Vec::new(),
+        file_references: Vec::new(),
+        is_private: false,
+        is_virtual: false,
+        extra_data: None,
         dependencies: Vec::new(),
-        parties: Vec::new(),
+        repository_homepage_url: None,
+        repository_download_url: None,
+        api_data_url: None,
+        datasource_id: None,
         purl: None,
     }
 }
@@ -114,6 +169,21 @@ fn parse_lockfile_v2_plus(
     let (namespace, name) = extract_namespace_and_name(&root_name);
     let purl = create_purl(&namespace, &name, &root_version);
 
+    // Collect root-level dependencies from top-level sections
+    let mut root_deps = std::collections::HashSet::new();
+
+    // Root dependencies are in top-level "dependencies" and "devDependencies"
+    if let Some(root_deps_obj) = json.get(FIELD_DEPENDENCIES).and_then(|v| v.as_object()) {
+        for key in root_deps_obj.keys() {
+            root_deps.insert(key.clone());
+        }
+    }
+    if let Some(root_dev_deps_obj) = json.get("devDependencies").and_then(|v| v.as_object()) {
+        for key in root_dev_deps_obj.keys() {
+            root_deps.insert(key.clone());
+        }
+    }
+
     let mut dependencies = Vec::new();
 
     for (key, value) in packages {
@@ -130,12 +200,9 @@ fn parse_lockfile_v2_plus(
 
         let version = match value.get(FIELD_VERSION).and_then(|v| v.as_str()) {
             Some(v) => v.to_string(),
-            None => continue, // Skip entries without version
+            None => continue,
         };
 
-        let (dep_namespace, dep_name) = extract_namespace_and_name(&package_name);
-
-        // Determine dependency scope and flags
         let is_dev = value
             .get(FIELD_DEV)
             .and_then(|v| v.as_bool())
@@ -149,46 +216,21 @@ fn parse_lockfile_v2_plus(
             .and_then(|v| v.as_bool())
             .unwrap_or(false);
 
-        let (scope, is_runtime, is_optional_flag) =
-            determine_scope(is_dev, is_dev_optional, is_optional);
-
-        // Create PURL for dependency
-        let dep_purl = create_purl(&dep_namespace, &dep_name, &version);
-
-        // Parse integrity and resolved URL
         let resolved = value.get(FIELD_RESOLVED).and_then(|v| v.as_str());
         let integrity = value.get(FIELD_INTEGRITY).and_then(|v| v.as_str());
+        let is_direct = root_deps.contains(&package_name);
 
-        let (sha1_from_integrity, sha512_from_integrity) = parse_integrity_field(integrity);
-        let sha1_from_url = resolved.and_then(parse_resolved_url);
-
-        // Prefer integrity sha1 over URL sha1
-        let sha1 = sha1_from_integrity.or(sha1_from_url);
-
-        // Create resolved package
-        let resolved_package = ResolvedPackage {
-            package_type: NpmLockParser::PACKAGE_TYPE.to_string(),
-            namespace: dep_namespace.clone(),
-            name: dep_name.clone(),
-            version: version.clone(),
-            primary_language: Some("JavaScript".to_string()),
-            download_url: resolved.map(|s| s.to_string()),
-            sha1,
-            sha512: sha512_from_integrity,
-            is_virtual: true,
-            dependencies: Vec::new(), // v2+ doesn't have nested dependencies
-        };
-
-        let dependency = Dependency {
-            purl: dep_purl,
-            extracted_requirement: Some(version),
-            scope: Some(scope.to_string()),
-            is_runtime: Some(is_runtime),
-            is_optional: Some(is_optional_flag),
-            is_pinned: Some(true),  // Lock files always have pinned versions
-            is_direct: Some(false), // In flat structure, we mark all as transitive
-            resolved_package: Some(Box::new(resolved_package)),
-        };
+        let dependency = build_npm_dependency(
+            &package_name,
+            version,
+            is_dev,
+            is_dev_optional,
+            is_optional,
+            resolved,
+            integrity,
+            is_direct,
+            Vec::new(),
+        );
 
         dependencies.push(dependency);
     }
@@ -198,12 +240,43 @@ fn parse_lockfile_v2_plus(
         namespace: Some(namespace),
         name: Some(name),
         version: Some(root_version),
+        qualifiers: None,
+        subpath: None,
+        primary_language: None,
+        description: None,
+        release_date: None,
+        parties: Vec::new(),
+        keywords: Vec::new(),
         homepage_url: None,
         download_url: None,
+        size: None,
+        sha1: None,
+        md5: None,
+        sha256: None,
+        sha512: None,
+        bug_tracking_url: None,
+        code_view_url: None,
+        vcs_url: None,
         copyright: None,
+        holder: None,
+        declared_license_expression: None,
+        declared_license_expression_spdx: None,
         license_detections: Vec::new(),
+        other_license_expression: None,
+        other_license_expression_spdx: None,
+        other_license_detections: Vec::new(),
+        extracted_license_statement: None,
+        notice_text: None,
+        source_packages: Vec::new(),
+        file_references: Vec::new(),
+        is_private: false,
+        is_virtual: false,
+        extra_data: None,
         dependencies,
-        parties: Vec::new(),
+        repository_homepage_url: None,
+        repository_download_url: None,
+        api_data_url: None,
+        datasource_id: None,
         purl,
     }
 }
@@ -233,18 +306,60 @@ fn parse_lockfile_v1(
         namespace: Some(namespace),
         name: Some(name),
         version: Some(root_version),
+        qualifiers: None,
+        subpath: None,
+        primary_language: None,
+        description: None,
+        release_date: None,
+        parties: Vec::new(),
+        keywords: Vec::new(),
         homepage_url: None,
         download_url: None,
+        size: None,
+        sha1: None,
+        md5: None,
+        sha256: None,
+        sha512: None,
+        bug_tracking_url: None,
+        code_view_url: None,
+        vcs_url: None,
         copyright: None,
+        holder: None,
+        declared_license_expression: None,
+        declared_license_expression_spdx: None,
         license_detections: Vec::new(),
+        other_license_expression: None,
+        other_license_expression_spdx: None,
+        other_license_detections: Vec::new(),
+        extracted_license_statement: None,
+        notice_text: None,
+        source_packages: Vec::new(),
+        file_references: Vec::new(),
+        is_private: false,
+        is_virtual: false,
+        extra_data: None,
         dependencies,
-        parties: Vec::new(),
+        repository_homepage_url: None,
+        repository_download_url: None,
+        api_data_url: None,
+        datasource_id: None,
         purl,
     }
 }
 
 /// Recursively parse v1 dependencies object
+///
+/// For v1 lockfiles, root dependencies are at nesting level 0 (direct children of the root
+/// "dependencies" object). Transitive dependencies are nested within parent dependencies.
 fn parse_dependencies_v1(dependencies_obj: &serde_json::Map<String, Value>) -> Vec<Dependency> {
+    parse_dependencies_v1_with_depth(dependencies_obj, 0)
+}
+
+/// Recursively parse v1 dependencies with depth tracking
+fn parse_dependencies_v1_with_depth(
+    dependencies_obj: &serde_json::Map<String, Value>,
+    depth: usize,
+) -> Vec<Dependency> {
     let mut dependencies = Vec::new();
 
     for (package_name, dep_data) in dependencies_obj {
@@ -253,9 +368,6 @@ fn parse_dependencies_v1(dependencies_obj: &serde_json::Map<String, Value>) -> V
             None => continue,
         };
 
-        let (dep_namespace, dep_name) = extract_namespace_and_name(package_name);
-
-        // Determine dependency scope and flags
         let is_dev = dep_data
             .get(FIELD_DEV)
             .and_then(|v| v.as_bool())
@@ -265,51 +377,28 @@ fn parse_dependencies_v1(dependencies_obj: &serde_json::Map<String, Value>) -> V
             .and_then(|v| v.as_bool())
             .unwrap_or(false);
 
-        let (scope, is_runtime, is_optional_flag) = determine_scope(is_dev, false, is_optional);
-
-        // Create PURL for dependency
-        let dep_purl = create_purl(&dep_namespace, &dep_name, &version);
-
-        // Parse integrity and resolved URL
         let resolved = dep_data.get(FIELD_RESOLVED).and_then(|v| v.as_str());
         let integrity = dep_data.get(FIELD_INTEGRITY).and_then(|v| v.as_str());
 
-        let (sha1_from_integrity, sha512_from_integrity) = parse_integrity_field(integrity);
-        let sha1_from_url = resolved.and_then(parse_resolved_url);
-
-        let sha1 = sha1_from_integrity.or(sha1_from_url);
-
-        // Parse nested dependencies if present
         let nested_deps = dep_data
             .get(FIELD_DEPENDENCIES)
             .and_then(|v| v.as_object())
-            .map(parse_dependencies_v1)
+            .map(|nested| parse_dependencies_v1_with_depth(nested, depth + 1))
             .unwrap_or_default();
 
-        // Create resolved package
-        let resolved_package = ResolvedPackage {
-            package_type: NpmLockParser::PACKAGE_TYPE.to_string(),
-            namespace: dep_namespace.clone(),
-            name: dep_name.clone(),
-            version: version.clone(),
-            primary_language: Some("JavaScript".to_string()),
-            download_url: resolved.map(|s| s.to_string()),
-            sha1,
-            sha512: sha512_from_integrity,
-            is_virtual: true,
-            dependencies: nested_deps,
-        };
+        let is_direct = depth == 0;
 
-        let dependency = Dependency {
-            purl: dep_purl,
-            extracted_requirement: Some(version),
-            scope: Some(scope.to_string()),
-            is_runtime: Some(is_runtime),
-            is_optional: Some(is_optional_flag),
-            is_pinned: Some(true),
-            is_direct: Some(false),
-            resolved_package: Some(Box::new(resolved_package)),
-        };
+        let dependency = build_npm_dependency(
+            package_name,
+            version,
+            is_dev,
+            false, // v1 lockfiles don't have devOptional flag
+            is_optional,
+            resolved,
+            integrity,
+            is_direct,
+            nested_deps,
+        );
 
         dependencies.push(dependency);
     }
@@ -369,20 +458,13 @@ fn extract_package_name_from_path(path: &str) -> String {
     path.to_string()
 }
 
-/// Create a Package URL (PURL) from namespace, name, and version
-/// Namespace should be "@org" for scoped packages, "" for regular packages
 fn create_purl(namespace: &str, name: &str, version: &str) -> Option<String> {
-    let mut package_url = PackageUrl::new(NpmLockParser::PACKAGE_TYPE, name).ok()?;
-
-    // Add namespace if present (for scoped packages)
-    if !namespace.is_empty() {
-        package_url.with_namespace(namespace).ok()?;
-    }
-
-    // Add version
-    package_url.with_version(version).ok()?;
-
-    Some(package_url.to_string())
+    let full_name = if namespace.is_empty() {
+        name.to_string()
+    } else {
+        format!("{}/{}", namespace, name)
+    };
+    npm_purl(&full_name, Some(version))
 }
 
 /// Parse integrity field like "sha512-base64string==" or "sha1-base64string="
@@ -393,31 +475,13 @@ fn parse_integrity_field(integrity: Option<&str>) -> (Option<String>, Option<Str
         None => return (None, None),
     };
 
-    // Format: "algorithm-base64string"
-    let parts: Vec<&str> = integrity.splitn(2, '-').collect();
-    if parts.len() != 2 {
-        return (None, None);
-    }
-
-    let algorithm = parts[0];
-    let base64_str = parts[1];
-
-    // Decode base64 to bytes
-    let bytes = match BASE64_STANDARD.decode(base64_str) {
-        Ok(bytes) => bytes,
-        Err(_) => return (None, None),
-    };
-
-    // Convert bytes to hex string
-    let hex_string = bytes
-        .iter()
-        .map(|b| format!("{:02x}", b))
-        .collect::<String>();
-
-    match algorithm {
-        "sha1" => (Some(hex_string), None),
-        "sha512" => (None, Some(hex_string)),
-        _ => (None, None),
+    match parse_sri(integrity) {
+        Some((algo, hex_digest)) => match algo.as_str() {
+            "sha1" => (Some(hex_digest), None),
+            "sha512" => (None, Some(hex_digest)),
+            _ => (None, None),
+        },
+        None => (None, None),
     }
 }
 
@@ -450,3 +514,69 @@ fn determine_scope(
         ("dependencies", true, false)
     }
 }
+
+#[allow(clippy::too_many_arguments)]
+fn build_npm_dependency(
+    package_name: &str,
+    version: String,
+    is_dev: bool,
+    is_dev_optional: bool,
+    is_optional: bool,
+    resolved: Option<&str>,
+    integrity: Option<&str>,
+    is_direct: bool,
+    nested_deps: Vec<Dependency>,
+) -> Dependency {
+    let (dep_namespace, dep_name) = extract_namespace_and_name(package_name);
+    let (scope, is_runtime, is_optional_flag) =
+        determine_scope(is_dev, is_dev_optional, is_optional);
+    let dep_purl = create_purl(&dep_namespace, &dep_name, &version);
+
+    let (sha1_from_integrity, sha512_from_integrity) = parse_integrity_field(integrity);
+    let sha1_from_url = resolved.and_then(parse_resolved_url);
+    let sha1 = sha1_from_integrity.or(sha1_from_url);
+
+    let resolved_package = ResolvedPackage {
+        package_type: NpmLockParser::PACKAGE_TYPE.to_string(),
+        namespace: dep_namespace,
+        name: dep_name,
+        version: version.clone(),
+        primary_language: Some("JavaScript".to_string()),
+        download_url: resolved.map(|s| s.to_string()),
+        sha1,
+        sha256: None,
+        sha512: sha512_from_integrity,
+        md5: None,
+        is_virtual: true,
+        dependencies: nested_deps,
+        repository_homepage_url: None,
+        repository_download_url: None,
+        api_data_url: None,
+        datasource_id: None,
+        purl: None,
+    };
+
+    Dependency {
+        purl: dep_purl,
+        extracted_requirement: Some(version),
+        scope: Some(scope.to_string()),
+        is_runtime: Some(is_runtime),
+        is_optional: Some(is_optional_flag),
+        is_pinned: Some(true),
+        is_direct: Some(is_direct),
+        resolved_package: Some(Box::new(resolved_package)),
+        extra_data: None,
+    }
+}
+
+crate::register_parser!(
+    "npm package-lock.json lockfile",
+    &[
+        "**/package-lock.json",
+        "**/.package-lock.json",
+        "**/npm-shrinkwrap.json"
+    ],
+    "npm",
+    "JavaScript",
+    Some("https://docs.npmjs.com/cli/v8/configuring-npm/package-lock-json"),
+);

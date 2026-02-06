@@ -1,0 +1,10 @@
+<project>
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>com.example</groupId>
+  <artifactId>cycle-props</artifactId>
+  <properties>
+    <a>${b}</a>
+    <b>${a}</b>
+  </properties>
+  <version>${a}</version>
+</project>

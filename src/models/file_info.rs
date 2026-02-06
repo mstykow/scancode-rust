@@ -134,20 +134,101 @@ impl FileInfo {
     }
 }
 
-#[derive(Serialize, Debug, Clone)]
+/// Package metadata extracted from manifest files.
+///
+/// Compatible with ScanCode Toolkit output format. Contains standardized package
+/// information including name, version, dependencies, licenses, and other metadata.
+/// This is the primary data structure returned by all parsers.
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct PackageData {
     #[serde(rename = "type")] // name used by ScanCode
     pub package_type: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub namespace: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub version: Option<String>,
-    pub homepage_url: Option<String>,
-    pub download_url: Option<String>,
-    pub copyright: Option<String>,
-    pub license_detections: Vec<LicenseDetection>,
-    pub dependencies: Vec<Dependency>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub qualifiers: Option<std::collections::HashMap<String, String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub subpath: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub primary_language: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub release_date: Option<String>,
     pub parties: Vec<Party>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub keywords: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub homepage_url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub download_url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub size: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sha1: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub md5: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sha256: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sha512: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bug_tracking_url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub code_view_url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub vcs_url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub copyright: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub holder: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub declared_license_expression: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub declared_license_expression_spdx: Option<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub license_detections: Vec<LicenseDetection>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub other_license_expression: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub other_license_expression_spdx: Option<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub other_license_detections: Vec<LicenseDetection>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub extracted_license_statement: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub notice_text: Option<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub source_packages: Vec<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub file_references: Vec<FileReference>,
+    #[serde(skip_serializing_if = "is_false", default)]
+    pub is_private: bool,
+    #[serde(skip_serializing_if = "is_false", default)]
+    pub is_virtual: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub extra_data: Option<std::collections::HashMap<String, serde_json::Value>>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub dependencies: Vec<Dependency>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub repository_homepage_url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub repository_download_url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub api_data_url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub datasource_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub purl: Option<String>,
+}
+
+// Helper function for serde skip_serializing_if
+fn is_false(b: &bool) -> bool {
+    !b
 }
 
 impl PackageData {
@@ -166,21 +247,43 @@ impl PackageData {
     }
 }
 
-#[derive(Serialize, Debug, Clone)]
+/// License detection result containing matched license expressions.
+///
+/// Aggregates multiple license matches into a single SPDX license expression.
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct LicenseDetection {
-    #[serde(rename = "license_expression_spdx")] // name used by ScanCode
     pub license_expression: String,
+    pub license_expression_spdx: String,
     pub matches: Vec<Match>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub identifier: Option<String>,
 }
 
-#[derive(Serialize, Debug, Clone)]
+/// Individual license text match with location and confidence score.
+///
+/// Represents a specific region of text that matched a known license pattern.
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Match {
-    pub score: f64,
+    pub license_expression: String,
+    pub license_expression_spdx: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub from_file: Option<String>,
     pub start_line: usize,
     pub end_line: usize,
-    #[serde(rename = "license_expression_spdx")] // name used by ScanCode
-    pub license_expression: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub matcher: Option<String>,
+    pub score: f64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub matched_length: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub match_coverage: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rule_relevance: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub rule_identifier: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rule_url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub matched_text: Option<String>,
 }
 
@@ -191,7 +294,11 @@ pub struct Copyright {
     pub end_line: usize,
 }
 
-#[derive(Serialize, Debug, Clone)]
+/// Package dependency information with version constraints.
+///
+/// Represents a declared dependency with scope (e.g., runtime, dev, optional)
+/// and optional resolved package details.
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Dependency {
     pub purl: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -207,12 +314,15 @@ pub struct Dependency {
     pub is_direct: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub resolved_package: Option<Box<ResolvedPackage>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub extra_data: Option<std::collections::HashMap<String, serde_json::Value>>,
 }
 
-#[derive(Serialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ResolvedPackage {
     #[serde(rename = "type")]
     pub package_type: String,
+    #[serde(skip_serializing_if = "String::is_empty")]
     pub namespace: String,
     pub name: String,
     pub version: String,
@@ -223,14 +333,66 @@ pub struct ResolvedPackage {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sha1: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub sha256: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub sha512: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub md5: Option<String>,
     pub is_virtual: bool,
     pub dependencies: Vec<Dependency>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub repository_homepage_url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub repository_download_url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub api_data_url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub datasource_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub purl: Option<String>,
 }
 
-#[derive(Serialize, Debug, Clone)]
+/// Author, maintainer, or contributor information.
+///
+/// Represents a person or organization associated with a package.
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Party {
-    pub email: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub r#type: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub role: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub email: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub organization: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub organization_url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub timezone: Option<String>,
+}
+
+/// Reference to a file within a package archive with checksums.
+///
+/// Used in SBOM generation to track files within distribution archives.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct FileReference {
+    pub path: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub size: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sha1: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub md5: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sha256: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sha512: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub extra_data: Option<std::collections::HashMap<String, serde_json::Value>>,
 }
 
 #[derive(Serialize, Debug, Clone)]
@@ -238,7 +400,7 @@ pub struct OutputURL {
     pub url: String,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum FileType {
     File,
     Directory,

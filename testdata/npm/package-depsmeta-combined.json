@@ -1,0 +1,23 @@
+{
+  "name": "test-deps-meta-combined",
+  "version": "1.0.0",
+  "dependencies": {
+    "lodash": "^4.17.21",
+    "axios": "^1.0.0"
+  },
+  "peerDependencies": {
+    "react": "^18.0.0",
+    "react-dom": "^18.0.0"
+  },
+  "peerDependenciesMeta": {
+    "react-dom": {
+      "optional": true
+    }
+  },
+  "dependenciesMeta": {
+    "lodash": {
+      "optional": true,
+      "injected": true
+    }
+  }
+}

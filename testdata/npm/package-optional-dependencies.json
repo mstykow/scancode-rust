@@ -1,0 +1,9 @@
+{
+  "name": "@example/test-optional-deps",
+  "version": "1.0.0",
+  "license": "MIT",
+  "optionalDependencies": {
+    "fsevents": "^2.3.2",
+    "chokidar": "^3.5.0"
+  }
+}

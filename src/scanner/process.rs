@@ -1,8 +1,6 @@
 use crate::askalono::{ScanStrategy, TextData};
 use crate::models::{FileInfo, FileInfoBuilder, FileType, LicenseDetection, Match};
-use crate::parsers::{
-    CargoParser, MavenParser, NpmLockParser, NpmParser, PackageParser, PythonParser,
-};
+use crate::parsers::try_parse_file;
 use crate::scanner::ProcessResult;
 use crate::utils::file::{get_creation_date, is_path_excluded};
 use crate::utils::hash::{calculate_md5, calculate_sha1, calculate_sha256};
@@ -147,24 +145,7 @@ fn extract_information_from_content(
         .sha256(Some(calculate_sha256(&buffer)))
         .programming_language(Some(detect_language(path, &buffer)));
 
-    if NpmParser::is_match(path) {
-        let package_data = vec![NpmParser::extract_package_data(path)];
-        file_info_builder.package_data(package_data);
-        Ok(())
-    } else if NpmLockParser::is_match(path) {
-        let package_data = vec![NpmLockParser::extract_package_data(path)];
-        file_info_builder.package_data(package_data);
-        Ok(())
-    } else if CargoParser::is_match(path) {
-        let package_data = vec![CargoParser::extract_package_data(path)];
-        file_info_builder.package_data(package_data);
-        Ok(())
-    } else if PythonParser::is_match(path) {
-        let package_data = vec![PythonParser::extract_package_data(path)];
-        file_info_builder.package_data(package_data);
-        Ok(())
-    } else if MavenParser::is_match(path) {
-        let package_data = vec![MavenParser::extract_package_data(path)];
+    if let Some(package_data) = try_parse_file(path) {
         file_info_builder.package_data(package_data);
         Ok(())
     } else if inspect(&buffer) == ContentType::UTF_8 {
@@ -194,16 +175,28 @@ fn extract_license_information(
     let license_detections = license_result
         .containing
         .iter()
-        .map(|detection| LicenseDetection {
-            license_expression: detection.license.name.to_string(),
-            matches: vec![Match {
-                score: detection.score as f64,
-                start_line: detection.line_range.0,
-                end_line: detection.line_range.1,
-                license_expression: detection.license.name.to_string(),
-                matched_text: None, //TODO
-                rule_identifier: None,
-            }],
+        .map(|detection| {
+            let license_lower = detection.license.name.to_lowercase();
+            LicenseDetection {
+                license_expression: license_lower.clone(),
+                license_expression_spdx: detection.license.name.to_string(),
+                matches: vec![Match {
+                    license_expression: license_lower.clone(),
+                    license_expression_spdx: detection.license.name.to_string(),
+                    from_file: None,
+                    score: detection.score as f64,
+                    start_line: detection.line_range.0,
+                    end_line: detection.line_range.1,
+                    matcher: Some("2-aho".to_string()),
+                    matched_length: None,
+                    match_coverage: None,
+                    rule_relevance: None,
+                    rule_identifier: None,
+                    rule_url: None,
+                    matched_text: None,
+                }],
+                identifier: None,
+            }
         })
         .collect::<Vec<_>>();
 

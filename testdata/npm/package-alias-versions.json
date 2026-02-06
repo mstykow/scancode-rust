@@ -1,0 +1,11 @@
+{
+  "name": "test-package-versions",
+  "version": "1.0.0",
+  "dependencies": {
+    "alias-caret": "npm:actual-package@^1.0.0",
+    "alias-tilde": "npm:actual-package@~2.0.0",
+    "alias-asterisk": "npm:actual-package@*",
+    "alias-exact": "npm:actual-package@3.0.0",
+    "alias-range": "npm:actual-package@>=2.0.0 <3.0.0"
+  }
+}

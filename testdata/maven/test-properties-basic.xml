@@ -1,0 +1,10 @@
+<project>
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>com.example</groupId>
+  <artifactId>basic-props</artifactId>
+  <properties>
+    <base.version>1.0.0</base.version>
+    <project.version>${base.version}</project.version>
+  </properties>
+  <version>${project.version}</version>
+</project>

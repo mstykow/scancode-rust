@@ -1,0 +1,16 @@
+Metadata-Version: 2.1
+Name: example-package
+Version: 1.0.0
+Summary: An example package
+Home-page: https://example.com
+Author: Example Author
+Author-email: author@example.com
+License: MIT
+License-File: LICENSE
+License-File: COPYING.txt
+Platform: any
+Requires-Python: >=3.7
+Classifier: Development Status :: 3 - Alpha
+Classifier: License :: OSI Approved :: MIT License
+
+This is an example package with License-File metadata.

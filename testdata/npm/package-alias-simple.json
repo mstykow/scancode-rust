@@ -1,0 +1,8 @@
+{
+  "name": "test-package",
+  "version": "1.0.0",
+  "dependencies": {
+    "my-alias": "npm:actual-package@^1.0.0",
+    "regular-dep": "^2.0.0"
+  }
+}

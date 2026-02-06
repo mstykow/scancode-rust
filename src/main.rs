@@ -23,6 +23,9 @@ mod parsers;
 mod scanner;
 mod utils;
 
+#[cfg(test)]
+mod test_utils;
+
 const LICENSE_DETECTION_THRESHOLD: f32 = 0.9;
 
 fn main() -> std::io::Result<()> {
@@ -142,13 +145,32 @@ fn create_output(
         },
     };
 
+    // Collect all scan errors from individual files
+    let errors: Vec<String> = scan_result
+        .files
+        .iter()
+        .filter_map(|file| {
+            if file.scan_errors.is_empty() {
+                None
+            } else {
+                Some(
+                    file.scan_errors
+                        .iter()
+                        .map(|error| format!("{}: {}", file.path, error))
+                        .collect::<Vec<String>>(),
+                )
+            }
+        })
+        .flatten()
+        .collect();
+
     Output {
         headers: vec![Header {
             start_timestamp: start_time.to_rfc3339(),
             end_timestamp: end_time.to_rfc3339(),
             duration,
             extra_data,
-            errors: Vec::new(), // TODO: implement
+            errors,
             output_format_version: SCANCODE_OUTPUT_FORMAT_VERSION.to_string(),
         }],
         files: scan_result.files,

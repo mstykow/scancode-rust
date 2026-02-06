@@ -1,0 +1,6 @@
+{
+  "name": "@example/test-bundled-deps",
+  "version": "1.0.0",
+  "license": "MIT",
+  "bundledDependencies": ["lodash", "moment", "axios"]
+}

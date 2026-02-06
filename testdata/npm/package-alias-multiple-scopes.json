@@ -1,0 +1,16 @@
+{
+  "name": "test-package-dev",
+  "version": "1.0.0",
+  "devDependencies": {
+    "my-dev-alias": "npm:actual-package@~2.0.0"
+  },
+  "dependencies": {
+    "my-runtime-alias": "npm:actual-package@^1.0.0"
+  },
+  "peerDependencies": {
+    "my-peer-alias": "npm:peer-package@^3.0.0"
+  },
+  "optionalDependencies": {
+    "my-opt-alias": "npm:opt-package@*"
+  }
+}

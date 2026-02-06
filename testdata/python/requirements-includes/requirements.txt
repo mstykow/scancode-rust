@@ -1,0 +1,3 @@
+# Main requirements file with single-level include
+requests>=2.25.0
+-r requirements-dev.txt

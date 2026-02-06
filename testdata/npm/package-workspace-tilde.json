@@ -1,0 +1,12 @@
+{
+  "name": "test-workspace-tilde",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "lib/*"
+  ],
+  "dependencies": {
+    "lib-utils": "workspace:~",
+    "lib-config": "workspace:~"
+  }
+}

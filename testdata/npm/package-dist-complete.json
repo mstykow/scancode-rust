@@ -1,0 +1,15 @@
+{
+  "name": "test-package-dist-complete",
+  "version": "1.0.0",
+  "dist": {
+    "integrity": "sha512-7iaw3Ur350mqGo7jwQrpkj9hiYB3Lkc/iBml1JQODbJ6wYX4oOHV+E+IvIh/1nsUNzLDBMxfqa2Ob1f1ACio/w==",
+    "tarball": "https://registry.npmjs.org/test-package-dist-complete/-/test-package-dist-complete-1.0.0.tgz"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/user/repo.git"
+  },
+  "bugs": {
+    "url": "https://github.com/user/repo/issues"
+  }
+}

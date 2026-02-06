@@ -206,7 +206,7 @@ fn remove_common_tokens(input: Cow<str>) -> Cow<str> {
         .sum::<u32>();
 
     // the common string must be at least 80% of the text
-    let prefix_threshold = (0.8f32 * lines.len() as f32) as _;
+    let prefix_threshold = (0.8f32 * lines.len() as f32) as u32;
     if common_count < prefix_threshold {
         return input;
     }
@@ -344,7 +344,6 @@ mod tests {
                     abcd";
 
         let new_text = remove_common_tokens(text.into());
-        println!("{}", new_text);
 
         assert!(
             !new_text.contains("%%Copyright"),
@@ -358,7 +357,6 @@ mod tests {
                     this word -> this <- in it even though\n\
                     this is still the most common word";
         let new_text = remove_common_tokens(text.into());
-        println!("-- {}", new_text);
         // the "this" at the start of the line can be discarded...
         assert!(!new_text.contains("\nthis"));
         // ...but the "this" in the middle of sentences shouldn't be
@@ -368,7 +366,6 @@ mod tests {
                     eeee ffff aaaa gggg\n\
                     hhhh iiii jjjj";
         let new_text = remove_common_tokens(text.into());
-        println!("-- {}", new_text);
         assert!(new_text.contains("aaaa")); // similar to above test
     }
 
@@ -389,9 +386,8 @@ mod tests {
                     AAAAAA six more\n\
                     \n\
                     preserve\n\
-                    keep";
+                     keep";
         let new_text = remove_common_tokens(text.into());
-        println!("{}", new_text);
 
         assert!(new_text.contains("preserve"));
         assert!(new_text.contains("keep"));
