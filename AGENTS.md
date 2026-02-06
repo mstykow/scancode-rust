@@ -14,7 +14,7 @@ The `reference/scancode-toolkit/` submodule contains the original Python impleme
 - **Reference for behavior**: Verify expected behavior and output formats against the original implementation
 - **Bug avoidance**: Identify known issues in the original and implement cleaner solutions in Rust
 
-⚠️ **Important**: This is a *rewrite*, not a port. Use the original code as reference only. Do not replicate its bugs, architectural issues, or outdated patterns. Focus on clean, idiomatic Rust code that improves upon the original.
+⚠️ **Important**: This is a _rewrite_, not a port. Use the original code as reference only. Do not replicate its bugs, architectural issues, or outdated patterns. Focus on clean, idiomatic Rust code that improves upon the original.
 
 ## Quick Start
 
@@ -281,6 +281,81 @@ cd ../..
 # Implement in src/parsers/npm.rs with improvements
 ```
 
+## Dependency Scope Conventions
+
+The `Dependency.scope` field uses **native ecosystem terminology** to preserve semantic fidelity. This enables accurate round-tripping and maintains compatibility with ecosystem-specific tooling.
+
+### npm Ecosystem
+
+- **npm/yarn/pnpm package.json**:
+  - `"dependencies"` - Regular runtime dependencies
+  - `"devDependencies"` - Development-only dependencies
+  - `"peerDependencies"` - Required peer dependencies
+  - `"optionalDependencies"` - Optional runtime dependencies
+  - `"bundledDependencies"` - Dependencies bundled with the package
+
+- **npm lockfiles** (package-lock.json, npm-shrinkwrap.json):
+  - `"dependencies"` - Regular or optional runtime dependencies
+  - `"devDependencies"` - Development dependencies
+
+- **yarn lockfiles**:
+  - `"dependencies"` - Regular runtime dependencies (v1 and v2+)
+  - `"peerDependencies"` - Peer dependencies (v2+ only; v1 doesn't distinguish)
+
+- **pnpm lockfiles** (nested dependencies):
+  - `None` - Top-level packages (no scope)
+  - `"dev"` - Development dependencies
+  - `"peer"` - Peer dependencies
+  - `"optional"` - Optional dependencies
+
+### Python Ecosystem
+
+- **pyproject.toml, setup.py, setup.cfg**:
+  - `None` or `"install"` - Regular runtime dependencies
+  - `"dev"`, `"test"`, `"docs"` - Optional dependency groups (from `[tool.poetry.dev-dependencies]` or `extras_require`)
+
+- **poetry.lock**:
+  - `"dependencies"` - All direct dependencies (doesn't distinguish dev vs regular)
+  - `"<extra_name>"` - Dependencies from extras groups
+
+- **Pipfile.lock**:
+  - `"install"` - Regular runtime dependencies (from `default` section)
+  - `"develop"` - Development dependencies (from `develop` section)
+
+- **requirements.txt** (filename-based):
+  - `"install"` - Regular requirements.txt
+  - `"develop"` - requirements-dev.txt or requirements/dev.txt
+  - `"test"` - requirements-test.txt or requirements/test.txt
+  - `"docs"` - requirements-doc.txt or requirements/doc.txt
+
+### Rust Ecosystem
+
+- **Cargo.toml**:
+  - `"dependencies"` - Regular runtime dependencies
+  - `"dev-dependencies"` - Development-only dependencies
+  - `"build-dependencies"` - Build-time dependencies
+
+- **Cargo.lock**:
+  - `"dependencies"` - All runtime dependencies (dev/build deps not in lockfile by design)
+
+### Java Ecosystem
+
+- **Maven pom.xml** (`<scope>` element):
+  - `None` - Default scope (equivalent to `compile`)
+  - `"compile"` - Compile and runtime (default)
+  - `"test"` - Test-time only
+  - `"provided"` - Provided by runtime environment
+  - `"runtime"` - Runtime only (not compile-time)
+  - `"system"` - System-provided JARs
+
+### Cross-Ecosystem Normalization
+
+The `scope` field is intentionally **not standardized** across ecosystems. For cross-ecosystem analysis:
+
+- Use `is_runtime` flag: `true` for runtime dependencies, `false` for dev/test/build
+- Use `is_optional` flag: `true` for optional dependencies
+- Future: Consider adding `normalized_scope` enum for standardized queries
+
 ## Additional Notes
 
 - **Rust toolchain**: Version pinned in `rust-toolchain.toml` (currently 1.93.0)
@@ -291,6 +366,5 @@ cd ../..
 
 ## Useful References
 
-- Full guide: `.cursor/AGENTS.md` (comprehensive 335-line document)
 - README: `README.md` (user documentation)
 - Cargo manifest: `Cargo.toml` (dependencies and project config)
