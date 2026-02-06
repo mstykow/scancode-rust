@@ -540,4 +540,34 @@ mod tests {
             Some("c3b33ab5ee360d86e0e628f0468ae7ef27d654df".to_string())
         );
     }
+
+    #[test]
+    fn test_npm_lock_v2_nested_duplicate_is_direct_bug() {
+        let lock_path = PathBuf::from("testdata/npm/lock-v2-nested-dups/package-lock.json");
+        let package_data = NpmLockParser::extract_package_data(&lock_path);
+
+        let deps = package_data.dependencies;
+        assert!(deps.len() >= 2, "Should have at least 2 dependencies");
+
+        let foo_deps: Vec<_> = deps
+            .iter()
+            .filter(|d| d.purl.as_ref().map(|p| p.contains("foo")).unwrap_or(false))
+            .collect();
+
+        assert_eq!(
+            foo_deps.len(),
+            2,
+            "Should have exactly 2 'foo' dependencies (direct at root + nested under bar)"
+        );
+
+        let direct_count = foo_deps
+            .iter()
+            .filter(|d| d.is_direct == Some(true))
+            .count();
+
+        assert_eq!(
+            direct_count, 2,
+            "BUG: Both foo instances are marked is_direct=true. Only root-level should be direct. See CODE_QUALITY_IMPROVEMENTS.md #4"
+        );
+    }
 }
