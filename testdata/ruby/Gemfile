@@ -1,0 +1,37 @@
+# frozen_string_literal: true
+
+source "https://rubygems.org"
+
+# Specify your gem's dependencies in test-gem.gemspec
+gemspec
+
+gem "rake", "~> 13.0"
+gem "rspec", "~> 3.0"
+gem "rubocop", "~> 1.21"
+
+group :development do
+  gem "pry", ">= 0.14"
+  gem "solargraph"
+end
+
+group :test do
+  gem "simplecov", "~> 0.21"
+  gem "webmock"
+end
+
+group :development, :test do
+  gem "debug", platforms: [:mri, :mingw, :x64_mingw]
+end
+
+# Platform-specific gems
+gem "json", "~> 2.0", platforms: [:ruby, :jruby]
+gem "bcrypt-ruby", platforms: :ruby
+
+# Gem with .freeze (Bug #1 test case)
+gem "frozen-gem".freeze, "1.0.0".freeze
+
+# Pessimistic version operator
+gem "pessimistic", "~> 1.2.3"
+
+# Multiple version constraints
+gem "multi-constraint", ">= 1.0", "< 2.0"

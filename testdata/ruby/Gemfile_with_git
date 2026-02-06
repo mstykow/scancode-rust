@@ -1,0 +1,23 @@
+GIT
+  remote: https://github.com/example/my-git-gem.git
+  revision: abc123def456789
+  ref: v1.0.0
+  branch: main
+  specs:
+    my-git-gem (1.2.0)
+      json (~> 2.0)
+
+GEM
+  remote: https://rubygems.org/
+  specs:
+    json (2.6.3)
+
+PLATFORMS
+  ruby
+
+BUNDLED WITH
+   2.4.1
+
+DEPENDENCIES
+  my-git-gem!
+  json (~> 2.0)
