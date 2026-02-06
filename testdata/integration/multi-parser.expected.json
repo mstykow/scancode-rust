@@ -1,0 +1,233 @@
+{
+  "headers": [
+    {
+      "extra_data": {
+        "files_count": 3,
+        "directories_count": 1,
+        "excluded_count": 0,
+        "system_environment": {
+          "operating_system": "Darwin",
+          "cpu_architecture": "aarch64",
+          "platform": "Darwin-25.2.0-aarch64",
+          "rust_version": "1.93.0"
+        }
+      },
+      "errors": [],
+      "output_format_version": "4.0.0"
+    }
+  ],
+  "files": [
+    {
+      "name": "Cargo.toml",
+      "base_name": "Cargo",
+      "extension": ".toml",
+      "path": "testdata/integration/multi-parser/Cargo.toml",
+      "type": "file",
+      "mime_type": "text/x-toml",
+      "size": 129,
+      "programming_language": "Text",
+      "package_data": [
+        {
+          "type": "cargo",
+          "name": "multi-parser-test",
+          "version": "1.0.0",
+          "description": "Test package for multi-parser integration",
+          "parties": [],
+          "homepage_url": "https://crates.io/crates/multi-parser-test",
+          "download_url": "https://crates.io/api/v1/crates/multi-parser-test/1.0.0/download",
+          "declared_license_expression": "mit",
+          "declared_license_expression_spdx": "MIT",
+          "license_detections": [
+            {
+              "license_expression": "mit",
+              "license_expression_spdx": "MIT",
+              "matches": [
+                {
+                  "license_expression": "mit",
+                  "license_expression_spdx": "MIT",
+                  "start_line": 0,
+                  "end_line": 0,
+                  "matcher": "1-spdx-id",
+                  "score": 100.0,
+                  "matched_length": 1,
+                  "match_coverage": 100.0,
+                  "rule_relevance": 100,
+                  "rule_identifier": "spdx-license-identifier-mit-5da48780aba670b0860c46d899ed42a0f243ff06",
+                  "matched_text": "MIT"
+                }
+              ],
+              "identifier": "mit-a822f434-d61f-f2b1-c792-8b8cb9e7b9bf"
+            }
+          ],
+          "extracted_license_statement": "MIT",
+          "api_data_url": "https://crates.io/api/v1/crates/multi-parser-test",
+          "purl": "pkg:cargo/multi-parser-test@1.0.0"
+        }
+      ],
+      "detected_license_expression_spdx": "mit",
+      "license_detections": [
+        {
+          "license_expression": "mit",
+          "license_expression_spdx": "MIT",
+          "matches": [
+            {
+              "license_expression": "mit",
+              "license_expression_spdx": "MIT",
+              "start_line": 0,
+              "end_line": 0,
+              "matcher": "1-spdx-id",
+              "score": 100.0,
+              "matched_length": 1,
+              "match_coverage": 100.0,
+              "rule_relevance": 100,
+              "rule_identifier": "spdx-license-identifier-mit-5da48780aba670b0860c46d899ed42a0f243ff06",
+              "matched_text": "MIT"
+            }
+          ],
+          "identifier": "mit-a822f434-d61f-f2b1-c792-8b8cb9e7b9bf"
+        }
+      ],
+      "copyrights": [],
+      "urls": [],
+      "scan_errors": []
+    },
+    {
+      "name": "pyproject.toml",
+      "base_name": "pyproject",
+      "extension": ".toml",
+      "path": "testdata/integration/multi-parser/pyproject.toml",
+      "type": "file",
+      "mime_type": "text/x-toml",
+      "size": 129,
+      "programming_language": "Text",
+      "package_data": [
+        {
+          "type": "pypi",
+          "name": "multi-parser-test",
+          "version": "1.0.0",
+          "parties": [],
+          "homepage_url": "https://pypi.org/project/multi-parser-test",
+          "download_url": "https://pypi.org/packages/source/m/multi-parser-test/multi-parser-test-1.0.0.tar.gz",
+          "declared_license_expression": "mit",
+          "declared_license_expression_spdx": "MIT",
+          "license_detections": [
+            {
+              "license_expression": "mit",
+              "license_expression_spdx": "MIT",
+              "matches": [
+                {
+                  "license_expression": "mit",
+                  "license_expression_spdx": "MIT",
+                  "start_line": 0,
+                  "end_line": 0,
+                  "matcher": "1-spdx-id",
+                  "score": 100.0,
+                  "matched_length": 1,
+                  "match_coverage": 100.0,
+                  "rule_relevance": 100,
+                  "rule_identifier": "spdx-license-identifier-mit-5da48780aba670b0860c46d899ed42a0f243ff06",
+                  "matched_text": "MIT"
+                }
+              ],
+              "identifier": "mit-a822f434-d61f-f2b1-c792-8b8cb9e7b9bf"
+            }
+          ],
+          "extracted_license_statement": "MIT",
+          "api_data_url": "https://pypi.org/pypi/multi-parser-test/1.0.0/json",
+          "purl": "pkg:pypi/multi-parser-test@1.0.0"
+        }
+      ],
+      "detected_license_expression_spdx": "mit",
+      "license_detections": [
+        {
+          "license_expression": "mit",
+          "license_expression_spdx": "MIT",
+          "matches": [
+            {
+              "license_expression": "mit",
+              "license_expression_spdx": "MIT",
+              "start_line": 0,
+              "end_line": 0,
+              "matcher": "1-spdx-id",
+              "score": 100.0,
+              "matched_length": 1,
+              "match_coverage": 100.0,
+              "rule_relevance": 100,
+              "rule_identifier": "spdx-license-identifier-mit-5da48780aba670b0860c46d899ed42a0f243ff06",
+              "matched_text": "MIT"
+            }
+          ],
+          "identifier": "mit-a822f434-d61f-f2b1-c792-8b8cb9e7b9bf"
+        }
+      ],
+      "copyrights": [],
+      "urls": [],
+      "scan_errors": []
+    },
+    {
+      "name": "package.json",
+      "base_name": "package",
+      "extension": ".json",
+      "path": "testdata/integration/multi-parser/package.json",
+      "type": "file",
+      "mime_type": "application/json",
+      "size": 138,
+      "programming_language": "JSON",
+      "package_data": [
+        {
+          "type": "npm",
+          "name": "multi-parser-test",
+          "version": "1.0.0",
+          "primary_language": "JavaScript",
+          "description": "Test package for multi-parser integration",
+          "parties": [],
+          "download_url": "https://registry.npmjs.org/multi-parser-test/-/multi-parser-test-1.0.0.tgz",
+          "declared_license_expression": "mit",
+          "declared_license_expression_spdx": "MIT",
+          "license_detections": [
+            {
+              "license_expression": "mit",
+              "license_expression_spdx": "MIT",
+              "matches": [
+                {
+                  "license_expression": "mit",
+                  "license_expression_spdx": "MIT",
+                  "start_line": 4,
+                  "end_line": 4,
+                  "score": 100.0
+                }
+              ]
+            }
+          ],
+          "extracted_license_statement": "- MIT\n",
+          "repository_homepage_url": "https://www.npmjs.com/package/multi-parser-test",
+          "repository_download_url": "https://registry.npmjs.org/multi-parser-test/-/multi-parser-test-1.0.0.tgz",
+          "api_data_url": "https://registry.npmjs.org/multi-parser-test/1.0.0",
+          "datasource_id": "npm_package_json",
+          "purl": "pkg:npm/multi-parser-test@1.0.0"
+        }
+      ],
+      "detected_license_expression_spdx": "mit",
+      "license_detections": [
+        {
+          "license_expression": "mit",
+          "license_expression_spdx": "MIT",
+          "matches": [
+            {
+              "license_expression": "mit",
+              "license_expression_spdx": "MIT",
+              "start_line": 4,
+              "end_line": 4,
+              "score": 100.0
+            }
+          ]
+        }
+      ],
+      "copyrights": [],
+      "urls": [],
+      "scan_errors": []
+    }
+  ],
+  "license_references": [],
+  "license_rule_references": []
+}

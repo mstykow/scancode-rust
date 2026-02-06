@@ -118,3 +118,30 @@ pub use self::poetry_lock::PoetryLockParser;
 pub use self::python::PythonParser;
 pub use self::requirements_txt::RequirementsTxtParser;
 pub use self::yarn_lock::YarnLockParser;
+
+macro_rules! define_parsers {
+    ($($parser:ty),* $(,)?) => {
+        pub fn try_parse_file(path: &Path) -> Option<Vec<PackageData>> {
+            $(
+                if <$parser>::is_match(path) {
+                    return Some(vec![<$parser>::extract_package_data(path)]);
+                }
+            )*
+            None
+        }
+    };
+}
+
+define_parsers! {
+    NpmWorkspaceParser,
+    NpmParser,
+    NpmLockParser,
+    YarnLockParser,
+    PnpmLockParser,
+    PoetryLockParser,
+    PipfileLockParser,
+    RequirementsTxtParser,
+    CargoParser,
+    PythonParser,
+    MavenParser,
+}

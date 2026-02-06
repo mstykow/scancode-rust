@@ -400,7 +400,7 @@ pub struct OutputURL {
     pub url: String,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum FileType {
     File,
     Directory,
