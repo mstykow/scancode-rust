@@ -1,0 +1,7 @@
+Manifest-Version: 1.0
+Bundle-SymbolicName: com.example.mybundle
+Bundle-Name: My Bundle
+Bundle-Version: 2.1.0
+Bundle-Vendor: Example Corp
+Implementation-Title: My Implementation
+Implementation-Version: 2.1.0

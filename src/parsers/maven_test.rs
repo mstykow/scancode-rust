@@ -42,7 +42,7 @@ mod tests {
         // Check license detection
         assert_eq!(package_data.license_detections.len(), 1);
         assert_eq!(
-            package_data.license_detections[0].license_expression,
+            package_data.license_detections[0].license_expression_spdx,
             "Apache-2.0"
         );
 
@@ -110,7 +110,10 @@ mod tests {
 
         // Check license detection
         assert_eq!(package_data.license_detections.len(), 1);
-        assert_eq!(package_data.license_detections[0].license_expression, "MIT");
+        assert_eq!(
+            package_data.license_detections[0].license_expression_spdx,
+            "MIT"
+        );
 
         // Check purl
         assert_eq!(
@@ -158,9 +161,11 @@ mod tests {
             junit_dep.purl,
             Some("pkg:maven/org.junit/junit@5.9.2".to_string())
         );
+        assert_eq!(junit_dep.scope, Some("test".to_string()));
         assert_eq!(junit_dep.is_optional, Some(true));
+        assert_eq!(junit_dep.is_runtime, Some(false));
 
-        // Verify jackson dependency
+        // Verify jackson dependency (no scope = compile/runtime)
         let jackson_dep = package_data
             .dependencies
             .iter()
@@ -170,7 +175,104 @@ mod tests {
             jackson_dep.purl,
             Some("pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.15.2".to_string())
         );
+        assert_eq!(jackson_dep.scope, None);
         assert_eq!(jackson_dep.is_optional, Some(false));
+        assert_eq!(jackson_dep.is_runtime, None);
+    }
+
+    #[test]
+    fn test_maven_scope_types() {
+        let content = r#"
+<project>
+    <groupId>com.example</groupId>
+    <artifactId>scope-test</artifactId>
+    <version>1.0.0</version>
+    
+    <dependencies>
+        <dependency>
+            <groupId>org.example</groupId>
+            <artifactId>compile-dep</artifactId>
+            <version>1.0</version>
+            <scope>compile</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.example</groupId>
+            <artifactId>test-dep</artifactId>
+            <version>1.0</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.example</groupId>
+            <artifactId>provided-dep</artifactId>
+            <version>1.0</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.example</groupId>
+            <artifactId>runtime-dep</artifactId>
+            <version>1.0</version>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.example</groupId>
+            <artifactId>system-dep</artifactId>
+            <version>1.0</version>
+            <scope>system</scope>
+            <systemPath>/path/to/system.jar</systemPath>
+        </dependency>
+    </dependencies>
+</project>
+        "#;
+
+        let (_temp_dir, pom_path) = create_temp_pom_xml(content);
+        let package_data = MavenParser::extract_package_data(&pom_path);
+
+        assert_eq!(package_data.dependencies.len(), 5);
+
+        let compile_dep = package_data
+            .dependencies
+            .iter()
+            .find(|dep| dep.purl.as_ref().unwrap().contains("compile-dep"))
+            .expect("Should find compile-dep");
+        assert_eq!(compile_dep.scope, Some("compile".to_string()));
+        assert_eq!(compile_dep.is_optional, Some(false));
+        assert_eq!(compile_dep.is_runtime, Some(true));
+
+        let test_dep = package_data
+            .dependencies
+            .iter()
+            .find(|dep| dep.purl.as_ref().unwrap().contains("test-dep"))
+            .expect("Should find test-dep");
+        assert_eq!(test_dep.scope, Some("test".to_string()));
+        assert_eq!(test_dep.is_optional, Some(true));
+        assert_eq!(test_dep.is_runtime, Some(false));
+
+        let provided_dep = package_data
+            .dependencies
+            .iter()
+            .find(|dep| dep.purl.as_ref().unwrap().contains("provided-dep"))
+            .expect("Should find provided-dep");
+        assert_eq!(provided_dep.scope, Some("provided".to_string()));
+        assert_eq!(provided_dep.is_optional, Some(true));
+        assert_eq!(provided_dep.is_runtime, Some(false));
+
+        let runtime_dep = package_data
+            .dependencies
+            .iter()
+            .find(|dep| dep.purl.as_ref().unwrap().contains("runtime-dep"))
+            .expect("Should find runtime-dep");
+        assert_eq!(runtime_dep.scope, Some("runtime".to_string()));
+        assert_eq!(runtime_dep.is_optional, Some(false));
+        assert_eq!(runtime_dep.is_runtime, Some(true));
+
+        let system_dep = package_data
+            .dependencies
+            .iter()
+            .find(|dep| dep.purl.as_ref().unwrap().contains("system-dep"))
+            .expect("Should find system-dep");
+        assert_eq!(system_dep.scope, Some("system".to_string()));
+        assert_eq!(system_dep.is_optional, Some(false));
+        assert_eq!(system_dep.is_runtime, Some(true));
     }
 
     #[test]
@@ -194,5 +296,531 @@ mod tests {
         assert_eq!(package_data.name, None);
         assert_eq!(package_data.version, None);
         assert!(package_data.dependencies.is_empty());
+    }
+
+    #[test]
+    fn test_extract_api_url_basic() {
+        // Given: A pom.xml with groupId, artifactId, and version
+        let pom_path = PathBuf::from("testdata/maven/pom-api-url-basic.xml");
+        let package_data = MavenParser::extract_package_data(&pom_path);
+
+        // Then: API data URL should be generated with maven-metadata.xml
+        assert_eq!(
+            package_data.api_data_url,
+            Some("https://repo1.maven.org/maven2/org/apache/commons/commons-lang3/3.12.0/maven-metadata.xml".to_string())
+        );
+
+        // Then: Homepage URL should fall back to Maven repository URL
+        assert_eq!(
+            package_data.homepage_url,
+            Some(
+                "https://repo1.maven.org/maven2/org/apache/commons/commons-lang3/3.12.0/"
+                    .to_string()
+            )
+        );
+
+        // Then: Download URL should be the JAR file download URL
+        assert_eq!(
+            package_data.download_url,
+            Some("https://repo1.maven.org/maven2/org/apache/commons/commons-lang3/3.12.0/commons-lang3-3.12.0.jar".to_string())
+        );
+    }
+
+    #[test]
+    fn test_extract_api_url_no_version() {
+        // Given: A pom.xml with groupId and artifactId but no version
+        let pom_path = PathBuf::from("testdata/maven/pom-api-url-no-version.xml");
+        let package_data = MavenParser::extract_package_data(&pom_path);
+
+        // Then: API data URL should still be generated (without version)
+        assert_eq!(
+            package_data.api_data_url,
+            Some("https://repo1.maven.org/maven2/junit/junit/maven-metadata.xml".to_string())
+        );
+
+        // Then: Homepage URL should fall back to Maven repository URL (without version)
+        assert_eq!(
+            package_data.homepage_url,
+            Some("https://repo1.maven.org/maven2/junit/junit/".to_string())
+        );
+
+        // Then: Download URL should not be generated (no version)
+        assert_eq!(package_data.download_url, None);
+    }
+
+    #[test]
+    fn test_extract_vcs_url_with_scm_connection() {
+        // Given: A pom.xml with scm.connection
+        let pom_path = PathBuf::from("testdata/maven/pom-scm.xml");
+        let package_data = MavenParser::extract_package_data(&pom_path);
+
+        // Then: vcs_url should contain the scm.connection
+        assert_eq!(
+            package_data.vcs_url,
+            Some("git+https://github.com/junit-team/junit5.git".to_string())
+        );
+    }
+
+    #[test]
+    fn test_parse_pom_properties() {
+        let pom_props_path = PathBuf::from("testdata/maven/test1/pom.properties");
+        let package_data = MavenParser::extract_package_data(&pom_props_path);
+
+        assert_eq!(package_data.package_type, Some("maven".to_string()));
+        assert_eq!(package_data.namespace, Some("com.example.test".to_string()));
+        assert_eq!(package_data.name, Some("test-library".to_string()));
+        assert_eq!(package_data.version, Some("1.2.3".to_string()));
+        assert_eq!(
+            package_data.purl,
+            Some("pkg:maven/com.example.test/test-library@1.2.3".to_string())
+        );
+    }
+
+    #[test]
+    fn test_parse_manifest_mf_implementation() {
+        let manifest_path = PathBuf::from("testdata/maven/test2/MANIFEST.MF");
+        let package_data = MavenParser::extract_package_data(&manifest_path);
+
+        assert_eq!(package_data.package_type, Some("maven".to_string()));
+        assert_eq!(package_data.name, Some("spring-web".to_string()));
+        assert_eq!(package_data.version, Some("5.3.20".to_string()));
+
+        assert_eq!(package_data.parties.len(), 1);
+        let vendor = &package_data.parties[0];
+        assert_eq!(vendor.r#type, Some("organization".to_string()));
+        assert_eq!(vendor.role, Some("vendor".to_string()));
+        assert_eq!(vendor.name, Some("Spring Framework".to_string()));
+    }
+
+    #[test]
+    fn test_parse_manifest_mf_bundle() {
+        let manifest_path = PathBuf::from("testdata/maven/test3/MANIFEST.MF");
+        let package_data = MavenParser::extract_package_data(&manifest_path);
+
+        assert_eq!(package_data.package_type, Some("maven".to_string()));
+        assert_eq!(package_data.name, Some("com.example.mybundle".to_string()));
+        assert_eq!(package_data.version, Some("2.1.0".to_string()));
+
+        assert_eq!(package_data.parties.len(), 1);
+        let vendor = &package_data.parties[0];
+        assert_eq!(vendor.name, Some("Example Corp".to_string()));
+    }
+
+    #[test]
+    fn test_pom_properties_purl_generation() {
+        let pom_props_path = PathBuf::from("testdata/maven/test4/pom.properties");
+        let package_data = MavenParser::extract_package_data(&pom_props_path);
+
+        assert_eq!(
+            package_data.purl,
+            Some("pkg:maven/org.apache.commons/commons-lang3@3.12.0".to_string())
+        );
+        assert_eq!(
+            package_data.namespace,
+            Some("org.apache.commons".to_string())
+        );
+        assert_eq!(package_data.name, Some("commons-lang3".to_string()));
+        assert_eq!(package_data.version, Some("3.12.0".to_string()));
+    }
+
+    #[test]
+    fn test_extract_repositories() {
+        let pom_path = PathBuf::from("testdata/maven/repositories-test.xml");
+        let package_data = MavenParser::extract_package_data(&pom_path);
+
+        assert_eq!(package_data.namespace, Some("com.example".to_string()));
+        assert_eq!(package_data.name, Some("test-repo".to_string()));
+        assert_eq!(package_data.version, Some("1.0.0".to_string()));
+
+        let extra_data = package_data.extra_data.expect("extra_data should exist");
+
+        let repositories = extra_data
+            .get("repositories")
+            .expect("repositories should exist")
+            .as_array()
+            .expect("repositories should be array");
+        assert_eq!(repositories.len(), 2);
+
+        let repo1 = repositories[0].as_object().expect("repo should be object");
+        assert_eq!(repo1.get("id").unwrap().as_str().unwrap(), "central");
+        assert_eq!(
+            repo1.get("name").unwrap().as_str().unwrap(),
+            "Maven Central Repository"
+        );
+        assert_eq!(
+            repo1.get("url").unwrap().as_str().unwrap(),
+            "https://repo1.maven.org/maven2"
+        );
+
+        let repo2 = repositories[1].as_object().expect("repo should be object");
+        assert_eq!(
+            repo2.get("id").unwrap().as_str().unwrap(),
+            "spring-releases"
+        );
+        assert_eq!(
+            repo2.get("name").unwrap().as_str().unwrap(),
+            "Spring Releases"
+        );
+        assert_eq!(
+            repo2.get("url").unwrap().as_str().unwrap(),
+            "https://repo.spring.io/release"
+        );
+
+        let plugin_repositories = extra_data
+            .get("plugin_repositories")
+            .expect("plugin_repositories should exist")
+            .as_array()
+            .expect("plugin_repositories should be array");
+        assert_eq!(plugin_repositories.len(), 1);
+
+        let plugin_repo = plugin_repositories[0]
+            .as_object()
+            .expect("plugin_repo should be object");
+        assert_eq!(plugin_repo.get("id").unwrap().as_str().unwrap(), "central");
+        assert_eq!(
+            plugin_repo.get("name").unwrap().as_str().unwrap(),
+            "Maven Plugin Repository"
+        );
+        assert_eq!(
+            plugin_repo.get("url").unwrap().as_str().unwrap(),
+            "https://repo1.maven.org/maven2"
+        );
+    }
+
+    #[test]
+    fn test_extract_modules() {
+        let pom_path = PathBuf::from("testdata/maven/modules-test.xml");
+        let package_data = MavenParser::extract_package_data(&pom_path);
+
+        assert_eq!(package_data.namespace, Some("com.example".to_string()));
+        assert_eq!(package_data.name, Some("multi-module-parent".to_string()));
+        assert_eq!(package_data.version, Some("1.0.0".to_string()));
+
+        let extra_data = package_data.extra_data.expect("extra_data should exist");
+
+        let modules = extra_data
+            .get("modules")
+            .expect("modules should exist")
+            .as_array()
+            .expect("modules should be array");
+        assert_eq!(modules.len(), 3);
+
+        assert_eq!(modules[0].as_str().unwrap(), "module-core");
+        assert_eq!(modules[1].as_str().unwrap(), "module-api");
+        assert_eq!(modules[2].as_str().unwrap(), "module-web");
+    }
+
+    #[test]
+    fn test_extract_mailing_lists() {
+        let pom_path = PathBuf::from("testdata/maven/mailing-lists-test.xml");
+        let package_data = MavenParser::extract_package_data(&pom_path);
+
+        assert_eq!(
+            package_data.namespace,
+            Some("org.apache.commons".to_string())
+        );
+        assert_eq!(package_data.name, Some("commons-lang3".to_string()));
+        assert_eq!(package_data.version, Some("3.12.0".to_string()));
+
+        let extra_data = package_data.extra_data.expect("extra_data should exist");
+
+        let mailing_lists = extra_data
+            .get("mailing_lists")
+            .expect("mailing_lists should exist")
+            .as_array()
+            .expect("mailing_lists should be array");
+        assert_eq!(mailing_lists.len(), 2);
+
+        let ml1 = mailing_lists[0]
+            .as_object()
+            .expect("mailing list should be object");
+        assert_eq!(
+            ml1.get("name").unwrap().as_str().unwrap(),
+            "Commons User List"
+        );
+        assert_eq!(
+            ml1.get("subscribe").unwrap().as_str().unwrap(),
+            "user-subscribe@commons.apache.org"
+        );
+        assert_eq!(
+            ml1.get("unsubscribe").unwrap().as_str().unwrap(),
+            "user-unsubscribe@commons.apache.org"
+        );
+        assert_eq!(
+            ml1.get("post").unwrap().as_str().unwrap(),
+            "user@commons.apache.org"
+        );
+        assert_eq!(
+            ml1.get("archive").unwrap().as_str().unwrap(),
+            "https://lists.apache.org/list.html?user@commons.apache.org"
+        );
+
+        let ml2 = mailing_lists[1]
+            .as_object()
+            .expect("mailing list should be object");
+        assert_eq!(
+            ml2.get("name").unwrap().as_str().unwrap(),
+            "Commons Dev List"
+        );
+        assert_eq!(
+            ml2.get("subscribe").unwrap().as_str().unwrap(),
+            "dev-subscribe@commons.apache.org"
+        );
+    }
+
+    #[test]
+    fn test_extract_dependency_management() {
+        let pom_path = PathBuf::from("testdata/maven/dependency-management-test.xml");
+        let package_data = MavenParser::extract_package_data(&pom_path);
+
+        assert_eq!(package_data.namespace, Some("com.example".to_string()));
+        assert_eq!(package_data.name, Some("parent-project".to_string()));
+        assert_eq!(package_data.version, Some("1.0.0".to_string()));
+
+        assert_eq!(package_data.dependencies.len(), 1);
+        let slf4j_dep = &package_data.dependencies[0];
+        assert!(
+            slf4j_dep
+                .purl
+                .as_ref()
+                .unwrap()
+                .contains("org.slf4j/slf4j-api")
+        );
+
+        let extra_data = package_data.extra_data.expect("extra_data should exist");
+
+        let dep_mgmt = extra_data
+            .get("dependency_management")
+            .expect("dependency_management should exist")
+            .as_array()
+            .expect("dependency_management should be array");
+        assert_eq!(dep_mgmt.len(), 3);
+
+        let spring_dep = dep_mgmt[0].as_object().expect("dep should be object");
+        assert_eq!(
+            spring_dep.get("groupId").unwrap().as_str().unwrap(),
+            "org.springframework.boot"
+        );
+        assert_eq!(
+            spring_dep.get("artifactId").unwrap().as_str().unwrap(),
+            "spring-boot-dependencies"
+        );
+        assert_eq!(
+            spring_dep.get("version").unwrap().as_str().unwrap(),
+            "2.7.0"
+        );
+
+        let jackson_dep = dep_mgmt[1].as_object().expect("dep should be object");
+        assert_eq!(
+            jackson_dep.get("groupId").unwrap().as_str().unwrap(),
+            "com.fasterxml.jackson.core"
+        );
+
+        let junit_dep = dep_mgmt[2].as_object().expect("dep should be object");
+        assert_eq!(junit_dep.get("groupId").unwrap().as_str().unwrap(), "junit");
+    }
+
+    #[test]
+    fn test_extract_parent_pom() {
+        let pom_path = PathBuf::from("testdata/maven/parent-pom-test.xml");
+        let package_data = MavenParser::extract_package_data(&pom_path);
+
+        assert_eq!(
+            package_data.namespace,
+            Some("org.springframework.boot".to_string())
+        );
+        assert_eq!(package_data.name, Some("my-service".to_string()));
+        assert_eq!(package_data.version, Some("2.7.0".to_string()));
+
+        let extra_data = package_data.extra_data.expect("extra_data should exist");
+
+        let parent = extra_data
+            .get("parent")
+            .expect("parent should exist")
+            .as_object()
+            .expect("parent should be object");
+
+        assert_eq!(
+            parent.get("groupId").unwrap().as_str().unwrap(),
+            "org.springframework.boot"
+        );
+        assert_eq!(
+            parent.get("artifactId").unwrap().as_str().unwrap(),
+            "spring-boot-starter-parent"
+        );
+        assert_eq!(parent.get("version").unwrap().as_str().unwrap(), "2.7.0");
+
+        if let Some(relative_path) = parent.get("relativePath") {
+            assert_eq!(relative_path.as_str().unwrap(), "");
+        }
+    }
+
+    #[test]
+    fn test_is_match_pom_properties() {
+        let valid_path = PathBuf::from("/some/path/pom.properties");
+        let invalid_path = PathBuf::from("/some/path/not_pom.properties");
+
+        assert!(MavenParser::is_match(&valid_path));
+        assert!(!MavenParser::is_match(&invalid_path));
+    }
+
+    #[test]
+    fn test_is_match_manifest_mf() {
+        let valid_path = PathBuf::from("/some/path/MANIFEST.MF");
+        let invalid_path = PathBuf::from("/some/path/manifest.mf");
+
+        assert!(MavenParser::is_match(&valid_path));
+        assert!(!MavenParser::is_match(&invalid_path));
+    }
+
+    #[test]
+    fn test_basic_property_chain() {
+        let pom_path = PathBuf::from("testdata/maven/test-properties-basic.xml");
+        let package_data = MavenParser::extract_package_data(&pom_path);
+
+        assert_eq!(package_data.version, Some("1.0.0".to_string()));
+    }
+
+    #[test]
+    fn test_multiple_placeholders() {
+        let content = r#"
+<project>
+  <groupId>com.test</groupId>
+  <artifactId>multi</artifactId>
+  <properties>
+    <a>alpha</a>
+    <b>beta</b>
+    <c>gamma</c>
+  </properties>
+  <version>${a}-${b}-${c}</version>
+</project>
+        "#;
+
+        let (_temp_dir, pom_path) = create_temp_pom_xml(content);
+        let package_data = MavenParser::extract_package_data(&pom_path);
+
+        assert_eq!(package_data.version, Some("alpha-beta-gamma".to_string()));
+    }
+
+    #[test]
+    fn test_missing_key() {
+        let content = r#"
+<project>
+  <groupId>com.test</groupId>
+  <artifactId>missing</artifactId>
+  <version>${does.not.exist}</version>
+</project>
+        "#;
+
+        let (_temp_dir, pom_path) = create_temp_pom_xml(content);
+        let package_data = MavenParser::extract_package_data(&pom_path);
+
+        assert_eq!(package_data.version, Some("${does.not.exist}".to_string()));
+    }
+
+    #[test]
+    fn test_self_cycle() {
+        let content = r#"
+<project>
+  <groupId>com.test</groupId>
+  <artifactId>cycle</artifactId>
+  <properties>
+    <a>${a}</a>
+  </properties>
+  <version>${a}</version>
+</project>
+        "#;
+
+        let (_temp_dir, pom_path) = create_temp_pom_xml(content);
+        let package_data = MavenParser::extract_package_data(&pom_path);
+
+        assert_eq!(package_data.version, Some("${a}".to_string()));
+    }
+
+    #[test]
+    fn test_mutual_cycle() {
+        let pom_path = PathBuf::from("testdata/maven/test-properties-cycle.xml");
+        let package_data = MavenParser::extract_package_data(&pom_path);
+
+        assert_eq!(package_data.version, Some("${a}".to_string()));
+    }
+
+    #[test]
+    fn test_nested_placeholder() {
+        let pom_path = PathBuf::from("testdata/maven/test-properties-nested.xml");
+        let package_data = MavenParser::extract_package_data(&pom_path);
+
+        assert_eq!(package_data.version, Some("SUCCESS".to_string()));
+    }
+
+    #[test]
+    fn test_malformed_placeholders() {
+        let content = r#"
+<project>
+  <groupId>com.test</groupId>
+  <artifactId>malformed</artifactId>
+  <version>${a</version>
+  <url>${}</url>
+  <scm>
+    <url>${a}}</url>
+  </scm>
+</project>
+        "#;
+
+        let (_temp_dir, pom_path) = create_temp_pom_xml(content);
+        let package_data = MavenParser::extract_package_data(&pom_path);
+
+        assert_eq!(package_data.version, Some("${a".to_string()));
+        assert_eq!(package_data.homepage_url, Some("${}".to_string()));
+        assert_eq!(package_data.code_view_url, Some("${a}}".to_string()));
+    }
+
+    #[test]
+    fn test_depth_limit() {
+        let mut properties = String::new();
+        for index in 1..=11 {
+            if index < 11 {
+                properties.push_str(&format!(
+                    "<a{index}>${{a{next}}}</a{index}>",
+                    index = index,
+                    next = index + 1
+                ));
+            } else {
+                properties.push_str(&format!("<a{index}>final</a{index}>", index = index));
+            }
+        }
+
+        let content = format!(
+            "<project><groupId>com.test</groupId><artifactId>depth</artifactId><properties>{}</properties><version>${{a1}}</version></project>",
+            properties
+        );
+
+        let (_temp_dir, pom_path) = create_temp_pom_xml(&content);
+        let package_data = MavenParser::extract_package_data(&pom_path);
+
+        assert_eq!(package_data.version, Some("${a11}".to_string()));
+    }
+
+    #[test]
+    fn test_standard_properties() {
+        let content = r#"
+<project>
+  <groupId>com.test</groupId>
+  <artifactId>standard</artifactId>
+  <version>2.5.0</version>
+  <properties>
+    <resolved.version>${project.version}</resolved.version>
+  </properties>
+  <url>https://example.com/${resolved.version}</url>
+</project>
+        "#;
+
+        let (_temp_dir, pom_path) = create_temp_pom_xml(content);
+        let package_data = MavenParser::extract_package_data(&pom_path);
+
+        assert_eq!(
+            package_data.homepage_url,
+            Some("https://example.com/2.5.0".to_string())
+        );
     }
 }
