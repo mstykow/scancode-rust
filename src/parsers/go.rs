@@ -1,0 +1,792 @@
+//! Parsers for Go ecosystem files (go.mod, go.sum, Godeps.json).
+//!
+//! # Supported Formats
+//! - go.mod (module manifest)
+//! - go.sum (checksum database)
+//! - Godeps.json (legacy dependency format)
+//!
+//! # PURL type: "golang"
+
+use crate::models::{Dependency, PackageData};
+use log::warn;
+use packageurl::PackageUrl;
+use std::collections::{HashMap, HashSet};
+use std::fs;
+use std::path::Path;
+
+use super::PackageParser;
+
+const PACKAGE_TYPE: &str = "golang";
+
+/// Go go.mod manifest parser.
+///
+/// Extracts module declaration, require dependencies (with indirect marker
+/// preservation), and exclude directives from go.mod files.
+pub struct GoModParser;
+
+impl PackageParser for GoModParser {
+    const PACKAGE_TYPE: &'static str = PACKAGE_TYPE;
+
+    fn extract_package_data(path: &Path) -> PackageData {
+        let content = match fs::read_to_string(path) {
+            Ok(c) => c,
+            Err(e) => {
+                warn!("Failed to read go.mod at {:?}: {}", path, e);
+                return default_package_data();
+            }
+        };
+
+        parse_go_mod(&content)
+    }
+
+    fn is_match(path: &Path) -> bool {
+        path.file_name().is_some_and(|name| name == "go.mod")
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+enum BlockState {
+    None,
+    Require,
+    Exclude,
+    Replace,
+    Retract,
+}
+
+pub fn parse_go_mod(content: &str) -> PackageData {
+    let mut namespace: Option<String> = None;
+    let mut name: Option<String> = None;
+    let mut go_version: Option<String> = None;
+    let mut toolchain: Option<String> = None;
+    let mut require_deps: Vec<Dependency> = Vec::new();
+    let mut exclude_deps: Vec<Dependency> = Vec::new();
+    let mut replace_deps: Vec<Dependency> = Vec::new();
+    let mut retracted_versions: Vec<String> = Vec::new();
+    let mut block_state = BlockState::None;
+
+    for line in content.lines() {
+        let trimmed = line.trim();
+
+        if trimmed.is_empty() || trimmed.starts_with("//") {
+            continue;
+        }
+
+        // Bug #5: Reset block state on closing paren
+        if trimmed == ")" {
+            block_state = BlockState::None;
+            continue;
+        }
+
+        // Inside a block: dispatch by block type
+        if block_state != BlockState::None {
+            match block_state {
+                BlockState::Require => {
+                    if let Some(dep) = parse_dependency_line(trimmed, "require") {
+                        require_deps.push(dep);
+                    }
+                }
+                BlockState::Exclude => {
+                    if let Some(dep) = parse_dependency_line(trimmed, "exclude") {
+                        exclude_deps.push(dep);
+                    }
+                }
+                BlockState::Replace => {
+                    if let Some(dep) = parse_replace_line(trimmed) {
+                        replace_deps.push(dep);
+                    }
+                }
+                BlockState::Retract => {
+                    retracted_versions.extend(parse_retract_value(trimmed));
+                }
+                BlockState::None => {}
+            }
+            continue;
+        }
+
+        // Block openings
+        if trimmed.starts_with("require") && trimmed.contains('(') {
+            block_state = BlockState::Require;
+            continue;
+        }
+        if trimmed.starts_with("exclude") && trimmed.contains('(') {
+            block_state = BlockState::Exclude;
+            continue;
+        }
+        if trimmed.starts_with("replace") && trimmed.contains('(') {
+            block_state = BlockState::Replace;
+            continue;
+        }
+        if trimmed.starts_with("retract") && trimmed.contains('(') {
+            block_state = BlockState::Retract;
+            continue;
+        }
+
+        // Module declaration
+        if let Some(module_path) = trimmed.strip_prefix("module ") {
+            let module_path = strip_comment(module_path).trim();
+            if !module_path.is_empty() {
+                let (ns, n) = split_module_path(module_path);
+                namespace = ns;
+                name = Some(n);
+            }
+            continue;
+        }
+
+        // Go version directive
+        if let Some(version) = trimmed.strip_prefix("go ") {
+            let version = strip_comment(version).trim();
+            if !version.is_empty() {
+                go_version = Some(version.to_string());
+            }
+            continue;
+        }
+
+        // Toolchain directive
+        if let Some(tc) = trimmed.strip_prefix("toolchain ") {
+            let tc = strip_comment(tc).trim();
+            if !tc.is_empty() {
+                toolchain = Some(tc.to_string());
+            }
+            continue;
+        }
+
+        // Single-line require
+        if let Some(rest) = trimmed.strip_prefix("require ") {
+            if let Some(dep) = parse_dependency_line(rest, "require") {
+                require_deps.push(dep);
+            }
+            continue;
+        }
+
+        // Single-line exclude
+        if let Some(rest) = trimmed.strip_prefix("exclude ") {
+            if let Some(dep) = parse_dependency_line(rest, "exclude") {
+                exclude_deps.push(dep);
+            }
+            continue;
+        }
+
+        // Single-line replace (without opening paren)
+        if let Some(rest) = trimmed.strip_prefix("replace ") {
+            let rest = strip_comment(rest).trim();
+            if !rest.contains('(')
+                && let Some(dep) = parse_replace_line(rest)
+            {
+                replace_deps.push(dep);
+            }
+            continue;
+        }
+
+        // Single-line retract
+        if let Some(rest) = trimmed.strip_prefix("retract ") {
+            let rest = strip_comment(rest).trim();
+            if !rest.contains('(') {
+                retracted_versions.extend(parse_retract_value(rest));
+            }
+            continue;
+        }
+    }
+
+    let full_module = match (&namespace, &name) {
+        (Some(ns), Some(n)) => Some(format!("{}/{}", ns, n)),
+        (None, Some(n)) => Some(n.clone()),
+        _ => None,
+    };
+
+    let homepage_url = full_module
+        .as_ref()
+        .map(|m| format!("https://pkg.go.dev/{}", m));
+
+    let vcs_url = full_module.as_ref().map(|m| format!("https://{}.git", m));
+
+    let repository_homepage_url = homepage_url.clone();
+
+    let purl = full_module
+        .as_ref()
+        .and_then(|m| create_golang_purl(m, None));
+
+    let mut dependencies =
+        Vec::with_capacity(require_deps.len() + exclude_deps.len() + replace_deps.len());
+    dependencies.append(&mut require_deps);
+    dependencies.append(&mut exclude_deps);
+    dependencies.append(&mut replace_deps);
+
+    let mut extra_data_map = std::collections::HashMap::new();
+    if let Some(v) = go_version {
+        extra_data_map.insert("go_version".to_string(), serde_json::Value::String(v));
+    }
+    if let Some(tc) = toolchain {
+        extra_data_map.insert("toolchain".to_string(), serde_json::Value::String(tc));
+    }
+    if !retracted_versions.is_empty() {
+        extra_data_map.insert(
+            "retracted_versions".to_string(),
+            serde_json::json!(retracted_versions),
+        );
+    }
+    let extra_data = if extra_data_map.is_empty() {
+        None
+    } else {
+        Some(extra_data_map)
+    };
+
+    PackageData {
+        package_type: Some(PACKAGE_TYPE.to_string()),
+        namespace,
+        name,
+        version: None,
+        qualifiers: None,
+        subpath: None,
+        primary_language: Some("Go".to_string()),
+        description: None,
+        release_date: None,
+        parties: Vec::new(),
+        keywords: Vec::new(),
+        homepage_url,
+        download_url: None,
+        size: None,
+        sha1: None,
+        md5: None,
+        sha256: None,
+        sha512: None,
+        bug_tracking_url: None,
+        code_view_url: None,
+        vcs_url,
+        copyright: None,
+        holder: None,
+        declared_license_expression: None,
+        declared_license_expression_spdx: None,
+        license_detections: Vec::new(),
+        other_license_expression: None,
+        other_license_expression_spdx: None,
+        other_license_detections: Vec::new(),
+        extracted_license_statement: None,
+        notice_text: None,
+        source_packages: Vec::new(),
+        file_references: Vec::new(),
+        is_private: false,
+        is_virtual: false,
+        extra_data,
+        dependencies,
+        repository_homepage_url,
+        repository_download_url: None,
+        api_data_url: None,
+        datasource_id: Some("go_mod".to_string()),
+        purl,
+    }
+}
+
+/// Parses a single dependency line from a require or exclude block/directive.
+///
+/// Handles:
+/// - Bug #2: Preserves `// indirect` marker as `is_direct = false`
+/// - Bug #8: `+incompatible` suffix in versions
+/// - Bug #10: Pseudo-versions (v0.0.0-YYYYMMDDHHMMSS-hash)
+///
+/// Format: `github.com/foo/bar v1.2.3 // indirect`
+fn parse_dependency_line(line: &str, scope: &str) -> Option<Dependency> {
+    let trimmed = line.trim();
+    if trimmed.is_empty() || trimmed.starts_with("//") {
+        return None;
+    }
+
+    // Bug #2: Check for // indirect BEFORE stripping comments
+    let is_indirect = trimmed.contains("// indirect");
+    let is_direct = !is_indirect;
+
+    // Strip comment for parsing the module path and version
+    let without_comment = strip_comment(trimmed);
+    let without_comment = without_comment.trim();
+
+    // Split into module path and version
+    let parts: Vec<&str> = without_comment.split_whitespace().collect();
+    if parts.len() < 2 {
+        return None;
+    }
+
+    let module_path = parts[0];
+    // Bug #8 and #10: Version is taken as-is, preserving +incompatible and pseudo-versions
+    let version = parts[1].to_string();
+
+    // Generate PURL with version
+    let purl = create_golang_purl(module_path, Some(&version));
+
+    Some(Dependency {
+        purl,
+        extracted_requirement: Some(version),
+        scope: Some(scope.to_string()),
+        is_runtime: Some(true),
+        is_optional: Some(false),
+        is_pinned: Some(false),
+        is_direct: Some(is_direct),
+        resolved_package: None,
+        extra_data: None,
+    })
+}
+
+/// Parses a replace line: `old-module [version] => new-module [version]`
+///
+/// Returns a `Dependency` with scope "replace" and extra_data containing
+/// replace_old, replace_new, replace_version, and optionally replace_old_version.
+fn parse_replace_line(line: &str) -> Option<Dependency> {
+    let line = strip_comment(line).trim();
+
+    let parts: Vec<&str> = line.splitn(2, "=>").collect();
+    if parts.len() != 2 {
+        return None;
+    }
+
+    let old_parts: Vec<&str> = parts[0].split_whitespace().collect();
+    let new_parts: Vec<&str> = parts[1].split_whitespace().collect();
+
+    if old_parts.is_empty() || new_parts.is_empty() {
+        return None;
+    }
+
+    let old_module = old_parts[0];
+    let old_version = old_parts.get(1).copied();
+    let new_module = new_parts[0];
+    let new_version = new_parts.get(1).map(|s| s.to_string());
+
+    let purl = create_golang_purl(new_module, new_version.as_deref());
+
+    let mut extra = std::collections::HashMap::new();
+    extra.insert(
+        "replace_old".to_string(),
+        serde_json::Value::String(old_module.to_string()),
+    );
+    extra.insert(
+        "replace_new".to_string(),
+        serde_json::Value::String(new_module.to_string()),
+    );
+    if let Some(ref v) = new_version {
+        extra.insert(
+            "replace_version".to_string(),
+            serde_json::Value::String(v.clone()),
+        );
+    }
+    if let Some(ov) = old_version {
+        extra.insert(
+            "replace_old_version".to_string(),
+            serde_json::Value::String(ov.to_string()),
+        );
+    }
+
+    Some(Dependency {
+        purl,
+        extracted_requirement: new_version,
+        scope: Some("replace".to_string()),
+        is_runtime: Some(true),
+        is_optional: Some(false),
+        is_pinned: Some(false),
+        is_direct: Some(true),
+        resolved_package: None,
+        extra_data: Some(extra),
+    })
+}
+
+/// Parses a retract value which can be a single version or a range `[v1, v2]`.
+fn parse_retract_value(value: &str) -> Vec<String> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        return Vec::new();
+    }
+
+    if trimmed.starts_with('[') && trimmed.ends_with(']') {
+        let inner = &trimmed[1..trimmed.len() - 1];
+        inner
+            .split(',')
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .collect()
+    } else {
+        vec![trimmed.to_string()]
+    }
+}
+
+fn split_module_path(path: &str) -> (Option<String>, String) {
+    match path.rfind('/') {
+        Some(idx) => {
+            let namespace = &path[..idx];
+            let name = &path[idx + 1..];
+            (Some(namespace.to_string()), name.to_string())
+        }
+        None => (None, path.to_string()),
+    }
+}
+
+/// Strips inline comments (everything after `//`) from a line.
+///
+/// Preserves the content before the comment marker.
+fn strip_comment(line: &str) -> &str {
+    match line.find("//") {
+        Some(idx) => &line[..idx],
+        None => line,
+    }
+}
+
+/// Creates a PURL for a Go module.
+///
+/// Format: `pkg:golang/namespace/name@version`
+/// The module path is split into namespace and name for PURL construction.
+fn create_golang_purl(module_path: &str, version: Option<&str>) -> Option<String> {
+    let (namespace, name) = split_module_path(module_path);
+
+    let mut purl = match PackageUrl::new(PACKAGE_TYPE, &name) {
+        Ok(p) => p,
+        Err(e) => {
+            warn!(
+                "Failed to create PURL for golang module '{}': {}",
+                module_path, e
+            );
+            return None;
+        }
+    };
+
+    if let Some(ns) = &namespace
+        && let Err(e) = purl.with_namespace(ns)
+    {
+        warn!(
+            "Failed to set namespace '{}' for golang module '{}': {}",
+            ns, module_path, e
+        );
+        return None;
+    }
+
+    if let Some(v) = version
+        && let Err(e) = purl.with_version(v)
+    {
+        warn!(
+            "Failed to set version '{}' for golang module '{}': {}",
+            v, module_path, e
+        );
+        return None;
+    }
+
+    Some(purl.to_string())
+}
+
+/// Returns a default empty PackageData for Go modules.
+fn default_package_data() -> PackageData {
+    PackageData {
+        package_type: Some(PACKAGE_TYPE.to_string()),
+        namespace: None,
+        name: None,
+        version: None,
+        qualifiers: None,
+        subpath: None,
+        primary_language: Some("Go".to_string()),
+        description: None,
+        release_date: None,
+        parties: Vec::new(),
+        keywords: Vec::new(),
+        homepage_url: None,
+        download_url: None,
+        size: None,
+        sha1: None,
+        md5: None,
+        sha256: None,
+        sha512: None,
+        bug_tracking_url: None,
+        code_view_url: None,
+        vcs_url: None,
+        copyright: None,
+        holder: None,
+        declared_license_expression: None,
+        declared_license_expression_spdx: None,
+        license_detections: Vec::new(),
+        other_license_expression: None,
+        other_license_expression_spdx: None,
+        other_license_detections: Vec::new(),
+        extracted_license_statement: None,
+        notice_text: None,
+        source_packages: Vec::new(),
+        file_references: Vec::new(),
+        is_private: false,
+        is_virtual: false,
+        extra_data: None,
+        dependencies: Vec::new(),
+        repository_homepage_url: None,
+        repository_download_url: None,
+        api_data_url: None,
+        datasource_id: None,
+        purl: None,
+    }
+}
+
+crate::register_parser!(
+    "Go go.mod module manifest",
+    &["**/go.mod"],
+    "golang",
+    "Go",
+    Some("https://go.dev/ref/mod#go-mod-file"),
+);
+
+// ============================================================================
+// GoSumParser
+// ============================================================================
+
+pub struct GoSumParser;
+
+impl PackageParser for GoSumParser {
+    const PACKAGE_TYPE: &'static str = PACKAGE_TYPE;
+
+    fn extract_package_data(path: &Path) -> PackageData {
+        let content = match fs::read_to_string(path) {
+            Ok(c) => c,
+            Err(e) => {
+                warn!("Failed to read go.sum at {:?}: {}", path, e);
+                return default_package_data();
+            }
+        };
+
+        parse_go_sum(&content)
+    }
+
+    fn is_match(path: &Path) -> bool {
+        path.file_name().is_some_and(|name| name == "go.sum")
+    }
+}
+
+pub fn parse_go_sum(content: &str) -> PackageData {
+    let mut dependencies = Vec::new();
+    let mut seen = HashSet::new();
+
+    for line in content.lines() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+
+        let parts: Vec<&str> = trimmed.split_whitespace().collect();
+        if parts.len() < 3 || !parts[2].starts_with("h1:") {
+            continue;
+        }
+
+        let module = parts[0];
+        let raw_version = parts[1];
+
+        let version = raw_version.strip_suffix("/go.mod").unwrap_or(raw_version);
+
+        let key = format!("{}@{}", module, version);
+        if seen.contains(&key) {
+            continue;
+        }
+        seen.insert(key);
+
+        let purl = create_golang_purl(module, Some(version));
+
+        dependencies.push(Dependency {
+            purl,
+            extracted_requirement: Some(version.to_string()),
+            scope: Some("dependency".to_string()),
+            is_runtime: Some(true),
+            is_optional: Some(false),
+            is_pinned: Some(true),
+            is_direct: None,
+            resolved_package: None,
+            extra_data: None,
+        });
+    }
+
+    PackageData {
+        package_type: Some(PACKAGE_TYPE.to_string()),
+        namespace: None,
+        name: None,
+        version: None,
+        qualifiers: None,
+        subpath: None,
+        primary_language: Some("Go".to_string()),
+        description: None,
+        release_date: None,
+        parties: Vec::new(),
+        keywords: Vec::new(),
+        homepage_url: None,
+        download_url: None,
+        size: None,
+        sha1: None,
+        md5: None,
+        sha256: None,
+        sha512: None,
+        bug_tracking_url: None,
+        code_view_url: None,
+        vcs_url: None,
+        copyright: None,
+        holder: None,
+        declared_license_expression: None,
+        declared_license_expression_spdx: None,
+        license_detections: Vec::new(),
+        other_license_expression: None,
+        other_license_expression_spdx: None,
+        other_license_detections: Vec::new(),
+        extracted_license_statement: None,
+        notice_text: None,
+        source_packages: Vec::new(),
+        file_references: Vec::new(),
+        is_private: false,
+        is_virtual: false,
+        extra_data: None,
+        dependencies,
+        repository_homepage_url: None,
+        repository_download_url: None,
+        api_data_url: None,
+        datasource_id: Some("go_sum".to_string()),
+        purl: None,
+    }
+}
+
+crate::register_parser!(
+    "Go go.sum checksum database",
+    &["**/go.sum"],
+    "golang",
+    "Go",
+    Some("https://go.dev/ref/mod#go-sum-files"),
+);
+
+// ============================================================================
+// GodepsParser
+// ============================================================================
+
+pub struct GodepsParser;
+
+impl PackageParser for GodepsParser {
+    const PACKAGE_TYPE: &'static str = PACKAGE_TYPE;
+
+    fn extract_package_data(path: &Path) -> PackageData {
+        let content = match fs::read_to_string(path) {
+            Ok(c) => c,
+            Err(e) => {
+                warn!("Failed to read Godeps.json at {:?}: {}", path, e);
+                return default_package_data();
+            }
+        };
+
+        parse_godeps_json(&content)
+    }
+
+    fn is_match(path: &Path) -> bool {
+        path.file_name().is_some_and(|name| name == "Godeps.json")
+    }
+}
+
+pub fn parse_godeps_json(content: &str) -> PackageData {
+    let json: serde_json::Value = match serde_json::from_str(content) {
+        Ok(j) => j,
+        Err(e) => {
+            warn!("Failed to parse Godeps.json: {}", e);
+            return default_package_data();
+        }
+    };
+
+    let import_path = json
+        .get("ImportPath")
+        .and_then(|v| v.as_str())
+        .map(String::from);
+
+    let go_version = json
+        .get("GoVersion")
+        .and_then(|v| v.as_str())
+        .map(String::from);
+
+    let (namespace, name) = match &import_path {
+        Some(ip) => {
+            let (ns, n) = split_module_path(ip);
+            (ns, Some(n))
+        }
+        None => (None, None),
+    };
+
+    let purl = import_path
+        .as_deref()
+        .and_then(|ip| create_golang_purl(ip, None));
+
+    let mut dependencies = Vec::new();
+
+    if let Some(deps) = json.get("Deps").and_then(|v| v.as_array()) {
+        for dep in deps {
+            let dep_import_path = dep.get("ImportPath").and_then(|v| v.as_str());
+            let rev = dep.get("Rev").and_then(|v| v.as_str());
+
+            if let Some(path) = dep_import_path {
+                let dep_purl = create_golang_purl(path, None);
+
+                dependencies.push(Dependency {
+                    purl: dep_purl,
+                    extracted_requirement: rev.map(String::from),
+                    scope: Some("Deps".to_string()),
+                    is_runtime: Some(true),
+                    is_optional: Some(false),
+                    is_pinned: Some(false),
+                    is_direct: None,
+                    resolved_package: None,
+                    extra_data: None,
+                });
+            }
+        }
+    }
+
+    let extra_data = go_version.map(|v| {
+        let mut map = HashMap::new();
+        map.insert("go_version".to_string(), serde_json::Value::String(v));
+        map
+    });
+
+    let homepage_url = import_path
+        .as_ref()
+        .map(|m| format!("https://pkg.go.dev/{}", m));
+
+    let vcs_url = import_path.as_ref().map(|m| format!("https://{}.git", m));
+
+    PackageData {
+        package_type: Some(PACKAGE_TYPE.to_string()),
+        namespace,
+        name,
+        version: None,
+        qualifiers: None,
+        subpath: None,
+        primary_language: Some("Go".to_string()),
+        description: None,
+        release_date: None,
+        parties: Vec::new(),
+        keywords: Vec::new(),
+        homepage_url,
+        download_url: None,
+        size: None,
+        sha1: None,
+        md5: None,
+        sha256: None,
+        sha512: None,
+        bug_tracking_url: None,
+        code_view_url: None,
+        vcs_url,
+        copyright: None,
+        holder: None,
+        declared_license_expression: None,
+        declared_license_expression_spdx: None,
+        license_detections: Vec::new(),
+        other_license_expression: None,
+        other_license_expression_spdx: None,
+        other_license_detections: Vec::new(),
+        extracted_license_statement: None,
+        notice_text: None,
+        source_packages: Vec::new(),
+        file_references: Vec::new(),
+        is_private: false,
+        is_virtual: false,
+        extra_data,
+        dependencies,
+        repository_homepage_url: None,
+        repository_download_url: None,
+        api_data_url: None,
+        datasource_id: Some("godeps".to_string()),
+        purl,
+    }
+}
+
+crate::register_parser!(
+    "Go Godeps.json legacy dependency file",
+    &["**/Godeps.json"],
+    "golang",
+    "Go",
+    None,
+);
