@@ -4,6 +4,15 @@ mod cargo_lock;
 mod cargo_lock_test;
 #[cfg(test)]
 mod cargo_test;
+mod composer;
+#[cfg(test)]
+mod composer_test;
+mod dart;
+#[cfg(test)]
+mod dart_test;
+mod go;
+#[cfg(test)]
+mod go_test;
 mod maven;
 #[cfg(test)]
 mod maven_test;
@@ -19,6 +28,9 @@ mod npm_test;
 mod npm_workspace;
 #[cfg(test)]
 mod npm_workspace_test;
+mod nuget;
+#[cfg(test)]
+mod nuget_test;
 mod pep508;
 mod pipfile_lock;
 #[cfg(test)]
@@ -35,6 +47,9 @@ mod python_test;
 mod requirements_txt;
 #[cfg(test)]
 mod requirements_txt_test;
+mod ruby;
+#[cfg(test)]
+mod ruby_test;
 pub mod utils;
 mod yarn_lock;
 #[cfg(test)]
@@ -108,15 +123,20 @@ pub trait PackageParser {
 pub use self::cargo::CargoParser;
 #[cfg_attr(not(test), allow(unused_imports))]
 pub use self::cargo_lock::CargoLockParser;
+pub use self::composer::{ComposerJsonParser, ComposerLockParser};
+pub use self::dart::{PubspecLockParser, PubspecYamlParser};
+pub use self::go::{GoModParser, GoSumParser, GodepsParser};
 pub use self::maven::MavenParser;
 pub use self::npm::NpmParser;
 pub use self::npm_lock::NpmLockParser;
 pub use self::npm_workspace::NpmWorkspaceParser;
+pub use self::nuget::{NupkgParser, NuspecParser, PackagesConfigParser, PackagesLockParser};
 pub use self::pipfile_lock::PipfileLockParser;
 pub use self::pnpm_lock::PnpmLockParser;
 pub use self::poetry_lock::PoetryLockParser;
 pub use self::python::PythonParser;
 pub use self::requirements_txt::RequirementsTxtParser;
+pub use self::ruby::{GemArchiveParser, GemfileLockParser, GemfileParser, GemspecParser};
 pub use self::yarn_lock::YarnLockParser;
 
 macro_rules! define_parsers {
@@ -141,7 +161,22 @@ define_parsers! {
     PoetryLockParser,
     PipfileLockParser,
     RequirementsTxtParser,
+    ComposerJsonParser,
+    ComposerLockParser,
     CargoParser,
+    PubspecYamlParser,
+    PubspecLockParser,
     PythonParser,
     MavenParser,
+    GemfileParser,
+    GemfileLockParser,
+    GemspecParser,
+    GemArchiveParser,
+    GoModParser,
+    GoSumParser,
+    GodepsParser,
+    PackagesConfigParser,
+    NuspecParser,
+    PackagesLockParser,
+    NupkgParser,
 }

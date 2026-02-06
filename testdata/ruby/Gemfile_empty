@@ -1,0 +1,2 @@
+# Empty Gemfile with just a source
+source "https://rubygems.org"

@@ -1100,8 +1100,19 @@ fn extract_from_pyproject_toml(path: &Path) -> PackageData {
         if let Some(project) = toml_content.get(FIELD_PROJECT).and_then(|v| v.as_table()) {
             // Standard PEP 621 format with [project] table
             project.clone()
+        } else if let Some(tool) = toml_content.get("tool").and_then(|v| v.as_table()) {
+            if let Some(poetry) = tool.get("poetry").and_then(|v| v.as_table()) {
+                // Poetry format with [tool.poetry] table
+                poetry.clone()
+            } else {
+                warn!(
+                    "No project or tool.poetry data found in pyproject.toml at {:?}",
+                    path
+                );
+                return default_package_data();
+            }
         } else if toml_content.get(FIELD_NAME).is_some() {
-            // Poetry or other format with top-level fields
+            // Other format with top-level fields
             match toml_content.as_table() {
                 Some(table) => table.clone(),
                 None => {
@@ -1393,7 +1404,7 @@ fn extract_dependencies(
         }
     }
 
-    // Handle optional dependencies with scope
+    // Handle PEP 621 optional-dependencies with scope
     if let Some(opt_deps_table) = project
         .get(FIELD_OPTIONAL_DEPENDENCIES)
         .and_then(|v| v.as_table())
@@ -1415,6 +1426,52 @@ fn extract_dependencies(
                     ));
                 }
                 _ => {}
+            }
+        }
+    }
+
+    // Handle Poetry dev-dependencies
+    if let Some(dev_deps_value) = project.get("dev-dependencies") {
+        match dev_deps_value {
+            TomlValue::Array(arr) => {
+                optional_dependencies.extend(parse_dependency_array(
+                    arr,
+                    true,
+                    Some("dev-dependencies"),
+                ));
+            }
+            TomlValue::Table(table) => {
+                optional_dependencies.extend(parse_dependency_table(
+                    table,
+                    true,
+                    Some("dev-dependencies"),
+                ));
+            }
+            _ => {}
+        }
+    }
+
+    // Handle Poetry dependency groups: [tool.poetry.group.<name>]
+    if let Some(groups_table) = project.get("group").and_then(|v| v.as_table()) {
+        for (group_name, group_data) in groups_table {
+            if let Some(group_deps) = group_data.as_table().and_then(|t| t.get("dependencies")) {
+                match group_deps {
+                    TomlValue::Array(arr) => {
+                        optional_dependencies.extend(parse_dependency_array(
+                            arr,
+                            true,
+                            Some(group_name),
+                        ));
+                    }
+                    TomlValue::Table(table) => {
+                        optional_dependencies.extend(parse_dependency_table(
+                            table,
+                            true,
+                            Some(group_name),
+                        ));
+                    }
+                    _ => {}
+                }
             }
         }
     }

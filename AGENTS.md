@@ -4,17 +4,40 @@ This guide provides essential information for AI coding agents working on the `s
 
 ## Project Context
 
-**scancode-rust** is a complete rewrite of [ScanCode Toolkit](https://github.com/aboutcode-org/scancode-toolkit) in Rust, designed to be faster, more reliable, and bug-free. The original Python codebase is available as a reference submodule at `reference/scancode-toolkit/`.
+**scancode-rust** is a complete rewrite of [ScanCode Toolkit](https://github.com/aboutcode-org/scancode-toolkit) in Rust, designed to be a **drop-in replacement** with all features and requirements of the original, but with less complexity, zero bugs, and Rust-specific optimizations. The original Python codebase is available as a reference submodule at `reference/scancode-toolkit/`.
+
+### Core Philosophy: Correctness and Feature Parity Above All
+
+**The primary goal is to create a functionally identical replacement for ScanCode Toolkit that users can trust completely.**
+
+When implementing features:
+
+- **Maximize correctness and feature parity**: Every feature, edge case, and requirement from the original must be preserved
+- **Effort is irrelevant**: Take whatever time and effort needed to get it right. No shortcuts, no compromises
+- **Zero tolerance for bugs**: Identify bugs in the original Python code and fix them in the Rust implementation
+- **Leverage Rust advantages**: Use Rust's type system, ownership model, and ecosystem to create more robust, performant code
+- **Never cut corners**: Proper error handling, comprehensive tests, and thorough edge case coverage are non-negotiable
 
 ### Using the Reference Submodule
 
 The `reference/scancode-toolkit/` submodule contains the original Python implementation and serves as:
 
-- **Inspiration for porting features**: When implementing new functionality, examine the original code to understand the logic and edge cases
-- **Reference for behavior**: Verify expected behavior and output formats against the original implementation
-- **Bug avoidance**: Identify known issues in the original and implement cleaner solutions in Rust
+- **Feature specification**: Understand what the original does, including all edge cases and requirements
+- **Behavioral reference**: Verify expected output formats and results against the original
+- **Bug identification**: Find known issues and technical debt to avoid replicating
+- **Logic inspiration**: Understand the problem domain and solution approaches
 
-⚠️ **Important**: This is a _rewrite_, not a port. Use the original code as reference only. Do not replicate its bugs, architectural issues, or outdated patterns. Focus on clean, idiomatic Rust code that improves upon the original.
+⚠️ **Critical: This is a Rewrite, Not a Line-by-Line Port**
+
+You **cannot** and **should not** follow the reference Python implementation line by line. Here's why:
+
+- The original has architectural issues, bugs, and technical debt that must not be replicated
+- Python patterns don't translate directly to idiomatic Rust
+- Rust's type system and ownership model enable fundamentally better designs
+- We must leverage Rust-specific optimizations (zero-copy parsing, compile-time guarantees, etc.)
+- The goal is to achieve the same **outcomes** through better **implementation**
+
+**Use the reference to understand WHAT to build, not HOW to build it.** Implement features using clean, idiomatic Rust that leverages the language's strengths while maintaining complete functional compatibility with the original.
 
 ## Quick Start
 
@@ -249,37 +272,137 @@ mod tests {
 
 ## Common Pitfalls
 
-1. **License data missing**: Run `./setup.sh` to initialize submodule
-2. **Cross-platform paths**: Use `Path` and `PathBuf`, not string concatenation
-3. **Line endings**: Be careful with `\n` vs `\r\n` in tests
-4. **Unwrap in library code**: Use `?` or `match` instead
-5. **Breaking parallel processing**: Ensure modifications maintain thread safety
+1. **Taking shortcuts**: Never compromise on correctness for speed of implementation. Take the time to do it right.
+2. **Following Python code line-by-line**: The reference is for understanding requirements, not for copying implementation patterns.
+3. **Skipping edge cases**: The original has edge cases that must be handled. Study the tests thoroughly.
+4. **License data missing**: Run `./setup.sh` to initialize submodule
+5. **Cross-platform paths**: Use `Path` and `PathBuf`, not string concatenation
+6. **Line endings**: Be careful with `\n` vs `\r\n` in tests
+7. **Unwrap in library code**: Use `?` or `match` instead
+8. **Breaking parallel processing**: Ensure modifications maintain thread safety
+9. **Incomplete testing**: Every feature needs comprehensive test coverage including edge cases
 
 ## Porting Features from Original ScanCode
 
-When implementing features inspired by the original Python codebase at `reference/scancode-toolkit/`:
+When implementing features from the original Python codebase at `reference/scancode-toolkit/`:
 
-1. **Research first**: Read the original implementation to understand the problem and approach
-2. **Don't copy blindly**: The original has known bugs, performance issues, and technical debt
-3. **Rethink the design**: Leverage Rust's type system, ownership model, and modern patterns
-4. **Improve error handling**: Use `Result<T, E>` instead of exception-based control flow
-5. **Add comprehensive tests**: Include test cases that cover bugs present in the original
-6. **Document deviations**: If you intentionally differ from the original behavior, document why
+### Implementation Principles
+
+1. **Research exhaustively**: Read the original implementation, tests, and documentation to understand:
+   - The complete feature specification and all edge cases
+   - Input formats, output structures, and error conditions
+   - Known bugs, workarounds, and technical debt
+   - User expectations and real-world usage patterns
+
+2. **Achieve feature parity, not code parity**:
+   - Every capability of the original must be preserved
+   - Every edge case must be handled (correctly this time)
+   - Output must be functionally equivalent (same JSON structure, same semantics)
+   - **DO NOT** replicate line-by-line - use the reference to understand requirements, not implementation
+
+3. **Design for correctness**:
+   - Use Rust's type system to make invalid states unrepresentable
+   - Leverage compiler guarantees instead of runtime checks where possible
+   - Implement proper error handling with `Result<T, E>` (no exception-based control flow)
+   - Write code that's self-documenting through strong types and clear interfaces
+
+4. **Never compromise on quality**:
+   - Take the time to implement comprehensive test coverage
+   - Include test cases for bugs present in the original (document what you fixed)
+   - Handle all error conditions explicitly - no silent failures
+   - Don't ship until it's correct, complete, and well-tested
+
+5. **Leverage Rust advantages**:
+   - Use zero-copy parsing where possible (e.g., `&str` instead of `String`)
+   - Apply compile-time optimizations (const evaluation, inlining)
+   - Exploit the ownership system for memory safety without runtime cost
+   - Use iterators and functional patterns for clarity and performance
+
+6. **Document intentional differences**: If the Rust implementation differs behaviorally from the original:
+   - Explain why (usually: fixing a bug or edge case)
+   - Document the original behavior vs new behavior
+   - Add tests demonstrating the improvement
 
 ### Example Workflow
 
 ```bash
-# Explore the original implementation
+# STEP 1: Study the original implementation thoroughly
 cd reference/scancode-toolkit/
 grep -r "relevant_function_name" src/
-
-# Understand the data structures and logic
 cat src/packagedcode/npm.py
 
-# Return to main project and implement in Rust
+# Look at tests to understand expected behavior and edge cases
+find tests/ -name "*npm*" -type f
+cat tests/packagedcode/test_npm.py
+
+# Check for known issues
+git log --all --grep="npm" --grep="bug" --oneline
+
+# STEP 2: Return to main project and design the Rust implementation
 cd ../..
-# Implement in src/parsers/npm.rs with improvements
+
+# Create comprehensive test cases FIRST (TDD approach)
+# Include edge cases found in original tests + cases for known bugs
+vim src/parsers/npm_test.rs
+
+# STEP 3: Implement in idiomatic Rust with proper error handling
+vim src/parsers/npm.rs
+
+# STEP 4: Verify correctness against original behavior
+cargo test npm
+# Run on real-world testdata and compare outputs with original
 ```
+
+### Quality Checklist
+
+Before considering a feature complete:
+
+- [ ] All original functionality is preserved
+- [ ] All edge cases from original tests are covered
+- [ ] Known bugs from original are fixed (and tested)
+- [ ] Error handling is comprehensive and explicit
+- [ ] Code is idiomatic Rust (passes `clippy` without warnings)
+- [ ] Performance is equal to or better than original
+- [ ] Real-world testdata produces correct output
+- [ ] Documentation explains any intentional behavioral differences
+
+## Parser Implementation Guidelines
+
+When implementing or enhancing parsers, follow these principles to maintain feature parity with Python ScanCode Toolkit:
+
+### Validation Against Python Reference
+
+All parsers should be validated against the Python reference implementation to ensure:
+
+1. **All fields extracted**: Every field the Python reference extracts is extracted by Rust
+2. **All dependency scopes**: All dependency types and scopes are supported
+3. **URL generation**: All generated URLs match Python's patterns
+4. **License handling**: SPDX normalization works correctly
+5. **Extra data**: All extra_data fields are populated
+6. **Edge cases**: All edge cases from Python tests are handled
+7. **Output compatibility**: JSON output is functionally equivalent
+
+### Rust Implementation Advantages
+
+While maintaining feature parity, leverage Rust's advantages:
+
+**Security**:
+
+- AST-only parsing for code files (no execution)
+- Archive size and compression ratio limits
+- Input validation and bounds checking
+
+**Data Quality**:
+
+- Extract additional metadata where beneficial
+- Fix known bugs from Python implementation
+- Handle edge cases more robustly
+
+**Performance**:
+
+- Use efficient parsers (quick-xml, TOML, serde_json)
+- Zero-copy parsing where possible
+- Maintain parallel processing compatibility
 
 ## Dependency Scope Conventions
 
@@ -310,13 +433,22 @@ The `Dependency.scope` field uses **native ecosystem terminology** to preserve s
 
 ### Python Ecosystem
 
-- **pyproject.toml, setup.py, setup.cfg**:
-  - `None` or `"install"` - Regular runtime dependencies
-  - `"dev"`, `"test"`, `"docs"` - Optional dependency groups (from `[tool.poetry.dev-dependencies]` or `extras_require`)
+- **pyproject.toml (PEP 621)**:
+  - `None` - Regular runtime dependencies (from `dependencies` array)
+  - `"<extra_name>"` - Optional dependency groups (from `optional-dependencies.<extra_name>`)
+
+- **pyproject.toml (Poetry)**:
+  - `"dependencies"` - Regular runtime dependencies (from `[tool.poetry.dependencies]`)
+  - `"dev-dependencies"` - Development dependencies (from `[tool.poetry.dev-dependencies]`)
+  - `"<group_name>"` - Dependency groups (from `[tool.poetry.group.<group_name>.dependencies]`)
+
+- **setup.py, setup.cfg**:
+  - `"install"` - Regular runtime dependencies
+  - `"<extra_name>"` - Optional dependency groups (from `extras_require`)
 
 - **poetry.lock**:
-  - `"dependencies"` - All direct dependencies (doesn't distinguish dev vs regular)
-  - `"<extra_name>"` - Dependencies from extras groups
+  - `None` - All dependencies (no scope distinction in lockfile)
+  - `is_optional` flag indicates dev dependencies
 
 - **Pipfile.lock**:
   - `"install"` - Regular runtime dependencies (from `default` section)
