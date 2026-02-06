@@ -1,0 +1,6 @@
+[package]
+name = "serde"
+version = "1.0.228"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
