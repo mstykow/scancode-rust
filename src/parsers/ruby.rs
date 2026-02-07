@@ -21,8 +21,9 @@
 //! - Graceful error handling: logs warnings and returns default on parse failure
 //! - PURL type: "gem"
 
+use crate::askalono::Store;
 use crate::models::{Dependency, PackageData, Party};
-use crate::parsers::utils::split_name_email;
+use crate::parsers::utils::{normalize_license, split_name_email};
 use flate2::read::GzDecoder;
 use log::warn;
 use packageurl::PackageUrl;
@@ -840,6 +841,19 @@ impl PackageParser for GemspecParser {
 /// Cleans a value extracted from gemspec by stripping quotes, .freeze, %q{}, and brackets.
 fn clean_gemspec_value(s: &str) -> String {
     let s = strip_freeze_suffix(s).trim();
+
+    let s = if let Some(pos) = s.find(" #") {
+        s[..pos].trim()
+    } else {
+        s
+    };
+
+    let s = if s.starts_with("%q{") && s.ends_with("}") {
+        &s[3..s.len() - 1]
+    } else {
+        s
+    };
+
     let s = s
         .trim_start_matches('"')
         .trim_end_matches('"')
@@ -1038,14 +1052,13 @@ fn parse_gemspec(content: &str) -> PackageData {
     }
 
     // Build parties from authors and emails
-    // Bug #6: Use split_name_email for proper RFC 5322 email parsing
     let mut parties: Vec<Party> = Vec::new();
     let max_len = authors.len().max(emails.len());
+
     for i in 0..max_len {
         let author_name = authors.get(i).map(|s| s.as_str());
         let email_str = emails.get(i).map(|s| s.as_str());
 
-        // Parse email with split_name_email for RFC 5322 handling (Bug #6)
         let (parsed_email_name, parsed_email) = match email_str {
             Some(e) => split_name_email(e),
             None => (None, None),
@@ -1058,7 +1071,6 @@ fn parse_gemspec(content: &str) -> PackageData {
             role: Some("author".to_string()),
             name: party_name,
             email: parsed_email.or_else(|| {
-                // If no angle-bracket email was found, use raw email if it looks like an email
                 email_str
                     .filter(|e| e.contains('@') && !e.contains('<'))
                     .map(|e| e.to_string())
@@ -1096,7 +1108,7 @@ fn parse_gemspec(content: &str) -> PackageData {
         dependencies.push(Dependency {
             purl,
             extracted_requirement,
-            scope: None,
+            scope: Some("runtime".to_string()),
             is_runtime: Some(true),
             is_optional: Some(false),
             is_pinned: None,
@@ -1142,12 +1154,25 @@ fn parse_gemspec(content: &str) -> PackageData {
         });
     }
 
-    // Build license expression
-    let declared_license = if !licenses.is_empty() {
+    // Build license expression and normalize using askalono
+    let raw_license = if !licenses.is_empty() {
         Some(licenses.join(" AND "))
     } else {
         license
     };
+
+    let store = Store::new();
+    let (declared_license_expression, declared_license_expression_spdx) =
+        if let Some(ref lic) = raw_license {
+            let (expr, spdx) = normalize_license(lic, &store);
+            if store.is_empty() {
+                (Some(lic.to_lowercase()), Some(lic.clone()))
+            } else {
+                (expr, spdx)
+            }
+        } else {
+            (None, None)
+        };
 
     // Prefer description over summary
     let final_description = description.or(summary);
@@ -1173,8 +1198,8 @@ fn parse_gemspec(content: &str) -> PackageData {
         description: final_description,
         homepage_url: homepage,
         download_url,
-        declared_license_expression: declared_license.clone(),
-        declared_license_expression_spdx: declared_license,
+        declared_license_expression,
+        declared_license_expression_spdx,
         parties,
         dependencies,
         repository_homepage_url,
@@ -1318,10 +1343,22 @@ fn parse_gem_metadata_yaml(content: &str) -> Result<PackageData, String> {
         })
         .unwrap_or_default();
 
-    let license_expression = if !licenses.is_empty() {
+    let raw_license = if !licenses.is_empty() {
         Some(licenses.join(" AND "))
     } else {
         None
+    };
+
+    let store = Store::new();
+    let (license_expression, license_expression_spdx) = if let Some(ref lic) = raw_license {
+        let (expr, spdx) = normalize_license(lic, &store);
+        if store.is_empty() {
+            (Some(lic.to_lowercase()), Some(lic.clone()))
+        } else {
+            (expr, spdx)
+        }
+    } else {
+        (None, None)
     };
 
     // Authors
@@ -1457,8 +1494,8 @@ fn parse_gem_metadata_yaml(content: &str) -> Result<PackageData, String> {
         download_url,
         bug_tracking_url,
         code_view_url,
-        declared_license_expression: license_expression.clone(),
-        declared_license_expression_spdx: license_expression,
+        declared_license_expression: license_expression,
+        declared_license_expression_spdx: license_expression_spdx,
         file_references,
         parties,
         dependencies,
@@ -1512,36 +1549,38 @@ fn parse_gem_yaml_dependencies(yaml: &serde_yaml::Value) -> Vec<Dependency> {
             .and_then(|req| req.get("requirements"))
             .and_then(|reqs| reqs.as_sequence());
 
-        let extracted_requirement = requirements
-            .map(|reqs| {
-                let parts: Vec<String> = reqs
-                    .iter()
-                    .filter_map(|req| {
-                        let seq = req.as_sequence()?;
-                        if seq.len() >= 2 {
-                            let op = seq[0].as_str().unwrap_or("");
-                            let ver = seq[1].get("version").and_then(|v| v.as_str()).unwrap_or("");
-                            if op == ">=" && ver == "0" {
-                                // ">= 0" means "any version" - skip
-                                None
-                            } else if op.is_empty() || ver.is_empty() {
-                                None
-                            } else {
-                                Some(format!("{} {}", op, ver))
-                            }
-                        } else {
+        let extracted_requirement = requirements.map(|reqs| {
+            let parts: Vec<String> = reqs
+                .iter()
+                .filter_map(|req| {
+                    let seq = req.as_sequence()?;
+                    if seq.len() >= 2 {
+                        let op = seq[0].as_str().unwrap_or("");
+                        let ver = seq[1].get("version").and_then(|v| v.as_str()).unwrap_or("");
+                        if op == ">=" && ver == "0" {
+                            // ">= 0" means "any version" - skip
                             None
+                        } else if op.is_empty() || ver.is_empty() {
+                            None
+                        } else {
+                            Some(format!("{} {}", op, ver))
                         }
-                    })
-                    .collect();
-                parts.join(", ")
-            })
-            .filter(|s| !s.is_empty());
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+            parts.join(", ")
+        });
+
+        let extracted_requirement = extracted_requirement
+            .filter(|s| !s.is_empty())
+            .or_else(|| Some(String::new()));
 
         let (scope, is_runtime, is_optional) = if is_development {
             (Some("development".to_string()), false, true)
         } else {
-            (None, true, false)
+            (Some("runtime".to_string()), true, false)
         };
 
         let purl = create_gem_purl(&dep_name, None);
