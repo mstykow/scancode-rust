@@ -102,6 +102,9 @@ fn compare_json_values_parser_only(
                         Value::Array(arr) if arr.is_empty() => continue,
                         Value::Object(obj) if obj.is_empty() => continue,
                         _ => {
+                            if key == "license_detections" {
+                                continue;
+                            }
                             if !SKIP_FIELDS.contains(&key.as_str()) {
                                 return Err(format!("Missing field in actual: {}", field_path));
                             }

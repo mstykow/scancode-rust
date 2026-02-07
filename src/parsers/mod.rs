@@ -6,11 +6,17 @@ mod cargo_lock_test;
 mod cargo_test;
 mod composer;
 #[cfg(test)]
+mod composer_golden_test;
+#[cfg(test)]
 mod composer_test;
 mod dart;
 #[cfg(test)]
+mod dart_golden_test;
+#[cfg(test)]
 mod dart_test;
 mod go;
+#[cfg(test)]
+mod go_golden_test;
 #[cfg(test)]
 mod go_test;
 mod maven;
@@ -30,6 +36,8 @@ mod npm_workspace;
 mod npm_workspace_test;
 mod nuget;
 #[cfg(test)]
+mod nuget_golden_test;
+#[cfg(test)]
 mod nuget_test;
 mod pep508;
 mod pipfile_lock;
@@ -48,6 +56,8 @@ mod requirements_txt;
 #[cfg(test)]
 mod requirements_txt_test;
 mod ruby;
+#[cfg(test)]
+mod ruby_golden_test;
 #[cfg(test)]
 mod ruby_test;
 pub mod utils;
