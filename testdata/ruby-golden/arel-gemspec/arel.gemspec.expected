@@ -1,0 +1,170 @@
+[
+  {
+    "type": "gem",
+    "namespace": null,
+    "name": "arel",
+    "version": "2.0.7.beta.20110429111451",
+    "qualifiers": {},
+    "subpath": null,
+    "primary_language": "Ruby",
+    "description": "Arel is a SQL AST manager for Ruby. It",
+    "release_date": null,
+    "parties": [
+      {
+        "type": "person",
+        "role": "author",
+        "name": "Aaron Patterson",
+        "email": null,
+        "url": null
+      },
+      {
+        "type": "person",
+        "role": "author",
+        "name": " Bryan Halmkamp",
+        "email": null,
+        "url": null
+      },
+      {
+        "type": "person",
+        "role": "author",
+        "name": " Emilio Tagua",
+        "email": null,
+        "url": null
+      },
+      {
+        "type": "person",
+        "role": "author",
+        "name": " Nick Kallen",
+        "email": null,
+        "url": null
+      },
+      {
+        "type": "person",
+        "role": "author",
+        "name": null,
+        "email": "aaron@tenderlovemaking.com",
+        "url": null
+      },
+      {
+        "type": "person",
+        "role": "author",
+        "name": null,
+        "email": " bryan@brynary.com",
+        "url": null
+      },
+      {
+        "type": "person",
+        "role": "author",
+        "name": null,
+        "email": " miloops@gmail.com",
+        "url": null
+      },
+      {
+        "type": "person",
+        "role": "author",
+        "name": null,
+        "email": " nick@example.org",
+        "url": null
+      }
+    ],
+    "keywords": [],
+    "homepage_url": "http://github.com/rails/arel",
+    "download_url": "https://rubygems.org/downloads/arel-2.0.7.beta.20110429111451.gem",
+    "size": null,
+    "sha1": null,
+    "md5": null,
+    "sha256": null,
+    "sha512": null,
+    "bug_tracking_url": null,
+    "code_view_url": null,
+    "vcs_url": null,
+    "copyright": null,
+    "holder": null,
+    "declared_license_expression": null,
+    "declared_license_expression_spdx": null,
+    "license_detections": [],
+    "other_license_expression": null,
+    "other_license_expression_spdx": null,
+    "other_license_detections": [],
+    "extracted_license_statement": null,
+    "notice_text": null,
+    "source_packages": [],
+    "file_references": [],
+    "is_private": false,
+    "is_virtual": false,
+    "extra_data": {},
+    "dependencies": [
+      {
+        "purl": "pkg:gem/minitest",
+        "extracted_requirement": ">= 2.0.2",
+        "scope": "development",
+        "is_runtime": false,
+        "is_optional": true,
+        "is_pinned": false,
+        "is_direct": true,
+        "resolved_package": {},
+        "extra_data": {}
+      },
+      {
+        "purl": "pkg:gem/hoe",
+        "extracted_requirement": ">= 2.9.1",
+        "scope": "development",
+        "is_runtime": false,
+        "is_optional": true,
+        "is_pinned": false,
+        "is_direct": true,
+        "resolved_package": {},
+        "extra_data": {}
+      },
+      {
+        "purl": "pkg:gem/minitest",
+        "extracted_requirement": ">= 2.0.2",
+        "scope": "dependency",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true,
+        "resolved_package": {},
+        "extra_data": {}
+      },
+      {
+        "purl": "pkg:gem/hoe",
+        "extracted_requirement": ">= 2.9.1",
+        "scope": "dependency",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true,
+        "resolved_package": {},
+        "extra_data": {}
+      },
+      {
+        "purl": "pkg:gem/minitest",
+        "extracted_requirement": ">= 2.0.2",
+        "scope": "dependency",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true,
+        "resolved_package": {},
+        "extra_data": {}
+      },
+      {
+        "purl": "pkg:gem/hoe",
+        "extracted_requirement": ">= 2.9.1",
+        "scope": "dependency",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true,
+        "resolved_package": {},
+        "extra_data": {}
+      }
+    ],
+    "repository_homepage_url": "https://rubygems.org/gems/arel/versions/2.0.7.beta.20110429111451",
+    "repository_download_url": "https://rubygems.org/downloads/arel-2.0.7.beta.20110429111451.gem",
+    "api_data_url": "https://rubygems.org/api/v2/rubygems/arel/versions/2.0.7.beta.20110429111451.json",
+    "datasource_id": "gemspec",
+    "purl": "pkg:gem/arel@2.0.7.beta.20110429111451"
+  }
+]

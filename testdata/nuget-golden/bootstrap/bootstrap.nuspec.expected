@@ -1,0 +1,96 @@
+[
+  {
+    "type": "nuget",
+    "namespace": null,
+    "name": "bootstrap",
+    "version": "4.0.0-alpha",
+    "qualifiers": {},
+    "subpath": null,
+    "primary_language": null,
+    "description": "Bootstrap CSS\nBootstrap framework in CSS. Includes fonts and JavaScript\nThe most popular front-end framework for developing responsive, mobile first projects on the web.",
+    "release_date": null,
+    "parties": [
+      {
+        "type": null,
+        "role": "author",
+        "name": "Twitter, Inc.",
+        "email": null,
+        "url": null
+      },
+      {
+        "type": null,
+        "role": "owner",
+        "name": "bootstrap",
+        "email": null,
+        "url": null
+      }
+    ],
+    "keywords": [],
+    "homepage_url": "http://getbootstrap.com",
+    "download_url": null,
+    "size": null,
+    "sha1": null,
+    "md5": null,
+    "sha256": null,
+    "sha512": null,
+    "bug_tracking_url": null,
+    "code_view_url": null,
+    "vcs_url": null,
+    "copyright": "Copyright 2015",
+    "holder": "Copyright 2015",
+    "declared_license_expression": "mit",
+    "declared_license_expression_spdx": "MIT",
+    "license_detections": [
+      {
+        "license_expression": "mit",
+        "license_expression_spdx": "MIT",
+        "matches": [
+          {
+            "license_expression": "mit",
+            "license_expression_spdx": "MIT",
+            "from_file": null,
+            "start_line": 1,
+            "end_line": 1,
+            "matcher": "1-hash",
+            "score": 100.0,
+            "matched_length": 8,
+            "match_coverage": 100.0,
+            "rule_relevance": 100,
+            "rule_identifier": "mit_180.RULE",
+            "rule_url": "https://github.com/nexB/scancode-toolkit/tree/develop/src/licensedcode/data/rules/mit_180.RULE",
+            "matched_text": "https://github.com/twbs/bootstrap/blob/master/LICENSE"
+          }
+        ],
+        "identifier": "mit-899d417a-c474-8caa-1190-30de4b5ca35a"
+      }
+    ],
+    "other_license_expression": null,
+    "other_license_expression_spdx": null,
+    "other_license_detections": [],
+    "extracted_license_statement": "https://github.com/twbs/bootstrap/blob/master/LICENSE",
+    "notice_text": null,
+    "source_packages": [],
+    "file_references": [],
+    "is_private": false,
+    "is_virtual": false,
+    "extra_data": {},
+    "dependencies": [
+      {
+        "purl": "pkg:nuget/jQuery",
+        "extracted_requirement": "1.9.1",
+        "scope": "dependency",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true,
+        "resolved_package": {},
+        "extra_data": {}
+      }
+    ],
+    "repository_homepage_url": "https://www.nuget.org/packages/bootstrap/4.0.0-alpha",
+    "repository_download_url": "https://www.nuget.org/api/v2/package/bootstrap/4.0.0-alpha",
+    "api_data_url": "https://api.nuget.org/v3/registration3/bootstrap/4.0.0-alpha.json",
+    "datasource_id": "nuget_nuspec",
+    "purl": "pkg:nuget/bootstrap@4.0.0-alpha"
+  }
+]

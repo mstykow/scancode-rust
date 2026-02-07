@@ -1,0 +1,47 @@
+[
+  {
+    "type": "golang",
+    "namespace": "github.com/alecthomas",
+    "name": "sample",
+    "primary_language": "Go",
+    "parties": [],
+    "homepage_url": "https://pkg.go.dev/github.com/alecthomas/sample",
+    "vcs_url": "https://github.com/alecthomas/sample.git",
+    "extra_data": {
+      "go_version": "1.13"
+    },
+    "dependencies": [
+      {
+        "purl": "pkg:golang/github.com/davecgh/go-spew@v1.1.1",
+        "extracted_requirement": "v1.1.1",
+        "scope": "require",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": false
+      },
+      {
+        "purl": "pkg:golang/github.com/stretchr/testify@v1.4.0",
+        "extracted_requirement": "v1.4.0",
+        "scope": "require",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:golang/github.com/alecthomas/repr@v0.0.0",
+        "extracted_requirement": "v0.0.0",
+        "scope": "exclude",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true
+      }
+    ],
+    "repository_homepage_url": "https://pkg.go.dev/github.com/alecthomas/sample",
+    "datasource_id": "go_mod",
+    "purl": "pkg:golang/github.com/alecthomas/sample"
+  },
+  null
+]
