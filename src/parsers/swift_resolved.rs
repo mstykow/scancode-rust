@@ -14,9 +14,31 @@ use serde::Deserialize;
 use url::Url;
 
 use crate::models::{Dependency, PackageData};
+use crate::parsers::PackageParser;
 
-use super::PackageParser;
-
+/// Parses Swift Package Manager lockfiles (Package.resolved).
+///
+/// Extracts pinned dependency versions from Swift Package Manager lockfiles.
+/// Supports all three format versions (v1, v2, v3).
+///
+/// # Format Versions
+/// - **v1**: Legacy format with `object.pins` array
+/// - **v2**: Standard format with `pins` array at root
+/// - **v3**: Latest format with `pins` array and enhanced metadata
+///
+/// # Features
+/// - Extracts package identity, repository URL, version/branch/revision
+/// - Generates namespace from repository URL (e.g., github.com/apple)
+/// - Handles exact versions, branch references, and commit SHAs
+///
+/// # Example
+/// ```no_run
+/// use scancode_rust::parsers::{SwiftPackageResolvedParser, PackageParser};
+/// use std::path::Path;
+///
+/// let path = Path::new("Package.resolved");
+/// let package_data = SwiftPackageResolvedParser::extract_package_data(path);
+/// ```
 pub struct SwiftPackageResolvedParser;
 
 impl PackageParser for SwiftPackageResolvedParser {

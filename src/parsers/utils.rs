@@ -97,12 +97,12 @@ pub fn parse_sri(integrity: &str) -> Option<(String, String)> {
 ///
 /// # Arguments
 ///
-/// * `s` - A string potentially containing name and email in "Name <email>" format
+/// * `s` - A string potentially containing name and email in "Name \<email\>" format
 ///
 /// # Returns
 ///
 /// A tuple of `(Option<String>, Option<String>)` representing `(name, email)`:
-/// - If `<email>` pattern found: name (trimmed, or None if empty) and email
+/// - If `\<email\>` pattern found: name (trimmed, or None if empty) and email
 /// - If no pattern: trimmed input as name, None for email
 ///
 /// # Examples
