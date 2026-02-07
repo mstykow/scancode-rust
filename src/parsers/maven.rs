@@ -22,9 +22,8 @@
 //! - Property substitution limited to prevent infinite loops
 //! - Direct dependencies: all in pom.xml are direct
 
-use crate::askalono::Store;
-use crate::models::{Dependency, LicenseDetection, PackageData, Party};
-use crate::parsers::utils::{create_spdx_license_match, normalize_license, read_file_to_string};
+use crate::models::{Dependency, PackageData, Party};
+use crate::parsers::utils::read_file_to_string;
 use log::warn;
 use quick_xml::Reader;
 use quick_xml::events::Event;
@@ -383,7 +382,7 @@ impl PackageParser for MavenParser {
         let mut current_dependency: Option<Dependency> = None;
         let mut dependency_coords: Vec<DependencyCoordinates> = Vec::new();
         let mut current_dependency_coords: Option<DependencyCoordinates> = None;
-        let mut license_line = 0;
+
         let mut license_names: Vec<String> = Vec::new();
         let mut scm_connection = None;
         let mut scm_url = None;
@@ -506,9 +505,7 @@ impl PackageParser for MavenParser {
                                 timezone: None,
                             });
                         }
-                        b"license" => {
-                            license_line = reader.buffer_position() as usize;
-                        }
+                        b"license" => {}
                         b"distributionManagement" => in_distribution_management = true,
                         b"repository" if in_distribution_management => in_dist_repository = true,
                         b"snapshotRepository" if in_distribution_management => {
@@ -671,8 +668,6 @@ impl PackageParser for MavenParser {
                                     && current_element[current_element.len() - 2] == b"license" =>
                             {
                                 license_names.push(text.clone());
-                                package_data.license_detections =
-                                    extract_license_info(&text, license_line);
                             }
                             Some(b"name")
                                 if current_element.len() >= 2
@@ -1313,23 +1308,9 @@ impl PackageParser for MavenParser {
             package_data.extra_data = Some(extra_data);
         }
 
-        // Normalize license declarations
+        // Extract license statement only - detection happens in separate engine
         if !license_names.is_empty() {
-            let store = Store::new();
             let combined_license = license_names.join(" OR ");
-            let (declared_license_expression, declared_license_expression_spdx) =
-                if store.is_empty() {
-                    // Fallback to raw license string if store is empty or normalization fails
-                    (
-                        Some(combined_license.to_lowercase()),
-                        Some(combined_license.clone()),
-                    )
-                } else {
-                    let (expr, spdx) = normalize_license(&combined_license, &store);
-                    (expr, spdx)
-                };
-            package_data.declared_license_expression = declared_license_expression;
-            package_data.declared_license_expression_spdx = declared_license_expression_spdx;
             package_data.extracted_license_statement = Some(combined_license);
         }
 
@@ -1381,70 +1362,6 @@ fn build_maven_download_url(group_id: &str, artifact_id: &str, version: &str) ->
         "{}/{}/{}/{}/{}-{}.jar",
         BASE_URL, group_path, artifact_id, version, artifact_id, version
     )
-}
-
-fn extract_license_info(license_text: &str, _line: usize) -> Vec<LicenseDetection> {
-    let spdx_id = map_license_name_to_spdx(license_text);
-    let license_lower = spdx_id.to_lowercase();
-    vec![LicenseDetection {
-        license_expression: license_lower.clone(),
-        license_expression_spdx: spdx_id.to_string(),
-        matches: vec![create_spdx_license_match(spdx_id)],
-        identifier: Some(format!(
-            "{}-a822f434-d61f-f2b1-c792-8b8cb9e7b9bf",
-            license_lower
-        )),
-    }]
-}
-
-fn map_license_name_to_spdx(name: &str) -> &str {
-    match name {
-        // Apache licenses
-        "Apache License, Version 2.0" => "Apache-2.0",
-        "Apache 2.0" => "Apache-2.0",
-        "Apache-2.0" => "Apache-2.0",
-
-        // MIT licenses
-        "MIT License" => "MIT",
-        "MIT" => "MIT",
-
-        // GPL licenses
-        "GNU General Public License v3.0" => "GPL-3.0",
-        "GPL-3.0" => "GPL-3.0",
-        "GPL 3.0" => "GPL-3.0",
-
-        // BSD licenses
-        "BSD 3-Clause License" => "BSD-3-Clause",
-        "BSD-3-Clause" => "BSD-3-Clause",
-
-        // Eclipse Public License
-        "Eclipse Public License 1.0" => "EPL-1.0",
-        "EPL 1.0" => "EPL-1.0",
-        "EPL-1.0" => "EPL-1.0",
-        "Eclipse Public License 2.0" => "EPL-2.0",
-        "EPL 2.0" => "EPL-2.0",
-        "EPL-2.0" => "EPL-2.0",
-
-        // LGPL licenses
-        "GNU Lesser General Public License v2.1" => "LGPL-2.1",
-        "LGPL 2.1" => "LGPL-2.1",
-        "LGPL-2.1" => "LGPL-2.1",
-        "GNU Lesser General Public License v3.0" => "LGPL-3.0",
-        "LGPL 3.0" => "LGPL-3.0",
-        "LGPL-3.0" => "LGPL-3.0",
-
-        // CDDL licenses
-        "Common Development and Distribution License 1.0" => "CDDL-1.0",
-        "CDDL 1.0" => "CDDL-1.0",
-        "CDDL-1.0" => "CDDL-1.0",
-
-        // Mozilla Public License
-        "Mozilla Public License 2.0" => "MPL-2.0",
-        "MPL 2.0" => "MPL-2.0",
-        "MPL-2.0" => "MPL-2.0",
-
-        _ => name,
-    }
 }
 
 /// Parse pom.properties file (Java properties format)
@@ -1922,81 +1839,6 @@ mod tests {
                 "https://ci.example.com/job/test-app".to_string()
             ))
         );
-    }
-
-    #[test]
-    fn test_expanded_license_mapping() {
-        let temp_dir = TempDir::new().unwrap();
-        let pom_path = temp_dir.path().join("pom.xml");
-
-        let test_cases = vec![
-            ("Apache License, Version 2.0", "Apache-2.0"),
-            ("Apache 2.0", "Apache-2.0"),
-            ("Apache-2.0", "Apache-2.0"),
-            ("MIT License", "MIT"),
-            ("MIT", "MIT"),
-            ("GNU General Public License v3.0", "GPL-3.0"),
-            ("GPL-3.0", "GPL-3.0"),
-            ("GPL 3.0", "GPL-3.0"),
-            ("BSD 3-Clause License", "BSD-3-Clause"),
-            ("BSD-3-Clause", "BSD-3-Clause"),
-            ("Eclipse Public License 1.0", "EPL-1.0"),
-            ("EPL 1.0", "EPL-1.0"),
-            ("EPL-1.0", "EPL-1.0"),
-            ("Eclipse Public License 2.0", "EPL-2.0"),
-            ("EPL 2.0", "EPL-2.0"),
-            ("EPL-2.0", "EPL-2.0"),
-            ("GNU Lesser General Public License v2.1", "LGPL-2.1"),
-            ("LGPL 2.1", "LGPL-2.1"),
-            ("LGPL-2.1", "LGPL-2.1"),
-            ("GNU Lesser General Public License v3.0", "LGPL-3.0"),
-            ("LGPL 3.0", "LGPL-3.0"),
-            ("LGPL-3.0", "LGPL-3.0"),
-            (
-                "Common Development and Distribution License 1.0",
-                "CDDL-1.0",
-            ),
-            ("CDDL 1.0", "CDDL-1.0"),
-            ("CDDL-1.0", "CDDL-1.0"),
-            ("Mozilla Public License 2.0", "MPL-2.0"),
-            ("MPL 2.0", "MPL-2.0"),
-            ("MPL-2.0", "MPL-2.0"),
-        ];
-
-        for (input, expected) in test_cases {
-            let pom_content = format!(
-                r#"<?xml version="1.0" encoding="UTF-8"?>
-<project>
-    <modelVersion>4.0.0</modelVersion>
-    <groupId>com.example</groupId>
-    <artifactId>test-app</artifactId>
-    <version>1.0.0</version>
-    <licenses>
-        <license>
-            <name>{}</name>
-        </license>
-    </licenses>
-</project>"#,
-                input
-            );
-
-            fs::write(&pom_path, pom_content).unwrap();
-
-            let package_data = MavenParser::extract_package_data(&pom_path);
-
-            assert!(
-                !package_data.license_detections.is_empty(),
-                "License detections should not be empty for input: {}",
-                input
-            );
-
-            let license_detection = &package_data.license_detections[0];
-            assert_eq!(
-                license_detection.license_expression_spdx, expected,
-                "Failed for input: {} (expected: {})",
-                input, expected
-            );
-        }
     }
 
     #[test]

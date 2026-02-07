@@ -20,9 +20,8 @@
 //! - Graceful error handling with `warn!()` logs
 //! - Direct dependencies: all in manifest are direct (no lockfile)
 
-use crate::askalono::Store;
-use crate::models::{Dependency, LicenseDetection, PackageData, Party};
-use crate::parsers::utils::{create_spdx_license_match, normalize_license, split_name_email};
+use crate::models::{Dependency, PackageData, Party};
+use crate::parsers::utils::split_name_email;
 use log::warn;
 use packageurl::PackageUrl;
 use std::fs::File;
@@ -79,25 +78,14 @@ impl PackageParser for CargoParser {
             .and_then(|v| v.as_str())
             .map(String::from);
 
-        let license_detections = extract_license_info(&toml_content);
-
+        // Extract license statement only - detection happens in separate engine
+        let license_detections = Vec::new();
         let raw_license = package
             .and_then(|p| p.get(FIELD_LICENSE))
             .and_then(|v| v.as_str())
             .map(String::from);
-        let store = Store::new();
-        let (declared_license_expression, declared_license_expression_spdx) =
-            if let Some(raw) = &raw_license {
-                let (expr, spdx) = normalize_license(raw, &store);
-                // Fallback to raw license string if store is empty or normalization fails
-                if store.is_empty() {
-                    (Some(raw.to_lowercase()), Some(raw.clone()))
-                } else {
-                    (expr, spdx)
-                }
-            } else {
-                (None, None)
-            };
+        let declared_license_expression = None;
+        let declared_license_expression_spdx = None;
 
         let extracted_license_statement = raw_license.clone();
 
@@ -233,28 +221,6 @@ fn create_package_url(name: &Option<String>, version: &Option<String>) -> Option
 
         Some(package_url.to_string())
     })
-}
-
-fn extract_license_info(toml_content: &Value) -> Vec<LicenseDetection> {
-    let mut detections = Vec::new();
-
-    // Check for license field within the package table
-    if let Some(package) = toml_content.get(FIELD_PACKAGE).and_then(|v| v.as_table())
-        && let Some(license_str) = package.get(FIELD_LICENSE).and_then(|v| v.as_str())
-    {
-        let license_lower = license_str.to_lowercase();
-        detections.push(LicenseDetection {
-            license_expression: license_lower.clone(),
-            license_expression_spdx: license_str.to_string(),
-            matches: vec![create_spdx_license_match(license_str)],
-            identifier: Some(format!(
-                "{}-a822f434-d61f-f2b1-c792-8b8cb9e7b9bf",
-                license_lower
-            )),
-        });
-    }
-
-    detections
 }
 
 /// Extracts party information from the `authors` field

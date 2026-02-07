@@ -37,33 +37,10 @@
     "code_view_url": null,
     "vcs_url": null,
     "copyright": "Copyright 2015",
-    "holder": "Copyright 2015",
-    "declared_license_expression": "mit",
-    "declared_license_expression_spdx": "MIT",
-    "license_detections": [
-      {
-        "license_expression": "mit",
-        "license_expression_spdx": "MIT",
-        "matches": [
-          {
-            "license_expression": "mit",
-            "license_expression_spdx": "MIT",
-            "from_file": null,
-            "start_line": 1,
-            "end_line": 1,
-            "matcher": "1-hash",
-            "score": 100.0,
-            "matched_length": 8,
-            "match_coverage": 100.0,
-            "rule_relevance": 100,
-            "rule_identifier": "mit_180.RULE",
-            "rule_url": "https://github.com/nexB/scancode-toolkit/tree/develop/src/licensedcode/data/rules/mit_180.RULE",
-            "matched_text": "https://github.com/twbs/bootstrap/blob/master/LICENSE"
-          }
-        ],
-        "identifier": "mit-899d417a-c474-8caa-1190-30de4b5ca35a"
-      }
-    ],
+    "holder": null,
+    "declared_license_expression": null,
+    "declared_license_expression_spdx": null,
+    "license_detections": [],
     "other_license_expression": null,
     "other_license_expression_spdx": null,
     "other_license_detections": [],

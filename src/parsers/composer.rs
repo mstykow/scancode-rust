@@ -26,9 +26,7 @@ use log::warn;
 use packageurl::PackageUrl;
 use serde_json::Value;
 
-use crate::askalono::Store;
-use crate::models::{Dependency, LicenseDetection, PackageData, Party, ResolvedPackage};
-use crate::parsers::utils::{create_spdx_license_match, normalize_license};
+use crate::models::{Dependency, PackageData, Party, ResolvedPackage};
 
 use super::PackageParser;
 
@@ -102,21 +100,12 @@ impl PackageParser for ComposerJsonParser {
 
         let keywords = extract_keywords(&json_content);
 
-        let (extracted_license_statement, license_detections) =
-            extract_license_detections(&json_content);
+        let extracted_license_statement = extract_license_statement(&json_content);
 
-        let store = Store::new();
-        let (declared_license_expression, declared_license_expression_spdx) =
-            if let Some(raw) = extracted_license_statement.as_ref() {
-                let (expr, spdx) = normalize_license(raw, &store);
-                if store.is_empty() {
-                    (Some(raw.to_lowercase()), Some(raw.clone()))
-                } else {
-                    (expr, spdx)
-                }
-            } else {
-                (None, None)
-            };
+        // Extract license statement only - detection happens in separate engine
+        let declared_license_expression = None;
+        let declared_license_expression_spdx = None;
+        let license_detections = Vec::new();
 
         let dependencies =
             extract_dependencies(&json_content, FIELD_REQUIRE, "require", true, false);
@@ -497,7 +486,7 @@ fn is_hex_hash(value: &str) -> bool {
     value.chars().all(|c| c.is_ascii_hexdigit())
 }
 
-fn extract_license_detections(json_content: &Value) -> (Option<String>, Vec<LicenseDetection>) {
+fn extract_license_statement(json_content: &Value) -> Option<String> {
     let mut licenses = Vec::new();
 
     if let Some(license_value) = json_content.get(FIELD_LICENSE) {
@@ -523,33 +512,13 @@ fn extract_license_detections(json_content: &Value) -> (Option<String>, Vec<Lice
     }
 
     if licenses.is_empty() {
-        return (None, Vec::new());
+        return None;
     }
 
-    let extracted_license_statement = if licenses.len() == 1 {
+    if licenses.len() == 1 {
         Some(licenses[0].clone())
     } else {
         Some(licenses.join(" OR "))
-    };
-
-    let detections = licenses
-        .iter()
-        .map(|license| build_license_detection(license))
-        .collect();
-
-    (extracted_license_statement, detections)
-}
-
-fn build_license_detection(license: &str) -> LicenseDetection {
-    let license_lower = license.to_lowercase();
-    LicenseDetection {
-        license_expression: license_lower.clone(),
-        license_expression_spdx: license.to_string(),
-        matches: vec![create_spdx_license_match(license)],
-        identifier: Some(format!(
-            "{}-a822f434-d61f-f2b1-c792-8b8cb9e7b9bf",
-            license_lower
-        )),
     }
 }
 

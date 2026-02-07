@@ -209,28 +209,6 @@ packages:
     }
 
     #[test]
-    fn test_normalize_license() {
-        let content = r#"
-name: example
-license: MIT
-"#;
-
-        let (_temp_dir, pubspec_path) = create_temp_file("pubspec.yaml", content);
-        let package_data = PubspecYamlParser::extract_package_data(&pubspec_path);
-
-        assert_eq!(
-            package_data.extracted_license_statement.as_deref(),
-            Some("MIT")
-        );
-        assert_eq!(
-            package_data.declared_license_expression_spdx.as_deref(),
-            Some("MIT")
-        );
-        assert_eq!(package_data.license_detections.len(), 1);
-        assert_eq!(package_data.license_detections[0].license_expression, "mit");
-    }
-
-    #[test]
     fn test_graceful_error_handling() {
         let content = "[invalid_yaml";
 

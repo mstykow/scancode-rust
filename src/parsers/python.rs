@@ -32,11 +32,8 @@
 //! - Direct dependencies: all manifest dependencies are direct
 //! - Graceful fallback on parse errors with warning logs
 
-use crate::askalono::Store;
-use crate::models::{Dependency, FileReference, LicenseDetection, PackageData, Party};
-use crate::parsers::utils::{
-    create_spdx_license_match, normalize_license, read_file_to_string, split_name_email,
-};
+use crate::models::{Dependency, FileReference, PackageData, Party};
+use crate::parsers::utils::{read_file_to_string, split_name_email};
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use csv::ReaderBuilder;
@@ -736,10 +733,10 @@ fn build_package_data_from_rfc822(metadata: &Rfc822Metadata, datasource_id: &str
     }
 
     let (keywords, license_classifiers) = split_classifiers(&classifiers);
-    let license_detections = build_license_detections(license.as_deref(), &license_classifiers);
-
-    let declared_license_expression = license.as_ref().map(|value| value.to_lowercase());
-    let declared_license_expression_spdx = license.clone();
+    // Extract license statement only - detection happens in separate engine
+    let license_detections = Vec::new();
+    let declared_license_expression = None;
+    let declared_license_expression_spdx = None;
 
     let extracted_license_statement =
         build_extracted_license_statement(license.as_deref(), &license_classifiers);
@@ -963,53 +960,6 @@ fn split_classifiers(classifiers: &[String]) -> (Vec<String>, Vec<String>) {
     (keywords, license_classifiers)
 }
 
-fn build_license_detections(
-    license: Option<&str>,
-    license_classifiers: &[String],
-) -> Vec<LicenseDetection> {
-    let mut detections = Vec::new();
-
-    if let Some(value) = license
-        && !value.trim().is_empty()
-    {
-        detections.push(create_license_detection(value.trim()));
-    }
-
-    for classifier in license_classifiers {
-        if let Some(normalized) = normalize_license_classifier(classifier) {
-            detections.push(create_license_detection(&normalized));
-        }
-    }
-
-    detections
-}
-
-fn normalize_license_classifier(classifier: &str) -> Option<String> {
-    let last_segment = classifier.split("::").last()?.trim();
-    if last_segment.is_empty() {
-        return None;
-    }
-
-    let mut cleaned = last_segment.to_string();
-    for suffix in [
-        "Software License",
-        "Public License",
-        "Open Source License",
-        "License",
-    ] {
-        if cleaned.ends_with(suffix) {
-            cleaned = cleaned.trim_end_matches(suffix).trim().to_string();
-            break;
-        }
-    }
-
-    if cleaned.is_empty() {
-        None
-    } else {
-        Some(cleaned)
-    }
-}
-
 fn build_extracted_license_statement(
     license: Option<&str>,
     license_classifiers: &[String],
@@ -1135,22 +1085,11 @@ fn extract_from_pyproject_toml(path: &Path) -> PackageData {
         .and_then(|v| v.as_str())
         .map(String::from);
 
-    let license_detections = extract_license_info(&project_table);
-
+    // Extract license statement only - detection happens in separate engine
+    let license_detections = Vec::new();
     let extracted_license_statement = extract_raw_license_string(&project_table);
-    let store = Store::new();
-    let (declared_license_expression, declared_license_expression_spdx) =
-        if let Some(raw) = &extracted_license_statement {
-            let (expr, spdx) = normalize_license(raw, &store);
-            // Fallback to raw license string if store is empty or normalization fails
-            if store.is_empty() {
-                (Some(raw.to_lowercase()), Some(raw.clone()))
-            } else {
-                (expr, spdx)
-            }
-        } else {
-            (None, None)
-        };
+    let declared_license_expression = None;
+    let declared_license_expression_spdx = None;
 
     // URLs can be in different formats depending on the tool (poetry, flit, etc.)
     let (homepage_url, repository_url) = extract_urls(&project_table);
@@ -1250,43 +1189,6 @@ fn extract_from_pyproject_toml(path: &Path) -> PackageData {
         api_data_url,
         datasource_id: None,
         purl,
-    }
-}
-
-fn extract_license_info(project: &TomlMap<String, TomlValue>) -> Vec<LicenseDetection> {
-    let mut detections = Vec::new();
-
-    // Different projects might specify license in various ways
-    if let Some(license_value) = project.get(FIELD_LICENSE) {
-        match license_value {
-            TomlValue::String(license_str) => {
-                detections.push(create_license_detection(license_str));
-            }
-            TomlValue::Table(license_table) => {
-                if let Some(text) = license_table.get("text").and_then(|v| v.as_str()) {
-                    detections.push(create_license_detection(text));
-                }
-                if let Some(expr) = license_table.get("expression").and_then(|v| v.as_str()) {
-                    detections.push(create_license_detection(expr));
-                }
-            }
-            _ => {}
-        }
-    }
-
-    detections
-}
-
-fn create_license_detection(license_str: &str) -> LicenseDetection {
-    let license_lower = license_str.to_lowercase();
-    LicenseDetection {
-        license_expression: license_lower.clone(),
-        license_expression_spdx: license_str.to_string(),
-        matches: vec![create_spdx_license_match(license_str)],
-        identifier: Some(format!(
-            "{}-a822f434-d61f-f2b1-c792-8b8cb9e7b9bf",
-            license_lower
-        )),
     }
 }
 
@@ -2011,11 +1913,10 @@ fn build_setup_py_package_data(values: &HashMap<String, Value>) -> PackageData {
         });
     }
 
-    let declared_license_expression = license.as_ref().map(|value| value.to_lowercase());
-    let declared_license_expression_spdx = license.clone();
-    let license_detections = license
-        .as_ref()
-        .map_or(Vec::new(), |value| vec![create_license_detection(value)]);
+    // Extract license statement only - detection happens in separate engine
+    let declared_license_expression = None;
+    let declared_license_expression_spdx = None;
+    let license_detections = Vec::new();
     let extracted_license_statement = license.clone();
 
     let dependencies = build_setup_py_dependencies(values);
@@ -2149,13 +2050,10 @@ fn extract_from_setup_py_regex(content: &str) -> PackageData {
     let version = extract_setup_value(content, "version");
     let license_expression = extract_setup_value(content, "license");
 
-    let declared_license_expression = license_expression
-        .as_ref()
-        .map(|value| value.to_lowercase());
-    let declared_license_expression_spdx = license_expression.clone();
-    let license_detections = license_expression.as_ref().map_or(Vec::new(), |license| {
-        vec![create_license_detection(license)]
-    });
+    // Extract license statement only - detection happens in separate engine
+    let declared_license_expression = None;
+    let declared_license_expression_spdx = None;
+    let license_detections = Vec::new();
     let extracted_license_statement = license_expression.clone();
 
     let dependencies = extract_setup_py_dependencies(content);
@@ -2344,12 +2242,10 @@ fn extract_from_pip_inspect(path: &Path) -> PackageData {
             });
         }
 
-        let license_detections = license
-            .as_ref()
-            .map_or(Vec::new(), |lic| vec![create_license_detection(lic)]);
-
-        let declared_license_expression = license.as_ref().map(|l| l.to_lowercase());
-        let declared_license_expression_spdx = license.clone();
+        // Extract license statement only - detection happens in separate engine
+        let license_detections = Vec::new();
+        let declared_license_expression = None;
+        let declared_license_expression_spdx = None;
         let extracted_license_statement = license.clone();
 
         let purl = name.as_ref().and_then(|n| {
@@ -2525,12 +2421,10 @@ fn extract_from_setup_cfg(path: &Path) -> PackageData {
         });
     }
 
-    let declared_license_expression = license.as_ref().map(|value| value.to_lowercase());
-    let declared_license_expression_spdx = license.clone();
-    let license_detections = license
-        .as_ref()
-        .map_or(Vec::new(), |value| vec![create_license_detection(value)]);
-
+    // Extract license statement only - detection happens in separate engine
+    let declared_license_expression = None;
+    let declared_license_expression_spdx = None;
+    let license_detections = Vec::new();
     let extracted_license_statement = license.clone();
 
     let dependencies = extract_setup_cfg_dependencies(&sections);

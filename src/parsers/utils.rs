@@ -8,11 +8,7 @@ use std::path::Path;
 
 use anyhow::Result;
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64_STANDARD};
-use log::warn;
 use packageurl::PackageUrl;
-
-use crate::askalono::{Store, TextData};
-use crate::models::Match;
 
 /// Reads a file's entire contents into a String.
 ///
@@ -39,100 +35,6 @@ pub fn read_file_to_string(path: &Path) -> Result<String> {
     let mut content = String::new();
     file.read_to_string(&mut content)?;
     Ok(content)
-}
-
-/// Normalizes a raw license string using askalono with confidence threshold.
-///
-/// Analyzes the given license text and returns normalized SPDX identifiers
-/// if confidence meets or exceeds the threshold (0.8).
-///
-/// Returns (None, None) if the store is empty (e.g., during tests).
-///
-/// # Arguments
-///
-/// * `raw_license` - Raw license string from manifest
-/// * `store` - Askalono license store for analysis
-///
-/// # Returns
-///
-/// A tuple of `(declared_license_expression, declared_license_expression_spdx)`:
-/// - Both `Some(spdx_id)` if confidence >= 0.8
-/// - Both `None` if confidence < 0.8 (logs warning)
-/// - Both `None` if store is empty
-///
-/// # Examples
-///
-/// ```no_run
-/// use scancode_rust::askalono::Store;
-/// use scancode_rust::parsers::utils::normalize_license;
-///
-/// let store = Store::new();
-/// let (expr, spdx) = normalize_license("MIT License", &store);
-/// // Returns (None, None) if store is empty
-/// ```
-pub fn normalize_license(raw_license: &str, store: &Store) -> (Option<String>, Option<String>) {
-    if raw_license.trim().is_empty() || store.is_empty() {
-        return (None, None);
-    }
-
-    let text_data = TextData::new(raw_license);
-    let result = store.analyze(&text_data);
-
-    if result.score >= 0.8 {
-        let spdx_id = result.name.to_string();
-        (Some(spdx_id.clone()), Some(spdx_id))
-    } else {
-        warn!(
-            "Low confidence ({:.2}) for license normalization: {}",
-            result.score, raw_license
-        );
-        (None, None)
-    }
-}
-
-/// Creates a license detection match for a declared SPDX license identifier.
-///
-/// This is used when a package manifest explicitly declares a license using
-/// an SPDX identifier (e.g., "MIT", "Apache-2.0"). The match is marked with
-/// perfect confidence scores since it's a direct declaration, not detected text.
-///
-/// # Arguments
-///
-/// * `spdx_id` - SPDX license identifier from manifest
-///
-/// # Returns
-///
-/// A `Match` with 100% confidence scores indicating explicit license declaration.
-///
-/// # Examples
-///
-/// ```no_run
-/// use scancode_rust::parsers::utils::create_spdx_license_match;
-///
-/// let match_data = create_spdx_license_match("MIT");
-/// assert_eq!(match_data.score, 100.0);
-/// assert_eq!(match_data.license_expression_spdx, "MIT");
-/// ```
-pub fn create_spdx_license_match(spdx_id: &str) -> Match {
-    let license_lower = spdx_id.to_lowercase();
-    Match {
-        license_expression: license_lower.clone(),
-        license_expression_spdx: spdx_id.to_string(),
-        from_file: None,
-        score: 100.0,
-        start_line: 0,
-        end_line: 0,
-        matcher: Some("1-spdx-id".to_string()),
-        matched_length: Some(1),
-        match_coverage: Some(100.0),
-        rule_relevance: Some(100),
-        rule_identifier: Some(format!(
-            "spdx-license-identifier-{}-5da48780aba670b0860c46d899ed42a0f243ff06",
-            license_lower
-        )),
-        rule_url: None,
-        matched_text: Some(spdx_id.to_string()),
-    }
 }
 
 /// Creates a correctly-formatted npm Package URL for scoped or regular packages.

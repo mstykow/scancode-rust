@@ -19,9 +19,8 @@
 //! - Namespace format: `@org` for scoped packages (e.g., `@babel/core`)
 //! - Graceful error handling: logs warnings and returns default on parse failure
 
-use crate::askalono::Store;
-use crate::models::{Dependency, LicenseDetection, Match, PackageData, Party};
-use crate::parsers::utils::{normalize_license, npm_purl, parse_sri};
+use crate::models::{Dependency, PackageData, Party};
+use crate::parsers::utils::{npm_purl, parse_sri};
 use log::warn;
 use packageurl::PackageUrl;
 use serde_json::Value;
@@ -68,7 +67,7 @@ impl PackageParser for NpmParser {
     const PACKAGE_TYPE: &'static str = "npm";
 
     fn extract_package_data(path: &Path) -> PackageData {
-        let (json, field_lines) = match read_and_parse_json_with_lines(path) {
+        let (json, _field_lines) = match read_and_parse_json_with_lines(path) {
             Ok((json, lines)) => (json, lines),
             Err(e) => {
                 warn!("Failed to read or parse package.json at {:?}: {}", path, e);
@@ -89,22 +88,10 @@ impl PackageParser for NpmParser {
         let description = extract_description(&json);
 
         let extracted_license_statement = extract_license_statement(&json);
-        let raw_license = extract_raw_license_string(&json);
-        let store = Store::new();
-        let (declared_license_expression, declared_license_expression_spdx) =
-            if let Some(raw) = &raw_license {
-                let (expr, spdx) = normalize_license(raw, &store);
-                // Fallback to raw license string if store is empty or normalization fails
-                if store.is_empty() {
-                    (Some(raw.to_lowercase()), Some(raw.clone()))
-                } else {
-                    (expr, spdx)
-                }
-            } else {
-                (None, None)
-            };
-
-        let license_detections = extract_license_info(&json, &field_lines);
+        // Extract license statement only - detection happens in separate engine
+        let declared_license_expression = None;
+        let declared_license_expression_spdx = None;
+        let license_detections = Vec::new();
         let peer_dependencies_meta = extract_peer_dependencies_meta(&json);
         let dependencies = extract_dependencies(&json, false);
         let dev_dependencies = extract_dependencies(&json, true);
@@ -312,93 +299,6 @@ fn create_package_url(
     // but the full package name (e.g., "@babel/core") is used for PURL generation.
     let name = name.as_ref()?;
     npm_purl(name, version.as_deref())
-}
-
-fn extract_raw_license_string(json: &Value) -> Option<String> {
-    json.get(FIELD_LICENSE)
-        .and_then(|v| v.as_str())
-        .map(|s| s.to_string())
-        .or_else(|| {
-            json.get(FIELD_LICENSE)
-                .and_then(|v| v.as_object())
-                .and_then(|obj| obj.get("type"))
-                .and_then(|v| v.as_str())
-                .map(|s| s.to_string())
-        })
-        .or_else(|| {
-            json.get(FIELD_LICENSES)
-                .and_then(|v| v.as_array())
-                .and_then(|arr| arr.first())
-                .and_then(|obj| obj.get("type"))
-                .and_then(|v| v.as_str())
-                .map(|s| s.to_string())
-        })
-}
-
-fn create_license_match(license_str: &str, line: usize) -> Match {
-    Match {
-        license_expression: license_str.to_lowercase(),
-        license_expression_spdx: license_str.to_string(),
-        score: 100.0,
-        start_line: line,
-        end_line: line,
-        from_file: None,
-        matcher: None,
-        matched_length: None,
-        match_coverage: None,
-        rule_relevance: None,
-        rule_identifier: None,
-        rule_url: None,
-        matched_text: None,
-    }
-}
-
-fn extract_license_info(
-    json: &Value,
-    field_lines: &HashMap<String, usize>,
-) -> Vec<LicenseDetection> {
-    let mut detections = Vec::new();
-
-    // Check for string license field
-    if let Some(license_str) = json.get(FIELD_LICENSE).and_then(|v| v.as_str()) {
-        let line = field_lines.get(FIELD_LICENSE).copied().unwrap_or(0);
-        detections.push(LicenseDetection {
-            license_expression: license_str.to_lowercase(),
-            license_expression_spdx: license_str.to_string(),
-            identifier: None,
-            matches: vec![create_license_match(license_str, line)],
-        });
-    }
-
-    // Check for license object
-    if let Some(license_obj) = json.get(FIELD_LICENSE).and_then(|v| v.as_object())
-        && let Some(license_type) = license_obj.get("type").and_then(|v| v.as_str())
-    {
-        let line = field_lines.get(FIELD_LICENSE).copied().unwrap_or(0);
-        detections.push(LicenseDetection {
-            license_expression: license_type.to_lowercase(),
-            license_expression_spdx: license_type.to_string(),
-            identifier: None,
-            matches: vec![create_license_match(license_type, line)],
-        });
-    }
-
-    // Check for deprecated licenses array
-    if let Some(licenses) = json.get(FIELD_LICENSES).and_then(|v| v.as_array()) {
-        let base_line = field_lines.get(FIELD_LICENSES).copied().unwrap_or(0);
-        for (index, license) in licenses.iter().enumerate() {
-            if let Some(license_type) = license.get("type").and_then(|v| v.as_str()) {
-                detections.push(LicenseDetection {
-                    license_expression: license_type.to_lowercase(),
-                    license_expression_spdx: license_type.to_string(),
-                    identifier: None,
-                    matches: vec![create_license_match(license_type, base_line + index)],
-                });
-            }
-        }
-    }
-
-    detections
 }
 
 fn extract_license_statement(json: &Value) -> Option<String> {

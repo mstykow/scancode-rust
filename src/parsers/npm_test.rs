@@ -43,9 +43,10 @@ mod tests {
             Some("https://registry.npmjs.org/@example/test-package/-/@example/test-package-1.0.0.tgz".to_string())
         );
 
-        // Check license detection
-        assert_eq!(package_data.license_detections.len(), 1);
-        assert_eq!(package_data.license_detections[0].license_expression, "mit");
+        assert_eq!(package_data.declared_license_expression, None);
+        assert_eq!(package_data.declared_license_expression_spdx, None);
+        assert_eq!(package_data.license_detections.len(), 0);
+        assert!(package_data.extracted_license_statement.is_some());
 
         // Check purl
         // The PURL should include the scoped package name properly URL-encoded
@@ -94,9 +95,10 @@ mod tests {
             Some("https://registry.npmjs.org/@example/test-package/-/@example/test-package-1.0.0.tgz".to_string())
         );
 
-        // Check license detection
-        assert_eq!(package_data.license_detections.len(), 1);
-        assert_eq!(package_data.license_detections[0].license_expression, "mit");
+        assert_eq!(package_data.declared_license_expression, None);
+        assert_eq!(package_data.declared_license_expression_spdx, None);
+        assert_eq!(package_data.license_detections.len(), 0);
+        assert!(package_data.extracted_license_statement.is_some());
 
         // Check purl - should be pkg:npm/%40example/test-package@1.0.0 without namespace
         assert_eq!(
@@ -151,9 +153,10 @@ mod tests {
             Some("https://registry.npmjs.org/test-package/-/test-package-1.0.0.tgz".to_string())
         );
 
-        // Check license detection
-        assert_eq!(package_data.license_detections.len(), 1);
-        assert_eq!(package_data.license_detections[0].license_expression, "mit");
+        assert_eq!(package_data.declared_license_expression, None);
+        assert_eq!(package_data.declared_license_expression_spdx, None);
+        assert_eq!(package_data.license_detections.len(), 0);
+        assert!(package_data.extracted_license_statement.is_some());
 
         // Check purl
         assert_eq!(
@@ -210,11 +213,10 @@ mod tests {
         let (_temp_file_1, path_1) = create_temp_package_json(license_obj_content);
         let package_data_1 = NpmParser::extract_package_data(&path_1);
 
-        assert_eq!(package_data_1.license_detections.len(), 1);
-        assert_eq!(
-            package_data_1.license_detections[0].license_expression,
-            "bsd-3-clause"
-        );
+        assert_eq!(package_data_1.declared_license_expression, None);
+        assert_eq!(package_data_1.declared_license_expression_spdx, None);
+        assert_eq!(package_data_1.license_detections.len(), 0);
+        assert!(package_data_1.extracted_license_statement.is_some());
 
         // Test deprecated licenses array
         let licenses_array_content = r#"
@@ -237,15 +239,10 @@ mod tests {
         let (_temp_file_2, path_2) = create_temp_package_json(licenses_array_content);
         let package_data_2 = NpmParser::extract_package_data(&path_2);
 
-        assert_eq!(package_data_2.license_detections.len(), 2);
-        assert_eq!(
-            package_data_2.license_detections[0].license_expression,
-            "mit"
-        );
-        assert_eq!(
-            package_data_2.license_detections[1].license_expression,
-            "apache-2.0"
-        );
+        assert_eq!(package_data_2.declared_license_expression, None);
+        assert_eq!(package_data_2.declared_license_expression_spdx, None);
+        assert_eq!(package_data_2.license_detections.len(), 0);
+        assert!(package_data_2.extracted_license_statement.is_some());
     }
 
     #[test]

@@ -9,9 +9,7 @@ use log::warn;
 use packageurl::PackageUrl;
 use serde_yaml::{Mapping, Value};
 
-use crate::askalono::Store;
-use crate::models::{Dependency, LicenseDetection, PackageData, ResolvedPackage};
-use crate::parsers::utils::{create_spdx_license_match, normalize_license};
+use crate::models::{Dependency, PackageData, ResolvedPackage};
 
 use super::PackageParser;
 
@@ -97,23 +95,10 @@ fn parse_pubspec_yaml(yaml_content: &Value) -> PackageData {
 
     let parties = extract_authors(yaml_content);
 
-    let (declared_license_expression, declared_license_expression_spdx) =
-        if let Some(raw) = raw_license.as_ref() {
-            let store = Store::new();
-            let (expr, spdx) = normalize_license(raw, &store);
-            if store.is_empty() {
-                (Some(raw.to_lowercase()), Some(raw.clone()))
-            } else {
-                (expr, spdx)
-            }
-        } else {
-            (None, None)
-        };
-
-    let license_detections = raw_license
-        .as_ref()
-        .map(|license| vec![build_license_detection(license)])
-        .unwrap_or_default();
+    // Extract license statement only - detection happens in separate engine
+    let declared_license_expression = None;
+    let declared_license_expression_spdx = None;
+    let license_detections = Vec::new();
 
     let dependencies = [
         collect_dependencies(
@@ -523,19 +508,6 @@ fn build_purl_with_type(package_type: &str, name: &str, version: Option<&str>) -
     }
 
     Some(package_url.to_string())
-}
-
-fn build_license_detection(license: &str) -> LicenseDetection {
-    let license_lower = license.to_lowercase();
-    LicenseDetection {
-        license_expression: license_lower.clone(),
-        license_expression_spdx: license.to_string(),
-        matches: vec![create_spdx_license_match(license)],
-        identifier: Some(format!(
-            "{}-a822f434-d61f-f2b1-c792-8b8cb9e7b9bf",
-            license_lower
-        )),
-    }
 }
 
 fn extract_string_field(yaml_content: &Value, field: &str) -> Option<String> {

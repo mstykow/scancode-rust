@@ -13,23 +13,9 @@
       }
     ],
     "download_url": "https://registry.npmjs.org/casesensitivepathswebpackpluginDemo/-/casesensitivepathswebpackpluginDemo-0.0.1.tgz",
-    "declared_license_expression": "mit",
-    "declared_license_expression_spdx": "MIT",
-    "license_detections": [
-      {
-        "license_expression": "mit",
-        "license_expression_spdx": "MIT",
-        "matches": [
-          {
-            "license_expression": "mit",
-            "license_expression_spdx": "MIT",
-            "start_line": 21,
-            "end_line": 21,
-            "score": 100.0
-          }
-        ]
-      }
-    ],
+    "declared_license_expression": null,
+    "declared_license_expression_spdx": null,
+    "license_detections": [],
     "extracted_license_statement": "- MIT\n",
     "extra_data": {
       "engines": {
@@ -305,5 +291,9 @@
     "datasource_id": "npm_package_json",
     "purl": "pkg:npm/casesensitivepathswebpackplugindemo@0.0.1"
   },
-  null
+  {
+    "declared_license_expression": null,
+    "declared_license_expression_spdx": null,
+    "license_detections": []
+  }
 ]

@@ -6,7 +6,6 @@ mod golden_tests {
     use std::path::PathBuf;
 
     #[test]
-    #[ignore = "Requires license URL-to-SPDX mapping (e.g., 'https://github.com/.../license' -> 'mit')"]
     fn test_golden_bootstrap() {
         let test_file = PathBuf::from("testdata/nuget-golden/bootstrap/bootstrap.nuspec");
         let expected_file =
@@ -21,7 +20,6 @@ mod golden_tests {
     }
 
     #[test]
-    #[ignore = "Requires license URL-to-SPDX mapping"]
     fn test_golden_castle_core() {
         let test_file = PathBuf::from("testdata/nuget-golden/castle-core/Castle.Core.nuspec");
         let expected_file =
@@ -36,7 +34,6 @@ mod golden_tests {
     }
 
     #[test]
-    #[ignore = "Requires license URL-to-SPDX mapping"]
     fn test_golden_entity_framework() {
         let test_file =
             PathBuf::from("testdata/nuget-golden/entity-framework/EntityFramework.nuspec");
@@ -52,7 +49,6 @@ mod golden_tests {
     }
 
     #[test]
-    #[ignore = "Requires license URL-to-SPDX mapping"]
     fn test_golden_jquery_ui() {
         let test_file = PathBuf::from("testdata/nuget-golden/jquery-ui/jQuery.UI.Combined.nuspec");
         let expected_file =
@@ -67,7 +63,6 @@ mod golden_tests {
     }
 
     #[test]
-    #[ignore = "Requires license URL-to-SPDX mapping"]
     fn test_golden_aspnet_mvc() {
         let test_file =
             PathBuf::from("testdata/nuget-golden/aspnet-mvc/Microsoft.AspNet.Mvc.nuspec");
@@ -83,7 +78,6 @@ mod golden_tests {
     }
 
     #[test]
-    #[ignore = "Requires license URL-to-SPDX mapping"]
     fn test_golden_net_http() {
         let test_file = PathBuf::from("testdata/nuget-golden/net-http/Microsoft.Net.Http.nuspec");
         let expected_file =

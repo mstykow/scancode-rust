@@ -39,11 +39,12 @@ mod tests {
             Some("https://example.com/demo".to_string())
         );
 
-        // Check license detection
-        assert_eq!(package_data.license_detections.len(), 1);
+        assert_eq!(package_data.declared_license_expression, None);
+        assert_eq!(package_data.declared_license_expression_spdx, None);
+        assert_eq!(package_data.license_detections.len(), 0);
         assert_eq!(
-            package_data.license_detections[0].license_expression_spdx,
-            "Apache-2.0"
+            package_data.extracted_license_statement,
+            Some("Apache License, Version 2.0".to_string())
         );
 
         // Check purl
@@ -108,11 +109,12 @@ mod tests {
             Some("https://test.example.com".to_string())
         );
 
-        // Check license detection
-        assert_eq!(package_data.license_detections.len(), 1);
+        assert_eq!(package_data.declared_license_expression, None);
+        assert_eq!(package_data.declared_license_expression_spdx, None);
+        assert_eq!(package_data.license_detections.len(), 0);
         assert_eq!(
-            package_data.license_detections[0].license_expression_spdx,
-            "MIT"
+            package_data.extracted_license_statement,
+            Some("MIT License".to_string())
         );
 
         // Check purl
