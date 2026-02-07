@@ -2122,6 +2122,7 @@ fn package_data_to_resolved(pkg: &PackageData) -> crate::models::ResolvedPackage
         sha512: pkg.sha512.clone(),
         md5: pkg.md5.clone(),
         is_virtual: pkg.is_virtual,
+        extra_data: None,
         dependencies: pkg.dependencies.clone(),
         repository_homepage_url: pkg.repository_homepage_url.clone(),
         repository_download_url: pkg.repository_download_url.clone(),

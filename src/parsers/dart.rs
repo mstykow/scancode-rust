@@ -359,6 +359,7 @@ fn build_resolved_package(
         sha512: None,
         md5: None,
         is_virtual: true,
+        extra_data: None,
         dependencies,
         repository_homepage_url: None,
         repository_download_url: None,
