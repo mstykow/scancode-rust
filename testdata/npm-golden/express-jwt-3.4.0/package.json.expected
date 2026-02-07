@@ -42,54 +42,9 @@
     "vcs_url": "git://github.com/auth0/express-jwt.git",
     "copyright": null,
     "holder": null,
-    "declared_license_expression": "mit",
-    "declared_license_expression_spdx": "MIT",
-    "license_detections": [
-      {
-        "license_expression": "mit",
-        "license_expression_spdx": "MIT",
-        "matches": [
-          {
-            "license_expression": "mit",
-            "license_expression_spdx": "MIT",
-            "from_file": null,
-            "start_line": 1,
-            "end_line": 1,
-            "matcher": "1-spdx-id",
-            "score": 100.0,
-            "matched_length": 1,
-            "match_coverage": 100.0,
-            "rule_relevance": 100,
-            "rule_identifier": "spdx-license-identifier-mit-5da48780aba670b0860c46d899ed42a0f243ff06",
-            "rule_url": null,
-            "matched_text": "MIT"
-          }
-        ],
-        "identifier": "mit-a822f434-d61f-f2b1-c792-8b8cb9e7b9bf"
-      },
-      {
-        "license_expression": "mit",
-        "license_expression_spdx": "MIT",
-        "matches": [
-          {
-            "license_expression": "mit",
-            "license_expression_spdx": "MIT",
-            "from_file": null,
-            "start_line": 1,
-            "end_line": 1,
-            "matcher": "1-hash",
-            "score": 100.0,
-            "matched_length": 6,
-            "match_coverage": 100.0,
-            "rule_relevance": 100,
-            "rule_identifier": "mit_13.RULE",
-            "rule_url": "https://github.com/nexB/scancode-toolkit/tree/develop/src/licensedcode/data/rules/mit_13.RULE",
-            "matched_text": "http://www.opensource.org/licenses/MIT"
-          }
-        ],
-        "identifier": "mit-94c56745-1ab3-da39-1200-5c7823261ae9"
-      }
-    ],
+    "declared_license_expression": null,
+    "declared_license_expression_spdx": null,
+    "license_detections": [],
     "other_license_expression": null,
     "other_license_expression_spdx": null,
     "other_license_detections": [],

@@ -654,14 +654,10 @@ gem "specific-range", ">= 1.0.0", "< 1.5.0", "!= 1.2.3"
             package_data.homepage_url,
             Some("https://example.com/example-gem".to_string())
         );
-        assert_eq!(
-            package_data.declared_license_expression,
-            Some("mit".to_string())
-        );
-        assert_eq!(
-            package_data.declared_license_expression_spdx,
-            Some("MIT".to_string())
-        );
+        assert_eq!(package_data.declared_license_expression, None);
+        assert_eq!(package_data.declared_license_expression_spdx, None);
+        assert_eq!(package_data.license_detections.len(), 0);
+        assert!(package_data.extracted_license_statement.is_some());
         assert_eq!(package_data.primary_language, Some("Ruby".to_string()));
         assert_eq!(package_data.datasource_id, Some("gemspec".to_string()));
 
@@ -748,24 +744,10 @@ gem "specific-range", ">= 1.0.0", "< 1.5.0", "!= 1.2.3"
             "Should resolve variable version CSV::VERSION to '3.2.6'"
         );
 
-        // Check licenses (plural form) - should be normalized and lowercased
-        assert!(
-            package_data
-                .declared_license_expression
-                .as_ref()
-                .is_some_and(|l| l.contains("ruby") && l.contains("bsd-2-clause")),
-            "Should have both ruby and bsd-2-clause licenses (normalized), got: {:?}",
-            package_data.declared_license_expression
-        );
-        // SPDX should preserve original case
-        assert!(
-            package_data
-                .declared_license_expression_spdx
-                .as_ref()
-                .is_some_and(|l| l.contains("Ruby") && l.contains("BSD-2-Clause")),
-            "SPDX should have original case, got: {:?}",
-            package_data.declared_license_expression_spdx
-        );
+        assert_eq!(package_data.declared_license_expression, None);
+        assert_eq!(package_data.declared_license_expression_spdx, None);
+        assert_eq!(package_data.license_detections.len(), 0);
+        assert!(package_data.extracted_license_statement.is_some());
     }
 
     // ==========================================================================
@@ -878,26 +860,10 @@ gem "specific-range", ">= 1.0.0", "< 1.5.0", "!= 1.2.3"
         let package_data = GemspecParser::extract_package_data(&gemspec_path);
 
         assert_eq!(package_data.name, Some("multi-license-gem".to_string()));
-        // Multiple licenses should be joined with AND (normalized to lowercase)
-        let license = package_data.declared_license_expression.as_ref();
-        assert!(license.is_some(), "Should have license expression");
-        let lic = license.unwrap();
-        assert!(
-            lic.contains("mit") && lic.contains("apache-2.0") && lic.contains("bsd-2-clause"),
-            "Should contain all three licenses (normalized), got: {}",
-            lic
-        );
-        // SPDX should preserve original case
-        let spdx = package_data.declared_license_expression_spdx.as_ref();
-        assert!(spdx.is_some(), "Should have SPDX expression");
-        let spdx_str = spdx.unwrap();
-        assert!(
-            spdx_str.contains("MIT")
-                && spdx_str.contains("Apache-2.0")
-                && spdx_str.contains("BSD-2-Clause"),
-            "SPDX should preserve original case, got: {}",
-            spdx_str
-        );
+        assert_eq!(package_data.declared_license_expression, None);
+        assert_eq!(package_data.declared_license_expression_spdx, None);
+        assert_eq!(package_data.license_detections.len(), 0);
+        assert!(package_data.extracted_license_statement.is_some());
     }
 
     // ==========================================================================
@@ -1142,14 +1108,10 @@ gem "rails", "7.0.4"
             package_data.homepage_url,
             Some("https://example.com/example-gem".to_string())
         );
-        assert_eq!(
-            package_data.declared_license_expression,
-            Some("mit".to_string())
-        );
-        assert_eq!(
-            package_data.declared_license_expression_spdx,
-            Some("MIT".to_string())
-        );
+        assert_eq!(package_data.declared_license_expression, None);
+        assert_eq!(package_data.declared_license_expression_spdx, None);
+        assert_eq!(package_data.license_detections.len(), 0);
+        assert!(package_data.extracted_license_statement.is_some());
         assert_eq!(package_data.primary_language, Some("Ruby".to_string()));
         assert_eq!(package_data.datasource_id, Some("gem_archive".to_string()));
 

@@ -21,9 +21,8 @@
 //! - Graceful error handling: logs warnings and returns default on parse failure
 //! - PURL type: "gem"
 
-use crate::askalono::Store;
 use crate::models::{Dependency, PackageData, Party};
-use crate::parsers::utils::{normalize_license, split_name_email};
+use crate::parsers::utils::split_name_email;
 use flate2::read::GzDecoder;
 use log::warn;
 use packageurl::PackageUrl;
@@ -1154,25 +1153,15 @@ fn parse_gemspec(content: &str) -> PackageData {
         });
     }
 
-    // Build license expression and normalize using askalono
-    let raw_license = if !licenses.is_empty() {
+    // Extract license statement only - detection happens in separate engine
+    let extracted_license_statement = if !licenses.is_empty() {
         Some(licenses.join(" AND "))
     } else {
         license
     };
 
-    let store = Store::new();
-    let (declared_license_expression, declared_license_expression_spdx) =
-        if let Some(ref lic) = raw_license {
-            let (expr, spdx) = normalize_license(lic, &store);
-            if store.is_empty() {
-                (Some(lic.to_lowercase()), Some(lic.clone()))
-            } else {
-                (expr, spdx)
-            }
-        } else {
-            (None, None)
-        };
+    let declared_license_expression = None;
+    let declared_license_expression_spdx = None;
 
     // Prefer description over summary
     let final_description = description.or(summary);
@@ -1200,6 +1189,7 @@ fn parse_gemspec(content: &str) -> PackageData {
         download_url,
         declared_license_expression,
         declared_license_expression_spdx,
+        extracted_license_statement,
         parties,
         dependencies,
         repository_homepage_url,
@@ -1343,23 +1333,15 @@ fn parse_gem_metadata_yaml(content: &str) -> Result<PackageData, String> {
         })
         .unwrap_or_default();
 
-    let raw_license = if !licenses.is_empty() {
+    // Extract license statement only - detection happens in separate engine
+    let extracted_license_statement = if !licenses.is_empty() {
         Some(licenses.join(" AND "))
     } else {
         None
     };
 
-    let store = Store::new();
-    let (license_expression, license_expression_spdx) = if let Some(ref lic) = raw_license {
-        let (expr, spdx) = normalize_license(lic, &store);
-        if store.is_empty() {
-            (Some(lic.to_lowercase()), Some(lic.clone()))
-        } else {
-            (expr, spdx)
-        }
-    } else {
-        (None, None)
-    };
+    let license_expression = None;
+    let license_expression_spdx = None;
 
     // Authors
     let authors: Vec<String> = yaml
@@ -1496,6 +1478,7 @@ fn parse_gem_metadata_yaml(content: &str) -> Result<PackageData, String> {
         code_view_url,
         declared_license_expression: license_expression,
         declared_license_expression_spdx: license_expression_spdx,
+        extracted_license_statement,
         file_references,
         parties,
         dependencies,

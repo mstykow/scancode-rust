@@ -38,32 +38,9 @@
     "vcs_url": null,
     "copyright": null,
     "holder": null,
-    "declared_license_expression": "ms-net-library",
-    "declared_license_expression_spdx": "LicenseRef-scancode-ms-net-library",
-    "license_detections": [
-      {
-        "license_expression": "ms-net-library",
-        "license_expression_spdx": "LicenseRef-scancode-ms-net-library",
-        "matches": [
-          {
-            "license_expression": "ms-net-library",
-            "license_expression_spdx": "LicenseRef-scancode-ms-net-library",
-            "from_file": null,
-            "start_line": 1,
-            "end_line": 1,
-            "matcher": "1-hash",
-            "score": 100.0,
-            "matched_length": 7,
-            "match_coverage": 100.0,
-            "rule_relevance": 100,
-            "rule_identifier": "ms-net-library_6.RULE",
-            "rule_url": "https://github.com/nexB/scancode-toolkit/tree/develop/src/licensedcode/data/rules/ms-net-library_6.RULE",
-            "matched_text": "http://go.microsoft.com/fwlink/?LinkID=320539"
-          }
-        ],
-        "identifier": "ms_net_library-c4f25003-9bdd-58b0-1838-251037aad0bf"
-      }
-    ],
+    "declared_license_expression": null,
+    "declared_license_expression_spdx": null,
+    "license_detections": [],
     "other_license_expression": null,
     "other_license_expression_spdx": null,
     "other_license_detections": [],

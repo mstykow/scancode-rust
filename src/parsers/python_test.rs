@@ -70,12 +70,10 @@ numpy = ">=1.20.0"
             Some("https://example.com".to_string())
         );
 
-        // Check license detection
-        assert_eq!(package_data.license_detections.len(), 1);
-        assert_eq!(
-            package_data.license_detections[0].license_expression_spdx,
-            "MIT"
-        );
+        assert_eq!(package_data.declared_license_expression, None);
+        assert_eq!(package_data.declared_license_expression_spdx, None);
+        assert_eq!(package_data.license_detections.len(), 0);
+        assert!(package_data.extracted_license_statement.is_some());
 
         // Check purl
         assert_eq!(
@@ -97,12 +95,10 @@ numpy = ">=1.20.0"
             Some("https://example.com".to_string())
         );
 
-        // Check license detection
-        assert_eq!(package_data.license_detections.len(), 1);
-        assert_eq!(
-            package_data.license_detections[0].license_expression_spdx,
-            "MIT"
-        );
+        assert_eq!(package_data.declared_license_expression, None);
+        assert_eq!(package_data.declared_license_expression_spdx, None);
+        assert_eq!(package_data.license_detections.len(), 0);
+        assert!(package_data.extracted_license_statement.is_some());
 
         // Check purl
         assert_eq!(
@@ -161,12 +157,10 @@ setup(
             Some("https://example.com".to_string())
         );
 
-        // Check license detection
-        assert_eq!(package_data.license_detections.len(), 1);
-        assert_eq!(
-            package_data.license_detections[0].license_expression_spdx,
-            "MIT"
-        );
+        assert_eq!(package_data.declared_license_expression, None);
+        assert_eq!(package_data.declared_license_expression_spdx, None);
+        assert_eq!(package_data.license_detections.len(), 0);
+        assert!(package_data.extracted_license_statement.is_some());
 
         // Check purl
         assert_eq!(
@@ -1013,16 +1007,10 @@ Test package description.
         );
         assert!(package_data.is_virtual);
 
-        assert_eq!(
-            package_data.declared_license_expression,
-            Some("apache-2.0 and bsd-3-clause and mit".to_string())
-        );
-        assert_eq!(
-            package_data.declared_license_expression_spdx,
-            Some("Apache-2.0 AND BSD-3-Clause AND MIT".to_string())
-        );
-
-        assert_eq!(package_data.license_detections.len(), 1);
+        assert_eq!(package_data.declared_license_expression, None);
+        assert_eq!(package_data.declared_license_expression_spdx, None);
+        assert_eq!(package_data.license_detections.len(), 0);
+        assert!(package_data.extracted_license_statement.is_some());
 
         let extra_data = package_data
             .extra_data

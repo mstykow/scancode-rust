@@ -235,30 +235,6 @@ mod tests {
     }
 
     #[test]
-    fn test_normalize_license() {
-        let content = r#"
-{
-  "name": "acme/demo",
-  "license": "MIT"
-}
-"#;
-
-        let (_temp_dir, composer_path) = create_temp_file("composer.json", content);
-        let package_data = ComposerJsonParser::extract_package_data(&composer_path);
-
-        assert_eq!(
-            package_data.extracted_license_statement.as_deref(),
-            Some("MIT")
-        );
-        assert_eq!(
-            package_data.declared_license_expression_spdx.as_deref(),
-            Some("MIT")
-        );
-        assert_eq!(package_data.license_detections.len(), 1);
-        assert_eq!(package_data.license_detections[0].license_expression, "mit");
-    }
-
-    #[test]
     fn test_graceful_error_handling() {
         let content = r#"{ invalid-json }"#;
 

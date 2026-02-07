@@ -40,11 +40,12 @@ mod tests {
             Some("https://github.com/example/test-cargo".to_string())
         );
 
-        // Check license detection
-        assert_eq!(package_data.license_detections.len(), 1);
+        assert_eq!(package_data.declared_license_expression, None);
+        assert_eq!(package_data.declared_license_expression_spdx, None);
+        assert_eq!(package_data.license_detections.len(), 0);
         assert_eq!(
-            package_data.license_detections[0].license_expression_spdx,
-            "MIT OR Apache-2.0"
+            package_data.extracted_license_statement,
+            Some("MIT OR Apache-2.0".to_string())
         );
 
         // Check purl
@@ -99,11 +100,12 @@ authors = ["Test User <test@example.com>"]
             Some("https://github.com/user/test-package".to_string())
         );
 
-        // Check license detection
-        assert_eq!(package_data.license_detections.len(), 1);
+        assert_eq!(package_data.declared_license_expression, None);
+        assert_eq!(package_data.declared_license_expression_spdx, None);
+        assert_eq!(package_data.license_detections.len(), 0);
         assert_eq!(
-            package_data.license_detections[0].license_expression_spdx,
-            "MIT"
+            package_data.extracted_license_statement,
+            Some("MIT".to_string())
         );
 
         // Check purl

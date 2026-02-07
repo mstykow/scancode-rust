@@ -28,11 +28,9 @@ use packageurl::PackageUrl;
 use quick_xml::Reader;
 use quick_xml::events::Event;
 
-use crate::askalono::Store;
 use crate::models::{Dependency, PackageData, Party};
 
 use super::PackageParser;
-use super::utils::normalize_license;
 
 const DATASOURCE_PACKAGES_CONFIG: &str = "nuget_packages_config";
 const DATASOURCE_NUSPEC: &str = "nuget_nuspec";
@@ -360,23 +358,13 @@ impl PackageParser for NuspecParser {
             Some(package_url.to_string())
         });
 
-        // License normalization with empty-store fallback
-        let store = Store::new();
-        let (declared_license_expression, declared_license_expression_spdx) =
-            if let Some(ref license) = extracted_license_statement {
-                let (expr, spdx) = normalize_license(license, &store);
-                if store.is_empty() {
-                    // Fallback for testing without populated store
-                    (Some(license.to_lowercase()), Some(license.clone()))
-                } else {
-                    (expr, spdx)
-                }
-            } else {
-                (None, None)
-            };
+        // Extract license statement only - detection happens in separate engine
+        // Do NOT populate declared_license_expression or license_detections here
+        let declared_license_expression = None;
+        let declared_license_expression_spdx = None;
+        let license_detections = Vec::new();
 
-        // Copy copyright to holder field (as per ScanCode convention)
-        let holder = copyright.clone();
+        let holder = None;
 
         PackageData {
             datasource_id: Some(DATASOURCE_NUSPEC.to_string()),
@@ -390,6 +378,7 @@ impl PackageParser for NuspecParser {
             dependencies,
             declared_license_expression,
             declared_license_expression_spdx,
+            license_detections,
             extracted_license_statement,
             copyright,
             holder,
@@ -493,7 +482,7 @@ fn default_package_data(datasource_id: Option<&str>) -> PackageData {
         version: None,
         qualifiers: None,
         subpath: None,
-        primary_language: Some(".NET".to_string()),
+        primary_language: None,
         description: None,
         release_date: None,
         parties: Vec::new(),
@@ -909,6 +898,14 @@ fn parse_nuspec_content(content: &str) -> Result<PackageData, String> {
         })
     });
 
+    // Extract license statement only - detection happens in separate engine
+    // Do NOT populate declared_license_expression or license_detections here
+    let declared_license_expression = None;
+    let declared_license_expression_spdx = None;
+    let license_detections = Vec::new();
+
+    let holder = None;
+
     Ok(PackageData {
         datasource_id: Some(DATASOURCE_NUPKG.to_string()),
         package_type: Some("nuget".to_string()),
@@ -918,8 +915,12 @@ fn parse_nuspec_content(content: &str) -> Result<PackageData, String> {
         homepage_url,
         parties,
         dependencies,
+        declared_license_expression,
+        declared_license_expression_spdx,
+        license_detections,
         extracted_license_statement,
         copyright,
+        holder,
         vcs_url,
         repository_homepage_url,
         repository_download_url,
