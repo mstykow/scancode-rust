@@ -339,6 +339,8 @@ pub struct ResolvedPackage {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub md5: Option<String>,
     pub is_virtual: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub extra_data: Option<std::collections::HashMap<String, serde_json::Value>>,
     pub dependencies: Vec<Dependency>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub repository_homepage_url: Option<String>,

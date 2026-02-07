@@ -4,6 +4,8 @@ mod cargo_lock;
 mod cargo_lock_test;
 #[cfg(test)]
 mod cargo_test;
+#[cfg(test)]
+mod cocoapods_golden_test;
 mod composer;
 #[cfg(test)]
 mod composer_golden_test;
@@ -19,6 +21,12 @@ mod go;
 mod go_golden_test;
 #[cfg(test)]
 mod go_test;
+mod gradle;
+#[cfg(test)]
+mod gradle_golden_test;
+mod gradle_lock;
+#[cfg(test)]
+mod gradle_lock_test;
 mod maven;
 #[cfg(test)]
 mod maven_test;
@@ -46,6 +54,14 @@ mod pipfile_lock_test;
 mod pnpm_lock;
 #[cfg(test)]
 mod pnpm_lock_test;
+mod podfile;
+mod podfile_lock;
+#[cfg(test)]
+mod podfile_lock_test;
+mod podspec;
+mod podspec_json;
+#[cfg(test)]
+mod podspec_json_test;
 mod poetry_lock;
 #[cfg(test)]
 mod poetry_lock_test;
@@ -60,6 +76,14 @@ mod ruby;
 mod ruby_golden_test;
 #[cfg(test)]
 mod ruby_test;
+#[cfg(test)]
+mod swift_golden_test;
+mod swift_manifest_json;
+#[cfg(test)]
+mod swift_manifest_json_test;
+mod swift_resolved;
+#[cfg(test)]
+mod swift_resolved_test;
 pub mod utils;
 mod yarn_lock;
 #[cfg(test)]
@@ -136,6 +160,8 @@ pub use self::cargo_lock::CargoLockParser;
 pub use self::composer::{ComposerJsonParser, ComposerLockParser};
 pub use self::dart::{PubspecLockParser, PubspecYamlParser};
 pub use self::go::{GoModParser, GoSumParser, GodepsParser};
+pub use self::gradle::GradleParser;
+pub use self::gradle_lock::GradleLockfileParser;
 pub use self::maven::MavenParser;
 pub use self::npm::NpmParser;
 pub use self::npm_lock::NpmLockParser;
@@ -143,10 +169,16 @@ pub use self::npm_workspace::NpmWorkspaceParser;
 pub use self::nuget::{NupkgParser, NuspecParser, PackagesConfigParser, PackagesLockParser};
 pub use self::pipfile_lock::PipfileLockParser;
 pub use self::pnpm_lock::PnpmLockParser;
+pub use self::podfile::PodfileParser;
+pub use self::podfile_lock::PodfileLockParser;
+pub use self::podspec::PodspecParser;
+pub use self::podspec_json::PodspecJsonParser;
 pub use self::poetry_lock::PoetryLockParser;
 pub use self::python::PythonParser;
 pub use self::requirements_txt::RequirementsTxtParser;
 pub use self::ruby::{GemArchiveParser, GemfileLockParser, GemfileParser, GemspecParser};
+pub use self::swift_manifest_json::SwiftManifestJsonParser;
+pub use self::swift_resolved::SwiftPackageResolvedParser;
 pub use self::yarn_lock::YarnLockParser;
 
 macro_rules! define_parsers {
@@ -168,6 +200,10 @@ define_parsers! {
     NpmLockParser,
     YarnLockParser,
     PnpmLockParser,
+    PodfileParser,
+    PodfileLockParser,
+    PodspecParser,
+    PodspecJsonParser,
     PoetryLockParser,
     PipfileLockParser,
     RequirementsTxtParser,
@@ -182,9 +218,13 @@ define_parsers! {
     GemfileLockParser,
     GemspecParser,
     GemArchiveParser,
+    SwiftManifestJsonParser,
+    SwiftPackageResolvedParser,
     GoModParser,
     GoSumParser,
     GodepsParser,
+    GradleParser,
+    GradleLockfileParser,
     PackagesConfigParser,
     NuspecParser,
     PackagesLockParser,

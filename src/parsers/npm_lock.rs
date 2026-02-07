@@ -548,6 +548,7 @@ fn build_npm_dependency(
         sha512: sha512_from_integrity,
         md5: None,
         is_virtual: true,
+        extra_data: None,
         dependencies: nested_deps,
         repository_homepage_url: None,
         repository_download_url: None,

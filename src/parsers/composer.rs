@@ -402,6 +402,7 @@ fn build_lock_dependency(
         sha512,
         md5: None,
         is_virtual: true,
+        extra_data: None,
         dependencies: Vec::new(),
         repository_homepage_url: None,
         repository_download_url: None,

@@ -577,6 +577,7 @@ pub fn extract_dependency(
         sha512,
         md5,
         is_virtual: true,
+        extra_data: None,
         dependencies: all_dependencies,
         repository_homepage_url: None,
         repository_download_url: None,
