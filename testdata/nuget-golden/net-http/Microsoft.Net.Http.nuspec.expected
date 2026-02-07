@@ -1,0 +1,107 @@
+[
+  {
+    "type": "nuget",
+    "namespace": null,
+    "name": "Microsoft.Net.Http",
+    "version": "2.2.29",
+    "qualifiers": {},
+    "subpath": null,
+    "primary_language": null,
+    "description": "Microsoft HTTP Client Libraries\nThis package provides a programming interface for modern HTTP/REST based applications.\nThis package includes HttpClient for sending requests over HTTP, as well as HttpRequestMessage and HttpResponseMessage for processing HTTP messages.\n\nThis package is not supported in Visual Studio 2010, and is only required for projects targeting .NET Framework 4.5, Windows 8, or Windows Phone 8.1 when consuming a library that uses this package.\n\nSupported Platforms:\n- .NET Framework 4\n- Windows 8\n- Windows Phone 8.1\n- Windows Phone Silverlight 7.5\n- Silverlight 4\n- Portable Class Libraries",
+    "release_date": null,
+    "parties": [
+      {
+        "type": null,
+        "role": "author",
+        "name": "Microsoft",
+        "email": null,
+        "url": null
+      },
+      {
+        "type": null,
+        "role": "owner",
+        "name": "Microsoft",
+        "email": null,
+        "url": null
+      }
+    ],
+    "keywords": [],
+    "homepage_url": "http://go.microsoft.com/fwlink/?LinkID=280055",
+    "download_url": null,
+    "size": null,
+    "sha1": null,
+    "md5": null,
+    "sha256": null,
+    "sha512": null,
+    "bug_tracking_url": null,
+    "code_view_url": null,
+    "vcs_url": null,
+    "copyright": "Copyright \u00a9 Microsoft Corporation",
+    "holder": "Microsoft Corporation",
+    "declared_license_expression": "ms-net-library-2018-11",
+    "declared_license_expression_spdx": "LicenseRef-scancode-ms-net-library-2018-11",
+    "license_detections": [
+      {
+        "license_expression": "ms-net-library-2018-11",
+        "license_expression_spdx": "LicenseRef-scancode-ms-net-library-2018-11",
+        "matches": [
+          {
+            "license_expression": "ms-net-library-2018-11",
+            "license_expression_spdx": "LicenseRef-scancode-ms-net-library-2018-11",
+            "from_file": null,
+            "start_line": 1,
+            "end_line": 1,
+            "matcher": "1-hash",
+            "score": 100.0,
+            "matched_length": 7,
+            "match_coverage": 100.0,
+            "rule_relevance": 100,
+            "rule_identifier": "ms-net-library-2018-11_3.RULE",
+            "rule_url": "https://github.com/nexB/scancode-toolkit/tree/develop/src/licensedcode/data/rules/ms-net-library-2018-11_3.RULE",
+            "matched_text": "http://go.microsoft.com/fwlink/?LinkId=329770"
+          }
+        ],
+        "identifier": "ms_net_library_2018_11-961cabd2-ac43-442d-72fb-496c8f76dffa"
+      }
+    ],
+    "other_license_expression": null,
+    "other_license_expression_spdx": null,
+    "other_license_detections": [],
+    "extracted_license_statement": "http://go.microsoft.com/fwlink/?LinkId=329770",
+    "notice_text": null,
+    "source_packages": [],
+    "file_references": [],
+    "is_private": false,
+    "is_virtual": false,
+    "extra_data": {},
+    "dependencies": [
+      {
+        "purl": "pkg:nuget/Microsoft.Bcl",
+        "extracted_requirement": "1.1.10",
+        "scope": "dependency",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true,
+        "resolved_package": {},
+        "extra_data": {}
+      },
+      {
+        "purl": "pkg:nuget/Microsoft.Bcl.Build",
+        "extracted_requirement": "1.0.14",
+        "scope": "dependency",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true,
+        "resolved_package": {},
+        "extra_data": {}
+      }
+    ],
+    "repository_homepage_url": "https://www.nuget.org/packages/Microsoft.Net.Http/2.2.29",
+    "repository_download_url": "https://www.nuget.org/api/v2/package/Microsoft.Net.Http/2.2.29",
+    "api_data_url": "https://api.nuget.org/v3/registration3/microsoft.net.http/2.2.29.json",
+    "datasource_id": "nuget_nuspec",
+    "purl": "pkg:nuget/Microsoft.Net.Http@2.2.29"
+  }
+]

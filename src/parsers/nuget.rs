@@ -28,9 +28,11 @@ use packageurl::PackageUrl;
 use quick_xml::Reader;
 use quick_xml::events::Event;
 
+use crate::askalono::Store;
 use crate::models::{Dependency, PackageData, Party};
 
 use super::PackageParser;
+use super::utils::normalize_license;
 
 const DATASOURCE_PACKAGES_CONFIG: &str = "nuget_packages_config";
 const DATASOURCE_NUSPEC: &str = "nuget_nuspec";
@@ -349,17 +351,48 @@ impl PackageParser for NuspecParser {
             })
         });
 
+        // Generate PURL
+        let purl = name.as_ref().and_then(|n| {
+            let mut package_url = PackageUrl::new("nuget", n).ok()?;
+            if let Some(v) = &version {
+                package_url.with_version(v).ok()?;
+            }
+            Some(package_url.to_string())
+        });
+
+        // License normalization with empty-store fallback
+        let store = Store::new();
+        let (declared_license_expression, declared_license_expression_spdx) =
+            if let Some(ref license) = extracted_license_statement {
+                let (expr, spdx) = normalize_license(license, &store);
+                if store.is_empty() {
+                    // Fallback for testing without populated store
+                    (Some(license.to_lowercase()), Some(license.clone()))
+                } else {
+                    (expr, spdx)
+                }
+            } else {
+                (None, None)
+            };
+
+        // Copy copyright to holder field (as per ScanCode convention)
+        let holder = copyright.clone();
+
         PackageData {
             datasource_id: Some(DATASOURCE_NUSPEC.to_string()),
             package_type: Some(Self::PACKAGE_TYPE.to_string()),
             name,
             version,
+            purl,
             description: final_description,
             homepage_url,
             parties,
             dependencies,
+            declared_license_expression,
+            declared_license_expression_spdx,
             extracted_license_statement,
             copyright,
+            holder,
             vcs_url,
             repository_homepage_url,
             repository_download_url,

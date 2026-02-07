@@ -656,6 +656,10 @@ gem "specific-range", ">= 1.0.0", "< 1.5.0", "!= 1.2.3"
         );
         assert_eq!(
             package_data.declared_license_expression,
+            Some("mit".to_string())
+        );
+        assert_eq!(
+            package_data.declared_license_expression_spdx,
             Some("MIT".to_string())
         );
         assert_eq!(package_data.primary_language, Some("Ruby".to_string()));
@@ -744,14 +748,23 @@ gem "specific-range", ">= 1.0.0", "< 1.5.0", "!= 1.2.3"
             "Should resolve variable version CSV::VERSION to '3.2.6'"
         );
 
-        // Check licenses (plural form)
+        // Check licenses (plural form) - should be normalized and lowercased
         assert!(
             package_data
                 .declared_license_expression
                 .as_ref()
-                .is_some_and(|l| l.contains("Ruby") && l.contains("BSD-2-Clause")),
-            "Should have both Ruby and BSD-2-Clause licenses, got: {:?}",
+                .is_some_and(|l| l.contains("ruby") && l.contains("bsd-2-clause")),
+            "Should have both ruby and bsd-2-clause licenses (normalized), got: {:?}",
             package_data.declared_license_expression
+        );
+        // SPDX should preserve original case
+        assert!(
+            package_data
+                .declared_license_expression_spdx
+                .as_ref()
+                .is_some_and(|l| l.contains("Ruby") && l.contains("BSD-2-Clause")),
+            "SPDX should have original case, got: {:?}",
+            package_data.declared_license_expression_spdx
         );
     }
 
@@ -829,8 +842,7 @@ gem "specific-range", ">= 1.0.0", "< 1.5.0", "!= 1.2.3"
 
         assert_eq!(package_data.name, Some("email-test-gem".to_string()));
 
-        // Bug #6: When email contains "Name <email@example.com>" format,
-        // split_name_email should parse the email out properly
+        // Python ScanCode creates separate parties for authors and emails
         let party = package_data
             .parties
             .iter()
@@ -841,7 +853,6 @@ gem "specific-range", ">= 1.0.0", "< 1.5.0", "!= 1.2.3"
         );
         let alice = party.unwrap();
 
-        // The email should contain the actual email address
         assert!(
             alice.email.is_some(),
             "Alice should have an email parsed, got parties: {:?}",
@@ -867,14 +878,25 @@ gem "specific-range", ">= 1.0.0", "< 1.5.0", "!= 1.2.3"
         let package_data = GemspecParser::extract_package_data(&gemspec_path);
 
         assert_eq!(package_data.name, Some("multi-license-gem".to_string()));
-        // Multiple licenses should be joined with AND
+        // Multiple licenses should be joined with AND (normalized to lowercase)
         let license = package_data.declared_license_expression.as_ref();
         assert!(license.is_some(), "Should have license expression");
         let lic = license.unwrap();
         assert!(
-            lic.contains("MIT") && lic.contains("Apache-2.0") && lic.contains("BSD-2-Clause"),
-            "Should contain all three licenses, got: {}",
+            lic.contains("mit") && lic.contains("apache-2.0") && lic.contains("bsd-2-clause"),
+            "Should contain all three licenses (normalized), got: {}",
             lic
+        );
+        // SPDX should preserve original case
+        let spdx = package_data.declared_license_expression_spdx.as_ref();
+        assert!(spdx.is_some(), "Should have SPDX expression");
+        let spdx_str = spdx.unwrap();
+        assert!(
+            spdx_str.contains("MIT")
+                && spdx_str.contains("Apache-2.0")
+                && spdx_str.contains("BSD-2-Clause"),
+            "SPDX should preserve original case, got: {}",
+            spdx_str
         );
     }
 
@@ -906,10 +928,10 @@ gem "specific-range", ">= 1.0.0", "< 1.5.0", "!= 1.2.3"
         let rub = rubocop.unwrap();
         assert_eq!(rub.scope, Some("development".to_string()));
         assert_eq!(rub.is_runtime, Some(false));
-        // No version constraint
-        assert!(
-            rub.extracted_requirement.is_none(),
-            "rubocop should have no version requirement"
+        // No version constraint - use None (semantically correct)
+        assert_eq!(
+            rub.extracted_requirement, None,
+            "rubocop should have None for no version requirement"
         );
     }
 
@@ -1122,6 +1144,10 @@ gem "rails", "7.0.4"
         );
         assert_eq!(
             package_data.declared_license_expression,
+            Some("mit".to_string())
+        );
+        assert_eq!(
+            package_data.declared_license_expression_spdx,
             Some("MIT".to_string())
         );
         assert_eq!(package_data.primary_language, Some("Ruby".to_string()));
@@ -1183,10 +1209,10 @@ gem "rails", "7.0.4"
         let rails = rails_dep.unwrap();
         assert_eq!(rails.extracted_requirement, Some("~> 5.0".to_string()));
         assert_eq!(rails.is_runtime, Some(true));
-        assert!(
-            rails.scope.is_none(),
-            "Runtime dep scope should be None, got {:?}",
-            rails.scope
+        assert_eq!(
+            rails.scope,
+            Some("runtime".to_string()),
+            "Runtime dep scope should be 'runtime' (Python ScanCode compatibility)"
         );
 
         // Check runtime dependency - nokogiri

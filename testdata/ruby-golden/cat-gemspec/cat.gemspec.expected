@@ -1,0 +1,71 @@
+[
+  {
+    "type": "gem",
+    "name": "cat_",
+    "version": "12",
+    "primary_language": "Ruby",
+    "description": "The loading cat generator.",
+    "parties": [
+      {
+        "type": "person",
+        "role": "author",
+        "name": "蒼時弦也",
+        "email": "elct9620@frost.tw"
+      }
+    ],
+    "homepage_url": "https://github.com/elct9620/.cat",
+    "download_url": "https://rubygems.org/downloads/cat_-12.gem",
+    "dependencies": [
+      {
+        "purl": "pkg:gem/rack",
+        "scope": "runtime",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:gem/sassc",
+        "scope": "runtime",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:gem/slim",
+        "scope": "runtime",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:gem/bundler",
+        "extracted_requirement": "~> 1.13",
+        "scope": "development",
+        "is_runtime": false,
+        "is_optional": true,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:gem/rake",
+        "extracted_requirement": "~> 10.0",
+        "scope": "development",
+        "is_runtime": false,
+        "is_optional": true,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:gem/rspec",
+        "extracted_requirement": "~> 3.0",
+        "scope": "development",
+        "is_runtime": false,
+        "is_optional": true,
+        "is_direct": true
+      }
+    ],
+    "repository_homepage_url": "https://rubygems.org/gems/cat_/versions/12",
+    "repository_download_url": "https://rubygems.org/downloads/cat_-12.gem",
+    "api_data_url": "https://rubygems.org/api/v2/rubygems/cat_/versions/12.json",
+    "datasource_id": "gemspec",
+    "purl": "pkg:gem/cat_@12"
+  }
+]

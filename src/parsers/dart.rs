@@ -40,7 +40,7 @@ const FIELD_SHA256: &str = "sha256";
 pub struct PubspecYamlParser;
 
 impl PackageParser for PubspecYamlParser {
-    const PACKAGE_TYPE: &'static str = "pub";
+    const PACKAGE_TYPE: &'static str = "dart";
 
     fn extract_package_data(path: &Path) -> PackageData {
         let yaml_content = match read_yaml_file(path) {
@@ -63,7 +63,7 @@ impl PackageParser for PubspecYamlParser {
 pub struct PubspecLockParser;
 
 impl PackageParser for PubspecLockParser {
-    const PACKAGE_TYPE: &'static str = "pub";
+    const PACKAGE_TYPE: &'static str = "pubspec";
 
     fn extract_package_data(path: &Path) -> PackageData {
         let yaml_content = match read_yaml_file(path) {
@@ -90,7 +90,7 @@ fn read_yaml_file(path: &Path) -> Result<Value, String> {
 fn parse_pubspec_yaml(yaml_content: &Value) -> PackageData {
     let name = extract_string_field(yaml_content, FIELD_NAME);
     let version = extract_string_field(yaml_content, FIELD_VERSION);
-    let description = extract_string_field(yaml_content, FIELD_DESCRIPTION);
+    let description = extract_description_field(yaml_content);
     let homepage_url = extract_string_field(yaml_content, FIELD_HOMEPAGE);
     let raw_license = extract_string_field(yaml_content, FIELD_LICENSE);
     let vcs_url = extract_string_field(yaml_content, FIELD_REPOSITORY);
@@ -116,7 +116,13 @@ fn parse_pubspec_yaml(yaml_content: &Value) -> PackageData {
         .unwrap_or_default();
 
     let dependencies = [
-        collect_dependencies(yaml_content, FIELD_DEPENDENCIES, None, true, false),
+        collect_dependencies(
+            yaml_content,
+            FIELD_DEPENDENCIES,
+            Some("dependencies"),
+            true,
+            false,
+        ),
         collect_dependencies(
             yaml_content,
             FIELD_DEV_DEPENDENCIES,
@@ -176,7 +182,7 @@ fn parse_pubspec_yaml(yaml_content: &Value) -> PackageData {
         version,
         qualifiers: None,
         subpath: None,
-        primary_language: Some("Dart".to_string()),
+        primary_language: Some("dart".to_string()),
         description,
         release_date: None,
         parties,
@@ -210,7 +216,7 @@ fn parse_pubspec_yaml(yaml_content: &Value) -> PackageData {
         repository_homepage_url,
         repository_download_url,
         api_data_url,
-        datasource_id: None,
+        datasource_id: Some("pubspec_yaml".to_string()),
         purl,
     }
 }
@@ -218,8 +224,9 @@ fn parse_pubspec_yaml(yaml_content: &Value) -> PackageData {
 fn parse_pubspec_lock(yaml_content: &Value) -> PackageData {
     let dependencies = extract_lock_dependencies(yaml_content);
 
-    let mut package_data = default_package_data();
+    let mut package_data = default_package_data_with_type(PubspecLockParser::PACKAGE_TYPE);
     package_data.dependencies = dependencies;
+    package_data.datasource_id = Some("pubspec_lock".to_string());
     package_data
 }
 
@@ -229,7 +236,7 @@ fn extract_lock_dependencies(lock_data: &Value) -> Vec<Dependency> {
     if let Some(sdks) = lock_data.get(FIELD_SDKS).and_then(Value::as_mapping) {
         for (name_value, version_value) in sdks {
             if let (Some(name), Some(version_str)) = (name_value.as_str(), version_value.as_str()) {
-                let purl = build_purl(name, Some(version_str));
+                let purl = build_dependency_purl(name, None);
                 dependencies.push(Dependency {
                     purl,
                     extracted_requirement: Some(version_str.to_string()),
@@ -265,16 +272,13 @@ fn extract_lock_dependencies(lock_data: &Value) -> Vec<Dependency> {
             .and_then(Value::as_str)
             .map(|value| value.to_string());
 
-        let is_direct = dependency_kind
-            .as_deref()
-            .is_some_and(|value| value.starts_with("direct"));
         let is_runtime = dependency_kind.as_deref() != Some("direct dev");
 
         let is_pinned = version
             .as_ref()
             .is_some_and(|value| !value.trim().is_empty());
 
-        let purl = build_purl(name, version.as_deref());
+        let purl = build_dependency_purl(name, version.as_deref());
         let sha256 = extract_sha256(details);
         let resolved_dependencies = extract_lock_package_dependencies(details);
         let resolved_package =
@@ -287,7 +291,7 @@ fn extract_lock_dependencies(lock_data: &Value) -> Vec<Dependency> {
             is_runtime: Some(is_runtime),
             is_optional: Some(false),
             is_pinned: Some(is_pinned),
-            is_direct: Some(is_direct),
+            is_direct: Some(true),
             resolved_package: Some(Box::new(resolved_package)),
             extra_data: None,
         });
@@ -315,9 +319,9 @@ fn extract_lock_package_dependencies(details: &Mapping) -> Vec<Dependency> {
         };
         let is_pinned = is_pubspec_version_pinned(&requirement);
         let purl = if is_pinned {
-            build_purl(name, Some(requirement.as_str()))
+            build_dependency_purl(name, Some(requirement.as_str()))
         } else {
-            build_purl(name, None)
+            build_dependency_purl(name, None)
         };
 
         dependencies.push(Dependency {
@@ -363,7 +367,7 @@ fn build_resolved_package(
         namespace: String::new(),
         name: name.to_string(),
         version: version.clone().unwrap_or_default(),
-        primary_language: Some("Dart".to_string()),
+        primary_language: Some("dart".to_string()),
         download_url: None,
         sha1: None,
         sha256,
@@ -404,9 +408,9 @@ fn collect_dependencies(
 
         let is_pinned = is_pubspec_version_pinned(&requirement);
         let purl = if is_pinned {
-            build_purl(name, Some(requirement.as_str()))
+            build_dependency_purl(name, Some(requirement.as_str()))
         } else {
-            build_purl(name, None)
+            build_dependency_purl(name, None)
         };
 
         dependencies.push(Dependency {
@@ -489,12 +493,20 @@ fn is_pubspec_version_pinned(version: &str) -> bool {
 }
 
 fn build_purl(name: &str, version: Option<&str>) -> Option<String> {
-    let mut package_url = match PackageUrl::new(PubspecYamlParser::PACKAGE_TYPE, name) {
+    build_purl_with_type(PubspecYamlParser::PACKAGE_TYPE, name, version)
+}
+
+fn build_dependency_purl(name: &str, version: Option<&str>) -> Option<String> {
+    build_purl_with_type("pubspec", name, version)
+}
+
+fn build_purl_with_type(package_type: &str, name: &str, version: Option<&str>) -> Option<String> {
+    let mut package_url = match PackageUrl::new(package_type, name) {
         Ok(purl) => purl,
         Err(e) => {
             warn!(
-                "Failed to create PackageUrl for pub dependency '{}': {}",
-                name, e
+                "Failed to create PackageUrl for {} dependency '{}': {}",
+                package_type, name, e
             );
             return None;
         }
@@ -504,8 +516,8 @@ fn build_purl(name: &str, version: Option<&str>) -> Option<String> {
         && let Err(e) = package_url.with_version(version)
     {
         warn!(
-            "Failed to set version '{}' for pub dependency '{}': {}",
-            version, name, e
+            "Failed to set version '{}' for {} dependency '{}': {}",
+            version, package_type, name, e
         );
         return None;
     }
@@ -534,19 +546,40 @@ fn extract_string_field(yaml_content: &Value, field: &str) -> Option<String> {
         .filter(|value| !value.is_empty())
 }
 
+fn extract_description_field(yaml_content: &Value) -> Option<String> {
+    // For description fields, preserve trailing newlines as they are semantically
+    // significant in YAML folded/literal scalars (> or |)
+    yaml_content
+        .get(FIELD_DESCRIPTION)
+        .and_then(Value::as_str)
+        .and_then(|value| {
+            // Only trim leading whitespace, preserve trailing newlines
+            let trimmed = value.trim_start();
+            if trimmed.is_empty() {
+                None
+            } else {
+                Some(trimmed.to_string())
+            }
+        })
+}
+
 fn mapping_get<'a>(map: &'a Mapping, key: &str) -> Option<&'a Value> {
     map.get(Value::String(key.to_string()))
 }
 
 fn default_package_data() -> PackageData {
+    default_package_data_with_type(PubspecYamlParser::PACKAGE_TYPE)
+}
+
+fn default_package_data_with_type(package_type: &str) -> PackageData {
     PackageData {
-        package_type: Some(PubspecYamlParser::PACKAGE_TYPE.to_string()),
+        package_type: Some(package_type.to_string()),
         namespace: None,
         name: None,
         version: None,
         qualifiers: None,
         subpath: None,
-        primary_language: Some("Dart".to_string()),
+        primary_language: Some("dart".to_string()),
         description: None,
         release_date: None,
         parties: Vec::new(),

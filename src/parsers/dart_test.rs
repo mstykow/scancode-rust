@@ -50,7 +50,7 @@ dependency_overrides:
         let (_temp_dir, pubspec_path) = create_temp_file("pubspec.yaml", content);
         let package_data = PubspecYamlParser::extract_package_data(&pubspec_path);
 
-        assert_eq!(package_data.package_type.as_deref(), Some("pub"));
+        assert_eq!(package_data.package_type.as_deref(), Some("dart"));
         assert_eq!(package_data.name.as_deref(), Some("example"));
         assert_eq!(package_data.version.as_deref(), Some("1.2.3"));
         assert_eq!(package_data.description.as_deref(), Some("Example package"));
@@ -58,13 +58,13 @@ dependency_overrides:
             package_data.homepage_url.as_deref(),
             Some("https://example.com")
         );
-        assert_eq!(package_data.purl.as_deref(), Some("pkg:pub/example@1.2.3"));
+        assert_eq!(package_data.purl.as_deref(), Some("pkg:dart/example@1.2.3"));
         assert_eq!(package_data.dependencies.len(), 3);
 
         let http_dep = find_dependency(&package_data.dependencies, "http")
             .expect("http dependency should be present");
         assert_eq!(http_dep.extracted_requirement.as_deref(), Some("^0.13.0"));
-        assert!(http_dep.scope.is_none());
+        assert_eq!(http_dep.scope.as_deref(), Some("dependencies"));
         assert_eq!(http_dep.is_runtime, Some(true));
         assert_eq!(http_dep.is_optional, Some(false));
         assert_eq!(http_dep.is_pinned, Some(false));
@@ -237,7 +237,7 @@ license: MIT
         let (_temp_dir, pubspec_path) = create_temp_file("pubspec.yaml", content);
         let package_data = PubspecYamlParser::extract_package_data(&pubspec_path);
 
-        assert_eq!(package_data.package_type.as_deref(), Some("pub"));
+        assert_eq!(package_data.package_type.as_deref(), Some("dart"));
         assert!(package_data.name.is_none());
         assert!(package_data.dependencies.is_empty());
     }
