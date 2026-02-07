@@ -1,0 +1,14 @@
+{
+  "pins" : [
+    {
+      "identity" : "experimental-pkg",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/example/experimental-pkg.git",
+      "state" : {
+        "revision" : "deadbeef1234567890abcdef",
+        "version" : null
+      }
+    }
+  ],
+  "version" : 2
+}
