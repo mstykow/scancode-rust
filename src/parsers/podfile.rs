@@ -9,6 +9,17 @@ use regex::Regex;
 use crate::models::{Dependency, PackageData};
 use crate::parsers::PackageParser;
 
+/// Parses CocoaPods Podfile dependency files.
+///
+/// Extracts dependency declarations from Podfile using regex-based Ruby DSL parsing.
+///
+/// # Supported Syntax
+/// - `pod 'Name', 'version'` - Standard pod with version
+/// - `pod 'Name'` - Pod without version constraint
+/// - `pod 'Name', :git => 'url'` - Git dependency
+/// - `pod 'Name', :path => '../LocalPod'` - Local path dependency
+/// - `pod 'Firebase/Analytics'` - Subspecs
+/// - Version operators: `~>`, `>=`, `<=`, etc.
 pub struct PodfileParser;
 
 impl PackageParser for PodfileParser {

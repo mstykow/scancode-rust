@@ -12,6 +12,20 @@ use super::PackageParser;
 const DATASOURCE_ID: &str = "cocoapods_podfile_lock";
 const PRIMARY_LANGUAGE: &str = "Objective-C";
 
+/// Parses CocoaPods lockfiles (Podfile.lock).
+///
+/// Extracts pinned dependency versions from Podfile.lock using data aggregation
+/// across multiple YAML sections.
+///
+/// # Data Aggregation
+/// Correlates information from 5 sections:
+/// - **PODS**: Dependency tree with versions
+/// - **DEPENDENCIES**: Direct dependencies
+/// - **SPEC REPOS**: Source repositories
+/// - **CHECKSUMS**: SHA1 hashes
+/// - **EXTERNAL SOURCES**: Git/path sources
+///
+/// Uses `PodfileLockDataByPurl` pattern to aggregate data by package URL.
 pub struct PodfileLockParser;
 
 impl PackageParser for PodfileLockParser {

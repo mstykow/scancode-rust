@@ -7,6 +7,35 @@ use packageurl::PackageUrl;
 use crate::models::{Dependency, PackageData};
 use crate::parsers::PackageParser;
 
+/// Parses Gradle build files (build.gradle, build.gradle.kts).
+///
+/// Extracts dependencies from Gradle build scripts using a custom
+/// token-based lexer and recursive descent parser. Supports both
+/// Groovy and Kotlin DSL syntax.
+///
+/// # Supported Patterns
+/// - String notation: `implementation 'group:name:version'`
+/// - Named parameters: `implementation group: 'x', name: 'y', version: 'z'`
+/// - Map format: `implementation([group: 'x', name: 'y'])`
+/// - Nested functions: `implementation(enforcedPlatform("..."))`
+/// - Project references: `implementation(project(":module"))`
+/// - String interpolation: `implementation("group:name:${version}")`
+///
+/// # Implementation
+/// Uses a custom token-based lexer (870 lines) instead of tree-sitter for:
+/// - Lighter binary size (no external parser dependencies)
+/// - Easier maintenance for DSL-specific quirks
+/// - Better error messages for malformed input
+///
+/// # Example
+/// ```no_run
+/// use scancode_rust::parsers::{GradleParser, PackageParser};
+/// use std::path::Path;
+///
+/// let path = Path::new("testdata/gradle-golden/groovy1/build.gradle");
+/// let package_data = GradleParser::extract_package_data(path);
+/// assert!(!package_data.dependencies.is_empty());
+/// ```
 pub struct GradleParser;
 
 impl PackageParser for GradleParser {

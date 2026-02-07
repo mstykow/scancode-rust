@@ -9,6 +9,18 @@ use regex::Regex;
 use crate::models::{Dependency, PackageData, Party};
 use crate::parsers::PackageParser;
 
+/// Parses CocoaPods specification files (.podspec).
+///
+/// Extracts package metadata from .podspec files using regex-based Ruby DSL parsing.
+///
+/// # Extracted Fields
+/// - Name, version, summary, description
+/// - Homepage, license, source URLs
+/// - Author information (including author hashes)
+/// - Dependencies with version constraints
+///
+/// # Heredoc Support
+/// Handles multiline descriptions: `s.description = <<-DESC ... DESC`
 pub struct PodspecParser;
 
 impl PackageParser for PodspecParser {
