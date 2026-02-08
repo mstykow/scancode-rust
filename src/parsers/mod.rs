@@ -11,6 +11,11 @@ mod composer;
 mod composer_golden_test;
 #[cfg(test)]
 mod composer_test;
+mod cran;
+#[cfg(test)]
+mod cran_golden_test;
+#[cfg(test)]
+mod cran_test;
 mod dart;
 #[cfg(test)]
 mod dart_golden_test;
@@ -163,6 +168,7 @@ pub use self::cargo::CargoParser;
 #[cfg_attr(not(test), allow(unused_imports))]
 pub use self::cargo_lock::CargoLockParser;
 pub use self::composer::{ComposerJsonParser, ComposerLockParser};
+pub use self::cran::CranParser;
 pub use self::dart::{PubspecLockParser, PubspecYamlParser};
 pub use self::go::{GoModParser, GoSumParser, GodepsParser};
 pub use self::gradle::GradleParser;
@@ -232,6 +238,7 @@ define_parsers! {
     GradleParser,
     GradleLockfileParser,
     HaxeParser,
+    CranParser,
     PackagesConfigParser,
     NuspecParser,
     PackagesLockParser,
