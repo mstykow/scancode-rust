@@ -1,0 +1,28 @@
+{
+  "config": {
+    "default": true,
+    "MD013": false,
+    "MD003": { "style": "atx" },
+    "MD007": { "indent": 2 },
+    "MD024": { "siblings_only": true },
+    "MD033": {
+      "allowed_elements": ["img", "br", "details", "summary", "antml:function_calls", "antml:invoke", "antml:parameter", "email", "ecosystem"]
+    },
+    "MD034": false,
+    "MD036": false,
+    "MD040": true,
+    "MD041": false,
+    "MD051": false,
+    "MD059": false,
+    "MD060": false
+  },
+  "globs": ["**/*.md"],
+  "ignores": [
+    "reference/**",
+    "testdata/**",
+    "target/**",
+    ".sisyphus/**",
+    "resources/licenses/**",
+    "docs/archived/**"
+  ]
+}
