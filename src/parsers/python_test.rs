@@ -206,7 +206,6 @@ setup(
             .expect("Failed to read setup-ast-constants.py");
         let (_temp_dir, file_path) = create_temp_file(&content, "setup.py");
         let package_data = PythonParser::extract_package_data(&file_path);
-        println!("dict_unpack dependencies: {:?}", package_data.dependencies);
 
         assert_eq!(package_data.name, Some("mypackage".to_string()));
         assert_eq!(package_data.version, Some("1.2.3".to_string()));

@@ -263,10 +263,6 @@ mod tests {
         if let Some(download_url) = package_data_1.download_url {
             assert!(download_url.contains("registry.npmjs.org"));
             assert!(download_url.contains("test-package"));
-        } else {
-            println!(
-                "No download URL extracted from string repository - this may be expected if repository parsing isn't implemented"
-            );
         }
 
         // Test repository as object
@@ -291,10 +287,6 @@ mod tests {
             assert!(download_url.contains("test-package"));
             // Should be https
             assert!(download_url.starts_with("https://"));
-        } else {
-            println!(
-                "No download URL extracted from object repository - this may be expected if repository parsing isn't implemented"
-            );
         }
     }
 
@@ -353,11 +345,6 @@ mod tests {
             {
                 assert_eq!(jest_dep.is_optional, Some(true));
             }
-        } else {
-            // If no dependencies extracted, just verify the test doesn't crash
-            println!(
-                "No dependencies extracted - this may be expected if dependency parsing isn't implemented"
-            );
         }
     }
 
@@ -413,12 +400,6 @@ mod tests {
                     email
                 );
             }
-        } else {
-            // If no parties extracted, just verify the test doesn't crash
-            // This handles the case where party extraction isn't implemented yet
-            println!(
-                "No parties extracted - this may be expected if party parsing isn't implemented"
-            );
         }
     }
 

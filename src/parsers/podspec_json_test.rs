@@ -410,7 +410,6 @@ mod tests {
         );
 
         if !file_path.exists() {
-            println!("Skipping test - reference file not found");
             return;
         }
 
