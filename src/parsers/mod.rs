@@ -11,6 +11,11 @@ mod composer;
 mod composer_golden_test;
 #[cfg(test)]
 mod composer_test;
+mod conda;
+#[cfg(test)]
+mod conda_golden_test;
+#[cfg(test)]
+mod conda_test;
 mod cran;
 #[cfg(test)]
 mod cran_golden_test;
@@ -57,6 +62,9 @@ mod nuget;
 mod nuget_golden_test;
 #[cfg(test)]
 mod nuget_test;
+mod opam;
+#[cfg(test)]
+mod opam_golden_test;
 mod pep508;
 mod pipfile_lock;
 #[cfg(test)]
@@ -168,6 +176,7 @@ pub use self::cargo::CargoParser;
 #[cfg_attr(not(test), allow(unused_imports))]
 pub use self::cargo_lock::CargoLockParser;
 pub use self::composer::{ComposerJsonParser, ComposerLockParser};
+pub use self::conda::{CondaEnvironmentYmlParser, CondaMetaYamlParser};
 pub use self::cran::CranParser;
 pub use self::dart::{PubspecLockParser, PubspecYamlParser};
 pub use self::go::{GoModParser, GoSumParser, GodepsParser};
@@ -179,6 +188,7 @@ pub use self::npm::NpmParser;
 pub use self::npm_lock::NpmLockParser;
 pub use self::npm_workspace::NpmWorkspaceParser;
 pub use self::nuget::{NupkgParser, NuspecParser, PackagesConfigParser, PackagesLockParser};
+pub use self::opam::OpamParser;
 pub use self::pipfile_lock::PipfileLockParser;
 pub use self::pnpm_lock::PnpmLockParser;
 pub use self::podfile::PodfileParser;
@@ -239,6 +249,9 @@ define_parsers! {
     GradleLockfileParser,
     HaxeParser,
     CranParser,
+    CondaMetaYamlParser,
+    CondaEnvironmentYmlParser,
+    OpamParser,
     PackagesConfigParser,
     NuspecParser,
     PackagesLockParser,
