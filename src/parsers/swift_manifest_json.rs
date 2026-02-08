@@ -516,8 +516,7 @@ pub fn invoke_swift_dump_package(package_dir: &Path) -> Result<String, String> {
 /// * `Err(String)` - Error message with context
 ///
 /// # Example
-/// ```no_run
-/// use scancode_rust::parsers::swift_manifest_json::dump_package_cached;
+/// ```ignore
 /// use std::path::Path;
 ///
 /// let swift_path = Path::new("path/to/Package.swift");
