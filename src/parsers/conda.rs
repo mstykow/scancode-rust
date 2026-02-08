@@ -263,7 +263,7 @@ impl PackageParser for CondaEnvironmentYmlParser {
 /// Extract Jinja2-style variables from a Conda meta.yaml
 ///
 /// Example:
-/// ```
+/// ```ignore
 /// {% set version = "0.45.0" %}
 /// {% set sha256 = "abc123..." %}
 /// ```
