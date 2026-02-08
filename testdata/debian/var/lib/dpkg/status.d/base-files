@@ -1,0 +1,15 @@
+Package: base-files
+Status: install ok installed
+Priority: required
+Section: admin
+Installed-Size: 100
+Maintainer: Debian Base Packages Team <debian-base@lists.debian.org>
+Architecture: amd64
+Multi-Arch: foreign
+Version: 11.1+deb11u8
+Description: Debian base system miscellaneous files
+ This package contains the basic filesystem hierarchy of a Debian system, and
+ several important miscellaneous files, such as /etc/debian_version,
+ /etc/host.conf, /etc/issue, /etc/issue.net, /etc/profile, and others,
+ and the text of several common licenses in use on Debian systems.
+Homepage: https://packages.debian.org/base-files

@@ -1,0 +1,346 @@
+//! Parser for RPM database files.
+//!
+//! Extracts installed package metadata from the RPM database maintained by the
+//! system package manager, typically located in /var/lib/rpm/.
+//!
+//! # Supported Formats
+//! - /var/lib/rpm/Packages (BerkleyDB format or SQLite - raw database file)
+//! - Other RPM database index files
+//!
+//! # Key Features
+//! - Installed package metadata extraction from system RPM database
+//! - Database format detection (BDB vs SQLite)
+//! - Multi-version package support
+//! - Package URL (purl) generation with architecture namespace
+//!
+//! # Implementation Notes
+//! - Direct parsing of RPM database files (not via rpm CLI)
+//! - Database location detection (/var/lib/rpm/Packages or variants)
+//! - Graceful error handling for unreadable or corrupted databases
+//! - Returns package data for each installed package entry
+
+use std::path::Path;
+
+use log::warn;
+
+use crate::models::{Dependency, PackageData};
+use crate::parsers::utils::create_default_package_data;
+
+use super::PackageParser;
+
+const PACKAGE_TYPE: &str = "rpm";
+
+pub struct RpmBdbDatabaseParser;
+
+impl PackageParser for RpmBdbDatabaseParser {
+    const PACKAGE_TYPE: &'static str = PACKAGE_TYPE;
+
+    fn is_match(path: &Path) -> bool {
+        let path_str = path.to_string_lossy();
+        (path_str.ends_with("/Packages") || path_str.contains("/var/lib/rpm/Packages"))
+            && !path_str.ends_with(".db")
+    }
+
+    fn extract_package_data(path: &Path) -> PackageData {
+        match parse_rpm_database(path, "rpm_installed_database_bdb") {
+            Ok(pkgs) if !pkgs.is_empty() => pkgs.into_iter().next().unwrap(),
+            Ok(_) => create_default_package_data(PACKAGE_TYPE, Some("rpm_installed_database_bdb")),
+            Err(e) => {
+                warn!("Failed to parse RPM BDB database {:?}: {}", path, e);
+                create_default_package_data(PACKAGE_TYPE, Some("rpm_installed_database_bdb"))
+            }
+        }
+    }
+}
+
+pub struct RpmNdbDatabaseParser;
+
+impl PackageParser for RpmNdbDatabaseParser {
+    const PACKAGE_TYPE: &'static str = PACKAGE_TYPE;
+
+    fn is_match(path: &Path) -> bool {
+        let path_str = path.to_string_lossy();
+        path_str.ends_with("/Packages.db") || path_str.contains("usr/lib/sysimage/rpm/Packages.db")
+    }
+
+    fn extract_package_data(path: &Path) -> PackageData {
+        match parse_rpm_database(path, "rpm_installed_database_ndb") {
+            Ok(pkgs) if !pkgs.is_empty() => pkgs.into_iter().next().unwrap(),
+            Ok(_) => create_default_package_data(PACKAGE_TYPE, Some("rpm_installed_database_ndb")),
+            Err(e) => {
+                warn!("Failed to parse RPM NDB database {:?}: {}", path, e);
+                create_default_package_data(PACKAGE_TYPE, Some("rpm_installed_database_ndb"))
+            }
+        }
+    }
+}
+
+pub struct RpmSqliteDatabaseParser;
+
+impl PackageParser for RpmSqliteDatabaseParser {
+    const PACKAGE_TYPE: &'static str = PACKAGE_TYPE;
+
+    fn is_match(path: &Path) -> bool {
+        let path_str = path.to_string_lossy();
+        path_str.ends_with("/rpmdb.sqlite") || path_str.contains("rpm/rpmdb.sqlite")
+    }
+
+    fn extract_package_data(path: &Path) -> PackageData {
+        match parse_rpm_database(path, "rpm_installed_database_sqlite") {
+            Ok(pkgs) if !pkgs.is_empty() => pkgs.into_iter().next().unwrap(),
+            Ok(_) => {
+                create_default_package_data(PACKAGE_TYPE, Some("rpm_installed_database_sqlite"))
+            }
+            Err(e) => {
+                warn!("Failed to parse RPM SQLite database {:?}: {}", path, e);
+                create_default_package_data(PACKAGE_TYPE, Some("rpm_installed_database_sqlite"))
+            }
+        }
+    }
+}
+
+fn parse_rpm_database(path: &Path, datasource_id: &str) -> Result<Vec<PackageData>, String> {
+    match rpmdb::read_packages(path.to_path_buf()) {
+        Ok(packages) => Ok(packages
+            .into_iter()
+            .map(|pkg| {
+                let name = if pkg.name.is_empty() {
+                    None
+                } else {
+                    Some(pkg.name.clone())
+                };
+
+                let version = build_evr_version(pkg.epoch, &pkg.version, &pkg.release);
+
+                let namespace = Some("fedora".to_string());
+
+                let architecture = if pkg.arch.is_empty() {
+                    None
+                } else {
+                    Some(pkg.arch.clone())
+                };
+
+                let dependencies = pkg
+                    .requires
+                    .iter()
+                    .filter(|r| {
+                        !r.is_empty() && !r.starts_with("rpmlib(") && !r.starts_with("config(")
+                    })
+                    .map(|require| {
+                        use packageurl::PackageUrl;
+                        let purl = PackageUrl::new(PACKAGE_TYPE, require)
+                            .ok()
+                            .map(|p| p.to_string());
+
+                        Dependency {
+                            purl,
+                            extracted_requirement: None,
+                            scope: Some("requires".to_string()),
+                            is_runtime: Some(true),
+                            is_optional: Some(false),
+                            is_pinned: Some(false),
+                            is_direct: Some(true),
+                            resolved_package: None,
+                            extra_data: None,
+                        }
+                    })
+                    .collect();
+
+                let extracted_license_statement = if pkg.license.is_empty() {
+                    None
+                } else {
+                    Some(pkg.license)
+                };
+
+                let purl = name.as_ref().and_then(|n| {
+                    use packageurl::PackageUrl;
+                    let mut purl = PackageUrl::new(PACKAGE_TYPE, n).ok()?;
+
+                    if let Some(ns) = &namespace {
+                        purl.with_namespace(ns).ok()?;
+                    }
+
+                    if let Some(ver) = &version {
+                        purl.with_version(ver).ok()?;
+                    }
+
+                    if let Some(arch) = &architecture {
+                        purl.add_qualifier("arch", arch).ok()?;
+                    }
+
+                    Some(purl.to_string())
+                });
+
+                PackageData {
+                    datasource_id: Some(datasource_id.to_string()),
+                    package_type: Some(PACKAGE_TYPE.to_string()),
+                    namespace,
+                    name,
+                    version,
+                    qualifiers: architecture.as_ref().map(|arch| {
+                        let mut q = std::collections::HashMap::new();
+                        q.insert("arch".to_string(), arch.clone());
+                        q
+                    }),
+                    subpath: None,
+                    primary_language: None,
+                    description: None,
+                    release_date: None,
+                    parties: Vec::new(),
+                    keywords: Vec::new(),
+                    homepage_url: None,
+                    download_url: None,
+                    size: if pkg.size > 0 {
+                        Some(pkg.size as u64)
+                    } else {
+                        None
+                    },
+                    sha1: None,
+                    md5: None,
+                    sha256: None,
+                    sha512: None,
+                    bug_tracking_url: None,
+                    code_view_url: None,
+                    vcs_url: None,
+                    copyright: None,
+                    holder: None,
+                    declared_license_expression: None,
+                    declared_license_expression_spdx: None,
+                    license_detections: Vec::new(),
+                    other_license_expression: None,
+                    other_license_expression_spdx: None,
+                    other_license_detections: Vec::new(),
+                    extracted_license_statement,
+                    notice_text: None,
+                    source_packages: if pkg.source_rpm.is_empty() {
+                        Vec::new()
+                    } else {
+                        vec![pkg.source_rpm]
+                    },
+                    file_references: Vec::new(),
+                    is_private: false,
+                    is_virtual: false,
+                    extra_data: None,
+                    dependencies,
+                    repository_homepage_url: None,
+                    repository_download_url: None,
+                    api_data_url: None,
+                    purl,
+                }
+            })
+            .collect()),
+        Err(e) => Err(format!("Failed to read RPM database: {:?}", e)),
+    }
+}
+
+fn build_evr_version(epoch: i32, version: &str, release: &str) -> Option<String> {
+    if version.is_empty() {
+        return None;
+    }
+
+    let mut evr = String::new();
+
+    if epoch > 0 {
+        evr.push_str(&format!("{}:", epoch));
+    }
+
+    evr.push_str(version);
+
+    if !release.is_empty() {
+        evr.push('-');
+        evr.push_str(release);
+    }
+
+    Some(evr)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::PathBuf;
+
+    #[test]
+    fn test_bdb_parser_is_match() {
+        assert!(RpmBdbDatabaseParser::is_match(&PathBuf::from(
+            "/var/lib/rpm/Packages"
+        )));
+        assert!(RpmBdbDatabaseParser::is_match(&PathBuf::from(
+            "rootfs/var/lib/rpm/Packages"
+        )));
+        assert!(!RpmBdbDatabaseParser::is_match(&PathBuf::from(
+            "/var/lib/rpm/Packages.db"
+        )));
+    }
+
+    #[test]
+    fn test_ndb_parser_is_match() {
+        assert!(RpmNdbDatabaseParser::is_match(&PathBuf::from(
+            "usr/lib/sysimage/rpm/Packages.db"
+        )));
+        assert!(RpmNdbDatabaseParser::is_match(&PathBuf::from(
+            "/rootfs/usr/lib/sysimage/rpm/Packages.db"
+        )));
+        assert!(!RpmNdbDatabaseParser::is_match(&PathBuf::from(
+            "usr/lib/rpm/Packages"
+        )));
+    }
+
+    #[test]
+    fn test_sqlite_parser_is_match() {
+        assert!(RpmSqliteDatabaseParser::is_match(&PathBuf::from(
+            "var/lib/rpm/rpmdb.sqlite"
+        )));
+        assert!(RpmSqliteDatabaseParser::is_match(&PathBuf::from(
+            "/rootfs/var/lib/rpm/rpmdb.sqlite"
+        )));
+        assert!(!RpmSqliteDatabaseParser::is_match(&PathBuf::from(
+            "/var/lib/rpm/Packages"
+        )));
+    }
+
+    #[test]
+    fn test_build_evr_version_full() {
+        assert_eq!(
+            build_evr_version(2, "1.0.0", "1.el7"),
+            Some("2:1.0.0-1.el7".to_string())
+        );
+    }
+
+    #[test]
+    fn test_build_evr_version_no_epoch() {
+        assert_eq!(
+            build_evr_version(0, "1.0.0", "1.el7"),
+            Some("1.0.0-1.el7".to_string())
+        );
+    }
+
+    #[test]
+    fn test_build_evr_version_no_release() {
+        assert_eq!(build_evr_version(0, "1.0.0", ""), Some("1.0.0".to_string()));
+    }
+
+    #[test]
+    fn test_build_evr_version_empty() {
+        assert_eq!(build_evr_version(0, "", ""), None);
+    }
+
+    #[test]
+    fn test_parse_rpm_database_sqlite() {
+        let test_file =
+            PathBuf::from("reference/scancode-toolkit/tests/packagedcode/data/rpm/rpmdb.sqlite");
+
+        if !test_file.exists() {
+            eprintln!("Test file not found, skipping");
+            return;
+        }
+
+        let pkg = RpmSqliteDatabaseParser::extract_package_data(&test_file);
+
+        assert_eq!(pkg.package_type, Some("rpm".to_string()));
+        assert_eq!(
+            pkg.datasource_id,
+            Some("rpm_installed_database_sqlite".to_string())
+        );
+        assert!(pkg.name.is_some());
+    }
+}

@@ -1,0 +1,104 @@
+[
+  {
+    "type": "deb",
+    "namespace": "ubuntu",
+    "name": "adduser",
+    "version": "3.112ubuntu1",
+    "qualifiers": {
+      "arch": "all"
+    },
+    "description": "add and remove users and groups\n This package includes the 'adduser' and 'deluser' commands for creating\n and removing users.\n .\n  - 'adduser' creates new users and groups and adds existing users to\n    existing groups;\n  - 'deluser' removes users and groups and removes users from a given\n    group.\n .\n Adding users with 'adduser' is much easier than adding them manually.\n Adduser will choose appropriate UID and GID values, create a home\n directory, copy skeletal user configuration, and automate setting\n initial values for the user's password, real name and so on.\n .\n Deluser can back up and remove users' home directories\n and mail spool or all the files they own on the system.\n .\n A custom script can be executed after each of the commands.\n .\n  Development mailing list:\n    http://lists.alioth.debian.org/mailman/listinfo/adduser-devel/",
+    "parties": [
+      {
+        "type": "person",
+        "role": "maintainer",
+        "name": "Ubuntu Core Developers",
+        "email": "ubuntu-devel-discuss@lists.ubuntu.com"
+      }
+    ],
+    "keywords": [
+      "admin"
+    ],
+    "homepage_url": "http://alioth.debian.org/projects/adduser/",
+    "extra_data": {
+      "installed_size": 884
+    },
+    "dependencies": [
+      {
+        "purl": "pkg:deb/ubuntu/perl-base",
+        "extracted_requirement": ">= 5.6.0",
+        "scope": "depends",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:deb/ubuntu/passwd",
+        "extracted_requirement": ">= 1:4.0.12",
+        "scope": "depends",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:deb/ubuntu/debconf",
+        "scope": "depends",
+        "is_runtime": true,
+        "is_optional": true,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:deb/ubuntu/debconf-2.0",
+        "scope": "depends",
+        "is_runtime": true,
+        "is_optional": true,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:deb/ubuntu/liblocale-gettext-perl",
+        "scope": "suggests",
+        "is_runtime": true,
+        "is_optional": true,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:deb/ubuntu/perl-modules",
+        "scope": "suggests",
+        "is_runtime": true,
+        "is_optional": true,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:deb/ubuntu/ecryptfs-utils",
+        "extracted_requirement": ">= 67-1",
+        "scope": "suggests",
+        "is_runtime": true,
+        "is_optional": true,
+        "is_pinned": false,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:deb/ubuntu/manpages-it",
+        "extracted_requirement": "<< 0.3.4-2",
+        "scope": "replaces",
+        "is_runtime": false,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:deb/ubuntu/manpages-pl",
+        "extracted_requirement": "<= 20051117-1",
+        "scope": "replaces",
+        "is_runtime": false,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true
+      }
+    ],
+    "datasource_id": "debian_deb",
+    "purl": "pkg:deb/ubuntu/adduser@3.112ubuntu1?arch=all"
+  }
+]
