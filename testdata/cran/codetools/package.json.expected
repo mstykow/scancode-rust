@@ -1,0 +1,96 @@
+[
+  {
+    "type": "cran",
+    "namespace": null,
+    "name": "codetools",
+    "version": "0.2-16",
+    "qualifiers": {},
+    "subpath": null,
+    "primary_language": null,
+    "description": "Code analysis tools for R.",
+    "release_date": null,
+    "parties": [
+      {
+        "type": null,
+        "role": "maintainer",
+        "name": "Luke Tierney",
+        "email": "luke-tierney@uiowa.edu",
+        "url": null
+      },
+      {
+        "type": null,
+        "role": "author",
+        "name": "Luke Tierney",
+        "email": "luke-tierney@uiowa.edu",
+        "url": null
+      }
+    ],
+    "keywords": [],
+    "homepage_url": null,
+    "download_url": null,
+    "size": null,
+    "sha1": null,
+    "md5": null,
+    "sha256": null,
+    "sha512": null,
+    "bug_tracking_url": null,
+    "code_view_url": null,
+    "vcs_url": null,
+    "copyright": null,
+    "holder": null,
+    "declared_license_expression": "gpl-1.0-plus",
+    "declared_license_expression_spdx": "GPL-1.0-or-later",
+    "license_detections": [
+      {
+        "license_expression": "gpl-1.0-plus",
+        "license_expression_spdx": "GPL-1.0-or-later",
+        "matches": [
+          {
+            "license_expression": "gpl-1.0-plus",
+            "license_expression_spdx": "GPL-1.0-or-later",
+            "from_file": null,
+            "start_line": 1,
+            "end_line": 1,
+            "matcher": "1-hash",
+            "score": 50.0,
+            "matched_length": 1,
+            "match_coverage": 100.0,
+            "rule_relevance": 50,
+            "rule_identifier": "gpl_bare_word_only.RULE",
+            "rule_url": "https://github.com/nexB/scancode-toolkit/tree/develop/src/licensedcode/data/rules/gpl_bare_word_only.RULE",
+            "matched_text": "GPL"
+          }
+        ],
+        "identifier": "gpl_1_0_plus-473308ff-72ce-7e72-b3a9-5b1cc6680abb"
+      }
+    ],
+    "other_license_expression": null,
+    "other_license_expression_spdx": null,
+    "other_license_detections": [],
+    "extracted_license_statement": "GPL",
+    "notice_text": null,
+    "source_packages": [],
+    "file_references": [],
+    "is_private": false,
+    "is_virtual": false,
+    "extra_data": {},
+    "dependencies": [
+      {
+        "purl": "pkg:cran/R",
+        "extracted_requirement": ">= 2.1",
+        "scope": "dependencies",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true,
+        "resolved_package": {},
+        "extra_data": {}
+      }
+    ],
+    "repository_homepage_url": "https://cran.r-project.org/package=codetools",
+    "repository_download_url": null,
+    "api_data_url": null,
+    "datasource_id": "cran_description",
+    "purl": "pkg:cran/codetools@0.2-16"
+  }
+]
