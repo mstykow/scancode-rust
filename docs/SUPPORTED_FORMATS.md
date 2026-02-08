@@ -39,5 +39,5 @@ scancode-rust supports **33** package formats across 11 ecosystems.
 | Poetry lockfile | `**/poetry.lock` | pypi | Python | [Link](https://python-poetry.org/docs/basic-usage/#installing-with-poetrylock) |
 | Python package manifests (pyproject.toml, setup.py, setup.cfg, PKG-INFO, METADATA, .whl, .egg) | `**/pyproject.toml, **/setup.py, **/setup.cfg, **/PKG-INFO, **/METADATA, **/*.whl, **/*.egg` | pypi | Python | [Link](https://packaging.python.org/) |
 | pip requirements file | `**/requirements*.txt, **/requirements*.in, **/requirements/*.txt` | pypi | Python | [Link](https://pip.pypa.io/en/latest/reference/requirements-file-format/) |
+| Swift Package Manager manifest (Package.swift, Package.swift.json, Package.swift.deplock) | `**/Package.swift, **/Package.swift.json, **/Package.swift.deplock` | swift | Swift | [Link](https://docs.swift.org/package-manager/PackageDescription/PackageDescription.html) |
 | Swift Package.resolved lockfile | `**/Package.resolved, **/.package.resolved` | swift | Swift | [Link](https://docs.swift.org/package-manager/PackageDescription/PackageDescription.html#package-dependency) |
-| Swift Package.swift.json manifest (JSON dump of Package.swift) | `**/Package.swift.json, **/Package.swift.deplock` | swift | Swift | [Link](https://docs.swift.org/package-manager/PackageDescription/PackageDescription.html) |

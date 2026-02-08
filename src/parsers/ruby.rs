@@ -280,9 +280,12 @@ enum ParseState {
 }
 
 /// Parsed gem information from Gemfile.lock.
-/// Some fields are reserved for future use (.gemspec parser in Wave 2).
+///
+/// All fields are actively used:
+/// - `gem_type`, `remote`, `revision`, `ref_field`, `branch`, `tag`: Stored in extra_data for GIT/PATH/SVN sources
+/// - `name`, `version`, `platform`, `pinned`: Used for dependency PURL and metadata generation
+/// - `requirements`: Stored as extracted_requirement for version constraints
 #[derive(Debug, Clone, Default)]
-#[allow(dead_code)]
 struct GemInfo {
     name: String,
     version: Option<String>,
@@ -511,7 +514,7 @@ fn parse_gemfile_lock(content: &str) -> PackageData {
         api_data_url,
         download_url,
     ) = if let Some(ref pg) = primary_gem {
-        let urls = get_rubygems_urls(&pg.name, pg.version.as_deref(), None);
+        let urls = get_rubygems_urls(&pg.name, pg.version.as_deref(), pg.platform.as_deref());
         (
             Some(pg.name.clone()),
             pg.version.clone(),
