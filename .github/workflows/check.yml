@@ -1,4 +1,4 @@
-name: Code Check
+name: Quality Checks
 
 on:
   push:
@@ -12,8 +12,8 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  check:
-    name: Check
+  rust-check:
+    name: Rust Quality
     runs-on: ubuntu-latest
     if: |
       !(github.event_name == 'pull_request' && startsWith(github.head_ref, 'renovate/'))
@@ -41,3 +41,23 @@ jobs:
 
       - name: Run tests
         run: cargo test --all --verbose
+
+  docs-quality:
+    name: Documentation Quality
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Validate URLs
+        run: python3 scripts/validate_urls.py
+        continue-on-error: true
+
+      - name: Lint Markdown
+        run: npx --yes markdownlint-cli2
