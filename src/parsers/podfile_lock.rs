@@ -1,3 +1,24 @@
+//! Parser for CocoaPods Podfile.lock lockfiles.
+//!
+//! Extracts resolved dependency information from Podfile.lock files which maintain
+//! the exact versions of all dependencies used by a CocoaPods project.
+//!
+//! # Supported Formats
+//! - Podfile.lock (YAML-based lockfile with multiple sections)
+//!
+//! # Key Features
+//! - Direct vs transitive dependency tracking
+//! - Exact version resolution from lockfile
+//! - Pod source and repository information
+//! - Spec repository tracking
+//! - YAML multi-section aggregation (PODS, DEPENDENCIES, SPEC REPOS, PODFILE LOCK)
+//!
+//! # Implementation Notes
+//! - Uses YAML parsing via `serde_yaml` crate
+//! - All lockfile versions are pinned (`is_pinned: Some(true)`)
+//! - Data aggregation across PODS, DEPENDENCIES, and metadata sections
+//! - Graceful error handling with `warn!()` logs
+
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;

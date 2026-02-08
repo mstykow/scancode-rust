@@ -1,3 +1,26 @@
+//! Parser for CocoaPods .podspec manifest files.
+//!
+//! Extracts package metadata and dependencies from .podspec files which define
+//! CocoaPods package specifications using Ruby DSL syntax.
+//!
+//! # Supported Formats
+//! - *.podspec (CocoaPods package specification files)
+//! - .podspec files (same format, different naming convention)
+//!
+//! # Key Features
+//! - Metadata extraction (name, version, summary, description, license)
+//! - Author/contributor information parsing with email handling
+//! - Homepage and source repository URL extraction
+//! - Dependency declaration parsing with version constraints
+//! - Support for development dependencies
+//! - Regex-based Ruby DSL parsing (no full Ruby AST required)
+//!
+//! # Implementation Notes
+//! - Uses regex for pattern matching in Ruby DSL syntax
+//! - Supports multi-line string values and Ruby hash syntax
+//! - Dependency version constraints are parsed from DSL
+//! - Graceful error handling with `warn!()` logs on parse failures
+
 use std::fs;
 use std::path::Path;
 

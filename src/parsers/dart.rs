@@ -1,6 +1,24 @@
+//! Parser for Dart/Flutter pubspec.yaml and pubspec.lock files.
 //!
-//! Extracts package metadata and dependencies from Dart pubspec files.
+//! Extracts package metadata and dependencies from Dart/Flutter project manifest
+//! and lockfiles using YAML format.
 //!
+//! # Supported Formats
+//! - pubspec.yaml (Dart package manifest)
+//! - pubspec.lock (Dart package lockfile with pinned versions)
+//!
+//! # Key Features
+//! - Dependency extraction from dependencies and dev_dependencies sections
+//! - Direct vs transitive dependency tracking (lockfile)
+//! - Version constraint parsing for Dart's SemVer and range specifiers
+//! - Package URL (purl) generation for Pub packages
+//! - Author/maintainer and homepage extraction
+//!
+//! # Implementation Notes
+//! - Uses YAML parsing via `serde_yaml` crate
+//! - Lockfile versions are pinned (`is_pinned: Some(true)`)
+//! - Graceful error handling with `warn!()` logs
+//! - Supports both pub.dev and Git-hosted packages
 
 use std::fs;
 use std::path::Path;

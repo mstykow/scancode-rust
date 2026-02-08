@@ -1,3 +1,26 @@
+//! Parser for Gradle build files (Groovy and Kotlin DSL).
+//!
+//! Extracts dependencies from Gradle build scripts using a custom token-based
+//! lexer and recursive descent parser supporting both Groovy and Kotlin syntax.
+//!
+//! # Supported Formats
+//! - build.gradle (Groovy DSL)
+//! - build.gradle.kts (Kotlin DSL)
+//!
+//! # Key Features
+//! - Token-based lexer for Gradle syntax parsing (not full language parser)
+//! - Support for multiple dependency declaration styles
+//! - Dependency scope tracking (implementation, testImplementation, etc.)
+//! - Project dependency references and platform dependencies
+//! - Version interpolation and constraint parsing
+//! - Package URL (purl) generation for Maven packages
+//!
+//! # Implementation Notes
+//! - Custom 870-line lexer instead of external parser (smaller binary, easier maintenance)
+//! - Supports Groovy and Kotlin syntax variations
+//! - Graceful error handling with `warn!()` logs
+//! - Direct dependency tracking (all in build file are direct)
+
 use std::fs;
 use std::path::Path;
 

@@ -145,7 +145,7 @@ fn extract_from_rfc822_metadata(path: &Path, datasource_id: &str) -> PackageData
         }
     };
 
-    let metadata = parse_rfc822_metadata(&content);
+    let metadata = super::rfc822::parse_rfc822_content(&content);
     build_package_data_from_rfc822(&metadata, datasource_id)
 }
 
@@ -253,7 +253,7 @@ fn extract_from_wheel_archive(path: &Path) -> PackageData {
         }
     };
 
-    let mut package_data = parse_rfc822_content(&content, "pypi_wheel");
+    let mut package_data = python_parse_rfc822_content(&content, "pypi_wheel");
 
     let (size, sha256) = calculate_file_checksums(path);
     package_data.size = size;
@@ -353,7 +353,7 @@ fn extract_from_egg_archive(path: &Path) -> PackageData {
         }
     };
 
-    let mut package_data = parse_rfc822_content(&content, "pypi_egg");
+    let mut package_data = python_parse_rfc822_content(&content, "pypi_egg");
 
     let (size, sha256) = calculate_file_checksums(path);
     package_data.size = size;
@@ -632,71 +632,21 @@ fn build_egg_purl(name: Option<&str>, version: Option<&str>) -> Option<String> {
     Some(package_url.to_string())
 }
 
-fn parse_rfc822_content(content: &str, datasource_id: &str) -> PackageData {
-    let metadata = parse_rfc822_metadata(content);
+fn python_parse_rfc822_content(content: &str, datasource_id: &str) -> PackageData {
+    let metadata = super::rfc822::parse_rfc822_content(content);
     build_package_data_from_rfc822(&metadata, datasource_id)
-}
-
-struct Rfc822Metadata {
-    headers: HashMap<String, Vec<String>>,
-    body: String,
-}
-
-fn parse_rfc822_metadata(content: &str) -> Rfc822Metadata {
-    let mut headers: HashMap<String, Vec<String>> = HashMap::new();
-    let mut current_name: Option<String> = None;
-    let mut current_value = String::new();
-    let mut body_lines: Vec<String> = Vec::new();
-    let mut in_headers = true;
-
-    for line in content.lines() {
-        if in_headers {
-            if line.is_empty() {
-                if let Some(name) = current_name.take() {
-                    add_header_value(&mut headers, &name, &current_value);
-                    current_value.clear();
-                }
-                in_headers = false;
-                continue;
-            }
-
-            if line.starts_with(' ') || line.starts_with('\t') {
-                if !current_value.is_empty() {
-                    current_value.push(' ');
-                }
-                current_value.push_str(line.trim_start());
-                continue;
-            }
-
-            if let Some(name) = current_name.take() {
-                add_header_value(&mut headers, &name, &current_value);
-                current_value.clear();
-            }
-
-            if let Some((name, value)) = line.split_once(':') {
-                current_name = Some(name.trim().to_ascii_lowercase());
-                current_value = value.trim_start().to_string();
-            }
-        } else {
-            body_lines.push(line.to_string());
-        }
-    }
-
-    if let Some(name) = current_name.take() {
-        add_header_value(&mut headers, &name, &current_value);
-    }
-
-    let mut body = body_lines.join("\n");
-    body = body.trim_end_matches(['\n', '\r']).to_string();
-
-    Rfc822Metadata { headers, body }
 }
 
 /// Builds PackageData from parsed RFC822 metadata.
 ///
 /// This is the shared implementation for both `extract_from_rfc822_metadata` (file-based)
-/// and `parse_rfc822_content` (content-based) functions.
-fn build_package_data_from_rfc822(metadata: &Rfc822Metadata, datasource_id: &str) -> PackageData {
+/// and `python_parse_rfc822_content` (content-based) functions.
+fn build_package_data_from_rfc822(
+    metadata: &super::rfc822::Rfc822Metadata,
+    datasource_id: &str,
+) -> PackageData {
+    use super::rfc822::{get_header_all, get_header_first};
+
     let name = get_header_first(&metadata.headers, "name");
     let version = get_header_first(&metadata.headers, "version");
     let summary = get_header_first(&metadata.headers, "summary");
@@ -883,31 +833,6 @@ fn build_package_data_from_rfc822(metadata: &Rfc822Metadata, datasource_id: &str
         datasource_id: Some(datasource_id.to_string()),
         purl,
     }
-}
-
-fn add_header_value(headers: &mut HashMap<String, Vec<String>>, name: &str, value: &str) {
-    let entry = headers.entry(name.to_string()).or_default();
-    let trimmed = value.trim_end();
-    if !trimmed.is_empty() {
-        entry.push(trimmed.to_string());
-    }
-}
-
-fn get_header_first(headers: &HashMap<String, Vec<String>>, name: &str) -> Option<String> {
-    headers
-        .get(&name.to_ascii_lowercase())
-        .and_then(|values| values.first())
-        .map(|value| value.trim().to_string())
-}
-
-fn get_header_all(headers: &HashMap<String, Vec<String>>, name: &str) -> Vec<String> {
-    headers
-        .get(&name.to_ascii_lowercase())
-        .cloned()
-        .unwrap_or_default()
-        .into_iter()
-        .filter(|value| !value.trim().is_empty())
-        .collect()
 }
 
 fn parse_project_urls(project_urls: &[String]) -> Vec<(String, String)> {

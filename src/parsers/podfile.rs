@@ -1,3 +1,24 @@
+//! Parser for CocoaPods Podfile manifest files.
+//!
+//! Extracts dependency declarations from Podfile using regex-based Ruby Domain-Specific
+//! Language (DSL) parsing without full Ruby AST parsing.
+//!
+//! # Supported Formats
+//! - Podfile (CocoaPods manifest with Ruby DSL syntax)
+//!
+//! # Key Features
+//! - Regex-based Ruby DSL parsing for dependency declarations
+//! - Support for git, path, and source dependencies
+//! - Pod groups and target-specific dependencies
+//! - Version constraint parsing (exact, ranges, pessimistic)
+//! - Source URL extraction for custom pod repositories
+//!
+//! # Implementation Notes
+//! - Uses regex for pattern matching (not full Ruby parser)
+//! - Supports syntax: `pod 'Name', 'version'`, `pod 'Name', :git => 'url'`
+//! - Local path dependencies (`:path =>`) are tracked as dependencies
+//! - Graceful error handling with `warn!()` logs
+
 use std::fs;
 use std::path::Path;
 

@@ -1,3 +1,24 @@
+//! Parser for Poetry poetry.lock lockfiles.
+//!
+//! Extracts resolved dependency information from Poetry lockfiles which use TOML format
+//! to store resolved versions and metadata for Python dependencies.
+//!
+//! # Supported Formats
+//! - poetry.lock (TOML-based lockfile with package metadata)
+//!
+//! # Key Features
+//! - Direct vs transitive dependency tracking via `is_direct` flag
+//! - Dependency groups support (main, dev, etc.) via scope field
+//! - Dependency resolution with exact versions
+//! - Package URL (purl) generation for PyPI packages
+//! - Extra dependencies and optional package handling
+//!
+//! # Implementation Notes
+//! - Uses TOML parsing via `toml` crate
+//! - All lockfile versions are pinned (`is_pinned: Some(true)`)
+//! - Graceful error handling with `warn!()` logs
+//! - Integrates with Python parser utilities for PyPI URL building
+
 use std::collections::HashMap;
 use std::path::Path;
 

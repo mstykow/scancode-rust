@@ -31,7 +31,7 @@ use crate::parsers::utils::create_default_package_data;
 /// Parser for OCaml OPAM package manifest files.
 ///
 /// Handles the OPAM file format used by the OCaml package manager.
-/// Reference: https://opam.ocaml.org/doc/Manual.html#Common-file-format
+/// Reference: <https://opam.ocaml.org/doc/Manual.html#Common-file-format>
 pub struct OpamParser;
 
 impl crate::parsers::PackageParser for OpamParser {

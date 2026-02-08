@@ -1,3 +1,25 @@
+//! Parser for Yarn yarn.lock lockfiles.
+//!
+//! Extracts resolved dependency information from Yarn lockfiles supporting both
+//! Yarn Classic (v1) and Yarn Berry (v2+) formats with different syntax and structures.
+//!
+//! # Supported Formats
+//! - yarn.lock (Classic v1 format - key-value style)
+//! - yarn.lock (Berry v2+ format - YAML-like structure with different key format)
+//!
+//! # Key Features
+//! - Multi-format support for Yarn Classic and Berry versions
+//! - Direct vs transitive dependency tracking (`is_direct`)
+//! - Integrity hash extraction (sha1, sha512, sha256)
+//! - Package URL (purl) generation for scoped and unscoped packages
+//! - Workspace and monorepo dependency resolution
+//!
+//! # Implementation Notes
+//! - v1 format: `"@scope/name@version"` keys with nested `version` and `integrity` fields
+//! - v2+ format: Similar structure but different key generation with workspace awareness
+//! - All lockfile versions are pinned (`is_pinned: Some(true)`)
+//! - Graceful error handling with `warn!()` logs
+
 use crate::models::{Dependency, PackageData, ResolvedPackage};
 use crate::parsers::utils::{npm_purl, parse_sri};
 use log::warn;

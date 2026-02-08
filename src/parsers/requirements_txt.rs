@@ -1,3 +1,27 @@
+//! Parser for pip requirements.txt files.
+//!
+//! Extracts Python package dependencies from requirements.txt files using PEP 508
+//! specification parsing with support for includes, environment markers, and URLs.
+//!
+//! # Supported Formats
+//! - requirements.txt (pip dependency specification files)
+//! - Supports includes: `-r requirements.txt`, `-c constraints.txt`
+//! - Supports markers: `package; python_version >= '3.6'`
+//! - Supports VCS refs: `git+https://...`, `git+ssh://...`
+//!
+//! # Key Features
+//! - PEP 508 requirement parsing with environment marker evaluation
+//! - Recursive file inclusion support (`-r` and `-c` directives)
+//! - VCS/URL dependency detection and handling
+//! - Package URL (purl) generation for PyPI packages
+//! - Line comment handling and continuation lines
+//!
+//! # Implementation Notes
+//! - Uses PEP 508 parser from `pep508` module
+//! - Recursively resolves included files relative to parent file
+//! - Comments (lines starting with `#`) are skipped
+//! - Environment markers are preserved for dependency filtering
+
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};

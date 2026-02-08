@@ -1,12 +1,29 @@
-//! Conda package manager parser
+//! Parser for Conda/Anaconda package manifest files.
 //!
-//! Handles Conda ecosystem manifests:
-//! - meta.yaml - Conda recipe metadata (with Jinja2 templating)
-//! - conda.yaml/environment.yml - Environment dependency files
+//! Extracts package metadata and dependencies from Conda ecosystem manifest files
+//! supporting both recipe definitions and environment specifications.
 //!
-//! References:
-//! - https://docs.conda.io/projects/conda-build/en/latest/resources/define-metadata.html
-//! - https://docs.conda.io/projects/conda/en/latest/user-guide/tasks/manage-environments.html
+//! # Supported Formats
+//! - meta.yaml (Conda recipe metadata with Jinja2 templating support)
+//! - conda.yaml/environment.yml (Conda environment dependency specifications)
+//!
+//! # Key Features
+//! - YAML parsing for environment files
+//! - Dependency extraction from dependencies and build_requirements sections
+//! - Channel specification and platform detection
+//! - Version constraint parsing for Conda version specifiers
+//! - Package URL (purl) generation for conda packages
+//! - Limited meta.yaml support (note: Jinja2 templating not fully resolved)
+//!
+//! # Implementation Notes
+//! - Uses YAML parsing via `serde_yaml` crate
+//! - meta.yaml: Jinja2 templates not evaluated (use rendered YAML if available)
+//! - environment.yml: Full dependency specification support
+//! - Graceful error handling with `warn!()` logs
+//!
+//! # References
+//! - <https://docs.conda.io/projects/conda-build/en/latest/resources/define-metadata.html>
+//! - <https://docs.conda.io/projects/conda/en/latest/user-guide/tasks/manage-environments.html>
 
 use std::collections::HashMap;
 use std::fs;
