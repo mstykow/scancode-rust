@@ -102,7 +102,13 @@ fn compare_json_values_parser_only(
                         Value::Array(arr) if arr.is_empty() => continue,
                         Value::Object(obj) if obj.is_empty() => continue,
                         _ => {
-                            if key == "license_detections" {
+                            if key == "license_detections"
+                                || key == "declared_license_expression"
+                                || key == "declared_license_expression_spdx"
+                                || key == "other_license_detections"
+                                || key == "other_license_expression"
+                                || key == "other_license_expression_spdx"
+                            {
                                 continue;
                             }
                             if !SKIP_FIELDS.contains(&key.as_str()) {

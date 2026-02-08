@@ -1,0 +1,115 @@
+[
+  {
+    "type": "haxe",
+    "namespace": null,
+    "name": "haxelib",
+    "version": "3.4.0",
+    "qualifiers": {},
+    "subpath": null,
+    "primary_language": "Haxe",
+    "description": "The haxelib client",
+    "release_date": null,
+    "parties": [
+      {
+        "type": "person",
+        "role": "contributor",
+        "name": "back2dos",
+        "email": null,
+        "url": "https://lib.haxe.org/u/back2dos"
+      },
+      {
+        "type": "person",
+        "role": "contributor",
+        "name": "ncannasse",
+        "email": null,
+        "url": "https://lib.haxe.org/u/ncannasse"
+      },
+      {
+        "type": "person",
+        "role": "contributor",
+        "name": "jason",
+        "email": null,
+        "url": "https://lib.haxe.org/u/jason"
+      },
+      {
+        "type": "person",
+        "role": "contributor",
+        "name": "Simn",
+        "email": null,
+        "url": "https://lib.haxe.org/u/Simn"
+      },
+      {
+        "type": "person",
+        "role": "contributor",
+        "name": "nadako",
+        "email": null,
+        "url": "https://lib.haxe.org/u/nadako"
+      },
+      {
+        "type": "person",
+        "role": "contributor",
+        "name": "andyli",
+        "email": null,
+        "url": "https://lib.haxe.org/u/andyli"
+      }
+    ],
+    "keywords": [
+      "haxelib",
+      "core"
+    ],
+    "homepage_url": "https://lib.haxe.org/documentation/",
+    "download_url": "https://lib.haxe.org/p/haxelib/3.4.0/download/",
+    "size": null,
+    "sha1": null,
+    "md5": null,
+    "sha256": null,
+    "sha512": null,
+    "bug_tracking_url": null,
+    "code_view_url": null,
+    "vcs_url": null,
+    "copyright": null,
+    "holder": null,
+    "declared_license_expression": "gpl-1.0-plus",
+    "declared_license_expression_spdx": "GPL-1.0-or-later",
+    "license_detections": [
+      {
+        "license_expression": "gpl-1.0-plus",
+        "license_expression_spdx": "GPL-1.0-or-later",
+        "matches": [
+          {
+            "license_expression": "gpl-1.0-plus",
+            "license_expression_spdx": "GPL-1.0-or-later",
+            "from_file": null,
+            "start_line": 1,
+            "end_line": 1,
+            "matcher": "1-hash",
+            "score": 50.0,
+            "matched_length": 1,
+            "match_coverage": 100.0,
+            "rule_relevance": 50,
+            "rule_identifier": "gpl_bare_word_only.RULE",
+            "rule_url": "https://github.com/nexB/scancode-toolkit/tree/develop/src/licensedcode/data/rules/gpl_bare_word_only.RULE",
+            "matched_text": "GPL"
+          }
+        ],
+        "identifier": "gpl_1_0_plus-473308ff-72ce-7e72-b3a9-5b1cc6680abb"
+      }
+    ],
+    "other_license_expression": null,
+    "other_license_expression_spdx": null,
+    "other_license_detections": [],
+    "extracted_license_statement": "GPL",
+    "notice_text": null,
+    "source_packages": [],
+    "file_references": [],
+    "is_private": false,
+    "is_virtual": false,
+    "extra_data": {},
+    "dependencies": [],
+    "repository_homepage_url": "https://lib.haxe.org/p/haxelib",
+    "repository_download_url": "https://lib.haxe.org/p/haxelib/3.4.0/download/",
+    "api_data_url": null,
+    "datasource_id": "haxelib_json",
+    "purl": "pkg:haxe/haxelib@3.4.0"
+  }
+]

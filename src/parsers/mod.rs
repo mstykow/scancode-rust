@@ -27,6 +27,11 @@ mod gradle_golden_test;
 mod gradle_lock;
 #[cfg(test)]
 mod gradle_lock_test;
+mod haxe;
+#[cfg(test)]
+mod haxe_golden_test;
+#[cfg(test)]
+mod haxe_test;
 mod maven;
 #[cfg(test)]
 mod maven_test;
@@ -162,6 +167,7 @@ pub use self::dart::{PubspecLockParser, PubspecYamlParser};
 pub use self::go::{GoModParser, GoSumParser, GodepsParser};
 pub use self::gradle::GradleParser;
 pub use self::gradle_lock::GradleLockfileParser;
+pub use self::haxe::HaxeParser;
 pub use self::maven::MavenParser;
 pub use self::npm::NpmParser;
 pub use self::npm_lock::NpmLockParser;
@@ -225,6 +231,7 @@ define_parsers! {
     GodepsParser,
     GradleParser,
     GradleLockfileParser,
+    HaxeParser,
     PackagesConfigParser,
     NuspecParser,
     PackagesLockParser,
