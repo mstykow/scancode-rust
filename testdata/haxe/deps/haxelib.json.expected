@@ -1,0 +1,113 @@
+[
+  {
+    "type": "haxe",
+    "namespace": null,
+    "name": "selecthxml",
+    "version": "0.5.1",
+    "qualifiers": {},
+    "subpath": null,
+    "primary_language": "Haxe",
+    "description": "Allows type-safe CSS-style selection on Xml objects.",
+    "release_date": null,
+    "parties": [
+      {
+        "type": "person",
+        "role": "contributor",
+        "name": "simn",
+        "email": null,
+        "url": "https://lib.haxe.org/u/simn"
+      },
+      {
+        "type": "person",
+        "role": "contributor",
+        "name": "jason",
+        "email": null,
+        "url": "https://lib.haxe.org/u/jason"
+      }
+    ],
+    "keywords": [
+      "cross",
+      "xml",
+      "utility",
+      "css",
+      "macro"
+    ],
+    "homepage_url": "https://github.com/jasononeil/selecthxml",
+    "download_url": "https://lib.haxe.org/p/selecthxml/0.5.1/download/",
+    "size": null,
+    "sha1": null,
+    "md5": null,
+    "sha256": null,
+    "sha512": null,
+    "bug_tracking_url": null,
+    "code_view_url": null,
+    "vcs_url": null,
+    "copyright": null,
+    "holder": null,
+    "declared_license_expression": "bsd-new",
+    "declared_license_expression_spdx": "BSD-3-Clause",
+    "license_detections": [
+      {
+        "license_expression": "bsd-new",
+        "license_expression_spdx": "BSD-3-Clause",
+        "matches": [
+          {
+            "license_expression": "bsd-new",
+            "license_expression_spdx": "BSD-3-Clause",
+            "from_file": null,
+            "start_line": 1,
+            "end_line": 1,
+            "matcher": "1-hash",
+            "score": 99.0,
+            "matched_length": 2,
+            "match_coverage": 100.0,
+            "rule_relevance": 99,
+            "rule_identifier": "bsd-new_89.RULE",
+            "rule_url": "https://github.com/nexB/scancode-toolkit/tree/develop/src/licensedcode/data/rules/bsd-new_89.RULE",
+            "matched_text": "license BSD"
+          }
+        ],
+        "identifier": "bsd_new-261898a0-0118-87c4-7092-14e4ff134882"
+      }
+    ],
+    "other_license_expression": null,
+    "other_license_expression_spdx": null,
+    "other_license_detections": [],
+    "extracted_license_statement": "BSD",
+    "notice_text": null,
+    "source_packages": [],
+    "file_references": [],
+    "is_private": false,
+    "is_virtual": false,
+    "extra_data": {},
+    "dependencies": [
+      {
+        "purl": "pkg:haxe/tink_core",
+        "extracted_requirement": null,
+        "scope": null,
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true,
+        "resolved_package": {},
+        "extra_data": {}
+      },
+      {
+        "purl": "pkg:haxe/tink_macro@3.23",
+        "extracted_requirement": null,
+        "scope": null,
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": true,
+        "resolved_package": {},
+        "extra_data": {}
+      }
+    ],
+    "repository_homepage_url": "https://lib.haxe.org/p/selecthxml",
+    "repository_download_url": "https://lib.haxe.org/p/selecthxml/0.5.1/download/",
+    "api_data_url": null,
+    "datasource_id": "haxelib_json",
+    "purl": "pkg:haxe/selecthxml@0.5.1"
+  }
+]
