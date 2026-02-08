@@ -1,3 +1,24 @@
+//! Parser for Pipfile.lock lockfiles.
+//!
+//! Extracts resolved dependency information from Pipfile.lock files which store
+//! locked dependency versions for Python projects using pipenv.
+//!
+//! # Supported Formats
+//! - Pipfile.lock (JSON-based lockfile with per-environment dependency sections)
+//!
+//! # Key Features
+//! - Dependency extraction from default and develop sections
+//! - Direct dependency tracking (top-level locks are direct)
+//! - Exact version resolution with hash verification
+//! - Package URL (purl) generation for PyPI packages
+//! - Markers and extras dependency handling
+//!
+//! # Implementation Notes
+//! - Uses JSON parsing via `serde_json` and TOML for secondary parsing
+//! - All lockfile versions are pinned (`is_pinned: Some(true)`)
+//! - Graceful error handling with `warn!()` logs
+//! - Integrates with Python parser utilities for PyPI URL building
+
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;

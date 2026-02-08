@@ -1,11 +1,26 @@
-//! Parsers for Go ecosystem files (go.mod, go.sum, Godeps.json).
+//! Parser for Go ecosystem dependency files.
+//!
+//! Extracts package metadata and dependencies from Go module management files
+//! and legacy dependency tracking formats.
 //!
 //! # Supported Formats
-//! - go.mod (module manifest)
-//! - go.sum (checksum database)
-//! - Godeps.json (legacy dependency format)
+//! - go.mod (Go module manifest with dependencies and version constraints)
+//! - go.sum (Go module checksum database for verification)
+//! - Godeps.json (Legacy dependency format from godep tool)
 //!
-//! # PURL type: "golang"
+//! # Key Features
+//! - go.mod dependency extraction with version constraint parsing
+//! - Direct vs transitive dependency tracking from require/indirect fields
+//! - Checksum extraction from go.sum for integrity verification
+//! - Legacy Godeps.json support for older projects
+//! - Package URL (purl) generation for golang packages
+//! - Module path parsing and namespace detection
+//!
+//! # Implementation Notes
+//! - PURL type: "golang"
+//! - All dependencies are pinned in go.mod/go.sum (`is_pinned: Some(true)`)
+//! - Graceful error handling with `warn!()` logs
+//! - Supports Go 1.11+ module syntax
 
 use crate::models::{Dependency, PackageData};
 use log::warn;

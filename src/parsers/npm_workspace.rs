@@ -1,3 +1,21 @@
+//! Parser for npm/pnpm workspace configuration files.
+//!
+//! Extracts workspace package patterns and monorepo structure from workspace
+//! configuration files used by npm, yarn, and pnpm to define workspaces.
+//!
+//! # Supported Formats
+//! - pnpm-workspace.yaml (YAML workspace configuration)
+//!
+//! # Key Features
+//! - Workspace package pattern extraction (glob patterns for package locations)
+//! - Monorepo structure detection and documentation
+//! - Package discovery from workspace configurations
+//!
+//! # Implementation Notes
+//! - Parses YAML format for workspace field
+//! - Package patterns are glob expressions (e.g., `packages/*`, `@scoped/**`)
+//! - Returns package data representing the workspace configuration itself
+
 use crate::models::PackageData;
 use serde_yaml::Value;
 use std::fs;
