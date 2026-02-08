@@ -17,7 +17,7 @@ mod tests {
         assert!(SwiftManifestJsonParser::is_match(&PathBuf::from(
             "/some/path/Package.swift.deplock"
         )));
-        assert!(!SwiftManifestJsonParser::is_match(&PathBuf::from(
+        assert!(SwiftManifestJsonParser::is_match(&PathBuf::from(
             "/some/path/Package.swift"
         )));
         assert!(!SwiftManifestJsonParser::is_match(&PathBuf::from(
