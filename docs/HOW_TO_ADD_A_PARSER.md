@@ -328,7 +328,67 @@ pub use my_ecosystem::MyEcosystemParser;
 
 Find the parser registration section and add your parser to the appropriate collection.
 
-## Step 5: Validate Implementation
+## Step 5: Add Golden Tests (Optional but Recommended)
+
+Golden tests compare parser output against reference `.expected.json` files to catch regressions.
+
+### Generate Expected Output
+
+Use the test generator utility to create expected output files:
+
+```bash
+# List all available parser types
+cargo run --bin generate-test-expected --list
+
+# Generate expected output using parser struct name
+cargo run --bin generate-test-expected MyEcosystemParser \
+  testdata/<ecosystem>/sample.json \
+  testdata/<ecosystem>/sample.json.expected.json
+
+# Or use the convenience wrapper script
+./scripts/generate_test_expected.sh MyEcosystemParser \
+  testdata/<ecosystem>/sample.json \
+  testdata/<ecosystem>/sample.json.expected.json
+```
+
+**Auto-Discovery**: The generator automatically discovers ALL parsers registered in `src/parsers/mod.rs` via the `define_parsers!` macro. When you add your parser to that list, it becomes immediately available - no manual updates needed!
+
+### Create Golden Test File
+
+Create `src/parsers/<ecosystem>_golden_test.rs`:
+
+```rust
+#[cfg(test)]
+mod golden_tests {
+    use crate::parsers::PackageParser;
+    use crate::parsers::my_ecosystem::MyEcosystemParser;
+    use crate::test_utils::compare_package_data_parser_only;
+    use std::path::PathBuf;
+
+    #[test]
+    fn test_golden_basic() {
+        let test_file = PathBuf::from("testdata/<ecosystem>/basic.json");
+        let expected_file = PathBuf::from("testdata/<ecosystem>/basic.json.expected.json");
+
+        let package_data = MyEcosystemParser::extract_package_data(&test_file);
+
+        match compare_package_data_parser_only(&package_data, &expected_file) {
+            Ok(_) => (),
+            Err(e) => panic!("Golden test failed: {}", e),
+        }
+    }
+}
+```
+
+### Update Module Registration
+
+Add golden test module to `src/parsers/mod.rs`:
+
+```rust
+mod my_ecosystem_golden_test;
+```
+
+## Step 6: Validate Implementation
 
 ### Path A: Validation with Python Reference
 
@@ -353,6 +413,7 @@ cargo run -- testdata/<ecosystem>/ -o rust_output.json
 - [ ] Dependencies are equivalent
 - [ ] PURLs are correctly formatted
 - [ ] Edge cases handled
+- [ ] Golden tests pass (if added)
 
 ### Path B: Validation without Python Reference
 
@@ -386,8 +447,9 @@ If you followed Path B (new ecosystem):
 - [ ] PURLs follow purl-spec format
 - [ ] Output matches registry metadata
 - [ ] Edge cases from real projects handled
+- [ ] Golden tests pass (if added)
 
-## Step 6: Document Your Work
+## Step 7: Document Your Work
 
 ### Add Module Documentation
 
