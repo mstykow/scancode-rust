@@ -229,6 +229,32 @@ macro_rules! define_parsers {
             )*
             None
         }
+
+        /// Parses a file using a specific parser type by name.
+        ///
+        /// This is primarily used by test utilities to generate expected output files.
+        /// Pass the parser struct name (e.g., "NpmParser", "DebianDebParser").
+        ///
+        /// Returns None if the parser type name is not recognized.
+        #[allow(dead_code)]
+        pub fn parse_by_type_name(type_name: &str, path: &Path) -> Option<PackageData> {
+            match type_name {
+                $(
+                    stringify!($parser) => Some(<$parser>::extract_package_data(path)),
+                )*
+                _ => None
+            }
+        }
+
+        /// Lists all available parser type names for use with parse_by_type_name.
+        #[allow(dead_code)]
+        pub fn list_parser_types() -> Vec<&'static str> {
+            vec![
+                $(
+                    stringify!($parser),
+                )*
+            ]
+        }
     };
 }
 
