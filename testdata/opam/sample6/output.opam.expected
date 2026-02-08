@@ -1,0 +1,96 @@
+[
+  {
+    "type": "opam",
+    "namespace": null,
+    "name": null,
+    "version": null,
+    "qualifiers": {},
+    "subpath": null,
+    "primary_language": "Ocaml",
+    "description": "Library to make OCaml program act as a Windows service",
+    "release_date": null,
+    "parties": [
+      {
+        "type": "person",
+        "role": "author",
+        "name": "Romain Beauxis <toots@rastageeks.org>\"] license: \"GPL-2.0\" homepage: \"https://github.com/savonet/ocaml-winsvc\" bug-reports: \"https://github.com/savonet/ocaml-winsvc/issues\" depends: [ \"dune\" {> \"2.0\"}",
+        "email": null,
+        "url": null
+      },
+      {
+        "type": "person",
+        "role": "maintainer",
+        "name": null,
+        "email": "The Savonet Team <savonet-users@lists.sourceforge.net>",
+        "url": null
+      }
+    ],
+    "keywords": [],
+    "homepage_url": "https://github.com/savonet/ocaml-winsvc",
+    "download_url": "https://github.com/savonet/ocaml-winsvc/archive/v1.0.0.tar.gz",
+    "size": null,
+    "sha1": null,
+    "md5": "86d48dc11dd66adac6daadbecb5f6888",
+    "sha256": null,
+    "sha512": "30e208d35ed7eb30e90d5fd4f0dde3ff4f527155df90e2d9cffadec15513b65b72503fc223bd784203f2b9081f68bedd5a2b157ffb0b2d9b765546dac1094875",
+    "bug_tracking_url": "https://github.com/savonet/ocaml-winsvc/issues",
+    "code_view_url": null,
+    "vcs_url": "git+https://github.com/savonet/ocaml-winsvc.git",
+    "copyright": null,
+    "holder": null,
+    "declared_license_expression": "gpl-2.0",
+    "declared_license_expression_spdx": "GPL-2.0-only",
+    "license_detections": [
+      {
+        "license_expression": "gpl-2.0",
+        "license_expression_spdx": "GPL-2.0-only",
+        "matches": [
+          {
+            "license_expression": "gpl-2.0",
+            "license_expression_spdx": "GPL-2.0-only",
+            "from_file": null,
+            "start_line": 1,
+            "end_line": 1,
+            "matcher": "1-hash",
+            "score": 100.0,
+            "matched_length": 3,
+            "match_coverage": 100.0,
+            "rule_relevance": 100,
+            "rule_identifier": "gpl-2.0_52.RULE",
+            "rule_url": "https://github.com/nexB/scancode-toolkit/tree/develop/src/licensedcode/data/rules/gpl-2.0_52.RULE",
+            "matched_text": "GPL-2.0"
+          }
+        ],
+        "identifier": "gpl_2_0-d7f02717-086e-f71b-962e-b18cc23b1827"
+      }
+    ],
+    "other_license_expression": null,
+    "other_license_expression_spdx": null,
+    "other_license_detections": [],
+    "extracted_license_statement": "GPL-2.0",
+    "notice_text": null,
+    "source_packages": [],
+    "file_references": [],
+    "is_private": false,
+    "is_virtual": false,
+    "extra_data": {},
+    "dependencies": [
+      {
+        "purl": "pkg:opam/dune",
+        "extracted_requirement": "> 2.0",
+        "scope": "dependency",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true,
+        "resolved_package": {},
+        "extra_data": {}
+      }
+    ],
+    "repository_homepage_url": null,
+    "repository_download_url": null,
+    "api_data_url": null,
+    "datasource_id": "opam_file",
+    "purl": null
+  }
+]
