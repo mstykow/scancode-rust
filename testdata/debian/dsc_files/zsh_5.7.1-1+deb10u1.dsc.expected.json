@@ -1,0 +1,170 @@
+[
+  {
+    "type": "deb",
+    "namespace": "debian",
+    "name": "zsh",
+    "version": "5.7.1-1+deb10u1",
+    "parties": [
+      {
+        "role": "maintainer",
+        "name": "Debian Zsh Maintainers",
+        "email": "pkg-zsh-devel@lists.alioth.debian.org"
+      },
+      {
+        "role": "uploader",
+        "name": "Michael Prokop",
+        "email": "mika@debian.org"
+      },
+      {
+        "role": "uploader",
+        "name": "Axel Beckert",
+        "email": "abe@debian.org"
+      },
+      {
+        "role": "uploader",
+        "name": "Frank Terbeck",
+        "email": "ft@bewatermyfriend.org"
+      },
+      {
+        "role": "uploader",
+        "name": "Richard Hartmann",
+        "email": "richih@debian.org"
+      }
+    ],
+    "homepage_url": "https://www.zsh.org/",
+    "code_view_url": "https://salsa.debian.org/debian/zsh",
+    "vcs_url": "https://salsa.debian.org/debian/zsh.git -b debian",
+    "source_packages": [
+      "pkg:deb/debian/zsh"
+    ],
+    "extra_data": {
+      "standards_version": "4.3.0"
+    },
+    "dependencies": [
+      {
+        "purl": "pkg:deb/debian/bsdmainutils",
+        "scope": "build",
+        "is_runtime": false,
+        "is_optional": false,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:deb/debian/cm-super-minimal",
+        "scope": "build",
+        "is_runtime": false,
+        "is_optional": false,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:deb/debian/debhelper-compat",
+        "extracted_requirement": "= 12",
+        "scope": "build",
+        "is_runtime": false,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:deb/debian/dpkg-dev",
+        "extracted_requirement": ">= 1.16.2~",
+        "scope": "build",
+        "is_runtime": false,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:deb/debian/ghostscript",
+        "scope": "build",
+        "is_runtime": false,
+        "is_optional": false,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:deb/debian/groff",
+        "scope": "build",
+        "is_runtime": false,
+        "is_optional": false,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:deb/debian/groff-base",
+        "scope": "build",
+        "is_runtime": false,
+        "is_optional": false,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:deb/debian/libcap-dev",
+        "scope": "build",
+        "is_runtime": false,
+        "is_optional": false,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:deb/debian/libncursesw5-dev",
+        "scope": "build",
+        "is_runtime": false,
+        "is_optional": false,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:deb/debian/libpcre3-dev",
+        "scope": "build",
+        "is_runtime": false,
+        "is_optional": false,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:deb/debian/texinfo",
+        "extracted_requirement": ">= 5~",
+        "scope": "build",
+        "is_runtime": false,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:deb/debian/texlive-fonts-recommended",
+        "scope": "build",
+        "is_runtime": false,
+        "is_optional": false,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:deb/debian/texlive-latex-base",
+        "scope": "build",
+        "is_runtime": false,
+        "is_optional": false,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:deb/debian/texlive-latex-recommended",
+        "scope": "build",
+        "is_runtime": false,
+        "is_optional": false,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:deb/debian/yodl",
+        "extracted_requirement": ">= 3.08.01",
+        "scope": "build",
+        "is_runtime": false,
+        "is_optional": true,
+        "is_pinned": false,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:deb/debian/yodl",
+        "extracted_requirement": "<< 3.08.00",
+        "scope": "build",
+        "is_runtime": false,
+        "is_optional": true,
+        "is_pinned": false,
+        "is_direct": true
+      }
+    ],
+    "datasource_id": "debian_source_control_dsc",
+    "purl": "pkg:deb/debian/zsh@5.7.1-1%2Bdeb10u1?arch=any%20all"
+  }
+]

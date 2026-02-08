@@ -1,3 +1,5 @@
+mod alpine;
+mod alpine_golden_test;
 mod cargo;
 mod cargo_lock;
 #[cfg(test)]
@@ -26,6 +28,8 @@ mod dart;
 mod dart_golden_test;
 #[cfg(test)]
 mod dart_test;
+mod debian;
+mod debian_golden_test;
 mod go;
 #[cfg(test)]
 mod go_golden_test;
@@ -89,6 +93,10 @@ mod python_test;
 mod requirements_txt;
 #[cfg(test)]
 mod requirements_txt_test;
+pub(crate) mod rfc822;
+mod rpm_db;
+mod rpm_golden_test;
+mod rpm_parser;
 mod ruby;
 #[cfg(test)]
 mod ruby_golden_test;
@@ -172,6 +180,7 @@ pub trait PackageParser {
     fn is_match(path: &Path) -> bool;
 }
 
+pub use self::alpine::{AlpineApkParser, AlpineInstalledParser};
 pub use self::cargo::CargoParser;
 #[cfg_attr(not(test), allow(unused_imports))]
 pub use self::cargo_lock::CargoLockParser;
@@ -179,6 +188,11 @@ pub use self::composer::{ComposerJsonParser, ComposerLockParser};
 pub use self::conda::{CondaEnvironmentYmlParser, CondaMetaYamlParser};
 pub use self::cran::CranParser;
 pub use self::dart::{PubspecLockParser, PubspecYamlParser};
+pub use self::debian::{
+    DebianControlParser, DebianCopyrightParser, DebianDebParser, DebianDebianTarParser,
+    DebianDistrolessInstalledParser, DebianDscParser, DebianInstalledListParser,
+    DebianInstalledMd5sumsParser, DebianInstalledParser, DebianOrigTarParser,
+};
 pub use self::go::{GoModParser, GoSumParser, GodepsParser};
 pub use self::gradle::GradleParser;
 pub use self::gradle_lock::GradleLockfileParser;
@@ -198,6 +212,8 @@ pub use self::podspec_json::PodspecJsonParser;
 pub use self::poetry_lock::PoetryLockParser;
 pub use self::python::PythonParser;
 pub use self::requirements_txt::RequirementsTxtParser;
+pub use self::rpm_db::{RpmBdbDatabaseParser, RpmNdbDatabaseParser, RpmSqliteDatabaseParser};
+pub use self::rpm_parser::RpmParser;
 pub use self::ruby::{GemArchiveParser, GemfileLockParser, GemfileParser, GemspecParser};
 pub use self::swift_manifest_json::SwiftManifestJsonParser;
 pub use self::swift_resolved::SwiftPackageResolvedParser;
@@ -256,4 +272,20 @@ define_parsers! {
     NuspecParser,
     PackagesLockParser,
     NupkgParser,
+    DebianControlParser,
+    DebianInstalledParser,
+    DebianDistrolessInstalledParser,
+    DebianDscParser,
+    DebianOrigTarParser,
+    DebianDebianTarParser,
+    DebianInstalledListParser,
+    DebianInstalledMd5sumsParser,
+    DebianCopyrightParser,
+    DebianDebParser,
+    AlpineApkParser,
+    AlpineInstalledParser,
+    RpmParser,
+    RpmBdbDatabaseParser,
+    RpmNdbDatabaseParser,
+    RpmSqliteDatabaseParser,
 }

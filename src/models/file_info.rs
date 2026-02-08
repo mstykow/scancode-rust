@@ -139,7 +139,7 @@ impl FileInfo {
 /// Compatible with ScanCode Toolkit output format. Contains standardized package
 /// information including name, version, dependencies, licenses, and other metadata.
 /// This is the primary data structure returned by all parsers.
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct PackageData {
     #[serde(rename = "type")] // name used by ScanCode
     pub package_type: Option<String>,
