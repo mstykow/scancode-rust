@@ -2,6 +2,18 @@
 
 This guide provides essential information for AI coding agents working on the `scancode-rust` codebase - a high-performance Rust tool for detecting licenses, copyrights, and package metadata in source code.
 
+## Documentation Map
+
+**Finding Information Quickly:**
+
+- **Architecture & Design Decisions**: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) - System design, components, principles
+- **How-To Guides**: [`docs/HOW_TO_ADD_A_PARSER.md`](docs/HOW_TO_ADD_A_PARSER.md) - Step-by-step guide for adding new parsers
+- **Architectural Decision Records**: [`docs/adr/`](docs/adr/) - Why key decisions were made (5 ADRs)
+- **Beyond-Parity Features**: [`docs/improvements/`](docs/improvements/) - Where Rust exceeds Python (7 parsers documented)
+- **Supported Formats**: [`docs/SUPPORTED_FORMATS.md`](docs/SUPPORTED_FORMATS.md) - Auto-generated list of all supported package formats
+- **API Reference**: Run `cargo doc --open` - Complete API documentation
+- **This File**: Quick start, code style, common pitfalls
+
 ## Project Context
 
 **scancode-rust** is a complete rewrite of [ScanCode Toolkit](https://github.com/aboutcode-org/scancode-toolkit) in Rust, designed to be a **drop-in replacement** with all features and requirements of the original, but with less complexity, zero bugs, and Rust-specific optimizations. The original Python codebase is available as a reference submodule at `reference/scancode-toolkit/`.
@@ -74,22 +86,16 @@ cargo test test_is_match       # Runs all tests with "test_is_match" in name
 
 ## Project Architecture
 
-**Module Structure:**
+**High-Level Structure:**
 
-- `src/main.rs` - CLI entry point, orchestrates scanning workflow
-- `src/scanner/` - Core file system traversal and parallel processing
-- `src/parsers/` - Package manifest parsers (npm, Cargo, Maven, Python)
-- `src/models/` - Data structures for scan results and output format
-- `src/askalono/` - License detection using n-gram analysis
-- `src/utils/` - File operations, hashing, language detection, SPDX handling
+- `src/parsers/` - Package manifest parsers (trait-based, one per ecosystem)
+- `src/models/` - Core data structures (PackageData, Dependency, etc.)
+- `src/scanner/` - File system traversal and parallel processing
+- `src/main.rs` - CLI entry point
 
-**Key Design Patterns:**
+**Key Patterns**: Trait-based parsers, Result-based errors, parallel processing with rayon
 
-1. **Trait-Based Parsers**: All parsers implement `PackageParser` trait
-2. **Builder Pattern**: Complex structs (e.g., `FileInfo`) use derive_builder
-3. **Result-Based Errors**: Use `Result<T, E>` with `anyhow::Error` for error propagation
-4. **Parallel Processing**: Uses `rayon` for multi-threaded file scanning
-5. **Compile-Time Embedding**: License data embedded via `include_dir!` macro
+**For detailed architecture**: See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
 
 ## Code Style Guidelines
 
@@ -225,18 +231,27 @@ pub fn extract_package_data(path: &Path) -> PackageData {
 4. **Update mod.rs**: Add module declaration and public re-export
 5. **Add test data**: Place sample manifests in `testdata/<ecosystem>/`
 
-## Testing Conventions
+## Testing Strategy
 
-- **Co-located tests**: Use `#[cfg(test)] mod tests { ... }` in implementation files
-- **Separate test files**: For larger test suites, use `<module>_test.rs` pattern
-- **Test data**: Place in `testdata/` directory, organized by ecosystem
-- **Helper functions**: Create helpers for common test setup (e.g., `create_temp_file()`)
+scancode-rust uses a **four-layer testing approach** for comprehensive quality assurance:
+
+1. **Doctests** - API documentation examples that run as tests (verifies public API examples work)
+2. **Unit Tests** - Component-level tests for individual functions and edge cases
+3. **Golden Tests** - Regression tests comparing output against Python ScanCode reference
+4. **Integration Tests** - End-to-end tests validating the full scanner pipeline
+
+**For complete testing philosophy and guidelines**: See [`docs/TESTING_STRATEGY.md`](docs/TESTING_STRATEGY.md)
+
+### Quick Testing Reference
+
+**Co-located tests**: Use `#[cfg(test)] mod tests { ... }` in implementation files
+**Separate test files**: For larger suites, use `<module>_test.rs` and `<module>_golden_test.rs`
+**Test data**: Place in `testdata/` directory, organized by ecosystem
 
 ```rust
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::TempDir;
 
     #[test]
     fn test_parser_matches_correct_filename() {
@@ -368,41 +383,14 @@ Before considering a feature complete:
 
 ## Parser Implementation Guidelines
 
-When implementing or enhancing parsers, follow these principles to maintain feature parity with Python ScanCode Toolkit:
+**Comprehensive step-by-step guide**: [`docs/HOW_TO_ADD_A_PARSER.md`](docs/HOW_TO_ADD_A_PARSER.md)
 
-### Validation Against Python Reference
+### Key Principles
 
-All parsers should be validated against the Python reference implementation to ensure:
-
-1. **All fields extracted**: Every field the Python reference extracts is extracted by Rust
-2. **All dependency scopes**: All dependency types and scopes are supported
-3. **URL generation**: All generated URLs match Python's patterns
-4. **License handling**: SPDX normalization works correctly
-5. **Extra data**: All extra_data fields are populated
-6. **Edge cases**: All edge cases from Python tests are handled
-7. **Output compatibility**: JSON output is functionally equivalent
-
-### Rust Implementation Advantages
-
-While maintaining feature parity, leverage Rust's advantages:
-
-**Security**:
-
-- AST-only parsing for code files (no execution)
-- Archive size and compression ratio limits
-- Input validation and bounds checking
-
-**Data Quality**:
-
-- Extract additional metadata where beneficial
-- Fix known bugs from Python implementation
-- Handle edge cases more robustly
-
-**Performance**:
-
-- Use efficient parsers (quick-xml, TOML, serde_json)
-- Zero-copy parsing where possible
-- Maintain parallel processing compatibility
+1. **Feature parity**: Every field Python extracts, Rust must extract
+2. **Security first**: AST-only parsing, no code execution (see [ADR 0004](docs/adr/0004-security-first-parsing.md))
+3. **Beyond parity**: Fix bugs, implement TODOs (document in `docs/improvements/`)
+4. **Validation**: Golden tests against Python reference (see [ADR 0003](docs/adr/0003-golden-test-strategy.md))
 
 ## Dependency Scope Conventions
 
@@ -495,8 +483,3 @@ The `scope` field is intentionally **not standardized** across ecosystems. For c
 - **License detection**: Uses SPDX license data, threshold of 0.9 confidence
 - **Exclusion patterns**: Supports glob patterns (e.g., `*.git*`, `node_modules/*`)
 - **Git submodules**: Two submodules - `resources/licenses/` (SPDX data) and `reference/scancode-toolkit/` (original Python codebase for reference)
-
-## Useful References
-
-- README: `README.md` (user documentation)
-- Cargo manifest: `Cargo.toml` (dependencies and project config)
