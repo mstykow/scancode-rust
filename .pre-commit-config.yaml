@@ -22,3 +22,10 @@ repos:
     language: system
     pass_filenames: false
     files: ^src/parsers/.*\.rs$
+  
+  - id: markdown-lint
+    name: Lint markdown files with auto-fix
+    entry: bash -c 'npx --yes markdownlint-cli2 --fix "**/*.md" && git add -u :/*.md'
+    language: system
+    types: [markdown]
+    pass_filenames: false
