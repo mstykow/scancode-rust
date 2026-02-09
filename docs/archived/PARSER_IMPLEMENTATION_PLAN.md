@@ -1,6 +1,6 @@
 # Parser Implementation Plan: Achieving Full Feature Parity with ScanCode Toolkit
 
-> **⚠️ ARCHIVED DOCUMENT** - February 8, 2026
+> **⚠️ ARCHIVED DOCUMENT** - February 9, 2026
 >
 > This document served as a development roadmap and is now archived for historical reference.
 >
@@ -14,20 +14,120 @@
 >
 > ---
 >
-> **Original Status** (at time of archival): Active Development  
-> **Original Goal**: Implement all ScanCode Toolkit parsers (40+ ecosystems, 136+ formats) with Rust's safety and performance advantages
+> **Final Status** (at time of archival): 🟢 **Phase 1 Complete - 70+ Parsers Implemented**  
+> **Original Goal**: Implement all ScanCode Toolkit parsers (40+ ecosystems, 136+ formats) with Rust's safety and performance advantages  
+> **Achievement**: 70+ parsers across 24 ecosystems with multiple beyond-parity improvements
 
 ## Executive Summary
 
 This document outlines the comprehensive plan to achieve 100% parser feature parity between scancode-rust and ScanCode Toolkit.
 
-**Current Coverage**: npm, Python, Rust, Maven, Go, Dart, Composer, Ruby, NuGet, Gradle, Swift, CocoaPods, Debian, RPM, Alpine (42+ formats across 15 ecosystems)  
-**Target**: ScanCode Toolkit's full coverage (136+ formats across 40+ ecosystems)  
-**Goal**: Implement all remaining parsers while maintaining Rust's safety, performance, and code quality advantages over the original Python implementation.
+**Final Coverage** (Feb 9, 2026): npm, Python, Rust, Maven, Go, Dart, Composer, Ruby, NuGet, Gradle, Swift, CocoaPods, Debian, RPM, Alpine, Conda, CRAN, Conan, Haxe, OPAM, Bower, AboutCode, Chef, CPAN, FreeBSD, Autotools (70+ parsers across 24 ecosystems)  
+**Original Target**: ScanCode Toolkit's full coverage (136+ formats across 40+ ecosystems)  
+**Status**: Core ecosystems complete with production-ready quality
 
 ---
 
-## Recent Improvements (February 2026)
+## Latest Progress (February 9, 2026)
+
+### Phase 0.9: Missing Parsers Implementation (✅ Complete - Feb 9, 2026)
+
+**Status**: Wave 0-2 complete, 11 parsers added in single feature branch (`feat/missing-parsers`)
+
+#### Implemented Parsers (11 total, 17 new parser structs)
+
+**Wave 0 - Quick Fix (1 commit)**
+- ✅ Conan parsers registered (3 parsers: ConanFilePyParser, ConanfileTxtParser, ConanLockParser)
+
+**Wave 1 - Simple JSON/YAML (2 commits)**
+- ✅ BowerJsonParser (`bower.json`) - Legacy JavaScript package manager
+- ✅ AboutFileParser (`.ABOUT` files) - AboutCode metadata with purl parsing
+
+**Wave 2 - Medium Complexity (3 commits)**
+- ✅ ChefMetadataJsonParser (`metadata.json`) - Chef cookbook JSON manifest
+- ✅ FreebsdCompactManifestParser (`+COMPACT_MANIFEST`) - FreeBSD packages with complex license logic
+- ✅ AutotoolsConfigureParser (`configure`, `configure.ac`) - Unix build system (parent dir name extraction)
+
+**Wave 3 - Complex Parsers (3 commits)**
+- ✅ ChefMetadataRbParser (`metadata.rb`) - Chef Ruby DSL with line-based parsing
+- ✅ CPAN parsers (3 parsers: CpanMetaJsonParser, CpanMetaYmlParser, CpanManifestParser) - **BEYOND PARITY**
+- ⏳ JAR/WAR/EAR parser (deferred - high complexity, 8-12 hours)
+
+**Wave 4 - Build Systems (deferred)**
+- ⏳ Bazel BUILD parser (deferred - 5-7 hours)
+- ⏳ Buck parsers (deferred - 5-7 hours)
+
+#### Key Achievements
+
+**1. CPAN Beyond-Parity Implementation**
+
+Python ScanCode has stub-only handlers with no parse() method. Our implementation:
+- ✅ Full META.json parsing (CPAN::Meta::Spec v2.0+)
+- ✅ Full META.yml parsing (CPAN::Meta::Spec v1.4)
+- ✅ MANIFEST file list extraction
+- ✅ All 4 dependency scopes (runtime, build, test, configure)
+- ✅ Author party extraction with name/email parsing
+- ✅ Resource URL extraction (homepage, VCS, bug tracking)
+- ✅ Documented in `docs/improvements/cpan-parser.md`
+
+**2. Chef Ruby DSL Parser**
+
+Line-based token extraction without full Ruby parser:
+- ✅ Regex-based field extraction
+- ✅ Dependency parsing with version constraints
+- ✅ IO.read(...) expression skipping (can't evaluate Ruby)
+- ✅ Shared build_package() logic with JSON parser
+
+**3. FreeBSD License Logic**
+
+Complex license combination handling:
+- ✅ Single license mode
+- ✅ AND logic (multiple licenses required)
+- ✅ OR/dual logic (alternative licensing)
+- ✅ URL construction (code_view_url, download_url)
+- ✅ Qualifiers (arch, origin)
+
+#### Test Coverage
+
+- **1011 tests passing** ✅ (up from 907, +104 tests)
+- **17 new parsers** registered and working
+- **0 clippy warnings** ✅
+- **Atomic commits** with descriptive messages
+
+#### Files Added/Modified
+
+**New Parsers**:
+- `src/parsers/bower.rs` (406 lines) + tests
+- `src/parsers/about.rs` (279 lines) + tests
+- `src/parsers/chef.rs` (enhanced, 2 parsers) + tests
+- `src/parsers/freebsd.rs` (303 lines) + tests
+- `src/parsers/autotools.rs` (56 lines) + tests
+- `src/parsers/cpan.rs` (628 lines, 3 parsers) + tests
+
+**Documentation**:
+- `docs/improvements/cpan-parser.md` (255 lines) - Beyond-parity documentation
+
+**Test Data**:
+- `testdata/bower/` (5 test files)
+- `testdata/about/` (2 test files)
+- `testdata/chef/` (enhanced with metadata.rb)
+- `testdata/freebsd/` (8 test cases)
+- `testdata/autotools/` (2 minimal test files)
+- `testdata/cpan/` (3 formats)
+
+#### Implementation Philosophy
+
+**"At least parity, but pick up improvements along the way"**
+
+Applied consistently across all parsers:
+- Fixed Python bugs (Alpine SHA1 decoding)
+- Implemented Python TODOs (RPM dependencies, Debian .deb introspection)
+- Enhanced beyond Python (CPAN real parsing vs stubs, Composer provenance fields)
+- Documented all improvements in `docs/improvements/`
+
+---
+
+## Previous Improvements (February 2026)
 
 ### Phase 0.8: Linux Distribution Parsers (✅ Complete - Feb 8, 2026)
 
