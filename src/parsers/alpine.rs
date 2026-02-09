@@ -692,3 +692,11 @@ p:so:libtest.so.1
         assert!(!AlpineApkParser::is_match(&PathBuf::from("installed")));
     }
 }
+
+crate::register_parser!(
+    "Alpine Linux package (installed db and .apk archive)",
+    &["**/lib/apk/db/installed", "**/*.apk"],
+    "alpine",
+    "",
+    Some("https://wiki.alpinelinux.org/wiki/Apk_spec"),
+);

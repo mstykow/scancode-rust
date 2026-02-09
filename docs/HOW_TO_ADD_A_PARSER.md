@@ -144,16 +144,16 @@ impl PackageParser for MyEcosystemParser {
         })
     }
 
-    fn extract_package_data(path: &Path) -> PackageData {
+    fn extract_packages(path: &Path) -> Vec<PackageData> {
         let content = match fs::read_to_string(path) {
             Ok(c) => c,
             Err(e) => {
                 warn!("Failed to read file {:?}: {}", path, e);
-                return create_default_package_data(Self::PACKAGE_TYPE, None);
+                return vec![create_default_package_data(Self::PACKAGE_TYPE, None)];
             }
         };
 
-        parse_manifest(&content)
+        vec![parse_manifest(&content)]
     }
 }
 
@@ -213,7 +213,19 @@ fn build_purl(name: &str, version: Option<&str>) -> String {
         None => format!("pkg:<ecosystem>/{}", name),
     }
 }
+
+crate::register_parser!(
+    "<Ecosystem> package manifest",
+    &["**/manifest.json", "**/package.lock"],
+    "<ecosystem>",
+    "<Language>",
+    Some("https://example.com/docs"),
+);
 ```
+
+> **Important**: The `register_parser!` macro at the end of the file registers metadata for
+> auto-generating `docs/SUPPORTED_FORMATS.md`. Without it, your parser works for scanning but
+> won't appear in the supported formats documentation.
 
 ### Key Principles
 
@@ -254,7 +266,7 @@ mod tests {
     #[test]
     fn test_extract_basic() {
         let path = PathBuf::from("testdata/<ecosystem>/basic.json");
-        let data = MyEcosystemParser::extract_package_data(&path);
+        let data = MyEcosystemParser::extract_packages(&path);
         
         assert_eq!(data.name, Some("my-package".to_string()));
         assert_eq!(data.version, Some("1.0.0".to_string()));
@@ -264,7 +276,7 @@ mod tests {
     #[test]
     fn test_extract_with_all_fields() {
         let path = PathBuf::from("testdata/<ecosystem>/complete.json");
-        let data = MyEcosystemParser::extract_package_data(&path);
+        let data = MyEcosystemParser::extract_packages(&path);
         
         assert!(data.description.is_some());
         assert!(data.homepage_url.is_some());
@@ -274,7 +286,7 @@ mod tests {
     #[test]
     fn test_extract_malformed_json() {
         let path = PathBuf::from("testdata/<ecosystem>/malformed.json");
-        let data = MyEcosystemParser::extract_package_data(&path);
+        let data = MyEcosystemParser::extract_packages(&path);
         
         // Should not panic, returns default
         assert_eq!(data.package_type, Some("<ecosystem>".to_string()));
@@ -283,7 +295,7 @@ mod tests {
     #[test]
     fn test_dependency_scopes() {
         let path = PathBuf::from("testdata/<ecosystem>/dependencies.json");
-        let data = MyEcosystemParser::extract_package_data(&path);
+        let data = MyEcosystemParser::extract_packages(&path);
         
         let runtime_deps: Vec<_> = data.dependencies
             .iter()
@@ -410,7 +422,7 @@ mod golden_tests {
         let test_file = PathBuf::from("testdata/<ecosystem>/basic.json");
         let expected_file = PathBuf::from("testdata/<ecosystem>/basic.json.expected.json");
 
-        let package_data = MyEcosystemParser::extract_package_data(&test_file);
+        let package_data = MyEcosystemParser::extract_packages(&test_file);
 
         match compare_package_data_parser_only(&package_data, &expected_file) {
             Ok(_) => (),
@@ -546,7 +558,9 @@ Our Rust implementation improves on the Python reference by:
 
 ### Update Supported Formats
 
-The pre-commit hook will automatically regenerate `docs/SUPPORTED_FORMATS.md` when you add your parser. No manual action needed!
+The pre-commit hook will automatically regenerate `docs/SUPPORTED_FORMATS.md` when you commit,
+**but only if your parser file includes the `register_parser!` macro** (shown in Step 2).
+This macro registers metadata that the generator uses to build the formats table.
 
 ## Step 7: Quality Checks
 
@@ -677,7 +691,7 @@ Before submitting your parser:
 
 - [ ] Parser implements `PackageParser` trait
 - [ ] `is_match()` correctly identifies files
-- [ ] `extract_package_data()` extracts all Python fields
+- [ ] `extract_packages()` extracts all Python fields
 - [ ] Dependencies extracted with proper scopes
 - [ ] PURLs correctly formatted
 - [ ] Graceful error handling (no panics)
@@ -711,6 +725,7 @@ Before submitting your parser:
 - [ ] Parser module declared in `src/parsers/mod.rs`
 - [ ] Parser exported with `pub use`
 - [ ] Parser added to `define_parsers!` macro
+- [ ] `register_parser!` macro added at end of parser file
 - [ ] Integration test passes: `cargo test test_all_parsers_are_registered_and_exported`
 - [ ] Pre-commit hooks pass
 - [ ] SUPPORTED_FORMATS.md auto-updated

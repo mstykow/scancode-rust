@@ -395,3 +395,11 @@ mod tests {
         }
     }
 }
+
+crate::register_parser!(
+    "RPM package archive",
+    &["**/*.rpm", "**/*.srpm"],
+    "rpm",
+    "",
+    Some("https://rpm.org/"),
+);

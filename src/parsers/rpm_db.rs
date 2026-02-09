@@ -354,3 +354,15 @@ mod tests {
         assert!(pkg.name.is_some());
     }
 }
+
+crate::register_parser!(
+    "RPM installed package database",
+    &[
+        "**/var/lib/rpm/Packages",
+        "**/var/lib/rpm/Packages.db",
+        "**/var/lib/rpm/rpmdb.sqlite"
+    ],
+    "rpm",
+    "",
+    Some("https://rpm.org/"),
+);

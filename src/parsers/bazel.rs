@@ -198,3 +198,11 @@ mod tests {
         assert_eq!(pkg.name, Some("myproject".to_string()));
     }
 }
+
+crate::register_parser!(
+    "Bazel BUILD file",
+    &["**/BUILD"],
+    "bazel",
+    "",
+    Some("https://bazel.build/"),
+);

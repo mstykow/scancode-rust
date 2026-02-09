@@ -9,7 +9,7 @@
 
 **Why Failing**: Parser now extracts ONLY `extracted_license_statement` (raw license URLs/text). License detection fields (`declared_license_expression*`, `license_detections`) are intentionally None/empty until the separate detection engine is built.
 
-**Architecture Details**: See `docs/PARSER_IMPLEMENTATION_PLAN.md` → "Critical Separation of Concerns: Extraction vs Detection"
+**Architecture Details**: See `docs/ARCHITECTURE.md` and `docs/adr/` for the extraction vs detection separation of concerns
 
 ## Test Coverage
 

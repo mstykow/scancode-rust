@@ -404,3 +404,11 @@ fn parse_conan_lock(json: &Value) -> Vec<Dependency> {
 fn default_package_data() -> PackageData {
     create_default_package_data("conan", Some("C++"))
 }
+
+crate::register_parser!(
+    "Conan C/C++ package manifest",
+    &["**/conanfile.py", "**/conanfile.txt", "**/conan.lock"],
+    "conan",
+    "C++",
+    Some("https://docs.conan.io/"),
+);

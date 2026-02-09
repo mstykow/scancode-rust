@@ -301,3 +301,11 @@ mod tests {
         assert_eq!(result, Some("MIT OR Apache-2.0".to_string()));
     }
 }
+
+crate::register_parser!(
+    "FreeBSD +COMPACT_MANIFEST package manifest",
+    &["**/*COMPACT_MANIFEST"],
+    "freebsd",
+    "",
+    Some("https://man.freebsd.org/cgi/man.cgi?query=pkg-create"),
+);

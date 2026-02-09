@@ -49,3 +49,11 @@ impl PackageParser for AutotoolsConfigureParser {
         }]
     }
 }
+
+crate::register_parser!(
+    "Autotools configure script",
+    &["**/configure", "**/configure.ac"],
+    "autotools",
+    "C",
+    Some("https://www.gnu.org/software/autoconf/"),
+);

@@ -423,3 +423,11 @@ mod tests {
         assert!(!check_rule_name_ending("filegroup"));
     }
 }
+
+crate::register_parser!(
+    "Buck build file and METADATA.bzl",
+    &["**/BUCK", "**/METADATA.bzl"],
+    "buck",
+    "",
+    Some("https://buck.build/"),
+);

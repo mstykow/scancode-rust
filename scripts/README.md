@@ -10,7 +10,7 @@
 
 **Included**:
 
-- All markdown files in `docs/` (except `docs/archived/`)
+- All markdown files in `docs/`
 - Root markdown files: `README.md`, `AGENTS.md`, etc.
 - Rust docstrings (`///` and `//!`) in `src/`
 

@@ -577,3 +577,16 @@ fn create_pip_dependency(parsed_req: pep508_rs::Requirement, scope: &str) -> Opt
         extra_data: None,
     })
 }
+
+crate::register_parser!(
+    "Conda package manifest and environment file",
+    &[
+        "**/meta.yaml",
+        "**/meta.yml",
+        "**/environment.yml",
+        "**/conda.yaml"
+    ],
+    "conda",
+    "Python",
+    Some("https://docs.conda.io/"),
+);

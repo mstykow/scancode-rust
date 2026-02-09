@@ -9,7 +9,7 @@ scancode-rust is a complete rewrite of [ScanCode Toolkit](https://github.com/abo
 - **Enhanced security**: No code execution, comprehensive DoS protection
 - **Feature parity or better**: 100% compatibility plus intentional improvements
 
-**Current Status**: 15 ecosystems, 40+ package formats supported
+**Current Status**: See [SUPPORTED_FORMATS.md](SUPPORTED_FORMATS.md) for the full list of supported ecosystems and formats.
 
 ## Core Principles
 
@@ -56,7 +56,7 @@ pub trait PackageParser {
     const PACKAGE_TYPE: &'static str;
     
     fn is_match(path: &Path) -> bool;
-    fn extract_package_data(path: &Path) -> PackageData;
+    fn extract_packages(path: &Path) -> Vec<PackageData>;
 }
 ```
 
@@ -82,7 +82,7 @@ impl PackageParser for NpmParser {
         )
     }
     
-    fn extract_package_data(path: &Path) -> PackageData {
+    fn extract_packages(path: &Path) -> Vec<PackageData> {
         // Implementation
     }
 }
@@ -102,7 +102,7 @@ define_parsers! {
     NpmLockParser,
     CargoParser,
     CargoLockParser,
-    // ... 40+ parsers ...
+    // ... more parsers ...
 }
 ```
 
@@ -157,7 +157,7 @@ pub struct PackageData {
 
 **Rationale:**
 
-- Normalizes differences across 40+ ecosystems
+- Normalizes differences across all supported ecosystems
 - SBOM-compliant output format
 - Single source of truth for structure
 
@@ -176,7 +176,7 @@ pub struct PackageData {
 │                                      │                     │
 │  3. Extraction                       v                     │
 │  ┌────────────────────────────────────────────┐           │
-│  │ PackageParser::extract_package_data()      │           │
+│  │ PackageParser::extract_packages()           │           │
 │  │ ─ Read manifest                            │           │
 │  │ ─ Parse structure                          │           │
 │  │ ─ Extract metadata                         │           │
@@ -296,21 +296,7 @@ See [ADR 0004: Security-First Parsing](adr/0004-security-first-parsing.md) for c
 - Reference outputs from Python ScanCode Toolkit
 - Automated JSON comparison
 - Regression detection
-- Comprehensive test suite with high pass rate
-
-**Test Coverage by Ecosystem:**
-
-| Ecosystem | Golden Tests | Status | Notes |
-|-----------|--------------|--------|-------|
-| Go | 4/4 passing | ✅ 100% | Complete |
-| Dart | 4/4 passing | ✅ 100% | Complete |
-| Composer | 1/1 passing | ✅ 100% | Complete |
-| Cargo | 1/1 passing | ✅ 100% | Complete |
-| Python | 6/6 passing | ✅ 100% | Complete |
-| Alpine | 12/13 passing | ✅ 92% | 1 beyond-parity (ignored) |
-| RPM | 11/11 passing | ✅ 100% | Complete |
-| Gradle | 15/19 passing | 🟡 79% | 4 documented differences |
-| npm | 4/12 passing | 🟡 33% | 8 blocked on license engine |
+- Run `cargo test golden` to see current pass rates
 
 See [ADR 0003: Golden Test Strategy](adr/0003-golden-test-strategy.md) for details.
 
@@ -352,9 +338,14 @@ We don't just match Python ScanCode - we improve it:
 | **Alpine** | SHA1 checksums correctly decoded + Provider field extraction | 🐛 Bug Fix + ✨ Feature |
 | **RPM** | Full dependency extraction with version constraints | ✨ Feature |
 | **Debian** | .deb archive introspection | ✨ Feature |
+| **Conan** | conanfile.txt and conan.lock parsers (Python has neither) | ✨ Feature |
+| **Gradle** | No code execution (token lexer vs Groovy engine) | 🛡️ Security |
+| **Gradle Lockfile** | gradle.lockfile parser (Python has no equivalent) | ✨ Feature |
+| **npm Workspace** | pnpm-workspace.yaml metadata extraction (Python has stub only) | ✨ Feature |
 | **Composer** | Richer provenance metadata (7 extra fields) | 🔍 Enhanced |
 | **Ruby** | Semantic party model (unified name+email) | 🔍 Enhanced |
-| **Gradle** | No code execution (token lexer vs Groovy engine) | 🛡️ Security |
+| **Dart** | Proper scope handling + YAML preservation | 🔍 Enhanced |
+| **CPAN** | Full metadata extraction (Python has stubs only) | ✨ Feature |
 
 See [docs/improvements/](improvements/) for detailed documentation of each improvement.
 
@@ -395,13 +386,9 @@ opt-level = 3             # Maximum optimization
 
 ## Future Work
 
-### Phase 1-5: Remaining Parsers
+### Remaining Parsers
 
-- **Phase 1**: Ruby (✅), Go (✅), Composer (✅), NuGet, Dart (✅)
-- **Phase 2**: Haxe, Chef, Bower, Conda, Conan, CRAN
-- **Phase 3**: Bazel, Buck, Autotools, OpenEmbedded/Yocto, Buildroot
-- **Phase 4**: Linux distributions (Debian ✅, RPM ✅, Alpine ✅, Arch, Gentoo)
-- **Phase 5**: Android, iOS, Windows, Container formats
+See [NEXT_PHASE_PLAN.md](NEXT_PHASE_PLAN.md) for the current roadmap of remaining ecosystems and parsers.
 
 ### Detection Engines
 

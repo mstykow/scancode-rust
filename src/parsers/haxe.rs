@@ -367,3 +367,11 @@ mod tests {
         assert!(package_data.name.is_none());
     }
 }
+
+crate::register_parser!(
+    "Haxe haxelib.json package manifest",
+    &["**/haxelib.json"],
+    "haxe",
+    "Haxe",
+    Some("https://lib.haxe.org/documentation/creating-a-haxelib-package/"),
+);

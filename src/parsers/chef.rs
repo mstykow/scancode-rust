@@ -424,3 +424,11 @@ fn build_package(fields: ChefPackageFields) -> PackageData {
         ..Default::default()
     }
 }
+
+crate::register_parser!(
+    "Chef cookbook metadata",
+    &["**/metadata.json", "**/metadata.rb"],
+    "chef",
+    "Ruby",
+    Some("https://docs.chef.io/config_rb_metadata/"),
+);

@@ -277,3 +277,11 @@ fn extract_file_references(yaml: &serde_yaml::Mapping) -> Vec<FileReference> {
 fn default_package_data() -> PackageData {
     PackageData::default()
 }
+
+crate::register_parser!(
+    "AboutCode .ABOUT metadata file",
+    &["**/*.ABOUT"],
+    "about",
+    "",
+    Some("https://aboutcode-toolkit.readthedocs.io/en/latest/specification.html"),
+);

@@ -407,3 +407,11 @@ fn default_package_data() -> PackageData {
     pkg.datasource_id = Some("cran_description".to_string());
     pkg
 }
+
+crate::register_parser!(
+    "CRAN R package DESCRIPTION file",
+    &["**/DESCRIPTION"],
+    "cran",
+    "R",
+    Some("https://cran.r-project.org/doc/manuals/r-release/R-exts.html#The-DESCRIPTION-file"),
+);

@@ -595,3 +595,11 @@ mod tests {
         assert_eq!(parties[1].role, Some("maintainer".to_string()));
     }
 }
+
+crate::register_parser!(
+    "OCaml OPAM package manifest",
+    &["**/*.opam", "**/opam"],
+    "opam",
+    "OCaml",
+    Some("https://opam.ocaml.org/doc/Manual.html"),
+);
