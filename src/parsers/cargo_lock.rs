@@ -18,8 +18,6 @@
 //! - Direct dependencies determined from root package's dependency list
 //! - Uses TOML parsing for structured data extraction
 
-#![allow(dead_code)]
-
 use crate::models::{Dependency, PackageData};
 use log::warn;
 use packageurl::PackageUrl;

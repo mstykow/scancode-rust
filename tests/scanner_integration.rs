@@ -1,6 +1,7 @@
 use glob::Pattern;
 use indicatif::ProgressBar;
 use scancode_rust::askalono::{ScanStrategy, Store};
+use scancode_rust::parsers::list_parser_types;
 use scancode_rust::{FileType, process};
 use std::sync::Arc;
 
@@ -239,4 +240,49 @@ fn test_max_depth_limits_traversal() {
     // Should not find the deep package.json
     let has_deep_json = result.files.iter().any(|f| f.name == "package.json");
     assert!(!has_deep_json, "Should not find package.json at depth > 1");
+}
+
+/// Regression test: Verify that all parsers in define_parsers! macro are actually
+/// exported and accessible. This catches bugs where parsers are implemented but
+/// not registered in the macro (like CargoLockParser was before being fixed).
+#[test]
+fn test_all_parsers_are_registered_and_exported() {
+    // Get list of all parser types from the macro
+    let parser_types = list_parser_types();
+
+    // This test verifies that list_parser_types() returns a non-empty list
+    // If a parser is implemented but not in define_parsers!, it won't appear here
+    assert!(
+        !parser_types.is_empty(),
+        "Should have at least one parser registered"
+    );
+
+    // Known parsers that should be present (sample check)
+    let expected_parsers = vec![
+        "NpmParser",
+        "NpmLockParser",
+        "CargoParser",
+        "CargoLockParser", // This was missing before the fix
+        "PythonParser",
+        "ComposerLockParser",
+        "YarnLockParser",
+        "PnpmLockParser",
+        "PoetryLockParser",
+    ];
+
+    for expected in expected_parsers {
+        assert!(
+            parser_types.contains(&expected),
+            "Parser '{}' should be registered in define_parsers! macro",
+            expected
+        );
+    }
+
+    // Verify we have a reasonable number of parsers (40+ formats supported)
+    // If this number is suspiciously low, it indicates missing registrations
+    assert!(
+        parser_types.len() >= 40,
+        "Expected at least 40 parsers, found {}. Some parsers may not be registered.",
+        parser_types.len()
+    );
 }

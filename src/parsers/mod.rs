@@ -274,6 +274,7 @@ define_parsers! {
     ComposerJsonParser,
     ComposerLockParser,
     CargoParser,
+    CargoLockParser,
     PubspecYamlParser,
     PubspecLockParser,
     PythonParser,

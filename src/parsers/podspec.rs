@@ -314,14 +314,13 @@ fn parse_author_hash_entry(entry: &str) -> Option<(String, String)> {
 }
 
 /// Parse author from string, extracting email if present
-#[allow(clippy::collapsible_if)]
 fn parse_author_string(author: &str) -> (String, Option<String>) {
-    if let Some(email_start) = author.find('<') {
-        if let Some(email_end) = author.find('>') {
-            let name = author[..email_start].trim().to_string();
-            let email = author[email_start + 1..email_end].trim().to_string();
-            return (name, Some(email));
-        }
+    if let Some(email_start) = author.find('<')
+        && let Some(email_end) = author.find('>')
+    {
+        let name = author[..email_start].trim().to_string();
+        let email = author[email_start + 1..email_end].trim().to_string();
+        return (name, Some(email));
     }
     (author.to_string(), None)
 }
