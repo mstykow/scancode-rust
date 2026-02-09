@@ -324,33 +324,34 @@ fn is_ident_char(c: char) -> bool {
 // Dependency block extraction
 // ---------------------------------------------------------------------------
 
-#[allow(clippy::collapsible_if)]
 fn find_dependency_blocks(tokens: &[Tok]) -> Vec<Vec<Tok>> {
     let mut blocks = Vec::new();
     let mut i = 0;
 
     while i < tokens.len() {
-        if let Tok::Ident(ref name) = tokens[i] {
-            if name == "dependencies" && i + 1 < tokens.len() && tokens[i + 1] == Tok::OpenBrace {
-                i += 2;
-                let mut depth = 1;
-                let start = i;
-                while i < tokens.len() && depth > 0 {
-                    match &tokens[i] {
-                        Tok::OpenBrace => depth += 1,
-                        Tok::CloseBrace => depth -= 1,
-                        _ => {}
-                    }
-                    if depth > 0 {
-                        i += 1;
-                    }
+        if let Tok::Ident(ref name) = tokens[i]
+            && name == "dependencies"
+            && i + 1 < tokens.len()
+            && tokens[i + 1] == Tok::OpenBrace
+        {
+            i += 2;
+            let mut depth = 1;
+            let start = i;
+            while i < tokens.len() && depth > 0 {
+                match &tokens[i] {
+                    Tok::OpenBrace => depth += 1,
+                    Tok::CloseBrace => depth -= 1,
+                    _ => {}
                 }
-                blocks.push(tokens[start..i].to_vec());
-                if i < tokens.len() {
+                if depth > 0 {
                     i += 1;
                 }
-                continue;
             }
+            blocks.push(tokens[start..i].to_vec());
+            if i < tokens.len() {
+                i += 1;
+            }
+            continue;
         }
         i += 1;
     }
@@ -388,7 +389,6 @@ fn extract_dependencies(tokens: &[Tok]) -> Vec<Dependency> {
     dependencies
 }
 
-#[allow(clippy::collapsible_if)]
 fn parse_block(tokens: &[Tok]) -> Vec<RawDep> {
     let mut deps = Vec::new();
     let mut i = 0;
@@ -436,95 +436,88 @@ fn parse_block(tokens: &[Tok]) -> Vec<RawDep> {
         }
 
         // PATTERN: scope group: ..., name: ..., version: ... (named params without parens)
-        if next < tokens.len() {
-            if let Tok::Ident(ref label) = tokens[next] {
-                if label == "group" && next + 1 < tokens.len() && tokens[next + 1] == Tok::Colon {
-                    if let Some((rd, consumed)) = parse_named_params(&scope_name, &tokens[next..]) {
-                        deps.push(rd);
-                        i = next + consumed;
-                        continue;
-                    }
-                }
-            }
+        if next < tokens.len()
+            && let Tok::Ident(ref label) = tokens[next]
+            && label == "group"
+            && next + 1 < tokens.len()
+            && tokens[next + 1] == Tok::Colon
+            && let Some((rd, consumed)) = parse_named_params(&scope_name, &tokens[next..])
+        {
+            deps.push(rd);
+            i = next + consumed;
+            continue;
         }
 
         // PATTERN: scope 'string:notation' (string notation)
-        if next < tokens.len() {
-            if let Tok::Str(ref val) = tokens[next] {
-                if val.contains(':') {
-                    // `scope 'str', { closure }` → skip (unparenthesized call with trailing closure)
-                    if next + 1 < tokens.len()
-                        && tokens[next + 1] == Tok::Comma
-                        && next + 2 < tokens.len()
-                        && tokens[next + 2] == Tok::OpenBrace
-                    {
-                        i = next + 1;
-                        continue;
-                    }
-                    let is_multi = i + 2 < tokens.len()
-                        && tokens[next + 1] == Tok::Comma
-                        && matches!(tokens.get(next + 2), Some(Tok::Str(_)));
-                    let effective_scope = if is_multi { "" } else { &scope_name };
-                    let rd = parse_colon_string(val, effective_scope);
-                    deps.push(rd);
-                    i = next + 1;
-                    while i < tokens.len() && tokens[i] == Tok::Comma {
-                        i += 1;
-                        if i < tokens.len() {
-                            if let Tok::Str(ref v2) = tokens[i] {
-                                if v2.contains(':') {
-                                    deps.push(parse_colon_string(v2, ""));
-                                    i += 1;
-                                    continue;
-                                }
-                            }
-                        }
-                        break;
-                    }
+        if next < tokens.len()
+            && let Tok::Str(ref val) = tokens[next]
+            && val.contains(':')
+        {
+            // `scope 'str', { closure }` → skip (unparenthesized call with trailing closure)
+            if next + 1 < tokens.len()
+                && tokens[next + 1] == Tok::Comma
+                && next + 2 < tokens.len()
+                && tokens[next + 2] == Tok::OpenBrace
+            {
+                i = next + 1;
+                continue;
+            }
+            let is_multi = i + 2 < tokens.len()
+                && tokens[next + 1] == Tok::Comma
+                && matches!(tokens.get(next + 2), Some(Tok::Str(_)));
+            let effective_scope = if is_multi { "" } else { &scope_name };
+            let rd = parse_colon_string(val, effective_scope);
+            deps.push(rd);
+            i = next + 1;
+            while i < tokens.len() && tokens[i] == Tok::Comma {
+                i += 1;
+                if i < tokens.len()
+                    && let Tok::Str(ref v2) = tokens[i]
+                    && v2.contains(':')
+                {
+                    deps.push(parse_colon_string(v2, ""));
+                    i += 1;
                     continue;
                 }
+                break;
             }
+            continue;
         }
 
         // PATTERN: scope ident.attr (variable reference / dotted identifier)
         // Note: Skip references starting with "dependencies." as Python's pygmars
         // relabels the "dependencies" token, breaking the DEPENDENCY-5 grammar rule.
-        if next < tokens.len() {
-            if let Tok::Ident(ref val) = tokens[next] {
-                if val.contains('.') && !val.starts_with("dependencies.") {
-                    if let Some(last_seg) = val.rsplit('.').next() {
-                        if !last_seg.is_empty() {
-                            deps.push(RawDep {
-                                namespace: String::new(),
-                                name: last_seg.to_string(),
-                                version: String::new(),
-                                scope: scope_name.clone(),
-                            });
-                            i = next + 1;
-                            continue;
-                        }
-                    }
-                }
-            }
+        if next < tokens.len()
+            && let Tok::Ident(ref val) = tokens[next]
+            && val.contains('.')
+            && !val.starts_with("dependencies.")
+            && let Some(last_seg) = val.rsplit('.').next()
+            && !last_seg.is_empty()
+        {
+            deps.push(RawDep {
+                namespace: String::new(),
+                name: last_seg.to_string(),
+                version: String::new(),
+                scope: scope_name.clone(),
+            });
+            i = next + 1;
+            continue;
         }
 
         // PATTERN: scope project(':module') — project reference without parens
-        if next < tokens.len() {
-            if let Tok::Ident(ref name) = tokens[next] {
-                if name == "project"
-                    && next + 1 < tokens.len()
-                    && tokens[next + 1] == Tok::OpenParen
-                {
-                    if let Some(end) = find_matching_paren(tokens, next + 1) {
-                        let inner = &tokens[next + 2..end];
-                        if let Some(rd) = parse_project_ref(inner) {
-                            deps.push(rd);
-                        }
-                        i = end + 1;
-                        continue;
-                    }
-                }
+        if next < tokens.len()
+            && let Tok::Ident(ref name) = tokens[next]
+            && name == "project"
+            && next + 1 < tokens.len()
+            && tokens[next + 1] == Tok::OpenParen
+            && let Some(end) = find_matching_paren(tokens, next + 1)
+        {
+            let inner = &tokens[next + 2..end];
+            if let Some(rd) = parse_project_ref(inner) {
+                deps.push(rd);
             }
+            i = end + 1;
+            continue;
         }
 
         i += 1;
@@ -552,7 +545,6 @@ fn is_skip_keyword(name: &str) -> bool {
     )
 }
 
-#[allow(clippy::collapsible_if)]
 fn parse_paren_content(scope: &str, tokens: &[Tok], deps: &mut Vec<RawDep>) {
     if tokens.is_empty() {
         return;
@@ -565,88 +557,89 @@ fn parse_paren_content(scope: &str, tokens: &[Tok], deps: &mut Vec<RawDep>) {
     }
 
     // Check for named parameters: group: 'x' or group = "x"
-    if let Some(Tok::Ident(label)) = tokens.first() {
-        if label == "group" && tokens.len() > 1 && tokens[1] == Tok::Colon {
-            if let Some((rd, _)) = parse_named_params("", tokens) {
-                deps.push(rd);
-            }
-            return;
+    if let Some(Tok::Ident(label)) = tokens.first()
+        && label == "group"
+        && tokens.len() > 1
+        && tokens[1] == Tok::Colon
+    {
+        if let Some((rd, _)) = parse_named_params("", tokens) {
+            deps.push(rd);
         }
+        return;
     }
 
     // Check for nested function call or project reference
-    if let Some(Tok::Ident(inner_fn)) = tokens.first() {
-        if tokens.len() > 1 && tokens[1] == Tok::OpenParen {
-            if inner_fn == "project" {
-                if let Some(end) = find_matching_paren(tokens, 1) {
-                    let inner = &tokens[2..end];
-                    if let Some(rd) = parse_project_ref(inner) {
-                        deps.push(rd);
-                    }
-                }
-                return;
-            }
-
+    if let Some(Tok::Ident(inner_fn)) = tokens.first()
+        && tokens.len() > 1
+        && tokens[1] == Tok::OpenParen
+    {
+        if inner_fn == "project" {
             if let Some(end) = find_matching_paren(tokens, 1) {
                 let inner = &tokens[2..end];
-                if let Some(Tok::Str(val)) = inner.first() {
-                    if val.contains(':') {
-                        deps.push(parse_colon_string(val, inner_fn));
-                        return;
-                    }
+                if let Some(rd) = parse_project_ref(inner) {
+                    deps.push(rd);
                 }
+            }
+            return;
+        }
+
+        if let Some(end) = find_matching_paren(tokens, 1) {
+            let inner = &tokens[2..end];
+            if let Some(Tok::Str(val)) = inner.first()
+                && val.contains(':')
+            {
+                deps.push(parse_colon_string(val, inner_fn));
+                return;
             }
         }
     }
 
     // Simple string: ("g:n:v")
-    if let Some(Tok::Str(val)) = tokens.first() {
-        if val.contains(':') {
-            deps.push(parse_colon_string(val, scope));
-        }
+    if let Some(Tok::Str(val)) = tokens.first()
+        && val.contains(':')
+    {
+        deps.push(parse_colon_string(val, scope));
     }
 }
 
-#[allow(clippy::collapsible_if)]
 fn parse_bracket_maps(tokens: &[Tok], deps: &mut Vec<RawDep>) {
     let mut i = 0;
     while i < tokens.len() {
-        if tokens[i] == Tok::OpenBracket {
-            if let Some(end) = find_matching_bracket(tokens, i) {
-                let map_tokens = &tokens[i + 1..end];
-                if let Some(rd) = parse_map_entries(map_tokens) {
-                    deps.push(rd);
-                }
-                i = end + 1;
-                continue;
+        if tokens[i] == Tok::OpenBracket
+            && let Some(end) = find_matching_bracket(tokens, i)
+        {
+            let map_tokens = &tokens[i + 1..end];
+            if let Some(rd) = parse_map_entries(map_tokens) {
+                deps.push(rd);
             }
+            i = end + 1;
+            continue;
         }
         i += 1;
     }
 }
 
-#[allow(clippy::collapsible_if)]
 fn parse_map_entries(tokens: &[Tok]) -> Option<RawDep> {
     let mut name = String::new();
     let mut version = String::new();
     let mut i = 0;
 
     while i < tokens.len() {
-        if let Tok::Ident(ref label) = tokens[i] {
-            if i + 2 < tokens.len() && tokens[i + 1] == Tok::Colon {
-                if let Tok::Str(ref val) = tokens[i + 2] {
-                    match label.as_str() {
-                        "name" => name = val.clone(),
-                        "version" => version = val.clone(),
-                        _ => {}
-                    }
-                    i += 3;
-                    if i < tokens.len() && tokens[i] == Tok::Comma {
-                        i += 1;
-                    }
-                    continue;
-                }
+        if let Tok::Ident(ref label) = tokens[i]
+            && i + 2 < tokens.len()
+            && tokens[i + 1] == Tok::Colon
+            && let Tok::Str(ref val) = tokens[i + 2]
+        {
+            match label.as_str() {
+                "name" => name = val.clone(),
+                "version" => version = val.clone(),
+                _ => {}
             }
+            i += 3;
+            if i < tokens.len() && tokens[i] == Tok::Comma {
+                i += 1;
+            }
+            continue;
         }
         i += 1;
     }
@@ -663,7 +656,6 @@ fn parse_map_entries(tokens: &[Tok]) -> Option<RawDep> {
     })
 }
 
-#[allow(clippy::collapsible_if)]
 fn parse_named_params(scope: &str, tokens: &[Tok]) -> Option<(RawDep, usize)> {
     let mut group = String::new();
     let mut name = String::new();
@@ -671,28 +663,22 @@ fn parse_named_params(scope: &str, tokens: &[Tok]) -> Option<(RawDep, usize)> {
     let mut i = 0;
 
     while i < tokens.len() {
-        if let Tok::Ident(ref label) = tokens[i] {
-            if i + 2 < tokens.len() && tokens[i + 1] == Tok::Colon {
-                if let Tok::Str(ref val) = tokens[i + 2] {
-                    match label.as_str() {
-                        "group" => group = val.clone(),
-                        "name" => name = val.clone(),
-                        "version" => version = val.clone(),
-                        _ => {
-                            i += 3;
-                            if i < tokens.len() && tokens[i] == Tok::Comma {
-                                i += 1;
-                            }
-                            continue;
-                        }
-                    }
-                    i += 3;
-                    if i < tokens.len() && tokens[i] == Tok::Comma {
-                        i += 1;
-                    }
-                    continue;
-                }
+        if let Tok::Ident(ref label) = tokens[i]
+            && i + 2 < tokens.len()
+            && tokens[i + 1] == Tok::Colon
+            && let Tok::Str(ref val) = tokens[i + 2]
+        {
+            match label.as_str() {
+                "group" => group = val.clone(),
+                "name" => name = val.clone(),
+                "version" => version = val.clone(),
+                _ => {}
             }
+            i += 3;
+            if i < tokens.len() && tokens[i] == Tok::Comma {
+                i += 1;
+            }
+            continue;
         }
         break;
     }

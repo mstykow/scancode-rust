@@ -311,22 +311,62 @@ mod tests {
 - [ ] Malformed input handled gracefully
 - [ ] Edge cases (empty, minimal, complex)
 
+### Integration Test Verification
+
+After implementing your parser, verify it's properly wired up to the scanner:
+
+**Run the integration test suite:**
+
+```bash
+cargo test --test scanner_integration
+```
+
+The `test_all_parsers_are_registered_and_exported` test will verify your parser is:
+
+1. Listed in the `define_parsers!` macro
+2. Exported from the parsers module
+3. Accessible to the scanner
+
+**If this test fails**, it means you forgot to add your parser to the `define_parsers!` macro in Step 4.2.
+
 ## Step 4: Register the Parser
 
 ### Update `src/parsers/mod.rs`
 
-Add module declaration and public re-export:
+**Step 4.1: Add module declaration and public re-export**
 
 ```rust
-pub mod my_ecosystem;
-pub mod my_ecosystem_test;
+mod my_ecosystem;
+#[cfg(test)]
+mod my_ecosystem_test;
 
-pub use my_ecosystem::MyEcosystemParser;
+pub use self::my_ecosystem::MyEcosystemParser;
 ```
 
-### Register in Parser List
+**Step 4.2: Register in `define_parsers!` macro**
 
-Find the parser registration section and add your parser to the appropriate collection.
+This is **CRITICAL** - if you skip this step, your parser will be implemented but never called by the scanner!
+
+Find the `define_parsers!` macro (around line 261) and add your parser to the list:
+
+```rust
+define_parsers! {
+    NpmWorkspaceParser,
+    NpmParser,
+    // ... other parsers ...
+    MyEcosystemParser,  // <-- ADD YOUR PARSER HERE
+    // ... more parsers ...
+}
+```
+
+**Why this matters**: The `define_parsers!` macro generates the `try_parse_file()` function that the scanner uses to match files to parsers. If your parser isn't in this list, it will never be invoked, even if fully implemented and tested.
+
+**Verification**: After adding your parser, verify it's registered:
+
+```bash
+# Should include "MyEcosystemParser" in output
+cargo run --bin generate-test-expected --list | grep MyEcosystemParser
+```
 
 ## Step 5: Add Golden Tests (Optional but Recommended)
 
@@ -668,7 +708,10 @@ Before submitting your parser:
 
 ### Integration
 
-- [ ] Parser registered in `src/parsers/mod.rs`
+- [ ] Parser module declared in `src/parsers/mod.rs`
+- [ ] Parser exported with `pub use`
+- [ ] Parser added to `define_parsers!` macro
+- [ ] Integration test passes: `cargo test test_all_parsers_are_registered_and_exported`
 - [ ] Pre-commit hooks pass
 - [ ] SUPPORTED_FORMATS.md auto-updated
 

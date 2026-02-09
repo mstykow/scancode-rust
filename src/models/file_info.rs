@@ -1,6 +1,5 @@
 use derive_builder::Builder;
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
 
 use crate::utils::spdx::combine_license_expressions;
 
