@@ -1,0 +1,368 @@
+{
+  "packages": [
+    {
+      "type": "bower",
+      "namespace": null,
+      "name": "John Doe",
+      "version": null,
+      "qualifiers": {},
+      "subpath": null,
+      "primary_language": null,
+      "description": "Physics-like animations for pretty particles",
+      "release_date": null,
+      "parties": [
+        {
+          "type": null,
+          "role": "author",
+          "name": "Betty Beta <bbeta@example.com>",
+          "email": null,
+          "url": null
+        },
+        {
+          "type": null,
+          "role": "author",
+          "name": "John Doe",
+          "email": "john@doe.com",
+          "url": "http://johndoe.com"
+        }
+      ],
+      "keywords": [
+        "motion",
+        "physics",
+        "particles"
+      ],
+      "homepage_url": null,
+      "download_url": null,
+      "size": null,
+      "sha1": null,
+      "md5": null,
+      "sha256": null,
+      "sha512": null,
+      "bug_tracking_url": null,
+      "code_view_url": null,
+      "vcs_url": null,
+      "copyright": null,
+      "holder": null,
+      "declared_license_expression": "mit AND apache-2.0 AND bsd-new",
+      "declared_license_expression_spdx": "MIT AND Apache-2.0 AND BSD-3-Clause",
+      "license_detections": [
+        {
+          "license_expression": "mit",
+          "license_expression_spdx": "MIT",
+          "matches": [
+            {
+              "license_expression": "mit",
+              "license_expression_spdx": "MIT",
+              "from_file": "scan/bower.json",
+              "start_line": 1,
+              "end_line": 1,
+              "matcher": "1-spdx-id",
+              "score": 100.0,
+              "matched_length": 1,
+              "match_coverage": 100.0,
+              "rule_relevance": 100,
+              "rule_identifier": "spdx-license-identifier-mit-5da48780aba670b0860c46d899ed42a0f243ff06",
+              "rule_url": null,
+              "matched_text": "MIT"
+            }
+          ],
+          "identifier": "mit-a822f434-d61f-f2b1-c792-8b8cb9e7b9bf"
+        },
+        {
+          "license_expression": "apache-2.0",
+          "license_expression_spdx": "Apache-2.0",
+          "matches": [
+            {
+              "license_expression": "apache-2.0",
+              "license_expression_spdx": "Apache-2.0",
+              "from_file": "scan/bower.json",
+              "start_line": 1,
+              "end_line": 1,
+              "matcher": "1-hash",
+              "score": 100.0,
+              "matched_length": 3,
+              "match_coverage": 100.0,
+              "rule_relevance": 100,
+              "rule_identifier": "spdx_license_id_apache-2.0_for_apache-2.0.RULE",
+              "rule_url": "https://github.com/nexB/scancode-toolkit/tree/develop/src/licensedcode/data/rules/spdx_license_id_apache-2.0_for_apache-2.0.RULE",
+              "matched_text": "Apache 2.0"
+            }
+          ],
+          "identifier": "apache_2_0-d66ab77d-a5cc-7104-e702-dc7df61fe9e8"
+        },
+        {
+          "license_expression": "bsd-new",
+          "license_expression_spdx": "BSD-3-Clause",
+          "matches": [
+            {
+              "license_expression": "bsd-new",
+              "license_expression_spdx": "BSD-3-Clause",
+              "from_file": "scan/bower.json",
+              "start_line": 1,
+              "end_line": 1,
+              "matcher": "1-hash",
+              "score": 100.0,
+              "matched_length": 3,
+              "match_coverage": 100.0,
+              "rule_relevance": 100,
+              "rule_identifier": "bsd-new_10.RULE",
+              "rule_url": "https://github.com/nexB/scancode-toolkit/tree/develop/src/licensedcode/data/rules/bsd-new_10.RULE",
+              "matched_text": "BSD-3-Clause"
+            }
+          ],
+          "identifier": "bsd_new-50fa5753-f24d-ec04-33a1-36bb8ac0492c"
+        }
+      ],
+      "other_license_expression": null,
+      "other_license_expression_spdx": null,
+      "other_license_detections": [],
+      "extracted_license_statement": "- MIT\n- Apache 2.0\n- BSD-3-Clause\n",
+      "notice_text": null,
+      "source_packages": [],
+      "is_private": false,
+      "is_virtual": false,
+      "extra_data": {},
+      "repository_homepage_url": null,
+      "repository_download_url": null,
+      "api_data_url": null,
+      "package_uid": "pkg:bower/John%20Doe?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "datafile_paths": [
+        "scan/bower.json"
+      ],
+      "datasource_ids": [
+        "bower_json"
+      ],
+      "purl": "pkg:bower/John%20Doe"
+    }
+  ],
+  "dependencies": [
+    {
+      "purl": "pkg:bower/get-size",
+      "extracted_requirement": "~1.2.2",
+      "scope": "dependencies",
+      "is_runtime": true,
+      "is_optional": false,
+      "is_pinned": false,
+      "is_direct": true,
+      "resolved_package": {},
+      "extra_data": {},
+      "dependency_uid": "pkg:bower/get-size?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "for_package_uid": "pkg:bower/John%20Doe?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "datafile_path": "scan/bower.json",
+      "datasource_id": "bower_json"
+    },
+    {
+      "purl": "pkg:bower/eventEmitter",
+      "extracted_requirement": "~4.2.11",
+      "scope": "dependencies",
+      "is_runtime": true,
+      "is_optional": false,
+      "is_pinned": false,
+      "is_direct": true,
+      "resolved_package": {},
+      "extra_data": {},
+      "dependency_uid": "pkg:bower/eventEmitter?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "for_package_uid": "pkg:bower/John%20Doe?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "datafile_path": "scan/bower.json",
+      "datasource_id": "bower_json"
+    },
+    {
+      "purl": "pkg:bower/qunit",
+      "extracted_requirement": "~1.16.0",
+      "scope": "devDependencies",
+      "is_runtime": false,
+      "is_optional": true,
+      "is_pinned": false,
+      "is_direct": true,
+      "resolved_package": {},
+      "extra_data": {},
+      "dependency_uid": "pkg:bower/qunit?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "for_package_uid": "pkg:bower/John%20Doe?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "datafile_path": "scan/bower.json",
+      "datasource_id": "bower_json"
+    }
+  ],
+  "files": [
+    {
+      "path": "scan",
+      "type": "directory",
+      "package_data": [],
+      "for_packages": [],
+      "scan_errors": []
+    },
+    {
+      "path": "scan/bower.json",
+      "type": "file",
+      "package_data": [
+        {
+          "type": "bower",
+          "namespace": null,
+          "name": "John Doe",
+          "version": null,
+          "qualifiers": {},
+          "subpath": null,
+          "primary_language": null,
+          "description": "Physics-like animations for pretty particles",
+          "release_date": null,
+          "parties": [
+            {
+              "type": null,
+              "role": "author",
+              "name": "Betty Beta <bbeta@example.com>",
+              "email": null,
+              "url": null
+            },
+            {
+              "type": null,
+              "role": "author",
+              "name": "John Doe",
+              "email": "john@doe.com",
+              "url": "http://johndoe.com"
+            }
+          ],
+          "keywords": [
+            "motion",
+            "physics",
+            "particles"
+          ],
+          "homepage_url": null,
+          "download_url": null,
+          "size": null,
+          "sha1": null,
+          "md5": null,
+          "sha256": null,
+          "sha512": null,
+          "bug_tracking_url": null,
+          "code_view_url": null,
+          "vcs_url": null,
+          "copyright": null,
+          "holder": null,
+          "declared_license_expression": "mit AND apache-2.0 AND bsd-new",
+          "declared_license_expression_spdx": "MIT AND Apache-2.0 AND BSD-3-Clause",
+          "license_detections": [
+            {
+              "license_expression": "mit",
+              "license_expression_spdx": "MIT",
+              "matches": [
+                {
+                  "license_expression": "mit",
+                  "license_expression_spdx": "MIT",
+                  "from_file": "scan/bower.json",
+                  "start_line": 1,
+                  "end_line": 1,
+                  "matcher": "1-spdx-id",
+                  "score": 100.0,
+                  "matched_length": 1,
+                  "match_coverage": 100.0,
+                  "rule_relevance": 100,
+                  "rule_identifier": "spdx-license-identifier-mit-5da48780aba670b0860c46d899ed42a0f243ff06",
+                  "rule_url": null,
+                  "matched_text": "MIT"
+                }
+              ],
+              "identifier": "mit-a822f434-d61f-f2b1-c792-8b8cb9e7b9bf"
+            },
+            {
+              "license_expression": "apache-2.0",
+              "license_expression_spdx": "Apache-2.0",
+              "matches": [
+                {
+                  "license_expression": "apache-2.0",
+                  "license_expression_spdx": "Apache-2.0",
+                  "from_file": "scan/bower.json",
+                  "start_line": 1,
+                  "end_line": 1,
+                  "matcher": "1-hash",
+                  "score": 100.0,
+                  "matched_length": 3,
+                  "match_coverage": 100.0,
+                  "rule_relevance": 100,
+                  "rule_identifier": "spdx_license_id_apache-2.0_for_apache-2.0.RULE",
+                  "rule_url": "https://github.com/nexB/scancode-toolkit/tree/develop/src/licensedcode/data/rules/spdx_license_id_apache-2.0_for_apache-2.0.RULE",
+                  "matched_text": "Apache 2.0"
+                }
+              ],
+              "identifier": "apache_2_0-d66ab77d-a5cc-7104-e702-dc7df61fe9e8"
+            },
+            {
+              "license_expression": "bsd-new",
+              "license_expression_spdx": "BSD-3-Clause",
+              "matches": [
+                {
+                  "license_expression": "bsd-new",
+                  "license_expression_spdx": "BSD-3-Clause",
+                  "from_file": "scan/bower.json",
+                  "start_line": 1,
+                  "end_line": 1,
+                  "matcher": "1-hash",
+                  "score": 100.0,
+                  "matched_length": 3,
+                  "match_coverage": 100.0,
+                  "rule_relevance": 100,
+                  "rule_identifier": "bsd-new_10.RULE",
+                  "rule_url": "https://github.com/nexB/scancode-toolkit/tree/develop/src/licensedcode/data/rules/bsd-new_10.RULE",
+                  "matched_text": "BSD-3-Clause"
+                }
+              ],
+              "identifier": "bsd_new-50fa5753-f24d-ec04-33a1-36bb8ac0492c"
+            }
+          ],
+          "other_license_expression": null,
+          "other_license_expression_spdx": null,
+          "other_license_detections": [],
+          "extracted_license_statement": "- MIT\n- Apache 2.0\n- BSD-3-Clause\n",
+          "notice_text": null,
+          "source_packages": [],
+          "file_references": [],
+          "is_private": false,
+          "is_virtual": false,
+          "extra_data": {},
+          "dependencies": [
+            {
+              "purl": "pkg:bower/get-size",
+              "extracted_requirement": "~1.2.2",
+              "scope": "dependencies",
+              "is_runtime": true,
+              "is_optional": false,
+              "is_pinned": false,
+              "is_direct": true,
+              "resolved_package": {},
+              "extra_data": {}
+            },
+            {
+              "purl": "pkg:bower/eventEmitter",
+              "extracted_requirement": "~4.2.11",
+              "scope": "dependencies",
+              "is_runtime": true,
+              "is_optional": false,
+              "is_pinned": false,
+              "is_direct": true,
+              "resolved_package": {},
+              "extra_data": {}
+            },
+            {
+              "purl": "pkg:bower/qunit",
+              "extracted_requirement": "~1.16.0",
+              "scope": "devDependencies",
+              "is_runtime": false,
+              "is_optional": true,
+              "is_pinned": false,
+              "is_direct": true,
+              "resolved_package": {},
+              "extra_data": {}
+            }
+          ],
+          "repository_homepage_url": null,
+          "repository_download_url": null,
+          "api_data_url": null,
+          "datasource_id": "bower_json",
+          "purl": "pkg:bower/John%20Doe"
+        }
+      ],
+      "for_packages": [
+        "pkg:bower/John%20Doe?uuid=fixed-uid-done-for-testing-5642512d1758"
+      ],
+      "scan_errors": []
+    }
+  ]
+}

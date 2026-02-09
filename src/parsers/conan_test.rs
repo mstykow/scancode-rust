@@ -21,7 +21,7 @@ fn test_conanfile_py_parser_is_match() {
 #[test]
 fn test_conanfile_py_basic_metadata() {
     let test_file = "testdata/conan/recipes/libgettext/manifest/conanfile.py";
-    let result = ConanFilePyParser::extract_package_data(&PathBuf::from(test_file));
+    let result = ConanFilePyParser::extract_first_package(&PathBuf::from(test_file));
 
     assert_eq!(result.package_type, Some("conan".to_string()));
     assert_eq!(result.name, Some("libgettext".to_string()));
@@ -57,7 +57,7 @@ fn test_conanfile_py_basic_metadata() {
 #[test]
 fn test_conanfile_py_dependencies() {
     let test_file = "testdata/conan/recipes/libgettext/manifest/conanfile.py";
-    let result = ConanFilePyParser::extract_package_data(&PathBuf::from(test_file));
+    let result = ConanFilePyParser::extract_first_package(&PathBuf::from(test_file));
 
     assert_eq!(result.dependencies.len(), 1);
     let dep = &result.dependencies[0];
@@ -71,7 +71,7 @@ fn test_conanfile_py_dependencies() {
 #[test]
 fn test_conanfile_py_boost_metadata() {
     let test_file = "testdata/conan/recipes/boost/manifest/conanfile.py";
-    let result = ConanFilePyParser::extract_package_data(&PathBuf::from(test_file));
+    let result = ConanFilePyParser::extract_first_package(&PathBuf::from(test_file));
 
     assert_eq!(result.package_type, Some("conan".to_string()));
     assert_eq!(result.name, Some("boost".to_string()));
@@ -100,7 +100,7 @@ fn test_conanfile_py_boost_metadata() {
 #[test]
 fn test_conanfile_py_boost_complex_requirements() {
     let test_file = "testdata/conan/recipes/boost/manifest/conanfile.py";
-    let result = ConanFilePyParser::extract_package_data(&PathBuf::from(test_file));
+    let result = ConanFilePyParser::extract_first_package(&PathBuf::from(test_file));
 
     assert_eq!(result.package_type, Some("conan".to_string()));
     assert_eq!(result.name, Some("boost".to_string()));
@@ -110,7 +110,7 @@ fn test_conanfile_py_boost_complex_requirements() {
 fn test_conanfile_py_license_tuple() {
     // Test that license as a string literal is handled
     let test_file = "testdata/conan/recipes/libgettext/manifest/conanfile.py";
-    let result = ConanFilePyParser::extract_package_data(&PathBuf::from(test_file));
+    let result = ConanFilePyParser::extract_first_package(&PathBuf::from(test_file));
 
     assert_eq!(
         result.extracted_license_statement,
@@ -122,7 +122,7 @@ fn test_conanfile_py_license_tuple() {
 fn test_conanfile_py_no_version() {
     // libgettext doesn't have version in class attributes
     let test_file = "testdata/conan/recipes/libgettext/manifest/conanfile.py";
-    let result = ConanFilePyParser::extract_package_data(&PathBuf::from(test_file));
+    let result = ConanFilePyParser::extract_first_package(&PathBuf::from(test_file));
 
     assert_eq!(result.version, None);
 }
@@ -131,7 +131,7 @@ fn test_conanfile_py_no_version() {
 fn test_conanfile_py_invalid_python() {
     // Test with invalid Python file
     let test_file = "testdata/conan/conanfile.txt";
-    let result = ConanFilePyParser::extract_package_data(&PathBuf::from(test_file));
+    let result = ConanFilePyParser::extract_first_package(&PathBuf::from(test_file));
 
     // Should return default package data on parse failure
     assert_eq!(result.package_type, Some("conan".to_string()));
@@ -143,7 +143,7 @@ fn test_conanfile_py_no_conanfile_class() {
     // Test with Python file that doesn't have ConanFile class
     // (using a .py file that exists but isn't a conanfile)
     let test_file = "testdata/conan/recipes/boost/manifest/conanfile.py";
-    let result = ConanFilePyParser::extract_package_data(&PathBuf::from(test_file));
+    let result = ConanFilePyParser::extract_first_package(&PathBuf::from(test_file));
 
     // Should extract data from BoostConan(ConanFile)
     assert!(result.name.is_some());
@@ -166,7 +166,7 @@ fn test_conanfile_txt_parser_is_match() {
 #[test]
 fn test_conanfile_txt_basic() {
     let test_file = "testdata/conan/conanfile.txt";
-    let result = ConanfileTxtParser::extract_package_data(&PathBuf::from(test_file));
+    let result = ConanfileTxtParser::extract_first_package(&PathBuf::from(test_file));
 
     assert_eq!(result.package_type, Some("conan".to_string()));
     assert_eq!(result.primary_language, Some("C++".to_string()));
@@ -185,7 +185,7 @@ fn test_conan_lock_parser_is_match() {
 #[test]
 fn test_conan_lock_basic() {
     let test_file = "testdata/conan/conan.lock";
-    let result = ConanLockParser::extract_package_data(&PathBuf::from(test_file));
+    let result = ConanLockParser::extract_first_package(&PathBuf::from(test_file));
 
     assert_eq!(result.package_type, Some("conan".to_string()));
     assert_eq!(result.primary_language, Some("C++".to_string()));
