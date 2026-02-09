@@ -38,12 +38,12 @@ impl PackageParser for NpmWorkspaceParser {
             .unwrap_or(false)
     }
 
-    fn extract_package_data(path: &Path) -> PackageData {
+    fn extract_packages(path: &Path) -> Vec<PackageData> {
         let content = match fs::read_to_string(path) {
             Ok(content) => content,
             Err(e) => {
                 log::warn!("Failed to read npm workspace file at {:?}: {}", path, e);
-                return default_package_data();
+                return vec![default_package_data()];
             }
         };
 
@@ -51,11 +51,11 @@ impl PackageParser for NpmWorkspaceParser {
             Ok(data) => data,
             Err(e) => {
                 log::warn!("Failed to parse npm workspace file at {:?}: {}", path, e);
-                return default_package_data();
+                return vec![default_package_data()];
             }
         };
 
-        parse_workspace_file(&workspace_data)
+        vec![parse_workspace_file(&workspace_data)]
     }
 }
 

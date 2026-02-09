@@ -29,7 +29,7 @@ mod tests {
         let package_path = PathBuf::from("testdata/npm/package.json")
             .canonicalize()
             .unwrap();
-        let package_data = NpmParser::extract_package_data(&package_path);
+        let package_data = NpmParser::extract_first_package(&package_path);
 
         assert_eq!(package_data.package_type, Some("npm".to_string()));
         assert_eq!(package_data.name, Some("@example/test-package".to_string()));
@@ -81,7 +81,7 @@ mod tests {
         let package_path = PathBuf::from("testdata/npm/package.json")
             .canonicalize()
             .unwrap();
-        let package_data = NpmParser::extract_package_data(&package_path);
+        let package_data = NpmParser::extract_first_package(&package_path);
 
         assert_eq!(package_data.package_type, Some("npm".to_string()));
         assert_eq!(package_data.name, Some("@example/test-package".to_string()));
@@ -139,7 +139,7 @@ mod tests {
 "#;
 
         let (_temp_file, package_path) = create_temp_package_json(content);
-        let package_data = NpmParser::extract_package_data(&package_path);
+        let package_data = NpmParser::extract_first_package(&package_path);
 
         assert_eq!(package_data.package_type, Some("npm".to_string()));
         assert_eq!(package_data.name, Some("test-package".to_string()));
@@ -183,7 +183,7 @@ mod tests {
 "#;
 
         let (_temp_file, package_path) = create_temp_package_json(content);
-        let package_data = NpmParser::extract_package_data(&package_path);
+        let package_data = NpmParser::extract_first_package(&package_path);
 
         assert_eq!(package_data.name, Some("@org/test-package".to_string()));
         assert_eq!(package_data.namespace, Some("@org".to_string()));
@@ -211,7 +211,7 @@ mod tests {
 "#;
 
         let (_temp_file_1, path_1) = create_temp_package_json(license_obj_content);
-        let package_data_1 = NpmParser::extract_package_data(&path_1);
+        let package_data_1 = NpmParser::extract_first_package(&path_1);
 
         assert_eq!(package_data_1.declared_license_expression, None);
         assert_eq!(package_data_1.declared_license_expression_spdx, None);
@@ -237,7 +237,7 @@ mod tests {
 "#;
 
         let (_temp_file_2, path_2) = create_temp_package_json(licenses_array_content);
-        let package_data_2 = NpmParser::extract_package_data(&path_2);
+        let package_data_2 = NpmParser::extract_first_package(&path_2);
 
         assert_eq!(package_data_2.declared_license_expression, None);
         assert_eq!(package_data_2.declared_license_expression_spdx, None);
@@ -257,7 +257,7 @@ mod tests {
 "#;
 
         let (_temp_file_1, path_1) = create_temp_package_json(repo_string_content);
-        let package_data_1 = NpmParser::extract_package_data(&path_1);
+        let package_data_1 = NpmParser::extract_first_package(&path_1);
 
         // Check if repository extraction is working
         if let Some(download_url) = package_data_1.download_url {
@@ -278,7 +278,7 @@ mod tests {
 "#;
 
         let (_temp_file_2, path_2) = create_temp_package_json(repo_obj_content);
-        let package_data_2 = NpmParser::extract_package_data(&path_2);
+        let package_data_2 = NpmParser::extract_first_package(&path_2);
 
         // Check if repository object extraction is working
         if let Some(download_url) = package_data_2.download_url {
@@ -308,7 +308,7 @@ mod tests {
 "#;
 
         let (_temp_file, package_path) = create_temp_package_json(content);
-        let package_data = NpmParser::extract_package_data(&package_path);
+        let package_data = NpmParser::extract_first_package(&package_path);
 
         // Check if dependencies are extracted (may be 0 if parser doesn't support this yet)
         if !package_data.dependencies.is_empty() {
@@ -372,7 +372,7 @@ mod tests {
 "#;
 
         let (_temp_file, package_path) = create_temp_package_json(content);
-        let package_data = NpmParser::extract_package_data(&package_path);
+        let package_data = NpmParser::extract_first_package(&package_path);
 
         // Check that at least some parties are extracted (may be 0 if parser doesn't support this yet)
         if !package_data.parties.is_empty() {
@@ -408,7 +408,7 @@ mod tests {
         // Test with empty content
         let content = "{}";
         let (_temp_file_1, path_1) = create_temp_package_json(content);
-        let package_data_1 = NpmParser::extract_package_data(&path_1);
+        let package_data_1 = NpmParser::extract_first_package(&path_1);
 
         // Should return default/empty package data
         assert_eq!(package_data_1.name, None);
@@ -418,7 +418,7 @@ mod tests {
         // Test with invalid JSON
         let content = "this is not valid JSON";
         let (_temp_file_2, path_2) = create_temp_package_json(content);
-        let package_data_2 = NpmParser::extract_package_data(&path_2);
+        let package_data_2 = NpmParser::extract_first_package(&path_2);
 
         // Should return default/empty package data
         assert_eq!(package_data_2.name, None);
@@ -431,7 +431,7 @@ mod tests {
         let package_path = PathBuf::from("testdata/npm/package-peer-dependencies.json")
             .canonicalize()
             .unwrap();
-        let package_data = NpmParser::extract_package_data(&package_path);
+        let package_data = NpmParser::extract_first_package(&package_path);
 
         // Should have peer dependencies
         assert!(!package_data.dependencies.is_empty());
@@ -458,7 +458,7 @@ mod tests {
         let package_path = PathBuf::from("testdata/npm/package-optional-dependencies.json")
             .canonicalize()
             .unwrap();
-        let package_data = NpmParser::extract_package_data(&package_path);
+        let package_data = NpmParser::extract_first_package(&package_path);
 
         // Should have optional dependencies
         assert!(!package_data.dependencies.is_empty());
@@ -493,7 +493,7 @@ mod tests {
         let package_path = PathBuf::from("testdata/npm/package-bundled-dependencies.json")
             .canonicalize()
             .unwrap();
-        let package_data = NpmParser::extract_package_data(&package_path);
+        let package_data = NpmParser::extract_first_package(&package_path);
 
         // Should have bundled dependencies
         assert!(!package_data.dependencies.is_empty());
@@ -535,7 +535,7 @@ mod tests {
         let package_path = PathBuf::from("testdata/npm/package-bundle-dependencies.json")
             .canonicalize()
             .unwrap();
-        let package_data = NpmParser::extract_package_data(&package_path);
+        let package_data = NpmParser::extract_first_package(&package_path);
 
         // Should have bundled dependencies with bundleDependencies spelling
         assert!(!package_data.dependencies.is_empty());
@@ -564,7 +564,7 @@ mod tests {
         let package_path = PathBuf::from("testdata/npm/package-resolutions.json")
             .canonicalize()
             .unwrap();
-        let package_data = NpmParser::extract_package_data(&package_path);
+        let package_data = NpmParser::extract_first_package(&package_path);
 
         // Should have resolutions in extra_data
         let extra_data = package_data
@@ -594,7 +594,7 @@ mod tests {
         let package_path = PathBuf::from("testdata/npm/package-all-dependencies.json")
             .canonicalize()
             .unwrap();
-        let package_data = NpmParser::extract_package_data(&package_path);
+        let package_data = NpmParser::extract_first_package(&package_path);
 
         assert!(!package_data.dependencies.is_empty());
 
@@ -654,7 +654,7 @@ mod tests {
 
     #[test]
     fn test_extract_description() {
-        let package_data = NpmParser::extract_package_data(
+        let package_data = NpmParser::extract_first_package(
             PathBuf::from("testdata/npm/package-description.json").as_path(),
         );
 
@@ -673,7 +673,7 @@ mod tests {
 
     #[test]
     fn test_extract_keywords_array() {
-        let package_data = NpmParser::extract_package_data(
+        let package_data = NpmParser::extract_first_package(
             PathBuf::from("testdata/npm/package-keywords-array.json").as_path(),
         );
 
@@ -685,7 +685,7 @@ mod tests {
 
     #[test]
     fn test_extract_keywords_string() {
-        let package_data = NpmParser::extract_package_data(
+        let package_data = NpmParser::extract_first_package(
             PathBuf::from("testdata/npm/package-keywords-string.json").as_path(),
         );
 
@@ -697,7 +697,7 @@ mod tests {
 
     #[test]
     fn test_extract_engines() {
-        let package_data = NpmParser::extract_package_data(
+        let package_data = NpmParser::extract_first_package(
             PathBuf::from("testdata/npm/package-engines.json").as_path(),
         );
 
@@ -716,7 +716,7 @@ mod tests {
 
     #[test]
     fn test_extract_package_manager() {
-        let package_data = NpmParser::extract_package_data(
+        let package_data = NpmParser::extract_first_package(
             PathBuf::from("testdata/npm/package-manager.json").as_path(),
         );
 
@@ -734,7 +734,7 @@ mod tests {
 
     #[test]
     fn test_extract_workspaces() {
-        let package_data = NpmParser::extract_package_data(
+        let package_data = NpmParser::extract_first_package(
             PathBuf::from("testdata/npm/package-workspaces.json").as_path(),
         );
 
@@ -760,7 +760,7 @@ mod tests {
 
     #[test]
     fn test_extract_private() {
-        let package_data = NpmParser::extract_package_data(
+        let package_data = NpmParser::extract_first_package(
             PathBuf::from("testdata/npm/package-private.json").as_path(),
         );
 
@@ -778,7 +778,7 @@ mod tests {
 
     #[test]
     fn test_extract_all_metadata() {
-        let package_data = NpmParser::extract_package_data(
+        let package_data = NpmParser::extract_first_package(
             PathBuf::from("testdata/npm/package-metadata-all.json").as_path(),
         );
 
@@ -808,7 +808,7 @@ mod tests {
 
     #[test]
     fn test_extract_bugs_string() {
-        let package_data = NpmParser::extract_package_data(
+        let package_data = NpmParser::extract_first_package(
             PathBuf::from("testdata/npm/package-bugs-string.json").as_path(),
         );
 
@@ -820,7 +820,7 @@ mod tests {
 
     #[test]
     fn test_extract_bugs_object() {
-        let package_data = NpmParser::extract_package_data(
+        let package_data = NpmParser::extract_first_package(
             PathBuf::from("testdata/npm/package-bugs-object.json").as_path(),
         );
 
@@ -832,7 +832,7 @@ mod tests {
 
     #[test]
     fn test_extract_bugs_with_all_metadata() {
-        let package_data = NpmParser::extract_package_data(
+        let package_data = NpmParser::extract_first_package(
             PathBuf::from("testdata/npm/package-metadata-all-bugs.json").as_path(),
         );
 
@@ -863,7 +863,7 @@ mod tests {
 
     #[test]
     fn test_extract_dist_sha256() {
-        let package_data = NpmParser::extract_package_data(
+        let package_data = NpmParser::extract_first_package(
             PathBuf::from("testdata/npm/package-dist-sha256.json").as_path(),
         );
 
@@ -887,7 +887,7 @@ mod tests {
 
     #[test]
     fn test_extract_dist_sha512() {
-        let package_data = NpmParser::extract_package_data(
+        let package_data = NpmParser::extract_first_package(
             PathBuf::from("testdata/npm/package-dist-tarball.json").as_path(),
         );
 
@@ -911,7 +911,7 @@ mod tests {
 
     #[test]
     fn test_extract_dist_no_integrity() {
-        let package_data = NpmParser::extract_package_data(
+        let package_data = NpmParser::extract_first_package(
             PathBuf::from("testdata/npm/package-dist-no-integrity.json").as_path(),
         );
 
@@ -931,7 +931,7 @@ mod tests {
 
     #[test]
     fn test_extract_dist_complete() {
-        let package_data = NpmParser::extract_package_data(
+        let package_data = NpmParser::extract_first_package(
             PathBuf::from("testdata/npm/package-dist-complete.json").as_path(),
         );
 
@@ -960,7 +960,7 @@ mod tests {
 
     #[test]
     fn test_extract_no_dist_fallback_to_repo() {
-        let package_data = NpmParser::extract_package_data(
+        let package_data = NpmParser::extract_first_package(
             PathBuf::from("testdata/npm/package-no-dist.json").as_path(),
         );
 
@@ -980,7 +980,7 @@ mod tests {
 
     #[test]
     fn test_extract_repo_string_https() {
-        let package_data = NpmParser::extract_package_data(
+        let package_data = NpmParser::extract_first_package(
             PathBuf::from("testdata/npm/package-repo-string-https.json").as_path(),
         );
         assert_eq!(
@@ -991,7 +991,7 @@ mod tests {
 
     #[test]
     fn test_extract_repo_string_git() {
-        let package_data = NpmParser::extract_package_data(
+        let package_data = NpmParser::extract_first_package(
             PathBuf::from("testdata/npm/package-repo-string-git.json").as_path(),
         );
         assert_eq!(
@@ -1002,7 +1002,7 @@ mod tests {
 
     #[test]
     fn test_extract_repo_string_git_at() {
-        let package_data = NpmParser::extract_package_data(
+        let package_data = NpmParser::extract_first_package(
             PathBuf::from("testdata/npm/package-repo-string-git-at.json").as_path(),
         );
         assert_eq!(
@@ -1013,7 +1013,7 @@ mod tests {
 
     #[test]
     fn test_extract_repo_string_git_at_gitlab() {
-        let package_data = NpmParser::extract_package_data(
+        let package_data = NpmParser::extract_first_package(
             PathBuf::from("testdata/npm/package-repo-string-git-at-gitlab.json").as_path(),
         );
         assert_eq!(
@@ -1024,7 +1024,7 @@ mod tests {
 
     #[test]
     fn test_extract_repo_string_github_shortcut() {
-        let package_data = NpmParser::extract_package_data(
+        let package_data = NpmParser::extract_first_package(
             PathBuf::from("testdata/npm/package-repo-string-github-shortcut.json").as_path(),
         );
         assert_eq!(
@@ -1035,7 +1035,7 @@ mod tests {
 
     #[test]
     fn test_extract_repo_string_gitlab_shortcut() {
-        let package_data = NpmParser::extract_package_data(
+        let package_data = NpmParser::extract_first_package(
             PathBuf::from("testdata/npm/package-repo-string-gitlab-shortcut.json").as_path(),
         );
         assert_eq!(
@@ -1046,7 +1046,7 @@ mod tests {
 
     #[test]
     fn test_extract_repo_string_bitbucket_shortcut() {
-        let package_data = NpmParser::extract_package_data(
+        let package_data = NpmParser::extract_first_package(
             PathBuf::from("testdata/npm/package-repo-string-bitbucket-shortcut.json").as_path(),
         );
         assert_eq!(
@@ -1057,7 +1057,7 @@ mod tests {
 
     #[test]
     fn test_extract_repo_string_gist_shortcut() {
-        let package_data = NpmParser::extract_package_data(
+        let package_data = NpmParser::extract_first_package(
             PathBuf::from("testdata/npm/package-repo-string-gist-shortcut.json").as_path(),
         );
         assert_eq!(
@@ -1068,7 +1068,7 @@ mod tests {
 
     #[test]
     fn test_extract_repo_string_implicit_github() {
-        let package_data = NpmParser::extract_package_data(
+        let package_data = NpmParser::extract_first_package(
             PathBuf::from("testdata/npm/package-repo-string-implicit-github.json").as_path(),
         );
         assert_eq!(
@@ -1079,7 +1079,7 @@ mod tests {
 
     #[test]
     fn test_extract_repo_object_url() {
-        let package_data = NpmParser::extract_package_data(
+        let package_data = NpmParser::extract_first_package(
             PathBuf::from("testdata/npm/package-repo-object-url.json").as_path(),
         );
         assert_eq!(
@@ -1090,7 +1090,7 @@ mod tests {
 
     #[test]
     fn test_extract_repo_object_complete() {
-        let package_data = NpmParser::extract_package_data(
+        let package_data = NpmParser::extract_first_package(
             PathBuf::from("testdata/npm/package-repo-object-complete.json").as_path(),
         );
         assert_eq!(
@@ -1101,7 +1101,7 @@ mod tests {
 
     #[test]
     fn test_extract_peer_dependencies_meta() {
-        let package_data = NpmParser::extract_package_data(
+        let package_data = NpmParser::extract_first_package(
             PathBuf::from("testdata/npm/package-peerdeps-meta.json").as_path(),
         );
 
@@ -1135,7 +1135,7 @@ mod tests {
 
     #[test]
     fn test_extract_peer_dependencies_meta_multiple() {
-        let package_data = NpmParser::extract_package_data(
+        let package_data = NpmParser::extract_first_package(
             PathBuf::from("testdata/npm/package-peerdeps-meta-multiple.json").as_path(),
         );
 
@@ -1173,7 +1173,7 @@ mod tests {
 
     #[test]
     fn test_extract_peer_dependencies_meta_empty() {
-        let package_data = NpmParser::extract_package_data(
+        let package_data = NpmParser::extract_first_package(
             PathBuf::from("testdata/npm/package-peerdeps-meta-empty.json").as_path(),
         );
 
@@ -1194,7 +1194,7 @@ mod tests {
 
     #[test]
     fn test_extract_peer_dependencies_meta_optional_true_only() {
-        let package_data = NpmParser::extract_package_data(
+        let package_data = NpmParser::extract_first_package(
             PathBuf::from("testdata/npm/package-peerdeps-meta-optional-true.json").as_path(),
         );
 
@@ -1226,7 +1226,7 @@ mod tests {
 
     #[test]
     fn test_extract_peer_dependencies_meta_absent() {
-        let package_data = NpmParser::extract_package_data(
+        let package_data = NpmParser::extract_first_package(
             PathBuf::from("testdata/npm/package-peerdeps-meta-absent.json").as_path(),
         );
 
@@ -1247,7 +1247,7 @@ mod tests {
 
     #[test]
     fn test_extract_dependencies_meta_pnpm() {
-        let package_data = NpmParser::extract_package_data(
+        let package_data = NpmParser::extract_first_package(
             PathBuf::from("testdata/npm/package-depsmeta-pnpm.json").as_path(),
         );
 
@@ -1268,7 +1268,7 @@ mod tests {
 
     #[test]
     fn test_extract_dependencies_meta_empty() {
-        let package_data = NpmParser::extract_package_data(
+        let package_data = NpmParser::extract_first_package(
             PathBuf::from("testdata/npm/package-depsmeta-empty.json").as_path(),
         );
 
@@ -1287,7 +1287,7 @@ mod tests {
 
     #[test]
     fn test_extract_dependencies_meta_absent() {
-        let package_data = NpmParser::extract_package_data(
+        let package_data = NpmParser::extract_first_package(
             PathBuf::from("testdata/npm/package-depsmeta-absent.json").as_path(),
         );
 
@@ -1298,7 +1298,7 @@ mod tests {
 
     #[test]
     fn test_extract_dependencies_meta_combined() {
-        let package_data = NpmParser::extract_package_data(
+        let package_data = NpmParser::extract_first_package(
             PathBuf::from("testdata/npm/package-depsmeta-combined.json").as_path(),
         );
 
@@ -1337,7 +1337,7 @@ mod tests {
 
     #[test]
     fn test_extract_workspace_dependencies_caret() {
-        let package_data = NpmParser::extract_package_data(
+        let package_data = NpmParser::extract_first_package(
             PathBuf::from("testdata/npm/package-workspace-caret.json").as_path(),
         );
 
@@ -1371,7 +1371,7 @@ mod tests {
 
     #[test]
     fn test_extract_workspace_dependencies_tilde() {
-        let package_data = NpmParser::extract_package_data(
+        let package_data = NpmParser::extract_first_package(
             PathBuf::from("testdata/npm/package-workspace-tilde.json").as_path(),
         );
 
@@ -1399,7 +1399,7 @@ mod tests {
 
     #[test]
     fn test_extract_workspace_dependencies_asterisk() {
-        let package_data = NpmParser::extract_package_data(
+        let package_data = NpmParser::extract_first_package(
             PathBuf::from("testdata/npm/package-workspace-asterisk.json").as_path(),
         );
 
@@ -1427,7 +1427,7 @@ mod tests {
 
     #[test]
     fn test_extract_workspace_dependencies_mixed() {
-        let package_data = NpmParser::extract_package_data(
+        let package_data = NpmParser::extract_first_package(
             PathBuf::from("testdata/npm/package-workspace-deps.json").as_path(),
         );
 
@@ -1485,7 +1485,7 @@ mod tests {
 
     #[test]
     fn test_extract_workspaces_array() {
-        let package_data = NpmParser::extract_package_data(
+        let package_data = NpmParser::extract_first_package(
             PathBuf::from("testdata/npm/package-workspaces-multi.json").as_path(),
         );
 
@@ -1506,7 +1506,7 @@ mod tests {
 
     #[test]
     fn test_extract_workspaces_string() {
-        let package_data = NpmParser::extract_package_data(
+        let package_data = NpmParser::extract_first_package(
             PathBuf::from("testdata/npm/package-workspaces-string.json").as_path(),
         );
 
@@ -1524,7 +1524,7 @@ mod tests {
 
     #[test]
     fn test_extract_no_workspaces() {
-        let package_data = NpmParser::extract_package_data(
+        let package_data = NpmParser::extract_first_package(
             PathBuf::from("testdata/npm/package-no-workspaces.json").as_path(),
         );
 
@@ -1544,7 +1544,7 @@ mod tests {
 
     #[test]
     fn test_extract_regular_dependencies_have_requirement() {
-        let package_data = NpmParser::extract_package_data(
+        let package_data = NpmParser::extract_first_package(
             PathBuf::from("testdata/npm/package-no-workspaces.json").as_path(),
         );
 
@@ -1560,7 +1560,7 @@ mod tests {
 
     #[test]
     fn test_extract_alias_simple() {
-        let package_data = NpmParser::extract_package_data(
+        let package_data = NpmParser::extract_first_package(
             PathBuf::from("testdata/npm/package-alias-simple.json").as_path(),
         );
 
@@ -1597,7 +1597,7 @@ mod tests {
 
     #[test]
     fn test_extract_alias_scoped() {
-        let package_data = NpmParser::extract_package_data(
+        let package_data = NpmParser::extract_first_package(
             PathBuf::from("testdata/npm/package-alias-scoped.json").as_path(),
         );
 
@@ -1620,7 +1620,7 @@ mod tests {
 
     #[test]
     fn test_extract_alias_multiple_scopes() {
-        let package_data = NpmParser::extract_package_data(
+        let package_data = NpmParser::extract_first_package(
             PathBuf::from("testdata/npm/package-alias-multiple-scopes.json").as_path(),
         );
 
@@ -1659,7 +1659,7 @@ mod tests {
 
     #[test]
     fn test_extract_alias_version_formats() {
-        let package_data = NpmParser::extract_package_data(
+        let package_data = NpmParser::extract_first_package(
             PathBuf::from("testdata/npm/package-alias-versions.json").as_path(),
         );
 
@@ -1687,7 +1687,7 @@ mod tests {
 
     #[test]
     fn test_extract_no_alias() {
-        let package_data = NpmParser::extract_package_data(
+        let package_data = NpmParser::extract_first_package(
             PathBuf::from("testdata/npm/package-alias-no-alias.json").as_path(),
         );
 
@@ -1706,7 +1706,7 @@ mod tests {
 
     #[test]
     fn test_extract_api_url_basic() {
-        let package_data = NpmParser::extract_package_data(
+        let package_data = NpmParser::extract_first_package(
             PathBuf::from("testdata/npm/package-api-url-basic.json").as_path(),
         );
 
@@ -1718,7 +1718,7 @@ mod tests {
 
     #[test]
     fn test_extract_api_url_scoped() {
-        let package_data = NpmParser::extract_package_data(
+        let package_data = NpmParser::extract_first_package(
             PathBuf::from("testdata/npm/package-api-url-scoped.json").as_path(),
         );
 
@@ -1730,7 +1730,7 @@ mod tests {
 
     #[test]
     fn test_extract_api_url_no_version() {
-        let package_data = NpmParser::extract_package_data(
+        let package_data = NpmParser::extract_first_package(
             PathBuf::from("testdata/npm/package-api-url-no-version.json").as_path(),
         );
 
@@ -1749,7 +1749,7 @@ mod tests {
 }"#;
 
         let (_temp_file, path) = create_temp_package_json(content);
-        let package_data = NpmParser::extract_package_data(&path);
+        let package_data = NpmParser::extract_first_package(&path);
 
         assert_eq!(
             package_data.vcs_url,
@@ -1769,7 +1769,7 @@ mod tests {
 }"#;
 
         let (_temp_file, path) = create_temp_package_json(content);
-        let package_data = NpmParser::extract_package_data(&path);
+        let package_data = NpmParser::extract_first_package(&path);
 
         assert_eq!(
             package_data.vcs_url,
@@ -1790,7 +1790,7 @@ mod tests {
 }"#;
 
         let (_temp_file, path) = create_temp_package_json(content);
-        let package_data = NpmParser::extract_package_data(&path);
+        let package_data = NpmParser::extract_first_package(&path);
 
         assert_eq!(
             package_data.vcs_url,
@@ -1807,7 +1807,7 @@ mod tests {
 }"#;
 
         let (_temp_file, path) = create_temp_package_json(content);
-        let package_data = NpmParser::extract_package_data(&path);
+        let package_data = NpmParser::extract_first_package(&path);
 
         assert_eq!(
             package_data.vcs_url,
@@ -1824,7 +1824,7 @@ mod tests {
 }"#;
 
         let (_temp_file, path) = create_temp_package_json(content);
-        let package_data = NpmParser::extract_package_data(&path);
+        let package_data = NpmParser::extract_first_package(&path);
 
         assert_eq!(
             package_data.vcs_url,
@@ -1840,7 +1840,7 @@ mod tests {
 }"#;
 
         let (_temp_file, path) = create_temp_package_json(content);
-        let package_data = NpmParser::extract_package_data(&path);
+        let package_data = NpmParser::extract_first_package(&path);
 
         assert_eq!(package_data.vcs_url, None);
     }
@@ -1848,7 +1848,7 @@ mod tests {
     #[test]
     fn test_workspace_protocol_asterisk() {
         let path = PathBuf::from("testdata/npm/package-workspace-asterisk.json");
-        let package_data = NpmParser::extract_package_data(&path);
+        let package_data = NpmParser::extract_first_package(&path);
 
         let workspace_dep = package_data
             .dependencies
@@ -1867,7 +1867,7 @@ mod tests {
     #[test]
     fn test_workspace_protocol_caret() {
         let path = PathBuf::from("testdata/npm/package-workspace-caret.json");
-        let package_data = NpmParser::extract_package_data(&path);
+        let package_data = NpmParser::extract_first_package(&path);
 
         let workspace_dep = package_data
             .dependencies
@@ -1886,7 +1886,7 @@ mod tests {
     #[test]
     fn test_workspace_protocol_tilde() {
         let path = PathBuf::from("testdata/npm/package-workspace-tilde.json");
-        let package_data = NpmParser::extract_package_data(&path);
+        let package_data = NpmParser::extract_first_package(&path);
 
         let workspace_dep = package_data
             .dependencies
@@ -1905,7 +1905,7 @@ mod tests {
     #[test]
     fn test_workspace_protocol_mixed_deps() {
         let path = PathBuf::from("testdata/npm/package-workspace-deps.json");
-        let package_data = NpmParser::extract_package_data(&path);
+        let package_data = NpmParser::extract_first_package(&path);
 
         let workspace_deps: Vec<_> = package_data
             .dependencies
@@ -1958,7 +1958,7 @@ mod tests {
     #[test]
     fn test_scoped_dependency_purl_bug() {
         let package_path = PathBuf::from("testdata/npm/scoped-deps/package.json");
-        let package_data = NpmParser::extract_package_data(&package_path);
+        let package_data = NpmParser::extract_first_package(&package_path);
 
         assert!(
             !package_data.dependencies.is_empty(),
@@ -2023,7 +2023,7 @@ mod tests {
     #[test]
     fn test_peer_dependencies_meta_optional() {
         let package_path = PathBuf::from("testdata/npm/peer-deps-meta/package.json");
-        let package_data = NpmParser::extract_package_data(&package_path);
+        let package_data = NpmParser::extract_first_package(&package_path);
 
         let debug_dep = package_data
             .dependencies

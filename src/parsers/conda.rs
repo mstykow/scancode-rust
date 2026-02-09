@@ -90,12 +90,12 @@ impl PackageParser for CondaMetaYamlParser {
             .is_some_and(|name| name == "meta.yaml" || name == "meta.yml")
     }
 
-    fn extract_package_data(path: &Path) -> PackageData {
+    fn extract_packages(path: &Path) -> Vec<PackageData> {
         let contents = match fs::read_to_string(path) {
             Ok(c) => c,
             Err(e) => {
                 warn!("Failed to read {}: {}", path.display(), e);
-                return default_package_data();
+                return vec![default_package_data()];
             }
         };
 
@@ -108,7 +108,7 @@ impl PackageParser for CondaMetaYamlParser {
             Ok(y) => y,
             Err(e) => {
                 warn!("Failed to parse YAML in {}: {}", path.display(), e);
-                return default_package_data();
+                return vec![default_package_data()];
             }
         };
 
@@ -207,7 +207,7 @@ impl PackageParser for CondaMetaYamlParser {
         if !extra_data.is_empty() {
             pkg.extra_data = Some(extra_data);
         }
-        pkg
+        vec![pkg]
     }
 }
 
@@ -231,12 +231,12 @@ impl PackageParser for CondaEnvironmentYmlParser {
         }
     }
 
-    fn extract_package_data(path: &Path) -> PackageData {
+    fn extract_packages(path: &Path) -> Vec<PackageData> {
         let contents = match fs::read_to_string(path) {
             Ok(c) => c,
             Err(e) => {
                 warn!("Failed to read {}: {}", path.display(), e);
-                return default_package_data();
+                return vec![default_package_data()];
             }
         };
 
@@ -244,7 +244,7 @@ impl PackageParser for CondaEnvironmentYmlParser {
             Ok(y) => y,
             Err(e) => {
                 warn!("Failed to parse YAML in {}: {}", path.display(), e);
-                return default_package_data();
+                return vec![default_package_data()];
             }
         };
 
@@ -273,7 +273,7 @@ impl PackageParser for CondaEnvironmentYmlParser {
         if !extra_data.is_empty() {
             pkg.extra_data = Some(extra_data);
         }
-        pkg
+        vec![pkg]
     }
 }
 

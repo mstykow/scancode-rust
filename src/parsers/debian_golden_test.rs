@@ -15,7 +15,7 @@ mod golden_tests {
             return;
         }
 
-        let package_data = DebianDebParser::extract_package_data(&test_file);
+        let package_data = DebianDebParser::extract_first_package(&test_file);
 
         match compare_package_data_parser_only(&package_data, &expected_file) {
             Ok(_) => (),
@@ -33,7 +33,7 @@ mod golden_tests {
             return;
         }
 
-        let package_data = DebianDscParser::extract_package_data(&test_file);
+        let package_data = DebianDscParser::extract_first_package(&test_file);
 
         match compare_package_data_parser_only(&package_data, &expected_file) {
             Ok(_) => (),
@@ -51,7 +51,7 @@ mod golden_tests {
             return;
         }
 
-        let package_data = DebianCopyrightParser::extract_package_data(&test_file);
+        let package_data = DebianCopyrightParser::extract_first_package(&test_file);
 
         match compare_package_data_parser_only(&package_data, &expected_file) {
             Ok(_) => (),

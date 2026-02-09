@@ -353,12 +353,12 @@ pub struct MavenParser;
 impl PackageParser for MavenParser {
     const PACKAGE_TYPE: &'static str = "maven";
 
-    fn extract_package_data(path: &Path) -> PackageData {
+    fn extract_packages(path: &Path) -> Vec<PackageData> {
         if let Some(filename) = path.file_name().and_then(|name| name.to_str()) {
             if filename == "pom.properties" {
-                return parse_pom_properties(path);
+                return vec![parse_pom_properties(path)];
             } else if filename == "MANIFEST.MF" {
-                return parse_manifest_mf(path);
+                return vec![parse_manifest_mf(path)];
             }
         }
 
@@ -366,7 +366,7 @@ impl PackageParser for MavenParser {
             Ok(f) => f,
             Err(e) => {
                 warn!("Failed to open pom.xml at {:?}: {}", path, e);
-                return default_package_data();
+                return vec![default_package_data()];
             }
         };
 
@@ -938,7 +938,7 @@ impl PackageParser for MavenParser {
                 Ok(Event::Eof) => break,
                 Err(e) => {
                     warn!("Error parsing pom.xml at {:?}: {}", path, e);
-                    return package_data;
+                    return vec![package_data];
                 }
                 _ => {}
             }
@@ -1314,7 +1314,7 @@ impl PackageParser for MavenParser {
             package_data.extracted_license_statement = Some(combined_license);
         }
 
-        package_data
+        vec![package_data]
     }
 
     fn is_match(path: &Path) -> bool {
@@ -1623,7 +1623,7 @@ mod tests {
 
         fs::write(&pom_path, pom_content).unwrap();
 
-        let package_data = MavenParser::extract_package_data(&pom_path);
+        let package_data = MavenParser::extract_first_package(&pom_path);
 
         assert_eq!(package_data.name, Some("my-app".to_string()));
         assert_eq!(package_data.namespace, Some("com.example".to_string()));
@@ -1667,7 +1667,7 @@ mod tests {
 
         fs::write(&pom_path, pom_content).unwrap();
 
-        let package_data = MavenParser::extract_package_data(&pom_path);
+        let package_data = MavenParser::extract_first_package(&pom_path);
 
         assert_eq!(
             package_data.name,
@@ -1735,7 +1735,7 @@ mod tests {
 
         fs::write(&pom_path, pom_content).unwrap();
 
-        let package_data = MavenParser::extract_package_data(&pom_path);
+        let package_data = MavenParser::extract_first_package(&pom_path);
 
         assert_eq!(package_data.name, Some("test-app".to_string()));
         assert_eq!(package_data.parties.len(), 3);
@@ -1788,7 +1788,7 @@ mod tests {
 
         fs::write(&pom_path, pom_content).unwrap();
 
-        let package_data = MavenParser::extract_package_data(&pom_path);
+        let package_data = MavenParser::extract_first_package(&pom_path);
 
         assert_eq!(package_data.name, Some("test-app".to_string()));
         assert_eq!(
@@ -1824,7 +1824,7 @@ mod tests {
 
         fs::write(&pom_path, pom_content).unwrap();
 
-        let package_data = MavenParser::extract_package_data(&pom_path);
+        let package_data = MavenParser::extract_first_package(&pom_path);
 
         assert_eq!(package_data.name, Some("test-app".to_string()));
 
@@ -1878,7 +1878,7 @@ mod tests {
 
         fs::write(&pom_path, pom_content).unwrap();
 
-        let package_data = MavenParser::extract_package_data(&pom_path);
+        let package_data = MavenParser::extract_first_package(&pom_path);
 
         assert_eq!(package_data.name, Some("test-app".to_string()));
         assert_eq!(

@@ -24,7 +24,7 @@ mod tests {
     #[test]
     fn test_extract_from_real_cargo_lock() {
         let lock_path = PathBuf::from("Cargo.lock");
-        let package_data = CargoLockParser::extract_package_data(&lock_path);
+        let package_data = CargoLockParser::extract_first_package(&lock_path);
 
         assert_eq!(package_data.package_type, Some("cargo".to_string()));
         // The first package is alphabetically first, not the root
@@ -36,7 +36,7 @@ mod tests {
     #[test]
     fn test_extract_from_testdata() {
         let lock_path = PathBuf::from("testdata/cargo/Cargo-lock-basic.lock");
-        let package_data = CargoLockParser::extract_package_data(&lock_path);
+        let package_data = CargoLockParser::extract_first_package(&lock_path);
 
         assert_eq!(package_data.package_type, Some("cargo".to_string()));
         assert_eq!(package_data.name, Some("test-project".to_string()));
@@ -57,7 +57,7 @@ mod tests {
     #[test]
     fn test_extract_dependencies() {
         let lock_path = PathBuf::from("testdata/cargo/Cargo-lock-deps.lock");
-        let package_data = CargoLockParser::extract_package_data(&lock_path);
+        let package_data = CargoLockParser::extract_first_package(&lock_path);
 
         let deps = package_data.dependencies;
         assert!(!deps.is_empty());
@@ -77,7 +77,7 @@ mod tests {
     #[test]
     fn test_datasource_id() {
         let lock_path = PathBuf::from("testdata/cargo/Cargo-lock-basic.lock");
-        let package_data = CargoLockParser::extract_package_data(&lock_path);
+        let package_data = CargoLockParser::extract_first_package(&lock_path);
 
         assert_eq!(package_data.datasource_id, Some("cargo_lock".to_string()));
     }
@@ -85,7 +85,7 @@ mod tests {
     #[test]
     fn test_is_direct_flag() {
         let lock_path = PathBuf::from("testdata/cargo/Cargo-lock-deps.lock");
-        let package_data = CargoLockParser::extract_package_data(&lock_path);
+        let package_data = CargoLockParser::extract_first_package(&lock_path);
 
         let deps = package_data.dependencies;
         assert!(!deps.is_empty());
@@ -117,7 +117,7 @@ mod tests {
         // and is_runtime=true. This test documents and verifies this behavior.
 
         let lock_path = PathBuf::from("testdata/cargo/Cargo-lock-deps.lock");
-        let package_data = CargoLockParser::extract_package_data(&lock_path);
+        let package_data = CargoLockParser::extract_first_package(&lock_path);
 
         let deps = package_data.dependencies;
         assert!(!deps.is_empty());

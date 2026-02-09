@@ -45,22 +45,22 @@ impl PackageParser for YarnLockParser {
             .unwrap_or(false)
     }
 
-    fn extract_package_data(path: &Path) -> PackageData {
+    fn extract_packages(path: &Path) -> Vec<PackageData> {
         let content = match fs::read_to_string(path) {
             Ok(content) => content,
             Err(e) => {
                 warn!("Failed to read yarn.lock at {:?}: {}", path, e);
-                return default_package_data();
+                return vec![default_package_data()];
             }
         };
 
         let is_v2 = detect_yarn_version(&content);
 
-        if is_v2 {
+        vec![if is_v2 {
             parse_yarn_v2(&content)
         } else {
             parse_yarn_v1(&content)
-        }
+        }]
     }
 }
 

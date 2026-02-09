@@ -11,7 +11,7 @@ mod golden_tests {
         let expected_file =
             PathBuf::from("testdata/composer-golden/composer-lock/composer.lock.expected");
 
-        let package_data = ComposerLockParser::extract_package_data(&test_file);
+        let package_data = ComposerLockParser::extract_first_package(&test_file);
 
         match compare_package_data_parser_only(&package_data, &expected_file) {
             Ok(_) => (),

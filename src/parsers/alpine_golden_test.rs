@@ -14,7 +14,7 @@ mod golden_tests {
             return;
         }
 
-        let package_data = AlpineInstalledParser::extract_package_data(&test_file);
+        let package_data = AlpineInstalledParser::extract_first_package(&test_file);
 
         match compare_package_data_parser_only(&package_data, &expected_file) {
             Ok(_) => (),

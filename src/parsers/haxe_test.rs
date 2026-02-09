@@ -26,7 +26,7 @@ mod tests {
     #[test]
     fn test_extract_from_testdata() {
         let haxelib_path = PathBuf::from("testdata/haxe/basic/haxelib.json");
-        let package_data = HaxeParser::extract_package_data(&haxelib_path);
+        let package_data = HaxeParser::extract_first_package(&haxelib_path);
 
         assert_eq!(package_data.package_type, Some("haxe".to_string()));
         assert_eq!(package_data.name, Some("haxelib".to_string()));
@@ -77,7 +77,7 @@ mod tests {
     #[test]
     fn test_dependencies() {
         let haxelib_path = PathBuf::from("testdata/haxe/deps/haxelib.json");
-        let package_data = HaxeParser::extract_package_data(&haxelib_path);
+        let package_data = HaxeParser::extract_first_package(&haxelib_path);
 
         assert_eq!(package_data.dependencies.len(), 2);
 
@@ -103,7 +103,7 @@ mod tests {
     #[test]
     fn test_validation_empty_json() {
         let (_temp_dir, haxelib_path) = create_temp_haxelib_json("{}");
-        let package_data = HaxeParser::extract_package_data(&haxelib_path);
+        let package_data = HaxeParser::extract_first_package(&haxelib_path);
 
         // Should have proper type and datasource even for empty/invalid data
         assert_eq!(package_data.package_type, Some("haxe".to_string()));
@@ -123,7 +123,7 @@ mod tests {
         "#;
 
         let (_temp_dir, haxelib_path) = create_temp_haxelib_json(minimal_json);
-        let package_data = HaxeParser::extract_package_data(&haxelib_path);
+        let package_data = HaxeParser::extract_first_package(&haxelib_path);
 
         assert_eq!(package_data.name, Some("minimal".to_string()));
         assert_eq!(package_data.version, Some("1.0.0".to_string()));
@@ -140,7 +140,7 @@ mod tests {
     #[test]
     fn test_url_generation() {
         let haxelib_path = PathBuf::from("testdata/haxe/basic/haxelib.json");
-        let package_data = HaxeParser::extract_package_data(&haxelib_path);
+        let package_data = HaxeParser::extract_first_package(&haxelib_path);
 
         // Repository homepage URL should be generated
         assert_eq!(
@@ -164,7 +164,7 @@ mod tests {
     #[test]
     fn test_with_tags() {
         let haxelib_path = PathBuf::from("testdata/haxe/tags/haxelib.json");
-        let package_data = HaxeParser::extract_package_data(&haxelib_path);
+        let package_data = HaxeParser::extract_first_package(&haxelib_path);
 
         assert_eq!(package_data.name, Some("tink_core".to_string()));
 
@@ -190,7 +190,7 @@ mod tests {
         let invalid_json = "{ invalid json }";
 
         let (_temp_dir, haxelib_path) = create_temp_haxelib_json(invalid_json);
-        let package_data = HaxeParser::extract_package_data(&haxelib_path);
+        let package_data = HaxeParser::extract_first_package(&haxelib_path);
 
         // Should gracefully handle invalid JSON
         assert_eq!(package_data.package_type, Some("haxe".to_string()));

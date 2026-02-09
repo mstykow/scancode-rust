@@ -146,22 +146,16 @@ impl PackageParser for DebianControlParser {
         false
     }
 
-    fn extract_package_data(path: &Path) -> PackageData {
+    fn extract_packages(path: &Path) -> Vec<PackageData> {
         let content = match read_file_to_string(path) {
             Ok(c) => c,
             Err(e) => {
                 warn!("Failed to read debian/control at {:?}: {}", path, e);
-                return create_default_package_data(PACKAGE_TYPE, None);
+                return Vec::new();
             }
         };
 
-        let packages = parse_debian_control(&content);
-        if packages.is_empty() {
-            return create_default_package_data(PACKAGE_TYPE, None);
-        }
-
-        // Return first package (source paragraph data merged into binary, or standalone)
-        packages.into_iter().next().unwrap()
+        parse_debian_control(&content)
     }
 }
 
@@ -171,10 +165,15 @@ impl PackageParser for DebianControlParser {
 
 pub struct DebianInstalledParser;
 
-impl DebianInstalledParser {
-    /// Parses the dpkg status file and returns a `Vec<PackageData>`,
-    /// one per installed package (filtered by Status: install ok installed).
-    pub fn extract_all_packages(path: &Path) -> Vec<PackageData> {
+impl PackageParser for DebianInstalledParser {
+    const PACKAGE_TYPE: &'static str = PACKAGE_TYPE;
+
+    fn is_match(path: &Path) -> bool {
+        let path_str = path.to_string_lossy();
+        path_str.ends_with("var/lib/dpkg/status")
+    }
+
+    fn extract_packages(path: &Path) -> Vec<PackageData> {
         let content = match read_file_to_string(path) {
             Ok(c) => c,
             Err(e) => {
@@ -184,24 +183,6 @@ impl DebianInstalledParser {
         };
 
         parse_dpkg_status(&content)
-    }
-}
-
-impl PackageParser for DebianInstalledParser {
-    const PACKAGE_TYPE: &'static str = PACKAGE_TYPE;
-
-    fn is_match(path: &Path) -> bool {
-        let path_str = path.to_string_lossy();
-        path_str.ends_with("var/lib/dpkg/status")
-    }
-
-    fn extract_package_data(path: &Path) -> PackageData {
-        // For the single-package interface, return the first installed package
-        let packages = Self::extract_all_packages(path);
-        packages
-            .into_iter()
-            .next()
-            .unwrap_or_else(|| create_default_package_data(PACKAGE_TYPE, None))
     }
 }
 
@@ -215,19 +196,19 @@ impl PackageParser for DebianDistrolessInstalledParser {
         path_str.contains("var/lib/dpkg/status.d/")
     }
 
-    fn extract_package_data(path: &Path) -> PackageData {
+    fn extract_packages(path: &Path) -> Vec<PackageData> {
         let content = match read_file_to_string(path) {
             Ok(c) => c,
             Err(e) => {
                 warn!("Failed to read distroless status file at {:?}: {}", path, e);
-                return create_default_package_data(
+                return vec![create_default_package_data(
                     PACKAGE_TYPE,
                     Some("debian_distroless_installed_db"),
-                );
+                )];
             }
         };
 
-        parse_distroless_status(&content)
+        vec![parse_distroless_status(&content)]
     }
 }
 
@@ -842,16 +823,16 @@ impl PackageParser for DebianDscParser {
         path.extension().and_then(|e| e.to_str()) == Some("dsc")
     }
 
-    fn extract_package_data(path: &Path) -> PackageData {
+    fn extract_packages(path: &Path) -> Vec<PackageData> {
         let content = match read_file_to_string(path) {
             Ok(c) => c,
             Err(e) => {
                 warn!("Failed to read .dsc file {:?}: {}", path, e);
-                return create_default_package_data(PACKAGE_TYPE, None);
+                return vec![create_default_package_data(PACKAGE_TYPE, None)];
             }
         };
 
-        parse_dsc_content(&content)
+        vec![parse_dsc_content(&content)]
     }
 }
 
@@ -991,13 +972,13 @@ impl PackageParser for DebianOrigTarParser {
             .unwrap_or(false)
     }
 
-    fn extract_package_data(path: &Path) -> PackageData {
+    fn extract_packages(path: &Path) -> Vec<PackageData> {
         let filename = match path.file_name().and_then(|n| n.to_str()) {
             Some(f) => f,
-            None => return create_default_package_data(PACKAGE_TYPE, None),
+            None => return vec![create_default_package_data(PACKAGE_TYPE, None)],
         };
 
-        parse_source_tarball_filename(filename, "debian_orig_tar")
+        vec![parse_source_tarball_filename(filename, "debian_orig_tar")]
     }
 }
 
@@ -1014,13 +995,13 @@ impl PackageParser for DebianDebianTarParser {
             .unwrap_or(false)
     }
 
-    fn extract_package_data(path: &Path) -> PackageData {
+    fn extract_packages(path: &Path) -> Vec<PackageData> {
         let filename = match path.file_name().and_then(|n| n.to_str()) {
             Some(f) => f,
-            None => return create_default_package_data(PACKAGE_TYPE, None),
+            None => return vec![create_default_package_data(PACKAGE_TYPE, None)],
         };
 
-        parse_source_tarball_filename(filename, "debian_debian_tar")
+        vec![parse_source_tarball_filename(filename, "debian_debian_tar")]
     }
 }
 
@@ -1071,11 +1052,14 @@ impl PackageParser for DebianInstalledListParser {
                 .unwrap_or(false)
     }
 
-    fn extract_package_data(path: &Path) -> PackageData {
+    fn extract_packages(path: &Path) -> Vec<PackageData> {
         let filename = match path.file_stem().and_then(|s| s.to_str()) {
             Some(f) => f,
             None => {
-                return create_default_package_data(PACKAGE_TYPE, Some("debian_installed_list"));
+                return vec![create_default_package_data(
+                    PACKAGE_TYPE,
+                    Some("debian_installed_list"),
+                )];
             }
         };
 
@@ -1083,11 +1067,18 @@ impl PackageParser for DebianInstalledListParser {
             Ok(c) => c,
             Err(e) => {
                 warn!("Failed to read .list file {:?}: {}", path, e);
-                return create_default_package_data(PACKAGE_TYPE, Some("debian_installed_list"));
+                return vec![create_default_package_data(
+                    PACKAGE_TYPE,
+                    Some("debian_installed_list"),
+                )];
             }
         };
 
-        parse_debian_file_list(&content, filename, "debian_installed_list")
+        vec![parse_debian_file_list(
+            &content,
+            filename,
+            "debian_installed_list",
+        )]
     }
 }
 
@@ -1105,11 +1096,14 @@ impl PackageParser for DebianInstalledMd5sumsParser {
                 .unwrap_or(false)
     }
 
-    fn extract_package_data(path: &Path) -> PackageData {
+    fn extract_packages(path: &Path) -> Vec<PackageData> {
         let filename = match path.file_stem().and_then(|s| s.to_str()) {
             Some(f) => f,
             None => {
-                return create_default_package_data(PACKAGE_TYPE, Some("debian_installed_md5sums"));
+                return vec![create_default_package_data(
+                    PACKAGE_TYPE,
+                    Some("debian_installed_md5sums"),
+                )];
             }
         };
 
@@ -1117,11 +1111,18 @@ impl PackageParser for DebianInstalledMd5sumsParser {
             Ok(c) => c,
             Err(e) => {
                 warn!("Failed to read .md5sums file {:?}: {}", path, e);
-                return create_default_package_data(PACKAGE_TYPE, Some("debian_installed_md5sums"));
+                return vec![create_default_package_data(
+                    PACKAGE_TYPE,
+                    Some("debian_installed_md5sums"),
+                )];
             }
         };
 
-        parse_debian_file_list(&content, filename, "debian_installed_md5sums")
+        vec![parse_debian_file_list(
+            &content,
+            filename,
+            "debian_installed_md5sums",
+        )]
     }
 }
 
@@ -1206,17 +1207,20 @@ impl PackageParser for DebianCopyrightParser {
         }
     }
 
-    fn extract_package_data(path: &Path) -> PackageData {
+    fn extract_packages(path: &Path) -> Vec<PackageData> {
         let content = match read_file_to_string(path) {
             Ok(c) => c,
             Err(e) => {
                 warn!("Failed to read copyright file {:?}: {}", path, e);
-                return create_default_package_data(PACKAGE_TYPE, Some("debian_copyright"));
+                return vec![create_default_package_data(
+                    PACKAGE_TYPE,
+                    Some("debian_copyright"),
+                )];
             }
         };
 
         let package_name = extract_package_name_from_path(path);
-        parse_copyright_file(&content, package_name.as_deref())
+        vec![parse_copyright_file(&content, package_name.as_deref())]
     }
 }
 
@@ -1388,19 +1392,24 @@ impl PackageParser for DebianDebParser {
         path.extension().and_then(|e| e.to_str()) == Some("deb")
     }
 
-    fn extract_package_data(path: &Path) -> PackageData {
+    fn extract_packages(path: &Path) -> Vec<PackageData> {
         // Try to extract metadata from archive contents first
         if let Ok(data) = extract_deb_archive(path) {
-            return data;
+            return vec![data];
         }
 
         // Fallback to filename parsing
         let filename = match path.file_name().and_then(|n| n.to_str()) {
             Some(f) => f,
-            None => return create_default_package_data(PACKAGE_TYPE, Some("debian_deb")),
+            None => {
+                return vec![create_default_package_data(
+                    PACKAGE_TYPE,
+                    Some("debian_deb"),
+                )];
+            }
         };
 
-        parse_deb_filename(filename)
+        vec![parse_deb_filename(filename)]
     }
 }
 
@@ -2100,7 +2109,7 @@ Description: purged";
     #[test]
     fn test_dsc_parser_adduser() {
         let path = PathBuf::from("testdata/debian/dsc_files/adduser_3.118+deb11u1.dsc");
-        let package = DebianDscParser::extract_package_data(&path);
+        let package = DebianDscParser::extract_first_package(&path);
 
         assert_eq!(package.package_type, Some(PACKAGE_TYPE.to_string()));
         assert_eq!(package.namespace, Some("debian".to_string()));
@@ -2163,7 +2172,7 @@ Description: purged";
     #[test]
     fn test_dsc_parser_zsh() {
         let path = PathBuf::from("testdata/debian/dsc_files/zsh_5.7.1-1+deb10u1.dsc");
-        let package = DebianDscParser::extract_package_data(&path);
+        let package = DebianDscParser::extract_first_package(&path);
 
         assert_eq!(package.name, Some("zsh".to_string()));
         assert_eq!(package.version, Some("5.7.1-1+deb10u1".to_string()));
@@ -2552,7 +2561,7 @@ Copyright (C) 2015-2018 Example Corp";
             return;
         }
 
-        let pkg = DebianDebParser::extract_package_data(&test_path);
+        let pkg = DebianDebParser::extract_first_package(&test_path);
 
         assert_eq!(pkg.name, Some("adduser".to_string()));
         assert_eq!(pkg.version, Some("3.112ubuntu1".to_string()));
@@ -2590,7 +2599,7 @@ Copyright (C) 2015-2018 Example Corp";
             return;
         }
 
-        let pkg = DebianDistrolessInstalledParser::extract_package_data(&test_file);
+        let pkg = DebianDistrolessInstalledParser::extract_first_package(&test_file);
 
         assert_eq!(pkg.package_type, Some("deb".to_string()));
         assert_eq!(

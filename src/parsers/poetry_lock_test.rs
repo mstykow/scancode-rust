@@ -10,7 +10,7 @@ mod tests {
         let expected_file =
             PathBuf::from("testdata/python/golden/poetry_lock/poetry.lock-expected.json");
 
-        let package_data = PoetryLockParser::extract_package_data(&test_file);
+        let package_data = PoetryLockParser::extract_first_package(&test_file);
 
         assert_eq!(package_data.dependencies.len(), 5);
 
@@ -57,7 +57,7 @@ content-hash = "test"
         let lock_path = temp_dir.path().join("poetry.lock");
         fs::write(&lock_path, content).expect("Failed to write poetry.lock");
 
-        let package_data = PoetryLockParser::extract_package_data(&lock_path);
+        let package_data = PoetryLockParser::extract_first_package(&lock_path);
 
         assert_eq!(package_data.dependencies.len(), 2);
 

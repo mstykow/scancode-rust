@@ -53,18 +53,18 @@ impl PackageParser for PodfileParser {
         })
     }
 
-    fn extract_package_data(path: &Path) -> PackageData {
+    fn extract_packages(path: &Path) -> Vec<PackageData> {
         let content = match fs::read_to_string(path) {
             Ok(c) => c,
             Err(e) => {
                 warn!("Failed to read {:?}: {}", path, e);
-                return default_package_data();
+                return vec![default_package_data()];
             }
         };
 
         let dependencies = extract_dependencies(&content);
 
-        PackageData {
+        vec![PackageData {
             package_type: Some(Self::PACKAGE_TYPE.to_string()),
             namespace: None,
             name: None,
@@ -107,7 +107,7 @@ impl PackageParser for PodfileParser {
             purl: None,
             is_private: false,
             is_virtual: false,
-        }
+        }]
     }
 }
 

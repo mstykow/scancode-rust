@@ -58,16 +58,16 @@ impl PackageParser for PoetryLockParser {
             .unwrap_or(false)
     }
 
-    fn extract_package_data(path: &Path) -> PackageData {
+    fn extract_packages(path: &Path) -> Vec<PackageData> {
         let toml_content = match read_toml_file(path) {
             Ok(content) => content,
             Err(e) => {
                 warn!("Failed to read poetry.lock at {:?}: {}", path, e);
-                return default_package_data();
+                return vec![default_package_data()];
             }
         };
 
-        parse_poetry_lock(&toml_content)
+        vec![parse_poetry_lock(&toml_content)]
     }
 }
 

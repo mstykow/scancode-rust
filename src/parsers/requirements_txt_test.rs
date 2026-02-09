@@ -12,7 +12,7 @@ mod tests {
         let expected_file =
             PathBuf::from("testdata/python/golden/requirements_txt/basic-expected.json");
 
-        let package_data = RequirementsTxtParser::extract_package_data(&test_file);
+        let package_data = RequirementsTxtParser::extract_first_package(&test_file);
 
         assert_eq!(package_data.dependencies.len(), 3);
 
@@ -29,7 +29,7 @@ mod tests {
         let expected_file =
             PathBuf::from("testdata/python/golden/requirements_txt/complex-expected.json");
 
-        let package_data = RequirementsTxtParser::extract_package_data(&test_file);
+        let package_data = RequirementsTxtParser::extract_first_package(&test_file);
 
         assert_eq!(package_data.dependencies.len(), 4);
 
@@ -65,7 +65,7 @@ mod tests {
     #[test]
     fn test_requirements_single_level_include() {
         let test_file = PathBuf::from("testdata/python/requirements-includes/requirements.txt");
-        let package_data = RequirementsTxtParser::extract_package_data(&test_file);
+        let package_data = RequirementsTxtParser::extract_first_package(&test_file);
 
         assert_eq!(package_data.dependencies.len(), 3);
 
@@ -96,7 +96,7 @@ mod tests {
     #[test]
     fn test_requirements_nested_includes() {
         let test_file = PathBuf::from("testdata/python/requirements-nested/requirements.txt");
-        let package_data = RequirementsTxtParser::extract_package_data(&test_file);
+        let package_data = RequirementsTxtParser::extract_first_package(&test_file);
 
         assert_eq!(package_data.dependencies.len(), 4);
 
@@ -127,7 +127,7 @@ mod tests {
     #[test]
     fn test_requirements_circular_include_detection() {
         let test_file = PathBuf::from("testdata/python/requirements-circular/requirements-a.txt");
-        let package_data = RequirementsTxtParser::extract_package_data(&test_file);
+        let package_data = RequirementsTxtParser::extract_first_package(&test_file);
 
         assert_eq!(package_data.dependencies.len(), 2);
 
@@ -150,7 +150,7 @@ mod tests {
     #[test]
     fn test_requirements_constraints_file() {
         let test_file = PathBuf::from("testdata/python/requirements-constraints/requirements.txt");
-        let package_data = RequirementsTxtParser::extract_package_data(&test_file);
+        let package_data = RequirementsTxtParser::extract_first_package(&test_file);
 
         assert_eq!(package_data.dependencies.len(), 3);
 

@@ -43,14 +43,14 @@ impl crate::parsers::PackageParser for OpamParser {
         })
     }
 
-    fn extract_package_data(path: &Path) -> PackageData {
-        match std::fs::read_to_string(path) {
+    fn extract_packages(path: &Path) -> Vec<PackageData> {
+        vec![match std::fs::read_to_string(path) {
             Ok(text) => parse_opam(&text),
             Err(e) => {
                 warn!("Failed to read OPAM file {:?}: {}", path, e);
                 default_package_data()
             }
-        }
+        }]
     }
 }
 

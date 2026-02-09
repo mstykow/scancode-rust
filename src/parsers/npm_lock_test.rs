@@ -57,7 +57,7 @@ mod tests {
     #[test]
     fn test_parse_v1_from_testdata() {
         let lock_path = load_testdata_file("package-lock-v1.json");
-        let package_data = NpmLockParser::extract_package_data(&lock_path);
+        let package_data = NpmLockParser::extract_first_package(&lock_path);
 
         assert_eq!(package_data.package_type, Some("npm".to_string()));
         assert_eq!(package_data.name, Some("babel-runtime".to_string()));
@@ -97,7 +97,7 @@ mod tests {
     #[test]
     fn test_parse_v2_from_testdata() {
         let lock_path = load_testdata_file("package-lock-v2.json");
-        let package_data = NpmLockParser::extract_package_data(&lock_path);
+        let package_data = NpmLockParser::extract_first_package(&lock_path);
 
         assert_eq!(package_data.package_type, Some("npm".to_string()));
         assert_eq!(package_data.name, Some("megak".to_string()));
@@ -115,7 +115,7 @@ mod tests {
     #[test]
     fn test_parse_scoped_packages() {
         let lock_path = load_testdata_file("package-lock-scoped.json");
-        let package_data = NpmLockParser::extract_package_data(&lock_path);
+        let package_data = NpmLockParser::extract_first_package(&lock_path);
 
         // Root package should be scoped
         assert_eq!(package_data.namespace, Some("@example".to_string()));
@@ -146,7 +146,7 @@ mod tests {
     #[test]
     fn test_parse_npm_shrinkwrap() {
         let lock_path = load_testdata_file("npm-shrinkwrap.json");
-        let package_data = NpmLockParser::extract_package_data(&lock_path);
+        let package_data = NpmLockParser::extract_first_package(&lock_path);
 
         assert_eq!(package_data.package_type, Some("npm".to_string()));
         assert_eq!(package_data.name, Some("shrinkwrap-test".to_string()));
@@ -177,7 +177,7 @@ mod tests {
     #[test]
     fn test_parse_minimal_file() {
         let lock_path = load_testdata_file("package-lock-minimal.json");
-        let package_data = NpmLockParser::extract_package_data(&lock_path);
+        let package_data = NpmLockParser::extract_first_package(&lock_path);
 
         assert_eq!(package_data.package_type, Some("npm".to_string()));
         assert_eq!(package_data.name, Some("minimal-test".to_string()));
@@ -209,7 +209,7 @@ mod tests {
         }"#;
 
         let (_temp, path) = create_temp_lock_file(content);
-        let package_data = NpmLockParser::extract_package_data(&path);
+        let package_data = NpmLockParser::extract_first_package(&path);
 
         assert_eq!(package_data.dependencies.len(), 1);
         let dep = &package_data.dependencies[0];
@@ -237,7 +237,7 @@ mod tests {
         }"#;
 
         let (_temp, path) = create_temp_lock_file(content);
-        let package_data = NpmLockParser::extract_package_data(&path);
+        let package_data = NpmLockParser::extract_first_package(&path);
 
         assert_eq!(package_data.dependencies.len(), 1);
         let dep = &package_data.dependencies[0];
@@ -269,7 +269,7 @@ mod tests {
         }"#;
 
         let (_temp, path) = create_temp_lock_file(content);
-        let package_data = NpmLockParser::extract_package_data(&path);
+        let package_data = NpmLockParser::extract_first_package(&path);
 
         assert_eq!(package_data.dependencies.len(), 1);
         let dep = &package_data.dependencies[0];
@@ -298,7 +298,7 @@ mod tests {
         }"#;
 
         let (_temp, path) = create_temp_lock_file(content);
-        let package_data = NpmLockParser::extract_package_data(&path);
+        let package_data = NpmLockParser::extract_first_package(&path);
 
         assert_eq!(package_data.namespace, Some("@myorg".to_string()));
         assert_eq!(package_data.name, Some("mypackage".to_string()));
@@ -319,7 +319,7 @@ mod tests {
         }"#;
 
         let (_temp, path) = create_temp_lock_file(content);
-        let package_data = NpmLockParser::extract_package_data(&path);
+        let package_data = NpmLockParser::extract_first_package(&path);
 
         assert_eq!(package_data.namespace, Some("".to_string()));
         assert_eq!(package_data.name, Some("express".to_string()));
@@ -340,7 +340,7 @@ mod tests {
         }"#;
 
         let (_temp, path) = create_temp_lock_file(content);
-        let package_data = NpmLockParser::extract_package_data(&path);
+        let package_data = NpmLockParser::extract_first_package(&path);
 
         // PURL should encode @ as %40
         assert_eq!(
@@ -371,7 +371,7 @@ mod tests {
         }"#;
 
         let (_temp, path) = create_temp_lock_file(content);
-        let package_data = NpmLockParser::extract_package_data(&path);
+        let package_data = NpmLockParser::extract_first_package(&path);
 
         let jest_dep = &package_data.dependencies[0];
         assert_eq!(jest_dep.scope, Some("devDependencies".to_string()));
@@ -399,7 +399,7 @@ mod tests {
         }"#;
 
         let (_temp, path) = create_temp_lock_file(content);
-        let package_data = NpmLockParser::extract_package_data(&path);
+        let package_data = NpmLockParser::extract_first_package(&path);
 
         let fsevents_dep = &package_data.dependencies[0];
         assert_eq!(fsevents_dep.scope, Some("dependencies".to_string()));
@@ -426,7 +426,7 @@ mod tests {
         }"#;
 
         let (_temp, path) = create_temp_lock_file(content);
-        let package_data = NpmLockParser::extract_package_data(&path);
+        let package_data = NpmLockParser::extract_first_package(&path);
 
         let express_dep = &package_data.dependencies[0];
         assert_eq!(express_dep.is_pinned, Some(true));
@@ -441,7 +441,7 @@ mod tests {
     fn test_invalid_json() {
         let content = "{ invalid json }";
         let (_temp, path) = create_temp_lock_file(content);
-        let package_data = NpmLockParser::extract_package_data(&path);
+        let package_data = NpmLockParser::extract_first_package(&path);
 
         // Should return default empty data
         assert_eq!(package_data.package_type, Some("npm".to_string()));
@@ -465,7 +465,7 @@ mod tests {
         }"#;
 
         let (_temp, path) = create_temp_lock_file(content);
-        let package_data = NpmLockParser::extract_package_data(&path);
+        let package_data = NpmLockParser::extract_first_package(&path);
 
         // Should skip dependency without version
         assert_eq!(package_data.dependencies.len(), 0);
@@ -483,7 +483,7 @@ mod tests {
         }"#;
 
         let (_temp, path) = create_temp_lock_file(content);
-        let package_data = NpmLockParser::extract_package_data(&path);
+        let package_data = NpmLockParser::extract_first_package(&path);
 
         // Should successfully parse v1 format
         assert_eq!(package_data.name, Some("test".to_string()));
@@ -504,7 +504,7 @@ mod tests {
         }"#;
 
         let (_temp, path) = create_temp_lock_file(content);
-        let package_data = NpmLockParser::extract_package_data(&path);
+        let package_data = NpmLockParser::extract_first_package(&path);
 
         // Should successfully parse v2 format
         assert_eq!(package_data.name, Some("test".to_string()));
@@ -529,7 +529,7 @@ mod tests {
         }"#;
 
         let (_temp, path) = create_temp_lock_file(content);
-        let package_data = NpmLockParser::extract_package_data(&path);
+        let package_data = NpmLockParser::extract_first_package(&path);
 
         let dep = &package_data.dependencies[0];
         let resolved = dep.resolved_package.as_ref().unwrap();
@@ -544,7 +544,7 @@ mod tests {
     #[test]
     fn test_npm_lock_v2_nested_duplicate_is_direct_bug() {
         let lock_path = PathBuf::from("testdata/npm/lock-v2-nested-dups/package-lock.json");
-        let package_data = NpmLockParser::extract_package_data(&lock_path);
+        let package_data = NpmLockParser::extract_first_package(&lock_path);
 
         let deps = package_data.dependencies;
         assert!(deps.len() >= 2, "Should have at least 2 dependencies");

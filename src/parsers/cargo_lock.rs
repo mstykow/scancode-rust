@@ -42,12 +42,12 @@ impl PackageParser for CargoLockParser {
             .is_some_and(|name| name == "Cargo.lock")
     }
 
-    fn extract_package_data(path: &Path) -> PackageData {
+    fn extract_packages(path: &Path) -> Vec<PackageData> {
         let content = match read_cargo_lock(path) {
             Ok(content) => content,
             Err(e) => {
                 warn!("Failed to read or parse Cargo.lock at {:?}: {}", path, e);
-                return default_package_data();
+                return vec![default_package_data()];
             }
         };
 
@@ -55,7 +55,7 @@ impl PackageParser for CargoLockParser {
             Some(pkgs) => pkgs,
             None => {
                 warn!("No 'package' array found in Cargo.lock at {:?}", path);
-                return default_package_data();
+                return vec![default_package_data()];
             }
         };
 
@@ -92,7 +92,7 @@ impl PackageParser for CargoLockParser {
             _ => None,
         };
 
-        PackageData {
+        vec![PackageData {
             package_type: Some(Self::PACKAGE_TYPE.to_string()),
             namespace: None,
             name,
@@ -135,7 +135,7 @@ impl PackageParser for CargoLockParser {
             api_data_url,
             datasource_id: Some("cargo_lock".to_string()),
             purl,
-        }
+        }]
     }
 }
 

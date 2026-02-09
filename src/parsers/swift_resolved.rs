@@ -37,7 +37,7 @@ use crate::parsers::PackageParser;
 /// use std::path::Path;
 ///
 /// let path = Path::new("Package.resolved");
-/// let package_data = SwiftPackageResolvedParser::extract_package_data(path);
+/// let package_data = SwiftPackageResolvedParser::extract_first_package(path);
 /// ```
 pub struct SwiftPackageResolvedParser;
 
@@ -50,8 +50,8 @@ impl PackageParser for SwiftPackageResolvedParser {
             .is_some_and(|name| name == "Package.resolved" || name == ".package.resolved")
     }
 
-    fn extract_package_data(path: &Path) -> PackageData {
-        match parse_resolved(path) {
+    fn extract_packages(path: &Path) -> Vec<PackageData> {
+        vec![match parse_resolved(path) {
             Ok(data) => data,
             Err(e) => {
                 warn!(
@@ -60,7 +60,7 @@ impl PackageParser for SwiftPackageResolvedParser {
                 );
                 default_package_data()
             }
-        }
+        }]
     }
 }
 

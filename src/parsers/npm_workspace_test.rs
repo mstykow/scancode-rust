@@ -8,7 +8,7 @@ mod tests {
         let workspace_path = PathBuf::from("testdata/npm-workspace/basic.yaml")
             .canonicalize()
             .unwrap();
-        let package_data = NpmWorkspaceParser::extract_package_data(&workspace_path);
+        let package_data = NpmWorkspaceParser::extract_first_package(&workspace_path);
 
         assert_eq!(package_data.package_type, Some("npm-workspace".to_string()));
 
@@ -28,7 +28,7 @@ mod tests {
         let workspace_path = PathBuf::from("testdata/npm-workspace/multiple.yaml")
             .canonicalize()
             .unwrap();
-        let package_data = NpmWorkspaceParser::extract_package_data(&workspace_path);
+        let package_data = NpmWorkspaceParser::extract_first_package(&workspace_path);
 
         assert_eq!(package_data.package_type, Some("npm-workspace".to_string()));
 
@@ -45,7 +45,7 @@ mod tests {
         let workspace_path = PathBuf::from("testdata/npm-workspace/complex.yaml")
             .canonicalize()
             .unwrap();
-        let package_data = NpmWorkspaceParser::extract_package_data(&workspace_path);
+        let package_data = NpmWorkspaceParser::extract_first_package(&workspace_path);
 
         assert_eq!(package_data.package_type, Some("npm-workspace".to_string()));
 

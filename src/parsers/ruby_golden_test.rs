@@ -12,7 +12,7 @@ mod golden_tests {
         let expected_file =
             PathBuf::from("testdata/ruby-golden/arel-gemspec/arel.gemspec.expected");
 
-        let package_data = GemspecParser::extract_package_data(&test_file);
+        let package_data = GemspecParser::extract_first_package(&test_file);
 
         match compare_package_data_parser_only(&package_data, &expected_file) {
             Ok(_) => (),
@@ -25,7 +25,7 @@ mod golden_tests {
         let test_file = PathBuf::from("testdata/ruby-golden/cat-gemspec/cat.gemspec");
         let expected_file = PathBuf::from("testdata/ruby-golden/cat-gemspec/cat.gemspec.expected");
 
-        let package_data = GemspecParser::extract_package_data(&test_file);
+        let package_data = GemspecParser::extract_first_package(&test_file);
 
         match compare_package_data_parser_only(&package_data, &expected_file) {
             Ok(_) => (),
@@ -39,7 +39,7 @@ mod golden_tests {
         let test_file = PathBuf::from("testdata/ruby-golden/oj-gemspec/oj.gemspec");
         let expected_file = PathBuf::from("testdata/ruby-golden/oj-gemspec/oj.gemspec.expected");
 
-        let package_data = GemspecParser::extract_package_data(&test_file);
+        let package_data = GemspecParser::extract_first_package(&test_file);
 
         match compare_package_data_parser_only(&package_data, &expected_file) {
             Ok(_) => (),
@@ -54,7 +54,7 @@ mod golden_tests {
         let expected_file =
             PathBuf::from("testdata/ruby-golden/rubocop-gemspec/rubocop.gemspec.expected");
 
-        let package_data = GemspecParser::extract_package_data(&test_file);
+        let package_data = GemspecParser::extract_first_package(&test_file);
 
         match compare_package_data_parser_only(&package_data, &expected_file) {
             Ok(_) => (),

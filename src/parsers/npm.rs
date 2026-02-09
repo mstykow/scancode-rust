@@ -66,12 +66,12 @@ pub struct NpmParser;
 impl PackageParser for NpmParser {
     const PACKAGE_TYPE: &'static str = "npm";
 
-    fn extract_package_data(path: &Path) -> PackageData {
+    fn extract_packages(path: &Path) -> Vec<PackageData> {
         let (json, _field_lines) = match read_and_parse_json_with_lines(path) {
             Ok((json, lines)) => (json, lines),
             Err(e) => {
                 warn!("Failed to read or parse package.json at {:?}: {}", path, e);
-                return default_package_data();
+                return vec![default_package_data()];
             }
         };
 
@@ -160,7 +160,7 @@ impl PackageParser for NpmParser {
         let repository_download_url = generate_repository_download_url(&package_name, &version);
         let vcs_url = extract_vcs_url(&json);
 
-        PackageData {
+        vec![PackageData {
             package_type: Some(Self::PACKAGE_TYPE.to_string()),
             namespace,
             name,
@@ -213,7 +213,7 @@ impl PackageParser for NpmParser {
             api_data_url,
             datasource_id: Some("npm_package_json".to_string()),
             purl,
-        }
+        }]
     }
 
     fn is_match(path: &Path) -> bool {

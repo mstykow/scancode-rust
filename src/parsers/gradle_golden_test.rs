@@ -6,7 +6,7 @@ mod golden_tests {
     use std::path::PathBuf;
 
     fn run_golden(test_file: &str, expected_file: &str) {
-        let package_data = GradleParser::extract_package_data(&PathBuf::from(test_file));
+        let package_data = GradleParser::extract_first_package(&PathBuf::from(test_file));
         match compare_package_data_parser_only(&package_data, &PathBuf::from(expected_file)) {
             Ok(_) => (),
             Err(e) => panic!("Golden test failed: {}", e),

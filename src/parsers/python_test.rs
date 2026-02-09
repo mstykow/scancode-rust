@@ -60,7 +60,7 @@ numpy = ">=1.20.0"
 "#;
 
         let (_temp_file, file_path) = create_temp_file(content, "pyproject.toml");
-        let package_data = PythonParser::extract_package_data(&file_path);
+        let package_data = PythonParser::extract_first_package(&file_path);
 
         assert_eq!(package_data.package_type, Some("pypi".to_string()));
         assert_eq!(package_data.name, Some("test-package".to_string()));
@@ -85,7 +85,7 @@ numpy = ">=1.20.0"
     #[test]
     fn test_extract_from_python_testdata() {
         let file_path = PathBuf::from("testdata/python/pyproject.toml");
-        let package_data = PythonParser::extract_package_data(&file_path);
+        let package_data = PythonParser::extract_first_package(&file_path);
 
         assert_eq!(package_data.package_type, Some("pypi".to_string()));
         assert_eq!(package_data.name, Some("test-package".to_string()));
@@ -147,7 +147,7 @@ setup(
 "#;
 
         let (_temp_file, file_path) = create_temp_file(content, "setup.py");
-        let package_data = PythonParser::extract_package_data(&file_path);
+        let package_data = PythonParser::extract_first_package(&file_path);
 
         assert_eq!(package_data.package_type, Some("pypi".to_string()));
         assert_eq!(package_data.name, Some("test-package".to_string()));
@@ -174,7 +174,7 @@ setup(
         let content = fs::read_to_string("testdata/python/setup-ast-basic.py")
             .expect("Failed to read setup-ast-basic.py");
         let (_temp_dir, file_path) = create_temp_file(&content, "setup.py");
-        let package_data = PythonParser::extract_package_data(&file_path);
+        let package_data = PythonParser::extract_first_package(&file_path);
 
         assert_eq!(package_data.name, Some("mypackage".to_string()));
         assert_eq!(package_data.version, Some("1.0.0".to_string()));
@@ -205,7 +205,7 @@ setup(
         let content = fs::read_to_string("testdata/python/setup-ast-constants.py")
             .expect("Failed to read setup-ast-constants.py");
         let (_temp_dir, file_path) = create_temp_file(&content, "setup.py");
-        let package_data = PythonParser::extract_package_data(&file_path);
+        let package_data = PythonParser::extract_first_package(&file_path);
 
         assert_eq!(package_data.name, Some("mypackage".to_string()));
         assert_eq!(package_data.version, Some("1.2.3".to_string()));
@@ -216,7 +216,7 @@ setup(
         let content = fs::read_to_string("testdata/python/setup-ast-dict-unpack.py")
             .expect("Failed to read setup-ast-dict-unpack.py");
         let (_temp_dir, file_path) = create_temp_file(&content, "setup.py");
-        let package_data = PythonParser::extract_package_data(&file_path);
+        let package_data = PythonParser::extract_first_package(&file_path);
 
         assert_eq!(package_data.name, Some("dictpkg".to_string()));
         assert_eq!(package_data.version, Some("0.1.0".to_string()));
@@ -239,7 +239,7 @@ setup(
         let content = fs::read_to_string("testdata/python/setup-ast-dynamic.py")
             .expect("Failed to read setup-ast-dynamic.py");
         let (_temp_dir, file_path) = create_temp_file(&content, "setup.py");
-        let package_data = PythonParser::extract_package_data(&file_path);
+        let package_data = PythonParser::extract_first_package(&file_path);
 
         assert_eq!(package_data.name, Some("dynpkg".to_string()));
         assert_eq!(package_data.version, None);
@@ -250,7 +250,7 @@ setup(
         let content = fs::read_to_string("testdata/python/setup-ast-install-requires.py")
             .expect("Failed to read setup-ast-install-requires.py");
         let (_temp_dir, file_path) = create_temp_file(&content, "setup.py");
-        let package_data = PythonParser::extract_package_data(&file_path);
+        let package_data = PythonParser::extract_first_package(&file_path);
 
         let install_deps: Vec<&Dependency> = package_data
             .dependencies
@@ -282,7 +282,7 @@ setup(
         let content = fs::read_to_string("testdata/python/setup-ast-extras-require.py")
             .expect("Failed to read setup-ast-extras-require.py");
         let (_temp_dir, file_path) = create_temp_file(&content, "setup.py");
-        let package_data = PythonParser::extract_package_data(&file_path);
+        let package_data = PythonParser::extract_first_package(&file_path);
 
         let dev_deps: Vec<&Dependency> = package_data
             .dependencies
@@ -314,7 +314,7 @@ setup(
         let content = fs::read_to_string("testdata/python/setup-ast-malformed.py")
             .expect("Failed to read setup-ast-malformed.py");
         let (_temp_dir, file_path) = create_temp_file(&content, "setup.py");
-        let package_data = PythonParser::extract_package_data(&file_path);
+        let package_data = PythonParser::extract_first_package(&file_path);
 
         assert_eq!(package_data.name, Some("broken".to_string()));
         assert_eq!(package_data.version, Some("0.0.1".to_string()));
@@ -327,7 +327,7 @@ setup(
         content.push_str(&"a".repeat(1_048_600));
 
         let (_temp_dir, file_path) = create_temp_file(&content, "setup.py");
-        let package_data = PythonParser::extract_package_data(&file_path);
+        let package_data = PythonParser::extract_first_package(&file_path);
 
         assert_eq!(package_data.name, Some("big-package".to_string()));
         assert_eq!(package_data.version, Some("9.9.9".to_string()));
@@ -349,7 +349,7 @@ setup(name=NAME, version=VERSION)\n",
         );
 
         let (_temp_dir, file_path) = create_temp_file(&content, "setup.py");
-        let package_data = PythonParser::extract_package_data(&file_path);
+        let package_data = PythonParser::extract_first_package(&file_path);
 
         assert_eq!(package_data.name, Some("deep".to_string()));
         assert_eq!(package_data.version, None);
@@ -360,7 +360,7 @@ setup(name=NAME, version=VERSION)\n",
         let content = fs::read_to_string("testdata/python/setup-ast-malicious.py")
             .expect("Failed to read setup-ast-malicious.py");
         let (_temp_dir, file_path) = create_temp_file(&content, "setup.py");
-        let package_data = PythonParser::extract_package_data(&file_path);
+        let package_data = PythonParser::extract_first_package(&file_path);
 
         assert_eq!(package_data.name, Some("malicious".to_string()));
     }
@@ -383,7 +383,7 @@ chardet = ">=3.0.2,<5"
 "#;
 
         let (_temp_file, file_path) = create_temp_file(content, "pyproject.toml");
-        let package_data = PythonParser::extract_package_data(&file_path);
+        let package_data = PythonParser::extract_first_package(&file_path);
 
         // Then: API data URL should be generated
         assert_eq!(
@@ -419,7 +419,7 @@ authors = [
 "#;
 
         let (_temp_file, file_path) = create_temp_file(content, "pyproject.toml");
-        let package_data = PythonParser::extract_package_data(&file_path);
+        let package_data = PythonParser::extract_first_package(&file_path);
 
         // Then: API data URL should still be generated (without version)
         assert_eq!(
@@ -450,7 +450,7 @@ repository = "https://github.com/user/test-package"
 "#;
 
         let (_temp_file, file_path) = create_temp_file(content, "pyproject.toml");
-        let package_data = PythonParser::extract_package_data(&file_path);
+        let package_data = PythonParser::extract_first_package(&file_path);
 
         // Then: vcs_url should contain the repository URL
         assert_eq!(
@@ -475,7 +475,7 @@ homepage = "https://example.com"
 "#;
 
         let (_temp_file, file_path) = create_temp_file(content, "pyproject.toml");
-        let package_data = PythonParser::extract_package_data(&file_path);
+        let package_data = PythonParser::extract_first_package(&file_path);
 
         // Then: vcs_url should contain the repository URL from URLs section
         assert_eq!(
@@ -496,7 +496,7 @@ version = "1.0.0"
 "#;
 
         let (_temp_file, file_path) = create_temp_file(content, "pyproject.toml");
-        let package_data = PythonParser::extract_package_data(&file_path);
+        let package_data = PythonParser::extract_first_package(&file_path);
 
         // Then: vcs_url should be None
         assert_eq!(package_data.vcs_url, None);
@@ -519,7 +519,7 @@ This is a test package.
 "#;
 
         let (_temp_file, file_path) = create_temp_file(content, "METADATA");
-        let package_data = PythonParser::extract_package_data(&file_path);
+        let package_data = PythonParser::extract_first_package(&file_path);
 
         // Verify Download-URL is extracted
         assert_eq!(
@@ -541,7 +541,7 @@ This is a test package.
         let test_file = PathBuf::from("testdata/python/golden/metadata/METADATA");
         let expected_file = PathBuf::from("testdata/python/golden/metadata/METADATA-expected.json");
 
-        let package_data = PythonParser::extract_package_data(&test_file);
+        let package_data = PythonParser::extract_first_package(&test_file);
 
         match compare_package_data_parser_only(&package_data, &expected_file) {
             Ok(_) => (),
@@ -555,7 +555,7 @@ This is a test package.
         let expected_file =
             PathBuf::from("testdata/python/setup_cfg_wheel/setup.cfg-expected-corrected.json");
 
-        let package_data = PythonParser::extract_package_data(&test_file);
+        let package_data = PythonParser::extract_first_package(&test_file);
 
         match compare_package_data_parser_only(&package_data, &expected_file) {
             Ok(_) => (),
@@ -581,7 +581,7 @@ pip - The Python Package Installer
 "#;
 
         let (_temp_file, file_path) = create_temp_file(content, "METADATA");
-        let package_data = PythonParser::extract_package_data(&file_path);
+        let package_data = PythonParser::extract_first_package(&file_path);
 
         assert_eq!(package_data.name, Some("pip".to_string()));
         assert_eq!(package_data.version, Some("20.2.2".to_string()));
@@ -645,7 +645,7 @@ Trimesh is a pure Python library for loading and using triangular meshes.
 "#;
 
         let (_temp_file, file_path) = create_temp_file(content, "METADATA");
-        let package_data = PythonParser::extract_package_data(&file_path);
+        let package_data = PythonParser::extract_first_package(&file_path);
 
         assert_eq!(package_data.name, Some("trimesh".to_string()));
 
@@ -702,7 +702,7 @@ Test package description.
 "#;
 
         let (_temp_file, file_path) = create_temp_file(content, "METADATA");
-        let package_data = PythonParser::extract_package_data(&file_path);
+        let package_data = PythonParser::extract_first_package(&file_path);
 
         assert_eq!(
             package_data.code_view_url,
@@ -740,7 +740,7 @@ Test package description.
     #[test]
     fn test_extract_license_file_from_metadata() {
         let metadata_path = PathBuf::from("testdata/python/metadata-license-files/METADATA");
-        let package_data = PythonParser::extract_package_data(&metadata_path);
+        let package_data = PythonParser::extract_first_package(&metadata_path);
 
         assert_eq!(package_data.name, Some("example-package".to_string()));
         assert_eq!(package_data.version, Some("1.0.0".to_string()));
@@ -784,7 +784,7 @@ Test package description.
             "testdata/python/golden/archives/atomicwrites-1.2.1-py2.py3-none-any.whl",
         );
 
-        let package_data = PythonParser::extract_package_data(&wheel_path);
+        let package_data = PythonParser::extract_first_package(&wheel_path);
 
         assert_eq!(package_data.package_type, Some("pypi".to_string()));
         assert_eq!(package_data.name, Some("atomicwrites".to_string()));
@@ -826,7 +826,7 @@ Test package description.
         let egg_path =
             PathBuf::from("testdata/python/golden/archives/commoncode-21.5.12-py3.9.egg");
 
-        let package_data = PythonParser::extract_package_data(&egg_path);
+        let package_data = PythonParser::extract_first_package(&egg_path);
 
         assert_eq!(package_data.package_type, Some("pypi".to_string()));
         assert_eq!(package_data.name, Some("commoncode".to_string()));
@@ -857,7 +857,7 @@ Test package description.
     #[test]
     fn test_corrupt_wheel_archive_no_panic() {
         let (_temp_dir, corrupt_path) = create_temp_file("this is not a valid zip file", "bad.whl");
-        let package_data = PythonParser::extract_package_data(&corrupt_path);
+        let package_data = PythonParser::extract_first_package(&corrupt_path);
 
         assert!(package_data.name.is_none());
         assert!(package_data.version.is_none());
@@ -866,7 +866,7 @@ Test package description.
     #[test]
     fn test_corrupt_egg_archive_no_panic() {
         let (_temp_dir, corrupt_path) = create_temp_file("this is not a valid zip file", "bad.egg");
-        let package_data = PythonParser::extract_package_data(&corrupt_path);
+        let package_data = PythonParser::extract_first_package(&corrupt_path);
 
         assert!(package_data.name.is_none());
         assert!(package_data.version.is_none());
@@ -878,7 +878,7 @@ Test package description.
             "testdata/python/golden/archives/atomicwrites-1.2.1-py2.py3-none-any.whl",
         );
 
-        let package_data = PythonParser::extract_package_data(&wheel_path);
+        let package_data = PythonParser::extract_first_package(&wheel_path);
 
         let purl = package_data.purl.expect("PURL should be present");
         assert!(
@@ -893,7 +893,7 @@ Test package description.
         let egg_path =
             PathBuf::from("testdata/python/golden/archives/commoncode-21.5.12-py3.9.egg");
 
-        let package_data = PythonParser::extract_package_data(&egg_path);
+        let package_data = PythonParser::extract_first_package(&egg_path);
 
         let purl = package_data.purl.expect("PURL should be present");
         assert!(
@@ -956,7 +956,7 @@ Test package description.
             "testdata/python/golden/archives/atomicwrites-1.2.1-py2.py3-none-any.whl",
         );
 
-        let package_data = PythonParser::extract_package_data(&wheel_path);
+        let package_data = PythonParser::extract_first_package(&wheel_path);
 
         assert!(!package_data.file_references.is_empty());
         for file_ref in &package_data.file_references {
@@ -969,7 +969,7 @@ Test package description.
         let egg_path =
             PathBuf::from("testdata/python/golden/archives/commoncode-21.5.12-py3.9.egg");
 
-        let package_data = PythonParser::extract_package_data(&egg_path);
+        let package_data = PythonParser::extract_first_package(&egg_path);
 
         assert!(package_data.file_references.is_empty());
         for file_ref in &package_data.file_references {
@@ -980,7 +980,7 @@ Test package description.
     #[test]
     fn test_missing_file_references_graceful() {
         let (_temp_dir, corrupt_path) = create_temp_file("this is not a valid zip file", "bad.whl");
-        let package_data = PythonParser::extract_package_data(&corrupt_path);
+        let package_data = PythonParser::extract_first_package(&corrupt_path);
 
         assert!(package_data.file_references.is_empty());
     }
@@ -994,7 +994,7 @@ Test package description.
     #[test]
     fn test_extract_from_pip_inspect() {
         let test_file = PathBuf::from("testdata/python/pip-inspect/pip-inspect.deplock");
-        let package_data = PythonParser::extract_package_data(&test_file);
+        let package_data = PythonParser::extract_first_package(&test_file);
 
         assert_eq!(package_data.package_type, Some("pypi".to_string()));
         assert_eq!(package_data.name, Some("univers".to_string()));
@@ -1055,7 +1055,7 @@ Test package description.
     #[test]
     fn test_extract_from_pip_inspect_direct_dependencies() {
         let test_file = PathBuf::from("testdata/python/pip-inspect/pip-inspect.deplock");
-        let package_data = PythonParser::extract_package_data(&test_file);
+        let package_data = PythonParser::extract_first_package(&test_file);
 
         let direct_deps: Vec<&Dependency> = package_data
             .dependencies
@@ -1073,7 +1073,7 @@ Test package description.
     #[test]
     fn test_pip_inspect_invalid_json() {
         let (_temp_dir, invalid_path) = create_temp_file("not valid json", "pip-inspect.deplock");
-        let package_data = PythonParser::extract_package_data(&invalid_path);
+        let package_data = PythonParser::extract_first_package(&invalid_path);
 
         assert!(package_data.name.is_none());
         assert!(package_data.version.is_none());
@@ -1083,7 +1083,7 @@ Test package description.
     fn test_pip_inspect_missing_installed_array() {
         let content = r#"{"version": "1", "pip_version": "24.1"}"#;
         let (_temp_dir, file_path) = create_temp_file(content, "pip-inspect.deplock");
-        let package_data = PythonParser::extract_package_data(&file_path);
+        let package_data = PythonParser::extract_first_package(&file_path);
 
         assert!(package_data.name.is_none());
         assert!(package_data.version.is_none());
@@ -1106,7 +1106,7 @@ test = ["coverage>=6.0"]
 "#;
 
         let (_temp_dir, file_path) = create_temp_file(content, "pyproject.toml");
-        let package_data = PythonParser::extract_package_data(&file_path);
+        let package_data = PythonParser::extract_first_package(&file_path);
 
         assert_eq!(package_data.name, Some("test-package".to_string()));
         assert_eq!(package_data.dependencies.len(), 5);
@@ -1153,7 +1153,7 @@ docs = ["sphinx>=5.0"]
 "#;
 
         let (_temp_dir, file_path) = create_temp_file(content, "pyproject.toml");
-        let package_data = PythonParser::extract_package_data(&file_path);
+        let package_data = PythonParser::extract_first_package(&file_path);
 
         assert_eq!(package_data.dependencies.len(), 5);
 
@@ -1200,7 +1200,7 @@ test = coverage>=6.0
 "#;
 
         let (_temp_dir, file_path) = create_temp_file(content, "setup.cfg");
-        let package_data = PythonParser::extract_package_data(&file_path);
+        let package_data = PythonParser::extract_first_package(&file_path);
 
         assert_eq!(package_data.name, Some("test-package".to_string()));
         assert!(package_data.dependencies.len() >= 4);
@@ -1262,7 +1262,7 @@ setup(
 "#;
 
         let (_temp_dir, file_path) = create_temp_file(content, "setup.py");
-        let package_data = PythonParser::extract_package_data(&file_path);
+        let package_data = PythonParser::extract_first_package(&file_path);
 
         assert_eq!(package_data.name, Some("test-package".to_string()));
         assert_eq!(package_data.dependencies.len(), 4);

@@ -10,7 +10,7 @@ mod tests {
         let expected_file =
             PathBuf::from("testdata/python/golden/pipfile_lock/Pipfile.lock-expected.json");
 
-        let package_data = PipfileLockParser::extract_package_data(&test_file);
+        let package_data = PipfileLockParser::extract_first_package(&test_file);
 
         assert_eq!(package_data.dependencies.len(), 9);
         assert_eq!(
@@ -62,7 +62,7 @@ mod tests {
         let file_path = temp_dir.path().join("Pipfile.lock");
         fs::write(&file_path, content).unwrap();
 
-        let package_data = PipfileLockParser::extract_package_data(&file_path);
+        let package_data = PipfileLockParser::extract_first_package(&file_path);
 
         assert_eq!(package_data.dependencies.len(), 3);
 

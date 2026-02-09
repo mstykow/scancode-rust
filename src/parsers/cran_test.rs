@@ -18,7 +18,7 @@ mod tests {
     #[test]
     fn test_extract_from_testdata_geometry() {
         let desc_path = PathBuf::from("testdata/cran/geometry/DESCRIPTION");
-        let package_data = CranParser::extract_package_data(&desc_path);
+        let package_data = CranParser::extract_first_package(&desc_path);
 
         // Basic fields
         assert_eq!(package_data.package_type, Some("cran".to_string()));
@@ -132,7 +132,7 @@ mod tests {
     #[test]
     fn test_extract_from_testdata_codetools() {
         let desc_path = PathBuf::from("testdata/cran/codetools/DESCRIPTION");
-        let package_data = CranParser::extract_package_data(&desc_path);
+        let package_data = CranParser::extract_first_package(&desc_path);
 
         // Basic fields
         assert_eq!(package_data.name, Some("codetools".to_string()));
@@ -179,7 +179,7 @@ mod tests {
     fn test_dependencies_with_versions() {
         // Test version constraint parsing
         let desc_path = PathBuf::from("testdata/cran/geometry/DESCRIPTION");
-        let package_data = CranParser::extract_package_data(&desc_path);
+        let package_data = CranParser::extract_first_package(&desc_path);
 
         // All dependencies in this file don't have version constraints
         // except the R version in Depends which we filter out
@@ -193,7 +193,7 @@ mod tests {
     fn test_filter_r_version() {
         // Verify that R version requirements are filtered out
         let desc_path = PathBuf::from("testdata/cran/geometry/DESCRIPTION");
-        let package_data = CranParser::extract_package_data(&desc_path);
+        let package_data = CranParser::extract_first_package(&desc_path);
 
         // Check that no dependency has "R" as its package name (but allow Rcpp, RcppProgress)
         for dep in &package_data.dependencies {
@@ -208,7 +208,7 @@ mod tests {
     #[test]
     fn test_multiple_dependency_types() {
         let desc_path = PathBuf::from("testdata/cran/geometry/DESCRIPTION");
-        let package_data = CranParser::extract_package_data(&desc_path);
+        let package_data = CranParser::extract_first_package(&desc_path);
 
         // Verify we have dependencies from multiple scopes
         let scopes: std::collections::HashSet<_> = package_data
@@ -225,7 +225,7 @@ mod tests {
     #[test]
     fn test_author_maintainer_parsing() {
         let desc_path = PathBuf::from("testdata/cran/codetools/DESCRIPTION");
-        let package_data = CranParser::extract_package_data(&desc_path);
+        let package_data = CranParser::extract_first_package(&desc_path);
 
         // Check maintainer extraction
         let maintainers: Vec<_> = package_data
@@ -253,7 +253,7 @@ mod tests {
     fn test_empty_description() {
         // Test with minimal DESCRIPTION file
         let nonexistent_path = PathBuf::from("testdata/cran/nonexistent/DESCRIPTION");
-        let package_data = CranParser::extract_package_data(&nonexistent_path);
+        let package_data = CranParser::extract_first_package(&nonexistent_path);
 
         // Should return default data with proper type and datasource
         assert_eq!(package_data.package_type, Some("cran".to_string()));
@@ -269,7 +269,7 @@ mod tests {
     #[test]
     fn test_purl_generation() {
         let desc_path = PathBuf::from("testdata/cran/codetools/DESCRIPTION");
-        let package_data = CranParser::extract_package_data(&desc_path);
+        let package_data = CranParser::extract_first_package(&desc_path);
 
         assert_eq!(
             package_data.purl,

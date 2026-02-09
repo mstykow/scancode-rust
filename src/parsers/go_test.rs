@@ -287,7 +287,7 @@ go 1.13
     #[test]
     fn test_graceful_error_handling() {
         let bad_path = PathBuf::from("/nonexistent/path/go.mod");
-        let result = GoModParser::extract_package_data(&bad_path);
+        let result = GoModParser::extract_first_package(&bad_path);
 
         assert_eq!(result.package_type.as_deref(), Some("golang"));
         assert!(result.dependencies.is_empty());
@@ -1202,7 +1202,7 @@ github.com/foo/bar v0.3.1 h1:WXkYYl6Yr3qBf1K79EBnL4mak0OimBfB0XUf9Vl28OQ=
     #[test]
     fn test_go_sum_graceful_error_handling() {
         let bad_path = PathBuf::from("/nonexistent/path/go.sum");
-        let result = GoSumParser::extract_package_data(&bad_path);
+        let result = GoSumParser::extract_first_package(&bad_path);
 
         assert_eq!(result.package_type.as_deref(), Some("golang"));
         assert!(result.dependencies.is_empty());
@@ -1453,7 +1453,7 @@ github.com/foo/bar v1.1.0/go.mod h1:jkl=
     #[test]
     fn test_godeps_json_graceful_error_handling() {
         let bad_path = PathBuf::from("/nonexistent/path/Godeps.json");
-        let result = GodepsParser::extract_package_data(&bad_path);
+        let result = GodepsParser::extract_first_package(&bad_path);
 
         assert_eq!(result.package_type.as_deref(), Some("golang"));
         assert!(result.dependencies.is_empty());
@@ -1509,7 +1509,7 @@ github.com/foo/bar v1.1.0/go.mod h1:jkl=
     #[test]
     fn test_godeps_testdata_mini() {
         let path = PathBuf::from("testdata/go/mini-godeps.json");
-        let result = GodepsParser::extract_package_data(&path);
+        let result = GodepsParser::extract_first_package(&path);
 
         assert_eq!(result.package_type.as_deref(), Some("golang"));
         assert_eq!(result.name.as_deref(), Some("app"));
@@ -1520,7 +1520,7 @@ github.com/foo/bar v1.1.0/go.mod h1:jkl=
     #[test]
     fn test_godeps_testdata_full() {
         let path = PathBuf::from("testdata/go/full-godeps.json");
-        let result = GodepsParser::extract_package_data(&path);
+        let result = GodepsParser::extract_first_package(&path);
 
         assert_eq!(result.package_type.as_deref(), Some("golang"));
         assert_eq!(
@@ -1542,7 +1542,7 @@ github.com/foo/bar v1.1.0/go.mod h1:jkl=
     #[test]
     fn test_go_sum_testdata_basic() {
         let path = PathBuf::from("testdata/go/basic.go.sum");
-        let result = GoSumParser::extract_package_data(&path);
+        let result = GoSumParser::extract_first_package(&path);
 
         assert_eq!(result.package_type.as_deref(), Some("golang"));
         assert_eq!(result.datasource_id.as_deref(), Some("go_sum"));

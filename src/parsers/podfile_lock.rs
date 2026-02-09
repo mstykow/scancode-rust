@@ -58,12 +58,12 @@ impl PackageParser for PodfileLockParser {
             .is_some_and(|name| name == "Podfile.lock")
     }
 
-    fn extract_package_data(path: &Path) -> PackageData {
+    fn extract_packages(path: &Path) -> Vec<PackageData> {
         let content = match fs::read_to_string(path) {
             Ok(c) => c,
             Err(e) => {
                 warn!("Failed to read Podfile.lock at {:?}: {}", path, e);
-                return default_package_data();
+                return vec![default_package_data()];
             }
         };
 
@@ -71,11 +71,11 @@ impl PackageParser for PodfileLockParser {
             Ok(d) => d,
             Err(e) => {
                 warn!("Failed to parse Podfile.lock at {:?}: {}", path, e);
-                return default_package_data();
+                return vec![default_package_data()];
             }
         };
 
-        parse_podfile_lock(&data)
+        vec![parse_podfile_lock(&data)]
     }
 }
 

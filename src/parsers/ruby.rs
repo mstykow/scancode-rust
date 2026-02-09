@@ -68,16 +68,16 @@ pub struct GemfileParser;
 impl PackageParser for GemfileParser {
     const PACKAGE_TYPE: &'static str = PACKAGE_TYPE;
 
-    fn extract_package_data(path: &Path) -> PackageData {
+    fn extract_packages(path: &Path) -> Vec<PackageData> {
         let content = match fs::read_to_string(path) {
             Ok(c) => c,
             Err(e) => {
                 warn!("Failed to read Gemfile at {:?}: {}", path, e);
-                return default_package_data();
+                return vec![default_package_data()];
             }
         };
 
-        parse_gemfile(&content)
+        vec![parse_gemfile(&content)]
     }
 
     fn is_match(path: &Path) -> bool {
@@ -246,16 +246,16 @@ pub struct GemfileLockParser;
 impl PackageParser for GemfileLockParser {
     const PACKAGE_TYPE: &'static str = PACKAGE_TYPE;
 
-    fn extract_package_data(path: &Path) -> PackageData {
+    fn extract_packages(path: &Path) -> Vec<PackageData> {
         let content = match fs::read_to_string(path) {
             Ok(c) => c,
             Err(e) => {
                 warn!("Failed to read Gemfile.lock at {:?}: {}", path, e);
-                return default_package_data();
+                return vec![default_package_data()];
             }
         };
 
-        parse_gemfile_lock(&content)
+        vec![parse_gemfile_lock(&content)]
     }
 
     fn is_match(path: &Path) -> bool {
@@ -821,16 +821,16 @@ pub struct GemspecParser;
 impl PackageParser for GemspecParser {
     const PACKAGE_TYPE: &'static str = PACKAGE_TYPE;
 
-    fn extract_package_data(path: &Path) -> PackageData {
+    fn extract_packages(path: &Path) -> Vec<PackageData> {
         let content = match fs::read_to_string(path) {
             Ok(c) => c,
             Err(e) => {
                 warn!("Failed to read .gemspec at {:?}: {}", path, e);
-                return default_package_data();
+                return vec![default_package_data()];
             }
         };
 
-        parse_gemspec(&content)
+        vec![parse_gemspec(&content)]
     }
 
     fn is_match(path: &Path) -> bool {
@@ -1223,14 +1223,14 @@ pub struct GemArchiveParser;
 impl PackageParser for GemArchiveParser {
     const PACKAGE_TYPE: &'static str = PACKAGE_TYPE;
 
-    fn extract_package_data(path: &Path) -> PackageData {
-        match extract_gem_archive(path) {
+    fn extract_packages(path: &Path) -> Vec<PackageData> {
+        vec![match extract_gem_archive(path) {
             Ok(data) => data,
             Err(e) => {
                 warn!("Failed to extract .gem archive at {:?}: {}", path, e);
                 default_package_data()
             }
-        }
+        }]
     }
 
     fn is_match(path: &Path) -> bool {

@@ -57,12 +57,12 @@ pub struct CargoParser;
 impl PackageParser for CargoParser {
     const PACKAGE_TYPE: &'static str = "cargo";
 
-    fn extract_package_data(path: &Path) -> PackageData {
+    fn extract_packages(path: &Path) -> Vec<PackageData> {
         let toml_content = match read_cargo_toml(path) {
             Ok(content) => content,
             Err(e) => {
                 warn!("Failed to read or parse Cargo.toml at {:?}: {}", path, e);
-                return default_package_data();
+                return vec![default_package_data()];
             }
         };
 
@@ -130,7 +130,7 @@ impl PackageParser for CargoParser {
 
         let extra_data = extract_extra_data(&toml_content);
 
-        PackageData {
+        vec![PackageData {
             package_type: Some(Self::PACKAGE_TYPE.to_string()),
             namespace: None,
             name,
@@ -173,7 +173,7 @@ impl PackageParser for CargoParser {
             api_data_url,
             datasource_id: None,
             purl,
-        }
+        }]
     }
 
     fn is_match(path: &Path) -> bool {
