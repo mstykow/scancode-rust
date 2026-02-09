@@ -1,0 +1,36 @@
+---
+abstract: 'Simple database abstraction layer'
+author:
+  - 'Alice Developer <alice@cpan.org>'
+build_requires:
+  ExtUtils::MakeMaker: '6.64'
+  Test::Simple: '0.96'
+configure_requires:
+  ExtUtils::MakeMaker: '0'
+dynamic_config: 1
+generated_by: 'ExtUtils::MakeMaker version 6.98'
+license: artistic_2
+meta-spec:
+  url: http://module-build.sourceforge.net/META-spec-v1.4.html
+  version: '1.4'
+name: Example-DBLayer
+no_index:
+  directory:
+    - t
+    - inc
+provides:
+  Example::DBLayer:
+    file: lib/Example/DBLayer.pm
+    version: '0.005'
+requires:
+  DBI: '1.643'
+  DBD::SQLite: '1.66'
+  perl: '5.008001'
+resources:
+  bugtracker: https://rt.cpan.org/Public/Dist/Display.html?Name=Example-DBLayer
+  homepage: https://metacpan.org/dist/Example-DBLayer
+  repository: https://github.com/example/dblayer
+test_requires:
+  Test::More: '0.88'
+  Test::Deep: '1.130'
+version: '0.005'

@@ -1,0 +1,63 @@
+{
+  "abstract": "A modern Perl toolkit for web development",
+  "author": [
+    "John Doe <john@example.com>",
+    "Jane Smith <jane@example.com>"
+  ],
+  "dynamic_config": 1,
+  "generated_by": "ExtUtils::MakeMaker version 7.64",
+  "license": [
+    "perl_5"
+  ],
+  "meta-spec": {
+    "url": "http://search.cpan.org/perldoc?CPAN::Meta::Spec",
+    "version": "2.0"
+  },
+  "name": "Example-Web-Toolkit",
+  "no_index": {
+    "directory": [
+      "t",
+      "inc"
+    ]
+  },
+  "prereqs": {
+    "runtime": {
+      "requires": {
+        "perl": "5.010001",
+        "Moose": "2.2011",
+        "HTTP::Tiny": "0.070",
+        "JSON::PP": "4.04"
+      }
+    },
+    "build": {
+      "requires": {
+        "ExtUtils::MakeMaker": "7.24",
+        "Module::Build": "0.4224"
+      }
+    },
+    "test": {
+      "requires": {
+        "Test::More": "0.98",
+        "Test::Exception": "0.43"
+      }
+    },
+    "configure": {
+      "requires": {
+        "ExtUtils::MakeMaker": "0"
+      }
+    }
+  },
+  "release_status": "stable",
+  "resources": {
+    "bugtracker": {
+      "web": "https://github.com/example/web-toolkit/issues"
+    },
+    "homepage": "https://example.com/web-toolkit",
+    "repository": {
+      "type": "git",
+      "url": "https://github.com/example/web-toolkit.git",
+      "web": "https://github.com/example/web-toolkit"
+    }
+  },
+  "version": "1.042"
+}
