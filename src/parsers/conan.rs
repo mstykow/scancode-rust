@@ -47,22 +47,22 @@ impl PackageParser for ConanFilePyParser {
         path.file_name().is_some_and(|name| name == "conanfile.py")
     }
 
-    fn extract_package_data(path: &Path) -> PackageData {
+    fn extract_packages(path: &Path) -> Vec<PackageData> {
         let contents = match fs::read_to_string(path) {
             Ok(c) => c,
             Err(e) => {
                 warn!("Failed to read {}: {}", path.display(), e);
-                return default_package_data();
+                return vec![default_package_data()];
             }
         };
 
-        match ast::Suite::parse(&contents, "<conanfile.py>") {
+        vec![match ast::Suite::parse(&contents, "<conanfile.py>") {
             Ok(statements) => parse_conanfile_py(&statements),
             Err(e) => {
                 warn!("Failed to parse Python AST in {}: {}", path.display(), e);
                 default_package_data()
             }
-        }
+        }]
     }
 }
 
@@ -240,23 +240,23 @@ impl PackageParser for ConanfileTxtParser {
         path.file_name().is_some_and(|name| name == "conanfile.txt")
     }
 
-    fn extract_package_data(path: &Path) -> PackageData {
+    fn extract_packages(path: &Path) -> Vec<PackageData> {
         let contents = match fs::read_to_string(path) {
             Ok(c) => c,
             Err(e) => {
                 warn!("Failed to read {}: {}", path.display(), e);
-                return default_package_data();
+                return vec![default_package_data()];
             }
         };
 
         let dependencies = parse_conanfile_txt(&contents);
 
-        PackageData {
+        vec![PackageData {
             package_type: Some(Self::PACKAGE_TYPE.to_string()),
             dependencies,
             primary_language: Some("C++".to_string()),
             ..default_package_data()
-        }
+        }]
     }
 }
 
@@ -273,12 +273,12 @@ impl PackageParser for ConanLockParser {
         path.file_name().is_some_and(|name| name == "conan.lock")
     }
 
-    fn extract_package_data(path: &Path) -> PackageData {
+    fn extract_packages(path: &Path) -> Vec<PackageData> {
         let contents = match fs::read_to_string(path) {
             Ok(c) => c,
             Err(e) => {
                 warn!("Failed to read {}: {}", path.display(), e);
-                return default_package_data();
+                return vec![default_package_data()];
             }
         };
 
@@ -286,18 +286,18 @@ impl PackageParser for ConanLockParser {
             Ok(j) => j,
             Err(e) => {
                 warn!("Failed to parse JSON in {}: {}", path.display(), e);
-                return default_package_data();
+                return vec![default_package_data()];
             }
         };
 
         let dependencies = parse_conan_lock(&json);
 
-        PackageData {
+        vec![PackageData {
             package_type: Some(Self::PACKAGE_TYPE.to_string()),
             dependencies,
             primary_language: Some("C++".to_string()),
             ..default_package_data()
-        }
+        }]
     }
 }
 
