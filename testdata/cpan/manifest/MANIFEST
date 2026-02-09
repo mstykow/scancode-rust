@@ -1,0 +1,16 @@
+.gitignore
+Changes
+MANIFEST
+README
+README.md
+lib/Example/Module.pm
+lib/Example/Module/Helper.pm
+t/00-load.t
+t/01-basic.t
+t/02-advanced.t
+t/manifest.t
+t/pod.t
+cpanfile
+Makefile.PL
+META.yml
+META.json

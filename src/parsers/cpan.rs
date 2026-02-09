@@ -1,0 +1,628 @@
+//! Parser for CPAN Perl package manifests.
+//!
+//! Extracts package metadata, dependencies, and author information from
+//! CPAN distribution files used by Perl modules.
+//!
+//! # Supported Formats
+//! - META.json (CPAN::Meta::Spec v2.0+)
+//! - META.yml (CPAN::Meta::Spec v1.4)
+//! - MANIFEST (file list)
+//!
+//! # Key Features
+//! - Full metadata extraction from META.json and META.yml (beyond Python stub handlers)
+//! - Dependency extraction for all CPAN dependency scopes (runtime, build, test, configure)
+//! - Author party information extraction
+//! - Repository URL extraction
+//! - File references from MANIFEST
+//!
+//! # Implementation Notes
+//! - Uses serde_json for JSON parsing
+//! - Uses serde_yaml for YAML parsing
+//! - Python reference has stub-only handlers with no parse() method
+//! - This is a BEYOND PARITY implementation - we extract complete metadata
+
+use std::fs;
+use std::path::Path;
+
+use log::warn;
+use packageurl::PackageUrl;
+use serde_json::Value as JsonValue;
+use serde_yaml::Value as YamlValue;
+
+use crate::models::{Dependency, FileReference, PackageData, Party};
+
+use super::PackageParser;
+
+const FIELD_NAME: &str = "name";
+const FIELD_VERSION: &str = "version";
+const FIELD_ABSTRACT: &str = "abstract";
+const FIELD_DESCRIPTION: &str = "description";
+const FIELD_LICENSE: &str = "license";
+const FIELD_AUTHOR: &str = "author";
+const FIELD_RESOURCES: &str = "resources";
+const FIELD_PREREQS: &str = "prereqs";
+const FIELD_REQUIRES: &str = "requires";
+const FIELD_BUILD_REQUIRES: &str = "build_requires";
+const FIELD_TEST_REQUIRES: &str = "test_requires";
+const FIELD_CONFIGURE_REQUIRES: &str = "configure_requires";
+
+/// CPAN META.json parser for CPAN::Meta::Spec v2.0+ metadata.
+///
+/// Extracts complete metadata from META.json files including dependencies
+/// from all scopes (runtime, build, test, configure).
+pub struct CpanMetaJsonParser;
+
+impl PackageParser for CpanMetaJsonParser {
+    const PACKAGE_TYPE: &'static str = "cpan";
+
+    fn is_match(path: &Path) -> bool {
+        path.file_name().is_some_and(|name| name == "META.json")
+    }
+
+    fn extract_packages(path: &Path) -> Vec<PackageData> {
+        let json = match read_and_parse_json(path) {
+            Ok(json) => json,
+            Err(e) => {
+                warn!("Failed to parse META.json at {:?}: {}", path, e);
+                return vec![default_package_data()];
+            }
+        };
+
+        let name = json
+            .get(FIELD_NAME)
+            .and_then(|v| v.as_str())
+            .map(String::from);
+
+        let version = extract_version_from_json(&json);
+
+        let description = json
+            .get(FIELD_ABSTRACT)
+            .and_then(|v| v.as_str())
+            .map(String::from);
+
+        let extracted_license_statement = extract_license_from_json(&json);
+        let parties = extract_parties_from_json(&json);
+        let dependencies = extract_dependencies_from_json(&json);
+        let (homepage_url, vcs_url, code_view_url, bug_tracking_url) =
+            extract_resources_from_json(&json);
+
+        vec![PackageData {
+            package_type: Some(Self::PACKAGE_TYPE.to_string()),
+            name,
+            version,
+            description,
+            extracted_license_statement,
+            parties,
+            dependencies,
+            homepage_url,
+            vcs_url,
+            code_view_url,
+            bug_tracking_url,
+            primary_language: Some("Perl".to_string()),
+            datasource_id: Some("cpan_meta_json".to_string()),
+            ..Default::default()
+        }]
+    }
+}
+
+/// CPAN META.yml parser for CPAN::Meta::Spec v1.4 metadata.
+///
+/// Extracts complete metadata from META.yml files with legacy dependency structure.
+pub struct CpanMetaYmlParser;
+
+impl PackageParser for CpanMetaYmlParser {
+    const PACKAGE_TYPE: &'static str = "cpan";
+
+    fn is_match(path: &Path) -> bool {
+        path.file_name().is_some_and(|name| name == "META.yml")
+    }
+
+    fn extract_packages(path: &Path) -> Vec<PackageData> {
+        let yaml = match read_and_parse_yaml(path) {
+            Ok(yaml) => yaml,
+            Err(e) => {
+                warn!("Failed to parse META.yml at {:?}: {}", path, e);
+                return vec![default_package_data()];
+            }
+        };
+
+        let name = yaml
+            .get(FIELD_NAME)
+            .and_then(|v| v.as_str())
+            .map(String::from);
+
+        let version = extract_version_from_yaml(&yaml);
+
+        let description = yaml
+            .get(FIELD_ABSTRACT)
+            .or_else(|| yaml.get(FIELD_DESCRIPTION))
+            .and_then(|v| v.as_str())
+            .map(String::from);
+
+        let extracted_license_statement = extract_license_from_yaml(&yaml);
+        let parties = extract_parties_from_yaml(&yaml);
+        let dependencies = extract_dependencies_from_yaml(&yaml);
+        let (homepage_url, vcs_url, bug_tracking_url) = extract_resources_from_yaml(&yaml);
+
+        vec![PackageData {
+            package_type: Some(Self::PACKAGE_TYPE.to_string()),
+            name,
+            version,
+            description,
+            extracted_license_statement,
+            parties,
+            dependencies,
+            homepage_url,
+            vcs_url,
+            bug_tracking_url,
+            primary_language: Some("Perl".to_string()),
+            datasource_id: Some("cpan_meta_yml".to_string()),
+            ..Default::default()
+        }]
+    }
+}
+
+/// CPAN MANIFEST parser for module file lists.
+///
+/// Extracts file references from MANIFEST files (simple line-by-line format).
+pub struct CpanManifestParser;
+
+impl PackageParser for CpanManifestParser {
+    const PACKAGE_TYPE: &'static str = "cpan";
+
+    fn is_match(path: &Path) -> bool {
+        path.file_name().is_some_and(|name| name == "MANIFEST")
+    }
+
+    fn extract_packages(path: &Path) -> Vec<PackageData> {
+        let content = match fs::read_to_string(path) {
+            Ok(content) => content,
+            Err(e) => {
+                warn!("Failed to read MANIFEST at {:?}: {}", path, e);
+                return vec![default_package_data()];
+            }
+        };
+
+        let file_references = content
+            .lines()
+            .filter(|line| !line.trim().is_empty())
+            .filter(|line| !line.trim().starts_with('#'))
+            .map(|line| {
+                // MANIFEST can have comments after whitespace
+                let path = line.split_whitespace().next().unwrap_or(line);
+                FileReference {
+                    path: path.to_string(),
+                    size: None,
+                    sha1: None,
+                    md5: None,
+                    sha256: None,
+                    sha512: None,
+                    extra_data: None,
+                }
+            })
+            .collect();
+
+        vec![PackageData {
+            package_type: Some(Self::PACKAGE_TYPE.to_string()),
+            file_references,
+            primary_language: Some("Perl".to_string()),
+            datasource_id: Some("cpan_manifest".to_string()),
+            ..Default::default()
+        }]
+    }
+}
+
+fn default_package_data() -> PackageData {
+    PackageData {
+        package_type: Some(CpanMetaJsonParser::PACKAGE_TYPE.to_string()),
+        ..Default::default()
+    }
+}
+
+fn read_and_parse_json(path: &Path) -> Result<serde_json::Map<String, JsonValue>, String> {
+    let content = fs::read_to_string(path).map_err(|e| format!("Failed to read file: {}", e))?;
+    let json: JsonValue =
+        serde_json::from_str(&content).map_err(|e| format!("Failed to parse JSON: {}", e))?;
+    json.as_object()
+        .cloned()
+        .ok_or_else(|| "Root JSON is not an object".to_string())
+}
+
+fn read_and_parse_yaml(path: &Path) -> Result<serde_yaml::Mapping, String> {
+    let content = fs::read_to_string(path).map_err(|e| format!("Failed to read file: {}", e))?;
+    let yaml: YamlValue =
+        serde_yaml::from_str(&content).map_err(|e| format!("Failed to parse YAML: {}", e))?;
+    yaml.as_mapping()
+        .cloned()
+        .ok_or_else(|| "Root YAML is not a mapping".to_string())
+}
+
+fn extract_version_from_json(json: &serde_json::Map<String, JsonValue>) -> Option<String> {
+    json.get(FIELD_VERSION).and_then(|v| match v {
+        JsonValue::String(s) => Some(s.clone()),
+        JsonValue::Number(n) => Some(n.to_string()),
+        _ => None,
+    })
+}
+
+fn extract_version_from_yaml(yaml: &serde_yaml::Mapping) -> Option<String> {
+    yaml.get(YamlValue::String(FIELD_VERSION.to_string()))
+        .and_then(|v| match v {
+            YamlValue::String(s) => Some(s.clone()),
+            YamlValue::Number(n) => Some(n.to_string()),
+            _ => None,
+        })
+}
+
+fn extract_license_from_json(json: &serde_json::Map<String, JsonValue>) -> Option<String> {
+    json.get(FIELD_LICENSE).and_then(|v| match v {
+        JsonValue::String(s) => Some(s.clone()),
+        JsonValue::Array(arr) => {
+            let licenses: Vec<String> = arr
+                .iter()
+                .filter_map(|item| item.as_str().map(String::from))
+                .collect();
+            if licenses.is_empty() {
+                None
+            } else {
+                Some(licenses.join(" AND "))
+            }
+        }
+        _ => None,
+    })
+}
+
+fn extract_license_from_yaml(yaml: &serde_yaml::Mapping) -> Option<String> {
+    yaml.get(YamlValue::String(FIELD_LICENSE.to_string()))
+        .and_then(|v| match v {
+            YamlValue::String(s) => Some(s.clone()),
+            YamlValue::Sequence(arr) => {
+                let licenses: Vec<String> = arr
+                    .iter()
+                    .filter_map(|item| item.as_str().map(String::from))
+                    .collect();
+                if licenses.is_empty() {
+                    None
+                } else {
+                    Some(licenses.join(" AND "))
+                }
+            }
+            _ => None,
+        })
+}
+
+fn extract_parties_from_json(json: &serde_json::Map<String, JsonValue>) -> Vec<Party> {
+    json.get(FIELD_AUTHOR)
+        .and_then(|v| v.as_array())
+        .map_or_else(Vec::new, |authors| {
+            authors
+                .iter()
+                .filter_map(|author| {
+                    author.as_str().map(|s| {
+                        let (name, email) = parse_author_string(s);
+                        Party {
+                            r#type: Some("person".to_string()),
+                            role: Some("author".to_string()),
+                            name,
+                            email,
+                            url: None,
+                            organization: None,
+                            organization_url: None,
+                            timezone: None,
+                        }
+                    })
+                })
+                .collect()
+        })
+}
+
+fn extract_parties_from_yaml(yaml: &serde_yaml::Mapping) -> Vec<Party> {
+    yaml.get(YamlValue::String(FIELD_AUTHOR.to_string()))
+        .and_then(|v| v.as_sequence())
+        .map_or_else(Vec::new, |authors| {
+            authors
+                .iter()
+                .filter_map(|author| {
+                    author.as_str().map(|s| {
+                        let (name, email) = parse_author_string(s);
+                        Party {
+                            r#type: Some("person".to_string()),
+                            role: Some("author".to_string()),
+                            name,
+                            email,
+                            url: None,
+                            organization: None,
+                            organization_url: None,
+                            timezone: None,
+                        }
+                    })
+                })
+                .collect()
+        })
+}
+
+fn parse_author_string(author_str: &str) -> (Option<String>, Option<String>) {
+    // Parse "Name <email@example.com>" format
+    if let Some(email_start) = author_str.find('<')
+        && let Some(email_end) = author_str.find('>')
+        && email_start < email_end
+    {
+        let name = author_str[..email_start].trim();
+        let email = author_str[email_start + 1..email_end].trim();
+        return (
+            if name.is_empty() {
+                None
+            } else {
+                Some(name.to_string())
+            },
+            if email.is_empty() {
+                None
+            } else {
+                Some(email.to_string())
+            },
+        );
+    }
+    // No email found, treat entire string as name
+    (Some(author_str.trim().to_string()), None)
+}
+
+fn extract_resources_from_json(
+    json: &serde_json::Map<String, JsonValue>,
+) -> (
+    Option<String>,
+    Option<String>,
+    Option<String>,
+    Option<String>,
+) {
+    let resources = match json.get(FIELD_RESOURCES).and_then(|v| v.as_object()) {
+        Some(r) => r,
+        None => return (None, None, None, None),
+    };
+
+    let homepage_url = resources
+        .get("homepage")
+        .and_then(|v| v.as_str())
+        .map(String::from);
+
+    let vcs_url = resources.get("repository").and_then(|v| match v {
+        JsonValue::String(s) => Some(s.clone()),
+        JsonValue::Object(obj) => obj.get("url").and_then(|u| u.as_str()).map(String::from),
+        _ => None,
+    });
+
+    let code_view_url = resources
+        .get("repository")
+        .and_then(|v| v.as_object())
+        .and_then(|obj| obj.get("web").and_then(|u| u.as_str()).map(String::from));
+
+    let bug_tracking_url = resources.get("bugtracker").and_then(|v| match v {
+        JsonValue::String(s) => Some(s.clone()),
+        JsonValue::Object(obj) => obj.get("web").and_then(|u| u.as_str()).map(String::from),
+        _ => None,
+    });
+
+    (homepage_url, vcs_url, code_view_url, bug_tracking_url)
+}
+
+fn extract_resources_from_yaml(
+    yaml: &serde_yaml::Mapping,
+) -> (Option<String>, Option<String>, Option<String>) {
+    let resources = match yaml
+        .get(YamlValue::String(FIELD_RESOURCES.to_string()))
+        .and_then(|v| v.as_mapping())
+    {
+        Some(r) => r,
+        None => return (None, None, None),
+    };
+
+    let homepage_url = resources
+        .get(YamlValue::String("homepage".to_string()))
+        .and_then(|v| v.as_str())
+        .map(String::from);
+
+    let vcs_url = resources
+        .get(YamlValue::String("repository".to_string()))
+        .and_then(|v| v.as_str())
+        .map(String::from);
+
+    let bug_tracking_url = resources
+        .get(YamlValue::String("bugtracker".to_string()))
+        .and_then(|v| v.as_str())
+        .map(String::from);
+
+    (homepage_url, vcs_url, bug_tracking_url)
+}
+
+fn extract_dependencies_from_json(json: &serde_json::Map<String, JsonValue>) -> Vec<Dependency> {
+    let mut dependencies = Vec::new();
+
+    let prereqs = match json.get(FIELD_PREREQS).and_then(|v| v.as_object()) {
+        Some(p) => p,
+        None => return dependencies,
+    };
+
+    // Extract runtime dependencies
+    if let Some(runtime) = prereqs.get("runtime").and_then(|v| v.as_object())
+        && let Some(requires) = runtime.get("requires").and_then(|v| v.as_object())
+    {
+        dependencies.extend(extract_dependency_group(requires, "runtime", true, false));
+    }
+
+    // Extract build dependencies
+    if let Some(build) = prereqs.get("build").and_then(|v| v.as_object())
+        && let Some(requires) = build.get("requires").and_then(|v| v.as_object())
+    {
+        dependencies.extend(extract_dependency_group(requires, "build", false, false));
+    }
+
+    // Extract test dependencies
+    if let Some(test) = prereqs.get("test").and_then(|v| v.as_object())
+        && let Some(requires) = test.get("requires").and_then(|v| v.as_object())
+    {
+        dependencies.extend(extract_dependency_group(requires, "test", false, false));
+    }
+
+    // Extract configure dependencies
+    if let Some(configure) = prereqs.get("configure").and_then(|v| v.as_object())
+        && let Some(requires) = configure.get("requires").and_then(|v| v.as_object())
+    {
+        dependencies.extend(extract_dependency_group(
+            requires,
+            "configure",
+            false,
+            false,
+        ));
+    }
+
+    dependencies
+}
+
+fn extract_dependencies_from_yaml(yaml: &serde_yaml::Mapping) -> Vec<Dependency> {
+    let mut dependencies = Vec::new();
+
+    // META.yml v1.4 has flat dependency structure
+    if let Some(requires) = yaml
+        .get(YamlValue::String(FIELD_REQUIRES.to_string()))
+        .and_then(|v| v.as_mapping())
+    {
+        dependencies.extend(extract_yaml_dependency_group(
+            requires, "runtime", true, false,
+        ));
+    }
+
+    if let Some(build_requires) = yaml
+        .get(YamlValue::String(FIELD_BUILD_REQUIRES.to_string()))
+        .and_then(|v| v.as_mapping())
+    {
+        dependencies.extend(extract_yaml_dependency_group(
+            build_requires,
+            "build",
+            false,
+            false,
+        ));
+    }
+
+    if let Some(test_requires) = yaml
+        .get(YamlValue::String(FIELD_TEST_REQUIRES.to_string()))
+        .and_then(|v| v.as_mapping())
+    {
+        dependencies.extend(extract_yaml_dependency_group(
+            test_requires,
+            "test",
+            false,
+            false,
+        ));
+    }
+
+    if let Some(configure_requires) = yaml
+        .get(YamlValue::String(FIELD_CONFIGURE_REQUIRES.to_string()))
+        .and_then(|v| v.as_mapping())
+    {
+        dependencies.extend(extract_yaml_dependency_group(
+            configure_requires,
+            "configure",
+            false,
+            false,
+        ));
+    }
+
+    dependencies
+}
+
+fn extract_dependency_group(
+    deps: &serde_json::Map<String, JsonValue>,
+    scope: &str,
+    is_runtime: bool,
+    is_optional: bool,
+) -> Vec<Dependency> {
+    deps.iter()
+        .filter_map(|(name, version)| {
+            // Skip perl itself as it's not a CPAN module
+            if name == "perl" {
+                return None;
+            }
+
+            let purl = PackageUrl::new("cpan", name).ok().map(|p| p.to_string());
+
+            let extracted_requirement = match version {
+                JsonValue::String(s) => Some(s.clone()),
+                JsonValue::Number(n) => Some(n.to_string()),
+                _ => None,
+            };
+
+            Some(Dependency {
+                purl,
+                extracted_requirement,
+                scope: Some(scope.to_string()),
+                is_runtime: Some(is_runtime),
+                is_optional: Some(is_optional),
+                is_pinned: None,
+                is_direct: Some(true),
+                resolved_package: None,
+                extra_data: None,
+            })
+        })
+        .collect()
+}
+
+fn extract_yaml_dependency_group(
+    deps: &serde_yaml::Mapping,
+    scope: &str,
+    is_runtime: bool,
+    is_optional: bool,
+) -> Vec<Dependency> {
+    deps.iter()
+        .filter_map(|(key, value)| {
+            let name = key.as_str()?;
+
+            // Skip perl itself as it's not a CPAN module
+            if name == "perl" {
+                return None;
+            }
+
+            let purl = PackageUrl::new("cpan", name).ok().map(|p| p.to_string());
+
+            let extracted_requirement = match value {
+                YamlValue::String(s) => Some(s.clone()),
+                YamlValue::Number(n) => Some(n.to_string()),
+                _ => None,
+            };
+
+            Some(Dependency {
+                purl,
+                extracted_requirement,
+                scope: Some(scope.to_string()),
+                is_runtime: Some(is_runtime),
+                is_optional: Some(is_optional),
+                is_pinned: None,
+                is_direct: Some(true),
+                resolved_package: None,
+                extra_data: None,
+            })
+        })
+        .collect()
+}
+
+crate::register_parser!(
+    "CPAN Perl META.json",
+    &["**/META.json"],
+    "cpan",
+    "Perl",
+    Some("https://metacpan.org/pod/CPAN::Meta::Spec"),
+);
+
+crate::register_parser!(
+    "CPAN Perl META.yml",
+    &["**/META.yml"],
+    "cpan",
+    "Perl",
+    Some("https://metacpan.org/pod/CPAN::Meta::Spec"),
+);
+
+crate::register_parser!(
+    "CPAN Perl MANIFEST",
+    &["**/MANIFEST"],
+    "cpan",
+    "Perl",
+    Some("https://metacpan.org/pod/Module::Manifest"),
+);
