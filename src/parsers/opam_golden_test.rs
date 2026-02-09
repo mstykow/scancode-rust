@@ -11,7 +11,7 @@ mod golden_tests {
     /// Compares parsed output against expected JSON files.
     fn run_golden(test_file: &str, expected_file: &str) {
         let test_path = PathBuf::from(test_file);
-        let package_data = OpamParser::extract_package_data(&test_path);
+        let package_data = OpamParser::extract_first_package(&test_path);
 
         let expected_json = fs::read_to_string(expected_file)
             .unwrap_or_else(|_| panic!("Failed to read expected file: {}", expected_file));

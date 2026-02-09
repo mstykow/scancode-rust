@@ -29,7 +29,7 @@ mod golden_tests {
         let expected_file =
             PathBuf::from("testdata/swift-golden/swift-fastlane-resolved-v1-package-expected.json");
 
-        let package_data = SwiftPackageResolvedParser::extract_package_data(&test_file);
+        let package_data = SwiftPackageResolvedParser::extract_first_package(&test_file);
 
         match compare_package_data_parser_only(&package_data, &expected_file) {
             Ok(_) => (),
@@ -43,7 +43,7 @@ mod golden_tests {
         let test_file = PathBuf::from("testdata/swift-golden/packages/vercelui/Package.resolved");
         let expected_file = PathBuf::from("testdata/swift-golden/swift-vercelui-expected.json");
 
-        let package_data = SwiftPackageResolvedParser::extract_package_data(&test_file);
+        let package_data = SwiftPackageResolvedParser::extract_first_package(&test_file);
 
         match compare_package_data_parser_only(&package_data, &expected_file) {
             Ok(_) => (),
@@ -60,7 +60,7 @@ mod golden_tests {
         let expected_file =
             PathBuf::from("testdata/swift-golden/swift-maboxmaps-resolved-parse-expected.json");
 
-        let package_data = SwiftPackageResolvedParser::extract_package_data(&test_file);
+        let package_data = SwiftPackageResolvedParser::extract_first_package(&test_file);
 
         match compare_package_data_parser_only(&package_data, &expected_file) {
             Ok(_) => (),
@@ -76,7 +76,7 @@ mod golden_tests {
         let expected_file =
             PathBuf::from("testdata/swift-golden/swift-mapboxmaps-manifest-package-expected.json");
 
-        let package_data = SwiftManifestJsonParser::extract_package_data(&test_file);
+        let package_data = SwiftManifestJsonParser::extract_first_package(&test_file);
 
         match compare_package_data_parser_only(&package_data, &expected_file) {
             Ok(_) => (),
@@ -94,7 +94,7 @@ mod golden_tests {
             "testdata/swift-golden/swift-mapboxmaps-manifest-and-resolved-package-expected.json",
         );
 
-        let package_data = SwiftManifestJsonParser::extract_package_data(&test_file);
+        let package_data = SwiftManifestJsonParser::extract_first_package(&test_file);
 
         match compare_package_data_parser_only(&package_data, &expected_file) {
             Ok(_) => (),
@@ -112,7 +112,7 @@ mod golden_tests {
             "testdata/swift-golden/swift-vercelui-show-dependencies-parse-expected.json",
         );
 
-        let package_data = SwiftPackageResolvedParser::extract_package_data(&test_file);
+        let package_data = SwiftPackageResolvedParser::extract_first_package(&test_file);
 
         match compare_package_data_parser_only(&package_data, &expected_file) {
             Ok(_) => (),
@@ -129,7 +129,7 @@ mod golden_tests {
         let expected_file =
             PathBuf::from("testdata/swift-golden/swift-vercelui-show-dependencies-expected.json");
 
-        let package_data = SwiftPackageResolvedParser::extract_package_data(&test_file);
+        let package_data = SwiftPackageResolvedParser::extract_first_package(&test_file);
 
         match compare_package_data_parser_only(&package_data, &expected_file) {
             Ok(_) => (),

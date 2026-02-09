@@ -40,7 +40,7 @@ mod tests {
     #[test]
     fn test_extract_v2_format() {
         let path = PathBuf::from("testdata/swift/Package-v2.resolved");
-        let data = SwiftPackageResolvedParser::extract_package_data(&path);
+        let data = SwiftPackageResolvedParser::extract_first_package(&path);
 
         assert_eq!(data.package_type, Some("swift".to_string()));
         assert_eq!(
@@ -72,7 +72,7 @@ mod tests {
     #[test]
     fn test_extract_v1_format() {
         let path = PathBuf::from("testdata/swift/Package-v1.resolved");
-        let data = SwiftPackageResolvedParser::extract_package_data(&path);
+        let data = SwiftPackageResolvedParser::extract_first_package(&path);
 
         assert_eq!(data.package_type, Some("swift".to_string()));
         assert_eq!(
@@ -101,7 +101,7 @@ mod tests {
     #[test]
     fn test_extract_v3_format() {
         let path = PathBuf::from("testdata/swift/Package-v3.resolved");
-        let data = SwiftPackageResolvedParser::extract_package_data(&path);
+        let data = SwiftPackageResolvedParser::extract_first_package(&path);
 
         assert_eq!(data.package_type, Some("swift".to_string()));
         assert_eq!(data.dependencies.len(), 2);
@@ -122,7 +122,7 @@ mod tests {
     #[test]
     fn test_revision_fallback_when_no_version() {
         let path = PathBuf::from("testdata/swift/Package-revision-only.resolved");
-        let data = SwiftPackageResolvedParser::extract_package_data(&path);
+        let data = SwiftPackageResolvedParser::extract_first_package(&path);
 
         assert_eq!(data.dependencies.len(), 1);
         let dep = &data.dependencies[0];
@@ -141,7 +141,7 @@ mod tests {
         let path = PathBuf::from(
             "reference/scancode-toolkit/tests/packagedcode/data/swift/packages/vercelui/Package.resolved",
         );
-        let data = SwiftPackageResolvedParser::extract_package_data(&path);
+        let data = SwiftPackageResolvedParser::extract_first_package(&path);
 
         assert_eq!(data.package_type, Some("swift".to_string()));
         assert_eq!(data.dependencies.len(), 5);
@@ -164,7 +164,7 @@ mod tests {
         let path = PathBuf::from(
             "reference/scancode-toolkit/tests/packagedcode/data/swift/packages/fastlane_resolved_v1/Package.resolved",
         );
-        let data = SwiftPackageResolvedParser::extract_package_data(&path);
+        let data = SwiftPackageResolvedParser::extract_first_package(&path);
 
         assert_eq!(data.dependencies.len(), 2);
 
@@ -183,7 +183,7 @@ mod tests {
         let path = PathBuf::from(
             "reference/scancode-toolkit/tests/packagedcode/data/swift/packages/mapboxmaps_manifest_and_resolved/Package.resolved",
         );
-        let data = SwiftPackageResolvedParser::extract_package_data(&path);
+        let data = SwiftPackageResolvedParser::extract_first_package(&path);
 
         assert_eq!(data.dependencies.len(), 3);
 
@@ -201,7 +201,7 @@ mod tests {
     #[test]
     fn test_nonexistent_file_returns_default() {
         let path = PathBuf::from("testdata/swift/nonexistent.resolved");
-        let data = SwiftPackageResolvedParser::extract_package_data(&path);
+        let data = SwiftPackageResolvedParser::extract_first_package(&path);
 
         assert_eq!(data.package_type, Some("swift".to_string()));
         assert!(data.dependencies.is_empty());
@@ -210,7 +210,7 @@ mod tests {
     #[test]
     fn test_all_dependencies_have_required_flags() {
         let path = PathBuf::from("testdata/swift/Package-v2.resolved");
-        let data = SwiftPackageResolvedParser::extract_package_data(&path);
+        let data = SwiftPackageResolvedParser::extract_first_package(&path);
 
         for dep in &data.dependencies {
             assert_eq!(dep.is_runtime, Some(true));
@@ -227,7 +227,7 @@ mod tests {
     fn test_empty_pins() {
         let path = PathBuf::from("testdata/swift/Package-empty.resolved");
         std::fs::write(&path, r#"{"pins": [], "version": 2}"#).ok();
-        let data = SwiftPackageResolvedParser::extract_package_data(&path);
+        let data = SwiftPackageResolvedParser::extract_first_package(&path);
         assert!(data.dependencies.is_empty());
         std::fs::remove_file(&path).ok();
     }

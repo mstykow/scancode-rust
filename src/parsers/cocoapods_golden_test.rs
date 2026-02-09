@@ -32,7 +32,7 @@ mod golden_tests {
             "testdata/cocoapods-golden/podspec.json/FirebaseAnalytics.podspec.json.expected.json",
         );
 
-        let package_data = PodspecJsonParser::extract_package_data(&test_file);
+        let package_data = PodspecJsonParser::extract_first_package(&test_file);
 
         match compare_package_data_parser_only(&package_data, &expected_file) {
             Ok(_) => (),
@@ -49,7 +49,7 @@ mod golden_tests {
             "testdata/cocoapods-golden/podfile.lock/braintree_ios_Podfile.lock.expected.json",
         );
 
-        let package_data = PodfileLockParser::extract_package_data(&test_file);
+        let package_data = PodfileLockParser::extract_first_package(&test_file);
 
         match compare_package_data_parser_only(&package_data, &expected_file) {
             Ok(_) => (),
@@ -66,7 +66,7 @@ mod golden_tests {
             "testdata/cocoapods-golden/podfile.lock/artsy_eigen_Podfile.lock.expected.json",
         );
 
-        let package_data = PodfileLockParser::extract_package_data(&test_file);
+        let package_data = PodfileLockParser::extract_first_package(&test_file);
 
         match compare_package_data_parser_only(&package_data, &expected_file) {
             Ok(_) => (),
@@ -81,7 +81,7 @@ mod golden_tests {
         let expected_file =
             PathBuf::from("testdata/cocoapods-golden/assemble/solo/Podfile.lock-expected.json");
 
-        let package_data = PodfileLockParser::extract_package_data(&test_file);
+        let package_data = PodfileLockParser::extract_first_package(&test_file);
 
         match compare_package_data_parser_only(&package_data, &expected_file) {
             Ok(_) => (),
@@ -98,7 +98,7 @@ mod golden_tests {
             "testdata/cocoapods-golden/assemble/solo/RxDataSources.podspec-expected.json",
         );
 
-        let package_data = PodspecParser::extract_package_data(&test_file);
+        let package_data = PodspecParser::extract_first_package(&test_file);
 
         match compare_package_data_parser_only(&package_data, &expected_file) {
             Ok(_) => (),
@@ -113,7 +113,7 @@ mod golden_tests {
         let expected_file =
             PathBuf::from("testdata/cocoapods-golden/podspec/RxDataSources.podspec.expected.json");
 
-        let package_data = PodspecParser::extract_package_data(&test_file);
+        let package_data = PodspecParser::extract_first_package(&test_file);
 
         match compare_package_data_parser_only(&package_data, &expected_file) {
             Ok(_) => (),
@@ -128,7 +128,7 @@ mod golden_tests {
         let expected_file =
             PathBuf::from("testdata/cocoapods-golden/podspec/Starscream.podspec.expected.json");
 
-        let package_data = PodspecParser::extract_package_data(&test_file);
+        let package_data = PodspecParser::extract_first_package(&test_file);
 
         match compare_package_data_parser_only(&package_data, &expected_file) {
             Ok(_) => (),
@@ -143,7 +143,7 @@ mod golden_tests {
         let expected_file =
             PathBuf::from("testdata/cocoapods-golden/podspec/nanopb.podspec.expected.json");
 
-        let package_data = PodspecParser::extract_package_data(&test_file);
+        let package_data = PodspecParser::extract_first_package(&test_file);
 
         match compare_package_data_parser_only(&package_data, &expected_file) {
             Ok(_) => (),
@@ -158,7 +158,7 @@ mod golden_tests {
         let expected_file =
             PathBuf::from("testdata/cocoapods-golden/podspec/BadgeHub.podspec.expected.json");
 
-        let package_data = PodspecParser::extract_package_data(&test_file);
+        let package_data = PodspecParser::extract_first_package(&test_file);
 
         match compare_package_data_parser_only(&package_data, &expected_file) {
             Ok(_) => (),
@@ -173,7 +173,7 @@ mod golden_tests {
         let expected_file =
             PathBuf::from("testdata/cocoapods-golden/assemble/solo/Podfile-expected.json");
 
-        let package_data = PodfileParser::extract_package_data(&test_file);
+        let package_data = PodfileParser::extract_first_package(&test_file);
 
         match compare_package_data_parser_only(&package_data, &expected_file) {
             Ok(_) => (),

@@ -48,7 +48,7 @@ dependency_overrides:
 "#;
 
         let (_temp_dir, pubspec_path) = create_temp_file("pubspec.yaml", content);
-        let package_data = PubspecYamlParser::extract_package_data(&pubspec_path);
+        let package_data = PubspecYamlParser::extract_first_package(&pubspec_path);
 
         assert_eq!(package_data.package_type.as_deref(), Some("dart"));
         assert_eq!(package_data.name.as_deref(), Some("example"));
@@ -102,7 +102,7 @@ dev_dependencies:
 "#;
 
         let (_temp_dir, pubspec_path) = create_temp_file("pubspec.yaml", content);
-        let package_data = PubspecYamlParser::extract_package_data(&pubspec_path);
+        let package_data = PubspecYamlParser::extract_first_package(&pubspec_path);
 
         let dev_dep = find_dependency(&package_data.dependencies, "test")
             .expect("dev dependency should be present");
@@ -137,7 +137,7 @@ packages:
 "#;
 
         let (_temp_dir, lock_path) = create_temp_file("pubspec.lock", content);
-        let package_data = PubspecLockParser::extract_package_data(&lock_path);
+        let package_data = PubspecLockParser::extract_first_package(&lock_path);
 
         let foo_dep = find_dependency(&package_data.dependencies, "foo")
             .expect("foo dependency should be present");
@@ -187,7 +187,7 @@ packages:
 "#;
 
         let (_temp_dir, lock_path) = create_temp_file("pubspec.lock", content);
-        let package_data = PubspecLockParser::extract_package_data(&lock_path);
+        let package_data = PubspecLockParser::extract_first_package(&lock_path);
 
         let foo_dep = find_dependency(&package_data.dependencies, "foo")
             .expect("foo dependency should be present");
@@ -213,7 +213,7 @@ packages:
         let content = "[invalid_yaml";
 
         let (_temp_dir, pubspec_path) = create_temp_file("pubspec.yaml", content);
-        let package_data = PubspecYamlParser::extract_package_data(&pubspec_path);
+        let package_data = PubspecYamlParser::extract_first_package(&pubspec_path);
 
         assert_eq!(package_data.package_type.as_deref(), Some("dart"));
         assert!(package_data.name.is_none());
@@ -242,7 +242,7 @@ environment:
 "#;
 
         let (_temp_dir, pubspec_path) = create_temp_file("pubspec.yaml", content);
-        let package_data = PubspecYamlParser::extract_package_data(&pubspec_path);
+        let package_data = PubspecYamlParser::extract_first_package(&pubspec_path);
 
         let sdk_dep = find_dependency(&package_data.dependencies, "sdk")
             .expect("sdk environment dependency should be present");
@@ -271,7 +271,7 @@ author: John Doe <john@example.com>
 "#;
 
         let (_temp_dir, pubspec_path) = create_temp_file("pubspec.yaml", content);
-        let package_data = PubspecYamlParser::extract_package_data(&pubspec_path);
+        let package_data = PubspecYamlParser::extract_first_package(&pubspec_path);
 
         assert_eq!(package_data.parties.len(), 1);
         let author = &package_data.parties[0];
@@ -290,7 +290,7 @@ authors:
 "#;
 
         let (_temp_dir, pubspec_path) = create_temp_file("pubspec.yaml", content);
-        let package_data = PubspecYamlParser::extract_package_data(&pubspec_path);
+        let package_data = PubspecYamlParser::extract_first_package(&pubspec_path);
 
         assert_eq!(package_data.parties.len(), 3);
         assert_eq!(package_data.parties[0].name.as_deref(), Some("Alice Smith"));
@@ -313,7 +313,7 @@ repository: https://github.com/example/repo
 "#;
 
         let (_temp_dir, pubspec_path) = create_temp_file("pubspec.yaml", content);
-        let package_data = PubspecYamlParser::extract_package_data(&pubspec_path);
+        let package_data = PubspecYamlParser::extract_first_package(&pubspec_path);
 
         assert_eq!(
             package_data.vcs_url.as_deref(),
@@ -334,7 +334,7 @@ executables:
 "#;
 
         let (_temp_dir, pubspec_path) = create_temp_file("pubspec.yaml", content);
-        let package_data = PubspecYamlParser::extract_package_data(&pubspec_path);
+        let package_data = PubspecYamlParser::extract_first_package(&pubspec_path);
 
         let extra_data = package_data
             .extra_data
@@ -385,7 +385,7 @@ packages:
 "#;
 
         let (_temp_dir, lock_path) = create_temp_file("pubspec.lock", content);
-        let package_data = PubspecLockParser::extract_package_data(&lock_path);
+        let package_data = PubspecLockParser::extract_first_package(&lock_path);
 
         let dart_sdk = find_dependency(&package_data.dependencies, "dart")
             .expect("dart SDK should be present");
@@ -414,7 +414,7 @@ description: Test package for URL generation
 "#;
 
         let (_temp_dir, pubspec_path) = create_temp_file("pubspec.yaml", content);
-        let package_data = PubspecYamlParser::extract_package_data(&pubspec_path);
+        let package_data = PubspecYamlParser::extract_first_package(&pubspec_path);
 
         assert_eq!(
             package_data.api_data_url.as_deref(),
@@ -442,7 +442,7 @@ description: Package without version
 "#;
 
         let (_temp_dir, pubspec_path) = create_temp_file("pubspec.yaml", content_no_version);
-        let package_data = PubspecYamlParser::extract_package_data(&pubspec_path);
+        let package_data = PubspecYamlParser::extract_first_package(&pubspec_path);
 
         assert!(package_data.api_data_url.is_none());
         assert!(package_data.repository_homepage_url.is_none());
@@ -455,7 +455,7 @@ description: Package without name
 "#;
 
         let (_temp_dir2, pubspec_path2) = create_temp_file("pubspec.yaml", content_no_name);
-        let package_data2 = PubspecYamlParser::extract_package_data(&pubspec_path2);
+        let package_data2 = PubspecYamlParser::extract_first_package(&pubspec_path2);
 
         assert!(package_data2.api_data_url.is_none());
         assert!(package_data2.repository_homepage_url.is_none());
@@ -492,7 +492,7 @@ executables:
 "#;
 
         let (_temp_dir, pubspec_path) = create_temp_file("pubspec.yaml", content);
-        let package_data = PubspecYamlParser::extract_package_data(&pubspec_path);
+        let package_data = PubspecYamlParser::extract_first_package(&pubspec_path);
 
         assert_eq!(package_data.name.as_deref(), Some("full_example"));
         assert_eq!(package_data.version.as_deref(), Some("2.3.4"));

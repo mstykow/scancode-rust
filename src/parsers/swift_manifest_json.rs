@@ -72,18 +72,18 @@ use super::PackageParser;
 ///
 /// // Works with pre-generated JSON
 /// let json_path = Path::new("Package.swift.json");
-/// let data1 = SwiftManifestJsonParser::extract_package_data(json_path);
+/// let data1 = SwiftManifestJsonParser::extract_first_package(json_path);
 ///
 /// // Also works with raw Package.swift (if Swift installed)
 /// let swift_path = Path::new("Package.swift");
-/// let data2 = SwiftManifestJsonParser::extract_package_data(swift_path);
+/// let data2 = SwiftManifestJsonParser::extract_first_package(swift_path);
 /// ```
 pub struct SwiftManifestJsonParser;
 
 impl PackageParser for SwiftManifestJsonParser {
     const PACKAGE_TYPE: &'static str = "swift";
 
-    fn extract_package_data(path: &Path) -> PackageData {
+    fn extract_packages(path: &Path) -> Vec<PackageData> {
         let filename = path.file_name().and_then(|n| n.to_str());
 
         let is_json_file = filename
@@ -91,7 +91,7 @@ impl PackageParser for SwiftManifestJsonParser {
             .unwrap_or(false);
         let is_raw_swift = filename.map(|n| n == "Package.swift").unwrap_or(false);
 
-        if is_json_file {
+        vec![if is_json_file {
             let json_content = match read_swift_manifest_json(path) {
                 Ok(content) => content,
                 Err(e) => {
@@ -99,7 +99,7 @@ impl PackageParser for SwiftManifestJsonParser {
                         "Failed to read or parse Swift manifest JSON at {:?}: {}",
                         path, e
                     );
-                    return default_package_data();
+                    return vec![default_package_data()];
                 }
             };
             parse_swift_manifest(&json_content)
@@ -127,7 +127,7 @@ impl PackageParser for SwiftManifestJsonParser {
             }
         } else {
             default_package_data()
-        }
+        }]
     }
 
     fn is_match(path: &Path) -> bool {

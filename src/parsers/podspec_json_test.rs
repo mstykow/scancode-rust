@@ -48,7 +48,7 @@ mod tests {
         }"#;
 
         let (_temp_dir, file_path) = create_temp_podspec_json(content);
-        let package_data = PodspecJsonParser::extract_package_data(&file_path);
+        let package_data = PodspecJsonParser::extract_first_package(&file_path);
 
         assert_eq!(package_data.package_type, Some("cocoapods".to_string()));
         assert_eq!(package_data.name, Some("TestPod".to_string()));
@@ -89,7 +89,7 @@ mod tests {
         }"#;
 
         let (_temp_dir, file_path) = create_temp_podspec_json(content);
-        let package_data = PodspecJsonParser::extract_package_data(&file_path);
+        let package_data = PodspecJsonParser::extract_first_package(&file_path);
 
         // License dict values should be joined with space
         let license_statement = package_data.extracted_license_statement.unwrap();
@@ -109,7 +109,7 @@ mod tests {
         }"#;
 
         let (_temp_dir, file_path) = create_temp_podspec_json(content);
-        let package_data = PodspecJsonParser::extract_package_data(&file_path);
+        let package_data = PodspecJsonParser::extract_first_package(&file_path);
 
         assert_eq!(
             package_data.vcs_url,
@@ -129,7 +129,7 @@ mod tests {
         }"#;
 
         let (_temp_dir, file_path) = create_temp_podspec_json(content);
-        let package_data = PodspecJsonParser::extract_package_data(&file_path);
+        let package_data = PodspecJsonParser::extract_first_package(&file_path);
 
         assert_eq!(package_data.vcs_url, None);
         assert_eq!(
@@ -147,7 +147,7 @@ mod tests {
         }"#;
 
         let (_temp_dir, file_path) = create_temp_podspec_json(content);
-        let package_data = PodspecJsonParser::extract_package_data(&file_path);
+        let package_data = PodspecJsonParser::extract_first_package(&file_path);
 
         assert_eq!(
             package_data.vcs_url,
@@ -167,7 +167,7 @@ mod tests {
         }"#;
 
         let (_temp_dir, file_path) = create_temp_podspec_json(content);
-        let package_data = PodspecJsonParser::extract_package_data(&file_path);
+        let package_data = PodspecJsonParser::extract_first_package(&file_path);
 
         assert_eq!(package_data.parties.len(), 2);
 
@@ -199,7 +199,7 @@ mod tests {
         }"#;
 
         let (_temp_dir, file_path) = create_temp_podspec_json(content);
-        let package_data = PodspecJsonParser::extract_package_data(&file_path);
+        let package_data = PodspecJsonParser::extract_first_package(&file_path);
 
         assert_eq!(package_data.parties.len(), 1);
         assert_eq!(
@@ -223,7 +223,7 @@ mod tests {
         }"#;
 
         let (_temp_dir, file_path) = create_temp_podspec_json(content);
-        let package_data = PodspecJsonParser::extract_package_data(&file_path);
+        let package_data = PodspecJsonParser::extract_first_package(&file_path);
 
         assert_eq!(package_data.dependencies.len(), 3);
 
@@ -260,7 +260,7 @@ mod tests {
         }"#;
 
         let (_temp_dir, file_path) = create_temp_podspec_json(content);
-        let package_data = PodspecJsonParser::extract_package_data(&file_path);
+        let package_data = PodspecJsonParser::extract_first_package(&file_path);
 
         assert!(package_data.extra_data.is_some());
         let extra_data = package_data.extra_data.unwrap();
@@ -287,7 +287,7 @@ mod tests {
         }"#;
 
         let (_temp_dir, file_path) = create_temp_podspec_json(content);
-        let package_data = PodspecJsonParser::extract_package_data(&file_path);
+        let package_data = PodspecJsonParser::extract_first_package(&file_path);
 
         // Check repository_homepage_url
         assert_eq!(
@@ -331,7 +331,7 @@ mod tests {
         }"#;
 
         let (_temp_dir, file_path) = create_temp_podspec_json(content);
-        let package_data = PodspecJsonParser::extract_package_data(&file_path);
+        let package_data = PodspecJsonParser::extract_first_package(&file_path);
 
         assert!(package_data.purl.is_some());
         let purl = package_data.purl.unwrap();
@@ -348,7 +348,7 @@ mod tests {
         }"#;
 
         let (_temp_dir, file_path) = create_temp_podspec_json(content);
-        let package_data = PodspecJsonParser::extract_package_data(&file_path);
+        let package_data = PodspecJsonParser::extract_first_package(&file_path);
 
         assert_eq!(package_data.description, Some("Just a summary".to_string()));
     }
@@ -363,7 +363,7 @@ mod tests {
         }"#;
 
         let (_temp_dir, file_path) = create_temp_podspec_json(content);
-        let package_data = PodspecJsonParser::extract_package_data(&file_path);
+        let package_data = PodspecJsonParser::extract_first_package(&file_path);
 
         // Should not prepend summary if description already starts with it
         assert_eq!(
@@ -377,7 +377,7 @@ mod tests {
         let content = r#"{ "name": "TestPod", invalid json }"#;
 
         let (_temp_dir, file_path) = create_temp_podspec_json(content);
-        let package_data = PodspecJsonParser::extract_package_data(&file_path);
+        let package_data = PodspecJsonParser::extract_first_package(&file_path);
 
         // Should return default package data
         assert_eq!(package_data.package_type, Some("cocoapods".to_string()));
@@ -394,7 +394,7 @@ mod tests {
         }"#;
 
         let (_temp_dir, file_path) = create_temp_podspec_json(content);
-        let package_data = PodspecJsonParser::extract_package_data(&file_path);
+        let package_data = PodspecJsonParser::extract_first_package(&file_path);
 
         // Empty/whitespace-only fields should be None
         assert_eq!(package_data.name, None);
@@ -413,7 +413,7 @@ mod tests {
             return;
         }
 
-        let package_data = PodspecJsonParser::extract_package_data(&file_path);
+        let package_data = PodspecJsonParser::extract_first_package(&file_path);
 
         assert_eq!(package_data.name, Some("FirebaseAnalytics".to_string()));
         assert_eq!(package_data.version, Some("8.1.1".to_string()));

@@ -54,7 +54,7 @@ abbrev@1:
     #[test]
     fn test_parse_yarn_v1_from_testdata() {
         let lock_path = load_testdata_file("yarn-v1.lock");
-        let package_data = YarnLockParser::extract_package_data(&lock_path);
+        let package_data = YarnLockParser::extract_first_package(&lock_path);
 
         assert_eq!(package_data.package_type, Some("npm".to_string()));
         assert!(!package_data.dependencies.is_empty());
@@ -63,7 +63,7 @@ abbrev@1:
     #[test]
     fn test_parse_yarn_v2_from_testdata() {
         let lock_path = load_testdata_file("yarn-v2.lock");
-        let package_data = YarnLockParser::extract_package_data(&lock_path);
+        let package_data = YarnLockParser::extract_first_package(&lock_path);
 
         assert_eq!(package_data.package_type, Some("npm".to_string()));
         assert!(!package_data.dependencies.is_empty());
@@ -87,7 +87,7 @@ abbrev@1:
 "#;
 
         let (_temp_dir, path) = create_temp_lock_file(content);
-        let package_data = YarnLockParser::extract_package_data(&path);
+        let package_data = YarnLockParser::extract_first_package(&path);
 
         assert_eq!(package_data.dependencies.len(), 1);
 
@@ -114,7 +114,7 @@ __metadata:
 "#;
 
         let (_temp_dir, path) = create_temp_lock_file(content);
-        let package_data = YarnLockParser::extract_package_data(&path);
+        let package_data = YarnLockParser::extract_first_package(&path);
 
         assert_eq!(package_data.dependencies.len(), 1);
 
@@ -140,7 +140,7 @@ __metadata:
 "#;
 
         let (_temp_dir, path) = create_temp_lock_file(content);
-        let package_data = YarnLockParser::extract_package_data(&path);
+        let package_data = YarnLockParser::extract_first_package(&path);
 
         assert_eq!(package_data.dependencies.len(), 1);
         let dep = &package_data.dependencies[0];
@@ -162,7 +162,7 @@ __metadata:
 "#;
 
         let (_temp_dir, path) = create_temp_lock_file(content);
-        let package_data = YarnLockParser::extract_package_data(&path);
+        let package_data = YarnLockParser::extract_first_package(&path);
 
         assert_eq!(package_data.dependencies.len(), 1);
         let dep = &package_data.dependencies[0];
@@ -186,7 +186,7 @@ __metadata:
 "#;
 
         let (_temp_dir, path) = create_temp_lock_file(content);
-        let package_data = YarnLockParser::extract_package_data(&path);
+        let package_data = YarnLockParser::extract_first_package(&path);
 
         assert_eq!(package_data.dependencies.len(), 1);
         let dep = &package_data.dependencies[0];
@@ -213,7 +213,7 @@ __metadata:
 "#;
 
         let (_temp_dir, path) = create_temp_lock_file(content);
-        let package_data = YarnLockParser::extract_package_data(&path);
+        let package_data = YarnLockParser::extract_first_package(&path);
 
         assert_eq!(package_data.dependencies.len(), 1);
 
@@ -242,7 +242,7 @@ __metadata:
 "#;
 
         let (_temp_dir, path) = create_temp_lock_file(content);
-        let package_data = YarnLockParser::extract_package_data(&path);
+        let package_data = YarnLockParser::extract_first_package(&path);
 
         assert_eq!(package_data.dependencies.len(), 1);
 
@@ -305,7 +305,7 @@ __metadata:
         let content = "invalid content without proper format";
 
         let (_temp_dir, path) = create_temp_lock_file(content);
-        let package_data = YarnLockParser::extract_package_data(&path);
+        let package_data = YarnLockParser::extract_first_package(&path);
 
         assert_eq!(package_data.package_type, Some("npm".to_string()));
         assert!(package_data.dependencies.is_empty());
@@ -316,7 +316,7 @@ __metadata:
         let content = r#"__metadata:"#;
 
         let (_temp_dir, path) = create_temp_lock_file(content);
-        let package_data = YarnLockParser::extract_package_data(&path);
+        let package_data = YarnLockParser::extract_first_package(&path);
 
         assert_eq!(package_data.package_type, Some("npm".to_string()));
         assert!(package_data.dependencies.is_empty());
@@ -325,7 +325,7 @@ __metadata:
     #[test]
     fn test_yarn_v2_malformed_yaml_graceful() {
         let path = PathBuf::from("testdata/yarn/malformed-v2/yarn.lock");
-        let result = YarnLockParser::extract_package_data(&path);
+        let result = YarnLockParser::extract_first_package(&path);
 
         // Should return default PackageData, not panic
         assert_eq!(result.package_type, Some("npm".to_string()));

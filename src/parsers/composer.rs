@@ -63,12 +63,12 @@ pub struct ComposerJsonParser;
 impl PackageParser for ComposerJsonParser {
     const PACKAGE_TYPE: &'static str = "composer";
 
-    fn extract_package_data(path: &Path) -> PackageData {
+    fn extract_packages(path: &Path) -> Vec<PackageData> {
         let json_content = match read_json_file(path) {
             Ok(content) => content,
             Err(e) => {
                 warn!("Failed to read composer.json at {:?}: {}", path, e);
-                return default_package_data(Some(DATASOURCE_COMPOSER_JSON));
+                return vec![default_package_data(Some(DATASOURCE_COMPOSER_JSON))];
             }
         };
 
@@ -124,7 +124,7 @@ impl PackageParser for ComposerJsonParser {
         let extra_data = build_extra_data(&json_content);
         let parties = extract_parties(&json_content, &namespace);
 
-        PackageData {
+        vec![PackageData {
             package_type: Some(Self::PACKAGE_TYPE.to_string()),
             namespace: namespace.clone(),
             name: name.clone(),
@@ -175,7 +175,7 @@ impl PackageParser for ComposerJsonParser {
             api_data_url: build_api_data_url(&namespace, &name),
             datasource_id: Some(DATASOURCE_COMPOSER_JSON.to_string()),
             purl: build_package_purl(&namespace, &name, &version),
-        }
+        }]
     }
 
     fn is_match(path: &Path) -> bool {
@@ -189,12 +189,12 @@ pub struct ComposerLockParser;
 impl PackageParser for ComposerLockParser {
     const PACKAGE_TYPE: &'static str = "composer";
 
-    fn extract_package_data(path: &Path) -> PackageData {
+    fn extract_packages(path: &Path) -> Vec<PackageData> {
         let json_content = match read_json_file(path) {
             Ok(content) => content,
             Err(e) => {
                 warn!("Failed to read composer.lock at {:?}: {}", path, e);
-                return default_package_data(Some(DATASOURCE_COMPOSER_LOCK));
+                return vec![default_package_data(Some(DATASOURCE_COMPOSER_LOCK))];
             }
         };
 
@@ -202,7 +202,7 @@ impl PackageParser for ComposerLockParser {
 
         let mut package_data = default_package_data(Some(DATASOURCE_COMPOSER_LOCK));
         package_data.dependencies = dependencies;
-        package_data
+        vec![package_data]
     }
 
     fn is_match(path: &Path) -> bool {

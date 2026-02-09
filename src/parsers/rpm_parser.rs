@@ -47,12 +47,15 @@ impl PackageParser for RpmParser {
         }
     }
 
-    fn extract_package_data(path: &Path) -> PackageData {
+    fn extract_packages(path: &Path) -> Vec<PackageData> {
         let file = match File::open(path) {
             Ok(f) => f,
             Err(e) => {
                 warn!("Failed to open RPM file {:?}: {}", path, e);
-                return create_default_package_data(PACKAGE_TYPE, Some("rpm_archive"));
+                return vec![create_default_package_data(
+                    PACKAGE_TYPE,
+                    Some("rpm_archive"),
+                )];
             }
         };
 
@@ -61,11 +64,14 @@ impl PackageParser for RpmParser {
             Ok(p) => p,
             Err(e) => {
                 warn!("Failed to parse RPM file {:?}: {}", path, e);
-                return create_default_package_data(PACKAGE_TYPE, Some("rpm_archive"));
+                return vec![create_default_package_data(
+                    PACKAGE_TYPE,
+                    Some("rpm_archive"),
+                )];
             }
         };
 
-        parse_rpm_package(&pkg)
+        vec![parse_rpm_package(&pkg)]
     }
 }
 
@@ -319,7 +325,7 @@ mod tests {
             return;
         }
 
-        let pkg = RpmParser::extract_package_data(&test_file);
+        let pkg = RpmParser::extract_first_package(&test_file);
 
         assert_eq!(pkg.package_type, Some("rpm".to_string()));
 
@@ -382,7 +388,7 @@ mod tests {
             return;
         }
 
-        let pkg = RpmParser::extract_package_data(&test_file);
+        let pkg = RpmParser::extract_first_package(&test_file);
         if pkg.datasource_id.is_some() {
             assert_eq!(pkg.name, Some("fping".to_string()));
             assert!(pkg.version.is_some());

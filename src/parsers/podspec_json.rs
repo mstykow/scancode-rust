@@ -54,12 +54,12 @@ pub struct PodspecJsonParser;
 impl PackageParser for PodspecJsonParser {
     const PACKAGE_TYPE: &'static str = "cocoapods";
 
-    fn extract_package_data(path: &Path) -> PackageData {
+    fn extract_packages(path: &Path) -> Vec<PackageData> {
         let json_content = match read_json_file(path) {
             Ok(content) => content,
             Err(e) => {
                 warn!("Failed to read .podspec.json at {:?}: {}", path, e);
-                return default_package_data();
+                return vec![default_package_data()];
             }
         };
 
@@ -186,7 +186,7 @@ impl PackageParser for PodspecJsonParser {
             None
         };
 
-        PackageData {
+        vec![PackageData {
             package_type: Some(Self::PACKAGE_TYPE.to_string()),
             namespace: None,
             name: name.clone(),
@@ -229,7 +229,7 @@ impl PackageParser for PodspecJsonParser {
             api_data_url,
             datasource_id: Some(DATASOURCE_ID.to_string()),
             purl,
-        }
+        }]
     }
 
     fn is_match(path: &Path) -> bool {

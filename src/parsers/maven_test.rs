@@ -28,7 +28,7 @@ mod tests {
     #[test]
     fn test_extract_from_testdata() {
         let pom_path = PathBuf::from("testdata/maven/pom.xml");
-        let package_data = MavenParser::extract_package_data(&pom_path);
+        let package_data = MavenParser::extract_first_package(&pom_path);
 
         assert_eq!(package_data.package_type, Some("maven".to_string()));
         assert_eq!(package_data.namespace, Some("com.example".to_string()));
@@ -98,7 +98,7 @@ mod tests {
         "#;
 
         let (_temp_dir, pom_path) = create_temp_pom_xml(content);
-        let package_data = MavenParser::extract_package_data(&pom_path);
+        let package_data = MavenParser::extract_first_package(&pom_path);
 
         assert_eq!(package_data.package_type, Some("maven".to_string()));
         assert_eq!(package_data.namespace, Some("com.test".to_string()));
@@ -149,7 +149,7 @@ mod tests {
         "#;
 
         let (_temp_dir, pom_path) = create_temp_pom_xml(content);
-        let package_data = MavenParser::extract_package_data(&pom_path);
+        let package_data = MavenParser::extract_first_package(&pom_path);
 
         assert_eq!(package_data.dependencies.len(), 2);
 
@@ -227,7 +227,7 @@ mod tests {
         "#;
 
         let (_temp_dir, pom_path) = create_temp_pom_xml(content);
-        let package_data = MavenParser::extract_package_data(&pom_path);
+        let package_data = MavenParser::extract_first_package(&pom_path);
 
         assert_eq!(package_data.dependencies.len(), 5);
 
@@ -282,7 +282,7 @@ mod tests {
         // Test with empty content
         let content = "";
         let (_temp_dir, pom_path) = create_temp_pom_xml(content);
-        let package_data = MavenParser::extract_package_data(&pom_path);
+        let package_data = MavenParser::extract_first_package(&pom_path);
 
         // Should return default/empty package data
         assert_eq!(package_data.name, None);
@@ -292,7 +292,7 @@ mod tests {
         // Test with invalid XML
         let content = "this is not valid XML";
         let (_temp_dir2, pom_path2) = create_temp_pom_xml(content);
-        let package_data = MavenParser::extract_package_data(&pom_path2);
+        let package_data = MavenParser::extract_first_package(&pom_path2);
 
         // Should return default/empty package data
         assert_eq!(package_data.name, None);
@@ -304,7 +304,7 @@ mod tests {
     fn test_extract_api_url_basic() {
         // Given: A pom.xml with groupId, artifactId, and version
         let pom_path = PathBuf::from("testdata/maven/pom-api-url-basic.xml");
-        let package_data = MavenParser::extract_package_data(&pom_path);
+        let package_data = MavenParser::extract_first_package(&pom_path);
 
         // Then: API data URL should be generated with maven-metadata.xml
         assert_eq!(
@@ -332,7 +332,7 @@ mod tests {
     fn test_extract_api_url_no_version() {
         // Given: A pom.xml with groupId and artifactId but no version
         let pom_path = PathBuf::from("testdata/maven/pom-api-url-no-version.xml");
-        let package_data = MavenParser::extract_package_data(&pom_path);
+        let package_data = MavenParser::extract_first_package(&pom_path);
 
         // Then: API data URL should still be generated (without version)
         assert_eq!(
@@ -354,7 +354,7 @@ mod tests {
     fn test_extract_vcs_url_with_scm_connection() {
         // Given: A pom.xml with scm.connection
         let pom_path = PathBuf::from("testdata/maven/pom-scm.xml");
-        let package_data = MavenParser::extract_package_data(&pom_path);
+        let package_data = MavenParser::extract_first_package(&pom_path);
 
         // Then: vcs_url should contain the scm.connection
         assert_eq!(
@@ -366,7 +366,7 @@ mod tests {
     #[test]
     fn test_parse_pom_properties() {
         let pom_props_path = PathBuf::from("testdata/maven/test1/pom.properties");
-        let package_data = MavenParser::extract_package_data(&pom_props_path);
+        let package_data = MavenParser::extract_first_package(&pom_props_path);
 
         assert_eq!(package_data.package_type, Some("maven".to_string()));
         assert_eq!(package_data.namespace, Some("com.example.test".to_string()));
@@ -381,7 +381,7 @@ mod tests {
     #[test]
     fn test_parse_manifest_mf_implementation() {
         let manifest_path = PathBuf::from("testdata/maven/test2/MANIFEST.MF");
-        let package_data = MavenParser::extract_package_data(&manifest_path);
+        let package_data = MavenParser::extract_first_package(&manifest_path);
 
         assert_eq!(package_data.package_type, Some("maven".to_string()));
         assert_eq!(package_data.name, Some("spring-web".to_string()));
@@ -397,7 +397,7 @@ mod tests {
     #[test]
     fn test_parse_manifest_mf_bundle() {
         let manifest_path = PathBuf::from("testdata/maven/test3/MANIFEST.MF");
-        let package_data = MavenParser::extract_package_data(&manifest_path);
+        let package_data = MavenParser::extract_first_package(&manifest_path);
 
         assert_eq!(package_data.package_type, Some("maven".to_string()));
         assert_eq!(package_data.name, Some("com.example.mybundle".to_string()));
@@ -411,7 +411,7 @@ mod tests {
     #[test]
     fn test_pom_properties_purl_generation() {
         let pom_props_path = PathBuf::from("testdata/maven/test4/pom.properties");
-        let package_data = MavenParser::extract_package_data(&pom_props_path);
+        let package_data = MavenParser::extract_first_package(&pom_props_path);
 
         assert_eq!(
             package_data.purl,
@@ -428,7 +428,7 @@ mod tests {
     #[test]
     fn test_extract_repositories() {
         let pom_path = PathBuf::from("testdata/maven/repositories-test.xml");
-        let package_data = MavenParser::extract_package_data(&pom_path);
+        let package_data = MavenParser::extract_first_package(&pom_path);
 
         assert_eq!(package_data.namespace, Some("com.example".to_string()));
         assert_eq!(package_data.name, Some("test-repo".to_string()));
@@ -492,7 +492,7 @@ mod tests {
     #[test]
     fn test_extract_modules() {
         let pom_path = PathBuf::from("testdata/maven/modules-test.xml");
-        let package_data = MavenParser::extract_package_data(&pom_path);
+        let package_data = MavenParser::extract_first_package(&pom_path);
 
         assert_eq!(package_data.namespace, Some("com.example".to_string()));
         assert_eq!(package_data.name, Some("multi-module-parent".to_string()));
@@ -515,7 +515,7 @@ mod tests {
     #[test]
     fn test_extract_mailing_lists() {
         let pom_path = PathBuf::from("testdata/maven/mailing-lists-test.xml");
-        let package_data = MavenParser::extract_package_data(&pom_path);
+        let package_data = MavenParser::extract_first_package(&pom_path);
 
         assert_eq!(
             package_data.namespace,
@@ -573,7 +573,7 @@ mod tests {
     #[test]
     fn test_extract_dependency_management() {
         let pom_path = PathBuf::from("testdata/maven/dependency-management-test.xml");
-        let package_data = MavenParser::extract_package_data(&pom_path);
+        let package_data = MavenParser::extract_first_package(&pom_path);
 
         assert_eq!(package_data.namespace, Some("com.example".to_string()));
         assert_eq!(package_data.name, Some("parent-project".to_string()));
@@ -625,7 +625,7 @@ mod tests {
     #[test]
     fn test_extract_parent_pom() {
         let pom_path = PathBuf::from("testdata/maven/parent-pom-test.xml");
-        let package_data = MavenParser::extract_package_data(&pom_path);
+        let package_data = MavenParser::extract_first_package(&pom_path);
 
         assert_eq!(
             package_data.namespace,
@@ -678,7 +678,7 @@ mod tests {
     #[test]
     fn test_basic_property_chain() {
         let pom_path = PathBuf::from("testdata/maven/test-properties-basic.xml");
-        let package_data = MavenParser::extract_package_data(&pom_path);
+        let package_data = MavenParser::extract_first_package(&pom_path);
 
         assert_eq!(package_data.version, Some("1.0.0".to_string()));
     }
@@ -699,7 +699,7 @@ mod tests {
         "#;
 
         let (_temp_dir, pom_path) = create_temp_pom_xml(content);
-        let package_data = MavenParser::extract_package_data(&pom_path);
+        let package_data = MavenParser::extract_first_package(&pom_path);
 
         assert_eq!(package_data.version, Some("alpha-beta-gamma".to_string()));
     }
@@ -715,7 +715,7 @@ mod tests {
         "#;
 
         let (_temp_dir, pom_path) = create_temp_pom_xml(content);
-        let package_data = MavenParser::extract_package_data(&pom_path);
+        let package_data = MavenParser::extract_first_package(&pom_path);
 
         assert_eq!(package_data.version, Some("${does.not.exist}".to_string()));
     }
@@ -734,7 +734,7 @@ mod tests {
         "#;
 
         let (_temp_dir, pom_path) = create_temp_pom_xml(content);
-        let package_data = MavenParser::extract_package_data(&pom_path);
+        let package_data = MavenParser::extract_first_package(&pom_path);
 
         assert_eq!(package_data.version, Some("${a}".to_string()));
     }
@@ -742,7 +742,7 @@ mod tests {
     #[test]
     fn test_mutual_cycle() {
         let pom_path = PathBuf::from("testdata/maven/test-properties-cycle.xml");
-        let package_data = MavenParser::extract_package_data(&pom_path);
+        let package_data = MavenParser::extract_first_package(&pom_path);
 
         assert_eq!(package_data.version, Some("${a}".to_string()));
     }
@@ -750,7 +750,7 @@ mod tests {
     #[test]
     fn test_nested_placeholder() {
         let pom_path = PathBuf::from("testdata/maven/test-properties-nested.xml");
-        let package_data = MavenParser::extract_package_data(&pom_path);
+        let package_data = MavenParser::extract_first_package(&pom_path);
 
         assert_eq!(package_data.version, Some("SUCCESS".to_string()));
     }
@@ -770,7 +770,7 @@ mod tests {
         "#;
 
         let (_temp_dir, pom_path) = create_temp_pom_xml(content);
-        let package_data = MavenParser::extract_package_data(&pom_path);
+        let package_data = MavenParser::extract_first_package(&pom_path);
 
         assert_eq!(package_data.version, Some("${a".to_string()));
         assert_eq!(package_data.homepage_url, Some("${}".to_string()));
@@ -798,7 +798,7 @@ mod tests {
         );
 
         let (_temp_dir, pom_path) = create_temp_pom_xml(&content);
-        let package_data = MavenParser::extract_package_data(&pom_path);
+        let package_data = MavenParser::extract_first_package(&pom_path);
 
         assert_eq!(package_data.version, Some("${a11}".to_string()));
     }
@@ -818,7 +818,7 @@ mod tests {
         "#;
 
         let (_temp_dir, pom_path) = create_temp_pom_xml(content);
-        let package_data = MavenParser::extract_package_data(&pom_path);
+        let package_data = MavenParser::extract_first_package(&pom_path);
 
         assert_eq!(
             package_data.homepage_url,

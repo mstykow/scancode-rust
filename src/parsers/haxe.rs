@@ -41,12 +41,12 @@ impl PackageParser for HaxeParser {
         path.file_name().is_some_and(|name| name == "haxelib.json")
     }
 
-    fn extract_package_data(path: &Path) -> PackageData {
+    fn extract_packages(path: &Path) -> Vec<PackageData> {
         let json_content = match read_haxelib_json(path) {
             Ok(content) => content,
             Err(e) => {
                 warn!("Failed to read or parse haxelib.json at {:?}: {}", path, e);
-                return default_package_data();
+                return vec![default_package_data()];
             }
         };
 
@@ -107,7 +107,7 @@ impl PackageParser for HaxeParser {
             });
         }
 
-        PackageData {
+        vec![PackageData {
             package_type: Some("haxe".to_string()),
             namespace: None,
             name,
@@ -150,7 +150,7 @@ impl PackageParser for HaxeParser {
             api_data_url: None,
             datasource_id: Some("haxelib_json".to_string()),
             purl,
-        }
+        }]
     }
 }
 
@@ -261,7 +261,7 @@ mod tests {
     #[test]
     fn test_extract_from_testdata_basic() {
         let haxelib_path = PathBuf::from("testdata/haxe/basic/haxelib.json");
-        let package_data = HaxeParser::extract_package_data(&haxelib_path);
+        let package_data = HaxeParser::extract_first_package(&haxelib_path);
 
         assert_eq!(package_data.package_type, Some("haxe".to_string()));
         assert_eq!(package_data.name, Some("haxelib".to_string()));
@@ -303,7 +303,7 @@ mod tests {
     #[test]
     fn test_extract_with_dependencies() {
         let haxelib_path = PathBuf::from("testdata/haxe/deps/haxelib.json");
-        let package_data = HaxeParser::extract_package_data(&haxelib_path);
+        let package_data = HaxeParser::extract_first_package(&haxelib_path);
 
         assert_eq!(package_data.name, Some("selecthxml".to_string()));
         assert_eq!(package_data.version, Some("0.5.1".to_string()));
@@ -330,7 +330,7 @@ mod tests {
     #[test]
     fn test_extract_with_tags() {
         let haxelib_path = PathBuf::from("testdata/haxe/tags/haxelib.json");
-        let package_data = HaxeParser::extract_package_data(&haxelib_path);
+        let package_data = HaxeParser::extract_first_package(&haxelib_path);
 
         assert_eq!(package_data.name, Some("tink_core".to_string()));
         assert_eq!(package_data.version, Some("1.18.0".to_string()));
@@ -359,7 +359,7 @@ mod tests {
     #[test]
     fn test_invalid_file() {
         let nonexistent_path = PathBuf::from("testdata/haxe/nonexistent/haxelib.json");
-        let package_data = HaxeParser::extract_package_data(&nonexistent_path);
+        let package_data = HaxeParser::extract_first_package(&nonexistent_path);
 
         // Should return default data with proper type and datasource
         assert_eq!(package_data.package_type, Some("haxe".to_string()));

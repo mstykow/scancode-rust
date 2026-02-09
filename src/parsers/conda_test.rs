@@ -237,12 +237,12 @@ package:
         assert_eq!(dep.is_optional, Some(true));
     }
 
-    // ==================== extract_package_data() Tests ====================
+    // ==================== extract_first_package() Tests ====================
 
     #[test]
     fn test_extract_meta_yaml_abeona() {
         let path = PathBuf::from("testdata/conda/meta-yaml/abeona/meta.yaml");
-        let package_data = CondaMetaYamlParser::extract_package_data(&path);
+        let package_data = CondaMetaYamlParser::extract_first_package(&path);
 
         // Basic package info
         assert_eq!(package_data.package_type, Some("conda".to_string()));
@@ -289,7 +289,7 @@ package:
     #[test]
     fn test_extract_meta_yaml_abeona_dependencies() {
         let path = PathBuf::from("testdata/conda/meta-yaml/abeona/meta.yaml");
-        let package_data = CondaMetaYamlParser::extract_package_data(&path);
+        let package_data = CondaMetaYamlParser::extract_first_package(&path);
 
         // Should have 7 dependencies (python >=3.6 in run scope)
         let deps = &package_data.dependencies;
@@ -337,7 +337,7 @@ package:
     #[test]
     fn test_extract_meta_yaml_abeona_extra_data() {
         let path = PathBuf::from("testdata/conda/meta-yaml/abeona/meta.yaml");
-        let package_data = CondaMetaYamlParser::extract_package_data(&path);
+        let package_data = CondaMetaYamlParser::extract_first_package(&path);
 
         // Check extra_data contains pip and python
         let extra_data = package_data.extra_data.unwrap_or_default();
@@ -359,7 +359,7 @@ package:
     #[test]
     fn test_extract_environment_yaml_ringer() {
         let path = PathBuf::from("testdata/conda/conda-yaml/ringer/environment.yaml");
-        let package_data = CondaEnvironmentYmlParser::extract_package_data(&path);
+        let package_data = CondaEnvironmentYmlParser::extract_first_package(&path);
 
         // Basic info
         assert_eq!(package_data.package_type, Some("conda".to_string()));
@@ -382,7 +382,7 @@ package:
     #[test]
     fn test_extract_environment_yaml_ringer_conda_dependencies() {
         let path = PathBuf::from("testdata/conda/conda-yaml/ringer/environment.yaml");
-        let package_data = CondaEnvironmentYmlParser::extract_package_data(&path);
+        let package_data = CondaEnvironmentYmlParser::extract_first_package(&path);
 
         let deps = &package_data.dependencies;
 
@@ -441,7 +441,7 @@ package:
     #[test]
     fn test_extract_environment_yaml_ringer_pip_filtering() {
         let path = PathBuf::from("testdata/conda/conda-yaml/ringer/environment.yaml");
-        let package_data = CondaEnvironmentYmlParser::extract_package_data(&path);
+        let package_data = CondaEnvironmentYmlParser::extract_first_package(&path);
 
         let deps = &package_data.dependencies;
 

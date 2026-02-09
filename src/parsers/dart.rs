@@ -58,16 +58,16 @@ pub struct PubspecYamlParser;
 impl PackageParser for PubspecYamlParser {
     const PACKAGE_TYPE: &'static str = "dart";
 
-    fn extract_package_data(path: &Path) -> PackageData {
+    fn extract_packages(path: &Path) -> Vec<PackageData> {
         let yaml_content = match read_yaml_file(path) {
             Ok(content) => content,
             Err(e) => {
                 warn!("Failed to read pubspec.yaml at {:?}: {}", path, e);
-                return default_package_data();
+                return vec![default_package_data()];
             }
         };
 
-        parse_pubspec_yaml(&yaml_content)
+        vec![parse_pubspec_yaml(&yaml_content)]
     }
 
     fn is_match(path: &Path) -> bool {
@@ -81,16 +81,16 @@ pub struct PubspecLockParser;
 impl PackageParser for PubspecLockParser {
     const PACKAGE_TYPE: &'static str = "pubspec";
 
-    fn extract_package_data(path: &Path) -> PackageData {
+    fn extract_packages(path: &Path) -> Vec<PackageData> {
         let yaml_content = match read_yaml_file(path) {
             Ok(content) => content,
             Err(e) => {
                 warn!("Failed to read pubspec.lock at {:?}: {}", path, e);
-                return default_package_data();
+                return vec![default_package_data()];
             }
         };
 
-        parse_pubspec_lock(&yaml_content)
+        vec![parse_pubspec_lock(&yaml_content)]
     }
 
     fn is_match(path: &Path) -> bool {

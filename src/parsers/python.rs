@@ -85,32 +85,34 @@ pub struct PythonParser;
 impl PackageParser for PythonParser {
     const PACKAGE_TYPE: &'static str = "pypi";
 
-    fn extract_package_data(path: &Path) -> PackageData {
-        if path.file_name().unwrap_or_default() == "pyproject.toml" {
-            extract_from_pyproject_toml(path)
-        } else if path.file_name().unwrap_or_default() == "setup.cfg" {
-            extract_from_setup_cfg(path)
-        } else if path.file_name().unwrap_or_default() == "setup.py" {
-            extract_from_setup_py(path)
-        } else if path.file_name().unwrap_or_default() == "PKG-INFO" {
-            extract_from_rfc822_metadata(path, "pypi_sdist_pkginfo")
-        } else if path.file_name().unwrap_or_default() == "METADATA" {
-            extract_from_rfc822_metadata(path, "pypi_wheel_metadata")
-        } else if path.file_name().unwrap_or_default() == "pip-inspect.deplock" {
-            extract_from_pip_inspect(path)
-        } else if path
-            .extension()
-            .is_some_and(|ext| ext.eq_ignore_ascii_case("whl"))
-        {
-            extract_from_wheel_archive(path)
-        } else if path
-            .extension()
-            .is_some_and(|ext| ext.eq_ignore_ascii_case("egg"))
-        {
-            extract_from_egg_archive(path)
-        } else {
-            default_package_data()
-        }
+    fn extract_packages(path: &Path) -> Vec<PackageData> {
+        vec![
+            if path.file_name().unwrap_or_default() == "pyproject.toml" {
+                extract_from_pyproject_toml(path)
+            } else if path.file_name().unwrap_or_default() == "setup.cfg" {
+                extract_from_setup_cfg(path)
+            } else if path.file_name().unwrap_or_default() == "setup.py" {
+                extract_from_setup_py(path)
+            } else if path.file_name().unwrap_or_default() == "PKG-INFO" {
+                extract_from_rfc822_metadata(path, "pypi_sdist_pkginfo")
+            } else if path.file_name().unwrap_or_default() == "METADATA" {
+                extract_from_rfc822_metadata(path, "pypi_wheel_metadata")
+            } else if path.file_name().unwrap_or_default() == "pip-inspect.deplock" {
+                extract_from_pip_inspect(path)
+            } else if path
+                .extension()
+                .is_some_and(|ext| ext.eq_ignore_ascii_case("whl"))
+            {
+                extract_from_wheel_archive(path)
+            } else if path
+                .extension()
+                .is_some_and(|ext| ext.eq_ignore_ascii_case("egg"))
+            {
+                extract_from_egg_archive(path)
+            } else {
+                default_package_data()
+            },
+        ]
     }
 
     fn is_match(path: &Path) -> bool {

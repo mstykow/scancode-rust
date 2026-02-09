@@ -10,7 +10,7 @@ mod golden_tests {
         let test_file = PathBuf::from("testdata/dart-golden/mini-lock/pubspec.lock");
         let expected_file = PathBuf::from("testdata/dart-golden/mini-lock/pubspec.lock.expected");
 
-        let package_data = PubspecLockParser::extract_package_data(&test_file);
+        let package_data = PubspecLockParser::extract_first_package(&test_file);
 
         match compare_package_data_parser_only(&package_data, &expected_file) {
             Ok(_) => (),
@@ -23,7 +23,7 @@ mod golden_tests {
         let test_file = PathBuf::from("testdata/dart-golden/stock-lock/pubspec.lock");
         let expected_file = PathBuf::from("testdata/dart-golden/stock-lock/pubspec.lock.expected");
 
-        let package_data = PubspecLockParser::extract_package_data(&test_file);
+        let package_data = PubspecLockParser::extract_first_package(&test_file);
 
         match compare_package_data_parser_only(&package_data, &expected_file) {
             Ok(_) => (),
@@ -36,7 +36,7 @@ mod golden_tests {
         let test_file = PathBuf::from("testdata/dart-golden/simple-yaml/pubspec.yaml");
         let expected_file = PathBuf::from("testdata/dart-golden/simple-yaml/pubspec.yaml.expected");
 
-        let package_data = PubspecYamlParser::extract_package_data(&test_file);
+        let package_data = PubspecYamlParser::extract_first_package(&test_file);
 
         match compare_package_data_parser_only(&package_data, &expected_file) {
             Ok(_) => (),
@@ -50,7 +50,7 @@ mod golden_tests {
         let expected_file =
             PathBuf::from("testdata/dart-golden/many-deps-yaml/pubspec.yaml.expected");
 
-        let package_data = PubspecYamlParser::extract_package_data(&test_file);
+        let package_data = PubspecYamlParser::extract_first_package(&test_file);
 
         match compare_package_data_parser_only(&package_data, &expected_file) {
             Ok(_) => (),

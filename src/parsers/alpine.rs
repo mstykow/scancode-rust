@@ -43,16 +43,19 @@ impl PackageParser for AlpineInstalledParser {
             .unwrap_or(false)
     }
 
-    fn extract_package_data(path: &Path) -> PackageData {
+    fn extract_packages(path: &Path) -> Vec<PackageData> {
         let content = match read_file_to_string(path) {
             Ok(c) => c,
             Err(e) => {
                 warn!("Failed to read Alpine installed db {:?}: {}", path, e);
-                return create_default_package_data(PACKAGE_TYPE, Some("alpine_installed_db"));
+                return vec![create_default_package_data(
+                    PACKAGE_TYPE,
+                    Some("alpine_installed_db"),
+                )];
             }
         };
 
-        parse_alpine_installed_db(&content)
+        vec![parse_alpine_installed_db(&content)]
     }
 }
 
@@ -317,14 +320,14 @@ impl PackageParser for AlpineApkParser {
         path.extension().and_then(|e| e.to_str()) == Some("apk")
     }
 
-    fn extract_package_data(path: &Path) -> PackageData {
-        match extract_apk_archive(path) {
+    fn extract_packages(path: &Path) -> Vec<PackageData> {
+        vec![match extract_apk_archive(path) {
             Ok(data) => data,
             Err(e) => {
                 warn!("Failed to extract .apk archive {:?}: {}", path, e);
                 create_default_package_data(PACKAGE_TYPE, Some("alpine_apk_archive"))
             }
-        }
+        }]
     }
 }
 

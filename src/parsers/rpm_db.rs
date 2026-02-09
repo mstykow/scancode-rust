@@ -41,15 +41,19 @@ impl PackageParser for RpmBdbDatabaseParser {
             && !path_str.ends_with(".db")
     }
 
-    fn extract_package_data(path: &Path) -> PackageData {
-        match parse_rpm_database(path, "rpm_installed_database_bdb") {
-            Ok(pkgs) if !pkgs.is_empty() => pkgs.into_iter().next().unwrap(),
-            Ok(_) => create_default_package_data(PACKAGE_TYPE, Some("rpm_installed_database_bdb")),
-            Err(e) => {
-                warn!("Failed to parse RPM BDB database {:?}: {}", path, e);
-                create_default_package_data(PACKAGE_TYPE, Some("rpm_installed_database_bdb"))
-            }
-        }
+    fn extract_packages(path: &Path) -> Vec<PackageData> {
+        vec![
+            match parse_rpm_database(path, "rpm_installed_database_bdb") {
+                Ok(pkgs) if !pkgs.is_empty() => pkgs.into_iter().next().unwrap(),
+                Ok(_) => {
+                    create_default_package_data(PACKAGE_TYPE, Some("rpm_installed_database_bdb"))
+                }
+                Err(e) => {
+                    warn!("Failed to parse RPM BDB database {:?}: {}", path, e);
+                    create_default_package_data(PACKAGE_TYPE, Some("rpm_installed_database_bdb"))
+                }
+            },
+        ]
     }
 }
 
@@ -63,15 +67,19 @@ impl PackageParser for RpmNdbDatabaseParser {
         path_str.ends_with("/Packages.db") || path_str.contains("usr/lib/sysimage/rpm/Packages.db")
     }
 
-    fn extract_package_data(path: &Path) -> PackageData {
-        match parse_rpm_database(path, "rpm_installed_database_ndb") {
-            Ok(pkgs) if !pkgs.is_empty() => pkgs.into_iter().next().unwrap(),
-            Ok(_) => create_default_package_data(PACKAGE_TYPE, Some("rpm_installed_database_ndb")),
-            Err(e) => {
-                warn!("Failed to parse RPM NDB database {:?}: {}", path, e);
-                create_default_package_data(PACKAGE_TYPE, Some("rpm_installed_database_ndb"))
-            }
-        }
+    fn extract_packages(path: &Path) -> Vec<PackageData> {
+        vec![
+            match parse_rpm_database(path, "rpm_installed_database_ndb") {
+                Ok(pkgs) if !pkgs.is_empty() => pkgs.into_iter().next().unwrap(),
+                Ok(_) => {
+                    create_default_package_data(PACKAGE_TYPE, Some("rpm_installed_database_ndb"))
+                }
+                Err(e) => {
+                    warn!("Failed to parse RPM NDB database {:?}: {}", path, e);
+                    create_default_package_data(PACKAGE_TYPE, Some("rpm_installed_database_ndb"))
+                }
+            },
+        ]
     }
 }
 
@@ -85,17 +93,19 @@ impl PackageParser for RpmSqliteDatabaseParser {
         path_str.ends_with("/rpmdb.sqlite") || path_str.contains("rpm/rpmdb.sqlite")
     }
 
-    fn extract_package_data(path: &Path) -> PackageData {
-        match parse_rpm_database(path, "rpm_installed_database_sqlite") {
-            Ok(pkgs) if !pkgs.is_empty() => pkgs.into_iter().next().unwrap(),
-            Ok(_) => {
-                create_default_package_data(PACKAGE_TYPE, Some("rpm_installed_database_sqlite"))
-            }
-            Err(e) => {
-                warn!("Failed to parse RPM SQLite database {:?}: {}", path, e);
-                create_default_package_data(PACKAGE_TYPE, Some("rpm_installed_database_sqlite"))
-            }
-        }
+    fn extract_packages(path: &Path) -> Vec<PackageData> {
+        vec![
+            match parse_rpm_database(path, "rpm_installed_database_sqlite") {
+                Ok(pkgs) if !pkgs.is_empty() => pkgs.into_iter().next().unwrap(),
+                Ok(_) => {
+                    create_default_package_data(PACKAGE_TYPE, Some("rpm_installed_database_sqlite"))
+                }
+                Err(e) => {
+                    warn!("Failed to parse RPM SQLite database {:?}: {}", path, e);
+                    create_default_package_data(PACKAGE_TYPE, Some("rpm_installed_database_sqlite"))
+                }
+            },
+        ]
     }
 }
 
@@ -334,7 +344,7 @@ mod tests {
             return;
         }
 
-        let pkg = RpmSqliteDatabaseParser::extract_package_data(&test_file);
+        let pkg = RpmSqliteDatabaseParser::extract_first_package(&test_file);
 
         assert_eq!(pkg.package_type, Some("rpm".to_string()));
         assert_eq!(

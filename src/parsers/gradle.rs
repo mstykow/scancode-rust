@@ -56,7 +56,7 @@ use crate::parsers::PackageParser;
 /// use std::path::Path;
 ///
 /// let path = Path::new("testdata/gradle-golden/groovy1/build.gradle");
-/// let package_data = GradleParser::extract_package_data(path);
+/// let package_data = GradleParser::extract_first_package(path);
 /// assert!(!package_data.dependencies.is_empty());
 /// ```
 pub struct GradleParser;
@@ -71,19 +71,19 @@ impl PackageParser for GradleParser {
         })
     }
 
-    fn extract_package_data(path: &Path) -> PackageData {
+    fn extract_packages(path: &Path) -> Vec<PackageData> {
         let content = match fs::read_to_string(path) {
             Ok(c) => c,
             Err(e) => {
                 warn!("Failed to read {:?}: {}", path, e);
-                return default_package_data();
+                return vec![default_package_data()];
             }
         };
 
         let tokens = lex(&content);
         let dependencies = extract_dependencies(&tokens);
 
-        PackageData {
+        vec![PackageData {
             package_type: Some(Self::PACKAGE_TYPE.to_string()),
             namespace: None,
             name: None,
@@ -126,7 +126,7 @@ impl PackageParser for GradleParser {
             purl: None,
             is_private: false,
             is_virtual: false,
-        }
+        }]
     }
 }
 

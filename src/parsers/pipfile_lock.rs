@@ -67,12 +67,12 @@ impl PackageParser for PipfileLockParser {
             .unwrap_or(false)
     }
 
-    fn extract_package_data(path: &Path) -> PackageData {
-        match path.file_name().and_then(|name| name.to_str()) {
+    fn extract_packages(path: &Path) -> Vec<PackageData> {
+        vec![match path.file_name().and_then(|name| name.to_str()) {
             Some("Pipfile.lock") => extract_from_pipfile_lock(path),
             Some("Pipfile") => extract_from_pipfile(path),
             _ => default_package_data(None),
-        }
+        }]
     }
 }
 

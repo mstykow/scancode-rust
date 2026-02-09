@@ -80,7 +80,7 @@ mod tests {
 "#;
 
         let (_temp_dir, composer_path) = create_temp_file("composer.json", content);
-        let package_data = ComposerJsonParser::extract_package_data(&composer_path);
+        let package_data = ComposerJsonParser::extract_first_package(&composer_path);
 
         assert_eq!(package_data.namespace, Some("acme".to_string()));
         assert_eq!(package_data.name, Some("demo".to_string()));
@@ -106,7 +106,7 @@ mod tests {
 "#;
 
         let (_temp_dir, composer_path) = create_temp_file("composer.json", content);
-        let package_data = ComposerJsonParser::extract_package_data(&composer_path);
+        let package_data = ComposerJsonParser::extract_first_package(&composer_path);
 
         assert_eq!(package_data.dependencies.len(), 3);
 
@@ -134,7 +134,7 @@ mod tests {
 "#;
 
         let (_temp_dir, composer_path) = create_temp_file("composer.json", content);
-        let package_data = ComposerJsonParser::extract_package_data(&composer_path);
+        let package_data = ComposerJsonParser::extract_first_package(&composer_path);
 
         assert_eq!(package_data.dependencies.len(), 1);
         let dev_dep = find_dependency(&package_data.dependencies, "pkg:composer/acme/devpkg");
@@ -158,7 +158,7 @@ mod tests {
 "#;
 
         let (_temp_dir, composer_path) = create_temp_file("composer.json", content);
-        let package_data = ComposerJsonParser::extract_package_data(&composer_path);
+        let package_data = ComposerJsonParser::extract_first_package(&composer_path);
 
         let exact_dep =
             find_dependency(&package_data.dependencies, "pkg:composer/acme/exact@1.2.3");
@@ -188,7 +188,7 @@ mod tests {
 "#;
 
         let (_temp_dir, composer_path) = create_temp_file("composer.json", content);
-        let package_data = ComposerJsonParser::extract_package_data(&composer_path);
+        let package_data = ComposerJsonParser::extract_first_package(&composer_path);
         let extra_data = package_data
             .extra_data
             .expect("Expected extra_data to be set");
@@ -218,7 +218,7 @@ mod tests {
 "#;
 
         let (_temp_dir, composer_path) = create_temp_file("composer.json", content);
-        let package_data = ComposerJsonParser::extract_package_data(&composer_path);
+        let package_data = ComposerJsonParser::extract_first_package(&composer_path);
         let extra_data = package_data
             .extra_data
             .expect("Expected extra_data to be set");
@@ -239,7 +239,7 @@ mod tests {
         let content = r#"{ invalid-json }"#;
 
         let (_temp_dir, composer_path) = create_temp_file("composer.json", content);
-        let package_data = ComposerJsonParser::extract_package_data(&composer_path);
+        let package_data = ComposerJsonParser::extract_first_package(&composer_path);
 
         assert_eq!(package_data.package_type, Some("composer".to_string()));
         assert!(package_data.name.is_none());
@@ -250,7 +250,7 @@ mod tests {
     fn test_extract_hashes() {
         let content = sample_composer_lock();
         let (_temp_dir, composer_path) = create_temp_file("composer.lock", &content);
-        let package_data = ComposerLockParser::extract_package_data(&composer_path);
+        let package_data = ComposerLockParser::extract_first_package(&composer_path);
 
         let runtime_dep = find_dependency(
             &package_data.dependencies,
@@ -287,7 +287,7 @@ mod tests {
     fn test_extract_package_type() {
         let content = sample_composer_lock();
         let (_temp_dir, composer_path) = create_temp_file("composer.lock", &content);
-        let package_data = ComposerLockParser::extract_package_data(&composer_path);
+        let package_data = ComposerLockParser::extract_first_package(&composer_path);
 
         let runtime_dep = find_dependency(
             &package_data.dependencies,
@@ -326,7 +326,7 @@ mod tests {
 "#;
 
         let (_temp_dir, composer_path) = create_temp_file("composer.json", content);
-        let package_data = ComposerJsonParser::extract_package_data(&composer_path);
+        let package_data = ComposerJsonParser::extract_first_package(&composer_path);
 
         assert_eq!(package_data.dependencies.len(), 2);
 
@@ -359,7 +359,7 @@ mod tests {
 "#;
 
         let (_temp_dir, composer_path) = create_temp_file("composer.json", content);
-        let package_data = ComposerJsonParser::extract_package_data(&composer_path);
+        let package_data = ComposerJsonParser::extract_first_package(&composer_path);
 
         assert_eq!(package_data.dependencies.len(), 2);
 
@@ -382,7 +382,7 @@ mod tests {
 "#;
 
         let (_temp_dir, composer_path) = create_temp_file("composer.json", content);
-        let package_data = ComposerJsonParser::extract_package_data(&composer_path);
+        let package_data = ComposerJsonParser::extract_first_package(&composer_path);
 
         assert_eq!(package_data.dependencies.len(), 1);
 
@@ -405,7 +405,7 @@ mod tests {
 "#;
 
         let (_temp_dir, composer_path) = create_temp_file("composer.json", content);
-        let package_data = ComposerJsonParser::extract_package_data(&composer_path);
+        let package_data = ComposerJsonParser::extract_first_package(&composer_path);
 
         assert_eq!(package_data.dependencies.len(), 1);
 
@@ -431,7 +431,7 @@ mod tests {
 "#;
 
         let (_temp_dir, composer_path) = create_temp_file("composer.json", content);
-        let package_data = ComposerJsonParser::extract_package_data(&composer_path);
+        let package_data = ComposerJsonParser::extract_first_package(&composer_path);
 
         assert_eq!(
             package_data.bug_tracking_url,
@@ -470,7 +470,7 @@ mod tests {
 "#;
 
         let (_temp_dir, composer_path) = create_temp_file("composer.json", content);
-        let package_data = ComposerJsonParser::extract_package_data(&composer_path);
+        let package_data = ComposerJsonParser::extract_first_package(&composer_path);
 
         assert_eq!(package_data.dependencies.len(), 6);
 

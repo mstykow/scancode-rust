@@ -42,19 +42,19 @@ impl PackageParser for GradleLockfileParser {
             .is_some_and(|name| name == "gradle.lockfile")
     }
 
-    fn extract_package_data(path: &Path) -> PackageData {
+    fn extract_packages(path: &Path) -> Vec<PackageData> {
         let file = match File::open(path) {
             Ok(f) => f,
             Err(e) => {
                 warn!("Failed to open gradle.lockfile at {:?}: {}", path, e);
-                return default_package_data();
+                return vec![default_package_data()];
             }
         };
 
         let reader = BufReader::new(file);
         let dependencies = extract_dependencies(reader);
 
-        PackageData {
+        vec![PackageData {
             package_type: Some(Self::PACKAGE_TYPE.to_string()),
             namespace: None,
             name: None,
@@ -97,7 +97,7 @@ impl PackageParser for GradleLockfileParser {
             api_data_url: None,
             datasource_id: Some("gradle_lockfile".to_string()),
             purl: None,
-        }
+        }]
     }
 }
 
@@ -397,7 +397,7 @@ mod tests {
     }
 
     #[test]
-    fn test_extract_package_data_returns_correct_package_type() {
+    fn test_extract_first_package_returns_correct_package_type() {
         let content = "com.example:lib:1.0.0=hash";
         let reader = Cursor::new(content);
         let deps = extract_dependencies(reader);

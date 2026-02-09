@@ -13,8 +13,8 @@ mod golden_tests {
         let test_path = PathBuf::from(test_file);
 
         let package_data = match parser_type {
-            "meta" => CondaMetaYamlParser::extract_package_data(&test_path),
-            "env" => CondaEnvironmentYmlParser::extract_package_data(&test_path),
+            "meta" => CondaMetaYamlParser::extract_first_package(&test_path),
+            "env" => CondaEnvironmentYmlParser::extract_first_package(&test_path),
             _ => panic!("Unknown parser type: {}", parser_type),
         };
 

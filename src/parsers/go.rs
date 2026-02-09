@@ -42,16 +42,16 @@ pub struct GoModParser;
 impl PackageParser for GoModParser {
     const PACKAGE_TYPE: &'static str = PACKAGE_TYPE;
 
-    fn extract_package_data(path: &Path) -> PackageData {
+    fn extract_packages(path: &Path) -> Vec<PackageData> {
         let content = match fs::read_to_string(path) {
             Ok(c) => c,
             Err(e) => {
                 warn!("Failed to read go.mod at {:?}: {}", path, e);
-                return default_package_data();
+                return vec![default_package_data()];
             }
         };
 
-        parse_go_mod(&content)
+        vec![parse_go_mod(&content)]
     }
 
     fn is_match(path: &Path) -> bool {
@@ -546,16 +546,16 @@ pub struct GoSumParser;
 impl PackageParser for GoSumParser {
     const PACKAGE_TYPE: &'static str = PACKAGE_TYPE;
 
-    fn extract_package_data(path: &Path) -> PackageData {
+    fn extract_packages(path: &Path) -> Vec<PackageData> {
         let content = match fs::read_to_string(path) {
             Ok(c) => c,
             Err(e) => {
                 warn!("Failed to read go.sum at {:?}: {}", path, e);
-                return default_package_data();
+                return vec![default_package_data()];
             }
         };
 
-        parse_go_sum(&content)
+        vec![parse_go_sum(&content)]
     }
 
     fn is_match(path: &Path) -> bool {
@@ -667,16 +667,16 @@ pub struct GodepsParser;
 impl PackageParser for GodepsParser {
     const PACKAGE_TYPE: &'static str = PACKAGE_TYPE;
 
-    fn extract_package_data(path: &Path) -> PackageData {
+    fn extract_packages(path: &Path) -> Vec<PackageData> {
         let content = match fs::read_to_string(path) {
             Ok(c) => c,
             Err(e) => {
                 warn!("Failed to read Godeps.json at {:?}: {}", path, e);
-                return default_package_data();
+                return vec![default_package_data()];
             }
         };
 
-        parse_godeps_json(&content)
+        vec![parse_godeps_json(&content)]
     }
 
     fn is_match(path: &Path) -> bool {

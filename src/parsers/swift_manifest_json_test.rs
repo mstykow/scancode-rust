@@ -31,7 +31,7 @@ mod tests {
     #[test]
     fn test_extract_mapbox_manifest() {
         let path = PathBuf::from("testdata/swift/Package.swift.json");
-        let data = SwiftManifestJsonParser::extract_package_data(&path);
+        let data = SwiftManifestJsonParser::extract_first_package(&path);
 
         assert_eq!(data.package_type, Some("swift".to_string()));
         assert_eq!(data.name, Some("MapboxMaps".to_string()));
@@ -90,7 +90,7 @@ mod tests {
     #[test]
     fn test_extract_vercelui_deplock() {
         let path = PathBuf::from("testdata/swift/Package.swift.deplock");
-        let data = SwiftManifestJsonParser::extract_package_data(&path);
+        let data = SwiftManifestJsonParser::extract_first_package(&path);
 
         assert_eq!(data.package_type, Some("swift".to_string()));
         assert_eq!(data.name, Some("VercelUI".to_string()));
@@ -112,7 +112,7 @@ mod tests {
     #[test]
     fn test_all_requirement_types() {
         let path = PathBuf::from("testdata/swift/Package-all-requirements.swift.json");
-        let data = SwiftManifestJsonParser::extract_package_data(&path);
+        let data = SwiftManifestJsonParser::extract_first_package(&path);
 
         assert_eq!(data.name, Some("TestPackage".to_string()));
         assert_eq!(data.dependencies.len(), 4);
@@ -159,7 +159,7 @@ mod tests {
     #[test]
     fn test_tools_version_in_extra_data() {
         let path = PathBuf::from("testdata/swift/Package.swift.json");
-        let data = SwiftManifestJsonParser::extract_package_data(&path);
+        let data = SwiftManifestJsonParser::extract_first_package(&path);
 
         let extra = data.extra_data.as_ref().expect("extra_data should exist");
         assert_eq!(
@@ -207,7 +207,7 @@ mod tests {
         )
         .expect("Failed to write");
 
-        let data = SwiftManifestJsonParser::extract_package_data(&path);
+        let data = SwiftManifestJsonParser::extract_first_package(&path);
         assert_eq!(data.name, Some("EmptyPkg".to_string()));
         assert!(data.dependencies.is_empty());
     }
@@ -218,7 +218,7 @@ mod tests {
         let path = temp_dir.path().join("Package.swift.json");
         fs::write(&path, r#"{"name": "MinimalPkg"}"#).expect("Failed to write");
 
-        let data = SwiftManifestJsonParser::extract_package_data(&path);
+        let data = SwiftManifestJsonParser::extract_first_package(&path);
         assert_eq!(data.name, Some("MinimalPkg".to_string()));
         assert!(data.dependencies.is_empty());
     }
@@ -229,7 +229,7 @@ mod tests {
         let path = temp_dir.path().join("Package.swift.json");
         fs::write(&path, "not valid json").expect("Failed to write");
 
-        let data = SwiftManifestJsonParser::extract_package_data(&path);
+        let data = SwiftManifestJsonParser::extract_first_package(&path);
         assert_eq!(data.package_type, None);
         assert_eq!(data.name, None);
     }
@@ -237,7 +237,7 @@ mod tests {
     #[test]
     fn test_nonexistent_file_returns_default() {
         let path = PathBuf::from("/nonexistent/Package.swift.json");
-        let data = SwiftManifestJsonParser::extract_package_data(&path);
+        let data = SwiftManifestJsonParser::extract_first_package(&path);
         assert_eq!(data.package_type, None);
         assert_eq!(data.name, None);
     }
@@ -264,7 +264,7 @@ mod tests {
         )
         .expect("Failed to write");
 
-        let data = SwiftManifestJsonParser::extract_package_data(&path);
+        let data = SwiftManifestJsonParser::extract_first_package(&path);
         assert_eq!(data.dependencies.len(), 1);
         assert_eq!(
             data.dependencies[0].purl.as_deref(),
@@ -318,7 +318,7 @@ mod tests {
         )
         .expect("Failed to write");
 
-        let data = SwiftManifestJsonParser::extract_package_data(&path);
+        let data = SwiftManifestJsonParser::extract_first_package(&path);
         assert_eq!(data.dependencies.len(), 1);
         let dep = &data.dependencies[0];
         assert_eq!(
@@ -331,7 +331,7 @@ mod tests {
     #[test]
     fn test_platforms_preserved_in_extra_data() {
         let path = PathBuf::from("testdata/swift/Package.swift.json");
-        let data = SwiftManifestJsonParser::extract_package_data(&path);
+        let data = SwiftManifestJsonParser::extract_first_package(&path);
 
         let extra = data.extra_data.as_ref().expect("extra_data should exist");
         let platforms = extra
@@ -367,7 +367,7 @@ mod tests {
         )
         .expect("Failed to write");
 
-        let data = SwiftManifestJsonParser::extract_package_data(&path);
+        let data = SwiftManifestJsonParser::extract_first_package(&path);
         assert_eq!(data.dependencies.len(), 1);
         let dep = &data.dependencies[0];
         assert_eq!(dep.extracted_requirement, None);

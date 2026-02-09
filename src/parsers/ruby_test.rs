@@ -69,7 +69,7 @@ gem "rake", "~> 13.0"
 gem "rspec", ">= 3.0"
 "#;
         let (_temp_dir, gemfile_path) = create_temp_gemfile(content);
-        let package_data = GemfileParser::extract_package_data(&gemfile_path);
+        let package_data = GemfileParser::extract_first_package(&gemfile_path);
 
         assert_eq!(package_data.package_type, Some("gem".to_string()));
         assert!(package_data.dependencies.len() >= 2);
@@ -96,7 +96,7 @@ gem "activesupport", "~> 7.0.4"
 gem "rails", "~> 7.0"
 "#;
         let (_temp_dir, gemfile_path) = create_temp_gemfile(content);
-        let package_data = GemfileParser::extract_package_data(&gemfile_path);
+        let package_data = GemfileParser::extract_first_package(&gemfile_path);
 
         let activesupport_dep = package_data
             .dependencies
@@ -145,7 +145,7 @@ group :development, :test do
 end
 "#;
         let (_temp_dir, gemfile_path) = create_temp_gemfile(content);
-        let package_data = GemfileParser::extract_package_data(&gemfile_path);
+        let package_data = GemfileParser::extract_first_package(&gemfile_path);
 
         // Rails should have NO scope (runtime dependency)
         let rails_dep = package_data
@@ -191,7 +191,7 @@ end
     #[test]
     fn test_extract_lockfile_gems() {
         let lockfile_path = PathBuf::from("testdata/ruby/Gemfile.lock");
-        let package_data = GemfileLockParser::extract_package_data(&lockfile_path);
+        let package_data = GemfileLockParser::extract_first_package(&lockfile_path);
 
         assert_eq!(package_data.package_type, Some("gem".to_string()));
 
@@ -219,7 +219,7 @@ end
     #[test]
     fn test_extract_lockfile_dependencies() {
         let lockfile_path = PathBuf::from("testdata/ruby/Gemfile.lock");
-        let package_data = GemfileLockParser::extract_package_data(&lockfile_path);
+        let package_data = GemfileLockParser::extract_first_package(&lockfile_path);
 
         // Should have parsed DEPENDENCIES section
         // The DEPENDENCIES section shows direct dependencies with constraints
@@ -245,7 +245,7 @@ end
     #[test]
     fn test_extract_platforms() {
         let lockfile_path = PathBuf::from("testdata/ruby/Gemfile.lock");
-        let package_data = GemfileLockParser::extract_package_data(&lockfile_path);
+        let package_data = GemfileLockParser::extract_first_package(&lockfile_path);
 
         // Check extra_data for platforms
         assert!(package_data.extra_data.is_some());
@@ -290,7 +290,7 @@ group :test do
 end
 "#;
         let (_temp_dir, gemfile_path) = create_temp_gemfile(content);
-        let package_data = GemfileParser::extract_package_data(&gemfile_path);
+        let package_data = GemfileParser::extract_first_package(&gemfile_path);
 
         // Runtime dependency: scope should be None (not "runtime")
         let activesupport = package_data
@@ -332,7 +332,7 @@ gem "frozen-gem".freeze, "1.0.0".freeze
 gem "another-gem", "2.0".freeze
 "#;
         let (_temp_dir, gemfile_path) = create_temp_gemfile(content);
-        let package_data = GemfileParser::extract_package_data(&gemfile_path);
+        let package_data = GemfileParser::extract_first_package(&gemfile_path);
 
         // Should have extracted the gem name without .freeze
         let frozen_dep = package_data
@@ -363,7 +363,7 @@ source "https://rubygems.org"
 gem "some-gem", "~> 1.0"
 "#;
         let (_temp_dir, gemfile_path) = create_temp_gemfile(content);
-        let package_data = GemfileParser::extract_package_data(&gemfile_path);
+        let package_data = GemfileParser::extract_first_package(&gemfile_path);
 
         // Should parse without error
         assert!(
@@ -385,7 +385,7 @@ gem "bcrypt-ruby", platforms: :ruby
 gem "debug", platforms: [:mri, :mingw, :x64_mingw]
 "#;
         let (_temp_dir, gemfile_path) = create_temp_gemfile(content);
-        let package_data = GemfileParser::extract_package_data(&gemfile_path);
+        let package_data = GemfileParser::extract_first_package(&gemfile_path);
 
         // Should have extracted all platform-specific gems
         let json_dep = package_data
@@ -419,7 +419,7 @@ gem "multi-constraint", ">= 1.0", "< 2.0"
 gem "specific-range", ">= 1.0.0", "< 1.5.0", "!= 1.2.3"
 "#;
         let (_temp_dir, gemfile_path) = create_temp_gemfile(content);
-        let package_data = GemfileParser::extract_package_data(&gemfile_path);
+        let package_data = GemfileParser::extract_first_package(&gemfile_path);
 
         let multi_dep = package_data.dependencies.iter().find(|d| {
             d.purl
@@ -439,14 +439,14 @@ gem "specific-range", ">= 1.0.0", "< 1.5.0", "!= 1.2.3"
     fn test_graceful_error_handling() {
         // Non-existent file
         let package_data =
-            GemfileParser::extract_package_data(&PathBuf::from("/nonexistent/Gemfile"));
+            GemfileParser::extract_first_package(&PathBuf::from("/nonexistent/Gemfile"));
         assert!(package_data.name.is_none());
         assert!(package_data.dependencies.is_empty());
 
         // Empty file
         let content = "";
         let (_temp_dir, gemfile_path) = create_temp_gemfile(content);
-        let package_data = GemfileParser::extract_package_data(&gemfile_path);
+        let package_data = GemfileParser::extract_first_package(&gemfile_path);
         // Should return default package data, not panic
         assert!(package_data.dependencies.is_empty());
     }
@@ -457,7 +457,7 @@ gem "specific-range", ">= 1.0.0", "< 1.5.0", "!= 1.2.3"
     #[test]
     fn test_extract_empty_lockfile() {
         let lockfile_path = PathBuf::from("testdata/ruby/Gemfile.lock_empty");
-        let package_data = GemfileLockParser::extract_package_data(&lockfile_path);
+        let package_data = GemfileLockParser::extract_first_package(&lockfile_path);
 
         // Should handle empty lockfile gracefully
         assert_eq!(package_data.package_type, Some("gem".to_string()));
@@ -474,7 +474,7 @@ gem "specific-range", ">= 1.0.0", "< 1.5.0", "!= 1.2.3"
     #[test]
     fn test_extract_lockfile_with_path() {
         let lockfile_path = PathBuf::from("testdata/ruby/Gemfile_with_path");
-        let package_data = GemfileLockParser::extract_package_data(&lockfile_path);
+        let package_data = GemfileLockParser::extract_first_package(&lockfile_path);
 
         assert_eq!(package_data.name.as_deref(), Some("my-local-gem"));
         assert!(package_data.version.is_some());
@@ -500,7 +500,7 @@ gem "specific-range", ">= 1.0.0", "< 1.5.0", "!= 1.2.3"
     #[test]
     fn test_extract_lockfile_with_git() {
         let lockfile_path = PathBuf::from("testdata/ruby/Gemfile_with_git");
-        let package_data = GemfileLockParser::extract_package_data(&lockfile_path);
+        let package_data = GemfileLockParser::extract_first_package(&lockfile_path);
 
         // Should find the GIT gem
         let git_gem = package_data
@@ -516,7 +516,7 @@ gem "specific-range", ">= 1.0.0", "< 1.5.0", "!= 1.2.3"
     #[test]
     fn test_extract_from_testdata() {
         let gemfile_path = PathBuf::from("testdata/ruby/Gemfile");
-        let package_data = GemfileParser::extract_package_data(&gemfile_path);
+        let package_data = GemfileParser::extract_first_package(&gemfile_path);
 
         assert_eq!(package_data.package_type, Some("gem".to_string()));
         assert!(!package_data.dependencies.is_empty());
@@ -542,7 +542,7 @@ gem "specific-range", ">= 1.0.0", "< 1.5.0", "!= 1.2.3"
     #[test]
     fn test_extract_lockfile_from_testdata() {
         let lockfile_path = PathBuf::from("testdata/ruby/Gemfile.lock");
-        let package_data = GemfileLockParser::extract_package_data(&lockfile_path);
+        let package_data = GemfileLockParser::extract_first_package(&lockfile_path);
 
         assert_eq!(package_data.package_type, Some("gem".to_string()));
         assert!(!package_data.dependencies.is_empty());
@@ -641,7 +641,7 @@ gem "specific-range", ">= 1.0.0", "< 1.5.0", "!= 1.2.3"
     fn test_extract_gemspec_basic() {
         use crate::parsers::ruby::GemspecParser;
         let gemspec_path = PathBuf::from("testdata/ruby/basic.gemspec");
-        let package_data = GemspecParser::extract_package_data(&gemspec_path);
+        let package_data = GemspecParser::extract_first_package(&gemspec_path);
 
         assert_eq!(package_data.package_type, Some("gem".to_string()));
         assert_eq!(package_data.name, Some("example-gem".to_string()));
@@ -734,7 +734,7 @@ gem "specific-range", ">= 1.0.0", "< 1.5.0", "!= 1.2.3"
     fn test_extract_gemspec_variable_version() {
         use crate::parsers::ruby::GemspecParser;
         let gemspec_path = PathBuf::from("testdata/ruby/variable_version.gemspec");
-        let package_data = GemspecParser::extract_package_data(&gemspec_path);
+        let package_data = GemspecParser::extract_first_package(&gemspec_path);
 
         assert_eq!(package_data.name, Some("csv".to_string()));
         // Bug #2: Should resolve CSV::VERSION to "3.2.6"
@@ -757,7 +757,7 @@ gem "specific-range", ">= 1.0.0", "< 1.5.0", "!= 1.2.3"
     fn test_extract_gemspec_frozen_strings() {
         use crate::parsers::ruby::GemspecParser;
         let gemspec_path = PathBuf::from("testdata/ruby/frozen_strings.gemspec");
-        let package_data = GemspecParser::extract_package_data(&gemspec_path);
+        let package_data = GemspecParser::extract_first_package(&gemspec_path);
 
         // Bug #1: .freeze should be stripped from all values
         assert_eq!(
@@ -820,7 +820,7 @@ gem "specific-range", ">= 1.0.0", "< 1.5.0", "!= 1.2.3"
     fn test_extract_gemspec_email_handling() {
         use crate::parsers::ruby::GemspecParser;
         let gemspec_path = PathBuf::from("testdata/ruby/email_handling.gemspec");
-        let package_data = GemspecParser::extract_package_data(&gemspec_path);
+        let package_data = GemspecParser::extract_first_package(&gemspec_path);
 
         assert_eq!(package_data.name, Some("email-test-gem".to_string()));
 
@@ -857,7 +857,7 @@ gem "specific-range", ">= 1.0.0", "< 1.5.0", "!= 1.2.3"
     fn test_extract_gemspec_multiple_licenses() {
         use crate::parsers::ruby::GemspecParser;
         let gemspec_path = PathBuf::from("testdata/ruby/multiple_licenses.gemspec");
-        let package_data = GemspecParser::extract_package_data(&gemspec_path);
+        let package_data = GemspecParser::extract_first_package(&gemspec_path);
 
         assert_eq!(package_data.name, Some("multi-license-gem".to_string()));
         assert_eq!(package_data.declared_license_expression, None);
@@ -873,7 +873,7 @@ gem "specific-range", ">= 1.0.0", "< 1.5.0", "!= 1.2.3"
     fn test_extract_gemspec_dependencies() {
         use crate::parsers::ruby::GemspecParser;
         let gemspec_path = PathBuf::from("testdata/ruby/basic.gemspec");
-        let package_data = GemspecParser::extract_package_data(&gemspec_path);
+        let package_data = GemspecParser::extract_first_package(&gemspec_path);
 
         // Runtime dependencies
         let nokogiri = package_data
@@ -908,7 +908,7 @@ gem "specific-range", ">= 1.0.0", "< 1.5.0", "!= 1.2.3"
     fn test_extract_gemspec_dev_dependencies() {
         use crate::parsers::ruby::GemspecParser;
         let gemspec_path = PathBuf::from("testdata/ruby/basic.gemspec");
-        let package_data = GemspecParser::extract_package_data(&gemspec_path);
+        let package_data = GemspecParser::extract_first_package(&gemspec_path);
 
         let dev_deps: Vec<_> = package_data
             .dependencies
@@ -935,7 +935,7 @@ gem "specific-range", ">= 1.0.0", "< 1.5.0", "!= 1.2.3"
         use crate::parsers::ruby::GemspecParser;
         // Non-existent file
         let package_data =
-            GemspecParser::extract_package_data(&PathBuf::from("/nonexistent/test.gemspec"));
+            GemspecParser::extract_first_package(&PathBuf::from("/nonexistent/test.gemspec"));
         assert!(package_data.name.is_none());
         assert!(package_data.dependencies.is_empty());
     }
@@ -956,7 +956,7 @@ gem "specific-range", ">= 1.0.0", "< 1.5.0", "!= 1.2.3"
     #[test]
     fn test_extract_lockfile_specs_versions() {
         let lockfile_path = PathBuf::from("testdata/ruby/Gemfile.lock");
-        let package_data = GemfileLockParser::extract_package_data(&lockfile_path);
+        let package_data = GemfileLockParser::extract_first_package(&lockfile_path);
 
         // rake should have version 13.0.6 from the specs section
         let rake_dep = package_data
@@ -987,7 +987,7 @@ gem "specific-range", ">= 1.0.0", "< 1.5.0", "!= 1.2.3"
     #[test]
     fn test_extract_lockfile_platform_gems() {
         let lockfile_path = PathBuf::from("testdata/ruby/Gemfile.lock");
-        let package_data = GemfileLockParser::extract_package_data(&lockfile_path);
+        let package_data = GemfileLockParser::extract_first_package(&lockfile_path);
 
         // json has both ruby and java platform variants in testdata
         let json_deps: Vec<_> = package_data
@@ -1027,7 +1027,7 @@ DEPENDENCIES
         let lockfile_path = temp_dir.path().join("Gemfile.lock");
         fs::write(&lockfile_path, content).expect("Failed to write lockfile");
 
-        let package_data = GemfileLockParser::extract_package_data(&lockfile_path);
+        let package_data = GemfileLockParser::extract_first_package(&lockfile_path);
 
         let svn_gem = package_data
             .dependencies
@@ -1047,7 +1047,7 @@ source "https://rubygems.org"
 gem "rails", "7.0.4"
 "#;
         let (_temp_dir, gemfile_path) = create_temp_gemfile(content);
-        let package_data = GemfileParser::extract_package_data(&gemfile_path);
+        let package_data = GemfileParser::extract_first_package(&gemfile_path);
 
         let rails = package_data
             .dependencies
@@ -1095,7 +1095,7 @@ gem "rails", "7.0.4"
     fn test_extract_gem_archive_basic() {
         use crate::parsers::ruby::GemArchiveParser;
         let gem_path = PathBuf::from("testdata/ruby/example-gem-1.2.3.gem");
-        let package_data = GemArchiveParser::extract_package_data(&gem_path);
+        let package_data = GemArchiveParser::extract_first_package(&gem_path);
 
         assert_eq!(package_data.package_type, Some("gem".to_string()));
         assert_eq!(package_data.name, Some("example-gem".to_string()));
@@ -1153,7 +1153,7 @@ gem "rails", "7.0.4"
     fn test_extract_gem_archive_dependencies() {
         use crate::parsers::ruby::GemArchiveParser;
         let gem_path = PathBuf::from("testdata/ruby/example-gem-1.2.3.gem");
-        let package_data = GemArchiveParser::extract_package_data(&gem_path);
+        let package_data = GemArchiveParser::extract_first_package(&gem_path);
 
         // Should have 3 dependencies (rails, nokogiri runtime; rspec dev)
         assert!(
@@ -1207,7 +1207,7 @@ gem "rails", "7.0.4"
     fn test_extract_gem_archive_minimal() {
         use crate::parsers::ruby::GemArchiveParser;
         let gem_path = PathBuf::from("testdata/ruby/minimal-gem-0.1.0.gem");
-        let package_data = GemArchiveParser::extract_package_data(&gem_path);
+        let package_data = GemArchiveParser::extract_first_package(&gem_path);
 
         assert_eq!(package_data.name, Some("minimal-gem".to_string()));
         assert_eq!(package_data.version, Some("0.1.0".to_string()));
@@ -1225,7 +1225,7 @@ gem "rails", "7.0.4"
         use crate::parsers::ruby::GemArchiveParser;
         // Non-existent file should return default package data gracefully
         let package_data =
-            GemArchiveParser::extract_package_data(&PathBuf::from("/nonexistent/test.gem"));
+            GemArchiveParser::extract_first_package(&PathBuf::from("/nonexistent/test.gem"));
         assert!(package_data.name.is_none());
         assert!(package_data.dependencies.is_empty());
 
@@ -1234,7 +1234,7 @@ gem "rails", "7.0.4"
         let corrupt_path = temp_dir.path().join("corrupt.gem");
         fs::write(&corrupt_path, b"this is not a valid gem archive")
             .expect("Failed to write corrupt file");
-        let package_data = GemArchiveParser::extract_package_data(&corrupt_path);
+        let package_data = GemArchiveParser::extract_first_package(&corrupt_path);
         assert!(
             package_data.name.is_none(),
             "Corrupt gem should return default package data"
@@ -1264,7 +1264,7 @@ gem "rails", "7.0.4"
             .expect("Failed to add dummy entry");
         builder.finish().expect("Failed to finish tar");
 
-        let package_data = GemArchiveParser::extract_package_data(&gem_path);
+        let package_data = GemArchiveParser::extract_first_package(&gem_path);
         assert!(
             package_data.name.is_none(),
             "Gem without metadata.gz should return default package data"
@@ -1277,7 +1277,7 @@ gem "rails", "7.0.4"
     #[test]
     fn test_lockfile_git_dependency_extra_data() {
         let lockfile_path = PathBuf::from("testdata/ruby/Gemfile_with_git");
-        let package_data = GemfileLockParser::extract_package_data(&lockfile_path);
+        let package_data = GemfileLockParser::extract_first_package(&lockfile_path);
 
         // Should find the GIT gem with extra_data containing remote, revision, branch
         let git_gem = package_data
@@ -1327,7 +1327,7 @@ gem "rails", "7.0.4"
     #[test]
     fn test_lockfile_path_dependency_extra_data() {
         let lockfile_path = PathBuf::from("testdata/ruby/Gemfile_with_path");
-        let package_data = GemfileLockParser::extract_package_data(&lockfile_path);
+        let package_data = GemfileLockParser::extract_first_package(&lockfile_path);
 
         assert_eq!(
             package_data.name.as_deref(),
@@ -1392,7 +1392,7 @@ DEPENDENCIES
         let lockfile_path = temp_dir.path().join("Gemfile.lock");
         fs::write(&lockfile_path, content).expect("Failed to write lockfile");
 
-        let package_data = GemfileLockParser::extract_package_data(&lockfile_path);
+        let package_data = GemfileLockParser::extract_first_package(&lockfile_path);
 
         let tagged = package_data
             .dependencies
@@ -1437,7 +1437,7 @@ DEPENDENCIES
     #[test]
     fn test_lockfile_gem_section_no_extra_data() {
         let lockfile_path = PathBuf::from("testdata/ruby/Gemfile.lock");
-        let package_data = GemfileLockParser::extract_package_data(&lockfile_path);
+        let package_data = GemfileLockParser::extract_first_package(&lockfile_path);
 
         // Gems from the GEM section should NOT have source_type extra_data
         let rake = package_data
@@ -1471,7 +1471,8 @@ end
 "#;
 
         let (_temp_dir, gemspec_path) = create_temp_gemspec(content);
-        let package_data = crate::parsers::ruby::GemspecParser::extract_package_data(&gemspec_path);
+        let package_data =
+            crate::parsers::ruby::GemspecParser::extract_first_package(&gemspec_path);
 
         assert_eq!(package_data.name.as_deref(), Some("my_gem"));
         assert_eq!(package_data.version.as_deref(), Some("1.2.3"));
@@ -1504,7 +1505,8 @@ end
 "#;
 
         let (_temp_dir, gemspec_path) = create_temp_gemspec(content);
-        let package_data = crate::parsers::ruby::GemspecParser::extract_package_data(&gemspec_path);
+        let package_data =
+            crate::parsers::ruby::GemspecParser::extract_first_package(&gemspec_path);
 
         assert_eq!(package_data.name.as_deref(), Some("my_gem"));
         assert!(package_data.version.is_none());
@@ -1562,7 +1564,7 @@ licenses:
         let mut gem_file = File::create(&gem_path).unwrap();
         gem_file.write_all(&tar_data).unwrap();
 
-        let package_data = crate::parsers::ruby::GemArchiveParser::extract_package_data(&gem_path);
+        let package_data = crate::parsers::ruby::GemArchiveParser::extract_first_package(&gem_path);
 
         assert_eq!(package_data.name.as_deref(), Some("test_gem"));
         assert_eq!(package_data.version.as_deref(), Some("2.0.0"));
@@ -1622,7 +1624,7 @@ summary: Java platform gem
         let mut gem_file = File::create(&gem_path).unwrap();
         gem_file.write_all(&tar_data).unwrap();
 
-        let package_data = crate::parsers::ruby::GemArchiveParser::extract_package_data(&gem_path);
+        let package_data = crate::parsers::ruby::GemArchiveParser::extract_first_package(&gem_path);
 
         assert_eq!(package_data.name.as_deref(), Some("nokogiri"));
         assert_eq!(package_data.version.as_deref(), Some("1.10.0"));
@@ -1681,7 +1683,7 @@ summary: Java platform gem
         let mut gem_file = File::create(&gem_path).unwrap();
         gem_file.write_all(&tar_data).unwrap();
 
-        let package_data = crate::parsers::ruby::GemArchiveParser::extract_package_data(&gem_path);
+        let package_data = crate::parsers::ruby::GemArchiveParser::extract_first_package(&gem_path);
 
         assert_eq!(package_data.name.as_deref(), Some("nokogiri"));
         assert_eq!(package_data.version.as_deref(), Some("1.10.0"));
@@ -1736,7 +1738,7 @@ metadata:
         let mut gem_file = File::create(&gem_path).unwrap();
         gem_file.write_all(&tar_data).unwrap();
 
-        let package_data = crate::parsers::ruby::GemArchiveParser::extract_package_data(&gem_path);
+        let package_data = crate::parsers::ruby::GemArchiveParser::extract_first_package(&gem_path);
 
         assert_eq!(
             package_data.bug_tracking_url.as_deref(),
@@ -1788,7 +1790,7 @@ platform: ruby
         let mut gem_file = File::create(&gem_path).unwrap();
         gem_file.write_all(&tar_data).unwrap();
 
-        let package_data = crate::parsers::ruby::GemArchiveParser::extract_package_data(&gem_path);
+        let package_data = crate::parsers::ruby::GemArchiveParser::extract_first_package(&gem_path);
 
         assert_eq!(package_data.name.as_deref(), Some("test_gem"));
         assert!(

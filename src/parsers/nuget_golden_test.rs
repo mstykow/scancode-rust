@@ -11,7 +11,7 @@ mod golden_tests {
         let expected_file =
             PathBuf::from("testdata/nuget-golden/bootstrap/bootstrap.nuspec.expected");
 
-        let package_data = NuspecParser::extract_package_data(&test_file);
+        let package_data = NuspecParser::extract_first_package(&test_file);
 
         match compare_package_data_parser_only(&package_data, &expected_file) {
             Ok(_) => (),
@@ -25,7 +25,7 @@ mod golden_tests {
         let expected_file =
             PathBuf::from("testdata/nuget-golden/castle-core/Castle.Core.nuspec.expected");
 
-        let package_data = NuspecParser::extract_package_data(&test_file);
+        let package_data = NuspecParser::extract_first_package(&test_file);
 
         match compare_package_data_parser_only(&package_data, &expected_file) {
             Ok(_) => (),
@@ -40,7 +40,7 @@ mod golden_tests {
         let expected_file =
             PathBuf::from("testdata/nuget-golden/entity-framework/EntityFramework.nuspec.expected");
 
-        let package_data = NuspecParser::extract_package_data(&test_file);
+        let package_data = NuspecParser::extract_first_package(&test_file);
 
         match compare_package_data_parser_only(&package_data, &expected_file) {
             Ok(_) => (),
@@ -54,7 +54,7 @@ mod golden_tests {
         let expected_file =
             PathBuf::from("testdata/nuget-golden/jquery-ui/jQuery.UI.Combined.nuspec.expected");
 
-        let package_data = NuspecParser::extract_package_data(&test_file);
+        let package_data = NuspecParser::extract_first_package(&test_file);
 
         match compare_package_data_parser_only(&package_data, &expected_file) {
             Ok(_) => (),
@@ -69,7 +69,7 @@ mod golden_tests {
         let expected_file =
             PathBuf::from("testdata/nuget-golden/aspnet-mvc/Microsoft.AspNet.Mvc.nuspec.expected");
 
-        let package_data = NuspecParser::extract_package_data(&test_file);
+        let package_data = NuspecParser::extract_first_package(&test_file);
 
         match compare_package_data_parser_only(&package_data, &expected_file) {
             Ok(_) => (),
@@ -83,7 +83,7 @@ mod golden_tests {
         let expected_file =
             PathBuf::from("testdata/nuget-golden/net-http/Microsoft.Net.Http.nuspec.expected");
 
-        let package_data = NuspecParser::extract_package_data(&test_file);
+        let package_data = NuspecParser::extract_first_package(&test_file);
 
         match compare_package_data_parser_only(&package_data, &expected_file) {
             Ok(_) => (),

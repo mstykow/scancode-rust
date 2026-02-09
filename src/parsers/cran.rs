@@ -48,12 +48,12 @@ impl PackageParser for CranParser {
         path.file_name().is_some_and(|name| name == "DESCRIPTION")
     }
 
-    fn extract_package_data(path: &Path) -> PackageData {
+    fn extract_packages(path: &Path) -> Vec<PackageData> {
         let fields = match read_description_file(path) {
             Ok(content) => parse_dcf(&content),
             Err(e) => {
                 warn!("Failed to read DESCRIPTION at {:?}: {}", path, e);
-                return default_package_data();
+                return vec![default_package_data()];
             }
         };
 
@@ -115,7 +115,7 @@ impl PackageParser for CranParser {
             }
         }
 
-        PackageData {
+        vec![PackageData {
             package_type: Some("cran".to_string()),
             namespace: None,
             name,
@@ -158,7 +158,7 @@ impl PackageParser for CranParser {
             api_data_url: None,
             datasource_id: Some("cran_description".to_string()),
             purl,
-        }
+        }]
     }
 }
 

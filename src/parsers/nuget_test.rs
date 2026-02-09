@@ -39,7 +39,7 @@ mod tests {
         temp_file.write_all(xml.as_bytes()).unwrap();
         let path = temp_file.path();
 
-        let package_data = PackagesConfigParser::extract_package_data(path);
+        let package_data = PackagesConfigParser::extract_first_package(path);
 
         assert_eq!(package_data.package_type, Some("nuget".to_string()));
         assert_eq!(
@@ -73,7 +73,7 @@ mod tests {
         temp_file.write_all(xml.as_bytes()).unwrap();
         let path = temp_file.path();
 
-        let package_data = PackagesConfigParser::extract_package_data(path);
+        let package_data = PackagesConfigParser::extract_first_package(path);
 
         assert_eq!(package_data.dependencies.len(), 1);
         assert_eq!(package_data.dependencies[0].scope, None);
@@ -99,7 +99,7 @@ mod tests {
         temp_file.write_all(xml.as_bytes()).unwrap();
         let path = temp_file.path();
 
-        let package_data = NuspecParser::extract_package_data(path);
+        let package_data = NuspecParser::extract_first_package(path);
 
         assert_eq!(package_data.name, Some("Newtonsoft.Json".to_string()));
         assert_eq!(package_data.version, Some("13.0.1".to_string()));
@@ -138,7 +138,7 @@ mod tests {
         temp_file.write_all(xml.as_bytes()).unwrap();
         let path = temp_file.path();
 
-        let package_data = NuspecParser::extract_package_data(path);
+        let package_data = NuspecParser::extract_first_package(path);
         let deps = &package_data.dependencies;
 
         assert_eq!(deps.len(), 2);
@@ -174,7 +174,7 @@ mod tests {
         temp_file.write_all(xml.as_bytes()).unwrap();
         let path = temp_file.path();
 
-        let package_data = NuspecParser::extract_package_data(path);
+        let package_data = NuspecParser::extract_first_package(path);
         let deps = &package_data.dependencies;
 
         assert_eq!(deps.len(), 3);
@@ -210,7 +210,7 @@ mod tests {
         temp_file.write_all(xml.as_bytes()).unwrap();
         let path = temp_file.path();
 
-        let package_data = NuspecParser::extract_package_data(path);
+        let package_data = NuspecParser::extract_first_package(path);
 
         assert_eq!(
             package_data.vcs_url,
@@ -233,7 +233,7 @@ mod tests {
         temp_file.write_all(xml.as_bytes()).unwrap();
         let path = temp_file.path();
 
-        let package_data = NuspecParser::extract_package_data(path);
+        let package_data = NuspecParser::extract_first_package(path);
 
         assert_eq!(
             package_data.extracted_license_statement,
@@ -255,7 +255,7 @@ mod tests {
         temp_file.write_all(xml.as_bytes()).unwrap();
         let path = temp_file.path();
 
-        let package_data = NuspecParser::extract_package_data(path);
+        let package_data = NuspecParser::extract_first_package(path);
 
         // Should return default package data on error
         assert_eq!(package_data.package_type, Some("nuget".to_string()));
@@ -273,7 +273,7 @@ mod tests {
         temp_file.write_all(xml.as_bytes()).unwrap();
         let path = temp_file.path();
 
-        let package_data = PackagesConfigParser::extract_package_data(path);
+        let package_data = PackagesConfigParser::extract_first_package(path);
 
         assert_eq!(package_data.dependencies.len(), 0);
     }
@@ -292,7 +292,7 @@ mod tests {
         temp_file.write_all(xml.as_bytes()).unwrap();
         let path = temp_file.path();
 
-        let package_data = NuspecParser::extract_package_data(path);
+        let package_data = NuspecParser::extract_first_package(path);
 
         assert_eq!(
             package_data.repository_homepage_url,
@@ -350,7 +350,7 @@ mod tests {
         temp_file.write_all(json.as_bytes()).unwrap();
         let path = temp_file.path();
 
-        let package_data = PackagesLockParser::extract_package_data(path);
+        let package_data = PackagesLockParser::extract_first_package(path);
 
         assert_eq!(package_data.package_type, Some("nuget".to_string()));
         assert_eq!(
@@ -396,7 +396,7 @@ mod tests {
         temp_file.write_all(json.as_bytes()).unwrap();
         let path = temp_file.path();
 
-        let package_data = PackagesLockParser::extract_package_data(path);
+        let package_data = PackagesLockParser::extract_first_package(path);
         let deps = &package_data.dependencies;
 
         assert_eq!(deps.len(), 2);
@@ -416,7 +416,7 @@ mod tests {
         temp_file.write_all(json.as_bytes()).unwrap();
         let path = temp_file.path();
 
-        let package_data = PackagesLockParser::extract_package_data(path);
+        let package_data = PackagesLockParser::extract_first_package(path);
 
         assert_eq!(package_data.package_type, Some("nuget".to_string()));
         assert!(package_data.dependencies.is_empty());
@@ -440,7 +440,7 @@ mod tests {
         temp_file.write_all(xml.as_bytes()).unwrap();
         let path = temp_file.path();
 
-        let package_data = NuspecParser::extract_package_data(path);
+        let package_data = NuspecParser::extract_first_package(path);
 
         assert_eq!(package_data.name, Some("TestPackage".to_string()));
         assert!(package_data.description.is_some());
@@ -489,7 +489,7 @@ mod tests {
         temp_file.write_all(xml.as_bytes()).unwrap();
         let path = temp_file.path();
 
-        let package_data = NuspecParser::extract_package_data(path);
+        let package_data = NuspecParser::extract_first_package(path);
 
         assert_eq!(package_data.description, Some("Just a summary".to_string()));
     }
@@ -511,7 +511,7 @@ mod tests {
         temp_file.write_all(xml.as_bytes()).unwrap();
         let path = temp_file.path();
 
-        let package_data = NuspecParser::extract_package_data(path);
+        let package_data = NuspecParser::extract_first_package(path);
 
         assert_eq!(
             package_data.description,

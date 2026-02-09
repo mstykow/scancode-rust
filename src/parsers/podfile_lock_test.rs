@@ -18,7 +18,7 @@ mod tests {
     #[test]
     fn test_parse_braintree_ios_podfile_lock() {
         let path = PathBuf::from("testdata/cocoapods/podfile_lock/braintree_ios_Podfile.lock");
-        let pkg = PodfileLockParser::extract_package_data(&path);
+        let pkg = PodfileLockParser::extract_first_package(&path);
 
         assert_eq!(pkg.package_type.as_deref(), Some("cocoapods"));
         assert_eq!(pkg.primary_language.as_deref(), Some("Objective-C"));
@@ -101,7 +101,7 @@ mod tests {
     #[test]
     fn test_parse_artsy_eigen_podfile_lock() {
         let path = PathBuf::from("testdata/cocoapods/podfile_lock/artsy_eigen_Podfile.lock");
-        let pkg = PodfileLockParser::extract_package_data(&path);
+        let pkg = PodfileLockParser::extract_first_package(&path);
 
         assert_eq!(pkg.package_type.as_deref(), Some("cocoapods"));
         assert_eq!(pkg.dependencies.len(), 25);
@@ -244,7 +244,7 @@ mod tests {
         let path = dir.path().join("Podfile.lock");
         fs::write(&path, "{}").unwrap();
 
-        let pkg = PodfileLockParser::extract_package_data(&path);
+        let pkg = PodfileLockParser::extract_first_package(&path);
         assert_eq!(pkg.package_type.as_deref(), Some("cocoapods"));
         assert!(pkg.dependencies.is_empty());
     }
@@ -262,7 +262,7 @@ mod tests {
         )
         .unwrap();
 
-        let pkg = PodfileLockParser::extract_package_data(&path);
+        let pkg = PodfileLockParser::extract_first_package(&path);
         assert_eq!(pkg.dependencies.len(), 1);
 
         let dep = &pkg.dependencies[0];
@@ -276,7 +276,7 @@ mod tests {
     #[test]
     fn test_nonexistent_file() {
         let path = PathBuf::from("nonexistent/Podfile.lock");
-        let pkg = PodfileLockParser::extract_package_data(&path);
+        let pkg = PodfileLockParser::extract_first_package(&path);
         assert_eq!(pkg.package_type.as_deref(), Some("cocoapods"));
         assert!(pkg.dependencies.is_empty());
     }
@@ -284,7 +284,7 @@ mod tests {
     #[test]
     fn test_checksum_lookup_uses_proper_podname() {
         let path = PathBuf::from("testdata/cocoapods/podfile_lock/braintree_ios_Podfile.lock");
-        let pkg = PodfileLockParser::extract_package_data(&path);
+        let pkg = PodfileLockParser::extract_first_package(&path);
 
         let ohhttpstubs = &pkg.dependencies[3];
         let resolved = ohhttpstubs.resolved_package.as_ref().unwrap();

@@ -28,7 +28,7 @@ fn test_extract_from_testdata_v5() {
         return; // Skip if test data not available
     }
 
-    let data = PnpmLockParser::extract_package_data(&test_data_path);
+    let data = PnpmLockParser::extract_first_package(&test_data_path);
 
     assert_eq!(data.package_type, Some("pnpm-lock".to_string()));
     assert!(
@@ -44,7 +44,7 @@ fn test_extract_from_testdata_v6() {
         return; // Skip if test data not available
     }
 
-    let data = PnpmLockParser::extract_package_data(&test_data_path);
+    let data = PnpmLockParser::extract_first_package(&test_data_path);
 
     assert_eq!(data.package_type, Some("pnpm-lock".to_string()));
     assert!(
@@ -60,7 +60,7 @@ fn test_extract_from_testdata_v9() {
         return; // Skip if test data not available
     }
 
-    let data = PnpmLockParser::extract_package_data(&test_data_path);
+    let data = PnpmLockParser::extract_first_package(&test_data_path);
 
     assert_eq!(data.package_type, Some("pnpm-lock".to_string()));
     assert!(
@@ -222,7 +222,7 @@ fn test_pnpm_dev_dependencies_v6() {
         return;
     }
 
-    let data = PnpmLockParser::extract_package_data(&test_data_path);
+    let data = PnpmLockParser::extract_first_package(&test_data_path);
 
     assert_eq!(data.package_type, Some("pnpm-lock".to_string()));
     assert!(!data.dependencies.is_empty());

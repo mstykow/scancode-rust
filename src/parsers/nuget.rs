@@ -83,12 +83,12 @@ impl PackageParser for PackagesConfigParser {
             .is_some_and(|name| name == "packages.config")
     }
 
-    fn extract_package_data(path: &Path) -> PackageData {
+    fn extract_packages(path: &Path) -> Vec<PackageData> {
         let file = match File::open(path) {
             Ok(f) => f,
             Err(e) => {
                 warn!("Failed to open packages.config at {:?}: {}", path, e);
-                return default_package_data(Some(DATASOURCE_PACKAGES_CONFIG));
+                return vec![default_package_data(Some(DATASOURCE_PACKAGES_CONFIG))];
             }
         };
 
@@ -109,19 +109,19 @@ impl PackageParser for PackagesConfigParser {
                 Ok(Event::Eof) => break,
                 Err(e) => {
                     warn!("Error parsing packages.config at {:?}: {}", path, e);
-                    return default_package_data(Some(DATASOURCE_PACKAGES_CONFIG));
+                    return vec![default_package_data(Some(DATASOURCE_PACKAGES_CONFIG))];
                 }
                 _ => {}
             }
             buf.clear();
         }
 
-        PackageData {
+        vec![PackageData {
             datasource_id: Some(DATASOURCE_PACKAGES_CONFIG.to_string()),
             package_type: Some(Self::PACKAGE_TYPE.to_string()),
             dependencies,
             ..default_package_data(Some(DATASOURCE_PACKAGES_CONFIG))
-        }
+        }]
     }
 }
 
@@ -137,12 +137,12 @@ impl PackageParser for NuspecParser {
             .is_some_and(|ext| ext == "nuspec")
     }
 
-    fn extract_package_data(path: &Path) -> PackageData {
+    fn extract_packages(path: &Path) -> Vec<PackageData> {
         let file = match File::open(path) {
             Ok(f) => f,
             Err(e) => {
                 warn!("Failed to open .nuspec at {:?}: {}", path, e);
-                return default_package_data(Some(DATASOURCE_NUSPEC));
+                return vec![default_package_data(Some(DATASOURCE_NUSPEC))];
             }
         };
 
@@ -310,7 +310,7 @@ impl PackageParser for NuspecParser {
                 Ok(Event::Eof) => break,
                 Err(e) => {
                     warn!("Error parsing .nuspec at {:?}: {}", path, e);
-                    return default_package_data(Some(DATASOURCE_NUSPEC));
+                    return vec![default_package_data(Some(DATASOURCE_NUSPEC))];
                 }
                 _ => {}
             }
@@ -366,7 +366,7 @@ impl PackageParser for NuspecParser {
 
         let holder = None;
 
-        PackageData {
+        vec![PackageData {
             datasource_id: Some(DATASOURCE_NUSPEC.to_string()),
             package_type: Some(Self::PACKAGE_TYPE.to_string()),
             name,
@@ -387,7 +387,7 @@ impl PackageParser for NuspecParser {
             repository_download_url,
             api_data_url,
             ..default_package_data(Some(DATASOURCE_NUSPEC))
-        }
+        }]
     }
 }
 
@@ -540,12 +540,12 @@ impl PackageParser for PackagesLockParser {
             .is_some_and(|name| name.ends_with("packages.lock.json"))
     }
 
-    fn extract_package_data(path: &Path) -> PackageData {
+    fn extract_packages(path: &Path) -> Vec<PackageData> {
         let file = match File::open(path) {
             Ok(f) => f,
             Err(e) => {
                 warn!("Failed to open packages.lock.json at {:?}: {}", path, e);
-                return default_package_data(Some(DATASOURCE_PACKAGES_LOCK));
+                return vec![default_package_data(Some(DATASOURCE_PACKAGES_LOCK))];
             }
         };
 
@@ -553,7 +553,7 @@ impl PackageParser for PackagesLockParser {
             Ok(v) => v,
             Err(e) => {
                 warn!("Failed to parse packages.lock.json at {:?}: {}", path, e);
-                return default_package_data(Some(DATASOURCE_PACKAGES_LOCK));
+                return vec![default_package_data(Some(DATASOURCE_PACKAGES_LOCK))];
             }
         };
 
@@ -625,12 +625,12 @@ impl PackageParser for PackagesLockParser {
             }
         }
 
-        PackageData {
+        vec![PackageData {
             datasource_id: Some(DATASOURCE_PACKAGES_LOCK.to_string()),
             package_type: Some(Self::PACKAGE_TYPE.to_string()),
             dependencies,
             ..default_package_data(Some(DATASOURCE_PACKAGES_LOCK))
-        }
+        }]
     }
 }
 
@@ -646,14 +646,14 @@ impl PackageParser for NupkgParser {
             .is_some_and(|ext| ext == "nupkg")
     }
 
-    fn extract_package_data(path: &Path) -> PackageData {
-        match extract_nupkg_archive(path) {
+    fn extract_packages(path: &Path) -> Vec<PackageData> {
+        vec![match extract_nupkg_archive(path) {
             Ok(data) => data,
             Err(e) => {
                 warn!("Failed to extract .nupkg at {:?}: {}", path, e);
                 default_package_data(Some(DATASOURCE_NUPKG))
             }
-        }
+        }]
     }
 }
 

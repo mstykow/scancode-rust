@@ -26,7 +26,7 @@ mod tests {
     #[test]
     fn test_extract_from_testdata() {
         let cargo_path = PathBuf::from("testdata/cargo/Cargo.toml");
-        let package_data = CargoParser::extract_package_data(&cargo_path);
+        let package_data = CargoParser::extract_first_package(&cargo_path);
 
         assert_eq!(package_data.package_type, Some("cargo".to_string()));
         assert_eq!(package_data.name, Some("test-cargo".to_string()));
@@ -86,7 +86,7 @@ authors = ["Test User <test@example.com>"]
         "#;
 
         let (_temp_file, cargo_path) = create_temp_cargo_toml(content);
-        let package_data = CargoParser::extract_package_data(&cargo_path);
+        let package_data = CargoParser::extract_first_package(&cargo_path);
 
         assert_eq!(package_data.package_type, Some("cargo".to_string()));
         assert_eq!(package_data.name, Some("test-package".to_string()));
@@ -139,7 +139,7 @@ tokio = { version = "1.0", features = ["full"] }
 "#;
 
         let (_temp_file, cargo_path) = create_temp_cargo_toml(content);
-        let package_data = CargoParser::extract_package_data(&cargo_path);
+        let package_data = CargoParser::extract_first_package(&cargo_path);
 
         // We should have 3 dependencies in total (2 regular, 1 dev)
         assert_eq!(package_data.dependencies.len(), 3);
@@ -187,7 +187,7 @@ mockito = "0.31.0"
 "#;
 
         let (_temp_file, cargo_path) = create_temp_cargo_toml(content);
-        let package_data = CargoParser::extract_package_data(&cargo_path);
+        let package_data = CargoParser::extract_first_package(&cargo_path);
 
         // Check we have all dependencies extracted (3 regular + 1 dev)
         assert_eq!(package_data.dependencies.len(), 4);
@@ -216,7 +216,7 @@ mockito = "0.31.0"
         // Test with empty content
         let content = "";
         let (_temp_file, cargo_path) = create_temp_cargo_toml(content);
-        let package_data = CargoParser::extract_package_data(&cargo_path);
+        let package_data = CargoParser::extract_first_package(&cargo_path);
 
         // Should return default/empty package data
         assert_eq!(package_data.name, None);
@@ -226,7 +226,7 @@ mockito = "0.31.0"
         // Test with invalid TOML
         let content = "this is not valid TOML";
         let (_temp_file, cargo_path) = create_temp_cargo_toml(content);
-        let package_data = CargoParser::extract_package_data(&cargo_path);
+        let package_data = CargoParser::extract_first_package(&cargo_path);
 
         // Should return default/empty package data
         assert_eq!(package_data.name, None);
@@ -238,7 +238,7 @@ mockito = "0.31.0"
     fn test_extract_api_url_basic() {
         // Given: A package.toml with name and version
         let cargo_path = PathBuf::from("testdata/cargo/Cargo-api-url-basic.toml");
-        let package_data = CargoParser::extract_package_data(&cargo_path);
+        let package_data = CargoParser::extract_first_package(&cargo_path);
 
         // Then: API data URL should be generated
         assert_eq!(
@@ -263,7 +263,7 @@ mockito = "0.31.0"
     fn test_extract_api_url_no_version() {
         // Given: A package.toml with name but no version
         let cargo_path = PathBuf::from("testdata/cargo/Cargo-api-url-no-version.toml");
-        let package_data = CargoParser::extract_package_data(&cargo_path);
+        let package_data = CargoParser::extract_first_package(&cargo_path);
 
         // Then: API data URL should still be generated (without version)
         assert_eq!(
@@ -286,7 +286,7 @@ mockito = "0.31.0"
         use serde_json::json;
 
         let cargo_path = PathBuf::from("testdata/cargo-golden/clap/Cargo.toml");
-        let package_data = CargoParser::extract_package_data(&cargo_path);
+        let package_data = CargoParser::extract_first_package(&cargo_path);
 
         assert_eq!(package_data.name, Some("clap".to_string()));
         assert_eq!(package_data.version, Some("2.32.0".to_string()));
@@ -370,7 +370,7 @@ mockito = "0.31.0"
     fn test_extract_vcs_url_no_repository() {
         // Given: A minimal Cargo.toml without a repository field
         let cargo_path = PathBuf::from("testdata/cargo/Cargo-minimal.toml");
-        let package_data = CargoParser::extract_package_data(&cargo_path);
+        let package_data = CargoParser::extract_first_package(&cargo_path);
 
         // Then: vcs_url should be None
         assert_eq!(package_data.vcs_url, None);
@@ -389,7 +389,7 @@ license-file = "LICENSE.txt"
 "#;
 
         let (_temp_file, cargo_path) = create_temp_cargo_toml(content);
-        let package_data = CargoParser::extract_package_data(&cargo_path);
+        let package_data = CargoParser::extract_first_package(&cargo_path);
 
         // Then: license-file should be extracted to extra_data
         assert!(package_data.extra_data.is_some());
@@ -416,7 +416,7 @@ cc = "1.0"
 "#;
 
         let (_temp_file, cargo_path) = create_temp_cargo_toml(content);
-        let package_data = CargoParser::extract_package_data(&cargo_path);
+        let package_data = CargoParser::extract_first_package(&cargo_path);
 
         // We should have 3 dependencies in total (1 regular, 1 dev, 1 build)
         assert_eq!(package_data.dependencies.len(), 3);
@@ -437,7 +437,7 @@ cc = "1.0"
     #[test]
     fn test_cargo_git_path_dependencies() {
         let path = PathBuf::from("testdata/cargo/git-path-deps/Cargo.toml");
-        let result = CargoParser::extract_package_data(&path);
+        let result = CargoParser::extract_first_package(&path);
 
         assert_eq!(result.dependencies.len(), 3);
 

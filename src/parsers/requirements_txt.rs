@@ -46,8 +46,8 @@ pub struct RequirementsTxtParser;
 impl PackageParser for RequirementsTxtParser {
     const PACKAGE_TYPE: &'static str = "pypi";
 
-    fn extract_package_data(path: &Path) -> PackageData {
-        extract_from_requirements_txt(path)
+    fn extract_packages(path: &Path) -> Vec<PackageData> {
+        vec![extract_from_requirements_txt(path)]
     }
 
     fn is_match(path: &Path) -> bool {

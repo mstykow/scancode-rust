@@ -1,11 +1,29 @@
+mod about;
+#[cfg(test)]
+mod about_test;
 mod alpine;
 mod alpine_golden_test;
+mod autotools;
+#[cfg(test)]
+mod autotools_test;
+mod bazel;
+#[cfg(test)]
+mod bazel_test;
+mod bower;
+#[cfg(test)]
+mod bower_test;
+mod buck;
+#[cfg(test)]
+mod buck_test;
 mod cargo;
 mod cargo_lock;
 #[cfg(test)]
 mod cargo_lock_test;
 #[cfg(test)]
 mod cargo_test;
+mod chef;
+#[cfg(test)]
+mod chef_test;
 #[cfg(test)]
 mod cocoapods_golden_test;
 mod composer;
@@ -13,11 +31,17 @@ mod composer;
 mod composer_golden_test;
 #[cfg(test)]
 mod composer_test;
+mod conan;
+#[cfg(test)]
+mod conan_test;
 mod conda;
 #[cfg(test)]
 mod conda_golden_test;
 #[cfg(test)]
 mod conda_test;
+mod cpan;
+#[cfg(test)]
+mod cpan_test;
 mod cran;
 #[cfg(test)]
 mod cran_golden_test;
@@ -30,6 +54,9 @@ mod dart_golden_test;
 mod dart_test;
 mod debian;
 mod debian_golden_test;
+mod freebsd;
+#[cfg(test)]
+mod freebsd_test;
 mod go;
 #[cfg(test)]
 mod go_golden_test;
@@ -130,7 +157,7 @@ use crate::models::PackageData;
 /// Implementors must provide:
 /// - `PACKAGE_TYPE`: Package URL (purl) type identifier (e.g., "npm", "pypi", "maven")
 /// - `is_match()`: Returns true if the given file path matches this parser's expected format
-/// - `extract_package_data()`: Parses the file and returns extracted metadata
+/// - `extract_packages()`: Parses the file and returns all extracted package metadata
 ///
 /// # Error Handling
 ///
@@ -155,10 +182,10 @@ use crate::models::PackageData;
 ///             .is_some_and(|name| name == "package-manifest.json")
 ///     }
 ///
-///     fn extract_package_data(path: &Path) -> PackageData {
+///     fn extract_packages(path: &Path) -> Vec<PackageData> {
 ///         // Parse file and return metadata
 ///         // On error, log warning and return default
-///         PackageData::default()
+///         vec![PackageData::default()]
 ///     }
 /// }
 /// ```
@@ -166,26 +193,47 @@ pub trait PackageParser {
     /// Package URL type identifier for this parser (e.g., "npm", "pypi", "maven").
     const PACKAGE_TYPE: &'static str;
 
-    /// Extracts package metadata from the given file path.
+    /// Extracts all packages from the given file path.
     ///
-    /// Returns a `PackageData` structure containing all extracted metadata including
-    /// name, version, dependencies, licenses, etc. On parse errors, returns a default
-    /// `PackageData` with minimal or no fields populated.
-    fn extract_package_data(path: &Path) -> PackageData;
+    /// Returns a vector of `PackageData` structures containing all extracted metadata
+    /// including name, version, dependencies, licenses, etc. Most parsers return a
+    /// single-element vector, but some (e.g., Bazel BUILD, Buck BUCK, Debian control)
+    /// can contain multiple packages in a single file.
+    ///
+    /// On parse errors, returns a vector with a default `PackageData` with minimal or
+    /// no fields populated.
+    fn extract_packages(path: &Path) -> Vec<PackageData>;
 
     /// Checks if the given file path matches this parser's expected format.
     ///
     /// Returns true if the file should be handled by this parser based on filename,
     /// extension, or path patterns. Used by the scanner to route files to appropriate parsers.
     fn is_match(path: &Path) -> bool;
+
+    /// Returns the first package from [`extract_packages()`](Self::extract_packages),
+    /// or a default [`PackageData`] if the file contains no packages.
+    fn extract_first_package(path: &Path) -> PackageData {
+        Self::extract_packages(path)
+            .into_iter()
+            .next()
+            .unwrap_or_default()
+    }
 }
 
+pub use self::about::AboutFileParser;
 pub use self::alpine::{AlpineApkParser, AlpineInstalledParser};
+pub use self::autotools::AutotoolsConfigureParser;
+pub use self::bazel::BazelBuildParser;
+pub use self::bower::BowerJsonParser;
+pub use self::buck::{BuckBuildParser, BuckMetadataBzlParser};
 pub use self::cargo::CargoParser;
 #[cfg_attr(not(test), allow(unused_imports))]
 pub use self::cargo_lock::CargoLockParser;
+pub use self::chef::{ChefMetadataJsonParser, ChefMetadataRbParser};
 pub use self::composer::{ComposerJsonParser, ComposerLockParser};
+pub use self::conan::{ConanFilePyParser, ConanLockParser, ConanfileTxtParser};
 pub use self::conda::{CondaEnvironmentYmlParser, CondaMetaYamlParser};
+pub use self::cpan::{CpanManifestParser, CpanMetaJsonParser, CpanMetaYmlParser};
 pub use self::cran::CranParser;
 pub use self::dart::{PubspecLockParser, PubspecYamlParser};
 pub use self::debian::{
@@ -193,6 +241,7 @@ pub use self::debian::{
     DebianDistrolessInstalledParser, DebianDscParser, DebianInstalledListParser,
     DebianInstalledMd5sumsParser, DebianInstalledParser, DebianOrigTarParser,
 };
+pub use self::freebsd::FreebsdCompactManifestParser;
 pub use self::go::{GoModParser, GoSumParser, GodepsParser};
 pub use self::gradle::GradleParser;
 pub use self::gradle_lock::GradleLockfileParser;
@@ -224,30 +273,23 @@ macro_rules! define_parsers {
         pub fn try_parse_file(path: &Path) -> Option<Vec<PackageData>> {
             $(
                 if <$parser>::is_match(path) {
-                    return Some(vec![<$parser>::extract_package_data(path)]);
+                    return Some(<$parser>::extract_packages(path));
                 }
             )*
             None
         }
 
-        /// Parses a file using a specific parser type by name.
-        ///
-        /// This is primarily used by test utilities to generate expected output files.
-        /// Pass the parser struct name (e.g., "NpmParser", "DebianDebParser").
-        ///
-        /// Returns None if the parser type name is not recognized.
-        #[allow(dead_code)]
+        #[allow(dead_code)] // Used by bin/generate_test_expected.rs, not library code
         pub fn parse_by_type_name(type_name: &str, path: &Path) -> Option<PackageData> {
             match type_name {
                 $(
-                    stringify!($parser) => Some(<$parser>::extract_package_data(path)),
+                    stringify!($parser) => Some(<$parser>::extract_first_package(path)),
                 )*
                 _ => None
             }
         }
 
-        /// Lists all available parser type names for use with parse_by_type_name.
-        #[allow(dead_code)]
+        #[allow(dead_code)] // Used by bin/generate_test_expected.rs and tests/scanner_integration.rs
         pub fn list_parser_types() -> Vec<&'static str> {
             vec![
                 $(
@@ -259,6 +301,12 @@ macro_rules! define_parsers {
 }
 
 define_parsers! {
+    AboutFileParser,
+    AutotoolsConfigureParser,
+    BazelBuildParser,
+    BowerJsonParser,
+    BuckBuildParser,
+    BuckMetadataBzlParser,
     NpmWorkspaceParser,
     NpmParser,
     NpmLockParser,
@@ -273,8 +321,16 @@ define_parsers! {
     RequirementsTxtParser,
     ComposerJsonParser,
     ComposerLockParser,
+    ConanFilePyParser,
+    ConanfileTxtParser,
+    ConanLockParser,
     CargoParser,
     CargoLockParser,
+    ChefMetadataJsonParser,
+    ChefMetadataRbParser,
+    CpanMetaJsonParser,
+    CpanMetaYmlParser,
+    CpanManifestParser,
     PubspecYamlParser,
     PubspecLockParser,
     PythonParser,
@@ -309,6 +365,7 @@ define_parsers! {
     DebianInstalledMd5sumsParser,
     DebianCopyrightParser,
     DebianDebParser,
+    FreebsdCompactManifestParser,
     AlpineApkParser,
     AlpineInstalledParser,
     RpmParser,

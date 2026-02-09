@@ -17,7 +17,7 @@ fn test_parse_simple_gradle_lockfile() {
     .expect("Failed to write to temp file");
 
     let path = file.path();
-    let package_data = GradleLockfileParser::extract_package_data(path);
+    let package_data = GradleLockfileParser::extract_first_package(path);
 
     assert_eq!(package_data.dependencies.len(), 2);
     assert_eq!(
@@ -64,7 +64,7 @@ fn test_parse_gradle_lockfile_with_comments() {
     .expect("Failed to write to temp file");
 
     let path = file.path();
-    let package_data = GradleLockfileParser::extract_package_data(path);
+    let package_data = GradleLockfileParser::extract_first_package(path);
 
     assert_eq!(package_data.dependencies.len(), 2);
 }
@@ -79,7 +79,7 @@ fn test_parse_gradle_lockfile_with_empty_lines() {
     .expect("Failed to write to temp file");
 
     let path = file.path();
-    let package_data = GradleLockfileParser::extract_package_data(path);
+    let package_data = GradleLockfileParser::extract_first_package(path);
 
     assert_eq!(package_data.dependencies.len(), 2);
 }
@@ -94,7 +94,7 @@ fn test_parse_gradle_lockfile_complex_group_name() {
     .expect("Failed to write to temp file");
 
     let path = file.path();
-    let package_data = GradleLockfileParser::extract_package_data(path);
+    let package_data = GradleLockfileParser::extract_first_package(path);
 
     assert_eq!(package_data.dependencies.len(), 1);
     let dep = &package_data.dependencies[0];
@@ -118,7 +118,7 @@ fn test_parse_gradle_lockfile_empty_file() {
     writeln!(file).expect("Failed to write to temp file");
 
     let path = file.path();
-    let package_data = GradleLockfileParser::extract_package_data(path);
+    let package_data = GradleLockfileParser::extract_first_package(path);
 
     assert_eq!(package_data.dependencies.len(), 0);
     assert_eq!(package_data.package_type, Some("maven".to_string()));
@@ -130,7 +130,7 @@ fn test_parse_gradle_lockfile_datasource_id() {
     writeln!(file, "com.example:lib:1.0.0=hash").expect("Failed to write to temp file");
 
     let path = file.path();
-    let package_data = GradleLockfileParser::extract_package_data(path);
+    let package_data = GradleLockfileParser::extract_first_package(path);
 
     assert_eq!(
         package_data.datasource_id,
@@ -144,7 +144,7 @@ fn test_parse_gradle_lockfile_dependency_flags() {
     writeln!(file, "com.example:lib:1.0.0=hash").expect("Failed to write to temp file");
 
     let path = file.path();
-    let package_data = GradleLockfileParser::extract_package_data(path);
+    let package_data = GradleLockfileParser::extract_first_package(path);
 
     assert_eq!(package_data.dependencies.len(), 1);
     let dep = &package_data.dependencies[0];
@@ -164,7 +164,7 @@ fn test_parse_gradle_lockfile_generates_purl() {
     writeln!(file, "com.google.guava:guava:30.1-jre=abc123").expect("Failed to write to temp file");
 
     let path = file.path();
-    let package_data = GradleLockfileParser::extract_package_data(path);
+    let package_data = GradleLockfileParser::extract_first_package(path);
 
     assert_eq!(package_data.dependencies.len(), 1);
     let dep = &package_data.dependencies[0];
@@ -183,7 +183,7 @@ fn test_parse_gradle_lockfile_extra_data() {
         .expect("Failed to write to temp file");
 
     let path = file.path();
-    let package_data = GradleLockfileParser::extract_package_data(path);
+    let package_data = GradleLockfileParser::extract_first_package(path);
 
     assert_eq!(package_data.dependencies.len(), 1);
     let dep = &package_data.dependencies[0];
@@ -217,7 +217,7 @@ fn test_parse_gradle_lockfile_multiple_deps_with_different_hashes() {
     .expect("Failed to write to temp file");
 
     let path = file.path();
-    let package_data = GradleLockfileParser::extract_package_data(path);
+    let package_data = GradleLockfileParser::extract_first_package(path);
 
     assert_eq!(package_data.dependencies.len(), 3);
 
@@ -241,7 +241,7 @@ fn test_parse_gradle_lockfile_malformed_lines_skipped() {
     .expect("Failed to write to temp file");
 
     let path = file.path();
-    let package_data = GradleLockfileParser::extract_package_data(path);
+    let package_data = GradleLockfileParser::extract_first_package(path);
 
     // Only valid dependencies should be extracted
     assert_eq!(package_data.dependencies.len(), 2);
@@ -273,7 +273,7 @@ fn test_parse_gradle_lockfile_versions_with_special_chars() {
     .expect("Failed to write to temp file");
 
     let path = file.path();
-    let package_data = GradleLockfileParser::extract_package_data(path);
+    let package_data = GradleLockfileParser::extract_first_package(path);
 
     assert_eq!(package_data.dependencies.len(), 2);
     assert_eq!(
@@ -308,7 +308,7 @@ org.hamcrest:hamcrest-core:1.3=3x2w1v0u9t8s7r6q5p4o3n2m1l0k9j8i7"#;
     writeln!(file, "{}", content).expect("Failed to write to temp file");
 
     let path = file.path();
-    let package_data = GradleLockfileParser::extract_package_data(path);
+    let package_data = GradleLockfileParser::extract_first_package(path);
 
     assert_eq!(package_data.dependencies.len(), 5);
 
@@ -381,7 +381,7 @@ fn test_package_data_default_values() {
     writeln!(file, "com.example:lib:1.0.0=hash").expect("Failed to write to temp file");
 
     let path = file.path();
-    let package_data = GradleLockfileParser::extract_package_data(path);
+    let package_data = GradleLockfileParser::extract_first_package(path);
 
     // Root package data should have no name/version
     assert_eq!(package_data.name, None);
@@ -403,7 +403,7 @@ fn test_parse_gradle_lockfile_with_no_hash() {
     writeln!(file, "com.example:lib:1.0.0=").expect("Failed to write to temp file");
 
     let path = file.path();
-    let package_data = GradleLockfileParser::extract_package_data(path);
+    let package_data = GradleLockfileParser::extract_first_package(path);
 
     assert_eq!(package_data.dependencies.len(), 1);
     let dep = &package_data.dependencies[0];
@@ -427,7 +427,7 @@ fn test_parse_gradle_lockfile_whitespace_handling() {
     .expect("Failed to write to temp file");
 
     let path = file.path();
-    let package_data = GradleLockfileParser::extract_package_data(path);
+    let package_data = GradleLockfileParser::extract_first_package(path);
 
     assert_eq!(package_data.dependencies.len(), 2);
     assert_eq!(

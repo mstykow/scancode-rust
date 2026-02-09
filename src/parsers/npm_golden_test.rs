@@ -10,7 +10,7 @@ mod golden_tests {
         let test_file = PathBuf::from("testdata/npm-golden/basic/package.json");
         let expected_file = PathBuf::from("testdata/npm-golden/basic/package.json.expected");
 
-        let package_data = NpmParser::extract_package_data(&test_file);
+        let package_data = NpmParser::extract_first_package(&test_file);
 
         match compare_package_data_parser_only(&package_data, &expected_file) {
             Ok(_) => (),
@@ -25,7 +25,7 @@ mod golden_tests {
         let expected_file =
             PathBuf::from("testdata/npm-golden/authors_list_dicts/package.json.expected");
 
-        let package_data = NpmParser::extract_package_data(&test_file);
+        let package_data = NpmParser::extract_first_package(&test_file);
 
         match compare_package_data_parser_only(&package_data, &expected_file) {
             Ok(_) => (),
@@ -39,7 +39,7 @@ mod golden_tests {
         let expected_file =
             PathBuf::from("testdata/npm-golden/authors_list_strings/package.json.expected");
 
-        let package_data = NpmParser::extract_package_data(&test_file);
+        let package_data = NpmParser::extract_first_package(&test_file);
 
         match compare_package_data_parser_only(&package_data, &expected_file) {
             Ok(_) => (),
@@ -54,7 +54,7 @@ mod golden_tests {
         let expected_file =
             PathBuf::from("testdata/npm-golden/double_license/package.json.expected");
 
-        let package_data = NpmParser::extract_package_data(&test_file);
+        let package_data = NpmParser::extract_first_package(&test_file);
 
         match compare_package_data_parser_only(&package_data, &expected_file) {
             Ok(_) => (),
@@ -69,7 +69,7 @@ mod golden_tests {
         let expected_file =
             PathBuf::from("testdata/npm-golden/express-jwt-3.4.0/package.json.expected");
 
-        let package_data = NpmParser::extract_package_data(&test_file);
+        let package_data = NpmParser::extract_first_package(&test_file);
 
         match compare_package_data_parser_only(&package_data, &expected_file) {
             Ok(_) => (),
@@ -83,7 +83,7 @@ mod golden_tests {
         let test_file = PathBuf::from("testdata/npm-golden/from_npmjs/package.json");
         let expected_file = PathBuf::from("testdata/npm-golden/from_npmjs/package.json.expected");
 
-        let package_data = NpmParser::extract_package_data(&test_file);
+        let package_data = NpmParser::extract_first_package(&test_file);
 
         match compare_package_data_parser_only(&package_data, &expected_file) {
             Ok(_) => (),
@@ -96,7 +96,7 @@ mod golden_tests {
         let test_file = PathBuf::from("testdata/npm-golden/bundledDeps/package.json");
         let expected_file = PathBuf::from("testdata/npm-golden/bundledDeps/package.json.expected");
 
-        let package_data = NpmParser::extract_package_data(&test_file);
+        let package_data = NpmParser::extract_first_package(&test_file);
 
         match compare_package_data_parser_only(&package_data, &expected_file) {
             Ok(_) => (),
@@ -109,7 +109,7 @@ mod golden_tests {
         let test_file = PathBuf::from("testdata/npm-golden/casepath/package.json");
         let expected_file = PathBuf::from("testdata/npm-golden/casepath/package.json.expected");
 
-        let package_data = NpmParser::extract_package_data(&test_file);
+        let package_data = NpmParser::extract_first_package(&test_file);
 
         match compare_package_data_parser_only(&package_data, &expected_file) {
             Ok(_) => (),
@@ -123,7 +123,7 @@ mod golden_tests {
         let test_file = PathBuf::from("testdata/npm-golden/chartist/package.json");
         let expected_file = PathBuf::from("testdata/npm-golden/chartist/package.json.expected");
 
-        let package_data = NpmParser::extract_package_data(&test_file);
+        let package_data = NpmParser::extract_first_package(&test_file);
 
         match compare_package_data_parser_only(&package_data, &expected_file) {
             Ok(_) => (),
@@ -137,7 +137,7 @@ mod golden_tests {
         let test_file = PathBuf::from("testdata/npm-golden/dist/package.json");
         let expected_file = PathBuf::from("testdata/npm-golden/dist/package.json.expected");
 
-        let package_data = NpmParser::extract_package_data(&test_file);
+        let package_data = NpmParser::extract_first_package(&test_file);
 
         match compare_package_data_parser_only(&package_data, &expected_file) {
             Ok(_) => (),
@@ -151,7 +151,7 @@ mod golden_tests {
         let test_file = PathBuf::from("testdata/npm-golden/electron/package.json");
         let expected_file = PathBuf::from("testdata/npm-golden/electron/package.json.expected");
 
-        let package_data = NpmParser::extract_package_data(&test_file);
+        let package_data = NpmParser::extract_first_package(&test_file);
 
         match compare_package_data_parser_only(&package_data, &expected_file) {
             Ok(_) => (),

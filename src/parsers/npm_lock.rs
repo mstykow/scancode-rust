@@ -61,12 +61,12 @@ impl PackageParser for NpmLockParser {
             .unwrap_or(false)
     }
 
-    fn extract_package_data(path: &Path) -> PackageData {
+    fn extract_packages(path: &Path) -> Vec<PackageData> {
         let content = match fs::read_to_string(path) {
             Ok(content) => content,
             Err(e) => {
                 warn!("Failed to read package-lock.json at {:?}: {}", path, e);
-                return default_package_data();
+                return vec![default_package_data()];
             }
         };
 
@@ -74,7 +74,7 @@ impl PackageParser for NpmLockParser {
             Ok(json) => json,
             Err(e) => {
                 warn!("Failed to parse package-lock.json at {:?}: {}", path, e);
-                return default_package_data();
+                return vec![default_package_data()];
             }
         };
 
@@ -95,11 +95,11 @@ impl PackageParser for NpmLockParser {
             .unwrap_or("")
             .to_string();
 
-        if lockfile_version == 1 {
+        vec![if lockfile_version == 1 {
             parse_lockfile_v1(&json, root_name, root_version, lockfile_version)
         } else {
             parse_lockfile_v2_plus(&json, root_name, root_version, lockfile_version)
-        }
+        }]
     }
 }
 
