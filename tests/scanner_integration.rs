@@ -242,7 +242,7 @@ fn test_max_depth_limits_traversal() {
     assert!(!has_deep_json, "Should not find package.json at depth > 1");
 }
 
-/// Regression test: Verify that all parsers in define_parsers! macro are actually
+/// Regression test: Verify that all parsers in register_package_handlers! macro are actually
 /// exported and accessible. This catches bugs where parsers are implemented but
 /// not registered in the macro (like CargoLockParser was before being fixed).
 #[test]
@@ -251,7 +251,7 @@ fn test_all_parsers_are_registered_and_exported() {
     let parser_types = list_parser_types();
 
     // This test verifies that list_parser_types() returns a non-empty list
-    // If a parser is implemented but not in define_parsers!, it won't appear here
+    // If a parser is implemented but not in register_package_handlers!, it won't appear here
     assert!(
         !parser_types.is_empty(),
         "Should have at least one parser registered"
@@ -273,7 +273,7 @@ fn test_all_parsers_are_registered_and_exported() {
     for expected in expected_parsers {
         assert!(
             parser_types.contains(&expected),
-            "Parser '{}' should be registered in define_parsers! macro",
+            "Parser '{}' should be registered in register_package_handlers! macro",
             expected
         );
     }

@@ -21,9 +21,9 @@
 //! # Auto-Discovery
 //!
 //! This tool automatically discovers ALL parsers registered in `src/parsers/mod.rs`
-//! via the `define_parsers!` macro. No manual maintenance required!
+//! via the `register_package_handlers!` macro. No manual maintenance required!
 //!
-//! When you add a new parser to `define_parsers!`, it automatically becomes available here.
+//! When you add a new parser to `register_package_handlers!`, it automatically becomes available here.
 
 use scancode_rust::parsers;
 use std::fs;

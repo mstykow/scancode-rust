@@ -335,11 +335,11 @@ cargo test --test scanner_integration
 
 The `test_all_parsers_are_registered_and_exported` test will verify your parser is:
 
-1. Listed in the `define_parsers!` macro
+1. Listed in the `register_package_handlers!` macro
 2. Exported from the parsers module
 3. Accessible to the scanner
 
-**If this test fails**, it means you forgot to add your parser to the `define_parsers!` macro in Step 4.2.
+**If this test fails**, it means you forgot to add your parser to the `register_package_handlers!` macro in Step 4.2.
 
 ## Step 4: Register the Parser
 
@@ -355,23 +355,28 @@ mod my_ecosystem_test;
 pub use self::my_ecosystem::MyEcosystemParser;
 ```
 
-**Step 4.2: Register in `define_parsers!` macro**
+**Step 4.2: Register in `register_package_handlers!` macro**
 
 This is **CRITICAL** - if you skip this step, your parser will be implemented but never called by the scanner!
 
-Find the `define_parsers!` macro (around line 261) and add your parser to the list:
+Find the `register_package_handlers!` macro in `src/parsers/mod.rs` and add your parser to the `parsers` list:
 
 ```rust
-define_parsers! {
-    NpmWorkspaceParser,
-    NpmParser,
-    // ... other parsers ...
-    MyEcosystemParser,  // <-- ADD YOUR PARSER HERE
-    // ... more parsers ...
+register_package_handlers! {
+    parsers: [
+        NpmWorkspaceParser,
+        NpmParser,
+        // ... other parsers ...
+        MyEcosystemParser,  // <-- ADD YOUR PARSER HERE
+        // ... more parsers ...
+    ],
+    recognizers: [
+        // ... file-type recognizers (don't add parsers here) ...
+    ],
 }
 ```
 
-**Why this matters**: The `define_parsers!` macro generates the `try_parse_file()` function that the scanner uses to match files to parsers. If your parser isn't in this list, it will never be invoked, even if fully implemented and tested.
+**Why this matters**: The `register_package_handlers!` macro generates the `try_parse_file()` function that the scanner uses to match files to parsers. If your parser isn't in this list, it will never be invoked, even if fully implemented and tested.
 
 **Verification**: After adding your parser, verify it's registered:
 
@@ -403,7 +408,7 @@ cargo run --bin generate-test-expected MyEcosystemParser \
   testdata/<ecosystem>/sample.json.expected.json
 ```
 
-**Auto-Discovery**: The generator automatically discovers ALL parsers registered in `src/parsers/mod.rs` via the `define_parsers!` macro. When you add your parser to that list, it becomes immediately available - no manual updates needed!
+**Auto-Discovery**: The generator automatically discovers ALL parsers registered in `src/parsers/mod.rs` via the `register_package_handlers!` macro. When you add your parser to that list, it becomes immediately available - no manual updates needed!
 
 ### Create Golden Test File
 
@@ -724,7 +729,7 @@ Before submitting your parser:
 
 - [ ] Parser module declared in `src/parsers/mod.rs`
 - [ ] Parser exported with `pub use`
-- [ ] Parser added to `define_parsers!` macro
+- [ ] Parser added to `register_package_handlers!` macro
 - [ ] `register_parser!` macro added at end of parser file
 - [ ] Integration test passes: `cargo test test_all_parsers_are_registered_and_exported`
 - [ ] Pre-commit hooks pass

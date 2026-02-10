@@ -42,7 +42,7 @@ Extensible plugin architecture allowing third-party plugins for custom parsers, 
 ### Implemented
 
 - ✅ Trait-based parser system (PackageParser trait)
-- ✅ Static parser registration (define_parsers! macro)
+- ✅ Static parser registration (register_package_handlers! macro)
 
 ### Missing
 

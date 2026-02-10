@@ -269,7 +269,7 @@ Every new handler must satisfy:
 
 1. **Code quality**: Zero clippy warnings, `cargo fmt` clean, no `.unwrap()` in library code
 2. **Testing**: Unit tests covering happy path + edge cases + malformed input
-3. **Registration**: Added to `define_parsers!` macro in `src/parsers/mod.rs`
+3. **Registration**: Added to `register_package_handlers!` macro in `src/parsers/mod.rs`
 4. **Documentation**: `SUPPORTED_FORMATS.md` regenerated (`cargo run --bin generate-supported-formats`)
 5. **Parity validation**: Output compared against Python reference for same test files
 6. **Beyond-parity**: If fixing Python bugs or implementing Python TODOs, document in `docs/improvements/`
