@@ -148,6 +148,9 @@ mod rpm_mariner_manifest;
 #[cfg(test)]
 mod rpm_mariner_manifest_test;
 mod rpm_parser;
+mod rpm_specfile;
+#[cfg(test)]
+mod rpm_specfile_test;
 mod ruby;
 #[cfg(test)]
 mod ruby_golden_test;
@@ -299,6 +302,7 @@ pub use self::requirements_txt::RequirementsTxtParser;
 pub use self::rpm_db::{RpmBdbDatabaseParser, RpmNdbDatabaseParser, RpmSqliteDatabaseParser};
 pub use self::rpm_mariner_manifest::RpmMarinerManifestParser;
 pub use self::rpm_parser::RpmParser;
+pub use self::rpm_specfile::RpmSpecfileParser;
 pub use self::ruby::{
     GemArchiveParser, GemMetadataExtractedParser, GemfileLockParser, GemfileParser, GemspecParser,
 };
@@ -417,6 +421,7 @@ define_parsers! {
     RpmMarinerManifestParser,
     RpmNdbDatabaseParser,
     RpmParser,
+    RpmSpecfileParser,
     RpmSqliteDatabaseParser,
     SwiftManifestJsonParser,
     SwiftPackageResolvedParser,
