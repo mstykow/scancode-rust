@@ -16,8 +16,12 @@ Adding a parser involves:
 1. **Research** - Understand the package format
 2. **Implementation** - Create the parser module
 3. **Testing** - Add comprehensive tests
-4. **Documentation** - Document the implementation
-5. **Integration** - Register the parser
+4. **Registration** - Register the parser with the scanner
+5. **Golden Tests** - Add regression tests (optional)
+6. **Assembly Support** - Add manifest/lockfile merging (if applicable)
+7. **Validation** - Verify against reference implementation
+8. **Documentation** - Document the implementation
+9. **Quality Checks** - Run linting and formatting
 
 **Time estimate**: 2-8 hours depending on complexity
 
@@ -445,7 +449,123 @@ Add golden test module to `src/parsers/mod.rs`:
 mod my_ecosystem_golden_test;
 ```
 
-## Step 6: Validate Implementation
+## Step 6: Add Assembly Support (If Applicable)
+
+Assembly merges related manifest/lockfile pairs into logical packages. If your ecosystem has multiple related files (e.g., manifest + lockfile), you need assembly support.
+
+### Check if Assembly is Needed
+
+Does your ecosystem have:
+
+- ✅ A manifest file (package.json, Cargo.toml, go.mod, etc.)
+- ✅ A lockfile (package-lock.json, Cargo.lock, go.sum, etc.)
+- ✅ Multiple related metadata files that describe the same package?
+
+If **YES** to any, your parser needs assembly support.
+
+### Add Assembler Configuration
+
+Edit `src/assembly/assemblers.rs` and add your ecosystem to the `ASSEMBLERS` array:
+
+```rust
+// Add to the ASSEMBLERS array
+AssemblerConfig {
+    datasource_ids: &["my_ecosystem_manifest", "my_ecosystem_lock"],
+    sibling_file_patterns: &["manifest.ext", "lockfile.ext"],
+},
+```
+
+**Key points**:
+
+- `datasource_ids`: Must match the `datasource_id` values your parsers set in `PackageData`
+- `sibling_file_patterns`: Filenames to look for in the same directory (order matters - first is primary)
+- Patterns support exact match, case-insensitive match, and glob wildcards (`*.podspec`)
+
+### Add Assembly Golden Tests
+
+Create test fixtures in `testdata/assembly-golden/<ecosystem>-basic/`:
+
+1. **Create directory**:
+
+   ```bash
+   mkdir -p testdata/assembly-golden/<ecosystem>-basic
+   ```
+
+2. **Add test files**:
+   - Add a minimal manifest file
+   - Add a minimal lockfile (if applicable)
+   - Keep files small and focused (5-20 lines each)
+
+3. **Generate expected output**:
+   The test will auto-generate `expected.json` on first run:
+
+   ```bash
+   cargo test test_assembly_<ecosystem>_basic
+   ```
+
+4. **Review generated output**:
+   - Check `testdata/assembly-golden/<ecosystem>-basic/expected.json`
+   - Verify UUIDs are normalized to `fixed-uid-done-for-testing-5642512d1758`
+   - Verify packages and dependencies are correctly assembled
+   - Verify `datafile_paths` includes both files
+   - Verify `datasource_ids` includes both parser IDs
+
+5. **Add test function**:
+   Edit `src/assembly/assembly_golden_test.rs` and add:
+
+   ```rust
+   #[test]
+   fn test_assembly_<ecosystem>_basic() {
+       match run_assembly_golden_test("<ecosystem>-basic") {
+           Ok(_) => (),
+           Err(e) => panic!("Assembly golden test failed for <ecosystem>-basic: {}", e),
+       }
+   }
+   ```
+
+6. **Verify test passes**:
+
+   ```bash
+   cargo test test_assembly_<ecosystem>_basic
+   ```
+
+### Assembly Checklist
+
+- [ ] Assembler config added to `src/assembly/assemblers.rs`
+- [ ] `datasource_ids` match parser `datasource_id` values
+- [ ] `sibling_file_patterns` match actual filenames
+- [ ] Test fixtures created in `testdata/assembly-golden/<ecosystem>-basic/`
+- [ ] Golden test function added to `src/assembly/assembly_golden_test.rs`
+- [ ] Assembly test passes: `cargo test test_assembly_<ecosystem>_basic`
+- [ ] Expected JSON reviewed and committed
+
+### Common Assembly Patterns
+
+**Sibling-Merge** (most common):
+
+- Files in same directory (package.json + package-lock.json)
+- Pattern: `["manifest.ext", "lockfile.ext"]`
+- See `src/assembly/assemblers.rs` for current implementations
+
+**Multi-File Merge**:
+
+- Multiple related files (*.podspec + Podfile + Podfile.lock)
+- Pattern: `["*.podspec", "Podfile", "Podfile.lock"]`
+- Supports glob patterns for variable filenames
+
+**Metadata Pairs**:
+
+- Two metadata files (metadata.json + metadata.rb)
+- Pattern: `["metadata.json", "metadata.rb"]`
+- For ecosystems with multiple metadata formats
+
+### Related Documentation
+
+- [Assembly Golden Tests README](../testdata/assembly-golden/README.md) - Test structure and UUID normalization
+- [Assembly Implementation Plan](implementation-plans/package-detection/ASSEMBLY_IMPLEMENTATION_PLAN.md) - Assembly architecture
+- [Assembler Configurations](../src/assembly/assemblers.rs) - All registered assemblers
+
+## Step 7: Validate Implementation
 
 ### Path A: Validation with Python Reference
 
@@ -506,7 +626,7 @@ If you followed Path B (new ecosystem):
 - [ ] Edge cases from real projects handled
 - [ ] Golden tests pass (if added)
 
-## Step 7: Document Your Work
+## Step 8: Document Your Work
 
 ### Add Module Documentation
 
@@ -567,7 +687,7 @@ The pre-commit hook will automatically regenerate `docs/SUPPORTED_FORMATS.md` wh
 **but only if your parser file includes the `register_parser!` macro** (shown in Step 2).
 This macro registers metadata that the generator uses to build the formats table.
 
-## Step 7: Quality Checks
+## Step 9: Quality Checks
 
 ### Run All Tests
 
@@ -734,6 +854,13 @@ Before submitting your parser:
 - [ ] Integration test passes: `cargo test test_all_parsers_are_registered_and_exported`
 - [ ] Pre-commit hooks pass
 - [ ] SUPPORTED_FORMATS.md auto-updated
+
+### Assembly (If Applicable)
+
+- [ ] Assembler config added to `src/assembly/assemblers.rs`
+- [ ] Assembly golden test created in `testdata/assembly-golden/`
+- [ ] Assembly test function added to `src/assembly/assembly_golden_test.rs`
+- [ ] Assembly test passes: `cargo test test_assembly_<ecosystem>_basic`
 
 ### Validation
 

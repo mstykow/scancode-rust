@@ -24,8 +24,9 @@ implementation-plans/
   - Remaining: Phase 5 complex binary formats (optional, low priority)
 
 - **[ASSEMBLY_IMPLEMENTATION_PLAN.md](package-detection/ASSEMBLY_IMPLEMENTATION_PLAN.md)** - Package assembly roadmap
-  - Status: Design complete, not started
+  - Status: Phase 1 Complete (8 ecosystems) - Feb 10, 2026
   - Scope: Merging related files into logical packages (e.g., package.json + package-lock.json)
+  - Next: Phase 2 (Maven nested sibling-merge)
 
 - **[CONSOLIDATION_PLAN.md](package-detection/CONSOLIDATION_PLAN.md)** - Package deduplication
   - Status: Placeholder
