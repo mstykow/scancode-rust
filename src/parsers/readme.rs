@@ -69,27 +69,14 @@ impl PackageParser for ReadmeParser {
                 continue;
             }
 
-            // Determine separator (: or =) - use whichever comes first
-            let idx_colon = line.find(':');
-            let idx_equals = line.find('=');
+            let split_colon = line.split_once(':');
+            let split_equals = line.split_once('=');
 
-            let (key, value) = match (idx_colon, idx_equals) {
-                (Some(c), Some(e)) if c < e => {
-                    // Colon comes first
-                    (line[..c].trim(), line[c + 1..].trim())
-                }
-                (Some(c), None) => {
-                    // Only colon
-                    (line[..c].trim(), line[c + 1..].trim())
-                }
-                (_, Some(e)) => {
-                    // Equals comes first or only equals
-                    (line[..e].trim(), line[e + 1..].trim())
-                }
-                (None, None) => {
-                    // No separator, skip line
-                    continue;
-                }
+            let (key, value) = match (split_colon, split_equals) {
+                (Some((ck, cv)), Some((ek, _))) if ck.len() <= ek.len() => (ck.trim(), cv.trim()),
+                (_, Some((ek, ev))) => (ek.trim(), ev.trim()),
+                (Some((ck, cv)), None) => (ck.trim(), cv.trim()),
+                (None, None) => continue,
             };
 
             if key.is_empty() || value.is_empty() {

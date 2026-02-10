@@ -1761,50 +1761,25 @@ pub(crate) fn split_osgi_list(list: &str) -> Vec<String> {
     result
 }
 
-/// Extract version directive from OSGi package entry.
-///
-/// Format: ";version=\"[1.0,2.0)\"" or ";version=1.0"
-pub(crate) fn extract_osgi_version(entry: &str) -> Option<String> {
-    // Look for version= directive
-    if let Some(version_pos) = entry.find("version=") {
-        let after_version = &entry[version_pos + "version=".len()..];
+fn extract_osgi_directive(entry: &str, directive: &str) -> Option<String> {
+    let needle = format!("{}=", directive);
+    let version_pos = entry.find(&needle)?;
+    let after_value = &entry[version_pos + needle.len()..];
 
-        // Check if quoted
-        if let Some(stripped) = after_version.strip_prefix('"') {
-            // Find closing quote
-            if let Some(quote_end) = stripped.find('"') {
-                return Some(stripped[..quote_end].to_string());
-            }
-        } else {
-            // Unquoted - take until semicolon or end
-            let version_end = after_version.find(';').unwrap_or(after_version.len());
-            return Some(after_version[..version_end].trim().to_string());
-        }
+    if let Some(stripped) = after_value.strip_prefix('"') {
+        stripped.find('"').map(|end| stripped[..end].to_string())
+    } else {
+        let end = after_value.find(';').unwrap_or(after_value.len());
+        Some(after_value[..end].trim().to_string())
     }
-
-    None
 }
 
-/// Extract bundle-version directive from OSGi Require-Bundle entry.
+pub(crate) fn extract_osgi_version(entry: &str) -> Option<String> {
+    extract_osgi_directive(entry, "version")
+}
+
 pub(crate) fn extract_osgi_bundle_version(entry: &str) -> Option<String> {
-    // Look for bundle-version= directive
-    if let Some(version_pos) = entry.find("bundle-version=") {
-        let after_version = &entry[version_pos + "bundle-version=".len()..];
-
-        // Check if quoted
-        if let Some(stripped) = after_version.strip_prefix('"') {
-            // Find closing quote
-            if let Some(quote_end) = stripped.find('"') {
-                return Some(stripped[..quote_end].to_string());
-            }
-        } else {
-            // Unquoted - take until semicolon or end
-            let version_end = after_version.find(';').unwrap_or(after_version.len());
-            return Some(after_version[..version_end].trim().to_string());
-        }
-    }
-
-    None
+    extract_osgi_directive(entry, "bundle-version")
 }
 
 fn default_package_data() -> PackageData {

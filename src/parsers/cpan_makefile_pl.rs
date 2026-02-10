@@ -15,15 +15,33 @@
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
+use std::sync::LazyLock;
 
 use log::warn;
 use packageurl::PackageUrl;
+use regex::Regex;
 use serde_json::json;
 
 use crate::models::{Dependency, PackageData, Party};
 use crate::parsers::utils::create_default_package_data;
 
 use super::PackageParser;
+
+static RE_WRITEMAKEFILE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"WriteMakefile1?\s*\(").unwrap());
+static RE_SIMPLE_KV: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r#"(?m)^\s*([A-Z_]+)\s*=>\s*(?:'([^']*)'|"([^"]*)"|q\{([^}]*)\}|q\(([^)]*)\))"#)
+        .unwrap()
+});
+static RE_HASH_BLOCK: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"([A-Z_]+)\s*=>\s*\{([^}]*)\}").unwrap());
+static RE_AUTHOR_ARRAY: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"AUTHOR\s*=>\s*\[([^\]]*)\]").unwrap());
+static RE_QUOTED_STRING: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r#"['"]([^'"]*)['"']"#).unwrap());
+static RE_DEP_PAIR: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r#"['"]([^'"]+)['"]\s*=>\s*(?:'([^']*)'|"([^"]*)"|(\d+))"#).unwrap()
+});
 
 const PACKAGE_TYPE: &str = "cpan";
 const DATASOURCE_ID: &str = "cpan_makefile_pl";
@@ -62,14 +80,8 @@ pub(crate) fn parse_makefile_pl(content: &str) -> PackageData {
     let fields = parse_hash_fields(&makefile_block);
 
     let name = fields.get("NAME").map(|n| n.to_string());
-    let version = fields
-        .get("VERSION")
-        .or_else(|| fields.get("VERSION_FROM"))
-        .map(|v| v.to_string());
-    let description = fields
-        .get("ABSTRACT")
-        .or_else(|| fields.get("ABSTRACT_FROM"))
-        .map(|d| d.to_string());
+    let version = fields.get("VERSION").map(|v| v.to_string());
+    let description = fields.get("ABSTRACT").map(|d| d.to_string());
     let extracted_license_statement = fields.get("LICENSE").map(|l| l.to_string());
 
     let parties = parse_author(&fields);
@@ -78,6 +90,12 @@ pub(crate) fn parse_makefile_pl(content: &str) -> PackageData {
     let mut extra_data = HashMap::new();
     if let Some(min_perl) = fields.get("MIN_PERL_VERSION") {
         extra_data.insert("MIN_PERL_VERSION".to_string(), json!(min_perl));
+    }
+    if let Some(version_from) = fields.get("VERSION_FROM") {
+        extra_data.insert("VERSION_FROM".to_string(), json!(version_from));
+    }
+    if let Some(abstract_from) = fields.get("ABSTRACT_FROM") {
+        extra_data.insert("ABSTRACT_FROM".to_string(), json!(abstract_from));
     }
 
     // Build PURL: convert Foo::Bar to Foo-Bar for CPAN naming convention
@@ -119,9 +137,7 @@ fn create_default_package_data_with_datasource() -> PackageData {
 }
 
 fn extract_writemakefile_block(content: &str) -> String {
-    // Find WriteMakefile( or WriteMakefile1(
-    let start_pattern = regex::Regex::new(r"WriteMakefile1?\s*\(").unwrap();
-    let start_match = match start_pattern.find(content) {
+    let start_match = match RE_WRITEMAKEFILE.find(content) {
         Some(m) => m,
         None => return String::new(),
     };
@@ -158,14 +174,12 @@ fn extract_writemakefile_block(content: &str) -> String {
 fn parse_hash_fields(content: &str) -> HashMap<String, String> {
     let mut fields = HashMap::new();
 
-    // Match simple key-value pairs: KEY => 'value' or KEY => "value" or KEY => q{value} or KEY => q(value)
-    let simple_pattern = regex::Regex::new(
-        r#"(?m)^\s*([A-Z_]+)\s*=>\s*(?:'([^']*)'|"([^"]*)"|q\{([^}]*)\}|q\(([^)]*)\))"#,
-    )
-    .unwrap();
-
-    for cap in simple_pattern.captures_iter(content) {
-        let key = cap.get(1).unwrap().as_str().to_string();
+    for cap in RE_SIMPLE_KV.captures_iter(content) {
+        let key = cap
+            .get(1)
+            .expect("group 1 always exists")
+            .as_str()
+            .to_string();
         let value = cap
             .get(2)
             .or_else(|| cap.get(3))
@@ -188,12 +202,9 @@ fn parse_hash_fields(content: &str) -> HashMap<String, String> {
 }
 
 fn parse_hash_dependencies(content: &str, fields: &mut HashMap<String, String>) {
-    // Match hash blocks: KEY => { ... }
-    let hash_pattern = regex::Regex::new(r"([A-Z_]+)\s*=>\s*\{([^}]*)\}").unwrap();
-
-    for cap in hash_pattern.captures_iter(content) {
-        let key = cap.get(1).unwrap().as_str();
-        let hash_content = cap.get(2).unwrap().as_str();
+    for cap in RE_HASH_BLOCK.captures_iter(content) {
+        let key = cap.get(1).expect("group 1 always exists").as_str();
+        let hash_content = cap.get(2).expect("group 2 always exists").as_str();
 
         // For dependency hashes, we'll store them with a special marker
         // so parse_dependencies can find them
@@ -207,15 +218,10 @@ fn parse_hash_dependencies(content: &str, fields: &mut HashMap<String, String>) 
 }
 
 fn parse_author_array(content: &str, fields: &mut HashMap<String, String>) {
-    // Match AUTHOR => [...] array refs
-    let array_pattern = regex::Regex::new(r"AUTHOR\s*=>\s*\[([^\]]*)\]").unwrap();
+    if let Some(cap) = RE_AUTHOR_ARRAY.captures(content) {
+        let array_content = cap.get(1).expect("group 1 always exists").as_str();
 
-    if let Some(cap) = array_pattern.captures(content) {
-        let array_content = cap.get(1).unwrap().as_str();
-
-        // Extract quoted strings from array
-        let item_pattern = regex::Regex::new(r#"['"]([^'"]*)['"']"#).unwrap();
-        let authors: Vec<String> = item_pattern
+        let authors: Vec<String> = RE_QUOTED_STRING
             .captures_iter(array_content)
             .filter_map(|c| c.get(1).map(|m| m.as_str().to_string()))
             .collect();
@@ -323,12 +329,8 @@ fn parse_dependencies(fields: &HashMap<String, String>) -> Vec<Dependency> {
 fn extract_deps_from_hash(hash_content: &str, scope: &str, is_runtime: bool) -> Vec<Dependency> {
     let mut deps = Vec::new();
 
-    // Match module => version pairs: 'Module::Name' => '1.0' or 'Module::Name' => 0
-    let dep_pattern =
-        regex::Regex::new(r#"['"]([^'"]+)['"]\s*=>\s*(?:'([^']*)'|"([^"]*)"|(\d+))"#).unwrap();
-
-    for cap in dep_pattern.captures_iter(hash_content) {
-        let module_name = cap.get(1).unwrap().as_str();
+    for cap in RE_DEP_PAIR.captures_iter(hash_content) {
+        let module_name = cap.get(1).expect("group 1 always exists").as_str();
 
         // Skip perl itself
         if module_name == "perl" {

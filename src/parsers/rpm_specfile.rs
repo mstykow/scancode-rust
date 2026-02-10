@@ -27,14 +27,19 @@
 
 use std::collections::HashMap;
 use std::path::Path;
+use std::sync::LazyLock;
 
 use log::warn;
 use packageurl::PackageUrl;
+use regex::Regex;
 
 use crate::models::{Dependency, PackageData, Party};
 use crate::parsers::utils::{create_default_package_data, read_file_to_string, split_name_email};
 
 use super::PackageParser;
+
+static RE_CONDITIONAL_MACRO: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"%\{\?[^}]+\}").unwrap());
 
 const PACKAGE_TYPE: &str = "rpm";
 
@@ -251,16 +256,13 @@ fn parse_specfile(content: &str) -> PackageData {
     // Create dependencies
     let mut dependencies = Vec::new();
 
-    // BuildRequires dependencies
     for dep_str in build_requires {
-        let extracted_requirement = dep_str.clone();
         let dep_name = extract_dep_name(&dep_str);
-
         let purl = build_rpm_purl(&dep_name, None);
 
         dependencies.push(Dependency {
             purl,
-            extracted_requirement: Some(extracted_requirement),
+            extracted_requirement: Some(dep_str),
             scope: Some("build".to_string()),
             is_runtime: Some(false),
             is_optional: Some(false),
@@ -271,16 +273,13 @@ fn parse_specfile(content: &str) -> PackageData {
         });
     }
 
-    // Requires dependencies
     for (dep_str, scope) in requires {
-        let extracted_requirement = dep_str.clone();
         let dep_name = extract_dep_name(&dep_str);
-
         let purl = build_rpm_purl(&dep_name, None);
 
         dependencies.push(Dependency {
             purl,
-            extracted_requirement: Some(extracted_requirement),
+            extracted_requirement: Some(dep_str),
             scope,
             is_runtime: Some(true),
             is_optional: Some(false),
@@ -349,9 +348,7 @@ fn parse_specfile(content: &str) -> PackageData {
 fn expand_macros(s: &str, macros: &HashMap<String, String>) -> String {
     let mut result = s.to_string();
 
-    // Handle conditional macros %{?macro}
-    let re_conditional = regex::Regex::new(r"%\{\?[^}]+\}").unwrap();
-    result = re_conditional.replace_all(&result, "").to_string();
+    result = RE_CONDITIONAL_MACRO.replace_all(&result, "").to_string();
 
     // Expand simple macros %{macro}
     for (key, value) in macros {
