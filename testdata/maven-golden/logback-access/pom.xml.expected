@@ -1,0 +1,63 @@
+[
+  {
+    "type": "maven",
+    "namespace": "ch.qos.logback",
+    "name": "logback-access",
+    "version": "${parent.version}",
+    "primary_language": "Java",
+    "parties": [],
+    "homepage_url": "http://logback.qos.ch/access",
+    "code_view_url": "http://svn.qos.ch/viewcvs/logback/access/trunk/",
+    "vcs_url": "https://svn.qos.ch/repos/logback/access/trunk/",
+    "extracted_license_statement": "GNU Lesser General Public License",
+    "extra_data": {
+      "parent": {
+        "artifactId": "logback",
+        "groupId": "ch.qos.logback",
+        "version": "0.2.5"
+      }
+    },
+    "dependencies": [
+      {
+        "purl": "pkg:maven/ch.qos.logback/logback-core",
+        "scope": "compile",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:maven/tomcat/catalina",
+        "scope": "compile",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:maven/org.mortbay.jetty/jetty",
+        "scope": "compile",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:maven/com.caucho/resin",
+        "scope": "compile",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:maven/org.mortbay.jetty/servlet-api-2.5",
+        "scope": "compile",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_direct": true
+      }
+    ],
+    "repository_homepage_url": "https://repo1.maven.org/maven2/ch/qos/logback/logback-access/${parent.version}/",
+    "repository_download_url": "https://repo1.maven.org/maven2/ch/qos/logback/logback-access/${parent.version}/logback-access-${parent.version}.jar",
+    "api_data_url": "https://repo1.maven.org/maven2/ch/qos/logback/logback-access/${parent.version}/logback-access-${parent.version}.pom",
+    "datasource_id": "maven_pom",
+    "purl": "pkg:maven/ch.qos.logback/logback-access@${parent.version}"
+  }
+]

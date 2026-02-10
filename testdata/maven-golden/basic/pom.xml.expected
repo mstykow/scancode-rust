@@ -1,0 +1,27 @@
+[
+  {
+    "type": "maven",
+    "namespace": "ur.urwerk.test.modules",
+    "name": "main",
+    "version": "1.0.0-SNAPSHOT",
+    "primary_language": "Java",
+    "parties": [],
+    "extra_data": {
+      "parent": {
+        "artifactId": "project",
+        "groupId": "ur.urwerk",
+        "version": "1.0.0-SNAPSHOT"
+      },
+      "modules": [
+        "module-x",
+        "module-y",
+        "module-z"
+      ]
+    },
+    "repository_homepage_url": "https://repo1.maven.org/maven2/ur/urwerk/test/modules/main/1.0.0-SNAPSHOT/",
+    "repository_download_url": "https://repo1.maven.org/maven2/ur/urwerk/test/modules/main/1.0.0-SNAPSHOT/main-1.0.0-SNAPSHOT.jar",
+    "api_data_url": "https://repo1.maven.org/maven2/ur/urwerk/test/modules/main/1.0.0-SNAPSHOT/main-1.0.0-SNAPSHOT.pom",
+    "datasource_id": "maven_pom",
+    "purl": "pkg:maven/ur.urwerk.test.modules/main@1.0.0-SNAPSHOT"
+  }
+]
