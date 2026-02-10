@@ -44,6 +44,10 @@ Python has unsafe patterns (code execution, DoS vulnerabilities), we use safe al
 | [Composer](composer-parser.md) | 🔍 Enhanced | Basic extraction | Richer metadata (7 extra_data fields) | Improved package provenance tracking |
 | [Ruby](ruby-parser.md) | 🔍 Enhanced | String-based party data | Semantic Party model | Structured author/maintainer data |
 | [Dart](dart-parser.md) | 🔍 Enhanced | Scope always `null` + YAML lossy | Proper scope + YAML preservation | Correct dependency classification |
+| [OS Release](os-release-parser.md) | 🐛 Bug Fix + 🔍 Enhanced | Debian name logic bug + no URL extraction | Fixed name logic + HOME/SUPPORT/BUG URLs | Correct distro identification + richer metadata |
+| [Conan Data](conan-data-parser.md) | 🔍 Enhanced | Only extracts primary source URL | Patches metadata + mirror/fallback URLs | Complete source provenance tracking |
+| [CPAN dist.ini](cpan-dist-ini-parser.md) | ✨ New Feature | Stub-only handler (returns empty) | Full INI parsing with dependency scopes | Perl Dist::Zilla metadata extraction |
+| [Swift Dependencies](swift-show-dependencies-parser.md) | 🔍 Enhanced | Only extracts root package name | Full dependency graph with versions + direct/transitive | Complete Swift dependency visibility |
 | All Parsers | 🛡️ Security | No DoS limits | File size + iteration limits | Protection against resource exhaustion |
 
 ## Per-Parser Documentation
@@ -61,6 +65,10 @@ Each parser with improvements has a dedicated document:
 - **[composer-parser.md](composer-parser.md)** — 🔍 Enhanced Extraction: 7 additional extra_data fields for package provenance
 - **[ruby-parser.md](ruby-parser.md)** — 🔍 Enhanced Extraction: Semantic Party model combining name and email
 - **[dart-parser.md](dart-parser.md)** — 🔍 Enhanced Extraction: Proper scope handling + YAML trailing newline preservation
+- **[os-release-parser.md](os-release-parser.md)** — 🐛 Bug Fix + 🔍 Enhanced: Debian name logic fix + URL extraction (HOME, SUPPORT, BUG)
+- **[conan-data-parser.md](conan-data-parser.md)** — 🔍 Enhanced Extraction: Patches metadata + mirror/fallback URL extraction
+- **[cpan-dist-ini-parser.md](cpan-dist-ini-parser.md)** — ✨ New Feature: Full dist.ini parsing (Python has stub only)
+- **[swift-show-dependencies-parser.md](swift-show-dependencies-parser.md)** — 🔍 Enhanced Extraction: Full dependency graph with versions and direct/transitive marking
 
 ## Verification
 
