@@ -534,6 +534,81 @@ fn test_iso_image_recognizer() {
 }
 
 // ============================================================================
+// Magic byte recognizers
+// ============================================================================
+
+#[test]
+fn test_android_apk_recognizer() {
+    let android_apk = PathBuf::from("testdata/misc/test_android.apk");
+    let alpine_apk = PathBuf::from("testdata/misc/test_alpine.apk");
+
+    assert!(AndroidApkRecognizer::is_match(&android_apk));
+    assert!(!AndroidApkRecognizer::is_match(&alpine_apk));
+    assert!(!AndroidApkRecognizer::is_match(&PathBuf::from("app.jar")));
+
+    let packages = AndroidApkRecognizer::extract_packages(&android_apk);
+    assert_eq!(packages.len(), 1);
+    assert_eq!(packages[0].package_type, Some("android".to_string()));
+    assert_eq!(packages[0].datasource_id, Some("android_apk".to_string()));
+}
+
+#[test]
+fn test_squashfs_recognizer() {
+    let squashfs = PathBuf::from("testdata/misc/test.squashfs");
+
+    assert!(SquashfsRecognizer::is_match(&squashfs));
+    assert!(!SquashfsRecognizer::is_match(&PathBuf::from(
+        "not_squashfs.bin"
+    )));
+
+    let packages = SquashfsRecognizer::extract_packages(&squashfs);
+    assert_eq!(packages.len(), 1);
+    assert_eq!(packages[0].package_type, Some("squashfs".to_string()));
+    assert_eq!(
+        packages[0].datasource_id,
+        Some("squashfs_disk_image".to_string())
+    );
+}
+
+#[test]
+fn test_nsis_recognizer() {
+    let nsis = PathBuf::from("testdata/misc/test_nsis.exe");
+    let zip_exe = PathBuf::from("testdata/misc/test_zip.exe");
+
+    assert!(NsisRecognizer::is_match(&nsis));
+    assert!(!NsisRecognizer::is_match(&zip_exe));
+    assert!(!NsisRecognizer::is_match(&PathBuf::from("app.exe")));
+
+    let packages = NsisRecognizer::extract_packages(&nsis);
+    assert_eq!(packages.len(), 1);
+    assert_eq!(packages[0].package_type, Some("nsis".to_string()));
+    assert_eq!(
+        packages[0].datasource_id,
+        Some("nsis_installer".to_string())
+    );
+}
+
+#[test]
+fn test_installshield_recognizer() {
+    let zip_exe = PathBuf::from("testdata/misc/test_zip.exe");
+    let nsis = PathBuf::from("testdata/misc/test_nsis.exe");
+
+    assert!(InstallShieldRecognizer::is_match(&zip_exe));
+    assert!(!InstallShieldRecognizer::is_match(&nsis));
+    assert!(!InstallShieldRecognizer::is_match(&PathBuf::from(
+        "app.msi"
+    )));
+
+    let packages = InstallShieldRecognizer::extract_packages(&zip_exe);
+    assert_eq!(packages.len(), 1);
+    assert_eq!(packages[0].package_type, Some("installshield".to_string()));
+    assert_eq!(
+        packages[0].datasource_id,
+        Some("installshield_installer".to_string())
+    );
+}
+
+// ============================================================================
 // Verify all recognizers return minimal PackageData
 // ============================================================================
 

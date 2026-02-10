@@ -10,23 +10,13 @@
 //! - Recognizers return minimal PackageData with only package_type and datasource_id set
 //! - These correspond to Python's misc.py NonAssemblableDatafileHandler classes
 //! - No actual parsing is performed (Python also has `# TODO: parse me!!!`)
-//!
-//! # Skipped Recognizers (Require Magic Byte Detection)
-//!
-//! The following recognizers from Python's misc.py are intentionally SKIPPED because
-//! they require checking file magic bytes, not just extensions:
-//!
-//! - **InstallShieldRecognizer**: Needs `filetypes=('zip installshield',)` check
-//! - **NsisInstallerRecognizer**: Needs `filetypes=('nullsoft installer',)` check
-//! - **SquashfsRecognizer**: Needs `filetypes=('squashfs filesystem',)` check
-//! - **AndroidApkRecognizer**: Would conflict with AlpineApkParser (both match *.apk)
-//!
-//! These would create false positives if implemented with extension-only matching.
+//! - Some recognizers use magic byte detection for disambiguation (Squashfs, NSIS, InstallShield)
 
 use std::path::Path;
 
 use super::PackageParser;
 use crate::models::PackageData;
+use crate::utils::magic;
 
 /// Helper macro to define file-type recognizers with minimal boilerplate.
 ///
@@ -158,6 +148,18 @@ file_recognizer!(
 // Mobile Apps
 
 file_recognizer!(
+    AndroidApkRecognizer,
+    "android",
+    "android_apk",
+    |path: &Path| {
+        path.extension()
+            .and_then(|e| e.to_str())
+            .is_some_and(|ext| ext == "apk")
+            && magic::is_zip(path)
+    }
+);
+
+file_recognizer!(
     AndroidLibraryRecognizer,
     "android_lib",
     "android_aar_library",
@@ -218,8 +220,36 @@ file_recognizer!(
     }
 );
 
+// Installers and Binary Formats (require magic byte detection)
+
+file_recognizer!(
+    SquashfsRecognizer,
+    "squashfs",
+    "squashfs_disk_image",
+    |path: &Path| magic::is_squashfs(path)
+);
+
+file_recognizer!(NsisRecognizer, "nsis", "nsis_installer", |path: &Path| {
+    path.extension()
+        .and_then(|e| e.to_str())
+        .is_some_and(|ext| ext == "exe")
+        && magic::is_nsis_installer(path)
+});
+
+file_recognizer!(
+    InstallShieldRecognizer,
+    "installshield",
+    "installshield_installer",
+    |path: &Path| {
+        path.extension()
+            .and_then(|e| e.to_str())
+            .is_some_and(|ext| ext == "exe")
+            && magic::is_zip(path)
+    }
+);
+
 crate::register_parser!(
-    "Misc file type recognizers (JAR, WAR, EAR, Android, iOS, Chrome, Mozilla, etc.)",
+    "Misc file type recognizers (JAR, WAR, EAR, Android, iOS, Chrome, Mozilla, installers, disk images, etc.)",
     &[
         "**/*.jar",
         "**/ivy.xml",
@@ -232,6 +262,7 @@ crate::register_parser!(
         "**/*.sar",
         "**/meta-inf/jboss-service.xml",
         "**/package.js",
+        "**/*.apk",
         "**/*.aar",
         "**/*.xpi",
         "**/*.crx",
@@ -243,6 +274,7 @@ crate::register_parser!(
         "**/*.iso",
         "**/*.udf",
         "**/*.img",
+        "**/*.exe",
     ],
     "",
     "",
