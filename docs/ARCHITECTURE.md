@@ -45,6 +45,106 @@ Parsers NEVER:
 
 See [ADR 0002: Extraction vs Detection Separation](adr/0002-extraction-vs-detection.md) for details.
 
+## System Architecture Overview
+
+### Complete Processing Pipeline
+
+scancode-rust implements a multi-phase processing pipeline based on Python ScanCode's architecture:
+
+```text
+┌─────────────────────────────────────────────────────────────────┐
+│                    ScanCode Processing Pipeline                  │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  Phase 1: Pre-Scan (Planned)                                    │
+│  ┌────────────────────────────────────────────────────────┐    │
+│  │ • Archive extraction                                    │    │
+│  │ • File type detection                                   │    │
+│  │ • Pre-processing hooks                                  │    │
+│  └────────────────────────────────────────────────────────┘    │
+│                           │                                      │
+│                           ▼                                      │
+│  Phase 2: Scanning (Partially Implemented)                      │
+│  ┌────────────────────────────────────────────────────────┐    │
+│  │ ✅ Package manifest parsing (see SUPPORTED_FORMATS.md) │    │
+│  │ ❌ License text detection                               │    │
+│  │ ❌ Copyright detection                                  │    │
+│  │ ❌ Email/URL extraction                                 │    │
+│  └────────────────────────────────────────────────────────┘    │
+│                           │                                      │
+│                           ▼                                      │
+│  Phase 3: Post-Processing (Planned)                             │
+│  ┌────────────────────────────────────────────────────────┐    │
+│  │ • Package assembly (design complete)                    │    │
+│  │ • Package consolidation/deduplication                   │    │
+│  │ • License/copyright summarization                       │    │
+│  │ • Tallies and facets                                    │    │
+│  │ • Classification                                        │    │
+│  └────────────────────────────────────────────────────────┘    │
+│                           │                                      │
+│                           ▼                                      │
+│  Phase 4: Filtering (Planned)                                   │
+│  ┌────────────────────────────────────────────────────────┐    │
+│  │ • License policy filtering                              │    │
+│  │ • Custom filter plugins                                 │    │
+│  └────────────────────────────────────────────────────────┘    │
+│                           │                                      │
+│                           ▼                                      │
+│  Phase 5: Output (Partially Implemented)                        │
+│  ┌────────────────────────────────────────────────────────┐    │
+│  │ ✅ JSON output (ScanCode-compatible)                    │    │
+│  │ ❌ SPDX (RDF, JSON, YAML, tag-value)                    │    │
+│  │ ❌ CycloneDX (JSON, XML)                                │    │
+│  │ ❌ CSV, YAML, HTML                                      │    │
+│  │ ❌ Custom templates                                     │    │
+│  └────────────────────────────────────────────────────────┘    │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Component Inventory
+
+**Implemented Components** (✅):
+
+- **Package Parsers**: See [SUPPORTED_FORMATS.md](SUPPORTED_FORMATS.md) for complete list
+- **Scanner Pipeline**: File discovery, parallel processing, progress tracking
+- **Security Layer**: DoS protection, no code execution, archive safety
+- **JSON Output**: ScanCode Toolkit-compatible format
+- **Testing Infrastructure**: Unit tests, golden tests, integration tests
+
+**Planned Components** (❌):
+
+- **Text Detection**: License detection, copyright detection, email/URL extraction
+- **Package Assembly**: Merge related manifests into logical packages
+- **Post-Processing**: Summarization, tallies, classification
+- **Output Formats**: SPDX, CycloneDX, CSV, YAML, HTML
+- **Infrastructure**: Plugin system, caching, enhanced progress tracking
+
+### Implementation Status
+
+For current implementation status, priorities, and effort estimates, see:
+
+- **[implementation-plans/README.md](implementation-plans/README.md)** - Overview of all implementation plans
+- **[implementation-plans/package-detection/](implementation-plans/package-detection/)** - Package parsing and assembly
+- **[implementation-plans/text-detection/](implementation-plans/text-detection/)** - License, copyright, email/URL detection
+- **[implementation-plans/post-processing/](implementation-plans/post-processing/)** - Summarization and tallies
+- **[implementation-plans/output/](implementation-plans/output/)** - Output format support
+- **[implementation-plans/infrastructure/](implementation-plans/infrastructure/)** - Plugin system, caching, progress tracking
+
+Each plan includes detailed status, priorities (P0-P3), effort estimates, and implementation phases.
+
+### Plugin Architecture (Planned)
+
+Python ScanCode uses a plugin-based architecture with 5 plugin types:
+
+1. **PreScan Plugins**: Archive extraction, file type detection
+2. **Scan Plugins**: Package detection, license detection, copyright detection
+3. **PostScan Plugins**: Package assembly, summarization, classification
+4. **OutputFilter Plugins**: License policy filtering, custom filters
+5. **Output Plugins**: Format-specific output (SPDX, CycloneDX, etc.)
+
+The Rust implementation will adopt a similar architecture using Rust traits and dynamic dispatch, with compile-time plugin registration for zero runtime overhead.
+
 ## Architecture Components
 
 ### Trait-Based Parser System
@@ -384,43 +484,151 @@ strip = true              # Strip symbols for smaller binary
 opt-level = 3             # Maximum optimization
 ```
 
-## Future Work
+## Future Architecture
 
-### Remaining Parsers
+### Planned Features
 
-See [NEXT_PHASE_PLAN.md](NEXT_PHASE_PLAN.md) for the current roadmap of remaining ecosystems and parsers.
+The following sections describe major architectural components planned for implementation. See [implementation-plans/](implementation-plans/) for detailed plans.
 
-### Detection Engines
+#### Text Detection Engines
 
-Post parser implementation:
+**License Detection**:
 
-- **License detection** - SPDX normalization, confidence scoring
-- **Copyright detection** - Copyright holder extraction from file content
-- **Author extraction** - Email and author pattern detection
+- License text matching using fingerprinting algorithms
+- SPDX license expression generation
+- Confidence scoring and multi-license handling
+- Integration with existing SPDX license data
+
+**Copyright Detection**:
+
+- Copyright statement extraction from file content
+- Copyright holder identification
+- Year range parsing
+- Statement normalization
+
+**Email/URL Detection**:
+
+- Email address extraction
+- URL detection and validation
+- Author contact information
+
+#### Package Assembly System
+
+**Assembly**:
+
+- Merge related manifests into logical packages
+- Example: `package.json` + `package-lock.json` → single npm package
+- Multiple assemblers for different ecosystems (npm, Maven, Python, etc.)
+
+**Consolidation**:
+
+- Package deduplication across scan results
+- Dependency graph resolution
+- Transitive dependency handling
+
+#### Post-Processing Pipeline
+
+**Summarization**:
+
+- License tallies and facets
+- Copyright holder aggregation
+- File classification (source, docs, data, etc.)
+- Summary statistics
+
+#### Output Format Support
+
+**SBOM Formats**:
+
+- SPDX: RDF, JSON, YAML, tag-value
+- CycloneDX: JSON, XML
+- Compatibility with SBOM tooling ecosystem
+
+**Additional Formats**:
+
+- CSV (tabular data export)
+- YAML (human-readable)
+- HTML (interactive reports)
+- Custom templates (user-defined formats)
+
+#### Infrastructure Enhancements
+
+**Plugin System**:
+
+- Extensible plugin architecture
+- Custom scan plugins
+- Custom output formats
+- Third-party integrations
+
+**Caching**:
+
+- Scan result caching
+- Incremental scanning
+- Cache invalidation strategies
+
+**Progress Tracking**:
+
+- Enhanced progress reporting
+- Per-phase progress indicators
+- Estimated time remaining
 
 ### Quality Enhancements
+
+Ongoing quality improvements:
 
 - Property-based testing with proptest
 - Fuzzing with cargo-fuzz
 - Performance benchmarks with criterion
-- Memory profiling
+- Memory profiling and optimization
+- Continuous golden test expansion
+
+## License Data Architecture
+
+### How License Detection Works
+
+This tool uses the [SPDX License List Data](https://github.com/spdx/license-list-data) for license detection. The license data is:
+
+1. **Stored in a Git submodule** at `resources/licenses/` (sparse checkout of `json/details/` only)
+2. **Embedded at compile time** using Rust's `include_dir!` macro (see `src/main.rs`)
+3. **Built into the binary** - no runtime dependencies on external files
+
+This means:
+
+- **For users**: The binary is self-contained and portable
+- **For developers**: The submodule must be initialized before building
+- **Package size**: Only the needed JSON files are included in the published crate
+
+### Updating the License Data
+
+**For Releases:** The `release.sh` script automatically updates the license data to the latest version before publishing. No manual action needed.
+
+**For Development:**
+
+To initialize or update to the latest SPDX license definitions:
+
+```sh
+./setup.sh                  # Initialize/update license data to latest
+cargo build --release       # Rebuild with updated data
+```
+
+The script will show if the license data was updated. If so, commit the change:
+
+```sh
+git add resources/licenses
+git commit -m "chore: update SPDX license data"
+```
+
+The `setup.sh` script:
+
+- Initializes the submodule with shallow clone (`--depth=1`)
+- Configures sparse checkout to only include `json/details/` (saves ~90% disk space)
+- Updates to the latest upstream version
+- The build process then embeds these files directly into the compiled binary
 
 ## Related Documentation
 
-- [README.md](../README.md) - User-facing overview and quick start
+- [README.md](../README.md) - User-facing overview, installation, and usage
+- [AGENTS.md](../AGENTS.md) - Contributor guidelines and code style
 - [ADRs](adr/) - Architectural decision records
 - [Improvements](improvements/) - Beyond-parity features
 - [SUPPORTED_FORMATS.md](SUPPORTED_FORMATS.md) - Complete format list (auto-generated)
-
-## Contributing
-
-See [AGENTS.md](../AGENTS.md) for guidelines on:
-
-- Adding new parsers
-- Parser implementation philosophy
-- Testing requirements
-- Code style and patterns
-
-## License
-
-Apache License 2.0
+- [Implementation Plans](implementation-plans/) - Feature implementation status and roadmap
