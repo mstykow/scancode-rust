@@ -135,6 +135,9 @@ mod poetry_lock_test;
 mod python;
 #[cfg(test)]
 mod python_test;
+mod readme;
+#[cfg(test)]
+mod readme_test;
 mod requirements_txt;
 #[cfg(test)]
 mod requirements_txt_test;
@@ -291,6 +294,7 @@ pub use self::podspec::PodspecParser;
 pub use self::podspec_json::PodspecJsonParser;
 pub use self::poetry_lock::PoetryLockParser;
 pub use self::python::PythonParser;
+pub use self::readme::ReadmeParser;
 pub use self::requirements_txt::RequirementsTxtParser;
 pub use self::rpm_db::{RpmBdbDatabaseParser, RpmNdbDatabaseParser, RpmSqliteDatabaseParser};
 pub use self::rpm_mariner_manifest::RpmMarinerManifestParser;
@@ -407,6 +411,7 @@ define_parsers! {
     PubspecLockParser,
     PubspecYamlParser,
     PythonParser,
+    ReadmeParser,
     RequirementsTxtParser,
     RpmBdbDatabaseParser,
     RpmMarinerManifestParser,
