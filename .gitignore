@@ -29,6 +29,7 @@ dist/
 
 # Build artifacts
 *.exe
+!testdata/**/*.exe
 
 # Development artifacts
 output.json
