@@ -199,5 +199,5 @@ The parser uses breadth-first traversal to flatten the nested dependency tree:
 
 - Python implementation: `reference/scancode-toolkit/src/packagedcode/swift.py`
 - Rust implementation: `src/parsers/swift_show_dependencies.rs`
-- Swift Package Manager: https://docs.swift.org/swiftpm/documentation/packagemanagerdocs/packageshowdependencies/
-- Discussion: https://forums.swift.org/t/swiftpm-show-dependencies-without-fetching-dependencies/51154
+- Swift Package Manager: <https://docs.swift.org/swiftpm/documentation/packagemanagerdocs/packageshowdependencies/>
+- Discussion: <https://forums.swift.org/t/swiftpm-show-dependencies-without-fetching-dependencies/51154>
