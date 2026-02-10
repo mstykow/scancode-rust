@@ -1,0 +1,79 @@
+[
+  {
+    "type": "maven",
+    "namespace": "it.assist.jrecordbind",
+    "name": "jrecordbind-java5",
+    "version": "2.3.4",
+    "primary_language": "Java",
+    "parties": [
+      {
+        "type": "person",
+        "role": "developer",
+        "name": "Federico Fissore",
+        "email": "fridrik@dev.java.net"
+      }
+    ],
+    "homepage_url": "https://jrecordbind.dev.java.net/",
+    "bug_tracking_url": "https://jrecordbind.dev.java.net/servlets/ProjectIssues",
+    "code_view_url": "https://jrecordbind.dev.java.net/source/browse/jrecordbind/",
+    "vcs_url": "svn:https://jrecordbind.dev.java.net/svn/jrecordbind/trunk/",
+    "extracted_license_statement": "LGPL",
+    "extra_data": {
+      "repositories": [
+        {
+          "id": "maven2-repository.dev.java.net",
+          "name": "Java.net Maven 2 Repository",
+          "url": "http://download.java.net/maven/2"
+        }
+      ],
+      "issue_management_system": "bugzilla",
+      "distribution_repository": {
+        "id": "java.net-m2-repository",
+        "url": "java-net:/maven2-repository/trunk/repository/"
+      },
+      "distribution_site": {
+        "id": "website",
+        "url": "svn:https://jrecordbind.dev.java.net/svn/jrecordbind/trunk/www/"
+      }
+    },
+    "dependencies": [
+      {
+        "purl": "pkg:maven/relaxngDatatype/relaxngDatatype@20020414",
+        "scope": "compile",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:maven/com.sun.xml.bind/jaxb-impl@2.1.11",
+        "scope": "compile",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:maven/com.sun.xml.bind/jaxb-xjc@2.1.11",
+        "scope": "compile",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:maven/com.sun.xsom/xsom@20081112",
+        "scope": "compile",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": true
+      }
+    ],
+    "repository_homepage_url": "https://repo1.maven.org/maven2/it/assist/jrecordbind/jrecordbind-java5/2.3.4/",
+    "repository_download_url": "https://repo1.maven.org/maven2/it/assist/jrecordbind/jrecordbind-java5/2.3.4/jrecordbind-java5-2.3.4.jar",
+    "api_data_url": "https://repo1.maven.org/maven2/it/assist/jrecordbind/jrecordbind-java5/2.3.4/jrecordbind-java5-2.3.4.pom",
+    "datasource_id": "maven_pom",
+    "purl": "pkg:maven/it.assist.jrecordbind/jrecordbind-java5@2.3.4"
+  }
+]

@@ -1,0 +1,83 @@
+[
+  {
+    "type": "maven",
+    "namespace": "commons-fileupload",
+    "name": "commons-fileupload",
+    "version": "1.0",
+    "primary_language": "Java",
+    "parties": [
+      {
+        "type": "person",
+        "role": "developer",
+        "name": "Martin Cooper",
+        "email": "martinc@apache.org",
+        "organization": "Tumbleweed Communications"
+      },
+      {
+        "type": "person",
+        "role": "developer",
+        "name": "dIon Gillard",
+        "email": "dion@apache.org",
+        "organization": "Multitask Consulting"
+      },
+      {
+        "type": "person",
+        "role": "developer",
+        "name": "John McNally",
+        "email": "jmcnally@collab.net",
+        "organization": "CollabNet"
+      },
+      {
+        "type": "person",
+        "role": "developer",
+        "name": "Daniel Rall",
+        "email": "dlr@finemaltcoding.com",
+        "organization": "CollabNet"
+      },
+      {
+        "type": "person",
+        "role": "developer",
+        "name": "Jason van Zyl",
+        "email": "jason@zenplex.com",
+        "organization": "Zenplex"
+      },
+      {
+        "type": "person",
+        "role": "developer",
+        "name": "Robert Burrell Donkin",
+        "email": "rdonkin@apache.org"
+      },
+      {
+        "type": "person",
+        "role": "developer",
+        "name": "Sean C. Sullivan",
+        "email": "sean |at| seansullivan |dot| com"
+      }
+    ],
+    "homepage_url": "http://jakarta.apache.org/commons/fileupload/",
+    "bug_tracking_url": "http://nagoya.apache.org/bugzilla/",
+    "dependencies": [
+      {
+        "purl": "pkg:maven/servletapi/servletapi@2.3",
+        "scope": "provided",
+        "is_runtime": false,
+        "is_optional": true,
+        "is_pinned": true,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:maven/junit/junit@3.8.1",
+        "scope": "test",
+        "is_runtime": false,
+        "is_optional": true,
+        "is_pinned": true,
+        "is_direct": true
+      }
+    ],
+    "repository_homepage_url": "https://repo1.maven.org/maven2/commons-fileupload/commons-fileupload/1.0/",
+    "repository_download_url": "https://repo1.maven.org/maven2/commons-fileupload/commons-fileupload/1.0/commons-fileupload-1.0.jar",
+    "api_data_url": "https://repo1.maven.org/maven2/commons-fileupload/commons-fileupload/1.0/commons-fileupload-1.0.pom",
+    "datasource_id": "maven_pom",
+    "purl": "pkg:maven/commons-fileupload/commons-fileupload@1.0"
+  }
+]

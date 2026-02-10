@@ -1,0 +1,252 @@
+[
+  {
+    "type": "cargo",
+    "name": "apple-xar",
+    "version": "0.4.0-pre",
+    "primary_language": "Rust",
+    "description": "XAR archive reading and writing",
+    "parties": [
+      {
+        "role": "author",
+        "name": "Gregory Szorc",
+        "email": "gregory.szorc@gmail.com"
+      }
+    ],
+    "keywords": [
+      "apple",
+      "xar"
+    ],
+    "homepage_url": "https://github.com/indygreg/PyOxidizer",
+    "vcs_url": "https://github.com/indygreg/PyOxidizer.git",
+    "extracted_license_statement": "MPL-2.0",
+    "extra_data": {
+      "rust_edition": "2021"
+    },
+    "dependencies": [
+      {
+        "purl": "pkg:cargo/base64",
+        "extracted_requirement": "0.13",
+        "scope": "dependencies",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:cargo/bcder",
+        "extracted_requirement": "0.6",
+        "scope": "dependencies",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:cargo/bzip2",
+        "extracted_requirement": "0.4",
+        "scope": "dependencies",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:cargo/chrono",
+        "extracted_requirement": "0.4",
+        "scope": "dependencies",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true,
+        "extra_data": {
+          "features": [
+            "serde"
+          ],
+          "version": "0.4"
+        }
+      },
+      {
+        "purl": "pkg:cargo/cryptographic-message-syntax",
+        "extracted_requirement": "0.15.0-pre",
+        "scope": "dependencies",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": true,
+        "extra_data": {
+          "path": "../cryptographic-message-syntax",
+          "version": "0.15.0-pre"
+        }
+      },
+      {
+        "purl": "pkg:cargo/digest",
+        "extracted_requirement": "0.10",
+        "scope": "dependencies",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:cargo/flate2",
+        "extracted_requirement": "1.0",
+        "scope": "dependencies",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:cargo/log",
+        "extracted_requirement": "0.4",
+        "scope": "dependencies",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:cargo/md-5",
+        "extracted_requirement": "0.10",
+        "scope": "dependencies",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:cargo/rand",
+        "extracted_requirement": "0.8",
+        "scope": "dependencies",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:cargo/reqwest",
+        "extracted_requirement": "0.11",
+        "scope": "dependencies",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true,
+        "extra_data": {
+          "default-features": false,
+          "version": "0.11"
+        }
+      },
+      {
+        "purl": "pkg:cargo/scroll",
+        "extracted_requirement": "0.11",
+        "scope": "dependencies",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true,
+        "extra_data": {
+          "version": "0.11",
+          "features": [
+            "derive"
+          ]
+        }
+      },
+      {
+        "purl": "pkg:cargo/serde",
+        "extracted_requirement": "1.0",
+        "scope": "dependencies",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true,
+        "extra_data": {
+          "features": [
+            "derive"
+          ],
+          "version": "1.0"
+        }
+      },
+      {
+        "purl": "pkg:cargo/serde-xml-rs",
+        "extracted_requirement": "0.5",
+        "scope": "dependencies",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:cargo/sha1",
+        "extracted_requirement": "0.10",
+        "scope": "dependencies",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:cargo/sha2",
+        "extracted_requirement": "0.10",
+        "scope": "dependencies",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:cargo/thiserror",
+        "extracted_requirement": "1.0",
+        "scope": "dependencies",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:cargo/url",
+        "extracted_requirement": "2.2",
+        "scope": "dependencies",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:cargo/x509-certificate",
+        "extracted_requirement": "0.13.0-pre",
+        "scope": "dependencies",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": true,
+        "extra_data": {
+          "path": "../x509-certificate",
+          "version": "0.13.0-pre"
+        }
+      },
+      {
+        "purl": "pkg:cargo/xml-rs",
+        "extracted_requirement": "0.8",
+        "scope": "dependencies",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:cargo/xz2",
+        "extracted_requirement": "0.1",
+        "scope": "dependencies",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true
+      }
+    ],
+    "repository_homepage_url": "https://crates.io/crates/apple-xar",
+    "repository_download_url": "https://crates.io/api/v1/crates/apple-xar/0.4.0-pre/download",
+    "api_data_url": "https://crates.io/api/v1/crates/apple-xar",
+    "datasource_id": "cargo_toml",
+    "purl": "pkg:cargo/apple-xar@0.4.0-pre"
+  }
+]
