@@ -149,6 +149,7 @@ fn extract_conanfile_data(class_def: &ast::StmtClassDef) -> PackageData {
         keywords,
         dependencies,
         extracted_license_statement: extracted_license,
+        datasource_id: Some("conan_conanfile_py".to_string()),
         ..default_package_data()
     }
 }
@@ -255,6 +256,7 @@ impl PackageParser for ConanfileTxtParser {
             package_type: Some(Self::PACKAGE_TYPE.to_string()),
             dependencies,
             primary_language: Some("C++".to_string()),
+            datasource_id: Some("conan_conanfile_txt".to_string()),
             ..default_package_data()
         }]
     }
@@ -296,6 +298,7 @@ impl PackageParser for ConanLockParser {
             package_type: Some(Self::PACKAGE_TYPE.to_string()),
             dependencies,
             primary_language: Some("C++".to_string()),
+            datasource_id: Some("conan_lock".to_string()),
             ..default_package_data()
         }]
     }

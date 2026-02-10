@@ -146,7 +146,7 @@ fn default_package_data() -> PackageData {
         repository_homepage_url: None,
         repository_download_url: None,
         api_data_url: None,
-        datasource_id: None,
+        datasource_id: Some("npm_package_lock_json".to_string()),
         purl: None,
     }
 }
@@ -276,7 +276,7 @@ fn parse_lockfile_v2_plus(
         repository_homepage_url: None,
         repository_download_url: None,
         api_data_url: None,
-        datasource_id: None,
+        datasource_id: Some("npm_package_lock_json".to_string()),
         purl,
     }
 }
@@ -342,7 +342,7 @@ fn parse_lockfile_v1(
         repository_homepage_url: None,
         repository_download_url: None,
         api_data_url: None,
-        datasource_id: None,
+        datasource_id: Some("npm_package_lock_json".to_string()),
         purl,
     }
 }
@@ -553,7 +553,7 @@ fn build_npm_dependency(
         repository_homepage_url: None,
         repository_download_url: None,
         api_data_url: None,
-        datasource_id: None,
+        datasource_id: Some("npm_package_lock_json".to_string()),
         purl: None,
     };
 

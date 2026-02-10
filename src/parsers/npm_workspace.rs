@@ -102,7 +102,7 @@ fn default_package_data() -> PackageData {
         repository_homepage_url: None,
         repository_download_url: None,
         api_data_url: None,
-        datasource_id: None,
+        datasource_id: Some("pnpm_workspace_yaml".to_string()),
         purl: None,
     }
 }

@@ -148,7 +148,7 @@ fn parse_yarn_v2(content: &str) -> PackageData {
             repository_homepage_url: None,
             repository_download_url: None,
             api_data_url: None,
-            datasource_id: None,
+            datasource_id: Some("yarn_lock".to_string()),
             purl: None,
         };
 
@@ -212,7 +212,7 @@ fn parse_yarn_v2(content: &str) -> PackageData {
         repository_homepage_url: None,
         repository_download_url: None,
         api_data_url: None,
-        datasource_id: None,
+        datasource_id: Some("yarn_lock".to_string()),
         purl: None,
     }
 }
@@ -279,7 +279,7 @@ fn parse_yarn_v1(content: &str) -> PackageData {
         repository_homepage_url: None,
         repository_download_url: None,
         api_data_url: None,
-        datasource_id: None,
+        datasource_id: Some("yarn_lock".to_string()),
         purl: None,
     }
 }
@@ -371,7 +371,7 @@ fn default_package_data() -> PackageData {
         repository_homepage_url: None,
         repository_download_url: None,
         api_data_url: None,
-        datasource_id: None,
+        datasource_id: Some("yarn_lock".to_string()),
         purl: None,
     }
 }
@@ -460,7 +460,7 @@ fn parse_yarn_v1_block(block: &str) -> Option<Dependency> {
         repository_homepage_url: None,
         repository_download_url: None,
         api_data_url: None,
-        datasource_id: None,
+        datasource_id: Some("yarn_lock".to_string()),
         purl: None,
     };
 
