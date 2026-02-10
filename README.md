@@ -82,11 +82,7 @@ scancode-rust ~/projects/my-codebase -o scan-results.json --exclude "*.git*" "ta
 
 ## Performance
 
-`scancode-rust` is designed to be significantly faster than the Python-based ScanCode Toolkit, especially for large codebases. Performance improvements come from:
-
-- Native Rust implementation
-- Efficient parallel processing
-- Optimized file handling
+`scancode-rust` is designed to be significantly faster than the Python-based ScanCode Toolkit, especially for large codebases, thanks to native Rust performance and parallel processing. See [Architecture: Performance Characteristics](docs/ARCHITECTURE.md#performance-characteristics) for details.
 
 ## Output Format
 
@@ -95,6 +91,15 @@ The tool produces JSON output compatible with ScanCode Toolkit, including:
 - Scan headers with timestamp information
 - File-level data with license and metadata information
 - System environment details
+
+## Documentation
+
+- **[Architecture](docs/ARCHITECTURE.md)** - System design, processing pipeline, and design decisions
+- **[Supported Formats](docs/SUPPORTED_FORMATS.md)** - Complete list of supported package ecosystems and file formats
+- **[How to Add a Parser](docs/HOW_TO_ADD_A_PARSER.md)** - Step-by-step guide for adding new parsers
+- **[Testing Strategy](docs/TESTING_STRATEGY.md)** - Testing approach and guidelines
+- **[ADRs](docs/adr/)** - Architectural decision records
+- **[Beyond-Parity Improvements](docs/improvements/)** - Features where Rust exceeds the Python original
 
 ## Contributing
 
@@ -221,49 +226,6 @@ Available release types:
 > **Note**: The release script ensures every release ships with the latest SPDX license definitions. It also handles a sparse checkout workaround for `cargo-release`.
 
 Monitor the [GitHub Actions workflow](https://github.com/mstykow/scancode-rust/actions) to verify completion.
-
-## License Data Architecture
-
-### How License Detection Works
-
-This tool uses the [SPDX License List Data](https://github.com/spdx/license-list-data) for license detection. The license data is:
-
-1. **Stored in a Git submodule** at `resources/licenses/` (sparse checkout of `json/details/` only)
-2. **Embedded at compile time** using Rust's `include_dir!` macro (see `src/main.rs`)
-3. **Built into the binary** - no runtime dependencies on external files
-
-This means:
-
-- **For users**: The binary is self-contained and portable
-- **For developers**: The submodule must be initialized before building
-- **Package size**: Only the needed JSON files are included in the published crate
-
-### Updating the License Data
-
-**For Releases:** The `release.sh` script automatically updates the license data to the latest version before publishing. No manual action needed.
-
-**For Development:**
-
-To initialize or update to the latest SPDX license definitions:
-
-```sh
-./setup.sh                  # Initialize/update license data to latest
-cargo build --release       # Rebuild with updated data
-```
-
-The script will show if the license data was updated. If so, commit the change:
-
-```sh
-git add resources/licenses
-git commit -m "chore: update SPDX license data"
-```
-
-The `setup.sh` script:
-
-- Initializes the submodule with shallow clone (`--depth=1`)
-- Configures sparse checkout to only include `json/details/` (saves ~90% disk space)
-- Updates to the latest upstream version
-- The build process then embeds these files directly into the compiled binary
 
 ## License
 
