@@ -38,6 +38,9 @@ Python has unsafe patterns (code execution, DoS vulnerabilities), we use safe al
 | [Debian](debian-parser.md) | ✨ New Feature | TODO: "introspect archive" | Full .deb control.tar.gz extraction | Better metadata accuracy |
 | [Conan](conan-parser.md) | ✨ New Feature | No conanfile.txt or conan.lock parser | Full conanfile.txt + conan.lock extraction | C/C++ dependency visibility |
 | [CPAN](cpan-parser.md) | ✨ New Feature | Stub-only handlers (no parse method) | Full META.json, META.yml, MANIFEST parsing | Perl metadata extraction |
+| [RPM Specfile](rpm-specfile-parser.md) | ✨ New Feature | Stub with TODO comment | Full preamble parsing | RPM spec metadata extraction |
+| [CPAN Makefile.PL](cpan-makefile-pl-parser.md) | ✨ New Feature | Stub-only handler (no parse method) | WriteMakefile metadata extraction | Perl build metadata |
+| [OSGi Manifest](osgi-manifest-parser.md) | ✨ New Feature | Empty path_patterns (assembly only) | Full OSGi metadata extraction | Java bundle dependencies |
 | [Gradle](gradle-parser.md) | 🛡️ Security | Groovy engine execution | Custom lexer (no execution) | No arbitrary code execution |
 | [Gradle Lockfile](gradle-lockfile-parser.md) | ✨ New Feature | No gradle.lockfile parser | Full lockfile dependency extraction | Pinned dependency auditing |
 | [npm Workspace](npm-workspace-parser.md) | ✨ New Feature | NonAssemblable stub | Workspace pattern extraction | Monorepo structure visibility |
@@ -69,6 +72,9 @@ Each parser with improvements has a dedicated document:
 - **[conan-data-parser.md](conan-data-parser.md)** — 🔍 Enhanced Extraction: Patches metadata + mirror/fallback URL extraction
 - **[cpan-dist-ini-parser.md](cpan-dist-ini-parser.md)** — ✨ New Feature: Full dist.ini parsing (Python has stub only)
 - **[swift-show-dependencies-parser.md](swift-show-dependencies-parser.md)** — 🔍 Enhanced Extraction: Full dependency graph with versions and direct/transitive marking
+- **[rpm-specfile-parser.md](rpm-specfile-parser.md)** — ✨ New Feature: Full RPM spec preamble parsing (Python is stub with TODO)
+- **[cpan-makefile-pl-parser.md](cpan-makefile-pl-parser.md)** — ✨ New Feature: Makefile.PL WriteMakefile extraction (Python has no parse method)
+- **[osgi-manifest-parser.md](osgi-manifest-parser.md)** — ✨ New Feature: OSGi bundle metadata extraction (Python has empty patterns)
 
 ## Verification
 
