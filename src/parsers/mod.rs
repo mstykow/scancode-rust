@@ -114,6 +114,8 @@ mod opam_golden_test;
 mod os_release;
 #[cfg(test)]
 mod os_release_test;
+#[cfg(test)]
+mod osgi_test;
 mod pep508;
 mod pip_inspect_deplock;
 #[cfg(test)]

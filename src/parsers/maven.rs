@@ -1438,6 +1438,11 @@ fn parse_pom_properties(path: &Path) -> PackageData {
 }
 
 /// Parse MANIFEST.MF file (JAR manifest format)
+///
+/// Detects and handles both regular JAR manifests and OSGi bundle manifests.
+/// If Bundle-SymbolicName is present, treats the manifest as an OSGi bundle
+/// and extracts OSGi-specific metadata including Import-Package and Require-Bundle
+/// dependencies.
 fn parse_manifest_mf(path: &Path) -> PackageData {
     let content = match read_file_to_string(path).map_err(|e| e.to_string()) {
         Ok(content) => content,
@@ -1448,7 +1453,6 @@ fn parse_manifest_mf(path: &Path) -> PackageData {
     };
 
     let mut package_data = default_package_data();
-    package_data.package_type = Some("maven".to_string());
 
     // Parse manifest headers (RFC822-style with space continuations)
     let mut headers: Vec<(String, String)> = Vec::new();
@@ -1479,76 +1483,328 @@ fn parse_manifest_mf(path: &Path) -> PackageData {
         headers.push((key, current_value.trim().to_string()));
     }
 
-    // Extract fields with priority order
-    let mut name: Option<String> = None;
-    let mut version: Option<String> = None;
-    let mut vendor: Option<String> = None;
+    // Convert headers to HashMap for easier lookup
+    let headers_map: HashMap<String, String> = headers.iter().cloned().collect();
 
-    for (key, value) in &headers {
-        match key.as_str() {
-            "Bundle-SymbolicName" if name.is_none() => {
-                name = Some(value.clone());
-            }
-            "Bundle-Name" if name.is_none() => {
-                name = Some(value.clone());
-            }
-            "Implementation-Title" if name.is_none() => {
-                name = Some(value.clone());
-            }
-            "Bundle-Version" if version.is_none() => {
-                version = Some(value.clone());
-            }
-            "Implementation-Version" if version.is_none() => {
-                version = Some(value.clone());
-            }
-            "Implementation-Vendor" | "Bundle-Vendor" if vendor.is_none() => {
-                vendor = Some(value.clone());
-            }
-            _ => {}
+    // Check if this is an OSGi bundle by looking for Bundle-SymbolicName
+    let bundle_symbolic_name = headers_map.get("Bundle-SymbolicName");
+    let is_osgi = bundle_symbolic_name.is_some();
+
+    if is_osgi {
+        // OSGi bundle - extract OSGi-specific metadata
+        package_data.package_type = Some("osgi".to_string());
+        package_data.datasource_id = Some("java_osgi_manifest".to_string());
+
+        // Bundle-SymbolicName is the canonical name for OSGi bundles
+        // Strip directives after semicolon: "org.example.bundle;singleton:=true" -> "org.example.bundle"
+        if let Some(bsn) = bundle_symbolic_name {
+            let name = if let Some(semicolon_pos) = bsn.find(';') {
+                bsn[..semicolon_pos].trim().to_string()
+            } else {
+                bsn.clone()
+            };
+            package_data.name = Some(name);
         }
-    }
 
-    package_data.name = name;
-    package_data.version = version;
+        // Bundle-Version
+        package_data.version = headers_map.get("Bundle-Version").cloned();
 
-    // Add vendor to parties if present
-    if let Some(vendor_name) = vendor {
-        package_data.parties.push(Party {
-            r#type: Some("organization".to_string()),
-            role: Some("vendor".to_string()),
-            name: Some(vendor_name),
-            email: None,
-            url: None,
-            organization: None,
-            organization_url: None,
-            timezone: None,
-        });
-    }
-
-    // Try to extract groupId from path (META-INF/maven/{groupId}/{artifactId}/)
-    if let Some(path_str) = path.to_str()
-        && let Some(meta_inf_pos) = path_str.find("META-INF/maven/")
-    {
-        let after_maven = &path_str[meta_inf_pos + "META-INF/maven/".len()..];
-        let parts: Vec<&str> = after_maven.split('/').collect();
-        if parts.len() >= 2 {
-            package_data.namespace = Some(parts[0].to_string());
+        // Bundle-Description takes priority over Bundle-Name for description
+        if let Some(desc) = headers_map.get("Bundle-Description") {
+            package_data.description = Some(desc.clone());
+        } else if let Some(name) = headers_map.get("Bundle-Name") {
+            package_data.description = Some(name.clone());
         }
-    }
 
-    // Generate PURL if we have enough information
-    if let (Some(group_id), Some(artifact_id), Some(version)) = (
-        &package_data.namespace,
-        &package_data.name,
-        &package_data.version,
-    ) {
-        package_data.purl = Some(format!(
-            "pkg:maven/{}/{}@{}",
-            group_id, artifact_id, version
-        ));
+        // Bundle-Vendor
+        if let Some(vendor) = headers_map.get("Bundle-Vendor") {
+            package_data.parties.push(Party {
+                r#type: Some("organization".to_string()),
+                role: Some("vendor".to_string()),
+                name: Some(vendor.clone()),
+                email: None,
+                url: None,
+                organization: None,
+                organization_url: None,
+                timezone: None,
+            });
+        }
+
+        // Bundle-DocURL
+        package_data.homepage_url = headers_map.get("Bundle-DocURL").cloned();
+
+        // Bundle-License
+        package_data.extracted_license_statement = headers_map.get("Bundle-License").cloned();
+
+        // Import-Package -> dependencies with scope "import"
+        if let Some(import_pkg) = headers_map.get("Import-Package") {
+            let deps = parse_osgi_package_list(import_pkg, "import");
+            package_data.dependencies.extend(deps);
+        }
+
+        // Require-Bundle -> dependencies with scope "require-bundle"
+        if let Some(require_bundle) = headers_map.get("Require-Bundle") {
+            let deps = parse_osgi_bundle_list(require_bundle, "require-bundle");
+            package_data.dependencies.extend(deps);
+        }
+
+        // Export-Package -> store in extra_data
+        if let Some(export_pkg) = headers_map.get("Export-Package") {
+            let mut extra_data = package_data.extra_data.take().unwrap_or_default();
+            extra_data.insert(
+                "export_packages".to_string(),
+                serde_json::Value::String(export_pkg.clone()),
+            );
+            package_data.extra_data = Some(extra_data);
+        }
+
+        // Build OSGi PURL: pkg:osgi/{bundle_symbolic_name}@{bundle_version}
+        if let (Some(name), Some(version)) = (&package_data.name, &package_data.version) {
+            package_data.purl = Some(format!("pkg:osgi/{}@{}", name, version));
+        }
+    } else {
+        // Regular JAR manifest
+        package_data.package_type = Some("maven".to_string());
+        package_data.datasource_id = Some("java_jar_manifest".to_string());
+
+        // Extract fields with priority order for non-OSGi JARs
+        let mut name: Option<String> = None;
+        let mut version: Option<String> = None;
+        let mut vendor: Option<String> = None;
+
+        for (key, value) in &headers {
+            match key.as_str() {
+                "Bundle-Name" if name.is_none() => {
+                    name = Some(value.clone());
+                }
+                "Implementation-Title" if name.is_none() => {
+                    name = Some(value.clone());
+                }
+                "Bundle-Version" if version.is_none() => {
+                    version = Some(value.clone());
+                }
+                "Implementation-Version" if version.is_none() => {
+                    version = Some(value.clone());
+                }
+                "Implementation-Vendor" | "Bundle-Vendor" if vendor.is_none() => {
+                    vendor = Some(value.clone());
+                }
+                _ => {}
+            }
+        }
+
+        package_data.name = name;
+        package_data.version = version;
+
+        // Add vendor to parties if present
+        if let Some(vendor_name) = vendor {
+            package_data.parties.push(Party {
+                r#type: Some("organization".to_string()),
+                role: Some("vendor".to_string()),
+                name: Some(vendor_name),
+                email: None,
+                url: None,
+                organization: None,
+                organization_url: None,
+                timezone: None,
+            });
+        }
+
+        // Try to extract groupId from path (META-INF/maven/{groupId}/{artifactId}/)
+        if let Some(path_str) = path.to_str()
+            && let Some(meta_inf_pos) = path_str.find("META-INF/maven/")
+        {
+            let after_maven = &path_str[meta_inf_pos + "META-INF/maven/".len()..];
+            let parts: Vec<&str> = after_maven.split('/').collect();
+            if parts.len() >= 2 {
+                package_data.namespace = Some(parts[0].to_string());
+            }
+        }
+
+        // Generate Maven PURL if we have enough information
+        if let (Some(group_id), Some(artifact_id), Some(version)) = (
+            &package_data.namespace,
+            &package_data.name,
+            &package_data.version,
+        ) {
+            package_data.purl = Some(format!(
+                "pkg:maven/{}/{}@{}",
+                group_id, artifact_id, version
+            ));
+        }
     }
 
     package_data
+}
+
+/// Parse OSGi Import-Package header into dependencies.
+///
+/// Format: comma-separated list of packages with optional directives:
+/// "org.osgi.framework;version=\"[1.6,2)\",javax.servlet;version=\"[3.0,4)\""
+pub(crate) fn parse_osgi_package_list(package_list: &str, scope: &str) -> Vec<Dependency> {
+    let mut dependencies = Vec::new();
+
+    // Split by comma, but be careful not to split within quoted strings
+    for package_entry in split_osgi_list(package_list) {
+        let package_entry = package_entry.trim();
+        if package_entry.is_empty() {
+            continue;
+        }
+
+        // Extract package name (before first semicolon)
+        let package_name = if let Some(semicolon_pos) = package_entry.find(';') {
+            package_entry[..semicolon_pos].trim()
+        } else {
+            package_entry
+        };
+
+        if package_name.is_empty() {
+            continue;
+        }
+
+        // Extract version directive if present
+        let version_requirement = extract_osgi_version(package_entry);
+
+        dependencies.push(Dependency {
+            purl: Some(format!("pkg:osgi/{}", package_name)),
+            extracted_requirement: version_requirement,
+            scope: Some(scope.to_string()),
+            is_runtime: Some(true),
+            is_optional: Some(false),
+            is_pinned: None,
+            is_direct: Some(true),
+            resolved_package: None,
+            extra_data: None,
+        });
+    }
+
+    dependencies
+}
+
+/// Parse OSGi Require-Bundle header into dependencies.
+///
+/// Format: comma-separated list of bundle symbolic names with optional directives:
+/// "org.eclipse.core.runtime;bundle-version=\"3.7.0\",org.eclipse.ui;resolution:=optional"
+pub(crate) fn parse_osgi_bundle_list(bundle_list: &str, scope: &str) -> Vec<Dependency> {
+    let mut dependencies = Vec::new();
+
+    for bundle_entry in split_osgi_list(bundle_list) {
+        let bundle_entry = bundle_entry.trim();
+        if bundle_entry.is_empty() {
+            continue;
+        }
+
+        // Extract bundle symbolic name (before first semicolon)
+        let bundle_name = if let Some(semicolon_pos) = bundle_entry.find(';') {
+            bundle_entry[..semicolon_pos].trim()
+        } else {
+            bundle_entry
+        };
+
+        if bundle_name.is_empty() {
+            continue;
+        }
+
+        // Extract bundle-version directive if present
+        let version_requirement = extract_osgi_bundle_version(bundle_entry);
+
+        // Check if optional
+        let is_optional = bundle_entry.contains("resolution:=optional");
+
+        dependencies.push(Dependency {
+            purl: Some(format!("pkg:osgi/{}", bundle_name)),
+            extracted_requirement: version_requirement,
+            scope: Some(scope.to_string()),
+            is_runtime: Some(!is_optional),
+            is_optional: Some(is_optional),
+            is_pinned: None,
+            is_direct: Some(true),
+            resolved_package: None,
+            extra_data: None,
+        });
+    }
+
+    dependencies
+}
+
+/// Split OSGi comma-separated list, respecting quoted strings.
+///
+/// OSGi headers can contain commas within quoted strings:
+/// "foo;version=\"[1.0,2.0)\",bar;version=\"3.0\""
+pub(crate) fn split_osgi_list(list: &str) -> Vec<String> {
+    let mut result = Vec::new();
+    let mut current = String::new();
+    let mut in_quotes = false;
+
+    for ch in list.chars() {
+        match ch {
+            '"' => {
+                in_quotes = !in_quotes;
+                current.push(ch);
+            }
+            ',' if !in_quotes => {
+                if !current.trim().is_empty() {
+                    result.push(current.trim().to_string());
+                }
+                current.clear();
+            }
+            _ => {
+                current.push(ch);
+            }
+        }
+    }
+
+    if !current.trim().is_empty() {
+        result.push(current.trim().to_string());
+    }
+
+    result
+}
+
+/// Extract version directive from OSGi package entry.
+///
+/// Format: ";version=\"[1.0,2.0)\"" or ";version=1.0"
+pub(crate) fn extract_osgi_version(entry: &str) -> Option<String> {
+    // Look for version= directive
+    if let Some(version_pos) = entry.find("version=") {
+        let after_version = &entry[version_pos + "version=".len()..];
+
+        // Check if quoted
+        if let Some(stripped) = after_version.strip_prefix('"') {
+            // Find closing quote
+            if let Some(quote_end) = stripped.find('"') {
+                return Some(stripped[..quote_end].to_string());
+            }
+        } else {
+            // Unquoted - take until semicolon or end
+            let version_end = after_version.find(';').unwrap_or(after_version.len());
+            return Some(after_version[..version_end].trim().to_string());
+        }
+    }
+
+    None
+}
+
+/// Extract bundle-version directive from OSGi Require-Bundle entry.
+pub(crate) fn extract_osgi_bundle_version(entry: &str) -> Option<String> {
+    // Look for bundle-version= directive
+    if let Some(version_pos) = entry.find("bundle-version=") {
+        let after_version = &entry[version_pos + "bundle-version=".len()..];
+
+        // Check if quoted
+        if let Some(stripped) = after_version.strip_prefix('"') {
+            // Find closing quote
+            if let Some(quote_end) = stripped.find('"') {
+                return Some(stripped[..quote_end].to_string());
+            }
+        } else {
+            // Unquoted - take until semicolon or end
+            let version_end = after_version.find(';').unwrap_or(after_version.len());
+            return Some(after_version[..version_end].trim().to_string());
+        }
+    }
+
+    None
 }
 
 fn default_package_data() -> PackageData {

@@ -1,0 +1,6 @@
+Manifest-Version: 1.0
+Created-By: Apache Maven
+Built-By: developer
+Implementation-Title: spring-web
+Implementation-Version: 5.3.20
+Implementation-Vendor: Spring Framework

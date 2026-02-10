@@ -1,0 +1,13 @@
+Manifest-Version: 1.0
+Bundle-ManifestVersion: 2
+Bundle-SymbolicName: org.example.mybundle
+Bundle-Version: 1.2.3
+Bundle-Name: My Example Bundle
+Bundle-Vendor: Example Corp
+Bundle-License: https://www.apache.org/licenses/LICENSE-2.0
+Bundle-DocURL: https://example.org/mybundle
+Bundle-Description: A comprehensive example OSGi bundle
+Import-Package: org.osgi.framework;version="[1.6,2)",javax.servlet;v
+ ersion="[3.0,4)"
+Export-Package: org.example.mybundle;version="1.2.3"
+Require-Bundle: org.eclipse.core.runtime;bundle-version="3.7.0"
