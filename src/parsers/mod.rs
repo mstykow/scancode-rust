@@ -144,6 +144,9 @@ mod requirements_txt_test;
 pub(crate) mod rfc822;
 mod rpm_db;
 mod rpm_golden_test;
+mod rpm_license_files;
+#[cfg(test)]
+mod rpm_license_files_test;
 mod rpm_mariner_manifest;
 #[cfg(test)]
 mod rpm_mariner_manifest_test;
@@ -300,6 +303,7 @@ pub use self::python::PythonParser;
 pub use self::readme::ReadmeParser;
 pub use self::requirements_txt::RequirementsTxtParser;
 pub use self::rpm_db::{RpmBdbDatabaseParser, RpmNdbDatabaseParser, RpmSqliteDatabaseParser};
+pub use self::rpm_license_files::RpmLicenseFilesParser;
 pub use self::rpm_mariner_manifest::RpmMarinerManifestParser;
 pub use self::rpm_parser::RpmParser;
 pub use self::rpm_specfile::RpmSpecfileParser;
@@ -418,6 +422,7 @@ define_parsers! {
     ReadmeParser,
     RequirementsTxtParser,
     RpmBdbDatabaseParser,
+    RpmLicenseFilesParser,
     RpmMarinerManifestParser,
     RpmNdbDatabaseParser,
     RpmParser,
