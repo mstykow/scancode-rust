@@ -84,6 +84,9 @@ impl PackageParser for GemfileParser {
         path.file_name()
             .and_then(|n| n.to_str())
             .is_some_and(|name| name == "Gemfile")
+            || path
+                .to_str()
+                .is_some_and(|p| p.contains("data.gz-extract/") && p.ends_with("/Gemfile"))
     }
 }
 
@@ -262,6 +265,9 @@ impl PackageParser for GemfileLockParser {
         path.file_name()
             .and_then(|n| n.to_str())
             .is_some_and(|name| name == "Gemfile.lock")
+            || path
+                .to_str()
+                .is_some_and(|p| p.contains("data.gz-extract/") && p.ends_with("/Gemfile.lock"))
     }
 }
 
@@ -1587,10 +1593,50 @@ fn parse_gem_yaml_dependencies(yaml: &serde_yaml::Value) -> Vec<Dependency> {
     dependencies
 }
 
+// =============================================================================
+// Gem Metadata Extracted Parser (metadata.gz-extract files)
+// =============================================================================
+
+pub struct GemMetadataExtractedParser;
+
+impl PackageParser for GemMetadataExtractedParser {
+    const PACKAGE_TYPE: &'static str = PACKAGE_TYPE;
+
+    fn extract_packages(path: &Path) -> Vec<PackageData> {
+        vec![match extract_gem_metadata_extracted(path) {
+            Ok(data) => data,
+            Err(e) => {
+                warn!("Failed to extract gem metadata from {:?}: {}", path, e);
+                default_package_data()
+            }
+        }]
+    }
+
+    fn is_match(path: &Path) -> bool {
+        path.to_str()
+            .is_some_and(|p| p.contains("metadata.gz-extract"))
+    }
+}
+
+fn extract_gem_metadata_extracted(path: &Path) -> Result<PackageData, String> {
+    let content = fs::read_to_string(path)
+        .map_err(|e| format!("Failed to read metadata.gz-extract file: {}", e))?;
+
+    parse_gem_metadata_yaml(&content)
+}
+
 // Register parser with metadata
 crate::register_parser!(
     "Ruby Gemfile manifest",
-    &["**/Gemfile"],
+    &["**/Gemfile", "**/data.gz-extract/Gemfile"],
+    "gem",
+    "Ruby",
+    Some("https://bundler.io/man/gemfile.5.html"),
+);
+
+crate::register_parser!(
+    "Ruby Gemfile.lock lockfile",
+    &["**/Gemfile.lock", "**/data.gz-extract/Gemfile.lock"],
     "gem",
     "Ruby",
     Some("https://bundler.io/man/gemfile.5.html"),
@@ -1598,7 +1644,11 @@ crate::register_parser!(
 
 crate::register_parser!(
     "Ruby .gemspec manifest",
-    &["**/*.gemspec"],
+    &[
+        "**/*.gemspec",
+        "**/data.gz-extract/*.gemspec",
+        "**/specifications/*.gemspec"
+    ],
     "gem",
     "Ruby",
     Some("https://guides.rubygems.org/specification-reference/"),
@@ -1607,6 +1657,14 @@ crate::register_parser!(
 crate::register_parser!(
     "Ruby .gem archive",
     &["**/*.gem"],
+    "gem",
+    "Ruby",
+    Some("https://guides.rubygems.org/specification-reference/"),
+);
+
+crate::register_parser!(
+    "Ruby gem metadata (extracted)",
+    &["**/metadata.gz-extract"],
     "gem",
     "Ruby",
     Some("https://guides.rubygems.org/specification-reference/"),

@@ -1798,4 +1798,160 @@ platform: ruby
             "Ruby platform should not have qualifiers"
         );
     }
+
+    // ==========================================================================
+    // EXTRACTED GEM ARCHIVE PARSER TESTS
+    // ==========================================================================
+
+    #[test]
+    fn test_gemfile_is_match_extracted() {
+        use crate::parsers::ruby::GemfileParser;
+        assert!(GemfileParser::is_match(&PathBuf::from(
+            "testdata/gem/extracted-gemfile/data.gz-extract/Gemfile"
+        )));
+        assert!(GemfileParser::is_match(&PathBuf::from(
+            "/path/to/gem/data.gz-extract/Gemfile"
+        )));
+    }
+
+    #[test]
+    fn test_gemfile_lock_is_match_extracted() {
+        use crate::parsers::ruby::GemfileLockParser;
+        assert!(GemfileLockParser::is_match(&PathBuf::from(
+            "testdata/gem/extracted-gemfile-lock/data.gz-extract/Gemfile.lock"
+        )));
+        assert!(GemfileLockParser::is_match(&PathBuf::from(
+            "/path/to/gem/data.gz-extract/Gemfile.lock"
+        )));
+    }
+
+    #[test]
+    fn test_gemspec_is_match_extracted() {
+        use crate::parsers::ruby::GemspecParser;
+        assert!(GemspecParser::is_match(&PathBuf::from(
+            "testdata/gem/extracted-gemspec/data.gz-extract/example.gemspec"
+        )));
+        assert!(GemspecParser::is_match(&PathBuf::from(
+            "testdata/gem/specifications/specifications/example.gemspec"
+        )));
+    }
+
+    #[test]
+    fn test_gem_metadata_extracted_is_match() {
+        use crate::parsers::ruby::GemMetadataExtractedParser;
+        assert!(GemMetadataExtractedParser::is_match(&PathBuf::from(
+            "testdata/gem/extracted/metadata.gz-extract"
+        )));
+        assert!(GemMetadataExtractedParser::is_match(&PathBuf::from(
+            "/path/to/gem/metadata.gz-extract"
+        )));
+        assert!(!GemMetadataExtractedParser::is_match(&PathBuf::from(
+            "metadata.gz"
+        )));
+    }
+
+    #[test]
+    fn test_extract_gemfile_from_extracted_archive() {
+        use crate::parsers::ruby::GemfileParser;
+        let gemfile_path = PathBuf::from("testdata/gem/extracted-gemfile/data.gz-extract/Gemfile");
+        let package_data = GemfileParser::extract_first_package(&gemfile_path);
+
+        assert_eq!(package_data.package_type, Some("gem".to_string()));
+        assert!(!package_data.dependencies.is_empty());
+
+        let rake_dep = package_data
+            .dependencies
+            .iter()
+            .find(|d| d.purl.as_ref().is_some_and(|p| p.contains("rake")));
+        assert!(rake_dep.is_some(), "Should find rake dependency");
+    }
+
+    #[test]
+    fn test_extract_gemfile_lock_from_extracted_archive() {
+        use crate::parsers::ruby::GemfileLockParser;
+        let lockfile_path =
+            PathBuf::from("testdata/gem/extracted-gemfile-lock/data.gz-extract/Gemfile.lock");
+        let package_data = GemfileLockParser::extract_first_package(&lockfile_path);
+
+        assert_eq!(package_data.package_type, Some("gem".to_string()));
+        assert!(!package_data.dependencies.is_empty());
+    }
+
+    #[test]
+    fn test_extract_gemspec_from_extracted_archive() {
+        use crate::parsers::ruby::GemspecParser;
+        let gemspec_path =
+            PathBuf::from("testdata/gem/extracted-gemspec/data.gz-extract/example.gemspec");
+        let package_data = GemspecParser::extract_first_package(&gemspec_path);
+
+        assert_eq!(package_data.package_type, Some("gem".to_string()));
+        assert_eq!(package_data.name, Some("example-gem".to_string()));
+    }
+
+    #[test]
+    fn test_extract_gemspec_from_specifications() {
+        use crate::parsers::ruby::GemspecParser;
+        let gemspec_path =
+            PathBuf::from("testdata/gem/specifications/specifications/example.gemspec");
+        let package_data = GemspecParser::extract_first_package(&gemspec_path);
+
+        assert_eq!(package_data.package_type, Some("gem".to_string()));
+        assert_eq!(package_data.name, Some("example-gem".to_string()));
+    }
+
+    #[test]
+    fn test_extract_gem_metadata_extracted() {
+        use crate::parsers::ruby::GemMetadataExtractedParser;
+        let metadata_path = PathBuf::from("testdata/gem/extracted/metadata.gz-extract");
+        let package_data = GemMetadataExtractedParser::extract_first_package(&metadata_path);
+
+        assert_eq!(package_data.package_type, Some("gem".to_string()));
+        assert_eq!(package_data.name, Some("example-gem".to_string()));
+        assert_eq!(package_data.version, Some("1.2.3".to_string()));
+        assert_eq!(
+            package_data.description,
+            Some("A longer description of the example gem for testing purposes".to_string())
+        );
+        assert_eq!(
+            package_data.homepage_url,
+            Some("https://example.com/example-gem".to_string())
+        );
+
+        assert!(
+            !package_data.parties.is_empty(),
+            "Should have extracted authors"
+        );
+        let author_names: Vec<_> = package_data
+            .parties
+            .iter()
+            .filter_map(|p| p.name.as_ref())
+            .collect();
+        assert!(
+            author_names.contains(&&"John Doe".to_string()),
+            "Should find John Doe"
+        );
+
+        assert!(
+            package_data.dependencies.len() >= 3,
+            "Should have at least 3 dependencies"
+        );
+
+        let rails_dep = package_data
+            .dependencies
+            .iter()
+            .find(|d| d.purl.as_ref().is_some_and(|p| p.contains("rails")));
+        assert!(rails_dep.is_some(), "Should find rails dependency");
+        let rails = rails_dep.unwrap();
+        assert_eq!(rails.extracted_requirement, Some("~> 5.0".to_string()));
+        assert_eq!(rails.is_runtime, Some(true));
+
+        let rspec_dep = package_data
+            .dependencies
+            .iter()
+            .find(|d| d.purl.as_ref().is_some_and(|p| p.contains("rspec")));
+        assert!(rspec_dep.is_some(), "Should find rspec dependency");
+        let rspec = rspec_dep.unwrap();
+        assert_eq!(rspec.scope, Some("development".to_string()));
+        assert_eq!(rspec.is_runtime, Some(false));
+    }
 }

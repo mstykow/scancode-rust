@@ -292,7 +292,9 @@ pub use self::requirements_txt::RequirementsTxtParser;
 pub use self::rpm_db::{RpmBdbDatabaseParser, RpmNdbDatabaseParser, RpmSqliteDatabaseParser};
 pub use self::rpm_mariner_manifest::RpmMarinerManifestParser;
 pub use self::rpm_parser::RpmParser;
-pub use self::ruby::{GemArchiveParser, GemfileLockParser, GemfileParser, GemspecParser};
+pub use self::ruby::{
+    GemArchiveParser, GemMetadataExtractedParser, GemfileLockParser, GemfileParser, GemspecParser,
+};
 pub use self::swift_manifest_json::SwiftManifestJsonParser;
 pub use self::swift_resolved::SwiftPackageResolvedParser;
 pub use self::swift_show_dependencies::SwiftShowDependenciesParser;
@@ -371,6 +373,7 @@ define_parsers! {
     GemArchiveParser,
     GemfileLockParser,
     GemfileParser,
+    GemMetadataExtractedParser,
     GemspecParser,
     GodepsParser,
     GoModParser,
