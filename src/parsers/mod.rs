@@ -92,6 +92,9 @@ pub mod metadata;
 mod microsoft_update_manifest;
 #[cfg(test)]
 mod microsoft_update_manifest_test;
+mod misc;
+#[cfg(test)]
+mod misc_test;
 mod npm;
 #[cfg(test)]
 mod npm_golden_test;
@@ -291,6 +294,13 @@ pub use self::gradle_lock::GradleLockfileParser;
 pub use self::haxe::HaxeParser;
 pub use self::maven::MavenParser;
 pub use self::microsoft_update_manifest::MicrosoftUpdateManifestParser;
+pub use self::misc::{
+    AndroidLibraryRecognizer, AppleDmgRecognizer, Axis2MarRecognizer, Axis2ModuleXmlRecognizer,
+    CabArchiveRecognizer, ChromeCrxRecognizer, IosIpaRecognizer, IsoImageRecognizer,
+    IvyXmlRecognizer, JBossSarRecognizer, JBossServiceXmlRecognizer, JavaEarAppXmlRecognizer,
+    JavaEarRecognizer, JavaJarRecognizer, JavaWarRecognizer, JavaWarWebXmlRecognizer,
+    MeteorPackageRecognizer, MozillaXpiRecognizer, SharArchiveRecognizer,
+};
 pub use self::npm::NpmParser;
 pub use self::npm_lock::NpmLockParser;
 pub use self::npm_workspace::NpmWorkspaceParser;
@@ -439,4 +449,24 @@ define_parsers! {
     SwiftPackageResolvedParser,
     SwiftShowDependenciesParser,
     YarnLockParser,
+    // File type recognizers (misc) - MUST come last to avoid shadowing real parsers
+    JavaJarRecognizer,
+    IvyXmlRecognizer,
+    JavaWarRecognizer,
+    JavaWarWebXmlRecognizer,
+    JavaEarRecognizer,
+    JavaEarAppXmlRecognizer,
+    Axis2ModuleXmlRecognizer,
+    Axis2MarRecognizer,
+    JBossSarRecognizer,
+    JBossServiceXmlRecognizer,
+    MeteorPackageRecognizer,
+    AndroidLibraryRecognizer,
+    MozillaXpiRecognizer,
+    ChromeCrxRecognizer,
+    IosIpaRecognizer,
+    CabArchiveRecognizer,
+    SharArchiveRecognizer,
+    AppleDmgRecognizer,
+    IsoImageRecognizer,
 }
