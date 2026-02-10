@@ -184,6 +184,7 @@ fn read_json_file(path: &Path) -> Result<Value, String> {
 fn default_package_data() -> PackageData {
     PackageData {
         package_type: Some(ChefMetadataJsonParser::PACKAGE_TYPE.to_string()),
+        datasource_id: Some("chef_metadata_json".to_string()),
         ..Default::default()
     }
 }
@@ -408,6 +409,7 @@ fn build_package(fields: ChefPackageFields) -> PackageData {
 
     PackageData {
         package_type: Some(ChefMetadataJsonParser::PACKAGE_TYPE.to_string()),
+        datasource_id: Some("chef_metadata_rb".to_string()),
         name,
         version,
         description,
