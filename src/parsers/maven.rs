@@ -376,6 +376,8 @@ impl PackageParser for MavenParser {
         let mut buf = Vec::new();
         let mut package_data = default_package_data();
         package_data.package_type = Some(Self::PACKAGE_TYPE.to_string());
+        package_data.primary_language = Some("Java".to_string());
+        package_data.datasource_id = Some("maven_pom".to_string());
 
         let mut current_element = Vec::new();
         let mut in_dependencies = false;
@@ -1052,28 +1054,27 @@ impl PackageParser for MavenParser {
         }
 
         if let (Some(group_id), Some(artifact_id)) = (&package_data.namespace, &package_data.name) {
-            package_data.api_data_url = build_maven_url(
+            package_data.repository_homepage_url = build_maven_url(
                 &package_data.namespace,
                 &package_data.name,
                 &package_data.version,
-                Some("maven-metadata.xml"),
+                None,
             );
 
-            package_data.homepage_url = package_data.homepage_url.or_else(|| {
-                build_maven_url(
+            package_data.repository_download_url = package_data
+                .version
+                .as_ref()
+                .map(|ver| build_maven_download_url(group_id, artifact_id, ver));
+
+            if let Some(ver) = &package_data.version {
+                let pom_filename = format!("{}-{}.pom", artifact_id, ver);
+                package_data.api_data_url = build_maven_url(
                     &package_data.namespace,
                     &package_data.name,
                     &package_data.version,
-                    None,
-                )
-            });
-
-            package_data.download_url = package_data.download_url.or_else(|| {
-                package_data
-                    .version
-                    .as_ref()
-                    .map(|ver| build_maven_download_url(group_id, artifact_id, ver))
-            });
+                    Some(&pom_filename),
+                );
+            }
         }
 
         package_data.vcs_url = scm_connection.or(scm_url.clone());
