@@ -1,4 +1,4 @@
-use super::FileInfo;
+use super::{FileInfo, Package, TopLevelDependency};
 use serde::Serialize;
 
 pub const SCANCODE_OUTPUT_FORMAT_VERSION: &str = "4.0.0";
@@ -6,6 +6,8 @@ pub const SCANCODE_OUTPUT_FORMAT_VERSION: &str = "4.0.0";
 #[derive(Serialize, Debug)]
 pub struct Output {
     pub headers: Vec<Header>,
+    pub packages: Vec<Package>,
+    pub dependencies: Vec<TopLevelDependency>,
     pub files: Vec<FileInfo>,
     pub license_references: Vec<LicenseReference>,
     pub license_rule_references: Vec<LicenseRuleReference>,

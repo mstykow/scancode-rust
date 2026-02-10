@@ -1,5 +1,6 @@
 use derive_builder::Builder;
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 use crate::utils::spdx::combine_license_expressions;
 
@@ -37,6 +38,8 @@ pub struct FileInfo {
     #[builder(default)]
     pub urls: Vec<OutputURL>,
     #[builder(default)]
+    pub for_packages: Vec<String>,
+    #[builder(default)]
     pub scan_errors: Vec<String>,
 }
 
@@ -60,6 +63,7 @@ impl FileInfoBuilder {
             self.license_detections.clone().unwrap_or_default(),
             self.copyrights.clone().unwrap_or_default(),
             self.urls.clone().unwrap_or_default(),
+            self.for_packages.clone().unwrap_or_default(),
             self.scan_errors.clone().unwrap_or_default(),
         ))
     }
@@ -85,6 +89,7 @@ impl FileInfo {
         mut license_detections: Vec<LicenseDetection>,
         copyrights: Vec<Copyright>,
         urls: Vec<OutputURL>,
+        for_packages: Vec<String>,
         scan_errors: Vec<String>,
     ) -> Self {
         // Combine license expressions from package data if license_expression is None
@@ -128,6 +133,7 @@ impl FileInfo {
             license_detections,
             copyrights,
             urls,
+            for_packages,
             scan_errors,
         }
     }
@@ -394,6 +400,324 @@ pub struct FileReference {
     pub sha512: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub extra_data: Option<std::collections::HashMap<String, serde_json::Value>>,
+}
+
+/// Top-level assembled package, created by merging one or more `PackageData`
+/// objects from related manifest/lockfiles (e.g., package.json + package-lock.json).
+///
+/// Compatible with ScanCode Toolkit output format. The key differences from
+/// `PackageData` are:
+/// - `package_uid`: unique identifier (PURL with UUID qualifier)
+/// - `datafile_paths`: list of all contributing files
+/// - `datasource_ids`: list of all contributing parsers
+/// - Excludes `dependencies` and `file_references` (hoisted to top-level)
+#[derive(Serialize, Debug, Clone)]
+pub struct Package {
+    #[serde(rename = "type")]
+    pub package_type: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub namespace: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub version: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub qualifiers: Option<std::collections::HashMap<String, String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub subpath: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub primary_language: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub release_date: Option<String>,
+    pub parties: Vec<Party>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub keywords: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub homepage_url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub download_url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub size: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sha1: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub md5: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sha256: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sha512: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bug_tracking_url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub code_view_url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub vcs_url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub copyright: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub holder: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub declared_license_expression: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub declared_license_expression_spdx: Option<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub license_detections: Vec<LicenseDetection>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub other_license_expression: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub other_license_expression_spdx: Option<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub other_license_detections: Vec<LicenseDetection>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub extracted_license_statement: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub notice_text: Option<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub source_packages: Vec<String>,
+    #[serde(skip_serializing_if = "is_false", default)]
+    pub is_private: bool,
+    #[serde(skip_serializing_if = "is_false", default)]
+    pub is_virtual: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub extra_data: Option<std::collections::HashMap<String, serde_json::Value>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub repository_homepage_url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub repository_download_url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub api_data_url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub purl: Option<String>,
+    /// Unique identifier for this package instance (PURL with UUID qualifier).
+    pub package_uid: String,
+    /// Paths to all datafiles that contributed to this package.
+    pub datafile_paths: Vec<String>,
+    /// Datasource identifiers for all parsers that contributed to this package.
+    pub datasource_ids: Vec<String>,
+}
+
+impl Package {
+    /// Create a `Package` from a `PackageData` and its source file path.
+    ///
+    /// Generates a unique `package_uid` by appending a UUID qualifier to the PURL.
+    /// If the `PackageData` has no PURL, the package_uid will be an empty string.
+    pub fn from_package_data(package_data: &PackageData, datafile_path: String) -> Self {
+        let package_uid = package_data
+            .purl
+            .as_ref()
+            .map(|p| build_package_uid(p))
+            .unwrap_or_default();
+
+        let datasource_id = package_data.datasource_id.clone().unwrap_or_default();
+
+        Package {
+            package_type: package_data.package_type.clone(),
+            namespace: package_data.namespace.clone(),
+            name: package_data.name.clone(),
+            version: package_data.version.clone(),
+            qualifiers: package_data.qualifiers.clone(),
+            subpath: package_data.subpath.clone(),
+            primary_language: package_data.primary_language.clone(),
+            description: package_data.description.clone(),
+            release_date: package_data.release_date.clone(),
+            parties: package_data.parties.clone(),
+            keywords: package_data.keywords.clone(),
+            homepage_url: package_data.homepage_url.clone(),
+            download_url: package_data.download_url.clone(),
+            size: package_data.size,
+            sha1: package_data.sha1.clone(),
+            md5: package_data.md5.clone(),
+            sha256: package_data.sha256.clone(),
+            sha512: package_data.sha512.clone(),
+            bug_tracking_url: package_data.bug_tracking_url.clone(),
+            code_view_url: package_data.code_view_url.clone(),
+            vcs_url: package_data.vcs_url.clone(),
+            copyright: package_data.copyright.clone(),
+            holder: package_data.holder.clone(),
+            declared_license_expression: package_data.declared_license_expression.clone(),
+            declared_license_expression_spdx: package_data.declared_license_expression_spdx.clone(),
+            license_detections: package_data.license_detections.clone(),
+            other_license_expression: package_data.other_license_expression.clone(),
+            other_license_expression_spdx: package_data.other_license_expression_spdx.clone(),
+            other_license_detections: package_data.other_license_detections.clone(),
+            extracted_license_statement: package_data.extracted_license_statement.clone(),
+            notice_text: package_data.notice_text.clone(),
+            source_packages: package_data.source_packages.clone(),
+            is_private: package_data.is_private,
+            is_virtual: package_data.is_virtual,
+            extra_data: package_data.extra_data.clone(),
+            repository_homepage_url: package_data.repository_homepage_url.clone(),
+            repository_download_url: package_data.repository_download_url.clone(),
+            api_data_url: package_data.api_data_url.clone(),
+            purl: package_data.purl.clone(),
+            package_uid,
+            datafile_paths: vec![datafile_path],
+            datasource_ids: if datasource_id.is_empty() {
+                vec![]
+            } else {
+                vec![datasource_id]
+            },
+        }
+    }
+
+    /// Update this package with data from another `PackageData`.
+    ///
+    /// Merges data from a related file (e.g., lockfile) into this package.
+    /// Existing non-empty values are preserved; empty fields are filled from
+    /// the new data. Lists (parties, license_detections) are merged.
+    pub fn update(&mut self, package_data: &PackageData, datafile_path: String) {
+        if let Some(ref dsid) = package_data.datasource_id
+            && !dsid.is_empty()
+        {
+            self.datasource_ids.push(dsid.clone());
+        }
+        self.datafile_paths.push(datafile_path);
+
+        macro_rules! fill_if_empty {
+            ($field:ident) => {
+                if self.$field.is_none() {
+                    self.$field = package_data.$field.clone();
+                }
+            };
+        }
+
+        fill_if_empty!(namespace);
+        fill_if_empty!(version);
+        fill_if_empty!(primary_language);
+        fill_if_empty!(description);
+        fill_if_empty!(release_date);
+        fill_if_empty!(homepage_url);
+        fill_if_empty!(download_url);
+        fill_if_empty!(size);
+        fill_if_empty!(sha1);
+        fill_if_empty!(md5);
+        fill_if_empty!(sha256);
+        fill_if_empty!(sha512);
+        fill_if_empty!(bug_tracking_url);
+        fill_if_empty!(code_view_url);
+        fill_if_empty!(vcs_url);
+        fill_if_empty!(copyright);
+        fill_if_empty!(holder);
+        fill_if_empty!(declared_license_expression);
+        fill_if_empty!(declared_license_expression_spdx);
+        fill_if_empty!(other_license_expression);
+        fill_if_empty!(other_license_expression_spdx);
+        fill_if_empty!(extracted_license_statement);
+        fill_if_empty!(notice_text);
+        fill_if_empty!(extra_data);
+        fill_if_empty!(repository_homepage_url);
+        fill_if_empty!(repository_download_url);
+        fill_if_empty!(api_data_url);
+
+        for party in &package_data.parties {
+            if !self
+                .parties
+                .iter()
+                .any(|p| p.name == party.name && p.role == party.role)
+            {
+                self.parties.push(party.clone());
+            }
+        }
+
+        for keyword in &package_data.keywords {
+            if !self.keywords.contains(keyword) {
+                self.keywords.push(keyword.clone());
+            }
+        }
+
+        for detection in &package_data.license_detections {
+            self.license_detections.push(detection.clone());
+        }
+
+        for detection in &package_data.other_license_detections {
+            self.other_license_detections.push(detection.clone());
+        }
+
+        for source_pkg in &package_data.source_packages {
+            if !self.source_packages.contains(source_pkg) {
+                self.source_packages.push(source_pkg.clone());
+            }
+        }
+    }
+}
+
+/// Top-level dependency instance, created during package assembly.
+///
+/// Extends the file-level `Dependency` with traceability fields that link
+/// each dependency to its owning package and source datafile.
+#[derive(Serialize, Debug, Clone)]
+pub struct TopLevelDependency {
+    pub purl: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub extracted_requirement: Option<String>,
+    pub scope: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub is_runtime: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub is_optional: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub is_pinned: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub is_direct: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub resolved_package: Option<Box<ResolvedPackage>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub extra_data: Option<std::collections::HashMap<String, serde_json::Value>>,
+    /// Unique identifier for this dependency instance (PURL with UUID qualifier).
+    pub dependency_uid: String,
+    /// The `package_uid` of the package this dependency belongs to.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub for_package_uid: Option<String>,
+    /// Path to the datafile where this dependency was declared.
+    pub datafile_path: String,
+    /// Datasource identifier for the parser that extracted this dependency.
+    pub datasource_id: String,
+}
+
+impl TopLevelDependency {
+    /// Create a `TopLevelDependency` from a file-level `Dependency`.
+    pub fn from_dependency(
+        dep: &Dependency,
+        datafile_path: String,
+        datasource_id: String,
+        for_package_uid: Option<String>,
+    ) -> Self {
+        let dependency_uid = dep
+            .purl
+            .as_ref()
+            .map(|p| build_package_uid(p))
+            .unwrap_or_default();
+
+        TopLevelDependency {
+            purl: dep.purl.clone(),
+            extracted_requirement: dep.extracted_requirement.clone(),
+            scope: dep.scope.clone(),
+            is_runtime: dep.is_runtime,
+            is_optional: dep.is_optional,
+            is_pinned: dep.is_pinned,
+            is_direct: dep.is_direct,
+            resolved_package: dep.resolved_package.clone(),
+            extra_data: dep.extra_data.clone(),
+            dependency_uid,
+            for_package_uid,
+            datafile_path,
+            datasource_id,
+        }
+    }
+}
+
+/// Generate a unique package identifier by appending a UUID v4 qualifier to a PURL.
+///
+/// The format matches Python ScanCode: `pkg:type/name@version?uuid=<uuid-v4>`
+pub fn build_package_uid(purl: &str) -> String {
+    let uuid = Uuid::new_v4();
+    if purl.contains('?') {
+        format!("{}&uuid={}", purl, uuid)
+    } else {
+        format!("{}?uuid={}", purl, uuid)
+    }
 }
 
 #[derive(Serialize, Debug, Clone)]

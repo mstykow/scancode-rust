@@ -251,6 +251,7 @@
 //! [SPDX License List](https://github.com/spdx/license-list-data) at release time.
 
 pub mod askalono;
+pub mod assembly;
 pub mod cli;
 pub mod models;
 pub mod parsers;

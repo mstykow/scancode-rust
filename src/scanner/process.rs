@@ -233,6 +233,7 @@ fn process_directory(path: &Path, metadata: &fs::Metadata) -> FileInfo {
         copyrights: Vec::new(),         // TODO: implement
         license_detections: Vec::new(), // TODO: implement
         urls: Vec::new(),               // TODO: implement
+        for_packages: Vec::new(),
         scan_errors: Vec::new(),
     }
 }

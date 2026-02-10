@@ -1,0 +1,11 @@
+{
+    "name": "test/package",
+    "version": "1.0.0",
+    "description": "A test PHP package",
+    "require": {
+        "symfony/console": "^6.0"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^10.0"
+    }
+}

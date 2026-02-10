@@ -1,0 +1,120 @@
+{
+  "dependencies": [
+    {
+      "datafile_path": "composer.json",
+      "datasource_id": "php_composer_json",
+      "dependency_uid": "pkg:composer/symfony/console?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "extracted_requirement": "^6.0",
+      "for_package_uid": "pkg:composer/test/package@1.0.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "is_direct": true,
+      "is_optional": false,
+      "is_pinned": false,
+      "is_runtime": true,
+      "purl": "pkg:composer/symfony/console",
+      "scope": "require"
+    },
+    {
+      "datafile_path": "composer.json",
+      "datasource_id": "php_composer_json",
+      "dependency_uid": "pkg:composer/phpunit/phpunit?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "extracted_requirement": "^10.0",
+      "for_package_uid": "pkg:composer/test/package@1.0.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "is_direct": true,
+      "is_optional": true,
+      "is_pinned": false,
+      "is_runtime": false,
+      "purl": "pkg:composer/phpunit/phpunit",
+      "scope": "require-dev"
+    },
+    {
+      "datafile_path": "composer.lock",
+      "datasource_id": "php_composer_lock",
+      "dependency_uid": "pkg:composer/symfony/console@v6.0.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "extra_data": {
+        "dist_reference": "xyz789",
+        "dist_type": "zip",
+        "dist_url": "https://api.github.com/repos/symfony/console/zipball/xyz789",
+        "source_reference": "xyz789",
+        "source_type": "git",
+        "source_url": "https://github.com/symfony/console.git"
+      },
+      "for_package_uid": "pkg:composer/test/package@1.0.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "is_direct": true,
+      "is_optional": false,
+      "is_pinned": true,
+      "is_runtime": true,
+      "purl": "pkg:composer/symfony/console@v6.0.0",
+      "resolved_package": {
+        "datasource_id": "php_composer_lock",
+        "dependencies": [],
+        "download_url": "https://api.github.com/repos/symfony/console/zipball/xyz789",
+        "is_virtual": true,
+        "name": "console",
+        "namespace": "symfony",
+        "primary_language": "PHP",
+        "type": "composer",
+        "version": "v6.0.0"
+      },
+      "scope": "require"
+    },
+    {
+      "datafile_path": "composer.lock",
+      "datasource_id": "php_composer_lock",
+      "dependency_uid": "pkg:composer/phpunit/phpunit@10.0.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "extra_data": {
+        "dist_reference": "abc123",
+        "dist_type": "zip",
+        "dist_url": "https://api.github.com/repos/sebastianbergmann/phpunit/zipball/abc123",
+        "source_reference": "abc123",
+        "source_type": "git",
+        "source_url": "https://github.com/sebastianbergmann/phpunit.git"
+      },
+      "for_package_uid": "pkg:composer/test/package@1.0.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "is_direct": true,
+      "is_optional": true,
+      "is_pinned": true,
+      "is_runtime": false,
+      "purl": "pkg:composer/phpunit/phpunit@10.0.0",
+      "resolved_package": {
+        "datasource_id": "php_composer_lock",
+        "dependencies": [],
+        "download_url": "https://api.github.com/repos/sebastianbergmann/phpunit/zipball/abc123",
+        "is_virtual": true,
+        "name": "phpunit",
+        "namespace": "phpunit",
+        "primary_language": "PHP",
+        "type": "composer",
+        "version": "10.0.0"
+      },
+      "scope": "require-dev"
+    }
+  ],
+  "packages": [
+    {
+      "api_data_url": "https://packagist.org/p/packages/test/package.json",
+      "datafile_paths": [
+        "composer.json",
+        "composer.lock"
+      ],
+      "datasource_ids": [
+        "php_composer_json",
+        "php_composer_lock"
+      ],
+      "description": "A test PHP package",
+      "name": "package",
+      "namespace": "test",
+      "package_uid": "pkg:composer/test/package@1.0.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "parties": [
+        {
+          "name": "test",
+          "role": "vendor"
+        }
+      ],
+      "primary_language": "PHP",
+      "purl": "pkg:composer/test/package@1.0.0",
+      "repository_homepage_url": "https://packagist.org/packages/test/package",
+      "type": "composer",
+      "version": "1.0.0"
+    }
+  ]
+}
