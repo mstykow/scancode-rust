@@ -35,10 +35,7 @@ mod tests {
             package_data.homepage_url,
             Some("https://example.com".to_string())
         );
-        assert_eq!(
-            package_data.download_url,
-            Some("https://github.com/example/test-cargo".to_string())
-        );
+        assert_eq!(package_data.download_url, None);
 
         assert_eq!(package_data.declared_license_expression, None);
         assert_eq!(package_data.declared_license_expression_spdx, None);
@@ -95,10 +92,7 @@ authors = ["Test User <test@example.com>"]
             package_data.homepage_url,
             Some("https://example.com".to_string())
         );
-        assert_eq!(
-            package_data.download_url,
-            Some("https://github.com/user/test-package".to_string())
-        );
+        assert_eq!(package_data.download_url, None);
 
         assert_eq!(package_data.declared_license_expression, None);
         assert_eq!(package_data.declared_license_expression_spdx, None);
@@ -252,9 +246,12 @@ mockito = "0.31.0"
             Some("https://crates.io/crates/serde".to_string())
         );
 
-        // Then: Download URL should fall back to crates.io download API
+        // Then: Download URL should be None (download URL goes in repository_download_url)
+        assert_eq!(package_data.download_url, None);
+
+        // Then: Repository download URL should point to crates.io download API
         assert_eq!(
-            package_data.download_url,
+            package_data.repository_download_url,
             Some("https://crates.io/api/v1/crates/serde/1.0.228/download".to_string())
         );
     }

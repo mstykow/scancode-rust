@@ -306,24 +306,24 @@ mod tests {
         let pom_path = PathBuf::from("testdata/maven/pom-api-url-basic.xml");
         let package_data = MavenParser::extract_first_package(&pom_path);
 
-        // Then: API data URL should be generated with maven-metadata.xml
+        // Then: API data URL should point to the POM file
         assert_eq!(
             package_data.api_data_url,
-            Some("https://repo1.maven.org/maven2/org/apache/commons/commons-lang3/3.12.0/maven-metadata.xml".to_string())
+            Some("https://repo1.maven.org/maven2/org/apache/commons/commons-lang3/3.12.0/commons-lang3-3.12.0.pom".to_string())
         );
 
-        // Then: Homepage URL should fall back to Maven repository URL
+        // Then: Repository homepage URL should be the Maven directory listing
         assert_eq!(
-            package_data.homepage_url,
+            package_data.repository_homepage_url,
             Some(
                 "https://repo1.maven.org/maven2/org/apache/commons/commons-lang3/3.12.0/"
                     .to_string()
             )
         );
 
-        // Then: Download URL should be the JAR file download URL
+        // Then: Repository download URL should be the JAR file download URL
         assert_eq!(
-            package_data.download_url,
+            package_data.repository_download_url,
             Some("https://repo1.maven.org/maven2/org/apache/commons/commons-lang3/3.12.0/commons-lang3-3.12.0.jar".to_string())
         );
     }
@@ -334,20 +334,17 @@ mod tests {
         let pom_path = PathBuf::from("testdata/maven/pom-api-url-no-version.xml");
         let package_data = MavenParser::extract_first_package(&pom_path);
 
-        // Then: API data URL should still be generated (without version)
-        assert_eq!(
-            package_data.api_data_url,
-            Some("https://repo1.maven.org/maven2/junit/junit/maven-metadata.xml".to_string())
-        );
+        // Then: API data URL should be None (no version, can't construct POM filename)
+        assert_eq!(package_data.api_data_url, None);
 
-        // Then: Homepage URL should fall back to Maven repository URL (without version)
+        // Then: Repository homepage URL should still be the Maven directory listing
         assert_eq!(
-            package_data.homepage_url,
+            package_data.repository_homepage_url,
             Some("https://repo1.maven.org/maven2/junit/junit/".to_string())
         );
 
-        // Then: Download URL should not be generated (no version)
-        assert_eq!(package_data.download_url, None);
+        // Then: Repository download URL should not be generated (no version)
+        assert_eq!(package_data.repository_download_url, None);
     }
 
     #[test]

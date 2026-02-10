@@ -108,18 +108,21 @@ impl PackageParser for CargoParser {
             .and_then(|p| p.get(FIELD_REPOSITORY))
             .and_then(|v| v.as_str())
             .map(String::from);
-        let download_url = repository_url.clone().or_else(|| {
-            if let (Some(n), Some(v)) = (&name, &version) {
-                Some(format!(
-                    "https://crates.io/api/v1/crates/{}/{}/download",
-                    n, v
-                ))
-            } else {
-                None
-            }
-        });
+        let download_url = None;
 
         let api_data_url = generate_cargo_api_url(&name, &version);
+
+        let repository_homepage_url = name
+            .as_ref()
+            .map(|n| format!("https://crates.io/crates/{}", n));
+
+        let repository_download_url = match (&name, &version) {
+            (Some(n), Some(v)) => Some(format!(
+                "https://crates.io/api/v1/crates/{}/{}/download",
+                n, v
+            )),
+            _ => None,
+        };
 
         let description = package
             .and_then(|p| p.get(FIELD_DESCRIPTION))
@@ -137,7 +140,7 @@ impl PackageParser for CargoParser {
             version,
             qualifiers: None,
             subpath: None,
-            primary_language: None,
+            primary_language: Some("Rust".to_string()),
             description,
             release_date: None,
             parties: extract_parties(&toml_content),
@@ -168,10 +171,10 @@ impl PackageParser for CargoParser {
             is_virtual: false,
             extra_data,
             dependencies: [dependencies, dev_dependencies, build_dependencies].concat(),
-            repository_homepage_url: None,
-            repository_download_url: None,
+            repository_homepage_url,
+            repository_download_url,
             api_data_url,
-            datasource_id: None,
+            datasource_id: Some("cargo_toml".to_string()),
             purl,
         }]
     }
