@@ -70,6 +70,7 @@ Options:
   -o, --output-file <OUTPUT_FILE>    Output JSON file path
   -d, --max-depth <MAX_DEPTH>        Maximum directory depth to scan [default: 50]
   -e, --exclude <EXCLUDE>...         Glob patterns to exclude from scanning
+      --no-assemble                  Disable package assembly (merging related manifest/lockfiles)
   -h, --help                         Print help
   -V, --version                      Print version
 ```

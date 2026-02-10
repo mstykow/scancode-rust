@@ -24,25 +24,19 @@ Each test case is a directory containing:
 - **Input files**: Real manifest/lockfile pairs (e.g., `package.json`, `package-lock.json`)
 - **Expected output**: `expected.json` with the complete assembly result
 
+**Directory naming convention**: `<ecosystem>-<testcase>/`
+
+**Example structure**:
 ```
 testdata/assembly-golden/
-├── npm-basic/
-│   ├── package.json          # npm manifest
-│   ├── package-lock.json     # npm lockfile
-│   └── expected.json         # Expected assembly output
-├── cargo-basic/
-│   ├── Cargo.toml           # Rust manifest
-│   ├── Cargo.lock           # Rust lockfile
-│   └── expected.json
-├── go-basic/
-│   ├── go.mod               # Go manifest
-│   ├── go.sum               # Go checksums
-│   └── expected.json
-└── composer-basic/
-    ├── composer.json        # PHP manifest
-    ├── composer.lock        # PHP lockfile
-    └── expected.json
+├── <ecosystem>-basic/
+│   ├── <manifest-file>      # Ecosystem manifest
+│   ├── <lockfile>           # Ecosystem lockfile (if applicable)
+│   └── expected.json        # Expected assembly output
+└── README.md                # This file
 ```
+
+**Current test cases**: Run `ls testdata/assembly-golden/` to see all available test directories.
 
 ## Test Execution Flow
 
