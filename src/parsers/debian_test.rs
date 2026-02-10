@@ -1,0 +1,127 @@
+#[cfg(test)]
+mod tests {
+    use crate::parsers::PackageParser;
+    use crate::parsers::debian::*;
+    use std::path::PathBuf;
+
+    #[test]
+    fn test_debian_md5sum_in_package_is_match_control_tar_xz() {
+        let path = PathBuf::from(
+            "testdata/debian/extracted-md5sums/testpkg_2.5-3_i386.deb-extract/control.tar.xz-extract/md5sums",
+        );
+        assert!(DebianMd5sumInPackageParser::is_match(&path));
+    }
+
+    #[test]
+    fn test_debian_md5sum_in_package_is_not_match_wrong_path() {
+        let path = PathBuf::from("testdata/debian/var/lib/dpkg/info/bash.md5sums");
+        assert!(!DebianMd5sumInPackageParser::is_match(&path));
+    }
+
+    #[test]
+    fn test_debian_md5sum_in_package_is_not_match_wrong_filename() {
+        let path = PathBuf::from(
+            "testdata/debian/extracted-md5sums/example_1.0-1_amd64.deb-extract/control.tar.gz-extract/control",
+        );
+        assert!(!DebianMd5sumInPackageParser::is_match(&path));
+    }
+
+    #[test]
+    fn test_debian_md5sum_in_package_extract_from_control_tar_gz() {
+        let path = PathBuf::from(
+            "testdata/debian/extracted-md5sums/example_1.0-1_amd64.deb-extract/control.tar.gz-extract/md5sums",
+        );
+
+        if !path.exists() {
+            return;
+        }
+
+        let packages = DebianMd5sumInPackageParser::extract_packages(&path);
+        assert_eq!(packages.len(), 1);
+
+        let package = &packages[0];
+        assert_eq!(package.package_type, Some("deb".to_string()));
+        assert_eq!(
+            package.datasource_id,
+            Some("debian_md5sums_in_extracted_deb".to_string())
+        );
+        assert_eq!(package.name, Some("example".to_string()));
+        assert_eq!(package.namespace, Some("debian".to_string()));
+        assert_eq!(package.purl, Some("pkg:deb/debian/example".to_string()));
+
+        assert_eq!(package.file_references.len(), 4);
+
+        let first_ref = &package.file_references[0];
+        assert_eq!(first_ref.path, "usr/bin/example");
+        assert_eq!(
+            first_ref.md5,
+            Some("d41d8cd98f00b204e9800998ecf8427e".to_string())
+        );
+        assert!(first_ref.sha1.is_none());
+        assert!(first_ref.sha256.is_none());
+
+        let last_ref = &package.file_references[3];
+        assert_eq!(last_ref.path, "usr/share/man/man1/example.1.gz");
+        assert_eq!(
+            last_ref.md5,
+            Some("9e107d9d372bb6826bd81d3542a419d6".to_string())
+        );
+    }
+
+    #[test]
+    fn test_debian_md5sum_in_package_extract_from_control_tar_xz() {
+        let path = PathBuf::from(
+            "testdata/debian/extracted-md5sums/testpkg_2.5-3_i386.deb-extract/control.tar.xz-extract/md5sums",
+        );
+
+        if !path.exists() {
+            return;
+        }
+
+        let packages = DebianMd5sumInPackageParser::extract_packages(&path);
+        assert_eq!(packages.len(), 1);
+
+        let package = &packages[0];
+        assert_eq!(package.package_type, Some("deb".to_string()));
+        assert_eq!(
+            package.datasource_id,
+            Some("debian_md5sums_in_extracted_deb".to_string())
+        );
+        assert_eq!(package.name, Some("testpkg".to_string()));
+        assert_eq!(package.namespace, Some("debian".to_string()));
+        assert_eq!(package.purl, Some("pkg:deb/debian/testpkg".to_string()));
+
+        assert_eq!(package.file_references.len(), 3);
+
+        let first_ref = &package.file_references[0];
+        assert_eq!(first_ref.path, "usr/bin/testapp");
+        assert_eq!(
+            first_ref.md5,
+            Some("5f4dcc3b5aa765d61d8327deb882cf99".to_string())
+        );
+
+        let last_ref = &package.file_references[2];
+        assert_eq!(last_ref.path, "usr/lib/testpkg/libtest.so");
+        assert_eq!(
+            last_ref.md5,
+            Some("ad0234829205b9033196ba818f7a872b".to_string())
+        );
+    }
+
+    #[test]
+    fn test_extract_package_name_from_deb_path() {
+        let path1 = PathBuf::from("example_1.0-1_amd64.deb-extract/control.tar.gz-extract/md5sums");
+        let name1 = extract_package_name_from_deb_path(&path1);
+        assert_eq!(name1, Some("example".to_string()));
+
+        let path2 = PathBuf::from("testpkg_2.5-3_i386.deb-extract/control.tar.xz-extract/md5sums");
+        let name2 = extract_package_name_from_deb_path(&path2);
+        assert_eq!(name2, Some("testpkg".to_string()));
+
+        let path3 = PathBuf::from(
+            "complex-name_1.2.3-4ubuntu1_amd64.deb-extract/control.tar.gz-extract/md5sums",
+        );
+        let name3 = extract_package_name_from_deb_path(&path3);
+        assert_eq!(name3, Some("complex-name".to_string()));
+    }
+}

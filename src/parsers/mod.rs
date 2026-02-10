@@ -61,6 +61,8 @@ mod dart_golden_test;
 mod dart_test;
 mod debian;
 mod debian_golden_test;
+#[cfg(test)]
+mod debian_test;
 mod freebsd;
 #[cfg(test)]
 mod freebsd_test;
@@ -264,7 +266,8 @@ pub use self::dart::{PubspecLockParser, PubspecYamlParser};
 pub use self::debian::{
     DebianControlParser, DebianCopyrightParser, DebianDebParser, DebianDebianTarParser,
     DebianDistrolessInstalledParser, DebianDscParser, DebianInstalledListParser,
-    DebianInstalledMd5sumsParser, DebianInstalledParser, DebianOrigTarParser,
+    DebianInstalledMd5sumsParser, DebianInstalledParser, DebianMd5sumInPackageParser,
+    DebianOrigTarParser,
 };
 pub use self::freebsd::FreebsdCompactManifestParser;
 pub use self::go::{GoModParser, GoSumParser, GodepsParser};
@@ -368,6 +371,7 @@ define_parsers! {
     DebianInstalledListParser,
     DebianInstalledMd5sumsParser,
     DebianInstalledParser,
+    DebianMd5sumInPackageParser,
     DebianOrigTarParser,
     FreebsdCompactManifestParser,
     GemArchiveParser,
