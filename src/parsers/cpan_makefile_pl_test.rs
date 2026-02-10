@@ -165,7 +165,12 @@ WriteMakefile(
         let pkg = parse_makefile_pl(content);
 
         assert_eq!(pkg.name.as_deref(), Some("My::Module"));
-        assert_eq!(pkg.version.as_deref(), Some("lib/My/Module.pm"));
+        assert_eq!(pkg.version, None);
+        let extra = pkg.extra_data.as_ref().expect("extra_data should exist");
+        assert_eq!(
+            extra.get("VERSION_FROM").and_then(|v| v.as_str()),
+            Some("lib/My/Module.pm")
+        );
     }
 
     #[test]
@@ -180,7 +185,12 @@ WriteMakefile(
 "#;
         let pkg = parse_makefile_pl(content);
 
-        assert_eq!(pkg.description.as_deref(), Some("lib/My/Module.pm"));
+        assert_eq!(pkg.description, None);
+        let extra = pkg.extra_data.as_ref().expect("extra_data should exist");
+        assert_eq!(
+            extra.get("ABSTRACT_FROM").and_then(|v| v.as_str()),
+            Some("lib/My/Module.pm")
+        );
     }
 
     #[test]
