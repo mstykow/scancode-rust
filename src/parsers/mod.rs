@@ -32,14 +32,21 @@ mod composer_golden_test;
 #[cfg(test)]
 mod composer_test;
 mod conan;
+mod conan_data;
+#[cfg(test)]
+mod conan_data_test;
 #[cfg(test)]
 mod conan_test;
 mod conda;
+mod conda_meta_json;
 #[cfg(test)]
-mod conda_golden_test;
+mod conda_meta_json_test;
 #[cfg(test)]
 mod conda_test;
 mod cpan;
+mod cpan_dist_ini;
+#[cfg(test)]
+mod cpan_dist_ini_test;
 #[cfg(test)]
 mod cpan_test;
 mod cran;
@@ -77,6 +84,9 @@ mod maven;
 #[cfg(test)]
 mod maven_test;
 pub mod metadata;
+mod microsoft_update_manifest;
+#[cfg(test)]
+mod microsoft_update_manifest_test;
 mod npm;
 #[cfg(test)]
 mod npm_golden_test;
@@ -96,7 +106,13 @@ mod nuget_test;
 mod opam;
 #[cfg(test)]
 mod opam_golden_test;
+mod os_release;
+#[cfg(test)]
+mod os_release_test;
 mod pep508;
+mod pip_inspect_deplock;
+#[cfg(test)]
+mod pip_inspect_deplock_test;
 mod pipfile_lock;
 #[cfg(test)]
 mod pipfile_lock_test;
@@ -123,6 +139,9 @@ mod requirements_txt_test;
 pub(crate) mod rfc822;
 mod rpm_db;
 mod rpm_golden_test;
+mod rpm_mariner_manifest;
+#[cfg(test)]
+mod rpm_mariner_manifest_test;
 mod rpm_parser;
 mod ruby;
 #[cfg(test)]
@@ -137,6 +156,9 @@ mod swift_manifest_json_test;
 mod swift_resolved;
 #[cfg(test)]
 mod swift_resolved_test;
+mod swift_show_dependencies;
+#[cfg(test)]
+mod swift_show_dependencies_test;
 pub mod utils;
 mod yarn_lock;
 #[cfg(test)]
@@ -232,8 +254,11 @@ pub use self::cargo_lock::CargoLockParser;
 pub use self::chef::{ChefMetadataJsonParser, ChefMetadataRbParser};
 pub use self::composer::{ComposerJsonParser, ComposerLockParser};
 pub use self::conan::{ConanFilePyParser, ConanLockParser, ConanfileTxtParser};
+pub use self::conan_data::ConanDataParser;
 pub use self::conda::{CondaEnvironmentYmlParser, CondaMetaYamlParser};
+pub use self::conda_meta_json::CondaMetaJsonParser;
 pub use self::cpan::{CpanManifestParser, CpanMetaJsonParser, CpanMetaYmlParser};
+pub use self::cpan_dist_ini::CpanDistIniParser;
 pub use self::cran::CranParser;
 pub use self::dart::{PubspecLockParser, PubspecYamlParser};
 pub use self::debian::{
@@ -247,11 +272,14 @@ pub use self::gradle::GradleParser;
 pub use self::gradle_lock::GradleLockfileParser;
 pub use self::haxe::HaxeParser;
 pub use self::maven::MavenParser;
+pub use self::microsoft_update_manifest::MicrosoftUpdateManifestParser;
 pub use self::npm::NpmParser;
 pub use self::npm_lock::NpmLockParser;
 pub use self::npm_workspace::NpmWorkspaceParser;
 pub use self::nuget::{NupkgParser, NuspecParser, PackagesConfigParser, PackagesLockParser};
 pub use self::opam::OpamParser;
+pub use self::os_release::OsReleaseParser;
+pub use self::pip_inspect_deplock::PipInspectDeplockParser;
 pub use self::pipfile_lock::PipfileLockParser;
 pub use self::pnpm_lock::PnpmLockParser;
 pub use self::podfile::PodfileParser;
@@ -262,10 +290,12 @@ pub use self::poetry_lock::PoetryLockParser;
 pub use self::python::PythonParser;
 pub use self::requirements_txt::RequirementsTxtParser;
 pub use self::rpm_db::{RpmBdbDatabaseParser, RpmNdbDatabaseParser, RpmSqliteDatabaseParser};
+pub use self::rpm_mariner_manifest::RpmMarinerManifestParser;
 pub use self::rpm_parser::RpmParser;
 pub use self::ruby::{GemArchiveParser, GemfileLockParser, GemfileParser, GemspecParser};
 pub use self::swift_manifest_json::SwiftManifestJsonParser;
 pub use self::swift_resolved::SwiftPackageResolvedParser;
+pub use self::swift_show_dependencies::SwiftShowDependenciesParser;
 pub use self::yarn_lock::YarnLockParser;
 
 macro_rules! define_parsers {
@@ -315,11 +345,14 @@ define_parsers! {
     ChefMetadataRbParser,
     ComposerJsonParser,
     ComposerLockParser,
+    ConanDataParser,
     ConanFilePyParser,
     ConanfileTxtParser,
     ConanLockParser,
     CondaEnvironmentYmlParser,
+    CondaMetaJsonParser,
     CondaMetaYamlParser,
+    CpanDistIniParser,
     CpanManifestParser,
     CpanMetaJsonParser,
     CpanMetaYmlParser,
@@ -346,14 +379,17 @@ define_parsers! {
     GradleParser,
     HaxeParser,
     MavenParser,
+    MicrosoftUpdateManifestParser,
     NpmLockParser,
     NpmParser,
     NpmWorkspaceParser,
     NupkgParser,
     NuspecParser,
     OpamParser,
+    OsReleaseParser,
     PackagesConfigParser,
     PackagesLockParser,
+    PipInspectDeplockParser,
     PipfileLockParser,
     PnpmLockParser,
     PodfileLockParser,
@@ -366,10 +402,12 @@ define_parsers! {
     PythonParser,
     RequirementsTxtParser,
     RpmBdbDatabaseParser,
+    RpmMarinerManifestParser,
     RpmNdbDatabaseParser,
     RpmParser,
     RpmSqliteDatabaseParser,
     SwiftManifestJsonParser,
     SwiftPackageResolvedParser,
+    SwiftShowDependenciesParser,
     YarnLockParser,
 }
