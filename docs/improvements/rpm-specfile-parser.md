@@ -206,4 +206,4 @@ These are complex features that Python also doesn't implement. The focus is on e
 
 - Python implementation: `reference/scancode-toolkit/src/packagedcode/rpm.py` (line 449: "TODO: implement me!!@")
 - Rust implementation: `src/parsers/rpm_specfile.rs`
-- RPM spec format: https://rpm-software-management.github.io/rpm/manual/spec.html
+- RPM spec format: <https://rpm-software-management.github.io/rpm/manual/spec.html>

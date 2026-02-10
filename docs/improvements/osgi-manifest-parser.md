@@ -218,4 +218,4 @@ Rust's `MavenParser` has **integrated OSGi detection**:
 
 - Python implementation: `reference/scancode-toolkit/src/packagedcode/maven.py` (empty path_patterns)
 - Rust implementation: `src/parsers/maven_pom.rs`
-- OSGi Core Specification: https://docs.osgi.org/specification/osgi.core/7.0.0/framework.module.html
+- OSGi Core Specification: <https://docs.osgi.org/specification/osgi.core/7.0.0/framework.module.html>

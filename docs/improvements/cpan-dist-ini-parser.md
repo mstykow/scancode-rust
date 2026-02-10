@@ -153,4 +153,4 @@ Test::More = 0.88
 
 - Python implementation: `reference/scancode-toolkit/src/packagedcode/misc.py`
 - Rust implementation: `src/parsers/cpan_dist_ini.rs`
-- Dist::Zilla spec: https://metacpan.org/pod/Dist::Zilla::Tutorial
+- Dist::Zilla spec: <https://metacpan.org/pod/Dist::Zilla::Tutorial>

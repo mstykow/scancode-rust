@@ -153,4 +153,4 @@ BUG_REPORT_URL="https://bugs.debian.org/"
 
 - Python implementation: `reference/scancode-toolkit/src/packagedcode/distro.py`
 - Rust implementation: `src/parsers/os_release.rs`
-- os-release spec: https://www.freedesktop.org/software/systemd/man/os-release.html
+- os-release spec: <https://www.freedesktop.org/software/systemd/man/os-release.html>

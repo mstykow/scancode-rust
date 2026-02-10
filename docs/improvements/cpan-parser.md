@@ -198,7 +198,7 @@ CPAN has 4 dependency scopes:
 
 Supports "Name <email>" format:
 
-- `"John Doe <john@example.com>"` → name="John Doe", email="john@example.com"
+- `"John Doe <john@example.com>"` → name="John Doe", email="<john@example.com>"
 - `"John Doe"` → name="John Doe", email=None
 
 ### License Handling

@@ -213,4 +213,4 @@ These features would require a full Perl parser or code execution, which poses s
 
 - Python implementation: `reference/scancode-toolkit/src/packagedcode/misc.py`
 - Rust implementation: `src/parsers/cpan_makefile_pl.rs`
-- ExtUtils::MakeMaker spec: https://metacpan.org/pod/ExtUtils::MakeMaker
+- ExtUtils::MakeMaker spec: <https://metacpan.org/pod/ExtUtils::MakeMaker>

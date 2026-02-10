@@ -151,5 +151,5 @@ patches:
 
 - Python implementation: `reference/scancode-toolkit/src/packagedcode/conan.py`
 - Rust implementation: `src/parsers/conan_data.rs`
-- conandata.yml spec: https://docs.conan.io/2/tutorial/creating_packages/handle_sources_in_packages.html
-- Conan Center format: https://github.com/conan-io/conan-center-index/blob/master/docs/adding_packages/conandata_yml_format.md
+- conandata.yml spec: <https://docs.conan.io/2/tutorial/creating_packages/handle_sources_in_packages.html>
+- Conan Center format: <https://github.com/conan-io/conan-center-index/blob/master/docs/adding_packages/conandata_yml_format.md>
