@@ -1509,6 +1509,118 @@ fn parse_deb_filename(filename: &str) -> PackageData {
     }
 }
 
+/// Parser for MD5 checksum files inside extracted .deb control tarballs
+pub struct DebianMd5sumInPackageParser;
+
+impl PackageParser for DebianMd5sumInPackageParser {
+    const PACKAGE_TYPE: &'static str = PACKAGE_TYPE;
+
+    fn is_match(path: &Path) -> bool {
+        path.file_name()
+            .and_then(|n| n.to_str())
+            .is_some_and(|name| name == "md5sums")
+            && path
+                .to_str()
+                .map(|p| {
+                    p.ends_with("control.tar.gz-extract/md5sums")
+                        || p.ends_with("control.tar.xz-extract/md5sums")
+                })
+                .unwrap_or(false)
+    }
+
+    fn extract_packages(path: &Path) -> Vec<PackageData> {
+        let content = match read_file_to_string(path) {
+            Ok(c) => c,
+            Err(e) => {
+                warn!("Failed to read md5sums file {:?}: {}", path, e);
+                return vec![create_default_package_data(
+                    PACKAGE_TYPE,
+                    Some("debian_md5sums_in_extracted_deb"),
+                )];
+            }
+        };
+
+        let package_name = extract_package_name_from_deb_path(path);
+
+        vec![parse_md5sums_in_package(&content, package_name.as_deref())]
+    }
+}
+
+pub(crate) fn extract_package_name_from_deb_path(path: &Path) -> Option<String> {
+    let parent = path.parent()?;
+    let grandparent = parent.parent()?;
+    let dirname = grandparent.file_name()?.to_str()?;
+    let without_extract = dirname.strip_suffix("-extract")?;
+    let without_deb = without_extract.strip_suffix(".deb")?;
+    let name = without_deb.split('_').next()?;
+
+    Some(name.to_string())
+}
+
+fn parse_md5sums_in_package(content: &str, package_name: Option<&str>) -> PackageData {
+    let mut file_references = Vec::new();
+
+    for line in content.lines() {
+        let line = line.trim();
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+
+        let (md5sum, filepath): (Option<String>, &str) = if let Some(idx) = line.find("  ") {
+            (Some(line[..idx].trim().to_string()), line[idx + 2..].trim())
+        } else if let Some((hash, path)) = line.split_once(' ') {
+            (Some(hash.trim().to_string()), path.trim())
+        } else {
+            (None, line)
+        };
+
+        if IGNORED_ROOT_DIRS.contains(&filepath) {
+            continue;
+        }
+
+        file_references.push(FileReference {
+            path: filepath.to_string(),
+            size: None,
+            sha1: None,
+            md5: md5sum,
+            sha256: None,
+            sha512: None,
+            extra_data: None,
+        });
+    }
+
+    if file_references.is_empty() {
+        return create_default_package_data(PACKAGE_TYPE, Some("debian_md5sums_in_extracted_deb"));
+    }
+
+    let namespace = Some("debian".to_string());
+    let mut package = PackageData {
+        datasource_id: Some("debian_md5sums_in_extracted_deb".to_string()),
+        package_type: Some(PACKAGE_TYPE.to_string()),
+        namespace: namespace.clone(),
+        name: package_name.map(|s| s.to_string()),
+        file_references,
+        ..Default::default()
+    };
+
+    if let Some(n) = &package.name {
+        package.purl = build_debian_purl(n, None, namespace.as_deref(), None);
+    }
+
+    package
+}
+
+crate::register_parser!(
+    "Debian MD5 checksums in extracted .deb control tarball",
+    &[
+        "**/control.tar.gz-extract/md5sums",
+        "**/control.tar.xz-extract/md5sums"
+    ],
+    "deb",
+    "",
+    Some("https://www.debian.org/doc/debian-policy/ch-controlfields.html"),
+);
+
 #[cfg(test)]
 mod tests {
     use super::*;
