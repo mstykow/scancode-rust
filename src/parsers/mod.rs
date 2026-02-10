@@ -16,6 +16,8 @@ mod buck;
 #[cfg(test)]
 mod buck_test;
 mod cargo;
+#[cfg(test)]
+mod cargo_golden_test;
 mod cargo_lock;
 #[cfg(test)]
 mod cargo_lock_test;
@@ -86,6 +88,8 @@ mod haxe_golden_test;
 #[cfg(test)]
 mod haxe_test;
 mod maven;
+#[cfg(test)]
+mod maven_golden_test;
 #[cfg(test)]
 mod maven_test;
 pub mod metadata;
@@ -297,11 +301,12 @@ pub use self::haxe::HaxeParser;
 pub use self::maven::MavenParser;
 pub use self::microsoft_update_manifest::MicrosoftUpdateManifestParser;
 pub use self::misc::{
-    AndroidLibraryRecognizer, AppleDmgRecognizer, Axis2MarRecognizer, Axis2ModuleXmlRecognizer,
-    CabArchiveRecognizer, ChromeCrxRecognizer, IosIpaRecognizer, IsoImageRecognizer,
-    IvyXmlRecognizer, JBossSarRecognizer, JBossServiceXmlRecognizer, JavaEarAppXmlRecognizer,
-    JavaEarRecognizer, JavaJarRecognizer, JavaWarRecognizer, JavaWarWebXmlRecognizer,
-    MeteorPackageRecognizer, MozillaXpiRecognizer, SharArchiveRecognizer,
+    AndroidApkRecognizer, AndroidLibraryRecognizer, AppleDmgRecognizer, Axis2MarRecognizer,
+    Axis2ModuleXmlRecognizer, CabArchiveRecognizer, ChromeCrxRecognizer, InstallShieldRecognizer,
+    IosIpaRecognizer, IsoImageRecognizer, IvyXmlRecognizer, JBossSarRecognizer,
+    JBossServiceXmlRecognizer, JavaEarAppXmlRecognizer, JavaEarRecognizer, JavaJarRecognizer,
+    JavaWarRecognizer, JavaWarWebXmlRecognizer, MeteorPackageRecognizer, MozillaXpiRecognizer,
+    NsisRecognizer, SharArchiveRecognizer, SquashfsRecognizer,
 };
 pub use self::npm::NpmParser;
 pub use self::npm_lock::NpmLockParser;
@@ -471,4 +476,8 @@ define_parsers! {
     SharArchiveRecognizer,
     AppleDmgRecognizer,
     IsoImageRecognizer,
+    AndroidApkRecognizer,
+    SquashfsRecognizer,
+    NsisRecognizer,
+    InstallShieldRecognizer,
 }

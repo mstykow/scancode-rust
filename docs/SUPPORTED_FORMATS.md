@@ -8,7 +8,7 @@ scancode-rust supports **68** package formats across 31 ecosystems.
 
 | Description | File Patterns | Package Type | Language | Documentation |
 |-------------|---------------|--------------|----------|---------------|
-| Misc file type recognizers (JAR, WAR, EAR, Android, iOS, Chrome, Mozilla, etc.) | `**/*.jar, **/ivy.xml, **/*.war, **/WEB-INF/web.xml, **/*.ear, **/META-INF/application.xml, **/meta-inf/module.xml, **/*.mar, **/*.sar, **/meta-inf/jboss-service.xml, **/package.js, **/*.aar, **/*.xpi, **/*.crx, **/*.ipa, **/*.cab, **/*.shar, **/*.dmg, **/*.sparseimage, **/*.iso, **/*.udf, **/*.img` |  |  | - |
+| Misc file type recognizers (JAR, WAR, EAR, Android, iOS, Chrome, Mozilla, installers, disk images, etc.) | `**/*.jar, **/ivy.xml, **/*.war, **/WEB-INF/web.xml, **/*.ear, **/META-INF/application.xml, **/meta-inf/module.xml, **/*.mar, **/*.sar, **/meta-inf/jboss-service.xml, **/package.js, **/*.apk, **/*.aar, **/*.xpi, **/*.crx, **/*.ipa, **/*.cab, **/*.shar, **/*.dmg, **/*.sparseimage, **/*.iso, **/*.udf, **/*.img, **/*.exe` |  |  | - |
 | AboutCode .ABOUT metadata file | `**/*.ABOUT` | about |  | [Link](https://aboutcode-toolkit.readthedocs.io/en/latest/specification.html) |
 | Alpine Linux package (installed db and .apk archive) | `**/lib/apk/db/installed, **/*.apk` | alpine |  | [Link](https://wiki.alpinelinux.org/wiki/Apk_spec) |
 | Autotools configure script | `**/configure, **/configure.ac` | autotools | C | [Link](https://www.gnu.org/software/autoconf/) |
