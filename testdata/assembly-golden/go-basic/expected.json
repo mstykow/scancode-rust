@@ -1,0 +1,79 @@
+{
+  "dependencies": [
+    {
+      "datafile_path": "go.mod",
+      "datasource_id": "go_mod",
+      "dependency_uid": "pkg:golang/github.com/gin-gonic/gin@v1.9.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "extracted_requirement": "v1.9.0",
+      "for_package_uid": "pkg:golang/example.com/test-module?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "is_direct": true,
+      "is_optional": false,
+      "is_pinned": false,
+      "is_runtime": true,
+      "purl": "pkg:golang/github.com/gin-gonic/gin@v1.9.0",
+      "scope": "require"
+    },
+    {
+      "datafile_path": "go.mod",
+      "datasource_id": "go_mod",
+      "dependency_uid": "pkg:golang/github.com/stretchr/testify@v1.8.4?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "extracted_requirement": "v1.8.4",
+      "for_package_uid": "pkg:golang/example.com/test-module?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "is_direct": true,
+      "is_optional": false,
+      "is_pinned": false,
+      "is_runtime": true,
+      "purl": "pkg:golang/github.com/stretchr/testify@v1.8.4",
+      "scope": "require"
+    },
+    {
+      "datafile_path": "go.sum",
+      "datasource_id": "go_sum",
+      "dependency_uid": "pkg:golang/github.com/gin-gonic/gin@v1.9.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "extracted_requirement": "v1.9.0",
+      "for_package_uid": "pkg:golang/example.com/test-module?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "is_optional": false,
+      "is_pinned": true,
+      "is_runtime": true,
+      "purl": "pkg:golang/github.com/gin-gonic/gin@v1.9.0",
+      "scope": "dependency"
+    },
+    {
+      "datafile_path": "go.sum",
+      "datasource_id": "go_sum",
+      "dependency_uid": "pkg:golang/github.com/stretchr/testify@v1.8.4?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "extracted_requirement": "v1.8.4",
+      "for_package_uid": "pkg:golang/example.com/test-module?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "is_optional": false,
+      "is_pinned": true,
+      "is_runtime": true,
+      "purl": "pkg:golang/github.com/stretchr/testify@v1.8.4",
+      "scope": "dependency"
+    }
+  ],
+  "packages": [
+    {
+      "datafile_paths": [
+        "go.mod",
+        "go.sum"
+      ],
+      "datasource_ids": [
+        "go_mod",
+        "go_sum"
+      ],
+      "extra_data": {
+        "go_version": "1.21"
+      },
+      "homepage_url": "https://pkg.go.dev/example.com/test-module",
+      "name": "test-module",
+      "namespace": "example.com",
+      "package_uid": "pkg:golang/example.com/test-module?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "parties": [],
+      "primary_language": "Go",
+      "purl": "pkg:golang/example.com/test-module",
+      "repository_homepage_url": "https://pkg.go.dev/example.com/test-module",
+      "type": "golang",
+      "vcs_url": "https://example.com/test-module.git"
+    }
+  ]
+}

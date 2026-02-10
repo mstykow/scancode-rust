@@ -3,6 +3,9 @@ mod output;
 
 pub use file_info::{
     Dependency, FileInfo, FileInfoBuilder, FileReference, FileType, LicenseDetection, Match,
-    PackageData, Party, ResolvedPackage,
+    Package, PackageData, Party, ResolvedPackage, TopLevelDependency,
 };
+
+#[cfg(test)]
+pub use file_info::build_package_uid;
 pub use output::{ExtraData, Header, Output, SCANCODE_OUTPUT_FORMAT_VERSION, SystemEnvironment};

@@ -17,4 +17,8 @@ pub struct Cli {
     /// Exclude patterns (glob patterns like "*.tmp" or "node_modules")
     #[arg(short, long, value_delimiter = ',')]
     pub exclude: Vec<String>,
+
+    /// Disable package assembly (merging related manifest/lockfiles into packages)
+    #[arg(long)]
+    pub no_assemble: bool,
 }

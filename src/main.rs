@@ -17,6 +17,7 @@ use crate::models::{ExtraData, Header, Output, SCANCODE_OUTPUT_FORMAT_VERSION, S
 use crate::scanner::{count, process};
 
 mod askalono;
+mod assembly;
 mod cli;
 mod models;
 mod parsers;
@@ -56,7 +57,7 @@ fn run() -> Result<(), Box<dyn Error>> {
     );
 
     let progress_bar = create_progress_bar(total_files);
-    let scan_result = process(
+    let mut scan_result = process(
         &cli.dir_path,
         cli.max_depth,
         Arc::clone(&progress_bar),
@@ -65,8 +66,23 @@ fn run() -> Result<(), Box<dyn Error>> {
     )?;
     progress_bar.finish_with_message("Scan complete!");
 
+    let assembly_result = if cli.no_assemble {
+        assembly::AssemblyResult {
+            packages: Vec::new(),
+            dependencies: Vec::new(),
+        }
+    } else {
+        assembly::assemble(&mut scan_result.files)
+    };
+
     let end_time = Utc::now();
-    let output = create_output(start_time, end_time, scan_result, total_dirs);
+    let output = create_output(
+        start_time,
+        end_time,
+        scan_result,
+        total_dirs,
+        assembly_result,
+    );
     write_output(&cli.output_file, &output)?;
 
     println!("JSON output written to {}", cli.output_file);
@@ -125,6 +141,7 @@ fn create_output(
     end_time: chrono::DateTime<Utc>,
     scan_result: scanner::ProcessResult,
     total_dirs: usize,
+    assembly_result: assembly::AssemblyResult,
 ) -> Output {
     let duration = (end_time - start_time).num_nanoseconds().unwrap_or(0) as f64 / 1_000_000_000.0;
 
@@ -173,6 +190,8 @@ fn create_output(
             errors,
             output_format_version: SCANCODE_OUTPUT_FORMAT_VERSION.to_string(),
         }],
+        packages: assembly_result.packages,
+        dependencies: assembly_result.dependencies,
         files: scan_result.files,
         license_references: Vec::new(),      // TODO: implement
         license_rule_references: Vec::new(), // TODO: implement

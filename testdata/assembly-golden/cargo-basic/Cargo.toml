@@ -1,0 +1,10 @@
+[package]
+name = "test-crate"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+serde = "1.0"
+
+[dev-dependencies]
+tokio = { version = "1.0", features = ["full"] }

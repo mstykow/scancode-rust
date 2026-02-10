@@ -1,0 +1,160 @@
+# Assembly Golden Tests
+
+This directory contains golden tests for the package assembly phase. Assembly golden tests exercise the **full pipeline**: parse real manifest/lockfile pairs → run assembly → compare assembled output against expected JSON.
+
+## Purpose
+
+Assembly is the phase where:
+1. Related manifest and lockfile pairs are discovered (e.g., `package.json` + `package-lock.json`)
+2. Package data is merged from both files into a single top-level `Package` object
+3. Dependencies are hoisted to the top level with traceability (`for_package_uid`, `datafile_path`, `datasource_id`)
+4. Each file is linked back to its packages via `for_packages` field
+5. Unique identifiers are generated (`package_uid` with UUID qualifiers)
+
+These tests validate that the assembly logic correctly:
+- Groups files by directory
+- Finds matching sibling files based on assembler configurations
+- Merges package data from multiple sources
+- Hoists dependencies to top level
+- Normalizes and enriches metadata
+
+## Test Structure
+
+Each test case is a directory containing:
+- **Input files**: Real manifest/lockfile pairs (e.g., `package.json`, `package-lock.json`)
+- **Expected output**: `expected.json` with the complete assembly result
+
+```
+testdata/assembly-golden/
+├── npm-basic/
+│   ├── package.json          # npm manifest
+│   ├── package-lock.json     # npm lockfile
+│   └── expected.json         # Expected assembly output
+├── cargo-basic/
+│   ├── Cargo.toml           # Rust manifest
+│   ├── Cargo.lock           # Rust lockfile
+│   └── expected.json
+├── go-basic/
+│   ├── go.mod               # Go manifest
+│   ├── go.sum               # Go checksums
+│   └── expected.json
+└── composer-basic/
+    ├── composer.json        # PHP manifest
+    ├── composer.lock        # PHP lockfile
+    └── expected.json
+```
+
+## Test Execution Flow
+
+1. **Build FileInfo objects**: The test discovers all parseable files in the directory and runs the appropriate parser to extract package data
+2. **Run assembly**: Calls `assembly::assemble()` on the FileInfo objects
+3. **Normalize UUIDs**: Replaces all UUID v4 values with a fixed placeholder for deterministic comparison
+4. **Compare JSON**: Deep compares actual vs expected JSON structure
+
+## UUID Normalization
+
+Assembly generates random UUID v4 values for `package_uid` and `dependency_uid`. To enable deterministic testing, the comparison function normalizes all UUIDs by replacing:
+
+```
+uuid=<any-uuid-v4>
+```
+
+with:
+
+```
+uuid=fixed-uid-done-for-testing-5642512d1758
+```
+
+This matches the normalization pattern used in existing cocoapods golden tests.
+
+## Expected JSON Format
+
+The expected JSON file contains the complete assembly result:
+
+```json
+{
+  "packages": [
+    {
+      "type": "npm",
+      "name": "my-package",
+      "version": "1.0.0",
+      "package_uid": "pkg:npm/my-package@1.0.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "datafile_paths": ["package.json", "package-lock.json"],
+      "datasource_ids": ["npm_package_json", "npm_package_lock_json"],
+      "purl": "pkg:npm/my-package@1.0.0",
+      ...other package fields...
+    }
+  ],
+  "dependencies": [
+    {
+      "purl": "pkg:npm/express@4.18.0",
+      "dependency_uid": "pkg:npm/express@4.18.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "for_package_uid": "pkg:npm/my-package@1.0.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "datafile_path": "package.json",
+      "datasource_id": "npm_package_json",
+      "scope": "dependencies",
+      ...other dependency fields...
+    }
+  ]
+}
+```
+
+## Supported Ecosystems
+
+Currently tested ecosystems:
+- **npm** - `package.json` + `package-lock.json`
+- **Cargo** - `Cargo.toml` + `Cargo.lock`
+- **Go** - `go.mod` + `go.sum`
+- **Composer** - `composer.json` + `composer.lock`
+
+Additional ecosystems can be added by:
+1. Creating a new directory with manifest/lockfile pair
+2. Running tests to auto-generate `expected.json`
+3. Reviewing and committing the expected file
+
+## Running Tests
+
+```bash
+# Run all assembly golden tests
+cargo test --lib assembly_golden
+
+# Run specific test
+cargo test --lib test_assembly_npm_basic
+
+# Run with output
+cargo test --lib assembly_golden -- --nocapture
+```
+
+## Adding New Test Cases
+
+1. Create a new directory under `testdata/assembly-golden/<ecosystem>-<testcase>/`
+2. Add minimal manifest/lockfile pair (keep files small and focused)
+3. Run the test - it will auto-generate `expected.json` on first run
+4. Review the generated `expected.json` carefully:
+   - Verify UUIDs are normalized to `fixed-uid-done-for-testing-5642512d1758`
+   - Check that packages and dependencies are correctly assembled
+   - Ensure datafile_paths and datasource_ids are populated
+5. Re-run test to verify it passes
+6. Commit both input files and expected.json
+
+## Common Issues
+
+### Test fails with "Missing key in actual"
+- The expected JSON has a field that wasn't generated by assembly
+- Check if parser is populating that field correctly
+- Verify assembler configuration includes the datasource_id
+
+### Test fails with "Array length mismatch"
+- Dependencies or packages count doesn't match
+- Check if all files were parsed (should see multiple datasource_ids)
+- Verify assembly grouping logic (files must be in same directory)
+
+### UUIDs not normalized
+- Check regex pattern in `normalize_uuids()` function
+- Ensure expected file was generated through the test (not manually created)
+
+## Related Documentation
+
+- **[Assembly Architecture](../../docs/ARCHITECTURE.md#assembly-phase)** - Assembly phase design
+- **[Assembler Configurations](../../src/assembly/assemblers.rs)** - Sibling file patterns
+- **[Testing Strategy](../../docs/TESTING_STRATEGY.md)** - Overall testing approach

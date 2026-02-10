@@ -1,0 +1,4 @@
+github.com/gin-gonic/gin v1.9.0 h1:xyz123
+github.com/gin-gonic/gin v1.9.0/go.mod h1:abc456
+github.com/stretchr/testify v1.8.4 h1:def789
+github.com/stretchr/testify v1.8.4/go.mod h1:ghi012
