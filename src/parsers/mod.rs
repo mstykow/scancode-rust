@@ -145,6 +145,8 @@ mod python;
 mod python_test;
 mod readme;
 #[cfg(test)]
+mod readme_golden_test;
+#[cfg(test)]
 mod readme_test;
 mod requirements_txt;
 #[cfg(test)]
