@@ -399,7 +399,12 @@ mod tests {
         let manifest_path = PathBuf::from("testdata/maven/test3/MANIFEST.MF");
         let package_data = MavenParser::extract_first_package(&manifest_path);
 
-        assert_eq!(package_data.package_type, Some("maven".to_string()));
+        // This file has Bundle-SymbolicName, so it's detected as OSGi
+        assert_eq!(package_data.package_type, Some("osgi".to_string()));
+        assert_eq!(
+            package_data.datasource_id,
+            Some("java_osgi_manifest".to_string())
+        );
         assert_eq!(package_data.name, Some("com.example.mybundle".to_string()));
         assert_eq!(package_data.version, Some("2.1.0".to_string()));
 
