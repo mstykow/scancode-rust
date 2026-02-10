@@ -47,6 +47,9 @@ mod cpan;
 mod cpan_dist_ini;
 #[cfg(test)]
 mod cpan_dist_ini_test;
+mod cpan_makefile_pl;
+#[cfg(test)]
+mod cpan_makefile_pl_test;
 #[cfg(test)]
 mod cpan_test;
 mod cran;
@@ -270,6 +273,7 @@ pub use self::conda::{CondaEnvironmentYmlParser, CondaMetaYamlParser};
 pub use self::conda_meta_json::CondaMetaJsonParser;
 pub use self::cpan::{CpanManifestParser, CpanMetaJsonParser, CpanMetaYmlParser};
 pub use self::cpan_dist_ini::CpanDistIniParser;
+pub use self::cpan_makefile_pl::CpanMakefilePlParser;
 pub use self::cran::CranParser;
 pub use self::dart::{PubspecLockParser, PubspecYamlParser};
 pub use self::debian::{
@@ -370,6 +374,7 @@ define_parsers! {
     CondaMetaJsonParser,
     CondaMetaYamlParser,
     CpanDistIniParser,
+    CpanMakefilePlParser,
     CpanManifestParser,
     CpanMetaJsonParser,
     CpanMetaYmlParser,
