@@ -56,6 +56,9 @@
     ],
     "homepage_url": "http://jakarta.apache.org/commons/fileupload/",
     "bug_tracking_url": "http://nagoya.apache.org/bugzilla/",
+    "extra_data": {
+      "inception_year": "2002"
+    },
     "dependencies": [
       {
         "purl": "pkg:maven/servletapi/servletapi@2.3",

@@ -386,7 +386,9 @@ impl PackageParser for MavenParser {
         let mut current_dependency_coords: Option<DependencyCoordinates> = None;
 
         let mut license_names: Vec<String> = Vec::new();
+        let mut inception_year = None;
         let mut scm_connection = None;
+        let mut scm_developer_connection = None;
         let mut scm_url = None;
         let mut scm_tag = None;
         let mut organization_name = None;
@@ -641,11 +643,26 @@ impl PackageParser for MavenParser {
                             Some(b"url") if current_element.len() == 2 => {
                                 package_data.homepage_url = Some(text)
                             }
-                            Some(b"connection") | Some(b"developerConnection")
+                            Some(b"inceptionYear") if current_element.len() == 2 => {
+                                inception_year = Some(text)
+                            }
+                            Some(b"connection")
                                 if current_element.len() >= 3
                                     && current_element[current_element.len() - 2] == b"scm" =>
                             {
                                 scm_connection = if text.starts_with("scm:git:") {
+                                    Some(text.replacen("scm:git:", "git+", 1))
+                                } else if text.starts_with("scm:") {
+                                    Some(text.replacen("scm:", "", 1))
+                                } else {
+                                    Some(text)
+                                };
+                            }
+                            Some(b"developerConnection")
+                                if current_element.len() >= 3
+                                    && current_element[current_element.len() - 2] == b"scm" =>
+                            {
+                                scm_developer_connection = if text.starts_with("scm:git:") {
                                     Some(text.replacen("scm:git:", "git+", 1))
                                 } else if text.starts_with("scm:") {
                                     Some(text.replacen("scm:", "", 1))
@@ -962,7 +979,9 @@ impl PackageParser for MavenParser {
         resolve_option(&mut resolver, &mut package_data.name);
         resolve_option(&mut resolver, &mut package_data.version);
         resolve_option(&mut resolver, &mut package_data.homepage_url);
+        resolve_option(&mut resolver, &mut inception_year);
         resolve_option(&mut resolver, &mut scm_connection);
+        resolve_option(&mut resolver, &mut scm_developer_connection);
         resolve_option(&mut resolver, &mut scm_url);
         resolve_option(&mut resolver, &mut scm_tag);
         resolve_option(&mut resolver, &mut organization_name);
@@ -1077,7 +1096,9 @@ impl PackageParser for MavenParser {
             }
         }
 
-        package_data.vcs_url = scm_connection.or(scm_url.clone());
+        package_data.vcs_url = scm_connection
+            .or_else(|| scm_developer_connection.clone())
+            .or_else(|| scm_url.clone());
 
         // Set code_view_url from scm/url (human-browseable URL)
         if let Some(url) = &scm_url {
@@ -1094,9 +1115,11 @@ impl PackageParser for MavenParser {
             package_data.download_url = Some(url.clone());
         }
 
-        if organization_name.is_some()
+        if inception_year.is_some()
+            || organization_name.is_some()
             || organization_url.is_some()
             || scm_tag.is_some()
+            || scm_developer_connection.is_some()
             || issue_management_system.is_some()
             || ci_management_system.is_some()
             || ci_management_url.is_some()
@@ -1112,6 +1135,12 @@ impl PackageParser for MavenParser {
             || parent_group_id.is_some()
         {
             let mut extra_data = package_data.extra_data.take().unwrap_or_default();
+            if let Some(year) = inception_year {
+                extra_data.insert(
+                    "inception_year".to_string(),
+                    serde_json::Value::String(year),
+                );
+            }
             if let Some(name) = organization_name {
                 extra_data.insert(
                     "organization_name".to_string(),
@@ -1127,23 +1156,23 @@ impl PackageParser for MavenParser {
             if let Some(tag) = scm_tag {
                 extra_data.insert("scm_tag".to_string(), serde_json::Value::String(tag));
             }
+            if let Some(dev_conn) = scm_developer_connection {
+                extra_data.insert(
+                    "scm_developer_connection".to_string(),
+                    serde_json::Value::String(dev_conn),
+                );
+            }
             if let Some(system) = issue_management_system {
                 extra_data.insert(
-                    "issue_management_system".to_string(),
+                    "issue_tracking_system".to_string(),
                     serde_json::Value::String(system),
                 );
             }
             if let Some(system) = ci_management_system {
-                extra_data.insert(
-                    "ci_management_system".to_string(),
-                    serde_json::Value::String(system),
-                );
+                extra_data.insert("ci_system".to_string(), serde_json::Value::String(system));
             }
             if let Some(url) = ci_management_url {
-                extra_data.insert(
-                    "ci_management_url".to_string(),
-                    serde_json::Value::String(url),
-                );
+                extra_data.insert("ci_url".to_string(), serde_json::Value::String(url));
             }
 
             // Add distribution management data
@@ -1873,15 +1902,23 @@ mod tests {
             Some("https://github.com/spring-projects/spring-boot".to_string())
         );
 
+        // vcs_url prefers connection over developerConnection
         assert_eq!(
             package_data.vcs_url,
-            Some("git+git@github.com:spring-projects/spring-boot.git".to_string())
+            Some("git+https://github.com/spring-projects/spring-boot.git".to_string())
         );
 
         let extra_data = package_data.extra_data.unwrap();
         assert_eq!(
             extra_data.get("scm_tag"),
             Some(&serde_json::Value::String("v3.0.0".to_string()))
+        );
+        // developerConnection stored separately in extra_data
+        assert_eq!(
+            extra_data.get("scm_developer_connection"),
+            Some(&serde_json::Value::String(
+                "git+git@github.com:spring-projects/spring-boot.git".to_string()
+            ))
         );
     }
 
@@ -1987,7 +2024,7 @@ mod tests {
 
         let extra_data = package_data.extra_data.unwrap();
         assert_eq!(
-            extra_data.get("issue_management_system"),
+            extra_data.get("issue_tracking_system"),
             Some(&serde_json::Value::String("GitHub".to_string()))
         );
     }
@@ -2019,11 +2056,11 @@ mod tests {
 
         let extra_data = package_data.extra_data.unwrap();
         assert_eq!(
-            extra_data.get("ci_management_system"),
+            extra_data.get("ci_system"),
             Some(&serde_json::Value::String("Jenkins".to_string()))
         );
         assert_eq!(
-            extra_data.get("ci_management_url"),
+            extra_data.get("ci_url"),
             Some(&serde_json::Value::String(
                 "https://ci.example.com/job/test-app".to_string()
             ))

@@ -8,9 +8,10 @@
     "parties": [],
     "homepage_url": "http://www.springframework.org",
     "code_view_url": "http://springframework.cvs.sourceforge.net/springframework/",
-    "vcs_url": "cvs:ext:username@springframework.cvs.sourceforge.net:/cvsroot/springframework/spring",
+    "vcs_url": "cvs:pserver:anonymous:@springframework.cvs.sourceforge.net:/cvsroot/springframework/spring",
     "extracted_license_statement": "The Apache Software License, Version 2.0",
     "extra_data": {
+      "scm_developer_connection": "cvs:ext:username@springframework.cvs.sourceforge.net:/cvsroot/springframework/spring",
       "distribution_snapshot_repository": {
         "id": "spring-snapshot",
         "name": "Spring Snapshot Repository",
