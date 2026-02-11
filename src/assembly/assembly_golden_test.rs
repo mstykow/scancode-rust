@@ -24,25 +24,43 @@ mod tests {
 
     /// Build FileInfo objects from real files in a test directory.
     ///
-    /// This discovers all parseable files in the directory, runs the appropriate parser,
+    /// This discovers all parseable files in the directory (recursively), runs the appropriate parser,
     /// and constructs FileInfo objects with relative paths (required for proper assembly grouping).
     fn build_file_infos_from_directory(test_dir: &Path) -> Result<Vec<FileInfo>, String> {
         let mut file_infos = Vec::new();
 
-        // Read all files in the directory
-        let entries =
-            fs::read_dir(test_dir).map_err(|e| format!("Failed to read test directory: {}", e))?;
+        visit_dir_recursive(test_dir, test_dir, &mut file_infos)?;
+
+        if file_infos.is_empty() {
+            return Err(format!(
+                "No parseable files found in directory: {:?}",
+                test_dir
+            ));
+        }
+
+        Ok(file_infos)
+    }
+
+    fn visit_dir_recursive(
+        dir: &Path,
+        base_dir: &Path,
+        file_infos: &mut Vec<FileInfo>,
+    ) -> Result<(), String> {
+        let entries = fs::read_dir(dir).map_err(|e| format!("Failed to read directory: {}", e))?;
 
         for entry in entries {
             let entry = entry.map_err(|e| format!("Failed to read directory entry: {}", e))?;
             let path = entry.path();
 
-            // Skip directories and non-files
+            if path.is_dir() {
+                visit_dir_recursive(&path, base_dir, file_infos)?;
+                continue;
+            }
+
             if !path.is_file() {
                 continue;
             }
 
-            // Skip expected.json files
             if path
                 .file_name()
                 .and_then(|n| n.to_str())
@@ -52,28 +70,30 @@ mod tests {
                 continue;
             }
 
-            // Try to parse the file using the registered parsers
             if let Some(package_data_vec) = try_parse_file(&path) {
-                // Get relative path (file name only, which serves as the relative path for grouping)
                 let relative_path = path
-                    .file_name()
-                    .and_then(|n| n.to_str())
-                    .ok_or_else(|| format!("Invalid filename: {:?}", path))?
+                    .strip_prefix(base_dir)
+                    .map_err(|e| format!("Failed to strip prefix: {}", e))?
+                    .to_str()
+                    .ok_or_else(|| format!("Invalid path: {:?}", path))?
                     .to_string();
 
-                let file_name = relative_path.clone();
+                let file_name = path
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .unwrap_or("")
+                    .to_string();
+
                 let extension = path
                     .extension()
                     .and_then(|e| e.to_str())
                     .unwrap_or("")
                     .to_string();
 
-                // Read file size
                 let metadata = fs::metadata(&path)
                     .map_err(|e| format!("Failed to read file metadata: {}", e))?;
                 let size = metadata.len();
 
-                // Create FileInfo with the parsed package data
                 let file_info = FileInfo {
                     name: file_name.clone(),
                     base_name: file_name.clone(),
@@ -100,14 +120,7 @@ mod tests {
             }
         }
 
-        if file_infos.is_empty() {
-            return Err(format!(
-                "No parseable files found in directory: {:?}",
-                test_dir
-            ));
-        }
-
-        Ok(file_infos)
+        Ok(())
     }
 
     /// Compare assembly output against expected JSON file.
@@ -308,6 +321,14 @@ mod tests {
         match run_assembly_golden_test("composer-basic") {
             Ok(_) => (),
             Err(e) => panic!("Assembly golden test failed for composer-basic: {}", e),
+        }
+    }
+
+    #[test]
+    fn test_assembly_maven_basic() {
+        match run_assembly_golden_test("maven-basic") {
+            Ok(_) => (),
+            Err(e) => panic!("Assembly golden test failed for maven-basic: {}", e),
         }
     }
 
