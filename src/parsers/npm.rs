@@ -19,7 +19,7 @@
 //! - Namespace format: `@org` for scoped packages (e.g., `@babel/core`)
 //! - Graceful error handling: logs warnings and returns default on parse failure
 
-use crate::models::{Dependency, PackageData, Party};
+use crate::models::{DatasourceId, Dependency, PackageData, Party};
 use crate::parsers::utils::{npm_purl, parse_sri};
 use log::warn;
 use packageurl::PackageUrl;
@@ -211,7 +211,7 @@ impl PackageParser for NpmParser {
             repository_homepage_url,
             repository_download_url,
             api_data_url,
-            datasource_id: Some("npm_package_json".to_string()),
+            datasource_id: Some(DatasourceId::NpmPackageJson),
             purl,
         }]
     }
@@ -582,48 +582,8 @@ fn extract_name_from_author_string(author_str: &str) -> Option<String> {
 
 fn default_package_data() -> PackageData {
     PackageData {
-        package_type: None,
-        namespace: None,
-        name: None,
-        version: None,
-        qualifiers: None,
-        subpath: None,
         primary_language: Some("JavaScript".to_string()),
-        description: None,
-        release_date: None,
-        parties: Vec::new(),
-        keywords: Vec::new(),
-        homepage_url: None,
-        download_url: None,
-        size: None,
-        sha1: None,
-        md5: None,
-        sha256: None,
-        sha512: None,
-        bug_tracking_url: None,
-        code_view_url: None,
-        vcs_url: None,
-        copyright: None,
-        holder: None,
-        declared_license_expression: None,
-        declared_license_expression_spdx: None,
-        license_detections: Vec::new(),
-        other_license_expression: None,
-        other_license_expression_spdx: None,
-        other_license_detections: Vec::new(),
-        extracted_license_statement: None,
-        notice_text: None,
-        source_packages: Vec::new(),
-        file_references: Vec::new(),
-        is_private: false,
-        is_virtual: false,
-        extra_data: None,
-        dependencies: Vec::new(),
-        repository_homepage_url: None,
-        repository_download_url: None,
-        api_data_url: None,
-        datasource_id: None,
-        purl: None,
+        ..Default::default()
     }
 }
 

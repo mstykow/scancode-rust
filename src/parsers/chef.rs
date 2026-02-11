@@ -30,7 +30,7 @@ use packageurl::PackageUrl;
 use regex::Regex;
 use serde_json::Value;
 
-use crate::models::{Dependency, PackageData, Party};
+use crate::models::{DatasourceId, Dependency, PackageData, Party};
 
 use super::PackageParser;
 
@@ -184,7 +184,7 @@ fn read_json_file(path: &Path) -> Result<Value, String> {
 fn default_package_data() -> PackageData {
     PackageData {
         package_type: Some(ChefMetadataJsonParser::PACKAGE_TYPE.to_string()),
-        datasource_id: Some("chef_metadata_json".to_string()),
+        datasource_id: Some(DatasourceId::ChefCookbookMetadataJson),
         ..Default::default()
     }
 }
@@ -409,7 +409,7 @@ fn build_package(fields: ChefPackageFields) -> PackageData {
 
     PackageData {
         package_type: Some(ChefMetadataJsonParser::PACKAGE_TYPE.to_string()),
-        datasource_id: Some("chef_metadata_rb".to_string()),
+        datasource_id: Some(DatasourceId::ChefCookbookMetadataRb),
         name,
         version,
         description,

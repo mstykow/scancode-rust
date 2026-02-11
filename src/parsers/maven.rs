@@ -22,7 +22,7 @@
 //! - Property substitution limited to prevent infinite loops
 //! - Direct dependencies: all in pom.xml are direct
 
-use crate::models::{Dependency, PackageData, Party};
+use crate::models::{DatasourceId, Dependency, PackageData, Party};
 use crate::parsers::utils::read_file_to_string;
 use log::warn;
 use quick_xml::Reader;
@@ -377,7 +377,7 @@ impl PackageParser for MavenParser {
         let mut package_data = default_package_data();
         package_data.package_type = Some(Self::PACKAGE_TYPE.to_string());
         package_data.primary_language = Some("Java".to_string());
-        package_data.datasource_id = Some("maven_pom".to_string());
+        package_data.datasource_id = Some(DatasourceId::MavenPom);
 
         let mut current_element = Vec::new();
         let mut in_dependencies = false;
@@ -1494,7 +1494,7 @@ fn parse_manifest_mf(path: &Path) -> PackageData {
     if is_osgi {
         // OSGi bundle - extract OSGi-specific metadata
         package_data.package_type = Some("osgi".to_string());
-        package_data.datasource_id = Some("java_osgi_manifest".to_string());
+        package_data.datasource_id = Some(DatasourceId::JavaOsgiManifest);
 
         // Bundle-SymbolicName is the canonical name for OSGi bundles
         // Strip directives after semicolon: "org.example.bundle;singleton:=true" -> "org.example.bundle"
@@ -1566,7 +1566,7 @@ fn parse_manifest_mf(path: &Path) -> PackageData {
     } else {
         // Regular JAR manifest
         package_data.package_type = Some("maven".to_string());
-        package_data.datasource_id = Some("java_jar_manifest".to_string());
+        package_data.datasource_id = Some(DatasourceId::JavaJarManifest);
 
         // Extract fields with priority order for non-OSGi JARs
         let mut name: Option<String> = None;
@@ -1784,50 +1784,7 @@ pub(crate) fn extract_osgi_bundle_version(entry: &str) -> Option<String> {
 }
 
 fn default_package_data() -> PackageData {
-    PackageData {
-        package_type: None,
-        namespace: None,
-        name: None,
-        version: None,
-        qualifiers: None,
-        subpath: None,
-        primary_language: None,
-        description: None,
-        release_date: None,
-        parties: Vec::new(),
-        keywords: Vec::new(),
-        homepage_url: None,
-        download_url: None,
-        size: None,
-        sha1: None,
-        md5: None,
-        sha256: None,
-        sha512: None,
-        bug_tracking_url: None,
-        code_view_url: None,
-        vcs_url: None,
-        copyright: None,
-        holder: None,
-        declared_license_expression: None,
-        declared_license_expression_spdx: None,
-        license_detections: Vec::new(),
-        other_license_expression: None,
-        other_license_expression_spdx: None,
-        other_license_detections: Vec::new(),
-        extracted_license_statement: None,
-        notice_text: None,
-        source_packages: Vec::new(),
-        file_references: Vec::new(),
-        is_private: false,
-        is_virtual: false,
-        extra_data: None,
-        dependencies: Vec::new(),
-        repository_homepage_url: None,
-        repository_download_url: None,
-        api_data_url: None,
-        datasource_id: None,
-        purl: None,
-    }
+    PackageData::default()
 }
 
 #[cfg(test)]

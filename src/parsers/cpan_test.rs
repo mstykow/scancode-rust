@@ -1,6 +1,7 @@
 #[cfg(test)]
 mod tests {
     use super::super::{CpanManifestParser, CpanMetaJsonParser, CpanMetaYmlParser, PackageParser};
+    use crate::models::DatasourceId;
     use std::path::PathBuf;
 
     #[test]
@@ -50,7 +51,7 @@ mod tests {
             Some("A modern Perl toolkit for web development".to_string())
         );
         assert_eq!(package.primary_language, Some("Perl".to_string()));
-        assert_eq!(package.datasource_id, Some("cpan_meta_json".to_string()));
+        assert_eq!(package.datasource_id, Some(DatasourceId::CpanMetaJson));
     }
 
     #[test]
@@ -176,7 +177,7 @@ mod tests {
             Some("Simple database abstraction layer".to_string())
         );
         assert_eq!(package.primary_language, Some("Perl".to_string()));
-        assert_eq!(package.datasource_id, Some("cpan_meta_yml".to_string()));
+        assert_eq!(package.datasource_id, Some(DatasourceId::CpanMetaYml));
     }
 
     #[test]
@@ -280,7 +281,7 @@ mod tests {
 
         assert_eq!(package.package_type, Some("cpan".to_string()));
         assert_eq!(package.primary_language, Some("Perl".to_string()));
-        assert_eq!(package.datasource_id, Some("cpan_manifest".to_string()));
+        assert_eq!(package.datasource_id, Some(DatasourceId::CpanManifest));
 
         // Check file references
         assert_eq!(package.file_references.len(), 16);

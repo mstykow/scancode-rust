@@ -26,12 +26,19 @@ use std::path::Path;
 use log::warn;
 use rpm::{Package, PackageMetadata};
 
-use crate::models::{Dependency, PackageData, Party};
-use crate::parsers::utils::create_default_package_data;
+use crate::models::{DatasourceId, Dependency, PackageData, Party};
 
 use super::PackageParser;
 
 const PACKAGE_TYPE: &str = "rpm";
+
+fn default_package_data() -> PackageData {
+    PackageData {
+        package_type: Some(PACKAGE_TYPE.to_string()),
+        datasource_id: Some(DatasourceId::RpmArchive),
+        ..Default::default()
+    }
+}
 
 /// Parser for RPM package archives
 pub struct RpmParser;
@@ -52,10 +59,7 @@ impl PackageParser for RpmParser {
             Ok(f) => f,
             Err(e) => {
                 warn!("Failed to open RPM file {:?}: {}", path, e);
-                return vec![create_default_package_data(
-                    PACKAGE_TYPE,
-                    Some("rpm_archive"),
-                )];
+                return vec![default_package_data()];
             }
         };
 
@@ -64,10 +68,7 @@ impl PackageParser for RpmParser {
             Ok(p) => p,
             Err(e) => {
                 warn!("Failed to parse RPM file {:?}: {}", path, e);
-                return vec![create_default_package_data(
-                    PACKAGE_TYPE,
-                    Some("rpm_archive"),
-                )];
+                return vec![default_package_data()];
             }
         };
 
@@ -125,7 +126,7 @@ fn parse_rpm_package(pkg: &Package) -> PackageData {
     let architecture = metadata.get_arch().ok().map(|s| s.to_string());
 
     PackageData {
-        datasource_id: Some("rpm_archive".to_string()),
+        datasource_id: Some(DatasourceId::RpmArchive),
         package_type: Some(PACKAGE_TYPE.to_string()),
         namespace: namespace.clone(),
         name: name.clone(),
@@ -329,7 +330,7 @@ mod tests {
 
         assert_eq!(pkg.package_type, Some("rpm".to_string()));
 
-        if pkg.datasource_id.is_some() {
+        if pkg.name.is_some() {
             assert_eq!(pkg.name, Some("Eterm".to_string()));
             assert!(pkg.version.is_some());
         }
@@ -389,7 +390,7 @@ mod tests {
         }
 
         let pkg = RpmParser::extract_first_package(&test_file);
-        if pkg.datasource_id.is_some() {
+        if pkg.name.is_some() {
             assert_eq!(pkg.name, Some("fping".to_string()));
             assert!(pkg.version.is_some());
         }

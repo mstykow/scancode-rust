@@ -1,5 +1,6 @@
 use super::PackageParser;
 use super::maven::*;
+use crate::models::DatasourceId;
 use std::path::PathBuf;
 
 #[test]
@@ -8,10 +9,7 @@ fn test_osgi_basic_bundle_detection() {
     let package = MavenParser::extract_first_package(&path);
 
     assert_eq!(package.package_type, Some("osgi".to_string()));
-    assert_eq!(
-        package.datasource_id,
-        Some("java_osgi_manifest".to_string())
-    );
+    assert_eq!(package.datasource_id, Some(DatasourceId::JavaOsgiManifest));
     assert_eq!(package.name, Some("org.example.mybundle".to_string()));
     assert_eq!(package.version, Some("1.2.3".to_string()));
 }
@@ -152,7 +150,7 @@ fn test_non_osgi_manifest_stays_maven() {
     let package = MavenParser::extract_first_package(&path);
 
     assert_eq!(package.package_type, Some("maven".to_string()));
-    assert_eq!(package.datasource_id, Some("java_jar_manifest".to_string()));
+    assert_eq!(package.datasource_id, Some(DatasourceId::JavaJarManifest));
     assert_eq!(package.name, Some("spring-web".to_string()));
     assert_eq!(package.version, Some("5.3.20".to_string()));
 

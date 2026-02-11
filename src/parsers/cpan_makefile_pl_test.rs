@@ -2,6 +2,7 @@
 mod tests {
     use super::super::PackageParser;
     use super::super::cpan_makefile_pl::*;
+    use crate::models::DatasourceId;
     use std::path::PathBuf;
 
     #[test]
@@ -50,7 +51,7 @@ WriteMakefile(
         assert_eq!(pkg.description.as_deref(), Some("An example CPAN module"));
         assert_eq!(pkg.extracted_license_statement.as_deref(), Some("perl_5"));
         assert_eq!(pkg.primary_language.as_deref(), Some("Perl"));
-        assert_eq!(pkg.datasource_id.as_deref(), Some("cpan_makefile_pl"));
+        assert_eq!(pkg.datasource_id, Some(DatasourceId::CpanMakefile));
         assert_eq!(pkg.purl.as_deref(), Some("pkg:cpan/Acme-Example@1.23"));
 
         // Check author

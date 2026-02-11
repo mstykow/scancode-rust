@@ -18,6 +18,7 @@
 //! - Patches section contains version→[{patch_file, patch_description, patch_type}]
 //! - Spec: https://docs.conan.io/2/tutorial/creating_packages/handle_sources_in_packages.html
 
+use crate::models::DatasourceId;
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
@@ -27,12 +28,19 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 use crate::models::PackageData;
-use crate::parsers::utils::create_default_package_data;
 
 use super::PackageParser;
 
 const PACKAGE_TYPE: &str = "conan";
-const DATASOURCE_ID: &str = "conan_conandata_yml";
+
+fn default_package_data() -> PackageData {
+    PackageData {
+        package_type: Some(PACKAGE_TYPE.to_string()),
+        primary_language: Some("C++".to_string()),
+        datasource_id: Some(DatasourceId::ConanConanDataYml),
+        ..Default::default()
+    }
+}
 
 /// Parser for Conan conandata.yml files
 pub struct ConanDataParser;
@@ -82,9 +90,7 @@ impl PackageParser for ConanDataParser {
             Ok(c) => c,
             Err(e) => {
                 warn!("Failed to read conandata.yml file {:?}: {}", path, e);
-                let mut pkg = create_default_package_data(PACKAGE_TYPE, Some("C++"));
-                pkg.datasource_id = Some(DATASOURCE_ID.to_string());
-                return vec![pkg];
+                return vec![default_package_data()];
             }
         };
 
@@ -97,16 +103,12 @@ pub(crate) fn parse_conandata_yml(content: &str) -> Vec<PackageData> {
         Ok(d) => d,
         Err(e) => {
             warn!("Failed to parse conandata.yml: {}", e);
-            let mut pkg = create_default_package_data(PACKAGE_TYPE, Some("C++"));
-            pkg.datasource_id = Some(DATASOURCE_ID.to_string());
-            return vec![pkg];
+            return vec![default_package_data()];
         }
     };
 
     let Some(sources) = data.sources else {
-        let mut pkg = create_default_package_data(PACKAGE_TYPE, Some("C++"));
-        pkg.datasource_id = Some(DATASOURCE_ID.to_string());
-        return vec![pkg];
+        return vec![default_package_data()];
     };
 
     let mut packages = Vec::new();
@@ -159,15 +161,13 @@ pub(crate) fn parse_conandata_yml(content: &str) -> Vec<PackageData> {
             } else {
                 Some(extra_data)
             },
-            datasource_id: Some(DATASOURCE_ID.to_string()),
+            datasource_id: Some(DatasourceId::ConanConanDataYml),
             ..Default::default()
         });
     }
 
     if packages.is_empty() {
-        let mut pkg = create_default_package_data(PACKAGE_TYPE, Some("C++"));
-        pkg.datasource_id = Some(DATASOURCE_ID.to_string());
-        packages.push(pkg);
+        packages.push(default_package_data());
     }
 
     packages

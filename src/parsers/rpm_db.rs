@@ -23,12 +23,19 @@ use std::path::Path;
 
 use log::warn;
 
-use crate::models::{Dependency, PackageData};
-use crate::parsers::utils::create_default_package_data;
+use crate::models::{DatasourceId, Dependency, PackageData};
 
 use super::PackageParser;
 
 const PACKAGE_TYPE: &str = "rpm";
+
+fn default_package_data(datasource_id: DatasourceId) -> PackageData {
+    PackageData {
+        package_type: Some(PACKAGE_TYPE.to_string()),
+        datasource_id: Some(datasource_id),
+        ..Default::default()
+    }
+}
 
 pub struct RpmBdbDatabaseParser;
 
@@ -42,18 +49,14 @@ impl PackageParser for RpmBdbDatabaseParser {
     }
 
     fn extract_packages(path: &Path) -> Vec<PackageData> {
-        vec![
-            match parse_rpm_database(path, "rpm_installed_database_bdb") {
-                Ok(pkgs) if !pkgs.is_empty() => pkgs.into_iter().next().unwrap(),
-                Ok(_) => {
-                    create_default_package_data(PACKAGE_TYPE, Some("rpm_installed_database_bdb"))
-                }
-                Err(e) => {
-                    warn!("Failed to parse RPM BDB database {:?}: {}", path, e);
-                    create_default_package_data(PACKAGE_TYPE, Some("rpm_installed_database_bdb"))
-                }
-            },
-        ]
+        match parse_rpm_database(path, DatasourceId::RpmInstalledDatabaseBdb) {
+            Ok(pkgs) if !pkgs.is_empty() => pkgs,
+            Ok(_) => vec![default_package_data(DatasourceId::RpmInstalledDatabaseBdb)],
+            Err(e) => {
+                warn!("Failed to parse RPM BDB database {:?}: {}", path, e);
+                vec![default_package_data(DatasourceId::RpmInstalledDatabaseBdb)]
+            }
+        }
     }
 }
 
@@ -68,18 +71,14 @@ impl PackageParser for RpmNdbDatabaseParser {
     }
 
     fn extract_packages(path: &Path) -> Vec<PackageData> {
-        vec![
-            match parse_rpm_database(path, "rpm_installed_database_ndb") {
-                Ok(pkgs) if !pkgs.is_empty() => pkgs.into_iter().next().unwrap(),
-                Ok(_) => {
-                    create_default_package_data(PACKAGE_TYPE, Some("rpm_installed_database_ndb"))
-                }
-                Err(e) => {
-                    warn!("Failed to parse RPM NDB database {:?}: {}", path, e);
-                    create_default_package_data(PACKAGE_TYPE, Some("rpm_installed_database_ndb"))
-                }
-            },
-        ]
+        match parse_rpm_database(path, DatasourceId::RpmInstalledDatabaseNdb) {
+            Ok(pkgs) if !pkgs.is_empty() => pkgs,
+            Ok(_) => vec![default_package_data(DatasourceId::RpmInstalledDatabaseNdb)],
+            Err(e) => {
+                warn!("Failed to parse RPM NDB database {:?}: {}", path, e);
+                vec![default_package_data(DatasourceId::RpmInstalledDatabaseNdb)]
+            }
+        }
     }
 }
 
@@ -94,22 +93,25 @@ impl PackageParser for RpmSqliteDatabaseParser {
     }
 
     fn extract_packages(path: &Path) -> Vec<PackageData> {
-        vec![
-            match parse_rpm_database(path, "rpm_installed_database_sqlite") {
-                Ok(pkgs) if !pkgs.is_empty() => pkgs.into_iter().next().unwrap(),
-                Ok(_) => {
-                    create_default_package_data(PACKAGE_TYPE, Some("rpm_installed_database_sqlite"))
-                }
-                Err(e) => {
-                    warn!("Failed to parse RPM SQLite database {:?}: {}", path, e);
-                    create_default_package_data(PACKAGE_TYPE, Some("rpm_installed_database_sqlite"))
-                }
-            },
-        ]
+        match parse_rpm_database(path, DatasourceId::RpmInstalledDatabaseSqlite) {
+            Ok(pkgs) if !pkgs.is_empty() => pkgs,
+            Ok(_) => vec![default_package_data(
+                DatasourceId::RpmInstalledDatabaseSqlite,
+            )],
+            Err(e) => {
+                warn!("Failed to parse RPM SQLite database {:?}: {}", path, e);
+                vec![default_package_data(
+                    DatasourceId::RpmInstalledDatabaseSqlite,
+                )]
+            }
+        }
     }
 }
 
-fn parse_rpm_database(path: &Path, datasource_id: &str) -> Result<Vec<PackageData>, String> {
+fn parse_rpm_database(
+    path: &Path,
+    datasource_id: DatasourceId,
+) -> Result<Vec<PackageData>, String> {
     match rpmdb::read_packages(path.to_path_buf()) {
         Ok(packages) => Ok(packages
             .into_iter()
@@ -182,7 +184,7 @@ fn parse_rpm_database(path: &Path, datasource_id: &str) -> Result<Vec<PackageDat
                 });
 
                 PackageData {
-                    datasource_id: Some(datasource_id.to_string()),
+                    datasource_id: Some(datasource_id),
                     package_type: Some(PACKAGE_TYPE.to_string()),
                     namespace,
                     name,
@@ -267,6 +269,7 @@ fn build_evr_version(epoch: i32, version: &str, release: &str) -> Option<String>
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::models::DatasourceId;
     use std::path::PathBuf;
 
     #[test]
@@ -349,7 +352,7 @@ mod tests {
         assert_eq!(pkg.package_type, Some("rpm".to_string()));
         assert_eq!(
             pkg.datasource_id,
-            Some("rpm_installed_database_sqlite".to_string())
+            Some(DatasourceId::RpmInstalledDatabaseSqlite)
         );
         assert!(pkg.name.is_some());
     }

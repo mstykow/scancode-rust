@@ -25,8 +25,7 @@ use std::path::Path;
 use log::warn;
 use regex::Regex;
 
-use crate::models::{Dependency, PackageData, Party};
-use crate::parsers::utils::create_default_package_data;
+use crate::models::{DatasourceId, Dependency, PackageData, Party};
 
 /// Parser for OCaml OPAM package manifest files.
 ///
@@ -76,9 +75,12 @@ struct OpamData {
 }
 
 fn default_package_data() -> PackageData {
-    let mut pkg = create_default_package_data("opam", Some("Ocaml"));
-    pkg.datasource_id = Some("opam_file".to_string());
-    pkg
+    PackageData {
+        package_type: Some("opam".to_string()),
+        primary_language: Some("Ocaml".to_string()),
+        datasource_id: Some(DatasourceId::OpamFile),
+        ..Default::default()
+    }
 }
 
 /// Parse an OPAM file from text content
@@ -133,7 +135,7 @@ fn parse_opam(text: &str) -> PackageData {
         repository_homepage_url,
         repository_download_url: None,
         api_data_url,
-        datasource_id: Some("opam_file".to_string()),
+        datasource_id: Some(DatasourceId::OpamFile),
         purl,
     }
 }

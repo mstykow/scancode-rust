@@ -28,12 +28,9 @@ use packageurl::PackageUrl;
 use quick_xml::Reader;
 use quick_xml::events::Event;
 
-use crate::models::{Dependency, PackageData, Party};
+use crate::models::{DatasourceId, Dependency, PackageData, Party};
 
 use super::PackageParser;
-
-const DATASOURCE_PACKAGES_CONFIG: &str = "nuget_packages_config";
-const DATASOURCE_NUSPEC: &str = "nuget_nuspec";
 
 fn build_nuget_description(
     summary: Option<&str>,
@@ -88,7 +85,9 @@ impl PackageParser for PackagesConfigParser {
             Ok(f) => f,
             Err(e) => {
                 warn!("Failed to open packages.config at {:?}: {}", path, e);
-                return vec![default_package_data(Some(DATASOURCE_PACKAGES_CONFIG))];
+                return vec![default_package_data(Some(
+                    DatasourceId::NugetPackagesConfig,
+                ))];
             }
         };
 
@@ -109,7 +108,9 @@ impl PackageParser for PackagesConfigParser {
                 Ok(Event::Eof) => break,
                 Err(e) => {
                     warn!("Error parsing packages.config at {:?}: {}", path, e);
-                    return vec![default_package_data(Some(DATASOURCE_PACKAGES_CONFIG))];
+                    return vec![default_package_data(Some(
+                        DatasourceId::NugetPackagesConfig,
+                    ))];
                 }
                 _ => {}
             }
@@ -117,10 +118,10 @@ impl PackageParser for PackagesConfigParser {
         }
 
         vec![PackageData {
-            datasource_id: Some(DATASOURCE_PACKAGES_CONFIG.to_string()),
+            datasource_id: Some(DatasourceId::NugetPackagesConfig),
             package_type: Some(Self::PACKAGE_TYPE.to_string()),
             dependencies,
-            ..default_package_data(Some(DATASOURCE_PACKAGES_CONFIG))
+            ..default_package_data(Some(DatasourceId::NugetPackagesConfig))
         }]
     }
 }
@@ -142,7 +143,7 @@ impl PackageParser for NuspecParser {
             Ok(f) => f,
             Err(e) => {
                 warn!("Failed to open .nuspec at {:?}: {}", path, e);
-                return vec![default_package_data(Some(DATASOURCE_NUSPEC))];
+                return vec![default_package_data(Some(DatasourceId::NugetNuspec))];
             }
         };
 
@@ -310,7 +311,7 @@ impl PackageParser for NuspecParser {
                 Ok(Event::Eof) => break,
                 Err(e) => {
                     warn!("Error parsing .nuspec at {:?}: {}", path, e);
-                    return vec![default_package_data(Some(DATASOURCE_NUSPEC))];
+                    return vec![default_package_data(Some(DatasourceId::NugetNuspec))];
                 }
                 _ => {}
             }
@@ -367,7 +368,7 @@ impl PackageParser for NuspecParser {
         let holder = None;
 
         vec![PackageData {
-            datasource_id: Some(DATASOURCE_NUSPEC.to_string()),
+            datasource_id: Some(DatasourceId::NugetNuspec),
             package_type: Some(Self::PACKAGE_TYPE.to_string()),
             name,
             version,
@@ -386,7 +387,7 @@ impl PackageParser for NuspecParser {
             repository_homepage_url,
             repository_download_url,
             api_data_url,
-            ..default_package_data(Some(DATASOURCE_NUSPEC))
+            ..default_package_data(Some(DatasourceId::NugetNuspec))
         }]
     }
 }
@@ -474,55 +475,13 @@ fn parse_nuspec_dependency(
     })
 }
 
-fn default_package_data(datasource_id: Option<&str>) -> PackageData {
+fn default_package_data(datasource_id: Option<DatasourceId>) -> PackageData {
     PackageData {
         package_type: Some("nuget".to_string()),
-        namespace: None,
-        name: None,
-        version: None,
-        qualifiers: None,
-        subpath: None,
-        primary_language: None,
-        description: None,
-        release_date: None,
-        parties: Vec::new(),
-        keywords: Vec::new(),
-        homepage_url: None,
-        download_url: None,
-        size: None,
-        sha1: None,
-        md5: None,
-        sha256: None,
-        sha512: None,
-        bug_tracking_url: None,
-        code_view_url: None,
-        vcs_url: None,
-        copyright: None,
-        holder: None,
-        declared_license_expression: None,
-        declared_license_expression_spdx: None,
-        license_detections: Vec::new(),
-        other_license_expression: None,
-        other_license_expression_spdx: None,
-        other_license_detections: Vec::new(),
-        extracted_license_statement: None,
-        notice_text: None,
-        source_packages: Vec::new(),
-        file_references: Vec::new(),
-        is_private: false,
-        is_virtual: false,
-        extra_data: None,
-        dependencies: Vec::new(),
-        repository_homepage_url: None,
-        repository_download_url: None,
-        api_data_url: None,
-        datasource_id: datasource_id.map(|value| value.to_string()),
-        purl: None,
+        datasource_id,
+        ..Default::default()
     }
 }
-
-const DATASOURCE_PACKAGES_LOCK: &str = "nuget_packages_lock";
-const DATASOURCE_NUPKG: &str = "nuget_nupkg";
 
 const MAX_ARCHIVE_SIZE: u64 = 100 * 1024 * 1024; // 100MB
 const MAX_FILE_SIZE: u64 = 50 * 1024 * 1024; // 50MB
@@ -545,7 +504,7 @@ impl PackageParser for PackagesLockParser {
             Ok(f) => f,
             Err(e) => {
                 warn!("Failed to open packages.lock.json at {:?}: {}", path, e);
-                return vec![default_package_data(Some(DATASOURCE_PACKAGES_LOCK))];
+                return vec![default_package_data(Some(DatasourceId::NugetPackagesLock))];
             }
         };
 
@@ -553,7 +512,7 @@ impl PackageParser for PackagesLockParser {
             Ok(v) => v,
             Err(e) => {
                 warn!("Failed to parse packages.lock.json at {:?}: {}", path, e);
-                return vec![default_package_data(Some(DATASOURCE_PACKAGES_LOCK))];
+                return vec![default_package_data(Some(DatasourceId::NugetPackagesLock))];
             }
         };
 
@@ -626,10 +585,10 @@ impl PackageParser for PackagesLockParser {
         }
 
         vec![PackageData {
-            datasource_id: Some(DATASOURCE_PACKAGES_LOCK.to_string()),
+            datasource_id: Some(DatasourceId::NugetPackagesLock),
             package_type: Some(Self::PACKAGE_TYPE.to_string()),
             dependencies,
-            ..default_package_data(Some(DATASOURCE_PACKAGES_LOCK))
+            ..default_package_data(Some(DatasourceId::NugetPackagesLock))
         }]
     }
 }
@@ -651,7 +610,7 @@ impl PackageParser for NupkgParser {
             Ok(data) => data,
             Err(e) => {
                 warn!("Failed to extract .nupkg at {:?}: {}", path, e);
-                default_package_data(Some(DATASOURCE_NUPKG))
+                default_package_data(Some(DatasourceId::NugetNupkg))
             }
         }]
     }
@@ -907,7 +866,7 @@ fn parse_nuspec_content(content: &str) -> Result<PackageData, String> {
     let holder = None;
 
     Ok(PackageData {
-        datasource_id: Some(DATASOURCE_NUPKG.to_string()),
+        datasource_id: Some(DatasourceId::NugetNupkg),
         package_type: Some("nuget".to_string()),
         name,
         version,
@@ -925,7 +884,7 @@ fn parse_nuspec_content(content: &str) -> Result<PackageData, String> {
         repository_homepage_url,
         repository_download_url,
         api_data_url,
-        ..default_package_data(Some(DATASOURCE_NUPKG))
+        ..default_package_data(Some(DatasourceId::NugetNupkg))
     })
 }
 

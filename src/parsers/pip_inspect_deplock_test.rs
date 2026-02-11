@@ -2,6 +2,7 @@
 mod tests {
     use super::super::PackageParser;
     use super::super::pip_inspect_deplock::*;
+    use crate::models::DatasourceId;
     use std::path::PathBuf;
 
     #[test]
@@ -61,7 +62,7 @@ mod tests {
         assert_eq!(pkg.keywords, vec!["http,requests".to_string()]);
         assert_eq!(pkg.package_type.as_deref(), Some("pypi"));
         assert_eq!(pkg.primary_language.as_deref(), Some("Python"));
-        assert_eq!(pkg.datasource_id.as_deref(), Some("pypi_inspect_deplock"));
+        assert_eq!(pkg.datasource_id, Some(DatasourceId::PypiInspectDeplock));
         assert!(pkg.is_virtual);
 
         // Check extra_data
@@ -111,7 +112,7 @@ mod tests {
 
         // Should return default package
         assert_eq!(pkg.package_type.as_deref(), Some("pypi"));
-        assert_eq!(pkg.datasource_id.as_deref(), Some("pypi_inspect_deplock"));
+        assert_eq!(pkg.datasource_id, Some(DatasourceId::PypiInspectDeplock));
     }
 
     #[test]
@@ -121,6 +122,6 @@ mod tests {
 
         // Should return default package on parse error
         assert_eq!(pkg.package_type.as_deref(), Some("pypi"));
-        assert_eq!(pkg.datasource_id.as_deref(), Some("pypi_inspect_deplock"));
+        assert_eq!(pkg.datasource_id, Some(DatasourceId::PypiInspectDeplock));
     }
 }

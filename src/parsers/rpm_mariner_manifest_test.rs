@@ -2,6 +2,7 @@
 mod tests {
     use super::super::PackageParser;
     use super::super::rpm_mariner_manifest::*;
+    use crate::models::DatasourceId;
     use std::path::PathBuf;
 
     #[test]
@@ -37,7 +38,7 @@ mod tests {
         assert!(pkg1.qualifiers.is_some());
         let quals = pkg1.qualifiers.as_ref().unwrap();
         assert_eq!(quals.get("arch"), Some(&"x86_64".to_string()));
-        assert_eq!(pkg1.datasource_id.as_deref(), Some("rpm_mariner_manifest"));
+        assert_eq!(pkg1.datasource_id, Some(DatasourceId::RpmMarinerManifest));
 
         // Check extra_data contains filename
         assert!(pkg1.extra_data.is_some());
@@ -94,8 +95,8 @@ mod tests {
         assert_eq!(packages[0].package_type.as_deref(), Some("rpm"));
         assert_eq!(packages[0].namespace.as_deref(), Some("mariner"));
         assert_eq!(
-            packages[0].datasource_id.as_deref(),
-            Some("rpm_mariner_manifest")
+            packages[0].datasource_id,
+            Some(DatasourceId::RpmMarinerManifest)
         );
     }
 

@@ -22,7 +22,7 @@ use log::warn;
 use packageurl::PackageUrl;
 use rustpython_parser::{Parse, ast};
 
-use crate::models::{PackageData, Party};
+use crate::models::{DatasourceId, PackageData, Party};
 
 use super::PackageParser;
 
@@ -69,6 +69,7 @@ impl PackageParser for BuckMetadataBzlParser {
                 warn!("Failed to parse Buck METADATA.bzl {:?}: {}", path, e);
                 PackageData {
                     package_type: Some(Self::PACKAGE_TYPE.to_string()),
+                    datasource_id: Some(DatasourceId::BuckMetadata),
                     ..Default::default()
                 }
             }
@@ -123,6 +124,7 @@ fn parse_metadata_bzl(path: &Path) -> Result<PackageData, String> {
     // No METADATA found
     Ok(PackageData {
         package_type: Some(BuckMetadataBzlParser::PACKAGE_TYPE.to_string()),
+        datasource_id: Some(DatasourceId::BuckMetadata),
         ..Default::default()
     })
 }
@@ -181,6 +183,7 @@ enum MetadataValue {
 fn build_package_from_metadata(fields: HashMap<String, MetadataValue>) -> PackageData {
     let mut pkg = PackageData {
         package_type: Some(BuckMetadataBzlParser::PACKAGE_TYPE.to_string()),
+        datasource_id: Some(DatasourceId::BuckMetadata),
         ..Default::default()
     };
 
@@ -364,6 +367,7 @@ fn extract_from_call(call: &ast::ExprCall) -> Option<PackageData> {
         package_type: Some(BuckBuildParser::PACKAGE_TYPE.to_string()),
         name: Some(package_name),
         extracted_license_statement: licenses.map(|l| l.join(", ")),
+        datasource_id: Some(DatasourceId::BuckFile),
         ..Default::default()
     })
 }
@@ -384,6 +388,7 @@ fn fallback_package_data(path: &Path) -> PackageData {
     PackageData {
         package_type: Some(BuckBuildParser::PACKAGE_TYPE.to_string()),
         name,
+        datasource_id: Some(DatasourceId::BuckFile),
         ..Default::default()
     }
 }

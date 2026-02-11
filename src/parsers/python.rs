@@ -32,7 +32,7 @@
 //! - Direct dependencies: all manifest dependencies are direct
 //! - Graceful fallback on parse errors with warning logs
 
-use crate::models::{Dependency, FileReference, PackageData, Party};
+use crate::models::{DatasourceId, Dependency, FileReference, PackageData, Party};
 use crate::parsers::utils::{read_file_to_string, split_name_email};
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
@@ -94,9 +94,9 @@ impl PackageParser for PythonParser {
             } else if path.file_name().unwrap_or_default() == "setup.py" {
                 extract_from_setup_py(path)
             } else if path.file_name().unwrap_or_default() == "PKG-INFO" {
-                extract_from_rfc822_metadata(path, "pypi_sdist_pkginfo")
+                extract_from_rfc822_metadata(path, DatasourceId::PypiSdistPkginfo)
             } else if path.file_name().unwrap_or_default() == "METADATA" {
-                extract_from_rfc822_metadata(path, "pypi_wheel_metadata")
+                extract_from_rfc822_metadata(path, DatasourceId::PypiWheelMetadata)
             } else if path.file_name().unwrap_or_default() == "pip-inspect.deplock" {
                 extract_from_pip_inspect(path)
             } else if path
@@ -138,7 +138,7 @@ impl PackageParser for PythonParser {
     }
 }
 
-fn extract_from_rfc822_metadata(path: &Path, datasource_id: &str) -> PackageData {
+fn extract_from_rfc822_metadata(path: &Path, datasource_id: DatasourceId) -> PackageData {
     let content = match read_file_to_string(path) {
         Ok(content) => content,
         Err(e) => {
@@ -255,7 +255,7 @@ fn extract_from_wheel_archive(path: &Path) -> PackageData {
         }
     };
 
-    let mut package_data = python_parse_rfc822_content(&content, "pypi_wheel");
+    let mut package_data = python_parse_rfc822_content(&content, DatasourceId::PypiWheel);
 
     let (size, sha256) = calculate_file_checksums(path);
     package_data.size = size;
@@ -355,7 +355,7 @@ fn extract_from_egg_archive(path: &Path) -> PackageData {
         }
     };
 
-    let mut package_data = python_parse_rfc822_content(&content, "pypi_egg");
+    let mut package_data = python_parse_rfc822_content(&content, DatasourceId::PypiEgg);
 
     let (size, sha256) = calculate_file_checksums(path);
     package_data.size = size;
@@ -634,7 +634,7 @@ fn build_egg_purl(name: Option<&str>, version: Option<&str>) -> Option<String> {
     Some(package_url.to_string())
 }
 
-fn python_parse_rfc822_content(content: &str, datasource_id: &str) -> PackageData {
+fn python_parse_rfc822_content(content: &str, datasource_id: DatasourceId) -> PackageData {
     let metadata = super::rfc822::parse_rfc822_content(content);
     build_package_data_from_rfc822(&metadata, datasource_id)
 }
@@ -645,7 +645,7 @@ fn python_parse_rfc822_content(content: &str, datasource_id: &str) -> PackageDat
 /// and `python_parse_rfc822_content` (content-based) functions.
 fn build_package_data_from_rfc822(
     metadata: &super::rfc822::Rfc822Metadata,
-    datasource_id: &str,
+    datasource_id: DatasourceId,
 ) -> PackageData {
     use super::rfc822::{get_header_all, get_header_first};
 
@@ -832,7 +832,7 @@ fn build_package_data_from_rfc822(
         repository_homepage_url,
         repository_download_url,
         api_data_url,
-        datasource_id: Some(datasource_id.to_string()),
+        datasource_id: Some(datasource_id),
         purl,
     }
 }
@@ -1114,7 +1114,7 @@ fn extract_from_pyproject_toml(path: &Path) -> PackageData {
         repository_homepage_url: None,
         repository_download_url: None,
         api_data_url,
-        datasource_id: None,
+        datasource_id: Some(DatasourceId::PypiPyprojectToml),
         purl,
     }
 }
@@ -1890,7 +1890,7 @@ fn build_setup_py_package_data(values: &HashMap<String, Value>) -> PackageData {
         repository_homepage_url: None,
         repository_download_url: None,
         api_data_url: None,
-        datasource_id: None,
+        datasource_id: Some(DatasourceId::PypiSetupPy),
         purl,
     }
 }
@@ -2028,7 +2028,7 @@ fn extract_from_setup_py_regex(content: &str) -> PackageData {
         repository_homepage_url: None,
         repository_download_url: None,
         api_data_url: None,
-        datasource_id: None,
+        datasource_id: Some(DatasourceId::PypiSetupPy),
         purl,
     }
 }
@@ -2054,7 +2054,7 @@ fn package_data_to_resolved(pkg: &PackageData) -> crate::models::ResolvedPackage
         repository_homepage_url: pkg.repository_homepage_url.clone(),
         repository_download_url: pkg.repository_download_url.clone(),
         api_data_url: pkg.api_data_url.clone(),
-        datasource_id: pkg.datasource_id.clone(),
+        datasource_id: pkg.datasource_id,
         purl: pkg.purl.clone(),
     }
 }
@@ -2244,7 +2244,7 @@ fn extract_from_pip_inspect(path: &Path) -> PackageData {
                 repository_homepage_url: None,
                 repository_download_url: None,
                 api_data_url: None,
-                datasource_id: Some("pypi_inspect_deplock".to_string()),
+                datasource_id: Some(DatasourceId::PypiInspectDeplock),
                 purl,
             });
         } else {
@@ -2289,7 +2289,7 @@ fn extract_from_pip_inspect(path: &Path) -> PackageData {
                 repository_homepage_url: None,
                 repository_download_url: None,
                 api_data_url: None,
-                datasource_id: Some("pypi_inspect_deplock".to_string()),
+                datasource_id: Some(DatasourceId::PypiInspectDeplock),
                 purl: purl.clone(),
             };
 
@@ -2406,7 +2406,7 @@ fn extract_from_setup_cfg(path: &Path) -> PackageData {
         repository_homepage_url: None,
         repository_download_url: None,
         api_data_url: None,
-        datasource_id: Some("pypi_setup_cfg".to_string()),
+        datasource_id: Some(DatasourceId::PypiSetupCfg),
         purl,
     }
 }
@@ -2721,50 +2721,7 @@ fn calculate_file_checksums(path: &Path) -> (Option<u64>, Option<String>) {
 }
 
 fn default_package_data() -> PackageData {
-    PackageData {
-        package_type: None,
-        namespace: None,
-        name: None,
-        version: None,
-        qualifiers: None,
-        subpath: None,
-        primary_language: None,
-        description: None,
-        release_date: None,
-        parties: Vec::new(),
-        keywords: Vec::new(),
-        homepage_url: None,
-        download_url: None,
-        size: None,
-        sha1: None,
-        md5: None,
-        sha256: None,
-        sha512: None,
-        bug_tracking_url: None,
-        code_view_url: None,
-        vcs_url: None,
-        copyright: None,
-        holder: None,
-        declared_license_expression: None,
-        declared_license_expression_spdx: None,
-        license_detections: Vec::new(),
-        other_license_expression: None,
-        other_license_expression_spdx: None,
-        other_license_detections: Vec::new(),
-        extracted_license_statement: None,
-        notice_text: None,
-        source_packages: Vec::new(),
-        file_references: Vec::new(),
-        is_private: false,
-        is_virtual: false,
-        extra_data: None,
-        dependencies: Vec::new(),
-        repository_homepage_url: None,
-        repository_download_url: None,
-        api_data_url: None,
-        datasource_id: None,
-        purl: None,
-    }
+    PackageData::default()
 }
 
 crate::register_parser!(

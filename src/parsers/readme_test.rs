@@ -1,5 +1,6 @@
 #[cfg(test)]
 mod tests {
+    use crate::models::DatasourceId;
     use crate::parsers::PackageParser;
     use crate::parsers::readme::ReadmeParser;
     use std::path::PathBuf;
@@ -55,7 +56,7 @@ mod tests {
         assert_eq!(pkg.version, Some("2.1.0".to_string()));
         assert_eq!(pkg.homepage_url, Some("https://example.com".to_string()));
         assert_eq!(pkg.extracted_license_statement, Some("MIT".to_string()));
-        assert_eq!(pkg.datasource_id, Some("readme".to_string()));
+        assert_eq!(pkg.datasource_id, Some(DatasourceId::Readme));
     }
 
     #[test]
@@ -248,7 +249,7 @@ mod tests {
         // Should use parent dir name as fallback
         assert_eq!(pkg.name, Some("testdir".to_string()));
         assert_eq!(pkg.package_type, Some("readme".to_string()));
-        assert_eq!(pkg.datasource_id, Some("readme".to_string()));
+        assert_eq!(pkg.datasource_id, Some(DatasourceId::Readme));
     }
 
     #[test]
@@ -276,7 +277,7 @@ mod tests {
 
         // Should return default data with proper type and datasource
         assert_eq!(pkg.package_type, Some("readme".to_string()));
-        assert_eq!(pkg.datasource_id, Some("readme".to_string()));
+        assert_eq!(pkg.datasource_id, Some(DatasourceId::Readme));
         assert!(pkg.name.is_none());
     }
 

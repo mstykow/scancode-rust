@@ -24,12 +24,20 @@ use std::path::Path;
 use log::warn;
 use serde::Deserialize;
 
-use crate::models::{PackageData, Party};
-use crate::parsers::utils::{create_default_package_data, read_file_to_string};
+use crate::models::{DatasourceId, PackageData, Party};
+use crate::parsers::utils::read_file_to_string;
 
 use super::PackageParser;
 
 const PACKAGE_TYPE: &str = "freebsd";
+
+fn default_package_data() -> PackageData {
+    PackageData {
+        package_type: Some(PACKAGE_TYPE.to_string()),
+        datasource_id: Some(DatasourceId::FreebsdCompactManifest),
+        ..Default::default()
+    }
+}
 
 /// Parser for FreeBSD +COMPACT_MANIFEST files
 pub struct FreebsdCompactManifestParser;
@@ -49,7 +57,7 @@ impl PackageParser for FreebsdCompactManifestParser {
             Ok(c) => c,
             Err(e) => {
                 warn!("Failed to read FreeBSD manifest {:?}: {}", path, e);
-                return vec![create_default_package_data(PACKAGE_TYPE, None)];
+                return vec![default_package_data()];
             }
         };
 
@@ -77,7 +85,7 @@ pub(crate) fn parse_freebsd_manifest(content: &str) -> PackageData {
         Ok(m) => m,
         Err(e) => {
             warn!("Failed to parse FreeBSD manifest: {}", e);
-            return create_default_package_data(PACKAGE_TYPE, None);
+            return default_package_data();
         }
     };
 
@@ -134,7 +142,7 @@ pub(crate) fn parse_freebsd_manifest(content: &str) -> PackageData {
     };
 
     PackageData {
-        datasource_id: Some("freebsd_compact_manifest".to_string()),
+        datasource_id: Some(DatasourceId::FreebsdCompactManifest),
         package_type: Some(PACKAGE_TYPE.to_string()),
         name,
         version,

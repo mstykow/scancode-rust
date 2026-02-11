@@ -2,6 +2,7 @@
 mod tests {
     use super::super::PackageParser;
     use super::super::conda_meta_json::*;
+    use crate::models::DatasourceId;
     use std::path::PathBuf;
 
     #[test]
@@ -56,7 +57,7 @@ mod tests {
         );
         assert_eq!(pkg.package_type.as_deref(), Some("conda"));
         assert_eq!(pkg.primary_language.as_deref(), Some("Python"));
-        assert_eq!(pkg.datasource_id.as_deref(), Some("conda_meta_json"));
+        assert_eq!(pkg.datasource_id, Some(DatasourceId::CondaMetaJson));
 
         // Check extra_data
         assert!(pkg.extra_data.is_some());
@@ -131,6 +132,6 @@ mod tests {
 
         // Should return default package on parse error
         assert_eq!(pkg.package_type.as_deref(), Some("conda"));
-        assert_eq!(pkg.datasource_id.as_deref(), Some("conda_meta_json"));
+        assert_eq!(pkg.datasource_id, Some(DatasourceId::CondaMetaJson));
     }
 }

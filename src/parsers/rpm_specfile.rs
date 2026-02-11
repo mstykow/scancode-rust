@@ -33,8 +33,8 @@ use log::warn;
 use packageurl::PackageUrl;
 use regex::Regex;
 
-use crate::models::{Dependency, PackageData, Party};
-use crate::parsers::utils::{create_default_package_data, read_file_to_string, split_name_email};
+use crate::models::{DatasourceId, Dependency, PackageData, Party};
+use crate::parsers::utils::{read_file_to_string, split_name_email};
 
 use super::PackageParser;
 
@@ -60,7 +60,11 @@ impl PackageParser for RpmSpecfileParser {
             Ok(c) => c,
             Err(e) => {
                 warn!("Failed to read RPM specfile {:?}: {}", path, e);
-                return vec![create_default_package_data(PACKAGE_TYPE, None)];
+                return vec![PackageData {
+                    package_type: Some(PACKAGE_TYPE.to_string()),
+                    datasource_id: Some(DatasourceId::RpmSpecfile),
+                    ..Default::default()
+                }];
             }
         };
 
@@ -327,7 +331,7 @@ fn parse_specfile(content: &str) -> PackageData {
     let description_text = description.or(summary);
 
     PackageData {
-        datasource_id: Some("rpm_specfile".to_string()),
+        datasource_id: Some(DatasourceId::RpmSpecfile),
         package_type: Some(PACKAGE_TYPE.to_string()),
         namespace: None, // RPM namespace is optional
         name,

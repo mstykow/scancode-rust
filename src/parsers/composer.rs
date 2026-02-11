@@ -26,7 +26,7 @@ use log::warn;
 use packageurl::PackageUrl;
 use serde_json::Value;
 
-use crate::models::{Dependency, PackageData, Party, ResolvedPackage};
+use crate::models::{DatasourceId, Dependency, PackageData, Party, ResolvedPackage};
 
 use super::PackageParser;
 
@@ -54,9 +54,6 @@ const FIELD_PACKAGES_DEV: &str = "packages-dev";
 const FIELD_SOURCE: &str = "source";
 const FIELD_DIST: &str = "dist";
 
-const DATASOURCE_COMPOSER_JSON: &str = "php_composer_json";
-const DATASOURCE_COMPOSER_LOCK: &str = "php_composer_lock";
-
 /// Composer manifest parser for composer.json files.
 pub struct ComposerJsonParser;
 
@@ -68,7 +65,7 @@ impl PackageParser for ComposerJsonParser {
             Ok(content) => content,
             Err(e) => {
                 warn!("Failed to read composer.json at {:?}: {}", path, e);
-                return vec![default_package_data(Some(DATASOURCE_COMPOSER_JSON))];
+                return vec![default_package_data(Some(DatasourceId::PhpComposerJson))];
             }
         };
 
@@ -173,7 +170,7 @@ impl PackageParser for ComposerJsonParser {
             repository_homepage_url: build_repository_homepage_url(&namespace, &name),
             repository_download_url: None,
             api_data_url: build_api_data_url(&namespace, &name),
-            datasource_id: Some(DATASOURCE_COMPOSER_JSON.to_string()),
+            datasource_id: Some(DatasourceId::PhpComposerJson),
             purl: build_package_purl(&namespace, &name, &version),
         }]
     }
@@ -194,13 +191,13 @@ impl PackageParser for ComposerLockParser {
             Ok(content) => content,
             Err(e) => {
                 warn!("Failed to read composer.lock at {:?}: {}", path, e);
-                return vec![default_package_data(Some(DATASOURCE_COMPOSER_LOCK))];
+                return vec![default_package_data(Some(DatasourceId::PhpComposerLock))];
             }
         };
 
         let dependencies = extract_lock_dependencies(&json_content);
 
-        let mut package_data = default_package_data(Some(DATASOURCE_COMPOSER_LOCK));
+        let mut package_data = default_package_data(Some(DatasourceId::PhpComposerLock));
         package_data.dependencies = dependencies;
         vec![package_data]
     }
@@ -407,7 +404,7 @@ fn build_lock_dependency(
         repository_homepage_url: None,
         repository_download_url: None,
         api_data_url: None,
-        datasource_id: Some(DATASOURCE_COMPOSER_LOCK.to_string()),
+        datasource_id: Some(DatasourceId::PhpComposerLock),
         purl: None,
     };
 
@@ -819,50 +816,12 @@ fn is_composer_version_pinned(version: &str) -> bool {
     without_prefix.matches('.').count() >= 2
 }
 
-fn default_package_data(datasource_id: Option<&str>) -> PackageData {
+fn default_package_data(datasource_id: Option<DatasourceId>) -> PackageData {
     PackageData {
         package_type: Some(ComposerJsonParser::PACKAGE_TYPE.to_string()),
-        namespace: None,
-        name: None,
-        version: None,
-        qualifiers: None,
-        subpath: None,
         primary_language: Some("PHP".to_string()),
-        description: None,
-        release_date: None,
-        parties: Vec::new(),
-        keywords: Vec::new(),
-        homepage_url: None,
-        download_url: None,
-        size: None,
-        sha1: None,
-        md5: None,
-        sha256: None,
-        sha512: None,
-        bug_tracking_url: None,
-        code_view_url: None,
-        vcs_url: None,
-        copyright: None,
-        holder: None,
-        declared_license_expression: None,
-        declared_license_expression_spdx: None,
-        license_detections: Vec::new(),
-        other_license_expression: None,
-        other_license_expression_spdx: None,
-        other_license_detections: Vec::new(),
-        extracted_license_statement: None,
-        notice_text: None,
-        source_packages: Vec::new(),
-        file_references: Vec::new(),
-        is_private: false,
-        is_virtual: false,
-        extra_data: None,
-        dependencies: Vec::new(),
-        repository_homepage_url: None,
-        repository_download_url: None,
-        api_data_url: None,
-        datasource_id: datasource_id.map(|value| value.to_string()),
-        purl: None,
+        datasource_id,
+        ..Default::default()
     }
 }
 

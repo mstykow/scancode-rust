@@ -30,8 +30,7 @@ use log::warn;
 use packageurl::PackageUrl;
 use regex::Regex;
 
-use crate::models::{Dependency, PackageData, Party};
-use crate::parsers::utils::create_default_package_data;
+use crate::models::{DatasourceId, Dependency, PackageData, Party};
 
 use super::PackageParser;
 
@@ -156,7 +155,7 @@ impl PackageParser for CranParser {
             repository_homepage_url,
             repository_download_url: None,
             api_data_url: None,
-            datasource_id: Some("cran_description".to_string()),
+            datasource_id: Some(DatasourceId::CranDescription),
             purl,
         }]
     }
@@ -403,9 +402,12 @@ fn create_package_url(name: &Option<String>, version: &Option<String>) -> Option
 }
 
 fn default_package_data() -> PackageData {
-    let mut pkg = create_default_package_data("cran", Some("R"));
-    pkg.datasource_id = Some("cran_description".to_string());
-    pkg
+    PackageData {
+        package_type: Some("cran".to_string()),
+        primary_language: Some("R".to_string()),
+        datasource_id: Some(DatasourceId::CranDescription),
+        ..Default::default()
+    }
 }
 
 crate::register_parser!(

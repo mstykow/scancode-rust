@@ -27,7 +27,7 @@ use packageurl::PackageUrl;
 use toml::Value as TomlValue;
 use toml::map::Map as TomlMap;
 
-use crate::models::{Dependency, PackageData, ResolvedPackage};
+use crate::models::{DatasourceId, Dependency, PackageData, ResolvedPackage};
 use crate::parsers::python::{build_pypi_urls, read_toml_file};
 
 use super::PackageParser;
@@ -40,8 +40,6 @@ const FIELD_PYTHON_VERSIONS: &str = "python-versions";
 const FIELD_DEPENDENCIES: &str = "dependencies";
 const FIELD_EXTRAS: &str = "extras";
 const FIELD_LOCK_VERSION: &str = "lock-version";
-
-const DATASOURCE_ID: &str = "pypi_poetry_lock";
 
 /// Poetry lockfile parser for poetry.lock files.
 ///
@@ -132,7 +130,7 @@ fn parse_poetry_lock(toml_content: &TomlValue) -> PackageData {
         repository_homepage_url: None,
         repository_download_url: None,
         api_data_url: None,
-        datasource_id: Some(DATASOURCE_ID.to_string()),
+        datasource_id: Some(DatasourceId::PypiPoetryLock),
         purl: None,
     }
 }
@@ -241,7 +239,7 @@ fn build_resolved_package(
         repository_homepage_url,
         repository_download_url,
         api_data_url,
-        datasource_id: Some(DATASOURCE_ID.to_string()),
+        datasource_id: Some(DatasourceId::PypiPoetryLock),
         purl,
     }
 }
@@ -399,47 +397,9 @@ fn extract_sha256_from_files(package_table: &TomlMap<String, TomlValue>) -> Opti
 fn default_package_data() -> PackageData {
     PackageData {
         package_type: Some(PoetryLockParser::PACKAGE_TYPE.to_string()),
-        namespace: None,
-        name: None,
-        version: None,
-        qualifiers: None,
-        subpath: None,
         primary_language: Some("Python".to_string()),
-        description: None,
-        release_date: None,
-        parties: Vec::new(),
-        keywords: Vec::new(),
-        homepage_url: None,
-        download_url: None,
-        size: None,
-        sha1: None,
-        md5: None,
-        sha256: None,
-        sha512: None,
-        bug_tracking_url: None,
-        code_view_url: None,
-        vcs_url: None,
-        copyright: None,
-        holder: None,
-        declared_license_expression: None,
-        declared_license_expression_spdx: None,
-        license_detections: Vec::new(),
-        other_license_expression: None,
-        other_license_expression_spdx: None,
-        other_license_detections: Vec::new(),
-        extracted_license_statement: None,
-        notice_text: None,
-        source_packages: Vec::new(),
-        file_references: Vec::new(),
-        is_private: false,
-        is_virtual: false,
-        extra_data: None,
-        dependencies: Vec::new(),
-        repository_homepage_url: None,
-        repository_download_url: None,
-        api_data_url: None,
-        datasource_id: Some(DATASOURCE_ID.to_string()),
-        purl: None,
+        datasource_id: Some(DatasourceId::PypiPoetryLock),
+        ..Default::default()
     }
 }
 

@@ -15,7 +15,7 @@
 use std::path::Path;
 
 use super::PackageParser;
-use crate::models::PackageData;
+use crate::models::{DatasourceId, PackageData};
 use crate::utils::magic;
 
 /// Helper macro to define file-type recognizers with minimal boilerplate.
@@ -44,7 +44,7 @@ macro_rules! file_recognizer {
                 let _ = path;
                 vec![PackageData {
                     package_type: Some($pkg_type.to_string()),
-                    datasource_id: Some($datasource.to_string()),
+                    datasource_id: Some($datasource),
                     ..Default::default()
                 }]
             }
@@ -54,26 +54,31 @@ macro_rules! file_recognizer {
 
 // Java Archives
 
-file_recognizer!(JavaJarRecognizer, "jar", "java_jar", |path: &Path| path
-    .extension()
-    .and_then(|e| e.to_str())
-    == Some("jar"));
+file_recognizer!(
+    JavaJarRecognizer,
+    "jar",
+    DatasourceId::JavaJar,
+    |path: &Path| path.extension().and_then(|e| e.to_str()) == Some("jar")
+);
 
-file_recognizer!(IvyXmlRecognizer, "ivy", "ant_ivy_xml", |path: &Path| path
-    .to_str()
-    .is_some_and(|p| p.ends_with("/ivy.xml")));
+file_recognizer!(
+    IvyXmlRecognizer,
+    "ivy",
+    DatasourceId::AntIvyXml,
+    |path: &Path| path.to_str().is_some_and(|p| p.ends_with("/ivy.xml"))
+);
 
 file_recognizer!(
     JavaWarRecognizer,
     "war",
-    "java_war_archive",
+    DatasourceId::JavaWarArchive,
     |path: &Path| path.extension().and_then(|e| e.to_str()) == Some("war")
 );
 
 file_recognizer!(
     JavaWarWebXmlRecognizer,
     "war",
-    "java_war_web_xml",
+    DatasourceId::JavaWarWebXml,
     |path: &Path| path
         .to_str()
         .is_some_and(|p| p.ends_with("/WEB-INF/web.xml") || p.ends_with("WEB-INF/web.xml"))
@@ -82,14 +87,14 @@ file_recognizer!(
 file_recognizer!(
     JavaEarRecognizer,
     "ear",
-    "java_ear_archive",
+    DatasourceId::JavaEarArchive,
     |path: &Path| path.extension().and_then(|e| e.to_str()) == Some("ear")
 );
 
 file_recognizer!(
     JavaEarAppXmlRecognizer,
     "ear",
-    "java_ear_application_xml",
+    DatasourceId::JavaEarApplicationXml,
     |path: &Path| path.to_str().is_some_and(
         |p| p.ends_with("/META-INF/application.xml") || p.ends_with("META-INF/application.xml")
     )
@@ -100,7 +105,7 @@ file_recognizer!(
 file_recognizer!(
     Axis2ModuleXmlRecognizer,
     "axis2",
-    "axis2_module_xml",
+    DatasourceId::Axis2ModuleXml,
     |path: &Path| {
         path.to_str().is_some_and(|p| {
             let lower = p.to_lowercase();
@@ -109,24 +114,26 @@ file_recognizer!(
     }
 );
 
-file_recognizer!(Axis2MarRecognizer, "axis2", "axis2_mar", |path: &Path| path
-    .extension()
-    .and_then(|e| e.to_str())
-    == Some("mar"));
+file_recognizer!(
+    Axis2MarRecognizer,
+    "axis2",
+    DatasourceId::Axis2Mar,
+    |path: &Path| path.extension().and_then(|e| e.to_str()) == Some("mar")
+);
 
 // JBoss
 
 file_recognizer!(
     JBossSarRecognizer,
     "jboss-service",
-    "jboss_sar",
+    DatasourceId::JbossSar,
     |path: &Path| path.extension().and_then(|e| e.to_str()) == Some("sar")
 );
 
 file_recognizer!(
     JBossServiceXmlRecognizer,
     "jboss-service",
-    "jboss_service_xml",
+    DatasourceId::JbossServiceXml,
     |path: &Path| {
         path.to_str().is_some_and(|p| {
             let lower = p.to_lowercase();
@@ -141,7 +148,7 @@ file_recognizer!(
 file_recognizer!(
     MeteorPackageRecognizer,
     "meteor",
-    "meteor_package",
+    DatasourceId::MeteorPackage,
     |path: &Path| path.to_str().is_some_and(|p| p.ends_with("/package.js"))
 );
 
@@ -150,7 +157,7 @@ file_recognizer!(
 file_recognizer!(
     AndroidApkRecognizer,
     "android",
-    "android_apk",
+    DatasourceId::AndroidApk,
     |path: &Path| {
         path.extension()
             .and_then(|e| e.to_str())
@@ -162,57 +169,64 @@ file_recognizer!(
 file_recognizer!(
     AndroidLibraryRecognizer,
     "android_lib",
-    "android_aar_library",
+    DatasourceId::AndroidAarLibrary,
     |path: &Path| path.extension().and_then(|e| e.to_str()) == Some("aar")
 );
 
 file_recognizer!(
     MozillaXpiRecognizer,
     "mozilla",
-    "mozilla_xpi",
+    DatasourceId::MozillaXpi,
     |path: &Path| path.extension().and_then(|e| e.to_str()) == Some("xpi")
 );
 
 file_recognizer!(
     ChromeCrxRecognizer,
     "chrome",
-    "chrome_crx",
+    DatasourceId::ChromeCrx,
     |path: &Path| path.extension().and_then(|e| e.to_str()) == Some("crx")
 );
 
-file_recognizer!(IosIpaRecognizer, "ios", "ios_ipa", |path: &Path| path
-    .extension()
-    .and_then(|e| e.to_str())
-    == Some("ipa"));
+file_recognizer!(
+    IosIpaRecognizer,
+    "ios",
+    DatasourceId::IosIpa,
+    |path: &Path| path.extension().and_then(|e| e.to_str()) == Some("ipa")
+);
 
 // Archives
 
 file_recognizer!(
     CabArchiveRecognizer,
     "cab",
-    "microsoft_cabinet",
+    DatasourceId::MicrosoftCabinet,
     |path: &Path| path.extension().and_then(|e| e.to_str()) == Some("cab")
 );
 
 file_recognizer!(
     SharArchiveRecognizer,
     "shar",
-    "shar_shell_archive",
+    DatasourceId::SharShellArchive,
     |path: &Path| path.extension().and_then(|e| e.to_str()) == Some("shar")
 );
 
 // Disk Images
 
-file_recognizer!(AppleDmgRecognizer, "dmg", "apple_dmg", |path: &Path| {
-    path.extension()
-        .and_then(|e| e.to_str())
-        .is_some_and(|ext| ext == "dmg" || ext == "sparseimage")
-});
+file_recognizer!(
+    AppleDmgRecognizer,
+    "dmg",
+    DatasourceId::AppleDmg,
+    |path: &Path| {
+        path.extension()
+            .and_then(|e| e.to_str())
+            .is_some_and(|ext| ext == "dmg" || ext == "sparseimage")
+    }
+);
 
 file_recognizer!(
     IsoImageRecognizer,
     "iso",
-    "iso_disk_image",
+    DatasourceId::IsoDiskImage,
     |path: &Path| {
         path.extension()
             .and_then(|e| e.to_str())
@@ -225,21 +239,26 @@ file_recognizer!(
 file_recognizer!(
     SquashfsRecognizer,
     "squashfs",
-    "squashfs_disk_image",
+    DatasourceId::SquashfsDiskImage,
     |path: &Path| magic::is_squashfs(path)
 );
 
-file_recognizer!(NsisRecognizer, "nsis", "nsis_installer", |path: &Path| {
-    path.extension()
-        .and_then(|e| e.to_str())
-        .is_some_and(|ext| ext == "exe")
-        && magic::is_nsis_installer(path)
-});
+file_recognizer!(
+    NsisRecognizer,
+    "nsis",
+    DatasourceId::NsisInstaller,
+    |path: &Path| {
+        path.extension()
+            .and_then(|e| e.to_str())
+            .is_some_and(|ext| ext == "exe")
+            && magic::is_nsis_installer(path)
+    }
+);
 
 file_recognizer!(
     InstallShieldRecognizer,
     "installshield",
-    "installshield_installer",
+    DatasourceId::InstallshieldInstaller,
     |path: &Path| {
         path.extension()
             .and_then(|e| e.to_str())

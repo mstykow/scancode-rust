@@ -18,13 +18,20 @@ use std::path::Path;
 use log::warn;
 use serde::{Deserialize, Serialize};
 
-use crate::models::{Dependency, PackageData};
-use crate::parsers::utils::create_default_package_data;
+use crate::models::{DatasourceId, Dependency, PackageData};
 
 use super::PackageParser;
 
 const PACKAGE_TYPE: &str = "swift";
-const DATASOURCE_ID: &str = "swift_package_show_dependencies";
+
+fn default_package_data() -> PackageData {
+    PackageData {
+        package_type: Some(PACKAGE_TYPE.to_string()),
+        primary_language: Some("Swift".to_string()),
+        datasource_id: Some(DatasourceId::SwiftPackageShowDependencies),
+        ..Default::default()
+    }
+}
 
 pub struct SwiftShowDependenciesParser;
 
@@ -63,9 +70,7 @@ impl PackageParser for SwiftShowDependenciesParser {
                     "Failed to read swift-show-dependencies.deplock {:?}: {}",
                     path, e
                 );
-                let mut pkg = create_default_package_data(PACKAGE_TYPE, Some("Swift"));
-                pkg.datasource_id = Some(DATASOURCE_ID.to_string());
-                return vec![pkg];
+                return vec![default_package_data()];
             }
         };
 
@@ -78,9 +83,7 @@ pub(crate) fn parse_swift_show_dependencies(content: &str) -> PackageData {
         Ok(d) => d,
         Err(e) => {
             warn!("Failed to parse swift-show-dependencies.deplock: {}", e);
-            let mut pkg = create_default_package_data(PACKAGE_TYPE, Some("Swift"));
-            pkg.datasource_id = Some(DATASOURCE_ID.to_string());
-            return pkg;
+            return default_package_data();
         }
     };
 
@@ -93,7 +96,7 @@ pub(crate) fn parse_swift_show_dependencies(content: &str) -> PackageData {
         version: data.version,
         homepage_url: data.url,
         dependencies,
-        datasource_id: Some(DATASOURCE_ID.to_string()),
+        datasource_id: Some(DatasourceId::SwiftPackageShowDependencies),
         ..Default::default()
     }
 }

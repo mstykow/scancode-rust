@@ -2,6 +2,7 @@
 mod tests {
     use super::super::PackageParser;
     use super::super::conan_data::*;
+    use crate::models::DatasourceId;
     use std::path::PathBuf;
 
     #[test]
@@ -44,7 +45,7 @@ sources:
             Some("https://example.com/package-1.0.0.tar.gz")
         );
         assert_eq!(pkg1.sha256.as_deref(), Some("abc123def456"));
-        assert_eq!(pkg1.datasource_id.as_deref(), Some("conan_conandata_yml"));
+        assert_eq!(pkg1.datasource_id, Some(DatasourceId::ConanConanDataYml));
 
         // Check second package
         let pkg2 = packages

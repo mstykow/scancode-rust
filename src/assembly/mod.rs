@@ -1,12 +1,13 @@
 mod assemblers;
 #[cfg(test)]
 mod assembly_golden_test;
+mod nested_merge;
 mod sibling_merge;
 
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
-use crate::models::{FileInfo, Package, PackageData, TopLevelDependency};
+use crate::models::{DatasourceId, FileInfo, Package, PackageData, TopLevelDependency};
 
 pub use assemblers::ASSEMBLERS;
 
@@ -18,17 +19,20 @@ pub struct AssemblyResult {
     pub dependencies: Vec<TopLevelDependency>,
 }
 
-/// Configuration for a sibling-merge assembler.
-///
-/// Each assembler declares which datasource IDs it handles and which
-/// sibling filenames to look for when merging related package data.
+/// How an assembler groups PackageData into Packages.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AssemblyMode {
+    /// Merge related files in the same directory (or nested) into one Package.
+    SiblingMerge,
+    /// Each PackageData becomes its own independent Package (e.g., database files
+    /// containing many installed packages like Alpine DB, RPM DB, Debian status).
+    OnePerPackageData,
+}
+
 pub struct AssemblerConfig {
-    /// Datasource IDs that trigger this assembler (e.g., "npm_package_json").
-    pub datasource_ids: &'static [&'static str],
-    /// Filename patterns to search for among siblings, in priority order.
-    /// The first match is treated as the primary manifest; subsequent matches
-    /// provide supplementary data (e.g., lockfile dependencies).
+    pub datasource_ids: &'static [DatasourceId],
     pub sibling_file_patterns: &'static [&'static str],
+    pub mode: AssemblyMode,
 }
 
 /// Run the assembly phase over all scanned files.
@@ -42,52 +46,92 @@ pub fn assemble(files: &mut [FileInfo]) -> AssemblyResult {
     let mut dependencies = Vec::new();
     let mut seen_dirs: HashSet<PathBuf> = HashSet::new();
 
-    // Group files by parent directory
     let dir_files = group_files_by_directory(files);
 
-    // Process each directory
     for (dir, file_indices) in &dir_files {
         if seen_dirs.contains(dir) {
             continue;
         }
 
-        // Find all package data in this directory and their assembler configs
-        let mut groups: HashMap<&'static str, Vec<(usize, &PackageData)>> = HashMap::new();
+        let mut groups: HashMap<DatasourceId, Vec<(usize, &PackageData)>> = HashMap::new();
 
         for &idx in file_indices {
             for pkg_data in &files[idx].package_data {
-                if let Some(dsid) = &pkg_data.datasource_id
-                    && let Some(config_key) = assembler_lookup.get(dsid.as_str())
+                if let Some(dsid) = pkg_data.datasource_id
+                    && let Some(&config_key) = assembler_lookup.get(&dsid)
                 {
                     groups.entry(config_key).or_default().push((idx, pkg_data));
                 }
             }
         }
 
-        for config_key in groups.keys() {
+        for &config_key in groups.keys() {
             let config = ASSEMBLERS
                 .iter()
-                .find(|a| a.datasource_ids.first() == Some(config_key))
+                .find(|a| a.datasource_ids.first() == Some(&config_key))
                 .expect("assembler config must exist");
 
-            let result = sibling_merge::assemble_siblings(config, files, file_indices);
-
-            if let Some((pkg, deps, affected_indices)) = result {
-                let package_uid = pkg.package_uid.clone();
-
-                // Update for_packages on all affected files
-                for idx in &affected_indices {
-                    if !files[*idx].for_packages.contains(&package_uid) {
-                        files[*idx].for_packages.push(package_uid.clone());
+            match config.mode {
+                AssemblyMode::SiblingMerge => {
+                    if let Some((pkg, deps, affected_indices)) =
+                        sibling_merge::assemble_siblings(config, files, file_indices)
+                    {
+                        let package_uid = pkg.package_uid.clone();
+                        for idx in &affected_indices {
+                            if !files[*idx].for_packages.contains(&package_uid) {
+                                files[*idx].for_packages.push(package_uid.clone());
+                            }
+                        }
+                        packages.push(pkg);
+                        dependencies.extend(deps);
                     }
                 }
-
-                packages.push(pkg);
-                dependencies.extend(deps);
+                AssemblyMode::OnePerPackageData => {
+                    let results = assemble_one_per_package_data(config, files, file_indices);
+                    for (pkg, deps, affected_idx) in results {
+                        let package_uid = pkg.package_uid.clone();
+                        if !files[affected_idx].for_packages.contains(&package_uid) {
+                            files[affected_idx].for_packages.push(package_uid);
+                        }
+                        packages.push(pkg);
+                        dependencies.extend(deps);
+                    }
+                }
             }
         }
 
         seen_dirs.insert(dir.clone());
+    }
+
+    let mut assembled_indices: HashSet<usize> = HashSet::new();
+    for (idx, file) in files.iter().enumerate() {
+        if !file.for_packages.is_empty() {
+            assembled_indices.insert(idx);
+        }
+    }
+
+    for config in ASSEMBLERS {
+        if config.mode != AssemblyMode::SiblingMerge {
+            continue;
+        }
+        if let Some((pkg, deps, affected_indices)) =
+            nested_merge::assemble_nested_patterns(files, config)
+        {
+            let package_uid = pkg.package_uid.clone();
+            let purl = pkg.purl.clone();
+
+            packages.retain(|p| p.purl != purl);
+            dependencies.retain(|d| d.for_package_uid.as_ref() != Some(&package_uid));
+
+            for idx in &affected_indices {
+                files[*idx].for_packages.clear();
+                files[*idx].for_packages.push(package_uid.clone());
+                assembled_indices.insert(*idx);
+            }
+
+            packages.push(pkg);
+            dependencies.extend(deps);
+        }
     }
 
     AssemblyResult {
@@ -96,17 +140,59 @@ pub fn assemble(files: &mut [FileInfo]) -> AssemblyResult {
     }
 }
 
-/// Build a lookup from datasource_id → first datasource_id of the assembler
-/// (used as a config key to group related datasource IDs).
-fn build_assembler_lookup() -> HashMap<&'static str, &'static str> {
+fn assemble_one_per_package_data(
+    config: &AssemblerConfig,
+    files: &[FileInfo],
+    file_indices: &[usize],
+) -> Vec<(Package, Vec<TopLevelDependency>, usize)> {
+    let mut results = Vec::new();
+
+    for &idx in file_indices {
+        let file = &files[idx];
+        for pkg_data in &file.package_data {
+            let dsid_matches = pkg_data
+                .datasource_id
+                .is_some_and(|dsid| config.datasource_ids.contains(&dsid));
+
+            if !dsid_matches || pkg_data.purl.is_none() {
+                continue;
+            }
+
+            let datafile_path = file.path.clone();
+            let datasource_id = pkg_data.datasource_id.expect("datasource_id must be Some");
+            let pkg = Package::from_package_data(pkg_data, datafile_path.clone());
+            let for_package_uid = Some(pkg.package_uid.clone());
+
+            let deps: Vec<TopLevelDependency> = pkg_data
+                .dependencies
+                .iter()
+                .filter(|dep| dep.purl.is_some())
+                .map(|dep| {
+                    TopLevelDependency::from_dependency(
+                        dep,
+                        datafile_path.clone(),
+                        datasource_id,
+                        for_package_uid.clone(),
+                    )
+                })
+                .collect();
+
+            results.push((pkg, deps, idx));
+        }
+    }
+
+    results
+}
+
+fn build_assembler_lookup() -> HashMap<DatasourceId, DatasourceId> {
     let mut lookup = HashMap::new();
     for config in ASSEMBLERS {
-        let key = config
+        let key = *config
             .datasource_ids
             .first()
             .expect("assembler must have at least one datasource_id");
         for &dsid in config.datasource_ids {
-            lookup.insert(dsid, *key);
+            lookup.insert(dsid, key);
         }
     }
     lookup
@@ -130,7 +216,7 @@ mod tests {
 
     fn create_test_file_info(
         path: &str,
-        datasource_id: &str,
+        datasource_id: DatasourceId,
         purl: Option<&str>,
         name: Option<&str>,
         version: Option<&str>,
@@ -154,7 +240,7 @@ mod tests {
             sha256: None,
             programming_language: None,
             package_data: vec![PackageData {
-                datasource_id: Some(datasource_id.to_string()),
+                datasource_id: Some(datasource_id),
                 purl: purl.map(|s| s.to_string()),
                 name: name.map(|s| s.to_string()),
                 version: version.map(|s| s.to_string()),
@@ -187,7 +273,7 @@ mod tests {
         let mut files = vec![
             create_test_file_info(
                 "project/package.json",
-                "npm_package_json",
+                DatasourceId::NpmPackageJson,
                 Some("pkg:npm/my-app@1.0.0"),
                 Some("my-app"),
                 Some("1.0.0"),
@@ -195,7 +281,7 @@ mod tests {
             ),
             create_test_file_info(
                 "project/package-lock.json",
-                "npm_package_lock_json",
+                DatasourceId::NpmPackageLockJson,
                 Some("pkg:npm/my-app@1.0.0"),
                 Some("my-app"),
                 Some("1.0.0"),
@@ -235,19 +321,19 @@ mod tests {
         assert!(
             package
                 .datasource_ids
-                .contains(&"npm_package_json".to_string())
+                .contains(&DatasourceId::NpmPackageJson)
         );
         assert!(
             package
                 .datasource_ids
-                .contains(&"npm_package_lock_json".to_string())
+                .contains(&DatasourceId::NpmPackageLockJson)
         );
 
         assert_eq!(result.dependencies.len(), 1, "Expected one dependency");
         let dep = &result.dependencies[0];
         assert_eq!(dep.purl, Some("pkg:npm/express@4.18.0".to_string()));
         assert_eq!(dep.datafile_path, "project/package.json");
-        assert_eq!(dep.datasource_id, "npm_package_json");
+        assert_eq!(dep.datasource_id, DatasourceId::NpmPackageJson);
         assert!(
             dep.for_package_uid.is_some(),
             "Expected for_package_uid to be set"
@@ -277,7 +363,7 @@ mod tests {
         let mut files = vec![
             create_test_file_info(
                 "project/Cargo.toml",
-                "cargo_toml",
+                DatasourceId::CargoToml,
                 Some("pkg:cargo/my-crate@0.1.0"),
                 Some("my-crate"),
                 Some("0.1.0"),
@@ -285,7 +371,7 @@ mod tests {
             ),
             create_test_file_info(
                 "project/Cargo.lock",
-                "cargo_lock",
+                DatasourceId::CargoLock,
                 Some("pkg:cargo/my-crate@0.1.0"),
                 Some("my-crate"),
                 Some("0.1.0"),
@@ -323,15 +409,15 @@ mod tests {
             2,
             "Expected both datasource IDs"
         );
-        assert!(package.datasource_ids.contains(&"cargo_toml".to_string()));
-        assert!(package.datasource_ids.contains(&"cargo_lock".to_string()));
+        assert!(package.datasource_ids.contains(&DatasourceId::CargoToml));
+        assert!(package.datasource_ids.contains(&DatasourceId::CargoLock));
     }
 
     #[test]
     fn test_assemble_no_matching_datasource() {
         let mut files = vec![create_test_file_info(
             "project/unknown.json",
-            "unknown_datasource",
+            DatasourceId::Readme,
             Some("pkg:unknown/pkg@1.0.0"),
             Some("pkg"),
             Some("1.0.0"),
@@ -368,7 +454,7 @@ mod tests {
 
         let mut files = vec![create_test_file_info(
             "project/package.json",
-            "npm_package_json",
+            DatasourceId::NpmPackageJson,
             Some("pkg:npm/solo-app@2.0.0"),
             Some("solo-app"),
             Some("2.0.0"),
@@ -403,7 +489,7 @@ mod tests {
     fn test_assemble_no_purl_no_package() {
         let mut files = vec![create_test_file_info(
             "project/package.json",
-            "npm_package_json",
+            DatasourceId::NpmPackageJson,
             None,
             Some("no-purl-app"),
             None,
@@ -445,7 +531,7 @@ mod tests {
     #[test]
     fn test_package_update_merges_fields() {
         let initial_pkg_data = PackageData {
-            datasource_id: Some("npm_package_json".to_string()),
+            datasource_id: Some(DatasourceId::NpmPackageJson),
             purl: Some("pkg:npm/test@1.0.0".to_string()),
             name: Some("test".to_string()),
             version: Some("1.0.0".to_string()),
@@ -456,7 +542,7 @@ mod tests {
         let mut package = Package::from_package_data(&initial_pkg_data, "file1.json".to_string());
 
         let update_pkg_data = PackageData {
-            datasource_id: Some("npm_package_lock_json".to_string()),
+            datasource_id: Some(DatasourceId::NpmPackageLockJson),
             purl: Some("pkg:npm/test@1.0.0".to_string()),
             name: Some("test".to_string()),
             version: Some("1.0.0".to_string()),
@@ -472,12 +558,12 @@ mod tests {
         assert!(
             package
                 .datasource_ids
-                .contains(&"npm_package_json".to_string())
+                .contains(&DatasourceId::NpmPackageJson)
         );
         assert!(
             package
                 .datasource_ids
-                .contains(&"npm_package_lock_json".to_string())
+                .contains(&DatasourceId::NpmPackageLockJson)
         );
         assert_eq!(
             package.description,
@@ -524,5 +610,100 @@ mod tests {
 
         assert!(matches_pattern("MyLib.podspec.json", "*.podspec.json"));
         assert!(!matches_pattern("MyLib.podspec", "*.podspec.json"));
+    }
+
+    #[test]
+    fn test_assemble_one_per_package_data_mode() {
+        let dep = Dependency {
+            purl: Some("pkg:alpine/scanelf".to_string()),
+            extracted_requirement: None,
+            scope: Some("install".to_string()),
+            is_runtime: Some(true),
+            is_optional: Some(false),
+            is_pinned: Some(false),
+            is_direct: Some(true),
+            resolved_package: None,
+            extra_data: None,
+        };
+
+        let path = "rootfs/lib/apk/db/installed";
+        let file_name = "installed";
+        let extension = "";
+
+        let mut files = vec![FileInfo {
+            name: file_name.to_string(),
+            base_name: file_name.to_string(),
+            extension: extension.to_string(),
+            path: path.to_string(),
+            file_type: FileType::File,
+            mime_type: Some("text/plain".to_string()),
+            size: 5000,
+            date: None,
+            sha1: None,
+            md5: None,
+            sha256: None,
+            programming_language: None,
+            package_data: vec![
+                PackageData {
+                    datasource_id: Some(DatasourceId::AlpineInstalledDb),
+                    purl: Some("pkg:alpine/musl@1.2.3-r0".to_string()),
+                    name: Some("musl".to_string()),
+                    version: Some("1.2.3-r0".to_string()),
+                    dependencies: vec![dep],
+                    ..Default::default()
+                },
+                PackageData {
+                    datasource_id: Some(DatasourceId::AlpineInstalledDb),
+                    purl: Some("pkg:alpine/busybox@1.35.0-r13".to_string()),
+                    name: Some("busybox".to_string()),
+                    version: Some("1.35.0-r13".to_string()),
+                    dependencies: vec![],
+                    ..Default::default()
+                },
+            ],
+            license_expression: None,
+            license_detections: vec![],
+            copyrights: vec![],
+            urls: vec![],
+            for_packages: vec![],
+            scan_errors: vec![],
+        }];
+
+        let result = assemble(&mut files);
+
+        assert_eq!(
+            result.packages.len(),
+            2,
+            "Expected two independent packages from one database file"
+        );
+
+        let musl = result
+            .packages
+            .iter()
+            .find(|p| p.name == Some("musl".to_string()));
+        let busybox = result
+            .packages
+            .iter()
+            .find(|p| p.name == Some("busybox".to_string()));
+
+        assert!(musl.is_some(), "Expected musl package");
+        assert!(busybox.is_some(), "Expected busybox package");
+
+        let musl = musl.unwrap();
+        assert_eq!(musl.version, Some("1.2.3-r0".to_string()));
+        assert_eq!(musl.datafile_paths, vec![path.to_string()]);
+        assert!(musl.package_uid.contains("uuid="));
+
+        assert_eq!(result.dependencies.len(), 1);
+        assert_eq!(
+            result.dependencies[0].purl,
+            Some("pkg:alpine/scanelf".to_string())
+        );
+
+        assert_eq!(
+            files[0].for_packages.len(),
+            2,
+            "Expected database file to reference both packages"
+        );
     }
 }

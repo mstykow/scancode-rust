@@ -20,7 +20,7 @@
 //! - Graceful error handling with `warn!()` logs
 //! - Direct dependencies: all in manifest are direct (no lockfile)
 
-use crate::models::{Dependency, PackageData, Party};
+use crate::models::{DatasourceId, Dependency, PackageData, Party};
 use crate::parsers::utils::split_name_email;
 use log::warn;
 use packageurl::PackageUrl;
@@ -174,7 +174,7 @@ impl PackageParser for CargoParser {
             repository_homepage_url,
             repository_download_url,
             api_data_url,
-            datasource_id: Some("cargo_toml".to_string()),
+            datasource_id: Some(DatasourceId::CargoToml),
             purl,
         }]
     }
@@ -463,50 +463,7 @@ fn extract_extra_data(
 }
 
 fn default_package_data() -> PackageData {
-    PackageData {
-        package_type: None,
-        namespace: None,
-        name: None,
-        version: None,
-        qualifiers: None,
-        subpath: None,
-        primary_language: None,
-        description: None,
-        release_date: None,
-        parties: Vec::new(),
-        keywords: Vec::new(),
-        homepage_url: None,
-        download_url: None,
-        size: None,
-        sha1: None,
-        md5: None,
-        sha256: None,
-        sha512: None,
-        bug_tracking_url: None,
-        code_view_url: None,
-        vcs_url: None,
-        copyright: None,
-        holder: None,
-        declared_license_expression: None,
-        declared_license_expression_spdx: None,
-        license_detections: Vec::new(),
-        other_license_expression: None,
-        other_license_expression_spdx: None,
-        other_license_detections: Vec::new(),
-        extracted_license_statement: None,
-        notice_text: None,
-        source_packages: Vec::new(),
-        file_references: Vec::new(),
-        is_private: false,
-        is_virtual: false,
-        extra_data: None,
-        dependencies: Vec::new(),
-        repository_homepage_url: None,
-        repository_download_url: None,
-        api_data_url: None,
-        datasource_id: None,
-        purl: None,
-    }
+    PackageData::default()
 }
 
 crate::register_parser!(

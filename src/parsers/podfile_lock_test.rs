@@ -1,5 +1,6 @@
 #[cfg(test)]
 mod tests {
+    use crate::models::DatasourceId;
     use std::path::PathBuf;
 
     use crate::parsers::{PackageParser, PodfileLockParser};
@@ -22,7 +23,7 @@ mod tests {
 
         assert_eq!(pkg.package_type.as_deref(), Some("cocoapods"));
         assert_eq!(pkg.primary_language.as_deref(), Some("Objective-C"));
-        assert_eq!(pkg.datasource_id.as_deref(), Some("cocoapods_podfile_lock"));
+        assert_eq!(pkg.datasource_id, Some(DatasourceId::CocoapodsPodfileLock));
         assert!(pkg.name.is_none());
         assert!(pkg.version.is_none());
 

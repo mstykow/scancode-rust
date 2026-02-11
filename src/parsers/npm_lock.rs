@@ -19,7 +19,7 @@
 //! - v2+: Flat dependency structure with `node_modules/` prefix for nesting
 //! - Direct dependencies determined by top-level `dependencies` and `devDependencies`
 
-use crate::models::{Dependency, PackageData, ResolvedPackage};
+use crate::models::{DatasourceId, Dependency, PackageData, ResolvedPackage};
 use crate::parsers::utils::{npm_purl, parse_sri};
 use log::warn;
 use serde_json::Value;
@@ -107,47 +107,8 @@ impl PackageParser for NpmLockParser {
 fn default_package_data() -> PackageData {
     PackageData {
         package_type: Some(NpmLockParser::PACKAGE_TYPE.to_string()),
-        namespace: None,
-        name: None,
-        version: None,
-        qualifiers: None,
-        subpath: None,
-        primary_language: None,
-        description: None,
-        release_date: None,
-        parties: Vec::new(),
-        keywords: Vec::new(),
-        homepage_url: None,
-        download_url: None,
-        size: None,
-        sha1: None,
-        md5: None,
-        sha256: None,
-        sha512: None,
-        bug_tracking_url: None,
-        code_view_url: None,
-        vcs_url: None,
-        copyright: None,
-        holder: None,
-        declared_license_expression: None,
-        declared_license_expression_spdx: None,
-        license_detections: Vec::new(),
-        other_license_expression: None,
-        other_license_expression_spdx: None,
-        other_license_detections: Vec::new(),
-        extracted_license_statement: None,
-        notice_text: None,
-        source_packages: Vec::new(),
-        file_references: Vec::new(),
-        is_private: false,
-        is_virtual: false,
-        extra_data: None,
-        dependencies: Vec::new(),
-        repository_homepage_url: None,
-        repository_download_url: None,
-        api_data_url: None,
-        datasource_id: Some("npm_package_lock_json".to_string()),
-        purl: None,
+        datasource_id: Some(DatasourceId::NpmPackageLockJson),
+        ..Default::default()
     }
 }
 
@@ -276,7 +237,7 @@ fn parse_lockfile_v2_plus(
         repository_homepage_url: None,
         repository_download_url: None,
         api_data_url: None,
-        datasource_id: Some("npm_package_lock_json".to_string()),
+        datasource_id: Some(DatasourceId::NpmPackageLockJson),
         purl,
     }
 }
@@ -342,7 +303,7 @@ fn parse_lockfile_v1(
         repository_homepage_url: None,
         repository_download_url: None,
         api_data_url: None,
-        datasource_id: Some("npm_package_lock_json".to_string()),
+        datasource_id: Some(DatasourceId::NpmPackageLockJson),
         purl,
     }
 }
@@ -553,7 +514,7 @@ fn build_npm_dependency(
         repository_homepage_url: None,
         repository_download_url: None,
         api_data_url: None,
-        datasource_id: Some("npm_package_lock_json".to_string()),
+        datasource_id: Some(DatasourceId::NpmPackageLockJson),
         purl: None,
     };
 

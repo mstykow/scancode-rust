@@ -21,7 +21,7 @@
 //! - Graceful error handling: logs warnings and returns default on parse failure
 //! - PURL type: "gem"
 
-use crate::models::{Dependency, PackageData, Party};
+use crate::models::{DatasourceId, Dependency, PackageData, Party};
 use crate::parsers::utils::split_name_email;
 use flate2::read::GzDecoder;
 use log::warn;
@@ -221,7 +221,7 @@ fn parse_gemfile(content: &str) -> PackageData {
         package_type: Some(PACKAGE_TYPE.to_string()),
         primary_language: Some("Ruby".to_string()),
         dependencies,
-        datasource_id: Some("gemfile".to_string()),
+        datasource_id: Some(DatasourceId::Gemfile),
         ..default_package_data()
     }
 }
@@ -601,7 +601,7 @@ fn parse_gemfile_lock(content: &str) -> PackageData {
         } else {
             Some(extra_data)
         },
-        datasource_id: Some("gemfile_lock".to_string()),
+        datasource_id: Some(DatasourceId::GemfileLock),
         purl,
         ..default_package_data()
     }
@@ -769,47 +769,8 @@ fn get_rubygems_urls(
 fn default_package_data() -> PackageData {
     PackageData {
         package_type: Some(PACKAGE_TYPE.to_string()),
-        namespace: None,
-        name: None,
-        version: None,
-        qualifiers: None,
-        subpath: None,
         primary_language: Some("Ruby".to_string()),
-        description: None,
-        release_date: None,
-        parties: Vec::new(),
-        keywords: Vec::new(),
-        homepage_url: None,
-        download_url: None,
-        size: None,
-        sha1: None,
-        md5: None,
-        sha256: None,
-        sha512: None,
-        bug_tracking_url: None,
-        code_view_url: None,
-        vcs_url: None,
-        copyright: None,
-        holder: None,
-        declared_license_expression: None,
-        declared_license_expression_spdx: None,
-        license_detections: Vec::new(),
-        other_license_expression: None,
-        other_license_expression_spdx: None,
-        other_license_detections: Vec::new(),
-        extracted_license_statement: None,
-        notice_text: None,
-        source_packages: Vec::new(),
-        file_references: Vec::new(),
-        is_private: false,
-        is_virtual: false,
-        extra_data: None,
-        dependencies: Vec::new(),
-        repository_homepage_url: None,
-        repository_download_url: None,
-        api_data_url: None,
-        datasource_id: None,
-        purl: None,
+        ..Default::default()
     }
 }
 
@@ -1204,7 +1165,7 @@ fn parse_gemspec(content: &str) -> PackageData {
         repository_homepage_url,
         repository_download_url,
         api_data_url,
-        datasource_id: Some("gemspec".to_string()),
+        datasource_id: Some(DatasourceId::Gemspec),
         purl,
         ..default_package_data()
     }
@@ -1302,14 +1263,17 @@ fn extract_gem_archive(path: &Path) -> Result<PackageData, String> {
                 ));
             }
 
-            return parse_gem_metadata_yaml(&content);
+            return parse_gem_metadata_yaml(&content, DatasourceId::GemArchive);
         }
     }
 
     Err("metadata.gz not found in .gem archive".to_string())
 }
 
-fn parse_gem_metadata_yaml(content: &str) -> Result<PackageData, String> {
+fn parse_gem_metadata_yaml(
+    content: &str,
+    datasource_id: DatasourceId,
+) -> Result<PackageData, String> {
     // Ruby YAML tagged types need to be handled:
     // --- !ruby/object:Gem::Specification
     // We strip Ruby-specific YAML tags since serde_yaml can't handle them
@@ -1494,7 +1458,7 @@ fn parse_gem_metadata_yaml(content: &str) -> Result<PackageData, String> {
         repository_homepage_url,
         repository_download_url,
         api_data_url,
-        datasource_id: Some("gem_archive".to_string()),
+        datasource_id: Some(datasource_id),
         purl,
         vcs_url,
         ..default_package_data()
@@ -1622,7 +1586,7 @@ fn extract_gem_metadata_extracted(path: &Path) -> Result<PackageData, String> {
     let content = fs::read_to_string(path)
         .map_err(|e| format!("Failed to read metadata.gz-extract file: {}", e))?;
 
-    parse_gem_metadata_yaml(&content)
+    parse_gem_metadata_yaml(&content, DatasourceId::GemArchiveExtracted)
 }
 
 // Register parser with metadata

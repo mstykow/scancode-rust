@@ -16,6 +16,7 @@
 //! - Located in conda-meta/ directory in rootfs
 //! - Spec: https://docs.conda.io/
 
+use crate::models::DatasourceId;
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
@@ -25,12 +26,19 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::models::PackageData;
-use crate::parsers::utils::create_default_package_data;
 
 use super::PackageParser;
 
 const PACKAGE_TYPE: &str = "conda";
-const DATASOURCE_ID: &str = "conda_meta_json";
+
+fn default_package_data() -> PackageData {
+    PackageData {
+        package_type: Some(PACKAGE_TYPE.to_string()),
+        primary_language: Some("Python".to_string()),
+        datasource_id: Some(DatasourceId::CondaMetaJson),
+        ..Default::default()
+    }
+}
 
 /// Parser for Conda metadata JSON files
 pub struct CondaMetaJsonParser;
@@ -66,10 +74,7 @@ impl PackageParser for CondaMetaJsonParser {
             Ok(c) => c,
             Err(e) => {
                 warn!("Failed to read conda-meta JSON file {:?}: {}", path, e);
-                return vec![create_default_package_data(
-                    PACKAGE_TYPE,
-                    Some(DATASOURCE_ID),
-                )];
+                return vec![default_package_data()];
             }
         };
 
@@ -82,9 +87,7 @@ pub(crate) fn parse_conda_meta_json(content: &str) -> PackageData {
         Ok(m) => m,
         Err(e) => {
             warn!("Failed to parse conda-meta JSON: {}", e);
-            let mut pkg = create_default_package_data(PACKAGE_TYPE, Some("Python"));
-            pkg.datasource_id = Some(DATASOURCE_ID.to_string());
-            return pkg;
+            return default_package_data();
         }
     };
 
@@ -135,7 +138,7 @@ pub(crate) fn parse_conda_meta_json(content: &str) -> PackageData {
         md5: metadata.md5,
         sha256: metadata.sha256,
         extra_data: extra_data_opt,
-        datasource_id: Some(DATASOURCE_ID.to_string()),
+        datasource_id: Some(DatasourceId::CondaMetaJson),
         ..Default::default()
     }
 }

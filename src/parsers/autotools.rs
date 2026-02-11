@@ -16,6 +16,7 @@
 //! - configure.in is NOT supported (deprecated legacy format)
 //! - Returns minimal PackageData with only package_type and name fields
 
+use crate::models::DatasourceId;
 use crate::models::PackageData;
 use std::path::Path;
 
@@ -45,6 +46,7 @@ impl PackageParser for AutotoolsConfigureParser {
         vec![PackageData {
             package_type: Some("autotools".to_string()),
             name,
+            datasource_id: Some(DatasourceId::AutotoolsConfigure),
             ..Default::default()
         }]
     }

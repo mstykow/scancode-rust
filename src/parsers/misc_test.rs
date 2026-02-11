@@ -2,6 +2,7 @@
 
 use super::PackageParser;
 use super::misc::*;
+use crate::models::DatasourceId;
 use std::path::PathBuf;
 
 // ============================================================================
@@ -32,7 +33,7 @@ fn test_java_jar_recognizer() {
     let packages = JavaJarRecognizer::extract_packages(&PathBuf::from("test.jar"));
     assert_eq!(packages.len(), 1);
     assert_eq!(packages[0].package_type, Some("jar".to_string()));
-    assert_eq!(packages[0].datasource_id, Some("java_jar".to_string()));
+    assert_eq!(packages[0].datasource_id, Some(DatasourceId::JavaJar));
 }
 
 #[test]
@@ -54,7 +55,7 @@ fn test_ivy_xml_recognizer() {
     let packages = IvyXmlRecognizer::extract_packages(&PathBuf::from("ivy.xml"));
     assert_eq!(packages.len(), 1);
     assert_eq!(packages[0].package_type, Some("ivy".to_string()));
-    assert_eq!(packages[0].datasource_id, Some("ant_ivy_xml".to_string()));
+    assert_eq!(packages[0].datasource_id, Some(DatasourceId::AntIvyXml));
 }
 
 #[test]
@@ -81,7 +82,7 @@ fn test_java_war_recognizer() {
     assert_eq!(packages[0].package_type, Some("war".to_string()));
     assert_eq!(
         packages[0].datasource_id,
-        Some("java_war_archive".to_string())
+        Some(DatasourceId::JavaWarArchive)
     );
 }
 
@@ -110,10 +111,7 @@ fn test_java_war_web_xml_recognizer() {
     let packages = JavaWarWebXmlRecognizer::extract_packages(&PathBuf::from("WEB-INF/web.xml"));
     assert_eq!(packages.len(), 1);
     assert_eq!(packages[0].package_type, Some("war".to_string()));
-    assert_eq!(
-        packages[0].datasource_id,
-        Some("java_war_web_xml".to_string())
-    );
+    assert_eq!(packages[0].datasource_id, Some(DatasourceId::JavaWarWebXml));
 }
 
 #[test]
@@ -140,7 +138,7 @@ fn test_java_ear_recognizer() {
     assert_eq!(packages[0].package_type, Some("ear".to_string()));
     assert_eq!(
         packages[0].datasource_id,
-        Some("java_ear_archive".to_string())
+        Some(DatasourceId::JavaEarArchive)
     );
 }
 
@@ -172,7 +170,7 @@ fn test_java_ear_app_xml_recognizer() {
     assert_eq!(packages[0].package_type, Some("ear".to_string()));
     assert_eq!(
         packages[0].datasource_id,
-        Some("java_ear_application_xml".to_string())
+        Some(DatasourceId::JavaEarApplicationXml)
     );
 }
 
@@ -208,7 +206,7 @@ fn test_axis2_module_xml_recognizer() {
     assert_eq!(packages[0].package_type, Some("axis2".to_string()));
     assert_eq!(
         packages[0].datasource_id,
-        Some("axis2_module_xml".to_string())
+        Some(DatasourceId::Axis2ModuleXml)
     );
 }
 
@@ -228,7 +226,7 @@ fn test_axis2_mar_recognizer() {
     let packages = Axis2MarRecognizer::extract_packages(&PathBuf::from("module.mar"));
     assert_eq!(packages.len(), 1);
     assert_eq!(packages[0].package_type, Some("axis2".to_string()));
-    assert_eq!(packages[0].datasource_id, Some("axis2_mar".to_string()));
+    assert_eq!(packages[0].datasource_id, Some(DatasourceId::Axis2Mar));
 }
 
 // ============================================================================
@@ -251,7 +249,7 @@ fn test_jboss_sar_recognizer() {
     let packages = JBossSarRecognizer::extract_packages(&PathBuf::from("service.sar"));
     assert_eq!(packages.len(), 1);
     assert_eq!(packages[0].package_type, Some("jboss-service".to_string()));
-    assert_eq!(packages[0].datasource_id, Some("jboss_sar".to_string()));
+    assert_eq!(packages[0].datasource_id, Some(DatasourceId::JbossSar));
 }
 
 #[test]
@@ -282,7 +280,7 @@ fn test_jboss_service_xml_recognizer() {
     assert_eq!(packages[0].package_type, Some("jboss-service".to_string()));
     assert_eq!(
         packages[0].datasource_id,
-        Some("jboss_service_xml".to_string())
+        Some(DatasourceId::JbossServiceXml)
     );
 }
 
@@ -316,10 +314,7 @@ fn test_meteor_package_recognizer() {
         MeteorPackageRecognizer::extract_packages(&PathBuf::from("mypackage/package.js"));
     assert_eq!(packages.len(), 1);
     assert_eq!(packages[0].package_type, Some("meteor".to_string()));
-    assert_eq!(
-        packages[0].datasource_id,
-        Some("meteor_package".to_string())
-    );
+    assert_eq!(packages[0].datasource_id, Some(DatasourceId::MeteorPackage));
 }
 
 // ============================================================================
@@ -350,7 +345,7 @@ fn test_android_library_recognizer() {
     assert_eq!(packages[0].package_type, Some("android_lib".to_string()));
     assert_eq!(
         packages[0].datasource_id,
-        Some("android_aar_library".to_string())
+        Some(DatasourceId::AndroidAarLibrary)
     );
 }
 
@@ -372,7 +367,7 @@ fn test_mozilla_xpi_recognizer() {
     let packages = MozillaXpiRecognizer::extract_packages(&PathBuf::from("addon.xpi"));
     assert_eq!(packages.len(), 1);
     assert_eq!(packages[0].package_type, Some("mozilla".to_string()));
-    assert_eq!(packages[0].datasource_id, Some("mozilla_xpi".to_string()));
+    assert_eq!(packages[0].datasource_id, Some(DatasourceId::MozillaXpi));
 }
 
 #[test]
@@ -395,7 +390,7 @@ fn test_chrome_crx_recognizer() {
     let packages = ChromeCrxRecognizer::extract_packages(&PathBuf::from("extension.crx"));
     assert_eq!(packages.len(), 1);
     assert_eq!(packages[0].package_type, Some("chrome".to_string()));
-    assert_eq!(packages[0].datasource_id, Some("chrome_crx".to_string()));
+    assert_eq!(packages[0].datasource_id, Some(DatasourceId::ChromeCrx));
 }
 
 #[test]
@@ -414,7 +409,7 @@ fn test_ios_ipa_recognizer() {
     let packages = IosIpaRecognizer::extract_packages(&PathBuf::from("MyApp.ipa"));
     assert_eq!(packages.len(), 1);
     assert_eq!(packages[0].package_type, Some("ios".to_string()));
-    assert_eq!(packages[0].datasource_id, Some("ios_ipa".to_string()));
+    assert_eq!(packages[0].datasource_id, Some(DatasourceId::IosIpa));
 }
 
 // ============================================================================
@@ -443,7 +438,7 @@ fn test_cab_archive_recognizer() {
     assert_eq!(packages[0].package_type, Some("cab".to_string()));
     assert_eq!(
         packages[0].datasource_id,
-        Some("microsoft_cabinet".to_string())
+        Some(DatasourceId::MicrosoftCabinet)
     );
 }
 
@@ -471,7 +466,7 @@ fn test_shar_archive_recognizer() {
     assert_eq!(packages[0].package_type, Some("shar".to_string()));
     assert_eq!(
         packages[0].datasource_id,
-        Some("shar_shell_archive".to_string())
+        Some(DatasourceId::SharShellArchive)
     );
 }
 
@@ -498,7 +493,7 @@ fn test_apple_dmg_recognizer() {
     let packages = AppleDmgRecognizer::extract_packages(&PathBuf::from("App.dmg"));
     assert_eq!(packages.len(), 1);
     assert_eq!(packages[0].package_type, Some("dmg".to_string()));
-    assert_eq!(packages[0].datasource_id, Some("apple_dmg".to_string()));
+    assert_eq!(packages[0].datasource_id, Some(DatasourceId::AppleDmg));
 
     let packages_sparse = AppleDmgRecognizer::extract_packages(&PathBuf::from("disk.sparseimage"));
     assert_eq!(packages_sparse[0].package_type, Some("dmg".to_string()));
@@ -523,7 +518,7 @@ fn test_iso_image_recognizer() {
     assert_eq!(packages_iso[0].package_type, Some("iso".to_string()));
     assert_eq!(
         packages_iso[0].datasource_id,
-        Some("iso_disk_image".to_string())
+        Some(DatasourceId::IsoDiskImage)
     );
 
     let packages_udf = IsoImageRecognizer::extract_packages(&PathBuf::from("disk.udf"));
@@ -549,7 +544,7 @@ fn test_android_apk_recognizer() {
     let packages = AndroidApkRecognizer::extract_packages(&android_apk);
     assert_eq!(packages.len(), 1);
     assert_eq!(packages[0].package_type, Some("android".to_string()));
-    assert_eq!(packages[0].datasource_id, Some("android_apk".to_string()));
+    assert_eq!(packages[0].datasource_id, Some(DatasourceId::AndroidApk));
 }
 
 #[test]
@@ -566,7 +561,7 @@ fn test_squashfs_recognizer() {
     assert_eq!(packages[0].package_type, Some("squashfs".to_string()));
     assert_eq!(
         packages[0].datasource_id,
-        Some("squashfs_disk_image".to_string())
+        Some(DatasourceId::SquashfsDiskImage)
     );
 }
 
@@ -582,10 +577,7 @@ fn test_nsis_recognizer() {
     let packages = NsisRecognizer::extract_packages(&nsis);
     assert_eq!(packages.len(), 1);
     assert_eq!(packages[0].package_type, Some("nsis".to_string()));
-    assert_eq!(
-        packages[0].datasource_id,
-        Some("nsis_installer".to_string())
-    );
+    assert_eq!(packages[0].datasource_id, Some(DatasourceId::NsisInstaller));
 }
 
 #[test]
@@ -604,7 +596,7 @@ fn test_installshield_recognizer() {
     assert_eq!(packages[0].package_type, Some("installshield".to_string()));
     assert_eq!(
         packages[0].datasource_id,
-        Some("installshield_installer".to_string())
+        Some(DatasourceId::InstallshieldInstaller)
     );
 }
 

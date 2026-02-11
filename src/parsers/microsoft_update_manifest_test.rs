@@ -2,6 +2,7 @@
 mod tests {
     use super::super::PackageParser;
     use super::super::microsoft_update_manifest::*;
+    use crate::models::DatasourceId;
     use std::path::PathBuf;
 
     #[test]
@@ -46,8 +47,8 @@ mod tests {
         );
         assert_eq!(pkg.package_type.as_deref(), Some("windows-update"));
         assert_eq!(
-            pkg.datasource_id.as_deref(),
-            Some("microsoft_update_manifest_mum")
+            pkg.datasource_id,
+            Some(DatasourceId::MicrosoftUpdateManifestMum)
         );
     }
 
@@ -71,8 +72,8 @@ mod tests {
 
         assert_eq!(pkg.package_type.as_deref(), Some("windows-update"));
         assert_eq!(
-            pkg.datasource_id.as_deref(),
-            Some("microsoft_update_manifest_mum")
+            pkg.datasource_id,
+            Some(DatasourceId::MicrosoftUpdateManifestMum)
         );
     }
 }

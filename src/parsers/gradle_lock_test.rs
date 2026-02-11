@@ -4,6 +4,7 @@ use std::io::Write;
 use std::path::Path;
 use tempfile::NamedTempFile;
 
+use crate::models::DatasourceId;
 use crate::parsers::PackageParser;
 use crate::parsers::gradle_lock::GradleLockfileParser;
 
@@ -134,7 +135,7 @@ fn test_parse_gradle_lockfile_datasource_id() {
 
     assert_eq!(
         package_data.datasource_id,
-        Some("gradle_lockfile".to_string())
+        Some(DatasourceId::GradleLockfile)
     );
 }
 

@@ -18,13 +18,11 @@ use std::path::Path;
 use log::warn;
 use serde_json::json;
 
-use crate::models::{Dependency, PackageData, Party};
-use crate::parsers::utils::create_default_package_data;
+use crate::models::{DatasourceId, Dependency, PackageData, Party};
 
 use super::PackageParser;
 
 const PACKAGE_TYPE: &str = "cpan";
-const DATASOURCE_ID: &str = "cpan_dist_ini";
 
 pub struct CpanDistIniParser;
 
@@ -40,9 +38,12 @@ impl PackageParser for CpanDistIniParser {
             Ok(c) => c,
             Err(e) => {
                 warn!("Failed to read dist.ini file {:?}: {}", path, e);
-                let mut pkg = create_default_package_data(PACKAGE_TYPE, Some("Perl"));
-                pkg.datasource_id = Some(DATASOURCE_ID.to_string());
-                return vec![pkg];
+                return vec![PackageData {
+                    package_type: Some(PACKAGE_TYPE.to_string()),
+                    primary_language: Some("Perl".to_string()),
+                    datasource_id: Some(DatasourceId::CpanDistIni),
+                    ..Default::default()
+                }];
             }
         };
 
@@ -84,7 +85,7 @@ pub(crate) fn parse_dist_ini(content: &str) -> PackageData {
         } else {
             Some(extra_data)
         },
-        datasource_id: Some(DATASOURCE_ID.to_string()),
+        datasource_id: Some(DatasourceId::CpanDistIni),
         primary_language: Some("Perl".to_string()),
         ..Default::default()
     }

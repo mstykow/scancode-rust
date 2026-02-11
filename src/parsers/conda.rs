@@ -32,13 +32,16 @@ use std::path::Path;
 use log::warn;
 use serde_yaml::Value;
 
-use crate::models::{Dependency, PackageData};
-use crate::parsers::utils::create_default_package_data;
+use crate::models::{DatasourceId, Dependency, PackageData};
 
 use super::PackageParser;
 
-fn default_package_data() -> PackageData {
-    create_default_package_data("conda", None)
+fn default_package_data(datasource_id: Option<DatasourceId>) -> PackageData {
+    PackageData {
+        package_type: Some("conda".to_string()),
+        datasource_id,
+        ..Default::default()
+    }
 }
 
 /// Build a PURL (Package URL) for Conda or PyPI packages
@@ -95,7 +98,7 @@ impl PackageParser for CondaMetaYamlParser {
             Ok(c) => c,
             Err(e) => {
                 warn!("Failed to read {}: {}", path.display(), e);
-                return vec![default_package_data()];
+                return vec![default_package_data(Some(DatasourceId::CondaMetaYaml))];
             }
         };
 
@@ -108,7 +111,7 @@ impl PackageParser for CondaMetaYamlParser {
             Ok(y) => y,
             Err(e) => {
                 warn!("Failed to parse YAML in {}: {}", path.display(), e);
-                return vec![default_package_data()];
+                return vec![default_package_data(Some(DatasourceId::CondaMetaYaml))];
             }
         };
 
@@ -193,16 +196,17 @@ impl PackageParser for CondaMetaYamlParser {
             }
         }
 
-        let mut pkg = default_package_data();
+        let mut pkg = default_package_data(Some(DatasourceId::CondaMetaYaml));
         pkg.package_type = Some(Self::PACKAGE_TYPE.to_string());
+        pkg.datasource_id = Some(DatasourceId::CondaMetaYaml);
         pkg.name = name;
         pkg.version = version;
         pkg.download_url = download_url;
         pkg.homepage_url = homepage_url;
-        pkg.vcs_url = vcs_url;
-        pkg.description = description;
-        pkg.sha256 = sha256;
         pkg.extracted_license_statement = extracted_license_statement;
+        pkg.description = description;
+        pkg.vcs_url = vcs_url;
+        pkg.sha256 = sha256;
         pkg.dependencies = dependencies;
         if !extra_data.is_empty() {
             pkg.extra_data = Some(extra_data);
@@ -236,7 +240,7 @@ impl PackageParser for CondaEnvironmentYmlParser {
             Ok(c) => c,
             Err(e) => {
                 warn!("Failed to read {}: {}", path.display(), e);
-                return vec![default_package_data()];
+                return vec![default_package_data(Some(DatasourceId::CondaYaml))];
             }
         };
 
@@ -244,7 +248,7 @@ impl PackageParser for CondaEnvironmentYmlParser {
             Ok(y) => y,
             Err(e) => {
                 warn!("Failed to parse YAML in {}: {}", path.display(), e);
-                return vec![default_package_data()];
+                return vec![default_package_data(Some(DatasourceId::CondaYaml))];
             }
         };
 
@@ -264,8 +268,9 @@ impl PackageParser for CondaEnvironmentYmlParser {
         }
 
         // Environment files are private (not published packages)
-        let mut pkg = default_package_data();
+        let mut pkg = default_package_data(Some(DatasourceId::CondaYaml));
         pkg.package_type = Some(Self::PACKAGE_TYPE.to_string());
+        pkg.datasource_id = Some(DatasourceId::CondaYaml);
         pkg.name = name;
         pkg.primary_language = Some("Python".to_string());
         pkg.dependencies = dependencies;
