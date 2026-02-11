@@ -544,12 +544,39 @@ The following sections describe major architectural components in detail. See [i
 - Confidence scoring and multi-license handling
 - Integration with existing SPDX license data
 
-**Copyright Detection**:
+**Copyright Detection** (see [COPYRIGHT_DETECTION_PLAN.md](implementation-plans/text-detection/COPYRIGHT_DETECTION_PLAN.md)):
 
-- Copyright statement extraction from file content
-- Copyright holder identification
-- Year range parsing
-- Statement normalization
+The copyright detection engine extracts copyright statements, holder names, and author information from source files using a four-stage pipeline:
+
+```text
+┌──────────────┐    ┌──────────────┐    ┌──────────────┐    ┌──────────────┐
+│  1. Text     │───>│  2. Candidate│───>│  3. Lex +    │───>│  4. Tree     │
+│  Preparation │    │  Selection   │    │  Parse       │    │  Walk +      │
+│              │    │              │    │              │    │  Refinement  │
+└──────────────┘    └──────────────┘    └──────────────┘    └──────────────┘
+```
+
+1. **Text Preparation**: Normalizes copyright symbols (`©`, `(c)`, HTML entities), strips comment markers and markup, converts to ASCII
+2. **Candidate Selection**: Filters lines using hint markers (`opyr`, `auth`, `©`, year patterns), groups multi-line statements, filters gibberish
+3. **Lexing + Parsing**: POS-tags tokens via ~500 regex patterns (type-safe `PosTag` enum), then applies ~200 grammar rules to build parse trees identifying `COPYRIGHT`, `AUTHOR`, `NAME`, `COMPANY` structures
+4. **Tree Walk + Refinement**: Extracts `CopyrightDetection`, `HolderDetection`, `AuthorDetection` from parse trees, applies cleanup (strip unbalanced parens, deduplicate "Copyright" words, filter junk)
+
+Key design decisions vs Python reference:
+
+- **Type-safe POS tags**: Enum-based (not string-based) — compiler catches tag typos
+- **Thread-safe**: No global mutable state (Python uses a singleton `DETECTOR`)
+- **`RegexSet`-based lexer**: Parallel multi-pattern matching vs Python's sequential scan
+- **Extended year range**: 1960-2099 (Python stops at 2039)
+- **Bug fixes**: Fixed year-year separator bug, duplicate patterns, `is_private_ip` IPv6 bug
+
+Special cases handled:
+
+- Linux CREDITS files (structured `N:/E:/W:` format)
+- SPDX-FileCopyrightText and SPDX-FileContributor
+- "All Rights Reserved" in English, German, French, Spanish, Dutch
+- Multi-line copyright statements spanning consecutive lines
+
+Module location: `src/copyright/`
 
 **Email/URL Detection**:
 
