@@ -4,6 +4,7 @@ pub mod dictionary;
 pub mod token_sets;
 
 use crate::license_detection::index::dictionary::TokenDictionary;
+use crate::license_detection::models::License;
 use aho_corasick::AhoCorasick;
 use std::collections::{HashMap, HashSet};
 
@@ -149,6 +150,14 @@ pub struct LicenseIndex {
     ///
     /// Corresponds to Python: `self.approx_matchable_rids = set()` (line 234)
     pub approx_matchable_rids: HashSet<usize>,
+
+    /// Mapping from ScanCode license key to License object.
+    ///
+    /// Provides access to license metadata for building SPDX mappings
+    /// and validating license expressions.
+    ///
+    /// Corresponds to Python: `get_licenses_db()` in models.py
+    pub licenses_by_key: HashMap<String, crate::license_detection::models::License>,
 }
 
 impl LicenseIndex {
@@ -161,6 +170,51 @@ impl LicenseIndex {
     /// Option containing the rule ID, or None if hash not found
     pub fn get_rid_by_hash(&self, hash: &[u8; 20]) -> Option<&usize> {
         self.rid_by_hash.get(hash)
+    }
+
+    /// Get a license by its key.
+    ///
+    /// # Arguments
+    /// * `key` - ScanCode license key (lowercase)
+    ///
+    /// # Returns
+    /// Option containing the License, or None if not found
+    pub fn get_license(&self, key: &str) -> Option<&License> {
+        self.licenses_by_key.get(key)
+    }
+
+    /// Add a license to the index.
+    ///
+    /// # Arguments
+    /// * `license` - License to add
+    pub fn add_license(&mut self, license: License) {
+        self.licenses_by_key.insert(license.key.clone(), license);
+    }
+
+    /// Add multiple licenses to the index.
+    ///
+    /// # Arguments
+    /// * `licenses` - Slice of licenses to add
+    pub fn add_licenses(&mut self, licenses: &[License]) {
+        for license in licenses {
+            self.add_license(license.clone());
+        }
+    }
+
+    /// Get all ScanCode license keys.
+    ///
+    /// # Returns
+    /// Iterator over all ScanCode license keys
+    pub fn license_keys(&self) -> impl Iterator<Item = &String> {
+        self.licenses_by_key.keys()
+    }
+
+    /// Get the number of licenses in the index.
+    ///
+    /// # Returns
+    /// Count of licenses
+    pub fn license_count(&self) -> usize {
+        self.licenses_by_key.len()
     }
 }
 
@@ -192,6 +246,7 @@ impl LicenseIndex {
             regular_rids: HashSet::new(),
             false_positive_rids: HashSet::new(),
             approx_matchable_rids: HashSet::new(),
+            licenses_by_key: HashMap::new(),
         }
     }
 
@@ -233,6 +288,7 @@ mod tests {
         assert!(index.regular_rids.is_empty());
         assert!(index.false_positive_rids.is_empty());
         assert!(index.approx_matchable_rids.is_empty());
+        assert!(index.licenses_by_key.is_empty());
     }
 
     #[test]
@@ -265,5 +321,101 @@ mod tests {
 
         assert_eq!(cloned.dictionary.legalese_count(), 5);
         assert!(cloned.rid_by_hash.is_empty());
+    }
+
+    #[test]
+    fn test_license_index_add_license() {
+        let mut index = LicenseIndex::default();
+
+        let license = License {
+            key: "test-license".to_string(),
+            name: "Test License".to_string(),
+            spdx_license_key: Some("TEST".to_string()),
+            category: Some("Permissive".to_string()),
+            text: "Test license text".to_string(),
+            reference_urls: vec![],
+            notes: None,
+        };
+
+        index.add_license(license);
+
+        assert_eq!(index.license_count(), 1);
+        assert!(index.get_license("test-license").is_some());
+    }
+
+    #[test]
+    fn test_license_index_add_licenses() {
+        let mut index = LicenseIndex::default();
+
+        let licenses = vec![
+            License {
+                key: "license-1".to_string(),
+                name: "License 1".to_string(),
+                spdx_license_key: Some("LIC1".to_string()),
+                category: Some("Permissive".to_string()),
+                text: "License 1 text".to_string(),
+                reference_urls: vec![],
+                notes: None,
+            },
+            License {
+                key: "license-2".to_string(),
+                name: "License 2".to_string(),
+                spdx_license_key: Some("LIC2".to_string()),
+                category: Some("Copyleft".to_string()),
+                text: "License 2 text".to_string(),
+                reference_urls: vec![],
+                notes: None,
+            },
+        ];
+
+        index.add_licenses(&licenses);
+
+        assert_eq!(index.license_count(), 2);
+        assert!(index.get_license("license-1").is_some());
+        assert!(index.get_license("license-2").is_some());
+    }
+
+    #[test]
+    fn test_license_index_get_license() {
+        let mut index = LicenseIndex::default();
+
+        let license = License {
+            key: "mit".to_string(),
+            name: "MIT License".to_string(),
+            spdx_license_key: Some("MIT".to_string()),
+            category: Some("Permissive".to_string()),
+            text: "MIT License text".to_string(),
+            reference_urls: vec![],
+            notes: None,
+        };
+
+        index.add_license(license);
+
+        let retrieved = index.get_license("mit");
+        assert!(retrieved.is_some());
+        assert_eq!(retrieved.unwrap().name, "MIT License");
+
+        assert!(index.get_license("unknown").is_none());
+    }
+
+    #[test]
+    fn test_license_index_license_count() {
+        let mut index = LicenseIndex::default();
+
+        assert_eq!(index.license_count(), 0);
+
+        let license = License {
+            key: "test".to_string(),
+            name: "Test".to_string(),
+            spdx_license_key: Some("TEST".to_string()),
+            category: Some("Permissive".to_string()),
+            text: "Text".to_string(),
+            reference_urls: vec![],
+            notes: None,
+        };
+
+        index.add_license(license);
+
+        assert_eq!(index.license_count(), 1);
     }
 }
