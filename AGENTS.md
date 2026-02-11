@@ -89,7 +89,8 @@ cargo test test_is_match       # Runs all tests with "test_is_match" in name
 **High-Level Structure:**
 
 - `src/parsers/` - Package manifest parsers (trait-based, one per ecosystem)
-- `src/models/` - Core data structures (PackageData, Dependency, etc.)
+- `src/models/` - Core data structures (PackageData, Dependency, DatasourceId, etc.)
+- `src/assembly/` - Package assembly system (merging related manifests)
 - `src/scanner/` - File system traversal and parallel processing
 - `src/main.rs` - CLI entry point
 
@@ -209,7 +210,7 @@ pub fn extract_package_data(path: &Path) -> PackageData {
 2. **Implement trait**:
 
    ```rust
-   use crate::models::PackageData;
+   use crate::models::{DatasourceId, PackageData};
    use super::PackageParser;
 
    pub struct MyParser;
@@ -221,8 +222,8 @@ pub fn extract_package_data(path: &Path) -> PackageData {
            path.file_name().is_some_and(|name| name == "my-manifest.json")
        }
 
-       fn extract_package_data(path: &Path) -> PackageData {
-           // Implementation
+       fn extract_packages(path: &Path) -> Vec<PackageData> {
+           // Implementation - always set datasource_id via DatasourceId enum
        }
    }
    ```
@@ -290,12 +291,14 @@ mod tests {
 1. **Taking shortcuts**: Never compromise on correctness for speed of implementation. Take the time to do it right.
 2. **Following Python code line-by-line**: The reference is for understanding requirements, not for copying implementation patterns.
 3. **Skipping edge cases**: The original has edge cases that must be handled. Study the tests thoroughly.
-4. **License data missing**: Run `./setup.sh` to initialize submodule
-5. **Cross-platform paths**: Use `Path` and `PathBuf`, not string concatenation
-6. **Line endings**: Be careful with `\n` vs `\r\n` in tests
-7. **Unwrap in library code**: Use `?` or `match` instead
-8. **Breaking parallel processing**: Ensure modifications maintain thread safety
-9. **Incomplete testing**: Every feature needs comprehensive test coverage including edge cases
+4. **Missing datasource_id**: Setting `datasource_id: None` in production code paths breaks assembly
+5. **Datasource ID mismatch**: Using wrong `DatasourceId` enum variant for a parser's file format
+6. **License data missing**: Run `./setup.sh` to initialize submodule
+7. **Cross-platform paths**: Use `Path` and `PathBuf`, not string concatenation
+8. **Line endings**: Be careful with `\n` vs `\r\n` in tests
+9. **Unwrap in library code**: Use `?` or `match` instead
+10. **Breaking parallel processing**: Ensure modifications maintain thread safety
+11. **Incomplete testing**: Every feature needs comprehensive test coverage including edge cases
 
 ## Porting Features from Original ScanCode
 
@@ -475,6 +478,151 @@ The `scope` field is intentionally **not standardized** across ecosystems. For c
 - Use `is_runtime` flag: `true` for runtime dependencies, `false` for dev/test/build
 - Use `is_optional` flag: `true` for optional dependencies
 - Future: Consider adding `normalized_scope` enum for standardized queries
+
+## Datasource IDs: The Assembly Bridge
+
+**Datasource IDs** uniquely identify the type of package data source (file format) that was parsed. They serve as the critical link between parsers and the assembly system.
+
+### What Are Datasource IDs?
+
+A **datasource ID** is a type-safe enum variant that answers: "What specific file type did this package data come from?"
+
+- **Example**: `DatasourceId::NpmPackageJson` identifies data from a `package.json` file
+- **Example**: `DatasourceId::NpmPackageLockJson` identifies data from a `package-lock.json` file
+- **Example**: `DatasourceId::PypiPyprojectToml` identifies data from a `pyproject.toml` file
+
+### Why Do They Exist?
+
+Datasource IDs enable the **assembly system** to intelligently merge related package files:
+
+1. **Parser emits** `PackageData` with `datasource_id: Some(DatasourceId::NpmPackageJson)`
+2. **Parser emits** `PackageData` with `datasource_id: Some(DatasourceId::NpmPackageLockJson)`
+3. **Assembler sees** both datasource IDs are in the same `AssemblerConfig`
+4. **Assembler merges** them into a single logical package with combined data
+
+Without datasource IDs, the assembler couldn't distinguish between different file types from the same ecosystem.
+
+### How They Differ from `package_type`
+
+| Field | Purpose | Example Values | Granularity |
+|-------|---------|----------------|-------------|
+| `package_type` | Ecosystem/registry identifier | `"npm"`, `"pypi"`, `"cargo"` | Coarse (ecosystem-level) |
+| `datasource_id` | Specific file format identifier | `DatasourceId::NpmPackageJson`, `DatasourceId::NpmPackageLockJson` | Fine (file-type-level) |
+
+**Key difference**: One `package_type` can have multiple `datasource_id` values.
+
+### Implementation Requirements
+
+Every parser MUST:
+
+1. **Set `datasource_id` in PackageData** for ALL code paths using the `DatasourceId` enum:
+
+   ```rust
+   PackageData {
+       package_type: Some("npm".to_string()),
+       datasource_id: Some(DatasourceId::NpmPackageJson),
+       // ...
+   }
+   ```
+
+2. **Set `datasource_id` even on error/fallback paths**:
+
+   ```rust
+   Err(e) => {
+       warn!("Failed to parse {:?}: {}", path, e);
+       return vec![PackageData {
+           package_type: Some("npm".to_string()),
+           datasource_id: Some(DatasourceId::NpmPackageJson),
+           ..Default::default()
+       }];
+   }
+   ```
+
+### Multi-Datasource Parsers
+
+Some parsers handle multiple file formats and emit different datasource IDs:
+
+```rust
+impl PackageParser for PythonParser {
+    const PACKAGE_TYPE: &'static str = "pypi";
+
+    fn extract_packages(path: &Path) -> Vec<PackageData> {
+        if path.ends_with("pyproject.toml") {
+            vec![PackageData {
+                datasource_id: Some(DatasourceId::PypiPyprojectToml),
+                // ...
+            }]
+        } else if path.ends_with("setup.py") {
+            vec![PackageData {
+                datasource_id: Some(DatasourceId::PypiSetupPy),
+                // ...
+            }]
+        }
+        // ...
+    }
+}
+```
+
+### Uniqueness Enforcement
+
+Datasource IDs are globally unique by design. The `DatasourceId` enum in `src/models/datasource_id.rs` defines all valid IDs as enum variants. The compiler enforces:
+
+- **No duplicates**: Each variant exists exactly once in the enum
+- **No typos**: Invalid IDs are compile-time errors
+- **Exhaustive matching**: `match` statements must handle all variants
+
+This replaces the previous runtime validation approach with compile-time safety.
+
+### Naming Convention
+
+Enum variants use `PascalCase` (Rust convention). They serialize to `snake_case` strings for JSON output:
+
+- `DatasourceId::NpmPackageJson` → serialized as `"npm_package_json"`
+- `DatasourceId::CargoLock` → serialized as `"cargo_lock"`
+
+When Python reference values contain typos, we use correct PascalCase names with `#[serde(rename)]`:
+
+- `DatasourceId::NugetNuspec` → serialized as `"nuget_nupsec"` (Python typo preserved)
+- `DatasourceId::RpmSpecfile` → serialized as `"rpm_spefile"` (Python typo preserved)
+
+### Common Mistakes
+
+1. **Setting `datasource_id: None`** in production code paths
+   - ❌ Wrong: `datasource_id: None`
+   - ✅ Correct: `datasource_id: Some(DatasourceId::NpmPackageJson)`
+
+2. **Using wrong enum variant**
+   - ❌ Wrong: Using `DatasourceId::NpmPackageJson` in a lockfile parser
+   - ✅ Correct: Use the variant matching the actual file format
+
+3. **Forgetting to add new variants** when adding new file format support
+   - ❌ Wrong: Add parser for new format without adding `DatasourceId` variant
+   - ✅ Correct: Add variant to `DatasourceId` enum in `src/models/datasource_id.rs`
+
+4. **Missing error path coverage**
+   - ❌ Wrong: Error paths returning `PackageData::default()` without setting `datasource_id`
+   - ✅ Correct: Always set `datasource_id` even in error/fallback returns
+
+### Relationship to Assembly
+
+Datasource IDs are configured in `src/assembly/assemblers.rs`:
+
+```rust
+AssemblerConfig {
+    datasource_ids: &[DatasourceId::NpmPackageJson, DatasourceId::NpmPackageLockJson],
+    sibling_file_patterns: &["package.json", "package-lock.json"],
+    mode: AssemblyMode::SiblingMerge,
+},
+```
+
+The assembler:
+
+1. Groups packages by directory
+2. Checks if their `datasource_id` values match any `AssemblerConfig`
+3. Merges matching packages into a single logical package
+4. Combines their `datafile_paths` and `datasource_ids` arrays
+
+**See**: [`docs/HOW_TO_ADD_A_PARSER.md`](docs/HOW_TO_ADD_A_PARSER.md#step-6-add-assembly-support-if-applicable) for detailed assembly setup.
 
 ## Additional Notes
 
