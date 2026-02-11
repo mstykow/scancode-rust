@@ -92,6 +92,33 @@ pub struct Rule {
 
     /// Free text notes
     pub notes: Option<String>,
+
+    /// Count of unique token IDs in the rule (computed during indexing)
+    pub length_unique: usize,
+
+    /// Count of unique legalese token IDs (tokens with ID < len_legalese)
+    pub high_length_unique: usize,
+
+    /// Total count of legalese token occurrences (with duplicates)
+    pub high_length: usize,
+
+    /// Minimum matched length threshold (occurrences-based)
+    pub min_matched_length: usize,
+
+    /// Minimum high-value token matched length threshold (occurrences-based)
+    pub min_high_matched_length: usize,
+
+    /// Minimum matched length threshold (unique tokens)
+    pub min_matched_length_unique: usize,
+
+    /// Minimum high-value token matched length threshold (unique tokens)
+    pub min_high_matched_length_unique: usize,
+
+    /// True if rule length < SMALL_RULE (15 tokens)
+    pub is_small: bool,
+
+    /// True if rule length < TINY_RULE (6 tokens)
+    pub is_tiny: bool,
 }
 
 /// License match result from a matching strategy.
@@ -181,6 +208,15 @@ mod tests {
             ignorable_authors: None,
             language: None,
             notes: None,
+            length_unique: 0,
+            high_length_unique: 0,
+            high_length: 0,
+            min_matched_length: 0,
+            min_high_matched_length: 0,
+            min_matched_length_unique: 0,
+            min_high_matched_length_unique: 0,
+            is_small: false,
+            is_tiny: false,
         };
 
         assert_eq!(rule.license_expression, "mit");

@@ -117,6 +117,16 @@ pub fn legalese_count() -> usize {
     LEGALESE.len()
 }
 
+/// Get the legalese words and their token IDs as a vector.
+///
+/// Returns a vector of (word, token_id) pairs sorted by token ID.
+/// This is used to initialize the token dictionary with pre-assigned legalese tokens.
+pub fn get_legalese_words() -> Vec<(&'static str, u16)> {
+    let mut entries: Vec<(&str, u16)> = LEGALESE.iter().map(|(k, v)| (k.as_str(), *v)).collect();
+    entries.sort_by_key(|&(_, id)| id);
+    entries
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
