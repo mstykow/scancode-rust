@@ -362,7 +362,7 @@ After scanning, the assembly system merges related manifests into logical packag
 - **SiblingMerge**: Combines sibling files in the same directory (e.g., `package.json` + `package-lock.json` → single npm package)
 - **NestedMerge**: Combines parent/child manifests across directories (e.g., Maven parent POM + module POMs)
 - **FileRefResolve**: Resolves `file_references` from package database entries (RPM/Alpine/Debian) against scanned files, sets `for_packages` on matched files, tracks missing references, and resolves RPM namespace from os-release
-- **WorkspaceMerge**: Post-processing pass for monorepo workspaces (e.g., npm/pnpm workspaces → separate Package per workspace member with shared resource assignment and `workspace:*` version resolution)
+- **WorkspaceMerge**: Post-processing pass for monorepo workspaces (e.g., npm/pnpm/Cargo workspaces → separate Package per workspace member with shared resource assignment and `workspace:*` version resolution)
 
 **How it works:**
 
@@ -371,7 +371,7 @@ After scanning, the assembly system merges related manifests into logical packag
 3. Packages whose `datasource_id` values match the same config are merged into a single logical package
 4. Combined packages aggregate `datafile_paths` and `datasource_ids` from all contributing files
 5. File reference resolution matches installed-package database entries to files on disk (e.g., Alpine `installed` DB lists files belonging to each package)
-6. Workspace assembly runs as a final pass: detects workspace roots, discovers members via glob patterns, creates per-member packages, hoists dependencies, and resolves `workspace:*` version references
+6. Workspace assembly runs as a final pass: detects workspace roots (npm/pnpm/Cargo), discovers members via glob patterns, creates per-member packages with full metadata inheritance (Cargo `[workspace.package]` and `workspace = true` resolution), hoists dependencies, and resolves `workspace:*` version references
 
 Assembly is configurable via the `--no-assemble` CLI flag. See `src/assembly/` for implementation details.
 
@@ -487,6 +487,7 @@ We don't just match Python ScanCode - we improve it:
 | **Gradle** | No code execution (token lexer vs Groovy engine) | 🛡️ Security |
 | **Gradle Lockfile** | gradle.lockfile parser (Python has no equivalent) | ✨ Feature |
 | **npm Workspace** | pnpm-workspace.yaml extraction + workspace assembly with per-member packages (Python has stub parser + basic assembly) | ✨ Feature |
+| **Cargo Workspace** | Full `[workspace.package]` metadata inheritance + `workspace = true` dependency resolution (Python has basic assembly) | ✨ Feature |
 | **Composer** | Richer provenance metadata (7 extra fields) | 🔍 Enhanced |
 | **Ruby** | Semantic party model (unified name+email) | 🔍 Enhanced |
 | **Dart** | Proper scope handling + YAML preservation | 🔍 Enhanced |

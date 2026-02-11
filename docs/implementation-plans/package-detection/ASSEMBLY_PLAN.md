@@ -1,6 +1,6 @@
 # Package Assembly Implementation Plan
 
-> **Status**: 🟢 Phase 1-3 Complete (Feb 10, 2026) | Phase 4a: npm Workspace Assembly Complete (Feb 11, 2026) | Phase 4b: File Reference Resolution Complete (Feb 11, 2026)
+> **Status**: 🟢 **COMPLETE** — All phases done (Feb 11, 2026). Package assembly is feature-complete.
 > **Priority**: P0 - Critical for Package Detection Completeness
 > **Dependencies**: PARSER_PLAN.md (parsers must exist first)
 
@@ -92,6 +92,21 @@ Resolves `file_references` from package database entries (RPM/Alpine/Debian) aga
 - Fixed Alpine parser case-sensitivity bug: `T:`/`t:` and `C:`/`c:` keys were colliding due to rfc822 parser lowercasing all keys. Replaced with Alpine-specific case-sensitive parser.
 - Fixed file reference collection: was returning ALL file_references from a DB file for every package instead of only the matching package's references (purl-based filtering).
 
+### ✅ Phase 4c: Cargo Workspace Assembly — COMPLETE (Feb 11, 2026)
+
+Cargo workspace support: creates separate Package objects per workspace member, resolves `[workspace.package]` inheritance and `workspace = true` dependencies.
+
+- Workspace root detection via `[workspace]` section with `members` array
+- Member discovery via glob pattern matching (simple paths, single-star, complex globs)
+- Workspace metadata extraction (`[workspace.package]` and `[workspace.dependencies]`)
+- Full field inheritance: version, license, homepage, repository, categories, edition, rust-version, authors
+- Dependency version resolution for `{ workspace = true }` dependencies
+- Member Package creation with inherited metadata
+- Root package removal (workspace manifests don't publish)
+- `for_packages` assignment (member files → member UID; shared files → all members; `target/` excluded)
+
+**Implementation**: `src/assembly/cargo_workspace_merge.rs` (524 lines)
+
 ### Golden Tests (8 total)
 
 | Test | Ecosystem | Status |
@@ -104,65 +119,37 @@ Resolves `file_references` from package database entries (RPM/Alpine/Debian) aga
 | npm-workspace | npm (workspace) | ✅ Pass |
 | pnpm-workspace | npm (pnpm workspace) | ✅ Pass |
 | alpine-file-refs | alpine (file reference resolution) | ✅ Pass |
+| cargo-workspace | cargo (workspace) | ✅ Pass |
 
 ---
 
-## What's Left: Phase 4
+## Completed — No Remaining Work
 
-### Python Reference Audit Findings
+All package assembly features are implemented. The assembly pipeline is feature-complete.
 
-The Python ScanCode reference implementation has **three assembly patterns** beyond what we've implemented. These are all complex and involve capabilities that scancode-rust doesn't currently have (archive extraction, codebase tree walking).
+### ✅ Archive Extraction Assembly — OUT OF SCOPE
 
-#### Pattern A: Archive Extraction Assembly
+Archive extraction is **permanently out of scope** for scancode-rust. The Python ScanCode ecosystem uses a separate tool called [ExtractCode](https://github.com/aboutcode-org/extractcode) that users run as a preprocessing step before scanning. ScanCode's core pipeline never extracts archives — it only scans pre-existing files on disk.
 
-**Ecosystems**: RubyGems (.gem), Debian (.deb), Alpine (.apk)
+Users of scancode-rust can use ExtractCode before scanning, just like with Python ScanCode. A future `extractcode-rust` tool could be created as a separate project, but that is entirely outside the scope of scancode-rust.
 
-**What Python does**:
+**Note**: Our `.deb` and `.apk` parsers can read metadata directly from archive files without extraction, which is an improvement over Python (documented in `docs/improvements/debian-parser.md` and `docs/improvements/alpine-parser.md`). This means users get package metadata from these archives without needing ExtractCode at all.
 
-- Extracts archive contents (tar, gzip, etc.)
-- Parses metadata from extracted files
-- Uses `get_ancestor(levels_up=N)` to navigate up extracted directory trees
-- Calls `assemble_from_many_datafiles()` to merge extracted manifests
+### ExtractCode Naming Convention Compatibility
 
-**Example** (RubyGems):
+When ExtractCode extracts archives, it creates directories with a `-extract` suffix (e.g., `control.tar.gz-extract/`, `data.gz-extract/`, `metadata.gz-extract/`). For scancode-rust to be a drop-in replacement, parsers must also match these `-extract` paths.
 
-```text
-my-gem.gem (extracted) →
-├── metadata.gz-extract/metadata.gz-extract  → gem metadata
-├── data.gz-extract/*.gemspec                → gemspec
-├── data.gz-extract/Gemfile                  → Gemfile
-└── data.gz-extract/Gemfile.lock             → lockfile
-```
+**Current coverage**:
 
-**Rust gap**: We don't extract archives during scanning. Parsers only see pre-existing files on disk.
-
-#### Pattern B: Database + File Reference Resolution
-
-**Ecosystems**: RPM (NDB, SQLite, BDB), Alpine (installed DB), Debian (installed DB)
-
-**What Python does**:
-
-- Parses package database entries
-- Each entry contains `file_references` (list of installed file paths)
-- Walks up to filesystem root, then resolves each file reference path
-- Associates resolved files with the package (`package_adder`)
-- Tracks `missing_file_references` in `extra_data`
-- Uses `os-release` to determine distro namespace (RPM)
-
-**Rust gap**: Our `OnePerPackageData` mode creates packages from database entries, but doesn't resolve file references. The `for_packages` linking for database-sourced packages is incomplete.
-
-#### Pattern C: Workspace Support
-
-**Ecosystems**: npm (npm/pnpm workspaces), Cargo (workspaces)
-
-**What Python does** (npm):
-
-- Reads `workspaces` field from package.json
-- Finds `pnpm-workspace.yaml` if present
-- Creates separate Package for each workspace member
-- Uses `walk_npm()` to assign resources, skipping `node_modules`
-
-**Rust gap**: Cargo workspaces are partially handled by our sibling merge (Cargo.toml + Cargo.lock), but npm workspaces are not. Neither implementation creates separate packages per workspace member.
+| ExtractCode Pattern | Python Parser | Rust Status |
+|---|---|---|
+| `*/control.tar.{gz,xz}-extract/control` | `DebianControlFileInExtractedDebHandler` | ✅ Supported |
+| `*/control.tar.{gz,xz}-extract/md5sums` | `DebianMd5sumsInDebHandler` | ✅ Supported |
+| `*/metadata.gz-extract` | `GemArchiveHandler` | ✅ Supported |
+| `*/data.gz-extract/*.gemspec` | `GemspecInExtractedGemHandler` | ✅ Supported |
+| `*/data.gz-extract/Gemfile` | `GemfileInExtractedGemHandler` | ✅ Supported |
+| `*/data.gz-extract/Gemfile.lock` | `GemfileLockInExtractedGemHandler` | ✅ Supported |
+| `info/recipe.tar-extract/recipe/meta.yaml` | `CondaMetaYamlHandler` | ✅ Supported (by filename match) |
 
 ### What Python's "Consolidation" Does (NOT Assembly)
 
@@ -175,28 +162,14 @@ Consolidation is a **separate post-scan plugin** (`plugin_consolidate.py`), not 
 
 ---
 
-## Phase 4: Remaining Assembly Work
-
-### Priority Assessment
-
-| Feature | Effort | Impact | Priority |
-|---------|--------|--------|----------|
-| File reference resolution (RPM/Alpine/Debian) | 2-3 weeks | Medium (installed pkg scanning) | P2 |
-| npm workspace support | 1-2 weeks | High (monorepo scanning) | P1 |
-| Archive extraction assembly | 3-4 weeks | Low (requires archive extraction infrastructure) | P3 |
-
-### Recommended Order
-
-1. **npm workspace support** — High impact, moderate effort. Many real-world codebases use npm/pnpm workspaces.
-2. **File reference resolution** — Completes the database assembly story for installed package scanning.
-3. **Archive extraction** — Requires building archive extraction infrastructure first. Lower priority since users typically scan source code, not archives.
-
-### Success Criteria
+## Success Criteria
 
 - [x] npm workspace assembly creates separate packages per workspace member
 - [x] Database assembly resolves file references for RPM/Alpine/Debian
 - [x] Golden tests for workspace and database assembly scenarios
-- [ ] Archive extraction framework in place (stretch goal)
+- [x] ExtractCode `-extract` path patterns supported for drop-in compatibility
+- [x] Cargo workspace assembly with metadata inheritance and dependency resolution
+- [x] Debian extracted control file parser for ExtractCode compatibility
 
 ---
 
@@ -237,7 +210,7 @@ File Enumeration → Parser Selection → Package Extraction → Assembly Phase 
 | `SiblingMerge` | Merge related files in same/nested directory | npm, cargo, maven, golang, etc. (23 configs) |
 | `OnePerPackageData` | Each file becomes independent packages | Alpine DB, RPM DB, Debian installed DB (3 configs) |
 | File ref resolution | Resolve file_references → `for_packages` linking | Alpine, RPM, Debian installed DBs |
-| Workspace assembly | Post-processing pass creating per-member packages | npm/pnpm workspaces |
+| Workspace assembly | Post-processing pass creating per-member packages | npm/pnpm workspaces, Cargo workspaces |
 
 ### Key Code Locations
 
@@ -248,8 +221,9 @@ File Enumeration → Parser Selection → Package Extraction → Assembly Phase 
 | `src/assembly/sibling_merge.rs` | Sibling pattern matching (102 lines) |
 | `src/assembly/nested_merge.rs` | Nested pattern matching (356 lines) |
 | `src/assembly/workspace_merge.rs` | npm/pnpm workspace assembly (859 lines) |
+| `src/assembly/cargo_workspace_merge.rs` | Cargo workspace assembly (524 lines) |
 | `src/assembly/file_ref_resolve.rs` | File reference resolution for DB packages (750 lines) |
-| `src/assembly/assembly_golden_test.rs` | 8 golden tests (390 lines) |
+| `src/assembly/assembly_golden_test.rs` | 9 golden tests |
 
 ---
 
@@ -259,6 +233,7 @@ File Enumeration → Parser Selection → Package Extraction → Assembly Phase 
 |----------|----------|
 | Assembly framework | `reference/scancode-toolkit/src/packagedcode/models.py` |
 | npm assembly | `reference/scancode-toolkit/src/packagedcode/npm.py` |
+| Cargo assembly | `reference/scancode-toolkit/src/packagedcode/cargo.py` |
 | Consolidation plugin | `reference/scancode-toolkit/src/summarycode/plugin_consolidate.py` |
 | Test data | `reference/scancode-toolkit/tests/packagedcode/data/` |
 
