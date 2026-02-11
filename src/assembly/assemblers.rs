@@ -304,6 +304,7 @@ pub static UNASSEMBLED_DATASOURCE_IDS: &[&str] = &[
     "debian_deb",
     "rpm_archive",
     // Supplementary metadata (not primary package definitions)
+    "debian_control_extracted_deb",
     "debian_source_control_dsc",
     "debian_md5sums_in_extracted_deb",
     "rpm_package_licenses",

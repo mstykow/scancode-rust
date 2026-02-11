@@ -287,10 +287,10 @@ pub use self::cpan_makefile_pl::CpanMakefilePlParser;
 pub use self::cran::CranParser;
 pub use self::dart::{PubspecLockParser, PubspecYamlParser};
 pub use self::debian::{
-    DebianControlParser, DebianCopyrightParser, DebianDebParser, DebianDebianTarParser,
-    DebianDistrolessInstalledParser, DebianDscParser, DebianInstalledListParser,
-    DebianInstalledMd5sumsParser, DebianInstalledParser, DebianMd5sumInPackageParser,
-    DebianOrigTarParser,
+    DebianControlInExtractedDebParser, DebianControlParser, DebianCopyrightParser, DebianDebParser,
+    DebianDebianTarParser, DebianDistrolessInstalledParser, DebianDscParser,
+    DebianInstalledListParser, DebianInstalledMd5sumsParser, DebianInstalledParser,
+    DebianMd5sumInPackageParser, DebianOrigTarParser,
 };
 pub use self::freebsd::FreebsdCompactManifestParser;
 pub use self::go::{GoModParser, GoSumParser, GodepsParser};
@@ -417,6 +417,7 @@ register_package_handlers! {
         CpanMetaJsonParser,
         CpanMetaYmlParser,
         CranParser,
+        DebianControlInExtractedDebParser,
         DebianControlParser,
         DebianCopyrightParser,
         DebianDebianTarParser,

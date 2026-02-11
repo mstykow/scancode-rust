@@ -1522,6 +1522,66 @@ fn parse_deb_filename(filename: &str) -> PackageData {
     }
 }
 
+/// Parser for control files inside extracted .deb control tarballs.
+///
+/// Matches paths like `*/control.tar.gz-extract/control` and
+/// `*/control.tar.xz-extract/control` which are created by ExtractCode
+/// when extracting .deb archives.
+pub struct DebianControlInExtractedDebParser;
+
+impl PackageParser for DebianControlInExtractedDebParser {
+    const PACKAGE_TYPE: &'static str = PACKAGE_TYPE;
+
+    fn is_match(path: &Path) -> bool {
+        path.file_name()
+            .and_then(|n| n.to_str())
+            .is_some_and(|name| name == "control")
+            && path
+                .to_str()
+                .map(|p| {
+                    p.ends_with("control.tar.gz-extract/control")
+                        || p.ends_with("control.tar.xz-extract/control")
+                })
+                .unwrap_or(false)
+    }
+
+    fn extract_packages(path: &Path) -> Vec<PackageData> {
+        let content = match read_file_to_string(path) {
+            Ok(c) => c,
+            Err(e) => {
+                warn!(
+                    "Failed to read control file in extracted deb {:?}: {}",
+                    path, e
+                );
+                return vec![default_package_data(
+                    DatasourceId::DebianControlExtractedDeb,
+                )];
+            }
+        };
+
+        // A control file inside an extracted .deb has a single paragraph
+        // (unlike debian/control which has source + binary paragraphs)
+        let paragraphs = rfc822::parse_rfc822_paragraphs(&content);
+        if paragraphs.is_empty() {
+            return vec![default_package_data(
+                DatasourceId::DebianControlExtractedDeb,
+            )];
+        }
+
+        if let Some(pkg) = build_package_from_paragraph(
+            &paragraphs[0],
+            None,
+            DatasourceId::DebianControlExtractedDeb,
+        ) {
+            vec![pkg]
+        } else {
+            vec![default_package_data(
+                DatasourceId::DebianControlExtractedDeb,
+            )]
+        }
+    }
+}
+
 /// Parser for MD5 checksum files inside extracted .deb control tarballs
 pub struct DebianMd5sumInPackageParser;
 
@@ -1621,6 +1681,17 @@ fn parse_md5sums_in_package(content: &str, package_name: Option<&str>) -> Packag
 
     package
 }
+
+crate::register_parser!(
+    "Debian control file in extracted .deb control tarball",
+    &[
+        "**/control.tar.gz-extract/control",
+        "**/control.tar.xz-extract/control"
+    ],
+    "deb",
+    "",
+    Some("https://www.debian.org/doc/debian-policy/ch-controlfields.html"),
+);
 
 crate::register_parser!(
     "Debian MD5 checksums in extracted .deb control tarball",

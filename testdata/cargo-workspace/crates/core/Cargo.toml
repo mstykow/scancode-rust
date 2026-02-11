@@ -1,0 +1,10 @@
+[package]
+name = "myproject-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Core library for myproject"
+
+[dependencies]
+serde = { workspace = true }
+log = { workspace = true }

@@ -115,6 +115,7 @@ pub enum DatasourceId {
     PubspecYaml,
 
     // ── Debian ──
+    DebianControlExtractedDeb,
     DebianControlInSource,
     DebianCopyright,
     DebianDeb,
@@ -327,6 +328,7 @@ impl DatasourceId {
             Self::PubspecYaml => "pubspec_yaml",
 
             // Debian
+            Self::DebianControlExtractedDeb => "debian_control_extracted_deb",
             Self::DebianControlInSource => "debian_control_in_source",
             Self::DebianCopyright => "debian_copyright",
             Self::DebianDeb => "debian_deb",
