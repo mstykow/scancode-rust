@@ -1,0 +1,14 @@
+[workspace]
+members = ["crates/core", "crates/cli"]
+
+[workspace.package]
+version = "0.5.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+homepage = "https://example.com/myproject"
+repository = "https://github.com/example/myproject"
+
+[workspace.dependencies]
+serde = { version = "1.0", features = ["derive"] }
+tokio = { version = "1.0", features = ["full"] }
+log = "0.4"

@@ -1,0 +1,12 @@
+Package: example
+Version: 1.0-1
+Architecture: amd64
+Maintainer: Example Developer <dev@example.com>
+Installed-Size: 256
+Depends: libc6 (>= 2.17), libssl1.1 (>= 1.1.0)
+Section: utils
+Priority: optional
+Homepage: https://example.com
+Description: An example package
+ This is a longer description of the example package
+ that spans multiple lines.

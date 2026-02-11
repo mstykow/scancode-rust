@@ -1,0 +1,167 @@
+{
+  "dependencies": [
+    {
+      "datafile_path": "crates/cli/Cargo.toml",
+      "datasource_id": "cargo_toml",
+      "dependency_uid": "pkg:cargo/myproject-core?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "extra_data": {
+        "path": "../core"
+      },
+      "for_package_uid": "pkg:cargo/myproject-cli@0.5.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "is_direct": true,
+      "is_optional": false,
+      "is_pinned": false,
+      "is_runtime": true,
+      "purl": "pkg:cargo/myproject-core",
+      "scope": "dependencies"
+    },
+    {
+      "datafile_path": "crates/cli/Cargo.toml",
+      "datasource_id": "cargo_toml",
+      "dependency_uid": "pkg:cargo/serde?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "extra_data": {
+        "workspace": true
+      },
+      "extracted_requirement": "1.0",
+      "for_package_uid": "pkg:cargo/myproject-cli@0.5.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "is_direct": true,
+      "is_optional": false,
+      "is_pinned": false,
+      "is_runtime": true,
+      "purl": "pkg:cargo/serde",
+      "scope": "dependencies"
+    },
+    {
+      "datafile_path": "crates/cli/Cargo.toml",
+      "datasource_id": "cargo_toml",
+      "dependency_uid": "pkg:cargo/tokio?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "extra_data": {
+        "workspace": true
+      },
+      "extracted_requirement": "1.0",
+      "for_package_uid": "pkg:cargo/myproject-cli@0.5.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "is_direct": true,
+      "is_optional": false,
+      "is_pinned": false,
+      "is_runtime": true,
+      "purl": "pkg:cargo/tokio",
+      "scope": "dependencies"
+    },
+    {
+      "datafile_path": "crates/cli/Cargo.toml",
+      "datasource_id": "cargo_toml",
+      "dependency_uid": "pkg:cargo/assert_cmd?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "extracted_requirement": "2.0",
+      "for_package_uid": "pkg:cargo/myproject-cli@0.5.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "is_direct": true,
+      "is_optional": false,
+      "is_pinned": false,
+      "is_runtime": false,
+      "purl": "pkg:cargo/assert_cmd",
+      "scope": "dev-dependencies"
+    },
+    {
+      "datafile_path": "crates/core/Cargo.toml",
+      "datasource_id": "cargo_toml",
+      "dependency_uid": "pkg:cargo/log?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "extra_data": {
+        "workspace": true
+      },
+      "extracted_requirement": "0.4",
+      "for_package_uid": "pkg:cargo/myproject-core@0.5.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "is_direct": true,
+      "is_optional": false,
+      "is_pinned": false,
+      "is_runtime": true,
+      "purl": "pkg:cargo/log",
+      "scope": "dependencies"
+    },
+    {
+      "datafile_path": "crates/core/Cargo.toml",
+      "datasource_id": "cargo_toml",
+      "dependency_uid": "pkg:cargo/serde?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "extra_data": {
+        "workspace": true
+      },
+      "extracted_requirement": "1.0",
+      "for_package_uid": "pkg:cargo/myproject-core@0.5.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "is_direct": true,
+      "is_optional": false,
+      "is_pinned": false,
+      "is_runtime": true,
+      "purl": "pkg:cargo/serde",
+      "scope": "dependencies"
+    }
+  ],
+  "files_with_packages": [
+    {
+      "for_packages": [
+        "pkg:cargo/myproject-cli@0.5.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+        "pkg:cargo/myproject-core@0.5.0?uuid=fixed-uid-done-for-testing-5642512d1758"
+      ],
+      "path": "Cargo.toml"
+    },
+    {
+      "for_packages": [
+        "pkg:cargo/myproject-cli@0.5.0?uuid=fixed-uid-done-for-testing-5642512d1758"
+      ],
+      "path": "crates/cli/Cargo.toml"
+    },
+    {
+      "for_packages": [
+        "pkg:cargo/myproject-core@0.5.0?uuid=fixed-uid-done-for-testing-5642512d1758"
+      ],
+      "path": "crates/core/Cargo.toml"
+    }
+  ],
+  "packages": [
+    {
+      "api_data_url": "https://crates.io/api/v1/crates/myproject-cli",
+      "datafile_paths": [
+        "crates/cli/Cargo.toml"
+      ],
+      "datasource_ids": [
+        "cargo_toml"
+      ],
+      "description": "CLI for myproject",
+      "extra_data": {
+        "rust_edition": "2021"
+      },
+      "extracted_license_statement": "MIT OR Apache-2.0",
+      "homepage_url": "https://crates.io/crates/myproject-cli",
+      "name": "myproject-cli",
+      "package_uid": "pkg:cargo/myproject-cli@0.5.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "parties": [],
+      "primary_language": "Rust",
+      "purl": "pkg:cargo/myproject-cli@0.5.0",
+      "repository_download_url": "https://crates.io/api/v1/crates/myproject-cli/0.5.0/download",
+      "repository_homepage_url": "https://crates.io/crates/myproject-cli",
+      "type": "cargo",
+      "version": "0.5.0"
+    },
+    {
+      "api_data_url": "https://crates.io/api/v1/crates/myproject-core",
+      "datafile_paths": [
+        "crates/core/Cargo.toml"
+      ],
+      "datasource_ids": [
+        "cargo_toml"
+      ],
+      "description": "Core library for myproject",
+      "extra_data": {
+        "rust_edition": "2021"
+      },
+      "extracted_license_statement": "MIT OR Apache-2.0",
+      "homepage_url": "https://crates.io/crates/myproject-core",
+      "name": "myproject-core",
+      "package_uid": "pkg:cargo/myproject-core@0.5.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "parties": [],
+      "primary_language": "Rust",
+      "purl": "pkg:cargo/myproject-core@0.5.0",
+      "repository_download_url": "https://crates.io/api/v1/crates/myproject-core/0.5.0/download",
+      "repository_homepage_url": "https://crates.io/crates/myproject-core",
+      "type": "cargo",
+      "version": "0.5.0"
+    }
+  ]
+}

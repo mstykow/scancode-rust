@@ -1,0 +1,10 @@
+Package: testpkg
+Version: 2.5-3
+Architecture: i386
+Maintainer: Test Maintainer <test@debian.org>
+Installed-Size: 128
+Depends: libc6 (>= 2.14)
+Recommends: testpkg-doc
+Section: devel
+Priority: optional
+Description: A test package for unit testing

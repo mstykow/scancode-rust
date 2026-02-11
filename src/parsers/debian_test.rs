@@ -109,6 +109,111 @@ mod tests {
         );
     }
 
+    // ====== DebianControlInExtractedDebParser tests ======
+
+    #[test]
+    fn test_debian_control_in_extracted_deb_is_match_gz() {
+        let path = PathBuf::from(
+            "testdata/debian/extracted-md5sums/example_1.0-1_amd64.deb-extract/control.tar.gz-extract/control",
+        );
+        assert!(DebianControlInExtractedDebParser::is_match(&path));
+    }
+
+    #[test]
+    fn test_debian_control_in_extracted_deb_is_match_xz() {
+        let path = PathBuf::from(
+            "testdata/debian/extracted-md5sums/testpkg_2.5-3_i386.deb-extract/control.tar.xz-extract/control",
+        );
+        assert!(DebianControlInExtractedDebParser::is_match(&path));
+    }
+
+    #[test]
+    fn test_debian_control_in_extracted_deb_not_match_debian_control() {
+        let path = PathBuf::from("debian/control");
+        assert!(!DebianControlInExtractedDebParser::is_match(&path));
+    }
+
+    #[test]
+    fn test_debian_control_in_extracted_deb_not_match_md5sums() {
+        let path = PathBuf::from("example_1.0-1_amd64.deb-extract/control.tar.gz-extract/md5sums");
+        assert!(!DebianControlInExtractedDebParser::is_match(&path));
+    }
+
+    #[test]
+    fn test_debian_control_in_extracted_deb_not_match_plain_control() {
+        let path = PathBuf::from("/some/path/control");
+        assert!(!DebianControlInExtractedDebParser::is_match(&path));
+    }
+
+    #[test]
+    fn test_debian_control_in_extracted_deb_extract_gz() {
+        let path = PathBuf::from(
+            "testdata/debian/extracted-md5sums/example_1.0-1_amd64.deb-extract/control.tar.gz-extract/control",
+        );
+
+        if !path.exists() {
+            return;
+        }
+
+        let packages = DebianControlInExtractedDebParser::extract_packages(&path);
+        assert_eq!(packages.len(), 1);
+
+        let pkg = &packages[0];
+        assert_eq!(pkg.package_type, Some("deb".to_string()));
+        assert_eq!(
+            pkg.datasource_id,
+            Some(DatasourceId::DebianControlExtractedDeb)
+        );
+        assert_eq!(pkg.name, Some("example".to_string()));
+        assert_eq!(pkg.version, Some("1.0-1".to_string()));
+        assert_eq!(pkg.namespace, Some("debian".to_string()));
+        assert_eq!(pkg.homepage_url, Some("https://example.com".to_string()));
+        assert!(pkg.purl.is_some());
+        assert!(pkg.purl.as_ref().unwrap().contains("example"));
+        assert!(pkg.purl.as_ref().unwrap().contains("1.0-1"));
+
+        assert_eq!(pkg.parties.len(), 1);
+        assert_eq!(pkg.parties[0].role, Some("maintainer".to_string()));
+        assert_eq!(pkg.parties[0].name, Some("Example Developer".to_string()));
+
+        assert!(!pkg.dependencies.is_empty());
+    }
+
+    #[test]
+    fn test_debian_control_in_extracted_deb_extract_xz() {
+        let path = PathBuf::from(
+            "testdata/debian/extracted-md5sums/testpkg_2.5-3_i386.deb-extract/control.tar.xz-extract/control",
+        );
+
+        if !path.exists() {
+            return;
+        }
+
+        let packages = DebianControlInExtractedDebParser::extract_packages(&path);
+        assert_eq!(packages.len(), 1);
+
+        let pkg = &packages[0];
+        assert_eq!(pkg.package_type, Some("deb".to_string()));
+        assert_eq!(
+            pkg.datasource_id,
+            Some(DatasourceId::DebianControlExtractedDeb)
+        );
+        assert_eq!(pkg.name, Some("testpkg".to_string()));
+        assert_eq!(pkg.version, Some("2.5-3".to_string()));
+        assert_eq!(pkg.namespace, Some("debian".to_string()));
+
+        assert_eq!(pkg.parties.len(), 1);
+        assert_eq!(pkg.parties[0].name, Some("Test Maintainer".to_string()));
+
+        assert!(!pkg.dependencies.is_empty());
+        let dep_purls: Vec<&str> = pkg
+            .dependencies
+            .iter()
+            .filter_map(|d| d.purl.as_deref())
+            .collect();
+        assert!(dep_purls.iter().any(|p| p.contains("libc6")));
+    }
+
     #[test]
     fn test_extract_package_name_from_deb_path() {
         let path1 = PathBuf::from("example_1.0-1_amd64.deb-extract/control.tar.gz-extract/md5sums");
