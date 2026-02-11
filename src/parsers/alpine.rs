@@ -24,7 +24,6 @@ use std::path::Path;
 use log::warn;
 
 use crate::models::{DatasourceId, Dependency, FileReference, PackageData, Party};
-use crate::parsers::rfc822;
 use crate::parsers::utils::{read_file_to_string, split_name_email};
 
 use super::PackageParser;
@@ -65,8 +64,6 @@ impl PackageParser for AlpineInstalledParser {
 }
 
 fn parse_alpine_installed_db(content: &str) -> Vec<PackageData> {
-    let paragraphs = rfc822::parse_rfc822_paragraphs(content);
-
     let raw_paragraphs: Vec<&str> = content
         .split("\n\n")
         .filter(|p| !p.trim().is_empty())
@@ -74,9 +71,9 @@ fn parse_alpine_installed_db(content: &str) -> Vec<PackageData> {
 
     let mut all_packages = Vec::new();
 
-    for (idx, para) in paragraphs.iter().enumerate() {
-        let raw_text = raw_paragraphs.get(idx).copied().unwrap_or("");
-        let pkg = parse_alpine_package_paragraph(&para.headers, raw_text);
+    for raw_text in &raw_paragraphs {
+        let headers = parse_alpine_headers(raw_text);
+        let pkg = parse_alpine_package_paragraph(&headers, raw_text);
         if pkg.name.is_some() {
             all_packages.push(pkg);
         }
@@ -89,20 +86,65 @@ fn parse_alpine_installed_db(content: &str) -> Vec<PackageData> {
     all_packages
 }
 
+/// Parse Alpine DB headers preserving case sensitivity.
+///
+/// Alpine's installed DB uses single-letter case-sensitive keys (e.g., `T:` for
+/// description vs `t:` for timestamp, `C:` for checksum vs `c:` for git commit).
+/// The generic rfc822 parser lowercases all keys, causing collisions.
+fn parse_alpine_headers(content: &str) -> HashMap<String, Vec<String>> {
+    let mut headers: HashMap<String, Vec<String>> = HashMap::new();
+
+    for line in content.lines() {
+        if line.is_empty() {
+            continue;
+        }
+
+        if let Some((key, value)) = line.split_once(':') {
+            let key = key.trim();
+            let value = value.trim();
+            if !key.is_empty() && !value.is_empty() {
+                headers
+                    .entry(key.to_string())
+                    .or_default()
+                    .push(value.to_string());
+            }
+        }
+    }
+
+    headers
+}
+
+fn get_first(headers: &HashMap<String, Vec<String>>, key: &str) -> Option<String> {
+    headers
+        .get(key)
+        .and_then(|values| values.first())
+        .map(|v| v.trim().to_string())
+}
+
+fn get_all(headers: &HashMap<String, Vec<String>>, key: &str) -> Vec<String> {
+    headers
+        .get(key)
+        .cloned()
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|v| !v.trim().is_empty())
+        .collect()
+}
+
 fn parse_alpine_package_paragraph(
     headers: &HashMap<String, Vec<String>>,
     raw_text: &str,
 ) -> PackageData {
-    let name = rfc822::get_header_first(headers, "P");
-    let version = rfc822::get_header_first(headers, "V");
-    let description = rfc822::get_header_first(headers, "T");
-    let homepage_url = rfc822::get_header_first(headers, "U");
-    let architecture = rfc822::get_header_first(headers, "A");
+    let name = get_first(headers, "P");
+    let version = get_first(headers, "V");
+    let description = get_first(headers, "T");
+    let homepage_url = get_first(headers, "U");
+    let architecture = get_first(headers, "A");
 
     let namespace = Some("alpine".to_string());
     let mut parties = Vec::new();
 
-    if let Some(maintainer) = rfc822::get_header_first(headers, "m") {
+    if let Some(maintainer) = get_first(headers, "m") {
         let (name_opt, email_opt) = split_name_email(&maintainer);
         parties.push(Party {
             r#type: None,
@@ -116,16 +158,16 @@ fn parse_alpine_package_paragraph(
         });
     }
 
-    let extracted_license_statement = rfc822::get_header_first(headers, "L");
+    let extracted_license_statement = get_first(headers, "L");
 
-    let source_packages = if let Some(origin) = rfc822::get_header_first(headers, "o") {
+    let source_packages = if let Some(origin) = get_first(headers, "o") {
         vec![format!("pkg:alpine/{}", origin)]
     } else {
         Vec::new()
     };
 
     let mut dependencies = Vec::new();
-    for dep in rfc822::get_header_all(headers, "D") {
+    for dep in get_all(headers, "D") {
         for dep_str in dep.split_whitespace() {
             if dep_str.starts_with("so:") || dep_str.starts_with("cmd:") {
                 continue;
@@ -147,23 +189,23 @@ fn parse_alpine_package_paragraph(
 
     let mut extra_data = HashMap::new();
 
-    if let Some(checksum) = rfc822::get_header_first(headers, "C") {
+    if let Some(checksum) = get_first(headers, "C") {
         extra_data.insert("checksum".to_string(), checksum.into());
     }
 
-    if let Some(size) = rfc822::get_header_first(headers, "S") {
+    if let Some(size) = get_first(headers, "S") {
         extra_data.insert("compressed_size".to_string(), size.into());
     }
 
-    if let Some(installed_size) = rfc822::get_header_first(headers, "I") {
+    if let Some(installed_size) = get_first(headers, "I") {
         extra_data.insert("installed_size".to_string(), installed_size.into());
     }
 
-    if let Some(timestamp) = rfc822::get_header_first(headers, "t") {
+    if let Some(timestamp) = get_first(headers, "t") {
         extra_data.insert("build_timestamp".to_string(), timestamp.into());
     }
 
-    if let Some(commit) = rfc822::get_header_first(headers, "c") {
+    if let Some(commit) = get_first(headers, "c") {
         extra_data.insert("git_commit".to_string(), commit.into());
     }
 
@@ -605,11 +647,33 @@ c:gitcommithash
         let pkg = AlpineInstalledParser::extract_first_package(&path);
         assert!(pkg.extra_data.is_some());
         let extra = pkg.extra_data.as_ref().unwrap();
-        assert!(extra.contains_key("checksum"));
-        assert!(extra.contains_key("compressed_size"));
-        assert!(extra.contains_key("installed_size"));
-        assert!(extra.contains_key("build_timestamp"));
-        assert!(extra.contains_key("git_commit"));
+        assert_eq!(extra["checksum"], "base64checksum==");
+        assert_eq!(extra["compressed_size"], "12345");
+        assert_eq!(extra["installed_size"], "67890");
+        assert_eq!(extra["build_timestamp"], "1234567890");
+        assert_eq!(extra["git_commit"], "gitcommithash");
+    }
+
+    #[test]
+    fn test_parse_alpine_case_sensitive_keys() {
+        let content = "C:Q1v4QhLje3kWlC8DJj+ZfJTjlJRSU=
+P:test-pkg
+V:1.0
+T:A test description
+t:1655134784
+c:cb70ca5c6d6db0399d2dd09189c5d57827bce5cd
+
+";
+        let (_dir, path) = create_temp_installed_db(content);
+        let pkg = AlpineInstalledParser::extract_first_package(&path);
+        assert_eq!(pkg.description, Some("A test description".to_string()));
+        let extra = pkg.extra_data.as_ref().unwrap();
+        assert_eq!(extra["checksum"], "Q1v4QhLje3kWlC8DJj+ZfJTjlJRSU=");
+        assert_eq!(extra["build_timestamp"], "1655134784");
+        assert_eq!(
+            extra["git_commit"],
+            "cb70ca5c6d6db0399d2dd09189c5d57827bce5cd"
+        );
     }
 
     #[test]

@@ -82,11 +82,11 @@
       }
     ],
     "extra_data": {
-      "checksum": "Q1v4QhLje3kWlC8DJj+ZfJTjlJRSU=",
-      "compressed_size": "11435",
-      "build_timestamp": "Alpine base dir structure and init scripts",
       "installed_size": "73728",
-      "git_commit": "Q1v4QhLje3kWlC8DJj+ZfJTjlJRSU="
+      "compressed_size": "11435",
+      "build_timestamp": "1655134784",
+      "git_commit": "cb70ca5c6d6db0399d2dd09189c5d57827bce5cd",
+      "checksum": "Q1v4QhLje3kWlC8DJj+ZfJTjlJRSU="
     },
     "datasource_id": "alpine_installed_db",
     "purl": "pkg:alpine/alpine-baselayout-data@3.2.0-r22?arch=x86_64"
