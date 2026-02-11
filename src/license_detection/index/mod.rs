@@ -4,30 +4,17 @@ pub mod dictionary;
 pub mod token_sets;
 
 use crate::license_detection::index::dictionary::TokenDictionary;
+use aho_corasick::AhoCorasick;
 use std::collections::{HashMap, HashSet};
 
-/// Placeholder for Aho-Corasick automaton.
+/// Type alias for Aho-Corasick automaton.
 ///
-/// This will be implemented in a future phase to support multi-pattern matching
-/// on token sequences. For now, this is a placeholder type.
+/// The automaton is built from u16 token sequences encoded as bytes.
+/// Each token is encoded as 2 bytes in little-endian format.
 ///
 /// Based on the Python ScanCode Toolkit implementation at:
 /// reference/scancode-toolkit/src/licensedcode/match_aho.py
-#[derive(Debug, Clone)]
-pub struct Automaton;
-
-impl Automaton {
-    /// Create a new empty automaton (placeholder).
-    pub fn new() -> Self {
-        Self
-    }
-}
-
-impl Default for Automaton {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+pub type Automaton = AhoCorasick;
 
 /// License index containing all data structures for efficient license detection.
 ///
@@ -75,8 +62,25 @@ pub struct LicenseIndex {
     /// This enables fast exact matches using a hash of the rule\'s token IDs.
     /// Each hash maps to exactly one rule ID.
     ///
+    /// Note: The hash is a 20-byte SHA1 digest, stored as a key in HashMap.
+    /// In practice, we use a HashMap<[u8; 20], usize>.
+    ///
     /// Corresponds to Python: `self.rid_by_hash = {}` (line 216)
-    pub rid_by_hash: HashMap<u64, usize>,
+    pub rid_by_hash: HashMap<[u8; 20], usize>,
+
+    /// Rules indexed by rule ID.
+    ///
+    /// Maps rule IDs to Rule objects for quick lookup.
+    ///
+    /// Corresponds to Python: `self.rules_by_rid = []` (line 201)
+    pub rules_by_rid: Vec<crate::license_detection::models::Rule>,
+
+    /// Token ID sequences indexed by rule ID.
+    ///
+    /// Maps rule IDs to their token ID sequences.
+    ///
+    /// Corresponds to Python: `self.tids_by_rid = []` (line 204)
+    pub tids_by_rid: Vec<Vec<u16>>,
 
     /// Aho-Corasick automaton built from all rule token sequences.
     ///
@@ -148,6 +152,19 @@ pub struct LicenseIndex {
 }
 
 impl LicenseIndex {
+    /// Get the rule ID for a hash, if it exists.
+    ///
+    /// # Arguments
+    /// * `hash` - The 20-byte SHA1 hash
+    ///
+    /// # Returns
+    /// Option containing the rule ID, or None if hash not found
+    pub fn get_rid_by_hash(&self, hash: &[u8; 20]) -> Option<&usize> {
+        self.rid_by_hash.get(hash)
+    }
+}
+
+impl LicenseIndex {
     /// Create a new empty license index.
     ///
     /// This constructor initializes all index structures with empty collections.
@@ -163,8 +180,12 @@ impl LicenseIndex {
             len_legalese,
             digit_only_tids: HashSet::new(),
             rid_by_hash: HashMap::new(),
-            rules_automaton: Automaton::new(),
-            unknown_automaton: Automaton::new(),
+            rules_by_rid: Vec::new(),
+            tids_by_rid: Vec::new(),
+            rules_automaton: Automaton::new(std::iter::empty::<&[u8]>())
+                .expect("Failed to create empty automaton"),
+            unknown_automaton: Automaton::new(std::iter::empty::<&[u8]>())
+                .expect("Failed to create empty automaton"),
             sets_by_rid: HashMap::new(),
             msets_by_rid: HashMap::new(),
             high_postings_by_rid: HashMap::new(),
@@ -232,7 +253,8 @@ mod tests {
 
     #[test]
     fn test_automaton_default() {
-        let automaton = Automaton::new();
+        let automaton =
+            Automaton::new(std::iter::empty::<&[u8]>()).expect("Failed to create automaton");
         let _ = format!("{:?}", automaton);
     }
 
