@@ -578,11 +578,36 @@ Special cases handled:
 
 Module location: `src/copyright/`
 
-**Email/URL Detection**:
+**Email/URL Detection** (see [EMAIL_URL_DETECTION_PLAN.md](implementation-plans/text-detection/EMAIL_URL_DETECTION_PLAN.md)):
 
-- Email address extraction
-- URL detection and validation
-- Author contact information
+The email/URL detection engine is the simplest text detection feature — regex-based extraction with an ordered filter pipeline to remove junk results.
+
+```text
+┌──────────────┐    ┌──────────────┐    ┌──────────────┐    ┌──────────────┐
+│  1. Read     │───>│  2. Regex    │───>│  3. Filter   │───>│  4. Yield    │
+│  Lines       │    │  Match       │    │  Pipeline    │    │  Results     │
+└──────────────┘    └──────────────┘    └──────────────┘    └──────────────┘
+```
+
+**Email detection**: RFC-ish regex (`[A-Z0-9._%-]+@[A-Z0-9.-]+\.[A-Z]{2,63}`) → 3-step filter pipeline (junk domain filter, uninteresting email filter, dedup).
+
+**URL detection**: Three regex alternatives (scheme URLs, bare-domain URLs, git-style URLs) → 10-step filter pipeline:
+
+1. CRLF cleanup → trailing junk stripping → empty URL filter → scheme addition → user/password stripping → invalid URL filter → canonicalization (via `url` crate) → junk host filter → junk URL filter → dedup
+
+Both support configurable thresholds (`--max-email N`, `--max-url N`, default 50).
+
+Key design decisions vs Python reference:
+
+- **`url` crate** for URL parsing/canonicalization (replaces `urlpy`)
+- **`std::net`** for IP classification (replaces `ipaddress`)
+- **Extended TLD support**: `{2,63}` per RFC 1035 (Python's `{2,4}` rejects `.museum`, `.technology`)
+- **Fixed IPv6 private detection**: Python has assignment bug making IPv6 private detection non-functional
+- **Proper error handling**: No silent exception swallowing in URL canonicalization
+
+Junk classification data (~150 entries): example domains, private IPs, W3C/XML namespaces, DTD URLs, PKI/certificate URLs, CDN URLs, image file suffixes.
+
+Module location: `src/finder/`
 
 ### Post-Processing Pipeline
 
