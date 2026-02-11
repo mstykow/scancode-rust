@@ -89,6 +89,20 @@
       "scope": "require-dev"
     }
   ],
+  "files_with_packages": [
+    {
+      "for_packages": [
+        "pkg:composer/test/package@1.0.0?uuid=fixed-uid-done-for-testing-5642512d1758"
+      ],
+      "path": "composer.json"
+    },
+    {
+      "for_packages": [
+        "pkg:composer/test/package@1.0.0?uuid=fixed-uid-done-for-testing-5642512d1758"
+      ],
+      "path": "composer.lock"
+    }
+  ],
   "packages": [
     {
       "api_data_url": "https://packagist.org/p/packages/test/package.json",

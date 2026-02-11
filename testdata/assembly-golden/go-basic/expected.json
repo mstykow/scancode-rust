@@ -51,6 +51,20 @@
       "scope": "dependency"
     }
   ],
+  "files_with_packages": [
+    {
+      "for_packages": [
+        "pkg:golang/example.com/test-module?uuid=fixed-uid-done-for-testing-5642512d1758"
+      ],
+      "path": "go.mod"
+    },
+    {
+      "for_packages": [
+        "pkg:golang/example.com/test-module?uuid=fixed-uid-done-for-testing-5642512d1758"
+      ],
+      "path": "go.sum"
+    }
+  ],
   "packages": [
     {
       "datafile_paths": [

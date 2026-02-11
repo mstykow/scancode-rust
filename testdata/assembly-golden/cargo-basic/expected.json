@@ -57,6 +57,20 @@
       "scope": "dependencies"
     }
   ],
+  "files_with_packages": [
+    {
+      "for_packages": [
+        "pkg:cargo/test-crate@0.1.0?uuid=fixed-uid-done-for-testing-5642512d1758"
+      ],
+      "path": "Cargo.lock"
+    },
+    {
+      "for_packages": [
+        "pkg:cargo/test-crate@0.1.0?uuid=fixed-uid-done-for-testing-5642512d1758"
+      ],
+      "path": "Cargo.toml"
+    }
+  ],
   "packages": [
     {
       "api_data_url": "https://crates.io/api/v1/crates/test-crate",

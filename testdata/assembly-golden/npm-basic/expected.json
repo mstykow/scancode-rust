@@ -73,6 +73,20 @@
       "scope": "devDependencies"
     }
   ],
+  "files_with_packages": [
+    {
+      "for_packages": [
+        "pkg:npm/test-package@1.0.0?uuid=fixed-uid-done-for-testing-5642512d1758"
+      ],
+      "path": "package-lock.json"
+    },
+    {
+      "for_packages": [
+        "pkg:npm/test-package@1.0.0?uuid=fixed-uid-done-for-testing-5642512d1758"
+      ],
+      "path": "package.json"
+    }
+  ],
   "packages": [
     {
       "api_data_url": "https://registry.npmjs.org/test-package/1.0.0",

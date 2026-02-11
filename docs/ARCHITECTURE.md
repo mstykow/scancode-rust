@@ -75,7 +75,7 @@ scancode-rust implements a multi-phase processing pipeline based on Python ScanC
 │                           ▼                                      │
 │  Phase 3: Post-Processing                                       │
 │  ┌────────────────────────────────────────────────────────┐    │
-│  │ • Package assembly (sibling, nested, workspace merge)   │    │
+│  │ • Package assembly (sibling, nested, file-ref, workspace)│    │
 │  │ • Package consolidation/deduplication                   │    │
 │  │ • License/copyright summarization                       │    │
 │  │ • Tallies and facets                                    │    │
@@ -357,10 +357,11 @@ if let Some(package_data) = try_parse_file(path) {
 
 After scanning, the assembly system merges related manifests into logical packages using `DatasourceId`-based matching.
 
-**Three merge strategies:**
+**Four assembly passes:**
 
 - **SiblingMerge**: Combines sibling files in the same directory (e.g., `package.json` + `package-lock.json` → single npm package)
 - **NestedMerge**: Combines parent/child manifests across directories (e.g., Maven parent POM + module POMs)
+- **FileRefResolve**: Resolves `file_references` from package database entries (RPM/Alpine/Debian) against scanned files, sets `for_packages` on matched files, tracks missing references, and resolves RPM namespace from os-release
 - **WorkspaceMerge**: Post-processing pass for monorepo workspaces (e.g., npm/pnpm workspaces → separate Package per workspace member with shared resource assignment and `workspace:*` version resolution)
 
 **How it works:**
@@ -369,7 +370,8 @@ After scanning, the assembly system merges related manifests into logical packag
 2. After scanning, the assembler groups packages by directory
 3. Packages whose `datasource_id` values match the same config are merged into a single logical package
 4. Combined packages aggregate `datafile_paths` and `datasource_ids` from all contributing files
-5. Workspace assembly runs as a final pass: detects workspace roots, discovers members via glob patterns, creates per-member packages, hoists dependencies, and resolves `workspace:*` version references
+5. File reference resolution matches installed-package database entries to files on disk (e.g., Alpine `installed` DB lists files belonging to each package)
+6. Workspace assembly runs as a final pass: detects workspace roots, discovers members via glob patterns, creates per-member packages, hoists dependencies, and resolves `workspace:*` version references
 
 Assembly is configurable via the `--no-assemble` CLI flag. See `src/assembly/` for implementation details.
 

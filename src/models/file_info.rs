@@ -671,6 +671,9 @@ pub struct TopLevelDependency {
     pub datafile_path: String,
     /// Datasource identifier for the parser that extracted this dependency.
     pub datasource_id: DatasourceId,
+    /// Namespace for the dependency (e.g., distribution name for RPM packages).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub namespace: Option<String>,
 }
 
 impl TopLevelDependency {
@@ -701,6 +704,7 @@ impl TopLevelDependency {
             for_package_uid,
             datafile_path,
             datasource_id,
+            namespace: None,
         }
     }
 }

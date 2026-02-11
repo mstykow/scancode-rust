@@ -32,6 +32,12 @@ mod tests {
         visit_dir_recursive(test_dir, test_dir, &mut file_infos)?;
 
         if file_infos.is_empty() {
+            return Err(format!("No files found in directory: {:?}", test_dir));
+        }
+
+        // At least one file must have package data for assembly to be meaningful
+        let has_package_data = file_infos.iter().any(|f| !f.package_data.is_empty());
+        if !has_package_data {
             return Err(format!(
                 "No parseable files found in directory: {:?}",
                 test_dir
@@ -74,89 +80,94 @@ mod tests {
                 continue;
             }
 
-            if let Some(package_data_vec) = try_parse_file(&path) {
-                let relative_path = path
-                    .strip_prefix(base_dir)
-                    .map_err(|e| format!("Failed to strip prefix: {}", e))?
-                    .to_str()
-                    .ok_or_else(|| format!("Invalid path: {:?}", path))?
-                    .to_string();
+            let package_data_vec = try_parse_file(&path).unwrap_or_default();
 
-                let file_name = path
-                    .file_name()
-                    .and_then(|n| n.to_str())
-                    .unwrap_or("")
-                    .to_string();
+            let relative_path = path
+                .strip_prefix(base_dir)
+                .map_err(|e| format!("Failed to strip prefix: {}", e))?
+                .to_str()
+                .ok_or_else(|| format!("Invalid path: {:?}", path))?
+                .to_string();
 
-                let extension = path
-                    .extension()
-                    .and_then(|e| e.to_str())
-                    .unwrap_or("")
-                    .to_string();
+            let file_name = path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or("")
+                .to_string();
 
-                let metadata = fs::metadata(&path)
-                    .map_err(|e| format!("Failed to read file metadata: {}", e))?;
-                let size = metadata.len();
+            let extension = path
+                .extension()
+                .and_then(|e| e.to_str())
+                .unwrap_or("")
+                .to_string();
 
-                let file_info = FileInfo {
-                    name: file_name.clone(),
-                    base_name: file_name.clone(),
-                    extension,
-                    path: relative_path,
-                    file_type: FileType::File,
-                    mime_type: Some("text/plain".to_string()),
-                    size,
-                    date: None,
-                    sha1: None,
-                    md5: None,
-                    sha256: None,
-                    programming_language: None,
-                    package_data: package_data_vec,
-                    license_expression: None,
-                    license_detections: vec![],
-                    copyrights: vec![],
-                    urls: vec![],
-                    for_packages: vec![],
-                    scan_errors: vec![],
-                };
+            let metadata =
+                fs::metadata(&path).map_err(|e| format!("Failed to read file metadata: {}", e))?;
+            let size = metadata.len();
 
-                file_infos.push(file_info);
-            }
+            let file_info = FileInfo {
+                name: file_name.clone(),
+                base_name: file_name.clone(),
+                extension,
+                path: relative_path,
+                file_type: FileType::File,
+                mime_type: Some("text/plain".to_string()),
+                size,
+                date: None,
+                sha1: None,
+                md5: None,
+                sha256: None,
+                programming_language: None,
+                package_data: package_data_vec,
+                license_expression: None,
+                license_detections: vec![],
+                copyrights: vec![],
+                urls: vec![],
+                for_packages: vec![],
+                scan_errors: vec![],
+            };
+
+            file_infos.push(file_info);
         }
 
         Ok(())
     }
 
-    /// Compare assembly output against expected JSON file.
-    ///
-    /// Normalizes UUIDs before comparison and validates the structure matches.
     fn compare_assembly_output(
         actual: &AssemblyResult,
+        file_infos: &[FileInfo],
         expected_path: &Path,
     ) -> Result<(), String> {
-        // Read expected file
         let expected_str = fs::read_to_string(expected_path)
             .map_err(|e| format!("Failed to read expected file: {}", e))?;
 
-        // Serialize actual result to JSON
+        let file_for_packages: Vec<Value> = file_infos
+            .iter()
+            .filter(|f| !f.for_packages.is_empty())
+            .map(|f| {
+                json!({
+                    "path": f.path,
+                    "for_packages": f.for_packages,
+                })
+            })
+            .collect();
+
         let actual_json = json!({
             "packages": actual.packages,
             "dependencies": actual.dependencies,
+            "files_with_packages": file_for_packages,
         });
         let actual_str = serde_json::to_string_pretty(&actual_json)
             .map_err(|e| format!("Failed to serialize actual result: {}", e))?;
 
-        // Normalize UUIDs in both
         let actual_normalized = normalize_uuids(&actual_str);
         let expected_normalized = normalize_uuids(&expected_str);
 
-        // Parse normalized strings back to JSON for comparison
         let actual_value: Value = serde_json::from_str(&actual_normalized)
             .map_err(|e| format!("Failed to parse normalized actual JSON: {}", e))?;
         let expected_value: Value = serde_json::from_str(&expected_normalized)
             .map_err(|e| format!("Failed to parse normalized expected JSON: {}", e))?;
 
-        // Deep compare
         compare_json_values(&actual_value, &expected_value, "")
     }
 
@@ -262,15 +273,26 @@ mod tests {
         }
 
         if !expected_file.exists() {
-            // Generate expected file on first run
             eprintln!("Expected file not found, generating: {:?}", expected_file);
 
             let mut file_infos = build_file_infos_from_directory(&test_dir)?;
             let result = assemble(&mut file_infos);
 
+            let file_for_packages: Vec<Value> = file_infos
+                .iter()
+                .filter(|f| !f.for_packages.is_empty())
+                .map(|f| {
+                    json!({
+                        "path": f.path,
+                        "for_packages": f.for_packages,
+                    })
+                })
+                .collect();
+
             let output_json = json!({
                 "packages": result.packages,
                 "dependencies": result.dependencies,
+                "files_with_packages": file_for_packages,
             });
             let output_str = serde_json::to_string_pretty(&output_json)
                 .map_err(|e| format!("Failed to serialize output: {}", e))?;
@@ -286,14 +308,10 @@ mod tests {
             ));
         }
 
-        // Build FileInfo from real files
         let mut file_infos = build_file_infos_from_directory(&test_dir)?;
-
-        // Run assembly
         let result = assemble(&mut file_infos);
 
-        // Compare against expected
-        compare_assembly_output(&result, &expected_file)
+        compare_assembly_output(&result, &file_infos, &expected_file)
     }
 
     #[test]
@@ -349,6 +367,14 @@ mod tests {
         match run_assembly_golden_test("pnpm-workspace") {
             Ok(_) => (),
             Err(e) => panic!("Assembly golden test failed for pnpm-workspace: {}", e),
+        }
+    }
+
+    #[test]
+    fn test_assembly_alpine_file_refs() {
+        match run_assembly_golden_test("alpine-file-refs") {
+            Ok(_) => (),
+            Err(e) => panic!("Assembly golden test failed for alpine-file-refs: {}", e),
         }
     }
 

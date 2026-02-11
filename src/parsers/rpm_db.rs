@@ -23,7 +23,7 @@ use std::path::Path;
 
 use log::warn;
 
-use crate::models::{DatasourceId, Dependency, PackageData};
+use crate::models::{DatasourceId, Dependency, FileReference, PackageData};
 
 use super::PackageParser;
 
@@ -229,7 +229,11 @@ fn parse_rpm_database(
                     } else {
                         vec![pkg.source_rpm]
                     },
-                    file_references: Vec::new(),
+                    file_references: build_file_references(
+                        &pkg.base_names,
+                        &pkg.dir_indexes,
+                        &pkg.dir_names,
+                    ),
                     is_private: false,
                     is_virtual: false,
                     extra_data: None,
@@ -264,6 +268,37 @@ fn build_evr_version(epoch: i32, version: &str, release: &str) -> Option<String>
     }
 
     Some(evr)
+}
+
+fn build_file_references(
+    base_names: &[String],
+    dir_indexes: &[i32],
+    dir_names: &[String],
+) -> Vec<FileReference> {
+    if base_names.is_empty() || dir_names.is_empty() {
+        return Vec::new();
+    }
+
+    base_names
+        .iter()
+        .zip(dir_indexes.iter())
+        .filter_map(|(basename, &dir_idx)| {
+            let dirname = dir_names.get(dir_idx as usize)?;
+            let path = format!("{}{}", dirname, basename);
+            if path.is_empty() || path == "/" {
+                return None;
+            }
+            Some(FileReference {
+                path,
+                size: None,
+                sha1: None,
+                md5: None,
+                sha256: None,
+                sha512: None,
+                extra_data: None,
+            })
+        })
+        .collect()
 }
 
 #[cfg(test)]
