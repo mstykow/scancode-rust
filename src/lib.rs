@@ -211,6 +211,7 @@
 
 pub mod assembly;
 pub mod cli;
+pub mod license_detection;
 pub mod models;
 pub mod parsers;
 pub mod scanner;
