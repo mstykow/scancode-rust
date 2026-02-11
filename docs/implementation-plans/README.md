@@ -23,8 +23,7 @@ implementation-plans/
   - Status: ~98% complete — only complex binary formats remain (low priority)
 
 - **[ASSEMBLY_PLAN.md](package-detection/ASSEMBLY_PLAN.md)** - Package assembly roadmap
-  - Status: Phase 1-3 Complete + Phase 4a npm workspace assembly + Phase 4b file reference resolution complete
-  - Next: Archive extraction assembly (stretch goal)
+  - Status: **COMPLETE** — All phases done (sibling merge, nested merge, workspace assembly, file reference resolution)
 
 ## Placeholder Plans (To Be Fleshed Out)
 
