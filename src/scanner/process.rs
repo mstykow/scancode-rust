@@ -1,5 +1,4 @@
-use crate::askalono::{ScanStrategy, TextData};
-use crate::models::{FileInfo, FileInfoBuilder, FileType, LicenseDetection, Match};
+use crate::models::{FileInfo, FileInfoBuilder, FileType};
 use crate::parsers::try_parse_file;
 use crate::scanner::ProcessResult;
 use crate::utils::file::{get_creation_date, is_path_excluded};
@@ -15,14 +14,11 @@ use std::fs::{self};
 use std::path::Path;
 use std::sync::Arc;
 
-// License detection threshold - scores above this value are considered a match
-
 pub fn process<P: AsRef<Path>>(
     path: P,
     max_depth: usize,
     progress_bar: Arc<ProgressBar>,
     exclude_patterns: &[Pattern],
-    scan_strategy: &ScanStrategy,
 ) -> Result<ProcessResult, Error> {
     let path = path.as_ref();
 
@@ -63,7 +59,7 @@ pub fn process<P: AsRef<Path>>(
         &mut file_entries
             .par_iter()
             .map(|(path, metadata)| {
-                let file_entry = process_file(path, metadata, scan_strategy);
+                let file_entry = process_file(path, metadata);
                 progress_bar.inc(1);
                 file_entry
             })
@@ -75,13 +71,7 @@ pub fn process<P: AsRef<Path>>(
         all_files.push(process_directory(&path, &metadata));
 
         if max_depth > 0 {
-            match process(
-                &path,
-                max_depth - 1,
-                progress_bar.clone(),
-                exclude_patterns,
-                scan_strategy,
-            ) {
+            match process(&path, max_depth - 1, progress_bar.clone(), exclude_patterns) {
                 Ok(mut result) => {
                     all_files.append(&mut result.files);
                     total_excluded += result.excluded_count;
@@ -97,11 +87,11 @@ pub fn process<P: AsRef<Path>>(
     })
 }
 
-fn process_file(path: &Path, metadata: &fs::Metadata, scan_strategy: &ScanStrategy) -> FileInfo {
+fn process_file(path: &Path, metadata: &fs::Metadata) -> FileInfo {
     let mut scan_errors: Vec<String> = vec![];
     let mut file_info_builder = FileInfoBuilder::default();
 
-    if let Err(e) = extract_information_from_content(&mut file_info_builder, path, scan_strategy) {
+    if let Err(e) = extract_information_from_content(&mut file_info_builder, path) {
         scan_errors.push(e.to_string());
     };
 
@@ -135,7 +125,6 @@ fn process_file(path: &Path, metadata: &fs::Metadata, scan_strategy: &ScanStrate
 fn extract_information_from_content(
     file_info_builder: &mut FileInfoBuilder,
     path: &Path,
-    scan_strategy: &ScanStrategy,
 ) -> Result<(), Error> {
     let buffer = fs::read(path)?;
 
@@ -152,7 +141,6 @@ fn extract_information_from_content(
         extract_license_information(
             file_info_builder,
             String::from_utf8_lossy(&buffer).into_owned(),
-            scan_strategy,
         )
     } else {
         Ok(())
@@ -160,50 +148,10 @@ fn extract_information_from_content(
 }
 
 fn extract_license_information(
-    file_info_builder: &mut FileInfoBuilder,
-    text_content: String,
-    scan_strategy: &ScanStrategy,
+    _file_info_builder: &mut FileInfoBuilder,
+    _text_content: String,
 ) -> Result<(), Error> {
-    // Analyze license with the text content
-    if text_content.is_empty() {
-        return Ok(());
-    }
-
-    let license_result = scan_strategy.scan(&TextData::from(text_content.as_str()))?;
-    let license_expr = license_result.license.map(|x| x.name.to_string());
-
-    let license_detections = license_result
-        .containing
-        .iter()
-        .map(|detection| {
-            let license_lower = detection.license.name.to_lowercase();
-            LicenseDetection {
-                license_expression: license_lower.clone(),
-                license_expression_spdx: detection.license.name.to_string(),
-                matches: vec![Match {
-                    license_expression: license_lower.clone(),
-                    license_expression_spdx: detection.license.name.to_string(),
-                    from_file: None,
-                    score: detection.score as f64,
-                    start_line: detection.line_range.0,
-                    end_line: detection.line_range.1,
-                    matcher: Some("2-aho".to_string()),
-                    matched_length: None,
-                    match_coverage: None,
-                    rule_relevance: None,
-                    rule_identifier: None,
-                    rule_url: None,
-                    matched_text: None,
-                }],
-                identifier: None,
-            }
-        })
-        .collect::<Vec<_>>();
-
-    file_info_builder
-        .license_expression(license_expr)
-        .license_detections(license_detections);
-
+    // TODO: Implement ScanCode-compatible license detection engine
     Ok(())
 }
 

@@ -1,22 +1,18 @@
-use askalono::ScanStrategy;
 use chrono::Utc;
 use clap::Parser;
 use glob::Pattern;
-use include_dir::{Dir, include_dir};
 use indicatif::{ProgressBar, ProgressStyle};
-use serde_json::{Value, from_str, to_string_pretty};
+use serde_json::to_string_pretty;
 use std::env;
 use std::error::Error;
 use std::fs::File;
 use std::io::Write;
 use std::sync::Arc;
 
-use crate::askalono::{Store, TextData};
 use crate::cli::Cli;
 use crate::models::{ExtraData, Header, Output, SCANCODE_OUTPUT_FORMAT_VERSION, SystemEnvironment};
 use crate::scanner::{count, process};
 
-mod askalono;
 mod assembly;
 mod cli;
 mod models;
@@ -26,8 +22,6 @@ mod utils;
 
 #[cfg(test)]
 mod test_utils;
-
-const LICENSE_DETECTION_THRESHOLD: f32 = 0.9;
 
 fn main() -> std::io::Result<()> {
     if let Err(err) = run() {
@@ -44,11 +38,6 @@ fn run() -> Result<(), Box<dyn Error>> {
     let exclude_patterns = compile_exclude_patterns(&cli.exclude);
     println!("Exclusion patterns: {:?}", cli.exclude);
 
-    let store = load_license_database()?;
-    let strategy = ScanStrategy::new(&store)
-        .optimize(true)
-        .confidence_threshold(LICENSE_DETECTION_THRESHOLD);
-
     let (total_files, total_dirs, excluded_count) =
         count(&cli.dir_path, cli.max_depth, &exclude_patterns)?;
     println!(
@@ -62,7 +51,6 @@ fn run() -> Result<(), Box<dyn Error>> {
         cli.max_depth,
         Arc::clone(&progress_bar),
         &exclude_patterns,
-        &strategy,
     )?;
     progress_bar.finish_with_message("Scan complete!");
 
@@ -94,35 +82,6 @@ fn compile_exclude_patterns(patterns: &[String]) -> Vec<Pattern> {
         .iter()
         .filter_map(|pattern| Pattern::new(pattern).ok())
         .collect()
-}
-
-// Embed the license files into the binary
-const LICENSES_DIR: Dir = include_dir!("resources/licenses/json/details");
-
-fn load_license_database() -> Result<Store, Box<dyn Error>> {
-    println!("Loading SPDX data, this may take a while...");
-    let mut store = Store::new();
-
-    for file in LICENSES_DIR.files() {
-        let string_content = file.contents_utf8().ok_or("Failed to read file as UTF-8")?;
-        let value: Value = from_str(string_content)?;
-
-        if value["isDeprecatedLicenseId"].as_bool().unwrap_or(false) {
-            continue;
-        }
-
-        let name = value["licenseId"]
-            .as_str()
-            .ok_or("Missing license ID")?
-            .to_string();
-        let text = value["licenseText"]
-            .as_str()
-            .ok_or("Missing license text")?;
-
-        store.add_license(name, TextData::new(text));
-    }
-
-    Ok(store)
 }
 
 fn create_progress_bar(total_files: usize) -> Arc<ProgressBar> {
