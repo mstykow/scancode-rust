@@ -128,8 +128,7 @@ use std::path::Path;
 use log::warn;
 use serde::{Deserialize, Serialize};
 
-use crate::models::{Dependency, PackageData, Party};
-use crate::parsers::utils::create_default_package_data;
+use crate::models::{DatasourceId, Dependency, PackageData, Party};
 
 use super::PackageParser;
 
@@ -153,7 +152,11 @@ impl PackageParser for MyEcosystemParser {
             Ok(c) => c,
             Err(e) => {
                 warn!("Failed to read file {:?}: {}", path, e);
-                return vec![create_default_package_data(Self::PACKAGE_TYPE, None)];
+                return vec![PackageData {
+                    package_type: Some(Self::PACKAGE_TYPE.to_string()),
+                    datasource_id: Some(DatasourceId::MyEcosystemManifest),
+                    ..Default::default()
+                }];
             }
         };
 
@@ -178,7 +181,11 @@ fn parse_manifest(content: &str) -> PackageData {
         Ok(m) => m,
         Err(e) => {
             warn!("Failed to parse manifest: {}", e);
-            return create_default_package_data("<ecosystem>", None);
+            return PackageData {
+                package_type: Some("<ecosystem>".to_string()),
+                datasource_id: Some(DatasourceId::MyEcosystemManifest),
+                ..Default::default()
+            };
         }
     };
 
@@ -201,6 +208,7 @@ fn parse_manifest(content: &str) -> PackageData {
 
     PackageData {
         package_type: Some("<ecosystem>".to_string()),
+        datasource_id: Some("<ecosystem>_manifest".to_string()),
         name: manifest.name,
         version: manifest.version,
         description: manifest.description,
@@ -453,6 +461,55 @@ mod my_ecosystem_golden_test;
 
 Assembly merges related manifest/lockfile pairs into logical packages. If your ecosystem has multiple related files (e.g., manifest + lockfile), you need assembly support.
 
+### Understanding Datasource IDs
+
+**Datasource IDs** are unique identifiers for each type of package data source your parser handles. They serve as the bridge between parsers and the assembly system.
+
+**Key Concepts**:
+
+- **`DatasourceId` enum**: A type-safe enum in `src/models/datasource_id.rs` with variants for every supported file format. Using an enum instead of strings provides compile-time checking and prevents typos.
+- **`datasource_id` field**: Set in each `PackageData` instance to indicate which specific file type was parsed
+- **Assembly matching**: The assembler uses `datasource_id` values to group related files (e.g., manifest + lockfile)
+
+**Example - Single Datasource Parser**:
+
+```rust
+use crate::models::DatasourceId;
+
+// In extract_packages():
+PackageData {
+    datasource_id: Some(DatasourceId::CargoToml),
+    // ...
+}
+```
+
+**Example - Multi-Datasource Parser**:
+
+```rust
+use crate::models::DatasourceId;
+
+// In extract_packages():
+if path.ends_with("pyproject.toml") {
+    PackageData {
+        datasource_id: Some(DatasourceId::PypiPyprojectToml),
+        // ...
+    }
+} else if path.ends_with("setup.py") {
+    PackageData {
+        datasource_id: Some(DatasourceId::PypiSetupPy),
+        // ...
+    }
+}
+```
+
+**Naming Convention**: Enum variants use `PascalCase` (e.g., `NpmPackageJson`, `CargoLock`, `MavenPom`). They serialize to `snake_case` strings for JSON output.
+
+**Critical Rules**:
+
+1. Every new file format needs a corresponding `DatasourceId` variant in `src/models/datasource_id.rs`
+2. Datasource IDs are globally unique — enforced at compile time by the enum
+3. The `datasource_id` field must NEVER be `None` in production code paths
+
 ### Check if Assembly is Needed
 
 Does your ecosystem have:
@@ -477,9 +534,10 @@ AssemblerConfig {
 
 **Key points**:
 
-- `datasource_ids`: Must match the `datasource_id` values your parsers set in `PackageData`
+- `datasource_ids`: Must **exactly match** the `datasource_id` values your parsers emit in `PackageData`
 - `sibling_file_patterns`: Filenames to look for in the same directory (order matters - first is primary)
 - Patterns support exact match, case-insensitive match, and glob wildcards (`*.podspec`)
+- The assembler will only merge packages whose `datasource_id` values are listed in the same `AssemblerConfig`
 
 ### Add Assembly Golden Tests
 
@@ -748,7 +806,11 @@ let manifest: ManifestFile = match serde_json::from_str(content) {
     Ok(m) => m,
     Err(e) => {
         warn!("Failed to parse manifest: {}. Content: {}", e, content);
-        return create_default_package_data("<ecosystem>", None);
+        return PackageData {
+            package_type: Some("<ecosystem>".to_string()),
+            datasource_id: Some(DatasourceId::MyEcosystemManifest),
+            ..Default::default()
+        };
     }
 };
 ```
@@ -815,8 +877,10 @@ Before submitting your parser:
 ### Implementation
 
 - [ ] Parser implements `PackageParser` trait
+- [ ] `DatasourceId` variant(s) added to `src/models/datasource_id.rs` for each file format
 - [ ] `is_match()` correctly identifies files
-- [ ] `extract_packages()` extracts all Python fields
+- [ ] `extract_packages()` extracts all fields
+- [ ] `datasource_id` field set correctly in ALL code paths (never `None` in production)
 - [ ] Dependencies extracted with proper scopes
 - [ ] PURLs correctly formatted
 - [ ] Graceful error handling (no panics)

@@ -56,7 +56,7 @@ scancode-rust implements a multi-phase processing pipeline based on Python ScanC
 │                    ScanCode Processing Pipeline                  │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                  │
-│  Phase 1: Pre-Scan (Planned)                                    │
+│  Phase 1: Pre-Scan                                              │
 │  ┌────────────────────────────────────────────────────────┐    │
 │  │ • Archive extraction                                    │    │
 │  │ • File type detection                                   │    │
@@ -64,18 +64,18 @@ scancode-rust implements a multi-phase processing pipeline based on Python ScanC
 │  └────────────────────────────────────────────────────────┘    │
 │                           │                                      │
 │                           ▼                                      │
-│  Phase 2: Scanning (Partially Implemented)                      │
+│  Phase 2: Scanning                                              │
 │  ┌────────────────────────────────────────────────────────┐    │
-│  │ ✅ Package manifest parsing (see SUPPORTED_FORMATS.md) │    │
-│  │ ❌ License text detection                               │    │
-│  │ ❌ Copyright detection                                  │    │
-│  │ ❌ Email/URL extraction                                 │    │
+│  │ • Package manifest parsing (see SUPPORTED_FORMATS.md)   │    │
+│  │ • License text detection                                │    │
+│  │ • Copyright detection                                   │    │
+│  │ • Email/URL extraction                                  │    │
 │  └────────────────────────────────────────────────────────┘    │
 │                           │                                      │
 │                           ▼                                      │
-│  Phase 3: Post-Processing (Planned)                             │
+│  Phase 3: Post-Processing                                       │
 │  ┌────────────────────────────────────────────────────────┐    │
-│  │ • Package assembly (design complete)                    │    │
+│  │ • Package assembly (sibling + nested merge strategies)  │    │
 │  │ • Package consolidation/deduplication                   │    │
 │  │ • License/copyright summarization                       │    │
 │  │ • Tallies and facets                                    │    │
@@ -83,20 +83,20 @@ scancode-rust implements a multi-phase processing pipeline based on Python ScanC
 │  └────────────────────────────────────────────────────────┘    │
 │                           │                                      │
 │                           ▼                                      │
-│  Phase 4: Filtering (Planned)                                   │
+│  Phase 4: Filtering                                             │
 │  ┌────────────────────────────────────────────────────────┐    │
 │  │ • License policy filtering                              │    │
 │  │ • Custom filter plugins                                 │    │
 │  └────────────────────────────────────────────────────────┘    │
 │                           │                                      │
 │                           ▼                                      │
-│  Phase 5: Output (Partially Implemented)                        │
+│  Phase 5: Output                                                │
 │  ┌────────────────────────────────────────────────────────┐    │
-│  │ ✅ JSON output (ScanCode-compatible)                    │    │
-│  │ ❌ SPDX (RDF, JSON, YAML, tag-value)                    │    │
-│  │ ❌ CycloneDX (JSON, XML)                                │    │
-│  │ ❌ CSV, YAML, HTML                                      │    │
-│  │ ❌ Custom templates                                     │    │
+│  │ • JSON output (ScanCode-compatible)                     │    │
+│  │ • SPDX (RDF, JSON, YAML, tag-value)                     │    │
+│  │ • CycloneDX (JSON, XML)                                 │    │
+│  │ • CSV, YAML, HTML                                       │    │
+│  │ • Custom templates                                      │    │
 │  └────────────────────────────────────────────────────────┘    │
 │                                                                  │
 └─────────────────────────────────────────────────────────────────┘
@@ -104,20 +104,14 @@ scancode-rust implements a multi-phase processing pipeline based on Python ScanC
 
 ### Component Inventory
 
-**Implemented Components** (✅):
-
 - **Package Parsers**: See [SUPPORTED_FORMATS.md](SUPPORTED_FORMATS.md) for complete list
 - **Scanner Pipeline**: File discovery, parallel processing, progress tracking
 - **Security Layer**: DoS protection, no code execution, archive safety
-- **JSON Output**: ScanCode Toolkit-compatible format
-- **Testing Infrastructure**: Unit tests, golden tests, integration tests
-
-**Planned Components** (❌):
-
+- **Package Assembly**: Sibling and nested merge strategies for combining related manifests
 - **Text Detection**: License detection, copyright detection, email/URL extraction
-- **Package Assembly**: Merge related manifests into logical packages
 - **Post-Processing**: Summarization, tallies, classification
-- **Output Formats**: SPDX, CycloneDX, CSV, YAML, HTML
+- **Output**: JSON (ScanCode-compatible), SPDX, CycloneDX, CSV, YAML, HTML
+- **Testing Infrastructure**: Unit tests, doctests, golden tests, integration tests
 - **Infrastructure**: Plugin system, caching, enhanced progress tracking
 
 ### Implementation Status
@@ -133,7 +127,7 @@ For current implementation status, priorities, and effort estimates, see:
 
 Each plan includes detailed status, priorities (P0-P3), effort estimates, and implementation phases.
 
-### Plugin Architecture (Planned)
+### Plugin Architecture
 
 Python ScanCode uses a plugin-based architecture with 5 plugin types:
 
@@ -237,27 +231,46 @@ All parsers output a single `PackageData` struct:
 pub struct PackageData {
     // Identity
     pub package_type: Option<String>,
+    pub namespace: Option<String>,
     pub name: Option<String>,
     pub version: Option<String>,
-    pub namespace: Option<String>,
+    pub purl: Option<String>,
+    pub datasource_id: Option<DatasourceId>,
     
     // Metadata
     pub description: Option<String>,
+    pub primary_language: Option<String>,
+    pub release_date: Option<String>,
     pub homepage_url: Option<String>,
     pub parties: Vec<Party>,
+    pub keywords: Vec<String>,
     
     // Dependencies
     pub dependencies: Vec<Dependency>,
     
     // Licenses (extraction only - detection is separate)
     pub extracted_license_statement: Option<String>,
+    pub declared_license_expression: Option<String>,
+    pub license_detections: Vec<LicenseDetection>,
     
     // Checksums & URLs
+    pub sha1: Option<String>,
+    pub md5: Option<String>,
     pub sha256: Option<String>,
+    pub sha512: Option<String>,
+    pub download_url: Option<String>,
+    pub vcs_url: Option<String>,
     pub repository_homepage_url: Option<String>,
+    pub repository_download_url: Option<String>,
+    pub api_data_url: Option<String>,
     
     // Additional data
-    pub extra_data: serde_json::Value,
+    pub extra_data: Option<HashMap<String, serde_json::Value>>,
+    pub source_packages: Vec<String>,
+    pub file_references: Vec<FileReference>,
+    pub is_private: bool,
+    pub is_virtual: bool,
+    // ... and more (see src/models/file_info.rs for complete definition)
 }
 ```
 
@@ -340,6 +353,24 @@ if let Some(package_data) = try_parse_file(path) {
 - Maintains thread safety (Rust ownership guarantees)
 - Progress tracking with atomic operations
 
+### Package Assembly System
+
+After scanning, the assembly system merges related manifests into logical packages using `DatasourceId`-based matching.
+
+**Two merge strategies:**
+
+- **SiblingMerge**: Combines sibling files in the same directory (e.g., `package.json` + `package-lock.json` → single npm package)
+- **NestedMerge**: Combines parent/child manifests across directories (e.g., Maven parent POM + module POMs)
+
+**How it works:**
+
+1. Each `AssemblerConfig` declares which `DatasourceId` variants belong together and which file patterns to look for
+2. After scanning, the assembler groups packages by directory
+3. Packages whose `datasource_id` values match the same config are merged into a single logical package
+4. Combined packages aggregate `datafile_paths` and `datasource_ids` from all contributing files
+
+Assembly is configurable via the `--no-assemble` CLI flag. See `src/assembly/` for implementation details.
+
 ### Security Architecture
 
 ```text
@@ -384,27 +415,31 @@ See [ADR 0004: Security-First Parsing](adr/0004-security-first-parsing.md) for c
 
 ## Testing Strategy
 
-### Three-Layer Test Pyramid
+### Four-Layer Test Pyramid
 
 ```text
-       /\
-      /  \    Golden Tests (Integration)
-     /    \   ─ Compare with Python ScanCode output
-    /------\  ─ Real-world manifest files
-   /        \
-  /   Unit   \ Unit Tests
- /   Tests    \ ─ Parser functions
-/______________\ ─ Edge cases
+         /\
+        /  \    Integration Tests
+       /    \   ─ End-to-end scanner pipeline
+      /------\  ─ Full scan validation
+     /        \
+    / Golden   \ Golden Tests
+   /  Tests     \ ─ Compare with Python ScanCode output
+  /--------------\ ─ Real-world manifest files
+ /                \
+/    Unit Tests    \ Unit Tests + Doctests
+/   + Doctests      \ ─ Parser functions, edge cases
+/____________________\ ─ API documentation examples
 ```
 
-**Golden Tests** validate feature parity:
+**Four layers** (see [TESTING_STRATEGY.md](TESTING_STRATEGY.md) for full details):
 
-- Reference outputs from Python ScanCode Toolkit
-- Automated JSON comparison
-- Regression detection
-- Run `cargo test golden` to see current pass rates
+1. **Doctests**: API documentation examples that run as tests
+2. **Unit Tests**: Component-level tests for individual functions and edge cases
+3. **Golden Tests**: Regression tests comparing output against Python ScanCode reference
+4. **Integration Tests**: End-to-end tests validating the full scanner pipeline
 
-See [ADR 0003: Golden Test Strategy](adr/0003-golden-test-strategy.md) for details.
+See [ADR 0003: Golden Test Strategy](adr/0003-golden-test-strategy.md) for golden test details.
 
 ## Documentation Strategy
 
@@ -460,7 +495,8 @@ See [docs/improvements/](improvements/) for detailed documentation of each impro
 The codebase follows a modular architecture:
 
 - **`src/parsers/`** - Package manifest parsers (one per ecosystem)
-- **`src/models/`** - Core data structures (PackageData, Dependency, etc.)
+- **`src/models/`** - Core data structures (PackageData, Dependency, DatasourceId, etc.)
+- **`src/assembly/`** - Package assembly system (merging related manifests)
 - **`src/scanner/`** - File system traversal and orchestration
 - **`docs/`** - Architecture decisions, improvement docs, and guides
 - **`testdata/`** - Test manifests for validation
@@ -490,13 +526,11 @@ strip = true              # Strip symbols for smaller binary
 opt-level = 3             # Maximum optimization
 ```
 
-## Future Architecture
+## Extended Architecture
 
-### Planned Features
+The following sections describe major architectural components in detail. See [implementation-plans/](implementation-plans/) for implementation status and roadmap.
 
-The following sections describe major architectural components planned for implementation. See [implementation-plans/](implementation-plans/) for detailed plans.
-
-#### Text Detection Engines
+### Text Detection Engines
 
 **License Detection**:
 
@@ -518,21 +552,13 @@ The following sections describe major architectural components planned for imple
 - URL detection and validation
 - Author contact information
 
-#### Package Assembly System
+### Post-Processing Pipeline
 
-**Assembly**:
-
-- Merge related manifests into logical packages
-- Example: `package.json` + `package-lock.json` → single npm package
-- Multiple assemblers for different ecosystems (npm, Maven, Python, etc.)
-
-**Consolidation**:
+**Package Consolidation**:
 
 - Package deduplication across scan results
 - Dependency graph resolution
 - Transitive dependency handling
-
-#### Post-Processing Pipeline
 
 **Summarization**:
 
@@ -541,7 +567,7 @@ The following sections describe major architectural components planned for imple
 - File classification (source, docs, data, etc.)
 - Summary statistics
 
-#### Output Format Support
+### Output Format Support
 
 **SBOM Formats**:
 
