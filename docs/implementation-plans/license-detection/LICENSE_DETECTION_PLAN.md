@@ -341,11 +341,20 @@ spdx = []
 
 #### 1.2 Text Tokenization
 
-- Implement ScanCode-compatible tokenizer: split on non-alphanumeric, lowercase, strip punctuation
-- Implement text normalization: collapse whitespace, normalize unicode, handle special characters
-- Build the "legalese" dictionary — common license-specific words that are high-value tokens
-- Distinguish high-value (legalese) tokens from low-value (junk/common) tokens
-- Token ID assignment: legalese tokens get low IDs, other tokens get higher IDs
+- [x] Implement ScanCode-compatible tokenizer: split on non-alphanumeric, lowercase, strip punctuation
+- [x] Implement text normalization: collapse whitespace, normalize unicode, handle special characters
+- [ ] Build the "legalese" dictionary — common license-specific words that are high-value tokens
+- [ ] Distinguish high-value (legalese) tokens from low-value (junk/common) tokens
+- [ ] Token ID assignment: legalese tokens get low IDs, other tokens get higher IDs
+
+**Status**: ✅ Complete — Basic tokenization implemented (2025-02-11)
+**Implementation**: `src/license_detection/tokenize.rs`
+
+- `tokenize()` - Tokenizes text with stopword filtering
+- `tokenize_without_stopwords()` - Tokenizes without filtering (for queries)
+- `normalize_text()` - Text normalization (currently passthrough)
+- Full ScanCode compatibility via regex pattern `[A-Za-z0-9]+\+?[A-Za-z0-9]*`
+- Complete STOPWORDS set from reference implementation
 
 #### 1.3 Data Structures
 
