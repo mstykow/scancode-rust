@@ -14,10 +14,12 @@ pub mod rules;
 pub mod seq_match;
 pub mod spans;
 pub mod spdx_lid;
+pub mod spdx_mapping;
 mod tokenize;
 pub mod unknown_match;
 
 pub use aho_match::{MATCH_AHO, MATCH_AHO_ORDER, aho_match};
+pub use expression::{CombineRelation, combine_expressions};
 pub use hash_match::{MATCH_HASH, MATCH_HASH_ORDER, compute_hash, hash_match, index_hash};
 pub use match_refine::refine_matches;
 pub use models::{License, LicenseMatch, Rule};

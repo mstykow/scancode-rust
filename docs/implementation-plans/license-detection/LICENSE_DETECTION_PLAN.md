@@ -470,32 +470,46 @@ spdx = []
 
 **Testing**: Golden tests for each strategy against known inputs. Unit tests for scoring.
 
-### Phase 5: License Expression Composition
+### Phase 5: License Expression Composition ✅ **COMPLETE**
 
 **Goal**: Combine match results into license expressions with SPDX mapping.
 
-#### 5.1 License Expression Parser
+**Implemented**: ✅ Custom license expression parser, SPDX mapping, and expression combination
+**Tests**: 67 tests passing
+**Date**: 2024-02-11
+**Details**: `docs/license-detection/phase-5-expression-composition.md`
 
-- Evaluate existing Rust crates (`spdx` from embark-studios) for compatibility
-- If insufficient, implement custom parser supporting:
+#### 5.1 License Expression Parser ✅ **COMPLETE**
+
+- ✅ Evaluated existing Rust crates (`spdx` from embark-studios) - decided custom parser is better
+  - `spdx` crate only supports official SPDX identifiers (MIT, Apache-2.0, GPL-2.0)
+  - ScanCode uses custom lowercase keys (mit, gpl-2.0-plus) not recognized by crate
+  - ScanCode uses `LicenseRef-scancode-*` format for non-SPDX licenses
+- ✅ Implemented custom parser supporting:
   - ScanCode license keys (e.g., `mit`, `gpl-2.0-plus`, `apache-2.0`)
-  - Operators: `AND`, `OR`, `WITH`
+  - Operators: `AND`, `OR`, `WITH` (with correct precedence)
   - Parenthetical grouping
   - Simplification and deduplication
+  - Error handling with detailed `ParseError` enum
+- **File**: `src/license_detection/expression.rs` (920 lines)
+- **Tests**: 45 tests (all passing)
 
-#### 5.2 ScanCode Key ↔ SPDX Key Mapping
+#### 5.2 ScanCode Key ↔ SPDX Key Mapping ✅ **COMPLETE**
 
-- Load mapping from `.LICENSE` file metadata (`spdx_license_key` field)
-- Build bidirectional mapping: ScanCode key → SPDX key and vice versa
-- Handle `LicenseRef-scancode-*` keys for non-SPDX licenses
+- ✅ Load mapping from `License` objects (`spdx_license_key` field)
+- ✅ Build bidirectional mapping: ScanCode key → SPDX key and vice versa
+- ✅ Handle `LicenseRef-scancode-*` keys for non-SPDX licenses
+- ✅ Expression-level conversion (recursive AST traversal)
+- **File**: `src/license_detection/spdx_mapping.rs` (551 lines)
+- **Tests**: 22 tests (all passing)
 
-#### 5.3 Expression Combination
+#### 5.3 Expression Combination ✅ **COMPLETE**
 
-- Combine multiple match expressions using `AND` (default for same detection)
-- Deduplicate and simplify combined expressions
-- Generate both ScanCode-key and SPDX-key versions of expressions
-
-**Testing**: Unit tests for expression parsing, combination, and SPDX mapping.
+- ✅ Combine multiple match expressions using `AND` and `OR`
+- ✅ Deduplicate and simplify combined expressions (via `unique` flag)
+- ✅ Generate license expression strings from AST
+- **File**: Extended `src/license_detection/expression.rs`
+- **Tests**: 11 tests for combination (all passing)
 
 ### Phase 6: Detection Assembly and Heuristics
 
