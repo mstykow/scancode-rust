@@ -11,7 +11,6 @@
 //!
 //! ```rust,no_run
 //! use scancode_rust::scanner::process;
-//! use scancode_rust::askalono::{Store, ScanStrategy};
 //! use std::path::PathBuf;
 //! use std::sync::Arc;
 //! use indicatif::ProgressBar;
@@ -25,13 +24,10 @@
 //!     Pattern::new("*.git*")?,
 //!     Pattern::new("node_modules/*")?,
 //! ];
-//! let store = Store::new();
-//! let strategy = ScanStrategy::new(&store);
-//! let result = process(&path, 50, progress, &patterns, &strategy)?;
+//! let result = process(&path, 50, progress, &patterns)?;
 //!
 //! // Output contains:
 //! // - Detected packages and their metadata
-//! // - License information with confidence scores
 //! // - File-level information
 //! // - System environment details
 //! println!("Files scanned: {}", result.files.len());
@@ -64,11 +60,6 @@
 //!   - Extract dependencies, versions, licenses from ecosystem-specific formats
 //!   - Support for both manifests and lockfiles
 //!   - Comprehensive error handling with detailed diagnostics
-//!
-//! - [`askalono`]: License detection engine using n-gram analysis
-//!   - Built-in SPDX license data (compile-time embedded)
-//!   - Configurable confidence thresholds
-//!   - Fast approximate matching for unknown licenses
 //!
 //! - [`scanner`]: File system traversal and parallel processing
 //!   - Multi-threaded scanning with `rayon`
@@ -157,7 +148,6 @@
 //!
 //! ```rust,no_run
 //! use scancode_rust::scanner::process;
-//! use scancode_rust::askalono::{Store, ScanStrategy};
 //! use std::path::PathBuf;
 //! use std::sync::Arc;
 //! use indicatif::ProgressBar;
@@ -166,9 +156,7 @@
 //! # fn main() -> anyhow::Result<()> {
 //! let progress = Arc::new(ProgressBar::hidden());
 //! let patterns: Vec<Pattern> = vec![];
-//! let store = Store::new();
-//! let strategy = ScanStrategy::new(&store);
-//! let result = process(&PathBuf::from("."), 50, progress, &patterns, &strategy)?;
+//! let result = process(&PathBuf::from("."), 50, progress, &patterns)?;
 //! println!("Found {} files", result.files.len());
 //! # Ok(())
 //! # }
@@ -178,7 +166,6 @@
 //!
 //! ```rust,no_run
 //! use scancode_rust::scanner::process;
-//! use scancode_rust::askalono::{Store, ScanStrategy};
 //! use std::path::PathBuf;
 //! use std::sync::Arc;
 //! use indicatif::ProgressBar;
@@ -192,43 +179,15 @@
 //!     Pattern::new("target/*")?,
 //!     Pattern::new(".venv/*")?,
 //! ];
-//! let store = Store::new();
-//! let strategy = ScanStrategy::new(&store);
-//! let result = process(&PathBuf::from("."), 50, progress, &patterns, &strategy)?;
+//! let result = process(&PathBuf::from("."), 50, progress, &patterns)?;
 //! # Ok(())
 //! # }
 //! ```
 //!
-//! ### Working with Packages
+//! NOTE: License detection is currently under reimplementation. The scanner will
+//! compile and run but produces no license detection output in this version.
 //!
-//! ```rust,no_run
-//! use scancode_rust::scanner::process;
-//! use scancode_rust::askalono::{Store, ScanStrategy};
-//! use std::path::PathBuf;
-//! use std::sync::Arc;
-//! use indicatif::ProgressBar;
-//! use glob::Pattern;
-//!
-//! # fn main() -> anyhow::Result<()> {
-//! let progress = Arc::new(ProgressBar::hidden());
-//! let patterns: Vec<Pattern> = vec![];
-//! let store = Store::new();
-//! let strategy = ScanStrategy::new(&store);
-//! let result = process(&PathBuf::from("."), 50, progress, &patterns, &strategy)?;
-//!
-//! for file in result.files {
-//!     for package in file.package_data {
-//!         println!("Package: {} {}",
-//!             package.name.unwrap_or_default(),
-//!             package.version.unwrap_or_default());
-//!         if let Some(license_expr) = package.declared_license_expression {
-//!             println!("  License: {}", license_expr);
-//!         }
-//!     }
-//! }
-//! # Ok(())
-//! # }
-//! ```
+//! ## Comparison with Original ScanCode Toolkit
 //!
 //! ## Comparison with Original ScanCode Toolkit
 //!
@@ -250,7 +209,6 @@
 //! The SPDX license data is automatically updated from the upstream
 //! [SPDX License List](https://github.com/spdx/license-list-data) at release time.
 
-pub mod askalono;
 pub mod assembly;
 pub mod cli;
 pub mod models;

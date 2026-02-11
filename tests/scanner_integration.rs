@@ -1,34 +1,17 @@
 use glob::Pattern;
 use indicatif::ProgressBar;
-use scancode_rust::askalono::{ScanStrategy, Store};
 use scancode_rust::models::PackageType;
 use scancode_rust::parsers::list_parser_types;
 use scancode_rust::{FileType, process};
 use std::sync::Arc;
-
-/// Helper to create a minimal Store for testing
-/// This creates an empty store - tests don't need actual license data
-fn create_test_store() -> Store {
-    Store::new()
-}
-
-/// Helper to create a ScanStrategy for testing
-fn create_test_strategy(store: &Store) -> ScanStrategy<'_> {
-    ScanStrategy::new(store)
-        .optimize(false)
-        .confidence_threshold(0.9)
-}
 
 #[test]
 fn test_scanner_discovers_all_registered_parsers() {
     let test_dir = "testdata/integration/multi-parser";
     let progress = Arc::new(ProgressBar::hidden());
     let patterns: Vec<Pattern> = vec![];
-    let store = create_test_store();
-    let strategy = create_test_strategy(&store);
 
-    let result =
-        process(test_dir, 50, progress, &patterns, &strategy).expect("Scan should succeed");
+    let result = process(test_dir, 50, progress, &patterns).expect("Scan should succeed");
 
     // Should find 3 files with package data (npm, python, cargo)
     let package_files: Vec<_> = result
@@ -65,11 +48,8 @@ fn test_full_output_format_structure() {
     let test_dir = "testdata/integration/multi-parser";
     let progress = Arc::new(ProgressBar::hidden());
     let patterns: Vec<Pattern> = vec![];
-    let store = create_test_store();
-    let strategy = create_test_strategy(&store);
 
-    let result =
-        process(test_dir, 50, progress, &patterns, &strategy).expect("Scan should succeed");
+    let result = process(test_dir, 50, progress, &patterns).expect("Scan should succeed");
 
     // Verify basic structure
     assert!(!result.files.is_empty(), "Should have files in result");
@@ -127,10 +107,8 @@ fn test_scanner_handles_empty_directory() {
 
     let progress = Arc::new(ProgressBar::hidden());
     let patterns: Vec<Pattern> = vec![];
-    let store = create_test_store();
-    let strategy = create_test_strategy(&store);
 
-    let result = process(test_path, 50, progress, &patterns, &strategy)
+    let result = process(test_path, 50, progress, &patterns)
         .expect("Scan should succeed on empty directory");
 
     // Should have no files (only the directory entry might be present)
@@ -155,11 +133,9 @@ fn test_scanner_handles_parse_errors_gracefully() {
 
     let progress = Arc::new(ProgressBar::hidden());
     let patterns: Vec<Pattern> = vec![];
-    let store = create_test_store();
-    let strategy = create_test_strategy(&store);
 
     // Scan should complete without crashing
-    let result = process(test_path, 50, progress, &patterns, &strategy)
+    let result = process(test_path, 50, progress, &patterns)
         .expect("Scan should not crash on malformed files");
 
     // Should find the file
@@ -183,11 +159,8 @@ fn test_exclusion_patterns_filter_correctly() {
     let progress = Arc::new(ProgressBar::hidden());
 
     let patterns: Vec<Pattern> = vec![Pattern::new("*.toml").expect("Invalid pattern")];
-    let store = create_test_store();
-    let strategy = create_test_strategy(&store);
 
-    let result =
-        process(test_dir, 50, progress, &patterns, &strategy).expect("Scan should succeed");
+    let result = process(test_dir, 50, progress, &patterns).expect("Scan should succeed");
 
     // Should not find any .toml files
     let toml_files: Vec<_> = result
@@ -231,12 +204,9 @@ fn test_max_depth_limits_traversal() {
 
     let progress = Arc::new(ProgressBar::hidden());
     let patterns: Vec<Pattern> = vec![];
-    let store = create_test_store();
-    let strategy = create_test_strategy(&store);
 
     // Scan with max_depth=1 (should not reach level2)
-    let result =
-        process(test_path, 1, progress, &patterns, &strategy).expect("Scan should succeed");
+    let result = process(test_path, 1, progress, &patterns).expect("Scan should succeed");
 
     // Should not find the deep package.json
     let has_deep_json = result.files.iter().any(|f| f.name == "package.json");
