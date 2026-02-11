@@ -251,6 +251,15 @@
     "repository_download_url": "https://crates.io/api/v1/crates/rustup/1.17.0/download",
     "api_data_url": "https://crates.io/api/v1/crates/rustup",
     "datasource_id": "cargo_toml",
-    "purl": "pkg:cargo/rustup@1.17.0"
+    "purl": "pkg:cargo/rustup@1.17.0",
+    "extra_data": {
+      "rust_edition": "2018",
+      "workspace": {
+        "members": [
+          "src/download"
+        ]
+      },
+      "documentation_url": "http://rust-lang.github.io/rustup.rs/rustup/index.html"
+    }
   }
 ]

@@ -89,6 +89,15 @@
     "repository_download_url": "https://crates.io/api/v1/crates/tauri-runtime/1.0.0-alpha.4/download",
     "api_data_url": "https://crates.io/api/v1/crates/tauri-runtime",
     "datasource_id": "cargo_toml",
-    "purl": "pkg:cargo/tauri-runtime@1.0.0-alpha.4"
+    "purl": "pkg:cargo/tauri-runtime@1.0.0-alpha.4",
+    "extra_data": {
+      "homepage": "workspace",
+      "repository": "workspace",
+      "authors": "workspace",
+      "categories": "workspace",
+      "edition": "workspace",
+      "rust-version": "workspace",
+      "license": "workspace"
+    }
   }
 ]
