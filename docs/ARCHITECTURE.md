@@ -648,11 +648,19 @@ Module location: `src/finder/`
 - Custom output formats
 - Third-party integrations
 
-**Caching**:
+**Caching** (see [CACHING_PLAN.md](implementation-plans/infrastructure/CACHING_PLAN.md)):
 
-- Scan result caching
-- Incremental scanning
-- Cache invalidation strategies
+Two-layer caching system for scan performance optimization:
+
+1. **License Index Cache**: Persists the compiled askalono `Store` (MessagePack + zstd) to avoid rebuilding from SPDX text on each run. Existing `Store::from_cache()`/`to_cache()` infrastructure handles serialization. Version-stamped with tool version + SPDX data version. Expected speedup: 200-300ms → 20-50ms startup.
+
+2. **Scan Result Cache** (beyond-parity — Python has none): Content-addressed per-file cache keyed by SHA256 hash (already computed in `process_file()`). Cached data: package_data, license_detections, copyrights, programming_language. Path-dependent fields reconstructed at load time. Sharded directory layout (`ab/ab3f...postcard`) for filesystem scalability. Expected speedup: 10-50x on repeated scans.
+
+3. **Incremental Scanning** (beyond-parity — Python has none): Scan manifest tracks `{path: (mtime, size, sha256)}` per directory. On re-scan, only files with changed mtime/size are re-hashed and re-scanned. Enables CI/CD integration (scan only changed files per commit).
+
+Cache location: XDG-compliant (`~/.cache/scancode-rust/`), overridable via `SCANCODE_RUST_CACHE` env var or `--cache-dir` CLI flag. Multi-process safety via `fd-lock` file locking. Atomic writes (temp + rename) prevent corruption on crash.
+
+Module location: `src/cache/`
 
 **Progress Tracking**:
 
