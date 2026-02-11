@@ -1,0 +1,7 @@
+Manifest-Version: 1.0
+Implementation-Title: Test Library
+Implementation-Version: 1.0.0
+Implementation-Vendor: Example Corp
+Built-By: build-system
+Build-Jdk: 11.0.12
+Created-By: Apache Maven 3.8.1

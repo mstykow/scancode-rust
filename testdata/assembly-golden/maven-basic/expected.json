@@ -1,0 +1,81 @@
+{
+  "dependencies": [
+    {
+      "datafile_path": "pom.xml",
+      "datasource_id": "maven_pom",
+      "dependency_uid": "pkg:maven/junit/junit@4.13.2?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "for_package_uid": "pkg:maven/com.example/test-library@1.0.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "is_direct": true,
+      "is_optional": true,
+      "is_pinned": true,
+      "is_runtime": false,
+      "purl": "pkg:maven/junit/junit@4.13.2",
+      "scope": "test"
+    },
+    {
+      "datafile_path": "pom.xml",
+      "datasource_id": "maven_pom",
+      "dependency_uid": "pkg:maven/org.apache.commons/commons-lang3@3.12.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "for_package_uid": "pkg:maven/com.example/test-library@1.0.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "is_direct": true,
+      "is_optional": false,
+      "is_pinned": true,
+      "purl": "pkg:maven/org.apache.commons/commons-lang3@3.12.0",
+      "scope": null
+    },
+    {
+      "datafile_path": "pom.xml",
+      "datasource_id": "maven_pom",
+      "dependency_uid": "pkg:maven/junit/junit@4.13.2?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "for_package_uid": "pkg:maven/com.example/test-library@1.0.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "is_direct": true,
+      "is_optional": true,
+      "is_pinned": true,
+      "is_runtime": false,
+      "purl": "pkg:maven/junit/junit@4.13.2",
+      "scope": "test"
+    },
+    {
+      "datafile_path": "pom.xml",
+      "datasource_id": "maven_pom",
+      "dependency_uid": "pkg:maven/org.apache.commons/commons-lang3@3.12.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "for_package_uid": "pkg:maven/com.example/test-library@1.0.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "is_direct": true,
+      "is_optional": false,
+      "is_pinned": true,
+      "purl": "pkg:maven/org.apache.commons/commons-lang3@3.12.0",
+      "scope": null
+    }
+  ],
+  "packages": [
+    {
+      "api_data_url": "https://repo1.maven.org/maven2/com/example/test-library/1.0.0/test-library-1.0.0.pom",
+      "datafile_paths": [
+        "pom.xml",
+        "META-INF/MANIFEST.MF"
+      ],
+      "datasource_ids": [
+        "maven_pom",
+        "java_jar_manifest"
+      ],
+      "extracted_license_statement": "Apache License 2.0",
+      "homepage_url": "https://github.com/example/test-library",
+      "name": "test-library",
+      "namespace": "com.example",
+      "package_uid": "pkg:maven/com.example/test-library@1.0.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "parties": [
+        {
+          "name": "Example Corp",
+          "role": "vendor",
+          "type": "organization"
+        }
+      ],
+      "primary_language": "Java",
+      "purl": "pkg:maven/com.example/test-library@1.0.0",
+      "repository_download_url": "https://repo1.maven.org/maven2/com/example/test-library/1.0.0/test-library-1.0.0.jar",
+      "repository_homepage_url": "https://repo1.maven.org/maven2/com/example/test-library/1.0.0/",
+      "type": "maven",
+      "version": "1.0.0"
+    }
+  ]
+}
