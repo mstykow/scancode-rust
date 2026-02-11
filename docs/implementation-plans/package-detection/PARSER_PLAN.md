@@ -1,11 +1,11 @@
 # Parser Parity Plan
 
 > **Updated**: February 11, 2026
-> **Status**: ~98% parity — only complex binary formats remain
+> **Status**: 🟢 **COMPLETE** — 87 parsers + 23 recognizers covering 31 ecosystems. Only Windows binary formats remain (low priority, deferred).
 
 ## Current State
 
-79 Rust parsers covering 31 ecosystems. Phases 1–4 complete. Only Phase 5 (complex/binary formats) remains.
+87 Rust parsers + 23 file-type recognizers covering 31 ecosystems. All phases complete except 3 low-priority Windows binary parsers (deferred).
 
 ---
 
@@ -16,20 +16,20 @@ All production handlers covered. Some consolidate multiple Python handlers into 
 | Ecosystem | Python Handlers | Rust Parsers | Notes |
 |-----------|----------------|--------------|-------|
 | AboutCode | 1 | 1 | `AboutFileParser` |
-| Alpine | 4 | 4 | Includes ⭐ APKBUILD (Python stub) |
+| Alpine | 4 | 2 | .apk archive + installed DB. APKBUILD not yet implemented. |
 | Autotools | 1 | 1 | `AutotoolsConfigureParser` |
 | Bazel | 1 | 1 | `BazelBuildParser` |
 | Bower | 1 | 1 | `BowerJsonParser` |
 | Buck | 2 | 2 | `BuckBuildParser`, `BuckMetadataBzlParser` |
 | Cargo/Rust | 2 | 2 | `CargoParser`, `CargoLockParser` |
-| Chef | 3 | 3 | metadata.rb, metadata.json, ⭐ cookbook .tgz |
+| Chef | 3 | 2 | metadata.rb, metadata.json. Cookbook .tgz not implemented (archive). |
 | CocoaPods | 4 | 4 | Podfile, Podfile.lock, .podspec, .podspec.json |
 | Conan | 2 | 4 | ⭐ Beyond parity: added `conanfile.txt`, `conan.lock` |
 | Conda | 3 | 3 | conda-meta JSON, environment.yaml, meta.yaml |
 | CPAN | 2 | 2 | ⭐ Both beyond parity (Python has stubs only) |
 | CRAN/R | 1 | 1 | `CranParser` |
 | Dart/Pub | 2 | 2 | pubspec.yaml, pubspec.lock |
-| Debian | 6 | 6 | Includes ⭐ .deb introspection, md5sums variants |
+| Debian | 11 | 12 | Includes ⭐ .deb introspection, copyright, distroless, md5sums variants |
 | FreeBSD | 1 | 1 | `FreebsdCompactManifestParser` |
 | Go | 3 | 3 | go.mod, go.sum, Godeps.json |
 | Gradle | 1 | 2 | ⭐ Beyond parity: added `GradleLockfileParser` |
@@ -46,24 +46,27 @@ All production handlers covered. Some consolidate multiple Python handlers into 
 | Ruby | 7 | 7 | Gemspec, Gemfile, lockfile, extracted gem variants |
 | Swift | 3 | 3 | Package.resolved, Package.swift.json, deplock |
 | Windows Update | 1 | 1 | `MicrosoftUpdateManifestParser` |
-| misc.py recognizers | 23 | 19 | File-type-only (Python: `# TODO: parse me!!!`) |
+| misc.py recognizers | 23 | 23 | All recognizers implemented, including magic byte detection |
 
 ---
 
-## What's Left: Phase 5 — Complex/Binary Formats
+## Deferred: Windows Binary Formats
 
-These require substantial new infrastructure and have questionable ROI. Even Python doesn't fully parse most of them.
+These require specialized crates and have low ROI. Even Python doesn't fully parse most of them. Deferred unless user demand.
 
 | Handler | Format | Challenge | Priority |
 |---------|--------|-----------|----------|
-| `PypiSdistArchiveHandler` | `*.tar.gz`, `*.zip` | Archive extraction + parse contents | Low |
 | `MsiInstallerHandler` | `*.msi` | OLE Compound Document binary format | Low |
 | `WindowsExecutableHandler` | `*.exe`, `*.dll` | PE binary format, VERSION_INFO resource | Low |
 | Win Registry handlers (3) | Registry hive files | Binary registry format | Low |
 
-**Skipped recognizers** (4 of 23): InstallShieldPackageHandler, NsisInstallerHandler, SquashfsImageHandler (need magic bytes), AndroidAppArchiveHandler (conflicts with AlpineApkParser).
+### Out of Scope
 
-**Recommendation**: Defer unless user demand. The binary Windows formats require specialized crates. `PypiSdistArchive` requires archive extraction infrastructure (same blocker as assembly Phase 4).
+| Handler | Reason |
+|---------|--------|
+| `PypiSdistArchiveHandler` | Requires archive extraction, permanently out of scope (see ASSEMBLY_PLAN.md) |
+| `ChefCookbookTarballHandler` | Requires archive extraction |
+| `AlpineApkbuildHandler` | Python implementation is a stub only |
 
 ---
 
