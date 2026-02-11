@@ -1,6 +1,7 @@
 mod assemblers;
 #[cfg(test)]
 mod assembly_golden_test;
+mod cargo_workspace_merge;
 pub mod file_ref_resolve;
 mod nested_merge;
 mod sibling_merge;
@@ -141,6 +142,9 @@ pub fn assemble(files: &mut [FileInfo]) -> AssemblyResult {
 
     // Post-processing: workspace assembly for npm/pnpm monorepos
     workspace_merge::assemble_workspaces(files, &mut packages, &mut dependencies);
+
+    // Post-processing: workspace assembly for Cargo workspaces
+    cargo_workspace_merge::assemble_cargo_workspaces(files, &mut packages, &mut dependencies);
 
     AssemblyResult {
         packages,

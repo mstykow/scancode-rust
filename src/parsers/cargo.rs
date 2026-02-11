@@ -426,7 +426,26 @@ fn extract_keywords_and_categories(toml_content: &Value) -> Vec<String> {
     keywords
 }
 
-/// Extracts extra_data fields (rust-version, edition, documentation, license-file)
+/// Converts toml::Value to serde_json::Value recursively
+fn toml_to_json(value: &toml::Value) -> serde_json::Value {
+    match value {
+        toml::Value::String(s) => serde_json::json!(s),
+        toml::Value::Integer(i) => serde_json::json!(i),
+        toml::Value::Float(f) => serde_json::json!(f),
+        toml::Value::Boolean(b) => serde_json::json!(b),
+        toml::Value::Array(a) => serde_json::Value::Array(a.iter().map(toml_to_json).collect()),
+        toml::Value::Table(t) => {
+            let map: serde_json::Map<String, serde_json::Value> = t
+                .iter()
+                .map(|(k, v)| (k.clone(), toml_to_json(v)))
+                .collect();
+            serde_json::Value::Object(map)
+        }
+        toml::Value::Datetime(d) => serde_json::json!(d.to_string()),
+    }
+}
+
+/// Extracts extra_data fields (rust-version, edition, documentation, license-file, workspace)
 fn extract_extra_data(
     toml_content: &Value,
 ) -> Option<std::collections::HashMap<String, serde_json::Value>> {
@@ -434,14 +453,28 @@ fn extract_extra_data(
     let mut extra_data = std::collections::HashMap::new();
 
     if let Some(package) = toml_content.get(FIELD_PACKAGE).and_then(|v| v.as_table()) {
-        // Extract rust-version
-        if let Some(rust_version) = package.get(FIELD_RUST_VERSION).and_then(|v| v.as_str()) {
-            extra_data.insert("rust_version".to_string(), json!(rust_version));
+        // Extract rust-version (or detect workspace inheritance)
+        if let Some(rust_version_value) = package.get(FIELD_RUST_VERSION) {
+            if let Some(rust_version_str) = rust_version_value.as_str() {
+                extra_data.insert("rust_version".to_string(), json!(rust_version_str));
+            } else if rust_version_value
+                .as_table()
+                .is_some_and(|t| t.get("workspace") == Some(&toml::Value::Boolean(true)))
+            {
+                extra_data.insert("rust-version".to_string(), json!("workspace"));
+            }
         }
 
-        // Extract edition
-        if let Some(edition) = package.get(FIELD_EDITION).and_then(|v| v.as_str()) {
-            extra_data.insert("rust_edition".to_string(), json!(edition));
+        // Extract edition (or detect workspace inheritance)
+        if let Some(edition_value) = package.get(FIELD_EDITION) {
+            if let Some(edition_str) = edition_value.as_str() {
+                extra_data.insert("rust_edition".to_string(), json!(edition_str));
+            } else if edition_value
+                .as_table()
+                .is_some_and(|t| t.get("workspace") == Some(&toml::Value::Boolean(true)))
+            {
+                extra_data.insert("edition".to_string(), json!("workspace"));
+            }
         }
 
         // Extract documentation URL
@@ -453,6 +486,66 @@ fn extract_extra_data(
         if let Some(license_file) = package.get(FIELD_LICENSE_FILE).and_then(|v| v.as_str()) {
             extra_data.insert("license_file".to_string(), json!(license_file));
         }
+
+        // Check for workspace inheritance markers for other fields
+        // version
+        if let Some(version_value) = package.get(FIELD_VERSION)
+            && version_value
+                .as_table()
+                .is_some_and(|t| t.get("workspace") == Some(&toml::Value::Boolean(true)))
+        {
+            extra_data.insert("version".to_string(), json!("workspace"));
+        }
+
+        // license
+        if let Some(license_value) = package.get(FIELD_LICENSE)
+            && license_value
+                .as_table()
+                .is_some_and(|t| t.get("workspace") == Some(&toml::Value::Boolean(true)))
+        {
+            extra_data.insert("license".to_string(), json!("workspace"));
+        }
+
+        // homepage
+        if let Some(homepage_value) = package.get(FIELD_HOMEPAGE)
+            && homepage_value
+                .as_table()
+                .is_some_and(|t| t.get("workspace") == Some(&toml::Value::Boolean(true)))
+        {
+            extra_data.insert("homepage".to_string(), json!("workspace"));
+        }
+
+        // repository
+        if let Some(repository_value) = package.get(FIELD_REPOSITORY)
+            && repository_value
+                .as_table()
+                .is_some_and(|t| t.get("workspace") == Some(&toml::Value::Boolean(true)))
+        {
+            extra_data.insert("repository".to_string(), json!("workspace"));
+        }
+
+        // categories
+        if let Some(categories_value) = package.get(FIELD_CATEGORIES)
+            && categories_value
+                .as_table()
+                .is_some_and(|t| t.get("workspace") == Some(&toml::Value::Boolean(true)))
+        {
+            extra_data.insert("categories".to_string(), json!("workspace"));
+        }
+
+        // authors
+        if let Some(authors_value) = package.get(FIELD_AUTHORS)
+            && authors_value
+                .as_table()
+                .is_some_and(|t| t.get("workspace") == Some(&toml::Value::Boolean(true)))
+        {
+            extra_data.insert("authors".to_string(), json!("workspace"));
+        }
+    }
+
+    // Extract workspace table if it exists
+    if let Some(workspace_value) = toml_content.get("workspace") {
+        extra_data.insert("workspace".to_string(), toml_to_json(workspace_value));
     }
 
     if extra_data.is_empty() {
