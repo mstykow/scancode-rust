@@ -212,6 +212,10 @@ File Enumeration → Parser Selection → Package Extraction → Assembly Phase 
 | File ref resolution | Resolve file_references → `for_packages` linking | Alpine, RPM, Debian installed DBs |
 | Workspace assembly | Post-processing pass creating per-member packages | npm/pnpm workspaces, Cargo workspaces |
 
+### Performance Optimizations
+
+- **Static assembler lookup via `LazyLock`**: The `ASSEMBLER_LOOKUP` HashMap (mapping every `DatasourceId` to its config key) is built once on first access using `std::sync::LazyLock` and stored as a `static`. Previously, this map was rebuilt on every `assemble()` call. Now there is zero allocation per call and O(1) config lookup by `DatasourceId`. See `src/assembly/mod.rs` lines 18–32.
+
 ### Key Code Locations
 
 | File | Purpose |

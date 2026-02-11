@@ -208,7 +208,7 @@ fn parse_manifest(content: &str) -> PackageData {
 
     PackageData {
         package_type: Some("<ecosystem>".to_string()),
-        datasource_id: Some("<ecosystem>_manifest".to_string()),
+        datasource_id: Some(DatasourceId::MyEcosystemManifest),
         name: manifest.name,
         version: manifest.version,
         description: manifest.description,
