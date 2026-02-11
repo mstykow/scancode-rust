@@ -6,6 +6,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::fmt;
+use strum::{EnumCount, EnumIter};
 
 /// Unique identifier for the type of package data source (file format).
 ///
@@ -27,7 +28,7 @@ use std::fmt;
 /// assert_eq!(id.as_ref(), "npm_package_json");
 /// assert_eq!(id.to_string(), "npm_package_json");
 /// ```
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, EnumCount, EnumIter)]
 #[serde(rename_all = "snake_case")]
 pub enum DatasourceId {
     // ── About/README/OS ──

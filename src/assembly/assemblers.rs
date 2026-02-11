@@ -107,17 +107,21 @@ pub static ASSEMBLERS: &[AssemblerConfig] = &[
             DatasourceId::PypiSetupPy,
             DatasourceId::PypiSetupCfg,
             DatasourceId::PypiWheel,
+            DatasourceId::PypiWheelMetadata,
             DatasourceId::PypiEgg,
+            DatasourceId::PypiSdistPkginfo,
             DatasourceId::PypiInspectDeplock,
             DatasourceId::PipRequirements,
             DatasourceId::PypiPoetryLock,
             DatasourceId::Pipfile,
+            DatasourceId::PipfileLock,
         ],
         sibling_file_patterns: &[
             "pyproject.toml",
             "setup.py",
             "setup.cfg",
             "requirements*.txt",
+            "Pipfile",
             "Pipfile.lock",
             "poetry.lock",
         ],
@@ -256,6 +260,36 @@ pub static ASSEMBLERS: &[AssemblerConfig] = &[
         sibling_file_patterns: &["*.mum"],
         mode: AssemblyMode::SiblingMerge,
     },
+    // Autotools (C/C++ build system)
+    AssemblerConfig {
+        datasource_ids: &[DatasourceId::AutotoolsConfigure],
+        sibling_file_patterns: &["configure", "configure.ac"],
+        mode: AssemblyMode::SiblingMerge,
+    },
+    // Bazel (build system)
+    AssemblerConfig {
+        datasource_ids: &[DatasourceId::BazelBuild],
+        sibling_file_patterns: &["BUILD"],
+        mode: AssemblyMode::SiblingMerge,
+    },
+    // Buck (build system)
+    AssemblerConfig {
+        datasource_ids: &[DatasourceId::BuckFile, DatasourceId::BuckMetadata],
+        sibling_file_patterns: &["BUCK", ".buckconfig"],
+        mode: AssemblyMode::SiblingMerge,
+    },
+    // Ant/Ivy (Java dependency management)
+    AssemblerConfig {
+        datasource_ids: &[DatasourceId::AntIvyXml],
+        sibling_file_patterns: &["ivy.xml"],
+        mode: AssemblyMode::SiblingMerge,
+    },
+    // Meteor (JavaScript platform)
+    AssemblerConfig {
+        datasource_ids: &[DatasourceId::MeteorPackage],
+        sibling_file_patterns: &["package.js"],
+        mode: AssemblyMode::SiblingMerge,
+    },
     // ── One-per-PackageData assemblers (database files with many packages) ──
     //
     // Alpine installed package database
@@ -289,23 +323,85 @@ pub static ASSEMBLERS: &[AssemblerConfig] = &[
 ///
 /// These are either:
 /// - Non-package metadata (readme, about, os_release)
-/// - Binary archives that need extraction support (Phase 4)
+/// - Binary archives (require external extraction via ExtractCode before scanning)
 /// - Supplementary metadata files (not primary package definitions)
 ///
 /// This list serves as documentation; it is not used at runtime.
-#[allow(dead_code)]
-pub static UNASSEMBLED_DATASOURCE_IDS: &[&str] = &[
+#[allow(dead_code)] // used only in tests (test_every_datasource_id_is_accounted_for)
+pub static UNASSEMBLED_DATASOURCE_IDS: &[DatasourceId] = &[
     // Non-package metadata
-    "readme",
-    "about_file",
-    "etc_os_release",
-    // Binary archives (future: Phase 4 archive extraction)
-    "alpine_apk_archive",
-    "debian_deb",
-    "rpm_archive",
+    DatasourceId::Readme,
+    DatasourceId::AboutFile,
+    DatasourceId::EtcOsRelease,
+    // Binary archives (require external extraction via ExtractCode before scanning)
+    DatasourceId::AlpineApkArchive,
+    DatasourceId::AndroidAarLibrary,
+    DatasourceId::AndroidApk,
+    DatasourceId::AppleDmg,
+    DatasourceId::Axis2Mar,
+    DatasourceId::ChromeCrx,
+    DatasourceId::DebianDeb,
+    DatasourceId::DebianOriginalSourceTarball,
+    DatasourceId::DebianSourceMetadataTarball,
+    DatasourceId::InstallshieldInstaller,
+    DatasourceId::IosIpa,
+    DatasourceId::IsoDiskImage,
+    DatasourceId::JavaEarArchive,
+    DatasourceId::JavaJar,
+    DatasourceId::JavaWarArchive,
+    DatasourceId::JbossSar,
+    DatasourceId::MicrosoftCabinet,
+    DatasourceId::MozillaXpi,
+    DatasourceId::NsisInstaller,
+    DatasourceId::RpmArchive,
+    DatasourceId::SharShellArchive,
+    DatasourceId::SquashfsDiskImage,
     // Supplementary metadata (not primary package definitions)
-    "debian_control_extracted_deb",
-    "debian_source_control_dsc",
-    "debian_md5sums_in_extracted_deb",
-    "rpm_package_licenses",
+    DatasourceId::Axis2ModuleXml,
+    DatasourceId::DebianControlExtractedDeb,
+    DatasourceId::DebianInstalledFilesList,
+    DatasourceId::DebianInstalledMd5Sums,
+    DatasourceId::DebianMd5SumsInExtractedDeb,
+    DatasourceId::DebianSourceControlDsc,
+    DatasourceId::GemArchiveExtracted,
+    DatasourceId::JavaEarApplicationXml,
+    DatasourceId::JavaWarWebXml,
+    DatasourceId::JbossServiceXml,
+    DatasourceId::RpmPackageLicenses,
 ];
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashSet;
+    use strum::IntoEnumIterator;
+
+    #[test]
+    fn test_every_datasource_id_is_accounted_for() {
+        let mut assembled: HashSet<DatasourceId> = HashSet::new();
+        for config in ASSEMBLERS {
+            for &dsid in config.datasource_ids {
+                assembled.insert(dsid);
+            }
+        }
+
+        let unassembled: HashSet<DatasourceId> =
+            UNASSEMBLED_DATASOURCE_IDS.iter().copied().collect();
+
+        let overlap: Vec<_> = assembled.intersection(&unassembled).collect();
+        assert!(
+            overlap.is_empty(),
+            "Datasource IDs in BOTH ASSEMBLERS and UNASSEMBLED: {overlap:?}"
+        );
+
+        let missing: Vec<_> = DatasourceId::iter()
+            .filter(|dsid| !assembled.contains(dsid) && !unassembled.contains(dsid))
+            .collect();
+
+        assert!(
+            missing.is_empty(),
+            "Datasource IDs in NEITHER ASSEMBLERS nor UNASSEMBLED: {missing:?}\n\
+             Add each to an AssemblerConfig in ASSEMBLERS, or to UNASSEMBLED_DATASOURCE_IDS."
+        );
+    }
+}
