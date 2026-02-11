@@ -55,9 +55,24 @@ pub struct LicenseIndex {
     /// IDs len_legalese and above are assigned to other tokens as encountered.
     pub dictionary: TokenDictionary,
 
+    /// Number of legalese tokens.
+    ///
+    /// Tokens with ID < len_legalese are considered high-value legalese words.
+    /// Tokens with ID >= len_legalese are considered low-value tokens.
+    ///
+    /// Corresponds to Python: `self.len_legalese = 0` (line 185)
+    pub len_legalese: usize,
+
+    /// Set of token IDs made entirely of digits.
+    ///
+    /// These tokens can create worst-case behavior when there are long runs of them.
+    ///
+    /// Corresponds to Python: `self.digit_only_tids = set()` (line 191)
+    pub digit_only_tids: HashSet<u16>,
+
     /// Mapping from rule hash to rule ID for hash-based exact matching.
     ///
-    /// This enables fast exact matches using a hash of the rule's token IDs.
+    /// This enables fast exact matches using a hash of the rule\'s token IDs.
     /// Each hash maps to exactly one rule ID.
     ///
     /// Corresponds to Python: `self.rid_by_hash = {}` (line 216)
@@ -73,7 +88,7 @@ pub struct LicenseIndex {
 
     /// Aho-Corasick automaton for unknown license detection.
     ///
-    /// Separate automaton used to detect license-like text that doesn't match
+    /// Separate automaton used to detect license-like text that doesn\'t match
     /// any known rule. Populated with ngrams from all approx-matchable rules.
     ///
     /// Corresponds to Python: `self.unknown_automaton = match_unknown.get_automaton()` (line 222)
@@ -142,8 +157,11 @@ impl LicenseIndex {
     /// # Returns
     /// A new LicenseIndex instance with empty index structures
     pub fn new(dictionary: TokenDictionary) -> Self {
+        let len_legalese = dictionary.legalese_count();
         Self {
             dictionary,
+            len_legalese,
+            digit_only_tids: HashSet::new(),
             rid_by_hash: HashMap::new(),
             rules_automaton: Automaton::new(),
             unknown_automaton: Automaton::new(),
