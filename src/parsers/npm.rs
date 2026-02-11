@@ -197,7 +197,10 @@ impl PackageParser for NpmParser {
             notice_text: None,
             source_packages: Vec::new(),
             file_references: Vec::new(),
-            is_private: false,
+            is_private: json
+                .get("private")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false),
             is_virtual: false,
             extra_data,
             dependencies: [

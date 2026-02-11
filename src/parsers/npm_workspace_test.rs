@@ -10,7 +10,7 @@ mod tests {
             .unwrap();
         let package_data = NpmWorkspaceParser::extract_first_package(&workspace_path);
 
-        assert_eq!(package_data.package_type, Some("npm-workspace".to_string()));
+        assert_eq!(package_data.package_type, Some("npm".to_string()));
 
         // Check workspaces are extracted
         let extra_data = package_data.extra_data.unwrap();
@@ -30,7 +30,7 @@ mod tests {
             .unwrap();
         let package_data = NpmWorkspaceParser::extract_first_package(&workspace_path);
 
-        assert_eq!(package_data.package_type, Some("npm-workspace".to_string()));
+        assert_eq!(package_data.package_type, Some("npm".to_string()));
 
         let extra_data = package_data.extra_data.unwrap();
         let workspaces = extra_data.get("workspaces").unwrap().as_array().unwrap();
@@ -47,7 +47,7 @@ mod tests {
             .unwrap();
         let package_data = NpmWorkspaceParser::extract_first_package(&workspace_path);
 
-        assert_eq!(package_data.package_type, Some("npm-workspace".to_string()));
+        assert_eq!(package_data.package_type, Some("npm".to_string()));
 
         let extra_data = package_data.extra_data.unwrap();
         let workspaces = extra_data.get("workspaces").unwrap().as_array().unwrap();

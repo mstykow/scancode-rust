@@ -30,7 +30,7 @@ use super::PackageParser;
 pub struct NpmWorkspaceParser;
 
 impl PackageParser for NpmWorkspaceParser {
-    const PACKAGE_TYPE: &'static str = "npm-workspace";
+    const PACKAGE_TYPE: &'static str = "npm";
 
     fn is_match(path: &Path) -> bool {
         path.file_name()
@@ -63,7 +63,7 @@ impl PackageParser for NpmWorkspaceParser {
 /// Returns a default empty PackageData for error cases
 fn default_package_data() -> PackageData {
     PackageData {
-        package_type: Some("npm-workspace".to_string()),
+        package_type: Some("npm".to_string()),
         datasource_id: Some(DatasourceId::PnpmWorkspaceYaml),
         ..Default::default()
     }
@@ -83,7 +83,7 @@ fn parse_workspace_file(workspace_data: &Value) -> PackageData {
                 .collect();
 
             PackageData {
-                package_type: Some("npm-workspace".to_string()),
+                package_type: Some("npm".to_string()),
                 extra_data: if workspaces_vec.is_empty() {
                     None
                 } else {
@@ -109,7 +109,7 @@ fn parse_workspace_file(workspace_data: &Value) -> PackageData {
         None => {
             // No workspaces found, return basic package data
             PackageData {
-                package_type: Some("npm-workspace".to_string()),
+                package_type: Some("npm".to_string()),
                 extra_data: {
                     let mut extra = std::collections::HashMap::new();
                     extra.insert(
@@ -148,7 +148,7 @@ packages:
         let workspace_data: Value = serde_yaml::from_str(yaml_content).unwrap();
         let result = parse_workspace_file(&workspace_data);
 
-        assert_eq!(result.package_type, Some("npm-workspace".to_string()));
+        assert_eq!(result.package_type, Some("npm".to_string()));
 
         let extra_data = result.extra_data.unwrap();
         assert_eq!(
@@ -239,7 +239,7 @@ name: my-workspace
         let workspace_data: Value = serde_yaml::from_str(yaml_content).unwrap();
         let result = parse_workspace_file(&workspace_data);
 
-        assert_eq!(result.package_type, Some("npm-workspace".to_string()));
+        assert_eq!(result.package_type, Some("npm".to_string()));
         assert!(result.extra_data.is_some());
         let extra_data = result.extra_data.unwrap();
         assert_eq!(
@@ -258,7 +258,7 @@ packages: []
         let workspace_data: Value = serde_yaml::from_str(yaml_content).unwrap();
         let result = parse_workspace_file(&workspace_data);
 
-        assert_eq!(result.package_type, Some("npm-workspace".to_string()));
+        assert_eq!(result.package_type, Some("npm".to_string()));
         assert!(
             result.extra_data.is_none() || !result.extra_data.unwrap().contains_key("workspaces")
         );
@@ -268,7 +268,7 @@ packages: []
     fn test_default_package_data() {
         let result = default_package_data();
 
-        assert_eq!(result.package_type, Some("npm-workspace".to_string()));
+        assert_eq!(result.package_type, Some("npm".to_string()));
         assert!(result.name.is_none());
         assert!(result.version.is_none());
         assert!(result.extra_data.is_none());
