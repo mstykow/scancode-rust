@@ -1,6 +1,6 @@
 # License Detection Implementation Plan
 
-> **Status**: 🟡 Planning Complete — Ready for Implementation
+> **Status**: 🟢 Phases 0-4 Complete — In Progress (Phase 5: License Expression Composition)
 > **Priority**: P0 — Critical Core Feature
 > **Dependencies**: None (foundational feature)
 
@@ -418,7 +418,7 @@ spdx = []
 
 **Testing**: Verify tokenization and query run construction against reference outputs.
 
-### Phase 4: Matching Strategies
+### Phase 4: Matching Strategies (✅ Complete)
 
 **Goal**: Implement each matching strategy to produce individual `LicenseMatch` results.
 
