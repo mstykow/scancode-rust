@@ -653,18 +653,19 @@ fn extract_dependency_group(
                     let version_str = version.as_str()?;
 
                     if version_str.starts_with("workspace:") {
+                        let package_url = PackageUrl::new(NpmParser::PACKAGE_TYPE, name).ok()?;
                         let is_opt = if let Some(meta) = optional_meta {
                             meta.get(name).copied()
                         } else {
                             Some(is_optional)
                         };
                         return Some(Dependency {
-                            purl: None,
+                            purl: Some(package_url.to_string()),
                             extracted_requirement: Some(version_str.to_string()),
                             scope: Some(scope.to_string()),
                             is_runtime: Some(is_runtime),
                             is_optional: is_opt,
-                            is_pinned: None,
+                            is_pinned: Some(false),
                             is_direct: Some(true),
                             resolved_package: None,
                             extra_data: None,

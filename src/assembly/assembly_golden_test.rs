@@ -38,6 +38,10 @@ mod tests {
             ));
         }
 
+        // Sort by path for deterministic order across platforms
+        // (fs::read_dir order is OS-dependent)
+        file_infos.sort_by(|a, b| a.path.cmp(&b.path));
+
         Ok(file_infos)
     }
 
@@ -329,6 +333,22 @@ mod tests {
         match run_assembly_golden_test("maven-basic") {
             Ok(_) => (),
             Err(e) => panic!("Assembly golden test failed for maven-basic: {}", e),
+        }
+    }
+
+    #[test]
+    fn test_assembly_npm_workspace() {
+        match run_assembly_golden_test("npm-workspace") {
+            Ok(_) => (),
+            Err(e) => panic!("Assembly golden test failed for npm-workspace: {}", e),
+        }
+    }
+
+    #[test]
+    fn test_assembly_pnpm_workspace() {
+        match run_assembly_golden_test("pnpm-workspace") {
+            Ok(_) => (),
+            Err(e) => panic!("Assembly golden test failed for pnpm-workspace: {}", e),
         }
     }
 

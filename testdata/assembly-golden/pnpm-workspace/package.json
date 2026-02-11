@@ -1,0 +1,9 @@
+{
+  "name": "my-pnpm-monorepo",
+  "version": "1.0.0",
+  "description": "A pnpm monorepo",
+  "license": "Apache-2.0",
+  "dependencies": {
+    "shared-config": "^1.0.0"
+  }
+}
