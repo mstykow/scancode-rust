@@ -1836,6 +1836,7 @@ checksum = "a50f4cf475b65d88e057964e0e9bb1f0aa9bbb2036dc65c64596b42932536984"
 name = "scancode-rust"
 version = "0.0.5"
 dependencies = [
+ "aho-corasick",
  "anyhow",
  "ar",
  "base64",

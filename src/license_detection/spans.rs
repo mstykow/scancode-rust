@@ -2,8 +2,6 @@
 //!
 //! Spans are used to track matched positions in license detection.
 
-#![allow(dead_code)]
-
 use std::ops::Range;
 
 /// A span represents an efficient integer range set.
@@ -27,6 +25,38 @@ impl Span {
         Self {
             ranges: vec![range],
         }
+    }
+
+    /// Create a span from an iterator of positions.
+    ///
+    /// This converts individual positions into contiguous ranges.
+    ///
+    /// # Arguments
+    /// * `positions` - Iterator over positions to include in the span
+    pub fn from_iterator(positions: impl IntoIterator<Item = usize>) -> Self {
+        let mut sorted: Vec<usize> = positions.into_iter().collect();
+        sorted.sort_unstable();
+        sorted.dedup();
+
+        let mut ranges = Vec::new();
+        let mut iter = sorted.into_iter().peekable();
+
+        while let Some(start) = iter.next() {
+            let mut end = start + 1;
+
+            while let Some(&next) = iter.peek() {
+                if next == end {
+                    end += 1;
+                    iter.next();
+                } else {
+                    break;
+                }
+            }
+
+            ranges.push(start..end);
+        }
+
+        Self { ranges }
     }
 
     /// Add a range to this span, merging with existing ranges if needed.

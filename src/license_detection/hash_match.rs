@@ -1,0 +1,363 @@
+//! Hash-based exact matching for license detection.
+//!
+//! This module implements the hash matching strategy which computes a hash of the
+//! entire query token sequence and looks for exact matches in the index.
+
+use sha1::{Digest, Sha1};
+
+use crate::license_detection::index::LicenseIndex;
+use crate::license_detection::models::LicenseMatch;
+use crate::license_detection::query::QueryRun;
+use crate::license_detection::spans::Span;
+
+/// Matcher identifier for hash-based matching.
+///
+/// Corresponds to Python: `MATCH_HASH = '1-hash'` (line 40)
+pub const MATCH_HASH: &str = "1-hash";
+
+/// Matcher order for hash-based matching.
+///
+/// Hash matching is the fastest and has highest priority (0).
+///
+/// Corresponds to Python: `MATCH_HASH_ORDER = 0` (line 41)
+pub const MATCH_HASH_ORDER: u8 = 0;
+
+/// Compute a SHA1 hash of a token sequence.
+///
+/// Converts token IDs to signed 16-bit integers (matching Python's `array('h')`),
+/// serializes them as little-endian bytes, and computes the SHA1 hash.
+///
+/// # Arguments
+/// * `tokens` - Slice of token IDs
+///
+/// # Returns
+/// 20-byte SHA1 digest
+///
+/// Corresponds to Python: `tokens_hash()` (lines 44-49)
+pub fn compute_hash(tokens: &[u16]) -> [u8; 20] {
+    let mut hasher = Sha1::new();
+
+    for token in tokens {
+        let signed = *token as i16;
+        hasher.update(signed.to_le_bytes());
+    }
+
+    hasher.finalize().into()
+}
+
+/// Compute a hash of a rule's token sequence.
+///
+/// This is an alias for `compute_hash` to match the Python API.
+///
+/// Corresponds to Python: `index_hash()` (lines 52-56)
+pub fn index_hash(rule_tokens: &[u16]) -> [u8; 20] {
+    compute_hash(rule_tokens)
+}
+
+/// Perform hash-based matching for a query run.
+///
+/// Computes the hash of the query token sequence and looks for exact matches
+/// in the index. If found, returns a single LicenseMatch with 100% coverage.
+///
+/// # Arguments
+/// * `index` - The license index
+/// * `query_run` - The query run to match
+///
+/// # Returns
+/// Vector of matches (0 or 1 match)
+///
+/// Corresponds to Python: `hash_match()` (lines 59-87)
+pub fn hash_match(index: &LicenseIndex, query_run: &QueryRun) -> Vec<LicenseMatch> {
+    let mut matches = Vec::new();
+    let query_hash = compute_hash(query_run.tokens());
+
+    if let Some(&rid) = index.rid_by_hash.get(&query_hash) {
+        let rule = &index.rules_by_rid[rid];
+        let itokens = &index.tids_by_rid[rid];
+
+        let _qspan =
+            Span::from_range(query_run.start..query_run.end.map_or(query_run.start, |e| e + 1));
+        let rule_length = rule.tokens.len();
+        let _ispan = Span::from_range(0..rule_length);
+
+        let _hispan = Span::from_iterator(
+            (0..rule_length).filter(|&p| itokens[p] < index.len_legalese as u16),
+        );
+
+        let matched_length = query_run.tokens().len();
+        let match_coverage = 100.0;
+
+        let license_match = LicenseMatch {
+            license_expression: rule.license_expression.clone(),
+            license_expression_spdx: rule.license_expression.clone(),
+            from_file: None,
+            start_line: query_run.start_line().unwrap_or(1),
+            end_line: query_run
+                .end_line()
+                .or_else(|| query_run.start_line())
+                .unwrap_or(1),
+            matcher: MATCH_HASH.to_string(),
+            score: 1.0,
+            matched_length,
+            match_coverage,
+            rule_relevance: rule.relevance,
+            rule_identifier: format!("#{}", rid),
+            rule_url: String::new(),
+            matched_text: None,
+        };
+
+        matches.push(license_match);
+    }
+
+    matches
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::license_detection::models::Rule;
+
+    fn create_test_rules_by_rid() -> Vec<Rule> {
+        vec![
+            Rule {
+                license_expression: "mit".to_string(),
+                text: "MIT License".to_string(),
+                tokens: vec![0, 1],
+                is_license_text: true,
+                is_license_notice: false,
+                is_license_reference: false,
+                is_license_tag: false,
+                is_license_intro: false,
+                is_license_clue: false,
+                is_false_positive: false,
+                relevance: 100,
+                minimum_coverage: None,
+                is_continuous: true,
+                referenced_filenames: None,
+                ignorable_urls: None,
+                ignorable_emails: None,
+                ignorable_copyrights: None,
+                ignorable_holders: None,
+                ignorable_authors: None,
+                language: None,
+                notes: None,
+                length_unique: 2,
+                high_length_unique: 2,
+                high_length: 2,
+                min_matched_length: 0,
+                min_high_matched_length: 0,
+                min_matched_length_unique: 0,
+                min_high_matched_length_unique: 0,
+                is_small: false,
+                is_tiny: false,
+            },
+            Rule {
+                license_expression: "apache-2.0".to_string(),
+                text: "Apache License 2.0".to_string(),
+                tokens: vec![2, 3, 4],
+                is_license_text: true,
+                is_license_notice: false,
+                is_license_reference: false,
+                is_license_tag: false,
+                is_license_intro: false,
+                is_license_clue: false,
+                is_false_positive: false,
+                relevance: 100,
+                minimum_coverage: None,
+                is_continuous: true,
+                referenced_filenames: None,
+                ignorable_urls: None,
+                ignorable_emails: None,
+                ignorable_copyrights: None,
+                ignorable_holders: None,
+                ignorable_authors: None,
+                language: None,
+                notes: None,
+                length_unique: 3,
+                high_length_unique: 0,
+                high_length: 0,
+                min_matched_length: 0,
+                min_high_matched_length: 0,
+                min_matched_length_unique: 0,
+                min_high_matched_length_unique: 0,
+                is_small: false,
+                is_tiny: false,
+            },
+        ]
+    }
+
+    #[test]
+    fn test_compute_hash() {
+        let tokens = vec![1u16, 2, 3, 4, 5];
+        let hash = compute_hash(&tokens);
+
+        assert_eq!(hash.len(), 20);
+
+        let tokens2 = vec![1u16, 2, 3, 4, 5];
+        let hash2 = compute_hash(&tokens2);
+
+        assert_eq!(hash, hash2, "Same tokens should produce same hash");
+
+        let hash_hex: String = hash.iter().map(|b| format!("{:02x}", b)).collect();
+        assert_eq!(
+            hash_hex, "aaa562e5641b932d5d5ecae43b47793b33b3b5f0",
+            "Hash should match Python implementation"
+        );
+    }
+
+    #[test]
+    fn test_compute_hash_different_tokens() {
+        let tokens1 = vec![1u16, 2, 3];
+        let hash1 = compute_hash(&tokens1);
+
+        let tokens2 = vec![1u16, 2, 4];
+        let hash2 = compute_hash(&tokens2);
+
+        assert_ne!(
+            hash1, hash2,
+            "Different tokens should produce different hashes"
+        );
+    }
+
+    #[test]
+    fn test_index_hash() {
+        let rule_tokens = vec![10u16, 20, 30];
+        let hash1 = compute_hash(&rule_tokens);
+        let hash2 = index_hash(&rule_tokens);
+
+        assert_eq!(hash1, hash2, "index_hash should be same as compute_hash");
+    }
+
+    #[test]
+    fn test_hash_match_no_match() {
+        use crate::license_detection::index::dictionary::TokenDictionary;
+
+        let legalese = [("mit", 0), ("license", 1), ("apache", 2), ("2.0", 3)];
+
+        let dictionary = TokenDictionary::new_with_legalese(
+            &legalese.iter().map(|(s, i)| (*s, *i)).collect::<Vec<_>>(),
+        );
+
+        let mut index = LicenseIndex::new(dictionary);
+        index.len_legalese = 2;
+
+        let rules_by_rid = create_test_rules_by_rid();
+        let tids_by_rid: Vec<Vec<u16>> = vec![vec![0, 1], vec![2, 3, 4]];
+
+        index.rid_by_hash.insert(compute_hash(&[5, 6, 7]), 0);
+        index.rules_by_rid = rules_by_rid;
+        index.tids_by_rid = tids_by_rid;
+
+        let matches = hash_match(&index, &create_mock_query_run_with_tokens(&[0, 1]));
+
+        assert!(
+            matches.is_empty(),
+            "Should return empty list when no match found"
+        );
+    }
+
+    #[test]
+    fn test_hash_match_with_match() {
+        use crate::license_detection::index::dictionary::TokenDictionary;
+
+        let legalese = [("mit", 0), ("license", 1), ("apache", 2), ("2.0", 3)];
+
+        let dictionary = TokenDictionary::new_with_legalese(
+            &legalese.iter().map(|(s, i)| (*s, *i)).collect::<Vec<_>>(),
+        );
+
+        let mut index = LicenseIndex::new(dictionary);
+        index.len_legalese = 2;
+
+        let rules_by_rid = create_test_rules_by_rid();
+        let tids_by_rid: Vec<Vec<u16>> = vec![vec![0, 1], vec![2, 3, 4]];
+
+        index.rid_by_hash.insert(compute_hash(&[0, 1]), 0);
+        index.rules_by_rid = rules_by_rid;
+        index.tids_by_rid = tids_by_rid;
+
+        let matches = hash_match(&index, &create_mock_query_run_with_tokens(&[0, 1]));
+
+        assert_eq!(matches.len(), 1, "Should return exactly one match");
+        assert_eq!(matches[0].matcher, MATCH_HASH);
+        assert_eq!(matches[0].score, 1.0);
+        assert_eq!(matches[0].match_coverage, 100.0);
+    }
+
+    #[test]
+    fn test_hash_match_hispan_filters_legalese() {
+        use crate::license_detection::index::dictionary::TokenDictionary;
+
+        let legalese = [("mit", 0), ("license", 1), ("apache", 2), ("2.0", 3)];
+
+        let dictionary = TokenDictionary::new_with_legalese(
+            &legalese.iter().map(|(s, i)| (*s, *i)).collect::<Vec<_>>(),
+        );
+
+        let mut index = LicenseIndex::new(dictionary);
+        index.len_legalese = 2;
+
+        let rules_by_rid = create_test_rules_by_rid();
+        let tids_by_rid: Vec<Vec<u16>> = vec![vec![0, 1], vec![2, 3, 4]];
+
+        index.rid_by_hash.insert(compute_hash(&[0, 1]), 0);
+        index.rules_by_rid = rules_by_rid;
+        index.tids_by_rid = tids_by_rid;
+
+        let matches = hash_match(&index, &create_mock_query_run_with_tokens(&[0, 1]));
+
+        assert_eq!(matches.len(), 1);
+    }
+
+    #[test]
+    fn test_match_hash_empty_tokens() {
+        let tokens: Vec<u16> = vec![];
+        let hash = compute_hash(&tokens);
+
+        assert_eq!(hash.len(), 20);
+    }
+
+    #[test]
+    fn test_match_hash_large_tokens() {
+        let tokens: Vec<u16> = (0..1000).collect();
+        let hash = compute_hash(&tokens);
+
+        assert_eq!(hash.len(), 20);
+
+        let hash2 = compute_hash(&tokens);
+        assert_eq!(hash, hash2);
+    }
+
+    fn create_mock_query_run_with_tokens(tokens: &[u16]) -> QueryRun {
+        use crate::license_detection::index::dictionary::TokenDictionary;
+
+        let legalese = [("token", 0)];
+        let dictionary = TokenDictionary::new_with_legalese(
+            &legalese.iter().map(|(s, i)| (*s, *i)).collect::<Vec<_>>(),
+        );
+
+        let index = LicenseIndex::new(dictionary);
+
+        let query = crate::license_detection::query::Query {
+            tokens: tokens.to_vec(),
+            line_by_pos: vec![1; tokens.len()],
+            unknowns_by_pos: std::collections::HashMap::new(),
+            stopwords_by_pos: std::collections::HashMap::new(),
+            shorts_and_digits_pos: std::collections::HashSet::new(),
+            high_matchables: std::collections::HashSet::new(),
+            low_matchables: std::collections::HashSet::new(),
+            has_long_lines: false,
+            is_binary: false,
+            query_runs: Vec::new(),
+            index,
+        };
+
+        let end = if tokens.is_empty() {
+            None
+        } else {
+            Some(tokens.len() - 1)
+        };
+
+        QueryRun::new(query, 0, end)
+    }
+}

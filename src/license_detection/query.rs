@@ -219,14 +219,14 @@ pub struct Query {
     /// These are tokens with ID < len_legalese.
     ///
     /// Corresponds to Python: `self.high_matchables` (line 293)
-    high_matchables: HashSet<usize>,
+    pub high_matchables: HashSet<usize>,
 
     /// Low-value matchable token positions (non-legalese tokens)
     ///
     /// These are tokens with ID >= len_legalese.
     ///
     /// Corresponds to Python: `self.low_matchables` (line 294)
-    low_matchables: HashSet<usize>,
+    pub low_matchables: HashSet<usize>,
 
     /// True if the query contains very long lines (e.g., minified JS/CSS)
     ///
@@ -246,7 +246,7 @@ pub struct Query {
     pub query_runs: Vec<QueryRun>,
 
     /// Reference to the license index for dictionary access and metadata
-    index: LicenseIndex,
+    pub index: LicenseIndex,
 }
 
 #[allow(dead_code)]
@@ -631,8 +631,8 @@ impl Query {
 #[allow(dead_code)]
 pub struct QueryRun {
     query: Query,
-    start: usize,
-    end: Option<usize>,
+    pub start: usize,
+    pub end: Option<usize>,
     len_legalese: usize,
     digit_only_tids: HashSet<u16>,
 }
@@ -665,6 +665,11 @@ impl QueryRun {
     /// This is a convenience method that clones the query.
     pub fn from_query(query: &Query, start: usize, end: Option<usize>) -> Self {
         Self::new(query.clone(), start, end)
+    }
+
+    /// Get the license index used by this query run.
+    pub fn get_index(&self) -> &LicenseIndex {
+        &self.query.index
     }
 
     /// Get the start line number of this query run.

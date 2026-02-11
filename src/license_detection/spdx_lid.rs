@@ -9,6 +9,21 @@
 
 use regex::Regex;
 
+use crate::license_detection::index::LicenseIndex;
+use crate::license_detection::models::LicenseMatch;
+
+/// Matcher identifier for SPDX-License-Identifier based matching.
+///
+/// Corresponds to Python: `MATCH_SPDX_ID = '1-spdx-id'` (line 61)
+pub const MATCH_SPDX_ID: &str = "1-spdx-id";
+
+/// Matcher order for SPDX-License-Identifier based matching.
+///
+/// SPDX-LID matching runs after hash matching.
+///
+/// Corresponds to Python: `MATCH_SPDX_ID_ORDER = 2` (line 62)
+pub const MATCH_SPDX_ID_ORDER: u8 = 1;
+
 lazy_static::lazy_static! {
     static ref SPDX_LID_PATTERN: Regex = Regex::new(
         r"(?i)(spd[xz][\-\s]+lin?[cs]en?[sc]es?[\-\s]+identifi?er\s*:? *)"
@@ -19,7 +34,6 @@ lazy_static::lazy_static! {
     ).expect("Invalid NuGet SPDX regex");
 }
 
-#[allow(dead_code)]
 pub fn split_spdx_lid(text: &str) -> (Option<String>, String) {
     // Try SPDX pattern first
     if let Some(captures) = SPDX_LID_PATTERN.captures(text)
@@ -42,7 +56,6 @@ pub fn split_spdx_lid(text: &str) -> (Option<String>, String) {
     (None, text.to_string())
 }
 
-#[allow(dead_code)]
 pub fn clean_spdx_text(text: &str) -> String {
     let mut text = text.to_string();
 
@@ -68,7 +81,6 @@ pub fn clean_spdx_text(text: &str) -> String {
     text
 }
 
-#[allow(dead_code)]
 pub fn extract_spdx_expressions(text: &str) -> Vec<String> {
     text.lines()
         .filter_map(|line| {
@@ -84,13 +96,11 @@ pub fn extract_spdx_expressions(text: &str) -> Vec<String> {
         .collect()
 }
 
-#[allow(dead_code)]
 fn normalize_spaces(text: &mut String) {
     let normalized = text.split_whitespace().collect::<Vec<_>>().join(" ");
     *text = normalized;
 }
 
-#[allow(dead_code)]
 fn strip_punctuation(text: &mut String) {
     let punctuation = "!\"#$%&\'*,-./:;<=>?@[\\]^_`{|}~ \t\r\n ";
 
@@ -115,7 +125,6 @@ fn strip_punctuation(text: &mut String) {
     }
 }
 
-#[allow(dead_code)]
 fn fix_unbalanced_parens(text: &mut String) {
     let open_count = text.matches('(').count();
     let close_count = text.matches(')').count();
@@ -125,6 +134,113 @@ fn fix_unbalanced_parens(text: &mut String) {
     } else if close_count == 1 && open_count == 0 {
         *text = text.replace(')', " ");
     }
+}
+
+pub fn extract_spdx_expressions_with_lines(text: &str) -> Vec<(usize, String)> {
+    text.lines()
+        .enumerate()
+        .filter_map(|(line_num, line)| {
+            let line_num_1indexed = line_num + 1;
+            let (prefix, expression) = split_spdx_lid(line.trim());
+            prefix.as_ref()?;
+            let cleaned = clean_spdx_text(&expression);
+            if cleaned.is_empty() {
+                None
+            } else {
+                Some((line_num_1indexed, cleaned))
+            }
+        })
+        .collect()
+}
+
+fn normalize_spdx_key(key: &str) -> String {
+    key.to_lowercase().replace("_", "-")
+}
+
+fn find_matching_rules(index: &LicenseIndex, spdx_key: &str) -> Vec<usize> {
+    let normalized_spdx = normalize_spdx_key(spdx_key);
+    let mut matching_rids = Vec::new();
+
+    for (rid, rule) in index.rules_by_rid.iter().enumerate() {
+        let license_expr = normalize_spdx_key(&rule.license_expression);
+
+        if license_expr == normalized_spdx {
+            matching_rids.push(rid);
+        }
+    }
+
+    matching_rids
+}
+
+fn split_license_expression(license_expression: &str) -> Vec<String> {
+    let normalized = license_expression.replace(['(', ')'], " ");
+    let mut tokens: Vec<String> = Vec::new();
+
+    let mut current = String::new();
+    for c in normalized.chars() {
+        if c == ' ' {
+            if !current.is_empty() {
+                tokens.push(current.clone());
+                current.clear();
+            }
+        } else {
+            current.push(c);
+        }
+    }
+
+    if !current.is_empty() {
+        tokens.push(current);
+    }
+
+    tokens
+        .into_iter()
+        .filter(|t| {
+            let t_lower = t.to_lowercase();
+            !matches!(t_lower.as_str(), "and" | "or" | "with")
+        })
+        .collect()
+}
+
+pub fn spdx_lid_match(index: &LicenseIndex, text: &str) -> Vec<LicenseMatch> {
+    let mut matches = Vec::new();
+
+    let spdx_lines = extract_spdx_expressions_with_lines(text);
+
+    for (line_num, spdx_expression) in spdx_lines {
+        let license_keys = split_license_expression(&spdx_expression);
+
+        for license_key in license_keys {
+            let matching_rids = find_matching_rules(index, &license_key);
+
+            for rid in &matching_rids {
+                let rule = &index.rules_by_rid[*rid];
+
+                let score = rule.relevance as f32 / 100.0;
+                let matched_length = spdx_expression.len();
+                let match_coverage = 100.0;
+
+                let license_match = LicenseMatch {
+                    license_expression: rule.license_expression.clone(),
+                    license_expression_spdx: spdx_expression.clone(),
+                    from_file: None,
+                    start_line: line_num,
+                    end_line: line_num,
+                    matcher: MATCH_SPDX_ID.to_string(),
+                    score,
+                    matched_length,
+                    match_coverage,
+                    rule_relevance: rule.relevance,
+                    rule_identifier: format!("#{}", rid),
+                    rule_url: String::new(),
+                    matched_text: None,
+                };
+
+                matches.push(license_match);
+            }
+        }
+    }
+
+    matches
 }
 
 #[cfg(test)]
@@ -337,5 +453,222 @@ mod tests {
             exprs,
             vec!["(EPL-2.0 OR Apache-2.0 OR GPL-2.0 WITH Classpath-exception-2.0)"]
         );
+    }
+
+    #[test]
+    fn test_extract_spdx_expressions_with_lines() {
+        let text = "# SPDX-License-Identifier: MIT\n# SPDX-License-Identifier: Apache-2.0";
+        let exprs = extract_spdx_expressions_with_lines(text);
+        assert_eq!(exprs.len(), 2);
+        assert_eq!(exprs[0], (1, "MIT".to_string()));
+        assert_eq!(exprs[1], (2, "Apache-2.0".to_string()));
+    }
+
+    #[test]
+    fn test_extract_spdx_expressions_with_lines_single() {
+        let text = "// SPDX-License-Identifier: GPL-2.0-or-later";
+        let exprs = extract_spdx_expressions_with_lines(text);
+        assert_eq!(exprs.len(), 1);
+        assert_eq!(exprs[0].0, 1);
+        assert_eq!(exprs[0].1, "GPL-2.0-or-later");
+    }
+
+    #[test]
+    fn test_extract_spdx_expressions_with_lines_no_match() {
+        let text = "/* Regular comment with no SPDX identifier */";
+        let exprs = extract_spdx_expressions_with_lines(text);
+        assert!(exprs.is_empty());
+    }
+
+    #[test]
+    fn test_normalize_spdx_key() {
+        assert_eq!(normalize_spdx_key("MIT"), "mit");
+        assert_eq!(normalize_spdx_key("Apache-2.0"), "apache-2.0");
+        assert_eq!(normalize_spdx_key("GPL_2.0_plus"), "gpl-2.0-plus");
+        assert_eq!(normalize_spdx_key("gPL-2.0-PLUS"), "gpl-2.0-plus");
+    }
+
+    #[test]
+    fn test_split_license_expression_simple() {
+        let expr = "MIT";
+        let keys = split_license_expression(expr);
+        assert_eq!(keys, vec!["MIT"]);
+    }
+
+    #[test]
+    fn test_split_license_expression_with_or() {
+        let expr = "MIT OR Apache-2.0";
+        let keys = split_license_expression(expr);
+        assert_eq!(keys.len(), 2);
+        assert!(keys.contains(&"MIT".to_string()));
+        assert!(keys.contains(&"Apache-2.0".to_string()));
+    }
+
+    #[test]
+    fn test_split_license_expression_with_and() {
+        let expr = "GPL-2.0 AND Classpath-exception-2.0";
+        let keys = split_license_expression(expr);
+        assert_eq!(keys.len(), 2);
+        assert!(keys.contains(&"GPL-2.0".to_string()));
+        assert!(keys.contains(&"Classpath-exception-2.0".to_string()));
+    }
+
+    #[test]
+    fn test_split_license_expression_with_parens() {
+        let expr = "(MIT OR Apache-2.0)";
+        let keys = split_license_expression(expr);
+        assert_eq!(keys.len(), 2);
+        assert!(keys.contains(&"MIT".to_string()));
+        assert!(keys.contains(&"Apache-2.0".to_string()));
+    }
+
+    #[test]
+    fn test_split_license_expression_complex() {
+        let expr = "GPL-2.0-or-later WITH Classpath-exception-2.0";
+        let keys = split_license_expression(expr);
+        assert_eq!(keys.len(), 2);
+        assert!(keys.contains(&"GPL-2.0-or-later".to_string()));
+        assert!(keys.contains(&"Classpath-exception-2.0".to_string()));
+    }
+
+    #[test]
+    fn test_spdx_lid_match_simple() {
+        use crate::license_detection::index::LicenseIndex;
+        use crate::license_detection::index::dictionary::TokenDictionary;
+
+        let legalese = [("mit", 0), ("license", 1)];
+        let dictionary = TokenDictionary::new_with_legalese(
+            &legalese.iter().map(|(s, i)| (*s, *i)).collect::<Vec<_>>(),
+        );
+
+        let mut index = LicenseIndex::new(dictionary);
+        index.rules_by_rid.push(create_mock_rule("mit", 100));
+        index.rules_by_rid.push(create_mock_rule("apache-2.0", 100));
+
+        let text = "SPDX-License-Identifier: MIT";
+        let matches = spdx_lid_match(&index, text);
+
+        assert_eq!(matches.len(), 1);
+        assert_eq!(matches[0].license_expression, "mit");
+        assert_eq!(matches[0].license_expression_spdx, "MIT");
+        assert_eq!(matches[0].start_line, 1);
+        assert_eq!(matches[0].end_line, 1);
+        assert_eq!(matches[0].matcher, MATCH_SPDX_ID);
+    }
+
+    #[test]
+    fn test_spdx_lid_match_case_insensitive() {
+        use crate::license_detection::index::LicenseIndex;
+        use crate::license_detection::index::dictionary::TokenDictionary;
+
+        let legalese = [("mit", 0)];
+        let dictionary = TokenDictionary::new_with_legalese(
+            &legalese.iter().map(|(s, i)| (*s, *i)).collect::<Vec<_>>(),
+        );
+
+        let mut index = LicenseIndex::new(dictionary);
+        index.rules_by_rid.push(create_mock_rule("mit", 90));
+
+        let text = "SPDX-License-Identifier: mit";
+        let matches = spdx_lid_match(&index, text);
+
+        assert_eq!(matches.len(), 1);
+        assert_eq!(matches[0].license_expression, "mit");
+    }
+
+    #[test]
+    fn test_spdx_lid_match_multiple() {
+        use crate::license_detection::index::LicenseIndex;
+        use crate::license_detection::index::dictionary::TokenDictionary;
+
+        let legalese = [("mit", 0), ("license", 1)];
+        let dictionary = TokenDictionary::new_with_legalese(
+            &legalese.iter().map(|(s, i)| (*s, *i)).collect::<Vec<_>>(),
+        );
+
+        let mut index = LicenseIndex::new(dictionary);
+        index.rules_by_rid.push(create_mock_rule("mit", 100));
+        index.rules_by_rid.push(create_mock_rule("apache-2.0", 100));
+
+        let text = "SPDX-License-Identifier: OR\n# SPDX-License-Identifier: MIT\n# SPDX-License-Identifier: Apache-2.0";
+        let matches = spdx_lid_match(&index, text);
+
+        assert_eq!(matches.len(), 2);
+    }
+
+    #[test]
+    fn test_spdx_lid_match_no_match() {
+        use crate::license_detection::index::LicenseIndex;
+        use crate::license_detection::index::dictionary::TokenDictionary;
+
+        let legalese = [("mit", 0)];
+        let dictionary = TokenDictionary::new_with_legalese(
+            &legalese.iter().map(|(s, i)| (*s, *i)).collect::<Vec<_>>(),
+        );
+
+        let index = LicenseIndex::new(dictionary);
+
+        let text = "/* Regular comment */";
+        let matches = spdx_lid_match(&index, text);
+
+        assert!(matches.is_empty());
+    }
+
+    #[test]
+    fn test_spdx_lid_match_score_from_relevance() {
+        use crate::license_detection::index::LicenseIndex;
+        use crate::license_detection::index::dictionary::TokenDictionary;
+
+        let legalese = [("mit", 0)];
+        let dictionary = TokenDictionary::new_with_legalese(
+            &legalese.iter().map(|(s, i)| (*s, *i)).collect::<Vec<_>>(),
+        );
+
+        let mut index = LicenseIndex::new(dictionary);
+        index.rules_by_rid.push(create_mock_rule("mit", 80));
+
+        let text = "SPDX-License-Identifier: MIT";
+        let matches = spdx_lid_match(&index, text);
+
+        assert_eq!(matches.len(), 1);
+        assert!((matches[0].score - 0.8).abs() < 0.01);
+    }
+
+    fn create_mock_rule(
+        license_expression: &str,
+        relevance: u8,
+    ) -> crate::license_detection::models::Rule {
+        crate::license_detection::models::Rule {
+            license_expression: license_expression.to_string(),
+            text: String::new(),
+            tokens: Vec::new(),
+            is_license_text: false,
+            is_license_notice: false,
+            is_license_reference: false,
+            is_license_tag: false,
+            is_license_intro: false,
+            is_license_clue: false,
+            is_false_positive: false,
+            relevance,
+            minimum_coverage: None,
+            is_continuous: false,
+            referenced_filenames: None,
+            ignorable_urls: None,
+            ignorable_emails: None,
+            ignorable_copyrights: None,
+            ignorable_holders: None,
+            ignorable_authors: None,
+            language: None,
+            notes: None,
+            length_unique: 0,
+            high_length_unique: 0,
+            high_length: 0,
+            min_matched_length: 0,
+            min_high_matched_length: 0,
+            min_matched_length_unique: 0,
+            min_high_matched_length_unique: 0,
+            is_small: false,
+            is_tiny: false,
+        }
     }
 }
