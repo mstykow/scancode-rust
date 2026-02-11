@@ -9,10 +9,27 @@ mod workspace_merge;
 
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
+use std::sync::LazyLock;
 
 use crate::models::{DatasourceId, FileInfo, Package, PackageData, TopLevelDependency};
 
 pub use assemblers::ASSEMBLERS;
+
+/// Pre-computed lookup: DatasourceId → config key (first DatasourceId in config).
+/// Built once on first use, avoiding HashMap allocation on every `assemble()` call.
+static ASSEMBLER_LOOKUP: LazyLock<HashMap<DatasourceId, DatasourceId>> = LazyLock::new(|| {
+    let mut lookup = HashMap::new();
+    for config in ASSEMBLERS {
+        let key = *config
+            .datasource_ids
+            .first()
+            .expect("assembler must have at least one datasource_id");
+        for &dsid in config.datasource_ids {
+            lookup.insert(dsid, key);
+        }
+    }
+    lookup
+});
 
 /// Result of the assembly phase: top-level packages and dependencies,
 /// plus updated file-to-package associations.
@@ -44,7 +61,7 @@ pub struct AssemblerConfig {
 /// merges them into top-level `Package` objects, and hoists dependencies.
 /// Updates each `FileInfo.for_packages` with the UIDs of packages it belongs to.
 pub fn assemble(files: &mut [FileInfo]) -> AssemblyResult {
-    let assembler_lookup = build_assembler_lookup();
+    let assembler_lookup = &*ASSEMBLER_LOOKUP;
     let mut packages = Vec::new();
     let mut dependencies = Vec::new();
     let mut seen_dirs: HashSet<PathBuf> = HashSet::new();
@@ -194,20 +211,6 @@ fn assemble_one_per_package_data(
     }
 
     results
-}
-
-fn build_assembler_lookup() -> HashMap<DatasourceId, DatasourceId> {
-    let mut lookup = HashMap::new();
-    for config in ASSEMBLERS {
-        let key = *config
-            .datasource_ids
-            .first()
-            .expect("assembler must have at least one datasource_id");
-        for &dsid in config.datasource_ids {
-            lookup.insert(dsid, key);
-        }
-    }
-    lookup
 }
 
 /// Group file indices by their parent directory path.
