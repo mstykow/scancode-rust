@@ -84,6 +84,7 @@ rpm = { version = "0.18", default-features = false, features = ["gzip-compressio
 cpio-archive = "0.10" # CPIO archive extraction (for .rpm)
 rusqlite = { version = "0.37.0", optional = true }  # RPM SQLite database (pinned for rpmdb compat)
 rpmdb = { git = "https://github.com/yybit/rpmdb-rs", rev = "8a20c8b8" }  # RPM database reading (BDB, NDB, SQLite) - pinned to commit with rusqlite 0.37 support
+strum = { version = "0.27.2", features = ["derive"] }
 
 [dev-dependencies]
 # askalono
