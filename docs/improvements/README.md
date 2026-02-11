@@ -43,7 +43,7 @@ Python has unsafe patterns (code execution, DoS vulnerabilities), we use safe al
 | [OSGi Manifest](osgi-manifest-parser.md) | ✨ New Feature | Empty path_patterns (assembly only) | Full OSGi metadata extraction | Java bundle dependencies |
 | [Gradle](gradle-parser.md) | 🛡️ Security | Groovy engine execution | Custom lexer (no execution) | No arbitrary code execution |
 | [Gradle Lockfile](gradle-lockfile-parser.md) | ✨ New Feature | No gradle.lockfile parser | Full lockfile dependency extraction | Pinned dependency auditing |
-| [npm Workspace](npm-workspace-parser.md) | ✨ New Feature | NonAssemblable stub | Workspace pattern extraction | Monorepo structure visibility |
+| [npm Workspace](npm-workspace-parser.md) | ✨ New Feature | NonAssemblable stub + basic assembly | Workspace extraction + improved assembly | Monorepo structure visibility + correct package counts |
 | [Composer](composer-parser.md) | 🔍 Enhanced | Basic extraction | Richer metadata (7 extra_data fields) | Improved package provenance tracking |
 | [Ruby](ruby-parser.md) | 🔍 Enhanced | String-based party data | Semantic Party model | Structured author/maintainer data |
 | [Dart](dart-parser.md) | 🔍 Enhanced | Scope always `null` + YAML lossy | Proper scope + YAML preservation | Correct dependency classification |

@@ -75,7 +75,7 @@ scancode-rust implements a multi-phase processing pipeline based on Python ScanC
 │                           ▼                                      │
 │  Phase 3: Post-Processing                                       │
 │  ┌────────────────────────────────────────────────────────┐    │
-│  │ • Package assembly (sibling + nested merge strategies)  │    │
+│  │ • Package assembly (sibling, nested, workspace merge)   │    │
 │  │ • Package consolidation/deduplication                   │    │
 │  │ • License/copyright summarization                       │    │
 │  │ • Tallies and facets                                    │    │
@@ -357,10 +357,11 @@ if let Some(package_data) = try_parse_file(path) {
 
 After scanning, the assembly system merges related manifests into logical packages using `DatasourceId`-based matching.
 
-**Two merge strategies:**
+**Three merge strategies:**
 
 - **SiblingMerge**: Combines sibling files in the same directory (e.g., `package.json` + `package-lock.json` → single npm package)
 - **NestedMerge**: Combines parent/child manifests across directories (e.g., Maven parent POM + module POMs)
+- **WorkspaceMerge**: Post-processing pass for monorepo workspaces (e.g., npm/pnpm workspaces → separate Package per workspace member with shared resource assignment and `workspace:*` version resolution)
 
 **How it works:**
 
@@ -368,6 +369,7 @@ After scanning, the assembly system merges related manifests into logical packag
 2. After scanning, the assembler groups packages by directory
 3. Packages whose `datasource_id` values match the same config are merged into a single logical package
 4. Combined packages aggregate `datafile_paths` and `datasource_ids` from all contributing files
+5. Workspace assembly runs as a final pass: detects workspace roots, discovers members via glob patterns, creates per-member packages, hoists dependencies, and resolves `workspace:*` version references
 
 Assembly is configurable via the `--no-assemble` CLI flag. See `src/assembly/` for implementation details.
 
@@ -482,7 +484,7 @@ We don't just match Python ScanCode - we improve it:
 | **Conan** | conanfile.txt and conan.lock parsers (Python has neither) | ✨ Feature |
 | **Gradle** | No code execution (token lexer vs Groovy engine) | 🛡️ Security |
 | **Gradle Lockfile** | gradle.lockfile parser (Python has no equivalent) | ✨ Feature |
-| **npm Workspace** | pnpm-workspace.yaml metadata extraction (Python has stub only) | ✨ Feature |
+| **npm Workspace** | pnpm-workspace.yaml extraction + workspace assembly with per-member packages (Python has stub parser + basic assembly) | ✨ Feature |
 | **Composer** | Richer provenance metadata (7 extra fields) | 🔍 Enhanced |
 | **Ruby** | Semantic party model (unified name+email) | 🔍 Enhanced |
 | **Dart** | Proper scope handling + YAML preservation | 🔍 Enhanced |
