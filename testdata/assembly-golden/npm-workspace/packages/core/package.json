@@ -1,0 +1,14 @@
+{
+  "name": "@myorg/core",
+  "version": "1.0.0",
+  "description": "Core utilities",
+  "license": "MIT",
+  "author": "Test Author <test@example.com>",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/myorg/monorepo.git"
+  },
+  "dependencies": {
+    "lodash": "^4.17.21"
+  }
+}

@@ -1440,7 +1440,10 @@ mod tests {
                     && d.scope.as_deref() == Some("dependencies")
             })
             .unwrap();
-        assert_eq!(runtime_workspace_dep.purl, None);
+        assert_eq!(
+            runtime_workspace_dep.purl,
+            Some("pkg:npm/shared-utils".to_string())
+        );
         assert_eq!(
             runtime_workspace_dep.extracted_requirement.as_deref(),
             Some("workspace:^")
@@ -1454,7 +1457,7 @@ mod tests {
                     && d.scope.as_deref() == Some("devDependencies")
             })
             .unwrap();
-        assert_eq!(dev_workspace_dep.purl, None);
+        assert_eq!(dev_workspace_dep.purl, Some("pkg:npm/config".to_string()));
         assert_eq!(
             dev_workspace_dep.extracted_requirement.as_deref(),
             Some("workspace:*")
@@ -1468,7 +1471,7 @@ mod tests {
                     && d.scope.as_ref().is_some_and(|s| s == "peerDependencies")
             })
             .unwrap();
-        assert_eq!(peer_workspace_dep.purl, None);
+        assert_eq!(peer_workspace_dep.purl, Some("pkg:npm/types".to_string()));
         assert_eq!(
             peer_workspace_dep.extracted_requirement.as_deref(),
             Some("workspace:~")
@@ -1860,7 +1863,7 @@ mod tests {
             "Should find workspace:* dependency"
         );
         let dep = workspace_dep.unwrap();
-        assert_eq!(dep.purl, None);
+        assert!(dep.purl.is_some(), "Workspace deps should have a purl");
         assert_eq!(dep.extracted_requirement, Some("workspace:*".to_string()));
     }
 
@@ -1879,7 +1882,7 @@ mod tests {
             "Should find workspace:^ dependency"
         );
         let dep = workspace_dep.unwrap();
-        assert_eq!(dep.purl, None);
+        assert!(dep.purl.is_some(), "Workspace deps should have a purl");
         assert_eq!(dep.extracted_requirement, Some("workspace:^".to_string()));
     }
 
@@ -1898,7 +1901,7 @@ mod tests {
             "Should find workspace:~ dependency"
         );
         let dep = workspace_dep.unwrap();
-        assert_eq!(dep.purl, None);
+        assert!(dep.purl.is_some(), "Workspace deps should have a purl");
         assert_eq!(dep.extracted_requirement, Some("workspace:~".to_string()));
     }
 
@@ -1923,10 +1926,10 @@ mod tests {
             "Should find 3 workspace dependencies (regular, dev, and peer)"
         );
 
-        for dep in workspace_deps {
-            assert_eq!(
-                dep.purl, None,
-                "Workspace dependencies should not have PURL"
+        for dep in &workspace_deps {
+            assert!(
+                dep.purl.is_some(),
+                "Workspace dependencies should have a purl derived from the dep name"
             );
             assert!(
                 dep.extracted_requirement

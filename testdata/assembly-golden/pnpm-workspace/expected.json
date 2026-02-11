@@ -1,0 +1,83 @@
+{
+  "dependencies": [
+    {
+      "datafile_path": "package.json",
+      "datasource_id": "npm_package_json",
+      "dependency_uid": "pkg:npm/shared-config?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "extracted_requirement": "^1.0.0",
+      "for_package_uid": "pkg:npm/my-pnpm-monorepo@1.0.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "is_direct": true,
+      "is_optional": false,
+      "is_pinned": false,
+      "is_runtime": true,
+      "purl": "pkg:npm/shared-config",
+      "scope": "dependencies"
+    },
+    {
+      "datafile_path": "packages/app/package.json",
+      "datasource_id": "npm_package_json",
+      "dependency_uid": "pkg:npm/express?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "extracted_requirement": "^4.18.0",
+      "for_package_uid": "pkg:npm/%40myorg/app@0.1.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "is_direct": true,
+      "is_optional": false,
+      "is_pinned": false,
+      "is_runtime": true,
+      "purl": "pkg:npm/express",
+      "scope": "dependencies"
+    }
+  ],
+  "packages": [
+    {
+      "api_data_url": "https://registry.npmjs.org/my-pnpm-monorepo/1.0.0",
+      "datafile_paths": [
+        "package.json",
+        "pnpm-workspace.yaml"
+      ],
+      "datasource_ids": [
+        "npm_package_json",
+        "pnpm_workspace_yaml"
+      ],
+      "description": "A pnpm monorepo",
+      "download_url": "https://registry.npmjs.org/my-pnpm-monorepo/-/my-pnpm-monorepo-1.0.0.tgz",
+      "extra_data": {
+        "datasource_id": "pnpm_workspace_yaml",
+        "workspaces": [
+          "packages/*"
+        ]
+      },
+      "extracted_license_statement": "- Apache-2.0\n",
+      "name": "my-pnpm-monorepo",
+      "package_uid": "pkg:npm/my-pnpm-monorepo@1.0.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "parties": [],
+      "primary_language": "JavaScript",
+      "purl": "pkg:npm/my-pnpm-monorepo@1.0.0",
+      "repository_download_url": "https://registry.npmjs.org/my-pnpm-monorepo/-/my-pnpm-monorepo-1.0.0.tgz",
+      "repository_homepage_url": "https://www.npmjs.com/package/my-pnpm-monorepo",
+      "type": "npm",
+      "version": "1.0.0"
+    },
+    {
+      "api_data_url": "https://registry.npmjs.org/@myorg%2fapp/0.1.0",
+      "datafile_paths": [
+        "packages/app/package.json"
+      ],
+      "datasource_ids": [
+        "npm_package_json"
+      ],
+      "description": "Application package",
+      "download_url": "https://registry.npmjs.org/@myorg/app/-/@myorg/app-0.1.0.tgz",
+      "extracted_license_statement": "- MIT\n",
+      "name": "@myorg/app",
+      "namespace": "@myorg",
+      "package_uid": "pkg:npm/%40myorg/app@0.1.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "parties": [],
+      "primary_language": "JavaScript",
+      "purl": "pkg:npm/%40myorg/app@0.1.0",
+      "repository_download_url": "https://registry.npmjs.org/app/-/app-0.1.0.tgz",
+      "repository_homepage_url": "https://www.npmjs.com/package/app",
+      "type": "npm",
+      "version": "0.1.0"
+    }
+  ]
+}

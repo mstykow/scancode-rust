@@ -3,6 +3,7 @@ mod assemblers;
 mod assembly_golden_test;
 mod nested_merge;
 mod sibling_merge;
+mod workspace_merge;
 
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
@@ -133,6 +134,9 @@ pub fn assemble(files: &mut [FileInfo]) -> AssemblyResult {
             dependencies.extend(deps);
         }
     }
+
+    // Post-processing: workspace assembly for npm/pnpm monorepos
+    workspace_merge::assemble_workspaces(files, &mut packages, &mut dependencies);
 
     AssemblyResult {
         packages,

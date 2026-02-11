@@ -1,0 +1,859 @@
+//! Workspace assembly for npm/pnpm monorepos.
+//!
+//! This module implements a post-processing pass that detects npm/pnpm workspace
+//! roots in already-assembled packages, removes incorrectly-created root Packages,
+//! discovers workspace members across directories, creates one Package per member,
+//! and correctly assigns `for_packages` associations.
+//!
+//! # Workspace Detection
+//!
+//! Workspaces are detected through:
+//! - `package.json` files with `extra_data.workspaces` field (npm/yarn)
+//! - `pnpm-workspace.yaml` files with `extra_data.workspaces` field (pnpm)
+//!
+//! # Algorithm Overview
+//!
+//! 1. **Find workspace roots**: Scan for files with workspace patterns
+//! 2. **Discover members**: Match glob patterns against all package.json files
+//! 3. **Remove root Package**: Delete the incorrectly-assembled root package
+//! 4. **Create member Packages**: One Package per workspace member
+//! 5. **Hoist root dependencies**: Root deps become workspace-level (for_package_uid: None)
+//! 6. **Assign for_packages**: Files under members → member UID, shared → all members
+//! 7. **Resolve workspace: versions**: Replace `workspace:*` with actual versions
+
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
+
+use log::warn;
+
+use crate::models::{DatasourceId, FileInfo, Package, PackageData, TopLevelDependency};
+
+/// Assemble npm/pnpm workspace packages from already-assembled packages.
+///
+/// This is a post-processing pass that runs after the per-directory assembly loop.
+/// It detects workspace roots, removes incorrectly-created root packages, discovers
+/// workspace members, and creates proper Package structures for each member.
+///
+/// # Arguments
+///
+/// * `files` - Mutable slice of all scanned files
+/// * `packages` - Mutable vector of assembled packages (will be modified)
+/// * `dependencies` - Mutable vector of top-level dependencies (will be modified)
+pub fn assemble_workspaces(
+    files: &mut [FileInfo],
+    packages: &mut Vec<Package>,
+    dependencies: &mut Vec<TopLevelDependency>,
+) {
+    // Step 1: Find all workspace roots
+    let workspace_roots = find_workspace_roots(files);
+
+    if workspace_roots.is_empty() {
+        return;
+    }
+
+    // Process each workspace root independently
+    for workspace_root in workspace_roots {
+        process_workspace(files, packages, dependencies, &workspace_root);
+    }
+}
+
+/// Information about a detected workspace root
+struct WorkspaceRoot {
+    /// Directory path of the workspace root
+    root_dir: PathBuf,
+    /// File index of the root package.json (if exists)
+    root_package_json_idx: Option<usize>,
+    /// File index of pnpm-workspace.yaml (if exists)
+    pnpm_workspace_yaml_idx: Option<usize>,
+    /// Workspace glob patterns
+    patterns: Vec<String>,
+}
+
+/// Find all workspace roots in the scanned files
+fn find_workspace_roots(files: &[FileInfo]) -> Vec<WorkspaceRoot> {
+    let mut roots = Vec::new();
+    let mut seen_roots: HashMap<PathBuf, WorkspaceRoot> = HashMap::new();
+
+    // First pass: find package.json files with workspaces
+    for (idx, file) in files.iter().enumerate() {
+        let path = Path::new(&file.path);
+        let file_name = if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+            name
+        } else {
+            continue;
+        };
+
+        if file_name != "package.json" {
+            continue;
+        }
+
+        // Check if this package.json has workspace patterns
+        for pkg_data in &file.package_data {
+            if pkg_data.datasource_id != Some(DatasourceId::NpmPackageJson) {
+                continue;
+            }
+
+            if let Some(workspaces) = extract_workspaces(pkg_data)
+                && let Some(parent) = path.parent()
+            {
+                let root_dir = parent.to_path_buf();
+                seen_roots.insert(
+                    root_dir.clone(),
+                    WorkspaceRoot {
+                        root_dir,
+                        root_package_json_idx: Some(idx),
+                        pnpm_workspace_yaml_idx: None,
+                        patterns: workspaces,
+                    },
+                );
+            }
+        }
+    }
+
+    // Second pass: find pnpm-workspace.yaml files
+    for (idx, file) in files.iter().enumerate() {
+        let path = Path::new(&file.path);
+        let file_name = if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+            name
+        } else {
+            continue;
+        };
+
+        if file_name != "pnpm-workspace.yaml" {
+            continue;
+        }
+
+        // Check if this pnpm-workspace.yaml has workspace patterns
+        for pkg_data in &file.package_data {
+            if pkg_data.datasource_id != Some(DatasourceId::PnpmWorkspaceYaml) {
+                continue;
+            }
+
+            if let Some(workspaces) = extract_workspaces(pkg_data)
+                && let Some(parent) = path.parent()
+            {
+                let root_dir = parent.to_path_buf();
+
+                // Either create new or update existing entry
+                if let Some(existing) = seen_roots.get_mut(&root_dir) {
+                    existing.pnpm_workspace_yaml_idx = Some(idx);
+                    if existing.patterns.is_empty() {
+                        existing.patterns = workspaces;
+                    }
+                } else {
+                    seen_roots.insert(
+                        root_dir.clone(),
+                        WorkspaceRoot {
+                            root_dir,
+                            root_package_json_idx: None,
+                            pnpm_workspace_yaml_idx: Some(idx),
+                            patterns: workspaces,
+                        },
+                    );
+                }
+            }
+        }
+    }
+
+    roots.extend(seen_roots.into_values());
+    roots
+}
+
+/// Extract workspace patterns from PackageData extra_data
+fn extract_workspaces(pkg_data: &PackageData) -> Option<Vec<String>> {
+    let extra_data = pkg_data.extra_data.as_ref()?;
+    let workspaces_value = extra_data.get("workspaces")?;
+
+    if let Some(arr) = workspaces_value.as_array() {
+        let patterns: Vec<String> = arr
+            .iter()
+            .filter_map(|v| v.as_str())
+            .map(|s| s.to_string())
+            .collect();
+        if patterns.is_empty() {
+            None
+        } else {
+            Some(patterns)
+        }
+    } else {
+        None
+    }
+}
+
+/// Process a single workspace root
+fn process_workspace(
+    files: &mut [FileInfo],
+    packages: &mut Vec<Package>,
+    dependencies: &mut Vec<TopLevelDependency>,
+    workspace_root: &WorkspaceRoot,
+) {
+    // Step 2: Discover workspace members
+    let member_indices = discover_members(files, workspace_root);
+
+    if member_indices.is_empty() {
+        warn!(
+            "No workspace members found for patterns {:?} in {:?}",
+            workspace_root.patterns, workspace_root.root_dir
+        );
+        return;
+    }
+
+    // Determine if this is a pnpm workspace with a publishable root package.
+    // pnpm workspaces with a non-private root package keep the root as a separate Package
+    // and assign shared files to the root only (not to all members).
+    let is_pnpm_with_root_package = workspace_root.pnpm_workspace_yaml_idx.is_some()
+        && workspace_root.root_package_json_idx.is_some_and(|idx| {
+            files[idx].package_data.iter().any(|pkg| {
+                pkg.datasource_id == Some(DatasourceId::NpmPackageJson)
+                    && pkg.purl.is_some()
+                    && !pkg.is_private
+            })
+        });
+
+    // Step 3: Remove incorrectly-created root Package (unless pnpm with root package)
+    let root_package_uid = if is_pnpm_with_root_package {
+        // For pnpm with a root package, find the root package UID but keep it in `packages`
+        packages.iter().find_map(|pkg| {
+            if let Some(idx) = workspace_root.root_package_json_idx
+                && pkg.datafile_paths.contains(&files[idx].path)
+            {
+                Some(pkg.package_uid.clone())
+            } else {
+                None
+            }
+        })
+    } else if let Some(idx) = workspace_root.root_package_json_idx {
+        // For npm/yarn, remove the root package (root is typically private with no purl)
+        remove_root_package(&files[idx], packages, dependencies);
+        None
+    } else {
+        None
+    };
+
+    // Step 3b: Remove sibling-merged packages for workspace members.
+    // The per-directory assembly loop already created Package objects for each member's
+    // package.json. We need to remove those so workspace_merge can recreate them with
+    // proper workspace-level associations and version resolution.
+    remove_member_packages(files, &member_indices, packages, dependencies);
+
+    // Step 4: Create member Packages
+    let member_packages = create_member_packages(files, &member_indices);
+
+    // Build a map of member package names to versions for workspace: resolution
+    let mut member_versions: HashMap<String, String> = HashMap::new();
+    for (pkg, _deps) in &member_packages {
+        if let (Some(name), Some(version)) = (&pkg.name, &pkg.version) {
+            member_versions.insert(name.clone(), version.clone());
+        }
+    }
+
+    // Collect member UIDs for for_packages assignment
+    let member_uids: Vec<String> = member_packages
+        .iter()
+        .map(|(pkg, _deps)| pkg.package_uid.clone())
+        .collect();
+
+    // Step 5: Handle root dependencies (hoist to workspace level)
+    if let Some(idx) = workspace_root.root_package_json_idx {
+        let for_uid = if is_pnpm_with_root_package {
+            root_package_uid.clone()
+        } else {
+            None
+        };
+        hoist_root_dependencies(
+            files,
+            idx,
+            &workspace_root.root_dir,
+            dependencies,
+            &member_versions,
+            for_uid.as_deref(),
+        );
+    }
+
+    // Add member packages and dependencies to output
+    for (pkg, deps) in member_packages {
+        packages.push(pkg);
+        dependencies.extend(deps);
+    }
+
+    // Step 6: Assign for_packages
+    assign_for_packages(
+        files,
+        workspace_root,
+        &member_indices,
+        &member_uids,
+        root_package_uid.as_deref(),
+    );
+
+    // Step 7: Resolve workspace: versions in all dependencies
+    resolve_workspace_versions(dependencies, &member_versions);
+}
+
+/// Discover workspace member package.json files matching the patterns
+fn discover_members(files: &[FileInfo], workspace_root: &WorkspaceRoot) -> Vec<usize> {
+    let mut member_indices = Vec::new();
+    let mut excluded_paths = Vec::new();
+
+    // First pass: collect exclusion patterns (patterns starting with !)
+    for pattern in &workspace_root.patterns {
+        if let Some(stripped) = pattern.strip_prefix('!') {
+            excluded_paths.push(stripped);
+        }
+    }
+
+    // Second pass: match inclusion patterns
+    for (idx, file) in files.iter().enumerate() {
+        let path = Path::new(&file.path);
+
+        // Skip if not a package.json
+        if path.file_name().and_then(|n| n.to_str()) != Some("package.json") {
+            continue;
+        }
+
+        // Skip if not under workspace root
+        if !path.starts_with(&workspace_root.root_dir) {
+            continue;
+        }
+
+        // Skip root package.json itself
+        if Some(idx) == workspace_root.root_package_json_idx {
+            continue;
+        }
+
+        // Skip if no valid PackageData with purl
+        let has_valid_package = file.package_data.iter().any(|pkg| {
+            pkg.datasource_id == Some(DatasourceId::NpmPackageJson) && pkg.purl.is_some()
+        });
+        if !has_valid_package {
+            continue;
+        }
+
+        // Check if path matches any pattern
+        let relative_path = if let Ok(rel) = path.strip_prefix(&workspace_root.root_dir) {
+            rel
+        } else {
+            continue;
+        };
+
+        let mut matched = false;
+        for pattern in &workspace_root.patterns {
+            if pattern.starts_with('!') {
+                continue; // Exclusions handled separately
+            }
+
+            if matches_workspace_pattern(relative_path, pattern) {
+                matched = true;
+                break;
+            }
+        }
+
+        if !matched {
+            continue;
+        }
+
+        // Check exclusions
+        let excluded = excluded_paths
+            .iter()
+            .any(|excl| matches_workspace_pattern(relative_path, excl));
+
+        if !excluded {
+            member_indices.push(idx);
+        }
+    }
+
+    member_indices
+}
+
+/// Check if a path matches a workspace glob pattern
+fn matches_workspace_pattern(path: &Path, pattern: &str) -> bool {
+    // Convert path to string with forward slashes
+    let path_str = path.to_str().unwrap_or("");
+
+    // Handle simple patterns without wildcards
+    if !pattern.contains('*') && !pattern.contains('?') {
+        // Exact match: "packages/foo" → look for packages/foo/package.json
+        let pattern_with_manifest = format!("{}/package.json", pattern);
+        return path_str == pattern_with_manifest;
+    }
+
+    // Handle single trailing star: "packages/*" → packages/*/package.json
+    if pattern.ends_with("/*") && !pattern[..pattern.len() - 2].contains('*') {
+        let prefix = &pattern[..pattern.len() - 2];
+        if let Some(remainder) = path_str.strip_prefix(prefix) {
+            if remainder.is_empty() {
+                return false;
+            }
+            // Check if it's exactly one level deep + package.json
+            let parts: Vec<&str> = remainder.trim_start_matches('/').split('/').collect();
+            return parts.len() == 2 && parts[1] == "package.json";
+        }
+        return false;
+    }
+
+    // Handle complex patterns with glob crate
+    if let Ok(glob_pattern) = glob::Pattern::new(&format!("{}/package.json", pattern)) {
+        return glob_pattern.matches(path_str);
+    }
+
+    false
+}
+
+fn remove_member_packages(
+    files: &[FileInfo],
+    member_indices: &[usize],
+    packages: &mut Vec<Package>,
+    dependencies: &mut Vec<TopLevelDependency>,
+) {
+    let member_paths: Vec<&str> = member_indices
+        .iter()
+        .map(|&idx| files[idx].path.as_str())
+        .collect();
+
+    let removed_uids: Vec<String> = packages
+        .iter()
+        .filter(|pkg| {
+            pkg.datafile_paths
+                .iter()
+                .any(|dp| member_paths.contains(&dp.as_str()))
+        })
+        .map(|pkg| pkg.package_uid.clone())
+        .collect();
+
+    packages.retain(|pkg| !removed_uids.contains(&pkg.package_uid));
+    dependencies.retain(|dep| {
+        dep.for_package_uid
+            .as_ref()
+            .is_none_or(|uid| !removed_uids.contains(uid))
+    });
+}
+
+fn remove_root_package(
+    root_file: &FileInfo,
+    packages: &mut Vec<Package>,
+    dependencies: &mut Vec<TopLevelDependency>,
+) {
+    let root_purl = root_file
+        .package_data
+        .iter()
+        .find(|pkg| pkg.datasource_id == Some(DatasourceId::NpmPackageJson))
+        .and_then(|pkg| pkg.purl.as_ref())
+        .cloned();
+
+    let Some(purl) = root_purl else {
+        return;
+    };
+
+    let mut removed_uid = None;
+    packages.retain(|pkg| {
+        if pkg.purl.as_ref() == Some(&purl) {
+            removed_uid = Some(pkg.package_uid.clone());
+            false
+        } else {
+            true
+        }
+    });
+
+    if let Some(uid) = &removed_uid {
+        dependencies.retain(|dep| dep.for_package_uid.as_ref() != Some(uid));
+    }
+}
+
+/// Create Package instances for each workspace member
+fn create_member_packages(
+    files: &[FileInfo],
+    member_indices: &[usize],
+) -> Vec<(Package, Vec<TopLevelDependency>)> {
+    let mut results = Vec::new();
+
+    for &idx in member_indices {
+        let file = &files[idx];
+
+        // Find the first valid PackageData
+        let pkg_data = if let Some(pkg) = file.package_data.iter().find(|pkg| {
+            pkg.datasource_id == Some(DatasourceId::NpmPackageJson) && pkg.purl.is_some()
+        }) {
+            pkg
+        } else {
+            continue;
+        };
+
+        let datafile_path = file.path.clone();
+        let datasource_id = DatasourceId::NpmPackageJson;
+        let package = Package::from_package_data(pkg_data, datafile_path.clone());
+        let for_package_uid = Some(package.package_uid.clone());
+
+        // Collect dependencies
+        let deps: Vec<TopLevelDependency> = pkg_data
+            .dependencies
+            .iter()
+            .filter(|dep| dep.purl.is_some())
+            .map(|dep| {
+                TopLevelDependency::from_dependency(
+                    dep,
+                    datafile_path.clone(),
+                    datasource_id,
+                    for_package_uid.clone(),
+                )
+            })
+            .collect();
+
+        results.push((package, deps));
+    }
+
+    results
+}
+
+/// Hoist root package.json dependencies to workspace level.
+///
+/// If `for_package_uid` is Some, deps are assigned to that package (pnpm root).
+/// If None, deps are workspace-level with no owning package.
+fn hoist_root_dependencies(
+    files: &[FileInfo],
+    root_idx: usize,
+    root_dir: &Path,
+    dependencies: &mut Vec<TopLevelDependency>,
+    member_versions: &HashMap<String, String>,
+    for_package_uid: Option<&str>,
+) {
+    let root_file = &files[root_idx];
+
+    // Find root PackageData
+    let root_pkg_data = if let Some(pkg) = root_file
+        .package_data
+        .iter()
+        .find(|pkg| pkg.datasource_id == Some(DatasourceId::NpmPackageJson))
+    {
+        pkg
+    } else {
+        return;
+    };
+
+    for dep in &root_pkg_data.dependencies {
+        if dep.purl.is_some() {
+            let mut top_dep = TopLevelDependency::from_dependency(
+                dep,
+                root_file.path.clone(),
+                DatasourceId::NpmPackageJson,
+                for_package_uid.map(|s| s.to_string()),
+            );
+
+            // Resolve workspace: version immediately
+            if let Some(req) = &top_dep.extracted_requirement
+                && req.starts_with("workspace:")
+                && let Some(resolved) =
+                    resolve_workspace_requirement(req, &top_dep.purl, member_versions)
+            {
+                top_dep.extracted_requirement = Some(resolved);
+            }
+
+            dependencies.push(top_dep);
+        }
+    }
+
+    // Also hoist lockfile dependencies if they exist
+    for file in files.iter() {
+        let path = Path::new(&file.path);
+
+        // Check if this is a lockfile in the same directory as root
+        if path.parent() != Some(root_dir) {
+            continue;
+        }
+
+        let file_name = if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+            name
+        } else {
+            continue;
+        };
+
+        let datasource_id = match file_name {
+            "package-lock.json" => Some(DatasourceId::NpmPackageLockJson),
+            "yarn.lock" => Some(DatasourceId::YarnLock),
+            "pnpm-lock.yaml" => Some(DatasourceId::PnpmLockYaml),
+            _ => None,
+        };
+
+        if let Some(dsid) = datasource_id {
+            for pkg_data in &file.package_data {
+                if pkg_data.datasource_id != Some(dsid) {
+                    continue;
+                }
+
+                for dep in &pkg_data.dependencies {
+                    if dep.purl.is_some() {
+                        let mut top_dep = TopLevelDependency::from_dependency(
+                            dep,
+                            file.path.clone(),
+                            dsid,
+                            for_package_uid.map(|s| s.to_string()),
+                        );
+
+                        // Resolve workspace: version
+                        if let Some(req) = &top_dep.extracted_requirement
+                            && req.starts_with("workspace:")
+                            && let Some(resolved) =
+                                resolve_workspace_requirement(req, &top_dep.purl, member_versions)
+                        {
+                            top_dep.extracted_requirement = Some(resolved);
+                        }
+
+                        dependencies.push(top_dep);
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// Assign for_packages to all files under the workspace.
+///
+/// For pnpm workspaces with a root package (`root_package_uid` is Some),
+/// shared files are assigned to the root package only.
+/// For npm/yarn workspaces, shared files are assigned to all member packages.
+fn assign_for_packages(
+    files: &mut [FileInfo],
+    workspace_root: &WorkspaceRoot,
+    member_indices: &[usize],
+    member_uids: &[String],
+    root_package_uid: Option<&str>,
+) {
+    let mut member_dirs: Vec<PathBuf> = Vec::new();
+    for &idx in member_indices {
+        if let Some(parent) = Path::new(&files[idx].path).parent() {
+            member_dirs.push(parent.to_path_buf());
+        }
+    }
+
+    for file in files.iter_mut() {
+        let path = Path::new(&file.path);
+        if !path.starts_with(&workspace_root.root_dir) {
+            continue;
+        }
+
+        // Clear stale for_packages assignments from sibling merge
+        file.for_packages.clear();
+
+        // Check if file is under a member's subdirectory
+        let mut assigned = false;
+        for (i, member_dir) in member_dirs.iter().enumerate() {
+            if path.starts_with(member_dir) {
+                file.for_packages.push(member_uids[i].clone());
+                assigned = true;
+                break;
+            }
+        }
+
+        if assigned {
+            continue;
+        }
+
+        // Skip node_modules at workspace root level
+        if let Ok(rel) = path.strip_prefix(&workspace_root.root_dir)
+            && let Some(first_component) = rel.components().next()
+            && first_component.as_os_str() == "node_modules"
+        {
+            continue;
+        }
+
+        // Shared file: assign to root package (pnpm) or all members (npm/yarn)
+        if let Some(root_uid) = root_package_uid {
+            file.for_packages.push(root_uid.to_string());
+        } else {
+            for uid in member_uids {
+                file.for_packages.push(uid.clone());
+            }
+        }
+    }
+}
+
+/// Resolve workspace: version references in all dependencies
+fn resolve_workspace_versions(
+    dependencies: &mut [TopLevelDependency],
+    member_versions: &HashMap<String, String>,
+) {
+    for dep in dependencies {
+        if let Some(req) = &dep.extracted_requirement
+            && req.starts_with("workspace:")
+            && let Some(resolved) = resolve_workspace_requirement(req, &dep.purl, member_versions)
+        {
+            dep.extracted_requirement = Some(resolved);
+        }
+    }
+}
+
+/// Resolve a single workspace: requirement to actual version
+fn resolve_workspace_requirement(
+    requirement: &str,
+    dep_purl: &Option<String>,
+    member_versions: &HashMap<String, String>,
+) -> Option<String> {
+    // Extract the package name from the purl
+    let package_name = dep_purl
+        .as_ref()
+        .and_then(|purl| extract_package_name_from_purl(purl))?;
+
+    // Look up the version
+    let version = member_versions.get(&package_name)?;
+
+    // Extract operator from workspace: prefix
+    let workspace_spec = requirement.strip_prefix("workspace:")?;
+
+    if workspace_spec == "*" || workspace_spec.is_empty() {
+        // workspace:* or workspace: → use exact version
+        Some(version.clone())
+    } else if let Some(op) = workspace_spec.chars().next() {
+        // workspace:^ → ^1.2.3
+        // workspace:~ → ~1.2.3
+        // workspace:>= → >=1.2.3
+        if op == '^' || op == '~' || op == '>' || op == '<' || op == '=' {
+            Some(format!("{}{}", workspace_spec, version))
+        } else {
+            // workspace:1.2.3 → use as-is
+            Some(workspace_spec.to_string())
+        }
+    } else {
+        Some(version.clone())
+    }
+}
+
+fn extract_package_name_from_purl(purl: &str) -> Option<String> {
+    let after_type = purl.strip_prefix("pkg:npm/")?;
+    let without_query = after_type.split('?').next().unwrap_or(after_type);
+
+    // The @ version separator is always a literal @, never URL-encoded.
+    // Scoped package names use %40 for @, so rfind('@') safely finds only the version separator.
+    let name_part = if let Some(at_pos) = without_query.rfind('@') {
+        if at_pos > 0 {
+            &without_query[..at_pos]
+        } else {
+            without_query
+        }
+    } else {
+        without_query
+    };
+
+    let decoded = name_part
+        .replace("%40", "@")
+        .replace("%2F", "/")
+        .replace("%2f", "/");
+
+    Some(decoded)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_matches_workspace_pattern_exact() {
+        let path = Path::new("packages/foo/package.json");
+        assert!(matches_workspace_pattern(path, "packages/foo"));
+        assert!(!matches_workspace_pattern(path, "packages/bar"));
+    }
+
+    #[test]
+    fn test_matches_workspace_pattern_single_star() {
+        let path = Path::new("packages/foo/package.json");
+        assert!(matches_workspace_pattern(path, "packages/*"));
+
+        let nested = Path::new("packages/foo/bar/package.json");
+        assert!(!matches_workspace_pattern(nested, "packages/*"));
+
+        let wrong_dir = Path::new("apps/foo/package.json");
+        assert!(!matches_workspace_pattern(wrong_dir, "packages/*"));
+    }
+
+    #[test]
+    fn test_matches_workspace_pattern_double_star() {
+        let path = Path::new("packages/foo/package.json");
+        assert!(matches_workspace_pattern(path, "packages/*"));
+
+        let nested = Path::new("packages/foo/bar/package.json");
+        assert!(matches_workspace_pattern(nested, "packages/**"));
+    }
+
+    #[test]
+    fn test_extract_package_name_from_purl() {
+        assert_eq!(
+            extract_package_name_from_purl("pkg:npm/lodash@4.17.21"),
+            Some("lodash".to_string())
+        );
+        assert_eq!(
+            extract_package_name_from_purl("pkg:npm/@types/node@18.0.0"),
+            Some("@types/node".to_string())
+        );
+        assert_eq!(
+            extract_package_name_from_purl("pkg:npm/package@1.0.0?uuid=abc"),
+            Some("package".to_string())
+        );
+        assert_eq!(extract_package_name_from_purl("pkg:pypi/django@3.2"), None);
+        assert_eq!(
+            extract_package_name_from_purl("pkg:npm/%40myorg%2Fcore"),
+            Some("@myorg/core".to_string())
+        );
+        assert_eq!(
+            extract_package_name_from_purl("pkg:npm/%40myorg%2Fcore@1.0.0"),
+            Some("@myorg/core".to_string())
+        );
+        assert_eq!(
+            extract_package_name_from_purl("pkg:npm/simple-pkg"),
+            Some("simple-pkg".to_string())
+        );
+    }
+
+    #[test]
+    fn test_resolve_workspace_requirement() {
+        let mut versions = HashMap::new();
+        versions.insert("my-package".to_string(), "1.2.3".to_string());
+
+        let purl = Some("pkg:npm/my-package@1.2.3".to_string());
+
+        assert_eq!(
+            resolve_workspace_requirement("workspace:*", &purl, &versions),
+            Some("1.2.3".to_string())
+        );
+        assert_eq!(
+            resolve_workspace_requirement("workspace:^", &purl, &versions),
+            Some("^1.2.3".to_string())
+        );
+        assert_eq!(
+            resolve_workspace_requirement("workspace:~", &purl, &versions),
+            Some("~1.2.3".to_string())
+        );
+        assert_eq!(
+            resolve_workspace_requirement("workspace:", &purl, &versions),
+            Some("1.2.3".to_string())
+        );
+    }
+
+    #[test]
+    fn test_extract_workspaces() {
+        let mut extra_data = std::collections::HashMap::new();
+        extra_data.insert(
+            "workspaces".to_string(),
+            serde_json::json!(["packages/*", "apps/*"]),
+        );
+
+        let pkg_data = PackageData {
+            package_type: Some("npm".to_string()),
+            datasource_id: Some(DatasourceId::NpmPackageJson),
+            extra_data: Some(extra_data),
+            ..Default::default()
+        };
+
+        let workspaces = extract_workspaces(&pkg_data).unwrap();
+        assert_eq!(workspaces.len(), 2);
+        assert_eq!(workspaces[0], "packages/*");
+        assert_eq!(workspaces[1], "apps/*");
+    }
+
+    #[test]
+    fn test_extract_workspaces_empty() {
+        let pkg_data = PackageData {
+            package_type: Some("npm".to_string()),
+            datasource_id: Some(DatasourceId::NpmPackageJson),
+            ..Default::default()
+        };
+
+        assert_eq!(extract_workspaces(&pkg_data), None);
+    }
+}
