@@ -40,7 +40,7 @@ We implemented `NpmWorkspaceParser` which extracts workspace configuration data 
 
 ```json
 {
-  "type": "npm-workspace",
+  "type": "npm",
   "extra_data": {
     "datasource_id": "pnpm_workspace_yaml",
     "workspaces": [
@@ -56,7 +56,7 @@ We implemented `NpmWorkspaceParser` which extracts workspace configuration data 
 
 | Field | Source | Description |
 |-------|--------|-------------|
-| `package_type` | hardcoded | `"npm-workspace"` |
+| `package_type` | hardcoded | `"npm"` (consistent with ecosystem) |
 | `extra_data.datasource_id` | hardcoded | `"pnpm_workspace_yaml"` |
 | `extra_data.workspaces` | `packages` field | Array of glob patterns defining workspace package locations |
 

@@ -486,12 +486,14 @@ We don't just match Python ScanCode - we improve it:
 | **Conan** | conanfile.txt and conan.lock parsers (Python has neither) | ✨ Feature |
 | **Gradle** | No code execution (token lexer vs Groovy engine) | 🛡️ Security |
 | **Gradle Lockfile** | gradle.lockfile parser (Python has no equivalent) | ✨ Feature |
+| **Maven** | SCM developerConnection separation, inception_year, renamed extra_data keys for consistency | 🔍 Enhanced |
 | **npm Workspace** | pnpm-workspace.yaml extraction + workspace assembly with per-member packages (Python has stub parser + basic assembly) | ✨ Feature |
 | **Cargo Workspace** | Full `[workspace.package]` metadata inheritance + `workspace = true` dependency resolution (Python has basic assembly) | ✨ Feature |
 | **Composer** | Richer provenance metadata (7 extra fields) | 🔍 Enhanced |
 | **Ruby** | Semantic party model (unified name+email) | 🔍 Enhanced |
 | **Dart** | Proper scope handling + YAML preservation | 🔍 Enhanced |
 | **CPAN** | Full metadata extraction (Python has stubs only) | ✨ Feature |
+| **Assembly** | LazyLock static assembler lookup (zero allocation per call) | ⚡ Performance |
 
 See [docs/improvements/](improvements/) for detailed documentation of each improvement.
 
