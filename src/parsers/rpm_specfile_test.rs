@@ -1,3 +1,4 @@
+use crate::models::PackageType;
 use std::path::PathBuf;
 
 use super::PackageParser;
@@ -35,7 +36,7 @@ fn test_parse_minimal_spec() {
 
     let pkg = RpmSpecfileParser::extract_first_package(&test_file);
 
-    assert_eq!(pkg.package_type, Some("rpm".to_string()));
+    assert_eq!(pkg.package_type, Some(PackageType::Rpm));
     assert_eq!(pkg.datasource_id, Some(DatasourceId::RpmSpecfile));
     assert_eq!(pkg.name, Some("minimal-pkg".to_string()));
     assert_eq!(pkg.version, Some("1.0".to_string()));
@@ -58,7 +59,7 @@ fn test_parse_cpio_spec() {
 
     let pkg = RpmSpecfileParser::extract_first_package(&test_file);
 
-    assert_eq!(pkg.package_type, Some("rpm".to_string()));
+    assert_eq!(pkg.package_type, Some(PackageType::Rpm));
     assert_eq!(pkg.name, Some("cpio".to_string()));
     assert_eq!(pkg.version, Some("2.9".to_string()));
     assert_eq!(pkg.extracted_license_statement, Some("GPLv3+".to_string()));
@@ -137,7 +138,7 @@ fn test_parse_openssl_spec() {
 
     let pkg = RpmSpecfileParser::extract_first_package(&test_file);
 
-    assert_eq!(pkg.package_type, Some("rpm".to_string()));
+    assert_eq!(pkg.package_type, Some(PackageType::Rpm));
     assert_eq!(pkg.name, Some("openssl".to_string()));
     assert_eq!(pkg.version, Some("1.0.2e".to_string()));
     assert_eq!(pkg.extracted_license_statement, Some("OpenSSL".to_string()));

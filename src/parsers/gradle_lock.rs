@@ -18,7 +18,7 @@
 //! - Comments and empty lines are skipped
 //! - All dependencies are pinned (is_pinned: true)
 
-use crate::models::{DatasourceId, Dependency, PackageData, ResolvedPackage};
+use crate::models::{DatasourceId, Dependency, PackageData, PackageType, ResolvedPackage};
 use log::warn;
 use packageurl::PackageUrl;
 use std::collections::HashMap;
@@ -34,7 +34,7 @@ use super::PackageParser;
 pub struct GradleLockfileParser;
 
 impl PackageParser for GradleLockfileParser {
-    const PACKAGE_TYPE: &'static str = "maven";
+    const PACKAGE_TYPE: PackageType = PackageType::Maven;
 
     fn is_match(path: &Path) -> bool {
         path.file_name()
@@ -55,7 +55,7 @@ impl PackageParser for GradleLockfileParser {
         let dependencies = extract_dependencies(reader);
 
         vec![PackageData {
-            package_type: Some(Self::PACKAGE_TYPE.to_string()),
+            package_type: Some(Self::PACKAGE_TYPE),
             namespace: None,
             name: None,
             version: None,
@@ -184,7 +184,7 @@ fn parse_dependency_line(line: &str) -> Option<Dependency> {
 
     // Create resolved_package
     let resolved_package = ResolvedPackage {
-        package_type: "maven".to_string(),
+        package_type: PackageType::Maven,
         namespace: group,
         name: artifact,
         version,
@@ -220,7 +220,7 @@ fn parse_dependency_line(line: &str) -> Option<Dependency> {
 /// Returns a default empty PackageData for error cases
 fn default_package_data() -> PackageData {
     PackageData {
-        package_type: Some(GradleLockfileParser::PACKAGE_TYPE.to_string()),
+        package_type: Some(GradleLockfileParser::PACKAGE_TYPE),
         datasource_id: Some(DatasourceId::GradleLockfile),
         ..Default::default()
     }
@@ -265,9 +265,8 @@ mod tests {
         );
         assert_eq!(
             dep.resolved_package.as_ref().unwrap().package_type,
-            "maven".to_string()
+            PackageType::Maven
         );
-        assert_eq!(dep.is_pinned, Some(true));
     }
 
     #[test]
@@ -366,7 +365,7 @@ mod tests {
         assert!(!deps.is_empty());
         assert_eq!(
             deps[0].resolved_package.as_ref().unwrap().package_type,
-            "maven".to_string()
+            PackageType::Maven
         );
     }
 

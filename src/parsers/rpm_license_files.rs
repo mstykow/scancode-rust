@@ -3,13 +3,13 @@
 //! Identifies packages from their license files installed in the standard
 //! /usr/share/licenses/ location, primarily used in Mariner distroless containers.
 
-use crate::models::DatasourceId;
+use crate::models::{DatasourceId, PackageType};
 use std::path::Path;
 
 use crate::models::PackageData;
 use crate::parsers::PackageParser;
 
-const PACKAGE_TYPE: &str = "rpm";
+const PACKAGE_TYPE: PackageType = PackageType::Rpm;
 
 /// Parser for RPM license files in /usr/share/licenses/ directories.
 ///
@@ -34,7 +34,7 @@ const PACKAGE_TYPE: &str = "rpm";
 pub struct RpmLicenseFilesParser;
 
 impl PackageParser for RpmLicenseFilesParser {
-    const PACKAGE_TYPE: &'static str = PACKAGE_TYPE;
+    const PACKAGE_TYPE: PackageType = PACKAGE_TYPE;
 
     fn is_match(path: &Path) -> bool {
         let path_str = path.to_string_lossy();
@@ -67,7 +67,7 @@ impl PackageParser for RpmLicenseFilesParser {
 
         // Build package data
         let mut pkg = PackageData {
-            package_type: Some(PACKAGE_TYPE.to_string()),
+            package_type: Some(PACKAGE_TYPE),
             datasource_id: Some(DatasourceId::RpmPackageLicenses),
             namespace: Some("mariner".to_string()),
             name: name.clone(),
@@ -77,7 +77,7 @@ impl PackageParser for RpmLicenseFilesParser {
         // Build PURL if we have a name
         if let Some(ref package_name) = name {
             use packageurl::PackageUrl;
-            if let Ok(mut purl) = PackageUrl::new(PACKAGE_TYPE, package_name)
+            if let Ok(mut purl) = PackageUrl::new(PACKAGE_TYPE.as_str(), package_name)
                 && purl.with_namespace("mariner").is_ok()
             {
                 pkg.purl = Some(purl.to_string());

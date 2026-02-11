@@ -1,5 +1,7 @@
 //! Tests for Autotools configure script parser.
 
+use crate::models::PackageType;
+
 use super::PackageParser;
 use super::autotools::AutotoolsConfigureParser;
 use std::path::PathBuf;
@@ -47,7 +49,7 @@ fn test_parent_dir_name_extraction() {
     let path = PathBuf::from("testdata/autotools/myproject/configure");
     let package_data = AutotoolsConfigureParser::extract_first_package(&path);
 
-    assert_eq!(package_data.package_type, Some("autotools".to_string()));
+    assert_eq!(package_data.package_type, Some(PackageType::Autotools));
     assert_eq!(package_data.name, Some("myproject".to_string()));
     assert_eq!(package_data.version, None);
     assert_eq!(package_data.homepage_url, None);
@@ -58,7 +60,7 @@ fn test_configure_ac() {
     let path = PathBuf::from("testdata/autotools/another-project/configure.ac");
     let package_data = AutotoolsConfigureParser::extract_first_package(&path);
 
-    assert_eq!(package_data.package_type, Some("autotools".to_string()));
+    assert_eq!(package_data.package_type, Some(PackageType::Autotools));
     assert_eq!(package_data.name, Some("another-project".to_string()));
 }
 
@@ -67,7 +69,7 @@ fn test_nested_path() {
     let path = PathBuf::from("/usr/local/src/my-awesome-project/configure");
     let package_data = AutotoolsConfigureParser::extract_first_package(&path);
 
-    assert_eq!(package_data.package_type, Some("autotools".to_string()));
+    assert_eq!(package_data.package_type, Some(PackageType::Autotools));
     assert_eq!(package_data.name, Some("my-awesome-project".to_string()));
 }
 
@@ -77,7 +79,7 @@ fn test_root_path_edge_case() {
     let path = PathBuf::from("configure");
     let package_data = AutotoolsConfigureParser::extract_first_package(&path);
 
-    assert_eq!(package_data.package_type, Some("autotools".to_string()));
+    assert_eq!(package_data.package_type, Some(PackageType::Autotools));
     // When at root level, parent() returns None, so name should be None
     assert_eq!(package_data.name, None);
 }

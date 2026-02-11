@@ -18,7 +18,7 @@
 //! - Direct dependencies determined from root package's dependency list
 //! - Uses TOML parsing for structured data extraction
 
-use crate::models::{DatasourceId, Dependency, PackageData};
+use crate::models::{DatasourceId, Dependency, PackageData, PackageType};
 use log::warn;
 use packageurl::PackageUrl;
 use std::fs::File;
@@ -34,7 +34,7 @@ use super::PackageParser;
 pub struct CargoLockParser;
 
 impl PackageParser for CargoLockParser {
-    const PACKAGE_TYPE: &'static str = "cargo";
+    const PACKAGE_TYPE: PackageType = PackageType::Cargo;
 
     fn is_match(path: &Path) -> bool {
         path.file_name()
@@ -93,7 +93,7 @@ impl PackageParser for CargoLockParser {
         };
 
         vec![PackageData {
-            package_type: Some(Self::PACKAGE_TYPE.to_string()),
+            package_type: Some(Self::PACKAGE_TYPE),
             namespace: None,
             name,
             version,
@@ -218,7 +218,7 @@ fn parse_dependency_string(dep_str: &str) -> (&str, &str) {
 
 fn default_package_data() -> PackageData {
     PackageData {
-        package_type: Some(CargoLockParser::PACKAGE_TYPE.to_string()),
+        package_type: Some(CargoLockParser::PACKAGE_TYPE),
         ..Default::default()
     }
 }

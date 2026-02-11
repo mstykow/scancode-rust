@@ -3,6 +3,7 @@ mod tests {
     use super::super::PackageParser;
     use super::super::swift_show_dependencies::*;
     use crate::models::DatasourceId;
+    use crate::models::PackageType;
     use std::path::PathBuf;
 
     #[test]
@@ -27,7 +28,7 @@ mod tests {
         let pkg = parse_swift_show_dependencies(content);
 
         assert_eq!(pkg.name.as_deref(), Some("MyPackage"));
-        assert_eq!(pkg.package_type.as_deref(), Some("swift"));
+        assert_eq!(pkg.package_type, Some(PackageType::Swift));
         assert_eq!(pkg.primary_language.as_deref(), Some("Swift"));
         assert_eq!(
             pkg.datasource_id,
@@ -40,7 +41,7 @@ mod tests {
         let content = "not json";
         let pkg = parse_swift_show_dependencies(content);
 
-        assert_eq!(pkg.package_type.as_deref(), Some("swift"));
+        assert_eq!(pkg.package_type, Some(PackageType::Swift));
         assert_eq!(
             pkg.datasource_id,
             Some(DatasourceId::SwiftPackageShowDependencies)

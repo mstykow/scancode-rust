@@ -3,6 +3,7 @@ mod tests {
     use super::super::PackageParser;
     use super::super::cpan_dist_ini::*;
     use crate::models::DatasourceId;
+    use crate::models::PackageType;
     use std::path::PathBuf;
 
     #[test]
@@ -30,7 +31,7 @@ abstract = Dancer2 plugin for Minion job queue
 "#;
         let pkg = parse_dist_ini(content);
 
-        assert_eq!(pkg.package_type.as_deref(), Some("cpan"));
+        assert_eq!(pkg.package_type, Some(PackageType::Cpan));
         assert_eq!(pkg.namespace.as_deref(), Some("cpan"));
         assert_eq!(pkg.name.as_deref(), Some("Dancer2::Plugin::Minion"));
         assert_eq!(pkg.version.as_deref(), Some("1.0.0"));
@@ -137,7 +138,7 @@ author = John Doe
         let content = "";
         let pkg = parse_dist_ini(content);
 
-        assert_eq!(pkg.package_type.as_deref(), Some("cpan"));
+        assert_eq!(pkg.package_type, Some(PackageType::Cpan));
         assert_eq!(pkg.name, None);
         assert_eq!(pkg.version, None);
     }

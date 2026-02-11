@@ -1,6 +1,7 @@
 #[cfg(test)]
 mod tests {
     use crate::models::DatasourceId;
+    use crate::models::PackageType;
     use std::path::PathBuf;
 
     use crate::parsers::{PackageParser, PodfileLockParser};
@@ -21,7 +22,7 @@ mod tests {
         let path = PathBuf::from("testdata/cocoapods/podfile_lock/braintree_ios_Podfile.lock");
         let pkg = PodfileLockParser::extract_first_package(&path);
 
-        assert_eq!(pkg.package_type.as_deref(), Some("cocoapods"));
+        assert_eq!(pkg.package_type, Some(PackageType::Cocoapods));
         assert_eq!(pkg.primary_language.as_deref(), Some("Objective-C"));
         assert_eq!(pkg.datasource_id, Some(DatasourceId::CocoapodsPodfileLock));
         assert!(pkg.name.is_none());
@@ -104,7 +105,7 @@ mod tests {
         let path = PathBuf::from("testdata/cocoapods/podfile_lock/artsy_eigen_Podfile.lock");
         let pkg = PodfileLockParser::extract_first_package(&path);
 
-        assert_eq!(pkg.package_type.as_deref(), Some("cocoapods"));
+        assert_eq!(pkg.package_type, Some(PackageType::Cocoapods));
         assert_eq!(pkg.dependencies.len(), 25);
 
         let extra = pkg.extra_data.as_ref().unwrap();
@@ -246,7 +247,7 @@ mod tests {
         fs::write(&path, "{}").unwrap();
 
         let pkg = PodfileLockParser::extract_first_package(&path);
-        assert_eq!(pkg.package_type.as_deref(), Some("cocoapods"));
+        assert_eq!(pkg.package_type, Some(PackageType::Cocoapods));
         assert!(pkg.dependencies.is_empty());
     }
 
@@ -278,7 +279,7 @@ mod tests {
     fn test_nonexistent_file() {
         let path = PathBuf::from("nonexistent/Podfile.lock");
         let pkg = PodfileLockParser::extract_first_package(&path);
-        assert_eq!(pkg.package_type.as_deref(), Some("cocoapods"));
+        assert_eq!(pkg.package_type, Some(PackageType::Cocoapods));
         assert!(pkg.dependencies.is_empty());
     }
 

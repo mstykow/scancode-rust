@@ -3,6 +3,7 @@ mod tests {
     use super::super::PackageParser;
     use super::super::os_release::*;
     use crate::models::DatasourceId;
+    use crate::models::PackageType;
     use std::path::PathBuf;
 
     #[test]
@@ -49,7 +50,7 @@ BUG_REPORT_URL="https://bugs.debian.org/"
 
         let result = super::super::os_release::parse_os_release(content);
 
-        assert_eq!(result.package_type, Some("linux-distro".to_string()));
+        assert_eq!(result.package_type, Some(PackageType::LinuxDistro));
         assert_eq!(result.namespace, Some("debian".to_string()));
         assert_eq!(result.name, Some("debian".to_string()));
         assert_eq!(result.version, Some("11".to_string()));

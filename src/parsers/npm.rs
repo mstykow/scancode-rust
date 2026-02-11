@@ -8,7 +8,6 @@
 //!
 //! # Key Features
 //! - Full dependency extraction (dependencies, devDependencies, peerDependencies, optionalDependencies, bundledDependencies)
-//! - License declaration normalization using askalono
 //! - Package URL (purl) generation for scoped and unscoped packages
 //! - VCS repository URL extraction
 //! - Distribution integrity hash extraction (sha1, sha512)
@@ -19,7 +18,7 @@
 //! - Namespace format: `@org` for scoped packages (e.g., `@babel/core`)
 //! - Graceful error handling: logs warnings and returns default on parse failure
 
-use crate::models::{DatasourceId, Dependency, PackageData, Party};
+use crate::models::{DatasourceId, Dependency, PackageData, PackageType, Party};
 use crate::parsers::utils::{npm_purl, parse_sri};
 use log::warn;
 use packageurl::PackageUrl;
@@ -64,7 +63,7 @@ const FIELD_DEPENDENCIES_META: &str = "dependenciesMeta";
 pub struct NpmParser;
 
 impl PackageParser for NpmParser {
-    const PACKAGE_TYPE: &'static str = "npm";
+    const PACKAGE_TYPE: PackageType = PackageType::Npm;
 
     fn extract_packages(path: &Path) -> Vec<PackageData> {
         let (json, _field_lines) = match read_and_parse_json_with_lines(path) {
@@ -161,7 +160,7 @@ impl PackageParser for NpmParser {
         let vcs_url = extract_vcs_url(&json);
 
         vec![PackageData {
-            package_type: Some(Self::PACKAGE_TYPE.to_string()),
+            package_type: Some(Self::PACKAGE_TYPE),
             namespace,
             name,
             version,
@@ -656,7 +655,8 @@ fn extract_dependency_group(
                     let version_str = version.as_str()?;
 
                     if version_str.starts_with("workspace:") {
-                        let package_url = PackageUrl::new(NpmParser::PACKAGE_TYPE, name).ok()?;
+                        let package_url =
+                            PackageUrl::new(NpmParser::PACKAGE_TYPE.as_str(), name).ok()?;
                         let is_opt = if let Some(meta) = optional_meta {
                             meta.get(name).copied()
                         } else {
@@ -683,7 +683,8 @@ fn extract_dependency_group(
                         };
 
                     let mut package_url =
-                        PackageUrl::new(NpmParser::PACKAGE_TYPE, actual_package_name).ok()?;
+                        PackageUrl::new(NpmParser::PACKAGE_TYPE.as_str(), actual_package_name)
+                            .ok()?;
 
                     let stripped_version = strip_version_modifier(constraint);
                     let is_pinned_version = is_exact_version(constraint);
@@ -785,7 +786,7 @@ fn extract_bundled_list(bundled_array: &[Value]) -> Vec<Dependency> {
         .filter_map(|value| {
             let name = value.as_str()?;
             // Create PURL without version for bundled dependencies
-            let package_url = PackageUrl::new(NpmParser::PACKAGE_TYPE, name).ok()?;
+            let package_url = PackageUrl::new(NpmParser::PACKAGE_TYPE.as_str(), name).ok()?;
 
             Some(Dependency {
                 purl: Some(package_url.to_string()),

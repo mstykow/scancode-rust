@@ -2,6 +2,7 @@
 mod tests {
     use super::super::{CpanManifestParser, CpanMetaJsonParser, CpanMetaYmlParser, PackageParser};
     use crate::models::DatasourceId;
+    use crate::models::PackageType;
     use std::path::PathBuf;
 
     #[test]
@@ -43,7 +44,7 @@ mod tests {
         let path = PathBuf::from("testdata/cpan/meta_json/META.json");
         let package = CpanMetaJsonParser::extract_first_package(&path);
 
-        assert_eq!(package.package_type, Some("cpan".to_string()));
+        assert_eq!(package.package_type, Some(PackageType::Cpan));
         assert_eq!(package.name, Some("Example-Web-Toolkit".to_string()));
         assert_eq!(package.version, Some("1.042".to_string()));
         assert_eq!(
@@ -169,7 +170,7 @@ mod tests {
         let path = PathBuf::from("testdata/cpan/meta_yml/META.yml");
         let package = CpanMetaYmlParser::extract_first_package(&path);
 
-        assert_eq!(package.package_type, Some("cpan".to_string()));
+        assert_eq!(package.package_type, Some(PackageType::Cpan));
         assert_eq!(package.name, Some("Example-DBLayer".to_string()));
         assert_eq!(package.version, Some("0.005".to_string()));
         assert_eq!(
@@ -279,7 +280,7 @@ mod tests {
         let path = PathBuf::from("testdata/cpan/manifest/MANIFEST");
         let package = CpanManifestParser::extract_first_package(&path);
 
-        assert_eq!(package.package_type, Some("cpan".to_string()));
+        assert_eq!(package.package_type, Some(PackageType::Cpan));
         assert_eq!(package.primary_language, Some("Perl".to_string()));
         assert_eq!(package.datasource_id, Some(DatasourceId::CpanManifest));
 
@@ -316,7 +317,7 @@ mod tests {
         let package = CpanMetaJsonParser::extract_first_package(temp_file.path());
 
         // Should return default package data on parse error
-        assert_eq!(package.package_type, Some("cpan".to_string()));
+        assert_eq!(package.package_type, Some(PackageType::Cpan));
         assert_eq!(package.name, None);
         assert_eq!(package.version, None);
     }
@@ -333,7 +334,7 @@ mod tests {
         let package = CpanMetaYmlParser::extract_first_package(temp_file.path());
 
         // Should return default package data on parse error
-        assert_eq!(package.package_type, Some("cpan".to_string()));
+        assert_eq!(package.package_type, Some(PackageType::Cpan));
         assert_eq!(package.name, None);
         assert_eq!(package.version, None);
     }

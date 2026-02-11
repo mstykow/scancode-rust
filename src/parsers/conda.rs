@@ -32,13 +32,13 @@ use std::path::Path;
 use log::warn;
 use serde_yaml::Value;
 
-use crate::models::{DatasourceId, Dependency, PackageData};
+use crate::models::{DatasourceId, Dependency, PackageData, PackageType};
 
 use super::PackageParser;
 
 fn default_package_data(datasource_id: Option<DatasourceId>) -> PackageData {
     PackageData {
-        package_type: Some("conda".to_string()),
+        package_type: Some(CondaMetaYamlParser::PACKAGE_TYPE),
         datasource_id,
         ..Default::default()
     }
@@ -85,7 +85,7 @@ fn build_purl(
 pub struct CondaMetaYamlParser;
 
 impl PackageParser for CondaMetaYamlParser {
-    const PACKAGE_TYPE: &'static str = "conda";
+    const PACKAGE_TYPE: PackageType = PackageType::Conda;
 
     fn is_match(path: &Path) -> bool {
         // Match */meta.yaml following Python reference logic
@@ -197,7 +197,7 @@ impl PackageParser for CondaMetaYamlParser {
         }
 
         let mut pkg = default_package_data(Some(DatasourceId::CondaMetaYaml));
-        pkg.package_type = Some(Self::PACKAGE_TYPE.to_string());
+        pkg.package_type = Some(Self::PACKAGE_TYPE);
         pkg.datasource_id = Some(DatasourceId::CondaMetaYaml);
         pkg.name = name;
         pkg.version = version;
@@ -222,7 +222,7 @@ impl PackageParser for CondaMetaYamlParser {
 pub struct CondaEnvironmentYmlParser;
 
 impl PackageParser for CondaEnvironmentYmlParser {
-    const PACKAGE_TYPE: &'static str = "conda";
+    const PACKAGE_TYPE: PackageType = PackageType::Conda;
 
     fn is_match(path: &Path) -> bool {
         // Python reference: path_patterns = ('*conda*.yaml', '*env*.yaml', '*environment*.yaml')
@@ -269,7 +269,7 @@ impl PackageParser for CondaEnvironmentYmlParser {
 
         // Environment files are private (not published packages)
         let mut pkg = default_package_data(Some(DatasourceId::CondaYaml));
-        pkg.package_type = Some(Self::PACKAGE_TYPE.to_string());
+        pkg.package_type = Some(Self::PACKAGE_TYPE);
         pkg.datasource_id = Some(DatasourceId::CondaYaml);
         pkg.name = name;
         pkg.primary_language = Some("Python".to_string());

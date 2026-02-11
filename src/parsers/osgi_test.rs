@@ -1,6 +1,7 @@
 use super::PackageParser;
 use super::maven::*;
 use crate::models::DatasourceId;
+use crate::models::PackageType;
 use std::path::PathBuf;
 
 #[test]
@@ -8,7 +9,7 @@ fn test_osgi_basic_bundle_detection() {
     let path = PathBuf::from("testdata/osgi/basic/META-INF/MANIFEST.MF");
     let package = MavenParser::extract_first_package(&path);
 
-    assert_eq!(package.package_type, Some("osgi".to_string()));
+    assert_eq!(package.package_type, Some(PackageType::Osgi));
     assert_eq!(package.datasource_id, Some(DatasourceId::JavaOsgiManifest));
     assert_eq!(package.name, Some("org.example.mybundle".to_string()));
     assert_eq!(package.version, Some("1.2.3".to_string()));
@@ -125,7 +126,7 @@ fn test_osgi_minimal_bundle() {
     let path = PathBuf::from("testdata/osgi/minimal/META-INF/MANIFEST.MF");
     let package = MavenParser::extract_first_package(&path);
 
-    assert_eq!(package.package_type, Some("osgi".to_string()));
+    assert_eq!(package.package_type, Some(PackageType::Osgi));
     assert_eq!(package.name, Some("com.simple.bundle".to_string()));
     assert_eq!(package.version, Some("0.1.0".to_string()));
     assert_eq!(
@@ -139,7 +140,7 @@ fn test_osgi_bundle_symbolic_name_with_directives() {
     let path = PathBuf::from("testdata/osgi/directive/META-INF/MANIFEST.MF");
     let package = MavenParser::extract_first_package(&path);
 
-    assert_eq!(package.package_type, Some("osgi".to_string()));
+    assert_eq!(package.package_type, Some(PackageType::Osgi));
     assert_eq!(package.name, Some("com.example.mybundle".to_string()));
     assert_eq!(package.version, Some("2.1.0".to_string()));
 }
@@ -149,7 +150,7 @@ fn test_non_osgi_manifest_stays_maven() {
     let path = PathBuf::from("testdata/osgi/non-osgi/META-INF/MANIFEST.MF");
     let package = MavenParser::extract_first_package(&path);
 
-    assert_eq!(package.package_type, Some("maven".to_string()));
+    assert_eq!(package.package_type, Some(PackageType::Maven));
     assert_eq!(package.datasource_id, Some(DatasourceId::JavaJarManifest));
     assert_eq!(package.name, Some("spring-web".to_string()));
     assert_eq!(package.version, Some("5.3.20".to_string()));

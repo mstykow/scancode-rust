@@ -742,6 +742,7 @@ fn extract_package_name_from_purl(purl: &str) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::models::PackageType;
 
     #[test]
     fn test_matches_workspace_pattern_exact() {
@@ -834,7 +835,7 @@ mod tests {
         );
 
         let pkg_data = PackageData {
-            package_type: Some("npm".to_string()),
+            package_type: Some(PackageType::Npm),
             datasource_id: Some(DatasourceId::NpmPackageJson),
             extra_data: Some(extra_data),
             ..Default::default()
@@ -849,7 +850,7 @@ mod tests {
     #[test]
     fn test_extract_workspaces_empty() {
         let pkg_data = PackageData {
-            package_type: Some("npm".to_string()),
+            package_type: Some(PackageType::Npm),
             datasource_id: Some(DatasourceId::NpmPackageJson),
             ..Default::default()
         };

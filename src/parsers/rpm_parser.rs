@@ -26,15 +26,15 @@ use std::path::Path;
 use log::warn;
 use rpm::{Package, PackageMetadata};
 
-use crate::models::{DatasourceId, Dependency, PackageData, Party};
+use crate::models::{DatasourceId, Dependency, PackageData, PackageType, Party};
 
 use super::PackageParser;
 
-const PACKAGE_TYPE: &str = "rpm";
+const PACKAGE_TYPE: PackageType = PackageType::Rpm;
 
 fn default_package_data() -> PackageData {
     PackageData {
-        package_type: Some(PACKAGE_TYPE.to_string()),
+        package_type: Some(PACKAGE_TYPE),
         datasource_id: Some(DatasourceId::RpmArchive),
         ..Default::default()
     }
@@ -44,7 +44,7 @@ fn default_package_data() -> PackageData {
 pub struct RpmParser;
 
 impl PackageParser for RpmParser {
-    const PACKAGE_TYPE: &'static str = PACKAGE_TYPE;
+    const PACKAGE_TYPE: PackageType = PACKAGE_TYPE;
 
     fn is_match(path: &Path) -> bool {
         if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
@@ -127,7 +127,7 @@ fn parse_rpm_package(pkg: &Package) -> PackageData {
 
     PackageData {
         datasource_id: Some(DatasourceId::RpmArchive),
-        package_type: Some(PACKAGE_TYPE.to_string()),
+        package_type: Some(PACKAGE_TYPE),
         namespace: namespace.clone(),
         name: name.clone(),
         version: version.clone(),
@@ -252,7 +252,7 @@ fn build_rpm_purl(
 ) -> Option<String> {
     use packageurl::PackageUrl;
 
-    let mut purl = PackageUrl::new(PACKAGE_TYPE, name).ok()?;
+    let mut purl = PackageUrl::new(PACKAGE_TYPE.as_str(), name).ok()?;
 
     if let Some(ns) = namespace {
         purl.with_namespace(ns).ok()?;
@@ -328,7 +328,7 @@ mod tests {
 
         let pkg = RpmParser::extract_first_package(&test_file);
 
-        assert_eq!(pkg.package_type, Some("rpm".to_string()));
+        assert_eq!(pkg.package_type, Some(PackageType::Rpm));
 
         if pkg.name.is_some() {
             assert_eq!(pkg.name, Some("Eterm".to_string()));

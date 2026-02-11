@@ -1,5 +1,7 @@
 //! Tests for Chef metadata.json and metadata.rb parsers.
 
+use crate::models::PackageType;
+
 use std::path::PathBuf;
 
 use super::PackageParser;
@@ -39,7 +41,7 @@ fn test_basic_extraction() {
     let path = PathBuf::from("testdata/chef/basic/metadata.json");
     let package = ChefMetadataJsonParser::extract_first_package(&path);
 
-    assert_eq!(package.package_type, Some("chef".to_string()));
+    assert_eq!(package.package_type, Some(PackageType::Chef));
     assert_eq!(package.name, Some("301".to_string()));
     assert_eq!(package.version, Some("0.1.0".to_string()));
     assert_eq!(
@@ -338,7 +340,7 @@ fn test_malformed_json() {
     let package = ChefMetadataJsonParser::extract_first_package(&test_file);
 
     // Should return default package data with just package_type set
-    assert_eq!(package.package_type, Some("chef".to_string()));
+    assert_eq!(package.package_type, Some(PackageType::Chef));
     assert_eq!(package.name, None);
     assert_eq!(package.version, None);
 
@@ -393,7 +395,7 @@ fn test_basic_rb_extraction() {
     let path = PathBuf::from("testdata/chef/basic/metadata.rb");
     let package = ChefMetadataRbParser::extract_first_package(&path);
 
-    assert_eq!(package.package_type, Some("chef".to_string()));
+    assert_eq!(package.package_type, Some(PackageType::Chef));
     assert_eq!(package.name, Some("301".to_string()));
     assert_eq!(package.version, Some("0.1.0".to_string()));
     assert_eq!(
@@ -521,7 +523,7 @@ fn test_rb_handles_empty_file() {
 
     let package = ChefMetadataRbParser::extract_first_package(&test_file);
 
-    assert_eq!(package.package_type, Some("chef".to_string()));
+    assert_eq!(package.package_type, Some(PackageType::Chef));
     assert_eq!(package.name, None);
     assert_eq!(package.version, None);
 

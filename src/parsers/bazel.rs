@@ -16,7 +16,7 @@
 //! ## Reference
 //! Python implementation: `reference/scancode-toolkit/src/packagedcode/build.py` (BazelBuildHandler)
 
-use crate::models::DatasourceId;
+use crate::models::{DatasourceId, PackageType};
 use std::path::Path;
 
 use log::warn;
@@ -29,7 +29,7 @@ use super::PackageParser;
 pub struct BazelBuildParser;
 
 impl PackageParser for BazelBuildParser {
-    const PACKAGE_TYPE: &'static str = "bazel";
+    const PACKAGE_TYPE: PackageType = PackageType::Bazel;
 
     fn is_match(path: &Path) -> bool {
         path.file_name()
@@ -139,7 +139,7 @@ fn extract_from_call(call: &ast::ExprCall) -> Option<PackageData> {
     let package_name = name?;
 
     Some(PackageData {
-        package_type: Some(BazelBuildParser::PACKAGE_TYPE.to_string()),
+        package_type: Some(BazelBuildParser::PACKAGE_TYPE),
         name: Some(package_name),
         extracted_license_statement: licenses.map(|l| l.join(", ")),
         datasource_id: Some(DatasourceId::BazelBuild),
@@ -161,7 +161,7 @@ fn fallback_package_data(path: &Path) -> PackageData {
         .map(|s| s.to_string());
 
     PackageData {
-        package_type: Some(BazelBuildParser::PACKAGE_TYPE.to_string()),
+        package_type: Some(BazelBuildParser::PACKAGE_TYPE),
         name,
         datasource_id: Some(DatasourceId::BazelBuild),
         ..Default::default()
@@ -171,6 +171,7 @@ fn fallback_package_data(path: &Path) -> PackageData {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::models::PackageType;
     use std::path::PathBuf;
 
     #[test]
@@ -197,7 +198,7 @@ mod tests {
     fn test_fallback_package_data() {
         let path = PathBuf::from("/path/to/myproject/BUILD");
         let pkg = fallback_package_data(&path);
-        assert_eq!(pkg.package_type, Some("bazel".to_string()));
+        assert_eq!(pkg.package_type, Some(PackageType::Bazel));
         assert_eq!(pkg.name, Some("myproject".to_string()));
     }
 }

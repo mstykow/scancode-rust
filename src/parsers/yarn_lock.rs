@@ -20,7 +20,7 @@
 //! - All lockfile versions are pinned (`is_pinned: Some(true)`)
 //! - Graceful error handling with `warn!()` logs
 
-use crate::models::{DatasourceId, Dependency, PackageData, ResolvedPackage};
+use crate::models::{DatasourceId, Dependency, PackageData, PackageType, ResolvedPackage};
 use crate::parsers::utils::{npm_purl, parse_sri};
 use log::warn;
 use serde_yaml::Value;
@@ -36,7 +36,7 @@ use super::PackageParser;
 pub struct YarnLockParser;
 
 impl PackageParser for YarnLockParser {
-    const PACKAGE_TYPE: &'static str = "npm";
+    const PACKAGE_TYPE: PackageType = PackageType::Npm;
 
     fn is_match(path: &Path) -> bool {
         path.file_name()
@@ -132,7 +132,7 @@ fn parse_yarn_v2(content: &str) -> PackageData {
         };
 
         let resolved_package = ResolvedPackage {
-            package_type: YarnLockParser::PACKAGE_TYPE.to_string(),
+            package_type: YarnLockParser::PACKAGE_TYPE,
             namespace: namespace.clone(),
             name: name.clone(),
             version: resolved_version.clone(),
@@ -172,7 +172,7 @@ fn parse_yarn_v2(content: &str) -> PackageData {
     }
 
     PackageData {
-        package_type: Some(YarnLockParser::PACKAGE_TYPE.to_string()),
+        package_type: Some(YarnLockParser::PACKAGE_TYPE),
         namespace: None,
         name: None,
         version: None,
@@ -239,7 +239,7 @@ fn parse_yarn_v1(content: &str) -> PackageData {
     }
 
     PackageData {
-        package_type: Some(YarnLockParser::PACKAGE_TYPE.to_string()),
+        package_type: Some(YarnLockParser::PACKAGE_TYPE),
         namespace: None,
         name: None,
         version: None,
@@ -331,7 +331,7 @@ fn create_purl(namespace: &str, name: &str, version: &str) -> Option<String> {
 
 fn default_package_data() -> PackageData {
     PackageData {
-        package_type: Some(YarnLockParser::PACKAGE_TYPE.to_string()),
+        package_type: Some(YarnLockParser::PACKAGE_TYPE),
         datasource_id: Some(DatasourceId::YarnLock),
         ..Default::default()
     }
@@ -401,7 +401,7 @@ fn parse_yarn_v1_block(block: &str) -> Option<Dependency> {
     let purl = create_purl(&namespace, &name, &version);
 
     let resolved_package = ResolvedPackage {
-        package_type: YarnLockParser::PACKAGE_TYPE.to_string(),
+        package_type: YarnLockParser::PACKAGE_TYPE,
         namespace: namespace.clone(),
         name: name.clone(),
         version: version.clone(),

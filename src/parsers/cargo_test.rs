@@ -1,5 +1,6 @@
 #[cfg(test)]
 mod tests {
+    use crate::models::PackageType;
     use crate::parsers::{CargoParser, PackageParser};
     use std::fs;
     use std::path::PathBuf;
@@ -28,7 +29,7 @@ mod tests {
         let cargo_path = PathBuf::from("testdata/cargo/Cargo.toml");
         let package_data = CargoParser::extract_first_package(&cargo_path);
 
-        assert_eq!(package_data.package_type, Some("cargo".to_string()));
+        assert_eq!(package_data.package_type, Some(PackageType::Cargo));
         assert_eq!(package_data.name, Some("test-cargo".to_string()));
         assert_eq!(package_data.version, Some("1.2.3".to_string()));
         assert_eq!(
@@ -85,7 +86,7 @@ authors = ["Test User <test@example.com>"]
         let (_temp_file, cargo_path) = create_temp_cargo_toml(content);
         let package_data = CargoParser::extract_first_package(&cargo_path);
 
-        assert_eq!(package_data.package_type, Some("cargo".to_string()));
+        assert_eq!(package_data.package_type, Some(PackageType::Cargo));
         assert_eq!(package_data.name, Some("test-package".to_string()));
         assert_eq!(package_data.version, Some("0.1.0".to_string()));
         assert_eq!(

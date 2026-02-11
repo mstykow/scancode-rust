@@ -10,7 +10,6 @@
 //!
 //! # Key Features
 //! - Property value substitution (`${project.version}`)
-//! - License declaration normalization using askalono
 //! - `is_pinned` analysis (exact version vs ranges like `[1.0,2.0)`)
 //! - Dependency scope handling (compile, test, provided, runtime, system)
 //! - Package URL (purl) generation
@@ -22,7 +21,7 @@
 //! - Property substitution limited to prevent infinite loops
 //! - Direct dependencies: all in pom.xml are direct
 
-use crate::models::{DatasourceId, Dependency, PackageData, Party};
+use crate::models::{DatasourceId, Dependency, PackageData, PackageType, Party};
 use crate::parsers::utils::read_file_to_string;
 use log::warn;
 use quick_xml::Reader;
@@ -351,7 +350,7 @@ fn build_builtin_properties(
 pub struct MavenParser;
 
 impl PackageParser for MavenParser {
-    const PACKAGE_TYPE: &'static str = "maven";
+    const PACKAGE_TYPE: PackageType = PackageType::Maven;
 
     fn extract_packages(path: &Path) -> Vec<PackageData> {
         if let Some(filename) = path.file_name().and_then(|name| name.to_str()) {
@@ -375,7 +374,7 @@ impl PackageParser for MavenParser {
 
         let mut buf = Vec::new();
         let mut package_data = default_package_data();
-        package_data.package_type = Some(Self::PACKAGE_TYPE.to_string());
+        package_data.package_type = Some(Self::PACKAGE_TYPE);
         package_data.primary_language = Some("Java".to_string());
         package_data.datasource_id = Some(DatasourceId::MavenPom);
 
@@ -1405,7 +1404,7 @@ fn parse_pom_properties(path: &Path) -> PackageData {
     };
 
     let mut package_data = default_package_data();
-    package_data.package_type = Some("maven".to_string());
+    package_data.package_type = Some(PackageType::Maven);
 
     let mut group_id: Option<String> = None;
     let mut artifact_id: Option<String> = None;
@@ -1522,7 +1521,7 @@ fn parse_manifest_mf(path: &Path) -> PackageData {
 
     if is_osgi {
         // OSGi bundle - extract OSGi-specific metadata
-        package_data.package_type = Some("osgi".to_string());
+        package_data.package_type = Some(PackageType::Osgi);
         package_data.datasource_id = Some(DatasourceId::JavaOsgiManifest);
 
         // Bundle-SymbolicName is the canonical name for OSGi bundles
@@ -1594,7 +1593,7 @@ fn parse_manifest_mf(path: &Path) -> PackageData {
         }
     } else {
         // Regular JAR manifest
-        package_data.package_type = Some("maven".to_string());
+        package_data.package_type = Some(PackageType::Maven);
         package_data.datasource_id = Some(DatasourceId::JavaJarManifest);
 
         // Extract fields with priority order for non-OSGi JARs

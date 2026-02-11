@@ -13,7 +13,6 @@
 //! - requirements.txt
 //!
 //! # Key Features
-//! - License declaration normalization using askalono
 //! - Archive safety checks (size limits, compression ratio validation)
 //! - AST-based setup.py parsing (no code execution)
 //! - RFC 822 metadata parsing for wheels/eggs
@@ -32,7 +31,7 @@
 //! - Direct dependencies: all manifest dependencies are direct
 //! - Graceful fallback on parse errors with warning logs
 
-use crate::models::{DatasourceId, Dependency, FileReference, PackageData, Party};
+use crate::models::{DatasourceId, Dependency, FileReference, PackageData, PackageType, Party};
 use crate::parsers::utils::{read_file_to_string, split_name_email};
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
@@ -83,7 +82,7 @@ const MAX_COMPRESSION_RATIO: f64 = 100.0; // 100:1 ratio
 pub struct PythonParser;
 
 impl PackageParser for PythonParser {
-    const PACKAGE_TYPE: &'static str = "pypi";
+    const PACKAGE_TYPE: PackageType = PackageType::Pypi;
 
     fn extract_packages(path: &Path) -> Vec<PackageData> {
         vec![
@@ -606,7 +605,7 @@ fn build_wheel_purl(
     wheel_info: &WheelInfo,
 ) -> Option<String> {
     let name = name?;
-    let mut package_url = PackageUrl::new(PythonParser::PACKAGE_TYPE, name).ok()?;
+    let mut package_url = PackageUrl::new(PythonParser::PACKAGE_TYPE.as_str(), name).ok()?;
 
     if let Some(ver) = version {
         package_url.with_version(ver).ok()?;
@@ -623,7 +622,7 @@ fn build_wheel_purl(
 
 fn build_egg_purl(name: Option<&str>, version: Option<&str>) -> Option<String> {
     let name = name?;
-    let mut package_url = PackageUrl::new(PythonParser::PACKAGE_TYPE, name).ok()?;
+    let mut package_url = PackageUrl::new(PythonParser::PACKAGE_TYPE.as_str(), name).ok()?;
 
     if let Some(ver) = version {
         package_url.with_version(ver).ok()?;
@@ -792,7 +791,7 @@ fn build_package_data_from_rfc822(
         build_pypi_urls(name.as_deref(), version.as_deref());
 
     PackageData {
-        package_type: Some(PythonParser::PACKAGE_TYPE.to_string()),
+        package_type: Some(PythonParser::PACKAGE_TYPE),
         namespace: None,
         name,
         version,
@@ -945,7 +944,7 @@ pub(crate) fn build_pypi_urls(
     });
 
     let purl = name.and_then(|value| {
-        let mut package_url = PackageUrl::new(PythonParser::PACKAGE_TYPE, value).ok()?;
+        let mut package_url = PackageUrl::new(PythonParser::PACKAGE_TYPE.as_str(), value).ok()?;
         if let Some(ver) = version {
             package_url.with_version(ver).ok()?;
         }
@@ -1025,7 +1024,7 @@ fn extract_from_pyproject_toml(path: &Path) -> PackageData {
 
     // Create package URL
     let purl = name.as_ref().and_then(|n| {
-        let mut package_url = match PackageUrl::new(PythonParser::PACKAGE_TYPE, n) {
+        let mut package_url = match PackageUrl::new(PythonParser::PACKAGE_TYPE.as_str(), n) {
             Ok(p) => p,
             Err(e) => {
                 warn!(
@@ -1074,7 +1073,7 @@ fn extract_from_pyproject_toml(path: &Path) -> PackageData {
     });
 
     PackageData {
-        package_type: Some(PythonParser::PACKAGE_TYPE.to_string()),
+        package_type: Some(PythonParser::PACKAGE_TYPE),
         namespace: None,
         name,
         version,
@@ -1317,7 +1316,8 @@ fn parse_dependency_table(
         .iter()
         .filter_map(|(name, version)| {
             let version_str = version.as_str().map(|s| s.to_string());
-            let mut package_url = PackageUrl::new(PythonParser::PACKAGE_TYPE, name).ok()?;
+            let mut package_url =
+                PackageUrl::new(PythonParser::PACKAGE_TYPE.as_str(), name).ok()?;
 
             if let Some(v) = &version_str {
                 package_url.with_version(v).ok()?;
@@ -1353,7 +1353,8 @@ fn parse_dependency_array(
 
             let version = parts.next().map(|v| v.trim().to_string());
 
-            let mut package_url = match PackageUrl::new(PythonParser::PACKAGE_TYPE, &name) {
+            let mut package_url = match PackageUrl::new(PythonParser::PACKAGE_TYPE.as_str(), &name)
+            {
                 Ok(purl) => purl,
                 Err(_) => return None,
             };
@@ -1850,7 +1851,7 @@ fn build_setup_py_package_data(values: &HashMap<String, Value>) -> PackageData {
     let purl = build_setup_py_purl(name.as_deref(), version.as_deref());
 
     PackageData {
-        package_type: Some(PythonParser::PACKAGE_TYPE.to_string()),
+        package_type: Some(PythonParser::PACKAGE_TYPE),
         namespace: None,
         name,
         version,
@@ -1965,7 +1966,7 @@ fn value_to_string_list(value: &Value) -> Option<Vec<String>> {
 
 fn build_setup_py_purl(name: Option<&str>, version: Option<&str>) -> Option<String> {
     let name = name?;
-    let mut package_url = PackageUrl::new(PythonParser::PACKAGE_TYPE, name).ok()?;
+    let mut package_url = PackageUrl::new(PythonParser::PACKAGE_TYPE.as_str(), name).ok()?;
     if let Some(version) = version {
         package_url.with_version(version).ok()?;
     }
@@ -1988,7 +1989,7 @@ fn extract_from_setup_py_regex(content: &str) -> PackageData {
     let purl = build_setup_py_purl(name.as_deref(), version.as_deref());
 
     PackageData {
-        package_type: Some(PythonParser::PACKAGE_TYPE.to_string()),
+        package_type: Some(PythonParser::PACKAGE_TYPE),
         namespace: None,
         name,
         version,
@@ -2035,10 +2036,7 @@ fn extract_from_setup_py_regex(content: &str) -> PackageData {
 
 fn package_data_to_resolved(pkg: &PackageData) -> crate::models::ResolvedPackage {
     crate::models::ResolvedPackage {
-        package_type: pkg
-            .package_type
-            .clone()
-            .unwrap_or_else(|| "pypi".to_string()),
+        package_type: pkg.package_type.unwrap_or(PackageType::Pypi),
         namespace: pkg.namespace.clone().unwrap_or_default(),
         name: pkg.name.clone().unwrap_or_default(),
         version: pkg.version.clone().unwrap_or_default(),
@@ -2177,7 +2175,7 @@ fn extract_from_pip_inspect(path: &Path) -> PackageData {
         let extracted_license_statement = license.clone();
 
         let purl = name.as_ref().and_then(|n| {
-            let mut package_url = PackageUrl::new(PythonParser::PACKAGE_TYPE, n).ok()?;
+            let mut package_url = PackageUrl::new(PythonParser::PACKAGE_TYPE.as_str(), n).ok()?;
             if let Some(v) = &version {
                 package_url.with_version(v).ok()?;
             }
@@ -2200,7 +2198,7 @@ fn extract_from_pip_inspect(path: &Path) -> PackageData {
             }
 
             main_package = Some(PackageData {
-                package_type: Some(PythonParser::PACKAGE_TYPE.to_string()),
+                package_type: Some(PythonParser::PACKAGE_TYPE),
                 namespace: None,
                 name,
                 version,
@@ -2249,7 +2247,7 @@ fn extract_from_pip_inspect(path: &Path) -> PackageData {
             });
         } else {
             let resolved_package = PackageData {
-                package_type: Some(PythonParser::PACKAGE_TYPE.to_string()),
+                package_type: Some(PythonParser::PACKAGE_TYPE),
                 namespace: None,
                 name: name.clone(),
                 version: version.clone(),
@@ -2358,7 +2356,7 @@ fn extract_from_setup_cfg(path: &Path) -> PackageData {
     let dependencies = extract_setup_cfg_dependencies(&sections);
 
     let purl = name.as_ref().and_then(|n| {
-        let mut package_url = PackageUrl::new(PythonParser::PACKAGE_TYPE, n).ok()?;
+        let mut package_url = PackageUrl::new(PythonParser::PACKAGE_TYPE.as_str(), n).ok()?;
         if let Some(v) = &version {
             package_url.with_version(v).ok()?;
         }
@@ -2366,7 +2364,7 @@ fn extract_from_setup_cfg(path: &Path) -> PackageData {
     });
 
     PackageData {
-        package_type: Some(PythonParser::PACKAGE_TYPE.to_string()),
+        package_type: Some(PythonParser::PACKAGE_TYPE),
         namespace: None,
         name,
         version,
@@ -2534,7 +2532,7 @@ fn build_setup_cfg_dependency(req: &str, scope: &str, is_optional: bool) -> Opti
     }
 
     let name = extract_setup_cfg_dependency_name(trimmed)?;
-    let purl = PackageUrl::new(PythonParser::PACKAGE_TYPE, &name).ok()?;
+    let purl = PackageUrl::new(PythonParser::PACKAGE_TYPE.as_str(), &name).ok()?;
 
     Some(Dependency {
         purl: Some(purl.to_string()),
@@ -2660,7 +2658,7 @@ fn parse_setup_py_dep_list(deps_str: &str, scope: &str, is_optional: bool) -> Ve
             }
 
             let name = extract_setup_cfg_dependency_name(dep_str)?;
-            let purl = PackageUrl::new(PythonParser::PACKAGE_TYPE, &name).ok()?;
+            let purl = PackageUrl::new(PythonParser::PACKAGE_TYPE.as_str(), &name).ok()?;
 
             Some(Dependency {
                 purl: Some(purl.to_string()),

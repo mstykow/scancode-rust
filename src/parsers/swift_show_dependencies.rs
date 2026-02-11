@@ -18,15 +18,15 @@ use std::path::Path;
 use log::warn;
 use serde::{Deserialize, Serialize};
 
-use crate::models::{DatasourceId, Dependency, PackageData};
+use crate::models::{DatasourceId, Dependency, PackageData, PackageType};
 
 use super::PackageParser;
 
-const PACKAGE_TYPE: &str = "swift";
+const PACKAGE_TYPE: PackageType = PackageType::Swift;
 
 fn default_package_data() -> PackageData {
     PackageData {
-        package_type: Some(PACKAGE_TYPE.to_string()),
+        package_type: Some(PACKAGE_TYPE),
         primary_language: Some("Swift".to_string()),
         datasource_id: Some(DatasourceId::SwiftPackageShowDependencies),
         ..Default::default()
@@ -55,7 +55,7 @@ struct SwiftDependency {
 }
 
 impl PackageParser for SwiftShowDependenciesParser {
-    const PACKAGE_TYPE: &'static str = PACKAGE_TYPE;
+    const PACKAGE_TYPE: PackageType = PACKAGE_TYPE;
 
     fn is_match(path: &Path) -> bool {
         path.to_str()
@@ -90,7 +90,7 @@ pub(crate) fn parse_swift_show_dependencies(content: &str) -> PackageData {
     let dependencies = flatten_dependencies(&data.dependencies);
 
     PackageData {
-        package_type: Some(PACKAGE_TYPE.to_string()),
+        package_type: Some(PACKAGE_TYPE),
         primary_language: Some("Swift".to_string()),
         name: data.name,
         version: data.version,

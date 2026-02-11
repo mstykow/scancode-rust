@@ -27,7 +27,7 @@ use log::warn;
 use packageurl::PackageUrl;
 use serde_yaml::{Mapping, Value};
 
-use crate::models::{DatasourceId, Dependency, PackageData, ResolvedPackage};
+use crate::models::{DatasourceId, Dependency, PackageData, PackageType, ResolvedPackage};
 
 use super::PackageParser;
 
@@ -56,7 +56,7 @@ const FIELD_SHA256: &str = "sha256";
 pub struct PubspecYamlParser;
 
 impl PackageParser for PubspecYamlParser {
-    const PACKAGE_TYPE: &'static str = "dart";
+    const PACKAGE_TYPE: PackageType = PackageType::Dart;
 
     fn extract_packages(path: &Path) -> Vec<PackageData> {
         let yaml_content = match read_yaml_file(path) {
@@ -79,7 +79,7 @@ impl PackageParser for PubspecYamlParser {
 pub struct PubspecLockParser;
 
 impl PackageParser for PubspecLockParser {
-    const PACKAGE_TYPE: &'static str = "pubspec";
+    const PACKAGE_TYPE: PackageType = PackageType::Pubspec;
 
     fn extract_packages(path: &Path) -> Vec<PackageData> {
         let yaml_content = match read_yaml_file(path) {
@@ -179,7 +179,7 @@ fn parse_pubspec_yaml(yaml_content: &Value) -> PackageData {
     let download_url = repository_download_url.clone();
 
     PackageData {
-        package_type: Some(PubspecYamlParser::PACKAGE_TYPE.to_string()),
+        package_type: Some(PubspecYamlParser::PACKAGE_TYPE),
         namespace: None,
         name,
         version,
@@ -227,7 +227,7 @@ fn parse_pubspec_yaml(yaml_content: &Value) -> PackageData {
 fn parse_pubspec_lock(yaml_content: &Value) -> PackageData {
     let dependencies = extract_lock_dependencies(yaml_content);
 
-    let mut package_data = default_package_data_with_type(PubspecLockParser::PACKAGE_TYPE);
+    let mut package_data = default_package_data_with_type(PubspecLockParser::PACKAGE_TYPE.as_str());
     package_data.dependencies = dependencies;
     package_data.datasource_id = Some(DatasourceId::PubspecLock);
     package_data
@@ -366,7 +366,7 @@ fn build_resolved_package(
     dependencies: Vec<Dependency>,
 ) -> ResolvedPackage {
     ResolvedPackage {
-        package_type: PubspecLockParser::PACKAGE_TYPE.to_string(),
+        package_type: PubspecLockParser::PACKAGE_TYPE,
         namespace: String::new(),
         name: name.to_string(),
         version: version.clone().unwrap_or_default(),
@@ -497,7 +497,7 @@ fn is_pubspec_version_pinned(version: &str) -> bool {
 }
 
 fn build_purl(name: &str, version: Option<&str>) -> Option<String> {
-    build_purl_with_type(PubspecYamlParser::PACKAGE_TYPE, name, version)
+    build_purl_with_type(PubspecYamlParser::PACKAGE_TYPE.as_str(), name, version)
 }
 
 fn build_dependency_purl(name: &str, version: Option<&str>) -> Option<String> {
@@ -559,12 +559,12 @@ fn mapping_get<'a>(map: &'a Mapping, key: &str) -> Option<&'a Value> {
 }
 
 fn default_package_data() -> PackageData {
-    default_package_data_with_type(PubspecYamlParser::PACKAGE_TYPE)
+    default_package_data_with_type(PubspecYamlParser::PACKAGE_TYPE.as_str())
 }
 
 fn default_package_data_with_type(package_type: &str) -> PackageData {
     PackageData {
-        package_type: Some(package_type.to_string()),
+        package_type: package_type.parse::<PackageType>().ok(),
         primary_language: Some("dart".to_string()),
         ..Default::default()
     }

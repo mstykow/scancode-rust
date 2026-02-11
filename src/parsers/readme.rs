@@ -21,8 +21,8 @@
 //! - Multiple URL-related keys map to homepage_url (repo, source, upstream, etc.)
 //! - Separator precedence: the first separator (`:` or `=`) on each line is used
 
-use crate::models::DatasourceId;
 use crate::models::PackageData;
+use crate::models::{DatasourceId, PackageType};
 use crate::parsers::utils::read_file_to_string;
 use log::warn;
 use std::path::Path;
@@ -36,7 +36,7 @@ use super::PackageParser;
 pub struct ReadmeParser;
 
 impl PackageParser for ReadmeParser {
-    const PACKAGE_TYPE: &'static str = "readme";
+    const PACKAGE_TYPE: PackageType = PackageType::Readme;
 
     fn is_match(path: &Path) -> bool {
         path.file_name().is_some_and(|name| {
@@ -125,7 +125,7 @@ impl PackageParser for ReadmeParser {
 
 fn default_package_data() -> PackageData {
     PackageData {
-        package_type: Some("readme".to_string()),
+        package_type: Some(ReadmeParser::PACKAGE_TYPE),
         datasource_id: Some(DatasourceId::Readme),
         ..Default::default()
     }
@@ -192,7 +192,7 @@ mod tests {
         let path = PathBuf::from("testdata/readme/chromium/third_party/example/README.chromium");
         let pkg = ReadmeParser::extract_first_package(&path);
 
-        assert_eq!(pkg.package_type, Some("readme".to_string()));
+        assert_eq!(pkg.package_type, Some(PackageType::Readme));
         assert_eq!(pkg.name, Some("Example Library".to_string()));
         assert_eq!(pkg.version, Some("2.1.0".to_string()));
         assert_eq!(pkg.homepage_url, Some("https://example.com".to_string()));
@@ -277,7 +277,7 @@ mod tests {
         let pkg = ReadmeParser::extract_first_package(&nonexistent);
 
         // Should return default data with proper type and datasource
-        assert_eq!(pkg.package_type, Some("readme".to_string()));
+        assert_eq!(pkg.package_type, Some(PackageType::Readme));
         assert_eq!(pkg.datasource_id, Some(DatasourceId::Readme));
     }
 }

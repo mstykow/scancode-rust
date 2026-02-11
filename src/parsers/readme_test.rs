@@ -1,6 +1,7 @@
 #[cfg(test)]
 mod tests {
     use crate::models::DatasourceId;
+    use crate::models::PackageType;
     use crate::parsers::PackageParser;
     use crate::parsers::readme::ReadmeParser;
     use std::path::PathBuf;
@@ -51,7 +52,7 @@ mod tests {
         let path = PathBuf::from("testdata/readme/chromium/third_party/example/README.chromium");
         let pkg = ReadmeParser::extract_first_package(&path);
 
-        assert_eq!(pkg.package_type, Some("readme".to_string()));
+        assert_eq!(pkg.package_type, Some(PackageType::Readme));
         assert_eq!(pkg.name, Some("Example Library".to_string()));
         assert_eq!(pkg.version, Some("2.1.0".to_string()));
         assert_eq!(pkg.homepage_url, Some("https://example.com".to_string()));
@@ -248,7 +249,7 @@ mod tests {
 
         // Should use parent dir name as fallback
         assert_eq!(pkg.name, Some("testdir".to_string()));
-        assert_eq!(pkg.package_type, Some("readme".to_string()));
+        assert_eq!(pkg.package_type, Some(PackageType::Readme));
         assert_eq!(pkg.datasource_id, Some(DatasourceId::Readme));
     }
 
@@ -276,7 +277,7 @@ mod tests {
         let pkg = ReadmeParser::extract_first_package(&path);
 
         // Should return default data with proper type and datasource
-        assert_eq!(pkg.package_type, Some("readme".to_string()));
+        assert_eq!(pkg.package_type, Some(PackageType::Readme));
         assert_eq!(pkg.datasource_id, Some(DatasourceId::Readme));
         assert!(pkg.name.is_none());
     }

@@ -3,6 +3,7 @@ mod tests {
     use super::super::PackageParser;
     use super::super::conan_data::*;
     use crate::models::DatasourceId;
+    use crate::models::PackageType;
     use std::path::PathBuf;
 
     #[test]
@@ -38,7 +39,7 @@ sources:
             .find(|p| p.version.as_deref() == Some("1.0.0"));
         assert!(pkg1.is_some());
         let pkg1 = pkg1.unwrap();
-        assert_eq!(pkg1.package_type.as_deref(), Some("conan"));
+        assert_eq!(pkg1.package_type, Some(PackageType::Conan));
         assert_eq!(pkg1.primary_language.as_deref(), Some("C++"));
         assert_eq!(
             pkg1.download_url.as_deref(),
@@ -122,7 +123,7 @@ sources: {}
         let packages = parse_conandata_yml(content);
         // Should return default package when sources is empty
         assert_eq!(packages.len(), 1);
-        assert_eq!(packages[0].package_type.as_deref(), Some("conan"));
+        assert_eq!(packages[0].package_type, Some(PackageType::Conan));
     }
 
     #[test]
@@ -130,7 +131,7 @@ sources: {}
         let content = "this is not valid yaml: [[[";
         let packages = parse_conandata_yml(content);
         assert_eq!(packages.len(), 1);
-        assert_eq!(packages[0].package_type.as_deref(), Some("conan"));
+        assert_eq!(packages[0].package_type, Some(PackageType::Conan));
     }
 
     #[test]

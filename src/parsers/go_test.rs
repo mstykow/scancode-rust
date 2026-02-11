@@ -1,6 +1,7 @@
 #[cfg(test)]
 mod tests {
     use crate::models::DatasourceId;
+    use crate::models::PackageType;
     use crate::parsers::PackageParser;
     use crate::parsers::go::{
         GoModParser, GoSumParser, GodepsParser, parse_go_mod, parse_go_sum, parse_godeps_json,
@@ -24,7 +25,7 @@ mod tests {
 
         assert_eq!(result.namespace.as_deref(), Some("github.com/alecthomas"));
         assert_eq!(result.name.as_deref(), Some("kingpin"));
-        assert_eq!(result.package_type.as_deref(), Some("golang"));
+        assert_eq!(result.package_type, Some(PackageType::Golang));
         assert_eq!(result.primary_language.as_deref(), Some("Go"));
         assert_eq!(result.datasource_id, Some(DatasourceId::GoMod));
     }
@@ -279,7 +280,7 @@ go 1.13
         let content = "";
         let result = parse_go_mod(content);
 
-        assert_eq!(result.package_type.as_deref(), Some("golang"));
+        assert_eq!(result.package_type, Some(PackageType::Golang));
         assert_eq!(result.name, None);
         assert_eq!(result.namespace, None);
         assert!(result.dependencies.is_empty());
@@ -290,7 +291,7 @@ go 1.13
         let bad_path = PathBuf::from("/nonexistent/path/go.mod");
         let result = GoModParser::extract_first_package(&bad_path);
 
-        assert_eq!(result.package_type.as_deref(), Some("golang"));
+        assert_eq!(result.package_type, Some(PackageType::Golang));
         assert!(result.dependencies.is_empty());
     }
 
@@ -794,7 +795,7 @@ garbage in garbage out\n\
         let result = parse_go_mod(content);
 
         // Should return default data without crashing
-        assert_eq!(result.package_type.as_deref(), Some("golang"));
+        assert_eq!(result.package_type, Some(PackageType::Golang));
         assert!(result.dependencies.is_empty());
         assert!(result.name.is_none());
     }
@@ -1073,7 +1074,7 @@ github.com/cznic/golex v0.0.0-20181122101858-9c343928389c/go.mod h1:+bmmJDNmKlhW
 ";
         let result = parse_go_sum(content);
 
-        assert_eq!(result.package_type.as_deref(), Some("golang"));
+        assert_eq!(result.package_type, Some(PackageType::Golang));
         assert_eq!(result.primary_language.as_deref(), Some("Go"));
         assert_eq!(result.datasource_id, Some(DatasourceId::GoSum));
 
@@ -1167,7 +1168,7 @@ golang.org/x/text v0.3.1-0.20180807135948-17ff2d5776d2/go.mod h1:NqM8EUOU14njkJ3
         let content = "";
         let result = parse_go_sum(content);
 
-        assert_eq!(result.package_type.as_deref(), Some("golang"));
+        assert_eq!(result.package_type, Some(PackageType::Golang));
         assert!(result.dependencies.is_empty());
     }
 
@@ -1205,7 +1206,7 @@ github.com/foo/bar v0.3.1 h1:WXkYYl6Yr3qBf1K79EBnL4mak0OimBfB0XUf9Vl28OQ=
         let bad_path = PathBuf::from("/nonexistent/path/go.sum");
         let result = GoSumParser::extract_first_package(&bad_path);
 
-        assert_eq!(result.package_type.as_deref(), Some("golang"));
+        assert_eq!(result.package_type, Some(PackageType::Golang));
         assert!(result.dependencies.is_empty());
     }
 
@@ -1274,7 +1275,7 @@ github.com/foo/bar v1.1.0/go.mod h1:jkl=
 }"#;
         let result = parse_godeps_json(content);
 
-        assert_eq!(result.package_type.as_deref(), Some("golang"));
+        assert_eq!(result.package_type, Some(PackageType::Golang));
         assert_eq!(result.primary_language.as_deref(), Some("Go"));
         assert_eq!(result.datasource_id, Some(DatasourceId::Godeps));
         assert_eq!(result.name.as_deref(), Some("app"));
@@ -1456,7 +1457,7 @@ github.com/foo/bar v1.1.0/go.mod h1:jkl=
         let bad_path = PathBuf::from("/nonexistent/path/Godeps.json");
         let result = GodepsParser::extract_first_package(&bad_path);
 
-        assert_eq!(result.package_type.as_deref(), Some("golang"));
+        assert_eq!(result.package_type, Some(PackageType::Golang));
         assert!(result.dependencies.is_empty());
     }
 
@@ -1466,7 +1467,7 @@ github.com/foo/bar v1.1.0/go.mod h1:jkl=
         let result = parse_godeps_json(content);
 
         // Should return default data without crashing
-        assert_eq!(result.package_type.as_deref(), Some("golang"));
+        assert_eq!(result.package_type, Some(PackageType::Golang));
         assert!(result.dependencies.is_empty());
     }
 
@@ -1512,7 +1513,7 @@ github.com/foo/bar v1.1.0/go.mod h1:jkl=
         let path = PathBuf::from("testdata/go/mini-godeps.json");
         let result = GodepsParser::extract_first_package(&path);
 
-        assert_eq!(result.package_type.as_deref(), Some("golang"));
+        assert_eq!(result.package_type, Some(PackageType::Golang));
         assert_eq!(result.name.as_deref(), Some("app"));
         assert_eq!(result.namespace, None);
         assert!(result.dependencies.is_empty());
@@ -1523,7 +1524,7 @@ github.com/foo/bar v1.1.0/go.mod h1:jkl=
         let path = PathBuf::from("testdata/go/full-godeps.json");
         let result = GodepsParser::extract_first_package(&path);
 
-        assert_eq!(result.package_type.as_deref(), Some("golang"));
+        assert_eq!(result.package_type, Some(PackageType::Golang));
         assert_eq!(
             result.namespace.as_deref(),
             Some("github.com/cloudfoundry-incubator")
@@ -1545,7 +1546,7 @@ github.com/foo/bar v1.1.0/go.mod h1:jkl=
         let path = PathBuf::from("testdata/go/basic.go.sum");
         let result = GoSumParser::extract_first_package(&path);
 
-        assert_eq!(result.package_type.as_deref(), Some("golang"));
+        assert_eq!(result.package_type, Some(PackageType::Golang));
         assert_eq!(result.datasource_id, Some(DatasourceId::GoSum));
         // 6 lines → 3 unique modules after dedup
         assert_eq!(result.dependencies.len(), 3);

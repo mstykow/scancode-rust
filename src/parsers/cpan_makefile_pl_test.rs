@@ -3,6 +3,7 @@ mod tests {
     use super::super::PackageParser;
     use super::super::cpan_makefile_pl::*;
     use crate::models::DatasourceId;
+    use crate::models::PackageType;
     use std::path::PathBuf;
 
     #[test]
@@ -44,7 +45,7 @@ WriteMakefile(
 "#;
         let pkg = parse_makefile_pl(content);
 
-        assert_eq!(pkg.package_type.as_deref(), Some("cpan"));
+        assert_eq!(pkg.package_type, Some(PackageType::Cpan));
         assert_eq!(pkg.namespace.as_deref(), Some("cpan"));
         assert_eq!(pkg.name.as_deref(), Some("Acme::Example"));
         assert_eq!(pkg.version.as_deref(), Some("1.23"));
@@ -265,7 +266,7 @@ WriteMakefile1(
         let content = "";
         let pkg = parse_makefile_pl(content);
 
-        assert_eq!(pkg.package_type.as_deref(), Some("cpan"));
+        assert_eq!(pkg.package_type, Some(PackageType::Cpan));
         assert_eq!(pkg.name, None);
         assert_eq!(pkg.version, None);
     }
@@ -279,7 +280,7 @@ use warnings;
 "#;
         let pkg = parse_makefile_pl(content);
 
-        assert_eq!(pkg.package_type.as_deref(), Some("cpan"));
+        assert_eq!(pkg.package_type, Some(PackageType::Cpan));
         assert_eq!(pkg.name, None);
     }
 

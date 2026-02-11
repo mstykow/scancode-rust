@@ -1,6 +1,7 @@
 #[cfg(test)]
 mod tests {
     use crate::models::DatasourceId;
+    use crate::models::PackageType;
     use crate::parsers::{MavenParser, PackageParser};
     use std::fs;
     use std::path::PathBuf;
@@ -31,7 +32,7 @@ mod tests {
         let pom_path = PathBuf::from("testdata/maven/pom.xml");
         let package_data = MavenParser::extract_first_package(&pom_path);
 
-        assert_eq!(package_data.package_type, Some("maven".to_string()));
+        assert_eq!(package_data.package_type, Some(PackageType::Maven));
         assert_eq!(package_data.namespace, Some("com.example".to_string()));
         assert_eq!(package_data.name, Some("demo-app".to_string()));
         assert_eq!(package_data.version, Some("1.0.0".to_string()));
@@ -101,7 +102,7 @@ mod tests {
         let (_temp_dir, pom_path) = create_temp_pom_xml(content);
         let package_data = MavenParser::extract_first_package(&pom_path);
 
-        assert_eq!(package_data.package_type, Some("maven".to_string()));
+        assert_eq!(package_data.package_type, Some(PackageType::Maven));
         assert_eq!(package_data.namespace, Some("com.test".to_string()));
         assert_eq!(package_data.name, Some("test-project".to_string()));
         assert_eq!(package_data.version, Some("1.0.0".to_string()));
@@ -366,7 +367,7 @@ mod tests {
         let pom_props_path = PathBuf::from("testdata/maven/test1/pom.properties");
         let package_data = MavenParser::extract_first_package(&pom_props_path);
 
-        assert_eq!(package_data.package_type, Some("maven".to_string()));
+        assert_eq!(package_data.package_type, Some(PackageType::Maven));
         assert_eq!(package_data.namespace, Some("com.example.test".to_string()));
         assert_eq!(package_data.name, Some("test-library".to_string()));
         assert_eq!(package_data.version, Some("1.2.3".to_string()));
@@ -381,7 +382,7 @@ mod tests {
         let manifest_path = PathBuf::from("testdata/maven/test2/MANIFEST.MF");
         let package_data = MavenParser::extract_first_package(&manifest_path);
 
-        assert_eq!(package_data.package_type, Some("maven".to_string()));
+        assert_eq!(package_data.package_type, Some(PackageType::Maven));
         assert_eq!(package_data.name, Some("spring-web".to_string()));
         assert_eq!(package_data.version, Some("5.3.20".to_string()));
 
@@ -398,7 +399,7 @@ mod tests {
         let package_data = MavenParser::extract_first_package(&manifest_path);
 
         // This file has Bundle-SymbolicName, so it's detected as OSGi
-        assert_eq!(package_data.package_type, Some("osgi".to_string()));
+        assert_eq!(package_data.package_type, Some(PackageType::Osgi));
         assert_eq!(
             package_data.datasource_id,
             Some(DatasourceId::JavaOsgiManifest)

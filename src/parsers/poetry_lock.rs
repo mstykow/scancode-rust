@@ -27,7 +27,7 @@ use packageurl::PackageUrl;
 use toml::Value as TomlValue;
 use toml::map::Map as TomlMap;
 
-use crate::models::{DatasourceId, Dependency, PackageData, ResolvedPackage};
+use crate::models::{DatasourceId, Dependency, PackageData, PackageType, ResolvedPackage};
 use crate::parsers::python::{build_pypi_urls, read_toml_file};
 
 use super::PackageParser;
@@ -47,7 +47,7 @@ const FIELD_LOCK_VERSION: &str = "lock-version";
 pub struct PoetryLockParser;
 
 impl PackageParser for PoetryLockParser {
-    const PACKAGE_TYPE: &'static str = "pypi";
+    const PACKAGE_TYPE: PackageType = PackageType::Pypi;
 
     fn is_match(path: &Path) -> bool {
         path.file_name()
@@ -90,7 +90,7 @@ fn parse_poetry_lock(toml_content: &TomlValue) -> PackageData {
     }
 
     PackageData {
-        package_type: Some(PoetryLockParser::PACKAGE_TYPE.to_string()),
+        package_type: Some(PoetryLockParser::PACKAGE_TYPE),
         namespace: None,
         name: None,
         version: None,
@@ -223,7 +223,7 @@ fn build_resolved_package(
     let sha256 = extract_sha256_from_files(package_table);
 
     ResolvedPackage {
-        package_type: PoetryLockParser::PACKAGE_TYPE.to_string(),
+        package_type: PoetryLockParser::PACKAGE_TYPE,
         namespace: String::new(),
         name: name.to_string(),
         version: version.to_string(),
@@ -355,7 +355,7 @@ fn create_pypi_purl(name: &str, version: Option<&str>) -> Option<String> {
         return Some(build_manual_pypi_purl(name, version));
     }
 
-    if let Ok(mut purl) = PackageUrl::new(PoetryLockParser::PACKAGE_TYPE, name) {
+    if let Ok(mut purl) = PackageUrl::new(PoetryLockParser::PACKAGE_TYPE.as_str(), name) {
         if let Some(version) = version
             && purl.with_version(version).is_err()
         {
@@ -396,7 +396,7 @@ fn extract_sha256_from_files(package_table: &TomlMap<String, TomlValue>) -> Opti
 
 fn default_package_data() -> PackageData {
     PackageData {
-        package_type: Some(PoetryLockParser::PACKAGE_TYPE.to_string()),
+        package_type: Some(PoetryLockParser::PACKAGE_TYPE),
         primary_language: Some("Python".to_string()),
         datasource_id: Some(DatasourceId::PypiPoetryLock),
         ..Default::default()

@@ -191,7 +191,7 @@ mod yarn_lock_test;
 
 use std::path::Path;
 
-use crate::models::PackageData;
+use crate::models::{PackageData, PackageType};
 
 /// Package parser trait for extracting metadata from package manifest files.
 ///
@@ -216,13 +216,13 @@ use crate::models::PackageData;
 ///
 /// ```ignore
 /// use scancode_rust::parsers::PackageParser;
-/// use scancode_rust::models::PackageData;
+/// use scancode_rust::models::{PackageData, PackageType};
 /// use std::path::Path;
 ///
 /// pub struct MyParser;
 ///
 /// impl PackageParser for MyParser {
-///     const PACKAGE_TYPE: &'static str = "my-package-type";
+///     const PACKAGE_TYPE: PackageType = PackageType::Npm;
 ///
 ///     fn is_match(path: &Path) -> bool {
 ///         path.file_name().is_some_and(|name| name == "package.json")
@@ -236,8 +236,8 @@ use crate::models::PackageData;
 /// }
 /// ```
 pub trait PackageParser {
-    /// Package URL type identifier for this parser (e.g., "npm", "pypi", "maven").
-    const PACKAGE_TYPE: &'static str;
+    /// Package URL type identifier for this parser (e.g., PackageType::Npm, PackageType::Pypi).
+    const PACKAGE_TYPE: PackageType;
 
     /// Extracts all packages from the given file path.
     ///

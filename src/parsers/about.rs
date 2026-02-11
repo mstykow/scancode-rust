@@ -21,7 +21,7 @@
 //! - Type can be overridden by 'type' field or extracted from 'purl' field
 //! - Graceful error handling: logs warnings and returns default on parse failure
 
-use crate::models::{DatasourceId, FileReference, PackageData, Party};
+use crate::models::{DatasourceId, FileReference, PackageData, PackageType, Party};
 use log::warn;
 use packageurl::PackageUrl;
 use serde_yaml::Value;
@@ -51,7 +51,7 @@ const FIELD_ABOUT_RESOURCE: &str = "about_resource";
 pub struct AboutFileParser;
 
 impl PackageParser for AboutFileParser {
-    const PACKAGE_TYPE: &'static str = "about";
+    const PACKAGE_TYPE: PackageType = PackageType::About;
 
     fn extract_packages(path: &Path) -> Vec<PackageData> {
         let yaml = match read_and_parse_yaml(path) {
@@ -97,10 +97,10 @@ impl PackageParser for AboutFileParser {
                 (None, None, None, None)
             };
 
-        // Priority: about_type > purl_type > default
         let package_type = about_type
             .or(purl_type)
-            .unwrap_or_else(|| Self::PACKAGE_TYPE.to_string());
+            .and_then(|s| s.parse::<crate::models::PackageType>().ok())
+            .unwrap_or(Self::PACKAGE_TYPE);
 
         // Priority: about_namespace > purl_namespace
         let namespace = about_namespace.or(purl_namespace);

@@ -3,6 +3,7 @@ mod tests {
     use super::super::PackageParser;
     use super::super::bower::BowerJsonParser;
     use crate::models::DatasourceId;
+    use crate::models::PackageType;
     use std::path::PathBuf;
 
     #[test]
@@ -22,7 +23,7 @@ mod tests {
         let path = PathBuf::from("testdata/bower/basic/bower.json");
         let package_data = BowerJsonParser::extract_first_package(&path);
 
-        assert_eq!(package_data.package_type, Some("bower".to_string()));
+        assert_eq!(package_data.package_type, Some(PackageType::Bower));
         assert_eq!(package_data.name, Some("blue-leaf".to_string()));
         assert_eq!(
             package_data.description,

@@ -29,7 +29,7 @@ use log::warn;
 use packageurl::PackageUrl;
 use serde_json::Value;
 
-use crate::models::{DatasourceId, Dependency, PackageData, Party};
+use crate::models::{DatasourceId, Dependency, PackageData, PackageType, Party};
 
 use super::PackageParser;
 
@@ -51,7 +51,7 @@ const PRIMARY_LANGUAGE: &str = "Objective-C";
 pub struct PodspecJsonParser;
 
 impl PackageParser for PodspecJsonParser {
-    const PACKAGE_TYPE: &'static str = "cocoapods";
+    const PACKAGE_TYPE: PackageType = PackageType::Cocoapods;
 
     fn extract_packages(path: &Path) -> Vec<PackageData> {
         let json_content = match read_json_file(path) {
@@ -175,7 +175,7 @@ impl PackageParser for PodspecJsonParser {
         };
 
         let purl = if let Some(name_str) = &name {
-            let mut purl = PackageUrl::new(Self::PACKAGE_TYPE, name_str)
+            let mut purl = PackageUrl::new(Self::PACKAGE_TYPE.as_str(), name_str)
                 .unwrap_or_else(|_| PackageUrl::new("generic", name_str).unwrap());
             if let Some(version_str) = &version {
                 let _ = purl.with_version(version_str);
@@ -186,7 +186,7 @@ impl PackageParser for PodspecJsonParser {
         };
 
         vec![PackageData {
-            package_type: Some(Self::PACKAGE_TYPE.to_string()),
+            package_type: Some(Self::PACKAGE_TYPE),
             namespace: None,
             name: name.clone(),
             version: version.clone(),
@@ -250,7 +250,7 @@ fn read_json_file(path: &Path) -> Result<Value, String> {
 /// Returns a default empty PackageData.
 fn default_package_data() -> PackageData {
     PackageData {
-        package_type: Some(PodspecJsonParser::PACKAGE_TYPE.to_string()),
+        package_type: Some(PodspecJsonParser::PACKAGE_TYPE),
         primary_language: Some(PRIMARY_LANGUAGE.to_string()),
         datasource_id: Some(DatasourceId::CocoapodsPodspecJson),
         ..Default::default()
@@ -389,7 +389,7 @@ fn extract_dependencies(json: &Value) -> Vec<Dependency> {
                 .map(|s| s.trim().to_string())
                 .filter(|s| !s.is_empty());
 
-            let purl = PackageUrl::new(PodspecJsonParser::PACKAGE_TYPE, name_str)
+            let purl = PackageUrl::new(PodspecJsonParser::PACKAGE_TYPE.as_str(), name_str)
                 .ok()
                 .map(|p| p.to_string());
 

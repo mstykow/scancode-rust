@@ -1,5 +1,7 @@
 //! Tests for Bazel BUILD parser
 
+use crate::models::PackageType;
+
 use std::path::PathBuf;
 
 use crate::parsers::PackageParser;
@@ -10,7 +12,7 @@ fn test_parse_build_with_rules() {
     let path = PathBuf::from("testdata/bazel/parse/BUILD");
     let pkg = BazelBuildParser::extract_first_package(&path);
 
-    assert_eq!(pkg.package_type, Some("bazel".to_string()));
+    assert_eq!(pkg.package_type, Some(PackageType::Bazel));
     assert_eq!(pkg.name, Some("hello-greet".to_string()));
     // No licenses field in this BUILD file
     assert_eq!(pkg.extracted_license_statement, None);
@@ -21,7 +23,7 @@ fn test_parse_empty_build_fallback() {
     let path = PathBuf::from("testdata/bazel/end2end/BUILD");
     let pkg = BazelBuildParser::extract_first_package(&path);
 
-    assert_eq!(pkg.package_type, Some("bazel".to_string()));
+    assert_eq!(pkg.package_type, Some(PackageType::Bazel));
     // Should use parent directory name
     assert_eq!(pkg.name, Some("end2end".to_string()));
 }
@@ -31,7 +33,7 @@ fn test_parse_empty_build_subdir_fallback() {
     let path = PathBuf::from("testdata/bazel/end2end/subdir2/BUILD");
     let pkg = BazelBuildParser::extract_first_package(&path);
 
-    assert_eq!(pkg.package_type, Some("bazel".to_string()));
+    assert_eq!(pkg.package_type, Some(PackageType::Bazel));
     // Should use parent directory name
     assert_eq!(pkg.name, Some("subdir2".to_string()));
 }
@@ -49,7 +51,7 @@ cc_binary(
     std::fs::write(&build_path, content).unwrap();
 
     let pkg = BazelBuildParser::extract_first_package(&build_path);
-    assert_eq!(pkg.package_type, Some("bazel".to_string()));
+    assert_eq!(pkg.package_type, Some(PackageType::Bazel));
     assert_eq!(pkg.name, Some("hello-world".to_string()));
 }
 
@@ -67,7 +69,7 @@ cc_library(
     std::fs::write(&build_path, content).unwrap();
 
     let pkg = BazelBuildParser::extract_first_package(&build_path);
-    assert_eq!(pkg.package_type, Some("bazel".to_string()));
+    assert_eq!(pkg.package_type, Some(PackageType::Bazel));
     assert_eq!(pkg.name, Some("hello-greet".to_string()));
 }
 
@@ -85,7 +87,7 @@ java_binary(
     std::fs::write(&build_path, content).unwrap();
 
     let pkg = BazelBuildParser::extract_first_package(&build_path);
-    assert_eq!(pkg.package_type, Some("bazel".to_string()));
+    assert_eq!(pkg.package_type, Some(PackageType::Bazel));
     assert_eq!(pkg.name, Some("my-app".to_string()));
 }
 
@@ -102,7 +104,7 @@ py_library(
     std::fs::write(&build_path, content).unwrap();
 
     let pkg = BazelBuildParser::extract_first_package(&build_path);
-    assert_eq!(pkg.package_type, Some("bazel".to_string()));
+    assert_eq!(pkg.package_type, Some(PackageType::Bazel));
     assert_eq!(pkg.name, Some("mylib".to_string()));
 }
 
@@ -120,7 +122,7 @@ cc_binary(
     std::fs::write(&build_path, content).unwrap();
 
     let pkg = BazelBuildParser::extract_first_package(&build_path);
-    assert_eq!(pkg.package_type, Some("bazel".to_string()));
+    assert_eq!(pkg.package_type, Some(PackageType::Bazel));
     assert_eq!(pkg.name, Some("hello-world".to_string()));
     assert_eq!(
         pkg.extracted_license_statement,
@@ -152,7 +154,7 @@ cc_binary(
 
     let pkg = BazelBuildParser::extract_first_package(&build_path);
     // Should only extract cc_binary, not filegroup or cc_test
-    assert_eq!(pkg.package_type, Some("bazel".to_string()));
+    assert_eq!(pkg.package_type, Some(PackageType::Bazel));
     assert_eq!(pkg.name, Some("hello-world".to_string()));
 }
 
@@ -172,7 +174,7 @@ cc_library(
     std::fs::write(&build_path, content).unwrap();
 
     let pkg = BazelBuildParser::extract_first_package(&build_path);
-    assert_eq!(pkg.package_type, Some("bazel".to_string()));
+    assert_eq!(pkg.package_type, Some(PackageType::Bazel));
     assert_eq!(pkg.name, Some("hello-greet".to_string()));
 }
 
@@ -189,7 +191,7 @@ my_lib = cc_library(
     std::fs::write(&build_path, content).unwrap();
 
     let pkg = BazelBuildParser::extract_first_package(&build_path);
-    assert_eq!(pkg.package_type, Some("bazel".to_string()));
+    assert_eq!(pkg.package_type, Some(PackageType::Bazel));
     assert_eq!(pkg.name, Some("assigned-lib".to_string()));
 }
 
@@ -212,7 +214,7 @@ cc_binary(
 
     let pkg = BazelBuildParser::extract_first_package(&build_path);
     // Should return the first rule found
-    assert_eq!(pkg.package_type, Some("bazel".to_string()));
+    assert_eq!(pkg.package_type, Some(PackageType::Bazel));
     assert_eq!(pkg.name, Some("first-lib".to_string()));
 }
 
@@ -229,7 +231,7 @@ cc_binary(
 
     let pkg = BazelBuildParser::extract_first_package(&build_path);
     // Should fall back to parent directory name
-    assert_eq!(pkg.package_type, Some("bazel".to_string()));
+    assert_eq!(pkg.package_type, Some(PackageType::Bazel));
     assert!(pkg.name.is_some());
 }
 
@@ -246,7 +248,7 @@ this is not valid starlark syntax {{{
 
     let pkg = BazelBuildParser::extract_first_package(&build_file);
     // Should fall back to parent directory name
-    assert_eq!(pkg.package_type, Some("bazel".to_string()));
+    assert_eq!(pkg.package_type, Some(PackageType::Bazel));
     assert_eq!(pkg.name, Some("myproject".to_string()));
 }
 
@@ -264,7 +266,7 @@ cc_binary(
     std::fs::write(&build_path, content).unwrap();
 
     let pkg = BazelBuildParser::extract_first_package(&build_path);
-    assert_eq!(pkg.package_type, Some("bazel".to_string()));
+    assert_eq!(pkg.package_type, Some(PackageType::Bazel));
     assert_eq!(pkg.name, Some("hello-world".to_string()));
     assert_eq!(pkg.extracted_license_statement, None);
 }

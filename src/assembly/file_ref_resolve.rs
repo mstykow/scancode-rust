@@ -226,7 +226,7 @@ fn resolve_rpm_namespace(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::{FileReference, FileType, PackageData};
+    use crate::models::{FileReference, FileType, PackageData, PackageType};
 
     #[test]
     fn test_find_root_from_path() {
@@ -342,7 +342,7 @@ mod tests {
         ];
 
         let mut packages = vec![Package {
-            package_type: Some("alpine".to_string()),
+            package_type: Some(PackageType::Alpine),
             namespace: None,
             name: Some("musl".to_string()),
             version: Some("1.2.3".to_string()),
@@ -452,7 +452,7 @@ mod tests {
         }];
 
         let mut packages = vec![Package {
-            package_type: Some("alpine".to_string()),
+            package_type: Some(PackageType::Alpine),
             namespace: None,
             name: Some("test".to_string()),
             version: Some("1.0".to_string()),
@@ -571,7 +571,7 @@ mod tests {
         ];
 
         let mut packages = vec![Package {
-            package_type: Some("rpm".to_string()),
+            package_type: Some(PackageType::Rpm),
             namespace: None,
             name: Some("bash".to_string()),
             version: Some("5.0".to_string()),
@@ -700,7 +700,7 @@ mod tests {
         ];
 
         let mut packages = vec![Package {
-            package_type: Some("alpine".to_string()),
+            package_type: Some(PackageType::Alpine),
             namespace: None,
             name: Some("test".to_string()),
             version: Some("1.0".to_string()),

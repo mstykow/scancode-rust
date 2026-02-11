@@ -9,7 +9,7 @@
 //! - Format: XML with assembly and package metadata
 //! - Spec: Windows Update manifests
 
-use crate::models::DatasourceId;
+use crate::models::{DatasourceId, PackageType};
 use std::fs;
 use std::path::Path;
 
@@ -21,12 +21,12 @@ use crate::models::PackageData;
 
 use super::PackageParser;
 
-const PACKAGE_TYPE: &str = "windows-update";
+const PACKAGE_TYPE: PackageType = PackageType::WindowsUpdate;
 
 pub struct MicrosoftUpdateManifestParser;
 
 impl PackageParser for MicrosoftUpdateManifestParser {
-    const PACKAGE_TYPE: &'static str = PACKAGE_TYPE;
+    const PACKAGE_TYPE: PackageType = PACKAGE_TYPE;
 
     fn is_match(path: &Path) -> bool {
         path.extension().is_some_and(|ext| ext == "mum")
@@ -38,7 +38,7 @@ impl PackageParser for MicrosoftUpdateManifestParser {
             Err(e) => {
                 warn!("Failed to read .mum file {:?}: {}", path, e);
                 return vec![PackageData {
-                    package_type: Some(PACKAGE_TYPE.to_string()),
+                    package_type: Some(PACKAGE_TYPE),
                     datasource_id: Some(DatasourceId::MicrosoftUpdateManifestMum),
                     ..Default::default()
                 }];
@@ -105,7 +105,7 @@ pub(crate) fn parse_mum_xml(content: &str) -> PackageData {
     }
 
     PackageData {
-        package_type: Some(PACKAGE_TYPE.to_string()),
+        package_type: Some(PACKAGE_TYPE),
         name,
         version,
         description,

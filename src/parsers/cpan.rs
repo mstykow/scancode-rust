@@ -29,7 +29,7 @@ use packageurl::PackageUrl;
 use serde_json::Value as JsonValue;
 use serde_yaml::Value as YamlValue;
 
-use crate::models::{DatasourceId, Dependency, FileReference, PackageData, Party};
+use crate::models::{DatasourceId, Dependency, FileReference, PackageData, PackageType, Party};
 
 use super::PackageParser;
 
@@ -53,7 +53,7 @@ const FIELD_CONFIGURE_REQUIRES: &str = "configure_requires";
 pub struct CpanMetaJsonParser;
 
 impl PackageParser for CpanMetaJsonParser {
-    const PACKAGE_TYPE: &'static str = "cpan";
+    const PACKAGE_TYPE: PackageType = PackageType::Cpan;
 
     fn is_match(path: &Path) -> bool {
         path.file_name().is_some_and(|name| name == "META.json")
@@ -87,7 +87,7 @@ impl PackageParser for CpanMetaJsonParser {
             extract_resources_from_json(&json);
 
         vec![PackageData {
-            package_type: Some(Self::PACKAGE_TYPE.to_string()),
+            package_type: Some(Self::PACKAGE_TYPE),
             name,
             version,
             description,
@@ -111,7 +111,7 @@ impl PackageParser for CpanMetaJsonParser {
 pub struct CpanMetaYmlParser;
 
 impl PackageParser for CpanMetaYmlParser {
-    const PACKAGE_TYPE: &'static str = "cpan";
+    const PACKAGE_TYPE: PackageType = PackageType::Cpan;
 
     fn is_match(path: &Path) -> bool {
         path.file_name().is_some_and(|name| name == "META.yml")
@@ -145,7 +145,7 @@ impl PackageParser for CpanMetaYmlParser {
         let (homepage_url, vcs_url, bug_tracking_url) = extract_resources_from_yaml(&yaml);
 
         vec![PackageData {
-            package_type: Some(Self::PACKAGE_TYPE.to_string()),
+            package_type: Some(Self::PACKAGE_TYPE),
             name,
             version,
             description,
@@ -168,7 +168,7 @@ impl PackageParser for CpanMetaYmlParser {
 pub struct CpanManifestParser;
 
 impl PackageParser for CpanManifestParser {
-    const PACKAGE_TYPE: &'static str = "cpan";
+    const PACKAGE_TYPE: PackageType = PackageType::Cpan;
 
     fn is_match(path: &Path) -> bool {
         path.file_name().is_some_and(|name| name == "MANIFEST")
@@ -203,7 +203,7 @@ impl PackageParser for CpanManifestParser {
             .collect();
 
         vec![PackageData {
-            package_type: Some(Self::PACKAGE_TYPE.to_string()),
+            package_type: Some(Self::PACKAGE_TYPE),
             file_references,
             primary_language: Some("Perl".to_string()),
             datasource_id: Some(DatasourceId::CpanManifest),
@@ -214,7 +214,7 @@ impl PackageParser for CpanManifestParser {
 
 fn default_package_data() -> PackageData {
     PackageData {
-        package_type: Some(CpanMetaJsonParser::PACKAGE_TYPE.to_string()),
+        package_type: Some(CpanMetaJsonParser::PACKAGE_TYPE),
         ..Default::default()
     }
 }

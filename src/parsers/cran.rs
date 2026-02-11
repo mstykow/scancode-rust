@@ -30,7 +30,7 @@ use log::warn;
 use packageurl::PackageUrl;
 use regex::Regex;
 
-use crate::models::{DatasourceId, Dependency, PackageData, Party};
+use crate::models::{DatasourceId, Dependency, PackageData, PackageType, Party};
 
 use super::PackageParser;
 
@@ -41,7 +41,7 @@ use super::PackageParser;
 pub struct CranParser;
 
 impl PackageParser for CranParser {
-    const PACKAGE_TYPE: &'static str = "cran";
+    const PACKAGE_TYPE: PackageType = PackageType::Cran;
 
     fn is_match(path: &Path) -> bool {
         path.file_name().is_some_and(|name| name == "DESCRIPTION")
@@ -115,7 +115,7 @@ impl PackageParser for CranParser {
         }
 
         vec![PackageData {
-            package_type: Some("cran".to_string()),
+            package_type: Some(Self::PACKAGE_TYPE),
             namespace: None,
             name,
             version,
@@ -403,7 +403,7 @@ fn create_package_url(name: &Option<String>, version: &Option<String>) -> Option
 
 fn default_package_data() -> PackageData {
     PackageData {
-        package_type: Some("cran".to_string()),
+        package_type: Some(CranParser::PACKAGE_TYPE),
         primary_language: Some("R".to_string()),
         datasource_id: Some(DatasourceId::CranDescription),
         ..Default::default()

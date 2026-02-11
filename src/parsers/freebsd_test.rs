@@ -1,3 +1,4 @@
+use crate::models::PackageType;
 use std::path::PathBuf;
 
 use super::PackageParser;
@@ -47,7 +48,7 @@ fn test_basic_extraction() {
         Some("http://www.nongnu.org/dmidecode/".to_string())
     );
     assert_eq!(pkg.keywords, vec!["sysutils".to_string()]);
-    assert_eq!(pkg.package_type, Some("freebsd".to_string()));
+    assert_eq!(pkg.package_type, Some(PackageType::Freebsd));
     assert_eq!(
         pkg.datasource_id,
         Some(DatasourceId::FreebsdCompactManifest)
@@ -233,7 +234,7 @@ fn test_malformed_json() {
     let pkg = parse_freebsd_manifest(content);
 
     // Should return default package data
-    assert_eq!(pkg.package_type, Some("freebsd".to_string()));
+    assert_eq!(pkg.package_type, Some(PackageType::Freebsd));
     assert_eq!(pkg.name, None);
 }
 
@@ -277,7 +278,7 @@ fn test_extract_from_testdata() {
                 "Version should be present in {}",
                 file_path
             );
-            assert_eq!(pkg.package_type, Some("freebsd".to_string()));
+            assert_eq!(pkg.package_type, Some(PackageType::Freebsd));
             assert_eq!(
                 pkg.datasource_id,
                 Some(DatasourceId::FreebsdCompactManifest)

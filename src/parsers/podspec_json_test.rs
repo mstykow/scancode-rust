@@ -2,6 +2,7 @@
 mod tests {
     use super::super::PackageParser;
     use super::super::podspec_json::PodspecJsonParser;
+    use crate::models::PackageType;
     use std::fs;
     use std::path::PathBuf;
     use tempfile::TempDir;
@@ -50,7 +51,7 @@ mod tests {
         let (_temp_dir, file_path) = create_temp_podspec_json(content);
         let package_data = PodspecJsonParser::extract_first_package(&file_path);
 
-        assert_eq!(package_data.package_type, Some("cocoapods".to_string()));
+        assert_eq!(package_data.package_type, Some(PackageType::Cocoapods));
         assert_eq!(package_data.name, Some("TestPod".to_string()));
         assert_eq!(package_data.version, Some("1.0.0".to_string()));
         assert_eq!(
@@ -380,7 +381,7 @@ mod tests {
         let package_data = PodspecJsonParser::extract_first_package(&file_path);
 
         // Should return default package data
-        assert_eq!(package_data.package_type, Some("cocoapods".to_string()));
+        assert_eq!(package_data.package_type, Some(PackageType::Cocoapods));
         assert_eq!(package_data.name, None);
     }
 

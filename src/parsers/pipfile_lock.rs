@@ -29,7 +29,7 @@ use serde_json::Value as JsonValue;
 use toml::Value as TomlValue;
 use toml::map::Map as TomlMap;
 
-use crate::models::{DatasourceId, Dependency, PackageData};
+use crate::models::{DatasourceId, Dependency, PackageData, PackageType};
 use crate::parsers::python::read_toml_file;
 
 use super::PackageParser;
@@ -55,7 +55,7 @@ const FIELD_PYTHON_VERSION: &str = "python_version";
 pub struct PipfileLockParser;
 
 impl PackageParser for PipfileLockParser {
-    const PACKAGE_TYPE: &'static str = "pypi";
+    const PACKAGE_TYPE: PackageType = PackageType::Pypi;
 
     fn is_match(path: &Path) -> bool {
         path.file_name()
@@ -406,7 +406,7 @@ fn normalize_pypi_name(name: &str) -> String {
 }
 
 fn create_pypi_purl(name: &str, version: Option<&str>) -> Option<String> {
-    let mut purl = PackageUrl::new(PipfileLockParser::PACKAGE_TYPE, name).ok()?;
+    let mut purl = PackageUrl::new(PipfileLockParser::PACKAGE_TYPE.as_str(), name).ok()?;
     if let Some(version) = version
         && purl.with_version(version).is_err()
     {
@@ -418,7 +418,7 @@ fn create_pypi_purl(name: &str, version: Option<&str>) -> Option<String> {
 
 fn default_package_data(datasource_id: Option<DatasourceId>) -> PackageData {
     PackageData {
-        package_type: Some(PipfileLockParser::PACKAGE_TYPE.to_string()),
+        package_type: Some(PipfileLockParser::PACKAGE_TYPE),
         primary_language: Some("Python".to_string()),
         datasource_id,
         ..Default::default()

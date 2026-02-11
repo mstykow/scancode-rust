@@ -3,6 +3,7 @@ mod tests {
     use super::super::PackageParser;
     use super::super::rpm_mariner_manifest::*;
     use crate::models::DatasourceId;
+    use crate::models::PackageType;
     use std::path::PathBuf;
 
     #[test]
@@ -31,7 +32,7 @@ mod tests {
 
         // Check first package
         let pkg1 = &packages[0];
-        assert_eq!(pkg1.package_type.as_deref(), Some("rpm"));
+        assert_eq!(pkg1.package_type, Some(PackageType::Rpm));
         assert_eq!(pkg1.namespace.as_deref(), Some("mariner"));
         assert_eq!(pkg1.name.as_deref(), Some("bash"));
         assert_eq!(pkg1.version.as_deref(), Some("5.0.17"));
@@ -92,7 +93,7 @@ mod tests {
         let packages = parse_rpm_mariner_manifest(content);
         // Should return default package
         assert_eq!(packages.len(), 1);
-        assert_eq!(packages[0].package_type.as_deref(), Some("rpm"));
+        assert_eq!(packages[0].package_type, Some(PackageType::Rpm));
         assert_eq!(packages[0].namespace.as_deref(), Some("mariner"));
         assert_eq!(
             packages[0].datasource_id,

@@ -30,7 +30,7 @@ use packageurl::PackageUrl;
 use regex::Regex;
 use serde_json::Value;
 
-use crate::models::{DatasourceId, Dependency, PackageData, Party};
+use crate::models::{DatasourceId, Dependency, PackageData, PackageType, Party};
 
 use super::PackageParser;
 
@@ -65,7 +65,7 @@ struct ChefPackageFields {
 pub struct ChefMetadataJsonParser;
 
 impl PackageParser for ChefMetadataJsonParser {
-    const PACKAGE_TYPE: &'static str = "chef";
+    const PACKAGE_TYPE: PackageType = PackageType::Chef;
 
     fn is_match(path: &Path) -> bool {
         if path.file_name().is_some_and(|name| name == "metadata.json") {
@@ -183,7 +183,7 @@ fn read_json_file(path: &Path) -> Result<Value, String> {
 
 fn default_package_data() -> PackageData {
     PackageData {
-        package_type: Some(ChefMetadataJsonParser::PACKAGE_TYPE.to_string()),
+        package_type: Some(ChefMetadataJsonParser::PACKAGE_TYPE),
         datasource_id: Some(DatasourceId::ChefCookbookMetadataJson),
         ..Default::default()
     }
@@ -209,7 +209,7 @@ fn extract_description(json: &Value) -> Option<String> {
 pub struct ChefMetadataRbParser;
 
 impl PackageParser for ChefMetadataRbParser {
-    const PACKAGE_TYPE: &'static str = "chef";
+    const PACKAGE_TYPE: PackageType = PackageType::Chef;
 
     fn is_match(path: &Path) -> bool {
         path.file_name().is_some_and(|name| name == "metadata.rb")
@@ -408,7 +408,7 @@ fn build_package(fields: ChefPackageFields) -> PackageData {
         };
 
     PackageData {
-        package_type: Some(ChefMetadataJsonParser::PACKAGE_TYPE.to_string()),
+        package_type: Some(ChefMetadataJsonParser::PACKAGE_TYPE),
         datasource_id: Some(DatasourceId::ChefCookbookMetadataRb),
         name,
         version,

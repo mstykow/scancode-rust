@@ -20,7 +20,7 @@
 //! - v5: Similar to v6 but with different dependency structure
 //! - Direct dependencies tracked via `importers['.'].dependencies`
 
-use crate::models::{DatasourceId, Dependency, PackageData, ResolvedPackage};
+use crate::models::{DatasourceId, Dependency, PackageData, PackageType, ResolvedPackage};
 use crate::parsers::utils::npm_purl;
 use serde_yaml::Value;
 use std::fs;
@@ -35,7 +35,7 @@ use super::yarn_lock::extract_namespace_and_name;
 pub struct PnpmLockParser;
 
 impl PackageParser for PnpmLockParser {
-    const PACKAGE_TYPE: &'static str = "pnpm-lock";
+    const PACKAGE_TYPE: PackageType = PackageType::PnpmLock;
 
     fn is_match(path: &Path) -> bool {
         path.file_name()
@@ -68,7 +68,7 @@ impl PackageParser for PnpmLockParser {
 /// Returns a default empty PackageData for error cases
 fn default_package_data() -> PackageData {
     PackageData {
-        package_type: Some("pnpm-lock".to_string()),
+        package_type: Some(PnpmLockParser::PACKAGE_TYPE),
         extra_data: Some(std::collections::HashMap::new()),
         datasource_id: Some(DatasourceId::PnpmLockYaml),
         ..Default::default()
@@ -195,7 +195,7 @@ fn parse_pnpm_lockfile(lock_data: &Value) -> PackageData {
     let lockfile_version = detect_pnpm_version(lock_data);
 
     let mut result = default_package_data();
-    result.package_type = Some("pnpm-lock".to_string());
+    result.package_type = Some(PackageType::PnpmLock);
 
     // For v9: Build dependency graph to determine dev status
     // For v5/v6: Use dev flag from packages section
@@ -528,7 +528,7 @@ pub fn extract_dependency(
     let all_dependencies = parse_nested_dependencies(data);
 
     let resolved_package = ResolvedPackage {
-        package_type: "npm".to_string(),
+        package_type: PackageType::Npm,
         namespace: namespace.clone().unwrap_or_default(),
         name: name.clone(),
         version: version.clone(),

@@ -101,6 +101,34 @@ Features where Rust exceeds the Python original. Documented in detail at `docs/i
 
 ---
 
+## Future: Missing purl-spec Ecosystems
+
+The following ecosystems are defined in the [purl-spec types index](https://github.com/package-url/purl-spec/blob/main/purl-types-index.json) but are not handled by either ScanCode Python or Rust. These represent potential future improvements.
+
+| purl type | Ecosystem | Manifest files / detection signals | Priority |
+|-----------|-----------|-------------------------------------|----------|
+| `docker` | Docker/OCI | `Dockerfile`, `docker-compose.yml`, image manifests | High |
+| `hex` | Elixir/Erlang | `mix.exs`, `mix.lock` | Medium |
+| `hackage` | Haskell | `*.cabal`, `cabal.project`, `stack.yaml` | Medium |
+| `swid` | SWID tags | `*.swidtag` (ISO 19770-2 XML) | Medium |
+| `julia` | Julia | `Project.toml`, `Manifest.toml` | Low |
+| `luarocks` | Lua | `*.rockspec`, `.luarocks/config.lua` | Low |
+| `alpm` | Arch Linux | `PKGBUILD`, pacman DB entries | Low |
+| `yocto` | Yocto/OE | BitBake recipes (`*.bb`, `*.bbappend`) | Low |
+| `huggingface` | HuggingFace | `config.json` (model cards), no standard manifest | Low |
+| `oci` | OCI images | Image manifests (overlaps with `docker`) | Low |
+| `bitnami` | Bitnami | Bitnami catalog metadata | Low |
+| `mlflow` | MLflow | MLmodel files, model registry API | Low |
+| `otp` | Erlang/OTP | `*.app.src`, `rebar.config` (overlaps with `hex`) | Low |
+| `bitbucket` | Bitbucket | URL-based identification only (no manifest) | Low |
+| `generic` | Generic | Catch-all type, not parseable | N/A |
+| `qpkg` | QNAP NAS | Proprietary format, very niche | N/A |
+| `vscode-extension` | VS Code | `package.json` with `engines.vscode` (subset of npm) | N/A |
+
+High-priority candidates (`docker`, `hex`, `hackage`) have well-defined manifest formats and broad adoption.
+
+---
+
 ## Quality Gates
 
 Every new handler must satisfy:

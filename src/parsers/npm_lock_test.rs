@@ -1,5 +1,6 @@
 #[cfg(test)]
 mod tests {
+    use crate::models::PackageType;
     use crate::parsers::{NpmLockParser, PackageParser};
     use std::fs;
     use std::path::PathBuf;
@@ -59,7 +60,7 @@ mod tests {
         let lock_path = load_testdata_file("package-lock-v1.json");
         let package_data = NpmLockParser::extract_first_package(&lock_path);
 
-        assert_eq!(package_data.package_type, Some("npm".to_string()));
+        assert_eq!(package_data.package_type, Some(PackageType::Npm));
         assert_eq!(package_data.name, Some("babel-runtime".to_string()));
         assert_eq!(package_data.version, Some("6.23.0".to_string()));
         assert_eq!(package_data.namespace, Some("".to_string()));
@@ -99,7 +100,7 @@ mod tests {
         let lock_path = load_testdata_file("package-lock-v2.json");
         let package_data = NpmLockParser::extract_first_package(&lock_path);
 
-        assert_eq!(package_data.package_type, Some("npm".to_string()));
+        assert_eq!(package_data.package_type, Some(PackageType::Npm));
         assert_eq!(package_data.name, Some("megak".to_string()));
         assert_eq!(package_data.version, Some("1.0.0".to_string()));
 
@@ -148,7 +149,7 @@ mod tests {
         let lock_path = load_testdata_file("npm-shrinkwrap.json");
         let package_data = NpmLockParser::extract_first_package(&lock_path);
 
-        assert_eq!(package_data.package_type, Some("npm".to_string()));
+        assert_eq!(package_data.package_type, Some(PackageType::Npm));
         assert_eq!(package_data.name, Some("shrinkwrap-test".to_string()));
         assert_eq!(package_data.version, Some("2.0.0".to_string()));
 
@@ -179,7 +180,7 @@ mod tests {
         let lock_path = load_testdata_file("package-lock-minimal.json");
         let package_data = NpmLockParser::extract_first_package(&lock_path);
 
-        assert_eq!(package_data.package_type, Some("npm".to_string()));
+        assert_eq!(package_data.package_type, Some(PackageType::Npm));
         assert_eq!(package_data.name, Some("minimal-test".to_string()));
         assert_eq!(package_data.version, Some("1.0.0".to_string()));
 
@@ -444,7 +445,7 @@ mod tests {
         let package_data = NpmLockParser::extract_first_package(&path);
 
         // Should return default empty data
-        assert_eq!(package_data.package_type, Some("npm".to_string()));
+        assert_eq!(package_data.package_type, Some(PackageType::Npm));
         assert!(package_data.name.is_none());
         assert!(package_data.dependencies.is_empty());
     }

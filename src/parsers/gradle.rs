@@ -27,7 +27,7 @@ use std::path::Path;
 use log::warn;
 use packageurl::PackageUrl;
 
-use crate::models::{DatasourceId, Dependency, PackageData};
+use crate::models::{DatasourceId, Dependency, PackageData, PackageType};
 use crate::parsers::PackageParser;
 
 /// Parses Gradle build files (build.gradle, build.gradle.kts).
@@ -62,7 +62,7 @@ use crate::parsers::PackageParser;
 pub struct GradleParser;
 
 impl PackageParser for GradleParser {
-    const PACKAGE_TYPE: &'static str = "maven";
+    const PACKAGE_TYPE: PackageType = PackageType::Maven;
 
     fn is_match(path: &Path) -> bool {
         path.file_name().is_some_and(|name| {
@@ -84,7 +84,7 @@ impl PackageParser for GradleParser {
         let dependencies = extract_dependencies(&tokens);
 
         vec![PackageData {
-            package_type: Some(Self::PACKAGE_TYPE.to_string()),
+            package_type: Some(Self::PACKAGE_TYPE),
             namespace: None,
             name: None,
             version: None,
@@ -132,7 +132,7 @@ impl PackageParser for GradleParser {
 
 fn default_package_data() -> PackageData {
     PackageData {
-        package_type: Some("maven".to_string()),
+        package_type: Some(GradleParser::PACKAGE_TYPE),
         datasource_id: Some(DatasourceId::BuildGradle),
         ..Default::default()
     }

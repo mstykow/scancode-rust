@@ -13,7 +13,7 @@ use packageurl::PackageUrl;
 use serde::Deserialize;
 use url::Url;
 
-use crate::models::{DatasourceId, Dependency, PackageData};
+use crate::models::{DatasourceId, Dependency, PackageData, PackageType};
 use crate::parsers::PackageParser;
 
 /// Parses Swift Package Manager lockfiles (Package.resolved).
@@ -42,7 +42,7 @@ use crate::parsers::PackageParser;
 pub struct SwiftPackageResolvedParser;
 
 impl PackageParser for SwiftPackageResolvedParser {
-    const PACKAGE_TYPE: &'static str = "swift";
+    const PACKAGE_TYPE: PackageType = PackageType::Swift;
 
     fn is_match(path: &Path) -> bool {
         path.file_name()
@@ -128,7 +128,7 @@ fn parse_resolved(path: &Path) -> Result<PackageData, String> {
     };
 
     Ok(PackageData {
-        package_type: Some("swift".to_string()),
+        package_type: Some(SwiftPackageResolvedParser::PACKAGE_TYPE),
         namespace: None,
         name: None,
         version: None,
@@ -292,7 +292,7 @@ fn read_file(path: &Path) -> Result<String, String> {
 
 fn default_package_data() -> PackageData {
     PackageData {
-        package_type: Some("swift".to_string()),
+        package_type: Some(SwiftPackageResolvedParser::PACKAGE_TYPE),
         primary_language: Some("Swift".to_string()),
         datasource_id: Some(DatasourceId::SwiftPackageResolved),
         ..Default::default()

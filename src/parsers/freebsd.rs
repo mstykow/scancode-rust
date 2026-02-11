@@ -24,16 +24,16 @@ use std::path::Path;
 use log::warn;
 use serde::Deserialize;
 
-use crate::models::{DatasourceId, PackageData, Party};
+use crate::models::{DatasourceId, PackageData, PackageType, Party};
 use crate::parsers::utils::read_file_to_string;
 
 use super::PackageParser;
 
-const PACKAGE_TYPE: &str = "freebsd";
+const PACKAGE_TYPE: PackageType = PackageType::Freebsd;
 
 fn default_package_data() -> PackageData {
     PackageData {
-        package_type: Some(PACKAGE_TYPE.to_string()),
+        package_type: Some(PACKAGE_TYPE),
         datasource_id: Some(DatasourceId::FreebsdCompactManifest),
         ..Default::default()
     }
@@ -43,7 +43,7 @@ fn default_package_data() -> PackageData {
 pub struct FreebsdCompactManifestParser;
 
 impl PackageParser for FreebsdCompactManifestParser {
-    const PACKAGE_TYPE: &'static str = PACKAGE_TYPE;
+    const PACKAGE_TYPE: PackageType = PACKAGE_TYPE;
 
     fn is_match(path: &Path) -> bool {
         path.file_name()
@@ -143,7 +143,7 @@ pub(crate) fn parse_freebsd_manifest(content: &str) -> PackageData {
 
     PackageData {
         datasource_id: Some(DatasourceId::FreebsdCompactManifest),
-        package_type: Some(PACKAGE_TYPE.to_string()),
+        package_type: Some(PACKAGE_TYPE),
         name,
         version,
         description,

@@ -5,6 +5,7 @@ mod tests {
         NupkgParser, NuspecParser, PackagesConfigParser, PackagesLockParser,
     };
     use crate::models::DatasourceId;
+    use crate::models::PackageType;
     use std::io::Write;
     use std::path::PathBuf;
     use tempfile::NamedTempFile;
@@ -42,7 +43,7 @@ mod tests {
 
         let package_data = PackagesConfigParser::extract_first_package(path);
 
-        assert_eq!(package_data.package_type, Some("nuget".to_string()));
+        assert_eq!(package_data.package_type, Some(PackageType::Nuget));
         assert_eq!(
             package_data.datasource_id,
             Some(DatasourceId::NugetPackagesConfig)
@@ -259,7 +260,7 @@ mod tests {
         let package_data = NuspecParser::extract_first_package(path);
 
         // Should return default package data on error
-        assert_eq!(package_data.package_type, Some("nuget".to_string()));
+        assert_eq!(package_data.package_type, Some(PackageType::Nuget));
         assert_eq!(package_data.datasource_id, Some(DatasourceId::NugetNuspec));
         assert!(package_data.name.is_none());
     }
@@ -353,7 +354,7 @@ mod tests {
 
         let package_data = PackagesLockParser::extract_first_package(path);
 
-        assert_eq!(package_data.package_type, Some("nuget".to_string()));
+        assert_eq!(package_data.package_type, Some(PackageType::Nuget));
         assert_eq!(
             package_data.datasource_id,
             Some(DatasourceId::NugetPackagesLock)
@@ -419,7 +420,7 @@ mod tests {
 
         let package_data = PackagesLockParser::extract_first_package(path);
 
-        assert_eq!(package_data.package_type, Some("nuget".to_string()));
+        assert_eq!(package_data.package_type, Some(PackageType::Nuget));
         assert!(package_data.dependencies.is_empty());
     }
 

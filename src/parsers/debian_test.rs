@@ -1,6 +1,7 @@
 #[cfg(test)]
 mod tests {
     use crate::models::DatasourceId;
+    use crate::models::PackageType;
     use crate::parsers::PackageParser;
     use crate::parsers::debian::*;
     use std::path::PathBuf;
@@ -41,7 +42,7 @@ mod tests {
         assert_eq!(packages.len(), 1);
 
         let package = &packages[0];
-        assert_eq!(package.package_type, Some("deb".to_string()));
+        assert_eq!(package.package_type, Some(PackageType::Deb));
         assert_eq!(
             package.datasource_id,
             Some(DatasourceId::DebianMd5SumsInExtractedDeb)
@@ -83,7 +84,7 @@ mod tests {
         assert_eq!(packages.len(), 1);
 
         let package = &packages[0];
-        assert_eq!(package.package_type, Some("deb".to_string()));
+        assert_eq!(package.package_type, Some(PackageType::Deb));
         assert_eq!(
             package.datasource_id,
             Some(DatasourceId::DebianMd5SumsInExtractedDeb)
@@ -159,7 +160,7 @@ mod tests {
         assert_eq!(packages.len(), 1);
 
         let pkg = &packages[0];
-        assert_eq!(pkg.package_type, Some("deb".to_string()));
+        assert_eq!(pkg.package_type, Some(PackageType::Deb));
         assert_eq!(
             pkg.datasource_id,
             Some(DatasourceId::DebianControlExtractedDeb)
@@ -193,7 +194,7 @@ mod tests {
         assert_eq!(packages.len(), 1);
 
         let pkg = &packages[0];
-        assert_eq!(pkg.package_type, Some("deb".to_string()));
+        assert_eq!(pkg.package_type, Some(PackageType::Deb));
         assert_eq!(
             pkg.datasource_id,
             Some(DatasourceId::DebianControlExtractedDeb)

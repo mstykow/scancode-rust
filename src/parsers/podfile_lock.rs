@@ -26,7 +26,7 @@ use std::path::Path;
 use log::warn;
 use serde_yaml::Value;
 
-use crate::models::{DatasourceId, Dependency, PackageData, ResolvedPackage};
+use crate::models::{DatasourceId, Dependency, PackageData, PackageType, ResolvedPackage};
 
 use super::PackageParser;
 
@@ -49,7 +49,7 @@ const PRIMARY_LANGUAGE: &str = "Objective-C";
 pub struct PodfileLockParser;
 
 impl PackageParser for PodfileLockParser {
-    const PACKAGE_TYPE: &'static str = "cocoapods";
+    const PACKAGE_TYPE: PackageType = PackageType::Cocoapods;
 
     fn is_match(path: &Path) -> bool {
         path.file_name()
@@ -271,7 +271,7 @@ fn build_pod_dependency(
     }
 
     let resolved_package = ResolvedPackage {
-        package_type: PodfileLockParser::PACKAGE_TYPE.to_string(),
+        package_type: PodfileLockParser::PACKAGE_TYPE,
         namespace: namespace.clone().unwrap_or_default(),
         name: name.clone(),
         version: version.clone().unwrap_or_default(),
@@ -447,7 +447,7 @@ fn process_external_source(mapping: &serde_yaml::Mapping) -> String {
 
 fn default_package_data() -> PackageData {
     PackageData {
-        package_type: Some(PodfileLockParser::PACKAGE_TYPE.to_string()),
+        package_type: Some(PodfileLockParser::PACKAGE_TYPE),
         primary_language: Some(PRIMARY_LANGUAGE.to_string()),
         datasource_id: Some(DatasourceId::CocoapodsPodfileLock),
         ..Default::default()

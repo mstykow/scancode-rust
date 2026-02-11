@@ -1,3 +1,4 @@
+use crate::models::PackageType;
 // Tests for gradle.lockfile parser
 
 use std::io::Write;
@@ -122,7 +123,7 @@ fn test_parse_gradle_lockfile_empty_file() {
     let package_data = GradleLockfileParser::extract_first_package(path);
 
     assert_eq!(package_data.dependencies.len(), 0);
-    assert_eq!(package_data.package_type, Some("maven".to_string()));
+    assert_eq!(package_data.package_type, Some(PackageType::Maven));
 }
 
 #[test]
@@ -155,7 +156,7 @@ fn test_parse_gradle_lockfile_dependency_flags() {
     assert_eq!(dep.is_runtime, Some(true));
     assert_eq!(
         dep.resolved_package.as_ref().unwrap().package_type,
-        "maven".to_string()
+        PackageType::Maven
     );
 }
 
@@ -346,7 +347,7 @@ org.hamcrest:hamcrest-core:1.3=3x2w1v0u9t8s7r6q5p4o3n2m1l0k9j8i7"#;
         assert_eq!(dep.is_pinned, Some(true));
         assert_eq!(
             dep.resolved_package.as_ref().unwrap().package_type,
-            "maven".to_string()
+            PackageType::Maven
         );
     }
 }
@@ -389,7 +390,7 @@ fn test_package_data_default_values() {
     assert_eq!(package_data.version, None);
 
     // Should have correct package type
-    assert_eq!(package_data.package_type, Some("maven".to_string()));
+    assert_eq!(package_data.package_type, Some(PackageType::Maven));
 
     // Verify empty/default fields
     assert!(package_data.parties.is_empty());

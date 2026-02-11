@@ -8,6 +8,7 @@ use std::path::PathBuf;
 mod rpm_license_files_tests {
     use super::*;
     use crate::models::DatasourceId;
+    use crate::models::PackageType;
 
     #[test]
     fn test_is_match_copying_file() {
@@ -82,7 +83,7 @@ mod rpm_license_files_tests {
         assert_eq!(packages.len(), 1);
         let pkg = &packages[0];
 
-        assert_eq!(pkg.package_type, Some("rpm".to_string()));
+        assert_eq!(pkg.package_type, Some(PackageType::Rpm));
         assert_eq!(pkg.datasource_id, Some(DatasourceId::RpmPackageLicenses));
         assert_eq!(pkg.namespace, Some("mariner".to_string()));
         assert_eq!(pkg.name, Some("openssl".to_string()));
@@ -97,7 +98,7 @@ mod rpm_license_files_tests {
         assert_eq!(packages.len(), 1);
         let pkg = &packages[0];
 
-        assert_eq!(pkg.package_type, Some("rpm".to_string()));
+        assert_eq!(pkg.package_type, Some(PackageType::Rpm));
         assert_eq!(pkg.datasource_id, Some(DatasourceId::RpmPackageLicenses));
         assert_eq!(pkg.namespace, Some("mariner".to_string()));
         assert_eq!(pkg.name, Some("glibc".to_string()));
@@ -134,7 +135,7 @@ mod rpm_license_files_tests {
             assert_eq!(packages.len(), 1);
 
             let pkg = &packages[0];
-            assert_eq!(pkg.package_type, Some("rpm".to_string()));
+            assert_eq!(pkg.package_type, Some(PackageType::Rpm));
             assert_eq!(pkg.datasource_id, Some(DatasourceId::RpmPackageLicenses));
             assert_eq!(pkg.namespace, Some("mariner".to_string()));
             assert!(pkg.name.is_some());

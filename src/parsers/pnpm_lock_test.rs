@@ -1,4 +1,5 @@
 use super::pnpm_lock::*;
+use crate::models::PackageType;
 use crate::parsers::PackageParser;
 use std::path::PathBuf;
 
@@ -30,7 +31,7 @@ fn test_extract_from_testdata_v5() {
 
     let data = PnpmLockParser::extract_first_package(&test_data_path);
 
-    assert_eq!(data.package_type, Some("pnpm-lock".to_string()));
+    assert_eq!(data.package_type, Some(PackageType::PnpmLock));
     assert!(
         !data.dependencies.is_empty(),
         "Should extract packages from v5 lockfile"
@@ -46,7 +47,7 @@ fn test_extract_from_testdata_v6() {
 
     let data = PnpmLockParser::extract_first_package(&test_data_path);
 
-    assert_eq!(data.package_type, Some("pnpm-lock".to_string()));
+    assert_eq!(data.package_type, Some(PackageType::PnpmLock));
     assert!(
         !data.dependencies.is_empty(),
         "Should extract packages from v6 lockfile"
@@ -62,7 +63,7 @@ fn test_extract_from_testdata_v9() {
 
     let data = PnpmLockParser::extract_first_package(&test_data_path);
 
-    assert_eq!(data.package_type, Some("pnpm-lock".to_string()));
+    assert_eq!(data.package_type, Some(PackageType::PnpmLock));
     assert!(
         !data.dependencies.is_empty(),
         "Should extract packages from v9 lockfile"
@@ -224,7 +225,7 @@ fn test_pnpm_dev_dependencies_v6() {
 
     let data = PnpmLockParser::extract_first_package(&test_data_path);
 
-    assert_eq!(data.package_type, Some("pnpm-lock".to_string()));
+    assert_eq!(data.package_type, Some(PackageType::PnpmLock));
     assert!(!data.dependencies.is_empty());
 
     let dev_deps: Vec<_> = data

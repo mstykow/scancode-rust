@@ -14,7 +14,7 @@
 //! - Package URL (purl) generation
 //!
 //! # Implementation Notes
-//! - Uses RFC 822-like format parsing via `rfc822` module
+//! - Uses custom case-sensitive key-value parser (not the generic `rfc822` module)
 //! - Database stored in text format with multi-paragraph records
 //! - Graceful error handling with `warn!()` logs
 
@@ -23,16 +23,16 @@ use std::path::Path;
 
 use log::warn;
 
-use crate::models::{DatasourceId, Dependency, FileReference, PackageData, Party};
+use crate::models::{DatasourceId, Dependency, FileReference, PackageData, PackageType, Party};
 use crate::parsers::utils::{read_file_to_string, split_name_email};
 
 use super::PackageParser;
 
-const PACKAGE_TYPE: &str = "alpine";
+const PACKAGE_TYPE: PackageType = PackageType::Alpine;
 
 fn default_package_data(datasource_id: DatasourceId) -> PackageData {
     PackageData {
-        package_type: Some(PACKAGE_TYPE.to_string()),
+        package_type: Some(PACKAGE_TYPE),
         datasource_id: Some(datasource_id),
         ..Default::default()
     }
@@ -42,7 +42,7 @@ fn default_package_data(datasource_id: DatasourceId) -> PackageData {
 pub struct AlpineInstalledParser;
 
 impl PackageParser for AlpineInstalledParser {
-    const PACKAGE_TYPE: &'static str = PACKAGE_TYPE;
+    const PACKAGE_TYPE: PackageType = PACKAGE_TYPE;
 
     fn is_match(path: &Path) -> bool {
         path.to_str()
@@ -220,7 +220,7 @@ fn parse_alpine_package_paragraph(
 
     PackageData {
         datasource_id: Some(DatasourceId::AlpineInstalledDb),
-        package_type: Some(PACKAGE_TYPE.to_string()),
+        package_type: Some(PACKAGE_TYPE),
         namespace: namespace.clone(),
         name: name.clone(),
         version: version.clone(),
@@ -344,7 +344,7 @@ fn build_alpine_purl(
 ) -> Option<String> {
     use packageurl::PackageUrl;
 
-    let mut purl = PackageUrl::new(PACKAGE_TYPE, name).ok()?;
+    let mut purl = PackageUrl::new(PACKAGE_TYPE.as_str(), name).ok()?;
 
     if let Some(ver) = version {
         purl.with_version(ver).ok()?;
@@ -361,7 +361,7 @@ fn build_alpine_purl(
 pub struct AlpineApkParser;
 
 impl PackageParser for AlpineApkParser {
-    const PACKAGE_TYPE: &'static str = PACKAGE_TYPE;
+    const PACKAGE_TYPE: PackageType = PACKAGE_TYPE;
 
     fn is_match(path: &Path) -> bool {
         path.extension().and_then(|e| e.to_str()) == Some("apk")
@@ -373,7 +373,7 @@ impl PackageParser for AlpineApkParser {
             Err(e) => {
                 warn!("Failed to extract .apk archive {:?}: {}", path, e);
                 PackageData {
-                    package_type: Some(PACKAGE_TYPE.to_string()),
+                    package_type: Some(PACKAGE_TYPE),
                     datasource_id: Some(DatasourceId::AlpineApkArchive),
                     ..Default::default()
                 }
@@ -495,7 +495,7 @@ fn parse_pkginfo(content: &str) -> PackageData {
 
     PackageData {
         datasource_id: Some(DatasourceId::AlpineApkArchive),
-        package_type: Some(PACKAGE_TYPE.to_string()),
+        package_type: Some(PACKAGE_TYPE),
         namespace: Some("alpine".to_string()),
         name,
         version,

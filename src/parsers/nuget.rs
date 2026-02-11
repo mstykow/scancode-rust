@@ -3,14 +3,17 @@
 //! Extracts package metadata and dependencies from .NET/NuGet ecosystem files:
 //! - packages.config (legacy .NET Framework format)
 //! - .nuspec (NuGet package specification)
+//! - packages.lock.json (NuGet lock file)
+//! - .nupkg (NuGet package archive — metadata extraction)
 //!
 //! # Supported Formats
 //! - packages.config (XML)
 //! - *.nuspec (XML)
+//! - packages.lock.json (JSON)
+//! - *.nupkg (ZIP archive with .nuspec inside)
 //!
 //! # Key Features
 //! - Dependency extraction with targetFramework support
-//! - License normalization using askalono
 //! - Dependency groups by framework version
 //! - Package URL (purl) generation
 //!
@@ -28,7 +31,7 @@ use packageurl::PackageUrl;
 use quick_xml::Reader;
 use quick_xml::events::Event;
 
-use crate::models::{DatasourceId, Dependency, PackageData, Party};
+use crate::models::{DatasourceId, Dependency, PackageData, PackageType, Party};
 
 use super::PackageParser;
 
@@ -72,7 +75,7 @@ fn build_nuget_description(
 pub struct PackagesConfigParser;
 
 impl PackageParser for PackagesConfigParser {
-    const PACKAGE_TYPE: &'static str = "nuget";
+    const PACKAGE_TYPE: PackageType = PackageType::Nuget;
 
     fn is_match(path: &Path) -> bool {
         path.file_name()
@@ -119,7 +122,7 @@ impl PackageParser for PackagesConfigParser {
 
         vec![PackageData {
             datasource_id: Some(DatasourceId::NugetPackagesConfig),
-            package_type: Some(Self::PACKAGE_TYPE.to_string()),
+            package_type: Some(Self::PACKAGE_TYPE),
             dependencies,
             ..default_package_data(Some(DatasourceId::NugetPackagesConfig))
         }]
@@ -130,7 +133,7 @@ impl PackageParser for PackagesConfigParser {
 pub struct NuspecParser;
 
 impl PackageParser for NuspecParser {
-    const PACKAGE_TYPE: &'static str = "nuget";
+    const PACKAGE_TYPE: PackageType = PackageType::Nuget;
 
     fn is_match(path: &Path) -> bool {
         path.extension()
@@ -369,7 +372,7 @@ impl PackageParser for NuspecParser {
 
         vec![PackageData {
             datasource_id: Some(DatasourceId::NugetNuspec),
-            package_type: Some(Self::PACKAGE_TYPE.to_string()),
+            package_type: Some(Self::PACKAGE_TYPE),
             name,
             version,
             purl,
@@ -477,7 +480,7 @@ fn parse_nuspec_dependency(
 
 fn default_package_data(datasource_id: Option<DatasourceId>) -> PackageData {
     PackageData {
-        package_type: Some("nuget".to_string()),
+        package_type: Some(PackagesConfigParser::PACKAGE_TYPE),
         datasource_id,
         ..Default::default()
     }
@@ -491,7 +494,7 @@ const MAX_COMPRESSION_RATIO: f64 = 100.0; // 100:1
 pub struct PackagesLockParser;
 
 impl PackageParser for PackagesLockParser {
-    const PACKAGE_TYPE: &'static str = "nuget";
+    const PACKAGE_TYPE: PackageType = PackageType::Nuget;
 
     fn is_match(path: &Path) -> bool {
         path.file_name()
@@ -586,7 +589,7 @@ impl PackageParser for PackagesLockParser {
 
         vec![PackageData {
             datasource_id: Some(DatasourceId::NugetPackagesLock),
-            package_type: Some(Self::PACKAGE_TYPE.to_string()),
+            package_type: Some(Self::PACKAGE_TYPE),
             dependencies,
             ..default_package_data(Some(DatasourceId::NugetPackagesLock))
         }]
@@ -597,7 +600,7 @@ impl PackageParser for PackagesLockParser {
 pub struct NupkgParser;
 
 impl PackageParser for NupkgParser {
-    const PACKAGE_TYPE: &'static str = "nuget";
+    const PACKAGE_TYPE: PackageType = PackageType::Nuget;
 
     fn is_match(path: &Path) -> bool {
         path.extension()
@@ -867,7 +870,7 @@ fn parse_nuspec_content(content: &str) -> Result<PackageData, String> {
 
     Ok(PackageData {
         datasource_id: Some(DatasourceId::NugetNupkg),
-        package_type: Some("nuget".to_string()),
+        package_type: Some(NupkgParser::PACKAGE_TYPE),
         name,
         version,
         description,

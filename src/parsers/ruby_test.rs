@@ -5,6 +5,7 @@
 #[cfg(test)]
 mod tests {
     use crate::models::DatasourceId;
+    use crate::models::PackageType;
     use crate::parsers::PackageParser;
     use crate::parsers::ruby::{GemfileLockParser, GemfileParser, strip_freeze_suffix};
     use std::fs;
@@ -72,7 +73,7 @@ gem "rspec", ">= 3.0"
         let (_temp_dir, gemfile_path) = create_temp_gemfile(content);
         let package_data = GemfileParser::extract_first_package(&gemfile_path);
 
-        assert_eq!(package_data.package_type, Some("gem".to_string()));
+        assert_eq!(package_data.package_type, Some(PackageType::Gem));
         assert!(package_data.dependencies.len() >= 2);
 
         // Check rake dependency
@@ -194,7 +195,7 @@ end
         let lockfile_path = PathBuf::from("testdata/ruby/Gemfile.lock");
         let package_data = GemfileLockParser::extract_first_package(&lockfile_path);
 
-        assert_eq!(package_data.package_type, Some("gem".to_string()));
+        assert_eq!(package_data.package_type, Some(PackageType::Gem));
 
         // Should have extracted gems from the GEM section
         assert!(!package_data.dependencies.is_empty());
@@ -461,7 +462,7 @@ gem "specific-range", ">= 1.0.0", "< 1.5.0", "!= 1.2.3"
         let package_data = GemfileLockParser::extract_first_package(&lockfile_path);
 
         // Should handle empty lockfile gracefully
-        assert_eq!(package_data.package_type, Some("gem".to_string()));
+        assert_eq!(package_data.package_type, Some(PackageType::Gem));
         // No gems means empty dependencies
         assert!(
             package_data.dependencies.is_empty(),
@@ -519,7 +520,7 @@ gem "specific-range", ">= 1.0.0", "< 1.5.0", "!= 1.2.3"
         let gemfile_path = PathBuf::from("testdata/ruby/Gemfile");
         let package_data = GemfileParser::extract_first_package(&gemfile_path);
 
-        assert_eq!(package_data.package_type, Some("gem".to_string()));
+        assert_eq!(package_data.package_type, Some(PackageType::Gem));
         assert!(!package_data.dependencies.is_empty());
 
         // Should have rake dependency
@@ -545,7 +546,7 @@ gem "specific-range", ">= 1.0.0", "< 1.5.0", "!= 1.2.3"
         let lockfile_path = PathBuf::from("testdata/ruby/Gemfile.lock");
         let package_data = GemfileLockParser::extract_first_package(&lockfile_path);
 
-        assert_eq!(package_data.package_type, Some("gem".to_string()));
+        assert_eq!(package_data.package_type, Some(PackageType::Gem));
         assert!(!package_data.dependencies.is_empty());
 
         // Verify bundler version is captured
@@ -644,7 +645,7 @@ gem "specific-range", ">= 1.0.0", "< 1.5.0", "!= 1.2.3"
         let gemspec_path = PathBuf::from("testdata/ruby/basic.gemspec");
         let package_data = GemspecParser::extract_first_package(&gemspec_path);
 
-        assert_eq!(package_data.package_type, Some("gem".to_string()));
+        assert_eq!(package_data.package_type, Some(PackageType::Gem));
         assert_eq!(package_data.name, Some("example-gem".to_string()));
         assert_eq!(package_data.version, Some("1.2.3".to_string()));
         assert_eq!(
@@ -1098,7 +1099,7 @@ gem "rails", "7.0.4"
         let gem_path = PathBuf::from("testdata/ruby/example-gem-1.2.3.gem");
         let package_data = GemArchiveParser::extract_first_package(&gem_path);
 
-        assert_eq!(package_data.package_type, Some("gem".to_string()));
+        assert_eq!(package_data.package_type, Some(PackageType::Gem));
         assert_eq!(package_data.name, Some("example-gem".to_string()));
         assert_eq!(package_data.version, Some("1.2.3".to_string()));
         assert_eq!(
@@ -1857,7 +1858,7 @@ platform: ruby
         let gemfile_path = PathBuf::from("testdata/gem/extracted-gemfile/data.gz-extract/Gemfile");
         let package_data = GemfileParser::extract_first_package(&gemfile_path);
 
-        assert_eq!(package_data.package_type, Some("gem".to_string()));
+        assert_eq!(package_data.package_type, Some(PackageType::Gem));
         assert!(!package_data.dependencies.is_empty());
 
         let rake_dep = package_data
@@ -1874,7 +1875,7 @@ platform: ruby
             PathBuf::from("testdata/gem/extracted-gemfile-lock/data.gz-extract/Gemfile.lock");
         let package_data = GemfileLockParser::extract_first_package(&lockfile_path);
 
-        assert_eq!(package_data.package_type, Some("gem".to_string()));
+        assert_eq!(package_data.package_type, Some(PackageType::Gem));
         assert!(!package_data.dependencies.is_empty());
     }
 
@@ -1885,7 +1886,7 @@ platform: ruby
             PathBuf::from("testdata/gem/extracted-gemspec/data.gz-extract/example.gemspec");
         let package_data = GemspecParser::extract_first_package(&gemspec_path);
 
-        assert_eq!(package_data.package_type, Some("gem".to_string()));
+        assert_eq!(package_data.package_type, Some(PackageType::Gem));
         assert_eq!(package_data.name, Some("example-gem".to_string()));
     }
 
@@ -1896,7 +1897,7 @@ platform: ruby
             PathBuf::from("testdata/gem/specifications/specifications/example.gemspec");
         let package_data = GemspecParser::extract_first_package(&gemspec_path);
 
-        assert_eq!(package_data.package_type, Some("gem".to_string()));
+        assert_eq!(package_data.package_type, Some(PackageType::Gem));
         assert_eq!(package_data.name, Some("example-gem".to_string()));
     }
 
@@ -1906,7 +1907,7 @@ platform: ruby
         let metadata_path = PathBuf::from("testdata/gem/extracted/metadata.gz-extract");
         let package_data = GemMetadataExtractedParser::extract_first_package(&metadata_path);
 
-        assert_eq!(package_data.package_type, Some("gem".to_string()));
+        assert_eq!(package_data.package_type, Some(PackageType::Gem));
         assert_eq!(package_data.name, Some("example-gem".to_string()));
         assert_eq!(package_data.version, Some("1.2.3".to_string()));
         assert_eq!(

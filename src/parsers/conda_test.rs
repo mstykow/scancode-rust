@@ -5,6 +5,7 @@ mod tests {
         CondaEnvironmentYmlParser, CondaMetaYamlParser, apply_jinja2_substitutions,
         extract_jinja2_variables, parse_conda_requirement,
     };
+    use crate::models::PackageType;
     use std::collections::HashMap;
     use std::path::PathBuf;
 
@@ -245,7 +246,7 @@ package:
         let package_data = CondaMetaYamlParser::extract_first_package(&path);
 
         // Basic package info
-        assert_eq!(package_data.package_type, Some("conda".to_string()));
+        assert_eq!(package_data.package_type, Some(PackageType::Conda));
         assert_eq!(package_data.name, Some("abeona".to_string()));
         assert_eq!(package_data.version, Some("0.45.0".to_string()));
 
@@ -362,7 +363,7 @@ package:
         let package_data = CondaEnvironmentYmlParser::extract_first_package(&path);
 
         // Basic info
-        assert_eq!(package_data.package_type, Some("conda".to_string()));
+        assert_eq!(package_data.package_type, Some(PackageType::Conda));
         assert_eq!(package_data.name, Some("ringer".to_string()));
         assert_eq!(package_data.version, None);
         assert_eq!(package_data.primary_language, Some("Python".to_string()));

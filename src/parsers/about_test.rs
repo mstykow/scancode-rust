@@ -1,6 +1,7 @@
 #[cfg(test)]
 mod tests {
     use crate::models::DatasourceId;
+    use crate::models::PackageType;
     use std::path::PathBuf;
 
     use crate::parsers::PackageParser;
@@ -38,7 +39,7 @@ mod tests {
         let path = PathBuf::from("testdata/about/appdirs.ABOUT");
         let result = AboutFileParser::extract_first_package(&path);
 
-        assert_eq!(result.package_type, Some("about".to_string()));
+        assert_eq!(result.package_type, Some(PackageType::About));
         assert_eq!(result.name, Some("appdirs".to_string()));
         assert_eq!(result.version, Some("1.4.3".to_string()));
         assert_eq!(
@@ -94,7 +95,7 @@ version: 1.0.0
 
         let result = AboutFileParser::extract_first_package(&file_path);
 
-        assert_eq!(result.package_type, Some("about".to_string()));
+        assert_eq!(result.package_type, Some(PackageType::About));
         assert_eq!(result.name, Some("test-package".to_string()));
         assert_eq!(result.version, Some("1.0.0".to_string()));
         assert_eq!(result.homepage_url, None);
@@ -121,7 +122,7 @@ purl: pkg:pypi/django@3.2.0
         let result = AboutFileParser::extract_first_package(&file_path);
 
         // Type should be extracted from purl
-        assert_eq!(result.package_type, Some("pypi".to_string()));
+        assert_eq!(result.package_type, Some(PackageType::Pypi));
         assert_eq!(result.name, Some("django".to_string()));
         assert_eq!(result.version, Some("3.2.0".to_string()));
         assert_eq!(result.purl, Some("pkg:pypi/django@3.2.0".to_string()));
@@ -143,8 +144,8 @@ version: 2.0.0
 
         let result = AboutFileParser::extract_first_package(&file_path);
 
-        // Type from explicit field should take precedence
-        assert_eq!(result.package_type, Some("custom-type".to_string()));
+        // Unknown type falls back to default "about" since "custom-type" is not a valid PackageType
+        assert_eq!(result.package_type, Some(PackageType::About));
         assert_eq!(result.name, Some("mypackage".to_string()));
         assert_eq!(result.version, Some("2.0.0".to_string()));
     }
@@ -164,7 +165,7 @@ purl: pkg:npm/%40babel/core@7.0.0
         let result = AboutFileParser::extract_first_package(&file_path);
 
         // Should extract namespace from purl
-        assert_eq!(result.package_type, Some("npm".to_string()));
+        assert_eq!(result.package_type, Some(PackageType::Npm));
         assert_eq!(result.namespace, Some("@babel".to_string()));
         assert_eq!(result.name, Some("core".to_string()));
         assert_eq!(result.version, Some("7.0.0".to_string()));
@@ -210,7 +211,7 @@ homepage_url: https://example.com/homepage
         let path = PathBuf::from("testdata/about/apipkg.ABOUT");
         let result = AboutFileParser::extract_first_package(&path);
 
-        assert_eq!(result.package_type, Some("about".to_string()));
+        assert_eq!(result.package_type, Some(PackageType::About));
         assert_eq!(result.name, Some("apipkg".to_string()));
         assert_eq!(result.version, Some("1.4".to_string()));
         assert_eq!(

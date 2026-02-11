@@ -1,5 +1,6 @@
 #[cfg(test)]
 mod tests {
+    use crate::models::PackageType;
     use crate::models::{DatasourceId, Dependency};
     use crate::parsers::{PackageParser, PythonParser};
     use crate::test_utils::compare_package_data_parser_only;
@@ -62,7 +63,7 @@ numpy = ">=1.20.0"
         let (_temp_file, file_path) = create_temp_file(content, "pyproject.toml");
         let package_data = PythonParser::extract_first_package(&file_path);
 
-        assert_eq!(package_data.package_type, Some("pypi".to_string()));
+        assert_eq!(package_data.package_type, Some(PackageType::Pypi));
         assert_eq!(package_data.name, Some("test-package".to_string()));
         assert_eq!(package_data.version, Some("0.1.0".to_string()));
         assert_eq!(
@@ -87,7 +88,7 @@ numpy = ">=1.20.0"
         let file_path = PathBuf::from("testdata/python/pyproject.toml");
         let package_data = PythonParser::extract_first_package(&file_path);
 
-        assert_eq!(package_data.package_type, Some("pypi".to_string()));
+        assert_eq!(package_data.package_type, Some(PackageType::Pypi));
         assert_eq!(package_data.name, Some("test-package".to_string()));
         assert_eq!(package_data.version, Some("0.1.0".to_string()));
         assert_eq!(
@@ -149,7 +150,7 @@ setup(
         let (_temp_file, file_path) = create_temp_file(content, "setup.py");
         let package_data = PythonParser::extract_first_package(&file_path);
 
-        assert_eq!(package_data.package_type, Some("pypi".to_string()));
+        assert_eq!(package_data.package_type, Some(PackageType::Pypi));
         assert_eq!(package_data.name, Some("test-package".to_string()));
         assert_eq!(package_data.version, Some("0.1.0".to_string()));
         assert_eq!(
@@ -786,7 +787,7 @@ Test package description.
 
         let package_data = PythonParser::extract_first_package(&wheel_path);
 
-        assert_eq!(package_data.package_type, Some("pypi".to_string()));
+        assert_eq!(package_data.package_type, Some(PackageType::Pypi));
         assert_eq!(package_data.name, Some("atomicwrites".to_string()));
         assert_eq!(package_data.version, Some("1.2.1".to_string()));
         assert_eq!(
@@ -828,7 +829,7 @@ Test package description.
 
         let package_data = PythonParser::extract_first_package(&egg_path);
 
-        assert_eq!(package_data.package_type, Some("pypi".to_string()));
+        assert_eq!(package_data.package_type, Some(PackageType::Pypi));
         assert_eq!(package_data.name, Some("commoncode".to_string()));
         assert_eq!(package_data.version, Some("21.5.12".to_string()));
         assert_eq!(
@@ -996,7 +997,7 @@ Test package description.
         let test_file = PathBuf::from("testdata/python/pip-inspect/pip-inspect.deplock");
         let package_data = PythonParser::extract_first_package(&test_file);
 
-        assert_eq!(package_data.package_type, Some("pypi".to_string()));
+        assert_eq!(package_data.package_type, Some(PackageType::Pypi));
         assert_eq!(package_data.name, Some("univers".to_string()));
         assert_eq!(package_data.version, Some("0.0.0".to_string()));
         assert_eq!(package_data.primary_language, Some("Python".to_string()));

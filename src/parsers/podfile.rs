@@ -27,7 +27,7 @@ use log::warn;
 use packageurl::PackageUrl;
 use regex::Regex;
 
-use crate::models::{DatasourceId, Dependency, PackageData};
+use crate::models::{DatasourceId, Dependency, PackageData, PackageType};
 use crate::parsers::PackageParser;
 
 /// Parses CocoaPods Podfile dependency files.
@@ -44,7 +44,7 @@ use crate::parsers::PackageParser;
 pub struct PodfileParser;
 
 impl PackageParser for PodfileParser {
-    const PACKAGE_TYPE: &'static str = "cocoapods";
+    const PACKAGE_TYPE: PackageType = PackageType::Cocoapods;
 
     fn is_match(path: &Path) -> bool {
         path.file_name().is_some_and(|name| {
@@ -65,7 +65,7 @@ impl PackageParser for PodfileParser {
         let dependencies = extract_dependencies(&content);
 
         vec![PackageData {
-            package_type: Some(Self::PACKAGE_TYPE.to_string()),
+            package_type: Some(Self::PACKAGE_TYPE),
             namespace: None,
             name: None,
             version: None,
@@ -113,7 +113,7 @@ impl PackageParser for PodfileParser {
 
 fn default_package_data() -> PackageData {
     PackageData {
-        package_type: Some("cocoapods".to_string()),
+        package_type: Some(PodfileParser::PACKAGE_TYPE),
         primary_language: Some("Objective-C".to_string()),
         datasource_id: Some(DatasourceId::CocoapodsPodfile),
         ..Default::default()

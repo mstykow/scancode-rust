@@ -1,5 +1,6 @@
 #[cfg(test)]
 mod tests {
+    use crate::models::PackageType;
     use crate::parsers::{NpmParser, PackageParser};
     use serde_json::Value;
     use std::fs;
@@ -31,7 +32,7 @@ mod tests {
             .unwrap();
         let package_data = NpmParser::extract_first_package(&package_path);
 
-        assert_eq!(package_data.package_type, Some("npm".to_string()));
+        assert_eq!(package_data.package_type, Some(PackageType::Npm));
         assert_eq!(package_data.name, Some("@example/test-package".to_string()));
         assert_eq!(package_data.version, Some("1.0.0".to_string()));
         assert_eq!(
@@ -83,7 +84,7 @@ mod tests {
             .unwrap();
         let package_data = NpmParser::extract_first_package(&package_path);
 
-        assert_eq!(package_data.package_type, Some("npm".to_string()));
+        assert_eq!(package_data.package_type, Some(PackageType::Npm));
         assert_eq!(package_data.name, Some("@example/test-package".to_string()));
         assert_eq!(package_data.version, Some("1.0.0".to_string()));
         assert_eq!(
@@ -141,7 +142,7 @@ mod tests {
         let (_temp_file, package_path) = create_temp_package_json(content);
         let package_data = NpmParser::extract_first_package(&package_path);
 
-        assert_eq!(package_data.package_type, Some("npm".to_string()));
+        assert_eq!(package_data.package_type, Some(PackageType::Npm));
         assert_eq!(package_data.name, Some("test-package".to_string()));
         assert_eq!(package_data.version, Some("1.0.0".to_string()));
         assert_eq!(

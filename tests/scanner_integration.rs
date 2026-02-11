@@ -1,6 +1,7 @@
 use glob::Pattern;
 use indicatif::ProgressBar;
 use scancode_rust::askalono::{ScanStrategy, Store};
+use scancode_rust::models::PackageType;
 use scancode_rust::parsers::list_parser_types;
 use scancode_rust::{FileType, process};
 use std::sync::Arc;
@@ -46,13 +47,13 @@ fn test_scanner_discovers_all_registered_parsers() {
     // Verify each parser was invoked
     let has_npm = package_files
         .iter()
-        .any(|f| f.package_data[0].package_type == Some("npm".to_string()));
+        .any(|f| f.package_data[0].package_type == Some(PackageType::Npm));
     let has_pypi = package_files
         .iter()
-        .any(|f| f.package_data[0].package_type == Some("pypi".to_string()));
+        .any(|f| f.package_data[0].package_type == Some(PackageType::Pypi));
     let has_cargo = package_files
         .iter()
-        .any(|f| f.package_data[0].package_type == Some("cargo".to_string()));
+        .any(|f| f.package_data[0].package_type == Some(PackageType::Cargo));
 
     assert!(has_npm, "NpmParser should be invoked");
     assert!(has_pypi, "PythonParser should be invoked");

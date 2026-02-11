@@ -8,11 +8,9 @@
 //!
 //! # Key Features
 //! - Dependency extraction with feature flags and optional dependencies
-//! - License declaration normalization using askalono
 //! - `is_pinned` analysis (exact version vs range specifiers)
 //! - Package URL (purl) generation
-//! - Property value resolution (nested table references)
-//! - License file reading support
+//! - Workspace inheritance detection (stores `"workspace"` markers in extra_data)
 //!
 //! # Implementation Notes
 //! - Uses toml crate for parsing
@@ -20,7 +18,7 @@
 //! - Graceful error handling with `warn!()` logs
 //! - Direct dependencies: all in manifest are direct (no lockfile)
 
-use crate::models::{DatasourceId, Dependency, PackageData, Party};
+use crate::models::{DatasourceId, Dependency, PackageData, PackageType, Party};
 use crate::parsers::utils::split_name_email;
 use log::warn;
 use packageurl::PackageUrl;
@@ -55,7 +53,7 @@ const FIELD_EDITION: &str = "edition";
 pub struct CargoParser;
 
 impl PackageParser for CargoParser {
-    const PACKAGE_TYPE: &'static str = "cargo";
+    const PACKAGE_TYPE: PackageType = PackageType::Cargo;
 
     fn extract_packages(path: &Path) -> Vec<PackageData> {
         let toml_content = match read_cargo_toml(path) {
@@ -134,7 +132,7 @@ impl PackageParser for CargoParser {
         let extra_data = extract_extra_data(&toml_content);
 
         vec![PackageData {
-            package_type: Some(Self::PACKAGE_TYPE.to_string()),
+            package_type: Some(Self::PACKAGE_TYPE),
             namespace: None,
             name,
             version,
@@ -201,7 +199,7 @@ fn generate_cargo_api_url(name: &Option<String>, _version: &Option<String>) -> O
 
 fn create_package_url(name: &Option<String>, version: &Option<String>) -> Option<String> {
     name.as_ref().and_then(|name| {
-        let mut package_url = match PackageUrl::new(CargoParser::PACKAGE_TYPE, name) {
+        let mut package_url = match PackageUrl::new(CargoParser::PACKAGE_TYPE.as_str(), name) {
             Ok(p) => p,
             Err(e) => {
                 warn!(
@@ -366,7 +364,7 @@ fn extract_dependencies(toml_content: &Value, scope: &str) -> Vec<Dependency> {
 
             // Only create dependency if we have a version or it's a table with other data
             if extracted_requirement.is_some() || !extra_data_map.is_empty() {
-                let purl = match PackageUrl::new(CargoParser::PACKAGE_TYPE, name) {
+                let purl = match PackageUrl::new(CargoParser::PACKAGE_TYPE.as_str(), name) {
                     Ok(p) => p.to_string(),
                     Err(e) => {
                         warn!(

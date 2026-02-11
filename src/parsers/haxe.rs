@@ -16,7 +16,7 @@
 //! - License must be one of: GPL, LGPL, BSD, Public, MIT, Apache
 //! - All fields are extracted with graceful error handling
 
-use crate::models::{DatasourceId, Dependency, PackageData, Party};
+use crate::models::{DatasourceId, Dependency, PackageData, PackageType, Party};
 use log::warn;
 use packageurl::PackageUrl;
 use serde::{Deserialize, Serialize};
@@ -34,7 +34,7 @@ use super::PackageParser;
 pub struct HaxeParser;
 
 impl PackageParser for HaxeParser {
-    const PACKAGE_TYPE: &'static str = "haxe";
+    const PACKAGE_TYPE: PackageType = PackageType::Haxe;
 
     fn is_match(path: &Path) -> bool {
         path.file_name().is_some_and(|name| name == "haxelib.json")
@@ -107,7 +107,7 @@ impl PackageParser for HaxeParser {
         }
 
         vec![PackageData {
-            package_type: Some("haxe".to_string()),
+            package_type: Some(Self::PACKAGE_TYPE),
             namespace: None,
             name,
             version,
@@ -239,7 +239,7 @@ fn create_dep_package_url(name: &str, version: &str, is_pinned: bool) -> Option<
 
 fn default_package_data() -> PackageData {
     PackageData {
-        package_type: Some("haxe".to_string()),
+        package_type: Some(HaxeParser::PACKAGE_TYPE),
         primary_language: Some("Haxe".to_string()),
         datasource_id: Some(DatasourceId::HaxelibJson),
         ..Default::default()
@@ -266,7 +266,7 @@ mod tests {
         let haxelib_path = PathBuf::from("testdata/haxe/basic/haxelib.json");
         let package_data = HaxeParser::extract_first_package(&haxelib_path);
 
-        assert_eq!(package_data.package_type, Some("haxe".to_string()));
+        assert_eq!(package_data.package_type, Some(PackageType::Haxe));
         assert_eq!(package_data.name, Some("haxelib".to_string()));
         assert_eq!(package_data.version, Some("3.4.0".to_string()));
         assert_eq!(
@@ -365,7 +365,7 @@ mod tests {
         let package_data = HaxeParser::extract_first_package(&nonexistent_path);
 
         // Should return default data with proper type and datasource
-        assert_eq!(package_data.package_type, Some("haxe".to_string()));
+        assert_eq!(package_data.package_type, Some(PackageType::Haxe));
         assert_eq!(package_data.datasource_id, Some(DatasourceId::HaxelibJson));
         assert!(package_data.name.is_none());
     }

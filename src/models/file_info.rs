@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use super::DatasourceId;
+use super::PackageType;
 use crate::utils::spdx::combine_license_expressions;
 
 #[derive(Debug, Builder, Serialize)]
@@ -148,7 +149,7 @@ impl FileInfo {
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct PackageData {
     #[serde(rename = "type")] // name used by ScanCode
-    pub package_type: Option<String>,
+    pub package_type: Option<PackageType>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub namespace: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -327,7 +328,7 @@ pub struct Dependency {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ResolvedPackage {
     #[serde(rename = "type")]
-    pub package_type: String,
+    pub package_type: PackageType,
     #[serde(skip_serializing_if = "String::is_empty")]
     pub namespace: String,
     pub name: String,
@@ -415,7 +416,7 @@ pub struct FileReference {
 #[derive(Serialize, Debug, Clone)]
 pub struct Package {
     #[serde(rename = "type")]
-    pub package_type: Option<String>,
+    pub package_type: Option<PackageType>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub namespace: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -512,7 +513,7 @@ impl Package {
             .unwrap_or_default();
 
         Package {
-            package_type: package_data.package_type.clone(),
+            package_type: package_data.package_type,
             namespace: package_data.namespace.clone(),
             name: package_data.name.clone(),
             version: package_data.version.clone(),

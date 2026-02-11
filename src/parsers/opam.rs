@@ -25,7 +25,8 @@ use std::path::Path;
 use log::warn;
 use regex::Regex;
 
-use crate::models::{DatasourceId, Dependency, PackageData, Party};
+use crate::models::{DatasourceId, Dependency, PackageData, PackageType, Party};
+use crate::parsers::PackageParser;
 
 /// Parser for OCaml OPAM package manifest files.
 ///
@@ -33,8 +34,8 @@ use crate::models::{DatasourceId, Dependency, PackageData, Party};
 /// Reference: <https://opam.ocaml.org/doc/Manual.html#Common-file-format>
 pub struct OpamParser;
 
-impl crate::parsers::PackageParser for OpamParser {
-    const PACKAGE_TYPE: &'static str = "opam";
+impl PackageParser for OpamParser {
+    const PACKAGE_TYPE: PackageType = PackageType::Opam;
 
     fn is_match(path: &Path) -> bool {
         path.file_name().is_some_and(|name| {
@@ -76,7 +77,7 @@ struct OpamData {
 
 fn default_package_data() -> PackageData {
     PackageData {
-        package_type: Some("opam".to_string()),
+        package_type: Some(OpamParser::PACKAGE_TYPE),
         primary_language: Some("Ocaml".to_string()),
         datasource_id: Some(DatasourceId::OpamFile),
         ..Default::default()
@@ -95,7 +96,7 @@ fn parse_opam(text: &str) -> PackageData {
         build_opam_urls(&opam_data.name, &opam_data.version);
 
     PackageData {
-        package_type: Some("opam".to_string()),
+        package_type: Some(OpamParser::PACKAGE_TYPE),
         namespace: None,
         name: opam_data.name,
         version: opam_data.version,

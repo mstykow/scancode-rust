@@ -6,6 +6,9 @@
 //! # Supported Formats
 //! - Gemfile (manifest with Ruby DSL)
 //! - Gemfile.lock (lockfile with state machine sections)
+//! - *.gemspec (gem specification files)
+//! - *.gem (gem archive packages)
+//! - metadata.gz-extract (pre-extracted gem metadata)
 //!
 //! # Key Features
 //! - State machine parsing for Gemfile.lock sections (GEM, GIT, PATH, SVN, PLATFORMS, BUNDLED WITH, DEPENDENCIES)
@@ -21,7 +24,7 @@
 //! - Graceful error handling: logs warnings and returns default on parse failure
 //! - PURL type: "gem"
 
-use crate::models::{DatasourceId, Dependency, PackageData, Party};
+use crate::models::{DatasourceId, Dependency, PackageData, PackageType, Party};
 use crate::parsers::utils::split_name_email;
 use flate2::read::GzDecoder;
 use log::warn;
@@ -35,7 +38,7 @@ use tar::Archive;
 
 use super::PackageParser;
 
-const PACKAGE_TYPE: &str = "gem";
+const PACKAGE_TYPE: PackageType = PackageType::Gem;
 
 // =============================================================================
 // Bug Fix #1: Strip .freeze suffix from strings
@@ -66,7 +69,7 @@ pub fn strip_freeze_suffix(s: &str) -> &str {
 pub struct GemfileParser;
 
 impl PackageParser for GemfileParser {
-    const PACKAGE_TYPE: &'static str = PACKAGE_TYPE;
+    const PACKAGE_TYPE: PackageType = PACKAGE_TYPE;
 
     fn extract_packages(path: &Path) -> Vec<PackageData> {
         let content = match fs::read_to_string(path) {
@@ -218,7 +221,7 @@ fn parse_gemfile(content: &str) -> PackageData {
     }
 
     PackageData {
-        package_type: Some(PACKAGE_TYPE.to_string()),
+        package_type: Some(PACKAGE_TYPE),
         primary_language: Some("Ruby".to_string()),
         dependencies,
         datasource_id: Some(DatasourceId::Gemfile),
@@ -247,7 +250,7 @@ fn looks_like_version_constraint(s: &str) -> bool {
 pub struct GemfileLockParser;
 
 impl PackageParser for GemfileLockParser {
-    const PACKAGE_TYPE: &'static str = PACKAGE_TYPE;
+    const PACKAGE_TYPE: PackageType = PACKAGE_TYPE;
 
     fn extract_packages(path: &Path) -> Vec<PackageData> {
         let content = match fs::read_to_string(path) {
@@ -587,7 +590,7 @@ fn parse_gemfile_lock(content: &str) -> PackageData {
         .unwrap_or(None);
 
     PackageData {
-        package_type: Some(PACKAGE_TYPE.to_string()),
+        package_type: Some(PACKAGE_TYPE),
         name: package_name,
         version: package_version,
         primary_language: Some("Ruby".to_string()),
@@ -666,7 +669,7 @@ fn parse_version_platform(s: &str) -> (Option<String>, Option<String>) {
 
 /// Creates a gem PURL.
 fn create_gem_purl(name: &str, version: Option<&str>) -> Option<String> {
-    let mut purl = match PackageUrl::new(PACKAGE_TYPE, name) {
+    let mut purl = match PackageUrl::new(PACKAGE_TYPE.as_str(), name) {
         Ok(p) => p,
         Err(e) => {
             warn!("Failed to create PURL for gem '{}': {}", name, e);
@@ -768,7 +771,7 @@ fn get_rubygems_urls(
 /// Returns a default PackageData with gem-specific settings.
 fn default_package_data() -> PackageData {
     PackageData {
-        package_type: Some(PACKAGE_TYPE.to_string()),
+        package_type: Some(PACKAGE_TYPE),
         primary_language: Some("Ruby".to_string()),
         ..Default::default()
     }
@@ -786,7 +789,7 @@ fn default_package_data() -> PackageData {
 pub struct GemspecParser;
 
 impl PackageParser for GemspecParser {
-    const PACKAGE_TYPE: &'static str = PACKAGE_TYPE;
+    const PACKAGE_TYPE: PackageType = PACKAGE_TYPE;
 
     fn extract_packages(path: &Path) -> Vec<PackageData> {
         let content = match fs::read_to_string(path) {
@@ -1150,7 +1153,7 @@ fn parse_gemspec(content: &str) -> PackageData {
         };
 
     PackageData {
-        package_type: Some(PACKAGE_TYPE.to_string()),
+        package_type: Some(PACKAGE_TYPE),
         name,
         version,
         primary_language: Some("Ruby".to_string()),
@@ -1188,7 +1191,7 @@ const MAX_COMPRESSION_RATIO: f64 = 100.0; // 100:1 ratio
 pub struct GemArchiveParser;
 
 impl PackageParser for GemArchiveParser {
-    const PACKAGE_TYPE: &'static str = PACKAGE_TYPE;
+    const PACKAGE_TYPE: PackageType = PACKAGE_TYPE;
 
     fn extract_packages(path: &Path) -> Vec<PackageData> {
         vec![match extract_gem_archive(path) {
@@ -1438,7 +1441,7 @@ fn parse_gem_metadata_yaml(
     };
 
     Ok(PackageData {
-        package_type: Some(PACKAGE_TYPE.to_string()),
+        package_type: Some(PACKAGE_TYPE),
         name,
         version,
         qualifiers,
@@ -1564,7 +1567,7 @@ fn parse_gem_yaml_dependencies(yaml: &serde_yaml::Value) -> Vec<Dependency> {
 pub struct GemMetadataExtractedParser;
 
 impl PackageParser for GemMetadataExtractedParser {
-    const PACKAGE_TYPE: &'static str = PACKAGE_TYPE;
+    const PACKAGE_TYPE: PackageType = PACKAGE_TYPE;
 
     fn extract_packages(path: &Path) -> Vec<PackageData> {
         vec![match extract_gem_metadata_extracted(path) {

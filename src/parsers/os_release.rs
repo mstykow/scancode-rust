@@ -19,7 +19,7 @@
 //! - Comments start with #
 //! - Spec: https://www.freedesktop.org/software/systemd/man/os-release.html
 
-use crate::models::DatasourceId;
+use crate::models::{DatasourceId, PackageType};
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
@@ -30,13 +30,13 @@ use crate::models::PackageData;
 
 use super::PackageParser;
 
-const PACKAGE_TYPE: &str = "linux-distro";
+const PACKAGE_TYPE: PackageType = PackageType::LinuxDistro;
 
 /// Parser for Linux OS release metadata files
 pub struct OsReleaseParser;
 
 impl PackageParser for OsReleaseParser {
-    const PACKAGE_TYPE: &'static str = PACKAGE_TYPE;
+    const PACKAGE_TYPE: PackageType = PACKAGE_TYPE;
 
     fn is_match(path: &Path) -> bool {
         path.to_str()
@@ -49,7 +49,7 @@ impl PackageParser for OsReleaseParser {
             Err(e) => {
                 warn!("Failed to read os-release file {:?}: {}", path, e);
                 return vec![PackageData {
-                    package_type: Some(PACKAGE_TYPE.to_string()),
+                    package_type: Some(PACKAGE_TYPE),
                     datasource_id: Some(DatasourceId::EtcOsRelease),
                     ..Default::default()
                 }];
@@ -80,7 +80,7 @@ pub(crate) fn parse_os_release(content: &str) -> PackageData {
     let code_view_url = fields.get("SUPPORT_URL").cloned();
 
     PackageData {
-        package_type: Some(PACKAGE_TYPE.to_string()),
+        package_type: Some(PACKAGE_TYPE),
         namespace: Some(namespace.to_string()),
         name: Some(name.to_string()),
         version: version_id,

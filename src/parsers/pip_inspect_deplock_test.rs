@@ -3,6 +3,7 @@ mod tests {
     use super::super::PackageParser;
     use super::super::pip_inspect_deplock::*;
     use crate::models::DatasourceId;
+    use crate::models::PackageType;
     use std::path::PathBuf;
 
     #[test]
@@ -60,7 +61,7 @@ mod tests {
         );
         assert_eq!(pkg.description.as_deref(), Some("Python HTTP for Humans."));
         assert_eq!(pkg.keywords, vec!["http,requests".to_string()]);
-        assert_eq!(pkg.package_type.as_deref(), Some("pypi"));
+        assert_eq!(pkg.package_type, Some(PackageType::Pypi));
         assert_eq!(pkg.primary_language.as_deref(), Some("Python"));
         assert_eq!(pkg.datasource_id, Some(DatasourceId::PypiInspectDeplock));
         assert!(pkg.is_virtual);
@@ -111,7 +112,7 @@ mod tests {
         let pkg = parse_pip_inspect_deplock(content);
 
         // Should return default package
-        assert_eq!(pkg.package_type.as_deref(), Some("pypi"));
+        assert_eq!(pkg.package_type, Some(PackageType::Pypi));
         assert_eq!(pkg.datasource_id, Some(DatasourceId::PypiInspectDeplock));
     }
 
@@ -121,7 +122,7 @@ mod tests {
         let pkg = parse_pip_inspect_deplock(content);
 
         // Should return default package on parse error
-        assert_eq!(pkg.package_type.as_deref(), Some("pypi"));
+        assert_eq!(pkg.package_type, Some(PackageType::Pypi));
         assert_eq!(pkg.datasource_id, Some(DatasourceId::PypiInspectDeplock));
     }
 }

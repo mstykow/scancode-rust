@@ -1,5 +1,6 @@
 mod tests {
     use crate::models::Dependency;
+    use crate::models::PackageType;
     use crate::parsers::{ComposerJsonParser, ComposerLockParser, PackageParser};
     use serde_json::Value;
     use std::fs;
@@ -241,7 +242,7 @@ mod tests {
         let (_temp_dir, composer_path) = create_temp_file("composer.json", content);
         let package_data = ComposerJsonParser::extract_first_package(&composer_path);
 
-        assert_eq!(package_data.package_type, Some("composer".to_string()));
+        assert_eq!(package_data.package_type, Some(PackageType::Composer));
         assert!(package_data.name.is_none());
         assert!(package_data.dependencies.is_empty());
     }

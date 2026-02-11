@@ -1,6 +1,7 @@
 #[cfg(test)]
 mod tests {
     use crate::models::DatasourceId;
+    use crate::models::PackageType;
     use crate::parsers::PackageParser;
     use crate::parsers::swift_manifest_json::{
         SwiftManifestJsonParser, dump_package_cached, get_namespace_and_name,
@@ -34,7 +35,7 @@ mod tests {
         let path = PathBuf::from("testdata/swift/Package.swift.json");
         let data = SwiftManifestJsonParser::extract_first_package(&path);
 
-        assert_eq!(data.package_type, Some("swift".to_string()));
+        assert_eq!(data.package_type, Some(PackageType::Swift));
         assert_eq!(data.name, Some("MapboxMaps".to_string()));
         assert_eq!(data.namespace, None);
         assert_eq!(data.version, None);
@@ -93,7 +94,7 @@ mod tests {
         let path = PathBuf::from("testdata/swift/Package.swift.deplock");
         let data = SwiftManifestJsonParser::extract_first_package(&path);
 
-        assert_eq!(data.package_type, Some("swift".to_string()));
+        assert_eq!(data.package_type, Some(PackageType::Swift));
         assert_eq!(data.name, Some("VercelUI".to_string()));
         assert_eq!(data.purl, Some("pkg:swift/VercelUI".to_string()));
 

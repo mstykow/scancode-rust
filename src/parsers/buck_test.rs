@@ -1,5 +1,7 @@
 //! Tests for Buck BUILD and METADATA.bzl parsers
 
+use crate::models::PackageType;
+
 use std::path::PathBuf;
 
 use crate::parsers::PackageParser;
@@ -14,7 +16,7 @@ fn test_parse_buck_with_rules() {
     let path = PathBuf::from("testdata/buck/parse/BUCK");
     let pkg = BuckBuildParser::extract_first_package(&path);
 
-    assert_eq!(pkg.package_type, Some("buck".to_string()));
+    assert_eq!(pkg.package_type, Some(PackageType::Buck));
     assert_eq!(pkg.name, Some("app".to_string()));
 }
 
@@ -23,7 +25,7 @@ fn test_parse_empty_buck_fallback() {
     let path = PathBuf::from("testdata/buck/end2end/BUCK");
     let pkg = BuckBuildParser::extract_first_package(&path);
 
-    assert_eq!(pkg.package_type, Some("buck".to_string()));
+    assert_eq!(pkg.package_type, Some(PackageType::Buck));
     assert_eq!(pkg.name, Some("end2end".to_string()));
 }
 
@@ -32,7 +34,7 @@ fn test_parse_buck_subdir_with_rule() {
     let path = PathBuf::from("testdata/buck/end2end/subdir2/BUCK");
     let pkg = BuckBuildParser::extract_first_package(&path);
 
-    assert_eq!(pkg.package_type, Some("buck".to_string()));
+    assert_eq!(pkg.package_type, Some(PackageType::Buck));
     // This BUCK file has a cxx_binary rule with name="bin"
     assert_eq!(pkg.name, Some("bin".to_string()));
     assert_eq!(pkg.extracted_license_statement, Some("LICENSE".to_string()));
@@ -51,7 +53,7 @@ android_binary(
     std::fs::write(&buck_path, content).unwrap();
 
     let pkg = BuckBuildParser::extract_first_package(&buck_path);
-    assert_eq!(pkg.package_type, Some("buck".to_string()));
+    assert_eq!(pkg.package_type, Some(PackageType::Buck));
     assert_eq!(pkg.name, Some("my-app".to_string()));
 }
 
@@ -68,7 +70,7 @@ android_library(
     std::fs::write(&buck_path, content).unwrap();
 
     let pkg = BuckBuildParser::extract_first_package(&buck_path);
-    assert_eq!(pkg.package_type, Some("buck".to_string()));
+    assert_eq!(pkg.package_type, Some(PackageType::Buck));
     assert_eq!(pkg.name, Some("my-lib".to_string()));
 }
 
@@ -85,7 +87,7 @@ java_binary(
     std::fs::write(&buck_path, content).unwrap();
 
     let pkg = BuckBuildParser::extract_first_package(&buck_path);
-    assert_eq!(pkg.package_type, Some("buck".to_string()));
+    assert_eq!(pkg.package_type, Some(PackageType::Buck));
     assert_eq!(pkg.name, Some("my-app".to_string()));
 }
 
@@ -107,7 +109,7 @@ android_binary(
     std::fs::write(&buck_path, content).unwrap();
 
     let pkg = BuckBuildParser::extract_first_package(&buck_path);
-    assert_eq!(pkg.package_type, Some("buck".to_string()));
+    assert_eq!(pkg.package_type, Some(PackageType::Buck));
     assert_eq!(pkg.name, Some("app".to_string()));
 }
 
@@ -130,7 +132,7 @@ android_binary(
 
     let pkg = BuckBuildParser::extract_first_package(&buck_path);
     // Should return first rule
-    assert_eq!(pkg.package_type, Some("buck".to_string()));
+    assert_eq!(pkg.package_type, Some(PackageType::Buck));
     assert_eq!(pkg.name, Some("app1".to_string()));
 }
 
@@ -143,7 +145,7 @@ fn test_parse_metadata_bzl_basic() {
     let path = PathBuf::from("testdata/buck/metadata/METADATA.bzl");
     let pkg = BuckMetadataBzlParser::extract_first_package(&path);
 
-    assert_eq!(pkg.package_type, Some("github".to_string()));
+    assert_eq!(pkg.package_type, Some(PackageType::Github));
     assert_eq!(pkg.name, Some("example".to_string()));
     assert_eq!(pkg.version, Some("0.0.1".to_string()));
     assert_eq!(
@@ -175,7 +177,7 @@ fn test_parse_metadata_bzl_new_format() {
     let path = PathBuf::from("testdata/buck/metadata/new-format-METADATA.bzl");
     let pkg = BuckMetadataBzlParser::extract_first_package(&path);
 
-    assert_eq!(pkg.package_type, Some("github".to_string()));
+    assert_eq!(pkg.package_type, Some(PackageType::Github));
     assert_eq!(pkg.name, Some("example/example".to_string()));
     assert_eq!(pkg.version, Some("0.0.1".to_string()));
     assert_eq!(
@@ -276,7 +278,7 @@ fn test_metadata_bzl_empty_file() {
     std::fs::write(&metadata_path, content).unwrap();
 
     let pkg = BuckMetadataBzlParser::extract_first_package(&metadata_path);
-    assert_eq!(pkg.package_type, Some("buck".to_string()));
+    assert_eq!(pkg.package_type, Some(PackageType::Buck));
     assert_eq!(pkg.name, None);
 }
 
@@ -292,7 +294,7 @@ OTHER_VAR = {
     std::fs::write(&metadata_path, content).unwrap();
 
     let pkg = BuckMetadataBzlParser::extract_first_package(&metadata_path);
-    assert_eq!(pkg.package_type, Some("buck".to_string()));
+    assert_eq!(pkg.package_type, Some(PackageType::Buck));
     assert_eq!(pkg.name, None);
 }
 
@@ -306,7 +308,7 @@ METADATA = {{{
     std::fs::write(&metadata_path, content).unwrap();
 
     let pkg = BuckMetadataBzlParser::extract_first_package(&metadata_path);
-    assert_eq!(pkg.package_type, Some("buck".to_string()));
+    assert_eq!(pkg.package_type, Some(PackageType::Buck));
 }
 
 #[test]
@@ -315,7 +317,7 @@ fn test_metadata_bzl_with_package_url() {
     let pkg = BuckMetadataBzlParser::extract_first_package(&path);
 
     // package_url should override type, namespace, name, version
-    assert_eq!(pkg.package_type, Some("maven".to_string()));
+    assert_eq!(pkg.package_type, Some(PackageType::Maven));
     assert_eq!(
         pkg.namespace,
         Some("androidx.compose.animation".to_string())

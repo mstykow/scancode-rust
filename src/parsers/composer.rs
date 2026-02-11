@@ -8,7 +8,6 @@
 //!
 //! # Key Features
 //! - Dependency extraction from require and require-dev
-//! - License normalization using askalono
 //! - PSR-4 autoload and repository metadata capture
 //! - Locked dependency versions with dist/source hashes
 //!
@@ -26,7 +25,7 @@ use log::warn;
 use packageurl::PackageUrl;
 use serde_json::Value;
 
-use crate::models::{DatasourceId, Dependency, PackageData, Party, ResolvedPackage};
+use crate::models::{DatasourceId, Dependency, PackageData, PackageType, Party, ResolvedPackage};
 
 use super::PackageParser;
 
@@ -58,7 +57,7 @@ const FIELD_DIST: &str = "dist";
 pub struct ComposerJsonParser;
 
 impl PackageParser for ComposerJsonParser {
-    const PACKAGE_TYPE: &'static str = "composer";
+    const PACKAGE_TYPE: PackageType = PackageType::Composer;
 
     fn extract_packages(path: &Path) -> Vec<PackageData> {
         let json_content = match read_json_file(path) {
@@ -122,7 +121,7 @@ impl PackageParser for ComposerJsonParser {
         let parties = extract_parties(&json_content, &namespace);
 
         vec![PackageData {
-            package_type: Some(Self::PACKAGE_TYPE.to_string()),
+            package_type: Some(Self::PACKAGE_TYPE),
             namespace: namespace.clone(),
             name: name.clone(),
             version: version.clone(),
@@ -184,7 +183,7 @@ impl PackageParser for ComposerJsonParser {
 pub struct ComposerLockParser;
 
 impl PackageParser for ComposerLockParser {
-    const PACKAGE_TYPE: &'static str = "composer";
+    const PACKAGE_TYPE: PackageType = PackageType::Composer;
 
     fn extract_packages(path: &Path) -> Vec<PackageData> {
         let json_content = match read_json_file(path) {
@@ -388,7 +387,7 @@ fn build_lock_dependency(
     };
 
     let resolved_package = ResolvedPackage {
-        package_type: ComposerLockParser::PACKAGE_TYPE.to_string(),
+        package_type: ComposerLockParser::PACKAGE_TYPE,
         namespace: namespace.clone().unwrap_or_default(),
         name: package_name.clone(),
         version: version.to_string(),
@@ -677,7 +676,7 @@ fn build_package_purl(
     version: &Option<String>,
 ) -> Option<String> {
     let name = name.as_ref()?;
-    let mut package_url = match PackageUrl::new(ComposerJsonParser::PACKAGE_TYPE, name) {
+    let mut package_url = match PackageUrl::new(ComposerJsonParser::PACKAGE_TYPE.as_str(), name) {
         Ok(purl) => purl,
         Err(e) => {
             warn!(
@@ -716,7 +715,7 @@ fn build_dependency_purl(
     name: &str,
     version: Option<&str>,
 ) -> Option<String> {
-    let mut package_url = match PackageUrl::new(ComposerJsonParser::PACKAGE_TYPE, name) {
+    let mut package_url = match PackageUrl::new(ComposerJsonParser::PACKAGE_TYPE.as_str(), name) {
         Ok(purl) => purl,
         Err(e) => {
             warn!(
@@ -818,7 +817,7 @@ fn is_composer_version_pinned(version: &str) -> bool {
 
 fn default_package_data(datasource_id: Option<DatasourceId>) -> PackageData {
     PackageData {
-        package_type: Some(ComposerJsonParser::PACKAGE_TYPE.to_string()),
+        package_type: Some(ComposerJsonParser::PACKAGE_TYPE),
         primary_language: Some("PHP".to_string()),
         datasource_id,
         ..Default::default()

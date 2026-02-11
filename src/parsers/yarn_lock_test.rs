@@ -1,5 +1,6 @@
 #[cfg(test)]
 mod tests {
+    use crate::models::PackageType;
     use crate::parsers::yarn_lock::{
         detect_yarn_version, extract_namespace_and_name, parse_yarn_v1_requirement,
         parse_yarn_v2_resolution,
@@ -56,7 +57,7 @@ abbrev@1:
         let lock_path = load_testdata_file("yarn-v1.lock");
         let package_data = YarnLockParser::extract_first_package(&lock_path);
 
-        assert_eq!(package_data.package_type, Some("npm".to_string()));
+        assert_eq!(package_data.package_type, Some(PackageType::Npm));
         assert!(!package_data.dependencies.is_empty());
     }
 
@@ -65,7 +66,7 @@ abbrev@1:
         let lock_path = load_testdata_file("yarn-v2.lock");
         let package_data = YarnLockParser::extract_first_package(&lock_path);
 
-        assert_eq!(package_data.package_type, Some("npm".to_string()));
+        assert_eq!(package_data.package_type, Some(PackageType::Npm));
         assert!(!package_data.dependencies.is_empty());
 
         for dep in &package_data.dependencies {
@@ -307,7 +308,7 @@ __metadata:
         let (_temp_dir, path) = create_temp_lock_file(content);
         let package_data = YarnLockParser::extract_first_package(&path);
 
-        assert_eq!(package_data.package_type, Some("npm".to_string()));
+        assert_eq!(package_data.package_type, Some(PackageType::Npm));
         assert!(package_data.dependencies.is_empty());
     }
 
@@ -318,7 +319,7 @@ __metadata:
         let (_temp_dir, path) = create_temp_lock_file(content);
         let package_data = YarnLockParser::extract_first_package(&path);
 
-        assert_eq!(package_data.package_type, Some("npm".to_string()));
+        assert_eq!(package_data.package_type, Some(PackageType::Npm));
         assert!(package_data.dependencies.is_empty());
     }
 
@@ -328,7 +329,7 @@ __metadata:
         let result = YarnLockParser::extract_first_package(&path);
 
         // Should return default PackageData, not panic
-        assert_eq!(result.package_type, Some("npm".to_string()));
+        assert_eq!(result.package_type, Some(PackageType::Npm));
         assert!(result.dependencies.is_empty()); // No valid data extracted
         // Test passes if we get here (no panic occurred)
     }

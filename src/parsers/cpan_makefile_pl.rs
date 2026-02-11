@@ -22,7 +22,7 @@ use packageurl::PackageUrl;
 use regex::Regex;
 use serde_json::json;
 
-use crate::models::{DatasourceId, Dependency, PackageData, Party};
+use crate::models::{DatasourceId, Dependency, PackageData, PackageType, Party};
 
 use super::PackageParser;
 
@@ -42,12 +42,12 @@ static RE_DEP_PAIR: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r#"['"]([^'"]+)['"]\s*=>\s*(?:'([^']*)'|"([^"]*)"|(\d+))"#).unwrap()
 });
 
-const PACKAGE_TYPE: &str = "cpan";
+const PACKAGE_TYPE: PackageType = PackageType::Cpan;
 
 pub struct CpanMakefilePlParser;
 
 impl PackageParser for CpanMakefilePlParser {
-    const PACKAGE_TYPE: &'static str = PACKAGE_TYPE;
+    const PACKAGE_TYPE: PackageType = PACKAGE_TYPE;
 
     fn is_match(path: &Path) -> bool {
         path.file_name().is_some_and(|name| name == "Makefile.PL")
@@ -59,7 +59,7 @@ impl PackageParser for CpanMakefilePlParser {
             Err(e) => {
                 warn!("Failed to read Makefile.PL file {:?}: {}", path, e);
                 return vec![PackageData {
-                    package_type: Some(PACKAGE_TYPE.to_string()),
+                    package_type: Some(PACKAGE_TYPE),
                     primary_language: Some("Perl".to_string()),
                     datasource_id: Some(DatasourceId::CpanMakefile),
                     ..Default::default()
@@ -111,7 +111,7 @@ pub(crate) fn parse_makefile_pl(content: &str) -> PackageData {
     });
 
     PackageData {
-        package_type: Some(PACKAGE_TYPE.to_string()),
+        package_type: Some(PACKAGE_TYPE),
         namespace: Some("cpan".to_string()),
         name,
         version,
@@ -133,7 +133,7 @@ pub(crate) fn parse_makefile_pl(content: &str) -> PackageData {
 
 fn default_package_data() -> PackageData {
     PackageData {
-        package_type: Some(PACKAGE_TYPE.to_string()),
+        package_type: Some(PACKAGE_TYPE),
         primary_language: Some("Perl".to_string()),
         datasource_id: Some(DatasourceId::CpanMakefile),
         ..Default::default()

@@ -16,7 +16,7 @@
 //! - Located in conda-meta/ directory in rootfs
 //! - Spec: https://docs.conda.io/
 
-use crate::models::DatasourceId;
+use crate::models::{DatasourceId, PackageType};
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
@@ -29,11 +29,11 @@ use crate::models::PackageData;
 
 use super::PackageParser;
 
-const PACKAGE_TYPE: &str = "conda";
+const PACKAGE_TYPE: PackageType = PackageType::Conda;
 
 fn default_package_data() -> PackageData {
     PackageData {
-        package_type: Some(PACKAGE_TYPE.to_string()),
+        package_type: Some(PACKAGE_TYPE),
         primary_language: Some("Python".to_string()),
         datasource_id: Some(DatasourceId::CondaMetaJson),
         ..Default::default()
@@ -62,7 +62,7 @@ struct CondaMetaJson {
 }
 
 impl PackageParser for CondaMetaJsonParser {
-    const PACKAGE_TYPE: &'static str = PACKAGE_TYPE;
+    const PACKAGE_TYPE: PackageType = PACKAGE_TYPE;
 
     fn is_match(path: &Path) -> bool {
         path.to_str()
@@ -128,7 +128,7 @@ pub(crate) fn parse_conda_meta_json(content: &str) -> PackageData {
     };
 
     PackageData {
-        package_type: Some(PACKAGE_TYPE.to_string()),
+        package_type: Some(PACKAGE_TYPE),
         primary_language: Some("Python".to_string()),
         name: metadata.name,
         version: metadata.version,

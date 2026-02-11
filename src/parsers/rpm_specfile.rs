@@ -33,7 +33,7 @@ use log::warn;
 use packageurl::PackageUrl;
 use regex::Regex;
 
-use crate::models::{DatasourceId, Dependency, PackageData, Party};
+use crate::models::{DatasourceId, Dependency, PackageData, PackageType, Party};
 use crate::parsers::utils::{read_file_to_string, split_name_email};
 
 use super::PackageParser;
@@ -41,13 +41,13 @@ use super::PackageParser;
 static RE_CONDITIONAL_MACRO: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"%\{\?[^}]+\}").unwrap());
 
-const PACKAGE_TYPE: &str = "rpm";
+const PACKAGE_TYPE: PackageType = PackageType::Rpm;
 
 /// Parser for RPM specfiles
 pub struct RpmSpecfileParser;
 
 impl PackageParser for RpmSpecfileParser {
-    const PACKAGE_TYPE: &'static str = PACKAGE_TYPE;
+    const PACKAGE_TYPE: PackageType = PACKAGE_TYPE;
 
     fn is_match(path: &Path) -> bool {
         path.extension()
@@ -61,7 +61,7 @@ impl PackageParser for RpmSpecfileParser {
             Err(e) => {
                 warn!("Failed to read RPM specfile {:?}: {}", path, e);
                 return vec![PackageData {
-                    package_type: Some(PACKAGE_TYPE.to_string()),
+                    package_type: Some(PACKAGE_TYPE),
                     datasource_id: Some(DatasourceId::RpmSpecfile),
                     ..Default::default()
                 }];
@@ -332,7 +332,7 @@ fn parse_specfile(content: &str) -> PackageData {
 
     PackageData {
         datasource_id: Some(DatasourceId::RpmSpecfile),
-        package_type: Some(PACKAGE_TYPE.to_string()),
+        package_type: Some(PACKAGE_TYPE),
         namespace: None, // RPM namespace is optional
         name,
         version,
@@ -373,7 +373,7 @@ fn extract_dep_name(dep: &str) -> String {
 
 /// Builds a package URL for RPM packages
 fn build_rpm_purl(name: &str, version: Option<&str>) -> Option<String> {
-    let mut purl = PackageUrl::new(PACKAGE_TYPE, name).ok()?;
+    let mut purl = PackageUrl::new(PACKAGE_TYPE.as_str(), name).ok()?;
 
     if let Some(ver) = version {
         purl.with_version(ver).ok()?;

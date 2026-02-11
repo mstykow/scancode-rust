@@ -22,7 +22,7 @@
 //! - Graceful error handling with `warn!()` logs
 //! - Supports Go 1.11+ module syntax
 
-use crate::models::{DatasourceId, Dependency, PackageData};
+use crate::models::{DatasourceId, Dependency, PackageData, PackageType};
 use log::warn;
 use packageurl::PackageUrl;
 use std::collections::{HashMap, HashSet};
@@ -31,7 +31,7 @@ use std::path::Path;
 
 use super::PackageParser;
 
-const PACKAGE_TYPE: &str = "golang";
+const PACKAGE_TYPE: PackageType = PackageType::Golang;
 
 /// Go go.mod manifest parser.
 ///
@@ -40,7 +40,7 @@ const PACKAGE_TYPE: &str = "golang";
 pub struct GoModParser;
 
 impl PackageParser for GoModParser {
-    const PACKAGE_TYPE: &'static str = PACKAGE_TYPE;
+    const PACKAGE_TYPE: PackageType = PACKAGE_TYPE;
 
     fn extract_packages(path: &Path) -> Vec<PackageData> {
         let content = match fs::read_to_string(path) {
@@ -246,7 +246,7 @@ pub fn parse_go_mod(content: &str) -> PackageData {
     };
 
     PackageData {
-        package_type: Some(PACKAGE_TYPE.to_string()),
+        package_type: Some(PACKAGE_TYPE),
         namespace,
         name,
         version: None,
@@ -447,7 +447,7 @@ fn strip_comment(line: &str) -> &str {
 fn create_golang_purl(module_path: &str, version: Option<&str>) -> Option<String> {
     let (namespace, name) = split_module_path(module_path);
 
-    let mut purl = match PackageUrl::new(PACKAGE_TYPE, &name) {
+    let mut purl = match PackageUrl::new(PACKAGE_TYPE.as_str(), &name) {
         Ok(p) => p,
         Err(e) => {
             warn!(
@@ -484,7 +484,7 @@ fn create_golang_purl(module_path: &str, version: Option<&str>) -> Option<String
 /// Returns a default empty PackageData for Go modules.
 fn default_package_data() -> PackageData {
     PackageData {
-        package_type: Some(PACKAGE_TYPE.to_string()),
+        package_type: Some(PACKAGE_TYPE),
         primary_language: Some("Go".to_string()),
         ..Default::default()
     }
@@ -505,7 +505,7 @@ crate::register_parser!(
 pub struct GoSumParser;
 
 impl PackageParser for GoSumParser {
-    const PACKAGE_TYPE: &'static str = PACKAGE_TYPE;
+    const PACKAGE_TYPE: PackageType = PACKAGE_TYPE;
 
     fn extract_packages(path: &Path) -> Vec<PackageData> {
         let content = match fs::read_to_string(path) {
@@ -566,7 +566,7 @@ pub fn parse_go_sum(content: &str) -> PackageData {
     }
 
     PackageData {
-        package_type: Some(PACKAGE_TYPE.to_string()),
+        package_type: Some(PACKAGE_TYPE),
         namespace: None,
         name: None,
         version: None,
@@ -626,7 +626,7 @@ crate::register_parser!(
 pub struct GodepsParser;
 
 impl PackageParser for GodepsParser {
-    const PACKAGE_TYPE: &'static str = PACKAGE_TYPE;
+    const PACKAGE_TYPE: PackageType = PACKAGE_TYPE;
 
     fn extract_packages(path: &Path) -> Vec<PackageData> {
         let content = match fs::read_to_string(path) {
@@ -714,7 +714,7 @@ pub fn parse_godeps_json(content: &str) -> PackageData {
     let vcs_url = import_path.as_ref().map(|m| format!("https://{}.git", m));
 
     PackageData {
-        package_type: Some(PACKAGE_TYPE.to_string()),
+        package_type: Some(PACKAGE_TYPE),
         namespace,
         name,
         version: None,

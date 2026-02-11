@@ -23,15 +23,15 @@ use std::path::Path;
 
 use log::warn;
 
-use crate::models::{DatasourceId, Dependency, FileReference, PackageData};
+use crate::models::{DatasourceId, Dependency, FileReference, PackageData, PackageType};
 
 use super::PackageParser;
 
-const PACKAGE_TYPE: &str = "rpm";
+const PACKAGE_TYPE: PackageType = PackageType::Rpm;
 
 fn default_package_data(datasource_id: DatasourceId) -> PackageData {
     PackageData {
-        package_type: Some(PACKAGE_TYPE.to_string()),
+        package_type: Some(PACKAGE_TYPE),
         datasource_id: Some(datasource_id),
         ..Default::default()
     }
@@ -40,7 +40,7 @@ fn default_package_data(datasource_id: DatasourceId) -> PackageData {
 pub struct RpmBdbDatabaseParser;
 
 impl PackageParser for RpmBdbDatabaseParser {
-    const PACKAGE_TYPE: &'static str = PACKAGE_TYPE;
+    const PACKAGE_TYPE: PackageType = PACKAGE_TYPE;
 
     fn is_match(path: &Path) -> bool {
         let path_str = path.to_string_lossy();
@@ -63,7 +63,7 @@ impl PackageParser for RpmBdbDatabaseParser {
 pub struct RpmNdbDatabaseParser;
 
 impl PackageParser for RpmNdbDatabaseParser {
-    const PACKAGE_TYPE: &'static str = PACKAGE_TYPE;
+    const PACKAGE_TYPE: PackageType = PACKAGE_TYPE;
 
     fn is_match(path: &Path) -> bool {
         let path_str = path.to_string_lossy();
@@ -85,7 +85,7 @@ impl PackageParser for RpmNdbDatabaseParser {
 pub struct RpmSqliteDatabaseParser;
 
 impl PackageParser for RpmSqliteDatabaseParser {
-    const PACKAGE_TYPE: &'static str = PACKAGE_TYPE;
+    const PACKAGE_TYPE: PackageType = PACKAGE_TYPE;
 
     fn is_match(path: &Path) -> bool {
         let path_str = path.to_string_lossy();
@@ -140,7 +140,7 @@ fn parse_rpm_database(
                     })
                     .map(|require| {
                         use packageurl::PackageUrl;
-                        let purl = PackageUrl::new(PACKAGE_TYPE, require)
+                        let purl = PackageUrl::new(PACKAGE_TYPE.as_str(), require)
                             .ok()
                             .map(|p| p.to_string());
 
@@ -166,7 +166,7 @@ fn parse_rpm_database(
 
                 let purl = name.as_ref().and_then(|n| {
                     use packageurl::PackageUrl;
-                    let mut purl = PackageUrl::new(PACKAGE_TYPE, n).ok()?;
+                    let mut purl = PackageUrl::new(PACKAGE_TYPE.as_str(), n).ok()?;
 
                     if let Some(ns) = &namespace {
                         purl.with_namespace(ns).ok()?;
@@ -185,7 +185,7 @@ fn parse_rpm_database(
 
                 PackageData {
                     datasource_id: Some(datasource_id),
-                    package_type: Some(PACKAGE_TYPE.to_string()),
+                    package_type: Some(PACKAGE_TYPE),
                     namespace,
                     name,
                     version,
@@ -384,7 +384,7 @@ mod tests {
 
         let pkg = RpmSqliteDatabaseParser::extract_first_package(&test_file);
 
-        assert_eq!(pkg.package_type, Some("rpm".to_string()));
+        assert_eq!(pkg.package_type, Some(PackageType::Rpm));
         assert_eq!(
             pkg.datasource_id,
             Some(DatasourceId::RpmInstalledDatabaseSqlite)

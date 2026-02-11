@@ -16,7 +16,7 @@
 //! - One package per line
 //! - Spec: https://github.com/microsoft/marinara/
 
-use crate::models::DatasourceId;
+use crate::models::{DatasourceId, PackageType};
 use std::fs;
 use std::path::Path;
 
@@ -26,11 +26,11 @@ use crate::models::PackageData;
 
 use super::PackageParser;
 
-const PACKAGE_TYPE: &str = "rpm";
+const PACKAGE_TYPE: PackageType = PackageType::Rpm;
 
 fn default_package_data() -> PackageData {
     PackageData {
-        package_type: Some(PACKAGE_TYPE.to_string()),
+        package_type: Some(PACKAGE_TYPE),
         namespace: Some("mariner".to_string()),
         datasource_id: Some(DatasourceId::RpmMarinerManifest),
         ..Default::default()
@@ -41,7 +41,7 @@ fn default_package_data() -> PackageData {
 pub struct RpmMarinerManifestParser;
 
 impl PackageParser for RpmMarinerManifestParser {
-    const PACKAGE_TYPE: &'static str = PACKAGE_TYPE;
+    const PACKAGE_TYPE: PackageType = PACKAGE_TYPE;
 
     fn is_match(path: &Path) -> bool {
         path.to_str()
@@ -111,7 +111,7 @@ pub(crate) fn parse_rpm_mariner_manifest(content: &str) -> Vec<PackageData> {
         };
 
         packages.push(PackageData {
-            package_type: Some(PACKAGE_TYPE.to_string()),
+            package_type: Some(PACKAGE_TYPE),
             namespace: Some("mariner".to_string()),
             name: if name.is_empty() {
                 None

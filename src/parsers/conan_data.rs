@@ -18,7 +18,7 @@
 //! - Patches section contains version→[{patch_file, patch_description, patch_type}]
 //! - Spec: https://docs.conan.io/2/tutorial/creating_packages/handle_sources_in_packages.html
 
-use crate::models::DatasourceId;
+use crate::models::{DatasourceId, PackageType};
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
@@ -31,11 +31,11 @@ use crate::models::PackageData;
 
 use super::PackageParser;
 
-const PACKAGE_TYPE: &str = "conan";
+const PACKAGE_TYPE: PackageType = PackageType::Conan;
 
 fn default_package_data() -> PackageData {
     PackageData {
-        package_type: Some(PACKAGE_TYPE.to_string()),
+        package_type: Some(PACKAGE_TYPE),
         primary_language: Some("C++".to_string()),
         datasource_id: Some(DatasourceId::ConanConanDataYml),
         ..Default::default()
@@ -79,7 +79,7 @@ struct SourceInfo {
 }
 
 impl PackageParser for ConanDataParser {
-    const PACKAGE_TYPE: &'static str = PACKAGE_TYPE;
+    const PACKAGE_TYPE: PackageType = PACKAGE_TYPE;
 
     fn is_match(path: &Path) -> bool {
         path.to_str().is_some_and(|p| p.ends_with("/conandata.yml"))
@@ -151,7 +151,7 @@ pub(crate) fn parse_conandata_yml(content: &str) -> Vec<PackageData> {
         }
 
         packages.push(PackageData {
-            package_type: Some(PACKAGE_TYPE.to_string()),
+            package_type: Some(PACKAGE_TYPE),
             primary_language: Some("C++".to_string()),
             version: Some(version),
             download_url,

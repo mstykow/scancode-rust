@@ -3,6 +3,7 @@ mod tests {
     use super::super::PackageParser;
     use super::super::cran::CranParser;
     use crate::models::DatasourceId;
+    use crate::models::PackageType;
     use std::path::PathBuf;
 
     #[test]
@@ -22,7 +23,7 @@ mod tests {
         let package_data = CranParser::extract_first_package(&desc_path);
 
         // Basic fields
-        assert_eq!(package_data.package_type, Some("cran".to_string()));
+        assert_eq!(package_data.package_type, Some(PackageType::Cran));
         assert_eq!(package_data.name, Some("geometry".to_string()));
         assert_eq!(package_data.version, Some("0.4.2".to_string()));
         assert_eq!(package_data.primary_language, Some("R".to_string()));
@@ -257,7 +258,7 @@ mod tests {
         let package_data = CranParser::extract_first_package(&nonexistent_path);
 
         // Should return default data with proper type and datasource
-        assert_eq!(package_data.package_type, Some("cran".to_string()));
+        assert_eq!(package_data.package_type, Some(PackageType::Cran));
         assert_eq!(
             package_data.datasource_id,
             Some(DatasourceId::CranDescription)

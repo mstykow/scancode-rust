@@ -6,6 +6,16 @@
 //! # Supported Formats
 //! - `debian/control` (Source package control files - multi-paragraph)
 //! - `/var/lib/dpkg/status` (Installed package database - multi-paragraph)
+//! - `/var/lib/dpkg/status.d/*` (Distroless installed packages)
+//! - `*.dsc` (Debian source control files)
+//! - `*.orig.tar.*` (Original upstream tarballs)
+//! - `*.debian.tar.*` (Debian packaging tarballs)
+//! - `/var/lib/dpkg/info/*.list` (Installed file lists)
+//! - `/var/lib/dpkg/info/*.md5sums` (Installed file checksums)
+//! - `debian/copyright` (Copyright/license declarations)
+//! - `*.deb` (Debian binary package archives)
+//! - `control` (extracted from .deb archives)
+//! - `md5sums` (extracted from .deb archives)
 //!
 //! # Key Features
 //! - RFC 822 format parsing for control files
@@ -27,17 +37,17 @@ use log::warn;
 use packageurl::PackageUrl;
 use regex::Regex;
 
-use crate::models::{DatasourceId, Dependency, FileReference, PackageData, Party};
+use crate::models::{DatasourceId, Dependency, FileReference, PackageData, PackageType, Party};
 use crate::parsers::rfc822::{self, Rfc822Metadata};
 use crate::parsers::utils::{read_file_to_string, split_name_email};
 
 use super::PackageParser;
 
-const PACKAGE_TYPE: &str = "deb";
+const PACKAGE_TYPE: PackageType = PackageType::Deb;
 
 fn default_package_data(datasource_id: DatasourceId) -> PackageData {
     PackageData {
-        package_type: Some(PACKAGE_TYPE.to_string()),
+        package_type: Some(PACKAGE_TYPE),
         datasource_id: Some(datasource_id),
         ..Default::default()
     }
@@ -141,7 +151,7 @@ const DEP_FIELDS: &[DepFieldSpec] = &[
 pub struct DebianControlParser;
 
 impl PackageParser for DebianControlParser {
-    const PACKAGE_TYPE: &'static str = PACKAGE_TYPE;
+    const PACKAGE_TYPE: PackageType = PACKAGE_TYPE;
 
     fn is_match(path: &Path) -> bool {
         if let Some(name) = path.file_name()
@@ -174,7 +184,7 @@ impl PackageParser for DebianControlParser {
 pub struct DebianInstalledParser;
 
 impl PackageParser for DebianInstalledParser {
-    const PACKAGE_TYPE: &'static str = PACKAGE_TYPE;
+    const PACKAGE_TYPE: PackageType = PACKAGE_TYPE;
 
     fn is_match(path: &Path) -> bool {
         let path_str = path.to_string_lossy();
@@ -197,7 +207,7 @@ impl PackageParser for DebianInstalledParser {
 pub struct DebianDistrolessInstalledParser;
 
 impl PackageParser for DebianDistrolessInstalledParser {
-    const PACKAGE_TYPE: &'static str = PACKAGE_TYPE;
+    const PACKAGE_TYPE: PackageType = PACKAGE_TYPE;
 
     fn is_match(path: &Path) -> bool {
         let path_str = path.to_string_lossy();
@@ -486,7 +496,7 @@ fn build_package_from_paragraph(
     });
 
     Some(PackageData {
-        package_type: Some(PACKAGE_TYPE.to_string()),
+        package_type: Some(PACKAGE_TYPE),
         namespace: namespace.clone(),
         name: Some(name),
         version,
@@ -550,7 +560,7 @@ fn build_package_from_source_paragraph(paragraph: &Rfc822Metadata) -> Option<Pac
     let keywords = section.into_iter().collect();
 
     Some(PackageData {
-        package_type: Some(PACKAGE_TYPE.to_string()),
+        package_type: Some(PACKAGE_TYPE),
         namespace: namespace.clone(),
         name: Some(name),
         version,
@@ -644,7 +654,7 @@ fn build_debian_purl(
     namespace: Option<&str>,
     architecture: Option<&str>,
 ) -> Option<String> {
-    let mut purl = PackageUrl::new(PACKAGE_TYPE, name).ok()?;
+    let mut purl = PackageUrl::new(PACKAGE_TYPE.as_str(), name).ok()?;
 
     if let Some(ns) = namespace {
         purl.with_namespace(ns).ok()?;
@@ -830,7 +840,7 @@ crate::register_parser!(
 pub struct DebianDscParser;
 
 impl PackageParser for DebianDscParser {
-    const PACKAGE_TYPE: &'static str = PACKAGE_TYPE;
+    const PACKAGE_TYPE: PackageType = PACKAGE_TYPE;
 
     fn is_match(path: &Path) -> bool {
         path.extension().and_then(|e| e.to_str()) == Some("dsc")
@@ -895,7 +905,7 @@ fn parse_dsc_content(content: &str) -> PackageData {
 
     let mut package = PackageData {
         datasource_id: Some(DatasourceId::DebianSourceControlDsc),
-        package_type: Some(PACKAGE_TYPE.to_string()),
+        package_type: Some(PACKAGE_TYPE),
         namespace: namespace.clone(),
         name: name.clone(),
         version: version.clone(),
@@ -976,7 +986,7 @@ fn parse_dsc_content(content: &str) -> PackageData {
 pub struct DebianOrigTarParser;
 
 impl PackageParser for DebianOrigTarParser {
-    const PACKAGE_TYPE: &'static str = PACKAGE_TYPE;
+    const PACKAGE_TYPE: PackageType = PACKAGE_TYPE;
 
     fn is_match(path: &Path) -> bool {
         path.file_name()
@@ -1006,7 +1016,7 @@ impl PackageParser for DebianOrigTarParser {
 pub struct DebianDebianTarParser;
 
 impl PackageParser for DebianDebianTarParser {
-    const PACKAGE_TYPE: &'static str = PACKAGE_TYPE;
+    const PACKAGE_TYPE: PackageType = PACKAGE_TYPE;
 
     fn is_match(path: &Path) -> bool {
         path.file_name()
@@ -1056,7 +1066,7 @@ fn parse_source_tarball_filename(filename: &str, datasource_id: DatasourceId) ->
 
     PackageData {
         datasource_id: Some(datasource_id),
-        package_type: Some(PACKAGE_TYPE.to_string()),
+        package_type: Some(PACKAGE_TYPE),
         namespace: namespace.clone(),
         name: Some(name.clone()),
         version: Some(version.clone()),
@@ -1069,7 +1079,7 @@ fn parse_source_tarball_filename(filename: &str, datasource_id: DatasourceId) ->
 pub struct DebianInstalledListParser;
 
 impl PackageParser for DebianInstalledListParser {
-    const PACKAGE_TYPE: &'static str = PACKAGE_TYPE;
+    const PACKAGE_TYPE: PackageType = PACKAGE_TYPE;
 
     fn is_match(path: &Path) -> bool {
         path.extension().and_then(|e| e.to_str()) == Some("list")
@@ -1107,7 +1117,7 @@ impl PackageParser for DebianInstalledListParser {
 pub struct DebianInstalledMd5sumsParser;
 
 impl PackageParser for DebianInstalledMd5sumsParser {
-    const PACKAGE_TYPE: &'static str = PACKAGE_TYPE;
+    const PACKAGE_TYPE: PackageType = PACKAGE_TYPE;
 
     fn is_match(path: &Path) -> bool {
         path.extension().and_then(|e| e.to_str()) == Some("md5sums")
@@ -1192,7 +1202,7 @@ fn parse_debian_file_list(
     let namespace = Some("debian".to_string());
     let mut package = PackageData {
         datasource_id: Some(datasource_id),
-        package_type: Some(PACKAGE_TYPE.to_string()),
+        package_type: Some(PACKAGE_TYPE),
         namespace: namespace.clone(),
         name: name.clone(),
         file_references,
@@ -1210,7 +1220,7 @@ fn parse_debian_file_list(
 pub struct DebianCopyrightParser;
 
 impl PackageParser for DebianCopyrightParser {
-    const PACKAGE_TYPE: &'static str = PACKAGE_TYPE;
+    const PACKAGE_TYPE: PackageType = PACKAGE_TYPE;
 
     fn is_match(path: &Path) -> bool {
         if let Some(filename) = path.file_name().and_then(|n| n.to_str()) {
@@ -1328,7 +1338,7 @@ fn parse_copyright_file(content: &str, package_name: Option<&str>) -> PackageDat
 
     PackageData {
         datasource_id: Some(DatasourceId::DebianCopyright),
-        package_type: Some(PACKAGE_TYPE.to_string()),
+        package_type: Some(PACKAGE_TYPE),
         namespace: namespace.clone(),
         name: package_name.map(|s| s.to_string()),
         parties,
@@ -1402,7 +1412,7 @@ fn extract_unstructured_field(content: &str, field_name: &str) -> Option<String>
 pub struct DebianDebParser;
 
 impl PackageParser for DebianDebParser {
-    const PACKAGE_TYPE: &'static str = PACKAGE_TYPE;
+    const PACKAGE_TYPE: PackageType = PACKAGE_TYPE;
 
     fn is_match(path: &Path) -> bool {
         path.extension().and_then(|e| e.to_str()) == Some("deb")
@@ -1508,7 +1518,7 @@ fn parse_deb_filename(filename: &str) -> PackageData {
 
     PackageData {
         datasource_id: Some(DatasourceId::DebianDeb),
-        package_type: Some(PACKAGE_TYPE.to_string()),
+        package_type: Some(PACKAGE_TYPE),
         namespace: namespace.clone(),
         name: Some(name.clone()),
         version: Some(version.clone()),
@@ -1530,7 +1540,7 @@ fn parse_deb_filename(filename: &str) -> PackageData {
 pub struct DebianControlInExtractedDebParser;
 
 impl PackageParser for DebianControlInExtractedDebParser {
-    const PACKAGE_TYPE: &'static str = PACKAGE_TYPE;
+    const PACKAGE_TYPE: PackageType = PACKAGE_TYPE;
 
     fn is_match(path: &Path) -> bool {
         path.file_name()
@@ -1586,7 +1596,7 @@ impl PackageParser for DebianControlInExtractedDebParser {
 pub struct DebianMd5sumInPackageParser;
 
 impl PackageParser for DebianMd5sumInPackageParser {
-    const PACKAGE_TYPE: &'static str = PACKAGE_TYPE;
+    const PACKAGE_TYPE: PackageType = PACKAGE_TYPE;
 
     fn is_match(path: &Path) -> bool {
         path.file_name()
@@ -1668,7 +1678,7 @@ fn parse_md5sums_in_package(content: &str, package_name: Option<&str>) -> Packag
     let namespace = Some("debian".to_string());
     let mut package = PackageData {
         datasource_id: Some(DatasourceId::DebianMd5SumsInExtractedDeb),
-        package_type: Some(PACKAGE_TYPE.to_string()),
+        package_type: Some(PACKAGE_TYPE),
         namespace: namespace.clone(),
         name: package_name.map(|s| s.to_string()),
         file_references,
@@ -1708,6 +1718,7 @@ crate::register_parser!(
 mod tests {
     use super::*;
     use crate::models::DatasourceId;
+    use crate::models::PackageType;
     use std::path::PathBuf;
 
     // ====== Namespace detection ======
@@ -1941,7 +1952,7 @@ Description: command line tool for transferring data with URL syntax";
 
         let pkg = &packages[0];
         assert_eq!(pkg.name, Some("curl".to_string()));
-        assert_eq!(pkg.package_type, Some("deb".to_string()));
+        assert_eq!(pkg.package_type, Some(PackageType::Deb));
         assert_eq!(pkg.homepage_url, Some("https://curl.se/".to_string()));
         assert_eq!(
             pkg.vcs_url,
@@ -2307,7 +2318,7 @@ Description: purged";
         let path = PathBuf::from("testdata/debian/dsc_files/adduser_3.118+deb11u1.dsc");
         let package = DebianDscParser::extract_first_package(&path);
 
-        assert_eq!(package.package_type, Some(PACKAGE_TYPE.to_string()));
+        assert_eq!(package.package_type, Some(PACKAGE_TYPE));
         assert_eq!(package.namespace, Some("debian".to_string()));
         assert_eq!(package.name, Some("adduser".to_string()));
         assert_eq!(package.version, Some("3.118+deb11u1".to_string()));
@@ -2823,7 +2834,7 @@ Copyright (C) 2015-2018 Example Corp";
 
         let pkg = DebianDistrolessInstalledParser::extract_first_package(&test_file);
 
-        assert_eq!(pkg.package_type, Some("deb".to_string()));
+        assert_eq!(pkg.package_type, Some(PackageType::Deb));
         assert_eq!(
             pkg.datasource_id,
             Some(DatasourceId::DebianDistrolessInstalledDb)

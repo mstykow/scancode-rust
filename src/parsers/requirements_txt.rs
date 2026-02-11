@@ -30,7 +30,7 @@ use log::warn;
 use packageurl::PackageUrl;
 use serde_json::Value as JsonValue;
 
-use crate::models::{DatasourceId, Dependency, PackageData};
+use crate::models::{DatasourceId, Dependency, PackageData, PackageType};
 use crate::parsers::pep508::{Pep508Requirement, parse_pep508_requirement};
 
 use super::PackageParser;
@@ -42,7 +42,7 @@ use super::PackageParser;
 pub struct RequirementsTxtParser;
 
 impl PackageParser for RequirementsTxtParser {
-    const PACKAGE_TYPE: &'static str = "pypi";
+    const PACKAGE_TYPE: PackageType = PackageType::Pypi;
 
     fn extract_packages(path: &Path) -> Vec<PackageData> {
         vec![extract_from_requirements_txt(path)]
@@ -236,7 +236,7 @@ fn default_package_data(
     extra_data: Option<HashMap<String, JsonValue>>,
 ) -> PackageData {
     PackageData {
-        package_type: Some(RequirementsTxtParser::PACKAGE_TYPE.to_string()),
+        package_type: Some(RequirementsTxtParser::PACKAGE_TYPE),
         primary_language: Some("Python".to_string()),
         extra_data,
         dependencies,
@@ -643,7 +643,7 @@ fn extract_pinned_version(specifiers: &str) -> Option<String> {
 }
 
 fn create_pypi_purl(name: &str, version: Option<&str>) -> Option<String> {
-    let mut purl = PackageUrl::new(RequirementsTxtParser::PACKAGE_TYPE, name).ok()?;
+    let mut purl = PackageUrl::new(RequirementsTxtParser::PACKAGE_TYPE.as_str(), name).ok()?;
     if let Some(version) = version {
         purl.with_version(version).ok()?;
     }

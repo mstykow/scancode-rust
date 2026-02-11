@@ -9,7 +9,7 @@
 //!
 //! # Key Features
 //! - Dependency extraction (dependencies, devDependencies)
-//! - License declaration normalization (string or array)
+//! - License extraction (string or array format)
 //! - Author parsing (string or object format)
 //! - VCS repository URL extraction
 //! - Private package detection
@@ -19,7 +19,7 @@
 //! - Graceful error handling: logs warnings and returns default on parse failure
 //! - Authors field can be string, object, or array of either
 
-use crate::models::{DatasourceId, Dependency, PackageData, Party};
+use crate::models::{DatasourceId, Dependency, PackageData, PackageType, Party};
 use log::warn;
 use packageurl::PackageUrl;
 use serde_json::Value;
@@ -47,7 +47,7 @@ const FIELD_PRIVATE: &str = "private";
 pub struct BowerJsonParser;
 
 impl PackageParser for BowerJsonParser {
-    const PACKAGE_TYPE: &'static str = "bower";
+    const PACKAGE_TYPE: PackageType = PackageType::Bower;
 
     fn extract_packages(path: &Path) -> Vec<PackageData> {
         let json = match read_and_parse_json(path) {
@@ -96,7 +96,7 @@ impl PackageParser for BowerJsonParser {
             extract_dependencies(&json, FIELD_DEV_DEPENDENCIES, "devDependencies", false);
 
         vec![PackageData {
-            package_type: Some(Self::PACKAGE_TYPE.to_string()),
+            package_type: Some(Self::PACKAGE_TYPE),
             namespace: None,
             name,
             version,
@@ -332,7 +332,8 @@ fn extract_dependencies(
             deps.iter()
                 .filter_map(|(name, requirement)| {
                     let requirement_str = requirement.as_str()?;
-                    let package_url = PackageUrl::new(BowerJsonParser::PACKAGE_TYPE, name).ok()?;
+                    let package_url =
+                        PackageUrl::new(BowerJsonParser::PACKAGE_TYPE.as_str(), name).ok()?;
 
                     Some(Dependency {
                         purl: Some(package_url.to_string()),

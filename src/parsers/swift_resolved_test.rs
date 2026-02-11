@@ -1,4 +1,5 @@
 use super::*;
+use crate::models::PackageType;
 use std::path::PathBuf;
 
 #[cfg(test)]
@@ -43,7 +44,7 @@ mod tests {
         let path = PathBuf::from("testdata/swift/Package-v2.resolved");
         let data = SwiftPackageResolvedParser::extract_first_package(&path);
 
-        assert_eq!(data.package_type, Some("swift".to_string()));
+        assert_eq!(data.package_type, Some(PackageType::Swift));
         assert_eq!(data.datasource_id, Some(DatasourceId::SwiftPackageResolved));
         assert_eq!(data.primary_language, Some("Swift".to_string()));
         assert_eq!(data.dependencies.len(), 3);
@@ -72,7 +73,7 @@ mod tests {
         let path = PathBuf::from("testdata/swift/Package-v1.resolved");
         let data = SwiftPackageResolvedParser::extract_first_package(&path);
 
-        assert_eq!(data.package_type, Some("swift".to_string()));
+        assert_eq!(data.package_type, Some(PackageType::Swift));
         assert_eq!(data.datasource_id, Some(DatasourceId::SwiftPackageResolved));
         assert_eq!(data.dependencies.len(), 2);
 
@@ -98,7 +99,7 @@ mod tests {
         let path = PathBuf::from("testdata/swift/Package-v3.resolved");
         let data = SwiftPackageResolvedParser::extract_first_package(&path);
 
-        assert_eq!(data.package_type, Some("swift".to_string()));
+        assert_eq!(data.package_type, Some(PackageType::Swift));
         assert_eq!(data.dependencies.len(), 2);
 
         let remote_dep = &data.dependencies[0];
@@ -138,7 +139,7 @@ mod tests {
         );
         let data = SwiftPackageResolvedParser::extract_first_package(&path);
 
-        assert_eq!(data.package_type, Some("swift".to_string()));
+        assert_eq!(data.package_type, Some(PackageType::Swift));
         assert_eq!(data.dependencies.len(), 5);
 
         let purls: Vec<&str> = data
@@ -198,7 +199,7 @@ mod tests {
         let path = PathBuf::from("testdata/swift/nonexistent.resolved");
         let data = SwiftPackageResolvedParser::extract_first_package(&path);
 
-        assert_eq!(data.package_type, Some("swift".to_string()));
+        assert_eq!(data.package_type, Some(PackageType::Swift));
         assert!(data.dependencies.is_empty());
     }
 

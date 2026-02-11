@@ -3,6 +3,7 @@ mod tests {
     use super::super::PackageParser;
     use super::super::microsoft_update_manifest::*;
     use crate::models::DatasourceId;
+    use crate::models::PackageType;
     use std::path::PathBuf;
 
     #[test]
@@ -45,7 +46,7 @@ mod tests {
             pkg.homepage_url.as_deref(),
             Some("https://support.microsoft.com")
         );
-        assert_eq!(pkg.package_type.as_deref(), Some("windows-update"));
+        assert_eq!(pkg.package_type, Some(PackageType::WindowsUpdate));
         assert_eq!(
             pkg.datasource_id,
             Some(DatasourceId::MicrosoftUpdateManifestMum)
@@ -70,7 +71,7 @@ mod tests {
         let content = "not xml";
         let pkg = parse_mum_xml(content);
 
-        assert_eq!(pkg.package_type.as_deref(), Some("windows-update"));
+        assert_eq!(pkg.package_type, Some(PackageType::WindowsUpdate));
         assert_eq!(
             pkg.datasource_id,
             Some(DatasourceId::MicrosoftUpdateManifestMum)

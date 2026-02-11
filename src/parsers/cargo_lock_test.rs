@@ -1,4 +1,5 @@
 use super::*;
+use crate::models::PackageType;
 use std::path::PathBuf;
 
 #[cfg(test)]
@@ -27,7 +28,7 @@ mod tests {
         let lock_path = PathBuf::from("Cargo.lock");
         let package_data = CargoLockParser::extract_first_package(&lock_path);
 
-        assert_eq!(package_data.package_type, Some("cargo".to_string()));
+        assert_eq!(package_data.package_type, Some(PackageType::Cargo));
         // The first package is alphabetically first, not the root
         assert!(package_data.name.is_some());
         assert!(package_data.version.is_some());
@@ -39,7 +40,7 @@ mod tests {
         let lock_path = PathBuf::from("testdata/cargo/Cargo-lock-basic.lock");
         let package_data = CargoLockParser::extract_first_package(&lock_path);
 
-        assert_eq!(package_data.package_type, Some("cargo".to_string()));
+        assert_eq!(package_data.package_type, Some(PackageType::Cargo));
         assert_eq!(package_data.name, Some("test-project".to_string()));
         assert_eq!(package_data.version, Some("0.1.0".to_string()));
         assert!(package_data.sha256.is_some());

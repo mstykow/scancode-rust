@@ -1,6 +1,7 @@
 #[cfg(test)]
 mod tests {
     use crate::models::DatasourceId;
+    use crate::models::PackageType;
     use crate::parsers::{HaxeParser, PackageParser};
     use std::fs;
     use std::path::PathBuf;
@@ -29,7 +30,7 @@ mod tests {
         let haxelib_path = PathBuf::from("testdata/haxe/basic/haxelib.json");
         let package_data = HaxeParser::extract_first_package(&haxelib_path);
 
-        assert_eq!(package_data.package_type, Some("haxe".to_string()));
+        assert_eq!(package_data.package_type, Some(PackageType::Haxe));
         assert_eq!(package_data.name, Some("haxelib".to_string()));
         assert_eq!(package_data.version, Some("3.4.0".to_string()));
         assert_eq!(
@@ -107,7 +108,7 @@ mod tests {
         let package_data = HaxeParser::extract_first_package(&haxelib_path);
 
         // Should have proper type and datasource even for empty/invalid data
-        assert_eq!(package_data.package_type, Some("haxe".to_string()));
+        assert_eq!(package_data.package_type, Some(PackageType::Haxe));
         assert_eq!(package_data.datasource_id, Some(DatasourceId::HaxelibJson));
         assert!(package_data.name.is_none());
     }
@@ -194,7 +195,7 @@ mod tests {
         let package_data = HaxeParser::extract_first_package(&haxelib_path);
 
         // Should gracefully handle invalid JSON
-        assert_eq!(package_data.package_type, Some("haxe".to_string()));
+        assert_eq!(package_data.package_type, Some(PackageType::Haxe));
         assert!(package_data.name.is_none());
     }
 }

@@ -18,16 +18,16 @@ use std::path::Path;
 use log::warn;
 use serde_json::json;
 
-use crate::models::{DatasourceId, Dependency, PackageData, Party};
+use crate::models::{DatasourceId, Dependency, PackageData, PackageType, Party};
 
 use super::PackageParser;
 
-const PACKAGE_TYPE: &str = "cpan";
+const PACKAGE_TYPE: PackageType = PackageType::Cpan;
 
 pub struct CpanDistIniParser;
 
 impl PackageParser for CpanDistIniParser {
-    const PACKAGE_TYPE: &'static str = PACKAGE_TYPE;
+    const PACKAGE_TYPE: PackageType = PACKAGE_TYPE;
 
     fn is_match(path: &Path) -> bool {
         path.to_str().is_some_and(|p| p.ends_with("/dist.ini"))
@@ -39,7 +39,7 @@ impl PackageParser for CpanDistIniParser {
             Err(e) => {
                 warn!("Failed to read dist.ini file {:?}: {}", path, e);
                 return vec![PackageData {
-                    package_type: Some(PACKAGE_TYPE.to_string()),
+                    package_type: Some(PACKAGE_TYPE),
                     primary_language: Some("Perl".to_string()),
                     datasource_id: Some(DatasourceId::CpanDistIni),
                     ..Default::default()
@@ -72,7 +72,7 @@ pub(crate) fn parse_dist_ini(content: &str) -> PackageData {
     }
 
     PackageData {
-        package_type: Some(PACKAGE_TYPE.to_string()),
+        package_type: Some(PACKAGE_TYPE),
         namespace: Some("cpan".to_string()),
         name,
         version,

@@ -40,7 +40,7 @@ use log::warn;
 use packageurl::PackageUrl;
 use serde_json::Value;
 
-use crate::models::{DatasourceId, Dependency, PackageData};
+use crate::models::{DatasourceId, Dependency, PackageData, PackageType};
 
 use super::PackageParser;
 
@@ -81,7 +81,7 @@ use super::PackageParser;
 pub struct SwiftManifestJsonParser;
 
 impl PackageParser for SwiftManifestJsonParser {
-    const PACKAGE_TYPE: &'static str = "swift";
+    const PACKAGE_TYPE: PackageType = PackageType::Swift;
 
     fn extract_packages(path: &Path) -> Vec<PackageData> {
         let filename = path.file_name().and_then(|n| n.to_str());
@@ -176,7 +176,7 @@ fn parse_swift_manifest(manifest: &Value) -> PackageData {
     let purl = create_package_url(&name, &None);
 
     PackageData {
-        package_type: Some(SwiftManifestJsonParser::PACKAGE_TYPE.to_string()),
+        package_type: Some(SwiftManifestJsonParser::PACKAGE_TYPE),
         namespace: None,
         name,
         version: None,
@@ -370,7 +370,7 @@ fn create_dependency_purl(
     version: &Option<String>,
     is_pinned: bool,
 ) -> String {
-    let mut purl = match PackageUrl::new(SwiftManifestJsonParser::PACKAGE_TYPE, name) {
+    let mut purl = match PackageUrl::new(SwiftManifestJsonParser::PACKAGE_TYPE.as_str(), name) {
         Ok(p) => p,
         Err(e) => {
             warn!(
@@ -410,16 +410,17 @@ fn create_dependency_purl(
 
 fn create_package_url(name: &Option<String>, version: &Option<String>) -> Option<String> {
     name.as_ref().and_then(|name| {
-        let mut package_url = match PackageUrl::new(SwiftManifestJsonParser::PACKAGE_TYPE, name) {
-            Ok(p) => p,
-            Err(e) => {
-                warn!(
-                    "Failed to create PackageUrl for swift package '{}': {}",
-                    name, e
-                );
-                return None;
-            }
-        };
+        let mut package_url =
+            match PackageUrl::new(SwiftManifestJsonParser::PACKAGE_TYPE.as_str(), name) {
+                Ok(p) => p,
+                Err(e) => {
+                    warn!(
+                        "Failed to create PackageUrl for swift package '{}': {}",
+                        name, e
+                    );
+                    return None;
+                }
+            };
 
         if let Some(v) = version
             && let Err(e) = package_url.with_version(v)

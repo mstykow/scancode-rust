@@ -19,7 +19,7 @@
 //! - v2+: Flat dependency structure with `node_modules/` prefix for nesting
 //! - Direct dependencies determined by top-level `dependencies` and `devDependencies`
 
-use crate::models::{DatasourceId, Dependency, PackageData, ResolvedPackage};
+use crate::models::{DatasourceId, Dependency, PackageData, PackageType, ResolvedPackage};
 use crate::parsers::utils::{npm_purl, parse_sri};
 use log::warn;
 use serde_json::Value;
@@ -47,7 +47,7 @@ const FIELD_DEV_OPTIONAL: &str = "devOptional";
 pub struct NpmLockParser;
 
 impl PackageParser for NpmLockParser {
-    const PACKAGE_TYPE: &'static str = "npm";
+    const PACKAGE_TYPE: PackageType = PackageType::Npm;
 
     fn is_match(path: &Path) -> bool {
         path.file_name()
@@ -106,7 +106,7 @@ impl PackageParser for NpmLockParser {
 /// Returns a default empty PackageData for error cases
 fn default_package_data() -> PackageData {
     PackageData {
-        package_type: Some(NpmLockParser::PACKAGE_TYPE.to_string()),
+        package_type: Some(NpmLockParser::PACKAGE_TYPE),
         datasource_id: Some(DatasourceId::NpmPackageLockJson),
         ..Default::default()
     }
@@ -197,7 +197,7 @@ fn parse_lockfile_v2_plus(
     }
 
     PackageData {
-        package_type: Some(NpmLockParser::PACKAGE_TYPE.to_string()),
+        package_type: Some(NpmLockParser::PACKAGE_TYPE),
         namespace: Some(namespace),
         name: Some(name),
         version: Some(root_version),
@@ -263,7 +263,7 @@ fn parse_lockfile_v1(
     let dependencies = parse_dependencies_v1(dependencies_obj);
 
     PackageData {
-        package_type: Some(NpmLockParser::PACKAGE_TYPE.to_string()),
+        package_type: Some(NpmLockParser::PACKAGE_TYPE),
         namespace: Some(namespace),
         name: Some(name),
         version: Some(root_version),
@@ -498,7 +498,7 @@ fn build_npm_dependency(
     let sha1 = sha1_from_integrity.or(sha1_from_url);
 
     let resolved_package = ResolvedPackage {
-        package_type: NpmLockParser::PACKAGE_TYPE.to_string(),
+        package_type: NpmLockParser::PACKAGE_TYPE,
         namespace: dep_namespace,
         name: dep_name,
         version: version.clone(),

@@ -15,7 +15,7 @@
 use std::path::Path;
 
 use super::PackageParser;
-use crate::models::{DatasourceId, PackageData};
+use crate::models::{DatasourceId, PackageData, PackageType};
 use crate::utils::magic;
 
 /// Helper macro to define file-type recognizers with minimal boilerplate.
@@ -34,7 +34,7 @@ macro_rules! file_recognizer {
         pub struct $name;
 
         impl PackageParser for $name {
-            const PACKAGE_TYPE: &'static str = $pkg_type;
+            const PACKAGE_TYPE: PackageType = $pkg_type;
 
             fn is_match(path: &Path) -> bool {
                 ($match_fn)(path)
@@ -43,7 +43,7 @@ macro_rules! file_recognizer {
             fn extract_packages(path: &Path) -> Vec<PackageData> {
                 let _ = path;
                 vec![PackageData {
-                    package_type: Some($pkg_type.to_string()),
+                    package_type: Some($pkg_type),
                     datasource_id: Some($datasource),
                     ..Default::default()
                 }]
@@ -56,28 +56,28 @@ macro_rules! file_recognizer {
 
 file_recognizer!(
     JavaJarRecognizer,
-    "jar",
+    PackageType::Jar,
     DatasourceId::JavaJar,
     |path: &Path| path.extension().and_then(|e| e.to_str()) == Some("jar")
 );
 
 file_recognizer!(
     IvyXmlRecognizer,
-    "ivy",
+    PackageType::Ivy,
     DatasourceId::AntIvyXml,
     |path: &Path| path.to_str().is_some_and(|p| p.ends_with("/ivy.xml"))
 );
 
 file_recognizer!(
     JavaWarRecognizer,
-    "war",
+    PackageType::War,
     DatasourceId::JavaWarArchive,
     |path: &Path| path.extension().and_then(|e| e.to_str()) == Some("war")
 );
 
 file_recognizer!(
     JavaWarWebXmlRecognizer,
-    "war",
+    PackageType::War,
     DatasourceId::JavaWarWebXml,
     |path: &Path| path
         .to_str()
@@ -86,14 +86,14 @@ file_recognizer!(
 
 file_recognizer!(
     JavaEarRecognizer,
-    "ear",
+    PackageType::Ear,
     DatasourceId::JavaEarArchive,
     |path: &Path| path.extension().and_then(|e| e.to_str()) == Some("ear")
 );
 
 file_recognizer!(
     JavaEarAppXmlRecognizer,
-    "ear",
+    PackageType::Ear,
     DatasourceId::JavaEarApplicationXml,
     |path: &Path| path.to_str().is_some_and(
         |p| p.ends_with("/META-INF/application.xml") || p.ends_with("META-INF/application.xml")
@@ -104,7 +104,7 @@ file_recognizer!(
 
 file_recognizer!(
     Axis2ModuleXmlRecognizer,
-    "axis2",
+    PackageType::Axis2,
     DatasourceId::Axis2ModuleXml,
     |path: &Path| {
         path.to_str().is_some_and(|p| {
@@ -116,7 +116,7 @@ file_recognizer!(
 
 file_recognizer!(
     Axis2MarRecognizer,
-    "axis2",
+    PackageType::Axis2,
     DatasourceId::Axis2Mar,
     |path: &Path| path.extension().and_then(|e| e.to_str()) == Some("mar")
 );
@@ -125,14 +125,14 @@ file_recognizer!(
 
 file_recognizer!(
     JBossSarRecognizer,
-    "jboss-service",
+    PackageType::JbossService,
     DatasourceId::JbossSar,
     |path: &Path| path.extension().and_then(|e| e.to_str()) == Some("sar")
 );
 
 file_recognizer!(
     JBossServiceXmlRecognizer,
-    "jboss-service",
+    PackageType::JbossService,
     DatasourceId::JbossServiceXml,
     |path: &Path| {
         path.to_str().is_some_and(|p| {
@@ -147,7 +147,7 @@ file_recognizer!(
 
 file_recognizer!(
     MeteorPackageRecognizer,
-    "meteor",
+    PackageType::Meteor,
     DatasourceId::MeteorPackage,
     |path: &Path| path.to_str().is_some_and(|p| p.ends_with("/package.js"))
 );
@@ -156,7 +156,7 @@ file_recognizer!(
 
 file_recognizer!(
     AndroidApkRecognizer,
-    "android",
+    PackageType::Android,
     DatasourceId::AndroidApk,
     |path: &Path| {
         path.extension()
@@ -168,28 +168,28 @@ file_recognizer!(
 
 file_recognizer!(
     AndroidLibraryRecognizer,
-    "android_lib",
+    PackageType::AndroidLib,
     DatasourceId::AndroidAarLibrary,
     |path: &Path| path.extension().and_then(|e| e.to_str()) == Some("aar")
 );
 
 file_recognizer!(
     MozillaXpiRecognizer,
-    "mozilla",
+    PackageType::Mozilla,
     DatasourceId::MozillaXpi,
     |path: &Path| path.extension().and_then(|e| e.to_str()) == Some("xpi")
 );
 
 file_recognizer!(
     ChromeCrxRecognizer,
-    "chrome",
+    PackageType::Chrome,
     DatasourceId::ChromeCrx,
     |path: &Path| path.extension().and_then(|e| e.to_str()) == Some("crx")
 );
 
 file_recognizer!(
     IosIpaRecognizer,
-    "ios",
+    PackageType::Ios,
     DatasourceId::IosIpa,
     |path: &Path| path.extension().and_then(|e| e.to_str()) == Some("ipa")
 );
@@ -198,14 +198,14 @@ file_recognizer!(
 
 file_recognizer!(
     CabArchiveRecognizer,
-    "cab",
+    PackageType::Cab,
     DatasourceId::MicrosoftCabinet,
     |path: &Path| path.extension().and_then(|e| e.to_str()) == Some("cab")
 );
 
 file_recognizer!(
     SharArchiveRecognizer,
-    "shar",
+    PackageType::Shar,
     DatasourceId::SharShellArchive,
     |path: &Path| path.extension().and_then(|e| e.to_str()) == Some("shar")
 );
@@ -214,7 +214,7 @@ file_recognizer!(
 
 file_recognizer!(
     AppleDmgRecognizer,
-    "dmg",
+    PackageType::Dmg,
     DatasourceId::AppleDmg,
     |path: &Path| {
         path.extension()
@@ -225,7 +225,7 @@ file_recognizer!(
 
 file_recognizer!(
     IsoImageRecognizer,
-    "iso",
+    PackageType::Iso,
     DatasourceId::IsoDiskImage,
     |path: &Path| {
         path.extension()
@@ -238,14 +238,14 @@ file_recognizer!(
 
 file_recognizer!(
     SquashfsRecognizer,
-    "squashfs",
+    PackageType::Squashfs,
     DatasourceId::SquashfsDiskImage,
     |path: &Path| magic::is_squashfs(path)
 );
 
 file_recognizer!(
     NsisRecognizer,
-    "nsis",
+    PackageType::Nsis,
     DatasourceId::NsisInstaller,
     |path: &Path| {
         path.extension()
@@ -257,7 +257,7 @@ file_recognizer!(
 
 file_recognizer!(
     InstallShieldRecognizer,
-    "installshield",
+    PackageType::Installshield,
     DatasourceId::InstallshieldInstaller,
     |path: &Path| {
         path.extension()

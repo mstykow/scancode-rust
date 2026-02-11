@@ -1,5 +1,7 @@
 //! Unit tests for Conan parsers (conanfile.py, conanfile.txt, conan.lock)
 
+use crate::models::PackageType;
+
 use std::path::PathBuf;
 
 use super::PackageParser;
@@ -23,7 +25,7 @@ fn test_conanfile_py_basic_metadata() {
     let test_file = "testdata/conan/recipes/libgettext/manifest/conanfile.py";
     let result = ConanFilePyParser::extract_first_package(&PathBuf::from(test_file));
 
-    assert_eq!(result.package_type, Some("conan".to_string()));
+    assert_eq!(result.package_type, Some(PackageType::Conan));
     assert_eq!(result.name, Some("libgettext".to_string()));
     assert_eq!(
         result.description,
@@ -73,7 +75,7 @@ fn test_conanfile_py_boost_metadata() {
     let test_file = "testdata/conan/recipes/boost/manifest/conanfile.py";
     let result = ConanFilePyParser::extract_first_package(&PathBuf::from(test_file));
 
-    assert_eq!(result.package_type, Some("conan".to_string()));
+    assert_eq!(result.package_type, Some(PackageType::Conan));
     assert_eq!(result.name, Some("boost".to_string()));
     assert_eq!(
         result.description,
@@ -102,7 +104,7 @@ fn test_conanfile_py_boost_complex_requirements() {
     let test_file = "testdata/conan/recipes/boost/manifest/conanfile.py";
     let result = ConanFilePyParser::extract_first_package(&PathBuf::from(test_file));
 
-    assert_eq!(result.package_type, Some("conan".to_string()));
+    assert_eq!(result.package_type, Some(PackageType::Conan));
     assert_eq!(result.name, Some("boost".to_string()));
 }
 
@@ -134,7 +136,7 @@ fn test_conanfile_py_invalid_python() {
     let result = ConanFilePyParser::extract_first_package(&PathBuf::from(test_file));
 
     // Should return default package data on parse failure
-    assert_eq!(result.package_type, Some("conan".to_string()));
+    assert_eq!(result.package_type, Some(PackageType::Conan));
     assert_eq!(result.primary_language, Some("C++".to_string()));
 }
 
@@ -168,7 +170,7 @@ fn test_conanfile_txt_basic() {
     let test_file = "testdata/conan/conanfile.txt";
     let result = ConanfileTxtParser::extract_first_package(&PathBuf::from(test_file));
 
-    assert_eq!(result.package_type, Some("conan".to_string()));
+    assert_eq!(result.package_type, Some(PackageType::Conan));
     assert_eq!(result.primary_language, Some("C++".to_string()));
 }
 
@@ -187,6 +189,6 @@ fn test_conan_lock_basic() {
     let test_file = "testdata/conan/conan.lock";
     let result = ConanLockParser::extract_first_package(&PathBuf::from(test_file));
 
-    assert_eq!(result.package_type, Some("conan".to_string()));
+    assert_eq!(result.package_type, Some(PackageType::Conan));
     assert_eq!(result.primary_language, Some("C++".to_string()));
 }

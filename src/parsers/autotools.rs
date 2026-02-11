@@ -16,8 +16,8 @@
 //! - configure.in is NOT supported (deprecated legacy format)
 //! - Returns minimal PackageData with only package_type and name fields
 
-use crate::models::DatasourceId;
 use crate::models::PackageData;
+use crate::models::{DatasourceId, PackageType};
 use std::path::Path;
 
 use super::PackageParser;
@@ -28,7 +28,7 @@ use super::PackageParser;
 pub struct AutotoolsConfigureParser;
 
 impl PackageParser for AutotoolsConfigureParser {
-    const PACKAGE_TYPE: &'static str = "autotools";
+    const PACKAGE_TYPE: PackageType = PackageType::Autotools;
 
     fn is_match(path: &Path) -> bool {
         path.file_name()
@@ -44,7 +44,7 @@ impl PackageParser for AutotoolsConfigureParser {
             .map(|s| s.to_string());
 
         vec![PackageData {
-            package_type: Some("autotools".to_string()),
+            package_type: Some(Self::PACKAGE_TYPE),
             name,
             datasource_id: Some(DatasourceId::AutotoolsConfigure),
             ..Default::default()
