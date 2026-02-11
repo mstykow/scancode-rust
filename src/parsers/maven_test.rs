@@ -1,5 +1,6 @@
 #[cfg(test)]
 mod tests {
+    use crate::models::DatasourceId;
     use crate::parsers::{MavenParser, PackageParser};
     use std::fs;
     use std::path::PathBuf;
@@ -400,7 +401,7 @@ mod tests {
         assert_eq!(package_data.package_type, Some("osgi".to_string()));
         assert_eq!(
             package_data.datasource_id,
-            Some("java_osgi_manifest".to_string())
+            Some(DatasourceId::JavaOsgiManifest)
         );
         assert_eq!(package_data.name, Some("com.example.mybundle".to_string()));
         assert_eq!(package_data.version, Some("2.1.0".to_string()));

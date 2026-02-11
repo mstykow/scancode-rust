@@ -1,5 +1,6 @@
 #[cfg(test)]
 mod tests {
+    use crate::models::DatasourceId;
     use crate::parsers::{HaxeParser, PackageParser};
     use std::fs;
     use std::path::PathBuf;
@@ -107,7 +108,7 @@ mod tests {
 
         // Should have proper type and datasource even for empty/invalid data
         assert_eq!(package_data.package_type, Some("haxe".to_string()));
-        assert_eq!(package_data.datasource_id, Some("haxelib_json".to_string()));
+        assert_eq!(package_data.datasource_id, Some(DatasourceId::HaxelibJson));
         assert!(package_data.name.is_none());
     }
 

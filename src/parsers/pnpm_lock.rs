@@ -20,7 +20,7 @@
 //! - v5: Similar to v6 but with different dependency structure
 //! - Direct dependencies tracked via `importers['.'].dependencies`
 
-use crate::models::{Dependency, PackageData, ResolvedPackage};
+use crate::models::{DatasourceId, Dependency, PackageData, ResolvedPackage};
 use crate::parsers::utils::npm_purl;
 use serde_yaml::Value;
 use std::fs;
@@ -69,47 +69,9 @@ impl PackageParser for PnpmLockParser {
 fn default_package_data() -> PackageData {
     PackageData {
         package_type: Some("pnpm-lock".to_string()),
-        namespace: None,
-        name: None,
-        version: None,
-        qualifiers: None,
-        subpath: None,
-        primary_language: None,
-        description: None,
-        release_date: None,
-        parties: Vec::new(),
-        keywords: Vec::new(),
-        homepage_url: None,
-        download_url: None,
-        size: None,
-        sha1: None,
-        md5: None,
-        sha256: None,
-        sha512: None,
-        bug_tracking_url: None,
-        code_view_url: None,
-        vcs_url: None,
-        copyright: None,
-        holder: None,
-        declared_license_expression: None,
-        declared_license_expression_spdx: None,
-        license_detections: Vec::new(),
-        other_license_expression: None,
-        other_license_expression_spdx: None,
-        other_license_detections: Vec::new(),
-        extracted_license_statement: None,
-        notice_text: None,
-        source_packages: Vec::new(),
-        file_references: Vec::new(),
-        is_private: false,
-        is_virtual: false,
         extra_data: Some(std::collections::HashMap::new()),
-        dependencies: Vec::new(),
-        repository_homepage_url: None,
-        repository_download_url: None,
-        api_data_url: None,
-        datasource_id: Some("pnpm_lock_yaml".to_string()),
-        purl: None,
+        datasource_id: Some(DatasourceId::PnpmLockYaml),
+        ..Default::default()
     }
 }
 
@@ -582,7 +544,7 @@ pub fn extract_dependency(
         repository_homepage_url: None,
         repository_download_url: None,
         api_data_url: None,
-        datasource_id: Some("pnpm_lock_yaml".to_string()),
+        datasource_id: Some(DatasourceId::PnpmLockYaml),
         purl: None,
     };
 

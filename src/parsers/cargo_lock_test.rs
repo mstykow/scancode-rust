@@ -4,6 +4,7 @@ use std::path::PathBuf;
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::models::DatasourceId;
 
     #[test]
     fn test_is_match_cargo_lock() {
@@ -79,7 +80,7 @@ mod tests {
         let lock_path = PathBuf::from("testdata/cargo/Cargo-lock-basic.lock");
         let package_data = CargoLockParser::extract_first_package(&lock_path);
 
-        assert_eq!(package_data.datasource_id, Some("cargo_lock".to_string()));
+        assert_eq!(package_data.datasource_id, Some(DatasourceId::CargoLock));
     }
 
     #[test]

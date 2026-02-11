@@ -4,6 +4,7 @@ use super::PackageParser;
 use super::freebsd::{
     FreebsdCompactManifestParser, build_license_statement, parse_freebsd_manifest,
 };
+use crate::models::DatasourceId;
 
 #[test]
 fn test_is_match() {
@@ -49,7 +50,7 @@ fn test_basic_extraction() {
     assert_eq!(pkg.package_type, Some("freebsd".to_string()));
     assert_eq!(
         pkg.datasource_id,
-        Some("freebsd_compact_manifest".to_string())
+        Some(DatasourceId::FreebsdCompactManifest)
     );
 }
 
@@ -279,7 +280,7 @@ fn test_extract_from_testdata() {
             assert_eq!(pkg.package_type, Some("freebsd".to_string()));
             assert_eq!(
                 pkg.datasource_id,
-                Some("freebsd_compact_manifest".to_string())
+                Some(DatasourceId::FreebsdCompactManifest)
             );
         }
     }

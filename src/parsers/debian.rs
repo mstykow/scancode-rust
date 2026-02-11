@@ -27,13 +27,21 @@ use log::warn;
 use packageurl::PackageUrl;
 use regex::Regex;
 
-use crate::models::{Dependency, FileReference, PackageData, Party};
+use crate::models::{DatasourceId, Dependency, FileReference, PackageData, Party};
 use crate::parsers::rfc822::{self, Rfc822Metadata};
-use crate::parsers::utils::{create_default_package_data, read_file_to_string, split_name_email};
+use crate::parsers::utils::{read_file_to_string, split_name_email};
 
 use super::PackageParser;
 
 const PACKAGE_TYPE: &str = "deb";
+
+fn default_package_data(datasource_id: DatasourceId) -> PackageData {
+    PackageData {
+        package_type: Some(PACKAGE_TYPE.to_string()),
+        datasource_id: Some(datasource_id),
+        ..Default::default()
+    }
+}
 
 // Namespace detection clues from version strings
 const VERSION_CLUES_DEBIAN: &[&str] = &["deb"];
@@ -201,9 +209,8 @@ impl PackageParser for DebianDistrolessInstalledParser {
             Ok(c) => c,
             Err(e) => {
                 warn!("Failed to read distroless status file at {:?}: {}", path, e);
-                return vec![create_default_package_data(
-                    PACKAGE_TYPE,
-                    Some("debian_distroless_installed_db"),
+                return vec![default_package_data(
+                    DatasourceId::DebianDistrolessInstalledDb,
                 )];
             }
         };
@@ -216,13 +223,15 @@ fn parse_distroless_status(content: &str) -> PackageData {
     let paragraphs = rfc822::parse_rfc822_paragraphs(content);
 
     if paragraphs.is_empty() {
-        return create_default_package_data(PACKAGE_TYPE, Some("debian_distroless_installed_db"));
+        return default_package_data(DatasourceId::DebianDistrolessInstalledDb);
     }
 
-    build_package_from_paragraph(&paragraphs[0], None, "debian_distroless_installed_db")
-        .unwrap_or_else(|| {
-            create_default_package_data(PACKAGE_TYPE, Some("debian_distroless_installed_db"))
-        })
+    build_package_from_paragraph(
+        &paragraphs[0],
+        None,
+        DatasourceId::DebianDistrolessInstalledDb,
+    )
+    .unwrap_or_else(|| default_package_data(DatasourceId::DebianDistrolessInstalledDb))
 }
 
 // ---------------------------------------------------------------------------
@@ -255,9 +264,11 @@ fn parse_debian_control(content: &str) -> Vec<PackageData> {
     let mut packages = Vec::new();
 
     for para in &paragraphs[binary_start..] {
-        if let Some(pkg) =
-            build_package_from_paragraph(para, source_meta.as_ref(), "debian_control_in_source")
-        {
+        if let Some(pkg) = build_package_from_paragraph(
+            para,
+            source_meta.as_ref(),
+            DatasourceId::DebianControlInSource,
+        ) {
             packages.push(pkg);
         }
     }
@@ -286,7 +297,9 @@ fn parse_dpkg_status(content: &str) -> Vec<PackageData> {
             continue;
         }
 
-        if let Some(pkg) = build_package_from_paragraph(para, None, "debian_installed_status_db") {
+        if let Some(pkg) =
+            build_package_from_paragraph(para, None, DatasourceId::DebianInstalledStatusDb)
+        {
             packages.push(pkg);
         }
     }
@@ -387,7 +400,7 @@ fn extract_source_meta(paragraph: &Rfc822Metadata) -> SourceMeta {
 fn build_package_from_paragraph(
     paragraph: &Rfc822Metadata,
     source_meta: Option<&SourceMeta>,
-    datasource_id: &str,
+    datasource_id: DatasourceId,
 ) -> Option<PackageData> {
     let name = rfc822::get_header_first(&paragraph.headers, "package")?;
     let version = rfc822::get_header_first(&paragraph.headers, "version");
@@ -517,7 +530,7 @@ fn build_package_from_paragraph(
         repository_homepage_url: None,
         repository_download_url: None,
         api_data_url: None,
-        datasource_id: Some(datasource_id.to_string()),
+        datasource_id: Some(datasource_id),
         purl,
     })
 }
@@ -577,7 +590,7 @@ fn build_package_from_source_paragraph(paragraph: &Rfc822Metadata) -> Option<Pac
         repository_homepage_url: None,
         repository_download_url: None,
         api_data_url: None,
-        datasource_id: Some("debian_control_in_source".to_string()),
+        datasource_id: Some(DatasourceId::DebianControlInSource),
         purl,
     })
 }
@@ -828,7 +841,7 @@ impl PackageParser for DebianDscParser {
             Ok(c) => c,
             Err(e) => {
                 warn!("Failed to read .dsc file {:?}: {}", path, e);
-                return vec![create_default_package_data(PACKAGE_TYPE, None)];
+                return vec![default_package_data(DatasourceId::DebianSourceControlDsc)];
             }
         };
 
@@ -881,7 +894,7 @@ fn parse_dsc_content(content: &str) -> PackageData {
     let namespace = Some("debian".to_string());
 
     let mut package = PackageData {
-        datasource_id: Some("debian_source_control_dsc".to_string()),
+        datasource_id: Some(DatasourceId::DebianSourceControlDsc),
         package_type: Some(PACKAGE_TYPE.to_string()),
         namespace: namespace.clone(),
         name: name.clone(),
@@ -975,10 +988,17 @@ impl PackageParser for DebianOrigTarParser {
     fn extract_packages(path: &Path) -> Vec<PackageData> {
         let filename = match path.file_name().and_then(|n| n.to_str()) {
             Some(f) => f,
-            None => return vec![create_default_package_data(PACKAGE_TYPE, None)],
+            None => {
+                return vec![default_package_data(
+                    DatasourceId::DebianOriginalSourceTarball,
+                )];
+            }
         };
 
-        vec![parse_source_tarball_filename(filename, "debian_orig_tar")]
+        vec![parse_source_tarball_filename(
+            filename,
+            DatasourceId::DebianOriginalSourceTarball,
+        )]
     }
 }
 
@@ -998,14 +1018,21 @@ impl PackageParser for DebianDebianTarParser {
     fn extract_packages(path: &Path) -> Vec<PackageData> {
         let filename = match path.file_name().and_then(|n| n.to_str()) {
             Some(f) => f,
-            None => return vec![create_default_package_data(PACKAGE_TYPE, None)],
+            None => {
+                return vec![default_package_data(
+                    DatasourceId::DebianSourceMetadataTarball,
+                )];
+            }
         };
 
-        vec![parse_source_tarball_filename(filename, "debian_debian_tar")]
+        vec![parse_source_tarball_filename(
+            filename,
+            DatasourceId::DebianSourceMetadataTarball,
+        )]
     }
 }
 
-fn parse_source_tarball_filename(filename: &str, datasource_id: &str) -> PackageData {
+fn parse_source_tarball_filename(filename: &str, datasource_id: DatasourceId) -> PackageData {
     let without_tar_ext = filename
         .trim_end_matches(".gz")
         .trim_end_matches(".xz")
@@ -1014,7 +1041,7 @@ fn parse_source_tarball_filename(filename: &str, datasource_id: &str) -> Package
 
     let parts: Vec<&str> = without_tar_ext.splitn(2, '_').collect();
     if parts.len() < 2 {
-        return create_default_package_data(PACKAGE_TYPE, Some(datasource_id));
+        return default_package_data(datasource_id);
     }
 
     let name = parts[0].to_string();
@@ -1028,7 +1055,7 @@ fn parse_source_tarball_filename(filename: &str, datasource_id: &str) -> Package
     let namespace = Some("debian".to_string());
 
     PackageData {
-        datasource_id: Some(datasource_id.to_string()),
+        datasource_id: Some(datasource_id),
         package_type: Some(PACKAGE_TYPE.to_string()),
         namespace: namespace.clone(),
         name: Some(name.clone()),
@@ -1056,10 +1083,7 @@ impl PackageParser for DebianInstalledListParser {
         let filename = match path.file_stem().and_then(|s| s.to_str()) {
             Some(f) => f,
             None => {
-                return vec![create_default_package_data(
-                    PACKAGE_TYPE,
-                    Some("debian_installed_list"),
-                )];
+                return vec![default_package_data(DatasourceId::DebianInstalledFilesList)];
             }
         };
 
@@ -1067,17 +1091,14 @@ impl PackageParser for DebianInstalledListParser {
             Ok(c) => c,
             Err(e) => {
                 warn!("Failed to read .list file {:?}: {}", path, e);
-                return vec![create_default_package_data(
-                    PACKAGE_TYPE,
-                    Some("debian_installed_list"),
-                )];
+                return vec![default_package_data(DatasourceId::DebianInstalledFilesList)];
             }
         };
 
         vec![parse_debian_file_list(
             &content,
             filename,
-            "debian_installed_list",
+            DatasourceId::DebianInstalledFilesList,
         )]
     }
 }
@@ -1100,10 +1121,7 @@ impl PackageParser for DebianInstalledMd5sumsParser {
         let filename = match path.file_stem().and_then(|s| s.to_str()) {
             Some(f) => f,
             None => {
-                return vec![create_default_package_data(
-                    PACKAGE_TYPE,
-                    Some("debian_installed_md5sums"),
-                )];
+                return vec![default_package_data(DatasourceId::DebianInstalledMd5Sums)];
             }
         };
 
@@ -1111,24 +1129,25 @@ impl PackageParser for DebianInstalledMd5sumsParser {
             Ok(c) => c,
             Err(e) => {
                 warn!("Failed to read .md5sums file {:?}: {}", path, e);
-                return vec![create_default_package_data(
-                    PACKAGE_TYPE,
-                    Some("debian_installed_md5sums"),
-                )];
+                return vec![default_package_data(DatasourceId::DebianInstalledMd5Sums)];
             }
         };
 
         vec![parse_debian_file_list(
             &content,
             filename,
-            "debian_installed_md5sums",
+            DatasourceId::DebianInstalledMd5Sums,
         )]
     }
 }
 
 const IGNORED_ROOT_DIRS: &[&str] = &["/.", "/bin", "/etc", "/lib", "/sbin", "/usr", "/var"];
 
-fn parse_debian_file_list(content: &str, filename: &str, datasource_id: &str) -> PackageData {
+fn parse_debian_file_list(
+    content: &str,
+    filename: &str,
+    datasource_id: DatasourceId,
+) -> PackageData {
     let (name, arch_qualifier) = if let Some((pkg, arch)) = filename.split_once(':') {
         (Some(pkg.to_string()), Some(arch.to_string()))
     } else if filename == "md5sums" {
@@ -1167,12 +1186,12 @@ fn parse_debian_file_list(content: &str, filename: &str, datasource_id: &str) ->
     }
 
     if file_references.is_empty() {
-        return create_default_package_data(PACKAGE_TYPE, Some(datasource_id));
+        return default_package_data(datasource_id);
     }
 
     let namespace = Some("debian".to_string());
     let mut package = PackageData {
-        datasource_id: Some(datasource_id.to_string()),
+        datasource_id: Some(datasource_id),
         package_type: Some(PACKAGE_TYPE.to_string()),
         namespace: namespace.clone(),
         name: name.clone(),
@@ -1212,10 +1231,7 @@ impl PackageParser for DebianCopyrightParser {
             Ok(c) => c,
             Err(e) => {
                 warn!("Failed to read copyright file {:?}: {}", path, e);
-                return vec![create_default_package_data(
-                    PACKAGE_TYPE,
-                    Some("debian_copyright"),
-                )];
+                return vec![default_package_data(DatasourceId::DebianCopyright)];
             }
         };
 
@@ -1311,7 +1327,7 @@ fn parse_copyright_file(content: &str, package_name: Option<&str>) -> PackageDat
     };
 
     PackageData {
-        datasource_id: Some("debian_copyright".to_string()),
+        datasource_id: Some(DatasourceId::DebianCopyright),
         package_type: Some(PACKAGE_TYPE.to_string()),
         namespace: namespace.clone(),
         name: package_name.map(|s| s.to_string()),
@@ -1402,10 +1418,7 @@ impl PackageParser for DebianDebParser {
         let filename = match path.file_name().and_then(|n| n.to_str()) {
             Some(f) => f,
             None => {
-                return vec![create_default_package_data(
-                    PACKAGE_TYPE,
-                    Some("debian_deb"),
-                )];
+                return vec![default_package_data(DatasourceId::DebianDeb)];
             }
         };
 
@@ -1459,7 +1472,7 @@ fn extract_deb_archive(path: &Path) -> Result<PackageData, String> {
                     }
 
                     if let Some(package) =
-                        build_package_from_paragraph(&paragraphs[0], None, "debian_deb")
+                        build_package_from_paragraph(&paragraphs[0], None, DatasourceId::DebianDeb)
                     {
                         return Ok(package);
                     } else {
@@ -1480,7 +1493,7 @@ fn parse_deb_filename(filename: &str) -> PackageData {
 
     let parts: Vec<&str> = without_ext.split('_').collect();
     if parts.len() < 2 {
-        return create_default_package_data(PACKAGE_TYPE, Some("debian_deb"));
+        return default_package_data(DatasourceId::DebianDeb);
     }
 
     let name = parts[0].to_string();
@@ -1494,7 +1507,7 @@ fn parse_deb_filename(filename: &str) -> PackageData {
     let namespace = Some("debian".to_string());
 
     PackageData {
-        datasource_id: Some("debian_deb".to_string()),
+        datasource_id: Some(DatasourceId::DebianDeb),
         package_type: Some(PACKAGE_TYPE.to_string()),
         namespace: namespace.clone(),
         name: Some(name.clone()),
@@ -1533,9 +1546,8 @@ impl PackageParser for DebianMd5sumInPackageParser {
             Ok(c) => c,
             Err(e) => {
                 warn!("Failed to read md5sums file {:?}: {}", path, e);
-                return vec![create_default_package_data(
-                    PACKAGE_TYPE,
-                    Some("debian_md5sums_in_extracted_deb"),
+                return vec![default_package_data(
+                    DatasourceId::DebianMd5SumsInExtractedDeb,
                 )];
             }
         };
@@ -1590,12 +1602,12 @@ fn parse_md5sums_in_package(content: &str, package_name: Option<&str>) -> Packag
     }
 
     if file_references.is_empty() {
-        return create_default_package_data(PACKAGE_TYPE, Some("debian_md5sums_in_extracted_deb"));
+        return default_package_data(DatasourceId::DebianMd5SumsInExtractedDeb);
     }
 
     let namespace = Some("debian".to_string());
     let mut package = PackageData {
-        datasource_id: Some("debian_md5sums_in_extracted_deb".to_string()),
+        datasource_id: Some(DatasourceId::DebianMd5SumsInExtractedDeb),
         package_type: Some(PACKAGE_TYPE.to_string()),
         namespace: namespace.clone(),
         name: package_name.map(|s| s.to_string()),
@@ -1624,6 +1636,7 @@ crate::register_parser!(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::models::DatasourceId;
     use std::path::PathBuf;
 
     // ====== Namespace detection ======
@@ -2012,7 +2025,7 @@ Description: This should be skipped";
         assert_eq!(pkg.namespace, Some("ubuntu".to_string()));
         assert_eq!(
             pkg.datasource_id,
-            Some("debian_installed_status_db".to_string())
+            Some(DatasourceId::DebianInstalledStatusDb)
         );
 
         // Installed-Size in extra_data
@@ -2241,7 +2254,7 @@ Description: purged";
         );
         assert_eq!(
             package.datasource_id,
-            Some("debian_source_control_dsc".to_string())
+            Some(DatasourceId::DebianSourceControlDsc)
         );
 
         assert_eq!(package.parties.len(), 2);
@@ -2368,7 +2381,10 @@ Uploaders: Dev One <dev1@example.com>, Dev Two <dev2@example.com>
 
     #[test]
     fn test_parse_orig_tar_filename() {
-        let pkg = parse_source_tarball_filename("abseil_0~20200923.3.orig.tar.gz", "test_ds");
+        let pkg = parse_source_tarball_filename(
+            "abseil_0~20200923.3.orig.tar.gz",
+            DatasourceId::DebianOriginalSourceTarball,
+        );
         assert_eq!(pkg.name, Some("abseil".to_string()));
         assert_eq!(pkg.version, Some("0~20200923.3".to_string()));
         assert_eq!(pkg.namespace, Some("debian".to_string()));
@@ -2376,12 +2392,18 @@ Uploaders: Dev One <dev1@example.com>, Dev Two <dev2@example.com>
             pkg.purl,
             Some("pkg:deb/debian/abseil@0~20200923.3".to_string())
         );
-        assert_eq!(pkg.datasource_id, Some("test_ds".to_string()));
+        assert_eq!(
+            pkg.datasource_id,
+            Some(DatasourceId::DebianOriginalSourceTarball)
+        );
     }
 
     #[test]
     fn test_parse_debian_tar_filename() {
-        let pkg = parse_source_tarball_filename("abseil_20220623.1-1.debian.tar.xz", "test_ds");
+        let pkg = parse_source_tarball_filename(
+            "abseil_20220623.1-1.debian.tar.xz",
+            DatasourceId::DebianSourceMetadataTarball,
+        );
         assert_eq!(pkg.name, Some("abseil".to_string()));
         assert_eq!(pkg.version, Some("20220623.1-1".to_string()));
         assert_eq!(pkg.namespace, Some("debian".to_string()));
@@ -2404,9 +2426,18 @@ Uploaders: Dev One <dev1@example.com>, Dev Two <dev2@example.com>
 
     #[test]
     fn test_parse_source_tarball_various_compressions() {
-        let pkg_gz = parse_source_tarball_filename("test_1.0.orig.tar.gz", "test_ds");
-        let pkg_xz = parse_source_tarball_filename("test_1.0.orig.tar.xz", "test_ds");
-        let pkg_bz2 = parse_source_tarball_filename("test_1.0.orig.tar.bz2", "test_ds");
+        let pkg_gz = parse_source_tarball_filename(
+            "test_1.0.orig.tar.gz",
+            DatasourceId::DebianOriginalSourceTarball,
+        );
+        let pkg_xz = parse_source_tarball_filename(
+            "test_1.0.orig.tar.xz",
+            DatasourceId::DebianOriginalSourceTarball,
+        );
+        let pkg_bz2 = parse_source_tarball_filename(
+            "test_1.0.orig.tar.bz2",
+            DatasourceId::DebianOriginalSourceTarball,
+        );
 
         assert_eq!(pkg_gz.version, Some("1.0".to_string()));
         assert_eq!(pkg_xz.version, Some("1.0".to_string()));
@@ -2415,7 +2446,10 @@ Uploaders: Dev One <dev1@example.com>, Dev Two <dev2@example.com>
 
     #[test]
     fn test_parse_source_tarball_invalid_format() {
-        let pkg = parse_source_tarball_filename("invalid-no-underscore.tar.gz", "test_ds");
+        let pkg = parse_source_tarball_filename(
+            "invalid-no-underscore.tar.gz",
+            DatasourceId::DebianOriginalSourceTarball,
+        );
         assert!(pkg.name.is_none());
         assert!(pkg.version.is_none());
     }
@@ -2460,7 +2494,7 @@ Uploaders: Dev One <dev1@example.com>, Dev Two <dev2@example.com>
 /usr/bin/bashbug
 /usr/share/doc/bash/README
 ";
-        let pkg = parse_debian_file_list(content, "bash", "test_ds");
+        let pkg = parse_debian_file_list(content, "bash", DatasourceId::DebianInstalledFilesList);
         assert_eq!(pkg.name, Some("bash".to_string()));
         assert_eq!(pkg.file_references.len(), 3);
         assert_eq!(pkg.file_references[0].path, "/bin/bash");
@@ -2475,7 +2509,7 @@ Uploaders: Dev One <dev1@example.com>, Dev Two <dev2@example.com>
 1c77d2031971b4e4c512ac952102cd85  usr/bin/bashbug
 f55e3a16959b0bb8915cb5f219521c80  usr/share/doc/bash/COMPAT.gz
 ";
-        let pkg = parse_debian_file_list(content, "bash", "test_ds");
+        let pkg = parse_debian_file_list(content, "bash", DatasourceId::DebianInstalledFilesList);
         assert_eq!(pkg.name, Some("bash".to_string()));
         assert_eq!(pkg.file_references.len(), 3);
         assert_eq!(pkg.file_references[0].path, "bin/bash");
@@ -2495,7 +2529,11 @@ f55e3a16959b0bb8915cb5f219521c80  usr/share/doc/bash/COMPAT.gz
         let content = "/usr/bin/foo
 /usr/lib/x86_64-linux-gnu/libfoo.so
 ";
-        let pkg = parse_debian_file_list(content, "libfoo:amd64", "test_ds");
+        let pkg = parse_debian_file_list(
+            content,
+            "libfoo:amd64",
+            DatasourceId::DebianInstalledFilesList,
+        );
         assert_eq!(pkg.name, Some("libfoo".to_string()));
         assert!(pkg.purl.is_some());
         assert!(pkg.purl.as_ref().unwrap().contains("arch=amd64"));
@@ -2510,7 +2548,7 @@ f55e3a16959b0bb8915cb5f219521c80  usr/share/doc/bash/COMPAT.gz
 /usr/bin/bashbug
   
 ";
-        let pkg = parse_debian_file_list(content, "bash", "test_ds");
+        let pkg = parse_debian_file_list(content, "bash", DatasourceId::DebianInstalledFilesList);
         assert_eq!(pkg.file_references.len(), 2);
     }
 
@@ -2518,7 +2556,8 @@ f55e3a16959b0bb8915cb5f219521c80  usr/share/doc/bash/COMPAT.gz
     fn test_parse_debian_file_list_md5sums_only() {
         let content = "abc123  usr/bin/tool
 ";
-        let pkg = parse_debian_file_list(content, "md5sums", "test_ds");
+        let pkg =
+            parse_debian_file_list(content, "md5sums", DatasourceId::DebianInstalledFilesList);
         assert_eq!(pkg.name, None);
         assert_eq!(pkg.file_references.len(), 1);
     }
@@ -2532,7 +2571,7 @@ f55e3a16959b0bb8915cb5f219521c80  usr/share/doc/bash/COMPAT.gz
 /usr
 /var
 ";
-        let pkg = parse_debian_file_list(content, "bash", "test_ds");
+        let pkg = parse_debian_file_list(content, "bash", DatasourceId::DebianInstalledFilesList);
         assert_eq!(pkg.file_references.len(), 1);
         assert_eq!(pkg.file_references[0].path, "/bin/bash");
     }
@@ -2586,7 +2625,7 @@ License: LGPL-2.1
         let pkg = parse_copyright_file(content, Some("libseccomp"));
         assert_eq!(pkg.name, Some("libseccomp".to_string()));
         assert_eq!(pkg.namespace, Some("debian".to_string()));
-        assert_eq!(pkg.datasource_id, Some("debian_copyright".to_string()));
+        assert_eq!(pkg.datasource_id, Some(DatasourceId::DebianCopyright));
         assert_eq!(
             pkg.extracted_license_statement,
             Some("LGPL-2.1".to_string())
@@ -2655,7 +2694,7 @@ Copyright (C) 2015-2018 Example Corp";
             pkg.purl,
             Some("pkg:deb/debian/libapache2-mod-md@2.4.38-3%2Bdeb10u10?arch=amd64".to_string())
         );
-        assert_eq!(pkg.datasource_id, Some("debian_deb".to_string()));
+        assert_eq!(pkg.datasource_id, Some(DatasourceId::DebianDeb));
     }
 
     #[test]
@@ -2716,7 +2755,7 @@ Copyright (C) 2015-2018 Example Corp";
         assert_eq!(pkg.package_type, Some("deb".to_string()));
         assert_eq!(
             pkg.datasource_id,
-            Some("debian_distroless_installed_db".to_string())
+            Some(DatasourceId::DebianDistrolessInstalledDb)
         );
         assert_eq!(pkg.name, Some("base-files".to_string()));
         assert_eq!(pkg.version, Some("11.1+deb11u8".to_string()));

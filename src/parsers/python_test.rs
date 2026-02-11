@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use crate::models::Dependency;
+    use crate::models::{DatasourceId, Dependency};
     use crate::parsers::{PackageParser, PythonParser};
     use crate::test_utils::compare_package_data_parser_only;
     use std::fs;
@@ -793,7 +793,7 @@ Test package description.
             package_data.homepage_url,
             Some("https://github.com/untitaker/python-atomicwrites".to_string())
         );
-        assert_eq!(package_data.datasource_id, Some("pypi_wheel".to_string()));
+        assert_eq!(package_data.datasource_id, Some(DatasourceId::PypiWheel));
         assert_eq!(package_data.primary_language, Some("Python".to_string()));
 
         assert!(!package_data.parties.is_empty());
@@ -835,7 +835,7 @@ Test package description.
             package_data.homepage_url,
             Some("https://github.com/nexB/commoncode".to_string())
         );
-        assert_eq!(package_data.datasource_id, Some("pypi_egg".to_string()));
+        assert_eq!(package_data.datasource_id, Some(DatasourceId::PypiEgg));
         assert_eq!(package_data.primary_language, Some("Python".to_string()));
 
         assert!(!package_data.parties.is_empty());
@@ -1002,7 +1002,7 @@ Test package description.
         assert_eq!(package_data.primary_language, Some("Python".to_string()));
         assert_eq!(
             package_data.datasource_id,
-            Some("pypi_inspect_deplock".to_string())
+            Some(DatasourceId::PypiInspectDeplock)
         );
         assert!(package_data.is_virtual);
 

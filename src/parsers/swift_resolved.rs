@@ -13,7 +13,7 @@ use packageurl::PackageUrl;
 use serde::Deserialize;
 use url::Url;
 
-use crate::models::{Dependency, PackageData};
+use crate::models::{DatasourceId, Dependency, PackageData};
 use crate::parsers::PackageParser;
 
 /// Parses Swift Package Manager lockfiles (Package.resolved).
@@ -168,7 +168,7 @@ fn parse_resolved(path: &Path) -> Result<PackageData, String> {
         repository_homepage_url: None,
         repository_download_url: None,
         api_data_url: None,
-        datasource_id: Some("swift_package_resolved".to_string()),
+        datasource_id: Some(DatasourceId::SwiftPackageResolved),
         purl: None,
     })
 }
@@ -293,47 +293,9 @@ fn read_file(path: &Path) -> Result<String, String> {
 fn default_package_data() -> PackageData {
     PackageData {
         package_type: Some("swift".to_string()),
-        namespace: None,
-        name: None,
-        version: None,
-        qualifiers: None,
-        subpath: None,
         primary_language: Some("Swift".to_string()),
-        description: None,
-        release_date: None,
-        parties: Vec::new(),
-        keywords: Vec::new(),
-        homepage_url: None,
-        download_url: None,
-        size: None,
-        sha1: None,
-        md5: None,
-        sha256: None,
-        sha512: None,
-        bug_tracking_url: None,
-        code_view_url: None,
-        vcs_url: None,
-        copyright: None,
-        holder: None,
-        declared_license_expression: None,
-        declared_license_expression_spdx: None,
-        license_detections: Vec::new(),
-        other_license_expression: None,
-        other_license_expression_spdx: None,
-        other_license_detections: Vec::new(),
-        extracted_license_statement: None,
-        notice_text: None,
-        source_packages: Vec::new(),
-        file_references: Vec::new(),
-        is_private: false,
-        is_virtual: false,
-        extra_data: None,
-        dependencies: Vec::new(),
-        repository_homepage_url: None,
-        repository_download_url: None,
-        api_data_url: None,
-        datasource_id: Some("swift_package_resolved".to_string()),
-        purl: None,
+        datasource_id: Some(DatasourceId::SwiftPackageResolved),
+        ..Default::default()
     }
 }
 

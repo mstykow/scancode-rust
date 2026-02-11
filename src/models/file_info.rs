@@ -2,6 +2,7 @@ use derive_builder::Builder;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use super::DatasourceId;
 use crate::utils::spdx::combine_license_expressions;
 
 #[derive(Debug, Builder, Serialize)]
@@ -226,7 +227,7 @@ pub struct PackageData {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub api_data_url: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub datasource_id: Option<String>,
+    pub datasource_id: Option<DatasourceId>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub purl: Option<String>,
 }
@@ -354,7 +355,7 @@ pub struct ResolvedPackage {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub api_data_url: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub datasource_id: Option<String>,
+    pub datasource_id: Option<DatasourceId>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub purl: Option<String>,
 }
@@ -495,7 +496,7 @@ pub struct Package {
     /// Paths to all datafiles that contributed to this package.
     pub datafile_paths: Vec<String>,
     /// Datasource identifiers for all parsers that contributed to this package.
-    pub datasource_ids: Vec<String>,
+    pub datasource_ids: Vec<DatasourceId>,
 }
 
 impl Package {
@@ -509,8 +510,6 @@ impl Package {
             .as_ref()
             .map(|p| build_package_uid(p))
             .unwrap_or_default();
-
-        let datasource_id = package_data.datasource_id.clone().unwrap_or_default();
 
         Package {
             package_type: package_data.package_type.clone(),
@@ -554,10 +553,10 @@ impl Package {
             purl: package_data.purl.clone(),
             package_uid,
             datafile_paths: vec![datafile_path],
-            datasource_ids: if datasource_id.is_empty() {
-                vec![]
+            datasource_ids: if let Some(dsid) = package_data.datasource_id {
+                vec![dsid]
             } else {
-                vec![datasource_id]
+                vec![]
             },
         }
     }
@@ -568,10 +567,8 @@ impl Package {
     /// Existing non-empty values are preserved; empty fields are filled from
     /// the new data. Lists (parties, license_detections) are merged.
     pub fn update(&mut self, package_data: &PackageData, datafile_path: String) {
-        if let Some(ref dsid) = package_data.datasource_id
-            && !dsid.is_empty()
-        {
-            self.datasource_ids.push(dsid.clone());
+        if let Some(dsid) = package_data.datasource_id {
+            self.datasource_ids.push(dsid);
         }
         self.datafile_paths.push(datafile_path);
 
@@ -673,7 +670,7 @@ pub struct TopLevelDependency {
     /// Path to the datafile where this dependency was declared.
     pub datafile_path: String,
     /// Datasource identifier for the parser that extracted this dependency.
-    pub datasource_id: String,
+    pub datasource_id: DatasourceId,
 }
 
 impl TopLevelDependency {
@@ -681,7 +678,7 @@ impl TopLevelDependency {
     pub fn from_dependency(
         dep: &Dependency,
         datafile_path: String,
-        datasource_id: String,
+        datasource_id: DatasourceId,
         for_package_uid: Option<String>,
     ) -> Self {
         let dependency_uid = dep

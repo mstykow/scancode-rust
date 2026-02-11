@@ -16,8 +16,7 @@
 //! - License must be one of: GPL, LGPL, BSD, Public, MIT, Apache
 //! - All fields are extracted with graceful error handling
 
-use crate::models::{Dependency, PackageData, Party};
-use crate::parsers::utils::create_default_package_data;
+use crate::models::{DatasourceId, Dependency, PackageData, Party};
 use log::warn;
 use packageurl::PackageUrl;
 use serde::{Deserialize, Serialize};
@@ -148,7 +147,7 @@ impl PackageParser for HaxeParser {
             repository_homepage_url,
             repository_download_url,
             api_data_url: None,
-            datasource_id: Some("haxelib_json".to_string()),
+            datasource_id: Some(DatasourceId::HaxelibJson),
             purl,
         }]
     }
@@ -239,14 +238,18 @@ fn create_dep_package_url(name: &str, version: &str, is_pinned: bool) -> Option<
 }
 
 fn default_package_data() -> PackageData {
-    let mut pkg = create_default_package_data("haxe", Some("Haxe"));
-    pkg.datasource_id = Some("haxelib_json".to_string());
-    pkg
+    PackageData {
+        package_type: Some("haxe".to_string()),
+        primary_language: Some("Haxe".to_string()),
+        datasource_id: Some(DatasourceId::HaxelibJson),
+        ..Default::default()
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::models::DatasourceId;
     use std::path::PathBuf;
 
     #[test]
@@ -363,7 +366,7 @@ mod tests {
 
         // Should return default data with proper type and datasource
         assert_eq!(package_data.package_type, Some("haxe".to_string()));
-        assert_eq!(package_data.datasource_id, Some("haxelib_json".to_string()));
+        assert_eq!(package_data.datasource_id, Some(DatasourceId::HaxelibJson));
         assert!(package_data.name.is_none());
     }
 }

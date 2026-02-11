@@ -1,6 +1,8 @@
+mod datasource_id;
 mod file_info;
 mod output;
 
+pub use datasource_id::DatasourceId;
 pub use file_info::{
     Dependency, FileInfo, FileInfoBuilder, FileReference, FileType, LicenseDetection, Match,
     Package, PackageData, Party, ResolvedPackage, TopLevelDependency,

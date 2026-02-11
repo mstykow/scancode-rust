@@ -27,7 +27,7 @@ use log::warn;
 use packageurl::PackageUrl;
 use serde_yaml::{Mapping, Value};
 
-use crate::models::{Dependency, PackageData, ResolvedPackage};
+use crate::models::{DatasourceId, Dependency, PackageData, ResolvedPackage};
 
 use super::PackageParser;
 
@@ -219,7 +219,7 @@ fn parse_pubspec_yaml(yaml_content: &Value) -> PackageData {
         repository_homepage_url,
         repository_download_url,
         api_data_url,
-        datasource_id: Some("pubspec_yaml".to_string()),
+        datasource_id: Some(DatasourceId::PubspecYaml),
         purl,
     }
 }
@@ -229,7 +229,7 @@ fn parse_pubspec_lock(yaml_content: &Value) -> PackageData {
 
     let mut package_data = default_package_data_with_type(PubspecLockParser::PACKAGE_TYPE);
     package_data.dependencies = dependencies;
-    package_data.datasource_id = Some("pubspec_lock".to_string());
+    package_data.datasource_id = Some(DatasourceId::PubspecLock);
     package_data
 }
 
@@ -565,47 +565,8 @@ fn default_package_data() -> PackageData {
 fn default_package_data_with_type(package_type: &str) -> PackageData {
     PackageData {
         package_type: Some(package_type.to_string()),
-        namespace: None,
-        name: None,
-        version: None,
-        qualifiers: None,
-        subpath: None,
         primary_language: Some("dart".to_string()),
-        description: None,
-        release_date: None,
-        parties: Vec::new(),
-        keywords: Vec::new(),
-        homepage_url: None,
-        download_url: None,
-        size: None,
-        sha1: None,
-        md5: None,
-        sha256: None,
-        sha512: None,
-        bug_tracking_url: None,
-        code_view_url: None,
-        vcs_url: None,
-        copyright: None,
-        holder: None,
-        declared_license_expression: None,
-        declared_license_expression_spdx: None,
-        license_detections: Vec::new(),
-        other_license_expression: None,
-        other_license_expression_spdx: None,
-        other_license_detections: Vec::new(),
-        extracted_license_statement: None,
-        notice_text: None,
-        source_packages: Vec::new(),
-        file_references: Vec::new(),
-        is_private: false,
-        is_virtual: false,
-        extra_data: None,
-        dependencies: Vec::new(),
-        repository_homepage_url: None,
-        repository_download_url: None,
-        api_data_url: None,
-        datasource_id: None,
-        purl: None,
+        ..Default::default()
     }
 }
 

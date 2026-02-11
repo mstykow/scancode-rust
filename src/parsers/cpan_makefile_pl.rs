@@ -22,8 +22,7 @@ use packageurl::PackageUrl;
 use regex::Regex;
 use serde_json::json;
 
-use crate::models::{Dependency, PackageData, Party};
-use crate::parsers::utils::create_default_package_data;
+use crate::models::{DatasourceId, Dependency, PackageData, Party};
 
 use super::PackageParser;
 
@@ -44,7 +43,6 @@ static RE_DEP_PAIR: LazyLock<Regex> = LazyLock::new(|| {
 });
 
 const PACKAGE_TYPE: &str = "cpan";
-const DATASOURCE_ID: &str = "cpan_makefile_pl";
 
 pub struct CpanMakefilePlParser;
 
@@ -60,9 +58,12 @@ impl PackageParser for CpanMakefilePlParser {
             Ok(c) => c,
             Err(e) => {
                 warn!("Failed to read Makefile.PL file {:?}: {}", path, e);
-                let mut pkg = create_default_package_data(PACKAGE_TYPE, Some("Perl"));
-                pkg.datasource_id = Some(DATASOURCE_ID.to_string());
-                return vec![pkg];
+                return vec![PackageData {
+                    package_type: Some(PACKAGE_TYPE.to_string()),
+                    primary_language: Some("Perl".to_string()),
+                    datasource_id: Some(DatasourceId::CpanMakefile),
+                    ..Default::default()
+                }];
             }
         };
 
@@ -74,7 +75,7 @@ pub(crate) fn parse_makefile_pl(content: &str) -> PackageData {
     // Find WriteMakefile or WriteMakefile1 call
     let makefile_block = extract_writemakefile_block(content);
     if makefile_block.is_empty() {
-        return create_default_package_data_with_datasource();
+        return default_package_data();
     }
 
     let fields = parse_hash_fields(&makefile_block);
@@ -124,16 +125,19 @@ pub(crate) fn parse_makefile_pl(content: &str) -> PackageData {
             Some(extra_data)
         },
         purl,
-        datasource_id: Some(DATASOURCE_ID.to_string()),
+        datasource_id: Some(DatasourceId::CpanMakefile),
         primary_language: Some("Perl".to_string()),
         ..Default::default()
     }
 }
 
-fn create_default_package_data_with_datasource() -> PackageData {
-    let mut pkg = create_default_package_data(PACKAGE_TYPE, Some("Perl"));
-    pkg.datasource_id = Some(DATASOURCE_ID.to_string());
-    pkg
+fn default_package_data() -> PackageData {
+    PackageData {
+        package_type: Some(PACKAGE_TYPE.to_string()),
+        primary_language: Some("Perl".to_string()),
+        datasource_id: Some(DatasourceId::CpanMakefile),
+        ..Default::default()
+    }
 }
 
 fn extract_writemakefile_block(content: &str) -> String {

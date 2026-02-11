@@ -36,16 +36,14 @@ Each test includes:
 ### Fixed Issues
 
 - ✅ PURL generation for packages
-- ✅ `datasource_id` field: Uses `"nuget_nuspec"` (corrected Python's typo `"nuget_nupsec"`)
+- ✅ `datasource_id` field: Uses `"nuget_nupsec"` (matches Python reference value)
 - ✅ `holder` field population (copied from `copyright`)
 
-### Intentional Divergence from Python Reference
+### Note on `datasource_id` spelling
 
-**`datasource_id` typo correction:**
-- Python ScanCode: `"nuget_nupsec"` (typo: missing 'e')
-- Rust implementation: `"nuget_nuspec"` (correct spelling)
-- Golden test expected files updated to match correct spelling
-- This improves consistency and correctness without affecting functionality
+The `datasource_id` value `"nuget_nupsec"` matches the Python ScanCode reference exactly.
+This is a known typo in the original, but we preserve it for compatibility. A comment
+in the `DatasourceId` enum documents this.
 
 ## Parser Implementation
 

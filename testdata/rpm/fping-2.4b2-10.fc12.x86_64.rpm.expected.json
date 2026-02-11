@@ -1,7 +1,7 @@
 [
   {
     "type": "rpm",
-    "primary_language": "rpm_archive",
+    "datasource_id": "rpm_archive",
     "parties": []
   }
 ]

@@ -2,6 +2,7 @@
 mod tests {
     use super::super::PackageParser;
     use super::super::cran::CranParser;
+    use crate::models::DatasourceId;
     use std::path::PathBuf;
 
     #[test]
@@ -259,7 +260,7 @@ mod tests {
         assert_eq!(package_data.package_type, Some("cran".to_string()));
         assert_eq!(
             package_data.datasource_id,
-            Some("cran_description".to_string())
+            Some(DatasourceId::CranDescription)
         );
         assert_eq!(package_data.primary_language, Some("R".to_string()));
         assert!(package_data.name.is_none());

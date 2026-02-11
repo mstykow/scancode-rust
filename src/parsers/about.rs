@@ -21,7 +21,7 @@
 //! - Type can be overridden by 'type' field or extracted from 'purl' field
 //! - Graceful error handling: logs warnings and returns default on parse failure
 
-use crate::models::{FileReference, PackageData, Party};
+use crate::models::{DatasourceId, FileReference, PackageData, Party};
 use log::warn;
 use packageurl::PackageUrl;
 use serde_yaml::Value;
@@ -185,7 +185,7 @@ impl PackageParser for AboutFileParser {
             repository_homepage_url: None,
             repository_download_url: None,
             api_data_url: None,
-            datasource_id: Some("about_file".to_string()),
+            datasource_id: Some(DatasourceId::AboutFile),
             purl: purl_string,
         }]
     }

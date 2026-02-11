@@ -2,6 +2,7 @@
 mod tests {
     use super::super::PackageParser;
     use super::super::swift_show_dependencies::*;
+    use crate::models::DatasourceId;
     use std::path::PathBuf;
 
     #[test]
@@ -29,8 +30,8 @@ mod tests {
         assert_eq!(pkg.package_type.as_deref(), Some("swift"));
         assert_eq!(pkg.primary_language.as_deref(), Some("Swift"));
         assert_eq!(
-            pkg.datasource_id.as_deref(),
-            Some("swift_package_show_dependencies")
+            pkg.datasource_id,
+            Some(DatasourceId::SwiftPackageShowDependencies)
         );
     }
 
@@ -41,8 +42,8 @@ mod tests {
 
         assert_eq!(pkg.package_type.as_deref(), Some("swift"));
         assert_eq!(
-            pkg.datasource_id.as_deref(),
-            Some("swift_package_show_dependencies")
+            pkg.datasource_id,
+            Some(DatasourceId::SwiftPackageShowDependencies)
         );
     }
 

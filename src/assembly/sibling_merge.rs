@@ -44,7 +44,9 @@ pub fn assemble_siblings(
                 }
 
                 let datafile_path = file.path.clone();
-                let datasource_id = pkg_data.datasource_id.clone().unwrap_or_default();
+                let Some(datasource_id) = pkg_data.datasource_id else {
+                    continue;
+                };
 
                 match &mut package {
                     None => {
@@ -65,7 +67,7 @@ pub fn assemble_siblings(
                         dependencies.push(TopLevelDependency::from_dependency(
                             dep,
                             datafile_path.clone(),
-                            datasource_id.clone(),
+                            datasource_id,
                             for_package_uid.clone(),
                         ));
                     }
@@ -96,6 +98,5 @@ pub(crate) fn matches_pattern(file_name: &str, pattern: &str) -> bool {
 fn is_handled_by(pkg_data: &PackageData, config: &AssemblerConfig) -> bool {
     pkg_data
         .datasource_id
-        .as_ref()
-        .is_some_and(|dsid| config.datasource_ids.iter().any(|&id| id == dsid))
+        .is_some_and(|dsid| config.datasource_ids.contains(&dsid))
 }

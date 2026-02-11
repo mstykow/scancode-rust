@@ -1,5 +1,6 @@
 #[cfg(test)]
 mod tests {
+    use crate::models::DatasourceId;
     use crate::parsers::PackageParser;
     use crate::parsers::swift_manifest_json::{
         SwiftManifestJsonParser, dump_package_cached, get_namespace_and_name,
@@ -40,7 +41,7 @@ mod tests {
         assert_eq!(data.primary_language, Some("Swift".to_string()));
         assert_eq!(
             data.datasource_id,
-            Some("swift_package_manifest_json".to_string())
+            Some(DatasourceId::SwiftPackageManifestJson)
         );
         assert_eq!(data.purl, Some("pkg:swift/MapboxMaps".to_string()));
 

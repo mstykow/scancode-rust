@@ -4,6 +4,7 @@
 
 #[cfg(test)]
 mod tests {
+    use crate::models::DatasourceId;
     use crate::parsers::PackageParser;
     use crate::parsers::ruby::{GemfileLockParser, GemfileParser, strip_freeze_suffix};
     use std::fs;
@@ -659,7 +660,7 @@ gem "specific-range", ">= 1.0.0", "< 1.5.0", "!= 1.2.3"
         assert_eq!(package_data.license_detections.len(), 0);
         assert!(package_data.extracted_license_statement.is_some());
         assert_eq!(package_data.primary_language, Some("Ruby".to_string()));
-        assert_eq!(package_data.datasource_id, Some("gemspec".to_string()));
+        assert_eq!(package_data.datasource_id, Some(DatasourceId::Gemspec));
 
         // Authors should be extracted as parties
         assert!(
@@ -1113,7 +1114,7 @@ gem "rails", "7.0.4"
         assert_eq!(package_data.license_detections.len(), 0);
         assert!(package_data.extracted_license_statement.is_some());
         assert_eq!(package_data.primary_language, Some("Ruby".to_string()));
-        assert_eq!(package_data.datasource_id, Some("gem_archive".to_string()));
+        assert_eq!(package_data.datasource_id, Some(DatasourceId::GemArchive));
 
         // Authors should be extracted as parties
         assert!(

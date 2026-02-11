@@ -225,8 +225,7 @@ use crate::models::PackageData;
 ///     const PACKAGE_TYPE: &'static str = "my-package-type";
 ///
 ///     fn is_match(path: &Path) -> bool {
-///         path.file_name()
-///             .is_some_and(|name| name == "package-manifest.json")
+///         path.file_name().is_some_and(|name| name == "package.json")
 ///     }
 ///
 ///     fn extract_packages(path: &Path) -> Vec<PackageData> {

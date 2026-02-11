@@ -23,13 +23,21 @@ use std::path::Path;
 
 use log::warn;
 
-use crate::models::{Dependency, FileReference, PackageData, Party};
+use crate::models::{DatasourceId, Dependency, FileReference, PackageData, Party};
 use crate::parsers::rfc822;
-use crate::parsers::utils::{create_default_package_data, read_file_to_string, split_name_email};
+use crate::parsers::utils::{read_file_to_string, split_name_email};
 
 use super::PackageParser;
 
 const PACKAGE_TYPE: &str = "alpine";
+
+fn default_package_data(datasource_id: DatasourceId) -> PackageData {
+    PackageData {
+        package_type: Some(PACKAGE_TYPE.to_string()),
+        datasource_id: Some(datasource_id),
+        ..Default::default()
+    }
+}
 
 /// Parser for Alpine Linux installed package database
 pub struct AlpineInstalledParser;
@@ -48,18 +56,15 @@ impl PackageParser for AlpineInstalledParser {
             Ok(c) => c,
             Err(e) => {
                 warn!("Failed to read Alpine installed db {:?}: {}", path, e);
-                return vec![create_default_package_data(
-                    PACKAGE_TYPE,
-                    Some("alpine_installed_db"),
-                )];
+                return vec![default_package_data(DatasourceId::AlpineInstalledDb)];
             }
         };
 
-        vec![parse_alpine_installed_db(&content)]
+        parse_alpine_installed_db(&content)
     }
 }
 
-fn parse_alpine_installed_db(content: &str) -> PackageData {
+fn parse_alpine_installed_db(content: &str) -> Vec<PackageData> {
     let paragraphs = rfc822::parse_rfc822_paragraphs(content);
 
     let raw_paragraphs: Vec<&str> = content
@@ -78,10 +83,10 @@ fn parse_alpine_installed_db(content: &str) -> PackageData {
     }
 
     if all_packages.is_empty() {
-        return create_default_package_data(PACKAGE_TYPE, Some("alpine_installed_db"));
+        return vec![default_package_data(DatasourceId::AlpineInstalledDb)];
     }
 
-    all_packages.into_iter().next().unwrap()
+    all_packages
 }
 
 fn parse_alpine_package_paragraph(
@@ -172,7 +177,7 @@ fn parse_alpine_package_paragraph(
     let file_references = extract_file_references(raw_text);
 
     PackageData {
-        datasource_id: Some("alpine_installed_db".to_string()),
+        datasource_id: Some(DatasourceId::AlpineInstalledDb),
         package_type: Some(PACKAGE_TYPE.to_string()),
         namespace: namespace.clone(),
         name: name.clone(),
@@ -325,7 +330,11 @@ impl PackageParser for AlpineApkParser {
             Ok(data) => data,
             Err(e) => {
                 warn!("Failed to extract .apk archive {:?}: {}", path, e);
-                create_default_package_data(PACKAGE_TYPE, Some("alpine_apk_archive"))
+                PackageData {
+                    package_type: Some(PACKAGE_TYPE.to_string()),
+                    datasource_id: Some(DatasourceId::AlpineApkArchive),
+                    ..Default::default()
+                }
             }
         }]
     }
@@ -443,7 +452,7 @@ fn parse_pkginfo(content: &str) -> PackageData {
     }
 
     PackageData {
-        datasource_id: Some("alpine_apk_archive".to_string()),
+        datasource_id: Some(DatasourceId::AlpineApkArchive),
         package_type: Some(PACKAGE_TYPE.to_string()),
         namespace: Some("alpine".to_string()),
         name,
@@ -466,7 +475,22 @@ fn parse_pkginfo(content: &str) -> PackageData {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::Write;
     use std::path::PathBuf;
+    use tempfile::TempDir;
+
+    /// Creates a temp file mimicking the Alpine installed db path structure.
+    /// Returns the TempDir (must be kept alive) and path to the file.
+    fn create_temp_installed_db(content: &str) -> (TempDir, PathBuf) {
+        let temp_dir = TempDir::new().expect("Failed to create temp dir");
+        let db_dir = temp_dir.path().join("lib/apk/db");
+        std::fs::create_dir_all(&db_dir).expect("Failed to create db dir");
+        let file_path = db_dir.join("installed");
+        let mut file = std::fs::File::create(&file_path).expect("Failed to create file");
+        file.write_all(content.as_bytes())
+            .expect("Failed to write content");
+        (temp_dir, file_path)
+    }
 
     #[test]
     fn test_alpine_parser_is_match() {
@@ -501,7 +525,8 @@ t:1655134784
 c:cb70ca5c6d6db0399d2dd09189c5d57827bce5cd
 
 ";
-        let pkg = parse_alpine_installed_db(content);
+        let (_dir, path) = create_temp_installed_db(content);
+        let pkg = AlpineInstalledParser::extract_first_package(&path);
         assert_eq!(pkg.name, Some("alpine-baselayout-data".to_string()));
         assert_eq!(pkg.version, Some("3.2.0-r22".to_string()));
         assert_eq!(pkg.namespace, Some("alpine".to_string()));
@@ -540,7 +565,8 @@ A:x86_64
 D:scanelf so:libc.musl-x86_64.so.1
 
 ";
-        let pkg = parse_alpine_installed_db(content);
+        let (_dir, path) = create_temp_installed_db(content);
+        let pkg = AlpineInstalledParser::extract_first_package(&path);
         assert_eq!(pkg.name, Some("musl".to_string()));
         assert_eq!(pkg.dependencies.len(), 1);
         assert!(
@@ -575,9 +601,10 @@ t:1234567890
 c:gitcommithash
 
 ";
-        let pkg = parse_alpine_installed_db(content);
+        let (_dir, path) = create_temp_installed_db(content);
+        let pkg = AlpineInstalledParser::extract_first_package(&path);
         assert!(pkg.extra_data.is_some());
-        let extra = pkg.extra_data.unwrap();
+        let extra = pkg.extra_data.as_ref().unwrap();
         assert!(extra.contains_key("checksum"));
         assert!(extra.contains_key("compressed_size"));
         assert!(extra.contains_key("installed_size"));
@@ -596,8 +623,13 @@ V:2.0
 A:aarch64
 
 ";
-        let pkg = parse_alpine_installed_db(content);
-        assert_eq!(pkg.name, Some("package1".to_string()));
+        let (_dir, path) = create_temp_installed_db(content);
+        let pkgs = AlpineInstalledParser::extract_packages(&path);
+        assert_eq!(pkgs.len(), 2);
+        assert_eq!(pkgs[0].name, Some("package1".to_string()));
+        assert_eq!(pkgs[0].version, Some("1.0".to_string()));
+        assert_eq!(pkgs[1].name, Some("package2".to_string()));
+        assert_eq!(pkgs[1].version, Some("2.0".to_string()));
     }
 
     #[test]
@@ -612,7 +644,8 @@ R:config
 Z:Q1pcfTfDNEbNKQc2s1tia7da05M8Q=
 
 ";
-        let pkg = parse_alpine_installed_db(content);
+        let (_dir, path) = create_temp_installed_db(content);
+        let pkg = AlpineInstalledParser::extract_first_package(&path);
         assert_eq!(pkg.file_references.len(), 2);
         assert_eq!(pkg.file_references[0].path, "usr/bin/test");
         assert!(pkg.file_references[0].sha1.is_some());
@@ -626,7 +659,8 @@ Z:Q1pcfTfDNEbNKQc2s1tia7da05M8Q=
 V:1.0
 
 ";
-        let pkg = parse_alpine_installed_db(content);
+        let (_dir, path) = create_temp_installed_db(content);
+        let pkg = AlpineInstalledParser::extract_first_package(&path);
         assert_eq!(pkg.name, Some("minimal-package".to_string()));
         assert_eq!(pkg.version, Some("1.0".to_string()));
         assert!(pkg.description.is_none());
@@ -642,7 +676,8 @@ o:busybox
 A:x86_64
 
 ";
-        let pkg = parse_alpine_installed_db(content);
+        let (_dir, path) = create_temp_installed_db(content);
+        let pkg = AlpineInstalledParser::extract_first_package(&path);
         assert_eq!(pkg.name, Some("busybox-ifupdown".to_string()));
         assert_eq!(pkg.source_packages.len(), 1);
         assert_eq!(pkg.source_packages[0], "pkg:alpine/busybox");
@@ -656,7 +691,8 @@ U:https://www.openssl.org
 A:x86_64
 
 ";
-        let pkg = parse_alpine_installed_db(content);
+        let (_dir, path) = create_temp_installed_db(content);
+        let pkg = AlpineInstalledParser::extract_first_package(&path);
         assert_eq!(
             pkg.homepage_url,
             Some("https://www.openssl.org".to_string())
@@ -671,9 +707,10 @@ p:cmd:binary=1.0
 p:so:libtest.so.1
 
 ";
-        let pkg = parse_alpine_installed_db(content);
+        let (_dir, path) = create_temp_installed_db(content);
+        let pkg = AlpineInstalledParser::extract_first_package(&path);
         assert!(pkg.extra_data.is_some());
-        let extra = pkg.extra_data.unwrap();
+        let extra = pkg.extra_data.as_ref().unwrap();
         let providers = extra.get("providers").and_then(|v| v.as_array());
         assert!(providers.is_some());
         let provider_array = providers.unwrap();

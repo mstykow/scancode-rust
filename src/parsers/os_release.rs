@@ -19,6 +19,7 @@
 //! - Comments start with #
 //! - Spec: https://www.freedesktop.org/software/systemd/man/os-release.html
 
+use crate::models::DatasourceId;
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
@@ -26,7 +27,6 @@ use std::path::Path;
 use log::warn;
 
 use crate::models::PackageData;
-use crate::parsers::utils::create_default_package_data;
 
 use super::PackageParser;
 
@@ -48,10 +48,11 @@ impl PackageParser for OsReleaseParser {
             Ok(c) => c,
             Err(e) => {
                 warn!("Failed to read os-release file {:?}: {}", path, e);
-                return vec![create_default_package_data(
-                    PACKAGE_TYPE,
-                    Some("etc_os_release"),
-                )];
+                return vec![PackageData {
+                    package_type: Some(PACKAGE_TYPE.to_string()),
+                    datasource_id: Some(DatasourceId::EtcOsRelease),
+                    ..Default::default()
+                }];
             }
         };
 
@@ -86,7 +87,7 @@ pub(crate) fn parse_os_release(content: &str) -> PackageData {
         homepage_url,
         bug_tracking_url,
         code_view_url,
-        datasource_id: Some("etc_os_release".to_string()),
+        datasource_id: Some(DatasourceId::EtcOsRelease),
         ..Default::default()
     }
 }

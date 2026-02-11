@@ -29,13 +29,10 @@ use serde_json::Value as JsonValue;
 use toml::Value as TomlValue;
 use toml::map::Map as TomlMap;
 
-use crate::models::{Dependency, PackageData};
+use crate::models::{DatasourceId, Dependency, PackageData};
 use crate::parsers::python::read_toml_file;
 
 use super::PackageParser;
-
-const DATASOURCE_PIPFILE_LOCK: &str = "pipfile_lock";
-const DATASOURCE_PIPFILE: &str = "pipfile";
 
 const FIELD_META: &str = "_meta";
 const FIELD_HASH: &str = "hash";
@@ -81,7 +78,7 @@ fn extract_from_pipfile_lock(path: &Path) -> PackageData {
         Ok(content) => content,
         Err(e) => {
             warn!("Failed to read Pipfile.lock at {:?}: {}", path, e);
-            return default_package_data(Some(DATASOURCE_PIPFILE_LOCK));
+            return default_package_data(Some(DatasourceId::PipfileLock));
         }
     };
 
@@ -89,7 +86,7 @@ fn extract_from_pipfile_lock(path: &Path) -> PackageData {
         Ok(content) => content,
         Err(e) => {
             warn!("Failed to parse Pipfile.lock at {:?}: {}", path, e);
-            return default_package_data(Some(DATASOURCE_PIPFILE_LOCK));
+            return default_package_data(Some(DatasourceId::PipfileLock));
         }
     };
 
@@ -97,7 +94,7 @@ fn extract_from_pipfile_lock(path: &Path) -> PackageData {
 }
 
 fn parse_pipfile_lock(json_content: &JsonValue) -> PackageData {
-    let mut package_data = default_package_data(Some(DATASOURCE_PIPFILE_LOCK));
+    let mut package_data = default_package_data(Some(DatasourceId::PipfileLock));
     package_data.sha256 = extract_lockfile_sha256(json_content);
 
     let meta = json_content
@@ -221,7 +218,7 @@ fn extract_from_pipfile(path: &Path) -> PackageData {
         Ok(content) => content,
         Err(e) => {
             warn!("Failed to read Pipfile at {:?}: {}", path, e);
-            return default_package_data(Some(DATASOURCE_PIPFILE));
+            return default_package_data(Some(DatasourceId::Pipfile));
         }
     };
 
@@ -229,7 +226,7 @@ fn extract_from_pipfile(path: &Path) -> PackageData {
 }
 
 fn parse_pipfile(toml_content: &TomlValue) -> PackageData {
-    let mut package_data = default_package_data(Some(DATASOURCE_PIPFILE));
+    let mut package_data = default_package_data(Some(DatasourceId::Pipfile));
 
     let packages = toml_content
         .get(FIELD_PACKAGES)
@@ -419,50 +416,12 @@ fn create_pypi_purl(name: &str, version: Option<&str>) -> Option<String> {
     Some(purl.to_string())
 }
 
-fn default_package_data(datasource_id: Option<&str>) -> PackageData {
+fn default_package_data(datasource_id: Option<DatasourceId>) -> PackageData {
     PackageData {
         package_type: Some(PipfileLockParser::PACKAGE_TYPE.to_string()),
-        namespace: None,
-        name: None,
-        version: None,
-        qualifiers: None,
-        subpath: None,
         primary_language: Some("Python".to_string()),
-        description: None,
-        release_date: None,
-        parties: Vec::new(),
-        keywords: Vec::new(),
-        homepage_url: None,
-        download_url: None,
-        size: None,
-        sha1: None,
-        md5: None,
-        sha256: None,
-        sha512: None,
-        bug_tracking_url: None,
-        code_view_url: None,
-        vcs_url: None,
-        copyright: None,
-        holder: None,
-        declared_license_expression: None,
-        declared_license_expression_spdx: None,
-        license_detections: Vec::new(),
-        other_license_expression: None,
-        other_license_expression_spdx: None,
-        other_license_detections: Vec::new(),
-        extracted_license_statement: None,
-        notice_text: None,
-        source_packages: Vec::new(),
-        file_references: Vec::new(),
-        is_private: false,
-        is_virtual: false,
-        extra_data: None,
-        dependencies: Vec::new(),
-        repository_homepage_url: None,
-        repository_download_url: None,
-        api_data_url: None,
-        datasource_id: datasource_id.map(|value| value.to_string()),
-        purl: None,
+        datasource_id,
+        ..Default::default()
     }
 }
 

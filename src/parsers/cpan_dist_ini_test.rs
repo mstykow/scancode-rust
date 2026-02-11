@@ -2,6 +2,7 @@
 mod tests {
     use super::super::PackageParser;
     use super::super::cpan_dist_ini::*;
+    use crate::models::DatasourceId;
     use std::path::PathBuf;
 
     #[test]
@@ -39,7 +40,7 @@ abstract = Dancer2 plugin for Minion job queue
         );
         assert_eq!(pkg.declared_license_expression.as_deref(), Some("Perl_5"));
         assert_eq!(pkg.primary_language.as_deref(), Some("Perl"));
-        assert_eq!(pkg.datasource_id.as_deref(), Some("cpan_dist_ini"));
+        assert_eq!(pkg.datasource_id, Some(DatasourceId::CpanDistIni));
 
         assert_eq!(pkg.parties.len(), 1);
         assert_eq!(pkg.parties[0].role.as_deref(), Some("author"));

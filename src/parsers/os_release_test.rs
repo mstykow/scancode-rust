@@ -2,6 +2,7 @@
 mod tests {
     use super::super::PackageParser;
     use super::super::os_release::*;
+    use crate::models::DatasourceId;
     use std::path::PathBuf;
 
     #[test]
@@ -52,7 +53,7 @@ BUG_REPORT_URL="https://bugs.debian.org/"
         assert_eq!(result.namespace, Some("debian".to_string()));
         assert_eq!(result.name, Some("debian".to_string()));
         assert_eq!(result.version, Some("11".to_string()));
-        assert_eq!(result.datasource_id, Some("etc_os_release".to_string()));
+        assert_eq!(result.datasource_id, Some(DatasourceId::EtcOsRelease));
 
         assert_eq!(
             result.homepage_url,

@@ -29,8 +29,7 @@ use packageurl::PackageUrl;
 use rustpython_parser::{Parse, ast};
 use serde_json::Value;
 
-use crate::models::{Dependency, PackageData};
-use crate::parsers::utils::create_default_package_data;
+use crate::models::{DatasourceId, Dependency, PackageData};
 
 use super::PackageParser;
 
@@ -149,7 +148,7 @@ fn extract_conanfile_data(class_def: &ast::StmtClassDef) -> PackageData {
         keywords,
         dependencies,
         extracted_license_statement: extracted_license,
-        datasource_id: Some("conan_conanfile_py".to_string()),
+        datasource_id: Some(DatasourceId::ConanConanFilePy),
         ..default_package_data()
     }
 }
@@ -256,7 +255,7 @@ impl PackageParser for ConanfileTxtParser {
             package_type: Some(Self::PACKAGE_TYPE.to_string()),
             dependencies,
             primary_language: Some("C++".to_string()),
-            datasource_id: Some("conan_conanfile_txt".to_string()),
+            datasource_id: Some(DatasourceId::ConanConanFileTxt),
             ..default_package_data()
         }]
     }
@@ -298,7 +297,7 @@ impl PackageParser for ConanLockParser {
             package_type: Some(Self::PACKAGE_TYPE.to_string()),
             dependencies,
             primary_language: Some("C++".to_string()),
-            datasource_id: Some("conan_lock".to_string()),
+            datasource_id: Some(DatasourceId::ConanLock),
             ..default_package_data()
         }]
     }
@@ -405,7 +404,11 @@ fn parse_conan_lock(json: &Value) -> Vec<Dependency> {
 }
 
 fn default_package_data() -> PackageData {
-    create_default_package_data("conan", Some("C++"))
+    PackageData {
+        package_type: Some("conan".to_string()),
+        primary_language: Some("C++".to_string()),
+        ..Default::default()
+    }
 }
 
 crate::register_parser!(

@@ -1,5 +1,6 @@
 #[cfg(test)]
 mod tests {
+    use crate::models::DatasourceId;
     use crate::parsers::PackageParser;
     use crate::parsers::debian::*;
     use std::path::PathBuf;
@@ -43,7 +44,7 @@ mod tests {
         assert_eq!(package.package_type, Some("deb".to_string()));
         assert_eq!(
             package.datasource_id,
-            Some("debian_md5sums_in_extracted_deb".to_string())
+            Some(DatasourceId::DebianMd5SumsInExtractedDeb)
         );
         assert_eq!(package.name, Some("example".to_string()));
         assert_eq!(package.namespace, Some("debian".to_string()));
@@ -85,7 +86,7 @@ mod tests {
         assert_eq!(package.package_type, Some("deb".to_string()));
         assert_eq!(
             package.datasource_id,
-            Some("debian_md5sums_in_extracted_deb".to_string())
+            Some(DatasourceId::DebianMd5SumsInExtractedDeb)
         );
         assert_eq!(package.name, Some("testpkg".to_string()));
         assert_eq!(package.namespace, Some("debian".to_string()));

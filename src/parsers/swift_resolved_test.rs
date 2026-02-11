@@ -4,6 +4,7 @@ use std::path::PathBuf;
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::models::DatasourceId;
 
     #[test]
     fn test_is_match() {
@@ -43,10 +44,7 @@ mod tests {
         let data = SwiftPackageResolvedParser::extract_first_package(&path);
 
         assert_eq!(data.package_type, Some("swift".to_string()));
-        assert_eq!(
-            data.datasource_id,
-            Some("swift_package_resolved".to_string())
-        );
+        assert_eq!(data.datasource_id, Some(DatasourceId::SwiftPackageResolved));
         assert_eq!(data.primary_language, Some("Swift".to_string()));
         assert_eq!(data.dependencies.len(), 3);
 
@@ -75,10 +73,7 @@ mod tests {
         let data = SwiftPackageResolvedParser::extract_first_package(&path);
 
         assert_eq!(data.package_type, Some("swift".to_string()));
-        assert_eq!(
-            data.datasource_id,
-            Some("swift_package_resolved".to_string())
-        );
+        assert_eq!(data.datasource_id, Some(DatasourceId::SwiftPackageResolved));
         assert_eq!(data.dependencies.len(), 2);
 
         let dep0 = &data.dependencies[0];

@@ -3,11 +3,11 @@
 //! Identifies packages from their license files installed in the standard
 //! /usr/share/licenses/ location, primarily used in Mariner distroless containers.
 
+use crate::models::DatasourceId;
 use std::path::Path;
 
 use crate::models::PackageData;
 use crate::parsers::PackageParser;
-use crate::parsers::utils::create_default_package_data;
 
 const PACKAGE_TYPE: &str = "rpm";
 
@@ -66,10 +66,13 @@ impl PackageParser for RpmLicenseFilesParser {
         };
 
         // Build package data
-        let mut pkg = create_default_package_data(PACKAGE_TYPE, None);
-        pkg.datasource_id = Some("rpm_package_licenses".to_string());
-        pkg.namespace = Some("mariner".to_string());
-        pkg.name = name.clone();
+        let mut pkg = PackageData {
+            package_type: Some(PACKAGE_TYPE.to_string()),
+            datasource_id: Some(DatasourceId::RpmPackageLicenses),
+            namespace: Some("mariner".to_string()),
+            name: name.clone(),
+            ..Default::default()
+        };
 
         // Build PURL if we have a name
         if let Some(ref package_name) = name {

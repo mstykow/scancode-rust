@@ -2,6 +2,7 @@ use std::path::PathBuf;
 
 use super::PackageParser;
 use super::rpm_specfile::RpmSpecfileParser;
+use crate::models::DatasourceId;
 
 #[test]
 fn test_is_match_positive() {
@@ -35,7 +36,7 @@ fn test_parse_minimal_spec() {
     let pkg = RpmSpecfileParser::extract_first_package(&test_file);
 
     assert_eq!(pkg.package_type, Some("rpm".to_string()));
-    assert_eq!(pkg.datasource_id, Some("rpm_specfile".to_string()));
+    assert_eq!(pkg.datasource_id, Some(DatasourceId::RpmSpecfile));
     assert_eq!(pkg.name, Some("minimal-pkg".to_string()));
     assert_eq!(pkg.version, Some("1.0".to_string()));
     assert_eq!(pkg.extracted_license_statement, Some("MIT".to_string()));

@@ -2,6 +2,7 @@
 mod tests {
     use super::super::PackageParser;
     use super::super::bower::BowerJsonParser;
+    use crate::models::DatasourceId;
     use std::path::PathBuf;
 
     #[test]
@@ -31,7 +32,7 @@ mod tests {
             package_data.primary_language,
             Some("JavaScript".to_string())
         );
-        assert_eq!(package_data.datasource_id, Some("bower_json".to_string()));
+        assert_eq!(package_data.datasource_id, Some(DatasourceId::BowerJson));
         assert!(package_data.is_private);
     }
 

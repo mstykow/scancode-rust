@@ -16,6 +16,7 @@
 //! ## Reference
 //! Python implementation: `reference/scancode-toolkit/src/packagedcode/build.py` (BazelBuildHandler)
 
+use crate::models::DatasourceId;
 use std::path::Path;
 
 use log::warn;
@@ -141,6 +142,7 @@ fn extract_from_call(call: &ast::ExprCall) -> Option<PackageData> {
         package_type: Some(BazelBuildParser::PACKAGE_TYPE.to_string()),
         name: Some(package_name),
         extracted_license_statement: licenses.map(|l| l.join(", ")),
+        datasource_id: Some(DatasourceId::BazelBuild),
         ..Default::default()
     })
 }
@@ -161,6 +163,7 @@ fn fallback_package_data(path: &Path) -> PackageData {
     PackageData {
         package_type: Some(BazelBuildParser::PACKAGE_TYPE.to_string()),
         name,
+        datasource_id: Some(DatasourceId::BazelBuild),
         ..Default::default()
     }
 }

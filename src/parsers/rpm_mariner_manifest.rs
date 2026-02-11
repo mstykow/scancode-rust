@@ -16,18 +16,26 @@
 //! - One package per line
 //! - Spec: https://github.com/microsoft/marinara/
 
+use crate::models::DatasourceId;
 use std::fs;
 use std::path::Path;
 
 use log::warn;
 
 use crate::models::PackageData;
-use crate::parsers::utils::create_default_package_data;
 
 use super::PackageParser;
 
 const PACKAGE_TYPE: &str = "rpm";
-const DATASOURCE_ID: &str = "rpm_mariner_manifest";
+
+fn default_package_data() -> PackageData {
+    PackageData {
+        package_type: Some(PACKAGE_TYPE.to_string()),
+        namespace: Some("mariner".to_string()),
+        datasource_id: Some(DatasourceId::RpmMarinerManifest),
+        ..Default::default()
+    }
+}
 
 /// Parser for RPM Mariner container manifest files
 pub struct RpmMarinerManifestParser;
@@ -45,10 +53,7 @@ impl PackageParser for RpmMarinerManifestParser {
             Ok(c) => c,
             Err(e) => {
                 warn!("Failed to read RPM Mariner manifest {:?}: {}", path, e);
-                let mut pkg = create_default_package_data(PACKAGE_TYPE, None);
-                pkg.datasource_id = Some(DATASOURCE_ID.to_string());
-                pkg.namespace = Some("mariner".to_string());
-                return vec![pkg];
+                return vec![default_package_data()];
             }
         };
 
@@ -119,17 +124,14 @@ pub(crate) fn parse_rpm_mariner_manifest(content: &str) -> Vec<PackageData> {
                 Some(version.to_string())
             },
             qualifiers,
-            datasource_id: Some(DATASOURCE_ID.to_string()),
+            datasource_id: Some(DatasourceId::RpmMarinerManifest),
             extra_data,
             ..Default::default()
         });
     }
 
     if packages.is_empty() {
-        let mut pkg = create_default_package_data(PACKAGE_TYPE, None);
-        pkg.datasource_id = Some(DATASOURCE_ID.to_string());
-        pkg.namespace = Some("mariner".to_string());
-        packages.push(pkg);
+        packages.push(default_package_data());
     }
 
     packages

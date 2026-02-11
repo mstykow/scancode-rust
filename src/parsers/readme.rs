@@ -21,8 +21,9 @@
 //! - Multiple URL-related keys map to homepage_url (repo, source, upstream, etc.)
 //! - Separator precedence: the first separator (`:` or `=`) on each line is used
 
+use crate::models::DatasourceId;
 use crate::models::PackageData;
-use crate::parsers::utils::{create_default_package_data, read_file_to_string};
+use crate::parsers::utils::read_file_to_string;
 use log::warn;
 use std::path::Path;
 
@@ -123,9 +124,11 @@ impl PackageParser for ReadmeParser {
 }
 
 fn default_package_data() -> PackageData {
-    let mut pkg = create_default_package_data("readme", None);
-    pkg.datasource_id = Some("readme".to_string());
-    pkg
+    PackageData {
+        package_type: Some("readme".to_string()),
+        datasource_id: Some(DatasourceId::Readme),
+        ..Default::default()
+    }
 }
 
 #[cfg(test)]
@@ -194,7 +197,7 @@ mod tests {
         assert_eq!(pkg.version, Some("2.1.0".to_string()));
         assert_eq!(pkg.homepage_url, Some("https://example.com".to_string()));
         assert_eq!(pkg.extracted_license_statement, Some("MIT".to_string()));
-        assert_eq!(pkg.datasource_id, Some("readme".to_string()));
+        assert_eq!(pkg.datasource_id, Some(DatasourceId::Readme));
     }
 
     #[test]
@@ -275,7 +278,7 @@ mod tests {
 
         // Should return default data with proper type and datasource
         assert_eq!(pkg.package_type, Some("readme".to_string()));
-        assert_eq!(pkg.datasource_id, Some("readme".to_string()));
+        assert_eq!(pkg.datasource_id, Some(DatasourceId::Readme));
     }
 }
 

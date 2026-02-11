@@ -1,5 +1,6 @@
 #[cfg(test)]
 mod tests {
+    use crate::models::DatasourceId;
     use crate::parsers::PackageParser;
     use crate::parsers::go::{
         GoModParser, GoSumParser, GodepsParser, parse_go_mod, parse_go_sum, parse_godeps_json,
@@ -25,7 +26,7 @@ mod tests {
         assert_eq!(result.name.as_deref(), Some("kingpin"));
         assert_eq!(result.package_type.as_deref(), Some("golang"));
         assert_eq!(result.primary_language.as_deref(), Some("Go"));
-        assert_eq!(result.datasource_id.as_deref(), Some("go_mod"));
+        assert_eq!(result.datasource_id, Some(DatasourceId::GoMod));
     }
 
     #[test]
@@ -1074,7 +1075,7 @@ github.com/cznic/golex v0.0.0-20181122101858-9c343928389c/go.mod h1:+bmmJDNmKlhW
 
         assert_eq!(result.package_type.as_deref(), Some("golang"));
         assert_eq!(result.primary_language.as_deref(), Some("Go"));
-        assert_eq!(result.datasource_id.as_deref(), Some("go_sum"));
+        assert_eq!(result.datasource_id, Some(DatasourceId::GoSum));
 
         // Deduplication: 4 lines → 2 unique dependencies
         assert_eq!(result.dependencies.len(), 2);
@@ -1275,7 +1276,7 @@ github.com/foo/bar v1.1.0/go.mod h1:jkl=
 
         assert_eq!(result.package_type.as_deref(), Some("golang"));
         assert_eq!(result.primary_language.as_deref(), Some("Go"));
-        assert_eq!(result.datasource_id.as_deref(), Some("godeps"));
+        assert_eq!(result.datasource_id, Some(DatasourceId::Godeps));
         assert_eq!(result.name.as_deref(), Some("app"));
         assert_eq!(result.namespace, None);
         assert!(result.dependencies.is_empty());
@@ -1545,7 +1546,7 @@ github.com/foo/bar v1.1.0/go.mod h1:jkl=
         let result = GoSumParser::extract_first_package(&path);
 
         assert_eq!(result.package_type.as_deref(), Some("golang"));
-        assert_eq!(result.datasource_id.as_deref(), Some("go_sum"));
+        assert_eq!(result.datasource_id, Some(DatasourceId::GoSum));
         // 6 lines → 3 unique modules after dedup
         assert_eq!(result.dependencies.len(), 3);
     }

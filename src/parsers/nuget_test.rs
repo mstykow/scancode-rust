@@ -4,6 +4,7 @@ mod tests {
     use super::super::nuget::{
         NupkgParser, NuspecParser, PackagesConfigParser, PackagesLockParser,
     };
+    use crate::models::DatasourceId;
     use std::io::Write;
     use std::path::PathBuf;
     use tempfile::NamedTempFile;
@@ -44,7 +45,7 @@ mod tests {
         assert_eq!(package_data.package_type, Some("nuget".to_string()));
         assert_eq!(
             package_data.datasource_id,
-            Some("nuget_packages_config".to_string())
+            Some(DatasourceId::NugetPackagesConfig)
         );
 
         let deps = &package_data.dependencies;
@@ -259,7 +260,7 @@ mod tests {
 
         // Should return default package data on error
         assert_eq!(package_data.package_type, Some("nuget".to_string()));
-        assert_eq!(package_data.datasource_id, Some("nuget_nuspec".to_string()));
+        assert_eq!(package_data.datasource_id, Some(DatasourceId::NugetNuspec));
         assert!(package_data.name.is_none());
     }
 
@@ -355,7 +356,7 @@ mod tests {
         assert_eq!(package_data.package_type, Some("nuget".to_string()));
         assert_eq!(
             package_data.datasource_id,
-            Some("nuget_packages_lock".to_string())
+            Some(DatasourceId::NugetPackagesLock)
         );
 
         let deps = &package_data.dependencies;

@@ -20,7 +20,7 @@
 //! - All lockfile versions are pinned (`is_pinned: Some(true)`)
 //! - Graceful error handling with `warn!()` logs
 
-use crate::models::{Dependency, PackageData, ResolvedPackage};
+use crate::models::{DatasourceId, Dependency, PackageData, ResolvedPackage};
 use crate::parsers::utils::{npm_purl, parse_sri};
 use log::warn;
 use serde_yaml::Value;
@@ -148,7 +148,7 @@ fn parse_yarn_v2(content: &str) -> PackageData {
             repository_homepage_url: None,
             repository_download_url: None,
             api_data_url: None,
-            datasource_id: Some("yarn_lock".to_string()),
+            datasource_id: Some(DatasourceId::YarnLock),
             purl: None,
         };
 
@@ -212,7 +212,7 @@ fn parse_yarn_v2(content: &str) -> PackageData {
         repository_homepage_url: None,
         repository_download_url: None,
         api_data_url: None,
-        datasource_id: Some("yarn_lock".to_string()),
+        datasource_id: Some(DatasourceId::YarnLock),
         purl: None,
     }
 }
@@ -279,7 +279,7 @@ fn parse_yarn_v1(content: &str) -> PackageData {
         repository_homepage_url: None,
         repository_download_url: None,
         api_data_url: None,
-        datasource_id: Some("yarn_lock".to_string()),
+        datasource_id: Some(DatasourceId::YarnLock),
         purl: None,
     }
 }
@@ -332,47 +332,8 @@ fn create_purl(namespace: &str, name: &str, version: &str) -> Option<String> {
 fn default_package_data() -> PackageData {
     PackageData {
         package_type: Some(YarnLockParser::PACKAGE_TYPE.to_string()),
-        namespace: None,
-        name: None,
-        version: None,
-        qualifiers: None,
-        subpath: None,
-        primary_language: None,
-        description: None,
-        release_date: None,
-        parties: Vec::new(),
-        keywords: Vec::new(),
-        homepage_url: None,
-        download_url: None,
-        size: None,
-        sha1: None,
-        md5: None,
-        sha256: None,
-        sha512: None,
-        bug_tracking_url: None,
-        code_view_url: None,
-        vcs_url: None,
-        copyright: None,
-        holder: None,
-        declared_license_expression: None,
-        declared_license_expression_spdx: None,
-        license_detections: Vec::new(),
-        other_license_expression: None,
-        other_license_expression_spdx: None,
-        other_license_detections: Vec::new(),
-        extracted_license_statement: None,
-        notice_text: None,
-        source_packages: Vec::new(),
-        file_references: Vec::new(),
-        is_private: false,
-        is_virtual: false,
-        extra_data: None,
-        dependencies: Vec::new(),
-        repository_homepage_url: None,
-        repository_download_url: None,
-        api_data_url: None,
-        datasource_id: Some("yarn_lock".to_string()),
-        purl: None,
+        datasource_id: Some(DatasourceId::YarnLock),
+        ..Default::default()
     }
 }
 
@@ -460,7 +421,7 @@ fn parse_yarn_v1_block(block: &str) -> Option<Dependency> {
         repository_homepage_url: None,
         repository_download_url: None,
         api_data_url: None,
-        datasource_id: Some("yarn_lock".to_string()),
+        datasource_id: Some(DatasourceId::YarnLock),
         purl: None,
     };
 

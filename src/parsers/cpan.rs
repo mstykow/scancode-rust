@@ -29,7 +29,7 @@ use packageurl::PackageUrl;
 use serde_json::Value as JsonValue;
 use serde_yaml::Value as YamlValue;
 
-use crate::models::{Dependency, FileReference, PackageData, Party};
+use crate::models::{DatasourceId, Dependency, FileReference, PackageData, Party};
 
 use super::PackageParser;
 
@@ -99,7 +99,7 @@ impl PackageParser for CpanMetaJsonParser {
             code_view_url,
             bug_tracking_url,
             primary_language: Some("Perl".to_string()),
-            datasource_id: Some("cpan_meta_json".to_string()),
+            datasource_id: Some(DatasourceId::CpanMetaJson),
             ..Default::default()
         }]
     }
@@ -156,7 +156,7 @@ impl PackageParser for CpanMetaYmlParser {
             vcs_url,
             bug_tracking_url,
             primary_language: Some("Perl".to_string()),
-            datasource_id: Some("cpan_meta_yml".to_string()),
+            datasource_id: Some(DatasourceId::CpanMetaYml),
             ..Default::default()
         }]
     }
@@ -206,7 +206,7 @@ impl PackageParser for CpanManifestParser {
             package_type: Some(Self::PACKAGE_TYPE.to_string()),
             file_references,
             primary_language: Some("Perl".to_string()),
-            datasource_id: Some("cpan_manifest".to_string()),
+            datasource_id: Some(DatasourceId::CpanManifest),
             ..Default::default()
         }]
     }
