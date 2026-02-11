@@ -3,7 +3,7 @@
 > **Status**: 🔴 Placeholder - Not Started
 > **Priority**: P2 - Medium Priority (Post-Processing Feature)
 > **Estimated Effort**: 3-4 weeks
-> **Dependencies**: LICENSE_DETECTION_PLAN.md, COPYRIGHT_DETECTION_PLAN.md, ASSEMBLY_IMPLEMENTATION_PLAN.md
+> **Dependencies**: LICENSE_DETECTION_PLAN.md, COPYRIGHT_DETECTION_PLAN.md, ASSEMBLY_PLAN.md
 
 ## Overview
 
@@ -25,7 +25,7 @@ Post-scan analysis and summarization features that aggregate findings across fil
 ### What This Doesn't Cover
 
 - License policy evaluation (separate feature)
-- Package consolidation (covered by CONSOLIDATION_PLAN.md)
+- Package consolidation (covered by `CONSOLIDATION_PLAN.md` in this directory)
 - Output formatting (covered by OUTPUT_FORMATS_PLAN.md)
 
 ## Python Reference Implementation
@@ -82,7 +82,7 @@ Post-scan analysis and summarization features that aggregate findings across fil
 
 - **Implementation**: `LICENSE_DETECTION_PLAN.md` (prerequisite)
 - **Implementation**: `COPYRIGHT_DETECTION_PLAN.md` (prerequisite)
-- **Implementation**: `ASSEMBLY_IMPLEMENTATION_PLAN.md` (prerequisite)
+- **Implementation**: `../package-detection/ASSEMBLY_PLAN.md` (prerequisite)
 - **Evergreen**: `ARCHITECTURE.md` (post-processing pipeline)
 
 ## Notes

@@ -5,7 +5,7 @@ This index helps you find the right documentation for your needs.
 ## For Users
 
 - **[README.md](../README.md)** - Installation, usage, and quick start
-- **[SUPPORTED_FORMATS.md](SUPPORTED_FORMATS.md)** - List of all 68 supported package formats
+- **[SUPPORTED_FORMATS.md](SUPPORTED_FORMATS.md)** - List of all supported package formats
 
 ## For Contributors
 
@@ -17,25 +17,18 @@ This index helps you find the right documentation for your needs.
 
 ### Design Decisions
 
-- **[adr/](adr/)** - Architectural Decision Records (5 ADRs)
-  - Why we chose trait-based parsers
-  - Extraction vs detection separation
-  - Golden test strategy
-  - Security-first parsing
-  - Auto-generated documentation
+- **[adr/](adr/)** - Architectural Decision Records
 
 ### Beyond-Parity Features
 
-- **[improvements/](improvements/)** - Features where Rust exceeds Python (18 parsers documented)
+- **[improvements/](improvements/)** - Features where Rust exceeds Python
 
 ## For Maintainers
 
 ### Implementation Plans (Temporary)
 
 - **[implementation-plans/](implementation-plans/)** - Active and placeholder implementation plans
-  - **Active Plans**: Parser parity (~98% complete), Assembly (not started)
-  - **Placeholder Plans**: License detection, copyright detection, output formats, etc.
-  - See [implementation-plans/README.md](implementation-plans/README.md) for full list
+  - See [implementation-plans/README.md](implementation-plans/README.md) for current status
 
 ### Document Organization
 
@@ -48,26 +41,16 @@ docs/
 ├── DOCUMENTATION_INDEX.md             # This file
 │
 ├── adr/                               # Evergreen: Design decisions
-│   ├── 0001-trait-based-parsers.md
-│   ├── 0002-extraction-vs-detection.md
-│   ├── 0003-golden-test-strategy.md
-│   ├── 0004-security-first-parsing.md
-│   └── 0005-auto-generated-docs.md
 │
 ├── improvements/                      # Evergreen: Beyond-parity features
-│   ├── alpine-parser.md
-│   ├── composer-parser.md
-│   ├── ... (18 parsers total)
-│   └── README.md
 │
 └── implementation-plans/              # Temporary: Porting progress
-    ├── README.md                      # Plan lifecycle and organization
-    ├── PARSER_PARITY_PLAN.md         # ~98% complete
-    ├── ASSEMBLY_IMPLEMENTATION_PLAN.md # Not started
-    ├── LICENSE_DETECTION_PLAN.md      # Placeholder
-    ├── COPYRIGHT_DETECTION_PLAN.md    # Placeholder
-    ├── ... (10 plans total)
-    └── PYTHON_ASSEMBLERS_*.md         # Reference docs
+    ├── README.md                      # Plan index and status
+    ├── package-detection/             # Parser and assembly plans
+    ├── text-detection/                # License, copyright, email/URL plans
+    ├── post-processing/               # Summarization, consolidation plans
+    ├── output/                        # Output format plans
+    └── infrastructure/                # CLI, caching, plugins, progress plans
 ```
 
 ## Quick Links by Task

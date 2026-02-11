@@ -19,25 +19,12 @@ implementation-plans/
 
 ### Package Detection (`package-detection/`)
 
-- **[PARSER_PARITY_PLAN.md](package-detection/PARSER_PARITY_PLAN.md)** - Individual file format parser implementations
-  - Status: ~98% complete (79 parsers implemented)
-  - Remaining: Phase 5 complex binary formats (optional, low priority)
+- **[PARSER_PLAN.md](package-detection/PARSER_PLAN.md)** - Individual file format parser implementations
+  - Status: ~98% complete — only complex binary formats remain (low priority)
 
-- **[ASSEMBLY_IMPLEMENTATION_PLAN.md](package-detection/ASSEMBLY_IMPLEMENTATION_PLAN.md)** - Package assembly roadmap
-  - Status: Phase 1-3 Complete (28 assembler configs, all ecosystems) - Feb 10, 2026
-  - Scope: Merging related files into logical packages (e.g., package.json + package-lock.json)
-  - Next: Phase 4 (Archive extraction)
-
-- **[CONSOLIDATION_PLAN.md](package-detection/CONSOLIDATION_PLAN.md)** - Package deduplication
-  - Status: Placeholder
-
-**Supporting Docs**:
-
-- [ASSEMBLY_PARITY_ROADMAP.md](package-detection/ASSEMBLY_PARITY_ROADMAP.md) - Analysis of Python's 20 assemblers
-- [ASSEMBLY_QUICK_REFERENCE.md](package-detection/ASSEMBLY_QUICK_REFERENCE.md) - Assembly concepts
-- [PYTHON_ASSEMBLERS_SUMMARY.md](package-detection/PYTHON_ASSEMBLERS_SUMMARY.md) - Python framework overview
-- [PYTHON_ASSEMBLERS_DETAILED.md](package-detection/PYTHON_ASSEMBLERS_DETAILED.md) - Detailed assembler analysis
-- [ASSEMBLY_DOCUMENTATION_INDEX.md](package-detection/ASSEMBLY_DOCUMENTATION_INDEX.md) - Navigation guide
+- **[ASSEMBLY_PLAN.md](package-detection/ASSEMBLY_PLAN.md)** - Package assembly roadmap
+  - Status: Phase 1-3 Complete (26 assembler configs, all ecosystems)
+  - Next: Phase 4 (npm workspaces, file reference resolution, archive extraction)
 
 ## Placeholder Plans (To Be Fleshed Out)
 
@@ -58,6 +45,10 @@ These represent major architectural components not yet implemented. Each will be
 
 - **[SUMMARIZATION_PLAN.md](post-processing/SUMMARIZATION_PLAN.md)** - License/copyright tallies, facets, classification
   - Priority: P2 - Medium, Effort: 3-4 weeks
+
+- **[CONSOLIDATION_PLAN.md](post-processing/CONSOLIDATION_PLAN.md)** - Resource grouping by origin, package enrichment with discovered licenses/copyrights
+  - Priority: P2 - Medium, Effort: 2-3 weeks
+  - Dependencies: License detection, copyright detection, package assembly
 
 ### Output Formats (`output/`)
 
@@ -90,7 +81,7 @@ These implementation plans are **temporary** and complement the **evergreen** do
 | Evergreen (Permanent) | Implementation Plans (Temporary) |
 |-----------------------|----------------------------------|
 | `ARCHITECTURE.md` | Component-specific implementation plans |
-| `HOW_TO_ADD_A_PARSER.md` | `PARSER_PARITY_PLAN.md` |
+| `HOW_TO_ADD_A_PARSER.md` | `PARSER_PLAN.md` |
 | `TESTING_STRATEGY.md` | Test plans within implementation docs |
 | `adr/` | Design decisions made during implementation |
 | `improvements/` | Beyond-parity features documented here |

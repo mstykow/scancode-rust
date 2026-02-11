@@ -100,7 +100,7 @@ This section will be expanded when work begins. Preliminary phases:
 
 - **Evergreen**: `ARCHITECTURE.md` (scanner pipeline)
 - **Evergreen**: `TESTING_STRATEGY.md` (golden test approach)
-- **Implementation**: `PARSER_PARITY_PLAN.md` (package detection integration)
+- **Implementation**: `../package-detection/PARSER_PLAN.md` (package detection integration)
 - **ADR**: TBD - License detection algorithm selection
 
 ## Notes
