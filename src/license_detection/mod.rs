@@ -9,6 +9,7 @@ mod models;
 mod query;
 pub mod rules;
 mod spans;
+mod spdx_lid;
 mod tokenize;
 
 pub use models::{License, LicenseMatch, Rule};
