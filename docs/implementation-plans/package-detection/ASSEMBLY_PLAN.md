@@ -1,6 +1,6 @@
 # Package Assembly Implementation Plan
 
-> **Status**: 🟢 Phase 1-3 Complete (Feb 10, 2026) | Phase 4a: npm Workspace Assembly Complete (Feb 11, 2026)
+> **Status**: 🟢 Phase 1-3 Complete (Feb 10, 2026) | Phase 4a: npm Workspace Assembly Complete (Feb 11, 2026) | Phase 4b: File Reference Resolution Complete (Feb 11, 2026)
 > **Priority**: P0 - Critical for Package Detection Completeness
 > **Dependencies**: PARSER_PLAN.md (parsers must exist first)
 
@@ -72,7 +72,27 @@ npm/pnpm workspace support: creates separate Package objects per workspace membe
 **Implementation**: `src/assembly/workspace_merge.rs` (859 lines)
 **Key commits**: 55cac94 (workspace assembly implementation)
 
-### Golden Tests (7 total)
+### ✅ Phase 4b: File Reference Resolution — COMPLETE (Feb 11, 2026)
+
+Resolves `file_references` from package database entries (RPM/Alpine/Debian) against scanned files on disk.
+
+- Database path detection for Alpine (`lib/apk/db/installed`), RPM (BDB/NDB/SQLite), Debian (`var/lib/dpkg/status`), Debian Distroless
+- Root path computation from datafile path (e.g., `rootfs/var/lib/rpm/Packages` → root `rootfs/`)
+- File reference resolution via HashMap index (O(1) lookup per reference)
+- `for_packages` assignment on matched files
+- Missing reference tracking in `package.extra_data["missing_file_references"]`
+- RPM namespace resolution from `etc/os-release` or `usr/lib/os-release`
+- Namespace propagation to package dependencies
+- Per-package file reference collection (purl-matched, not all-packages-in-file)
+
+**Implementation**: `src/assembly/file_ref_resolve.rs` (750 lines)
+
+**Bug fixes during implementation:**
+
+- Fixed Alpine parser case-sensitivity bug: `T:`/`t:` and `C:`/`c:` keys were colliding due to rfc822 parser lowercasing all keys. Replaced with Alpine-specific case-sensitive parser.
+- Fixed file reference collection: was returning ALL file_references from a DB file for every package instead of only the matching package's references (purl-based filtering).
+
+### Golden Tests (8 total)
 
 | Test | Ecosystem | Status |
 |------|-----------|--------|
@@ -83,6 +103,7 @@ npm/pnpm workspace support: creates separate Package objects per workspace membe
 | maven-basic | maven | ✅ Pass |
 | npm-workspace | npm (workspace) | ✅ Pass |
 | pnpm-workspace | npm (pnpm workspace) | ✅ Pass |
+| alpine-file-refs | alpine (file reference resolution) | ✅ Pass |
 
 ---
 
@@ -173,7 +194,7 @@ Consolidation is a **separate post-scan plugin** (`plugin_consolidate.py`), not 
 ### Success Criteria
 
 - [x] npm workspace assembly creates separate packages per workspace member
-- [ ] Database assembly resolves file references for RPM/Alpine/Debian
+- [x] Database assembly resolves file references for RPM/Alpine/Debian
 - [x] Golden tests for workspace and database assembly scenarios
 - [ ] Archive extraction framework in place (stretch goal)
 
@@ -201,11 +222,12 @@ pub struct Package {
 
 ```text
 File Enumeration → Parser Selection → Package Extraction → Assembly Phase → JSON Output
-                                                              ↓
-                                                    Phase 1: Group by directory → merge siblings
-                                                    Phase 2: Find nested patterns → merge into root
-                                                    Phase 3: OnePerPackageData → each file's packages
-                                                    Phase 4: Workspace assembly → per-member packages
+                                                               ↓
+                                                     Phase 1: Group by directory → merge siblings
+                                                     Phase 2: Find nested patterns → merge into root
+                                                     Phase 3: OnePerPackageData → each file's packages
+                                                     Phase 4: File ref resolution → for_packages linking
+                                                     Phase 5: Workspace assembly → per-member packages
 ```
 
 ### Assembly Modes
@@ -214,6 +236,7 @@ File Enumeration → Parser Selection → Package Extraction → Assembly Phase 
 |------|----------|---------|
 | `SiblingMerge` | Merge related files in same/nested directory | npm, cargo, maven, golang, etc. (23 configs) |
 | `OnePerPackageData` | Each file becomes independent packages | Alpine DB, RPM DB, Debian installed DB (3 configs) |
+| File ref resolution | Resolve file_references → `for_packages` linking | Alpine, RPM, Debian installed DBs |
 | Workspace assembly | Post-processing pass creating per-member packages | npm/pnpm workspaces |
 
 ### Key Code Locations
@@ -225,7 +248,8 @@ File Enumeration → Parser Selection → Package Extraction → Assembly Phase 
 | `src/assembly/sibling_merge.rs` | Sibling pattern matching (102 lines) |
 | `src/assembly/nested_merge.rs` | Nested pattern matching (356 lines) |
 | `src/assembly/workspace_merge.rs` | npm/pnpm workspace assembly (859 lines) |
-| `src/assembly/assembly_golden_test.rs` | 7 golden tests (368 lines) |
+| `src/assembly/file_ref_resolve.rs` | File reference resolution for DB packages (750 lines) |
+| `src/assembly/assembly_golden_test.rs` | 8 golden tests (390 lines) |
 
 ---
 

@@ -1,6 +1,7 @@
 mod assemblers;
 #[cfg(test)]
 mod assembly_golden_test;
+pub mod file_ref_resolve;
 mod nested_merge;
 mod sibling_merge;
 mod workspace_merge;
@@ -134,6 +135,9 @@ pub fn assemble(files: &mut [FileInfo]) -> AssemblyResult {
             dependencies.extend(deps);
         }
     }
+
+    // Post-processing: resolve file references from package database entries
+    file_ref_resolve::resolve_file_references(files, &mut packages, &mut dependencies);
 
     // Post-processing: workspace assembly for npm/pnpm monorepos
     workspace_merge::assemble_workspaces(files, &mut packages, &mut dependencies);

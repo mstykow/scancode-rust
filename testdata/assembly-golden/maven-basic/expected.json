@@ -47,6 +47,20 @@
       "scope": null
     }
   ],
+  "files_with_packages": [
+    {
+      "for_packages": [
+        "pkg:maven/com.example/test-library@1.0.0?uuid=fixed-uid-done-for-testing-5642512d1758"
+      ],
+      "path": "META-INF/MANIFEST.MF"
+    },
+    {
+      "for_packages": [
+        "pkg:maven/com.example/test-library@1.0.0?uuid=fixed-uid-done-for-testing-5642512d1758"
+      ],
+      "path": "pom.xml"
+    }
+  ],
   "packages": [
     {
       "api_data_url": "https://repo1.maven.org/maven2/com/example/test-library/1.0.0/test-library-1.0.0.pom",

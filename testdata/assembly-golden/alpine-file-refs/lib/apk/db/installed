@@ -1,0 +1,35 @@
+C:Q1abc123=
+P:musl
+V:1.2.3-r0
+A:x86_64
+S:383304
+I:622592
+T:the musl c library (libc) implementation
+U:https://musl.libc.org/
+L:MIT
+o:musl
+m:Timo Teras <timo.teras@iki.fi>
+t:1649396308
+F:usr/lib
+R:libc.so
+F:lib
+R:ld-musl-x86_64.so.1
+
+C:Q1def456=
+P:busybox
+V:1.35.0-r17
+A:x86_64
+S:492528
+I:942080
+T:Size optimized toolbox of many common UNIX utilities
+U:https://busybox.net/
+L:GPL-2.0-only
+o:busybox
+m:Soren Hansen <soren@linux2go.dk>
+t:1655134784
+D:musl
+F:etc
+R:securetty
+F:usr/sbin
+R:crond
+

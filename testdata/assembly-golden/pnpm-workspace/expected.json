@@ -27,6 +27,26 @@
       "scope": "dependencies"
     }
   ],
+  "files_with_packages": [
+    {
+      "for_packages": [
+        "pkg:npm/%40myorg/app@0.1.0?uuid=fixed-uid-done-for-testing-5642512d1758"
+      ],
+      "path": "package.json"
+    },
+    {
+      "for_packages": [
+        "pkg:npm/%40myorg/app@0.1.0?uuid=fixed-uid-done-for-testing-5642512d1758"
+      ],
+      "path": "packages/app/package.json"
+    },
+    {
+      "for_packages": [
+        "pkg:npm/%40myorg/app@0.1.0?uuid=fixed-uid-done-for-testing-5642512d1758"
+      ],
+      "path": "pnpm-workspace.yaml"
+    }
+  ],
   "packages": [
     {
       "api_data_url": "https://registry.npmjs.org/my-pnpm-monorepo/1.0.0",
