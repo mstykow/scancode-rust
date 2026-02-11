@@ -4,6 +4,7 @@
 //! and matching it against known license patterns.
 
 pub mod aho_match;
+mod detection;
 pub mod expression;
 pub mod hash_match;
 pub mod index;
@@ -17,6 +18,14 @@ pub mod spdx_lid;
 pub mod spdx_mapping;
 mod tokenize;
 pub mod unknown_match;
+
+pub use detection::{
+    DetectionGroup, FileRegion, LicenseDetection, apply_detection_preferences, classify_detection,
+    create_detection_from_group, determine_spdx_expression,
+    determine_spdx_expression_from_scancode, filter_detections_by_score, group_matches_by_region,
+    populate_detection_from_group_with_spdx, post_process_detections, rank_detections,
+    remove_duplicate_detections, sort_matches_by_line,
+};
 
 pub use aho_match::{MATCH_AHO, MATCH_AHO_ORDER, aho_match};
 pub use expression::{CombineRelation, combine_expressions};

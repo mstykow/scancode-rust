@@ -511,38 +511,135 @@ spdx = []
 - **File**: Extended `src/license_detection/expression.rs`
 - **Tests**: 11 tests for combination (all passing)
 
-### Phase 6: Detection Assembly and Heuristics
+### Phase 6: Detection Assembly and Heuristics ✅ **COMPLETE**
 
 **Goal**: Group raw matches into `LicenseDetection` objects with heuristic analysis.
 
-#### 6.1 Match Grouping
+**Implemented**: ✅ Complete detection pipeline with grouping, analysis, expression generation, and post-processing
+**Tests**: 93 tests passing
+**Date**: 2024-02-11
+**Details**: `docs/license-detection/phase-6-detection-assembly.md`
 
-- Group matches by file region (contiguous or nearby line ranges)
-- Separate matches into detection groups based on proximity and relationship
+#### 6.1 Match Grouping ✅ **COMPLETE**
 
-#### 6.2 Detection Analysis
+- ✅ Group matches by file region (contiguous or nearby line ranges)
+- ✅ Separate matches into detection groups based on proximity and relationship
+- ✅ Uses proximity threshold of 4 lines (matches Python reference)
+- ✅ Creates DetectionGroup from nearby matches
+- **File**: `src/license_detection/detection.rs`
+- **Tests**: 7 tests
+
+#### 6.2 Detection Analysis ✅ **COMPLETE**
 
 Implement the detection categories from ScanCode's `detection.py`:
 
-- **Perfect detection**: All matches are exact (hash/SPDX-LID/Aho) with 100% coverage
-- **Unknown intro before detection**: License intro followed by proper match
-- **Extra words**: Perfect match with additional unmatched words
-- **Imperfect coverage**: Match coverage below 100%
-- **License clues**: Low-confidence matches reported as clues, not detections
-- **False positive**: Spurious matches to non-license text
-- **Low quality matches**: Coverage below clue threshold (60%)
-- **Unknown match**: Matches to unknown license rules
-- **File reference**: Match references another file (e.g., "see LICENSE")
+- ✅ **Perfect detection**: All matches are exact (hash/SPDX-LID/Aho) with 100% coverage
+- ✅ **Unknown intro before detection**: License intro followed by proper match
+- ✅ **Extra words**: Perfect match with additional unmatched words (formula: coverage * relevance / 100 - score > 0.01)
+- ✅ **Imperfect coverage**: Match coverage below 100%
+- ✅ **License clues**: Low-confidence matches reported as clues, not detections (60% threshold)
+- ✅ **False positive**: Spurious matches to non-license text (bare rules, GPL short, late matches)
+- ✅ **Low quality matches**: Coverage below clue threshold (60%)
+- ✅ **Unknown match**: Matches to unknown license rules
+- ✅ **File reference**: Match references another file (e.g., "see LICENSE")
+- ✅ **Score computation**: Weighted average of match scores
+- ✅ **Classification**: classify_detection() determines valid vs invalid detection
+- **File**: `src/license_detection/detection.rs`
+- **Tests**: 45+ tests
 
-#### 6.3 Detection Heuristics
+#### 6.3 License Expression Generation ✅ **COMPLETE**
 
-- Filter license intros when followed by proper matches
-- Handle `referenced_filenames` — resolve references to other files
-- Classify matches as detections vs. clues based on coverage thresholds
-- Generate detection identifiers (expression + UUID from match content)
-- Compute detection-level scores and coverage
+- ✅ Generate ScanCode license expressions from matches
+- ✅ Generate SPDX license expressions from matches
+- ✅ Convert ScanCode expressions to SPDX using SpdxMapping
+- ✅ Handle LicenseRef-scancode-* format for non-SPDX licenses
+- **Testing**: Golden tests comparing full detection output against Python ScanCode.
 
-**Testing**: Golden tests comparing full detection output against Python ScanCode.
+**Implementation Details (Phase 6.3)**:
+
+Implemented SPDX expression generation in `src/license_detection/detection.rs`:
+
+- `determine_spdx_expression(matches: &[LicenseMatch]) -> Result<String, String>`:
+  - ✅ Combines SPDX expressions from matches using AND relation
+  - ✅ Uses existing `combine_expressions()` with `CombineRelation::And`
+  - ✅ Falls back to ScanCode license_expression if SPDX is empty
+  - ✅ Returns error if no expressions available
+
+- `determine_spdx_expression_from_scancode(scancode_expression: &str, spdx_mapping: &SpdxMapping) -> Result<String, String>`:
+  - ✅ Converts ScanCode license keys to SPDX keys using SpdxMapping
+  - ✅ Uses `SpdxMapping.expression_scancode_to_spdx()` for full expression conversion
+  - ✅ Handles `LicenseRef-scancode-*` format for non-SPDX licenses
+  - ✅ Based on Python: `detection.spdx_license_expression()` at detection.py:269
+
+- `populate_detection_from_group_with_spdx(detection: &mut LicenseDetection, group: &DetectionGroup, spdx_mapping: &SpdxMapping)`:
+  - ✅ Extended version of `populate_detection_from_group()` with SPDX mapping
+  - ✅ Generates both ScanCode and SPDX expressions from detection group
+  - ✅ Handles cases where SPDX expression may be empty or unknown
+
+- `populate_detection_from_group(detection: &mut LicenseDetection, group: &DetectionGroup)`:
+  - ✅ Now auto-generates SPDX expression from matches' `license_expression_spdx` field
+- **Tests**: 6 tests (all passing)
+
+#### 6.4 Post-Processing ✅ **COMPLETE**
+
+- ✅ Filter detections by minimum score threshold
+- ✅ Remove duplicate detections (same license expression)
+- ✅ Rank detections by score and coverage
+- ✅ Apply detection-level heuristics (prefer SPDX-LID > hash > Aho > sequence > unknown)
+- ✅ Update licenses.json model (via LicenseDetection struct)
+- **File**: `src/license_detection/detection.rs`
+- **Tests**: 23 tests
+
+**Overall Phase 6: 93 tests passing (1645 total)**
+
+**Implementation Details (Phase 6.3)**:
+
+Implemented SPDX expression generation in `src/license_detection/detection.rs`:
+
+- `determine_spdx_expression(matches: &[LicenseMatch]) -> Result<String, String>`:
+  - Combines SPDX expressions from matches using AND relation
+  - Uses existing `combine_expressions()` with `CombineRelation::And`
+  - Falls back to ScanCode license_expression if SPDX is empty
+  - Returns error if no expressions available
+
+- `determine_spdx_expression_from_scancode(scancode_expression: &str, spdx_mapping: &SpdxMapping) -> Result<String, String>`:
+  - Converts ScanCode license keys to SPDX keys using SpdxMapping
+  - Uses `SpdxMapping.expression_scancode_to_spdx()` for full expression conversion
+  - Handles `LicenseRef-scancode-*` format for non-SPDX licenses
+  - Based on Python: `detection.spdx_license_expression()` at detection.py:269
+
+- `populate_detection_from_group_with_spdx(detection: &mut LicenseDetection, group: &DetectionGroup, spdx_mapping: &SpdxMapping)`:
+  - Extended version of `populate_detection_from_group()` with SPDX mapping
+  - Generates both ScanCode and SPDX expressions from detection group
+  - Handles cases where SPDX expression may be empty or unknown
+
+- Updated `populate_detection_from_group(detection: &mut LicenseDetection, group: &DetectionGroup)`:
+  - Now auto-generates SPDX expression from matches' `license_expression_spdx` field
+  - Calls `determine_spdx_expression()` internally
+
+**Tests Added** (72 tests now in detection module):
+
+- `test_determine_spdx_expression_single()`: Single match generates SPDX expression
+- `test_determine_spdx_expression_multiple()`: Multiple matches combined with AND
+- `test_determine_spdx_expression_empty()`: Empty matches return error
+
+- `test_determine_spdx_expression_from_scancode_single()`: Convert single license
+- `test_determine_spdx_expression_from_scancode_multiple()`: Convert AND expression
+- `test_determine_spdx_expression_from_scancode_empty()`: Empty expression handled
+- `test_determine_spdx_expression_from_scancode_custom_license()`: Custom license with LicenseRef
+
+**Public API Exports** (via `src/license_detection/mod.rs`):
+
+- `determine_spdx_expression`
+- `determine_spdx_expression_from_scancode`
+- `populate_detection_from_group_with_spdx`
+
+**Note**: Two expression generation approaches available:
+
+1. Direct from match SPDX expressions (simpler, no mapping overhead)
+2. Conversion from ScanCode expression (full SPDX mapping with LicenseRef support)
+
+Both are publicly exported for scanner pipeline integration, allowing choice based on performance vs. coverage needs.
 
 ### Phase 7: Scanner Integration
 
