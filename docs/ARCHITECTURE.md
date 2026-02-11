@@ -662,11 +662,20 @@ Cache location: XDG-compliant (`~/.cache/scancode-rust/`), overridable via `SCAN
 
 Module location: `src/cache/`
 
-**Progress Tracking**:
+**Progress Tracking** (see [PROGRESS_TRACKING_PLAN.md](implementation-plans/infrastructure/PROGRESS_TRACKING_PLAN.md)):
 
-- Enhanced progress reporting
-- Per-phase progress indicators
-- Estimated time remaining
+Centralized `ScanProgress` struct managing multi-phase progress bars via `indicatif::MultiProgress`:
+
+1. **Discovery phase**: Spinner while counting files. Records initial file/dir/size counts.
+2. **Scan phase**: Main progress bar with ETA, elapsed time, and file count. Integrates with rayon parallel processing via `Arc<ProgressBar>`. Rate-limited to 20 Hz (indicatif default).
+3. **Assembly phase**: Progress bar for package assembly (sibling merge, workspace merge, etc.).
+4. **Scan summary**: Files/sec, bytes/sec, error count, per-phase timings, initial/final counts.
+
+Three verbosity modes: `--quiet` (hidden draw target, suppresses all stderr), default (progress bars + summary), `--verbose` (file-by-file listing + extended summary). Mutually exclusive via `clap` conflicts.
+
+Logging integration via `indicatif-log-bridge`: parser `warn!()` messages route above the progress bar without corrupting display. All progress goes to stderr; stdout reserved for structured output.
+
+Module location: `src/progress.rs`
 
 ### Quality Enhancements
 
