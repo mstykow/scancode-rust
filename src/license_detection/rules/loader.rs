@@ -304,6 +304,15 @@ pub fn parse_rule_file(path: &Path) -> Result<Rule> {
         ignorable_authors: fm.ignorable_authors.filter(|v| !v.is_empty()),
         language: fm.language,
         notes: fm.notes.filter(|s| !s.trim().is_empty()),
+        length_unique: 0,
+        high_length_unique: 0,
+        high_length: 0,
+        min_matched_length: 0,
+        min_high_matched_length: 0,
+        min_matched_length_unique: 0,
+        min_high_matched_length_unique: 0,
+        is_small: false,
+        is_tiny: false,
     })
 }
 
