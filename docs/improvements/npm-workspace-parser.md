@@ -1,18 +1,21 @@
-# npm Workspace Parser: Improvements Over Python
+# npm Workspace: Improvements Over Python
 
 ## Summary
 
-Our Rust implementation improves on the Python reference by:
+Our Rust implementation improves on the Python reference in two areas:
 
 - ✨ **New Feature: pnpm-workspace.yaml metadata extraction** — Python recognizes the file but extracts no metadata (NonAssemblable handler)
+- ✨ **Improved Assembly: Workspace assembly with per-member packages** — Python has basic workspace assembly; Rust adds exclusion patterns, sibling-merge cleanup, and more robust member discovery
 
-## Problem in Python Reference
+## Part 1: Parser Improvements
+
+### Problem in Python Reference
 
 Python ScanCode has a `PnpmWorkspaceYamlHandler` in `packagedcode/npm.py`, but it is declared as `NonAssemblable` — meaning it only detects the file's presence without extracting any useful data from it.
 
 The handler recognizes `pnpm-workspace.yaml` files but produces no package metadata, no workspace pattern extraction, and no structural information about the monorepo.
 
-## Our Solution
+### Our Solution
 
 We implemented `NpmWorkspaceParser` which extracts workspace configuration data from `pnpm-workspace.yaml` files, including:
 
@@ -49,7 +52,7 @@ We implemented `NpmWorkspaceParser` which extracts workspace configuration data 
 }
 ```
 
-## What Gets Extracted
+### What Gets Extracted
 
 | Field | Source | Description |
 |-------|--------|-------------|
@@ -67,16 +70,56 @@ The parser handles all pnpm workspace glob patterns:
 - `"*"` — Root-level wildcard
 - Empty or missing `packages` field — Graceful fallback
 
+## Part 2: Assembly Improvements
+
+### What Python Does
+
+Python's `BaseNpmHandler.assemble()` in `packagedcode/npm.py` handles workspace assembly:
+
+- Reads `workspaces` from package.json
+- Reads `pnpm-workspace.yaml` if present
+- Creates separate Package for each workspace member
+- Uses `walk_npm()` to assign resources, skipping `node_modules`
+- Resolves `workspace:*` version references
+
+### What Rust Improves
+
+Our workspace assembly (`src/assembly/workspace_merge.rs`) achieves full feature parity with Python and adds several improvements:
+
+| Feature | Python | Rust | Improvement |
+|---------|--------|------|-------------|
+| Workspace root detection | ✅ | ✅ | Equivalent |
+| Member discovery via globs | ✅ | ✅ | Three-tier matching (simple, single-star, complex) |
+| Per-member Package creation | ✅ | ✅ | Equivalent |
+| `workspace:*` version resolution | ✅ | ✅ | Equivalent |
+| `workspace:^` / `workspace:~` resolution | ✅ | ✅ | Equivalent |
+| `for_packages` assignment | ✅ | ✅ | Equivalent |
+| pnpm variant handling | ✅ | ✅ | Equivalent |
+| **Exclusion patterns** | ❌ | ✅ | 🆕 Respects `!pattern` negation in workspace globs |
+| **Sibling-merge cleanup** | ❌ | ✅ | 🆕 Removes duplicate packages from earlier assembly phases |
+| **Explicit dependency cleanup** | ❌ | ✅ | 🆕 Cleans up root dependencies after hoisting to members |
+
+### Bugs Fixed from Python
+
+1. **No exclusion pattern support**: Python ignores `!pattern` entries in workspace globs; Rust filters them out during member discovery
+2. **Duplicate packages**: Python doesn't clean up packages created by sibling-merge before workspace assembly, leading to duplicates; Rust explicitly removes them
+3. **Version resolution timing**: Python resolves workspace versions during parsing; Rust defers to assembly phase where all member versions are known
+4. **Root package cleanup**: Python keeps private root packages in output; Rust removes them when all content is assigned to members
+5. **Member validation**: Python doesn't validate that discovered members actually have package.json files; Rust verifies before creating packages
+
 ## Impact
 
 - **Monorepo visibility**: pnpm workspaces are increasingly common; extracting their structure provides context for dependency analysis
 - **SBOM completeness**: Workspace configuration files are no longer opaque to the scanner
+- **Correct package counts**: No duplicate packages from assembly phase interactions
+- **Accurate dependency graphs**: `workspace:*` references resolved to actual versions
 
 ## References
 
 ### Python Reference
 
 - `reference/scancode-toolkit/src/packagedcode/npm.py` — `PnpmWorkspaceYamlHandler` (NonAssemblable, no extraction)
+- `reference/scancode-toolkit/src/packagedcode/npm.py` — `BaseNpmHandler.assemble()` (workspace assembly logic)
 
 ### pnpm Documentation
 
@@ -84,6 +127,7 @@ The parser handles all pnpm workspace glob patterns:
 
 ## Status
 
-- ✅ **Implementation**: Complete, validated, production-ready
-- ✅ **Testing**: Unit tests covering all pattern types and edge cases
+- ✅ **Parser**: Complete, validated, production-ready
+- ✅ **Assembly**: Complete with full feature parity + improvements
+- ✅ **Testing**: Unit tests + 2 golden tests (npm-workspace, pnpm-workspace)
 - ✅ **Documentation**: Complete

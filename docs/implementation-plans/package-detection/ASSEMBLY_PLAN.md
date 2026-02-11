@@ -1,6 +1,6 @@
 # Package Assembly Implementation Plan
 
-> **Status**: 🟢 Phase 1-3 Complete (Feb 10, 2026) | Phase 4 Pending
+> **Status**: 🟢 Phase 1-3 Complete (Feb 10, 2026) | Phase 4a: npm Workspace Assembly Complete (Feb 11, 2026)
 > **Priority**: P0 - Critical for Package Detection Completeness
 > **Dependencies**: PARSER_PLAN.md (parsers must exist first)
 
@@ -55,7 +55,24 @@ Every parser's datasource_id now has an assembly config.
 
 **Key commits**: 8f2465e (Alpine/RPM parser fixes), 70335a5 (OnePerPackageData), 34c4f37 (Debian source nested merge)
 
-### Golden Tests (5 total)
+### ✅ Phase 4a: npm Workspace Assembly — COMPLETE (Feb 11, 2026)
+
+npm/pnpm workspace support: creates separate Package objects per workspace member, resolves `workspace:*` version references, and properly assigns shared resources.
+
+- Workspace root detection (package.json `workspaces` field + pnpm-workspace.yaml)
+- Member discovery via three-tier glob matching (simple paths, single-star, complex globs)
+- Member Package creation with proper UID assignment
+- Root dependency hoisting (workspace-level, or to root if pnpm)
+- `workspace:*`, `workspace:^`, `workspace:~` version resolution against member versions
+- `for_packages` assignment (member files → member UID; shared files → all members or root only)
+- pnpm variant handling (non-private root kept as separate package)
+- Sibling-merge cleanup (removes duplicate packages created by earlier assembly phases)
+- Exclusion pattern support for workspace member discovery
+
+**Implementation**: `src/assembly/workspace_merge.rs` (859 lines)
+**Key commits**: 55cac94 (workspace assembly implementation)
+
+### Golden Tests (7 total)
 
 | Test | Ecosystem | Status |
 |------|-----------|--------|
@@ -64,6 +81,8 @@ Every parser's datasource_id now has an assembly config.
 | go-basic | golang | ✅ Pass |
 | composer-basic | phpcomposer | ✅ Pass |
 | maven-basic | maven | ✅ Pass |
+| npm-workspace | npm (workspace) | ✅ Pass |
+| pnpm-workspace | npm (pnpm workspace) | ✅ Pass |
 
 ---
 
@@ -153,9 +172,9 @@ Consolidation is a **separate post-scan plugin** (`plugin_consolidate.py`), not 
 
 ### Success Criteria
 
-- [ ] npm workspace assembly creates separate packages per workspace member
+- [x] npm workspace assembly creates separate packages per workspace member
 - [ ] Database assembly resolves file references for RPM/Alpine/Debian
-- [ ] Golden tests for workspace and database assembly scenarios
+- [x] Golden tests for workspace and database assembly scenarios
 - [ ] Archive extraction framework in place (stretch goal)
 
 ---
@@ -186,6 +205,7 @@ File Enumeration → Parser Selection → Package Extraction → Assembly Phase 
                                                     Phase 1: Group by directory → merge siblings
                                                     Phase 2: Find nested patterns → merge into root
                                                     Phase 3: OnePerPackageData → each file's packages
+                                                    Phase 4: Workspace assembly → per-member packages
 ```
 
 ### Assembly Modes
@@ -194,16 +214,18 @@ File Enumeration → Parser Selection → Package Extraction → Assembly Phase 
 |------|----------|---------|
 | `SiblingMerge` | Merge related files in same/nested directory | npm, cargo, maven, golang, etc. (23 configs) |
 | `OnePerPackageData` | Each file becomes independent packages | Alpine DB, RPM DB, Debian installed DB (3 configs) |
+| Workspace assembly | Post-processing pass creating per-member packages | npm/pnpm workspaces |
 
 ### Key Code Locations
 
 | File | Purpose |
 |------|---------|
-| `src/assembly/mod.rs` | Core pipeline (709 lines) |
+| `src/assembly/mod.rs` | Core pipeline (713 lines) |
 | `src/assembly/assemblers.rs` | 26 assembler configs (310 lines) |
 | `src/assembly/sibling_merge.rs` | Sibling pattern matching (102 lines) |
 | `src/assembly/nested_merge.rs` | Nested pattern matching (356 lines) |
-| `src/assembly/assembly_golden_test.rs` | 5 golden tests (352 lines) |
+| `src/assembly/workspace_merge.rs` | npm/pnpm workspace assembly (859 lines) |
+| `src/assembly/assembly_golden_test.rs` | 7 golden tests (368 lines) |
 
 ---
 
