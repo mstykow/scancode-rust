@@ -374,13 +374,7 @@ mod tests {
 
     #[test]
     fn test_parse_rpm_database_sqlite() {
-        let test_file =
-            PathBuf::from("reference/scancode-toolkit/tests/packagedcode/data/rpm/rpmdb.sqlite");
-
-        if !test_file.exists() {
-            eprintln!("Test file not found, skipping");
-            return;
-        }
+        let test_file = PathBuf::from("testdata/rpm/rpmdb.sqlite");
 
         let pkg = RpmSqliteDatabaseParser::extract_first_package(&test_file);
 

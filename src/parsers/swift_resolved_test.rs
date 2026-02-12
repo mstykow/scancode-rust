@@ -134,9 +134,7 @@ mod tests {
 
     #[test]
     fn test_extract_from_reference_vercelui() {
-        let path = PathBuf::from(
-            "reference/scancode-toolkit/tests/packagedcode/data/swift/packages/vercelui/Package.resolved",
-        );
+        let path = PathBuf::from("testdata/swift/Package-vercelui.resolved");
         let data = SwiftPackageResolvedParser::extract_first_package(&path);
 
         assert_eq!(data.package_type, Some(PackageType::Swift));
@@ -157,9 +155,7 @@ mod tests {
 
     #[test]
     fn test_extract_from_reference_fastlane_v1() {
-        let path = PathBuf::from(
-            "reference/scancode-toolkit/tests/packagedcode/data/swift/packages/fastlane_resolved_v1/Package.resolved",
-        );
+        let path = PathBuf::from("testdata/swift/Package-fastlane-v1.resolved");
         let data = SwiftPackageResolvedParser::extract_first_package(&path);
 
         assert_eq!(data.dependencies.len(), 2);
@@ -176,9 +172,7 @@ mod tests {
 
     #[test]
     fn test_extract_from_reference_mapboxmaps() {
-        let path = PathBuf::from(
-            "reference/scancode-toolkit/tests/packagedcode/data/swift/packages/mapboxmaps_manifest_and_resolved/Package.resolved",
-        );
+        let path = PathBuf::from("testdata/swift/Package-mapboxmaps.resolved");
         let data = SwiftPackageResolvedParser::extract_first_package(&path);
 
         assert_eq!(data.dependencies.len(), 3);

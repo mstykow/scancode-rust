@@ -405,14 +405,7 @@ mod tests {
 
     #[test]
     fn test_extract_from_firebase_analytics() {
-        // Use the actual FirebaseAnalytics.podspec.json from reference
-        let file_path = PathBuf::from(
-            "reference/scancode-toolkit/tests/packagedcode/data/cocoapods/podspec.json/FirebaseAnalytics.podspec.json",
-        );
-
-        if !file_path.exists() {
-            return;
-        }
+        let file_path = PathBuf::from("testdata/cocoapods/FirebaseAnalytics.podspec.json");
 
         let package_data = PodspecJsonParser::extract_first_package(&file_path);
 
