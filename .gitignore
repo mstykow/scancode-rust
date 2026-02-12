@@ -35,6 +35,10 @@ dist/
 output.json
 *.log
 
+# SQLite WAL journal files (created when tests open .sqlite fixtures)
+*.sqlite-shm
+*.sqlite-wal
+
 # Environment files
 .env
 .env.*
