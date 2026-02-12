@@ -249,6 +249,7 @@ mod integration_tests {
             min_high_matched_length_unique: 0,
             is_small: false,
             is_tiny: false,
+            is_required_phrase: false,
         };
 
         // Build token sets and multisets

@@ -60,6 +60,11 @@ pub struct Rule {
     /// True if exact matches to this rule are false positives
     pub is_false_positive: bool,
 
+    /// True if this rule text is a required phrase.
+    /// A required phrase is an essential section of the rule text which must be
+    /// present in the case of partial matches.
+    pub is_required_phrase: bool,
+
     /// Relevance score 0-100 (100 is most relevant)
     pub relevance: u8,
 
@@ -217,6 +222,7 @@ mod tests {
             min_high_matched_length_unique: 0,
             is_small: false,
             is_tiny: false,
+            is_required_phrase: false,
         };
 
         assert_eq!(rule.license_expression, "mit");

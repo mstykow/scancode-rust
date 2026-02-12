@@ -147,6 +147,11 @@ impl TokenDictionary {
     pub const fn legalese_count(&self) -> usize {
         self.len_legalese
     }
+
+    /// Get an iterator over all token string and ID pairs.
+    pub fn tokens_to_ids(&self) -> impl Iterator<Item = (&String, &u16)> {
+        self.tokens_to_ids.iter()
+    }
 }
 
 impl Default for TokenDictionary {

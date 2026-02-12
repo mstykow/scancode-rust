@@ -1,7 +1,10 @@
 //! License index construction and querying.
 
+pub mod builder;
 pub mod dictionary;
 pub mod token_sets;
+
+pub use builder::build_index;
 
 use crate::license_detection::index::dictionary::TokenDictionary;
 use crate::license_detection::models::License;
