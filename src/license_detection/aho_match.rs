@@ -161,6 +161,7 @@ pub fn aho_match(index: &LicenseIndex, query_run: &QueryRun) -> Vec<LicenseMatch
             rule_identifier: format!("#{}", rid),
             rule_url: String::new(),
             matched_text: None,
+            referenced_filenames: rule.referenced_filenames.clone(),
         };
 
         matches.push(license_match);
@@ -172,88 +173,10 @@ pub fn aho_match(index: &LicenseIndex, query_run: &QueryRun) -> Vec<LicenseMatch
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::license_detection::index::dictionary::TokenDictionary;
+    use crate::license_detection::test_utils::{
+        create_mock_query_run_with_tokens, create_mock_rule, create_test_index_default,
+    };
     use aho_corasick::{AhoCorasick, AhoCorasickBuilder};
-
-    fn create_test_index() -> LicenseIndex {
-        let legalese = [("mit", 0), ("license", 1), ("apache", 2), ("2.0", 3)];
-
-        let dictionary = TokenDictionary::new_with_legalese(
-            &legalese.iter().map(|(s, i)| (*s, *i)).collect::<Vec<_>>(),
-        );
-
-        let mut index = LicenseIndex::new(dictionary);
-        index.len_legalese = 2;
-        index
-    }
-
-    fn create_mock_query_run_with_tokens(tokens: &[u16], index: LicenseIndex) -> QueryRun {
-        let line_by_pos = vec![1; tokens.len()];
-
-        let query = crate::license_detection::query::Query {
-            tokens: tokens.to_vec(),
-            line_by_pos,
-            unknowns_by_pos: std::collections::HashMap::new(),
-            stopwords_by_pos: std::collections::HashMap::new(),
-            shorts_and_digits_pos: std::collections::HashSet::new(),
-            high_matchables: (0..tokens.len()).collect(),
-            low_matchables: std::collections::HashSet::new(),
-            has_long_lines: false,
-            is_binary: false,
-            query_runs: Vec::new(),
-            index,
-        };
-
-        let end = if tokens.is_empty() {
-            None
-        } else {
-            Some(tokens.len() - 1)
-        };
-
-        QueryRun::new(query, 0, end)
-    }
-
-    fn create_mock_rule(
-        license_expression: &str,
-        tokens: Vec<u16>,
-        is_small: bool,
-        is_tiny: bool,
-    ) -> crate::license_detection::models::Rule {
-        let length_unique = tokens.len();
-        crate::license_detection::models::Rule {
-            license_expression: license_expression.to_string(),
-            text: String::new(),
-            tokens: tokens.clone(),
-            is_license_text: true,
-            is_license_notice: false,
-            is_license_reference: false,
-            is_license_tag: false,
-            is_license_intro: false,
-            is_license_clue: false,
-            is_false_positive: false,
-            relevance: 100,
-            minimum_coverage: None,
-            is_continuous: true,
-            referenced_filenames: None,
-            ignorable_urls: None,
-            ignorable_emails: None,
-            ignorable_copyrights: None,
-            ignorable_holders: None,
-            ignorable_authors: None,
-            language: None,
-            notes: None,
-            length_unique,
-            high_length_unique: length_unique,
-            high_length: length_unique,
-            min_matched_length: 0,
-            min_high_matched_length: 0,
-            min_matched_length_unique: 0,
-            min_high_matched_length_unique: 0,
-            is_small,
-            is_tiny,
-            is_required_phrase: false,
-        }
-    }
 
     #[test]
     fn test_tokens_to_bytes_empty() {
@@ -288,7 +211,7 @@ mod tests {
 
     #[test]
     fn test_aho_match_empty_query() {
-        let index = create_test_index();
+        let index = create_test_index_default();
         let run = create_mock_query_run_with_tokens(&[], index);
 
         let matches = aho_match(run.get_index(), &run);
@@ -298,7 +221,7 @@ mod tests {
 
     #[test]
     fn test_aho_match_no_automaton_patterns() {
-        let mut index = create_test_index();
+        let mut index = create_test_index_default();
         index.rules_automaton = AhoCorasick::new::<_, &[u8]>([]).unwrap();
 
         let run = create_mock_query_run_with_tokens(&[0, 1, 2], index);
@@ -310,7 +233,7 @@ mod tests {
 
     #[test]
     fn test_aho_match_with_simple_pattern() {
-        let mut index = create_test_index();
+        let mut index = create_test_index_default();
 
         let rule_tokens = vec![0u16, 1];
         let pattern_bytes = tokens_to_bytes(&rule_tokens);
@@ -350,7 +273,7 @@ mod tests {
 
     #[test]
     fn test_aho_match_coverage() {
-        let mut index = create_test_index();
+        let mut index = create_test_index_default();
 
         let rule_tokens = vec![0u16, 1, 2];
         let pattern_bytes = tokens_to_bytes(&rule_tokens);
@@ -389,7 +312,7 @@ mod tests {
 
     #[test]
     fn test_aho_match_multiple_patterns() {
-        let mut index = create_test_index();
+        let mut index = create_test_index_default();
 
         let pattern1 = tokens_to_bytes(&[0u16, 1]);
         let pattern2 = tokens_to_bytes(&[2u16, 3]);
@@ -434,7 +357,7 @@ mod tests {
 
     #[test]
     fn test_aho_match_filters_non_matchable() {
-        let mut index = create_test_index();
+        let mut index = create_test_index_default();
 
         let pattern = tokens_to_bytes(&[0u16, 1, 2]);
 
@@ -473,7 +396,7 @@ mod tests {
 
     #[test]
     fn test_aho_match_line_numbers() {
-        let mut index = create_test_index();
+        let mut index = create_test_index_default();
 
         let pattern = tokens_to_bytes(&[0u16, 1]);
 

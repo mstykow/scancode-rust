@@ -6,6 +6,21 @@
 //!
 //! Based on Python implementation at:
 //! reference/scancode-toolkit/src/licensedcode/match_spdx_lid.py
+//!
+//! ## Signature Difference from Python
+//!
+//! The Rust `spdx_lid_match()` takes `(index, text)` instead of `(idx, query_run, text)`.
+//!
+//! **Why this differs from Python:**
+//!
+//! Python's `spdx_id_match()` is called per-SPDX-identifier occurrence via `Query.spdx_lines`,
+//! using `query_run` for position tracking. The Rust implementation processes the entire
+//! text at once via `extract_spdx_expressions_with_lines()`, computing line numbers directly
+//! from the text during parsing.
+//!
+//! This approach is simpler (single call vs. per-line calls), produces identical output
+//! (correct line numbers in matches), and avoids the complexity of tracking SPDX lines
+//! during query tokenization. The functional result is equivalent to Python's behavior.
 
 use regex::Regex;
 
@@ -233,6 +248,7 @@ pub fn spdx_lid_match(index: &LicenseIndex, text: &str) -> Vec<LicenseMatch> {
                     rule_identifier: format!("#{}", rid),
                     rule_url: String::new(),
                     matched_text: None,
+                    referenced_filenames: rule.referenced_filenames.clone(),
                 };
 
                 matches.push(license_match);
@@ -246,6 +262,7 @@ pub fn spdx_lid_match(index: &LicenseIndex, text: &str) -> Vec<LicenseMatch> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::license_detection::test_utils::{create_mock_rule_simple, create_test_index};
 
     #[test]
     fn test_split_spdx_lid_standard() {
@@ -533,17 +550,11 @@ mod tests {
 
     #[test]
     fn test_spdx_lid_match_simple() {
-        use crate::license_detection::index::LicenseIndex;
-        use crate::license_detection::index::dictionary::TokenDictionary;
-
-        let legalese = [("mit", 0), ("license", 1)];
-        let dictionary = TokenDictionary::new_with_legalese(
-            &legalese.iter().map(|(s, i)| (*s, *i)).collect::<Vec<_>>(),
-        );
-
-        let mut index = LicenseIndex::new(dictionary);
-        index.rules_by_rid.push(create_mock_rule("mit", 100));
-        index.rules_by_rid.push(create_mock_rule("apache-2.0", 100));
+        let mut index = create_test_index(&[("mit", 0), ("license", 1)], 1);
+        index.rules_by_rid.push(create_mock_rule_simple("mit", 100));
+        index
+            .rules_by_rid
+            .push(create_mock_rule_simple("apache-2.0", 100));
 
         let text = "SPDX-License-Identifier: MIT";
         let matches = spdx_lid_match(&index, text);
@@ -558,16 +569,8 @@ mod tests {
 
     #[test]
     fn test_spdx_lid_match_case_insensitive() {
-        use crate::license_detection::index::LicenseIndex;
-        use crate::license_detection::index::dictionary::TokenDictionary;
-
-        let legalese = [("mit", 0)];
-        let dictionary = TokenDictionary::new_with_legalese(
-            &legalese.iter().map(|(s, i)| (*s, *i)).collect::<Vec<_>>(),
-        );
-
-        let mut index = LicenseIndex::new(dictionary);
-        index.rules_by_rid.push(create_mock_rule("mit", 90));
+        let mut index = create_test_index(&[("mit", 0)], 1);
+        index.rules_by_rid.push(create_mock_rule_simple("mit", 90));
 
         let text = "SPDX-License-Identifier: mit";
         let matches = spdx_lid_match(&index, text);
@@ -578,17 +581,11 @@ mod tests {
 
     #[test]
     fn test_spdx_lid_match_multiple() {
-        use crate::license_detection::index::LicenseIndex;
-        use crate::license_detection::index::dictionary::TokenDictionary;
-
-        let legalese = [("mit", 0), ("license", 1)];
-        let dictionary = TokenDictionary::new_with_legalese(
-            &legalese.iter().map(|(s, i)| (*s, *i)).collect::<Vec<_>>(),
-        );
-
-        let mut index = LicenseIndex::new(dictionary);
-        index.rules_by_rid.push(create_mock_rule("mit", 100));
-        index.rules_by_rid.push(create_mock_rule("apache-2.0", 100));
+        let mut index = create_test_index(&[("mit", 0), ("license", 1)], 1);
+        index.rules_by_rid.push(create_mock_rule_simple("mit", 100));
+        index
+            .rules_by_rid
+            .push(create_mock_rule_simple("apache-2.0", 100));
 
         let text = "SPDX-License-Identifier: OR\n# SPDX-License-Identifier: MIT\n# SPDX-License-Identifier: Apache-2.0";
         let matches = spdx_lid_match(&index, text);
@@ -598,15 +595,7 @@ mod tests {
 
     #[test]
     fn test_spdx_lid_match_no_match() {
-        use crate::license_detection::index::LicenseIndex;
-        use crate::license_detection::index::dictionary::TokenDictionary;
-
-        let legalese = [("mit", 0)];
-        let dictionary = TokenDictionary::new_with_legalese(
-            &legalese.iter().map(|(s, i)| (*s, *i)).collect::<Vec<_>>(),
-        );
-
-        let index = LicenseIndex::new(dictionary);
+        let index = create_test_index(&[("mit", 0)], 1);
 
         let text = "/* Regular comment */";
         let matches = spdx_lid_match(&index, text);
@@ -616,60 +605,13 @@ mod tests {
 
     #[test]
     fn test_spdx_lid_match_score_from_relevance() {
-        use crate::license_detection::index::LicenseIndex;
-        use crate::license_detection::index::dictionary::TokenDictionary;
-
-        let legalese = [("mit", 0)];
-        let dictionary = TokenDictionary::new_with_legalese(
-            &legalese.iter().map(|(s, i)| (*s, *i)).collect::<Vec<_>>(),
-        );
-
-        let mut index = LicenseIndex::new(dictionary);
-        index.rules_by_rid.push(create_mock_rule("mit", 80));
+        let mut index = create_test_index(&[("mit", 0)], 1);
+        index.rules_by_rid.push(create_mock_rule_simple("mit", 80));
 
         let text = "SPDX-License-Identifier: MIT";
         let matches = spdx_lid_match(&index, text);
 
         assert_eq!(matches.len(), 1);
         assert!((matches[0].score - 0.8).abs() < 0.01);
-    }
-
-    fn create_mock_rule(
-        license_expression: &str,
-        relevance: u8,
-    ) -> crate::license_detection::models::Rule {
-        crate::license_detection::models::Rule {
-            license_expression: license_expression.to_string(),
-            text: String::new(),
-            tokens: Vec::new(),
-            is_license_text: false,
-            is_license_notice: false,
-            is_license_reference: false,
-            is_license_tag: false,
-            is_license_intro: false,
-            is_license_clue: false,
-            is_false_positive: false,
-            relevance,
-            minimum_coverage: None,
-            is_continuous: false,
-            referenced_filenames: None,
-            ignorable_urls: None,
-            ignorable_emails: None,
-            ignorable_copyrights: None,
-            ignorable_holders: None,
-            ignorable_authors: None,
-            language: None,
-            notes: None,
-            length_unique: 0,
-            high_length_unique: 0,
-            high_length: 0,
-            min_matched_length: 0,
-            min_high_matched_length: 0,
-            min_matched_length_unique: 0,
-            min_high_matched_length_unique: 0,
-            is_small: false,
-            is_tiny: false,
-            is_required_phrase: false,
-        }
     }
 }

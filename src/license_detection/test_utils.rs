@@ -1,0 +1,169 @@
+//! Shared test utilities for license detection tests.
+//!
+//! This module provides common helper functions used across multiple test modules
+//! to reduce code duplication and ensure consistent test setup.
+
+use std::collections::{HashMap, HashSet};
+
+use crate::license_detection::index::LicenseIndex;
+use crate::license_detection::index::dictionary::TokenDictionary;
+use crate::license_detection::models::Rule;
+use crate::license_detection::query::{Query, QueryRun};
+
+/// Creates a test index with customizable legalese tokens.
+///
+/// # Arguments
+/// * `legalese` - Slice of (token string, token id) pairs for the dictionary
+/// * `len_legalese` - Number of high-value legalese tokens (for high_matchables)
+///
+/// # Returns
+/// A `LicenseIndex` configured with the given dictionary
+pub fn create_test_index(legalese: &[(&str, u16)], len_legalese: usize) -> LicenseIndex {
+    let dictionary = TokenDictionary::new_with_legalese(
+        &legalese.iter().map(|(s, i)| (*s, *i)).collect::<Vec<_>>(),
+    );
+
+    let mut index = LicenseIndex::new(dictionary);
+    index.len_legalese = len_legalese;
+    index
+}
+
+/// Creates a test index with default legalese tokens for general testing.
+///
+/// Provides common license-related tokens: mit, license, apache, 2.0
+/// with len_legalese set to 2.
+pub fn create_test_index_default() -> LicenseIndex {
+    create_test_index(&[("mit", 0), ("license", 1), ("apache", 2), ("2.0", 3)], 2)
+}
+
+/// Creates a mock Rule for testing matchers.
+///
+/// # Arguments
+/// * `license_expression` - The license expression (e.g., "mit", "apache-2.0")
+/// * `tokens` - Token IDs for this rule
+/// * `is_small` - Whether the rule is considered "small"
+/// * `is_tiny` - Whether the rule is considered "tiny"
+///
+/// # Returns
+/// A `Rule` with sensible defaults for testing
+pub fn create_mock_rule(
+    license_expression: &str,
+    tokens: Vec<u16>,
+    is_small: bool,
+    is_tiny: bool,
+) -> Rule {
+    let length_unique = tokens.len();
+    Rule {
+        license_expression: license_expression.to_string(),
+        text: String::new(),
+        tokens,
+        is_license_text: true,
+        is_license_notice: false,
+        is_license_reference: false,
+        is_license_tag: false,
+        is_license_intro: false,
+        is_license_clue: false,
+        is_false_positive: false,
+        relevance: 100,
+        minimum_coverage: None,
+        is_continuous: true,
+        referenced_filenames: None,
+        ignorable_urls: None,
+        ignorable_emails: None,
+        ignorable_copyrights: None,
+        ignorable_holders: None,
+        ignorable_authors: None,
+        language: None,
+        notes: None,
+        length_unique,
+        high_length_unique: length_unique,
+        high_length: length_unique,
+        min_matched_length: 0,
+        min_high_matched_length: 0,
+        min_matched_length_unique: 0,
+        min_high_matched_length_unique: 0,
+        is_small,
+        is_tiny,
+        is_required_phrase: false,
+    }
+}
+
+/// Creates a mock Rule with just a license expression and relevance.
+///
+/// Simplified version for tests that don't need token matching.
+///
+/// # Arguments
+/// * `license_expression` - The license expression
+/// * `relevance` - Relevance score for the rule
+///
+/// # Returns
+/// A `Rule` with empty tokens and the given relevance
+pub fn create_mock_rule_simple(license_expression: &str, relevance: u8) -> Rule {
+    Rule {
+        license_expression: license_expression.to_string(),
+        text: String::new(),
+        tokens: Vec::new(),
+        is_license_text: false,
+        is_license_notice: false,
+        is_license_reference: false,
+        is_license_tag: false,
+        is_license_intro: false,
+        is_license_clue: false,
+        is_false_positive: false,
+        relevance,
+        minimum_coverage: None,
+        is_continuous: false,
+        referenced_filenames: None,
+        ignorable_urls: None,
+        ignorable_emails: None,
+        ignorable_copyrights: None,
+        ignorable_holders: None,
+        ignorable_authors: None,
+        language: None,
+        notes: None,
+        length_unique: 0,
+        high_length_unique: 0,
+        high_length: 0,
+        min_matched_length: 0,
+        min_high_matched_length: 0,
+        min_matched_length_unique: 0,
+        min_high_matched_length_unique: 0,
+        is_small: false,
+        is_tiny: false,
+        is_required_phrase: false,
+    }
+}
+
+/// Creates a mock QueryRun with the given tokens.
+///
+/// # Arguments
+/// * `tokens` - Token IDs for the query
+/// * `index` - The license index (must be cloned for the Query)
+///
+/// # Returns
+/// A `QueryRun` spanning the entire token range
+pub fn create_mock_query_run_with_tokens(tokens: &[u16], index: LicenseIndex) -> QueryRun {
+    let line_by_pos = vec![1; tokens.len()];
+
+    let query = Query {
+        tokens: tokens.to_vec(),
+        line_by_pos,
+        unknowns_by_pos: HashMap::new(),
+        stopwords_by_pos: HashMap::new(),
+        shorts_and_digits_pos: HashSet::new(),
+        high_matchables: (0..tokens.len()).collect(),
+        low_matchables: HashSet::new(),
+        has_long_lines: false,
+        is_binary: false,
+        query_runs: Vec::new(),
+        index,
+    };
+
+    let end = if tokens.is_empty() {
+        None
+    } else {
+        Some(tokens.len() - 1)
+    };
+
+    QueryRun::new(query, 0, end)
+}

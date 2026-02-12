@@ -27,6 +27,40 @@ const FALSE_POSITIVE_RULE_LENGTH_THRESHOLD: usize = 3;
 /// Matches after this line with short rules are potential false positives.
 const FALSE_POSITIVE_START_LINE_THRESHOLD: usize = 1000;
 
+// ============================================================================
+// Detection Log Categories (Python parity: DetectionRule enum)
+// ============================================================================
+
+/// Perfect detection - all matches are exact with 100% coverage.
+pub const DETECTION_LOG_PERFECT_DETECTION: &str = "perfect-detection";
+
+/// Possible false positive detection.
+pub const DETECTION_LOG_FALSE_POSITIVE: &str = "possible-false-positive";
+
+/// License clues - low quality matches.
+pub const DETECTION_LOG_LICENSE_CLUES: &str = "license-clues";
+
+/// Low quality match fragments - similar to license clues but distinct category.
+pub const DETECTION_LOG_LOW_QUALITY_MATCHES: &str = "low-quality-matches";
+
+/// Imperfect match coverage - at least one match has coverage < 100%.
+pub const DETECTION_LOG_IMPERFECT_COVERAGE: &str = "imperfect-match-coverage";
+
+/// Unknown match - matches with unknown license identifiers.
+pub const DETECTION_LOG_UNKNOWN_MATCH: &str = "unknown-match";
+
+/// Extra words - match contains extra text beyond the matched rule.
+pub const DETECTION_LOG_EXTRA_WORDS: &str = "extra-words";
+
+/// Undetected license - single undetected match (no license found).
+pub const DETECTION_LOG_UNDETECTED_LICENSE: &str = "undetected-license";
+
+/// Unknown intro followed by match - license intro followed by proper detection.
+pub const DETECTION_LOG_UNKNOWN_INTRO_FOLLOWED_BY_MATCH: &str = "unknown-intro-followed-by-match";
+
+/// Unknown reference to local file - match references another file (e.g., "see LICENSE").
+pub const DETECTION_LOG_UNKNOWN_REFERENCE_TO_LOCAL_FILE: &str = "unknown-reference-to-local-file";
+
 /// A group of license matches that are nearby each other in the file.
 #[derive(Debug, Clone)]
 pub struct DetectionGroup {
@@ -322,6 +356,130 @@ fn is_low_quality_matches(matches: &[LicenseMatch]) -> bool {
         && is_match_coverage_below_threshold(matches, CLUES_MATCH_COVERAGE_THR, false)
 }
 
+/// Check if matches represent an undetected license.
+///
+/// Returns true if there is exactly one match and its matcher is "5-undetected".
+/// This indicates no license was found in the analyzed text.
+///
+/// Based on Python: is_undetected_license_matches() at detection.py:1054
+fn is_undetected_license_matches(matches: &[LicenseMatch]) -> bool {
+    if matches.len() != 1 {
+        return false;
+    }
+    matches[0].matcher == "5-undetected"
+}
+
+/// Check if there's an unknown license intro followed by a proper detection.
+///
+/// This detects cases where a license introduction statement (like "Licensed under")
+/// is immediately followed by a proper license match. The intro can be discarded
+/// as it's describing the license that follows.
+///
+/// Based on Python: has_unknown_intro_before_detection() at detection.py:1289
+fn has_unknown_intro_before_detection(matches: &[LicenseMatch]) -> bool {
+    if matches.len() == 1 {
+        return false;
+    }
+
+    let all_unknown_intro = matches.iter().all(is_unknown_intro);
+    if all_unknown_intro {
+        return false;
+    }
+
+    let mut has_unknown_intro = false;
+
+    for m in matches {
+        if is_unknown_intro(m) {
+            has_unknown_intro = true;
+            continue;
+        }
+
+        if has_unknown_intro {
+            let coverage_ok = m.match_coverage >= IMPERFECT_MATCH_COVERAGE_THR - 0.01;
+            let not_unknown =
+                !m.rule_identifier.contains("unknown") && !m.license_expression.contains("unknown");
+            if coverage_ok && not_unknown {
+                return true;
+            }
+        }
+    }
+
+    false
+}
+
+/// Check if a match is an unknown license intro.
+///
+/// A license intro is typically a short statement introducing a license,
+/// often matched by the unknown matcher.
+fn is_unknown_intro(m: &LicenseMatch) -> bool {
+    m.matcher.starts_with("5-unknown") && m.rule_identifier.contains("intro")
+}
+
+/// Check if matches have references to local files.
+///
+/// This is detected when a rule has `referenced_filenames` populated,
+/// indicating the match references another file (e.g., "See LICENSE file").
+///
+/// Based on Python: has_references_to_local_files() at detection.py:1402
+fn has_references_to_local_files(matches: &[LicenseMatch]) -> bool {
+    !has_extra_words(matches)
+        && matches.iter().any(|m| {
+            m.referenced_filenames
+                .as_ref()
+                .is_some_and(|f| !f.is_empty())
+        })
+}
+
+/// Analyze detection and return the appropriate detection log category.
+///
+/// This implements the full detection analysis logic from Python's analyze_detection()
+/// function, determining what category a group of matches falls into.
+///
+/// Based on Python: analyze_detection() at detection.py:1760
+fn analyze_detection(matches: &[LicenseMatch], package_license: bool) -> &'static str {
+    if is_undetected_license_matches(matches) {
+        return DETECTION_LOG_UNDETECTED_LICENSE;
+    }
+
+    if has_unknown_intro_before_detection(matches) {
+        return DETECTION_LOG_UNKNOWN_INTRO_FOLLOWED_BY_MATCH;
+    }
+
+    if has_references_to_local_files(matches) {
+        return DETECTION_LOG_UNKNOWN_REFERENCE_TO_LOCAL_FILE;
+    }
+
+    if !package_license && is_false_positive(matches) {
+        return DETECTION_LOG_FALSE_POSITIVE;
+    }
+
+    if !package_license && is_low_quality_matches(matches) {
+        return DETECTION_LOG_LICENSE_CLUES;
+    }
+
+    if is_correctDetection(matches) && !has_unknown_matches(matches) && !has_extra_words(matches) {
+        return DETECTION_LOG_PERFECT_DETECTION;
+    }
+
+    if has_unknown_matches(matches) {
+        return DETECTION_LOG_UNKNOWN_MATCH;
+    }
+
+    if !package_license && is_low_quality_matches(matches) {
+        return DETECTION_LOG_LOW_QUALITY_MATCHES;
+    }
+
+    if is_match_coverage_below_threshold(matches, IMPERFECT_MATCH_COVERAGE_THR, true) {
+        return DETECTION_LOG_IMPERFECT_COVERAGE;
+    }
+
+    if has_extra_words(matches) {
+        return DETECTION_LOG_EXTRA_WORDS;
+    }
+
+    DETECTION_LOG_PERFECT_DETECTION
+}
+
 /// Compute detection score from grouped matches.
 ///
 /// The score is the weighted average of match scores, weighted by match length.
@@ -473,29 +631,8 @@ pub fn populate_detection_from_group(detection: &mut LicenseDetection, group: &D
         }
     }
 
-    if is_correctDetection(&detection.matches) {
-        detection
-            .detection_log
-            .push("perfect-detection".to_string());
-    } else if is_false_positive(&detection.matches) {
-        detection
-            .detection_log
-            .push("possible-false-positive".to_string());
-    } else if is_low_quality_matches(&detection.matches) {
-        detection.detection_log.push("license-clues".to_string());
-    } else if is_match_coverage_below_threshold(
-        &detection.matches,
-        IMPERFECT_MATCH_COVERAGE_THR,
-        true,
-    ) {
-        detection
-            .detection_log
-            .push("imperfect-match-coverage".to_string());
-    } else if has_unknown_matches(&detection.matches) {
-        detection.detection_log.push("unknown-match".to_string());
-    } else if has_extra_words(&detection.matches) {
-        detection.detection_log.push("extra-words".to_string());
-    }
+    let log_category = analyze_detection(&detection.matches, false);
+    detection.detection_log.push(log_category.to_string());
 
     detection.identifier = None;
 }
@@ -536,29 +673,8 @@ pub fn populate_detection_from_group_with_spdx(
         }
     }
 
-    if is_correctDetection(&detection.matches) {
-        detection
-            .detection_log
-            .push("perfect-detection".to_string());
-    } else if is_false_positive(&detection.matches) {
-        detection
-            .detection_log
-            .push("possible-false-positive".to_string());
-    } else if is_low_quality_matches(&detection.matches) {
-        detection.detection_log.push("license-clues".to_string());
-    } else if is_match_coverage_below_threshold(
-        &detection.matches,
-        IMPERFECT_MATCH_COVERAGE_THR,
-        true,
-    ) {
-        detection
-            .detection_log
-            .push("imperfect-match-coverage".to_string());
-    } else if has_unknown_matches(&detection.matches) {
-        detection.detection_log.push("unknown-match".to_string());
-    } else if has_extra_words(&detection.matches) {
-        detection.detection_log.push("extra-words".to_string());
-    }
+    let log_category = analyze_detection(&detection.matches, false);
+    detection.detection_log.push(log_category.to_string());
 
     detection.identifier = None;
 }
@@ -825,6 +941,7 @@ mod tests {
             rule_identifier: rule_identifier.to_string(),
             rule_url: "https://example.com".to_string(),
             matched_text: Some("MIT License".to_string()),
+            referenced_filenames: None,
         }
     }
 
@@ -990,6 +1107,7 @@ mod tests {
             rule_identifier: rule_identifier.to_string(),
             rule_url: "https://example.com".to_string(),
             matched_text: Some("License text".to_string()),
+            referenced_filenames: None,
         }
     }
 
@@ -1655,7 +1773,7 @@ mod tests {
                 "1-hash",
                 1,
                 10,
-                95.0,
+                100.0,
                 100,
                 100.0,
                 100,
@@ -1913,7 +2031,7 @@ mod tests {
                 "1-hash",
                 1,
                 10,
-                95.0,
+                100.0,
                 100,
                 100.0,
                 100,
@@ -1999,13 +2117,13 @@ mod tests {
 
         let group = DetectionGroup {
             matches: vec![
-                create_test_match_with_params("mit", "1-hash", 1, 10, 95.0, 100, 100.0, 100, "#1"),
+                create_test_match_with_params("mit", "1-hash", 1, 10, 100.0, 100, 100.0, 100, "#1"),
                 create_test_match_with_params(
                     "apache-2.0",
                     "1-spdx-id",
                     11,
                     20,
-                    85.0,
+                    100.0,
                     100,
                     100.0,
                     100,
@@ -2803,5 +2921,407 @@ mod tests {
 
         let coverage = compute_detection_coverage(&matches);
         assert_eq!(coverage, 100.0);
+    }
+
+    #[test]
+    fn test_detection_log_constants_match_python() {
+        assert_eq!(DETECTION_LOG_PERFECT_DETECTION, "perfect-detection");
+        assert_eq!(DETECTION_LOG_FALSE_POSITIVE, "possible-false-positive");
+        assert_eq!(DETECTION_LOG_LICENSE_CLUES, "license-clues");
+        assert_eq!(DETECTION_LOG_LOW_QUALITY_MATCHES, "low-quality-matches");
+        assert_eq!(DETECTION_LOG_IMPERFECT_COVERAGE, "imperfect-match-coverage");
+        assert_eq!(DETECTION_LOG_UNKNOWN_MATCH, "unknown-match");
+        assert_eq!(DETECTION_LOG_EXTRA_WORDS, "extra-words");
+        assert_eq!(DETECTION_LOG_UNDETECTED_LICENSE, "undetected-license");
+        assert_eq!(
+            DETECTION_LOG_UNKNOWN_INTRO_FOLLOWED_BY_MATCH,
+            "unknown-intro-followed-by-match"
+        );
+        assert_eq!(
+            DETECTION_LOG_UNKNOWN_REFERENCE_TO_LOCAL_FILE,
+            "unknown-reference-to-local-file"
+        );
+    }
+
+    #[test]
+    fn test_is_undetected_license_matches_single_undetected() {
+        let matches = vec![create_test_match_with_params(
+            "unknown",
+            "5-undetected",
+            1,
+            10,
+            0.0,
+            0,
+            0.0,
+            0,
+            "undetected.LICENSE",
+        )];
+
+        assert!(is_undetected_license_matches(&matches));
+    }
+
+    #[test]
+    fn test_is_undetected_license_matches_wrong_matcher() {
+        let matches = vec![create_test_match_with_params(
+            "mit",
+            "1-hash",
+            1,
+            10,
+            95.0,
+            100,
+            100.0,
+            100,
+            "mit.LICENSE",
+        )];
+
+        assert!(!is_undetected_license_matches(&matches));
+    }
+
+    #[test]
+    fn test_is_undetected_license_matches_multiple() {
+        let matches = vec![
+            create_test_match_with_params("mit", "1-hash", 1, 10, 95.0, 100, 100.0, 100, "#1"),
+            create_test_match_with_params(
+                "apache-2.0",
+                "1-spdx-id",
+                11,
+                20,
+                85.0,
+                100,
+                100.0,
+                100,
+                "#2",
+            ),
+        ];
+
+        assert!(!is_undetected_license_matches(&matches));
+    }
+
+    #[test]
+    fn test_is_undetected_license_matches_empty() {
+        let matches: Vec<LicenseMatch> = vec![];
+        assert!(!is_undetected_license_matches(&matches));
+    }
+
+    #[test]
+    fn test_analyze_detection_undetected() {
+        let matches = vec![create_test_match_with_params(
+            "unknown",
+            "5-undetected",
+            1,
+            10,
+            0.0,
+            0,
+            0.0,
+            0,
+            "undetected.LICENSE",
+        )];
+
+        assert_eq!(
+            analyze_detection(&matches, false),
+            DETECTION_LOG_UNDETECTED_LICENSE
+        );
+    }
+
+    #[test]
+    fn test_analyze_detection_perfect() {
+        let matches = vec![create_test_match_with_params(
+            "mit",
+            "1-hash",
+            1,
+            10,
+            100.0,
+            100,
+            100.0,
+            100,
+            "mit.LICENSE",
+        )];
+
+        assert_eq!(
+            analyze_detection(&matches, false),
+            DETECTION_LOG_PERFECT_DETECTION
+        );
+    }
+
+    #[test]
+    fn test_analyze_detection_false_positive() {
+        let matches = vec![create_test_match_with_params(
+            "gpl",
+            "2-aho",
+            2000,
+            2005,
+            30.0,
+            3,
+            30.0,
+            50,
+            "gpl_bare.LICENSE",
+        )];
+
+        assert_eq!(
+            analyze_detection(&matches, false),
+            DETECTION_LOG_FALSE_POSITIVE
+        );
+    }
+
+    #[test]
+    fn test_analyze_detection_false_positive_ignored_for_package() {
+        let matches = vec![create_test_match_with_params(
+            "gpl",
+            "2-aho",
+            2000,
+            2005,
+            30.0,
+            3,
+            30.0,
+            50,
+            "gpl_bare.LICENSE",
+        )];
+
+        assert_ne!(
+            analyze_detection(&matches, true),
+            DETECTION_LOG_FALSE_POSITIVE
+        );
+    }
+
+    #[test]
+    fn test_analyze_detection_license_clues() {
+        let matches = vec![create_test_match_with_params(
+            "mit",
+            "2-aho",
+            1,
+            10,
+            40.0,
+            20,
+            40.0,
+            80,
+            "mit.LICENSE",
+        )];
+
+        assert_eq!(
+            analyze_detection(&matches, false),
+            DETECTION_LOG_LICENSE_CLUES
+        );
+    }
+
+    #[test]
+    fn test_analyze_detection_unknown_match() {
+        let matches = vec![create_test_match_with_params(
+            "unknown",
+            "5-unknown",
+            1,
+            10,
+            80.0,
+            50,
+            80.0,
+            100,
+            "unknown.LICENSE",
+        )];
+
+        assert_eq!(
+            analyze_detection(&matches, false),
+            DETECTION_LOG_UNKNOWN_MATCH
+        );
+    }
+
+    #[test]
+    fn test_analyze_detection_imperfect_coverage() {
+        let matches = vec![create_test_match_with_params(
+            "mit",
+            "2-aho",
+            1,
+            10,
+            85.0,
+            100,
+            85.0,
+            100,
+            "mit.LICENSE",
+        )];
+
+        assert_eq!(
+            analyze_detection(&matches, false),
+            DETECTION_LOG_IMPERFECT_COVERAGE
+        );
+    }
+
+    #[test]
+    fn test_analyze_detection_extra_words() {
+        let matches = vec![create_test_match_with_params(
+            "mit",
+            "2-aho",
+            1,
+            10,
+            90.0,
+            100,
+            100.0,
+            100,
+            "mit.LICENSE",
+        )];
+
+        assert_eq!(
+            analyze_detection(&matches, false),
+            DETECTION_LOG_EXTRA_WORDS
+        );
+    }
+
+    #[test]
+    fn test_has_unknown_intro_before_detection_true() {
+        let intro = LicenseMatch {
+            license_expression: "unknown".to_string(),
+            license_expression_spdx: "unknown".to_string(),
+            from_file: Some("test.txt".to_string()),
+            start_line: 1,
+            end_line: 2,
+            matcher: "5-unknown".to_string(),
+            score: 50.0,
+            matched_length: 5,
+            match_coverage: 100.0,
+            rule_relevance: 100,
+            rule_identifier: "license-intro.LICENSE".to_string(),
+            rule_url: "https://example.com".to_string(),
+            matched_text: Some("Licensed under".to_string()),
+            referenced_filenames: None,
+        };
+        let license_match = create_test_match_with_params(
+            "mit",
+            "1-hash",
+            3,
+            10,
+            100.0,
+            100,
+            100.0,
+            100,
+            "mit.LICENSE",
+        );
+
+        let matches = vec![intro, license_match];
+        assert!(has_unknown_intro_before_detection(&matches));
+    }
+
+    #[test]
+    fn test_has_unknown_intro_before_detection_false_single_match() {
+        let matches = vec![create_test_match_with_params(
+            "mit",
+            "1-hash",
+            1,
+            10,
+            100.0,
+            100,
+            100.0,
+            100,
+            "mit.LICENSE",
+        )];
+
+        assert!(!has_unknown_intro_before_detection(&matches));
+    }
+
+    #[test]
+    fn test_has_unknown_intro_before_detection_false_all_intros() {
+        let intro1 = LicenseMatch {
+            license_expression: "unknown".to_string(),
+            license_expression_spdx: "unknown".to_string(),
+            from_file: Some("test.txt".to_string()),
+            start_line: 1,
+            end_line: 2,
+            matcher: "5-unknown".to_string(),
+            score: 50.0,
+            matched_length: 5,
+            match_coverage: 100.0,
+            rule_relevance: 100,
+            rule_identifier: "license-intro.LICENSE".to_string(),
+            rule_url: "https://example.com".to_string(),
+            matched_text: Some("Licensed under".to_string()),
+            referenced_filenames: None,
+        };
+        let intro2 = LicenseMatch {
+            license_expression: "unknown".to_string(),
+            license_expression_spdx: "unknown".to_string(),
+            from_file: Some("test.txt".to_string()),
+            start_line: 3,
+            end_line: 4,
+            matcher: "5-unknown".to_string(),
+            score: 50.0,
+            matched_length: 5,
+            match_coverage: 100.0,
+            rule_relevance: 100,
+            rule_identifier: "license-intro-2.LICENSE".to_string(),
+            rule_url: "https://example.com".to_string(),
+            matched_text: Some("See LICENSE file".to_string()),
+            referenced_filenames: None,
+        };
+
+        let matches = vec![intro1, intro2];
+        assert!(!has_unknown_intro_before_detection(&matches));
+    }
+
+    #[test]
+    fn test_populate_detection_from_group_uses_analyze_detection() {
+        let group = DetectionGroup {
+            matches: vec![create_test_match_with_params(
+                "mit",
+                "1-hash",
+                1,
+                10,
+                100.0,
+                100,
+                100.0,
+                100,
+                "mit.LICENSE",
+            )],
+            start_line: 1,
+            end_line: 10,
+        };
+
+        let mut detection = LicenseDetection {
+            license_expression: None,
+            license_expression_spdx: None,
+            matches: Vec::new(),
+            detection_log: Vec::new(),
+            identifier: None,
+            file_region: None,
+        };
+
+        populate_detection_from_group(&mut detection, &group);
+
+        assert!(
+            detection
+                .detection_log
+                .contains(&"perfect-detection".to_string())
+        );
+    }
+
+    #[test]
+    fn test_populate_detection_from_group_undetected() {
+        let group = DetectionGroup {
+            matches: vec![create_test_match_with_params(
+                "unknown",
+                "5-undetected",
+                1,
+                10,
+                0.0,
+                0,
+                0.0,
+                0,
+                "undetected.LICENSE",
+            )],
+            start_line: 1,
+            end_line: 10,
+        };
+
+        let mut detection = LicenseDetection {
+            license_expression: None,
+            license_expression_spdx: None,
+            matches: Vec::new(),
+            detection_log: Vec::new(),
+            identifier: None,
+            file_region: None,
+        };
+
+        populate_detection_from_group(&mut detection, &group);
+
+        assert!(
+            detection
+                .detection_log
+                .contains(&"undetected-license".to_string())
+        );
     }
 }

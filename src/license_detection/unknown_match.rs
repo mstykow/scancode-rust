@@ -3,6 +3,52 @@
 //! This module implements detection of license-like text that doesn't match
 //! any known rule. It uses an ngram-based approach to identify regions with
 //! sufficient license-like content.
+//!
+//! # Signature Difference from Other Matchers
+//!
+//! Unlike other matchers (`hash_match`, `aho_match`, `seq_match`) which take
+//! `&QueryRun` as their query parameter, `unknown_match` takes `&Query` directly
+//! and requires a `known_matches` parameter.
+//!
+//! ## Why This Design?
+//!
+//! The unknown matcher has a fundamentally different purpose: it finds regions
+//! of text that are **NOT** covered by previously detected licenses. This requires
+//! knowledge of what has already been matched.
+//!
+//! Other matchers operate independently:
+//! - `hash_match`: Looks for exact hash matches of the entire text
+//! - `aho_match`: Finds all occurrences of rule patterns
+//! - `seq_match`: Finds approximate matches using set similarity
+//!
+//! The unknown matcher operates on **gaps**:
+//! - First computes which positions are already covered by known matches
+//! - Then searches only the uncovered regions for license-like content
+//! - This prevents re-detecting known licenses as "unknown"
+//!
+//! ## Python Parity
+//!
+//! The Python reference (`match_unknowns()` in `match_unknown.py`) has a similar
+//! conceptual design but different signature:
+//!
+//! ```python
+//! def match_unknowns(idx, query_run, automaton, unknown_ngram_length=6, **kwargs):
+//!     matched_ngrams = get_matched_ngrams(...)
+//!     qspans = (Span(qstart, qend) for qstart, qend in matched_ngrams)
+//!     qspan = Span().union(*qspans)
+//! ```
+//!
+//! The Python version receives `query_run` but operates on the automaton matches
+//! within that run. The Rust version explicitly receives `known_matches` because:
+//!
+//! 1. The Rust detection pipeline calls matchers in sequence and accumulates results
+//! 2. By the time unknown_match is called, we already have the complete list of
+//!    matches from hash, SPDX-LID, aho, and seq matchers
+//! 3. Passing `known_matches` directly is more explicit and avoids recomputing
+//!    coverage information
+//!
+//! This design choice maintains functional parity with Python while being more
+//! idiomatic for Rust's explicit data flow patterns.
 
 use aho_corasick::AhoCorasick;
 
@@ -253,6 +299,7 @@ fn create_unknown_match(
         rule_identifier: "unknown".to_string(),
         rule_url: String::new(),
         matched_text: None,
+        referenced_filenames: None,
     }
     .into()
 }
