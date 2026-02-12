@@ -4,21 +4,22 @@ use crate::license_detection::index::LicenseIndex;
 use crate::license_detection::tokenize::tokenize_without_stopwords;
 use std::collections::{HashMap, HashSet};
 
-/// A span represents a range of integer positions.
+/// A span representing a range of token positions.
 ///
-/// Used for tracking matched token positions.
+/// Used for tracking matched token positions and performing position arithmetic.
+/// This is a single continuous range of token positions (start..=end, inclusive).
+///
+/// Distinct from `spans::Span` which tracks multiple byte ranges for coverage.
 ///
 /// Based on Python Span class at:
 /// reference/scancode-toolkit/src/licensedcode/spans.py
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
-pub struct Span {
+pub struct PositionSpan {
     start: usize,
     end: usize,
 }
 
-#[allow(dead_code)]
-impl Span {
+impl PositionSpan {
     /// Create a new span from start and end positions (inclusive).
     pub fn new(start: usize, end: usize) -> Self {
         Self { start, end }
@@ -47,7 +48,7 @@ impl Span {
     /// Subtract another span from this span.
     ///
     /// Returns positions in self that are not in other.
-    pub fn difference(&self, other: &Span) -> HashSet<usize> {
+    pub fn difference(&self, other: &PositionSpan) -> HashSet<usize> {
         self.positions()
             .difference(&other.positions())
             .copied()
@@ -605,7 +606,7 @@ impl Query {
     /// * `span` - The span of positions to subtract
     ///
     /// Corresponds to Python: `subtract()` method (lines 328-334)
-    pub fn subtract(&mut self, span: &Span) {
+    pub fn subtract(&mut self, span: &PositionSpan) {
         let positions = span.positions();
         self.high_matchables = self
             .high_matchables
@@ -727,7 +728,7 @@ impl QueryRun {
     /// Returns true if there are matchable tokens remaining
     ///
     /// Corresponds to Python: `is_matchable()` method (lines 798-818)
-    pub fn is_matchable(&self, include_low: bool, exclude_positions: &[Span]) -> bool {
+    pub fn is_matchable(&self, include_low: bool, exclude_positions: &[PositionSpan]) -> bool {
         if self.is_digits_only() {
             return false;
         }
@@ -1114,7 +1115,7 @@ mod tests {
         let query = Query::new("license copyright permission", index).unwrap();
         let run = QueryRun::from_query(&query, 0, Some(2));
 
-        let exclude_span = Span::new(0, 1);
+        let exclude_span = PositionSpan::new(0, 1);
         assert!(run.is_matchable(false, &[exclude_span]));
     }
 
@@ -1136,7 +1137,7 @@ mod tests {
         let index = create_query_test_index();
         let mut query = Query::new("license copyright permission", index).unwrap();
 
-        let span = Span::new(0, 1);
+        let span = PositionSpan::new(0, 1);
         query.subtract(&span);
 
         assert!(!query.is_high_matchable(0));
@@ -1145,8 +1146,8 @@ mod tests {
     }
 
     #[test]
-    fn test_span_contains() {
-        let span = Span::new(5, 10);
+    fn test_position_span_contains() {
+        let span = PositionSpan::new(5, 10);
 
         assert!(span.contains(5));
         assert!(span.contains(7));
@@ -1156,8 +1157,8 @@ mod tests {
     }
 
     #[test]
-    fn test_span_positions() {
-        let span = Span::new(5, 7);
+    fn test_position_span_positions() {
+        let span = PositionSpan::new(5, 7);
         let positions = span.positions();
 
         assert_eq!(positions.len(), 3);
@@ -1167,9 +1168,9 @@ mod tests {
     }
 
     #[test]
-    fn test_span_difference() {
-        let span1 = Span::new(0, 10);
-        let span2 = Span::new(5, 7);
+    fn test_position_span_difference() {
+        let span1 = PositionSpan::new(0, 10);
+        let span2 = PositionSpan::new(5, 7);
 
         let diff = span1.difference(&span2);
 
