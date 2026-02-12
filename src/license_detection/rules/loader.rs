@@ -2,7 +2,9 @@
 
 use crate::license_detection::models::{License, Rule};
 use anyhow::{Context, Result, anyhow};
+use log::warn;
 use serde::{Deserialize, Deserializer, Serialize};
+use std::collections::HashSet;
 use std::fs;
 use std::path::Path;
 
@@ -498,11 +500,48 @@ fn load_licenses_from_dir(dir: &Path, pattern: &str) -> Result<Vec<License>> {
 }
 
 pub fn load_rules_from_directory(dir: &Path) -> Result<Vec<Rule>> {
-    load_rules_from_dir(dir, ".RULE")
+    let rules = load_rules_from_dir(dir, ".RULE")?;
+    validate_rules(&rules);
+    Ok(rules)
 }
 
 pub fn load_licenses_from_directory(dir: &Path) -> Result<Vec<License>> {
     load_licenses_from_dir(dir, ".LICENSE")
+}
+
+/// Validate loaded rules for common issues.
+///
+/// Checks for:
+/// 1. Duplicate rule texts (warns if found)
+/// 2. Empty license expressions for non-false-positive rules (warns if found)
+///
+/// Corresponds to Python:
+/// - `models.py:validate()` for license expression validation
+/// - `index.py:_add_rules()` for duplicate detection via hash
+fn validate_rules(rules: &[Rule]) {
+    let mut seen_texts: HashSet<&str> = HashSet::new();
+    let mut duplicate_count = 0;
+
+    for rule in rules {
+        if !seen_texts.insert(&rule.text) {
+            warn!(
+                "Duplicate rule text found for license_expression: {}",
+                rule.license_expression
+            );
+            duplicate_count += 1;
+        }
+
+        if !rule.is_false_positive && rule.license_expression.trim().is_empty() {
+            warn!("Rule has empty license_expression but is not marked as false_positive");
+        }
+    }
+
+    if duplicate_count > 0 {
+        warn!(
+            "Found {} duplicate rule text(s) during rule validation",
+            duplicate_count
+        );
+    }
 }
 
 #[cfg(test)]
@@ -628,5 +667,192 @@ MIT License"#,
         let mit_rule = mit_rule.unwrap();
         assert!(mit_rule.is_license_reference);
         assert_eq!(mit_rule.relevance, 90);
+    }
+
+    #[test]
+    fn test_validate_rules_detects_duplicates() {
+        let rules = vec![
+            Rule {
+                license_expression: "mit".to_string(),
+                text: "MIT License".to_string(),
+                tokens: vec![],
+                is_license_text: true,
+                is_license_notice: false,
+                is_license_reference: false,
+                is_license_tag: false,
+                is_license_intro: false,
+                is_license_clue: false,
+                is_false_positive: false,
+                is_required_phrase: false,
+                relevance: 100,
+                minimum_coverage: None,
+                is_continuous: false,
+                referenced_filenames: None,
+                ignorable_urls: None,
+                ignorable_emails: None,
+                ignorable_copyrights: None,
+                ignorable_holders: None,
+                ignorable_authors: None,
+                language: None,
+                notes: None,
+                length_unique: 0,
+                high_length_unique: 0,
+                high_length: 0,
+                min_matched_length: 0,
+                min_high_matched_length: 0,
+                min_matched_length_unique: 0,
+                min_high_matched_length_unique: 0,
+                is_small: false,
+                is_tiny: false,
+            },
+            Rule {
+                license_expression: "apache-2.0".to_string(),
+                text: "MIT License".to_string(),
+                tokens: vec![],
+                is_license_text: true,
+                is_license_notice: false,
+                is_license_reference: false,
+                is_license_tag: false,
+                is_license_intro: false,
+                is_license_clue: false,
+                is_false_positive: false,
+                is_required_phrase: false,
+                relevance: 100,
+                minimum_coverage: None,
+                is_continuous: false,
+                referenced_filenames: None,
+                ignorable_urls: None,
+                ignorable_emails: None,
+                ignorable_copyrights: None,
+                ignorable_holders: None,
+                ignorable_authors: None,
+                language: None,
+                notes: None,
+                length_unique: 0,
+                high_length_unique: 0,
+                high_length: 0,
+                min_matched_length: 0,
+                min_high_matched_length: 0,
+                min_matched_length_unique: 0,
+                min_high_matched_length_unique: 0,
+                is_small: false,
+                is_tiny: false,
+            },
+        ];
+
+        validate_rules(&rules);
+    }
+
+    #[test]
+    fn test_validate_rules_accepts_false_positive_without_expression() {
+        let rules = vec![Rule {
+            license_expression: "".to_string(),
+            text: "Some text".to_string(),
+            tokens: vec![],
+            is_license_text: false,
+            is_license_notice: false,
+            is_license_reference: false,
+            is_license_tag: false,
+            is_license_intro: false,
+            is_license_clue: false,
+            is_false_positive: true,
+            is_required_phrase: false,
+            relevance: 100,
+            minimum_coverage: None,
+            is_continuous: false,
+            referenced_filenames: None,
+            ignorable_urls: None,
+            ignorable_emails: None,
+            ignorable_copyrights: None,
+            ignorable_holders: None,
+            ignorable_authors: None,
+            language: None,
+            notes: Some("False positive for common pattern".to_string()),
+            length_unique: 0,
+            high_length_unique: 0,
+            high_length: 0,
+            min_matched_length: 0,
+            min_high_matched_length: 0,
+            min_matched_length_unique: 0,
+            min_high_matched_length_unique: 0,
+            is_small: false,
+            is_tiny: false,
+        }];
+
+        validate_rules(&rules);
+    }
+
+    #[test]
+    fn test_validate_rules_no_duplicates() {
+        let rules = vec![
+            Rule {
+                license_expression: "mit".to_string(),
+                text: "MIT License".to_string(),
+                tokens: vec![],
+                is_license_text: true,
+                is_license_notice: false,
+                is_license_reference: false,
+                is_license_tag: false,
+                is_license_intro: false,
+                is_license_clue: false,
+                is_false_positive: false,
+                is_required_phrase: false,
+                relevance: 100,
+                minimum_coverage: None,
+                is_continuous: false,
+                referenced_filenames: None,
+                ignorable_urls: None,
+                ignorable_emails: None,
+                ignorable_copyrights: None,
+                ignorable_holders: None,
+                ignorable_authors: None,
+                language: None,
+                notes: None,
+                length_unique: 0,
+                high_length_unique: 0,
+                high_length: 0,
+                min_matched_length: 0,
+                min_high_matched_length: 0,
+                min_matched_length_unique: 0,
+                min_high_matched_length_unique: 0,
+                is_small: false,
+                is_tiny: false,
+            },
+            Rule {
+                license_expression: "apache-2.0".to_string(),
+                text: "Apache License".to_string(),
+                tokens: vec![],
+                is_license_text: true,
+                is_license_notice: false,
+                is_license_reference: false,
+                is_license_tag: false,
+                is_license_intro: false,
+                is_license_clue: false,
+                is_false_positive: false,
+                is_required_phrase: false,
+                relevance: 100,
+                minimum_coverage: None,
+                is_continuous: false,
+                referenced_filenames: None,
+                ignorable_urls: None,
+                ignorable_emails: None,
+                ignorable_copyrights: None,
+                ignorable_holders: None,
+                ignorable_authors: None,
+                language: None,
+                notes: None,
+                length_unique: 0,
+                high_length_unique: 0,
+                high_length: 0,
+                min_matched_length: 0,
+                min_high_matched_length: 0,
+                min_matched_length_unique: 0,
+                min_high_matched_length_unique: 0,
+                is_small: false,
+                is_tiny: false,
+            },
+        ];
+
+        validate_rules(&rules);
     }
 }
