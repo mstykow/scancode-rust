@@ -275,24 +275,58 @@ pub fn validate_expression(
 ///
 /// # Returns
 /// String representation of the expression
+///
+/// # Parentheses
+/// Parentheses are added when needed to preserve semantic meaning based on
+/// operator precedence (WITH > AND > OR). This matches the Python
+/// license-expression library behavior.
 pub fn expression_to_string(expr: &LicenseExpression) -> String {
+    expression_to_string_internal(expr, None)
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+enum Precedence {
+    Or = 1,
+    And = 2,
+    With = 3,
+}
+
+fn expression_to_string_internal(
+    expr: &LicenseExpression,
+    parent_prec: Option<Precedence>,
+) -> String {
     match expr {
         LicenseExpression::License(key) => key.clone(),
         LicenseExpression::LicenseRef(key) => key.clone(),
         LicenseExpression::And { left, right } => {
-            let left_str = expression_to_string(left);
-            let right_str = expression_to_string(right);
-            format!("{} AND {}", left_str, right_str)
+            let left_str = expression_to_string_internal(left, Some(Precedence::And));
+            let right_str = expression_to_string_internal(right, Some(Precedence::And));
+            let result = format!("{} AND {}", left_str, right_str);
+            if parent_prec.is_some_and(|p| p != Precedence::And) {
+                format!("({})", result)
+            } else {
+                result
+            }
         }
         LicenseExpression::Or { left, right } => {
-            let left_str = expression_to_string(left);
-            let right_str = expression_to_string(right);
-            format!("{} OR {}", left_str, right_str)
+            let left_str = expression_to_string_internal(left, Some(Precedence::Or));
+            let right_str = expression_to_string_internal(right, Some(Precedence::Or));
+            let result = format!("{} OR {}", left_str, right_str);
+            if parent_prec.is_some_and(|p| p != Precedence::Or) {
+                format!("({})", result)
+            } else {
+                result
+            }
         }
         LicenseExpression::With { left, right } => {
-            let left_str = expression_to_string(left);
-            let right_str = expression_to_string(right);
-            format!("{} WITH {}", left_str, right_str)
+            let left_str = expression_to_string_internal(left, Some(Precedence::With));
+            let right_str = expression_to_string_internal(right, Some(Precedence::With));
+            let result = format!("{} WITH {}", left_str, right_str);
+            if parent_prec.is_some_and(|p| p != Precedence::With) {
+                format!("({})", result)
+            } else {
+                result
+            }
         }
     }
 }
@@ -905,8 +939,9 @@ mod tests {
             true,
         )
         .unwrap();
+        assert_eq!(result, "(mit OR apache-2.0) AND gpl-2.0-plus");
         let expr = parse_expression(&result).unwrap();
-        assert!(matches!(expr, LicenseExpression::Or { .. }));
+        assert!(matches!(expr, LicenseExpression::And { .. }));
         let keys = expr.license_keys();
         assert_eq!(keys.len(), 3);
     }
@@ -915,5 +950,119 @@ mod tests {
     fn test_combine_expressions_parse_error() {
         let result = combine_expressions(&["mit", "@invalid@"], CombineRelation::And, true);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_expression_to_string_or_inside_and() {
+        let or_expr = LicenseExpression::Or {
+            left: Box::new(LicenseExpression::License("mit".to_string())),
+            right: Box::new(LicenseExpression::License("apache-2.0".to_string())),
+        };
+        let and_expr = LicenseExpression::And {
+            left: Box::new(or_expr),
+            right: Box::new(LicenseExpression::License("gpl-2.0".to_string())),
+        };
+        assert_eq!(
+            expression_to_string(&and_expr),
+            "(mit OR apache-2.0) AND gpl-2.0"
+        );
+    }
+
+    #[test]
+    fn test_expression_to_string_and_inside_or() {
+        let and_expr = LicenseExpression::And {
+            left: Box::new(LicenseExpression::License("mit".to_string())),
+            right: Box::new(LicenseExpression::License("apache-2.0".to_string())),
+        };
+        let or_expr = LicenseExpression::Or {
+            left: Box::new(and_expr),
+            right: Box::new(LicenseExpression::License("gpl-2.0".to_string())),
+        };
+        assert_eq!(
+            expression_to_string(&or_expr),
+            "(mit AND apache-2.0) OR gpl-2.0"
+        );
+    }
+
+    #[test]
+    fn test_expression_to_string_with_inside_or() {
+        let with_expr = LicenseExpression::With {
+            left: Box::new(LicenseExpression::License("gpl-2.0".to_string())),
+            right: Box::new(LicenseExpression::License(
+                "classpath-exception-2.0".to_string(),
+            )),
+        };
+        let or_expr = LicenseExpression::Or {
+            left: Box::new(with_expr),
+            right: Box::new(LicenseExpression::License("mit".to_string())),
+        };
+        assert_eq!(
+            expression_to_string(&or_expr),
+            "(gpl-2.0 WITH classpath-exception-2.0) OR mit"
+        );
+    }
+
+    #[test]
+    fn test_expression_to_string_with_inside_and() {
+        let with_expr = LicenseExpression::With {
+            left: Box::new(LicenseExpression::License("gpl-2.0".to_string())),
+            right: Box::new(LicenseExpression::License(
+                "classpath-exception-2.0".to_string(),
+            )),
+        };
+        let and_expr = LicenseExpression::And {
+            left: Box::new(with_expr),
+            right: Box::new(LicenseExpression::License("mit".to_string())),
+        };
+        assert_eq!(
+            expression_to_string(&and_expr),
+            "(gpl-2.0 WITH classpath-exception-2.0) AND mit"
+        );
+    }
+
+    #[test]
+    fn test_expression_to_string_nested_or_no_parens() {
+        let or_expr = LicenseExpression::Or {
+            left: Box::new(LicenseExpression::Or {
+                left: Box::new(LicenseExpression::License("mit".to_string())),
+                right: Box::new(LicenseExpression::License("apache-2.0".to_string())),
+            }),
+            right: Box::new(LicenseExpression::License("gpl-2.0".to_string())),
+        };
+        assert_eq!(
+            expression_to_string(&or_expr),
+            "mit OR apache-2.0 OR gpl-2.0"
+        );
+    }
+
+    #[test]
+    fn test_expression_to_string_nested_and_no_parens() {
+        let and_expr = LicenseExpression::And {
+            left: Box::new(LicenseExpression::And {
+                left: Box::new(LicenseExpression::License("mit".to_string())),
+                right: Box::new(LicenseExpression::License("apache-2.0".to_string())),
+            }),
+            right: Box::new(LicenseExpression::License("gpl-2.0".to_string())),
+        };
+        assert_eq!(
+            expression_to_string(&and_expr),
+            "mit AND apache-2.0 AND gpl-2.0"
+        );
+    }
+
+    #[test]
+    fn test_expression_to_string_roundtrip_or_and() {
+        let input = "(mit OR apache-2.0) AND gpl-2.0";
+        let expr = parse_expression(input).unwrap();
+        let output = expression_to_string(&expr);
+        assert_eq!(output, "(mit OR apache-2.0) AND gpl-2.0");
+    }
+
+    #[test]
+    fn test_expression_to_string_roundtrip_or_with() {
+        let input = "(gpl-2.0 WITH classpath-exception-2.0) OR mit";
+        let expr = parse_expression(input).unwrap();
+        let output = expression_to_string(&expr);
+        assert_eq!(output, "(gpl-2.0 WITH classpath-exception-2.0) OR mit");
     }
 }
