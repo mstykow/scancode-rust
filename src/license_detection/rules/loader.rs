@@ -268,12 +268,18 @@ pub fn parse_rule_file(path: &Path) -> Result<Rule> {
         }
     };
 
-    let license_expression = fm.license_expression.ok_or_else(|| {
-        anyhow!(
-            "Rule file missing required field 'license_expression': {}",
-            path.display()
-        )
-    })?;
+    let is_false_positive = fm.is_false_positive.unwrap_or(false);
+
+    let license_expression = match fm.license_expression {
+        Some(expr) => expr,
+        None if is_false_positive => "unknown".to_string(),
+        None => {
+            return Err(anyhow!(
+                "Rule file missing required field 'license_expression': {}",
+                path.display()
+            ));
+        }
+    };
 
     let relevance = match fm.relevance {
         Some(num) => num.as_u8().unwrap_or(100),

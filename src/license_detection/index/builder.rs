@@ -510,4 +510,249 @@ mod tests {
         assert!(index.get_license("mit").is_some());
         assert!(index.get_license("apache-2.0").is_some());
     }
+
+    #[test]
+    fn test_build_index_from_reference_rules() {
+        use std::path::Path;
+
+        let rules_path = Path::new("reference/scancode-toolkit/src/licensedcode/data/rules");
+        let licenses_path = Path::new("reference/scancode-toolkit/src/licensedcode/data/licenses");
+
+        if !rules_path.exists() || !licenses_path.exists() {
+            eprintln!("Skipping test: reference directories not found");
+            return;
+        }
+
+        let rules = crate::license_detection::rules::load_rules_from_directory(rules_path);
+        let licenses = crate::license_detection::rules::load_licenses_from_directory(licenses_path);
+
+        let rules = match rules {
+            Ok(r) => r,
+            Err(e) => {
+                eprintln!("Skipping test: failed to load rules: {}", e);
+                return;
+            }
+        };
+
+        let licenses = match licenses {
+            Ok(l) => l,
+            Err(e) => {
+                eprintln!("Skipping test: failed to load licenses: {}", e);
+                return;
+            }
+        };
+
+        let index = build_index(rules, licenses);
+
+        assert!(!index.rules_by_rid.is_empty(), "Should have rules loaded");
+        assert!(!index.tids_by_rid.is_empty(), "Should have token IDs");
+        assert!(
+            !index.rid_by_hash.is_empty(),
+            "Should have hash mappings for regular rules"
+        );
+        assert!(
+            !index.regular_rids.is_empty(),
+            "Should have regular rule IDs"
+        );
+        assert!(!index.sets_by_rid.is_empty(), "Should have token sets");
+        assert!(
+            !index.msets_by_rid.is_empty(),
+            "Should have token multisets"
+        );
+        assert!(
+            !index.licenses_by_key.is_empty(),
+            "Should have licenses loaded"
+        );
+
+        assert!(index.len_legalese > 0, "Should have legalese tokens");
+        assert!(
+            index.dictionary.len() >= index.len_legalese,
+            "Dictionary should have at least legalese tokens"
+        );
+
+        let mut rules_with_empty_tokens = 0;
+        for &rid in &index.regular_rids {
+            let rule = &index.rules_by_rid[rid];
+            if rule.tokens.is_empty() {
+                rules_with_empty_tokens += 1;
+            }
+            assert!(
+                index.sets_by_rid.contains_key(&rid),
+                "Rule {} should have token set",
+                rid
+            );
+            assert!(
+                index.msets_by_rid.contains_key(&rid),
+                "Rule {} should have token multiset",
+                rid
+            );
+        }
+        if rules_with_empty_tokens > 0 {
+            eprintln!(
+                "Note: {} rules have empty tokens (likely non-ASCII text like Japanese/Chinese)",
+                rules_with_empty_tokens
+            );
+        }
+
+        if !index.approx_matchable_rids.is_empty() {
+            for &rid in &index.approx_matchable_rids {
+                let rule = &index.rules_by_rid[rid];
+                assert!(!rule.is_false_positive);
+                assert!(!rule.is_tiny);
+            }
+        }
+    }
+
+    #[test]
+    fn test_build_index_automaton_functional() {
+        let rules = vec![
+            create_test_rule("MIT License copyright permission", false),
+            create_test_rule("Apache License Version 2.0", false),
+            create_test_rule("GNU General Public License", false),
+        ];
+        let index = build_index(rules, vec![]);
+
+        assert_eq!(index.rules_by_rid.len(), 3, "Should have 3 rules indexed");
+        assert_eq!(index.regular_rids.len(), 3);
+
+        let first_rule_tokens = &index.tids_by_rid[0];
+        let pattern: Vec<u8> = first_rule_tokens
+            .iter()
+            .flat_map(|t| t.to_le_bytes())
+            .collect();
+
+        let matches: Vec<_> = index.rules_automaton.find_iter(&pattern).collect();
+        assert!(!matches.is_empty(), "Automaton should find the pattern");
+    }
+
+    #[test]
+    fn test_build_index_rule_thresholds_computed() {
+        let rule_text = "Permission is hereby granted free of charge to any person obtaining a copy of this software and associated documentation files the MIT License";
+        let rules = vec![create_test_rule(rule_text, false)];
+        let index = build_index(rules, vec![]);
+
+        let rule = &index.rules_by_rid[0];
+
+        assert!(rule.length_unique > 0, "length_unique should be computed");
+        assert!(
+            rule.min_matched_length > 0,
+            "min_matched_length should be computed"
+        );
+
+        assert!(
+            rule.min_matched_length_unique > 0,
+            "min_matched_length_unique should be computed"
+        );
+    }
+
+    #[test]
+    fn test_build_index_approx_matchable_classification() {
+        let mut regular_rule = create_test_rule(
+            "Permission is hereby granted free of charge to any person obtaining a copy",
+            false,
+        );
+        regular_rule.is_license_text = true;
+
+        let mut tiny_rule = create_test_rule("MIT", false);
+        tiny_rule.is_license_text = false;
+
+        let false_positive_rule = create_test_rule("Some text", true);
+
+        let mut reference_rule = create_test_rule("MIT License", false);
+        reference_rule.is_license_reference = true;
+
+        let rules = vec![
+            regular_rule,
+            tiny_rule,
+            false_positive_rule.clone(),
+            reference_rule,
+        ];
+        let index = build_index(rules, vec![]);
+
+        assert!(
+            index.regular_rids.contains(&0),
+            "Regular rule should be in regular_rids"
+        );
+        assert!(
+            index.regular_rids.contains(&1),
+            "Tiny rule should be in regular_rids"
+        );
+        assert!(
+            !index.regular_rids.contains(&2),
+            "False positive should not be in regular_rids"
+        );
+        assert!(
+            index.false_positive_rids.contains(&2),
+            "False positive should be in false_positive_rids"
+        );
+    }
+
+    #[test]
+    fn test_build_index_high_postings_populated() {
+        let rule_text = "licensed copyrighted permission granted authorized distributed modification sublicense";
+        let rules = vec![create_test_rule(rule_text, false)];
+        let index = build_index(rules, vec![]);
+
+        if !index.approx_matchable_rids.is_empty() && index.approx_matchable_rids.contains(&0) {
+            assert!(
+                index.high_postings_by_rid.contains_key(&0),
+                "Should have high postings for approx-matchable rule with legalese"
+            );
+
+            let postings = &index.high_postings_by_rid[&0];
+            assert!(!postings.is_empty(), "Postings should have entries");
+        }
+    }
+
+    #[test]
+    fn test_build_index_unknown_automaton() {
+        let long_rule_text = "Permission is hereby granted free of charge to any person obtaining a copy of this software and associated documentation files the MIT License terms conditions";
+        let rules = vec![create_test_rule(long_rule_text, false)];
+        let index = build_index(rules, vec![]);
+
+        let unknown_matches: Vec<_> = index.unknown_automaton.find_iter(b"test").collect();
+        assert!(
+            unknown_matches.is_empty(),
+            "Unknown automaton should not match random text"
+        );
+    }
+
+    #[test]
+    fn test_build_index_with_actual_mit_license() {
+        let mit_text = r#"Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE."#;
+
+        let mut mit_rule = create_test_rule(mit_text, false);
+        mit_rule.is_license_text = true;
+        mit_rule.license_expression = "mit".to_string();
+
+        let rules = vec![mit_rule];
+        let licenses = vec![create_test_license("mit", "MIT License")];
+
+        let index = build_index(rules, licenses);
+
+        assert_eq!(index.rules_by_rid.len(), 1);
+        assert!(index.regular_rids.contains(&0));
+        assert!(!index.false_positive_rids.contains(&0));
+
+        let rule = &index.rules_by_rid[0];
+        assert!(!rule.tokens.is_empty());
+        assert!(rule.length_unique > 0);
+        assert!(rule.min_matched_length > 0);
+    }
 }
