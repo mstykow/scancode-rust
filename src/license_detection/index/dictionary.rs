@@ -368,11 +368,16 @@ mod tests {
             "License should be a legalese token"
         );
 
-        let copyright_id = dict.get_token_id("copyright");
-        assert!(copyright_id.is_some(), "Copyright should be in dictionary");
+        // Note: Standalone "copyright" is NOT in the Python reference dictionary
+        // Only compound words like "copyrighted", "copyrights" are present
+        let copyrighted_id = dict.get_token_id("copyrighted");
         assert!(
-            dict.is_legalese_token(copyright_id.unwrap()),
-            "Copyright should be a legalese token"
+            copyrighted_id.is_some(),
+            "Copyrighted should be in dictionary"
+        );
+        assert!(
+            dict.is_legalese_token(copyrighted_id.unwrap()),
+            "Copyrighted should be a legalese token"
         );
 
         // New tokens should get IDs after legalese
@@ -382,7 +387,7 @@ mod tests {
 
         // Token with same ID should have legalese status
         assert!(dict.is_legalese(license_id.unwrap()));
-        assert!(dict.is_legalese(copyright_id.unwrap()));
+        assert!(dict.is_legalese(copyrighted_id.unwrap()));
         assert!(!dict.is_legalese(hello_id));
     }
 }
