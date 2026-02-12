@@ -1,4 +1,5 @@
-use crate::models::{FileInfo, FileInfoBuilder, FileType};
+use crate::license_detection::LicenseDetectionEngine;
+use crate::models::{FileInfo, FileInfoBuilder, FileType, LicenseDetection, Match};
 use crate::parsers::try_parse_file;
 use crate::scanner::ProcessResult;
 use crate::utils::file::{get_creation_date, is_path_excluded};
@@ -8,6 +9,7 @@ use anyhow::Error;
 use content_inspector::{ContentType, inspect};
 use glob::Pattern;
 use indicatif::ProgressBar;
+use log::warn;
 use mime_guess::from_path;
 use rayon::prelude::*;
 use std::fs::{self};
@@ -19,6 +21,7 @@ pub fn process<P: AsRef<Path>>(
     max_depth: usize,
     progress_bar: Arc<ProgressBar>,
     exclude_patterns: &[Pattern],
+    license_engine: Option<Arc<LicenseDetectionEngine>>,
 ) -> Result<ProcessResult, Error> {
     let path = path.as_ref();
 
@@ -59,7 +62,7 @@ pub fn process<P: AsRef<Path>>(
         &mut file_entries
             .par_iter()
             .map(|(path, metadata)| {
-                let file_entry = process_file(path, metadata);
+                let file_entry = process_file(path, metadata, license_engine.clone());
                 progress_bar.inc(1);
                 file_entry
             })
@@ -71,7 +74,13 @@ pub fn process<P: AsRef<Path>>(
         all_files.push(process_directory(&path, &metadata));
 
         if max_depth > 0 {
-            match process(&path, max_depth - 1, progress_bar.clone(), exclude_patterns) {
+            match process(
+                &path,
+                max_depth - 1,
+                progress_bar.clone(),
+                exclude_patterns,
+                license_engine.clone(),
+            ) {
                 Ok(mut result) => {
                     all_files.append(&mut result.files);
                     total_excluded += result.excluded_count;
@@ -87,11 +96,15 @@ pub fn process<P: AsRef<Path>>(
     })
 }
 
-fn process_file(path: &Path, metadata: &fs::Metadata) -> FileInfo {
+fn process_file(
+    path: &Path,
+    metadata: &fs::Metadata,
+    license_engine: Option<Arc<LicenseDetectionEngine>>,
+) -> FileInfo {
     let mut scan_errors: Vec<String> = vec![];
     let mut file_info_builder = FileInfoBuilder::default();
 
-    if let Err(e) = extract_information_from_content(&mut file_info_builder, path) {
+    if let Err(e) = extract_information_from_content(&mut file_info_builder, path, license_engine) {
         scan_errors.push(e.to_string());
     };
 
@@ -125,6 +138,7 @@ fn process_file(path: &Path, metadata: &fs::Metadata) -> FileInfo {
 fn extract_information_from_content(
     file_info_builder: &mut FileInfoBuilder,
     path: &Path,
+    license_engine: Option<Arc<LicenseDetectionEngine>>,
 ) -> Result<(), Error> {
     let buffer = fs::read(path)?;
 
@@ -141,6 +155,7 @@ fn extract_information_from_content(
         extract_license_information(
             file_info_builder,
             String::from_utf8_lossy(&buffer).into_owned(),
+            license_engine,
         )
     } else {
         Ok(())
@@ -148,11 +163,78 @@ fn extract_information_from_content(
 }
 
 fn extract_license_information(
-    _file_info_builder: &mut FileInfoBuilder,
-    _text_content: String,
+    file_info_builder: &mut FileInfoBuilder,
+    text_content: String,
+    license_engine: Option<Arc<LicenseDetectionEngine>>,
 ) -> Result<(), Error> {
-    // TODO: Implement ScanCode-compatible license detection engine
+    let Some(engine) = license_engine else {
+        return Ok(());
+    };
+
+    match engine.detect(&text_content) {
+        Ok(detections) => {
+            let model_detections: Vec<LicenseDetection> = detections
+                .into_iter()
+                .filter_map(convert_detection_to_model)
+                .collect();
+
+            if !model_detections.is_empty() {
+                let expressions: Vec<String> = model_detections
+                    .iter()
+                    .filter(|d| !d.license_expression_spdx.is_empty())
+                    .map(|d| d.license_expression_spdx.clone())
+                    .collect();
+
+                if !expressions.is_empty() {
+                    let combined = crate::utils::spdx::combine_license_expressions(expressions);
+                    if let Some(expr) = combined {
+                        file_info_builder.license_expression(Some(expr));
+                    }
+                }
+            }
+
+            file_info_builder.license_detections(model_detections);
+        }
+        Err(e) => {
+            warn!("License detection failed: {}", e);
+        }
+    }
+
     Ok(())
+}
+
+fn convert_detection_to_model(
+    detection: crate::license_detection::LicenseDetection,
+) -> Option<LicenseDetection> {
+    let license_expression = detection.license_expression?;
+    let license_expression_spdx = detection.license_expression_spdx.unwrap_or_default();
+
+    let matches: Vec<Match> = detection
+        .matches
+        .into_iter()
+        .map(|m| Match {
+            license_expression: m.license_expression,
+            license_expression_spdx: m.license_expression_spdx,
+            from_file: m.from_file,
+            start_line: m.start_line,
+            end_line: m.end_line,
+            matcher: Some(m.matcher),
+            score: m.score as f64,
+            matched_length: Some(m.matched_length),
+            match_coverage: Some(m.match_coverage as f64),
+            rule_relevance: Some(m.rule_relevance as usize),
+            rule_identifier: Some(m.rule_identifier),
+            rule_url: Some(m.rule_url),
+            matched_text: m.matched_text,
+        })
+        .collect();
+
+    Some(LicenseDetection {
+        license_expression,
+        license_expression_spdx,
+        matches,
+        identifier: detection.identifier,
+    })
 }
 
 fn process_directory(path: &Path, metadata: &fs::Metadata) -> FileInfo {

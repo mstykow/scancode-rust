@@ -31,22 +31,19 @@ use crate::license_detection::query::Query;
 use crate::license_detection::rules::{load_licenses_from_directory, load_rules_from_directory};
 use crate::license_detection::spdx_mapping::{SpdxMapping, build_spdx_mapping};
 
-pub use detection::{
-    DetectionGroup, FileRegion, LicenseDetection, apply_detection_preferences, classify_detection,
-    create_detection_from_group, determine_spdx_expression,
-    determine_spdx_expression_from_scancode, filter_detections_by_score, group_matches_by_region,
-    populate_detection_from_group_with_spdx, post_process_detections, rank_detections,
-    remove_duplicate_detections, sort_matches_by_line,
+use crate::license_detection::detection::{
+    create_detection_from_group, group_matches_by_region, populate_detection_from_group_with_spdx,
+    post_process_detections, sort_matches_by_line,
 };
 
-pub use aho_match::{MATCH_AHO, MATCH_AHO_ORDER, aho_match};
-pub use expression::{CombineRelation, combine_expressions};
-pub use hash_match::{MATCH_HASH, MATCH_HASH_ORDER, compute_hash, hash_match, index_hash};
+pub use detection::LicenseDetection;
+
+pub use aho_match::aho_match;
+pub use hash_match::hash_match;
 pub use match_refine::refine_matches;
-pub use models::{License, LicenseMatch, Rule};
-pub use seq_match::{MATCH_SEQ, MATCH_SEQ_ORDER, seq_match};
-pub use spdx_lid::{MATCH_SPDX_ID, MATCH_SPDX_ID_ORDER, extract_spdx_expressions, spdx_lid_match};
-pub use unknown_match::{MATCH_UNKNOWN, MATCH_UNKNOWN_ORDER, unknown_match};
+pub use seq_match::seq_match;
+pub use spdx_lid::spdx_lid_match;
+pub use unknown_match::unknown_match;
 
 /// License detection engine that orchestrates the detection pipeline.
 ///
@@ -68,8 +65,19 @@ impl LicenseDetectionEngine {
     /// # Returns
     /// A Result containing the engine or an error
     pub fn new(rules_path: &Path) -> Result<Self> {
-        let rules = load_rules_from_directory(rules_path)?;
-        let licenses = load_licenses_from_directory(rules_path)?;
+        let (rules_dir, licenses_dir) = if rules_path.ends_with("data") {
+            (rules_path.join("rules"), rules_path.join("licenses"))
+        } else if rules_path.ends_with("rules") {
+            let parent = rules_path.parent().ok_or_else(|| {
+                anyhow::anyhow!("Cannot determine parent directory for rules path")
+            })?;
+            (rules_path.to_path_buf(), parent.join("licenses"))
+        } else {
+            (rules_path.to_path_buf(), rules_path.to_path_buf())
+        };
+
+        let rules = load_rules_from_directory(&rules_dir)?;
+        let licenses = load_licenses_from_directory(&licenses_dir)?;
         let index = build_index(rules, licenses);
         let spdx_mapping =
             build_spdx_mapping(&index.licenses_by_key.values().cloned().collect::<Vec<_>>());
@@ -122,8 +130,16 @@ impl LicenseDetectionEngine {
 
         let groups = group_matches_by_region(&sorted);
 
-        let detections: Vec<LicenseDetection> =
-            groups.iter().map(create_detection_from_group).collect();
+        let detections: Vec<LicenseDetection> = groups
+            .iter()
+            .map(|group| {
+                let mut detection = create_detection_from_group(group);
+                populate_detection_from_group_with_spdx(&mut detection, group, &self.spdx_mapping);
+                detection
+            })
+            .collect();
+
+        let detections = post_process_detections(detections, 0.0);
 
         Ok(detections)
     }
@@ -134,6 +150,7 @@ impl LicenseDetectionEngine {
     }
 
     /// Get a reference to the SPDX mapping.
+    #[allow(dead_code)]
     pub fn spdx_mapping(&self) -> &SpdxMapping {
         &self.spdx_mapping
     }

@@ -22,6 +22,7 @@ pub const MATCH_AHO: &str = "2-aho";
 /// Aho-Corasick matching runs after hash matching and SPDX-LID matching.
 ///
 /// Corresponds to Python: `MATCH_AHO_EXACT_ORDER = 1` (line 79)
+#[allow(dead_code)]
 pub const MATCH_AHO_ORDER: u8 = 2;
 
 /// Encode u16 token sequence as bytes.

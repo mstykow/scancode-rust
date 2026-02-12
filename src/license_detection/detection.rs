@@ -120,6 +120,7 @@ pub struct LicenseDetection {
 
 /// A file has one or more file-regions, which are separate regions of the file
 /// containing some license information.
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct FileRegion {
     /// File path
@@ -635,6 +636,14 @@ pub fn populate_detection_from_group(detection: &mut LicenseDetection, group: &D
     detection.detection_log.push(log_category.to_string());
 
     detection.identifier = None;
+
+    if group.start_line > 0 {
+        detection.file_region = Some(FileRegion {
+            path: String::new(),
+            start_line: group.start_line,
+            end_line: group.end_line,
+        });
+    }
 }
 
 /// Populate LicenseDetection from a DetectionGroup with SPDX mapping.
@@ -656,27 +665,13 @@ pub fn populate_detection_from_group_with_spdx(
     group: &DetectionGroup,
     spdx_mapping: &SpdxMapping,
 ) {
-    if group.matches.is_empty() {
-        return;
+    populate_detection_from_group(detection, group);
+
+    if let Some(ref scancode_expr) = detection.license_expression
+        && let Ok(spdx_expr) = determine_spdx_expression_from_scancode(scancode_expr, spdx_mapping)
+    {
+        detection.license_expression_spdx = Some(spdx_expr);
     }
-
-    detection.matches = group.matches.clone();
-
-    let _score = compute_detection_score(&detection.matches);
-
-    if let Ok(scancode_expr) = determine_license_expression(&detection.matches) {
-        detection.license_expression = Some(scancode_expr.clone());
-
-        if let Ok(spdx_expr) = determine_spdx_expression_from_scancode(&scancode_expr, spdx_mapping)
-        {
-            detection.license_expression_spdx = Some(spdx_expr);
-        }
-    }
-
-    let log_category = analyze_detection(&detection.matches, false);
-    detection.detection_log.push(log_category.to_string());
-
-    detection.identifier = None;
 }
 
 /// Create a basic LicenseDetection from a DetectionGroup.
@@ -692,17 +687,6 @@ pub fn populate_detection_from_group_with_spdx(
 ///
 /// A fully populated LicenseDetection
 pub fn create_detection_from_group(group: &DetectionGroup) -> LicenseDetection {
-    if group.matches.is_empty() {
-        return LicenseDetection {
-            license_expression: None,
-            license_expression_spdx: None,
-            matches: Vec::new(),
-            detection_log: Vec::new(),
-            identifier: None,
-            file_region: None,
-        };
-    }
-
     let mut detection = LicenseDetection {
         license_expression: None,
         license_expression_spdx: None,
@@ -712,7 +696,34 @@ pub fn create_detection_from_group(group: &DetectionGroup) -> LicenseDetection {
         file_region: None,
     };
 
-    populate_detection_from_group(&mut detection, group);
+    if group.matches.is_empty() {
+        return detection;
+    }
+
+    detection.matches = group.matches.clone();
+
+    let _score = compute_detection_score(&detection.matches);
+
+    if let Ok(expr) = determine_license_expression(&detection.matches) {
+        detection.license_expression = Some(expr.clone());
+
+        if let Ok(spdx_expr) = determine_spdx_expression(&detection.matches) {
+            detection.license_expression_spdx = Some(spdx_expr);
+        }
+    }
+
+    let log_category = analyze_detection(&detection.matches, false);
+    detection.detection_log.push(log_category.to_string());
+
+    detection.identifier = None;
+
+    if group.start_line > 0 {
+        detection.file_region = Some(FileRegion {
+            path: String::new(),
+            start_line: group.start_line,
+            end_line: group.end_line,
+        });
+    }
 
     detection
 }

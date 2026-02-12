@@ -4546,16 +4546,19 @@ pub static LEGALESE: LazyLock<HashMap<String, u16>> = LazyLock::new(|| {
 ///
 /// Returns Some(id) if the word is in the legalese dictionary,
 /// or None if it's not a legalese word.
+#[allow(dead_code)]
 pub fn get_legalese_token(word: &str) -> Option<u16> {
     LEGALESE.get(word).copied()
 }
 
 /// Check if a word is a legalese word.
+#[allow(dead_code)]
 pub fn is_legalese(word: &str) -> bool {
     LEGALESE.contains_key(word)
 }
 
 /// Get the number of legalese tokens in the dictionary.
+#[allow(dead_code)]
 pub fn legalese_count() -> usize {
     LEGALESE.len()
 }

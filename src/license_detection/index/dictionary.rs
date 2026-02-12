@@ -114,31 +114,32 @@ impl TokenDictionary {
 
     /// Check if a token ID is a legalese (high-value) token.
     ///
-    /// This follows the Python ScanCode Toolkit pattern where tokens with
-    /// IDs < len_legalese are considered high-value legalese tokens.
-    ///
     /// # Arguments
     /// * `token_id` - The token ID
     ///
     /// # Returns
     /// true if the token ID is in the legalese range
     #[inline]
+    #[allow(dead_code)]
     pub const fn is_legalese_token(&self, token_id: u16) -> bool {
         token_id < self.len_legalese as u16
     }
 
     /// Check if a token ID is a legalese (high-value) token (alias).
     #[inline]
+    #[allow(dead_code)]
     pub const fn is_legalese(&self, token_id: u16) -> bool {
         self.is_legalese_token(token_id)
     }
 
     /// Get the number of registered tokens.
+    #[allow(dead_code)]
     pub fn len(&self) -> usize {
         self.tokens_to_ids.len()
     }
 
     /// Check if the dictionary is empty.
+    #[allow(dead_code)]
     pub fn is_empty(&self) -> bool {
         self.tokens_to_ids.is_empty()
     }

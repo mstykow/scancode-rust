@@ -21,21 +21,13 @@ pub struct PositionSpan {
 
 impl PositionSpan {
     /// Create a new span from start and end positions (inclusive).
+    #[allow(dead_code)]
     pub fn new(start: usize, end: usize) -> Self {
         Self { start, end }
     }
 
-    /// Get the start of the span.
-    pub fn start(&self) -> usize {
-        self.start
-    }
-
-    /// Get the end of the span (inclusive).
-    pub fn end(&self) -> usize {
-        self.end
-    }
-
     /// Check if this span contains a position.
+    #[allow(dead_code)]
     pub fn contains(&self, pos: usize) -> bool {
         pos >= self.start && pos <= self.end
     }
@@ -48,6 +40,7 @@ impl PositionSpan {
     /// Subtract another span from this span.
     ///
     /// Returns positions in self that are not in other.
+    #[allow(dead_code)]
     pub fn difference(&self, other: &PositionSpan) -> HashSet<usize> {
         self.positions()
             .difference(&other.positions())
