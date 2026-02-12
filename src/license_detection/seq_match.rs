@@ -348,6 +348,7 @@ pub fn seq_match(index: &LicenseIndex, query_run: &QueryRun) -> Vec<LicenseMatch
                     rule_identifier: format!("#{}", rid),
                     rule_url: String::new(),
                     matched_text: None,
+                    referenced_filenames: candidate.rule.referenced_filenames.clone(),
                 };
 
                 matches.push(license_match);
@@ -361,23 +362,20 @@ pub fn seq_match(index: &LicenseIndex, query_run: &QueryRun) -> Vec<LicenseMatch
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::license_detection::index::dictionary::TokenDictionary;
     use crate::license_detection::query::Query;
+    use crate::license_detection::test_utils::create_test_index;
 
-    fn create_test_index() -> LicenseIndex {
-        let legalese = [
-            ("license", 0),
-            ("copyright", 1),
-            ("permission", 2),
-            ("redistribute", 3),
-            ("granted", 4),
-        ];
-
-        let dictionary = TokenDictionary::new_with_legalese(
-            &legalese.iter().map(|(s, i)| (*s, *i)).collect::<Vec<_>>(),
-        );
-
-        LicenseIndex::new(dictionary.clone())
+    fn create_seq_match_test_index() -> LicenseIndex {
+        create_test_index(
+            &[
+                ("license", 0),
+                ("copyright", 1),
+                ("permission", 2),
+                ("redistribute", 3),
+                ("granted", 4),
+            ],
+            5,
+        )
     }
 
     fn add_test_rule(index: &mut LicenseIndex, text: &str, expression: &str) -> usize {
@@ -529,7 +527,7 @@ mod tests {
 
     #[test]
     fn test_select_candidates() {
-        let mut index = create_test_index();
+        let mut index = create_seq_match_test_index();
 
         add_test_rule(&mut index, "license copyright granted", "test-license-1");
         add_test_rule(&mut index, "permission redistribute", "test-license-2");
@@ -609,7 +607,7 @@ mod tests {
 
     #[test]
     fn test_seq_match_basic() {
-        let mut index = create_test_index();
+        let mut index = create_seq_match_test_index();
 
         add_test_rule(&mut index, "license copyright granted", "test-license");
 
@@ -625,7 +623,7 @@ mod tests {
 
     #[test]
     fn test_seq_match_low_coverage_filtered() {
-        let mut index = create_test_index();
+        let mut index = create_seq_match_test_index();
 
         add_test_rule(
             &mut index,
@@ -644,7 +642,7 @@ mod tests {
 
     #[test]
     fn test_seq_match_empty_query() {
-        let mut index = create_test_index();
+        let mut index = create_seq_match_test_index();
 
         add_test_rule(&mut index, "license copyright", "test-license");
 

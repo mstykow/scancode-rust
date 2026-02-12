@@ -167,6 +167,10 @@ pub struct LicenseMatch {
 
     /// Matched text snippet (optional for privacy/performance)
     pub matched_text: Option<String>,
+
+    /// Filenames referenced by this match (e.g., ["LICENSE"] for "See LICENSE file")
+    /// Populated from rule.referenced_filenames when rule matches
+    pub referenced_filenames: Option<Vec<String>>,
 }
 
 #[cfg(test)]
@@ -246,6 +250,7 @@ mod tests {
             rule_identifier: "mit.LICENSE".to_string(),
             rule_url: "https://scancode-licensedb.aboutcode.org/mit".to_string(),
             matched_text: Some("MIT License text...".to_string()),
+            referenced_filenames: None,
         };
 
         assert_eq!(match_result.license_expression, "mit");

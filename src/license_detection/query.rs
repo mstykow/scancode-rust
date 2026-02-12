@@ -814,21 +814,15 @@ impl QueryRun {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::license_detection::index::dictionary::TokenDictionary;
+    use crate::license_detection::test_utils::create_test_index;
 
-    fn create_test_index() -> LicenseIndex {
-        let legalese = [("license", 0), ("copyright", 1), ("permission", 2)];
-
-        let dictionary = TokenDictionary::new_with_legalese(
-            &legalese.iter().map(|(s, i)| (*s, *i)).collect::<Vec<_>>(),
-        );
-
-        LicenseIndex::new(dictionary)
+    fn create_query_test_index() -> LicenseIndex {
+        create_test_index(&[("license", 0), ("copyright", 1), ("permission", 2)], 3)
     }
 
     #[test]
     fn test_query_new_with_empty_text() {
-        let index = create_test_index();
+        let index = create_query_test_index();
         let query = Query::new("", index).unwrap();
 
         assert!(query.is_empty());
@@ -838,7 +832,7 @@ mod tests {
 
     #[test]
     fn test_query_new_with_known_tokens() {
-        let index = create_test_index();
+        let index = create_query_test_index();
         let text = "License copyright permission";
         let query = Query::new(text, index).unwrap();
 
@@ -853,7 +847,7 @@ mod tests {
 
     #[test]
     fn test_query_new_with_unknown_tokens() {
-        let index = create_test_index();
+        let index = create_query_test_index();
         let text = "License foobar copyright";
         let query = Query::new(text, index).unwrap();
 
@@ -867,7 +861,7 @@ mod tests {
 
     #[test]
     fn test_query_new_with_stopwords() {
-        let index = create_test_index();
+        let index = create_query_test_index();
         let text = "license div copyright p";
         let query = Query::new(text, index).unwrap();
 
@@ -879,7 +873,7 @@ mod tests {
 
     #[test]
     fn test_query_new_with_short_tokens() {
-        let mut index = create_test_index();
+        let mut index = create_query_test_index();
         let _ = index.dictionary.get_or_assign("x");
         let _ = index.dictionary.get_or_assign("y");
         let _ = index.dictionary.get_or_assign("z");
@@ -901,7 +895,7 @@ mod tests {
 
     #[test]
     fn test_query_new_with_digit_tokens() {
-        let mut index = create_test_index();
+        let mut index = create_query_test_index();
         let _ = index.dictionary.get_or_assign("123");
         let _ = index.dictionary.get_or_assign("456");
 
@@ -915,7 +909,7 @@ mod tests {
 
     #[test]
     fn test_query_new_multiline() {
-        let index = create_test_index();
+        let index = create_query_test_index();
         let text = "Line 1 license\nLine 2 copyright\nLine 3 permission";
         let query = Query::new(text, index).unwrap();
 
@@ -927,7 +921,7 @@ mod tests {
 
     #[test]
     fn test_query_tokens_length_without_unknowns() {
-        let index = create_test_index();
+        let index = create_query_test_index();
         let text = "license foobar copyright";
         let query = Query::new(text, index).unwrap();
 
@@ -936,7 +930,7 @@ mod tests {
 
     #[test]
     fn test_query_tokens_length_with_unknowns() {
-        let index = create_test_index();
+        let index = create_query_test_index();
         let text = "license foobar copyright";
         let query = Query::new(text, index).unwrap();
 
@@ -945,7 +939,7 @@ mod tests {
 
     #[test]
     fn test_query_detect_binary_text() {
-        let index = create_test_index();
+        let index = create_query_test_index();
 
         let query = Query::new("license copyright", index.clone()).unwrap();
         assert!(!query.is_binary);
@@ -953,7 +947,7 @@ mod tests {
 
     #[test]
     fn test_query_detect_binary_null_bytes() {
-        let index = create_test_index();
+        let index = create_query_test_index();
         let text = "license\0copyright";
 
         let query = Query::new(text, index).unwrap();
@@ -962,7 +956,7 @@ mod tests {
 
     #[test]
     fn test_query_new_with_empty_lines() {
-        let index = create_test_index();
+        let index = create_query_test_index();
         let text = "license\n\ncopyright";
         let query = Query::new(text, index).unwrap();
 
@@ -973,7 +967,7 @@ mod tests {
 
     #[test]
     fn test_query_new_with_leading_unknowns() {
-        let index = create_test_index();
+        let index = create_query_test_index();
         let text = "unknown1 unknown2 license";
         let query = Query::new(text, index).unwrap();
 
@@ -983,7 +977,7 @@ mod tests {
 
     #[test]
     fn test_query_new_with_leading_stopwords() {
-        let index = create_test_index();
+        let index = create_query_test_index();
         let text = "div p license";
         let query = Query::new(text, index).unwrap();
 
@@ -993,7 +987,7 @@ mod tests {
 
     #[test]
     fn test_query_run_new() {
-        let index = create_test_index();
+        let index = create_query_test_index();
         let query = Query::new("license copyright permission", index);
         let run = QueryRun::new(query.unwrap(), 0, Some(2));
 
@@ -1003,7 +997,7 @@ mod tests {
 
     #[test]
     fn test_query_whole_query_run() {
-        let index = create_test_index();
+        let index = create_query_test_index();
         let query = Query::new("license copyright permission", index).unwrap();
         let run = query.whole_query_run();
 
@@ -1015,7 +1009,7 @@ mod tests {
 
     #[test]
     fn test_query_run_tokens() {
-        let index = create_test_index();
+        let index = create_query_test_index();
         let query = Query::new("license copyright permission", index).unwrap();
         let run = QueryRun::from_query(&query, 0, Some(1));
 
@@ -1024,7 +1018,7 @@ mod tests {
 
     #[test]
     fn test_query_run_tokens_with_pos() {
-        let index = create_test_index();
+        let index = create_query_test_index();
         let query = Query::new("license copyright permission", index).unwrap();
         let run = QueryRun::from_query(&query, 0, Some(1));
 
@@ -1034,7 +1028,7 @@ mod tests {
 
     #[test]
     fn test_query_run_empty() {
-        let index = create_test_index();
+        let index = create_query_test_index();
         let query = Query::new("", index).unwrap();
         let run = QueryRun::from_query(&query, 0, None);
 
@@ -1045,7 +1039,7 @@ mod tests {
 
     #[test]
     fn test_query_matchables() {
-        let index = create_test_index();
+        let index = create_query_test_index();
         let query = Query::new("license copyright permission", index).unwrap();
 
         let matchables = query.matchables();
@@ -1057,7 +1051,7 @@ mod tests {
 
     #[test]
     fn test_query_high_matchables() {
-        let index = create_test_index();
+        let index = create_query_test_index();
         let query = Query::new("license copyright permission", index).unwrap();
 
         let high = query.high_matchables(&0, &Some(2));
@@ -1070,7 +1064,7 @@ mod tests {
 
     #[test]
     fn test_query_low_matchables_in_range() {
-        let mut index = create_test_index();
+        let mut index = create_query_test_index();
         let _ = index.dictionary.get_or_assign("word");
         let query = Query::new("license word copyright", index).unwrap();
 
@@ -1081,7 +1075,7 @@ mod tests {
 
     #[test]
     fn test_query_run_matchables() {
-        let index = create_test_index();
+        let index = create_query_test_index();
         let query = Query::new("license copyright permission", index).unwrap();
         let run = QueryRun::from_query(&query, 0, Some(2));
 
@@ -1094,7 +1088,7 @@ mod tests {
 
     #[test]
     fn test_query_run_is_matchable() {
-        let index = create_test_index();
+        let index = create_query_test_index();
         let query = Query::new("license copyright permission", index).unwrap();
         let run = QueryRun::from_query(&query, 0, Some(2));
 
@@ -1104,7 +1098,7 @@ mod tests {
 
     #[test]
     fn test_query_run_is_not_matchable_digits_only() {
-        let mut index = create_test_index();
+        let mut index = create_query_test_index();
         let _ = index.dictionary.get_or_assign("123");
         let _ = index.dictionary.get_or_assign("456");
 
@@ -1116,7 +1110,7 @@ mod tests {
 
     #[test]
     fn test_query_run_is_matchable_with_exclude() {
-        let index = create_test_index();
+        let index = create_query_test_index();
         let query = Query::new("license copyright permission", index).unwrap();
         let run = QueryRun::from_query(&query, 0, Some(2));
 
@@ -1126,7 +1120,7 @@ mod tests {
 
     #[test]
     fn test_query_matchable_tokens() {
-        let index = create_test_index();
+        let index = create_query_test_index();
         let query = Query::new("license copyright permission", index).unwrap();
         let run = QueryRun::from_query(&query, 0, Some(2));
 
@@ -1139,7 +1133,7 @@ mod tests {
 
     #[test]
     fn test_query_run_subtract() {
-        let index = create_test_index();
+        let index = create_query_test_index();
         let mut query = Query::new("license copyright permission", index).unwrap();
 
         let span = Span::new(0, 1);
@@ -1191,7 +1185,7 @@ mod tests {
 
     #[test]
     fn test_query_new_lowercase_tokens() {
-        let index = create_test_index();
+        let index = create_query_test_index();
         let text = "LICENSE COPYRIGHT Permission";
         let query = Query::new(text, index).unwrap();
 

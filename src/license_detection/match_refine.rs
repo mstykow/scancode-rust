@@ -309,6 +309,7 @@ mod tests {
             rule_identifier: rule_identifier.to_string(),
             rule_url: "https://example.com".to_string(),
             matched_text: None,
+            referenced_filenames: None,
         }
     }
 

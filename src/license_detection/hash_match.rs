@@ -104,6 +104,7 @@ pub fn hash_match(index: &LicenseIndex, query_run: &QueryRun) -> Vec<LicenseMatc
             rule_identifier: format!("#{}", rid),
             rule_url: String::new(),
             matched_text: None,
+            referenced_filenames: rule.referenced_filenames.clone(),
         };
 
         matches.push(license_match);
@@ -116,6 +117,9 @@ pub fn hash_match(index: &LicenseIndex, query_run: &QueryRun) -> Vec<LicenseMatc
 mod tests {
     use super::*;
     use crate::license_detection::models::Rule;
+    use crate::license_detection::test_utils::{
+        create_mock_query_run_with_tokens, create_test_index,
+    };
 
     fn create_test_rules_by_rid() -> Vec<Rule> {
         vec![
@@ -232,16 +236,8 @@ mod tests {
 
     #[test]
     fn test_hash_match_no_match() {
-        use crate::license_detection::index::dictionary::TokenDictionary;
-
-        let legalese = [("mit", 0), ("license", 1), ("apache", 2), ("2.0", 3)];
-
-        let dictionary = TokenDictionary::new_with_legalese(
-            &legalese.iter().map(|(s, i)| (*s, *i)).collect::<Vec<_>>(),
-        );
-
-        let mut index = LicenseIndex::new(dictionary);
-        index.len_legalese = 2;
+        let mut index =
+            create_test_index(&[("mit", 0), ("license", 1), ("apache", 2), ("2.0", 3)], 2);
 
         let rules_by_rid = create_test_rules_by_rid();
         let tids_by_rid: Vec<Vec<u16>> = vec![vec![0, 1], vec![2, 3, 4]];
@@ -250,7 +246,11 @@ mod tests {
         index.rules_by_rid = rules_by_rid;
         index.tids_by_rid = tids_by_rid;
 
-        let matches = hash_match(&index, &create_mock_query_run_with_tokens(&[0, 1]));
+        let query_index = create_test_index(&[("token", 0)], 1);
+        let matches = hash_match(
+            &index,
+            &create_mock_query_run_with_tokens(&[0, 1], query_index),
+        );
 
         assert!(
             matches.is_empty(),
@@ -260,16 +260,8 @@ mod tests {
 
     #[test]
     fn test_hash_match_with_match() {
-        use crate::license_detection::index::dictionary::TokenDictionary;
-
-        let legalese = [("mit", 0), ("license", 1), ("apache", 2), ("2.0", 3)];
-
-        let dictionary = TokenDictionary::new_with_legalese(
-            &legalese.iter().map(|(s, i)| (*s, *i)).collect::<Vec<_>>(),
-        );
-
-        let mut index = LicenseIndex::new(dictionary);
-        index.len_legalese = 2;
+        let mut index =
+            create_test_index(&[("mit", 0), ("license", 1), ("apache", 2), ("2.0", 3)], 2);
 
         let rules_by_rid = create_test_rules_by_rid();
         let tids_by_rid: Vec<Vec<u16>> = vec![vec![0, 1], vec![2, 3, 4]];
@@ -278,7 +270,11 @@ mod tests {
         index.rules_by_rid = rules_by_rid;
         index.tids_by_rid = tids_by_rid;
 
-        let matches = hash_match(&index, &create_mock_query_run_with_tokens(&[0, 1]));
+        let query_index = create_test_index(&[("token", 0)], 1);
+        let matches = hash_match(
+            &index,
+            &create_mock_query_run_with_tokens(&[0, 1], query_index),
+        );
 
         assert_eq!(matches.len(), 1, "Should return exactly one match");
         assert_eq!(matches[0].matcher, MATCH_HASH);
@@ -288,16 +284,8 @@ mod tests {
 
     #[test]
     fn test_hash_match_hispan_filters_legalese() {
-        use crate::license_detection::index::dictionary::TokenDictionary;
-
-        let legalese = [("mit", 0), ("license", 1), ("apache", 2), ("2.0", 3)];
-
-        let dictionary = TokenDictionary::new_with_legalese(
-            &legalese.iter().map(|(s, i)| (*s, *i)).collect::<Vec<_>>(),
-        );
-
-        let mut index = LicenseIndex::new(dictionary);
-        index.len_legalese = 2;
+        let mut index =
+            create_test_index(&[("mit", 0), ("license", 1), ("apache", 2), ("2.0", 3)], 2);
 
         let rules_by_rid = create_test_rules_by_rid();
         let tids_by_rid: Vec<Vec<u16>> = vec![vec![0, 1], vec![2, 3, 4]];
@@ -306,7 +294,11 @@ mod tests {
         index.rules_by_rid = rules_by_rid;
         index.tids_by_rid = tids_by_rid;
 
-        let matches = hash_match(&index, &create_mock_query_run_with_tokens(&[0, 1]));
+        let query_index = create_test_index(&[("token", 0)], 1);
+        let matches = hash_match(
+            &index,
+            &create_mock_query_run_with_tokens(&[0, 1], query_index),
+        );
 
         assert_eq!(matches.len(), 1);
     }
@@ -328,38 +320,5 @@ mod tests {
 
         let hash2 = compute_hash(&tokens);
         assert_eq!(hash, hash2);
-    }
-
-    fn create_mock_query_run_with_tokens(tokens: &[u16]) -> QueryRun {
-        use crate::license_detection::index::dictionary::TokenDictionary;
-
-        let legalese = [("token", 0)];
-        let dictionary = TokenDictionary::new_with_legalese(
-            &legalese.iter().map(|(s, i)| (*s, *i)).collect::<Vec<_>>(),
-        );
-
-        let index = LicenseIndex::new(dictionary);
-
-        let query = crate::license_detection::query::Query {
-            tokens: tokens.to_vec(),
-            line_by_pos: vec![1; tokens.len()],
-            unknowns_by_pos: std::collections::HashMap::new(),
-            stopwords_by_pos: std::collections::HashMap::new(),
-            shorts_and_digits_pos: std::collections::HashSet::new(),
-            high_matchables: std::collections::HashSet::new(),
-            low_matchables: std::collections::HashSet::new(),
-            has_long_lines: false,
-            is_binary: false,
-            query_runs: Vec::new(),
-            index,
-        };
-
-        let end = if tokens.is_empty() {
-            None
-        } else {
-            Some(tokens.len() - 1)
-        };
-
-        QueryRun::new(query, 0, end)
     }
 }
