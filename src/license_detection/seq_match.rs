@@ -430,6 +430,7 @@ mod tests {
             min_high_matched_length_unique: 0,
             is_small: false,
             is_tiny: false,
+            is_required_phrase: false,
         };
 
         index.rules_by_rid.push(rule.clone());

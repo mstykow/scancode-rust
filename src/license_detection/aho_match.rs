@@ -251,6 +251,7 @@ mod tests {
             min_high_matched_length_unique: 0,
             is_small,
             is_tiny,
+            is_required_phrase: false,
         }
     }
 

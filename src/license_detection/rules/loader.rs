@@ -293,6 +293,7 @@ pub fn parse_rule_file(path: &Path) -> Result<Rule> {
         is_license_intro: fm.is_license_intro.unwrap_or(false),
         is_license_clue: fm.is_license_clue.unwrap_or(false),
         is_false_positive: fm.is_false_positive.unwrap_or(false),
+        is_required_phrase: fm.is_required_phrase.unwrap_or(false),
         relevance,
         minimum_coverage,
         is_continuous: fm.is_continuous.unwrap_or(false),
