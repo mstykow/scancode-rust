@@ -12,7 +12,9 @@
 use std::collections::HashSet;
 
 /// Error type for license expression parsing.
+#[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq)]
+#[allow(clippy::enum_variant_names)]
 pub enum ParseError {
     /// Empty expression
     EmptyExpression,
@@ -73,6 +75,7 @@ enum Token {
 }
 
 /// Result of license expression validation.
+#[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq)]
 pub enum ValidationResult {
     /// Expression is valid
@@ -115,6 +118,7 @@ pub enum LicenseExpression {
 
 impl LicenseExpression {
     /// Extract all license keys from the expression.
+    #[allow(dead_code)]
     pub fn license_keys(&self) -> Vec<String> {
         let mut keys = Vec::new();
         self.collect_keys(&mut keys);
@@ -123,6 +127,7 @@ impl LicenseExpression {
         keys
     }
 
+    #[allow(dead_code)]
     fn collect_keys(&self, keys: &mut Vec<String>) {
         match self {
             Self::License(key) => keys.push(key.clone()),
@@ -249,6 +254,7 @@ fn simplify_internal(expr: &LicenseExpression, seen: &mut HashSet<String>) -> Li
 ///
 /// # Returns
 /// ValidationResult indicating if expression is valid
+#[allow(dead_code)]
 pub fn validate_expression(
     expr: &LicenseExpression,
     known_keys: &HashSet<String>,
@@ -337,6 +343,7 @@ pub enum CombineRelation {
     /// Combine with AND operation
     And,
     /// Combine with OR operation
+    #[allow(dead_code)]
     Or,
 }
 

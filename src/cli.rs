@@ -21,4 +21,11 @@ pub struct Cli {
     /// Disable package assembly (merging related manifest/lockfiles into packages)
     #[arg(long)]
     pub no_assemble: bool,
+
+    /// Path to license rules directory containing .LICENSE and .RULE files
+    #[arg(
+        long,
+        default_value = "reference/scancode-toolkit/src/licensedcode/data"
+    )]
+    pub license_rules_path: Option<String>,
 }

@@ -11,7 +11,7 @@ fn test_scanner_discovers_all_registered_parsers() {
     let progress = Arc::new(ProgressBar::hidden());
     let patterns: Vec<Pattern> = vec![];
 
-    let result = process(test_dir, 50, progress, &patterns).expect("Scan should succeed");
+    let result = process(test_dir, 50, progress, &patterns, None).expect("Scan should succeed");
 
     // Should find 3 files with package data (npm, python, cargo)
     let package_files: Vec<_> = result
@@ -49,7 +49,7 @@ fn test_full_output_format_structure() {
     let progress = Arc::new(ProgressBar::hidden());
     let patterns: Vec<Pattern> = vec![];
 
-    let result = process(test_dir, 50, progress, &patterns).expect("Scan should succeed");
+    let result = process(test_dir, 50, progress, &patterns, None).expect("Scan should succeed");
 
     // Verify basic structure
     assert!(!result.files.is_empty(), "Should have files in result");
@@ -108,7 +108,7 @@ fn test_scanner_handles_empty_directory() {
     let progress = Arc::new(ProgressBar::hidden());
     let patterns: Vec<Pattern> = vec![];
 
-    let result = process(test_path, 50, progress, &patterns)
+    let result = process(test_path, 50, progress, &patterns, None)
         .expect("Scan should succeed on empty directory");
 
     // Should have no files (only the directory entry might be present)
@@ -135,7 +135,7 @@ fn test_scanner_handles_parse_errors_gracefully() {
     let patterns: Vec<Pattern> = vec![];
 
     // Scan should complete without crashing
-    let result = process(test_path, 50, progress, &patterns)
+    let result = process(test_path, 50, progress, &patterns, None)
         .expect("Scan should not crash on malformed files");
 
     // Should find the file
@@ -160,7 +160,7 @@ fn test_exclusion_patterns_filter_correctly() {
 
     let patterns: Vec<Pattern> = vec![Pattern::new("*.toml").expect("Invalid pattern")];
 
-    let result = process(test_dir, 50, progress, &patterns).expect("Scan should succeed");
+    let result = process(test_dir, 50, progress, &patterns, None).expect("Scan should succeed");
 
     // Should not find any .toml files
     let toml_files: Vec<_> = result
@@ -206,7 +206,7 @@ fn test_max_depth_limits_traversal() {
     let patterns: Vec<Pattern> = vec![];
 
     // Scan with max_depth=1 (should not reach level2)
-    let result = process(test_path, 1, progress, &patterns).expect("Scan should succeed");
+    let result = process(test_path, 1, progress, &patterns, None).expect("Scan should succeed");
 
     // Should not find the deep package.json
     let has_deep_json = result.files.iter().any(|f| f.name == "package.json");

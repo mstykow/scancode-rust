@@ -2,19 +2,23 @@ use chrono::Utc;
 use clap::Parser;
 use glob::Pattern;
 use indicatif::{ProgressBar, ProgressStyle};
+use log::warn;
 use serde_json::to_string_pretty;
 use std::env;
 use std::error::Error;
 use std::fs::File;
 use std::io::Write;
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use crate::cli::Cli;
+use crate::license_detection::LicenseDetectionEngine;
 use crate::models::{ExtraData, Header, Output, SCANCODE_OUTPUT_FORMAT_VERSION, SystemEnvironment};
 use crate::scanner::{count, process};
 
 mod assembly;
 mod cli;
+mod license_detection;
 mod models;
 mod parsers;
 mod scanner;
@@ -45,12 +49,15 @@ fn run() -> Result<(), Box<dyn Error>> {
         total_files, total_dirs, excluded_count
     );
 
+    let license_engine = init_license_engine(&cli.license_rules_path);
+
     let progress_bar = create_progress_bar(total_files);
     let mut scan_result = process(
         &cli.dir_path,
         cli.max_depth,
         Arc::clone(&progress_bar),
         &exclude_patterns,
+        license_engine.clone(),
     )?;
     progress_bar.finish_with_message("Scan complete!");
 
@@ -165,4 +172,31 @@ fn write_output(output_file: &str, output: &Output) -> std::io::Result<()> {
     let mut file = File::create(output_file)?;
     file.write_all(json_output.as_bytes())?;
     Ok(())
+}
+
+fn init_license_engine(rules_path: &Option<String>) -> Option<Arc<LicenseDetectionEngine>> {
+    let path = match rules_path {
+        Some(p) => PathBuf::from(p),
+        None => return None,
+    };
+
+    if !path.exists() {
+        warn!("License rules path does not exist: {:?}", path);
+        return None;
+    }
+
+    match LicenseDetectionEngine::new(&path) {
+        Ok(engine) => {
+            println!(
+                "License detection engine initialized with {} rules from {:?}",
+                engine.index().rules_by_rid.len(),
+                path
+            );
+            Some(Arc::new(engine))
+        }
+        Err(e) => {
+            warn!("Failed to initialize license detection engine: {}", e);
+            None
+        }
+    }
 }

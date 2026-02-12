@@ -11,6 +11,7 @@ use std::ops::Range;
 #[derive(Debug, Clone)]
 pub struct Span {
     /// The ranges in this span
+    #[allow(dead_code)]
     ranges: Vec<Range<usize>>,
 }
 
@@ -63,6 +64,7 @@ impl Span {
     ///
     /// # Arguments
     /// * `range` - The range to add
+    #[allow(dead_code)]
     pub fn add(&mut self, range: Range<usize>) {
         let mut new_range = range.clone();
         let mut to_remove = Vec::new();
@@ -86,33 +88,33 @@ impl Span {
     }
 
     /// Check if two ranges overlap.
+    #[allow(dead_code)]
     fn ranges_overlap(&self, r1: &Range<usize>, r2: &Range<usize>) -> bool {
         r1.start < r2.end && r2.start < r1.end
     }
 
     /// Merge two overlapping ranges.
+    #[allow(dead_code)]
     fn merge_ranges(&self, r1: &Range<usize>, r2: &Range<usize>) -> Range<usize> {
         r1.start.min(r2.start)..r1.end.max(r2.end)
     }
 
     /// Check if this span is empty.
+    #[allow(dead_code)]
     pub fn is_empty(&self) -> bool {
         self.ranges.is_empty()
     }
 
     /// Get the number of ranges in this span.
+    #[allow(dead_code)]
     pub fn len(&self) -> usize {
         self.ranges.len()
     }
 
     /// Get the total length covered by all ranges.
+    #[allow(dead_code)]
     pub fn total_length(&self) -> usize {
         self.ranges.iter().map(|r| r.end - r.start).sum()
-    }
-
-    /// Get the ranges in this span.
-    pub fn ranges(&self) -> impl Iterator<Item = &Range<usize>> {
-        self.ranges.iter()
     }
 }
 

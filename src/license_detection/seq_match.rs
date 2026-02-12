@@ -15,6 +15,7 @@ use crate::license_detection::query::QueryRun;
 use std::collections::{HashMap, HashSet};
 
 pub const MATCH_SEQ: &str = "3-seq";
+#[allow(dead_code)]
 pub const MATCH_SEQ_ORDER: u8 = 3;
 
 /// Score vector for ranking candidates using set similarity.

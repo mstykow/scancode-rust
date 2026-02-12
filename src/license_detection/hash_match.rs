@@ -20,6 +20,7 @@ pub const MATCH_HASH: &str = "1-hash";
 /// Hash matching is the fastest and has highest priority (0).
 ///
 /// Corresponds to Python: `MATCH_HASH_ORDER = 0` (line 41)
+#[allow(dead_code)]
 pub const MATCH_HASH_ORDER: u8 = 0;
 
 /// Compute a SHA1 hash of a token sequence.
@@ -50,6 +51,7 @@ pub fn compute_hash(tokens: &[u16]) -> [u8; 20] {
 /// This is an alias for `compute_hash` to match the Python API.
 ///
 /// Corresponds to Python: `index_hash()` (lines 52-56)
+#[allow(dead_code)]
 pub fn index_hash(rule_tokens: &[u16]) -> [u8; 20] {
     compute_hash(rule_tokens)
 }

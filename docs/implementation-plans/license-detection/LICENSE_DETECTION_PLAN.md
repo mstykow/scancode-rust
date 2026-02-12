@@ -1,6 +1,6 @@
 # License Detection Implementation Plan
 
-> **Status**: ✅ Phases 0-6 Complete — All Implementation Tasks Done
+> **Status**: ✅ Phases 0-7 Complete — Scanner Integration Done
 > **Priority**: P0 — Critical Core Feature
 > **Dependencies**: None (foundational feature)
 > **Last Updated**: 2026-02-12
@@ -650,36 +650,38 @@ Implemented SPDX expression generation in `src/license_detection/detection.rs`:
 
 Both are publicly exported for scanner pipeline integration, allowing choice based on performance vs. coverage needs.
 
-### Phase 7: Scanner Integration
+### Phase 7: Scanner Integration — ✅ COMPLETE
 
 **Goal**: Wire the new license detection engine into the scanner pipeline.
 
-#### 7.1 Engine API
+#### 7.1 Engine API — ✅ Complete
 
 - Create `LicenseDetectionEngine` with `detect(text: &str) -> Vec<LicenseDetection>` API
 - Initialize engine once at startup with rule path configuration
 - Wrap in `Arc<LicenseDetectionEngine>` for thread-safe sharing across rayon workers
 
-#### 7.2 Scanner Pipeline Integration
+#### 7.2 Scanner Pipeline Integration — ✅ Complete
 
 - Update [`src/scanner/process.rs`](../../../src/scanner/process.rs) to accept `&LicenseDetectionEngine` parameter
 - Replace the no-op `extract_license_information()` stub (from Phase 0) with actual detection call
 - Populate all `Match` fields: `score`, `matched_length`, `match_coverage`, `rule_relevance`, `rule_identifier`, `rule_url`, `matched_text`, `matcher`
 - Populate file-level `license_expression` from detection results
 
-#### 7.3 Output Compatibility
+#### 7.3 Output Compatibility — ✅ Complete
 
 - Verify JSON output matches ScanCode format exactly
 - Ensure `detected_license_expression_spdx` field is populated correctly
 - Verify `license_detections` array structure matches ScanCode
 - Handle `from_file` field in matches (for cross-file references)
 
-#### 7.4 CLI Updates
+#### 7.4 CLI Updates — ✅ Complete
 
 - Add `--license-rules-path` CLI option for custom rule directory
 - Default to `reference/scancode-toolkit/src/licensedcode/data/` if available
 - Add `--include-text` flag to include matched text in output
 - Error gracefully if rules directory is not found
+
+**Bug Fixed**: SPDX-LID matcher was creating thousands of duplicate matches (one per rule with matching license_expression). Fixed by selecting single best rule by relevance instead of all matching rules. See `docs/license-detection/improvements/` for details.
 
 **Testing**: Integration tests, golden tests against Python ScanCode output.
 

@@ -37,6 +37,7 @@ pub const MATCH_SPDX_ID: &str = "1-spdx-id";
 /// SPDX-LID matching runs after hash matching.
 ///
 /// Corresponds to Python: `MATCH_SPDX_ID_ORDER = 2` (line 62)
+#[allow(dead_code)]
 pub const MATCH_SPDX_ID_ORDER: u8 = 1;
 
 lazy_static::lazy_static! {
@@ -96,6 +97,7 @@ pub fn clean_spdx_text(text: &str) -> String {
     text
 }
 
+#[allow(dead_code)]
 pub fn extract_spdx_expressions(text: &str) -> Vec<String> {
     text.lines()
         .filter_map(|line| {
@@ -172,19 +174,30 @@ fn normalize_spdx_key(key: &str) -> String {
     key.to_lowercase().replace("_", "-")
 }
 
-fn find_matching_rules(index: &LicenseIndex, spdx_key: &str) -> Vec<usize> {
+fn find_best_matching_rule(index: &LicenseIndex, spdx_key: &str) -> Option<usize> {
     let normalized_spdx = normalize_spdx_key(spdx_key);
-    let mut matching_rids = Vec::new();
+
+    let mut best_rid: Option<usize> = None;
+    let mut best_relevance: u8 = 0;
 
     for (rid, rule) in index.rules_by_rid.iter().enumerate() {
         let license_expr = normalize_spdx_key(&rule.license_expression);
 
-        if license_expr == normalized_spdx {
-            matching_rids.push(rid);
+        if license_expr == normalized_spdx && rule.relevance > best_relevance {
+            best_relevance = rule.relevance;
+            best_rid = Some(rid);
         }
     }
 
-    matching_rids
+    best_rid.or_else(|| {
+        for (rid, rule) in index.rules_by_rid.iter().enumerate() {
+            let license_expr = normalize_spdx_key(&rule.license_expression);
+            if license_expr == normalized_spdx {
+                return Some(rid);
+            }
+        }
+        None
+    })
 }
 
 fn split_license_expression(license_expression: &str) -> Vec<String> {
@@ -225,10 +238,8 @@ pub fn spdx_lid_match(index: &LicenseIndex, text: &str) -> Vec<LicenseMatch> {
         let license_keys = split_license_expression(&spdx_expression);
 
         for license_key in license_keys {
-            let matching_rids = find_matching_rules(index, &license_key);
-
-            for rid in &matching_rids {
-                let rule = &index.rules_by_rid[*rid];
+            if let Some(rid) = find_best_matching_rule(index, &license_key) {
+                let rule = &index.rules_by_rid[rid];
 
                 let score = rule.relevance as f32 / 100.0;
                 let matched_length = spdx_expression.len();

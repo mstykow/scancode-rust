@@ -64,6 +64,7 @@ pub const MATCH_UNKNOWN: &str = "5-undetected";
 /// Matcher order for unknown license detection.
 ///
 /// Corresponds to Python: `MATCH_UNKNOWN_ORDER = 6` (line 47)
+#[allow(dead_code)]
 pub const MATCH_UNKNOWN_ORDER: u8 = 5;
 
 /// Length of ngrams for unknown detection.
