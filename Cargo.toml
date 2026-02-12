@@ -91,7 +91,7 @@ strum = { version = "0.27.2", features = ["derive"] }
 env_logger = "0.11.8"
 
 # own
-tempfile = "3.24.0"
+tempfile = "3.25.0"
 
 [profile.release]
 # Enable link-time optimization for better cross-module optimizations
