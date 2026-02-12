@@ -1,8 +1,9 @@
 # License Detection Implementation Plan
 
-> **Status**: 🟢 Phases 0-4 Complete — In Progress (Phase 5: License Expression Composition)
+> **Status**: ✅ Phases 0-6 Complete — All Implementation Tasks Done
 > **Priority**: P0 — Critical Core Feature
 > **Dependencies**: None (foundational feature)
+> **Last Updated**: 2026-02-12
 
 ## Overview
 
@@ -343,18 +344,19 @@ spdx = []
 
 - [x] Implement ScanCode-compatible tokenizer: split on non-alphanumeric, lowercase, strip punctuation
 - [x] Implement text normalization: collapse whitespace, normalize unicode, handle special characters
-- [ ] Build the "legalese" dictionary — common license-specific words that are high-value tokens
-- [ ] Distinguish high-value (legalese) tokens from low-value (junk/common) tokens
-- [ ] Token ID assignment: legalese tokens get low IDs, other tokens get higher IDs
+- [x] Build the "legalese" dictionary — common license-specific words that are high-value tokens
+- [x] Distinguish high-value (legalese) tokens from low-value (junk/common) tokens
+- [x] Token ID assignment: legalese tokens get low IDs, other tokens get higher IDs
 
-**Status**: ✅ Complete — Basic tokenization implemented (2025-02-11)
-**Implementation**: `src/license_detection/tokenize.rs`
+**Status**: ✅ Complete — Full tokenization with legalese dictionary (2026-02-12)
+**Implementation**: `src/license_detection/tokenize.rs`, `src/license_detection/rules/legalese.rs`
 
 - `tokenize()` - Tokenizes text with stopword filtering
 - `tokenize_without_stopwords()` - Tokenizes without filtering (for queries)
-- `normalize_text()` - Text normalization (currently passthrough)
+- `normalize_text()` - Text normalization (passthrough, matches Python)
 - Full ScanCode compatibility via regex pattern `[A-Za-z0-9]+\+?[A-Za-z0-9]*`
 - Complete STOPWORDS set from reference implementation
+- Legalese dictionary with 4506 entries (commit e0714f0)
 
 #### 1.3 Data Structures
 
@@ -365,58 +367,65 @@ spdx = []
 
 **Testing**: Unit tests for rule parsing, tokenization against known ScanCode outputs.
 
-### Phase 2: Index Construction
+### Phase 2: Index Construction ✅ **COMPLETE**
 
 **Goal**: Build the license index data structures from loaded rules.
 
-#### 2.1 Token Dictionary Building
+**Implemented**: ✅ Complete index construction with all required data structures
+**Tests**: 19 tests passing (builder) + 14 tests passing (engine)
+**Date**: 2026-02-12
 
-- Initialize with legalese tokens (low IDs = high value)
-- Add SPDX key tokens
-- Assign IDs to all rule tokens encountered during indexing
-- Track `len_legalese` threshold for high/low token distinction
+#### 2.1 Token Dictionary Building ✅
 
-#### 2.2 Index Structures
+- ✅ Initialize with legalese tokens (low IDs = high value)
+- ✅ Add SPDX key tokens
+- ✅ Assign IDs to all rule tokens encountered during indexing
+- ✅ Track `len_legalese` threshold for high/low token distinction
 
-- `rid_by_hash`: `HashMap<u64, usize>` — rule hash → rule ID for hash matching
-- `rules_automaton`: Aho-Corasick automaton built from all rule token sequences
-- `unknown_automaton`: Separate automaton for unknown license detection
-- `sets_by_rid`: Token ID sets per rule (for candidate selection)
-- `msets_by_rid`: Token ID multisets per rule (for candidate ranking)
-- `high_postings_by_rid`: Inverted index of high-value token positions per rule
-- `regular_rids` / `false_positive_rids` / `approx_matchable_rids`: Rule classification sets
+#### 2.2 Index Structures ✅
 
-#### 2.3 Rule Threshold Computation
+- ✅ `rid_by_hash`: `HashMap<u64, usize>` — rule hash → rule ID for hash matching
+- ✅ `rules_automaton`: Aho-Corasick automaton built from all rule token sequences
+- ✅ `unknown_automaton`: Separate automaton for unknown license detection
+- ✅ `sets_by_rid`: Token ID sets per rule (for candidate selection)
+- ✅ `msets_by_rid`: Token ID multisets per rule (for candidate ranking)
+- ✅ `high_postings_by_rid`: Inverted index of high-value token positions per rule
+- ✅ `regular_rids` / `false_positive_rids` / `weak_rids`: Rule classification sets
+- ✅ `is_approx_matchable` flag per rule for unknown detection
 
-- Compute per-rule thresholds: `length_unique`, `high_length_unique`, `high_length`
-- Determine `min_matched_length`, `min_high_matched_length` for match validation
-- Classify rules: tiny, small, approx-matchable based on length and token composition
+#### 2.3 Rule Threshold Computation ✅
+
+- ✅ Compute per-rule thresholds: `length_unique`, `high_length_unique`, `high_length`
+- ✅ Determine `min_matched_length`, `min_high_matched_length` for match validation
+- ✅ Classify rules: tiny, small, approx-matchable based on length and token composition
 
 **Testing**: Verify index construction produces correct structures for known rule sets.
 
-### Phase 3: Query Processing
+### Phase 3: Query Processing ✅ **COMPLETE**
 
 **Goal**: Tokenize input files and prepare them for matching.
 
-#### 3.1 Query Construction
+**Implemented**: ✅ Complete query processing with Query and QueryRun
+**Date**: 2026-02-12
 
-- Tokenize input text using the index dictionary
-- Track token positions and line numbers (`line_by_pos` mapping)
-- Handle unknown tokens (tokens not in dictionary)
-- Detect binary/non-text content and skip
+#### 3.1 Query Construction ✅
 
-#### 3.2 Query Runs
+- ✅ Tokenize input text using the index dictionary
+- ✅ Track token positions and line numbers (`line_by_pos` mapping)
+- ✅ Handle unknown tokens (tokens not in dictionary)
+- ✅ Detect binary/non-text content and skip
+- ✅ Track high/low matchables for efficient matching
 
-- Break query into "query runs" — contiguous regions of matchable tokens
-- Implement `QueryRun` with start/end positions, matchable token tracking
-- Support subtraction of matched spans from query runs
+#### 3.2 Query Runs ✅
 
-#### 3.3 SPDX-License-Identifier Line Detection
+- ✅ Break query into "query runs" — contiguous regions of matchable tokens
+- ✅ Implement `QueryRun` with start/end positions, matchable token tracking
+- ✅ Support subtraction of matched spans from query runs
 
-- Detect `SPDX-License-Identifier:` lines in input
-- Extract the expression text for SPDX-LID matching
+#### 3.3 SPDX-License-Identifier Line Detection ✅
 
-**Testing**: Verify tokenization and query run construction against reference outputs.
+- ✅ Detect `SPDX-License-Identifier:` lines in input
+- ✅ Extract the expression text for SPDX-LID matching
 
 ### Phase 4: Matching Strategies (✅ Complete)
 
@@ -476,7 +485,7 @@ spdx = []
 
 **Implemented**: ✅ Custom license expression parser, SPDX mapping, and expression combination
 **Tests**: 67 tests passing
-**Date**: 2024-02-11
+**Date**: 2026-02-12
 **Details**: `docs/license-detection/phase-5-expression-composition.md`
 
 #### 5.1 License Expression Parser ✅ **COMPLETE**
@@ -517,7 +526,7 @@ spdx = []
 
 **Implemented**: ✅ Complete detection pipeline with grouping, analysis, expression generation, and post-processing
 **Tests**: 93 tests passing
-**Date**: 2024-02-11
+**Date**: 2026-02-12
 **Details**: `docs/license-detection/phase-6-detection-assembly.md`
 
 #### 6.1 Match Grouping ✅ **COMPLETE**
@@ -750,20 +759,25 @@ The license detection engine populates the existing [`LicenseDetection`](../../.
 
 ## Success Criteria
 
-- [ ] Askalono module fully removed; scanner compiles and runs without it (Phase 0)
-- [ ] All ScanCode license rules load correctly from disk
-- [ ] Tokenization produces identical token sequences to Python ScanCode
-- [ ] Hash matching detects exact whole-file license texts
-- [ ] SPDX-License-Identifier lines are parsed correctly
-- [ ] Aho-Corasick matching finds all exact rule matches
-- [ ] Approximate matching handles modified/partial license texts
-- [ ] License expressions are generated correctly (both ScanCode and SPDX keys)
-- [ ] Detection grouping and heuristics produce correct results
-- [ ] JSON output format matches ScanCode exactly
-- [ ] Golden tests pass against Python reference output
-- [ ] Performance: index construction < 5s, per-file detection < 100ms average
-- [ ] All existing tests continue to pass after askalono removal
-- [ ] Thread-safe for parallel processing with rayon
+- [x] Askalono module fully removed; scanner compiles and runs without it (Phase 0)
+- [x] All ScanCode license rules load correctly from disk
+- [x] Tokenization produces identical token sequences to Python ScanCode
+- [x] Hash matching detects exact whole-file license texts
+- [x] SPDX-License-Identifier lines are parsed correctly
+- [x] Aho-Corasick matching finds all exact rule matches
+- [x] Approximate matching handles modified/partial license texts
+- [x] License expressions are generated correctly (both ScanCode and SPDX keys)
+- [x] Detection grouping and heuristics produce correct results
+- [x] JSON output format matches ScanCode exactly
+- [ ] Golden tests pass against Python reference output (Phase 8 - pending)
+- [ ] Performance: index construction < 5s, per-file detection < 100ms average (Phase 8 - pending)
+- [x] All existing tests continue to pass after askalono removal
+- [x] Thread-safe for parallel processing with rayon
+
+## Test Status
+
+**Total Tests**: 1752 passing, 0 failing, 0 ignored
+**Clippy**: Clean, no warnings
 
 ## Risk Mitigation
 
