@@ -1,0 +1,18 @@
+{
+  "license_detections": [
+    {
+      "license_expression": "mit",
+      "license_expression_spdx": "MIT",
+      "matches": [
+        {
+          "license_expression": "mit",
+          "license_expression_spdx": "MIT",
+          "matcher": "2-aho",
+          "score": 100.0,
+          "match_coverage": 100.0,
+          "rule_relevance": 100
+        }
+      ]
+    }
+  ]
+}

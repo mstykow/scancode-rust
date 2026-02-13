@@ -1,0 +1,18 @@
+{
+  "license_detections": [
+    {
+      "license_expression": "gpl-2.0-plus",
+      "license_expression_spdx": "GPL-2.0-or-later",
+      "matches": [
+        {
+          "license_expression": "gpl-2.0-plus",
+          "license_expression_spdx": "GPL-2.0-or-later",
+          "matcher": "1-spdx-id",
+          "score": 100.0,
+          "match_coverage": 100.0,
+          "rule_relevance": 100
+        }
+      ]
+    }
+  ]
+}
