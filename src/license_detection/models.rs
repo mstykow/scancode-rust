@@ -25,6 +25,30 @@ pub struct License {
 
     /// Free text notes
     pub notes: Option<String>,
+
+    /// Whether this license is deprecated
+    pub is_deprecated: bool,
+
+    /// List of license keys that replace this deprecated license
+    pub replaced_by: Vec<String>,
+
+    /// Minimum match coverage percentage (0-100) if specified
+    pub minimum_coverage: Option<u8>,
+
+    /// Copyrights that should be ignored when found in this license text
+    pub ignorable_copyrights: Option<Vec<String>>,
+
+    /// Holder names that should be ignored when found in this license text
+    pub ignorable_holders: Option<Vec<String>>,
+
+    /// Author names that should be ignored when found in this license text
+    pub ignorable_authors: Option<Vec<String>>,
+
+    /// URLs that should be ignored when found in this license text
+    pub ignorable_urls: Option<Vec<String>>,
+
+    /// Emails that should be ignored when found in this license text
+    pub ignorable_emails: Option<Vec<String>>,
 }
 
 /// Rule metadata loaded from .LICENSE and .RULE files.
@@ -64,6 +88,9 @@ pub struct Rule {
     /// A required phrase is an essential section of the rule text which must be
     /// present in the case of partial matches.
     pub is_required_phrase: bool,
+
+    /// True if this rule was created from a license file (not a .RULE file)
+    pub is_from_license: bool,
 
     /// Relevance score 0-100 (100 is most relevant)
     pub relevance: u8,
@@ -187,6 +214,14 @@ mod tests {
             text: "MIT License text here...".to_string(),
             reference_urls: vec!["https://opensource.org/licenses/MIT".to_string()],
             notes: None,
+            is_deprecated: false,
+            replaced_by: vec![],
+            minimum_coverage: None,
+            ignorable_copyrights: None,
+            ignorable_holders: None,
+            ignorable_authors: None,
+            ignorable_urls: None,
+            ignorable_emails: None,
         };
 
         assert_eq!(license.key, "mit");
@@ -206,6 +241,8 @@ mod tests {
             is_license_intro: false,
             is_license_clue: false,
             is_false_positive: false,
+            is_required_phrase: false,
+            is_from_license: false,
             relevance: 90,
             minimum_coverage: None,
             is_continuous: true,
@@ -226,7 +263,6 @@ mod tests {
             min_high_matched_length_unique: 0,
             is_small: false,
             is_tiny: false,
-            is_required_phrase: false,
         };
 
         assert_eq!(rule.license_expression, "mit");

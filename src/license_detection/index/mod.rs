@@ -358,6 +358,14 @@ mod tests {
             text: "Test license text".to_string(),
             reference_urls: vec![],
             notes: None,
+            is_deprecated: false,
+            replaced_by: vec![],
+            minimum_coverage: None,
+            ignorable_copyrights: None,
+            ignorable_holders: None,
+            ignorable_authors: None,
+            ignorable_urls: None,
+            ignorable_emails: None,
         };
 
         index.add_license(license);
@@ -379,6 +387,14 @@ mod tests {
                 text: "License 1 text".to_string(),
                 reference_urls: vec![],
                 notes: None,
+                is_deprecated: false,
+                replaced_by: vec![],
+                minimum_coverage: None,
+                ignorable_copyrights: None,
+                ignorable_holders: None,
+                ignorable_authors: None,
+                ignorable_urls: None,
+                ignorable_emails: None,
             },
             License {
                 key: "license-2".to_string(),
@@ -388,6 +404,14 @@ mod tests {
                 text: "License 2 text".to_string(),
                 reference_urls: vec![],
                 notes: None,
+                is_deprecated: false,
+                replaced_by: vec![],
+                minimum_coverage: None,
+                ignorable_copyrights: None,
+                ignorable_holders: None,
+                ignorable_authors: None,
+                ignorable_urls: None,
+                ignorable_emails: None,
             },
         ];
 
@@ -410,6 +434,14 @@ mod tests {
             text: "MIT License text".to_string(),
             reference_urls: vec![],
             notes: None,
+            is_deprecated: false,
+            replaced_by: vec![],
+            minimum_coverage: None,
+            ignorable_copyrights: None,
+            ignorable_holders: None,
+            ignorable_authors: None,
+            ignorable_urls: None,
+            ignorable_emails: None,
         };
 
         index.add_license(license);
@@ -435,6 +467,14 @@ mod tests {
             text: "Text".to_string(),
             reference_urls: vec![],
             notes: None,
+            is_deprecated: false,
+            replaced_by: vec![],
+            minimum_coverage: None,
+            ignorable_copyrights: None,
+            ignorable_holders: None,
+            ignorable_authors: None,
+            ignorable_urls: None,
+            ignorable_emails: None,
         };
 
         index.add_license(license);

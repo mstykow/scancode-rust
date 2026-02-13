@@ -64,6 +64,8 @@ pub fn create_mock_rule(
         is_license_intro: false,
         is_license_clue: false,
         is_false_positive: false,
+        is_required_phrase: false,
+        is_from_license: false,
         relevance: 100,
         minimum_coverage: None,
         is_continuous: true,
@@ -84,7 +86,6 @@ pub fn create_mock_rule(
         min_high_matched_length_unique: 0,
         is_small,
         is_tiny,
-        is_required_phrase: false,
     }
 }
 
@@ -110,6 +111,8 @@ pub fn create_mock_rule_simple(license_expression: &str, relevance: u8) -> Rule 
         is_license_intro: false,
         is_license_clue: false,
         is_false_positive: false,
+        is_required_phrase: false,
+        is_from_license: false,
         relevance,
         minimum_coverage: None,
         is_continuous: false,
@@ -130,7 +133,6 @@ pub fn create_mock_rule_simple(license_expression: &str, relevance: u8) -> Rule 
         min_high_matched_length_unique: 0,
         is_small: false,
         is_tiny: false,
-        is_required_phrase: false,
     }
 }
 

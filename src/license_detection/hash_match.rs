@@ -139,6 +139,8 @@ mod tests {
                 is_license_intro: false,
                 is_license_clue: false,
                 is_false_positive: false,
+                is_required_phrase: false,
+                is_from_license: false,
                 relevance: 100,
                 minimum_coverage: None,
                 is_continuous: true,
@@ -159,7 +161,6 @@ mod tests {
                 min_high_matched_length_unique: 0,
                 is_small: false,
                 is_tiny: false,
-                is_required_phrase: false,
             },
             Rule {
                 license_expression: "apache-2.0".to_string(),
@@ -172,6 +173,8 @@ mod tests {
                 is_license_intro: false,
                 is_license_clue: false,
                 is_false_positive: false,
+                is_required_phrase: false,
+                is_from_license: false,
                 relevance: 100,
                 minimum_coverage: None,
                 is_continuous: true,
@@ -192,7 +195,6 @@ mod tests {
                 min_high_matched_length_unique: 0,
                 is_small: false,
                 is_tiny: false,
-                is_required_phrase: false,
             },
         ]
     }

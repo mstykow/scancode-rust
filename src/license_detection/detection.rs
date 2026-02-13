@@ -1956,6 +1956,14 @@ mod tests {
             text: "MIT License text...".to_string(),
             reference_urls: vec![],
             notes: None,
+            is_deprecated: false,
+            replaced_by: vec![],
+            minimum_coverage: None,
+            ignorable_copyrights: None,
+            ignorable_holders: None,
+            ignorable_authors: None,
+            ignorable_urls: None,
+            ignorable_emails: None,
         }];
         let mapping = build_spdx_mapping(&licenses);
 
@@ -1975,6 +1983,14 @@ mod tests {
                 text: "MIT License text...".to_string(),
                 reference_urls: vec![],
                 notes: None,
+                is_deprecated: false,
+                replaced_by: vec![],
+                minimum_coverage: None,
+                ignorable_copyrights: None,
+                ignorable_holders: None,
+                ignorable_authors: None,
+                ignorable_urls: None,
+                ignorable_emails: None,
             },
             License {
                 key: "apache-2.0".to_string(),
@@ -1984,6 +2000,14 @@ mod tests {
                 text: "Apache License text...".to_string(),
                 reference_urls: vec![],
                 notes: None,
+                is_deprecated: false,
+                replaced_by: vec![],
+                minimum_coverage: None,
+                ignorable_copyrights: None,
+                ignorable_holders: None,
+                ignorable_authors: None,
+                ignorable_urls: None,
+                ignorable_emails: None,
             },
         ];
         let mapping = build_spdx_mapping(&licenses);
@@ -2015,6 +2039,14 @@ mod tests {
             text: "Custom license text...".to_string(),
             reference_urls: vec![],
             notes: None,
+            is_deprecated: false,
+            replaced_by: vec![],
+            minimum_coverage: None,
+            ignorable_copyrights: None,
+            ignorable_holders: None,
+            ignorable_authors: None,
+            ignorable_urls: None,
+            ignorable_emails: None,
         }];
         let mapping = build_spdx_mapping(&licenses);
 
@@ -2033,6 +2065,14 @@ mod tests {
             text: "MIT License text...".to_string(),
             reference_urls: vec![],
             notes: None,
+            is_deprecated: false,
+            replaced_by: vec![],
+            minimum_coverage: None,
+            ignorable_copyrights: None,
+            ignorable_holders: None,
+            ignorable_authors: None,
+            ignorable_urls: None,
+            ignorable_emails: None,
         }];
         let mapping = build_spdx_mapping(&licenses);
 
@@ -2113,6 +2153,14 @@ mod tests {
                 text: "MIT License text...".to_string(),
                 reference_urls: vec![],
                 notes: None,
+                is_deprecated: false,
+                replaced_by: vec![],
+                minimum_coverage: None,
+                ignorable_copyrights: None,
+                ignorable_holders: None,
+                ignorable_authors: None,
+                ignorable_urls: None,
+                ignorable_emails: None,
             },
             License {
                 key: "apache-2.0".to_string(),
@@ -2122,6 +2170,14 @@ mod tests {
                 text: "Apache License text...".to_string(),
                 reference_urls: vec![],
                 notes: None,
+                is_deprecated: false,
+                replaced_by: vec![],
+                minimum_coverage: None,
+                ignorable_copyrights: None,
+                ignorable_holders: None,
+                ignorable_authors: None,
+                ignorable_urls: None,
+                ignorable_emails: None,
             },
         ];
         let mapping = build_spdx_mapping(&licenses);
@@ -2182,6 +2238,14 @@ mod tests {
             text: "Custom license text...".to_string(),
             reference_urls: vec![],
             notes: None,
+            is_deprecated: false,
+            replaced_by: vec![],
+            minimum_coverage: None,
+            ignorable_copyrights: None,
+            ignorable_holders: None,
+            ignorable_authors: None,
+            ignorable_urls: None,
+            ignorable_emails: None,
         }];
         let mapping = build_spdx_mapping(&licenses);
 

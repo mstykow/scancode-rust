@@ -25,6 +25,67 @@ use crate::license_detection::tokenize::tokenize;
 
 const UNKNOWN_NGRAM_LENGTH: usize = 6;
 
+fn prepare_rule_text(text: &str) -> String {
+    text.lines()
+        .map(|line| line.trim())
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+fn build_rule_from_license(license: &License) -> Option<Rule> {
+    if license.text.is_empty() {
+        return None;
+    }
+
+    let minimum_coverage = license.minimum_coverage.unwrap_or(0);
+
+    Some(Rule {
+        license_expression: license.key.clone(),
+        text: prepare_rule_text(&license.text),
+        tokens: vec![],
+        is_license_text: true,
+        is_license_notice: false,
+        is_license_reference: false,
+        is_license_tag: false,
+        is_license_intro: false,
+        is_license_clue: false,
+        is_false_positive: false,
+        is_required_phrase: false,
+        is_from_license: true,
+        relevance: 100,
+        minimum_coverage: if minimum_coverage > 0 {
+            Some(minimum_coverage)
+        } else {
+            None
+        },
+        is_continuous: false,
+        referenced_filenames: None,
+        ignorable_urls: license.ignorable_urls.clone(),
+        ignorable_emails: license.ignorable_emails.clone(),
+        ignorable_copyrights: license.ignorable_copyrights.clone(),
+        ignorable_holders: license.ignorable_holders.clone(),
+        ignorable_authors: license.ignorable_authors.clone(),
+        language: None,
+        notes: license.notes.clone(),
+        length_unique: 0,
+        high_length_unique: 0,
+        high_length: 0,
+        min_matched_length: 0,
+        min_high_matched_length: 0,
+        min_matched_length_unique: 0,
+        min_high_matched_length_unique: 0,
+        is_small: false,
+        is_tiny: false,
+    })
+}
+
+fn build_rules_from_licenses(licenses: &[License]) -> Vec<Rule> {
+    licenses
+        .iter()
+        .filter_map(build_rule_from_license)
+        .collect()
+}
+
 const MARKERS: &[&str] = &[
     "copyright",
     "c",
@@ -141,7 +202,12 @@ pub fn build_index(rules: Vec<Rule>, licenses: Vec<License>) -> LicenseIndex {
         licenses_by_key.insert(license.key.clone(), license);
     }
 
-    for (rid, mut rule) in rules.into_iter().enumerate() {
+    let license_rules =
+        build_rules_from_licenses(&licenses_by_key.values().cloned().collect::<Vec<_>>());
+
+    let all_rules: Vec<Rule> = license_rules.into_iter().chain(rules).collect();
+
+    for (rid, mut rule) in all_rules.into_iter().enumerate() {
         let rule_tokens = tokenize(&rule.text);
         let mut rule_token_ids: Vec<u16> = Vec::with_capacity(rule_tokens.len());
 
@@ -296,6 +362,7 @@ mod tests {
             is_license_clue: false,
             is_false_positive,
             is_required_phrase: false,
+            is_from_license: false,
             relevance: 100,
             minimum_coverage: None,
             is_continuous: false,
@@ -328,6 +395,14 @@ mod tests {
             text: format!("{} license text", name),
             reference_urls: vec![],
             notes: None,
+            is_deprecated: false,
+            replaced_by: vec![],
+            minimum_coverage: None,
+            ignorable_copyrights: None,
+            ignorable_holders: None,
+            ignorable_authors: None,
+            ignorable_urls: None,
+            ignorable_emails: None,
         }
     }
 
@@ -349,8 +424,8 @@ mod tests {
 
         let index = build_index(rules, licenses);
 
-        assert_eq!(index.rules_by_rid.len(), 1);
-        assert_eq!(index.tids_by_rid.len(), 1);
+        assert_eq!(index.rules_by_rid.len(), 2);
+        assert_eq!(index.tids_by_rid.len(), 2);
         assert!(
             index
                 .rid_by_hash
@@ -517,6 +592,7 @@ mod tests {
         assert_eq!(index.license_count(), 2);
         assert!(index.get_license("mit").is_some());
         assert!(index.get_license("apache-2.0").is_some());
+        assert_eq!(index.rules_by_rid.len(), 3);
     }
 
     #[test]

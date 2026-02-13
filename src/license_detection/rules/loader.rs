@@ -302,6 +302,7 @@ pub fn parse_rule_file(path: &Path) -> Result<Rule> {
         is_license_clue: fm.is_license_clue.unwrap_or(false),
         is_false_positive: fm.is_false_positive.unwrap_or(false),
         is_required_phrase: fm.is_required_phrase.unwrap_or(false),
+        is_from_license: false,
         relevance,
         minimum_coverage,
         is_continuous: fm.is_continuous.unwrap_or(false),
@@ -394,8 +395,6 @@ pub fn parse_license_file(path: &Path) -> Result<License> {
         ));
     }
 
-    let _parsed_minimum_coverage = fm.minimum_coverage.and_then(|n| n.as_u8());
-
     let is_deprecated = fm.is_deprecated.unwrap_or(false);
 
     if trimmed_text.is_empty()
@@ -436,6 +435,14 @@ pub fn parse_license_file(path: &Path) -> Result<License> {
         text: trimmed_text.to_string(),
         reference_urls: urls,
         notes: fm.notes.filter(|s| !s.trim().is_empty()),
+        is_deprecated,
+        replaced_by: fm.replaced_by.unwrap_or_default(),
+        minimum_coverage: fm.minimum_coverage.and_then(|n| n.as_u8()),
+        ignorable_copyrights: fm.ignorable_copyrights.filter(|v| !v.is_empty()),
+        ignorable_holders: fm.ignorable_holders.filter(|v| !v.is_empty()),
+        ignorable_authors: fm.ignorable_authors.filter(|v| !v.is_empty()),
+        ignorable_urls: fm.ignorable_urls.filter(|v| !v.is_empty()),
+        ignorable_emails: fm.ignorable_emails.filter(|v| !v.is_empty()),
     })
 }
 
@@ -684,6 +691,7 @@ MIT License"#,
                 is_license_clue: false,
                 is_false_positive: false,
                 is_required_phrase: false,
+                is_from_license: false,
                 relevance: 100,
                 minimum_coverage: None,
                 is_continuous: false,
@@ -717,6 +725,7 @@ MIT License"#,
                 is_license_clue: false,
                 is_false_positive: false,
                 is_required_phrase: false,
+                is_from_license: false,
                 relevance: 100,
                 minimum_coverage: None,
                 is_continuous: false,
@@ -757,6 +766,7 @@ MIT License"#,
             is_license_clue: false,
             is_false_positive: true,
             is_required_phrase: false,
+            is_from_license: false,
             relevance: 100,
             minimum_coverage: None,
             is_continuous: false,
@@ -797,6 +807,7 @@ MIT License"#,
                 is_license_clue: false,
                 is_false_positive: false,
                 is_required_phrase: false,
+                is_from_license: false,
                 relevance: 100,
                 minimum_coverage: None,
                 is_continuous: false,
@@ -830,6 +841,7 @@ MIT License"#,
                 is_license_clue: false,
                 is_false_positive: false,
                 is_required_phrase: false,
+                is_from_license: false,
                 relevance: 100,
                 minimum_coverage: None,
                 is_continuous: false,
