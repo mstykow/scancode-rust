@@ -309,7 +309,7 @@ pub fn build_index(rules: Vec<Rule>, licenses: Vec<License>) -> LicenseIndex {
     }
 
     let rules_automaton = AhoCorasickBuilder::new()
-        .match_kind(aho_corasick::MatchKind::LeftmostFirst)
+        .match_kind(aho_corasick::MatchKind::Standard)
         .build(&rules_automaton_patterns)
         .expect("Failed to build rules automaton");
 

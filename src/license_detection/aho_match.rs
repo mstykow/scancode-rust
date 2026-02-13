@@ -88,7 +88,7 @@ pub fn aho_match(index: &LicenseIndex, query_run: &QueryRun) -> Vec<LicenseMatch
 
     let automaton = &index.rules_automaton;
 
-    for ac_match in automaton.find_iter(&encoded_query) {
+    for ac_match in automaton.find_overlapping_iter(&encoded_query) {
         let pattern_id = ac_match.pattern();
         let byte_start = ac_match.start();
         let byte_end = ac_match.end();
