@@ -220,6 +220,12 @@ pub mod utils;
 #[cfg(test)]
 pub mod test_utils;
 
+#[cfg(test)]
+mod license_detection_test;
+
+#[cfg(test)]
+mod license_detection_golden_test;
+
 pub use models::{ExtraData, FileInfo, FileType, Header, Output, SystemEnvironment};
 pub use parsers::{NpmParser, PackageParser};
 pub use scanner::{ProcessResult, count, process};
