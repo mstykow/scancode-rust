@@ -536,7 +536,7 @@ mod tests {
         add_test_rule(&mut index, "permission redistribute", "test-license-2");
 
         let text = "license copyright granted here";
-        let query = Query::new(text, index.clone()).unwrap();
+        let query = Query::new(text, &index).unwrap();
         let query_run = query.whole_query_run();
 
         let candidates = select_candidates(&index, &query_run, 10);
@@ -615,7 +615,7 @@ mod tests {
         add_test_rule(&mut index, "license copyright granted", "test-license");
 
         let text = "license copyright granted here";
-        let query = Query::new(text, index.clone()).unwrap();
+        let query = Query::new(text, &index).unwrap();
         let query_run = query.whole_query_run();
 
         let matches = seq_match(&index, &query_run);
@@ -635,7 +635,7 @@ mod tests {
         );
 
         let text = "license copyright";
-        let query = Query::new(text, index.clone()).unwrap();
+        let query = Query::new(text, &index).unwrap();
         let query_run = query.whole_query_run();
 
         let matches = seq_match(&index, &query_run);
@@ -650,7 +650,7 @@ mod tests {
         add_test_rule(&mut index, "license copyright", "test-license");
 
         let text = "";
-        let query = Query::new(text, index.clone()).unwrap();
+        let query = Query::new(text, &index).unwrap();
         let query_run = query.whole_query_run();
 
         let matches = seq_match(&index, &query_run);

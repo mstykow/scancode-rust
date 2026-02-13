@@ -103,7 +103,7 @@ impl LicenseDetectionEngine {
     /// # Returns
     /// A Result containing a vector of LicenseDetection objects
     pub fn detect(&self, text: &str) -> Result<Vec<LicenseDetection>> {
-        let query = Query::new(text, (*self.index).clone())?;
+        let query = Query::new(text, &self.index)?;
         let query_run = query.whole_query_run();
 
         let mut all_matches = Vec::new();

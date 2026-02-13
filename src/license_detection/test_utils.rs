@@ -134,18 +134,18 @@ pub fn create_mock_rule_simple(license_expression: &str, relevance: u8) -> Rule 
     }
 }
 
-/// Creates a mock QueryRun with the given tokens.
+/// Creates a mock Query with the given tokens.
 ///
 /// # Arguments
 /// * `tokens` - Token IDs for the query
-/// * `index` - The license index (must be cloned for the Query)
+/// * `index` - The license index (borrowed)
 ///
 /// # Returns
-/// A `QueryRun` spanning the entire token range
-pub fn create_mock_query_run_with_tokens(tokens: &[u16], index: LicenseIndex) -> QueryRun {
+/// A `Query` spanning the entire token range
+pub fn create_mock_query_with_tokens<'a>(tokens: &[u16], index: &'a LicenseIndex) -> Query<'a> {
     let line_by_pos = vec![1; tokens.len()];
 
-    let query = Query {
+    Query {
         text: String::new(),
         tokens: tokens.to_vec(),
         line_by_pos,
@@ -158,13 +158,22 @@ pub fn create_mock_query_run_with_tokens(tokens: &[u16], index: LicenseIndex) ->
         is_binary: false,
         query_runs: Vec::new(),
         index,
-    };
+    }
+}
 
-    let end = if tokens.is_empty() {
+/// Creates a mock QueryRun from a mock Query.
+///
+/// # Arguments
+/// * `query` - The query reference
+///
+/// # Returns
+/// A `QueryRun` spanning the entire token range
+#[allow(dead_code)]
+pub fn create_mock_query_run_from_query<'a>(query: &'a Query<'a>) -> QueryRun<'a> {
+    let end = if query.tokens.is_empty() {
         None
     } else {
-        Some(tokens.len() - 1)
+        Some(query.tokens.len() - 1)
     };
-
     QueryRun::new(query, 0, end)
 }

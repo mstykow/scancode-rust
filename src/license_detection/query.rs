@@ -168,9 +168,9 @@ const STOPWORDS: &[&str] = &[
 ///
 /// Based on Python Query class at:
 /// reference/scancode-toolkit/src/licensedcode/query.py (lines 155-295)
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 #[allow(dead_code)]
-pub struct Query {
+pub struct Query<'a> {
     /// The original input text.
     ///
     /// Corresponds to Python: `self.query_string` (line 215)
@@ -242,14 +242,14 @@ pub struct Query {
     /// These are the query runs computed during query construction.
     ///
     /// Corresponds to Python: `self.query_runs = []` (line 274)
-    pub query_runs: Vec<QueryRun>,
+    pub query_runs: Vec<QueryRun<'a>>,
 
     /// Reference to the license index for dictionary access and metadata
-    pub index: LicenseIndex,
+    pub index: &'a LicenseIndex,
 }
 
 #[allow(dead_code)]
-impl Query {
+impl<'a> Query<'a> {
     /// Create a new query from text string and license index.
     ///
     /// This tokenizes the input text, looks up each token in the index dictionary,
@@ -263,7 +263,7 @@ impl Query {
     /// A Result containing the Query or an error if binary detection fails
     ///
     /// Corresponds to Python: `Query.__init__()` (lines 196-295)
-    pub fn new(text: &str, index: LicenseIndex) -> Result<Self, anyhow::Error> {
+    pub fn new(text: &str, index: &'a LicenseIndex) -> Result<Self, anyhow::Error> {
         Self::with_options(text, index, 4)
     }
 
@@ -280,7 +280,7 @@ impl Query {
     /// Corresponds to Python: `Query.__init__()` with line_threshold parameter
     pub fn with_options(
         text: &str,
-        index: LicenseIndex,
+        index: &'a LicenseIndex,
         _line_threshold: usize,
     ) -> Result<Self, anyhow::Error> {
         let is_binary = Self::detect_binary(text)?;
@@ -295,7 +295,6 @@ impl Query {
         let mut shorts_and_digits_pos = HashSet::new();
 
         let len_legalese = index.len_legalese;
-        let _digit_only_tids = index.digit_only_tids.clone();
 
         let mut known_pos = -1i32;
         let mut started = false;
@@ -501,11 +500,11 @@ impl Query {
     /// Get a query run covering the entire query.
     ///
     /// Corresponds to Python: `whole_query_run()` method (lines 306-317)
-    pub fn whole_query_run(&self) -> QueryRun {
+    pub fn whole_query_run(&self) -> QueryRun<'_> {
         if self.is_empty() {
-            return QueryRun::new(self.clone(), 0, None);
+            return QueryRun::new(self, 0, None);
         }
-        QueryRun::new(self.clone(), 0, Some(self.tokens.len() - 1))
+        QueryRun::new(self, 0, Some(self.tokens.len() - 1))
     }
 
     /// Get all matchable token positions.
@@ -660,19 +659,23 @@ impl Query {
 ///
 /// Based on Python QueryRun class at:
 /// reference/scancode-toolkit/src/licensedcode/query.py (lines 720-914)
-#[derive(Debug, Clone)]
-pub struct QueryRun {
-    query: Query,
+#[derive(Debug)]
+pub struct QueryRun<'a> {
+    index: &'a LicenseIndex,
+    tokens: &'a [u16],
+    line_by_pos: &'a [usize],
+    text: &'a str,
+    high_matchables: &'a HashSet<usize>,
+    low_matchables: &'a HashSet<usize>,
+    digit_only_tids: &'a HashSet<u16>,
     pub start: usize,
     pub end: Option<usize>,
     #[allow(dead_code)]
     len_legalese: usize,
-    #[allow(dead_code)]
-    digit_only_tids: HashSet<u16>,
 }
 
 #[allow(dead_code)]
-impl QueryRun {
+impl<'a> QueryRun<'a> {
     /// Create a new query run from a query with start and end positions.
     ///
     /// # Arguments
@@ -681,43 +684,38 @@ impl QueryRun {
     /// * `end` - The end position (inclusive), or None for an empty run
     ///
     /// Corresponds to Python: `QueryRun.__init__()` (lines 735-749)
-    pub fn new(query: Query, start: usize, end: Option<usize>) -> Self {
-        let len_legalese = query.index.len_legalese;
-        let digit_only_tids = query.index.digit_only_tids.clone();
-
+    pub fn new(query: &'a Query<'a>, start: usize, end: Option<usize>) -> Self {
         Self {
-            query,
+            index: query.index,
+            tokens: &query.tokens,
+            line_by_pos: &query.line_by_pos,
+            text: &query.text,
+            high_matchables: &query.high_matchables,
+            low_matchables: &query.low_matchables,
+            digit_only_tids: &query.index.digit_only_tids,
             start,
             end,
-            len_legalese,
-            digit_only_tids,
+            len_legalese: query.index.len_legalese,
         }
-    }
-
-    /// Create a new query run from a borrowed query with start and end positions.
-    ///
-    /// This is a convenience method that clones the query.
-    pub fn from_query(query: &Query, start: usize, end: Option<usize>) -> Self {
-        Self::new(query.clone(), start, end)
     }
 
     /// Get the license index used by this query run.
     pub fn get_index(&self) -> &LicenseIndex {
-        &self.query.index
+        self.index
     }
 
     /// Get the start line number of this query run.
     ///
     /// Corresponds to Python: `start_line` property (lines 771-773)
     pub fn start_line(&self) -> Option<usize> {
-        self.query.line_for_pos(self.start)
+        self.line_by_pos.get(self.start).copied()
     }
 
     /// Get the end line number of this query run.
     ///
     /// Corresponds to Python: `end_line` property (lines 775-777)
     pub fn end_line(&self) -> Option<usize> {
-        self.end.and_then(|e| self.query.line_for_pos(e))
+        self.end.and_then(|e| self.line_by_pos.get(e).copied())
     }
 
     /// Get the sequence of token IDs for this run.
@@ -727,7 +725,7 @@ impl QueryRun {
     /// Corresponds to Python: `tokens` property (lines 779-786)
     pub fn tokens(&self) -> &[u16] {
         match self.end {
-            Some(end) => &self.query.tokens[self.start..=end],
+            Some(end) => &self.tokens[self.start..=end],
             None => &[],
         }
     }
@@ -735,12 +733,12 @@ impl QueryRun {
     /// Iterate over token IDs with their absolute positions.
     ///
     /// Corresponds to Python: `tokens_with_pos()` method (lines 788-789)
-    pub fn tokens_with_pos(&self) -> impl Iterator<Item = (usize, u16)> {
+    pub fn tokens_with_pos(&self) -> impl Iterator<Item = (usize, u16)> + '_ {
         self.tokens()
             .iter()
             .copied()
             .enumerate()
-            .map(move |(i, tid)| (self.start + i, tid))
+            .map(|(i, tid)| (self.start + i, tid))
     }
 
     /// Check if this query run contains only digit tokens.
@@ -794,7 +792,7 @@ impl QueryRun {
                 .copied()
                 .collect()
         } else {
-            self.high_matchables().clone()
+            self.high_matchables()
         }
     }
 
@@ -828,9 +826,11 @@ impl QueryRun {
     ///
     /// Corresponds to Python: `high_matchables` property (lines 851-861)
     pub fn high_matchables(&self) -> HashSet<usize> {
-        self.query
-            .high_matchables(&self.start, &self.end)
-            .unwrap_or_default()
+        self.high_matchables
+            .iter()
+            .filter(|&&pos| pos >= self.start && pos <= self.end.unwrap_or(usize::MAX))
+            .copied()
+            .collect()
     }
 
     /// Get low-value matchable token positions.
@@ -839,9 +839,11 @@ impl QueryRun {
     ///
     /// Corresponds to Python: `low_matchables` property (lines 839-849)
     pub fn low_matchables(&self) -> HashSet<usize> {
-        self.query
-            .low_matchables(&self.start, &self.end)
-            .unwrap_or_default()
+        self.low_matchables
+            .iter()
+            .filter(|&&pos| pos >= self.start && pos <= self.end.unwrap_or(usize::MAX))
+            .copied()
+            .collect()
     }
 
     /// Extract matched text for a given line range.
@@ -855,7 +857,23 @@ impl QueryRun {
     /// # Returns
     /// The matched text, or empty string if lines are out of range
     pub fn matched_text(&self, start_line: usize, end_line: usize) -> String {
-        self.query.matched_text(start_line, end_line)
+        if start_line == 0 || end_line == 0 || start_line > end_line {
+            return String::new();
+        }
+
+        self.text
+            .lines()
+            .enumerate()
+            .filter_map(|(idx, line)| {
+                let line_num = idx + 1;
+                if line_num >= start_line && line_num <= end_line {
+                    Some(line)
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
     }
 }
 
@@ -871,7 +889,7 @@ mod tests {
     #[test]
     fn test_query_new_with_empty_text() {
         let index = create_query_test_index();
-        let query = Query::new("", index).unwrap();
+        let query = Query::new("", &index).unwrap();
 
         assert!(query.is_empty());
         assert_eq!(query.len(), 0);
@@ -882,7 +900,7 @@ mod tests {
     fn test_query_new_with_known_tokens() {
         let index = create_query_test_index();
         let text = "License copyright permission";
-        let query = Query::new(text, index).unwrap();
+        let query = Query::new(text, &index).unwrap();
 
         assert_eq!(query.len(), 3);
         assert_eq!(query.token_at(0), Some(0));
@@ -897,7 +915,7 @@ mod tests {
     fn test_query_new_with_unknown_tokens() {
         let index = create_query_test_index();
         let text = "License foobar copyright";
-        let query = Query::new(text, index).unwrap();
+        let query = Query::new(text, &index).unwrap();
 
         assert_eq!(query.len(), 2);
         assert_eq!(query.token_at(0), Some(0));
@@ -911,7 +929,7 @@ mod tests {
     fn test_query_new_with_stopwords() {
         let index = create_query_test_index();
         let text = "license div copyright p";
-        let query = Query::new(text, index).unwrap();
+        let query = Query::new(text, &index).unwrap();
 
         assert_eq!(query.len(), 2);
 
@@ -927,7 +945,7 @@ mod tests {
         let _ = index.dictionary.get_or_assign("z");
 
         let text = "x y z license";
-        let query = Query::new(text, index.clone()).unwrap();
+        let query = Query::new(text, &index).unwrap();
 
         assert!(!query.is_empty());
         assert!(query.len() <= 4);
@@ -948,7 +966,7 @@ mod tests {
         let _ = index.dictionary.get_or_assign("456");
 
         let text = "123 456 license";
-        let query = Query::new(text, index).unwrap();
+        let query = Query::new(text, &index).unwrap();
 
         assert!(query.is_short_or_digit(0));
         assert!(query.is_short_or_digit(1));
@@ -959,7 +977,7 @@ mod tests {
     fn test_query_new_multiline() {
         let index = create_query_test_index();
         let text = "Line 1 license\nLine 2 copyright\nLine 3 permission";
-        let query = Query::new(text, index).unwrap();
+        let query = Query::new(text, &index).unwrap();
 
         assert_eq!(query.len(), 3);
         assert_eq!(query.line_for_pos(0), Some(1));
@@ -971,7 +989,7 @@ mod tests {
     fn test_query_tokens_length_without_unknowns() {
         let index = create_query_test_index();
         let text = "license foobar copyright";
-        let query = Query::new(text, index).unwrap();
+        let query = Query::new(text, &index).unwrap();
 
         assert_eq!(query.tokens_length(false), 2);
     }
@@ -980,7 +998,7 @@ mod tests {
     fn test_query_tokens_length_with_unknowns() {
         let index = create_query_test_index();
         let text = "license foobar copyright";
-        let query = Query::new(text, index).unwrap();
+        let query = Query::new(text, &index).unwrap();
 
         assert_eq!(query.tokens_length(true), 3);
     }
@@ -989,7 +1007,7 @@ mod tests {
     fn test_query_detect_binary_text() {
         let index = create_query_test_index();
 
-        let query = Query::new("license copyright", index.clone()).unwrap();
+        let query = Query::new("license copyright", &index).unwrap();
         assert!(!query.is_binary);
     }
 
@@ -998,7 +1016,7 @@ mod tests {
         let index = create_query_test_index();
         let text = "license\0copyright";
 
-        let query = Query::new(text, index).unwrap();
+        let query = Query::new(text, &index).unwrap();
         assert!(query.is_binary);
     }
 
@@ -1006,7 +1024,7 @@ mod tests {
     fn test_query_new_with_empty_lines() {
         let index = create_query_test_index();
         let text = "license\n\ncopyright";
-        let query = Query::new(text, index).unwrap();
+        let query = Query::new(text, &index).unwrap();
 
         assert_eq!(query.len(), 2);
         assert_eq!(query.line_for_pos(0), Some(1));
@@ -1017,7 +1035,7 @@ mod tests {
     fn test_query_new_with_leading_unknowns() {
         let index = create_query_test_index();
         let text = "unknown1 unknown2 license";
-        let query = Query::new(text, index).unwrap();
+        let query = Query::new(text, &index).unwrap();
 
         assert_eq!(query.len(), 1);
         assert_eq!(query.unknown_count_after(None), 2);
@@ -1027,7 +1045,7 @@ mod tests {
     fn test_query_new_with_leading_stopwords() {
         let index = create_query_test_index();
         let text = "div p license";
-        let query = Query::new(text, index).unwrap();
+        let query = Query::new(text, &index).unwrap();
 
         assert_eq!(query.len(), 1);
         assert_eq!(query.stopword_count_after(None), 2);
@@ -1036,8 +1054,8 @@ mod tests {
     #[test]
     fn test_query_run_new() {
         let index = create_query_test_index();
-        let query = Query::new("license copyright permission", index);
-        let run = QueryRun::new(query.unwrap(), 0, Some(2));
+        let query = Query::new("license copyright permission", &index).unwrap();
+        let run = QueryRun::new(&query, 0, Some(2));
 
         assert_eq!(run.start, 0);
         assert_eq!(run.end, Some(2));
@@ -1046,7 +1064,7 @@ mod tests {
     #[test]
     fn test_query_whole_query_run() {
         let index = create_query_test_index();
-        let query = Query::new("license copyright permission", index).unwrap();
+        let query = Query::new("license copyright permission", &index).unwrap();
         let run = query.whole_query_run();
 
         assert_eq!(run.start, 0);
@@ -1058,8 +1076,8 @@ mod tests {
     #[test]
     fn test_query_run_tokens() {
         let index = create_query_test_index();
-        let query = Query::new("license copyright permission", index).unwrap();
-        let run = QueryRun::from_query(&query, 0, Some(1));
+        let query = Query::new("license copyright permission", &index).unwrap();
+        let run = QueryRun::new(&query, 0, Some(1));
 
         assert_eq!(run.tokens(), vec![0, 1]);
     }
@@ -1067,8 +1085,8 @@ mod tests {
     #[test]
     fn test_query_run_tokens_with_pos() {
         let index = create_query_test_index();
-        let query = Query::new("license copyright permission", index).unwrap();
-        let run = QueryRun::from_query(&query, 0, Some(1));
+        let query = Query::new("license copyright permission", &index).unwrap();
+        let run = QueryRun::new(&query, 0, Some(1));
 
         let tokens_with_pos: Vec<(usize, u16)> = run.tokens_with_pos().collect();
         assert_eq!(tokens_with_pos, vec![(0, 0), (1, 1)]);
@@ -1077,8 +1095,8 @@ mod tests {
     #[test]
     fn test_query_run_empty() {
         let index = create_query_test_index();
-        let query = Query::new("", index).unwrap();
-        let run = QueryRun::from_query(&query, 0, None);
+        let query = Query::new("", &index).unwrap();
+        let run = QueryRun::new(&query, 0, None);
 
         assert_eq!(run.tokens().len(), 0);
         assert_eq!(run.start, 0);
@@ -1088,7 +1106,7 @@ mod tests {
     #[test]
     fn test_query_matchables() {
         let index = create_query_test_index();
-        let query = Query::new("license copyright permission", index).unwrap();
+        let query = Query::new("license copyright permission", &index).unwrap();
 
         let matchables = query.matchables();
         assert_eq!(matchables.len(), 3);
@@ -1100,7 +1118,7 @@ mod tests {
     #[test]
     fn test_query_high_matchables() {
         let index = create_query_test_index();
-        let query = Query::new("license copyright permission", index).unwrap();
+        let query = Query::new("license copyright permission", &index).unwrap();
 
         let high = query.high_matchables(&0, &Some(2));
         assert!(high.is_some());
@@ -1114,7 +1132,7 @@ mod tests {
     fn test_query_low_matchables_in_range() {
         let mut index = create_query_test_index();
         let _ = index.dictionary.get_or_assign("word");
-        let query = Query::new("license word copyright", index).unwrap();
+        let query = Query::new("license word copyright", &index).unwrap();
 
         let low = query.low_matchables(&0, &Some(2));
         assert!(low.is_some());
@@ -1124,8 +1142,8 @@ mod tests {
     #[test]
     fn test_query_run_matchables() {
         let index = create_query_test_index();
-        let query = Query::new("license copyright permission", index).unwrap();
-        let run = QueryRun::from_query(&query, 0, Some(2));
+        let query = Query::new("license copyright permission", &index).unwrap();
+        let run = QueryRun::new(&query, 0, Some(2));
 
         let matchables = run.matchables(true);
         assert_eq!(matchables.len(), 3);
@@ -1137,8 +1155,8 @@ mod tests {
     #[test]
     fn test_query_run_is_matchable() {
         let index = create_query_test_index();
-        let query = Query::new("license copyright permission", index).unwrap();
-        let run = QueryRun::from_query(&query, 0, Some(2));
+        let query = Query::new("license copyright permission", &index).unwrap();
+        let run = QueryRun::new(&query, 0, Some(2));
 
         assert!(run.is_matchable(false, &[]));
         assert!(run.is_matchable(true, &[]));
@@ -1150,8 +1168,8 @@ mod tests {
         let _ = index.dictionary.get_or_assign("123");
         let _ = index.dictionary.get_or_assign("456");
 
-        let query = Query::new("123 456", index).unwrap();
-        let run = QueryRun::from_query(&query, 0, Some(1));
+        let query = Query::new("123 456", &index).unwrap();
+        let run = QueryRun::new(&query, 0, Some(1));
 
         assert!(!run.is_matchable(false, &[]));
     }
@@ -1159,8 +1177,8 @@ mod tests {
     #[test]
     fn test_query_run_is_matchable_with_exclude() {
         let index = create_query_test_index();
-        let query = Query::new("license copyright permission", index).unwrap();
-        let run = QueryRun::from_query(&query, 0, Some(2));
+        let query = Query::new("license copyright permission", &index).unwrap();
+        let run = QueryRun::new(&query, 0, Some(2));
 
         let exclude_span = PositionSpan::new(0, 1);
         assert!(run.is_matchable(false, &[exclude_span]));
@@ -1169,8 +1187,8 @@ mod tests {
     #[test]
     fn test_query_matchable_tokens() {
         let index = create_query_test_index();
-        let query = Query::new("license copyright permission", index).unwrap();
-        let run = QueryRun::from_query(&query, 0, Some(2));
+        let query = Query::new("license copyright permission", &index).unwrap();
+        let run = QueryRun::new(&query, 0, Some(2));
 
         let tokens = run.matchable_tokens();
         assert_eq!(tokens.len(), 3);
@@ -1182,7 +1200,7 @@ mod tests {
     #[test]
     fn test_query_run_subtract() {
         let index = create_query_test_index();
-        let mut query = Query::new("license copyright permission", index).unwrap();
+        let mut query = Query::new("license copyright permission", &index).unwrap();
 
         let span = PositionSpan::new(0, 1);
         query.subtract(&span);
@@ -1235,7 +1253,7 @@ mod tests {
     fn test_query_new_lowercase_tokens() {
         let index = create_query_test_index();
         let text = "LICENSE COPYRIGHT Permission";
-        let query = Query::new(text, index).unwrap();
+        let query = Query::new(text, &index).unwrap();
 
         assert_eq!(query.len(), 3);
         assert_eq!(query.token_at(0), Some(0));
@@ -1247,7 +1265,7 @@ mod tests {
     fn test_query_matched_text_single_line() {
         let index = create_query_test_index();
         let text = "license copyright permission";
-        let query = Query::new(text, index).unwrap();
+        let query = Query::new(text, &index).unwrap();
 
         let matched = query.matched_text(1, 1);
         assert_eq!(matched, "license copyright permission");
@@ -1257,7 +1275,7 @@ mod tests {
     fn test_query_matched_text_multiple_lines() {
         let index = create_query_test_index();
         let text = "line1\nline2\nline3\nline4";
-        let query = Query::new(text, index).unwrap();
+        let query = Query::new(text, &index).unwrap();
 
         let matched = query.matched_text(2, 3);
         assert_eq!(matched, "line2\nline3");
@@ -1267,7 +1285,7 @@ mod tests {
     fn test_query_matched_text_full_range() {
         let index = create_query_test_index();
         let text = "line1\nline2\nline3";
-        let query = Query::new(text, index).unwrap();
+        let query = Query::new(text, &index).unwrap();
 
         let matched = query.matched_text(1, 3);
         assert_eq!(matched, "line1\nline2\nline3");
@@ -1277,7 +1295,7 @@ mod tests {
     fn test_query_matched_text_invalid_range() {
         let index = create_query_test_index();
         let text = "line1\nline2";
-        let query = Query::new(text, index).unwrap();
+        let query = Query::new(text, &index).unwrap();
 
         assert_eq!(query.matched_text(0, 1), "");
         assert_eq!(query.matched_text(2, 1), "");
@@ -1288,8 +1306,8 @@ mod tests {
     fn test_query_run_matched_text() {
         let index = create_query_test_index();
         let text = "line1\nlicense\nline3";
-        let query = Query::new(text, index).unwrap();
-        let run = QueryRun::from_query(&query, 0, Some(0));
+        let query = Query::new(text, &index).unwrap();
+        let run = QueryRun::new(&query, 0, Some(0));
 
         let matched = run.matched_text(2, 2);
         assert_eq!(matched, "license");

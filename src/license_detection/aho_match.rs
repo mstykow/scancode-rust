@@ -184,7 +184,7 @@ pub fn aho_match(index: &LicenseIndex, query_run: &QueryRun) -> Vec<LicenseMatch
 mod tests {
     use super::*;
     use crate::license_detection::test_utils::{
-        create_mock_query_run_with_tokens, create_mock_rule, create_test_index_default,
+        create_mock_query_with_tokens, create_mock_rule, create_test_index_default,
     };
     use aho_corasick::{AhoCorasick, AhoCorasickBuilder};
 
@@ -222,7 +222,8 @@ mod tests {
     #[test]
     fn test_aho_match_empty_query() {
         let index = create_test_index_default();
-        let run = create_mock_query_run_with_tokens(&[], index);
+        let query = create_mock_query_with_tokens(&[], &index);
+        let run = query.whole_query_run();
 
         let matches = aho_match(run.get_index(), &run);
 
@@ -234,7 +235,8 @@ mod tests {
         let mut index = create_test_index_default();
         index.rules_automaton = AhoCorasick::new::<_, &[u8]>([]).unwrap();
 
-        let run = create_mock_query_run_with_tokens(&[0, 1, 2], index);
+        let query = create_mock_query_with_tokens(&[0, 1, 2], &index);
+        let run = query.whole_query_run();
 
         let matches = aho_match(run.get_index(), &run);
 
@@ -271,10 +273,10 @@ mod tests {
             has_long_lines: false,
             is_binary: false,
             query_runs: Vec::new(),
-            index,
+            index: &index,
         };
 
-        let run = QueryRun::new(query.clone(), 0, Some(1));
+        let run = query.whole_query_run();
         let matches = aho_match(run.get_index(), &run);
 
         assert_eq!(matches.len(), 1);
@@ -313,10 +315,10 @@ mod tests {
             has_long_lines: false,
             is_binary: false,
             query_runs: Vec::new(),
-            index,
+            index: &index,
         };
 
-        let run = QueryRun::new(query.clone(), 0, Some(2));
+        let run = query.whole_query_run();
         let matches = aho_match(run.get_index(), &run);
 
         assert_eq!(matches.len(), 1);
@@ -359,10 +361,10 @@ mod tests {
             has_long_lines: false,
             is_binary: false,
             query_runs: Vec::new(),
-            index,
+            index: &index,
         };
 
-        let run = QueryRun::new(query.clone(), 0, Some(3));
+        let run = query.whole_query_run();
         let matches = aho_match(run.get_index(), &run);
 
         assert_eq!(matches.len(), 2);
@@ -401,10 +403,10 @@ mod tests {
             has_long_lines: false,
             is_binary: false,
             query_runs: Vec::new(),
-            index,
+            index: &index,
         };
 
-        let run = QueryRun::new(query.clone(), 0, Some(2));
+        let run = query.whole_query_run();
         let matches = aho_match(run.get_index(), &run);
 
         assert!(
@@ -442,10 +444,10 @@ mod tests {
             has_long_lines: false,
             is_binary: false,
             query_runs: Vec::new(),
-            index,
+            index: &index,
         };
 
-        let run = QueryRun::new(query.clone(), 0, Some(1));
+        let run = query.whole_query_run();
         let matches = aho_match(run.get_index(), &run);
 
         assert_eq!(matches.len(), 1);

@@ -601,7 +601,7 @@ mod tests {
             create_test_match("#99", 30, 35, 0.5, 50.0, 100),
         ];
 
-        let query = Query::new("test text", index.clone()).unwrap();
+        let query = Query::new("test text", &index).unwrap();
         let refined = refine_matches(&index, matches, &query);
 
         assert_eq!(refined.len(), 2);
@@ -618,7 +618,7 @@ mod tests {
     fn test_refine_matches_empty() {
         let index = LicenseIndex::with_legalese_count(10);
         let matches: Vec<LicenseMatch> = vec![];
-        let query = Query::new("", index.clone()).unwrap();
+        let query = Query::new("", &index).unwrap();
 
         let refined = refine_matches(&index, matches, &query);
 
@@ -629,7 +629,7 @@ mod tests {
     fn test_refine_matches_single() {
         let index = LicenseIndex::with_legalese_count(10);
         let matches = vec![create_test_match("#1", 1, 10, 0.5, 50.0, 100)];
-        let query = Query::new("test text", index.clone()).unwrap();
+        let query = Query::new("test text", &index).unwrap();
 
         let refined = refine_matches(&index, matches, &query);
 
@@ -646,7 +646,7 @@ mod tests {
             create_test_match("#2", 20, 30, 0.85, 85.0, 100),
         ];
 
-        let query = Query::new("test text", index.clone()).unwrap();
+        let query = Query::new("test text", &index).unwrap();
         let refined = refine_matches(&index, matches, &query);
 
         assert_eq!(refined.len(), 2);

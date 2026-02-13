@@ -124,9 +124,7 @@ pub fn hash_match(index: &LicenseIndex, query_run: &QueryRun) -> Vec<LicenseMatc
 mod tests {
     use super::*;
     use crate::license_detection::models::Rule;
-    use crate::license_detection::test_utils::{
-        create_mock_query_run_with_tokens, create_test_index,
-    };
+    use crate::license_detection::test_utils::{create_mock_query_with_tokens, create_test_index};
 
     fn create_test_rules_by_rid() -> Vec<Rule> {
         vec![
@@ -254,10 +252,8 @@ mod tests {
         index.tids_by_rid = tids_by_rid;
 
         let query_index = create_test_index(&[("token", 0)], 1);
-        let matches = hash_match(
-            &index,
-            &create_mock_query_run_with_tokens(&[0, 1], query_index),
-        );
+        let query = create_mock_query_with_tokens(&[0, 1], &query_index);
+        let matches = hash_match(&index, &query.whole_query_run());
 
         assert!(
             matches.is_empty(),
@@ -278,10 +274,8 @@ mod tests {
         index.tids_by_rid = tids_by_rid;
 
         let query_index = create_test_index(&[("token", 0)], 1);
-        let matches = hash_match(
-            &index,
-            &create_mock_query_run_with_tokens(&[0, 1], query_index),
-        );
+        let query = create_mock_query_with_tokens(&[0, 1], &query_index);
+        let matches = hash_match(&index, &query.whole_query_run());
 
         assert_eq!(matches.len(), 1, "Should return exactly one match");
         assert_eq!(matches[0].matcher, MATCH_HASH);
@@ -302,10 +296,8 @@ mod tests {
         index.tids_by_rid = tids_by_rid;
 
         let query_index = create_test_index(&[("token", 0)], 1);
-        let matches = hash_match(
-            &index,
-            &create_mock_query_run_with_tokens(&[0, 1], query_index),
-        );
+        let query = create_mock_query_with_tokens(&[0, 1], &query_index);
+        let matches = hash_match(&index, &query.whole_query_run());
 
         assert_eq!(matches.len(), 1);
     }

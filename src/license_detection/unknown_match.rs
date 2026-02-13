@@ -331,11 +331,6 @@ mod tests {
     use crate::license_detection::index::LicenseIndex;
     use crate::license_detection::query::Query;
 
-    fn create_test_query(text: &str) -> Query {
-        let index = LicenseIndex::with_legalese_count(10);
-        Query::new(text, index).expect("Failed to create query")
-    }
-
     #[test]
     fn test_constants() {
         assert_eq!(MATCH_UNKNOWN, "5-undetected");
@@ -346,7 +341,7 @@ mod tests {
     #[test]
     fn test_unknown_match_empty_query() {
         let index = LicenseIndex::with_legalese_count(10);
-        let query = create_test_query("");
+        let query = Query::new("", &index).expect("Failed to create query");
         let known_matches = vec![];
 
         let matches = unknown_match(&index, &query, &known_matches);
@@ -415,7 +410,7 @@ mod tests {
     #[test]
     fn test_create_unknown_match_too_short() {
         let index = LicenseIndex::with_legalese_count(10);
-        let query = create_test_query("short text");
+        let query = Query::new("short text", &index).expect("Failed to create query");
 
         let match_result = create_unknown_match(&index, &query, 0, 5, 10);
 
