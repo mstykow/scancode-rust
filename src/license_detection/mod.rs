@@ -114,11 +114,19 @@ impl LicenseDetectionEngine {
         let spdx_matches = spdx_lid_match(&self.index, text);
         all_matches.extend(spdx_matches);
 
-        let aho_matches = aho_match(&self.index, &query_run);
-        all_matches.extend(aho_matches);
+        let has_perfect_match = all_matches.iter().any(|m| m.match_coverage >= 100.0);
 
-        let seq_matches = seq_match(&self.index, &query_run);
-        all_matches.extend(seq_matches);
+        if !has_perfect_match {
+            let aho_matches = aho_match(&self.index, &query_run);
+            all_matches.extend(aho_matches);
+
+            let has_high_coverage = all_matches.iter().any(|m| m.match_coverage >= 90.0);
+
+            if !has_high_coverage {
+                let seq_matches = seq_match(&self.index, &query_run);
+                all_matches.extend(seq_matches);
+            }
+        }
 
         let unknown_matches = unknown_match(&self.index, &query, &all_matches);
         all_matches.extend(unknown_matches);

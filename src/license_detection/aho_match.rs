@@ -10,7 +10,6 @@
 use crate::license_detection::index::LicenseIndex;
 use crate::license_detection::models::LicenseMatch;
 use crate::license_detection::query::QueryRun;
-use std::collections::HashSet;
 
 /// Matcher identifier for Aho-Corasick exact matching.
 ///
@@ -97,9 +96,7 @@ pub fn aho_match(index: &LicenseIndex, query_run: &QueryRun) -> Vec<LicenseMatch
         let qstart = qbegin + byte_pos_to_token_pos(byte_start);
         let qend = qbegin + byte_pos_to_token_pos(byte_end);
 
-        let qspan_positions: HashSet<usize> = (qstart..qend).collect();
-
-        let is_entirely_matchable = qspan_positions.iter().all(|pos| matchables.contains(pos));
+        let is_entirely_matchable = (qstart..qend).all(|pos| matchables.contains(&pos));
 
         if !is_entirely_matchable {
             continue;
