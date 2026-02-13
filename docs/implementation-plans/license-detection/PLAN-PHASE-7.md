@@ -1,12 +1,14 @@
 # Phase 7 Completion Plan
 
+> **Status**: ✅ COMPLETE (2026-02-13)
+
 ## Overview
 
-Phase 7 is marked as PARTIAL PASS. Three issues need resolution:
+Phase 7 was marked as PARTIAL PASS. Three issues were identified and have been resolved:
 
-1. **CRITICAL**: MIT license text detection produces incorrect results (detects `psytec-freesoft` instead of `mit`)
-2. **MEDIUM**: `--include-text` CLI flag not implemented
-3. **MEDIUM**: `matched_text` field not populated in matches
+1. **CRITICAL**: MIT license text detection produces incorrect results (detects `psytec-freesoft` instead of `mit`) - ✅ FIXED
+2. **MEDIUM**: `--include-text` CLI flag not implemented - ✅ FIXED
+3. **MEDIUM**: `matched_text` field not populated in matches - ✅ FIXED
 
 ---
 
@@ -429,8 +431,14 @@ pub fn aho_match(index: &LicenseIndex, query_run: &QueryRun) -> Vec<LicenseMatch
 
 ## Success Criteria
 
-- [ ] MIT license text correctly detected as "mit"
-- [ ] All existing tests continue to pass
-- [ ] `--include-text` flag added and functional
-- [ ] `matched_text` populated when `--include-text` is specified
-- [ ] No regressions in other license detection
+- [x] MIT license text correctly detected as "mit"
+- [x] All existing tests continue to pass (1758 tests)
+- [x] `--include-text` flag added and functional
+- [x] `matched_text` populated when `--include-text` is specified
+- [x] No regressions in other license detection
+
+## Commits
+
+1. `718437e` - fix(license-detection): correct pattern_id to rid mapping in Aho-Corasick matcher
+2. `f1bc462` - feat(license-detection): populate matched_text field in all matchers
+3. `2f8bae6` - feat(cli): add --include-text flag for matched_text in output
