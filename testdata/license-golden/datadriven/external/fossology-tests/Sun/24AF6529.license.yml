@@ -1,0 +1,4 @@
+license_expressions:
+  - proprietary-license
+notes: the results of matching this can change a bit over time, but are always detected as some
+  variant of a proprietary license or proprietary Sun agreement

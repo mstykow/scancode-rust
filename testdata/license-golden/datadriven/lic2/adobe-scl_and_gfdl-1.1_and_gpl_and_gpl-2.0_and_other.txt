@@ -1,0 +1,94 @@
+This package was debianized by Sebastien Bacher <seb128@debian.org> on
+Mon, 10 Jan 2005 13:23:55 +0100.
+
+It was downloaded from ftp://ftp.gnome.org/pub/gnome/sources/evince/
+
+The upstream authors are <s>Bryan Clark</s>, <s>Carlos García Campos</s>, <s>David Malcolm</s>,
+<s>James Bowes</s>, <s>Jonathan Blandford</s>, <s>Kristian Høgsberg</s>, <s>Martin Kretzschmar</s>
+and <s>Nickolay V. Shmyrev</s>. See http://live.gnome.org/Evince/Team for more
+information on the team behind evince.
+
+Due to the huge number of supported file formats, evince's copyright situation
+is a bit complex. Please refer to the following table or the source package
+for more information. The used shortcuts are explained after the table:
+
+File                                                 | License | Copyright Holder
+-----------------------------------------------------+---------+-----------------
+backend/comics/comics-document.c                     | GPLv2h  | <s>Teemu Tervo <teemu.tervo@gmx.net></s>
+backend/dvi/fonts.c                                  | unspec  | unspec
+backend/dvi/mdvi-lib/afmparse.c                      | Adobe   | <s>Adobe Systems Incorporated.</s>
+backend/impress/document.c                           | GPL     | <s>Gurer Ozen <madcat@e-kolay.net></s>
+backend/impress/iksemel.c                            | LGPLv2h | <s>Gurer Ozen <madcat@e-kolay.net></s>
+backend/tiff/tiff2ps.c                               | SGI     | <s>Sam Leffler</s>, <s>Silicon Graphics, Inc.</s>
+help/bg/evince.xml                                   | GFDL1.1 | unspec
+po/br.po                                             | GPLv2   | <s>Free Software Foundation</s>
+backend/comics/comics-document.c                     | GPLv2h  | <s>Teemu Tervo <teemu.tervo@gmx.net></s>
+
+Shortcuts:
+ - "unspec":    The file contains no specific copyright/license notice. This
+                means that the copyright holder is the Evince Team (as
+                listed above) and the license is GPL2 or higher, unless
+                specified otherwise.
+ - "GPL":       The GNU General Public License, without versioning constraints.
+ - "GPLv2":     The GNU General Public License, version 2.
+ - "GPLv2h":    The GNU General Public License, version 2 or (at your
+                option) higher.
+ - "LGPLv2h":   The Lesser (or Library) GNU General Public License, version
+                2 or (at your option).
+ - "GFDL1.1":   The GNU Free Documentation License, version 1.1 or (at your
+                option) higher. The listed documents use the GFDL with no
+                Invariant Sections, no Front-Cover Texts, and no Back-Cover 
+                Texts.
+ - "Adobe":     The following licensing terms need to be respected:
+    | This file may be freely copied and redistributed as long as:
+    |   1) This entire notice continues to be included in the file,
+    |   2) If the file has been modified in any way, a notice of such
+    |      modification is conspicuously indicated.
+    |
+    | PostScript, Display PostScript, and Adobe are registered trademarks of
+    | Adobe Systems Incorporated.
+    |
+    | ************************************************************************
+    | THE INFORMATION BELOW IS FURNISHED AS IS, IS SUBJECT TO CHANGE WITHOUT
+    | NOTICE, AND SHOULD NOT BE CONSTRUED AS A COMMITMENT BY ADOBE SYSTEMS
+    | INCORPORATED. ADOBE SYSTEMS INCORPORATED ASSUMES NO RESPONSIBILITY OR
+    | LIABILITY FOR ANY ERRORS OR INACCURACIES, MAKES NO WARRANTY OF ANY
+    | KIND (EXPRESS, IMPLIED OR STATUTORY) WITH RESPECT TO THIS INFORMATION,
+    | AND EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES OF MERCHANTABILITY,
+    | FITNESS FOR PARTICULAR PURPOSES AND NONINFRINGEMENT OF THIRD PARTY RIGHTS.
+    | ************************************************************************
+ - "SGI":       The following licensing terms need to be respected:
+    | Permission to use, copy, modify, distribute, and sell this software and
+    | its documentation for any purpose is hereby granted without fee, provided
+    | that (i) the above copyright notices and this permission notice appear in
+    | all copies of the software and related documentation, and (ii) the names of
+    | Sam Leffler and Silicon Graphics may not be used in any advertising or
+    | publicity relating to the software without the specific, prior written
+    | permission of Sam Leffler and Silicon Graphics.
+ - "MIT":       The following licensing terms need to be respected: 
+    | Permission is hereby granted, free of charge, to any person
+    | obtaining a copy of this software and associated documentation files
+    | (the "Software"), to deal in the Software without restriction,
+    | including without limitation the rights to use, copy, modify, merge,
+    | publish, distribute, sublicense, and/or sell copies of the Software,
+    | and to permit persons to whom the Software is furnished to do so,
+    | subject to the following conditions: 
+    |
+    | The above copyright notice and this permission notice shall be
+    | included in all copies or substantial portions of the Software. 
+    |
+    | THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+    | EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+    | MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+    | NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
+    | BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+    | ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+    | CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+
+
+On Debian systems, you can find the complete textes for the GNU (Lesser)
+General licenses:
+  - GPL:      /usr/share/common-licenses/GPL
+  - GPLv2:    /usr/share/common-licenses/GPL-2
+  - LGPLv2:   /usr/share/common-licenses/LGPL-2
+  - GFDL:     /usr/share/common-licenses/GFDL

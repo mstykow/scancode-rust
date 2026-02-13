@@ -1,87 +1,87 @@
-# License Detection Golden Test Data
+# License Detection Golden Tests
 
-This directory contains test files and expected outputs for the license detection golden test suite.
+This directory contains golden tests for the license detection engine, copied from Python ScanCode Toolkit.
 
-## Directory Structure
+## Test Data Source
 
-```
-license-golden/
-├── single-license/     # Simple single-license detection tests
-│   ├── mit.txt         # Input: MIT license text
-│   ├── mit.txt.expected # Expected JSON output from Python ScanCode
-│   ├── apache-2.0.txt
-│   ├── apache-2.0.txt.expected
-│   └── ...
-├── multi-license/      # Multiple licenses in one file
-│   ├── ffmpeg-LICENSE.md
-│   ├── ffmpeg-LICENSE.md.expected
-│   └── ...
-├── spdx-lid/           # SPDX-License-Identifier headers
-│   ├── license
-│   ├── license.expected
-│   └── ...
-├── hash-match/         # Exact whole-file hash matches
-│   ├── query.txt
-│   ├── query.txt.expected
-│   └── ...
-├── seq-match/          # Sequence alignment (partial/modified licenses)
-│   ├── partial.txt
-│   ├── partial.txt.expected
-│   └── ...
-├── unknown/            # Unknown license detection
-│   ├── unknown.txt
-│   ├── unknown.txt.expected
-│   └── ...
-├── false-positive/     # Cases that should NOT match
-│   ├── false-positive-gpl3.txt
-│   ├── false-positive-gpl3.txt.expected
-│   └── ...
-└── reference/          # License references ("See COPYING", etc.)
-    ├── see-copying.txt
-    ├── see-copying.txt.expected
-    └── ...
+Tests are copied from `reference/scancode-toolkit/tests/licensedcode/data/datadriven/`:
+
+| Directory | Description | Test Count |
+|-----------|-------------|------------|
+| `lic1/` | Mixed license tests | ~291 |
+| `lic2/` | Mixed license tests | ~340 |
+| `lic3/` | Mixed license tests | ~292 |
+| `lic4/` | Mixed license tests | ~345 |
+| `external/` | External tool test results (recursive) | varies |
+| `unknown/` | Unknown license detection | ~10 |
+
+**Total: ~1,268 test cases**
+
+## Test Format
+
+Each test consists of two files:
+
+1. **Source file**: The file to scan (e.g., `mit.c`, `apache.txt`)
+2. **YAML expectation file**: Same name with `.yml` extension
+
+Example YAML format:
+```yaml
+license_expressions:
+  - mit
 ```
 
-## Expected File Format
-
-Each `.expected` file is a JSON file containing the output from Python ScanCode with the `--license` flag. The format should include:
-
-```json
-{
-  "license_detections": [
-    {
-      "license_expression": "mit",
-      "license_expression_spdx": "MIT",
-      "matches": [
-        {
-          "license_expression": "mit",
-          "matcher": "1-hash",
-          "score": 100.0,
-          "match_coverage": 100.0,
-          "rule_relevance": 100,
-          "start_line": 1,
-          "end_line": 21
-        }
-      ],
-      "detection_log": ["perfect-detection"]
-    }
-  ]
-}
+For multiple licenses:
+```yaml
+license_expressions:
+  - apache-2.0
+  - gpl-2.0
 ```
 
-## Generating Expected Files
+For tests expected to fail:
+```yaml
+license_expressions:
+  - some-license
+expected_failure: true
+```
 
-To generate expected files from Python ScanCode:
+## Running Tests
 
 ```bash
-cd reference/scancode-toolkit
-scancode --license --license-text \
-    path/to/input/file.txt \
-    --json path/to/output/file.txt.expected
+# Run all license golden tests
+cargo test license_detection_golden
+
+# Run specific suite
+cargo test test_golden_lic1
+
+# Run with output
+cargo test test_golden_summary -- --nocapture
 ```
 
-## Adding New Test Cases
+## Current Status
 
-1. Add the input file to the appropriate category directory
-2. Generate the expected output using Python ScanCode
-3. Run `cargo test license_detection_golden_test` to verify the test
+**Expected: Many tests will fail.** This is expected at this stage.
+
+The Rust license detection engine is still under development. Failures indicate areas where the Rust implementation differs from Python. These will be addressed in subsequent phases.
+
+## Test Implementation
+
+Tests are defined in `src/license_detection_golden_test.rs`:
+
+- `test_golden_lic1()` - Run lic1 test suite
+- `test_golden_lic2()` - Run lic2 test suite  
+- `test_golden_lic3()` - Run lic3 test suite
+- `test_golden_lic4()` - Run lic4 test suite
+- `test_golden_external()` - Run external test suite
+- `test_golden_unknown()` - Run unknown test suite
+- `test_golden_summary()` - Run all and print summary
+
+## Adding New Tests
+
+1. Add the source file to the appropriate directory
+2. Create a `.yml` file with the same base name
+3. Specify expected `license_expressions`
+4. Run tests to verify
+
+## Known Differences from Python
+
+See `COMPARISON.md` for documented differences between Python and Rust detection results.

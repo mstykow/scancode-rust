@@ -1,0 +1,19 @@
+license_expressions:
+  - postgresql
+  - henry-spencer-1999
+  - tcl
+  - tcl
+  - (artistic-perl-1.0 OR gpl-1.0-plus) AND bsd-new
+  - postgresql
+  - postgresql
+  - bsd-new
+  - bsd-new
+  - bsd-new
+  - bsd-new
+  - bsd-new
+  - bsd-new
+  - bsd-new
+  - other-permissive
+  - other-permissive
+  - tcl
+  - tcl

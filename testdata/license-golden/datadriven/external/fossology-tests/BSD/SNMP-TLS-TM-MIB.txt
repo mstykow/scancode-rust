@@ -1,0 +1,122 @@
+SNMP-TLS-TM-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+    MODULE-IDENTITY, OBJECT-TYPE,
+    OBJECT-IDENTITY, mib-2, snmpDomains,
+    Counter32, Unsigned32, Gauge32, NOTIFICATION-TYPE
+      FROM SNMPv2-SMI                 -- RFC 2578 or any update thereof
+    TEXTUAL-CONVENTION, TimeStamp, RowStatus, StorageType,
+    AutonomousType
+      FROM SNMPv2-TC                  -- RFC 2579 or any update thereof
+    MODULE-COMPLIANCE, OBJECT-GROUP, NOTIFICATION-GROUP
+      FROM SNMPv2-CONF                -- RFC 2580 or any update thereof
+    SnmpAdminString
+      FROM SNMP-FRAMEWORK-MIB         -- RFC 3411 or any update thereof
+    snmpTargetParamsName, snmpTargetAddrName
+      FROM SNMP-TARGET-MIB            -- RFC 3413 or any update thereof
+    ;
+
+snmpTlstmMIB MODULE-IDENTITY
+
+
+
+    LAST-UPDATED "201005070000Z"
+    ORGANIZATION "ISMS Working Group"
+    CONTACT-INFO "WG-EMail:   isms@lists.ietf.org
+                  Subscribe:  isms-request@lists.ietf.org
+
+                  Chairs:
+                     Juergen Schoenwaelder
+                     Jacobs University Bremen
+                     Campus Ring 1
+                     28725 Bremen
+                     Germany
+                     +49 421 200-3587
+                     j.schoenwaelder@jacobs-university.de
+
+                     Russ Mundy
+                     SPARTA, Inc.
+                     7110 Samuel Morse Drive
+                     Columbia, MD  21046
+                     USA
+
+                  Editor:
+                     Wes Hardaker
+                     SPARTA, Inc.
+                     P.O. Box 382
+                     Davis, CA  95617
+                     USA
+                     ietf@hardakers.net
+                  "
+
+    DESCRIPTION  "
+        The TLS Transport Model MIB
+
+        Copyright (c) 2010 IETF Trust and the persons identified as
+        the document authors.  All rights reserved.
+
+        Redistribution and use in source and binary forms, with or
+        without modification, is permitted pursuant to, and subject
+        to the license terms contained in, the Simplified BSD License
+        set forth in Section 4.c of the IETF Trust's Legal Provisions
+        Relating to IETF Documents
+        (http://trustee.ietf.org/license-info)."
+
+       REVISION     "201005070000Z"
+       DESCRIPTION  "This version of this MIB module is part of
+                     RFC 5953; see the RFC itself for full legal
+                     notices."
+
+    ::= { mib-2 198 }
+
+
+
+-- ************************************************
+-- subtrees of the SNMP-TLS-TM-MIB
+-- ************************************************
+
+snmpTlstmNotifications OBJECT IDENTIFIER ::= { snmpTlstmMIB 0 }
+snmpTlstmIdentities    OBJECT IDENTIFIER ::= { snmpTlstmMIB 1 }
+snmpTlstmObjects       OBJECT IDENTIFIER ::= { snmpTlstmMIB 2 }
+snmpTlstmConformance   OBJECT IDENTIFIER ::= { snmpTlstmMIB 3 }
+
+-- ************************************************
+-- snmpTlstmObjects - Objects
+-- ************************************************
+
+snmpTLSTCPDomain OBJECT-IDENTITY
+    STATUS      current
+    DESCRIPTION
+        "The SNMP over TLS via TCP transport domain.  The
+        corresponding transport address is of type SnmpTLSAddress.
+
+        The securityName prefix to be associated with the
+        snmpTLSTCPDomain is 'tls'.  This prefix may be used by
+        security models or other components to identify which secure
+        transport infrastructure authenticated a securityName."
+    REFERENCE
+      "RFC 2579: Textual Conventions for SMIv2"
+
+    ::= { snmpDomains 8 }
+
+snmpDTLSUDPDomain OBJECT-IDENTITY
+    STATUS      current
+    DESCRIPTION
+        "The SNMP over DTLS via UDP transport domain.  The
+        corresponding transport address is of type SnmpTLSAddress.
+
+        The securityName prefix to be associated with the
+        snmpDTLSUDPDomain is 'dtls'.  This prefix may be used by
+        security models or other components to identify which secure
+        transport infrastructure authenticated a securityName."
+    REFERENCE
+      "RFC 2579: Textual Conventions for SMIv2"
+
+    ::= { snmpDomains 9 }
+
+SnmpTLSAddress ::= TEXTUAL-CONVENTION
+    DISPLAY-HINT "1a"
+    STATUS       current
+    DESCRIPTION
+        "Represents an IPv4 address, an IPv6 address, or a
+

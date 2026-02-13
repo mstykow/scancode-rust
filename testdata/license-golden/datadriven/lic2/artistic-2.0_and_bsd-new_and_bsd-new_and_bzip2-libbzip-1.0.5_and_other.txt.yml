@@ -1,0 +1,10 @@
+license_expressions:
+  - artistic-perl-1.0 OR gpl-1.0-plus
+  - zlib
+  - unicode
+  - unicode
+  - unicode
+  - artistic-perl-1.0 OR gpl-1.0-plus
+  - bsd-new
+  - bsd-new
+  - bzip2-libbzip-2010

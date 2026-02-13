@@ -1,0 +1,21 @@
+/*
+ * Device Tree Source for AMCC Glacier (460GT)
+ *
+ * Copyright 2008-2010 DENX Software Engineering, Stefan Roese <sr@denx.de>
+ *
+ * SPDX-License-Identifier:	GPL-2.0
+ */
+
+/dts-v1/;
+
+/ {
+	#address-cells = <2>;
+	#size-cells = <1>;
+	model = "amcc,glacier";
+	compatible = "amcc,glacier";
+	dcr-parent = <&{/cpus/cpu@0}>;
+
+	aliases {
+		ethernet0 = &EMAC0;
+		ethernet1 = &EMAC1;
+		ethernet2 = &EMAC2;

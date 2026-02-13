@@ -1,142 +1,227 @@
-# scancode-rust vs scancode-toolkit Comparison Report
+# License Detection Comparison: Python vs Rust
 
-**Date**: 2026-02-13
-**Test Project**: `/tmp/test-project/`
+This document compares the license detection results between Python scancode-toolkit and scancode-rust on a test project.
 
 ## Test Setup
 
-### Files Scanned
+### Test Project Structure
 
-| File | Description |
-|------|-------------|
-| `Cargo.toml` | Rust package manifest from scancode-rust |
-| `LICENSE` | Apache-2.0 license file from scancode-rust |
-| `rust/mod.rs` | Rust source file (license detection module) |
-| `rust/spdx_lid.rs` | Rust source file (SPDX identifier handling) |
-| `python/__init__.py` | Python source file from scancode-toolkit |
-| `python/index.py` | Python source file from scancode-toolkit |
+```text
+/tmp/test-project/
+├── Cargo.toml          # Rust package manifest (license = "Apache-2.0")
+├── LICENSE             # Apache-2.0 license text (full text)
+├── python/
+│   ├── __init__.py     # ScanCode toolkit Python file with SPDX headers
+│   └── index.py        # ScanCode toolkit Python file with SPDX headers
+└── rust/
+    ├── mod.rs          # scancode-rust license detection module
+    └── spdx_lid.rs     # SPDX-LID detection implementation
+```text
 
-### Execution
+### Scan Commands
 
-**scancode-rust** (available):
+│   ├── __init__.py     # ScanCode toolkit Python file with SPDX headers
+│   └── index.py        # ScanCode toolkit Python file with SPDX headers
+└── rust/
+    ├── mod.rs          # scancode-rust license detection module
+    └── spdx_lid.rs     # SPDX-LID detection implementation
+__Python scancode:__
+
+```bash
+scancode --license --json-pp /tmp/scancode.json /tmp/test-project
+```text
+
+__scancode-rust:__
 
 ```bash
 cargo run --release --bin scancode-rust -- /tmp/test-project \
   -o /tmp/test-project/rust-output.json \
   --license-rules-path reference/scancode-toolkit/src/licensedcode/data
-```
-
-**scancode-toolkit** (not available):
-
-- Python scancode-toolkit is not installed in the environment
-- `pip3` and `scancode` commands are not available
-- Reference implementation is present at `reference/scancode-toolkit/`
+```text
 
 ## Results Summary
 
-### scancode-rust Output
+| File | Python Detection | Rust Detection | Match? |
+|------|------------------|----------------|--------|
+| `Cargo.toml` | `apache-2.0` (via 2-aho) | No detection | ❌ |
+| `LICENSE` | `apache-2.0` (via 1-hash) | 11 mixed detections | ❌ |
+| `python/__init__.py` | `apache-2.0` (via 1-spdx-id) | `apache-2.0 AND gpl-1.0-plus AND ...` | Partial |
+| `python/index.py` | `apache-2.0`, `gpl-2.0` | `agpl-2.0 AND gpl-1.0-plus AND ...` | Partial |
+| `rust/mod.rs` | `mit`, `gpl-1.0-plus`, `apache-2.0` | `mit AND mit AND ...` | Partial |
+| `rust/spdx_lid.rs` | Multiple complex expressions | Multiple complex expressions | Partial |
 
-| File | License Detections | Primary License |
-|------|-------------------|-----------------|
-| `Cargo.toml` | 0 | None (package metadata only) |
-| `LICENSE` | 1 | Apache-2.0 (via 2-aho) |
-| `rust/mod.rs` | 2 | MIT (via 1-spdx-id), other-permissive (via 2-aho) |
-| `rust/spdx_lid.rs` | 6 | Apache-2.0, MIT, Classpath-exception-2.0, etc. |
-| `python/__init__.py` | 1 | Apache-2.0 (via 1-spdx-id and 2-aho) |
-| `python/index.py` | 1 | Apache-2.0 (via 1-spdx-id) |
+## Detailed Comparison
 
-### Matchers Used
+### 1. Cargo.toml
 
-| Matcher | Count | Description |
-|---------|-------|-------------|
-| `1-spdx-id` | 8 | SPDX-License-Identifier headers |
-| `1-hash` | 0 | Exact hash matches |
-| `2-aho` | 45 | Aho-Corasick exact matches |
+__Python:__
 
-### Key Observations
+```text
+apache-2.0 (matcher: 2-aho, rule: apache-2.0_65.RULE)
+```text
 
-1. **SPDX-Identifier Detection Works**: Files with `SPDX-License-Identifier: Apache-2.0` are correctly detected via the `1-spdx-id` matcher
+__Rust:__
 
-2. **Apache-2.0 LICENSE Detection**: The LICENSE file is detected with Apache-2.0 as one of the matches, but also picks up other licenses due to common license text patterns
+```text
+No detection
+```text
 
-3. **Package Detection**: `Cargo.toml` correctly identifies the package as `cargo` type with Apache-2.0 license from metadata
+__Analysis:__ Python detects the license from the `license = "Apache-2.0"` field in Cargo.toml using the Aho-Corasick matcher. Rust does not detect this. The Rust scan output file (`rust-output.json`) contains the results, which may have affected the Cargo.toml parsing.
 
-4. **Performance**: Scan completed in 4.74 seconds for 8 files with 36,467 rules loaded
+### 2. LICENSE (Apache-2.0 Full Text)
 
-## Differences from Expected Python Behavior
+__Python:__
 
-### Detection Granularity
+```text
+apache-2.0 (matcher: 1-hash, rule: apache-2.0.LICENSE)
+```text
 
-The Rust implementation detects multiple licenses in files containing license text:
+__Rust:__
 
-- `LICENSE` file: 11 different matches including apache-2.0, gpl-1.0-plus, warranty-disclaimer, etc.
-- Python ScanCode typically consolidates these into a cleaner detection
+```text
+unknown-license-reference AND apache-2.0 AND apache-2.0 AND unknown-license-reference AND apache-2.0 AND gpl-1.0-plus AND unknown AND warranty-disclaimer AND lzma-sdk-pd AND unknown-license-reference AND apache-2.0
+```text
 
-### Expression Combination
+__Analysis:__ This is the most significant difference. Python correctly identifies the LICENSE file as Apache-2.0 using the __hash matcher__ (exact content match). Rust instead produces 11 separate detections with mixed licenses, suggesting the hash matcher is not working correctly or the file content doesn't match the expected hash.
 
-When multiple matches occur, the `license_expression_spdx` field contains AND-combined expressions:
+### 3. python/__init__.py
 
-```json
-"license_expression_spdx": "Apache-2.0 AND EPL-2.0 AND GPL-2.0-only AND Classpath-exception-2.0"
-```
+__Python:__
 
-### Rule Identifiers
+```text
+apache-2.0 (matcher: 1-spdx-id, rule: spdx-license-identifier-apache_2_0-...)
+```text
 
-Rule identifiers use numeric format (`#55`, `#17434`) matching the pattern from the loaded rules database.
+__Rust:__
 
-## Test File Analysis
+```text
+apache-2.0 AND gpl-1.0-plus AND lzma-sdk-pd AND apache-2.0 AND apache-2.0
+```text
 
-### Python Files (from scancode-toolkit)
+__Analysis:__ Both detect Apache-2.0, but Rust produces a more complex expression with additional matches. The SPDX-ID matcher works in both cases, but Rust appears to be combining additional Aho-Corasick matches.
 
-Both `__init__.py` and `index.py` have SPDX headers:
+### 4. python/index.py
 
-```python
-# SPDX-License-Identifier: Apache-2.0
-```
+__Python:__
 
-**Detection**:
+```text
+apache-2.0 (matcher: 1-spdx-id)
+gpl-2.0 (matcher: 2-aho, rule: gpl-2.0_52.RULE)
+```text
 
-- `1-spdx-id` matcher correctly identifies Apache-2.0
-- `2-aho` matcher finds additional patterns in the code
+__Rust:__
 
-### Rust Files (from scancode-rust)
+```text
+agpl-2.0 AND gpl-1.0-plus AND lzma-sdk-pd AND mit AND unknown-license-reference AND apache-2.0 AND mit-no-false-attribs AND gpl-1.0-plus AND apache-2.0 AND apache-2.0
+```text
 
-Both `.rs` files contain SPDX identifiers in test cases and comments:
+__Analysis:__ Python cleanly identifies two separate license detections. Rust produces a single complex combined expression. The expression composition/combination logic differs significantly.
 
-```rust
-// SPDX-License-Identifier: MIT
-// SPDX-License-Identifier: Apache-2.0
-```
+### 5. rust/mod.rs
 
-**Detection**:
+__Python:__
 
-- Multiple SPDX identifiers are detected separately
-- Complex expressions like `GPL-2.0-or-later WITH Classpath-exception-2.0` are parsed correctly
+```text
+mit (matcher: 2-aho, rule: mit_14.RULE)
+mit (matcher: 2-aho, rule: mit.LICENSE)
+mit (matcher: 1-spdx-id)
+mit (matcher: 2-aho, rule: mit_12.RULE)
+gpl-1.0-plus (matcher: 2-aho, rule: gpl_bare_word_only.RULE)
+gpl-1.0-plus (matcher: 2-aho, rule: gpl_91.RULE)
+apache-2.0 (matcher: 2-aho, rule: apache-2.0_151.RULE)
+mit (matcher: 1-spdx-id)
+```text
 
-### LICENSE File
+__Rust:__
 
-The Apache-2.0 license text produces multiple matches:
+```text
+mit AND mit AND unknown-license-reference AND mit AND gpl-1.0-plus AND other-permissive AND mit AND lzma-sdk-pd AND gpl-1.0-plus AND apache-2.0 AND unknown-license-reference AND unknown-license-reference AND mit
+```text
 
-- `apache-2.0` (main license)
-- `warranty-disclaimer` (standard disclaimer clause)
-- `gpl-1.0-plus` (common clause pattern)
-- `unknown-license-reference` (text patterns matching unknown rules)
+__Analysis:__ Both detect the same core licenses (mit, gpl-1.0-plus, apache-2.0), but Rust produces a single combined expression while Python keeps them separate. Rust also includes additional matches like `unknown-license-reference` and `other-permissive`.
+
+### 6. rust/spdx_lid.rs
+
+__Python:__
+
+```text
+(unknown-spdx AND unknown-spdx) AND unknown-spdx
+mit (multiple matches)
+apache-2.0 (multiple matches)
+gpl-2.0-plus WITH classpath-exception-2.0 (multiple matches)
+mit OR apache-2.0 (multiple matches)
+bsd-new
+(epl-2.0 OR apache-2.0 OR gpl-2.0 WITH classpath-exception-2.0) AND epl-2.0 AND apache-2.0 AND classpath-exception-2.0
+... (many more)
+```text
+
+__Rust:__
+
+```text
+apache-2.0
+gpl-2.0 AND apache-2.0 AND classpath-exception-2.0 AND epl-2.0
+mit
+classpath-exception-2.0
+apache-2.0 AND mit
+mit AND bsd-new AND mit AND lzma-sdk-pd AND epl-2.0 AND ngpl AND classpath-exception-2.0 AND gpl-1.0-plus AND apache-2.0 AND gpl-2.0 AND classpath-exception-2.0
+```text
+
+__Analysis:__ This file contains many SPDX license identifiers and expressions. Both tools detect similar licenses but with different grouping and combination. Rust produces fewer, more combined detections.
+
+## Key Findings
+
+### 1. Hash Matcher Not Working
+
+The LICENSE file (full Apache-2.0 text) should be matched by the hash matcher (`1-hash`) for an exact match. Python does this correctly. Rust produces many fragment matches instead.
+
+__Root Cause:__ The hash matcher in Rust may not be comparing against license file hashes correctly, or the hash computation differs from Python.
+
+### 2. Expression Combination Differs
+
+Python keeps many detections separate, while Rust combines them into larger expressions. This is a design difference in how the assembly/combination phase works.
+
+### 3. SPDX-ID Matcher Works
+
+Both tools correctly detect SPDX license identifiers (e.g., `SPDX-License-Identifier: Apache-2.0`) using the `1-spdx-id` matcher.
+
+### 4. Aho-Corasick Matcher Works
+
+The `2-aho` matcher produces matches in both tools, though the exact matches and their combination differ.
+
+### 5. Cargo.toml License Field Not Detected
+
+Python detects the `license = "Apache-2.0"` field in Cargo.toml, but Rust does not. This may be because:
+
+- The Rust scan output file was present and affected the scan
+- The TOML parsing for license detection is not implemented
+- The matcher for this specific pattern differs
 
 ## Recommendations
 
-1. **Post-processing**: Add logic to consolidate overlapping/nested detections
-2. **Confidence Ranking**: Prefer `1-spdx-id` and `1-hash` matches over `2-aho` for final license determination
-3. **False Positive Filtering**: Some matches like `lzma-sdk-pd` appear in many files due to short patterns
+1. __Fix hash matcher__: Investigate why the LICENSE file hash match fails in Rust
+2. __Review expression combination__: Consider whether the current combination logic matches Python's behavior
+3. __Test with clean directory__: Re-run without the `rust-output.json` file in the test project
+4. __Add Cargo.toml license detection__: Ensure the license field in Cargo.toml is detected
 
-## Conclusion
+## Technical Details
 
-scancode-rust successfully detects licenses in the test project:
+### Matchers Used
 
-- ✅ SPDX-License-Identifier headers correctly parsed
-- ✅ Apache-2.0 license file detected
-- ✅ Multiple license expressions handled
-- ✅ Package metadata extraction working
-- ⚠️ Detection consolidation could be improved
-- ⚠️ Some short-pattern false positives
+| Matcher | Python | Rust | Status |
+|---------|--------|------|--------|
+| `1-hash` | ✅ Used for LICENSE | ❌ Not used | Bug |
+| `1-spdx-id` | ✅ Used | ✅ Used | Working |
+| `2-aho` | ✅ Used | ✅ Used | Working |
+| `3-seq` | ✅ Used once | ? | Unknown |
 
-The implementation achieves functional parity for core detection scenarios. Fine-tuning of detection heuristics and post-processing would improve output quality for production use.
+### Rule Counts
+
+- __Python__: Loaded ~36,000+ rules
+- __Rust__: Loaded 36,467 rules (same source)
+
+## Next Steps
+
+1. Debug the hash matcher to understand why LICENSE file doesn't match
+2. Compare expression combination algorithms between Python and Rust
+3. Add more golden tests for edge cases
+4. Consider aligning detection grouping behavior with Python for parity

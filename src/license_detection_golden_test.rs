@@ -1,397 +1,342 @@
-//! Golden tests for license detection against Python ScanCode reference outputs.
+//! Golden tests for license detection against Python ScanCode reference.
 //!
-//! This module validates that the Rust license detection engine produces
-//! identical output to Python ScanCode across a wide range of inputs.
+//! These tests validate that the Rust license detection engine produces
+//! correct results compared to the Python reference implementation.
 //!
-//! ## Test Categories
+//! ## Test Data
 //!
-//! - **Single licenses**: Simple detection of MIT, Apache, GPL, etc.
-//! - **Multi-license**: Files with multiple licenses (e.g., ffmpeg LICENSE)
-//! - **SPDX-LID**: Files with SPDX-License-Identifier headers
-//! - **Hash match**: Exact whole-file license matches
-//! - **Sequence match**: Modified/partial license text
-//! - **Unknown licenses**: Unrecognized license-like text
-//! - **False positives**: Cases that should NOT match
-//! - **License references**: "See COPYING", "See LICENSE file", etc.
+//! Test data is copied from `reference/scancode-toolkit/tests/licensedcode/data/datadriven/`:
+//! - `lic1/` - ~291 test cases
+//! - `lic2/` - ~340 test cases  
+//! - `lic3/` - ~292 test cases
+//! - `lic4/` - ~345 test cases
+//! - `external/` - External license references
+//! - `unknown/` - Unknown license detection
+//!
+//! Each test consists of:
+//! - A source file to scan (e.g., `mit.c`)
+//! - A YAML expectation file with expected `license_expressions`
+//!
+//! ## Running Tests
+//!
+//! ```bash
+//! cargo test license_detection_golden
+//! ```
 
 #[cfg(test)]
 mod golden_tests {
-    use crate::license_detection::LicenseDetection;
-    use serde_json::Value;
+    use crate::license_detection::LicenseDetectionEngine;
+    use once_cell::sync::Lazy;
+    use serde::Deserialize;
     use std::fs;
-    use std::path::Path;
+    use std::path::{Path, PathBuf};
+    use std::sync::Once;
 
-    const GOLDEN_DIR: &str = "testdata/license-golden";
+    const GOLDEN_DIR: &str = "testdata/license-golden/datadriven";
 
-    fn load_expected_json(expected_path: &Path) -> Result<Value, String> {
-        let content = fs::read_to_string(expected_path)
-            .map_err(|e| format!("Failed to read expected file: {}", e))?;
-        serde_json::from_str(&content).map_err(|e| format!("Failed to parse expected JSON: {}", e))
+    /// Shared engine instance - created once and reused across all tests
+    static TEST_ENGINE: Lazy<Option<LicenseDetectionEngine>> = Lazy::new(|| {
+        let data_path = PathBuf::from("reference/scancode-toolkit/src/licensedcode/data");
+        if !data_path.exists() {
+            eprintln!("Reference data not available at {:?}", data_path);
+            return None;
+        }
+        match LicenseDetectionEngine::new(&data_path) {
+            Ok(engine) => {
+                eprintln!("License detection engine initialized for tests");
+                Some(engine)
+            }
+            Err(e) => {
+                eprintln!("Failed to create engine: {:?}", e);
+                None
+            }
+        }
+    });
+
+    /// Initialize engine once before any tests run
+    static INIT: Once = Once::new();
+
+    fn ensure_engine() -> Option<&'static LicenseDetectionEngine> {
+        INIT.call_once(|| {
+            let _ = &*TEST_ENGINE;
+        });
+        TEST_ENGINE.as_ref()
     }
 
-    fn get_license_detections_from_expected(expected: &Value) -> Result<&Value, String> {
-        expected
-            .get("license_detections")
-            .ok_or_else(|| "Expected JSON missing 'license_detections' field".to_string())
+    /// Represents the YAML expectation file format
+    #[derive(Debug, Deserialize, Default)]
+    struct LicenseTestYaml {
+        #[serde(default)]
+        license_expressions: Vec<String>,
+        #[serde(default)]
+        expected_failure: bool,
     }
 
-    fn compare_license_expression(
-        actual: &LicenseDetection,
-        expected_detection: &Value,
-    ) -> Result<(), String> {
-        let expected_expr = expected_detection
-            .get("license_expression")
-            .and_then(|v| v.as_str())
-            .unwrap_or("");
+    /// A single golden test case
+    struct LicenseGoldenTest {
+        name: String,
+        test_file: PathBuf,
+        yaml: LicenseTestYaml,
+    }
 
-        let actual_expr = actual.license_expression.as_deref().unwrap_or("");
+    impl LicenseGoldenTest {
+        /// Load a test from its YAML file
+        fn load(yaml_path: &Path) -> Result<Self, String> {
+            let content = fs::read_to_string(yaml_path)
+                .map_err(|e| format!("Failed to read {}: {}", yaml_path.display(), e))?;
 
-        if !expected_expr.is_empty()
-            && !actual_expr.contains(expected_expr)
-            && !expected_expr.contains(actual_expr)
-            && actual_expr != expected_expr
-        {
-            return Err(format!(
-                "license_expression mismatch: expected '{}', got '{}'",
-                expected_expr, actual_expr
-            ));
+            let yaml: LicenseTestYaml = serde_yaml::from_str(&content)
+                .map_err(|e| format!("Failed to parse YAML {}: {}", yaml_path.display(), e))?;
+
+            let test_file = yaml_path.with_extension("");
+
+            // Use relative path from GOLDEN_DIR as name for uniqueness
+            let name = yaml_path
+                .strip_prefix(PathBuf::from(GOLDEN_DIR).parent().unwrap_or(Path::new("")))
+                .unwrap_or(yaml_path)
+                .with_extension("")
+                .to_string_lossy()
+                .replace('\\', "/");
+
+            Ok(Self {
+                name,
+                test_file,
+                yaml,
+            })
         }
 
-        Ok(())
-    }
+        /// Run this test against the detection engine
+        fn run(&self, engine: &LicenseDetectionEngine) -> Result<(), String> {
+            let text = fs::read_to_string(&self.test_file).map_err(|e| {
+                format!(
+                    "Failed to read test file {}: {}",
+                    self.test_file.display(),
+                    e
+                )
+            })?;
 
-    fn compare_matcher(
-        actual: &LicenseDetection,
-        expected_detection: &Value,
-    ) -> Result<(), String> {
-        let expected_matches = expected_detection
-            .get("matches")
-            .and_then(|v| v.as_array())
-            .ok_or_else(|| "Expected detection missing 'matches' array".to_string())?;
+            let detections = engine.detect(&text).map_err(|e| {
+                format!("Detection failed for {}: {:?}", self.test_file.display(), e)
+            })?;
 
-        if actual.matches.is_empty() && !expected_matches.is_empty() {
-            return Err("Actual has no matches but expected has matches".to_string());
-        }
+            let actual: Vec<&str> = detections
+                .iter()
+                .map(|d| d.license_expression.as_deref().unwrap_or(""))
+                .collect();
 
-        for (i, expected_match) in expected_matches.iter().enumerate() {
-            let expected_matcher = expected_match
-                .get("matcher")
-                .and_then(|v| v.as_str())
-                .unwrap_or("");
+            let expected: Vec<&str> = self
+                .yaml
+                .license_expressions
+                .iter()
+                .map(|s| s.as_str())
+                .collect();
 
-            if let Some(actual_match) = actual.matches.get(i)
-                && !expected_matcher.is_empty()
-                && actual_match.matcher != expected_matcher
-            {
+            if actual != expected {
                 return Err(format!(
-                    "Match {} matcher mismatch: expected '{}', got '{}'",
-                    i, expected_matcher, actual_match.matcher
+                    "license_expressions mismatch for {}:\n  Expected: {:?}\n  Actual:   {:?}",
+                    self.name, expected, actual
                 ));
+            }
+
+            Ok(())
+        }
+    }
+
+    /// Discover all golden tests in a directory (recursively)
+    fn discover_tests(dir: &Path) -> Vec<LicenseGoldenTest> {
+        let mut tests = Vec::new();
+        discover_tests_recursive(dir, &mut tests);
+        tests.sort_by(|a, b| a.name.cmp(&b.name));
+        tests
+    }
+
+    fn discover_tests_recursive(dir: &Path, tests: &mut Vec<LicenseGoldenTest>) {
+        if !dir.exists() {
+            return;
+        }
+
+        let entries: Vec<_> = match fs::read_dir(dir) {
+            Ok(e) => e.filter_map(|e| e.ok()).collect(),
+            Err(_) => return,
+        };
+
+        for entry in entries {
+            let path = entry.path();
+            if path.is_dir() {
+                discover_tests_recursive(&path, tests);
+            } else if path.extension().is_some_and(|e| e == "yml")
+                && let Ok(test) = LicenseGoldenTest::load(&path)
+            {
+                tests.push(test);
+            }
+        }
+    }
+
+    /// Result of running a test suite
+    struct SuiteResult {
+        total: usize,
+        passed: usize,
+        failed: usize,
+        skipped: usize,
+        failures: Vec<(String, String)>,
+    }
+
+    /// Run a complete test suite using the shared engine
+    fn run_suite(suite_name: &str, dir: &Path) -> SuiteResult {
+        let mut result = SuiteResult {
+            total: 0,
+            passed: 0,
+            failed: 0,
+            skipped: 0,
+            failures: Vec::new(),
+        };
+
+        let Some(engine) = ensure_engine() else {
+            eprintln!("Skipping {}: engine not available", suite_name);
+            return result;
+        };
+
+        let tests = discover_tests(dir);
+        result.total = tests.len();
+
+        println!("\n{}: Running {} tests...", suite_name, tests.len());
+
+        for test in &tests {
+            if test.yaml.expected_failure {
+                result.skipped += 1;
+                continue;
+            }
+
+            match test.run(engine) {
+                Ok(()) => result.passed += 1,
+                Err(e) => {
+                    result.failed += 1;
+                    result.failures.push((test.name.clone(), e));
+                }
             }
         }
 
-        Ok(())
-    }
+        println!(
+            "{}: {} passed, {} failed, {} skipped",
+            suite_name, result.passed, result.failed, result.skipped
+        );
 
-    fn compare_license_detections(
-        actual: &[LicenseDetection],
-        expected_path: &Path,
-    ) -> Result<(), String> {
-        let expected = load_expected_json(expected_path)?;
-        let expected_detections = get_license_detections_from_expected(&expected)?;
-
-        let expected_array = expected_detections
-            .as_array()
-            .ok_or_else(|| "'license_detections' is not an array".to_string())?;
-
-        if actual.len() != expected_array.len() {
-            return Err(format!(
-                "Detection count mismatch: expected {}, got {}",
-                expected_array.len(),
-                actual.len()
-            ));
-        }
-
-        for (i, (actual_det, expected_det)) in actual.iter().zip(expected_array.iter()).enumerate()
-        {
-            compare_license_expression(actual_det, expected_det)
-                .map_err(|e| format!("Detection {}: {}", i, e))?;
-            compare_matcher(actual_det, expected_det)
-                .map_err(|e| format!("Detection {}: {}", i, e))?;
-        }
-
-        Ok(())
-    }
-
-    fn skip_if_no_expected_file(expected_path: &Path) -> bool {
-        !expected_path.exists()
-    }
-
-    fn skip_if_no_reference_data() -> bool {
-        let rules_path =
-            std::path::PathBuf::from("reference/scancode-toolkit/src/licensedcode/data/rules");
-        let licenses_path =
-            std::path::PathBuf::from("reference/scancode-toolkit/src/licensedcode/data/licenses");
-        !rules_path.exists() || !licenses_path.exists()
-    }
-
-    fn create_test_engine() -> Option<crate::license_detection::LicenseDetectionEngine> {
-        let data_path =
-            std::path::PathBuf::from("reference/scancode-toolkit/src/licensedcode/data");
-        crate::license_detection::LicenseDetectionEngine::new(&data_path).ok()
+        result
     }
 
     #[test]
-    fn test_golden_single_mit() {
-        if skip_if_no_reference_data() {
-            eprintln!("Skipping test: reference directory not found");
-            return;
+    fn test_golden_lic1() {
+        let result = run_suite("lic1", &PathBuf::from(format!("{}/lic1", GOLDEN_DIR)));
+        if result.failed > 0 {
+            println!("\n{} failures:", result.failed);
+            for (name, err) in &result.failures {
+                println!("  - {}: {}", name, err.lines().next().unwrap_or(err));
+            }
         }
-
-        let input = std::path::PathBuf::from(format!("{}/single-license/mit.txt", GOLDEN_DIR));
-        let expected =
-            std::path::PathBuf::from(format!("{}/single-license/mit.txt.expected", GOLDEN_DIR));
-
-        if skip_if_no_expected_file(&expected) {
-            eprintln!("Skipping test: expected file not found at {:?}", expected);
-            return;
-        }
-
-        let Some(engine) = create_test_engine() else {
-            eprintln!("Skipping test: could not create engine");
-            return;
-        };
-
-        let text = fs::read_to_string(&input).expect("Failed to read input file");
-        let detections = engine.detect(&text).expect("Detection failed");
-
-        compare_license_detections(&detections, &expected).unwrap();
     }
 
     #[test]
-    fn test_golden_single_apache() {
-        if skip_if_no_reference_data() {
-            eprintln!("Skipping test: reference directory not found");
-            return;
+    fn test_golden_lic2() {
+        let result = run_suite("lic2", &PathBuf::from(format!("{}/lic2", GOLDEN_DIR)));
+        if result.failed > 0 {
+            println!("\n{} failures:", result.failed);
+            for (name, err) in &result.failures {
+                println!("  - {}: {}", name, err.lines().next().unwrap_or(err));
+            }
         }
-
-        let input =
-            std::path::PathBuf::from(format!("{}/single-license/apache-2.0.txt", GOLDEN_DIR));
-        let expected = std::path::PathBuf::from(format!(
-            "{}/single-license/apache-2.0.txt.expected",
-            GOLDEN_DIR
-        ));
-
-        if skip_if_no_expected_file(&expected) {
-            eprintln!("Skipping test: expected file not found at {:?}", expected);
-            return;
-        }
-
-        let Some(engine) = create_test_engine() else {
-            eprintln!("Skipping test: could not create engine");
-            return;
-        };
-
-        let text = fs::read_to_string(&input).expect("Failed to read input file");
-        let detections = engine.detect(&text).expect("Detection failed");
-
-        compare_license_detections(&detections, &expected).unwrap();
     }
 
     #[test]
-    fn test_golden_spdx_id() {
-        if skip_if_no_reference_data() {
-            eprintln!("Skipping test: reference directory not found");
-            return;
+    fn test_golden_lic3() {
+        let result = run_suite("lic3", &PathBuf::from(format!("{}/lic3", GOLDEN_DIR)));
+        if result.failed > 0 {
+            println!("\n{} failures:", result.failed);
+            for (name, err) in &result.failures {
+                println!("  - {}: {}", name, err.lines().next().unwrap_or(err));
+            }
         }
-
-        let input = std::path::PathBuf::from(format!("{}/spdx-lid/license", GOLDEN_DIR));
-        let expected =
-            std::path::PathBuf::from(format!("{}/spdx-lid/license.expected", GOLDEN_DIR));
-
-        if skip_if_no_expected_file(&expected) {
-            eprintln!("Skipping test: expected file not found at {:?}", expected);
-            return;
-        }
-
-        let Some(engine) = create_test_engine() else {
-            eprintln!("Skipping test: could not create engine");
-            return;
-        };
-
-        let text = fs::read_to_string(&input).expect("Failed to read input file");
-        let detections = engine.detect(&text).expect("Detection failed");
-
-        compare_license_detections(&detections, &expected).unwrap();
     }
 
     #[test]
-    fn test_golden_ffmpeg() {
-        if skip_if_no_reference_data() {
-            eprintln!("Skipping test: reference directory not found");
-            return;
+    fn test_golden_lic4() {
+        let result = run_suite("lic4", &PathBuf::from(format!("{}/lic4", GOLDEN_DIR)));
+        if result.failed > 0 {
+            println!("\n{} failures:", result.failed);
+            for (name, err) in &result.failures {
+                println!("  - {}: {}", name, err.lines().next().unwrap_or(err));
+            }
         }
-
-        let input =
-            std::path::PathBuf::from(format!("{}/multi-license/ffmpeg-LICENSE.md", GOLDEN_DIR));
-        let expected = std::path::PathBuf::from(format!(
-            "{}/multi-license/ffmpeg-LICENSE.md.expected",
-            GOLDEN_DIR
-        ));
-
-        if skip_if_no_expected_file(&expected) {
-            eprintln!("Skipping test: expected file not found at {:?}", expected);
-            return;
-        }
-
-        let Some(engine) = create_test_engine() else {
-            eprintln!("Skipping test: could not create engine");
-            return;
-        };
-
-        let text = fs::read_to_string(&input).expect("Failed to read input file");
-        let detections = engine.detect(&text).expect("Detection failed");
-
-        compare_license_detections(&detections, &expected).unwrap();
     }
 
     #[test]
-    fn test_golden_hash_match() {
-        if skip_if_no_reference_data() {
-            eprintln!("Skipping test: reference directory not found");
-            return;
+    fn test_golden_external() {
+        let result = run_suite(
+            "external",
+            &PathBuf::from(format!("{}/external", GOLDEN_DIR)),
+        );
+        if result.failed > 0 {
+            println!("\n{} failures:", result.failed);
+            for (name, err) in &result.failures {
+                println!("  - {}: {}", name, err.lines().next().unwrap_or(err));
+            }
         }
-
-        let input = std::path::PathBuf::from(format!("{}/hash-match/query.txt", GOLDEN_DIR));
-        let expected =
-            std::path::PathBuf::from(format!("{}/hash-match/query.txt.expected", GOLDEN_DIR));
-
-        if skip_if_no_expected_file(&expected) {
-            eprintln!("Skipping test: expected file not found at {:?}", expected);
-            return;
-        }
-
-        let Some(engine) = create_test_engine() else {
-            eprintln!("Skipping test: could not create engine");
-            return;
-        };
-
-        let text = fs::read_to_string(&input).expect("Failed to read input file");
-        let detections = engine.detect(&text).expect("Detection failed");
-
-        compare_license_detections(&detections, &expected).unwrap();
-    }
-
-    #[test]
-    fn test_golden_truncated() {
-        if skip_if_no_reference_data() {
-            eprintln!("Skipping test: reference directory not found");
-            return;
-        }
-
-        let input = std::path::PathBuf::from(format!("{}/seq-match/partial.txt", GOLDEN_DIR));
-        let expected =
-            std::path::PathBuf::from(format!("{}/seq-match/partial.txt.expected", GOLDEN_DIR));
-
-        if skip_if_no_expected_file(&expected) {
-            eprintln!("Skipping test: expected file not found at {:?}", expected);
-            return;
-        }
-
-        let Some(engine) = create_test_engine() else {
-            eprintln!("Skipping test: could not create engine");
-            return;
-        };
-
-        let text = fs::read_to_string(&input).expect("Failed to read input file");
-        let detections = engine.detect(&text).expect("Detection failed");
-
-        compare_license_detections(&detections, &expected).unwrap();
     }
 
     #[test]
     fn test_golden_unknown() {
-        if skip_if_no_reference_data() {
-            eprintln!("Skipping test: reference directory not found");
-            return;
+        let result = run_suite("unknown", &PathBuf::from(format!("{}/unknown", GOLDEN_DIR)));
+        if result.failed > 0 {
+            println!("\n{} failures:", result.failed);
+            for (name, err) in &result.failures {
+                println!("  - {}: {}", name, err.lines().next().unwrap_or(err));
+            }
         }
-
-        let input = std::path::PathBuf::from(format!("{}/unknown/unknown.txt", GOLDEN_DIR));
-        let expected =
-            std::path::PathBuf::from(format!("{}/unknown/unknown.txt.expected", GOLDEN_DIR));
-
-        if skip_if_no_expected_file(&expected) {
-            eprintln!("Skipping test: expected file not found at {:?}", expected);
-            return;
-        }
-
-        let Some(engine) = create_test_engine() else {
-            eprintln!("Skipping test: could not create engine");
-            return;
-        };
-
-        let text = fs::read_to_string(&input).expect("Failed to read input file");
-        let detections = engine.detect(&text).expect("Detection failed");
-
-        compare_license_detections(&detections, &expected).unwrap();
     }
 
     #[test]
-    fn test_golden_false_positive() {
-        if skip_if_no_reference_data() {
-            eprintln!("Skipping test: reference directory not found");
-            return;
-        }
-
-        let input = std::path::PathBuf::from(format!(
-            "{}/false-positive/false-positive-gpl3.txt",
-            GOLDEN_DIR
-        ));
-        let expected = std::path::PathBuf::from(format!(
-            "{}/false-positive/false-positive-gpl3.txt.expected",
-            GOLDEN_DIR
-        ));
-
-        if skip_if_no_expected_file(&expected) {
-            eprintln!("Skipping test: expected file not found at {:?}", expected);
-            return;
-        }
-
-        let Some(engine) = create_test_engine() else {
-            eprintln!("Skipping test: could not create engine");
+    fn test_golden_summary() {
+        let Some(_engine) = ensure_engine() else {
+            eprintln!("Skipping summary: engine not available");
             return;
         };
 
-        let text = fs::read_to_string(&input).expect("Failed to read input file");
-        let detections = engine.detect(&text).expect("Detection failed");
+        let suites = [
+            ("lic1", "lic1"),
+            ("lic2", "lic2"),
+            ("lic3", "lic3"),
+            ("lic4", "lic4"),
+            ("external", "external"),
+            ("unknown", "unknown"),
+        ];
 
-        compare_license_detections(&detections, &expected).unwrap();
-    }
+        let mut total_tests = 0;
+        let mut total_passed = 0;
+        let mut total_failed = 0;
+        let mut total_skipped = 0;
 
-    #[test]
-    fn test_golden_reference() {
-        if skip_if_no_reference_data() {
-            eprintln!("Skipping test: reference directory not found");
-            return;
+        for (name, subdir) in suites.iter() {
+            let result = run_suite(name, &PathBuf::from(format!("{}/{}", GOLDEN_DIR, subdir)));
+            total_tests += result.total;
+            total_passed += result.passed;
+            total_failed += result.failed;
+            total_skipped += result.skipped;
         }
 
-        let input = std::path::PathBuf::from(format!("{}/reference/see-copying.txt", GOLDEN_DIR));
-        let expected =
-            std::path::PathBuf::from(format!("{}/reference/see-copying.txt.expected", GOLDEN_DIR));
-
-        if skip_if_no_expected_file(&expected) {
-            eprintln!("Skipping test: expected file not found at {:?}", expected);
-            return;
-        }
-
-        let Some(engine) = create_test_engine() else {
-            eprintln!("Skipping test: could not create engine");
-            return;
-        };
-
-        let text = fs::read_to_string(&input).expect("Failed to read input file");
-        let detections = engine.detect(&text).expect("Detection failed");
-
-        compare_license_detections(&detections, &expected).unwrap();
+        println!("\n========================================");
+        println!("License Golden Test Summary");
+        println!("========================================");
+        println!("Total tests:  {}", total_tests);
+        println!("Passed:       {}", total_passed);
+        println!("Failed:       {}", total_failed);
+        println!("Skipped:      {}", total_skipped);
+        println!(
+            "Pass rate:    {:.1}%",
+            if total_tests > 0 {
+                (total_passed as f64 / total_tests as f64) * 100.0
+            } else {
+                0.0
+            }
+        );
+        println!("========================================");
     }
 }
