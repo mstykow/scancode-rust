@@ -233,6 +233,7 @@ mod golden_tests {
                 println!("  - {}: {}", name, err.lines().next().unwrap_or(err));
             }
         }
+        assert_eq!(result.failed, 0, "lic1 had {} failures", result.failed);
     }
 
     #[test]
@@ -244,6 +245,7 @@ mod golden_tests {
                 println!("  - {}: {}", name, err.lines().next().unwrap_or(err));
             }
         }
+        assert_eq!(result.failed, 0, "lic2 had {} failures", result.failed);
     }
 
     #[test]
@@ -255,6 +257,7 @@ mod golden_tests {
                 println!("  - {}: {}", name, err.lines().next().unwrap_or(err));
             }
         }
+        assert_eq!(result.failed, 0, "lic3 had {} failures", result.failed);
     }
 
     #[test]
@@ -266,6 +269,7 @@ mod golden_tests {
                 println!("  - {}: {}", name, err.lines().next().unwrap_or(err));
             }
         }
+        assert_eq!(result.failed, 0, "lic4 had {} failures", result.failed);
     }
 
     #[test]
@@ -280,6 +284,7 @@ mod golden_tests {
                 println!("  - {}: {}", name, err.lines().next().unwrap_or(err));
             }
         }
+        assert_eq!(result.failed, 0, "external had {} failures", result.failed);
     }
 
     #[test]
@@ -291,6 +296,7 @@ mod golden_tests {
                 println!("  - {}: {}", name, err.lines().next().unwrap_or(err));
             }
         }
+        assert_eq!(result.failed, 0, "unknown had {} failures", result.failed);
     }
 
     #[test]
