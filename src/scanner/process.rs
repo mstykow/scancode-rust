@@ -22,6 +22,7 @@ pub fn process<P: AsRef<Path>>(
     progress_bar: Arc<ProgressBar>,
     exclude_patterns: &[Pattern],
     license_engine: Option<Arc<LicenseDetectionEngine>>,
+    include_text: bool,
 ) -> Result<ProcessResult, Error> {
     let path = path.as_ref();
 
@@ -62,7 +63,7 @@ pub fn process<P: AsRef<Path>>(
         &mut file_entries
             .par_iter()
             .map(|(path, metadata)| {
-                let file_entry = process_file(path, metadata, license_engine.clone());
+                let file_entry = process_file(path, metadata, license_engine.clone(), include_text);
                 progress_bar.inc(1);
                 file_entry
             })
@@ -80,6 +81,7 @@ pub fn process<P: AsRef<Path>>(
                 progress_bar.clone(),
                 exclude_patterns,
                 license_engine.clone(),
+                include_text,
             ) {
                 Ok(mut result) => {
                     all_files.append(&mut result.files);
@@ -100,11 +102,14 @@ fn process_file(
     path: &Path,
     metadata: &fs::Metadata,
     license_engine: Option<Arc<LicenseDetectionEngine>>,
+    include_text: bool,
 ) -> FileInfo {
     let mut scan_errors: Vec<String> = vec![];
     let mut file_info_builder = FileInfoBuilder::default();
 
-    if let Err(e) = extract_information_from_content(&mut file_info_builder, path, license_engine) {
+    if let Err(e) =
+        extract_information_from_content(&mut file_info_builder, path, license_engine, include_text)
+    {
         scan_errors.push(e.to_string());
     };
 
@@ -139,6 +144,7 @@ fn extract_information_from_content(
     file_info_builder: &mut FileInfoBuilder,
     path: &Path,
     license_engine: Option<Arc<LicenseDetectionEngine>>,
+    include_text: bool,
 ) -> Result<(), Error> {
     let buffer = fs::read(path)?;
 
@@ -156,6 +162,7 @@ fn extract_information_from_content(
             file_info_builder,
             String::from_utf8_lossy(&buffer).into_owned(),
             license_engine,
+            include_text,
         )
     } else {
         Ok(())
@@ -166,6 +173,7 @@ fn extract_license_information(
     file_info_builder: &mut FileInfoBuilder,
     text_content: String,
     license_engine: Option<Arc<LicenseDetectionEngine>>,
+    include_text: bool,
 ) -> Result<(), Error> {
     let Some(engine) = license_engine else {
         return Ok(());
@@ -175,7 +183,7 @@ fn extract_license_information(
         Ok(detections) => {
             let model_detections: Vec<LicenseDetection> = detections
                 .into_iter()
-                .filter_map(convert_detection_to_model)
+                .filter_map(|d| convert_detection_to_model(d, include_text))
                 .collect();
 
             if !model_detections.is_empty() {
@@ -205,6 +213,7 @@ fn extract_license_information(
 
 fn convert_detection_to_model(
     detection: crate::license_detection::LicenseDetection,
+    include_text: bool,
 ) -> Option<LicenseDetection> {
     let license_expression = detection.license_expression?;
     let license_expression_spdx = detection.license_expression_spdx.unwrap_or_default();
@@ -225,7 +234,7 @@ fn convert_detection_to_model(
             rule_relevance: Some(m.rule_relevance as usize),
             rule_identifier: Some(m.rule_identifier),
             rule_url: Some(m.rule_url),
-            matched_text: m.matched_text,
+            matched_text: if include_text { m.matched_text } else { None },
         })
         .collect();
 
