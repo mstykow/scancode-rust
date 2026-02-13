@@ -252,4 +252,115 @@ copies of the Software."#;
 
         assert!(!detections.is_empty(), "Should detect GPL notice");
     }
+
+    /// Debug test for camellia_bsd.c golden test failure
+    /// Expected: bsd-2-clause-first-lines
+    /// This test prints detailed detection info for debugging
+    #[test]
+    fn debug_camellia_bsd_detection() {
+        let Some(engine) = create_engine_from_reference() else {
+            eprintln!("Skipping test: reference directory not found");
+            return;
+        };
+
+        // Read the test file
+        let test_file =
+            std::path::PathBuf::from("testdata/license-golden/datadriven/lic1/camellia_bsd.c");
+        let text = match std::fs::read_to_string(&test_file) {
+            Ok(t) => t,
+            Err(e) => {
+                eprintln!("Skipping test: cannot read test file: {}", e);
+                return;
+            }
+        };
+
+        println!("\n========================================");
+        println!("DEBUG: camellia_bsd.c detection");
+        println!("========================================");
+        println!("Text length: {} bytes", text.len());
+        println!();
+
+        let detections = engine.detect(&text).expect("Detection failed");
+
+        println!("Number of detections: {}", detections.len());
+        println!();
+
+        for (i, detection) in detections.iter().enumerate() {
+            println!("Detection {}:", i + 1);
+            println!("  license_expression: {:?}", detection.license_expression);
+            println!(
+                "  license_expression_spdx: {:?}",
+                detection.license_expression_spdx
+            );
+            println!("  detection_log: {:?}", detection.detection_log);
+            println!("  Number of matches: {}", detection.matches.len());
+
+            for (j, m) in detection.matches.iter().enumerate() {
+                println!("    Match {}:", j + 1);
+                println!("      license_expression: {}", m.license_expression);
+                println!("      matcher: {}", m.matcher);
+                println!("      score: {:.2}", m.score);
+                println!("      match_coverage: {:.1}%", m.match_coverage);
+                println!("      matched_length: {}", m.matched_length);
+                println!("      rule_relevance: {}", m.rule_relevance);
+                println!("      rule_identifier: {}", m.rule_identifier);
+                println!("      start_line: {}", m.start_line);
+                println!("      end_line: {}", m.end_line);
+                if let Some(ref matched_text) = m.matched_text {
+                    let preview: String = matched_text.chars().take(200).collect();
+                    println!(
+                        "      matched_text (preview): {}...",
+                        preview.replace("\n", "\\n")
+                    );
+                }
+            }
+            println!();
+        }
+
+        // Print expected license text
+        println!("========================================");
+        println!("Expected license: bsd-2-clause-first-lines");
+        println!("========================================");
+
+        // Check if this license exists in the index
+        let index = engine.index();
+        let key = "bsd-2-clause-first-lines";
+        if index.licenses_by_key.contains_key(key) {
+            println!("License '{}' found in index", key);
+            let license = &index.licenses_by_key[key];
+            println!("License text from index (first 500 chars):");
+            let preview: String = license.text.chars().take(500).collect();
+            println!("{}", preview);
+        } else {
+            println!("License '{}' NOT found in index", key);
+            println!("Available licenses containing 'bsd-2':");
+            for k in index.licenses_by_key.keys() {
+                if k.contains("bsd-2") {
+                    println!("  - {}", k);
+                }
+            }
+        }
+
+        // Look at the GPL rule that's matching
+        println!("\n========================================");
+        println!("Investigating gpl-1.0-plus false positive");
+        println!("========================================");
+
+        // Find rules with matched_length 1 that match gpl-1.0-plus
+        let gpl_rid = 20010; // From debug output
+        if gpl_rid < index.rules_by_rid.len() {
+            let rule = &index.rules_by_rid[gpl_rid];
+            println!("Rule #{}:", gpl_rid);
+            println!("  license_expression: {}", rule.license_expression);
+            println!("  text: {}", rule.text);
+            println!("  is_license_tag: {}", rule.is_license_tag);
+            println!("  is_license_reference: {}", rule.is_license_reference);
+            println!("  is_license_notice: {}", rule.is_license_notice);
+            println!("  is_false_positive: {}", rule.is_false_positive);
+            println!("  relevance: {}", rule.relevance);
+            println!("  tokens: {:?}", rule.tokens);
+            println!("  is_small: {}", rule.is_small);
+            println!("  is_tiny: {}", rule.is_tiny);
+        }
+    }
 }

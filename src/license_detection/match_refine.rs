@@ -9,7 +9,7 @@
 use crate::license_detection::index::LicenseIndex;
 use crate::license_detection::models::LicenseMatch;
 use crate::license_detection::query::Query;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 /// Parse rule ID from rule_identifier string.
 ///
@@ -106,21 +106,22 @@ fn merge_overlapping_matches(matches: &[LicenseMatch]) -> Vec<LicenseMatch> {
     merged
 }
 
-/// Filter matches that are contained within other matches of the same rule.
+/// Filter matches that are contained within other matches.
 ///
 /// A match A is contained in match B if:
-/// - Same rule_identifier
 /// - A.start_line >= B.start_line
 /// - A.end_line <= B.end_line
-/// - A is not exactly equal to B
+/// - A.matched_length <= B.matched_length
 ///
 /// The containing (larger) match is kept, the contained (smaller) match is removed.
+/// This function does NOT group by rule_identifier - matches from different rules
+/// can contain each other.
 ///
 /// # Arguments
 /// * `matches` - Slice of LicenseMatch to filter
 ///
 /// # Returns
-/// Vector ofLicenseMatch with contained matches removed
+/// Vector of LicenseMatch with contained matches removed
 ///
 /// Based on Python: `filter_contained_matches()` (lines 950-1070)
 fn filter_contained_matches(matches: &[LicenseMatch]) -> Vec<LicenseMatch> {
@@ -128,72 +129,28 @@ fn filter_contained_matches(matches: &[LicenseMatch]) -> Vec<LicenseMatch> {
         return matches.to_vec();
     }
 
-    let mut grouped: HashMap<String, Vec<&LicenseMatch>> = HashMap::new();
+    let mut sorted: Vec<&LicenseMatch> = matches.iter().collect();
+    sorted.sort_by(|a, b| {
+        a.start_line
+            .cmp(&b.start_line)
+            .then_with(|| b.matched_length.cmp(&a.matched_length))
+    });
 
-    for m in matches {
-        grouped
-            .entry(m.rule_identifier.clone())
-            .or_default()
-            .push(m);
-    }
+    let mut kept = Vec::new();
 
-    let mut filtered = Vec::new();
+    for current in sorted {
+        let is_contained = kept.iter().any(|kept_match: &&LicenseMatch| {
+            current.start_line >= kept_match.start_line
+                && current.end_line <= kept_match.end_line
+                && current.matched_length <= kept_match.matched_length
+        });
 
-    for (_rid, rule_matches) in grouped {
-        if rule_matches.len() == 1 {
-            filtered.push(rule_matches[0].clone());
-            continue;
-        }
-
-        let sorted: Vec<LicenseMatch> = rule_matches.iter().map(|m| (*m).clone()).collect();
-
-        let mut to_remove: HashSet<usize> = HashSet::new();
-
-        for (i, m_i) in sorted.iter().enumerate() {
-            for (j, m_j) in sorted.iter().enumerate() {
-                if i >= j {
-                    continue;
-                }
-
-                let is_equal_line_ranges =
-                    m_i.start_line == m_j.start_line && m_i.end_line == m_j.end_line;
-
-                if is_equal_line_ranges {
-                    let (_keep, remove) = if m_i.match_coverage >= m_j.match_coverage {
-                        (i, j)
-                    } else {
-                        (j, i)
-                    };
-
-                    let _ = to_remove.insert(remove);
-
-                    if remove == i {
-                        break;
-                    } else {
-                        continue;
-                    }
-                }
-
-                let i_contains_j = m_i.start_line <= m_j.start_line && m_i.end_line >= m_j.end_line;
-                let j_contains_i = m_j.start_line <= m_i.start_line && m_j.end_line >= m_i.end_line;
-
-                if i_contains_j {
-                    let _ = to_remove.insert(j);
-                } else if j_contains_i {
-                    let _ = to_remove.insert(i);
-                    break;
-                }
-            }
-        }
-
-        for (i, m) in sorted.iter().enumerate() {
-            if !to_remove.contains(&i) {
-                filtered.push(m.clone());
-            }
+        if !is_contained {
+            kept.push(current);
         }
     }
 
-    filtered
+    kept.into_iter().cloned().collect()
 }
 
 /// Filter matches to false positive rules.
@@ -457,14 +414,17 @@ mod tests {
 
     #[test]
     fn test_filter_contained_matches_different_rules() {
-        let matches = vec![
+        let mut matches = vec![
             create_test_match("#1", 1, 20, 0.9, 90.0, 100),
             create_test_match("#2", 5, 15, 0.85, 85.0, 100),
         ];
+        matches[0].matched_length = 200;
+        matches[1].matched_length = 100;
 
         let filtered = filter_contained_matches(&matches);
 
-        assert_eq!(filtered.len(), 2);
+        assert_eq!(filtered.len(), 1);
+        assert_eq!(filtered[0].rule_identifier, "#1");
     }
 
     #[test]
