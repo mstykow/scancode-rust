@@ -171,6 +171,11 @@ const STOPWORDS: &[&str] = &[
 #[derive(Debug, Clone)]
 #[allow(dead_code)]
 pub struct Query {
+    /// The original input text.
+    ///
+    /// Corresponds to Python: `self.query_string` (line 215)
+    pub text: String,
+
     /// Token IDs for known tokens (tokens found in the index dictionary)
     ///
     /// Corresponds to Python: `self.tokens = []` (line 228)
@@ -343,6 +348,7 @@ impl Query {
             .collect();
 
         Ok(Query {
+            text: text.to_string(),
             tokens,
             line_by_pos,
             unknowns_by_pos,
@@ -612,6 +618,39 @@ impl Query {
             .copied()
             .collect();
     }
+
+    /// Extract matched text for a given line range.
+    ///
+    /// Returns the text from the original input between start_line and end_line
+    /// (both inclusive, 1-indexed).
+    ///
+    /// # Arguments
+    /// * `start_line` - Starting line number (1-indexed)
+    /// * `end_line` - Ending line number (1-indexed)
+    ///
+    /// # Returns
+    /// The matched text, or empty string if lines are out of range
+    ///
+    /// Corresponds to Python: `matched_text()` method in match.py (lines 757-795)
+    pub fn matched_text(&self, start_line: usize, end_line: usize) -> String {
+        if start_line == 0 || end_line == 0 || start_line > end_line {
+            return String::new();
+        }
+
+        self.text
+            .lines()
+            .enumerate()
+            .filter_map(|(idx, line)| {
+                let line_num = idx + 1;
+                if line_num >= start_line && line_num <= end_line {
+                    Some(line)
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
 }
 
 /// A query run is a slice of query tokens identified by a start and end positions.
@@ -803,6 +842,20 @@ impl QueryRun {
         self.query
             .low_matchables(&self.start, &self.end)
             .unwrap_or_default()
+    }
+
+    /// Extract matched text for a given line range.
+    ///
+    /// This delegates to the underlying Query's matched_text method.
+    ///
+    /// # Arguments
+    /// * `start_line` - Starting line number (1-indexed)
+    /// * `end_line` - Ending line number (1-indexed)
+    ///
+    /// # Returns
+    /// The matched text, or empty string if lines are out of range
+    pub fn matched_text(&self, start_line: usize, end_line: usize) -> String {
+        self.query.matched_text(start_line, end_line)
     }
 }
 
@@ -1188,5 +1241,57 @@ mod tests {
         assert_eq!(query.token_at(0), Some(0));
         assert_eq!(query.token_at(1), Some(1));
         assert_eq!(query.token_at(2), Some(2));
+    }
+
+    #[test]
+    fn test_query_matched_text_single_line() {
+        let index = create_query_test_index();
+        let text = "license copyright permission";
+        let query = Query::new(text, index).unwrap();
+
+        let matched = query.matched_text(1, 1);
+        assert_eq!(matched, "license copyright permission");
+    }
+
+    #[test]
+    fn test_query_matched_text_multiple_lines() {
+        let index = create_query_test_index();
+        let text = "line1\nline2\nline3\nline4";
+        let query = Query::new(text, index).unwrap();
+
+        let matched = query.matched_text(2, 3);
+        assert_eq!(matched, "line2\nline3");
+    }
+
+    #[test]
+    fn test_query_matched_text_full_range() {
+        let index = create_query_test_index();
+        let text = "line1\nline2\nline3";
+        let query = Query::new(text, index).unwrap();
+
+        let matched = query.matched_text(1, 3);
+        assert_eq!(matched, "line1\nline2\nline3");
+    }
+
+    #[test]
+    fn test_query_matched_text_invalid_range() {
+        let index = create_query_test_index();
+        let text = "line1\nline2";
+        let query = Query::new(text, index).unwrap();
+
+        assert_eq!(query.matched_text(0, 1), "");
+        assert_eq!(query.matched_text(2, 1), "");
+        assert_eq!(query.matched_text(0, 0), "");
+    }
+
+    #[test]
+    fn test_query_run_matched_text() {
+        let index = create_query_test_index();
+        let text = "line1\nlicense\nline3";
+        let query = Query::new(text, index).unwrap();
+        let run = QueryRun::from_query(&query, 0, Some(0));
+
+        let matched = run.matched_text(2, 2);
+        assert_eq!(matched, "license");
     }
 }

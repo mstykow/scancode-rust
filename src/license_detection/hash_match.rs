@@ -89,15 +89,20 @@ pub fn hash_match(index: &LicenseIndex, query_run: &QueryRun) -> Vec<LicenseMatc
         let matched_length = query_run.tokens().len();
         let match_coverage = 100.0;
 
+        let start_line = query_run.start_line().unwrap_or(1);
+        let end_line = query_run
+            .end_line()
+            .or_else(|| query_run.start_line())
+            .unwrap_or(1);
+
+        let matched_text = query_run.matched_text(start_line, end_line);
+
         let license_match = LicenseMatch {
             license_expression: rule.license_expression.clone(),
             license_expression_spdx: rule.license_expression.clone(),
             from_file: None,
-            start_line: query_run.start_line().unwrap_or(1),
-            end_line: query_run
-                .end_line()
-                .or_else(|| query_run.start_line())
-                .unwrap_or(1),
+            start_line,
+            end_line,
             matcher: MATCH_HASH.to_string(),
             score: 1.0,
             matched_length,
@@ -105,7 +110,7 @@ pub fn hash_match(index: &LicenseIndex, query_run: &QueryRun) -> Vec<LicenseMatc
             rule_relevance: rule.relevance,
             rule_identifier: format!("#{}", rid),
             rule_url: String::new(),
-            matched_text: None,
+            matched_text: Some(matched_text),
             referenced_filenames: rule.referenced_filenames.clone(),
         };
 

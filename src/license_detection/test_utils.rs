@@ -146,6 +146,7 @@ pub fn create_mock_query_run_with_tokens(tokens: &[u16], index: LicenseIndex) ->
     let line_by_pos = vec![1; tokens.len()];
 
     let query = Query {
+        text: String::new(),
         tokens: tokens.to_vec(),
         line_by_pos,
         unknowns_by_pos: HashMap::new(),

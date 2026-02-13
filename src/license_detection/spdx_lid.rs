@@ -229,6 +229,25 @@ fn split_license_expression(license_expression: &str) -> Vec<String> {
         .collect()
 }
 
+fn extract_matched_text_from_lines(text: &str, start_line: usize, end_line: usize) -> String {
+    if start_line == 0 || end_line == 0 || start_line > end_line {
+        return String::new();
+    }
+
+    text.lines()
+        .enumerate()
+        .filter_map(|(idx, line)| {
+            let line_num = idx + 1;
+            if line_num >= start_line && line_num <= end_line {
+                Some(line)
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
 pub fn spdx_lid_match(index: &LicenseIndex, text: &str) -> Vec<LicenseMatch> {
     let mut matches = Vec::new();
 
@@ -245,6 +264,8 @@ pub fn spdx_lid_match(index: &LicenseIndex, text: &str) -> Vec<LicenseMatch> {
                 let matched_length = spdx_expression.len();
                 let match_coverage = 100.0;
 
+                let matched_text = extract_matched_text_from_lines(text, line_num, line_num);
+
                 let license_match = LicenseMatch {
                     license_expression: rule.license_expression.clone(),
                     license_expression_spdx: spdx_expression.clone(),
@@ -258,7 +279,7 @@ pub fn spdx_lid_match(index: &LicenseIndex, text: &str) -> Vec<LicenseMatch> {
                     rule_relevance: rule.relevance,
                     rule_identifier: format!("#{}", rid),
                     rule_url: String::new(),
-                    matched_text: None,
+                    matched_text: Some(matched_text),
                     referenced_filenames: rule.referenced_filenames.clone(),
                 };
 
