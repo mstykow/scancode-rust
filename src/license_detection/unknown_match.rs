@@ -286,6 +286,8 @@ fn create_unknown_match(
 
     let score = calculate_score(ngram_count, region_length);
 
+    let matched_text = query.matched_text(start_line, end_line);
+
     LicenseMatch {
         license_expression: "unknown".to_string(),
         license_expression_spdx: "unknown".to_string(),
@@ -299,7 +301,7 @@ fn create_unknown_match(
         rule_relevance: 50,
         rule_identifier: "unknown".to_string(),
         rule_url: String::new(),
-        matched_text: None,
+        matched_text: Some(matched_text),
         referenced_filenames: None,
     }
     .into()

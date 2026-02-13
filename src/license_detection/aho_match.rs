@@ -155,6 +155,8 @@ pub fn aho_match(index: &LicenseIndex, query_run: &QueryRun) -> Vec<LicenseMatch
             1.0
         };
 
+        let matched_text = query_run.matched_text(start_line, end_line);
+
         let license_match = LicenseMatch {
             license_expression: rule.license_expression.clone(),
             license_expression_spdx: rule.license_expression.clone(),
@@ -168,7 +170,7 @@ pub fn aho_match(index: &LicenseIndex, query_run: &QueryRun) -> Vec<LicenseMatch
             rule_relevance: rule.relevance,
             rule_identifier: format!("#{}", rid),
             rule_url: String::new(),
-            matched_text: None,
+            matched_text: Some(matched_text),
             referenced_filenames: rule.referenced_filenames.clone(),
         };
 
@@ -258,6 +260,7 @@ mod tests {
         index.pattern_id_to_rid.push(0);
 
         let query = crate::license_detection::query::Query {
+            text: String::new(),
             tokens: vec![0, 1],
             line_by_pos: vec![1, 1],
             unknowns_by_pos: std::collections::HashMap::new(),
@@ -299,6 +302,7 @@ mod tests {
         index.pattern_id_to_rid.push(0);
 
         let query = crate::license_detection::query::Query {
+            text: String::new(),
             tokens: vec![0, 1, 2],
             line_by_pos: vec![1, 1, 1],
             unknowns_by_pos: std::collections::HashMap::new(),
@@ -344,6 +348,7 @@ mod tests {
         index.pattern_id_to_rid.push(1);
 
         let query = crate::license_detection::query::Query {
+            text: String::new(),
             tokens: vec![0, 1, 2, 3],
             line_by_pos: vec![1, 1, 2, 2],
             unknowns_by_pos: std::collections::HashMap::new(),
@@ -385,6 +390,7 @@ mod tests {
         index.pattern_id_to_rid.push(0);
 
         let query = crate::license_detection::query::Query {
+            text: String::new(),
             tokens: vec![0, 1, 2],
             line_by_pos: vec![1, 1, 1],
             unknowns_by_pos: std::collections::HashMap::new(),
@@ -425,6 +431,7 @@ mod tests {
         index.pattern_id_to_rid.push(0);
 
         let query = crate::license_detection::query::Query {
+            text: String::new(),
             tokens: vec![0, 1],
             line_by_pos: vec![5, 5],
             unknowns_by_pos: std::collections::HashMap::new(),

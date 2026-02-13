@@ -335,6 +335,8 @@ pub fn seq_match(index: &LicenseIndex, query_run: &QueryRun) -> Vec<LicenseMatch
 
                 let score = (match_coverage * candidate.rule.relevance as f32) / 100.0;
 
+                let matched_text = query_run.matched_text(start_line, end_line);
+
                 let license_match = LicenseMatch {
                     license_expression: candidate.rule.license_expression.clone(),
                     license_expression_spdx: candidate.rule.license_expression.clone(),
@@ -348,7 +350,7 @@ pub fn seq_match(index: &LicenseIndex, query_run: &QueryRun) -> Vec<LicenseMatch
                     rule_relevance: candidate.rule.relevance,
                     rule_identifier: format!("#{}", rid),
                     rule_url: String::new(),
-                    matched_text: None,
+                    matched_text: Some(matched_text),
                     referenced_filenames: candidate.rule.referenced_filenames.clone(),
                 };
 

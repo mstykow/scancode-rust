@@ -503,4 +503,33 @@ SOFTWARE."#;
             }
         }
     }
+
+    #[test]
+    fn test_engine_matched_text_populated() {
+        let Some(engine) = create_engine_from_reference() else {
+            eprintln!("Skipping test: reference directory not found");
+            return;
+        };
+
+        let text = "SPDX-License-Identifier: MIT";
+        let detections = engine.detect(text).expect("Detection should succeed");
+
+        assert!(!detections.is_empty(), "Should detect license");
+
+        for detection in &detections {
+            for m in &detection.matches {
+                assert!(
+                    m.matched_text.is_some(),
+                    "matched_text should be populated for matcher {}",
+                    m.matcher
+                );
+                let matched = m.matched_text.as_ref().unwrap();
+                assert!(
+                    !matched.is_empty(),
+                    "matched_text should not be empty for matcher {}",
+                    m.matcher
+                );
+            }
+        }
+    }
 }
