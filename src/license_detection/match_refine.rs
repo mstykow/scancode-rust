@@ -11,6 +11,25 @@ use crate::license_detection::models::LicenseMatch;
 use crate::license_detection::query::Query;
 use std::collections::HashMap;
 
+/// Filter GPL matches with very short matched_length.
+///
+/// GPL rules that match only a tiny number of tokens are typically false positives
+/// (e.g., matching "Copyright" in a comment). These should be filtered before merging
+/// to prevent them from being combined with legitimate matches.
+fn filter_short_gpl_matches(matches: &[LicenseMatch]) -> Vec<LicenseMatch> {
+    const GPL_SHORT_THRESHOLD: usize = 3;
+
+    matches
+        .iter()
+        .filter(|m| {
+            let is_gpl = m.license_expression.to_lowercase().contains("gpl");
+            let is_short = m.matched_length <= GPL_SHORT_THRESHOLD;
+            !(is_gpl && is_short)
+        })
+        .cloned()
+        .collect()
+}
+
 /// Parse rule ID from rule_identifier string.
 ///
 /// Rule identifiers typically have the format "#42" where the numeric portion is the rule ID.
@@ -229,7 +248,9 @@ pub fn refine_matches(
         return Vec::new();
     }
 
-    let mut refined = merge_overlapping_matches(&matches);
+    let filtered = filter_short_gpl_matches(&matches);
+
+    let mut refined = merge_overlapping_matches(&filtered);
 
     refined = filter_contained_matches(&refined);
 
@@ -607,8 +628,57 @@ mod tests {
         ];
 
         let query = Query::new("test text", &index).unwrap();
+
         let refined = refine_matches(&index, matches, &query);
 
         assert_eq!(refined.len(), 2);
+    }
+
+    #[test]
+    fn test_filter_short_gpl_matches_removes_short_gpl() {
+        let matches = vec![
+            LicenseMatch {
+                license_expression: "gpl-2.0".to_string(),
+                license_expression_spdx: "GPL-2.0".to_string(),
+                matched_length: 1,
+                ..create_test_match("#1", 1, 1, 1.0, 100.0, 100)
+            },
+            LicenseMatch {
+                license_expression: "mit".to_string(),
+                license_expression_spdx: "MIT".to_string(),
+                matched_length: 1,
+                ..create_test_match("#2", 5, 10, 1.0, 100.0, 100)
+            },
+        ];
+
+        let filtered = filter_short_gpl_matches(&matches);
+        assert_eq!(filtered.len(), 1);
+        assert_eq!(filtered[0].license_expression, "mit");
+    }
+
+    #[test]
+    fn test_filter_short_gpl_matches_keeps_long_gpl() {
+        let matches = vec![LicenseMatch {
+            license_expression: "gpl-2.0".to_string(),
+            license_expression_spdx: "GPL-2.0".to_string(),
+            matched_length: 10,
+            ..create_test_match("#1", 1, 10, 1.0, 100.0, 100)
+        }];
+
+        let filtered = filter_short_gpl_matches(&matches);
+        assert_eq!(filtered.len(), 1);
+    }
+
+    #[test]
+    fn test_filter_short_gpl_matches_keeps_short_non_gpl() {
+        let matches = vec![LicenseMatch {
+            license_expression: "mit".to_string(),
+            license_expression_spdx: "MIT".to_string(),
+            matched_length: 1,
+            ..create_test_match("#1", 1, 1, 1.0, 100.0, 100)
+        }];
+
+        let filtered = filter_short_gpl_matches(&matches);
+        assert_eq!(filtered.len(), 1);
     }
 }

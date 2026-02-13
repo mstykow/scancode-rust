@@ -718,6 +718,17 @@ impl<'a> QueryRun<'a> {
         self.end.and_then(|e| self.line_by_pos.get(e).copied())
     }
 
+    /// Get the line number for a specific token position.
+    ///
+    /// # Arguments
+    /// * `pos` - Absolute token position in the query
+    ///
+    /// # Returns
+    /// The line number (1-based), or None if position is out of range
+    pub fn line_for_pos(&self, pos: usize) -> Option<usize> {
+        self.line_by_pos.get(pos).copied()
+    }
+
     /// Get the sequence of token IDs for this run.
     ///
     /// Returns empty slice if end is None.

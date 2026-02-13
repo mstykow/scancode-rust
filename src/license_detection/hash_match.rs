@@ -89,11 +89,12 @@ pub fn hash_match(index: &LicenseIndex, query_run: &QueryRun) -> Vec<LicenseMatc
         let matched_length = query_run.tokens().len();
         let match_coverage = 100.0;
 
-        let start_line = query_run.start_line().unwrap_or(1);
-        let end_line = query_run
-            .end_line()
-            .or_else(|| query_run.start_line())
-            .unwrap_or(1);
+        let start_line = query_run.line_for_pos(query_run.start).unwrap_or(1);
+        let end_line = if let Some(end) = query_run.end {
+            query_run.line_for_pos(end).unwrap_or(start_line)
+        } else {
+            start_line
+        };
 
         let matched_text = query_run.matched_text(start_line, end_line);
 

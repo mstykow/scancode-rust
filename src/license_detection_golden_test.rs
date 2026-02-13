@@ -345,4 +345,44 @@ mod golden_tests {
         );
         println!("========================================");
     }
+
+    #[test]
+    fn debug_double_isc() {
+        let Some(engine) = ensure_engine() else {
+            eprintln!("Engine not available");
+            return;
+        };
+
+        let text =
+            fs::read_to_string("testdata/license-golden/datadriven/lic1/double_isc.txt").unwrap();
+        let detections = engine.detect(&text).unwrap();
+
+        let actual: Vec<&str> = detections
+            .iter()
+            .map(|d| d.license_expression.as_deref().unwrap_or(""))
+            .collect();
+
+        eprintln!("Expected: {:?}", vec!["isc", "isc", "sudo"]);
+        eprintln!("Actual:   {:?}", actual);
+
+        for (i, d) in detections.iter().enumerate() {
+            eprintln!(
+                "Detection {}: {:?} ({} matches)",
+                i,
+                d.license_expression,
+                d.matches.len()
+            );
+            for m in &d.matches {
+                eprintln!(
+                    "  Match: {} lines {}-{} score={} len={} rule_id={}",
+                    m.license_expression,
+                    m.start_line,
+                    m.end_line,
+                    m.score,
+                    m.matched_length,
+                    m.rule_identifier
+                );
+            }
+        }
+    }
 }

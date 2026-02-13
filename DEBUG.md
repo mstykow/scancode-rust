@@ -225,8 +225,140 @@ The simple fix caused cascading failures. Possible reasons:
 3. Match merging/deduplication logic depends on overlapping line ranges
 4. Need to trace through the full detection pipeline to understand dependencies
 
-**Next step:**
-This is a complex fix that requires deeper investigation. The bug is documented but not trivial to fix without breaking other functionality.
+---
+
+## DETAILED FIX PLAN (2026-02-13)
+
+### 1. Problem Summary
+
+**Bug**: `aho_match.rs` and `hash_match.rs` calculate line numbers using query run boundaries instead of match token positions.
+
+| Current (Wrong) | Python (Correct) |
+|-----------------|------------------|
+| `query_run.start_line()` → `line_by_pos[query_run.start]` | `line_by_pos[match.qstart]` |
+| `query_run.end_line()` → `line_by_pos[query_run.end]` | `line_by_pos[match.qend]` |
+
+**Result**: All matches appear to span the entire document, causing incorrect merging and single detections instead of multiple.
+
+### 2. Root Cause Analysis
+
+From Python `match.py:399-408`:
+
+```python
+def set_lines(self, line_by_pos):
+    self.start_line = line_by_pos[self.qstart]  # Match start position
+    self.end_line = line_by_pos[self.qend]       # Match end position
+```
+
+The Rust implementation incorrectly uses query run boundaries instead of match positions.
+
+### 3. Implementation Steps
+
+#### Step 1: Add `line_for_pos()` to `QueryRun`
+
+**File**: `src/license_detection/query.rs`
+
+Add method to `impl QueryRun` (after line 718):
+
+```rust
+/// Get the line number for a specific token position.
+///
+/// # Arguments
+/// * `pos` - Absolute token position in the query
+///
+/// # Returns
+/// The line number (1-based), or None if position is out of range
+pub fn line_for_pos(&self, pos: usize) -> Option<usize> {
+    self.line_by_pos.get(pos).copied()
+}
+```
+
+#### Step 2: Fix `aho_match.rs` Line Calculation
+
+**File**: `src/license_detection/aho_match.rs:137-147`
+
+Replace:
+
+```rust
+let start_line = query_run.start_line().unwrap_or(1);
+
+let end_line = if qend > qstart {
+    let _end_token_pos = qend.saturating_sub(1);
+    query_run
+        .end_line()
+        .or_else(|| query_run.start_line())
+        .unwrap_or(start_line)
+} else {
+    start_line
+};
+```
+
+With:
+
+```rust
+// Use match positions (qstart, qend-1) not query run boundaries
+let start_line = query_run.line_for_pos(qstart).unwrap_or(1);
+
+let end_line = if qend > qstart {
+    // qend is exclusive, so the last matched token is at qend-1
+    query_run.line_for_pos(qend.saturating_sub(1)).unwrap_or(start_line)
+} else {
+    start_line
+};
+```
+
+#### Step 3: Fix `hash_match.rs` Line Calculation
+
+**File**: `src/license_detection/hash_match.rs:92-96`
+
+Replace:
+
+```rust
+let start_line = query_run.start_line().unwrap_or(1);
+let end_line = query_run
+    .end_line()
+    .or_else(|| query_run.start_line())
+    .unwrap_or(1);
+```
+
+With:
+
+```rust
+let start_line = query_run.line_for_pos(query_run.start).unwrap_or(1);
+let end_line = if let Some(end) = query_run.end {
+    query_run.line_for_pos(end).unwrap_or(start_line)
+} else {
+    start_line
+};
+```
+
+### 4. Expected Behavior Changes
+
+After fixing line numbers:
+
+| Before Fix | After Fix | Reason |
+|------------|-----------|--------|
+| All matches have same line range | Matches have correct line ranges | Bug fix |
+| Many matches merged together | Fewer merges (correct) | Line ranges now differ |
+| Single detection for multiple licenses | Multiple detections | Matches no longer overlap |
+
+### 5. Validation Checklist
+
+After implementation:
+
+- [ ] `cargo clippy --all-targets -- -D warnings` passes
+- [ ] `cargo test --lib` passes
+- [ ] `test_aho_match_line_numbers` passes
+- [ ] Golden test count should **increase** (more correct detections)
+- [ ] `double_isc.txt` should produce 2-3 detections (not 1)
+
+### 6. Files to Change
+
+| File | Change |
+|------|--------|
+| `src/license_detection/query.rs` | Add `QueryRun::line_for_pos()` |
+| `src/license_detection/aho_match.rs:137-147` | Use `line_for_pos(qstart)` and `line_for_pos(qend-1)` |
+| `src/license_detection/hash_match.rs:92-96` | Use `line_for_pos(start)` and `line_for_pos(end)` |
 
 ---
 

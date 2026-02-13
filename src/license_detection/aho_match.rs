@@ -134,13 +134,13 @@ pub fn aho_match(index: &LicenseIndex, query_run: &QueryRun) -> Vec<LicenseMatch
             })
             .count();
 
-        let start_line = query_run.start_line().unwrap_or(1);
+        // Use match positions (qstart, qend-1) not query run boundaries
+        let start_line = query_run.line_for_pos(qstart).unwrap_or(1);
 
         let end_line = if qend > qstart {
-            let _end_token_pos = qend.saturating_sub(1);
+            // qend is exclusive, so the last matched token is at qend-1
             query_run
-                .end_line()
-                .or_else(|| query_run.start_line())
+                .line_for_pos(qend.saturating_sub(1))
                 .unwrap_or(start_line)
         } else {
             start_line
