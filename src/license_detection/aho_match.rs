@@ -105,15 +105,22 @@ pub fn aho_match(index: &LicenseIndex, query_run: &QueryRun) -> Vec<LicenseMatch
             continue;
         }
 
-        let rid = pattern_id.as_usize();
+        let Some(&rid) = index.pattern_id_to_rid.get(pattern_id.as_usize()) else {
+            continue;
+        };
         if rid >= index.rules_by_rid.len() {
+            continue;
+        }
+
+        let matched_length = qend - qstart;
+
+        // Skip zero-length matches (empty patterns)
+        if matched_length == 0 {
             continue;
         }
 
         let rule = &index.rules_by_rid[rid];
         let rule_tids = &index.tids_by_rid[rid];
-
-        let matched_length = qend - qstart;
         let rule_length = rule.tokens.len();
 
         let match_coverage = if rule_length > 0 {
@@ -248,6 +255,7 @@ mod tests {
             .rules_by_rid
             .push(create_mock_rule("mit", vec![0, 1], false, false));
         index.tids_by_rid.push(vec![0, 1]);
+        index.pattern_id_to_rid.push(0);
 
         let query = crate::license_detection::query::Query {
             tokens: vec![0, 1],
@@ -288,6 +296,7 @@ mod tests {
             .rules_by_rid
             .push(create_mock_rule("apache-2.0", vec![0, 1, 2], false, false));
         index.tids_by_rid.push(vec![0, 1, 2]);
+        index.pattern_id_to_rid.push(0);
 
         let query = crate::license_detection::query::Query {
             tokens: vec![0, 1, 2],
@@ -331,6 +340,8 @@ mod tests {
             .push(create_mock_rule("apache-2.0", vec![2, 3], true, false));
         index.tids_by_rid.push(vec![0, 1]);
         index.tids_by_rid.push(vec![2, 3]);
+        index.pattern_id_to_rid.push(0);
+        index.pattern_id_to_rid.push(1);
 
         let query = crate::license_detection::query::Query {
             tokens: vec![0, 1, 2, 3],
@@ -371,6 +382,7 @@ mod tests {
             .rules_by_rid
             .push(create_mock_rule("mit", vec![0, 1, 2], false, false));
         index.tids_by_rid.push(vec![0, 1, 2]);
+        index.pattern_id_to_rid.push(0);
 
         let query = crate::license_detection::query::Query {
             tokens: vec![0, 1, 2],
@@ -410,6 +422,7 @@ mod tests {
             .rules_by_rid
             .push(create_mock_rule("mit", vec![0, 1], true, false));
         index.tids_by_rid.push(vec![0, 1]);
+        index.pattern_id_to_rid.push(0);
 
         let query = crate::license_detection::query::Query {
             tokens: vec![0, 1],

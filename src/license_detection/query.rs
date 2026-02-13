@@ -622,12 +622,13 @@ impl Query {
 /// Based on Python QueryRun class at:
 /// reference/scancode-toolkit/src/licensedcode/query.py (lines 720-914)
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
 pub struct QueryRun {
     query: Query,
     pub start: usize,
     pub end: Option<usize>,
+    #[allow(dead_code)]
     len_legalese: usize,
+    #[allow(dead_code)]
     digit_only_tids: HashSet<u16>,
 }
 

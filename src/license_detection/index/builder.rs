@@ -133,6 +133,7 @@ pub fn build_index(rules: Vec<Rule>, licenses: Vec<License>) -> LicenseIndex {
     let mut approx_matchable_rids: HashSet<usize> = HashSet::new();
 
     let mut rules_automaton_patterns: Vec<Vec<u8>> = Vec::with_capacity(rules.len());
+    let mut pattern_id_to_rid: Vec<usize> = Vec::with_capacity(rules.len());
     let mut unknown_automaton_patterns: Vec<Vec<u8>> = Vec::new();
 
     let mut licenses_by_key: HashMap<String, License> = HashMap::new();
@@ -157,7 +158,13 @@ pub fn build_index(rules: Vec<Rule>, licenses: Vec<License>) -> LicenseIndex {
         rule.tokens = rule_token_ids.clone();
 
         let rule_hash = compute_hash(&rule_token_ids);
-        rules_automaton_patterns.push(tokens_to_bytes(&rule_token_ids));
+
+        // Only add non-empty patterns to the automaton
+        // Empty patterns (from non-ASCII text like Japanese) would match everywhere
+        if !rule_token_ids.is_empty() {
+            rules_automaton_patterns.push(tokens_to_bytes(&rule_token_ids));
+            pattern_id_to_rid.push(rid);
+        }
 
         if rule.is_false_positive {
             false_positive_rids.insert(rid);
@@ -268,6 +275,7 @@ pub fn build_index(rules: Vec<Rule>, licenses: Vec<License>) -> LicenseIndex {
         false_positive_rids,
         approx_matchable_rids,
         licenses_by_key,
+        pattern_id_to_rid,
     }
 }
 
