@@ -2,31 +2,37 @@
 
 **Date**: 2026-02-13
 **Verifier**: AI Code Review
-**Status**: PARTIAL PASS
+**Status**: ✅ PASS (Issues Resolved)
+
+> **Update**: All issues identified in the initial review have been fixed:
+>
+> - Issue 1 (MIT Detection Bug): Fixed via pattern_id_to_rid mapping
+> - Issue 2 (--include-text flag): Implemented
+> - Issue 3 (matched_text not populated): Implemented
 
 ## Task Requirements from Plan
 
-### 7.1 Engine API
+### 7.1 Engine API — ✅ COMPLETE
 
 - Create `LicenseDetectionEngine` with `detect(text: &str) -> Vec<LicenseDetection>` API
 - Initialize engine once at startup with rule path configuration
 - Wrap in `Arc<LicenseDetectionEngine>` for thread-safe sharing across rayon workers
 
-### 7.2 Scanner Pipeline Integration
+### 7.2 Scanner Pipeline Integration — ✅ COMPLETE
 
 - Update `src/scanner/process.rs` to accept `&LicenseDetectionEngine` parameter
 - Replace the no-op `extract_license_information()` stub with actual detection call
 - Populate all `Match` fields: `score`, `matched_length`, `match_coverage`, `rule_relevance`, `rule_identifier`, `rule_url`, `matched_text`, `matcher`
 - Populate file-level `license_expression` from detection results
 
-### 7.3 Output Compatibility
+### 7.3 Output Compatibility — ✅ COMPLETE
 
 - Verify JSON output matches ScanCode format exactly
 - Ensure `detected_license_expression_spdx` field is populated correctly
 - Verify `license_detections` array structure matches ScanCode
 - Handle `from_file` field in matches (for cross-file references)
 
-### 7.4 CLI Updates
+### 7.4 CLI Updates — ✅ COMPLETE
 
 - Add `--license-rules-path` CLI option for custom rule directory
 - Default to `reference/scancode-toolkit/src/licensedcode/data/` if available
