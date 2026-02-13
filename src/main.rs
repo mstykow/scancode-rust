@@ -58,6 +58,7 @@ fn run() -> Result<(), Box<dyn Error>> {
         Arc::clone(&progress_bar),
         &exclude_patterns,
         license_engine.clone(),
+        cli.include_text,
     )?;
     progress_bar.finish_with_message("Scan complete!");
 

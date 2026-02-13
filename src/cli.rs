@@ -28,4 +28,8 @@ pub struct Cli {
         default_value = "reference/scancode-toolkit/src/licensedcode/data"
     )]
     pub license_rules_path: Option<String>,
+
+    /// Include matched text in license detection output
+    #[arg(long)]
+    pub include_text: bool,
 }
