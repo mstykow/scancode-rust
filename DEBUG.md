@@ -227,6 +227,115 @@ The simple fix caused cascading failures. Possible reasons:
 
 ---
 
+## ISSUE: sudo License Not Detected (2026-02-13)
+
+**Status:** Investigating
+**Test:** `double_isc.txt`
+**Expected:**
+
+```yaml
+license_expressions:
+  - isc
+  - isc
+  - sudo
+```
+
+**Actual:**
+
+```yaml
+license_expressions:
+  - isc
+  - isc AND unknown
+```
+
+### Root Cause
+
+**Pipeline short-circuit issue in `src/license_detection/mod.rs:105-132`:**
+
+1. ISC hash-match succeeds with 100% coverage on lines 24-34
+2. The sequence matcher is **SKIPPED** because `has_high_coverage` is true
+3. The DARPA text (lines 36-38) is detected as "unknown" instead of "sudo"
+**Why the sudo rule doesn't match:**
+
+- The sudo rule has 143 tokens (ISC license + DARPA sponsorship)
+- The query at lines 24-38 has ~136 tokens (just ISC portion)
+- The query is a **subset** of the sudo rule
+- Hash matching requires exact token match - fails
+- Aho-Corasick finds patterns where RULE ⊂ QUERY, but here QUERY ⊂ RULE
+- Sequence matcher would find it, but is skipped
+
+### Python Behavior
+
+Python detects "sudo" because:
+
+1. It runs multiple matchers and combines results
+2. It has `licensing_contains()` to detect when one license semantically contains another
+3. It may not skip sequence matching as aggressively
+
+### Possible Fixes
+
+**Option A: Run sequence matcher on unmatched regions**
+Instead of skipping sequence matching entirely when there's a high-coverage match, run it on the **unmatched regions** to find licenses that extend beyond what was already matched.
+**Option B: Implement license expression containment**
+Python uses `licensing_contains()` to filter contained matches. This requires:
+
+- Implementing license expression containment checks
+- Modifying `filter_contained_matches` to use license expression semantics
+**Option C: Post-match merging**
+After detecting ISC, check if adjacent "unknown" matches can be combined with the known match to form a larger recognized license (ISC + DARPA = sudo).
+
+### Complexity Assessment
+
+- **Option A:** Medium complexity - requires tracking unmatched regions and running additional matchers
+- **Option B:** High complexity - requires understanding license expression semantics
+- **Option C:** Medium complexity - requires rule metadata about license containment
+
+---
+
+## IMPORTANT DISCOVERY: Golden Test Comparison Mismatch (2026-02-13)
+
+**Status:** Needs clarification
+
+### The Issue
+
+The Python golden tests compare **match expressions**:
+
+```python
+# licensedcode_test_utils.py:215
+detected_expressions = [match.rule.license_expression for match in matches]
+```
+
+The Rust golden tests compare **detection expressions**:
+
+```rust
+// license_detection_golden_test.rs:122-124
+let actual: Vec<&str> = detections
+    .iter()
+    .map(|d| d.license_expression.as_deref().unwrap_or(""))
+    .collect();
+```
+
+### Key Questions
+
+1. **Are match expressions and detection expressions supposed to be the same?**
+   - For simple files with one license: Yes (one match → one detection)
+   - For complex files: Maybe different (matches get grouped into detections)
+2. **What does `idx.match()` return in Python?**
+   - It returns `matches` directly, not detections
+   - The `license_expressions` in YAML are the expressions from all matches
+3. **What should Rust do?**
+   - Option A: Compare raw match expressions (change test to use matches)
+   - Option B: Keep comparing detection expressions (current approach)
+   - Option C: Both should work if detection logic is correct
+
+### Investigation Needed
+
+- Check if Python's `idx.match()` does grouping/deduplication before returning matches
+- Check if the expected `license_expressions` are meant to be detections or matches
+- Understand why COPYING.gplv3 produces 8 detections in Rust but expects just `gpl-3.0`
+
+---
+
 ## DETAILED FIX PLAN (2026-02-13)
 
 ### 1. Problem Summary
@@ -371,3 +480,111 @@ After implementation:
 | `src/license_detection/match_refine.rs` | `merge_overlapping_matches()` - merges matches with same rule |
 | `src/license_detection/detection.rs` | `remove_duplicate_detections()` - dedups by expression |
 | `reference/scancode-toolkit/src/licensedcode/data/rules/isc_11.RULE` | Full ISC license text rule |
+
+---
+
+## ISSUE: Multiple Detections + Unknown in Expressions (2026-02-13)
+
+**Status:** Root cause identified
+**Example:** `COPYING.gplv3`
+
+- Expected: `gpl-3.0`
+- Actual: 8 detections including `gpl-3.0 AND unknown`
+
+### Root Cause
+
+**Python filters "license intro" matches before building expressions:**
+
+1. `analyze_detection()` categorizes matches (detection.py:1760-1818)
+2. `get_detected_license_expression()` filters based on category (detection.py:1468-1602)
+3. Key filtering (lines 1510-1514):
+
+   ```python
+   elif analysis == DetectionCategory.UNKNOWN_INTRO_BEFORE_DETECTION.value:
+       matches_for_expression = filter_license_intros(license_matches)
+   ```
+
+4. `filter_license_intros()` removes intro matches before expression is built
+**Rust does NOT filter license intros:**
+Rust's `determine_license_expression()` (detection.rs:526) combines ALL match expressions, including unknown intros. This causes "unknown" to appear in expressions.
+
+### Fix Needed
+
+In `create_detection_from_group()`, filter out license intro matches before building the expression:
+
+```rust
+// Filter out license intros based on detection category
+let matches_for_expr = if detection_log_category == "unknown-intro-followed-by-match" {
+    detection.matches.iter()
+        .filter(|m| !is_license_intro_match(m))
+        .cloned()
+        .collect()
+} else {
+    detection.matches.clone()
+};
+```
+
+### Additional Issue: Multiple Detections
+
+Rust produces 8 detections where Python produces 1. This could be due to:
+
+1. Different grouping threshold
+2. Missing detection merging logic
+3. Detection category analysis differences
+
+---
+
+## FAILED FIX ATTEMPT: License Intro Filtering (2026-02-13)
+
+**Status:** Reverted - caused regression
+**Attempted:** Implement Python-style license intro filtering before building expressions.
+**Changes Made:**
+
+1. Added `is_license_intro` and `is_license_clue` fields to `LicenseMatch`
+2. Implemented `filter_license_intros()` function
+3. Modified expression building to filter intros based on detection category
+**Results:**
+
+- Before: 163 passed, 128 failed
+- After: 158 passed, 133 failed (5 test regression)
+**Why it failed:**
+The intro filtering logic is more nuanced than initially understood. Python's filtering is conditional on detection category analysis, and the logic for determining category differs between Python and Rust. The simple implementation caused false positives in filtering.
+**Next steps:**
+This requires deeper investigation of Python's detection category analysis. Defer to later.
+
+---
+
+## CURRENT SESSION: License Detection Improvement Loop (2026-02-14)
+
+### Baseline
+
+- lic1: 160 passed, 131 failed
+
+### Issue: sudo License Not Detected (double_isc.txt)
+
+**Expected:** `["isc", "isc", "sudo"]`
+**Actual:** `["isc", "isc AND unknown"]`
+
+**Root Cause:** Pipeline short-circuit. ISC hash-match succeeds, sequence matcher is skipped. DARPA text detected as "unknown" instead of "sudo".
+
+**Status:** Deferred - requires sequence matcher changes
+
+### Issue: Multiple Detections + Unknown in Expressions
+
+**Example:** `COPYING.gplv3` produces 8 detections including `gpl-3.0 AND unknown`, expected just `gpl-3.0`.
+
+**Root Cause:** Rust does not filter license intro matches before building expressions. Python's `filter_license_intros()` removes intros.
+
+**Status:** Deferred - requires detection category analysis
+
+### FAILED FIX: Deprecated Rule Skipping
+
+**Test:** `camellia_bsd.c` expected `bsd-2-clause-first-lines`, got `freebsd-doc` (deprecated rule).
+
+**Attempted:** Skip deprecated rules during index building.
+
+**Result:** Regression from 160 to 141 passed.
+
+**Reason:** Deprecated rule handling is complex - some are used for license variants. Python has sophisticated `replaced_by` logic.
+
+**Status:** Deferred - requires deeper investigation

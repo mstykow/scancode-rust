@@ -401,6 +401,7 @@ mod tests {
         let _ = index.high_postings_by_rid.insert(rid, high_postings);
 
         let rule = Rule {
+            identifier: format!("{}.test", expression),
             license_expression: expression.to_string(),
             text: text.to_string(),
             tokens: tokens.clone(),

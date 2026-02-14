@@ -223,6 +223,12 @@ pub fn parse_rule_file(path: &Path) -> Result<Rule> {
         return Err(anyhow!("Rule file content too short: {}", path.display()));
     }
 
+    let identifier = path
+        .file_name()
+        .and_then(|s| s.to_str())
+        .unwrap_or("unknown.RULE")
+        .to_string();
+
     let parts: Vec<&str> = content.split("---").collect();
 
     if parts.len() < 3 {
@@ -291,6 +297,7 @@ pub fn parse_rule_file(path: &Path) -> Result<Rule> {
     let minimum_coverage = fm.minimum_coverage.and_then(|n| n.as_u8());
 
     Ok(Rule {
+        identifier,
         license_expression,
         text: trimmed_text.to_string(),
         tokens: vec![],
@@ -680,6 +687,7 @@ MIT License"#,
     fn test_validate_rules_detects_duplicates() {
         let rules = vec![
             Rule {
+                identifier: "mit.LICENSE".to_string(),
                 license_expression: "mit".to_string(),
                 text: "MIT License".to_string(),
                 tokens: vec![],
@@ -714,6 +722,7 @@ MIT License"#,
                 is_tiny: false,
             },
             Rule {
+                identifier: "apache-2.0.LICENSE".to_string(),
                 license_expression: "apache-2.0".to_string(),
                 text: "MIT License".to_string(),
                 tokens: vec![],
@@ -755,6 +764,7 @@ MIT License"#,
     #[test]
     fn test_validate_rules_accepts_false_positive_without_expression() {
         let rules = vec![Rule {
+            identifier: "fp.RULE".to_string(),
             license_expression: "".to_string(),
             text: "Some text".to_string(),
             tokens: vec![],
@@ -796,6 +806,7 @@ MIT License"#,
     fn test_validate_rules_no_duplicates() {
         let rules = vec![
             Rule {
+                identifier: "mit.LICENSE".to_string(),
                 license_expression: "mit".to_string(),
                 text: "MIT License".to_string(),
                 tokens: vec![],
@@ -830,6 +841,7 @@ MIT License"#,
                 is_tiny: false,
             },
             Rule {
+                identifier: "apache-2.0.LICENSE".to_string(),
                 license_expression: "apache-2.0".to_string(),
                 text: "Apache License".to_string(),
                 tokens: vec![],

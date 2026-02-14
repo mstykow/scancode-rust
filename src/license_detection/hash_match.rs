@@ -130,6 +130,7 @@ mod tests {
     fn create_test_rules_by_rid() -> Vec<Rule> {
         vec![
             Rule {
+                identifier: "mit.LICENSE".to_string(),
                 license_expression: "mit".to_string(),
                 text: "MIT License".to_string(),
                 tokens: vec![0, 1],
@@ -164,6 +165,7 @@ mod tests {
                 is_tiny: false,
             },
             Rule {
+                identifier: "apache-2.0.LICENSE".to_string(),
                 license_expression: "apache-2.0".to_string(),
                 text: "Apache License 2.0".to_string(),
                 tokens: vec![2, 3, 4],

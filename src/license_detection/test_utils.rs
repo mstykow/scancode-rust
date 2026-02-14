@@ -54,6 +54,7 @@ pub fn create_mock_rule(
 ) -> Rule {
     let length_unique = tokens.len();
     Rule {
+        identifier: format!("{}.LICENSE", license_expression),
         license_expression: license_expression.to_string(),
         text: String::new(),
         tokens,
@@ -101,6 +102,7 @@ pub fn create_mock_rule(
 /// A `Rule` with empty tokens and the given relevance
 pub fn create_mock_rule_simple(license_expression: &str, relevance: u8) -> Rule {
     Rule {
+        identifier: format!("{}.LICENSE", license_expression),
         license_expression: license_expression.to_string(),
         text: String::new(),
         tokens: Vec::new(),

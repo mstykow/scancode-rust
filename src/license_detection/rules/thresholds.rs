@@ -219,6 +219,7 @@ mod integration_tests {
         len_legalese: usize,
     ) -> Rule {
         let mut rule = Rule {
+            identifier: "test.RULE".to_string(),
             license_expression: "mit".to_string(),
             text,
             tokens: tokens.clone(),

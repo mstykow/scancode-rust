@@ -52,8 +52,13 @@ pub struct License {
 }
 
 /// Rule metadata loaded from .LICENSE and .RULE files.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Rule {
+    /// Unique identifier for this rule (e.g., "mit.LICENSE", "gpl-2.0_12.RULE")
+    /// Used for sorting to match Python's attr.s field order.
+    /// This is the primary sort key after rid (which is None at sort time in Python).
+    pub identifier: String,
+
     /// License expression string using SPDX syntax and ScanCode license keys
     pub license_expression: String,
 
@@ -231,6 +236,7 @@ mod tests {
     #[test]
     fn test_rule_basic() {
         let rule = Rule {
+            identifier: "mit.LICENSE".to_string(),
             license_expression: "mit".to_string(),
             text: "MIT License".to_string(),
             tokens: vec![],

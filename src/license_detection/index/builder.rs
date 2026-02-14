@@ -40,6 +40,7 @@ fn build_rule_from_license(license: &License) -> Option<Rule> {
     let minimum_coverage = license.minimum_coverage.unwrap_or(0);
 
     Some(Rule {
+        identifier: format!("{}.LICENSE", license.key),
         license_expression: license.key.clone(),
         text: prepare_rule_text(&license.text),
         tokens: vec![],
@@ -205,7 +206,8 @@ pub fn build_index(rules: Vec<Rule>, licenses: Vec<License>) -> LicenseIndex {
     let license_rules =
         build_rules_from_licenses(&licenses_by_key.values().cloned().collect::<Vec<_>>());
 
-    let all_rules: Vec<Rule> = license_rules.into_iter().chain(rules).collect();
+    let mut all_rules: Vec<Rule> = license_rules.into_iter().chain(rules).collect();
+    all_rules.sort();
 
     for (rid, mut rule) in all_rules.into_iter().enumerate() {
         let rule_tokens = tokenize(&rule.text);
@@ -351,6 +353,7 @@ mod tests {
 
     fn create_test_rule(text: &str, is_false_positive: bool) -> Rule {
         Rule {
+            identifier: "test.RULE".to_string(),
             license_expression: "mit".to_string(),
             text: text.to_string(),
             tokens: vec![],
