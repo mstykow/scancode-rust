@@ -3,10 +3,15 @@
 use crate::license_detection::models::{License, Rule};
 use anyhow::{Context, Result, anyhow};
 use log::warn;
+use once_cell::sync::Lazy;
+use regex::Regex;
 use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::HashSet;
 use std::fs;
 use std::path::Path;
+
+static FM_BOUNDARY: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"(?m)^-{3,}\s*$").expect("Invalid frontmatter regex"));
 
 fn deserialize_yes_no_bool<'de, D>(deserializer: D) -> Result<Option<bool>, D::Error>
 where
@@ -229,7 +234,7 @@ pub fn parse_rule_file(path: &Path) -> Result<Rule> {
         .unwrap_or("unknown.RULE")
         .to_string();
 
-    let parts: Vec<&str> = content.split("---").collect();
+    let parts: Vec<&str> = FM_BOUNDARY.splitn(&content, 3).collect();
 
     if parts.len() < 3 {
         let trimmed = content.trim();
@@ -344,7 +349,7 @@ pub fn parse_license_file(path: &Path) -> Result<License> {
         ));
     }
 
-    let parts: Vec<&str> = content.split("---").collect();
+    let parts: Vec<&str> = FM_BOUNDARY.splitn(&content, 3).collect();
 
     if parts.len() < 3 {
         let trimmed = content.trim();
