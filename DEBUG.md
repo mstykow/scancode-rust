@@ -2,103 +2,97 @@
 
 ## Current Status
 
-**Golden Tests:** 154 passed, 137 failed (as of commit `a0952ea`)
+**Golden Tests:** 156 passed, 135 failed (as of commit `b714310`)
 
 ---
 
-## Issue 1: Pipeline Short-Circuit Causes Missing Detections
+## Open Issues
 
-### Problem
+### Issue 1: YAML Frontmatter Parsing Bug (High Priority)
 
-Files with multiple licenses or license variants (e.g., `sudo` = ISC + DARPA) don't detect all licenses.
+**Problem:** 25 license files fail to load with "empty text content" warnings. Files with PGP signatures or dashes in content are incorrectly parsed.
 
-**Example:** `double_isc.txt`
+**Example warnings:**
 
-- **Expected:** `["isc", "isc", "sudo"]`
-- **Actual:** `["isc", "isc AND unknown"]`
+```text
+Warning: Failed to parse license file reference/scancode-toolkit/src/licensedcode/data/licenses/tcp-wrappers.LICENSE: License file has empty text content and is not deprecated/unknown/generic
+```
 
-The DARPA acknowledgment text is detected as "unknown" instead of "sudo".
-
-### Root Cause
-
-Rust's pipeline in `src/license_detection/mod.rs:111-129` uses `match_coverage` (rule coverage) to skip matchers:
+**Root Cause:** Rust uses naive string split which matches `---` anywhere in the file:
 
 ```rust
-let has_perfect_match = all_matches.iter().any(|m| m.match_coverage >= 100.0);
-if !has_perfect_match {
-    // aho_match only runs if no 100% coverage
-    let has_high_coverage = all_matches.iter().any(|m| m.match_coverage >= 90.0);
-    if !has_high_coverage {
-        // seq_match only runs if no 90% coverage
-    }
+// src/license_detection/rules/loader.rs:232, 347
+let parts: Vec<&str> = content.split("---").collect();
+```
+
+This incorrectly splits on:
+
+- `-----BEGIN PGP SIGNED MESSAGE-----` (PGP signatures)
+- Any `---` appearing in license text
+
+**Example:** `tcp-wrappers.LICENSE` contains PGP-signed text. The naive split produces 9 parts, with `parts[2]` being empty.
+
+**Python Behavior:** Python uses regex with MULTILINE flag (`frontmatter.py`):
+
+```python
+FM_BOUNDARY = re.compile(r"^-{3,}\s*$", re.MULTILINE)
+_, fm, content = self.FM_BOUNDARY.split(text, 2)
+```
+
+This matches `---` only at line boundaries.
+
+**Fix Attempt:** Replaced with regex:
+
+```rust
+static FM_BOUNDARY: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"(?m)^---+\s*$").expect("Invalid frontmatter boundary regex")
+});
+
+fn split_frontmatter(content: &str) -> Vec<&str> {
+    FM_BOUNDARY.splitn(content, 3).collect()
 }
 ```
 
-**The bug:** `match_coverage` measures what percentage of the **RULE** is covered, not the **QUERY**. When ISC matches with 100% coverage, Rust skips `aho_match` and `seq_match` entirely. The DARPA text (lines 36-38) never gets matched against `sudo.LICENSE`.
+**Result:** 156 → 142 passed (14-test regression)
 
-### Python Behavior
+**Why it failed:** The regex split produces different whitespace handling. The YAML content has leading `\n` which affects parsing. Needs more investigation to match Python's exact behavior.
 
-Python's `match_query()` in `index.py:966-1151`:
+**Recommended Fix:**
 
-1. Runs matchers in sequence (spdx_lid → aho → seq)
-2. Tracks `already_matched_qspans` - query positions already matched
-3. Continues matching unmatched regions until no significant unmatched positions remain
-4. The `coverage() == 100` check is for tracking, not skipping matchers
+1. Study Python's exact whitespace handling in `frontmatter.py`
+2. Ensure regex split produces identical parts to Python's split
+3. Add unit tests comparing Python vs Rust split results for edge cases:
+   - Files with PGP signatures
+   - Files with dashes in content
+   - Files with varying numbers of dashes (--- vs ----)
 
-### Recommended Fix
-
-**Option A: Remove the short-circuit entirely** (simplest, most correct)
-
-```rust
-// In src/license_detection/mod.rs, replace lines 111-129:
-let hash_matches = hash_match(&self.index, &query_run);
-all_matches.extend(hash_matches);
-
-let spdx_matches = spdx_lid_match(&self.index, text);
-all_matches.extend(spdx_matches);
-
-// Always run aho and seq matchers - they handle overlap internally
-let aho_matches = aho_match(&self.index, &query_run);
-all_matches.extend(aho_matches);
-
-let seq_matches = seq_match(&self.index, &query_run);
-all_matches.extend(seq_matches);
-
-let unknown_matches = unknown_match(&self.index, &query, &all_matches);
-all_matches.extend(unknown_matches);
-```
-
-**Option B: Track query coverage** (more complex, potential performance gain)
-
-Track which query positions are covered by existing matches. Only skip matchers if the entire query is matched.
-
-### Files Affected
+**Files Affected:**
 
 | File | Location |
 |------|----------|
-| `src/license_detection/mod.rs` | Lines 111-129 (pipeline short-circuit) |
-| `reference/scancode-toolkit/src/licensedcode/index.py` | Lines 966-1151 (Python reference) |
+| `src/license_detection/rules/loader.rs` | Lines 232, 347 - YAML split logic |
+| `reference/scancode-toolkit/src/licensedcode/frontmatter.py` | Lines 49-54 (Python reference) |
+
+**Impact:**
+
+- 25 license files fail to load (including `tcp-wrappers`, `ofl-1.1`, etc.)
+- These licenses cannot be detected until fixed
+- Likely affects detection accuracy for many test cases
 
 ---
 
-## Issue 2: Unknown License Intros Appear in Expressions
+### Issue 2: Unknown License Intros Appear in Expressions (Medium Priority)
 
-### Problem
-
-Files produce detections with "unknown" in license expressions when they shouldn't.
+**Problem:** Files produce detections with "unknown" in license expressions when they shouldn't.
 
 **Example:** `COPYING.gplv3`
 
 - **Expected:** `["gpl-3.0"]`
 - **Actual:** 8 detections including `"gpl-3.0 AND unknown"`
 
-### Root Cause
+**Root Cause:** Rust builds license expressions from ALL matches, including license intro matches that should be filtered.
 
-Rust builds license expressions from ALL matches, including license intro matches that should be filtered.
-
-### Python Behavior
-
-Python filters intros through two-step process (`detection.py`):
+**Python Behavior:** Python filters intros through two-step process (`detection.py`):
 
 1. **`analyze_detection()`** (line 1760): Returns category `UNKNOWN_INTRO_BEFORE_DETECTION` when an unknown intro is followed by a proper license match.
 
@@ -113,9 +107,7 @@ Python filters intros through two-step process (`detection.py`):
    - Rule has `is_license_intro` OR `is_license_clue` OR `license_expression == 'free-unknown'`
    - AND matcher is exact (`MATCH_AHO_EXACT`) OR coverage is 100%
 
-### Previous Fix Attempt
-
-**Result:** 5-test regression, reverted.
+**Previous Fix Attempt:** 5-test regression, reverted.
 
 **Why it failed:**
 
@@ -123,7 +115,7 @@ Python filters intros through two-step process (`detection.py`):
 2. `is_unknown_intro()` logic was incomplete - didn't check rule fields
 3. Missing the "exact matcher OR 100% coverage" condition
 
-### Recommended Fix
+**Recommended Fix:**
 
 1. **Reorder `create_detection_from_group()`** in `src/license_detection/detection.rs`:
    - Analyze category FIRST
@@ -143,7 +135,7 @@ Python filters intros through two-step process (`detection.py`):
 
 3. **Ensure `is_license_intro` is populated** in `LicenseMatch` from rule data.
 
-### Files Affected
+**Files Affected:**
 
 | File | Location |
 |------|----------|
@@ -153,15 +145,11 @@ Python filters intros through two-step process (`detection.py`):
 
 ---
 
-## Issue 3: Deprecated Rules Handling
+### Issue 3: Deprecated Rules Handling (Low Priority)
 
-### Problem
+**Problem:** Test `camellia_bsd.c` expected `bsd-2-clause-first-lines`, got `freebsd-doc` (a deprecated rule).
 
-Test `camellia_bsd.c` expected `bsd-2-clause-first-lines`, got `freebsd-doc` (a deprecated rule).
-
-### Python Behavior
-
-Python **skips deprecated rules by default** (`models.py:1103-1104`):
+**Python Behavior:** Python **skips deprecated rules by default** (`models.py:1103-1104`):
 
 ```python
 # always skip deprecated rules
@@ -170,9 +158,7 @@ rules = [r for r in rules if not r.is_deprecated]
 
 Deprecated rules have `replaced_by` pointing to the new license key.
 
-### Previous Fix Attempt
-
-**Attempted:** Skip deprecated rules during index building.
+**Previous Fix Attempt:** Skip deprecated rules during index building.
 
 **Result:** 19-test regression (160 → 141 passed).
 
@@ -182,15 +168,13 @@ Deprecated rules have `replaced_by` pointing to the new license key.
 - The `freebsd-doc.LICENSE` file is NOT deprecated - only `freebsd-doc_5.RULE` is deprecated
 - Tests should match against the non-deprecated LICENSE file
 
-### Recommended Fix
+**Recommended Fix:**
 
 1. **Keep skipping deprecated rules** (matches Python's default behavior)
-
 2. **Update golden tests** that expect deprecated expressions to expect the replacement expressions
-
 3. **Alternative:** Add `--with-deprecated` flag for backwards compatibility
 
-### Files Affected
+**Files Affected:**
 
 | File | Location |
 |------|----------|
@@ -201,6 +185,14 @@ Deprecated rules have `replaced_by` pointing to the new license key.
 ---
 
 ## Fixed Issues
+
+### Pipeline Short-Circuit (Fixed in `b714310`)
+
+**Problem:** Matchers were skipped when high-coverage matches found, missing partial licenses.
+
+**Fix:** Removed `has_perfect_match`/`has_high_coverage` short-circuit logic. All matchers now always run.
+
+**File:** `src/license_detection/mod.rs`
 
 ### Line Number Calculation (Fixed in `0d72a6e`)
 
@@ -225,11 +217,3 @@ Deprecated rules have `replaced_by` pointing to the new license key.
 **Fix:** Added `all_rules.sort()` before assigning rule IDs in `builder.rs`.
 
 **Files:** `src/license_detection/index/builder.rs`, `src/license_detection/models.rs`
-
----
-
-## Priority Order
-
-1. **High:** Issue 1 (Pipeline Short-Circuit) - Affects many multi-license files
-2. **Medium:** Issue 2 (Unknown in Expressions) - Affects expression accuracy
-3. **Low:** Issue 3 (Deprecated Rules) - Only affects specific test cases
