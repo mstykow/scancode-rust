@@ -114,19 +114,11 @@ impl LicenseDetectionEngine {
         let spdx_matches = spdx_lid_match(&self.index, text);
         all_matches.extend(spdx_matches);
 
-        let has_perfect_match = all_matches.iter().any(|m| m.match_coverage >= 100.0);
+        let aho_matches = aho_match(&self.index, &query_run);
+        all_matches.extend(aho_matches);
 
-        if !has_perfect_match {
-            let aho_matches = aho_match(&self.index, &query_run);
-            all_matches.extend(aho_matches);
-
-            let has_high_coverage = all_matches.iter().any(|m| m.match_coverage >= 90.0);
-
-            if !has_high_coverage {
-                let seq_matches = seq_match(&self.index, &query_run);
-                all_matches.extend(seq_matches);
-            }
-        }
+        let seq_matches = seq_match(&self.index, &query_run);
+        all_matches.extend(seq_matches);
 
         let unknown_matches = unknown_match(&self.index, &query, &all_matches);
         all_matches.extend(unknown_matches);
@@ -539,5 +531,94 @@ SOFTWARE."#;
                 );
             }
         }
+    }
+
+    #[test]
+    fn test_detect_multiple_licenses_in_text() {
+        let Some(engine) = create_engine_from_reference() else {
+            eprintln!("Skipping test: reference directory not found");
+            return;
+        };
+
+        let isc_text = r#"Permission to use, copy, modify, and/or distribute this software for any
+purpose with or without fee is hereby granted, provided that the above
+copyright notice and this permission notice appear in all copies.
+
+THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE."#;
+
+        let darpa_text = r#"Portions of this software were developed by the University of California,
+Irvine under a U.S. Government contract with the Defense Advanced Research
+Projects Agency (DARPA)."#;
+
+        let combined_text = format!("{}\n\n{}", isc_text, darpa_text);
+
+        let detections = engine
+            .detect(&combined_text)
+            .expect("Detection should succeed");
+
+        assert!(!detections.is_empty(), "Should detect at least one license");
+
+        let detected_licenses: Vec<String> = detections
+            .iter()
+            .filter_map(|d| d.license_expression.as_ref())
+            .cloned()
+            .collect();
+
+        assert!(
+            detected_licenses
+                .iter()
+                .any(|l| l.to_lowercase().contains("isc")),
+            "Should detect ISC license, got: {:?}",
+            detected_licenses
+        );
+    }
+
+    #[test]
+    fn test_sudo_license_loaded_from_license_file() {
+        let Some(engine) = create_engine_from_reference() else {
+            eprintln!("Skipping test: reference directory not found");
+            return;
+        };
+
+        let index = engine.index();
+
+        let sudo_rules: Vec<_> = index
+            .rules_by_rid
+            .iter()
+            .filter(|r| r.license_expression.contains("sudo"))
+            .collect();
+
+        eprintln!("Found {} rules with 'sudo' expression", sudo_rules.len());
+        for rule in sudo_rules.iter().take(3) {
+            eprintln!(
+                "  Rule: {} - is_from_license: {}, text len: {}",
+                rule.identifier,
+                rule.is_from_license,
+                rule.text.len()
+            );
+        }
+
+        assert!(
+            !sudo_rules.is_empty(),
+            "Should have at least one rule with 'sudo' license expression"
+        );
+
+        let sudo_from_license = sudo_rules.iter().find(|r| r.is_from_license);
+        assert!(
+            sudo_from_license.is_some(),
+            "Should have a sudo rule created from license file"
+        );
+
+        let rule = sudo_from_license.unwrap();
+        assert!(
+            rule.text.contains("Sponsored in part"),
+            "sudo rule text should contain DARPA acknowledgment"
+        );
     }
 }
