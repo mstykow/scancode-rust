@@ -253,6 +253,7 @@
 pub mod askalono;
 pub mod assembly;
 pub mod cli;
+pub mod copyright;
 pub mod models;
 pub mod parsers;
 pub mod scanner;
