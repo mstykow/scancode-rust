@@ -1,0 +1,20 @@
+what:
+- copyrights
+- holders
+- authors
+copyrights:
+- Copyright (c) 1998 - 2002 Frodo Looijaard <frodol@dds.nl> , Kyösti Mälkki <kmalkki@cc.hut.fi>
+  , Mark Studebaker <mdsxyz123@yahoo.com>
+- Copyright 1998-2000 Jonathan Teh Soon
+- Copyright 1998-2000 Jonathan Teh Soon
+- Copyright 1998-2000 Jonathan Teh Soon Yew
+holders:
+- Frodo Looijaard , Kyösti Mälkki , Mark Studebaker
+- Jonathan Teh Soon
+- Jonathan Teh Soon
+- Jonathan Teh Soon Yew
+- Jonathan Teh Soon Yew voltagefactor 0 1.25/2628 (2628/1.25 2102.4) // Vccp voltagefactor
+  1 1.25/2628 (2628/1.25 2102.4) // +2.5V
+authors:
+- Jonathan Teh Soon Yew <j.teh@iname.com>
+- Alex van Kaam <darkside@chello.nl>

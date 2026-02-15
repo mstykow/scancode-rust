@@ -1,0 +1,11 @@
+what:
+  - copyrights
+  - holders
+  - holders_summary
+copyrights:
+  - Copyright (c) 2011 André Dieb Martins <andre.dieb@gmail.com>
+holders:
+  - André Dieb Martins
+holders_summary:
+  - value: André Dieb Martins
+    count: 1

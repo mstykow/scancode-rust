@@ -1,0 +1,14 @@
+what:
+  - copyrights
+  - holders
+  - authors
+copyrights:
+  - Copyright (c) 2008 Erik Andrén
+  - Copyright (c) 2007 Ilyes Gouta
+  - Copyright (c) 2006 Willem Duinker
+  - Copyright (c) 2008, Robert Jarzmik <robert.jarzmik@free.fr>
+holders:
+  - Erik Andrén
+  - Ilyes Gouta
+  - Willem Duinker
+  - Robert Jarzmik

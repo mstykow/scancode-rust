@@ -1,0 +1,23 @@
+what:
+- copyrights
+- holders
+- holders_summary
+copyrights:
+- Copyright (c) 2007 William Jon McCann <mccann@jhu.edu>
+- (c) 2007, Michael Biebl <biebl@debian.org>
+- (c) 2006 William Jon McCann <mccann@jhu.edu>
+- (c) 2007 David Zeuthen <davidz@redhat.com>
+holders:
+- William Jon McCann
+- William Jon McCann
+- Michael Biebl
+- David Zeuthen
+holders_summary:
+- value: William Jon McCann
+  count: 2
+- value: David Zeuthen
+  count: 1
+- value: Michael Biebl
+  count: 1
+- value: David Zeuthen
+  count: 1

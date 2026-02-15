@@ -1,0 +1,10 @@
+what:
+  - copyrights
+  - holders
+  - holders_summary
+copyrights: []
+holders:
+  - MetaStuff, Ltd.
+holders_summary:
+  - value: MetaStuff, Ltd.
+    count: 1

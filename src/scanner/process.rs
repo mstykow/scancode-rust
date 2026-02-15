@@ -1,19 +1,24 @@
-use crate::askalono::{ScanStrategy, TextData};
-use crate::models::{FileInfo, FileInfoBuilder, FileType, LicenseDetection, Match};
-use crate::parsers::try_parse_file;
-use crate::scanner::ProcessResult;
-use crate::utils::file::{get_creation_date, is_path_excluded};
-use crate::utils::hash::{calculate_md5, calculate_sha1, calculate_sha256};
-use crate::utils::language::detect_language;
+use std::fs;
+use std::path::Path;
+use std::sync::Arc;
+
 use anyhow::Error;
 use content_inspector::{ContentType, inspect};
 use glob::Pattern;
 use indicatif::ProgressBar;
 use mime_guess::from_path;
 use rayon::prelude::*;
-use std::fs::{self};
-use std::path::Path;
-use std::sync::Arc;
+
+use crate::askalono::{ScanStrategy, TextData};
+use crate::copyright;
+use crate::models::{
+    Author, Copyright, FileInfo, FileInfoBuilder, FileType, Holder, LicenseDetection, Match,
+};
+use crate::parsers::try_parse_file;
+use crate::scanner::ProcessResult;
+use crate::utils::file::{get_creation_date, is_path_excluded};
+use crate::utils::hash::{calculate_md5, calculate_sha1, calculate_sha256};
+use crate::utils::language::detect_language;
 
 // License detection threshold - scores above this value are considered a match
 
@@ -145,18 +150,77 @@ fn extract_information_from_content(
         .sha256(Some(calculate_sha256(&buffer)))
         .programming_language(Some(detect_language(path, &buffer)));
 
+    // Package parsing and text-based detection (copyright, license) are independent.
+    // Python ScanCode runs all enabled plugins on every file, so we do the same.
     if let Some(package_data) = try_parse_file(path) {
         file_info_builder.package_data(package_data);
-        Ok(())
-    } else if inspect(&buffer) == ContentType::UTF_8 {
-        extract_license_information(
-            file_info_builder,
-            String::from_utf8_lossy(&buffer).into_owned(),
-            scan_strategy,
-        )
+    }
+
+    if inspect(&buffer) == ContentType::UTF_8 {
+        let text_content = crate::utils::file::decode_bytes_to_string(&buffer);
+
+        extract_copyright_information(file_info_builder, path, &text_content);
+        extract_license_information(file_info_builder, text_content, scan_strategy)
     } else {
         Ok(())
     }
+}
+
+fn extract_copyright_information(
+    file_info_builder: &mut FileInfoBuilder,
+    path: &Path,
+    text_content: &str,
+) {
+    // CREDITS files get special handling (Linux kernel style).
+    if copyright::is_credits_file(path) {
+        let author_detections = copyright::detect_credits_authors(&path.to_string_lossy());
+        if !author_detections.is_empty() {
+            file_info_builder.authors(
+                author_detections
+                    .into_iter()
+                    .map(|a| Author {
+                        author: a.author,
+                        start_line: a.start_line,
+                        end_line: a.end_line,
+                    })
+                    .collect(),
+            );
+            return;
+        }
+    }
+
+    let (copyrights, holders, authors) = copyright::detect_copyrights(text_content);
+
+    file_info_builder.copyrights(
+        copyrights
+            .into_iter()
+            .map(|c| Copyright {
+                copyright: c.copyright,
+                start_line: c.start_line,
+                end_line: c.end_line,
+            })
+            .collect::<Vec<Copyright>>(),
+    );
+    file_info_builder.holders(
+        holders
+            .into_iter()
+            .map(|h| Holder {
+                holder: h.holder,
+                start_line: h.start_line,
+                end_line: h.end_line,
+            })
+            .collect::<Vec<Holder>>(),
+    );
+    file_info_builder.authors(
+        authors
+            .into_iter()
+            .map(|a| Author {
+                author: a.author,
+                start_line: a.start_line,
+                end_line: a.end_line,
+            })
+            .collect::<Vec<Author>>(),
+    );
 }
 
 fn extract_license_information(
@@ -164,8 +228,7 @@ fn extract_license_information(
     text_content: String,
     scan_strategy: &ScanStrategy,
 ) -> Result<(), Error> {
-    // Analyze license with the text content
-    if text_content.is_empty() {
+    if text_content.is_empty() || !scan_strategy.store_has_licenses() {
         return Ok(());
     }
 
@@ -231,6 +294,8 @@ fn process_directory(path: &Path, metadata: &fs::Metadata) -> FileInfo {
         package_data: Vec::new(), // TODO: implement
         license_expression: None,
         copyrights: Vec::new(),         // TODO: implement
+        holders: Vec::new(),            // TODO: implement
+        authors: Vec::new(),            // TODO: implement
         license_detections: Vec::new(), // TODO: implement
         urls: Vec::new(),               // TODO: implement
         for_packages: Vec::new(),

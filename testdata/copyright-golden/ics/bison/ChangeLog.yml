@@ -1,0 +1,18 @@
+what:
+- copyrights
+- holders
+- holders_summary
+copyrights:
+- Copyright (c) 1987, 1988, 1991, 1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999,
+  2000, 2001, 2002, 2003, 2004, 2005, 2006 Free Software Foundation, Inc.
+holders:
+- Free Software Foundation, Inc.
+- Akim Demaille <akim@epita.fr>
+- Joel E. Denny <jdenny@ces.clemson.edu>
+holders_summary:
+- value: Free Software Foundation
+  count: 1
+- value: Akim Demaille <akim@epita.fr>
+  count: 1
+- value: Joel E. Denny <jdenny@ces.clemson.edu>
+  count: 1

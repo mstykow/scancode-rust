@@ -1,0 +1,14 @@
+what:
+- copyrights
+- holders
+- holders_summary
+copyrights:
+- Copyright 1999 LaTeX3 Project
+holders:
+- LaTeX3 Project
+- M. Y.
+holders_summary:
+- value: LaTeX3 Project
+  count: 1
+- value: M. Y.
+  count: 1

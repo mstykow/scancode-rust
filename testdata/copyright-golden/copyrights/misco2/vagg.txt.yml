@@ -1,0 +1,13 @@
+what:
+  - copyrights
+  - holders
+  - holders_summary
+  - authors
+copyrights:
+  - Copyright (c) Rod Vagg
+holders:
+  - Rod Vagg
+authors: []
+holders_summary:
+  - value: Rod Vagg
+    count: 1

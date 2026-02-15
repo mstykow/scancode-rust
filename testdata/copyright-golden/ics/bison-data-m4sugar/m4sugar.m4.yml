@@ -1,0 +1,16 @@
+what:
+- copyrights
+- holders
+- holders_summary
+copyrights:
+- Copyright (c) 1999, 2000, 2001, 2002, 2003, 2004, 2005 Free Software Foundation,
+  Inc.
+holders:
+- Free Software Foundation, Inc.
+- (the parens part of the name, it not an argument) has not been run, then call it
+holders_summary:
+- value: Free Software Foundation
+  count: 1
+- value: (the parens part of the name, it not an argument) has not been run, then
+    call it
+  count: 1

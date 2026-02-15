@@ -1,0 +1,15 @@
+what:
+  - copyrights
+  - holders
+  - holders_summary
+copyrights:
+  - (c) 2006 Tim-Philipp Müller
+  - (c) 2008 Sebastian Dröge <slomo@circular-chaos.org>
+holders:
+  - Tim-Philipp Müller
+  - Sebastian Dröge
+holders_summary:
+  - value: Sebastian Dröge
+    count: 1
+  - value: Tim-Philipp Müller
+    count: 1

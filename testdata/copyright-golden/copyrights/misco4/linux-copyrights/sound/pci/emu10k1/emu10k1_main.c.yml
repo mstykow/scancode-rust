@@ -1,0 +1,26 @@
+what:
+  - copyrights
+  - holders
+  - authors
+copyrights:
+  - Copyright (c) by Jaroslav Kysela <perex@perex.cz> Creative Labs, Inc. Routines
+  - Copyright (c) by James Courtier-Dutton <James@superbug.co.uk>
+  - (Copyright unasserted) AN 0 (Audio data) P 0 (Consumer)
+holders:
+  - Jaroslav Kysela Creative Labs, Inc. Routines
+  - James Courtier-Dutton
+  - unasserted AN 0 (Audio data) P 0 (Consumer)
+authors:
+  - michael@gernoth.net
+  - James@superbug.co.uk
+  - James@superbug.co.uk
+  - James@superbug.co.uk
+  - James@superbug.co.uk
+  - James@superbug.co.uk
+  - James@superbug.co.uk
+  - James@superbug.co.uk
+  - James@superbug.co.uk
+  - James@superbug.co.uk
+  - shane-alsa@cm.nu
+  - James@superbug.co.uk
+  - James@superbug.co.uk

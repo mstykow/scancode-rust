@@ -42,6 +42,12 @@ jobs:
       - name: Run tests
         run: cargo test --all --verbose
 
+      - name: Run golden tests
+        run: cargo test --all --verbose --features golden-tests
+
+      - name: Check for unused dependencies
+        run: ./scripts/check_unused_deps.sh
+
   docs-quality:
     name: Documentation Quality
     runs-on: ubuntu-latest

@@ -1,0 +1,11 @@
+what:
+  - copyrights
+  - holders
+  - holders_summary
+copyrights:
+  - "(c) Copyright 1985-1999 ADVANCED TECHNOLOGY"
+holders:
+  - ADVANCED TECHNOLOGY
+holders_summary:
+  - value: ADVANCED TECHNOLOGY SYSTEMS
+    count: 1

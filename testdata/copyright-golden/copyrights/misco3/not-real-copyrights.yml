@@ -1,0 +1,12 @@
+what:
+  - copyrights
+  - holders
+  - holders_summary
+  - authors
+copyrights: []
+holders:
+  - United States Government
+  - United States Government
+holders_summary:
+  - value: United States Government
+    count: 2

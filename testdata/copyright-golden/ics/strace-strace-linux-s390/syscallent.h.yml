@@ -1,0 +1,17 @@
+what:
+- copyrights
+- holders
+- holders_summary
+copyrights:
+- Copyright (c) 2000 IBM Deutschland Entwicklung GmbH, IBM Coporation
+- Copyright (c) 2000 IBM Deutschland Entwicklung GmbH, IBM Coporation Authors Ulrich
+  Weigand <Ulrich.Weigand@de.ibm.com> D.J. Barrow <barrow_dj@mail.yahoo.com,djbarrow@de.ibm.com>
+holders:
+- IBM Deutschland Entwicklung GmbH, IBM Coporation
+- IBM Deutschland Entwicklung GmbH, IBM Coporation Authors Ulrich Weigand D.J. Barrow
+holders_summary:
+- value: IBM Deutschland Entwicklung GmbH, IBM Coporation
+  count: 1
+- value: IBM Deutschland Entwicklung GmbH, IBM Coporation Authors Ulrich Weigand D.J.
+    Barrow
+  count: 1

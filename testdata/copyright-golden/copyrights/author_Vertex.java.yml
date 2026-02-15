@@ -1,0 +1,6 @@
+what:
+  - authors
+authors:
+  - "Maczka @version $Id Vertex.java 5958 10:29:55Z olamy $"
+expected_failures:
+  - authors

@@ -1,0 +1,14 @@
+what:
+  - copyrights
+  - holders
+  - authors
+copyrights:
+  - Copyright (c) 1999, 2000, 2001 Ingo Molnar, Red Hat
+  - Copyright (c) 1996, 1997, 1998 Ingo Molnar, Miguel de Icaza, Gadi Oxman
+holders:
+  - Ingo Molnar, Red Hat
+  - Ingo Molnar, Miguel de Icaza, Gadi Oxman
+  - "Paul Clements, SteelEye Technology"
+authors:
+  - Peter T. Breuer <ptb@it.uc3m.es>
+  - "Mika Kuoppala <miku@iki.fi> , Fixes to reconstruction by Jakob Østergaard <jakob@ostenfeld.dk> Various fixes by Neil Brown <neilb@cse.unsw.edu.au>"

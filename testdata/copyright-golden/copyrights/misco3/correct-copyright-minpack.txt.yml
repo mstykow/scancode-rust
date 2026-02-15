@@ -1,0 +1,11 @@
+what:
+  - copyrights
+  - holders
+  - holders_summary
+  - authors
+copyrights: []
+holders:
+  - University of Chicago
+holders_summary:
+  - value: University of Chicago
+    count: 1

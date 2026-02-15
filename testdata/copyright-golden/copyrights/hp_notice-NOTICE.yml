@@ -1,0 +1,32 @@
+what:
+- copyrights
+- holders
+- holders_summary
+copyrights:
+- (c) Copyright 2007 Hewlett-Packard Development Company, L.P.
+- (c) Copyright 2008 Hewlett-Packard Development Company, L.P.
+- (c) Copyright 2008 Hewlett-Packard Development Company, L.P.
+- (c) Copyright 2009 Hewlett-Packard Development Company, L.P.
+- copyrighted by the Free Software Foundation
+- (c) 1989, 1991 Free Software Foundation, Inc.
+- (c) 2006 Alan D. Brunelle <Alan.Brunelle@hp.com>
+- (c) 2007 Alan D. Brunelle <Alan.Brunelle@hp.com>
+holders:
+- Hewlett-Packard Development Company, L.P.
+- Hewlett-Packard Development Company, L.P.
+- Hewlett-Packard Development Company, L.P.
+- Hewlett-Packard Development Company, L.P.
+- the Free Software Foundation
+- Alan D. Brunelle
+- Free Software Foundation, Inc.
+holders_summary:
+- value: Hewlett-Packard Development Company, L.P.
+  count: 4
+- value: Alan D. Brunelle
+  count: 2
+- value: Free Software Foundation
+  count: 2
+- value: Alan D. Brunelle
+  count: 1
+- value: Free Software Foundation, Inc.
+  count: 1

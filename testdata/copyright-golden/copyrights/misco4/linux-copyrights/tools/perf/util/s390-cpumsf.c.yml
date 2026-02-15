@@ -1,0 +1,9 @@
+what:
+- copyrights
+- holders
+- authors
+copyrights:
+- Copyright IBM Corp. 2018 Auxtrace
+holders: []
+authors:
+- Thomas Richter <tmricht@linux.ibm.com>

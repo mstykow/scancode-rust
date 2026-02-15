@@ -1,0 +1,13 @@
+what:
+- copyrights
+- holders
+- holders_summary
+copyrights:
+- (c) 2009 Company
+holders:
+- Company
+holders_summary:
+- value: Company Customer Identity Hidden
+  count: 1
+- value: Company
+  count: 1

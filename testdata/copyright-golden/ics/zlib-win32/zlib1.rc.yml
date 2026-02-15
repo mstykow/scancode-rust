@@ -1,0 +1,14 @@
+what:
+- copyrights
+- holders
+- holders_summary
+copyrights:
+- (c) 1995-2006 Jean-loup Gailly & Mark Adler
+holders:
+- Jean-loup Gailly & Mark Adler
+- Jean-loup Gailly & Mark Adler VALUE OriginalFilename zlib1.dll VALUE
+holders_summary:
+- value: Jean-loup Gailly & Mark Adler
+  count: 1
+- value: Jean-loup Gailly & Mark Adler VALUE OriginalFilename zlib1.dll VALUE
+  count: 1

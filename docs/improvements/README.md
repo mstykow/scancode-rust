@@ -52,6 +52,7 @@ Python has unsafe patterns (code execution, DoS vulnerabilities), we use safe al
 | [CPAN dist.ini](cpan-dist-ini-parser.md) | ✨ New Feature | Stub-only handler (returns empty) | Full INI parsing with dependency scopes | Perl Dist::Zilla metadata extraction |
 | [Swift Dependencies](swift-show-dependencies-parser.md) | 🔍 Enhanced | Only extracts root package name | Full dependency graph with versions + direct/transitive | Complete Swift dependency visibility |
 | [Maven](maven-parser.md) | 🔍 Enhanced | SCM fields merged, no inception_year | SCM separation + inception_year + consistent keys | Data preservation + SBOM completeness |
+| [Copyright Detection](copyright-detection.md) | 🐛 Bug Fix + 🔍 Enhanced + 🛡️ Security | Year range stops at 2039, short-year typo, French/Spanish case bugs, string-based POS tags, global mutable singleton | Year range 2099, all regex bugs fixed, type-safe enum POS tags, thread-safe `LazyLock` | Correct year detection, reliable i18n, compile-time safety, parallel scanning |
 | All Parsers | 🛡️ Security | No DoS limits | File size + iteration limits | Protection against resource exhaustion |
 
 ## Per-Parser Documentation
@@ -77,6 +78,7 @@ Each parser with improvements has a dedicated document:
 - **[cpan-makefile-pl-parser.md](cpan-makefile-pl-parser.md)** — ✨ New Feature: Makefile.PL WriteMakefile extraction (Python has no parse method)
 - **[osgi-manifest-parser.md](osgi-manifest-parser.md)** — ✨ New Feature: OSGi bundle metadata extraction (Python has empty patterns)
 - **[maven-parser.md](maven-parser.md)** — 🔍 Enhanced Extraction: SCM field separation, inception_year, consistent extra_data keys
+- **[copyright-detection.md](copyright-detection.md)** — 🐛 Bug Fix + 🔍 Enhanced + 🛡️ Security: Year range fix, regex typo fixes, type-safe POS tags, thread-safe design
 
 ## Verification
 

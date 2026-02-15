@@ -1,0 +1,18 @@
+what:
+- copyrights
+- holders
+- holders_summary
+copyrights:
+- Copyright (c) 1998-2010 Gilles Vollant
+- Copyright (c) 2009-2010 Mathias Svensson
+- Copyright 1998-2004 Gilles Vollant - http://www.winimage.com/zLibDll
+- Copyright 1998-2004 Gilles Vollant
+holders:
+- Gilles Vollant
+- Mathias Svensson
+- Gilles Vollant
+holders_summary:
+- value: Gilles Vollant
+  count: 2
+- value: Mathias Svensson
+  count: 1

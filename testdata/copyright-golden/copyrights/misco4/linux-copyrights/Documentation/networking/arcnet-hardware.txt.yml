@@ -1,0 +1,24 @@
+what:
+- copyrights
+- holders
+- authors
+copyrights:
+- (c) 1985 Waterloo Micro
+- Copyright Waterloo Microsystems Inc.
+- (c) 1985 Waterloo Micro. 8 No Name - 8/16 No Name Taiwan R.O.C? 8
+holders:
+- Waterloo Micro
+- Waterloo Microsystems Inc.
+- Waterloo Micro. 8 No Name - 8/16 No Name Taiwan R.O.C? 8
+authors:
+- Stephen A. Wood <saw@cebaf.gov>
+- Juergen Seifert <seifert@htwm.de>
+- Juergen Seifert <seifert@htwm.de>
+- Juergen Seifert <seifert@htwm.de>
+- Juergen Seifert <seifert@htwm.de>
+- Juergen Seifert <seifert@htwm.de>
+- Juergen Seifert <seifert@htwm.de>
+expected_failures:
+- copyrights
+- holders
+- authors

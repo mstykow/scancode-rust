@@ -1,0 +1,15 @@
+what:
+- copyrights
+- holders
+- holders_summary
+copyrights:
+- Copyright (c) 1998-2010 Gilles Vollant
+- Copyright (c) 2009-2010 Mathias Svensson
+holders:
+- Gilles Vollant
+- Mathias Svensson
+holders_summary:
+- value: Gilles Vollant
+  count: 1
+- value: Mathias Svensson
+  count: 1

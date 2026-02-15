@@ -1,0 +1,18 @@
+what:
+- copyrights
+- holders
+- authors
+copyrights:
+- Copyright (c) 1992, 1993 Krishna Balasubramanian Many
+- (c) 1999 Dragos Acostachioaie <dragos@iname.com>
+- (c) 1999 Dragos Acostachioaie <dragos@iname.com> BIGMEM support, Andrea Arcangeli
+  <andrea@suse.de> SMP thread shm, Jean-Luc Boyard <jean-luc.boyard@siemens.fr> HIGHMEM
+  support, Ingo Molnar <mingo@redhat.com> Make shmmax, shmall, shmmni sysctl'able,
+  Christoph Rohland <cr@sap.com> Shared /dev/zero support, Kanoj Sarcar <kanoj@sgi.com>
+  Move the mm
+holders:
+- Krishna Balasubramanian Many
+- Dragos Acostachioaie
+- Dragos Acostachioaie BIGMEM support, Andrea Arcangeli SMP thread shm, Jean-Luc Boyard
+  HIGHMEM support, Ingo Molnar Make shmmax, shmall, shmmni sysctl'able, Christoph
+  Rohland Shared /dev/zero support, Kanoj Sarcar Move the mm

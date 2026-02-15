@@ -1,0 +1,24 @@
+what:
+- copyrights
+- holders
+- holders_summary
+copyrights:
+- Copyright 2009 Confidential
+- Copyright (c) 2009 The Android Open Source Project
+- Copyright 2009 Sonic Network, Inc.
+- Copyright 2009 Confidential Information techdoc.dot <o:LastAuthor> Jennifer Hruska
+  </o:LastAuthor>
+holders:
+- Confidential
+- The Android Open Source Project
+- Sonic Network, Inc.
+- Confidential Information techdoc.dot <o:LastAuthor> Jennifer Hruska </o:LastAuthor>
+holders_summary:
+- value: Android Open Source Project
+  count: 1
+- value: Confidential
+  count: 1
+- value: Sonic Network, Inc.
+  count: 1
+- value: Confidential Information techdoc.dot <o:LastAuthor> Jennifer Hruska </o:LastAuthor>
+  count: 1

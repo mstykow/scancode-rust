@@ -2,6 +2,7 @@ mod about;
 #[cfg(test)]
 mod about_test;
 mod alpine;
+#[cfg(all(test, feature = "golden-tests"))]
 mod alpine_golden_test;
 mod autotools;
 #[cfg(test)]
@@ -16,7 +17,7 @@ mod buck;
 #[cfg(test)]
 mod buck_test;
 mod cargo;
-#[cfg(test)]
+#[cfg(all(test, feature = "golden-tests"))]
 mod cargo_golden_test;
 mod cargo_lock;
 #[cfg(test)]
@@ -26,10 +27,10 @@ mod cargo_test;
 mod chef;
 #[cfg(test)]
 mod chef_test;
-#[cfg(test)]
+#[cfg(all(test, feature = "golden-tests"))]
 mod cocoapods_golden_test;
 mod composer;
-#[cfg(test)]
+#[cfg(all(test, feature = "golden-tests"))]
 mod composer_golden_test;
 #[cfg(test)]
 mod composer_test;
@@ -40,6 +41,8 @@ mod conan_data_test;
 #[cfg(test)]
 mod conan_test;
 mod conda;
+#[cfg(all(test, feature = "golden-tests"))]
+mod conda_golden_test;
 mod conda_meta_json;
 #[cfg(test)]
 mod conda_meta_json_test;
@@ -55,16 +58,17 @@ mod cpan_makefile_pl_test;
 #[cfg(test)]
 mod cpan_test;
 mod cran;
-#[cfg(test)]
+#[cfg(all(test, feature = "golden-tests"))]
 mod cran_golden_test;
 #[cfg(test)]
 mod cran_test;
 mod dart;
-#[cfg(test)]
+#[cfg(all(test, feature = "golden-tests"))]
 mod dart_golden_test;
 #[cfg(test)]
 mod dart_test;
 mod debian;
+#[cfg(all(test, feature = "golden-tests"))]
 mod debian_golden_test;
 #[cfg(test)]
 mod debian_test;
@@ -72,23 +76,23 @@ mod freebsd;
 #[cfg(test)]
 mod freebsd_test;
 mod go;
-#[cfg(test)]
+#[cfg(all(test, feature = "golden-tests"))]
 mod go_golden_test;
 #[cfg(test)]
 mod go_test;
 mod gradle;
-#[cfg(test)]
+#[cfg(all(test, feature = "golden-tests"))]
 mod gradle_golden_test;
 mod gradle_lock;
 #[cfg(test)]
 mod gradle_lock_test;
 mod haxe;
-#[cfg(test)]
+#[cfg(all(test, feature = "golden-tests"))]
 mod haxe_golden_test;
 #[cfg(test)]
 mod haxe_test;
 mod maven;
-#[cfg(test)]
+#[cfg(all(test, feature = "golden-tests"))]
 mod maven_golden_test;
 #[cfg(test)]
 mod maven_test;
@@ -100,7 +104,7 @@ mod misc;
 #[cfg(test)]
 mod misc_test;
 mod npm;
-#[cfg(test)]
+#[cfg(all(test, feature = "golden-tests"))]
 mod npm_golden_test;
 mod npm_lock;
 #[cfg(test)]
@@ -111,12 +115,12 @@ mod npm_workspace;
 #[cfg(test)]
 mod npm_workspace_test;
 mod nuget;
-#[cfg(test)]
+#[cfg(all(test, feature = "golden-tests"))]
 mod nuget_golden_test;
 #[cfg(test)]
 mod nuget_test;
 mod opam;
-#[cfg(test)]
+#[cfg(all(test, feature = "golden-tests"))]
 mod opam_golden_test;
 mod os_release;
 #[cfg(test)]
@@ -128,6 +132,8 @@ mod pip_inspect_deplock;
 #[cfg(test)]
 mod pip_inspect_deplock_test;
 mod pipfile_lock;
+#[cfg(all(test, feature = "golden-tests"))]
+mod pipfile_lock_golden_test;
 #[cfg(test)]
 mod pipfile_lock_test;
 mod pnpm_lock;
@@ -142,21 +148,28 @@ mod podspec_json;
 #[cfg(test)]
 mod podspec_json_test;
 mod poetry_lock;
+#[cfg(all(test, feature = "golden-tests"))]
+mod poetry_lock_golden_test;
 #[cfg(test)]
 mod poetry_lock_test;
 mod python;
+#[cfg(all(test, feature = "golden-tests"))]
+mod python_golden_test;
 #[cfg(test)]
 mod python_test;
 mod readme;
-#[cfg(test)]
+#[cfg(all(test, feature = "golden-tests"))]
 mod readme_golden_test;
 #[cfg(test)]
 mod readme_test;
 mod requirements_txt;
+#[cfg(all(test, feature = "golden-tests"))]
+mod requirements_txt_golden_test;
 #[cfg(test)]
 mod requirements_txt_test;
 pub(crate) mod rfc822;
 mod rpm_db;
+#[cfg(all(test, feature = "golden-tests"))]
 mod rpm_golden_test;
 mod rpm_license_files;
 #[cfg(test)]
@@ -169,11 +182,11 @@ mod rpm_specfile;
 #[cfg(test)]
 mod rpm_specfile_test;
 mod ruby;
-#[cfg(test)]
+#[cfg(all(test, feature = "golden-tests"))]
 mod ruby_golden_test;
 #[cfg(test)]
 mod ruby_test;
-#[cfg(test)]
+#[cfg(all(test, feature = "golden-tests"))]
 mod swift_golden_test;
 mod swift_manifest_json;
 #[cfg(test)]

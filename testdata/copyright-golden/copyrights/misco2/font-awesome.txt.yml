@@ -1,0 +1,22 @@
+what:
+- copyrights
+- holders
+- holders_summary
+- authors
+copyrights:
+- Copyright 2022, LLC
+- Copyright 2022, LLC «V Kontakte»
+- Copyright fa-Copyright 2020 by the authors
+- Copyright glyphicon-copyright-mark' Dalegroup
+holders:
+- LLC
+- LLC «V Kontakte»
+- fa-copyright' by the authors
+- glyphicon-copyright-mark' Dalegroup
+holders_summary:
+- value: LLC «V Kontakte»
+  count: 1
+- value: fa-copyright' by the authors
+  count: 1
+- value: glyphicon-copyright-mark' Dalegroup
+  count: 1
