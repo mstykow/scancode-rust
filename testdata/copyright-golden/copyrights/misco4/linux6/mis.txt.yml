@@ -1,0 +1,14 @@
+what:
+- copyrights
+- holders
+- authors
+copyrights:
+- Copyright (c) 2005-2012 Jean Delvare <jdelvare@suse.de>
+- Copyright (c) 2006 Yuan
+- Copyright (c) 2010 Sheng-Yuan Huang
+- Copyright (c) 2003 Mark Studebaker
+holders:
+- Jean Delvare
+- Yuan
+- Sheng-Yuan Huang
+- Mark Studebaker

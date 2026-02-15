@@ -1,0 +1,10 @@
+what:
+  - copyrights
+  - holders
+  - authors
+copyrights:
+  - Copyright (c) 2007 Julian Scheel <julian@jusst.de>
+  - Copyright (c) 2004 Takashi Iwai <tiwai@suse.de>
+holders:
+  - Julian Scheel
+  - Takashi Iwai

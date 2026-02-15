@@ -1,0 +1,9 @@
+what:
+  - copyrights
+  - holders
+  - holders_summary
+copyrights: []
+holders: []
+holders_summary:
+  - value: The OpenLDAP Foundation, Redwood City, California, USA.
+    count: 1

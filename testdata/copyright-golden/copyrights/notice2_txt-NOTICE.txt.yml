@@ -1,0 +1,17 @@
+what:
+  - copyrights
+  - holders
+  - holders_summary
+copyrights:
+  - Copyright (c) 2002,2003, Stefan Haustein, Oberhausen, Rhld., Germany
+  - Copyright (c) 2002,2004, Stefan Haustein, Oberhausen, Rhld., Germany
+  - Copyright (c) 2002,2003, Stefan Haustein, Oberhausen, Rhld., Germany
+holders:
+  - Stefan Haustein, Oberhausen, Rhld., Germany
+  - Stefan Haustein, Oberhausen, Rhld., Germany
+  - Stefan Haustein, Oberhausen, Rhld., Germany
+holders_summary:
+  - value: Stefan Haustein, Oberhausen, Rhld., Germany
+    count: 3
+  - value: Richard S. Hall
+    count: 1

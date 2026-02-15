@@ -1,0 +1,18 @@
+what:
+- copyrights
+- holders
+- holders_summary
+- authors
+copyrights:
+- copyrighted by http://www.dre.vanderbilt.edu/~schmidt/ Douglas C. Schmidt and his
+  http://www.cs.wustl.edu/~schmidt/ACE-members.html research group at http://www.wustl.edu/
+  Washington University, http://www.uci.edu University of California, Irvine, and
+  http://www.vanderbilt.edu Vanderbilt University, Copyright (c) 1993-2009
+- copyrighted by C. Schmidt
+holders:
+- Douglas C. Schmidt and his research group at Washington University, University of
+  California, Irvine, and Vanderbilt University
+holders_summary:
+- value: Douglas C. Schmidt and his research group at Washington University, University
+    of California, Irvine, and Vanderbilt University
+  count: 1

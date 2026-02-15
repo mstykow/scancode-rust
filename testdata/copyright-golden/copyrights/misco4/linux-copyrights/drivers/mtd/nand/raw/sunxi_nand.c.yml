@@ -1,0 +1,16 @@
+what:
+  - copyrights
+  - holders
+  - authors
+copyrights:
+  - Copyright (c) 2013 Qiang Yu <yuq825@gmail.com>
+  - Copyright (c) 2013 Dmitriy B. <rzk333@gmail.com>
+  - Copyright (c) 2013 Sergey Lapin <slapin@ossfans.org>
+  - "Copyright (c) 2013 Boris BREZILLON .brezillon.dev@gmail.com"
+  - "https://github.com/hno/Allwinner-Info Copyright (c) 2013 Henrik Nordström"
+holders:
+  - Boris BREZILLON
+  - Qiang Yu
+  - Dmitriy B.
+  - Sergey Lapin
+  - Henrik Nordström

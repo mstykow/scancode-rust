@@ -1,0 +1,10 @@
+what:
+  - copyrights
+  - holders
+  - holders_summary
+copyrights: []
+holders:
+  - "� CERN - European Organization for Nuclear Research"
+holders_summary:
+  - value: CERN - European Organization for Nuclear Research
+    count: 1

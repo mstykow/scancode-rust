@@ -1,0 +1,12 @@
+what:
+  - copyrights
+  - holders
+  - holders_summary
+  - authors
+copyrights:
+  - "Copyright (c) 2001, Rice"
+holders:
+  - Rice
+holders_summary:
+  - value: Rice University
+    count: 1

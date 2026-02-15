@@ -1,0 +1,13 @@
+what:
+- copyrights
+- holders
+- holders_summary
+copyrights:
+- (c) 2001 Thomas Östreich
+holders:
+- Thomas Östreich
+holders_summary:
+- value: Thomas Ostreich
+  count: 1
+- value: Thomas Östreich
+  count: 1

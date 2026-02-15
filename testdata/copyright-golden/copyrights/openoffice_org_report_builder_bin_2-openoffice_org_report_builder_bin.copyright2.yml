@@ -1,0 +1,17 @@
+what:
+- copyrights
+- holders
+- holders_summary
+copyrights:
+- Copyright (c) 1995, 1996 The President and Fellows of Harvard University
+- (c) 1990, 1993, 1994, 1995 The Regents of the University of California
+holders:
+- The President and Fellows of Harvard University
+- The Regents of the University of California
+holders_summary:
+- value: The President and Fellows of Harvard University
+  count: 1
+- value: The Regents of the University of California
+  count: 1
+- value: The Regents of the University of California
+  count: 1

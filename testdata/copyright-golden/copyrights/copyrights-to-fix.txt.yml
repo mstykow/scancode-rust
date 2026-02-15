@@ -1,0 +1,12 @@
+what:
+  - copyrights
+  - holders
+copyrights:
+  - copyright 2017-2018, NumPy Developers
+  - (c) 2003, C. Bond
+  - Copyright (c) 2011, 2012
+  - copyright 2010-2020, Benjamin Peterson
+holders:
+  - NumPy Developers
+  - C. Bond
+  - Benjamin Peterson

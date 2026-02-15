@@ -1,0 +1,10 @@
+what:
+  - copyrights
+  - holders
+  - holders_summary
+copyrights:
+  - "Copyright Holders Kevin Vandersloot <kfv101@psu.edu> Erik Johnsson <zaphod@linux.nu> - icon support Jorgen Scheibengruber Benoît Dejean <TazForEver@dlfp.org> - maintainer Paolo Borelli <pborelli@katamail.com> (The full list is in /usr/share/doc/gnome-system-monitor/AUTHORS.)"
+holders: []
+holders_summary:
+  - value: Kevin Vandersloot Erik Johnsson
+    count: 1

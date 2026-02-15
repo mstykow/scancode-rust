@@ -1,0 +1,22 @@
+what:
+  - copyrights
+  - holders
+  - authors
+copyrights:
+  - Copyright (c) 1998-2000 Michel Aubry, Maintainer
+  - Copyright (c) 1998-2000 Andrzej Krzysztofowicz, Maintainer
+  - Copyright (c) 1998-2000 Andre Hedrick (andre@linux-ide.org)
+  - Copyright (c) 2002 Alan Cox
+  - Copyright (c) 2007-2010 Bartlomiej Zolnierkiewicz
+  - "Copyright (c) 1999-2000 CJ, cjtsai@ali.com.tw, Maintainer"
+  - "Copyright (c) 2007 MontaVista Software, Inc. @mvista.com"
+holders:
+  - Michel Aubry, Maintainer
+  - Andrzej Krzysztofowicz, Maintainer
+  - Andre Hedrick
+  - Alan Cox
+  - MontaVista Software, Inc.
+  - Bartlomiej Zolnierkiewicz
+  - 1535(D)
+  - "CJ, Maintainer"
+authors: []

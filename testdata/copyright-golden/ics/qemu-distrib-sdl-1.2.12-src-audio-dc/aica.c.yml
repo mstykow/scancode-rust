@@ -1,0 +1,14 @@
+what:
+- copyrights
+- holders
+- holders_summary
+copyrights:
+- (c) 2000 Dan Potter
+holders:
+- Dan Potter
+- Dan Potter modify BERO
+holders_summary:
+- value: Dan Potter
+  count: 1
+- value: Dan Potter modify BERO
+  count: 1

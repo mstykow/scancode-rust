@@ -1,0 +1,15 @@
+what:
+  - copyrights
+  - holders
+  - holders_summary
+copyrights:
+  - Copyright (c) 2002 Jeroen Janssen
+  - (c) 2003 http://savannah.nongnu.org/projects/vgabios
+holders:
+  - Jeroen Janssen
+  - http://savannah.nongnu.org/projects/vgabios
+holders_summary:
+  - value: Jeroen Janssen
+    count: 1
+  - value: http://savannah.nongnu.org/projects/vgabios
+    count: 1

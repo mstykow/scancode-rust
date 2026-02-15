@@ -1,0 +1,11 @@
+what:
+  - copyrights
+  - holders
+  - holders_summary
+copyrights:
+  - "Copyright (c) Sebastian Cla\xDFen , 2007 Jan Engelhardt , 2007 - 2010"
+holders:
+  - "Sebastian Cla\xDFen , Jan Engelhardt"
+holders_summary:
+  - value: "Sebastian Cla\xDFen , Jan Engelhardt"
+    count: 1

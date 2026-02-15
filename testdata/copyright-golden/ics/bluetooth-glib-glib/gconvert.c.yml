@@ -1,0 +1,13 @@
+what:
+- copyrights
+- holders
+- holders_summary
+copyrights:
+- Copyright Red Hat Inc., 2000
+- Copyright Red Hat Inc., 2000 Authors Havoc Pennington <hp@redhat.com> , Owen Taylor
+  <otaylor@redhat.com>
+holders:
+- Red Hat Inc.
+holders_summary:
+- value: Red Hat
+  count: 1

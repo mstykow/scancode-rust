@@ -1,0 +1,11 @@
+what:
+  - copyrights
+  - holders
+  - holders_summary
+copyrights:
+  - Copyright (c) 2002. OCLC Research
+holders:
+  - OCLC Research
+holders_summary:
+  - value: OCLC Research
+    count: 1

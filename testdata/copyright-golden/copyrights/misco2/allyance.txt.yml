@@ -1,0 +1,11 @@
+what:
+  - copyrights
+  - holders
+  - holders_summary
+  - authors
+copyrights: []
+holders:
+  - A11yance
+holders_summary:
+  - value: A11yance
+    count: 1

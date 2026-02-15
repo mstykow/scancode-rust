@@ -1,0 +1,11 @@
+what:
+  - copyrights
+  - holders
+  - holders_summary
+copyrights:
+  - Copyright (c) 2003 Dag-Erling Co�dan Sm�rgrav
+holders:
+  - Dag-Erling Co�dan Sm�rgrav
+holders_summary:
+  - value: Dag-Erling Co�dan Sm�rgrav
+    count: 1

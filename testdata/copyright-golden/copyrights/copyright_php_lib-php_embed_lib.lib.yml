@@ -1,0 +1,10 @@
+what:
+  - copyrights
+  - holders
+  - holders_summary
+copyrights:
+  - Copyright nexB and others (c) 2012
+holders: []
+holders_summary:
+  - value: nexB and others
+    count: 1
