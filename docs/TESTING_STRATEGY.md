@@ -324,11 +324,14 @@ testdata/
 ### All Tests
 
 ```bash
-cargo test                    # Run all tests (doctests + unit + golden + integration)
+cargo test                    # Run all tests except golden tests
 cargo test --lib              # Run only library tests (faster, excludes integration)
 cargo test --doc              # Run only doctests
 cargo test --test '*'         # Run only integration tests
+cargo test --features golden-tests  # Include golden tests (slower, compares against Python ScanCode)
 ```
+
+> **Note**: Golden tests (comparing output against Python ScanCode reference) are gated behind the `golden-tests` feature flag because they are slow and require the reference submodule. They run automatically in CI but are excluded from `cargo test` by default for faster local development.
 
 ### Specific Test Categories
 
@@ -347,11 +350,11 @@ cargo test test_parse_dependency_with_alternatives
 
 ### Ignored Tests
 
-Some golden tests are marked with `#[ignore]` because they depend on the license detection engine (not yet implemented):
+Golden tests are gated behind the `golden-tests` feature flag:
 
 ```bash
-cargo test -- --ignored       # Run only ignored tests
-cargo test -- --include-ignored  # Run all tests including ignored ones
+cargo test --features golden-tests             # Run all tests including golden tests
+cargo test --lib --features golden-tests golden # Run only golden tests
 ```
 
 ### CI/CD
@@ -362,7 +365,10 @@ Tests run automatically on:
 - Every push to main
 - Every pull request
 
-All tests must pass before merging. Command: `cargo test --all --verbose`
+All tests must pass before merging. Commands:
+
+- `cargo test --all --verbose` — unit tests, doctests, integration tests
+- `cargo test --all --verbose --features golden-tests` — all of the above plus golden tests
 
 ---
 

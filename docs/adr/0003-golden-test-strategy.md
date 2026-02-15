@@ -276,6 +276,17 @@ diff actual.json expected.json
 
 ## Implementation Guidelines
 
+### Feature Flag
+
+Golden tests are gated behind the `golden-tests` Cargo feature flag to keep the default `cargo test` fast:
+
+```bash
+cargo test --features golden-tests  # Include golden tests
+cargo test                          # Excludes golden tests (default)
+```
+
+All `*_golden_test.rs` modules are conditionally compiled with `#[cfg(all(test, feature = "golden-tests"))]`. CI always runs with `--features golden-tests`.
+
 ### When to Write a Golden Test
 
 ✅ **Write golden test when**:
