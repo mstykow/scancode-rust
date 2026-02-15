@@ -19,6 +19,8 @@ use crate::scanner::{count, process};
 mod askalono;
 mod assembly;
 mod cli;
+#[allow(dead_code, unused_imports)]
+mod copyright;
 mod models;
 mod parsers;
 mod scanner;
