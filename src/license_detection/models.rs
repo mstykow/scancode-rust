@@ -223,6 +223,27 @@ pub struct LicenseMatch {
     pub is_license_clue: bool,
 }
 
+impl LicenseMatch {
+    pub fn matcher_order(&self) -> u8 {
+        match self.matcher.as_str() {
+            "1-hash" => 1,
+            "2-aho" => 2,
+            "3-spdx" => 3,
+            "4-seq" => 4,
+            "5-unknown" => 5,
+            _ => 9,
+        }
+    }
+
+    pub fn hilen(&self) -> usize {
+        self.matched_length / 2
+    }
+
+    pub fn surround(&self, other: &LicenseMatch) -> bool {
+        self.start_line < other.start_line && self.end_line > other.end_line
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -836,5 +857,142 @@ mod tests {
             match_result.referenced_filenames,
             Some(vec!["LICENSE".to_string(), "COPYING".to_string()])
         );
+    }
+
+    #[test]
+    fn test_matcher_order_hash() {
+        let match_result = create_license_match();
+        assert_eq!(match_result.matcher_order(), 1);
+    }
+
+    #[test]
+    fn test_matcher_order_aho() {
+        let mut match_result = create_license_match();
+        match_result.matcher = "2-aho".to_string();
+        assert_eq!(match_result.matcher_order(), 2);
+    }
+
+    #[test]
+    fn test_matcher_order_spdx() {
+        let mut match_result = create_license_match();
+        match_result.matcher = "3-spdx".to_string();
+        assert_eq!(match_result.matcher_order(), 3);
+    }
+
+    #[test]
+    fn test_matcher_order_seq() {
+        let mut match_result = create_license_match();
+        match_result.matcher = "4-seq".to_string();
+        assert_eq!(match_result.matcher_order(), 4);
+    }
+
+    #[test]
+    fn test_matcher_order_unknown() {
+        let mut match_result = create_license_match();
+        match_result.matcher = "5-unknown".to_string();
+        assert_eq!(match_result.matcher_order(), 5);
+    }
+
+    #[test]
+    fn test_matcher_order_invalid() {
+        let mut match_result = create_license_match();
+        match_result.matcher = "invalid".to_string();
+        assert_eq!(match_result.matcher_order(), 9);
+    }
+
+    #[test]
+    fn test_hilen_basic() {
+        let match_result = create_license_match();
+        assert_eq!(match_result.hilen(), 50);
+    }
+
+    #[test]
+    fn test_hilen_zero() {
+        let mut match_result = create_license_match();
+        match_result.matched_length = 0;
+        assert_eq!(match_result.hilen(), 0);
+    }
+
+    #[test]
+    fn test_hilen_odd() {
+        let mut match_result = create_license_match();
+        match_result.matched_length = 99;
+        assert_eq!(match_result.hilen(), 49);
+    }
+
+    #[test]
+    fn test_surround_true() {
+        let outer = LicenseMatch {
+            start_line: 1,
+            end_line: 20,
+            ..create_license_match()
+        };
+        let inner = LicenseMatch {
+            start_line: 5,
+            end_line: 15,
+            ..create_license_match()
+        };
+        assert!(outer.surround(&inner));
+    }
+
+    #[test]
+    fn test_surround_false_same_start() {
+        let outer = LicenseMatch {
+            start_line: 1,
+            end_line: 20,
+            ..create_license_match()
+        };
+        let inner = LicenseMatch {
+            start_line: 1,
+            end_line: 15,
+            ..create_license_match()
+        };
+        assert!(!outer.surround(&inner));
+    }
+
+    #[test]
+    fn test_surround_false_same_end() {
+        let outer = LicenseMatch {
+            start_line: 1,
+            end_line: 20,
+            ..create_license_match()
+        };
+        let inner = LicenseMatch {
+            start_line: 5,
+            end_line: 20,
+            ..create_license_match()
+        };
+        assert!(!outer.surround(&inner));
+    }
+
+    #[test]
+    fn test_surround_false_reversed() {
+        let outer = LicenseMatch {
+            start_line: 5,
+            end_line: 15,
+            ..create_license_match()
+        };
+        let inner = LicenseMatch {
+            start_line: 1,
+            end_line: 20,
+            ..create_license_match()
+        };
+        assert!(!outer.surround(&inner));
+    }
+
+    #[test]
+    fn test_surround_false_adjacent() {
+        let first = LicenseMatch {
+            start_line: 1,
+            end_line: 10,
+            ..create_license_match()
+        };
+        let second = LicenseMatch {
+            start_line: 11,
+            end_line: 20,
+            ..create_license_match()
+        };
+        assert!(!first.surround(&second));
+        assert!(!second.surround(&first));
     }
 }

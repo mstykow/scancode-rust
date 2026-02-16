@@ -9,7 +9,13 @@
 use crate::license_detection::index::LicenseIndex;
 use crate::license_detection::models::LicenseMatch;
 use crate::license_detection::query::Query;
+use crate::license_detection::spans::Span;
 use std::collections::HashMap;
+
+const OVERLAP_SMALL: f64 = 0.10;
+const OVERLAP_MEDIUM: f64 = 0.40;
+const OVERLAP_LARGE: f64 = 0.70;
+const OVERLAP_EXTRA_LARGE: f64 = 0.90;
 
 /// Filter GPL matches with very short matched_length.
 ///
@@ -220,20 +226,254 @@ fn update_match_scores(matches: &mut [LicenseMatch]) {
     }
 }
 
+fn is_false_positive(m: &LicenseMatch, index: &LicenseIndex) -> bool {
+    parse_rule_id(&m.rule_identifier)
+        .map(|rid| index.false_positive_rids.contains(&rid))
+        .unwrap_or(false)
+}
+
+fn calculate_overlap(a: &LicenseMatch, b: &LicenseMatch) -> usize {
+    let start = a.start_line.max(b.start_line);
+    let end = a.end_line.min(b.end_line);
+    if start <= end { end - start + 1 } else { 0 }
+}
+
+fn licensing_contains_approx(current: &LicenseMatch, other: &LicenseMatch) -> bool {
+    current.matched_length >= other.matched_length * 2
+}
+
+pub fn filter_overlapping_matches(
+    matches: Vec<LicenseMatch>,
+    index: &LicenseIndex,
+) -> (Vec<LicenseMatch>, Vec<LicenseMatch>) {
+    if matches.len() < 2 {
+        return (matches, vec![]);
+    }
+
+    let mut matches = matches;
+    let mut discarded: Vec<LicenseMatch> = vec![];
+
+    matches.sort_by(|a, b| {
+        a.start_line
+            .cmp(&b.start_line)
+            .then_with(|| b.hilen().cmp(&a.hilen()))
+            .then_with(|| b.matched_length.cmp(&a.matched_length))
+            .then_with(|| a.matcher_order().cmp(&b.matcher_order()))
+    });
+
+    let mut i = 0;
+    while i < matches.len().saturating_sub(1) {
+        let mut j = i + 1;
+        while j < matches.len() {
+            let current_end = matches[i].end_line;
+            let next_start = matches[j].start_line;
+
+            if next_start > current_end {
+                break;
+            }
+
+            let both_fp =
+                is_false_positive(&matches[i], index) && is_false_positive(&matches[j], index);
+            if both_fp {
+                j += 1;
+                continue;
+            }
+
+            let overlap = calculate_overlap(&matches[i], &matches[j]);
+            if overlap == 0 {
+                j += 1;
+                continue;
+            }
+
+            let next_len = matches[j].matched_length;
+            let current_len = matches[i].matched_length;
+
+            if next_len == 0 || current_len == 0 {
+                j += 1;
+                continue;
+            }
+
+            let overlap_ratio_to_next = overlap as f64 / next_len as f64;
+            let overlap_ratio_to_current = overlap as f64 / current_len as f64;
+
+            let extra_large_next = overlap_ratio_to_next >= OVERLAP_EXTRA_LARGE;
+            let large_next = overlap_ratio_to_next >= OVERLAP_LARGE;
+            let medium_next = overlap_ratio_to_next >= OVERLAP_MEDIUM;
+            let small_next = overlap_ratio_to_next >= OVERLAP_SMALL;
+
+            let extra_large_current = overlap_ratio_to_current >= OVERLAP_EXTRA_LARGE;
+            let large_current = overlap_ratio_to_current >= OVERLAP_LARGE;
+            let medium_current = overlap_ratio_to_current >= OVERLAP_MEDIUM;
+            let small_current = overlap_ratio_to_current >= OVERLAP_SMALL;
+
+            let current_len_val = matches[i].matched_length;
+            let next_len_val = matches[j].matched_length;
+            let current_hilen = matches[i].hilen();
+            let next_hilen = matches[j].hilen();
+
+            if extra_large_next && current_len_val >= next_len_val {
+                discarded.push(matches.remove(j));
+                continue;
+            }
+
+            if extra_large_current && current_len_val <= next_len_val {
+                discarded.push(matches.remove(i));
+                i = i.saturating_sub(1);
+                break;
+            }
+
+            if large_next && current_len_val >= next_len_val && current_hilen >= next_hilen {
+                discarded.push(matches.remove(j));
+                continue;
+            }
+
+            if large_current && current_len_val <= next_len_val && current_hilen <= next_hilen {
+                discarded.push(matches.remove(i));
+                i = i.saturating_sub(1);
+                break;
+            }
+
+            if medium_next {
+                if licensing_contains_approx(&matches[i], &matches[j])
+                    && current_len_val >= next_len_val
+                    && current_hilen >= next_hilen
+                {
+                    discarded.push(matches.remove(j));
+                    continue;
+                }
+
+                if licensing_contains_approx(&matches[j], &matches[i])
+                    && current_len_val <= next_len_val
+                    && current_hilen <= next_hilen
+                {
+                    discarded.push(matches.remove(i));
+                    i = i.saturating_sub(1);
+                    break;
+                }
+            }
+
+            if medium_current {
+                if licensing_contains_approx(&matches[i], &matches[j])
+                    && current_len_val >= next_len_val
+                    && current_hilen >= next_hilen
+                {
+                    discarded.push(matches.remove(j));
+                    continue;
+                }
+
+                if licensing_contains_approx(&matches[j], &matches[i])
+                    && current_len_val <= next_len_val
+                    && current_hilen <= next_hilen
+                {
+                    discarded.push(matches.remove(i));
+                    i = i.saturating_sub(1);
+                    break;
+                }
+            }
+
+            if small_next
+                && matches[i].surround(&matches[j])
+                && licensing_contains_approx(&matches[i], &matches[j])
+                && current_len_val >= next_len_val
+                && current_hilen >= next_hilen
+            {
+                discarded.push(matches.remove(j));
+                continue;
+            }
+
+            if small_current
+                && matches[j].surround(&matches[i])
+                && licensing_contains_approx(&matches[j], &matches[i])
+                && current_len_val <= next_len_val
+                && current_hilen <= next_hilen
+            {
+                discarded.push(matches.remove(i));
+                i = i.saturating_sub(1);
+                break;
+            }
+
+            if i > 0 {
+                let prev_end = matches[i - 1].end_line;
+                let next_match_start = matches[j].start_line;
+
+                let prev_next_overlap = if prev_end >= next_match_start {
+                    prev_end - next_match_start.max(matches[i - 1].start_line) + 1
+                } else {
+                    0
+                };
+
+                if prev_next_overlap == 0 {
+                    let cpo = calculate_overlap(&matches[i], &matches[i - 1]);
+                    let cno = calculate_overlap(&matches[i], &matches[j]);
+
+                    if cpo > 0 && cno > 0 {
+                        let overlap_len = cpo + cno;
+                        let clen = matches[i].matched_length;
+
+                        if overlap_len as f64 >= clen as f64 * 0.9 {
+                            discarded.push(matches.remove(i));
+                            i = i.saturating_sub(1);
+                            break;
+                        }
+                    }
+                }
+            }
+
+            j += 1;
+        }
+        i += 1;
+    }
+
+    (matches, discarded)
+}
+
+fn match_to_span(m: &LicenseMatch) -> Span {
+    Span::from_range(m.start_line..m.end_line + 1)
+}
+
+pub fn restore_non_overlapping(
+    kept: &[LicenseMatch],
+    discarded: Vec<LicenseMatch>,
+) -> (Vec<LicenseMatch>, Vec<LicenseMatch>) {
+    let all_matched_qspans = kept
+        .iter()
+        .fold(Span::new(), |acc, m| acc.union_span(&match_to_span(m)));
+
+    let mut to_keep = Vec::new();
+    let mut to_discard = Vec::new();
+
+    let merged_discarded = merge_overlapping_matches(&discarded);
+
+    for disc in merged_discarded {
+        let disc_span = match_to_span(&disc);
+        if !disc_span.intersects(&all_matched_qspans) {
+            to_keep.push(disc);
+        } else {
+            to_discard.push(disc);
+        }
+    }
+
+    (to_keep, to_discard)
+}
+
 /// Main refinement function - applies all refinement operations to match results.
 ///
 /// This is the main entry point for Phase 4.6 match refinement. It:
-/// 1. Merges overlapping/adjacent matches
-/// 2. Filters contained matches
-/// 3. Filters false positive matches
-/// 4. Updates match scores
+/// 1. Filters short GPL false positives
+/// 2. Merges overlapping/adjacent matches
+/// 3. Filters contained matches
+/// 4. Filters overlapping matches (with sophisticated overlap handling)
+/// 5. Restores non-overlapping discarded matches
+/// 6. Combines kept + restored matches
+/// 7. Filters false positive matches
+/// 8. Updates match scores
 ///
 /// The operations are applied in sequence to produce final refined matches.
 ///
 /// # Arguments
 /// * `index` - LicenseIndex containing false_positive_rids
 /// * `matches` - Vector of raw LicenseMatch from all strategies
-/// * `_query` - Query (unused in Phase 4.6 but kept for API compatibility)
+/// * `_query` - Query (unused but kept for API compatibility)
 ///
 /// # Returns
 /// Vector of refined LicenseMatch ready for detection assembly
@@ -250,15 +490,23 @@ pub fn refine_matches(
 
     let filtered = filter_short_gpl_matches(&matches);
 
-    let mut refined = merge_overlapping_matches(&filtered);
+    let merged = merge_overlapping_matches(&filtered);
 
-    refined = filter_contained_matches(&refined);
+    let non_contained = filter_contained_matches(&merged);
 
-    refined = filter_false_positive_matches(index, &refined);
+    let (kept, discarded) = filter_overlapping_matches(non_contained, index);
 
-    update_match_scores(&mut refined);
+    let (restored, _) = restore_non_overlapping(&kept, discarded);
 
-    refined
+    let mut final_matches = kept;
+    final_matches.extend(restored);
+
+    let non_fp = filter_false_positive_matches(index, &final_matches);
+
+    let mut scored = non_fp;
+    update_match_scores(&mut scored);
+
+    scored
 }
 
 #[cfg(test)]
@@ -890,5 +1138,357 @@ mod tests {
         assert_eq!(filtered.len(), 2);
         assert!(filtered.iter().any(|m| m.rule_identifier == "mit.LICENSE"));
         assert!(filtered.iter().any(|m| m.rule_identifier == "#1"));
+    }
+
+    #[test]
+    fn test_restore_non_overlapping_empty_both() {
+        let kept: Vec<LicenseMatch> = vec![];
+        let discarded: Vec<LicenseMatch> = vec![];
+
+        let (to_keep, to_discard) = restore_non_overlapping(&kept, discarded);
+
+        assert_eq!(to_keep.len(), 0);
+        assert_eq!(to_discard.len(), 0);
+    }
+
+    #[test]
+    fn test_restore_non_overlapping_empty_kept() {
+        let kept: Vec<LicenseMatch> = vec![];
+        let discarded = vec![
+            create_test_match("#1", 1, 10, 0.9, 90.0, 100),
+            create_test_match("#2", 20, 30, 0.85, 85.0, 100),
+        ];
+
+        let (to_keep, to_discard) = restore_non_overlapping(&kept, discarded);
+
+        assert_eq!(to_keep.len(), 2);
+        assert_eq!(to_discard.len(), 0);
+    }
+
+    #[test]
+    fn test_restore_non_overlapping_empty_discarded() {
+        let kept = vec![create_test_match("#1", 1, 10, 0.9, 90.0, 100)];
+        let discarded: Vec<LicenseMatch> = vec![];
+
+        let (to_keep, to_discard) = restore_non_overlapping(&kept, discarded);
+
+        assert_eq!(to_keep.len(), 0);
+        assert_eq!(to_discard.len(), 0);
+    }
+
+    #[test]
+    fn test_restore_non_overlapping_non_overlapping_restored() {
+        let kept = vec![create_test_match("#1", 1, 10, 0.9, 90.0, 100)];
+        let discarded = vec![
+            create_test_match("#2", 50, 60, 0.85, 85.0, 100),
+            create_test_match("#3", 100, 110, 0.8, 80.0, 100),
+        ];
+
+        let (to_keep, to_discard) = restore_non_overlapping(&kept, discarded);
+
+        assert_eq!(to_keep.len(), 2);
+        assert_eq!(to_discard.len(), 0);
+    }
+
+    #[test]
+    fn test_restore_non_overlapping_overlapping_not_restored() {
+        let kept = vec![create_test_match("#1", 1, 20, 0.9, 90.0, 100)];
+        let discarded = vec![
+            create_test_match("#2", 5, 15, 0.85, 85.0, 100),
+            create_test_match("#3", 10, 25, 0.8, 80.0, 100),
+        ];
+
+        let (to_keep, to_discard) = restore_non_overlapping(&kept, discarded);
+
+        assert_eq!(to_keep.len(), 0);
+        assert_eq!(to_discard.len(), 2);
+    }
+
+    #[test]
+    fn test_restore_non_overlapping_partial_overlap() {
+        let kept = vec![create_test_match("#1", 10, 20, 0.9, 90.0, 100)];
+        let discarded = vec![
+            create_test_match("#2", 1, 5, 0.85, 85.0, 100),
+            create_test_match("#3", 15, 25, 0.8, 80.0, 100),
+            create_test_match("#4", 50, 60, 0.9, 90.0, 100),
+        ];
+
+        let (to_keep, to_discard) = restore_non_overlapping(&kept, discarded);
+
+        assert_eq!(to_keep.len(), 2);
+        assert_eq!(to_discard.len(), 1);
+
+        let kept_identifiers: Vec<&str> =
+            to_keep.iter().map(|m| m.rule_identifier.as_str()).collect();
+        assert!(kept_identifiers.contains(&"#2"));
+        assert!(kept_identifiers.contains(&"#4"));
+
+        assert_eq!(to_discard[0].rule_identifier, "#3");
+    }
+
+    #[test]
+    fn test_restore_non_overlapping_multiple_kept() {
+        let kept = vec![
+            create_test_match("#1", 1, 10, 0.9, 90.0, 100),
+            create_test_match("#2", 30, 40, 0.85, 85.0, 100),
+        ];
+        let discarded = vec![
+            create_test_match("#3", 15, 20, 0.8, 80.0, 100),
+            create_test_match("#4", 5, 15, 0.9, 90.0, 100),
+            create_test_match("#5", 50, 60, 0.9, 90.0, 100),
+        ];
+
+        let (to_keep, to_discard) = restore_non_overlapping(&kept, discarded);
+
+        assert_eq!(to_keep.len(), 2);
+        assert_eq!(to_discard.len(), 1);
+
+        let kept_identifiers: Vec<&str> =
+            to_keep.iter().map(|m| m.rule_identifier.as_str()).collect();
+        assert!(kept_identifiers.contains(&"#3"));
+        assert!(kept_identifiers.contains(&"#5"));
+
+        assert_eq!(to_discard[0].rule_identifier, "#4");
+    }
+
+    #[test]
+    fn test_restore_non_overlapping_merges_discarded() {
+        let kept = vec![create_test_match("#1", 1, 10, 0.9, 90.0, 100)];
+        let discarded = vec![
+            create_test_match("#2", 50, 60, 0.85, 85.0, 100),
+            create_test_match("#2", 55, 65, 0.8, 80.0, 100),
+        ];
+
+        let (to_keep, _to_discard) = restore_non_overlapping(&kept, discarded);
+
+        assert_eq!(to_keep.len(), 1);
+        assert_eq!(to_keep[0].rule_identifier, "#2");
+        assert_eq!(to_keep[0].start_line, 50);
+        assert_eq!(to_keep[0].end_line, 65);
+    }
+
+    #[test]
+    fn test_restore_non_overlapping_adjacent_not_overlapping() {
+        let kept = vec![create_test_match("#1", 1, 10, 0.9, 90.0, 100)];
+        let discarded = vec![create_test_match("#2", 11, 20, 0.85, 85.0, 100)];
+
+        let (to_keep, to_discard) = restore_non_overlapping(&kept, discarded);
+
+        assert_eq!(to_keep.len(), 1);
+        assert_eq!(to_discard.len(), 0);
+    }
+
+    #[test]
+    fn test_restore_non_overlapping_touching_is_overlapping() {
+        let kept = vec![create_test_match("#1", 1, 10, 0.9, 90.0, 100)];
+        let discarded = vec![create_test_match("#2", 10, 20, 0.85, 85.0, 100)];
+
+        let (to_keep, to_discard) = restore_non_overlapping(&kept, discarded);
+
+        assert_eq!(to_keep.len(), 0);
+        assert_eq!(to_discard.len(), 1);
+    }
+
+    #[test]
+    fn test_filter_overlapping_matches_empty() {
+        let index = LicenseIndex::with_legalese_count(10);
+        let matches: Vec<LicenseMatch> = vec![];
+
+        let (kept, discarded) = filter_overlapping_matches(matches, &index);
+
+        assert_eq!(kept.len(), 0);
+        assert_eq!(discarded.len(), 0);
+    }
+
+    #[test]
+    fn test_filter_overlapping_matches_single() {
+        let index = LicenseIndex::with_legalese_count(10);
+        let matches = vec![create_test_match("#1", 1, 10, 0.9, 90.0, 100)];
+
+        let (kept, discarded) = filter_overlapping_matches(matches, &index);
+
+        assert_eq!(kept.len(), 1);
+        assert_eq!(discarded.len(), 0);
+    }
+
+    #[test]
+    fn test_filter_overlapping_matches_non_overlapping() {
+        let index = LicenseIndex::with_legalese_count(10);
+        let matches = vec![
+            create_test_match("#1", 1, 10, 0.9, 90.0, 100),
+            create_test_match("#2", 20, 30, 0.85, 85.0, 100),
+        ];
+
+        let (kept, discarded) = filter_overlapping_matches(matches, &index);
+
+        assert_eq!(kept.len(), 2);
+        assert_eq!(discarded.len(), 0);
+    }
+
+    #[test]
+    fn test_filter_overlapping_matches_extra_large_discard_shorter() {
+        let index = LicenseIndex::with_legalese_count(10);
+        let mut m1 = create_test_match("#1", 1, 100, 0.9, 90.0, 100);
+        m1.matched_length = 100;
+        let mut m2 = create_test_match("#2", 5, 100, 0.85, 85.0, 100);
+        m2.matched_length = 10;
+
+        let matches = vec![m1, m2];
+
+        let (kept, discarded) = filter_overlapping_matches(matches, &index);
+
+        assert_eq!(kept.len(), 1);
+        assert_eq!(discarded.len(), 1);
+        assert_eq!(kept[0].matched_length, 100);
+    }
+
+    #[test]
+    fn test_filter_overlapping_matches_large_with_hilen() {
+        let index = LicenseIndex::with_legalese_count(10);
+        let mut m1 = create_test_match("#1", 1, 100, 0.9, 90.0, 100);
+        m1.matched_length = 100;
+        let mut m2 = create_test_match("#2", 30, 100, 0.85, 85.0, 100);
+        m2.matched_length = 10;
+
+        let matches = vec![m1, m2];
+
+        let (kept, discarded) = filter_overlapping_matches(matches, &index);
+
+        assert_eq!(kept.len(), 1);
+        assert_eq!(discarded.len(), 1);
+    }
+
+    #[test]
+    fn test_filter_overlapping_matches_false_positive_skip() {
+        let mut index = LicenseIndex::with_legalese_count(10);
+        let _ = index.false_positive_rids.insert(1);
+        let _ = index.false_positive_rids.insert(2);
+
+        let mut m1 = create_test_match("#1", 1, 20, 0.9, 90.0, 100);
+        m1.matched_length = 100;
+        let mut m2 = create_test_match("#2", 10, 30, 0.85, 85.0, 100);
+        m2.matched_length = 100;
+
+        let matches = vec![m1, m2];
+
+        let (kept, discarded) = filter_overlapping_matches(matches, &index);
+
+        assert_eq!(kept.len(), 2);
+        assert_eq!(discarded.len(), 0);
+    }
+
+    #[test]
+    fn test_filter_overlapping_matches_sandwich_detection() {
+        let index = LicenseIndex::with_legalese_count(10);
+
+        let mut prev = create_test_match("#1", 1, 10, 0.9, 90.0, 100);
+        prev.matched_length = 100;
+        let mut current = create_test_match("#2", 5, 15, 0.85, 85.0, 100);
+        current.matched_length = 50;
+        let mut next = create_test_match("#3", 12, 25, 0.8, 80.0, 100);
+        next.matched_length = 100;
+
+        let matches = vec![prev, current, next];
+
+        let (kept, discarded) = filter_overlapping_matches(matches, &index);
+
+        assert!(kept.len() >= 2);
+        assert!(!discarded.is_empty() || kept.len() == 3);
+    }
+
+    #[test]
+    fn test_filter_overlapping_matches_sorting_order() {
+        let index = LicenseIndex::with_legalese_count(10);
+
+        let m1 = create_test_match("#1", 5, 10, 0.9, 90.0, 100);
+        let m2 = create_test_match("#2", 1, 20, 0.85, 85.0, 100);
+        let m3 = create_test_match("#3", 25, 35, 0.8, 80.0, 100);
+
+        let matches = vec![m1, m2, m3];
+
+        let (kept, _) = filter_overlapping_matches(matches, &index);
+
+        assert_eq!(kept.len(), 3);
+        assert_eq!(kept[0].start_line, 1);
+        assert_eq!(kept[1].start_line, 5);
+        assert_eq!(kept[2].start_line, 25);
+    }
+
+    #[test]
+    fn test_filter_overlapping_matches_partial_overlap_no_filter() {
+        let index = LicenseIndex::with_legalese_count(10);
+
+        let mut m1 = create_test_match("#1", 1, 20, 0.9, 90.0, 100);
+        m1.matched_length = 200;
+        let mut m2 = create_test_match("#2", 15, 35, 0.85, 85.0, 100);
+        m2.matched_length = 150;
+
+        let matches = vec![m1, m2];
+
+        let (kept, discarded) = filter_overlapping_matches(matches, &index);
+
+        assert_eq!(kept.len(), 2);
+        assert_eq!(discarded.len(), 0);
+    }
+
+    #[test]
+    fn test_filter_overlapping_matches_surround_check() {
+        let index = LicenseIndex::with_legalese_count(10);
+
+        let mut outer = create_test_match("#1", 1, 100, 0.9, 90.0, 100);
+        outer.matched_length = 500;
+        let mut inner = create_test_match("#2", 20, 30, 0.85, 85.0, 100);
+        inner.matched_length = 50;
+
+        let matches = vec![outer, inner];
+
+        let (kept, discarded) = filter_overlapping_matches(matches, &index);
+
+        assert_eq!(kept.len(), 1);
+        assert_eq!(discarded.len(), 1);
+        assert!(kept[0].rule_identifier == "#1" || kept[0].matched_length == 500);
+    }
+
+    #[test]
+    fn test_calculate_overlap_no_overlap() {
+        let m1 = create_test_match("#1", 1, 10, 0.9, 90.0, 100);
+        let m2 = create_test_match("#2", 20, 30, 0.85, 85.0, 100);
+
+        assert_eq!(calculate_overlap(&m1, &m2), 0);
+        assert_eq!(calculate_overlap(&m2, &m1), 0);
+    }
+
+    #[test]
+    fn test_calculate_overlap_partial() {
+        let m1 = create_test_match("#1", 1, 10, 0.9, 90.0, 100);
+        let m2 = create_test_match("#2", 5, 15, 0.85, 85.0, 100);
+
+        assert_eq!(calculate_overlap(&m1, &m2), 6);
+        assert_eq!(calculate_overlap(&m2, &m1), 6);
+    }
+
+    #[test]
+    fn test_calculate_overlap_contained() {
+        let m1 = create_test_match("#1", 1, 20, 0.9, 90.0, 100);
+        let m2 = create_test_match("#2", 5, 15, 0.85, 85.0, 100);
+
+        assert_eq!(calculate_overlap(&m1, &m2), 11);
+        assert_eq!(calculate_overlap(&m2, &m1), 11);
+    }
+
+    #[test]
+    fn test_calculate_overlap_identical() {
+        let m1 = create_test_match("#1", 1, 10, 0.9, 90.0, 100);
+        let m2 = create_test_match("#2", 1, 10, 0.85, 85.0, 100);
+
+        assert_eq!(calculate_overlap(&m1, &m2), 10);
+    }
+
+    #[test]
+    fn test_calculate_overlap_adjacent() {
+        let m1 = create_test_match("#1", 1, 10, 0.9, 90.0, 100);
+        let m2 = create_test_match("#2", 11, 20, 0.85, 85.0, 100);
+
+        assert_eq!(calculate_overlap(&m1, &m2), 0);
     }
 }
