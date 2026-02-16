@@ -300,6 +300,7 @@ mod golden_tests {
     }
 
     #[test]
+    #[ignore = "Redundant - runs all suites which are tested individually"]
     fn test_golden_summary() {
         let Some(_engine) = ensure_engine() else {
             eprintln!("Skipping summary: engine not available");
