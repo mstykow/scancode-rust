@@ -109,7 +109,9 @@ The following areas have been identified as needing additional test coverage or 
 
 ### Unicode Support in Tokenizer
 
-The current tokenizer regex `[A-Za-z0-9]+\+?[A-Za-z0-9]*` only matches ASCII characters, unlike Python's `[^\W]` with `re.UNICODE` flag. This is a known limitation.
+**Problem:** The current tokenizer regex `[A-Za-z0-9]+\+?[A-Za-z0-9]*` only matches ASCII characters, unlike Python's `[^\W]` with `re.UNICODE` flag.
+
+**Not a Quick Win:** Attempted change from `[A-Za-z0-9]` to `[^\W_]` caused **regression of 28 tests** (2952→2924 passed). The golden test expected values appear to have been generated against ASCII-only tokenizer behavior, not Python's Unicode behavior. This requires deeper investigation to understand the mismatch.
 
 ### Python Functions Not Yet Implemented
 
