@@ -2,7 +2,7 @@
 
 ## Current Status
 
-**Last Updated:** After Unicode tokenizer implementation
+**Last Updated:** After PLAN-005 seq_match implementation
 
 ### Unit Tests
 
@@ -13,25 +13,26 @@ All unit tests passing. Key improvements:
 - License intro filtering - ✅ IMPLEMENTED (PLAN-002)
 - Overlapping match filtering - ✅ IMPLEMENTED (PLAN-004)
 - Unicode tokenizer - ✅ IMPLEMENTED
+- seq_match algorithm - ✅ IMPLEMENTED (PLAN-005, partial)
 
 ### Golden Tests
 
-| Metric | Initial | Current | Total Change |
-|--------|---------|---------|--------------|
-| Passed | 2,679 | 2,929 | **+250** |
-| Failed | 1,684 | 1,434 | **-250** |
+| Metric | Initial | After Unicode | After PLAN-005 | Total Change |
+|--------|---------|---------------|----------------|--------------|
+| Passed | 2,679 | 2,929 | 2,915 | **+236** |
+| Failed | 1,684 | 1,434 | 1,448 | **-236** |
 
-**Total Improvement:** 15% reduction in failing tests
+**Total Improvement:** 14% reduction in failing tests
 
-Breakdown by directory:
+Breakdown by directory (current):
 
 | Directory | Passed | Failed |
 |-----------|--------|--------|
-| lic1 | 172 | 119 |
-| lic2 | 701 | 152 |
+| lic1 | 169 | 122 |
+| lic2 | 702 | 151 |
 | lic3 | 199 | 93 |
-| lic4 | 218 | 132 |
-| external | 1,637 | 930 |
+| lic4 | 214 | 136 |
+| external | 1,629 | 938 |
 | unknown | 2 | 8 |
 
 Test data: 4,367 test files across 6 directories
@@ -40,35 +41,82 @@ Test data: 4,367 test files across 6 directories
 
 ## Investigation Reports
 
-### Issue 3: Partial License Text Not Detected (Investigated)
+### Issue 3: Partial License Text Not Detected (Partially Fixed)
 
 **Problem:** The `double_isc.txt` test produces `["isc", "isc AND unknown"]` instead of expected `["isc", "isc", "sudo"]`.
 
-**Root Cause Analysis:**
+**PLAN-005 Implementation Status:**
 
-The Rust `seq_match` implementation has several fundamental architectural differences from Python:
+| Step | Description | Status |
+|------|-------------|--------|
+| 1 | Remove 50% coverage filter | ✅ Done |
+| 2 | Add multiple match detection loop | ✅ Done |
+| 3 | Implement `find_longest_match()` | ✅ Done |
+| 4 | Implement `match_blocks()` | ✅ Done |
+| 5 | Implement `extend_match()` | ✅ Done (integrated into find_longest_match) |
+| 6 | Fix line number calculation | ✅ Done (already correct) |
 
-| Aspect | Python | Rust | Issue |
-|--------|--------|------|-------|
-| **Alignment Algorithm** | Divide-and-conquer longest common substring | Greedy sequential matching | Greedy misses non-contiguous matches |
-| **Coverage Filtering** | No minimum coverage for seq matches | 50% minimum coverage filter | Filters out partial matches |
-| **Loop Structure** | `while qstart <= qfinish` with position updates | Single pass per candidate | Misses multiple occurrences |
-| **High Postings Usage** | Uses `b2j` (high_postings) for efficient lookup | `_high_postings` parameter unused | Inefficient, misses token positions |
+**Remaining Issue:**
 
-**Why DARPA Text Fails:**
+The DARPA text is still not being detected. Root cause: **match filtering logic**.
 
-1. **Coverage Filter** (`seq_match.rs:329-331`): DARPA text is ~25% of sudo license, filtered by 50% threshold
-2. **Greedy Alignment**: Matches ISC text first (shares tokens with sudo), then skips DARPA text
-3. **Unused `high_postings`**: Python uses this to find high-value legalese token positions
+The new `find_longest_match()` function requires tokens to be:
 
-**Fixes Needed:**
+1. Below `len_legalese` threshold (high-value legalese tokens)
+2. In the `matchables` set
 
-1. **HIGH**: Remove or lower the 50% coverage filter for seq_match (primary blocker)
-2. **HIGH**: Fix line number calculation (currently uses query_run boundaries, not actual match positions)
-3. **MEDIUM**: Implement proper `match_blocks` algorithm with divide-and-conquer longest common substring
-4. **MEDIUM**: Add loop for multiple match detection (continue matching until no more found)
+This filtering is too strict compared to Python. Investigation needed.
 
 **Files:** `src/license_detection/seq_match.rs`
+
+---
+
+### PLAN-005: seq_match Algorithm (Implemented with Regression)
+
+**Commit:** `c0bd26b6`
+
+**Changes:**
+
+- Replaced greedy `align_sequences` with divide-and-conquer `match_blocks`
+- Added `find_longest_match` using dynamic programming LCS algorithm
+- Added multiple match detection loop (`while qstart <= qfinish`)
+- Removed 50% coverage filter
+
+**Golden Test Results:**
+
+| Metric | Before | After | Change |
+|--------|--------|-------|--------|
+| Passed | 2,919 | 2,915 | -4 |
+| Failed | 1,448 | 1,452 | +4 |
+
+**Breakdown:**
+
+- 27 tests now pass that failed before (improved)
+- 31 tests now fail that passed before (regression)
+
+**New Failures Analysis:**
+
+The 31 new failures are due to stricter token filtering in `find_longest_match`:
+
+- Only "legalese" tokens (ID < `len_legalese`) are considered
+- Position must be in `matchables` set
+- This is more restrictive than the old greedy algorithm
+
+Examples:
+
+- `version.c` - GPL headers with code not detected
+- `public-domain.txt` - Short texts lack enough legalese tokens
+- `FSFULLR.t1` - FSF unlimited texts not matched
+
+**New Passes Analysis:**
+
+The 27 new passes include:
+
+- Perl dual-license texts (`Perl_ref2`, `Perl_ref3`)
+- BSD variants (`0bsd.txt`)
+- Complex multi-license texts (`tzfile.h`)
+
+**Next Steps:** Investigate match filtering logic to match Python behavior exactly.
 
 ---
 

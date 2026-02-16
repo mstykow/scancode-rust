@@ -442,7 +442,7 @@ pub fn seq_match(index: &LicenseIndex, query_run: &QueryRun) -> Vec<LicenseMatch
             let qbegin = query_run.start;
             let qfinish = query_run.end.unwrap_or(qbegin);
 
-            let matchables = query_run.matchables(false);
+            let matchables = query_run.matchables(true);
 
             let mut qstart = qbegin;
 
@@ -1444,6 +1444,62 @@ mod tests {
         assert!(
             first_match.match_coverage < 100.0,
             "Should be partial coverage"
+        );
+    }
+
+    #[test]
+    fn test_extend_match_into_low_tokens() {
+        let query_tokens = vec![0, 1, 2, 10, 11];
+        let rule_tokens = vec![0, 1, 2, 10, 11];
+        let mut high_postings: HashMap<u16, Vec<usize>> = HashMap::new();
+        high_postings.insert(0, vec![0]);
+        high_postings.insert(1, vec![1]);
+        high_postings.insert(2, vec![2]);
+
+        let matchables: HashSet<usize> = (0..query_tokens.len()).collect();
+
+        let blocks = match_blocks(
+            &query_tokens,
+            &rule_tokens,
+            0,
+            query_tokens.len(),
+            &high_postings,
+            5,
+            &matchables,
+        );
+
+        assert_eq!(blocks.len(), 1, "Should find single extended match");
+        assert_eq!(
+            blocks[0].2, 5,
+            "Match should extend into low-token areas (positions 3,4) when they are in matchables"
+        );
+    }
+
+    #[test]
+    fn test_extend_match_blocked_by_non_matchable() {
+        let query_tokens = vec![0, 1, 2, 10, 11];
+        let rule_tokens = vec![0, 1, 2, 10, 11];
+        let mut high_postings: HashMap<u16, Vec<usize>> = HashMap::new();
+        high_postings.insert(0, vec![0]);
+        high_postings.insert(1, vec![1]);
+        high_postings.insert(2, vec![2]);
+
+        let matchables: HashSet<usize> = [0, 1, 2].into_iter().collect();
+
+        let blocks = match_blocks(
+            &query_tokens,
+            &rule_tokens,
+            0,
+            query_tokens.len(),
+            &high_postings,
+            5,
+            &matchables,
+        );
+
+        assert_eq!(blocks.len(), 1, "Should find one match block");
+        assert_eq!(
+            blocks[0].2, 3,
+            "Match should stop at position 3 because positions 3,4 are not in matchables"
         );
     }
 }
