@@ -87,6 +87,7 @@ pub fn create_mock_rule(
         min_high_matched_length_unique: 0,
         is_small,
         is_tiny,
+        is_deprecated: false,
     }
 }
 
@@ -135,6 +136,7 @@ pub fn create_mock_rule_simple(license_expression: &str, relevance: u8) -> Rule 
         min_high_matched_length_unique: 0,
         is_small: false,
         is_tiny: false,
+        is_deprecated: false,
     }
 }
 

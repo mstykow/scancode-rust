@@ -77,6 +77,7 @@ fn build_rule_from_license(license: &License) -> Option<Rule> {
         min_high_matched_length_unique: 0,
         is_small: false,
         is_tiny: false,
+        is_deprecated: license.is_deprecated,
     })
 }
 
@@ -408,6 +409,7 @@ mod tests {
             min_high_matched_length_unique: 0,
             is_small: false,
             is_tiny: false,
+            is_deprecated: false,
         }
     }
 
@@ -655,8 +657,9 @@ mod tests {
             return;
         }
 
-        let rules = crate::license_detection::rules::load_rules_from_directory(rules_path);
-        let licenses = crate::license_detection::rules::load_licenses_from_directory(licenses_path);
+        let rules = crate::license_detection::rules::load_rules_from_directory(rules_path, false);
+        let licenses =
+            crate::license_detection::rules::load_licenses_from_directory(licenses_path, false);
 
         let rules = match rules {
             Ok(r) => r,

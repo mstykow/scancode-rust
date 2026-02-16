@@ -78,8 +78,8 @@ impl LicenseDetectionEngine {
             (rules_path.to_path_buf(), rules_path.to_path_buf())
         };
 
-        let rules = load_rules_from_directory(&rules_dir)?;
-        let licenses = load_licenses_from_directory(&licenses_dir)?;
+        let rules = load_rules_from_directory(&rules_dir, false)?;
+        let licenses = load_licenses_from_directory(&licenses_dir, false)?;
         let index = build_index(rules, licenses);
         let spdx_mapping =
             build_spdx_mapping(&index.licenses_by_key.values().cloned().collect::<Vec<_>>());
@@ -176,8 +176,8 @@ mod tests {
 
     fn create_engine_from_reference() -> Option<LicenseDetectionEngine> {
         let (rules_path, licenses_path) = get_reference_data_paths()?;
-        let rules = load_rules_from_directory(&rules_path).ok()?;
-        let licenses = load_licenses_from_directory(&licenses_path).ok()?;
+        let rules = load_rules_from_directory(&rules_path, false).ok()?;
+        let licenses = load_licenses_from_directory(&licenses_path, false).ok()?;
         let index = build_index(rules, licenses);
         let spdx_mapping =
             build_spdx_mapping(&index.licenses_by_key.values().cloned().collect::<Vec<_>>());

@@ -434,6 +434,7 @@ mod tests {
             min_high_matched_length_unique: 0,
             is_small: false,
             is_tiny: false,
+            is_deprecated: false,
         };
 
         index.rules_by_rid.push(rule.clone());
@@ -811,6 +812,7 @@ mod tests {
                 min_high_matched_length_unique: 0,
                 is_small: false,
                 is_tiny: false,
+                is_deprecated: false,
             },
             high_set_intersection: HashSet::new(),
         };
@@ -863,6 +865,7 @@ mod tests {
                 min_high_matched_length_unique: 0,
                 is_small: false,
                 is_tiny: false,
+                is_deprecated: false,
             },
             high_set_intersection: HashSet::new(),
         };

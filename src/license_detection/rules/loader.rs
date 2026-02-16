@@ -335,6 +335,7 @@ pub fn parse_rule_file(path: &Path) -> Result<Rule> {
         min_high_matched_length_unique: 0,
         is_small: false,
         is_tiny: false,
+        is_deprecated: fm.is_deprecated.unwrap_or(false),
     })
 }
 
@@ -458,7 +459,7 @@ pub fn parse_license_file(path: &Path) -> Result<License> {
     })
 }
 
-fn load_rules_from_dir(dir: &Path, pattern: &str) -> Result<Vec<Rule>> {
+fn load_rules_from_dir(dir: &Path, pattern: &str, with_deprecated: bool) -> Result<Vec<Rule>> {
     let mut rules = Vec::new();
 
     let entries = fs::read_dir(dir)
@@ -473,7 +474,11 @@ fn load_rules_from_dir(dir: &Path, pattern: &str) -> Result<Vec<Rule>> {
             && path.extension().and_then(|s| s.to_str()) == Some(pattern.trim_start_matches('.'))
         {
             match parse_rule_file(&path) {
-                Ok(rule) => rules.push(rule),
+                Ok(rule) => {
+                    if with_deprecated || !rule.is_deprecated {
+                        rules.push(rule);
+                    }
+                }
                 Err(e) => {
                     eprintln!(
                         "Warning: Failed to parse rule file {}: {}",
@@ -488,7 +493,11 @@ fn load_rules_from_dir(dir: &Path, pattern: &str) -> Result<Vec<Rule>> {
     Ok(rules)
 }
 
-fn load_licenses_from_dir(dir: &Path, pattern: &str) -> Result<Vec<License>> {
+fn load_licenses_from_dir(
+    dir: &Path,
+    pattern: &str,
+    with_deprecated: bool,
+) -> Result<Vec<License>> {
     let mut licenses = Vec::new();
 
     let entries = fs::read_dir(dir)
@@ -503,7 +512,11 @@ fn load_licenses_from_dir(dir: &Path, pattern: &str) -> Result<Vec<License>> {
             && path.extension().and_then(|s| s.to_str()) == Some(pattern.trim_start_matches('.'))
         {
             match parse_license_file(&path) {
-                Ok(license) => licenses.push(license),
+                Ok(license) => {
+                    if with_deprecated || !license.is_deprecated {
+                        licenses.push(license);
+                    }
+                }
                 Err(e) => {
                     eprintln!(
                         "Warning: Failed to parse license file {}: {}",
@@ -518,14 +531,14 @@ fn load_licenses_from_dir(dir: &Path, pattern: &str) -> Result<Vec<License>> {
     Ok(licenses)
 }
 
-pub fn load_rules_from_directory(dir: &Path) -> Result<Vec<Rule>> {
-    let rules = load_rules_from_dir(dir, ".RULE")?;
+pub fn load_rules_from_directory(dir: &Path, with_deprecated: bool) -> Result<Vec<Rule>> {
+    let rules = load_rules_from_dir(dir, ".RULE", with_deprecated)?;
     validate_rules(&rules);
     Ok(rules)
 }
 
-pub fn load_licenses_from_directory(dir: &Path) -> Result<Vec<License>> {
-    load_licenses_from_dir(dir, ".LICENSE")
+pub fn load_licenses_from_directory(dir: &Path, with_deprecated: bool) -> Result<Vec<License>> {
+    load_licenses_from_dir(dir, ".LICENSE", with_deprecated)
 }
 
 /// Validate loaded rules for common issues.
@@ -657,7 +670,7 @@ MIT License"#,
             return;
         }
 
-        let licenses = load_licenses_from_directory(path).unwrap();
+        let licenses = load_licenses_from_directory(path, false).unwrap();
         assert!(!licenses.is_empty());
 
         let mit = licenses.iter().find(|l| l.key == "mit");
@@ -676,7 +689,7 @@ MIT License"#,
             return;
         }
 
-        let rules = load_rules_from_directory(path).unwrap();
+        let rules = load_rules_from_directory(path, false).unwrap();
         assert!(!rules.is_empty());
 
         let mit_rule = rules
@@ -725,6 +738,7 @@ MIT License"#,
                 min_high_matched_length_unique: 0,
                 is_small: false,
                 is_tiny: false,
+                is_deprecated: false,
             },
             Rule {
                 identifier: "apache-2.0.LICENSE".to_string(),
@@ -760,6 +774,7 @@ MIT License"#,
                 min_high_matched_length_unique: 0,
                 is_small: false,
                 is_tiny: false,
+                is_deprecated: false,
             },
         ];
 
@@ -802,6 +817,7 @@ MIT License"#,
             min_high_matched_length_unique: 0,
             is_small: false,
             is_tiny: false,
+            is_deprecated: false,
         }];
 
         validate_rules(&rules);
@@ -844,6 +860,7 @@ MIT License"#,
                 min_high_matched_length_unique: 0,
                 is_small: false,
                 is_tiny: false,
+                is_deprecated: false,
             },
             Rule {
                 identifier: "apache-2.0.LICENSE".to_string(),
@@ -879,9 +896,74 @@ MIT License"#,
                 min_high_matched_length_unique: 0,
                 is_small: false,
                 is_tiny: false,
+                is_deprecated: false,
             },
         ];
 
         validate_rules(&rules);
+    }
+
+    #[test]
+    fn test_load_licenses_filters_deprecated_by_default() {
+        let dir = tempdir().unwrap();
+
+        fs::write(
+            dir.path().join("active.LICENSE"),
+            r#"---
+key: active
+name: Active License
+---
+Active license text"#,
+        )
+        .unwrap();
+
+        fs::write(
+            dir.path().join("deprecated.LICENSE"),
+            r#"---
+key: deprecated
+name: Deprecated License
+is_deprecated: yes
+---
+Deprecated license text"#,
+        )
+        .unwrap();
+
+        let licenses_without = load_licenses_from_directory(dir.path(), false).unwrap();
+        assert_eq!(licenses_without.len(), 1);
+        assert_eq!(licenses_without[0].key, "active");
+
+        let licenses_with = load_licenses_from_directory(dir.path(), true).unwrap();
+        assert_eq!(licenses_with.len(), 2);
+    }
+
+    #[test]
+    fn test_load_rules_filters_deprecated_by_default() {
+        let dir = tempdir().unwrap();
+
+        fs::write(
+            dir.path().join("active.RULE"),
+            r#"---
+license_expression: active
+---
+Active rule text"#,
+        )
+        .unwrap();
+
+        fs::write(
+            dir.path().join("deprecated.RULE"),
+            r#"---
+license_expression: deprecated
+is_deprecated: yes
+---
+Deprecated rule text"#,
+        )
+        .unwrap();
+
+        let rules_without = load_rules_from_directory(dir.path(), false).unwrap();
+        assert_eq!(rules_without.len(), 1);
+        assert_eq!(rules_without[0].license_expression, "active");
+
+        let rules_with = load_rules_from_directory(dir.path(), true).unwrap();
+        assert_eq!(rules_with.len(), 2);
     }
 }

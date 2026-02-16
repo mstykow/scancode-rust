@@ -156,6 +156,9 @@ pub struct Rule {
 
     /// True if rule length < TINY_RULE (6 tokens)
     pub is_tiny: bool,
+
+    /// Whether this rule is deprecated
+    pub is_deprecated: bool,
 }
 
 /// License match result from a matching strategy.
@@ -264,6 +267,7 @@ mod tests {
             min_high_matched_length_unique: 0,
             is_small: false,
             is_tiny: false,
+            is_deprecated: false,
         }
     }
 
@@ -456,6 +460,7 @@ mod tests {
             min_high_matched_length_unique: 0,
             is_small: false,
             is_tiny: false,
+            is_deprecated: false,
         };
 
         assert!(rule.identifier.is_empty());
@@ -562,6 +567,7 @@ mod tests {
             min_high_matched_length_unique: 0,
             is_small: true,
             is_tiny: false,
+            is_deprecated: false,
         };
 
         assert_eq!(rule.tokens.len(), 5);
@@ -618,6 +624,7 @@ mod tests {
             min_high_matched_length_unique: 1,
             is_small: false,
             is_tiny: false,
+            is_deprecated: false,
         };
 
         assert_eq!(rule.minimum_coverage, Some(80));

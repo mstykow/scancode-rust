@@ -163,6 +163,7 @@ mod tests {
                 min_high_matched_length_unique: 0,
                 is_small: false,
                 is_tiny: false,
+                is_deprecated: false,
             },
             Rule {
                 identifier: "apache-2.0.LICENSE".to_string(),
@@ -198,6 +199,7 @@ mod tests {
                 min_high_matched_length_unique: 0,
                 is_small: false,
                 is_tiny: false,
+                is_deprecated: false,
             },
         ]
     }
