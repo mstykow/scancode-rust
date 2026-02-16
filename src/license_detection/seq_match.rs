@@ -223,66 +223,191 @@ fn select_candidates(index: &LicenseIndex, query_run: &QueryRun, top_n: usize) -
     candidates
 }
 
-/// Find matching blocks between query and rule token sequences.
+/// Find the longest matching block between query and rule token sequences.
 ///
-/// Returns list of blocks as (query_start, query_end, rule_start, rule_end).
+/// Uses dynamic programming to find the longest contiguous matching subsequence.
 ///
-/// For Phase 4.4, this is a simplified version that finds consecutive exact token matches.
-///
-/// Corresponds to Python: `match_blocks()` in seq.py (used by match_seq.py line 100)
+/// Corresponds to Python: `find_longest_match()` in seq.py (line 19)
 ///
 /// # Arguments
 ///
-/// * `query_tokens` - Query token sequence
-/// * `rule_tokens` - Rule token sequence
-/// * `len_legalese` - Number of legalese tokens
-/// * `high_postings` - Positions of high-value tokens in the rule (used for optimization)
+/// * `query_tokens` - Query token sequence (called `a` in Python)
+/// * `rule_tokens` - Rule token sequence (called `b` in Python)
+/// * `query_lo` - Start position in query (inclusive)
+/// * `query_hi` - End position in query (exclusive)
+/// * `rule_lo` - Start position in rule (inclusive)
+/// * `rule_hi` - End position in rule (exclusive)
+/// * `high_postings` - Mapping of rule token IDs to their positions (b2j in Python)
+/// * `len_legalese` - Token IDs below this are "good" tokens
+/// * `matchables` - Set of matchable positions in query
 ///
 /// # Returns
 ///
-/// Vector of matching blocks as (query_start, query_end, rule_start, rule_end)
-fn align_sequences(
+/// Tuple of (query_start, rule_start, match_length)
+#[allow(clippy::too_many_arguments, clippy::needless_range_loop)]
+#[allow(dead_code)]
+fn find_longest_match(
     query_tokens: &[u16],
     rule_tokens: &[u16],
+    query_lo: usize,
+    query_hi: usize,
+    rule_lo: usize,
+    rule_hi: usize,
+    high_postings: &HashMap<u16, Vec<usize>>,
     len_legalese: usize,
-    _high_postings: &HashMap<u16, Vec<usize>>,
-) -> Vec<(usize, usize, usize, usize)> {
-    let mut blocks = Vec::new();
+    matchables: &HashSet<usize>,
+) -> (usize, usize, usize) {
+    let mut best_i = query_lo;
+    let mut best_j = rule_lo;
+    let mut best_size = 0;
 
-    if query_tokens.is_empty() || rule_tokens.is_empty() {
-        return blocks;
+    let mut j2len: HashMap<usize, usize> = HashMap::new();
+
+    for i in query_lo..query_hi {
+        let mut new_j2len: HashMap<usize, usize> = HashMap::new();
+        let cur_a = query_tokens[i];
+
+        if (cur_a as usize) < len_legalese
+            && matchables.contains(&i)
+            && let Some(positions) = high_postings.get(&cur_a)
+        {
+            for &j in positions {
+                if j < rule_lo {
+                    continue;
+                }
+                if j >= rule_hi {
+                    break;
+                }
+
+                let prev_len = if j > 0 {
+                    j2len.get(&(j - 1)).copied().unwrap_or(0)
+                } else {
+                    0
+                };
+                let k = prev_len + 1;
+                new_j2len.insert(j, k);
+
+                if k > best_size {
+                    best_i = i + 1 - k;
+                    best_j = j + 1 - k;
+                    best_size = k;
+                }
+            }
+        }
+        j2len = new_j2len;
     }
 
-    let mut i = 0;
-    while i < query_tokens.len() {
-        let qtoken = query_tokens[i];
+    if best_size > 0 {
+        while best_i > query_lo
+            && best_j > rule_lo
+            && query_tokens[best_i - 1] == rule_tokens[best_j - 1]
+            && matchables.contains(&(best_i - 1))
+        {
+            best_i -= 1;
+            best_j -= 1;
+            best_size += 1;
+        }
 
-        let j_opt = rule_tokens.iter().position(|&rtoken| rtoken == qtoken);
-
-        if let Some(j) = j_opt {
-            let mut block_len = 1;
-
-            while i + block_len < query_tokens.len()
-                && j + block_len < rule_tokens.len()
-                && query_tokens[i + block_len] == rule_tokens[j + block_len]
-            {
-                block_len += 1;
-            }
-
-            let is_multi_token = block_len > 1;
-            let is_high_token = qtoken < len_legalese as u16;
-
-            if is_multi_token || is_high_token {
-                blocks.push((i, i + block_len - 1, j, j + block_len - 1));
-            }
-
-            i += block_len;
-        } else {
-            i += 1;
+        while best_i + best_size < query_hi
+            && best_j + best_size < rule_hi
+            && query_tokens[best_i + best_size] == rule_tokens[best_j + best_size]
+            && matchables.contains(&(best_i + best_size))
+        {
+            best_size += 1;
         }
     }
 
-    blocks
+    (best_i, best_j, best_size)
+}
+
+/// Find all matching blocks between query and rule token sequences using divide-and-conquer.
+///
+/// Uses a queue-based algorithm to find longest match, then recursively processes
+/// left and right regions to find all matches.
+///
+/// Corresponds to Python: `match_blocks()` in seq.py (line 107)
+///
+/// # Arguments
+///
+/// * `query_tokens` - Query token sequence (called `a` in Python)
+/// * `rule_tokens` - Rule token sequence (called `b` in Python)
+/// * `query_start` - Start position in query (inclusive)
+/// * `query_end` - End position in query (exclusive)
+/// * `high_postings` - Mapping of rule token IDs to their positions (b2j in Python)
+/// * `len_legalese` - Token IDs below this are "good" tokens
+/// * `matchables` - Set of matchable positions in query
+///
+/// # Returns
+///
+/// Vector of matching blocks as (query_pos, rule_pos, length)
+#[allow(dead_code)]
+fn match_blocks(
+    query_tokens: &[u16],
+    rule_tokens: &[u16],
+    query_start: usize,
+    query_end: usize,
+    high_postings: &HashMap<u16, Vec<usize>>,
+    len_legalese: usize,
+    matchables: &HashSet<usize>,
+) -> Vec<(usize, usize, usize)> {
+    if query_tokens.is_empty() || rule_tokens.is_empty() {
+        return Vec::new();
+    }
+
+    let mut queue: Vec<(usize, usize, usize, usize)> =
+        vec![(query_start, query_end, 0, rule_tokens.len())];
+    let mut matching_blocks: Vec<(usize, usize, usize)> = Vec::new();
+
+    while let Some((alo, ahi, blo, bhi)) = queue.pop() {
+        let (i, j, k) = find_longest_match(
+            query_tokens,
+            rule_tokens,
+            alo,
+            ahi,
+            blo,
+            bhi,
+            high_postings,
+            len_legalese,
+            matchables,
+        );
+
+        if k > 0 {
+            matching_blocks.push((i, j, k));
+
+            if alo < i && blo < j {
+                queue.push((alo, i, blo, j));
+            }
+            if i + k < ahi && j + k < bhi {
+                queue.push((i + k, ahi, j + k, bhi));
+            }
+        }
+    }
+
+    matching_blocks.sort();
+
+    let mut non_adjacent: Vec<(usize, usize, usize)> = Vec::new();
+    let mut i1 = 0usize;
+    let mut j1 = 0usize;
+    let mut k1 = 0usize;
+
+    for (i2, j2, k2) in matching_blocks {
+        if i1 + k1 == i2 && j1 + k1 == j2 {
+            k1 += k2;
+        } else {
+            if k1 > 0 {
+                non_adjacent.push((i1, j1, k1));
+            }
+            i1 = i2;
+            j1 = j2;
+            k1 = k2;
+        }
+    }
+
+    if k1 > 0 {
+        non_adjacent.push((i1, j1, k1));
+    }
+
+    non_adjacent
 }
 
 /// Main sequence matching function.
@@ -314,49 +439,79 @@ pub fn seq_match(index: &LicenseIndex, query_run: &QueryRun) -> Vec<LicenseMatch
             let query_tokens = query_run.tokens();
             let len_legalese = index.len_legalese;
 
-            let blocks = align_sequences(query_tokens, rule_tokens, len_legalese, high_postings);
+            let qbegin = query_run.start;
+            let qfinish = query_run.end.unwrap_or(qbegin);
 
-            for (q_start, q_end, _r_start, _r_end) in blocks {
-                let matched_length = q_end - q_start + 1;
+            let matchables = query_run.matchables(false);
 
-                let rule_length = rule_tokens.len();
-                if rule_length == 0 {
-                    continue;
+            let mut qstart = qbegin;
+
+            while qstart <= qfinish {
+                let blocks = match_blocks(
+                    query_tokens,
+                    rule_tokens,
+                    qstart,
+                    qfinish + 1,
+                    high_postings,
+                    len_legalese,
+                    &matchables,
+                );
+
+                if blocks.is_empty() {
+                    break;
                 }
 
-                let match_coverage = (matched_length as f32 / rule_length as f32) * 100.0;
+                let mut max_qend = qstart;
 
-                if match_coverage < 50.0 {
-                    continue;
+                for (qpos, _ipos, mlen) in blocks {
+                    if mlen < 1 {
+                        continue;
+                    }
+
+                    if mlen == 1 && query_tokens[qpos] >= len_legalese as u16 {
+                        continue;
+                    }
+
+                    let rule_length = rule_tokens.len();
+                    if rule_length == 0 {
+                        continue;
+                    }
+
+                    let match_coverage = (mlen as f32 / rule_length as f32) * 100.0;
+
+                    let qend = qpos + mlen - 1;
+                    let start_line = query_run.line_for_pos(qpos).unwrap_or(1);
+                    let end_line = query_run.line_for_pos(qend).unwrap_or(start_line);
+
+                    let score = (match_coverage * candidate.rule.relevance as f32) / 100.0;
+
+                    let matched_text = query_run.matched_text(start_line, end_line);
+
+                    let license_match = LicenseMatch {
+                        license_expression: candidate.rule.license_expression.clone(),
+                        license_expression_spdx: candidate.rule.license_expression.clone(),
+                        from_file: None,
+                        start_line,
+                        end_line,
+                        matcher: MATCH_SEQ.to_string(),
+                        score,
+                        matched_length: mlen,
+                        match_coverage,
+                        rule_relevance: candidate.rule.relevance,
+                        rule_identifier: format!("#{}", rid),
+                        rule_url: String::new(),
+                        matched_text: Some(matched_text),
+                        referenced_filenames: candidate.rule.referenced_filenames.clone(),
+                        is_license_intro: candidate.rule.is_license_intro,
+                        is_license_clue: candidate.rule.is_license_clue,
+                    };
+
+                    matches.push(license_match);
+
+                    max_qend = max_qend.max(qend + 1);
                 }
 
-                let start_line = query_run.start_line().unwrap_or(1);
-                let end_line = query_run.end_line().unwrap_or(start_line);
-
-                let score = (match_coverage * candidate.rule.relevance as f32) / 100.0;
-
-                let matched_text = query_run.matched_text(start_line, end_line);
-
-                let license_match = LicenseMatch {
-                    license_expression: candidate.rule.license_expression.clone(),
-                    license_expression_spdx: candidate.rule.license_expression.clone(),
-                    from_file: None,
-                    start_line,
-                    end_line,
-                    matcher: MATCH_SEQ.to_string(),
-                    score,
-                    matched_length,
-                    match_coverage,
-                    rule_relevance: candidate.rule.relevance,
-                    rule_identifier: format!("#{}", rid),
-                    rule_url: String::new(),
-                    matched_text: Some(matched_text),
-                    referenced_filenames: candidate.rule.referenced_filenames.clone(),
-                    is_license_intro: candidate.rule.is_license_intro,
-                    is_license_clue: candidate.rule.is_license_clue,
-                };
-
-                matches.push(license_match);
+                qstart = max_qend;
             }
         }
     }
@@ -552,67 +707,394 @@ mod tests {
     }
 
     #[test]
-    fn test_align_sequences_exact_match() {
+    fn test_find_longest_match_basic() {
         let query_tokens = vec![0, 1, 2, 3];
         let rule_tokens = vec![0, 1, 2, 3];
         let mut high_postings: HashMap<u16, Vec<usize>> = HashMap::new();
         high_postings.insert(0, vec![0]);
         high_postings.insert(1, vec![1]);
         high_postings.insert(2, vec![2]);
+        high_postings.insert(3, vec![3]);
 
-        let blocks = align_sequences(&query_tokens, &rule_tokens, 5, &high_postings);
+        let matchables: HashSet<usize> = (0..query_tokens.len()).collect();
 
-        assert_eq!(blocks.len(), 1);
-        assert_eq!(blocks[0], (0, 3, 0, 3));
+        let result = find_longest_match(
+            &query_tokens,
+            &rule_tokens,
+            0,
+            query_tokens.len(),
+            0,
+            rule_tokens.len(),
+            &high_postings,
+            5,
+            &matchables,
+        );
+
+        assert_eq!(result, (0, 0, 4), "Should find full match");
     }
 
     #[test]
-    fn test_align_sequences_partial_match() {
-        let query_tokens = vec![0, 1, 2, 5, 6, 0, 1, 2];
-        let rule_tokens = vec![0, 1, 2, 3, 4];
+    fn test_find_longest_match_with_gap() {
+        let query_tokens = vec![0, 1, 99, 2, 3];
+        let rule_tokens = vec![0, 1, 2, 3];
+        let mut high_postings: HashMap<u16, Vec<usize>> = HashMap::new();
+        high_postings.insert(0, vec![0]);
+        high_postings.insert(1, vec![1]);
+        high_postings.insert(2, vec![2]);
+        high_postings.insert(3, vec![3]);
+
+        let matchables: HashSet<usize> = (0..query_tokens.len()).collect();
+
+        let result = find_longest_match(
+            &query_tokens,
+            &rule_tokens,
+            0,
+            query_tokens.len(),
+            0,
+            rule_tokens.len(),
+            &high_postings,
+            5,
+            &matchables,
+        );
+
+        assert_eq!(
+            result.2, 2,
+            "Should find longest contiguous match (length 2)"
+        );
+        assert!(
+            result == (0, 0, 2) || result == (3, 2, 2),
+            "Should find either [0,1] or [2,3] match, got {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_find_longest_match_uses_high_postings() {
+        let query_tokens = vec![0, 10, 2];
+        let rule_tokens = vec![0, 1, 2];
+        let mut high_postings: HashMap<u16, Vec<usize>> = HashMap::new();
+        high_postings.insert(0, vec![0]);
+        high_postings.insert(2, vec![2]);
+
+        let matchables: HashSet<usize> = (0..query_tokens.len()).collect();
+
+        let result = find_longest_match(
+            &query_tokens,
+            &rule_tokens,
+            0,
+            query_tokens.len(),
+            0,
+            rule_tokens.len(),
+            &high_postings,
+            5,
+            &matchables,
+        );
+
+        assert_eq!(
+            result.2, 1,
+            "Token 10 is not in high_postings and doesn't match token 1, so LCS finds separate matches"
+        );
+    }
+
+    #[test]
+    fn test_find_longest_match_no_match() {
+        let query_tokens = vec![10, 11, 12];
+        let rule_tokens = vec![0, 1, 2];
+        let high_postings: HashMap<u16, Vec<usize>> = HashMap::new();
+
+        let matchables: HashSet<usize> = (0..query_tokens.len()).collect();
+
+        let result = find_longest_match(
+            &query_tokens,
+            &rule_tokens,
+            0,
+            query_tokens.len(),
+            0,
+            rule_tokens.len(),
+            &high_postings,
+            5,
+            &matchables,
+        );
+
+        assert_eq!(
+            result,
+            (0, 0, 0),
+            "Should return (alo, blo, 0) for no match"
+        );
+    }
+
+    #[test]
+    fn test_find_longest_match_respects_bounds() {
+        let query_tokens = vec![0, 1, 2, 0, 1, 2, 0, 1, 2];
+        let rule_tokens = vec![0, 1, 2];
         let mut high_postings: HashMap<u16, Vec<usize>> = HashMap::new();
         high_postings.insert(0, vec![0]);
         high_postings.insert(1, vec![1]);
         high_postings.insert(2, vec![2]);
 
-        let blocks = align_sequences(&query_tokens, &rule_tokens, 5, &high_postings);
+        let matchables: HashSet<usize> = (0..query_tokens.len()).collect();
 
-        assert_eq!(blocks.len(), 2);
-        assert!(blocks.contains(&(0, 2, 0, 2)));
-        assert!(blocks.contains(&(5, 7, 0, 2)));
+        let result = find_longest_match(
+            &query_tokens,
+            &rule_tokens,
+            3,
+            6,
+            0,
+            rule_tokens.len(),
+            &high_postings,
+            5,
+            &matchables,
+        );
+
+        assert_eq!(
+            result,
+            (3, 0, 3),
+            "Should find match within query bounds [3,6)"
+        );
     }
 
     #[test]
-    fn test_align_sequences_no_match() {
+    fn test_find_longest_match_non_matchable_position() {
+        let query_tokens = vec![0, 1, 2];
+        let rule_tokens = vec![0, 1, 2];
+        let mut high_postings: HashMap<u16, Vec<usize>> = HashMap::new();
+        high_postings.insert(0, vec![0]);
+        high_postings.insert(1, vec![1]);
+        high_postings.insert(2, vec![2]);
+
+        let matchables: HashSet<usize> = [0, 2].into_iter().collect();
+
+        let result = find_longest_match(
+            &query_tokens,
+            &rule_tokens,
+            0,
+            query_tokens.len(),
+            0,
+            rule_tokens.len(),
+            &high_postings,
+            5,
+            &matchables,
+        );
+
+        assert_eq!(
+            result.2, 1,
+            "Position 1 is not matchable, so longest match should be 1"
+        );
+    }
+
+    #[test]
+    fn test_match_blocks_divide_conquer() {
+        let query_tokens = vec![0, 1, 2, 3];
+        let rule_tokens = vec![0, 1, 2, 3];
+        let mut high_postings: HashMap<u16, Vec<usize>> = HashMap::new();
+        high_postings.insert(0, vec![0]);
+        high_postings.insert(1, vec![1]);
+        high_postings.insert(2, vec![2]);
+        high_postings.insert(3, vec![3]);
+
+        let matchables: HashSet<usize> = (0..query_tokens.len()).collect();
+
+        let blocks = match_blocks(
+            &query_tokens,
+            &rule_tokens,
+            0,
+            query_tokens.len(),
+            &high_postings,
+            5,
+            &matchables,
+        );
+
+        assert_eq!(blocks.len(), 1, "Should find single full match");
+        assert_eq!(blocks[0], (0, 0, 4), "Should match entire sequence");
+    }
+
+    #[test]
+    fn test_match_blocks_collapse_adjacent() {
+        let query_tokens = vec![0, 1, 2, 3, 4];
+        let rule_tokens = vec![0, 1, 2, 3, 4];
+        let mut high_postings: HashMap<u16, Vec<usize>> = HashMap::new();
+        for (i, &tid) in query_tokens.iter().enumerate() {
+            high_postings.entry(tid).or_default().push(i);
+        }
+
+        let matchables: HashSet<usize> = (0..query_tokens.len()).collect();
+
+        let blocks = match_blocks(
+            &query_tokens,
+            &rule_tokens,
+            0,
+            query_tokens.len(),
+            &high_postings,
+            5,
+            &matchables,
+        );
+
+        assert_eq!(
+            blocks.len(),
+            1,
+            "Adjacent blocks should be collapsed into one"
+        );
+        assert_eq!(blocks[0].2, 5, "Collapsed block should have full length");
+    }
+
+    #[test]
+    fn test_match_blocks_no_match() {
         let query_tokens = vec![10, 11, 12];
         let rule_tokens = vec![0, 1, 2];
         let high_postings: HashMap<u16, Vec<usize>> = HashMap::new();
 
-        let blocks = align_sequences(&query_tokens, &rule_tokens, 5, &high_postings);
+        let matchables: HashSet<usize> = (0..query_tokens.len()).collect();
 
-        assert!(blocks.is_empty());
+        let blocks = match_blocks(
+            &query_tokens,
+            &rule_tokens,
+            0,
+            query_tokens.len(),
+            &high_postings,
+            5,
+            &matchables,
+        );
+
+        assert!(blocks.is_empty(), "Should return empty when no matches");
     }
 
     #[test]
-    fn test_align_sequences_empty_query() {
+    fn test_match_blocks_empty_query() {
         let query_tokens: Vec<u16> = vec![];
         let rule_tokens = vec![0, 1, 2];
         let high_postings: HashMap<u16, Vec<usize>> = HashMap::new();
+        let matchables: HashSet<usize> = HashSet::new();
 
-        let blocks = align_sequences(&query_tokens, &rule_tokens, 5, &high_postings);
+        let blocks = match_blocks(
+            &query_tokens,
+            &rule_tokens,
+            0,
+            query_tokens.len(),
+            &high_postings,
+            5,
+            &matchables,
+        );
 
         assert!(blocks.is_empty());
     }
 
     #[test]
-    fn test_align_sequences_low_value_token() {
-        let query_tokens = vec![10];
-        let rule_tokens = vec![10];
-        let high_postings: HashMap<u16, Vec<usize>> = HashMap::new();
+    fn test_match_blocks_with_gap() {
+        let query_tokens = vec![0, 1, 99, 2, 3];
+        let rule_tokens = vec![0, 1, 2, 3];
+        let mut high_postings: HashMap<u16, Vec<usize>> = HashMap::new();
+        high_postings.insert(0, vec![0]);
+        high_postings.insert(1, vec![1]);
+        high_postings.insert(2, vec![2]);
+        high_postings.insert(3, vec![3]);
 
-        let blocks = align_sequences(&query_tokens, &rule_tokens, 5, &high_postings);
+        let matchables: HashSet<usize> = (0..query_tokens.len()).collect();
+
+        let blocks = match_blocks(
+            &query_tokens,
+            &rule_tokens,
+            0,
+            query_tokens.len(),
+            &high_postings,
+            5,
+            &matchables,
+        );
+
+        assert!(!blocks.is_empty(), "Should find matches despite gap");
+        assert!(
+            blocks.iter().any(|b| b.2 >= 2),
+            "Should find at least one block of length >= 2"
+        );
+    }
+
+    #[test]
+    fn test_match_blocks_empty_rule() {
+        let query_tokens = vec![0, 1, 2];
+        let rule_tokens: Vec<u16> = vec![];
+        let high_postings: HashMap<u16, Vec<usize>> = HashMap::new();
+        let matchables: HashSet<usize> = (0..query_tokens.len()).collect();
+
+        let blocks = match_blocks(
+            &query_tokens,
+            &rule_tokens,
+            0,
+            query_tokens.len(),
+            &high_postings,
+            5,
+            &matchables,
+        );
 
         assert!(blocks.is_empty());
+    }
+
+    #[test]
+    fn test_match_blocks_multiple_regions() {
+        let query_tokens = vec![0, 1, 99, 2, 3, 88, 0, 1];
+        let rule_tokens = vec![0, 1, 2, 3];
+        let mut high_postings: HashMap<u16, Vec<usize>> = HashMap::new();
+        high_postings.insert(0, vec![0]);
+        high_postings.insert(1, vec![1]);
+        high_postings.insert(2, vec![2]);
+        high_postings.insert(3, vec![3]);
+
+        let matchables: HashSet<usize> = (0..query_tokens.len()).collect();
+
+        let blocks = match_blocks(
+            &query_tokens,
+            &rule_tokens,
+            0,
+            query_tokens.len(),
+            &high_postings,
+            5,
+            &matchables,
+        );
+
+        assert!(
+            blocks.len() >= 2,
+            "Should find multiple match regions, got {:?}",
+            blocks
+        );
+    }
+
+    #[test]
+    fn test_match_blocks_with_range() {
+        let query_tokens = vec![0, 1, 2, 99, 0, 1, 2];
+        let rule_tokens = vec![0, 1, 2];
+        let mut high_postings: HashMap<u16, Vec<usize>> = HashMap::new();
+        high_postings.insert(0, vec![0]);
+        high_postings.insert(1, vec![1]);
+        high_postings.insert(2, vec![2]);
+
+        let matchables: HashSet<usize> = (0..query_tokens.len()).collect();
+
+        let blocks = match_blocks(
+            &query_tokens,
+            &rule_tokens,
+            0,
+            3,
+            &high_postings,
+            5,
+            &matchables,
+        );
+
+        assert_eq!(
+            blocks.len(),
+            1,
+            "Should only find one match in the restricted range"
+        );
+        assert_eq!(blocks[0], (0, 0, 3));
+
+        let blocks2 = match_blocks(
+            &query_tokens,
+            &rule_tokens,
+            4,
+            query_tokens.len(),
+            &high_postings,
+            5,
+            &matchables,
+        );
+        assert_eq!(blocks2.len(), 1, "Should find the second occurrence");
+        assert_eq!(blocks2[0], (4, 0, 3));
     }
 
     #[test]
@@ -632,7 +1114,7 @@ mod tests {
     }
 
     #[test]
-    fn test_seq_match_low_coverage_filtered() {
+    fn test_seq_match_partial_coverage_not_filtered() {
         let mut index = create_seq_match_test_index();
 
         add_test_rule(
@@ -647,7 +1129,11 @@ mod tests {
 
         let matches = seq_match(&index, &query_run);
 
-        assert!(matches.is_empty());
+        assert!(
+            !matches.is_empty(),
+            "Partial coverage matches should NOT be filtered (Python has no 50% coverage filter)"
+        );
+        assert!(matches[0].match_coverage < 50.0);
     }
 
     #[test]
@@ -698,38 +1184,6 @@ mod tests {
         assert!(result.is_some());
         let (_rounded, full) = result.unwrap();
         assert!(full.containment > 0.0 && full.containment <= 1.0);
-    }
-
-    #[test]
-    fn test_align_sequences_with_gap() {
-        let query_tokens = vec![0, 1, 99, 2, 3];
-        let rule_tokens = vec![0, 1, 2, 3];
-        let mut high_postings: HashMap<u16, Vec<usize>> = HashMap::new();
-        high_postings.insert(0, vec![0]);
-        high_postings.insert(1, vec![1]);
-        high_postings.insert(2, vec![2]);
-        high_postings.insert(3, vec![3]);
-
-        let blocks = align_sequences(&query_tokens, &rule_tokens, 5, &high_postings);
-
-        assert!(
-            !blocks.is_empty(),
-            "Should find at least one block despite gap"
-        );
-    }
-
-    #[test]
-    fn test_align_sequences_empty_rule() {
-        let query_tokens = vec![0, 1, 2];
-        let rule_tokens: Vec<u16> = vec![];
-        let high_postings: HashMap<u16, Vec<usize>> = HashMap::new();
-
-        let blocks = align_sequences(&query_tokens, &rule_tokens, 5, &high_postings);
-
-        assert!(
-            blocks.is_empty(),
-            "Should return empty blocks for empty rule"
-        );
     }
 
     #[test]
@@ -881,6 +1335,115 @@ mod tests {
         assert!(
             candidate1 > candidate2,
             "Higher containment candidate should rank higher"
+        );
+    }
+
+    #[test]
+    fn test_seq_match_multiple_occurrences() {
+        let mut index = create_seq_match_test_index();
+
+        add_test_rule(&mut index, "license copyright granted", "test-license");
+
+        let text = "license copyright granted some text license copyright granted more text";
+        let query = Query::new(text, &index).unwrap();
+        let query_run = query.whole_query_run();
+
+        let matches = seq_match(&index, &query_run);
+
+        assert!(
+            matches.len() >= 2,
+            "Should find multiple matches for the same rule appearing multiple times in query, got {} matches",
+            matches.len()
+        );
+
+        let license_expressions: Vec<&str> = matches
+            .iter()
+            .map(|m| m.license_expression.as_str())
+            .collect();
+        assert!(
+            license_expressions.iter().all(|&e| e == "test-license"),
+            "All matches should be for test-license"
+        );
+
+        let start_lines: Vec<usize> = matches.iter().map(|m| m.start_line).collect();
+        let end_lines: Vec<usize> = matches.iter().map(|m| m.end_line).collect();
+
+        assert!(
+            start_lines.iter().all(|&l| l >= 1),
+            "Start lines should be valid"
+        );
+        assert!(
+            end_lines.iter().all(|&l| l >= 1),
+            "End lines should be valid"
+        );
+    }
+
+    #[test]
+    fn test_seq_match_line_numbers_accurate() {
+        let mut index = create_seq_match_test_index();
+
+        add_test_rule(&mut index, "license copyright granted", "test-license");
+
+        let text = "line one\nlicense copyright granted\nline three";
+        let query = Query::new(text, &index).unwrap();
+        let query_run = query.whole_query_run();
+
+        let matches = seq_match(&index, &query_run);
+
+        assert!(!matches.is_empty(), "Should find matches");
+
+        let first_match = &matches[0];
+
+        assert_eq!(
+            first_match.start_line, 2,
+            "Match should start on line 2 (where license tokens are), not line 1"
+        );
+        assert_eq!(
+            first_match.end_line, 2,
+            "Match should end on line 2 (where license tokens are), not line 3"
+        );
+
+        assert!(
+            first_match
+                .matched_text
+                .as_ref()
+                .is_some_and(|t| t.contains("license")),
+            "Matched text should contain 'license'"
+        );
+    }
+
+    #[test]
+    fn test_seq_match_line_numbers_partial_match() {
+        let mut index = create_seq_match_test_index();
+
+        add_test_rule(
+            &mut index,
+            "license copyright granted permission",
+            "test-license",
+        );
+
+        let text = "line one\nlicense copyright\nline three";
+        let query = Query::new(text, &index).unwrap();
+        let query_run = query.whole_query_run();
+
+        let matches = seq_match(&index, &query_run);
+
+        assert!(!matches.is_empty(), "Should find partial matches");
+
+        let first_match = &matches[0];
+
+        assert_eq!(
+            first_match.start_line, 2,
+            "Partial match should start on line 2"
+        );
+        assert_eq!(
+            first_match.end_line, 2,
+            "Partial match should end on line 2"
+        );
+
+        assert!(
+            first_match.match_coverage < 100.0,
+            "Should be partial coverage"
         );
     }
 }
