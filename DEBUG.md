@@ -2,7 +2,7 @@
 
 ## Current Status
 
-**Last Updated:** After PLAN-005 seq_match implementation
+**Last Updated:** After detection sorting fix
 
 ### Unit Tests
 
@@ -13,26 +13,28 @@ All unit tests passing. Key improvements:
 - License intro filtering - ✅ IMPLEMENTED (PLAN-002)
 - Overlapping match filtering - ✅ IMPLEMENTED (PLAN-004)
 - Unicode tokenizer - ✅ IMPLEMENTED
-- seq_match algorithm - ✅ IMPLEMENTED (PLAN-005, partial)
+- seq_match algorithm - ✅ IMPLEMENTED (PLAN-005)
+- Match filtering - ✅ FIXED (PLAN-006)
+- Detection sorting - ✅ IMPLEMENTED
 
 ### Golden Tests
 
-| Metric | Initial | After Unicode | After PLAN-005 | Total Change |
-|--------|---------|---------------|----------------|--------------|
-| Passed | 2,679 | 2,929 | 2,915 | **+236** |
-| Failed | 1,684 | 1,434 | 1,448 | **-236** |
+| Metric | Initial | Current | Total Change |
+|--------|---------|---------|--------------|
+| Passed | 2,679 | 2,957 | **+278** |
+| Failed | 1,684 | 1,406 | **-278** |
 
-**Total Improvement:** 14% reduction in failing tests
+**Total Improvement:** 16.5% reduction in failing tests
 
-Breakdown by directory (current):
+Breakdown by directory:
 
 | Directory | Passed | Failed |
 |-----------|--------|--------|
-| lic1 | 169 | 122 |
-| lic2 | 702 | 151 |
-| lic3 | 199 | 93 |
-| lic4 | 214 | 136 |
-| external | 1,629 | 938 |
+| lic1 | 174 | 117 |
+| lic2 | 708 | 145 |
+| lic3 | 207 | 85 |
+| lic4 | 218 | 132 |
+| external | 1,648 | 919 |
 | unknown | 2 | 8 |
 
 Test data: 4,367 test files across 6 directories
@@ -187,6 +189,38 @@ detections.sort_by(|a, b| {
     min_line_a.cmp(&min_line_b)
 });
 ```
+
+---
+
+### Detection Sorting Fix (Implemented)
+
+**Commit:** `193b2a85`
+
+**Problem:**
+Detections were returned in non-deterministic order due to HashMap iteration. Python sorts detections by `qstart` (query position), ensuring matches earlier in the file come first.
+
+**Example:**
+
+- File: `bsd-new_and_gpl-2.0-plus.txt`
+- Expected: `["gpl-2.0-plus", "bsd-new"]` (GPL at lines 6-18, BSD at lines 354-376)
+- Actual (before fix): `["bsd-new", "gpl-2.0-plus"]` (wrong order)
+
+**Fix:**
+Added `sort_detections_by_line()` function that sorts detections by minimum match line number.
+
+**Golden Test Results:**
+
+| Metric | Before | After | Change |
+|--------|--------|-------|--------|
+| Passed | 2,914 | 2,957 | **+43** |
+| Failed | 1,450 | 1,407 | **-43** |
+
+**Breakdown:**
+
+- 44 tests now pass that failed before
+- 1 test now fails that passed before
+
+This fix resolved the detection ordering issues introduced by PLAN-005/006.
 
 ---
 
