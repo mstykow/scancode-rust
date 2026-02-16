@@ -40,6 +40,37 @@ Test data: 4,367 test files across 6 directories (lic1, lic2, lic3, lic4, extern
 
 ## Open Issues
 
+### Issue 0: SPDX `+` Suffix Not Detected (High Priority)
+
+**Problem:** SPDX identifiers with `+` suffix (e.g., `GPL-2.0+`) are not detected.
+
+**Test:** `test_spdx_with_plus` fails
+
+```rust
+let text = "SPDX-License-Identifier: GPL-2.0+";
+let detections = engine.detect(text).expect("Detection should succeed");
+assert!(!detections.is_empty(), "Should detect license from SPDX identifier with plus");
+```
+
+**Root Cause:** Rust's `find_best_matching_rule()` only matches `rule.license_expression`, not SPDX-specific keys. Python has a lookup table mapping SPDX keys (including `GPL-2.0+`) to ScanCode keys (`gpl-2.0-plus`).
+
+**Python Implementation:**
+
+- License files have `spdx_license_key` and `other_spdx_license_keys` fields
+- `build_spdx_symbols()` builds a lookup table for SPDX → License mapping
+- `GPL-2.0+` maps to `gpl-2.0-plus` license
+
+**Files Affected:**
+
+| File | Change |
+|------|--------|
+| `src/license_detection/models.rs` | Add `spdx_license_key`, `other_spdx_license_keys` fields |
+| `src/license_detection/rules/loader.rs` | Parse SPDX fields from .LICENSE files |
+| `src/license_detection/index/builder.rs` | Build `rid_by_spdx_key` lookup table |
+| `src/license_detection/spdx_lid.rs` | Update `find_best_matching_rule()` |
+
+---
+
 ### Issue 1: Unknown License Intros Appear in Expressions (Medium Priority)
 
 **Problem:** Files produce detections with "unknown" in license expressions when they shouldn't.
@@ -138,6 +169,14 @@ Deprecated rules have `replaced_by` pointing to the new license key.
 ## Test Coverage Gaps
 
 The following areas have been identified as needing additional test coverage or implementation work:
+
+### SPDX `+` Suffix Support
+
+SPDX identifiers with `+` suffix (meaning "or later") are not detected. Requires:
+
+- `spdx_license_key` and `other_spdx_license_keys` fields on Rule/License
+- SPDX-to-RID lookup table in index
+- Updated `find_best_matching_rule()` to use SPDX key lookup
 
 ### Unicode Support in Tokenizer
 
