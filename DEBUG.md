@@ -109,9 +109,16 @@ The following areas have been identified as needing additional test coverage or 
 
 ### Unicode Support in Tokenizer
 
-**Problem:** The current tokenizer regex `[A-Za-z0-9]+\+?[A-Za-z0-9]*` only matches ASCII characters, unlike Python's `[^\W]` with `re.UNICODE` flag.
+**Problem:** The current tokenizer regex `[A-Za-z0-9]+\+?[A-Za-z0-9]*` only matches ASCII characters, unlike Python's `[^_\W]+\+?[^_\W]*` with `re.UNICODE` flag.
 
-**Not a Quick Win:** Attempted change from `[A-Za-z0-9]` to `[^\W_]` caused **regression of 28 tests** (2952→2924 passed). The golden test expected values appear to have been generated against ASCII-only tokenizer behavior, not Python's Unicode behavior. This requires deeper investigation to understand the mismatch.
+**Not a Quick Win:** Attempted to change pattern to `[^_\W]+\+?[^_\W]*` to match Python:
+
+- **Result:** Regression of 38 tests (2957→2919 passed)
+- **Observation:** Python correctly tokenizes Unicode (e.g., `barfüsserplatz` from `day-spec.txt`)
+- **Root cause unknown:** Despite matching Python's tokenization pattern, the change causes MORE failures
+- **Hypothesis:** The issue may not be tokenization itself, but downstream processing (index building, matching, or detection pipeline)
+
+**Requires investigation:** Why does matching Python's tokenization behavior cause regression?
 
 ### Python Functions Not Yet Implemented
 
