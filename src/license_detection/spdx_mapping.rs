@@ -291,6 +291,7 @@ mod tests {
                 ignorable_authors: None,
                 ignorable_urls: None,
                 ignorable_emails: None,
+                other_spdx_license_keys: vec![],
             },
             License {
                 key: "gpl-2.0-plus".to_string(),
@@ -308,6 +309,7 @@ mod tests {
                 ignorable_authors: None,
                 ignorable_urls: None,
                 ignorable_emails: None,
+                other_spdx_license_keys: vec![],
             },
             License {
                 key: "apache-2.0".to_string(),
@@ -325,11 +327,13 @@ mod tests {
                 ignorable_authors: None,
                 ignorable_urls: None,
                 ignorable_emails: None,
+                other_spdx_license_keys: vec![],
             },
             License {
                 key: "custom-1".to_string(),
                 name: "Custom License 1".to_string(),
                 spdx_license_key: None,
+                other_spdx_license_keys: vec![],
                 category: Some("Unstated License".to_string()),
                 text: "Custom license text...".to_string(),
                 reference_urls: vec![],
@@ -606,6 +610,7 @@ mod tests {
                 ignorable_authors: None,
                 ignorable_urls: None,
                 ignorable_emails: None,
+                other_spdx_license_keys: vec![],
             },
             License {
                 key: "mit-x11".to_string(),
@@ -623,6 +628,7 @@ mod tests {
                 ignorable_authors: None,
                 ignorable_urls: None,
                 ignorable_emails: None,
+                other_spdx_license_keys: vec![],
             },
         ];
         let mapping = build_spdx_mapping(&licenses);
@@ -651,6 +657,7 @@ mod tests {
                 ignorable_authors: None,
                 ignorable_urls: None,
                 ignorable_emails: None,
+                other_spdx_license_keys: vec![],
             },
             License {
                 key: "gpl-2.0-old".to_string(),
@@ -668,6 +675,7 @@ mod tests {
                 ignorable_authors: None,
                 ignorable_urls: None,
                 ignorable_emails: None,
+                other_spdx_license_keys: vec![],
             },
         ];
         let mapping = build_spdx_mapping(&licenses);
@@ -701,6 +709,7 @@ mod tests {
                 ignorable_authors: None,
                 ignorable_urls: None,
                 ignorable_emails: None,
+                other_spdx_license_keys: vec![],
             },
             License {
                 key: "gpl-3.0-plus".to_string(),
@@ -718,6 +727,7 @@ mod tests {
                 ignorable_authors: None,
                 ignorable_urls: None,
                 ignorable_emails: None,
+                other_spdx_license_keys: vec![],
             },
             License {
                 key: "lgpl-2.1-plus".to_string(),
@@ -735,6 +745,7 @@ mod tests {
                 ignorable_authors: None,
                 ignorable_urls: None,
                 ignorable_emails: None,
+                other_spdx_license_keys: vec![],
             },
         ];
         let mapping = build_spdx_mapping(&licenses);
@@ -775,6 +786,7 @@ mod tests {
                 ignorable_authors: None,
                 ignorable_urls: None,
                 ignorable_emails: None,
+                other_spdx_license_keys: vec![],
             },
             License {
                 key: "classpath-exception-2.0".to_string(),
@@ -792,6 +804,7 @@ mod tests {
                 ignorable_authors: None,
                 ignorable_urls: None,
                 ignorable_emails: None,
+                other_spdx_license_keys: vec![],
             },
             License {
                 key: "gcc-exception-3.1".to_string(),
@@ -809,6 +822,7 @@ mod tests {
                 ignorable_authors: None,
                 ignorable_urls: None,
                 ignorable_emails: None,
+                other_spdx_license_keys: vec![],
             },
         ];
         let mapping = build_spdx_mapping(&licenses);
@@ -854,6 +868,7 @@ mod tests {
                 ignorable_authors: None,
                 ignorable_urls: None,
                 ignorable_emails: None,
+                other_spdx_license_keys: vec![],
             },
             License {
                 key: "boost-1.0".to_string(),
@@ -871,6 +886,7 @@ mod tests {
                 ignorable_authors: None,
                 ignorable_urls: None,
                 ignorable_emails: None,
+                other_spdx_license_keys: vec![],
             },
             License {
                 key: "unicode_dfs_2015".to_string(),
@@ -888,6 +904,7 @@ mod tests {
                 ignorable_authors: None,
                 ignorable_urls: None,
                 ignorable_emails: None,
+                other_spdx_license_keys: vec![],
             },
         ];
         let mapping = build_spdx_mapping(&licenses);
@@ -925,6 +942,7 @@ mod tests {
                 ignorable_authors: None,
                 ignorable_urls: None,
                 ignorable_emails: None,
+                other_spdx_license_keys: vec![],
             },
             License {
                 key: "exception-a".to_string(),
@@ -942,6 +960,7 @@ mod tests {
                 ignorable_authors: None,
                 ignorable_urls: None,
                 ignorable_emails: None,
+                other_spdx_license_keys: vec![],
             },
             License {
                 key: "exception-b".to_string(),
@@ -959,6 +978,7 @@ mod tests {
                 ignorable_authors: None,
                 ignorable_urls: None,
                 ignorable_emails: None,
+                other_spdx_license_keys: vec![],
             },
         ];
         let mapping = build_spdx_mapping(&licenses);
@@ -999,6 +1019,7 @@ mod tests {
             ignorable_authors: None,
             ignorable_urls: None,
             ignorable_emails: None,
+            other_spdx_license_keys: vec![],
         }];
         let mapping = build_spdx_mapping(&licenses);
 
@@ -1040,6 +1061,7 @@ mod tests {
                 ignorable_authors: None,
                 ignorable_urls: None,
                 ignorable_emails: None,
+                other_spdx_license_keys: vec![],
             },
             License {
                 key: "apache-2.0".to_string(),
@@ -1057,6 +1079,7 @@ mod tests {
                 ignorable_authors: None,
                 ignorable_urls: None,
                 ignorable_emails: None,
+                other_spdx_license_keys: vec![],
             },
             License {
                 key: "bsd-3-clause".to_string(),
@@ -1074,6 +1097,7 @@ mod tests {
                 ignorable_authors: None,
                 ignorable_urls: None,
                 ignorable_emails: None,
+                other_spdx_license_keys: vec![],
             },
             License {
                 key: "isc".to_string(),
@@ -1091,6 +1115,7 @@ mod tests {
                 ignorable_authors: None,
                 ignorable_urls: None,
                 ignorable_emails: None,
+                other_spdx_license_keys: vec![],
             },
             License {
                 key: "mpl-2.0".to_string(),
@@ -1108,6 +1133,7 @@ mod tests {
                 ignorable_authors: None,
                 ignorable_urls: None,
                 ignorable_emails: None,
+                other_spdx_license_keys: vec![],
             },
         ];
         let mapping = build_spdx_mapping(&licenses);

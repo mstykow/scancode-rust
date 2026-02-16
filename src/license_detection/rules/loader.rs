@@ -336,6 +336,8 @@ pub fn parse_rule_file(path: &Path) -> Result<Rule> {
         is_small: false,
         is_tiny: false,
         is_deprecated: fm.is_deprecated.unwrap_or(false),
+        spdx_license_key: None,
+        other_spdx_license_keys: vec![],
     })
 }
 
@@ -444,6 +446,7 @@ pub fn parse_license_file(path: &Path) -> Result<License> {
             .name
             .unwrap_or_else(|| fm.short_name.clone().unwrap_or_else(|| key.to_string())),
         spdx_license_key: fm.spdx_license_key,
+        other_spdx_license_keys: fm.other_spdx_license_keys.unwrap_or_default(),
         category: fm.category,
         text: trimmed_text.to_string(),
         reference_urls: urls,
@@ -739,6 +742,8 @@ MIT License"#,
                 is_small: false,
                 is_tiny: false,
                 is_deprecated: false,
+                spdx_license_key: None,
+                other_spdx_license_keys: vec![],
             },
             Rule {
                 identifier: "apache-2.0.LICENSE".to_string(),
@@ -775,6 +780,8 @@ MIT License"#,
                 is_small: false,
                 is_tiny: false,
                 is_deprecated: false,
+                spdx_license_key: None,
+                other_spdx_license_keys: vec![],
             },
         ];
 
@@ -818,6 +825,8 @@ MIT License"#,
             is_small: false,
             is_tiny: false,
             is_deprecated: false,
+            spdx_license_key: None,
+            other_spdx_license_keys: vec![],
         }];
 
         validate_rules(&rules);
@@ -861,6 +870,8 @@ MIT License"#,
                 is_small: false,
                 is_tiny: false,
                 is_deprecated: false,
+                spdx_license_key: None,
+                other_spdx_license_keys: vec![],
             },
             Rule {
                 identifier: "apache-2.0.LICENSE".to_string(),
@@ -897,6 +908,8 @@ MIT License"#,
                 is_small: false,
                 is_tiny: false,
                 is_deprecated: false,
+                spdx_license_key: None,
+                other_spdx_license_keys: vec![],
             },
         ];
 

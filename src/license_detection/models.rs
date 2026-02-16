@@ -14,6 +14,9 @@ pub struct License {
     /// SPDX license identifier if available
     pub spdx_license_key: Option<String>,
 
+    /// Alternative SPDX license identifiers (aliases)
+    pub other_spdx_license_keys: Vec<String>,
+
     /// License category (e.g., "Permissive", "Copyleft")
     pub category: Option<String>,
 
@@ -159,6 +162,12 @@ pub struct Rule {
 
     /// Whether this rule is deprecated
     pub is_deprecated: bool,
+
+    /// SPDX license identifier if available
+    pub spdx_license_key: Option<String>,
+
+    /// Alternative SPDX license identifiers (aliases)
+    pub other_spdx_license_keys: Vec<String>,
 }
 
 /// License match result from a matching strategy.
@@ -217,6 +226,7 @@ mod tests {
             key: "mit".to_string(),
             name: "MIT License".to_string(),
             spdx_license_key: Some("MIT".to_string()),
+            other_spdx_license_keys: vec![],
             category: Some("Permissive".to_string()),
             text: "MIT License text here...".to_string(),
             reference_urls: vec!["https://opensource.org/licenses/MIT".to_string()],
@@ -268,6 +278,8 @@ mod tests {
             is_small: false,
             is_tiny: false,
             is_deprecated: false,
+            spdx_license_key: None,
+            other_spdx_license_keys: vec![],
         }
     }
 
@@ -308,6 +320,7 @@ mod tests {
             key: "unknown".to_string(),
             name: String::new(),
             spdx_license_key: None,
+            other_spdx_license_keys: vec![],
             category: None,
             text: String::new(),
             reference_urls: vec![],
@@ -334,6 +347,7 @@ mod tests {
             key: "old-license".to_string(),
             name: "Old License".to_string(),
             spdx_license_key: None,
+            other_spdx_license_keys: vec![],
             category: None,
             text: String::new(),
             reference_urls: vec![],
@@ -386,6 +400,7 @@ mod tests {
             key: "apache-2.0".to_string(),
             name: "Apache 2.0".to_string(),
             spdx_license_key: Some("Apache-2.0".to_string()),
+            other_spdx_license_keys: vec![],
             category: Some("Permissive".to_string()),
             text: "Apache License text...".to_string(),
             reference_urls: vec![],
@@ -461,6 +476,8 @@ mod tests {
             is_small: false,
             is_tiny: false,
             is_deprecated: false,
+            spdx_license_key: None,
+            other_spdx_license_keys: vec![],
         };
 
         assert!(rule.identifier.is_empty());
@@ -568,6 +585,8 @@ mod tests {
             is_small: true,
             is_tiny: false,
             is_deprecated: false,
+            spdx_license_key: None,
+            other_spdx_license_keys: vec![],
         };
 
         assert_eq!(rule.tokens.len(), 5);
@@ -625,6 +644,8 @@ mod tests {
             is_small: false,
             is_tiny: false,
             is_deprecated: false,
+            spdx_license_key: None,
+            other_spdx_license_keys: vec![],
         };
 
         assert_eq!(rule.minimum_coverage, Some(80));

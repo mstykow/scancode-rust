@@ -253,6 +253,8 @@ mod integration_tests {
             is_small: false,
             is_tiny: false,
             is_deprecated: false,
+            spdx_license_key: None,
+            other_spdx_license_keys: vec![],
         };
 
         // Build token sets and multisets

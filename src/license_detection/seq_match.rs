@@ -435,6 +435,8 @@ mod tests {
             is_small: false,
             is_tiny: false,
             is_deprecated: false,
+            spdx_license_key: None,
+            other_spdx_license_keys: vec![],
         };
 
         index.rules_by_rid.push(rule.clone());
@@ -813,6 +815,8 @@ mod tests {
                 is_small: false,
                 is_tiny: false,
                 is_deprecated: false,
+                spdx_license_key: None,
+                other_spdx_license_keys: vec![],
             },
             high_set_intersection: HashSet::new(),
         };
@@ -866,6 +870,8 @@ mod tests {
                 is_small: false,
                 is_tiny: false,
                 is_deprecated: false,
+                spdx_license_key: None,
+                other_spdx_license_keys: vec![],
             },
             high_set_intersection: HashSet::new(),
         };

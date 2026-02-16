@@ -174,6 +174,16 @@ pub struct LicenseIndex {
     ///
     /// Corresponds to Python: automaton values contain (rid, istart, iend)
     pub pattern_id_to_rid: Vec<usize>,
+
+    /// Mapping from SPDX license key to rule ID.
+    ///
+    /// Enables direct lookup of rules by their SPDX license key,
+    /// including aliases like "GPL-2.0+" -> gpl-2.0-plus.
+    ///
+    /// Keys are stored lowercase for case-insensitive lookup.
+    ///
+    /// Corresponds to Python: `self.licenses_by_spdx_key` in cache.py
+    pub rid_by_spdx_key: HashMap<String, usize>,
 }
 
 impl LicenseIndex {
@@ -270,6 +280,7 @@ impl LicenseIndex {
             approx_matchable_rids: HashSet::new(),
             licenses_by_key: HashMap::new(),
             pattern_id_to_rid: Vec::new(),
+            rid_by_spdx_key: HashMap::new(),
         }
     }
 
@@ -354,6 +365,7 @@ mod tests {
             key: "test-license".to_string(),
             name: "Test License".to_string(),
             spdx_license_key: Some("TEST".to_string()),
+            other_spdx_license_keys: vec![],
             category: Some("Permissive".to_string()),
             text: "Test license text".to_string(),
             reference_urls: vec![],
@@ -383,6 +395,7 @@ mod tests {
                 key: "license-1".to_string(),
                 name: "License 1".to_string(),
                 spdx_license_key: Some("LIC1".to_string()),
+                other_spdx_license_keys: vec![],
                 category: Some("Permissive".to_string()),
                 text: "License 1 text".to_string(),
                 reference_urls: vec![],
@@ -400,6 +413,7 @@ mod tests {
                 key: "license-2".to_string(),
                 name: "License 2".to_string(),
                 spdx_license_key: Some("LIC2".to_string()),
+                other_spdx_license_keys: vec![],
                 category: Some("Copyleft".to_string()),
                 text: "License 2 text".to_string(),
                 reference_urls: vec![],
@@ -430,6 +444,7 @@ mod tests {
             key: "mit".to_string(),
             name: "MIT License".to_string(),
             spdx_license_key: Some("MIT".to_string()),
+            other_spdx_license_keys: vec![],
             category: Some("Permissive".to_string()),
             text: "MIT License text".to_string(),
             reference_urls: vec![],
@@ -463,6 +478,7 @@ mod tests {
             key: "test".to_string(),
             name: "Test".to_string(),
             spdx_license_key: Some("TEST".to_string()),
+            other_spdx_license_keys: vec![],
             category: Some("Permissive".to_string()),
             text: "Text".to_string(),
             reference_urls: vec![],

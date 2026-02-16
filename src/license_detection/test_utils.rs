@@ -88,6 +88,8 @@ pub fn create_mock_rule(
         is_small,
         is_tiny,
         is_deprecated: false,
+        spdx_license_key: None,
+        other_spdx_license_keys: vec![],
     }
 }
 
@@ -137,6 +139,8 @@ pub fn create_mock_rule_simple(license_expression: &str, relevance: u8) -> Rule 
         is_small: false,
         is_tiny: false,
         is_deprecated: false,
+        spdx_license_key: None,
+        other_spdx_license_keys: vec![],
     }
 }
 

@@ -177,6 +177,10 @@ fn normalize_spdx_key(key: &str) -> String {
 fn find_best_matching_rule(index: &LicenseIndex, spdx_key: &str) -> Option<usize> {
     let normalized_spdx = normalize_spdx_key(spdx_key);
 
+    if let Some(&rid) = index.rid_by_spdx_key.get(&normalized_spdx) {
+        return Some(rid);
+    }
+
     let mut best_rid: Option<usize> = None;
     let mut best_relevance: u8 = 0;
 
@@ -795,5 +799,43 @@ mod tests {
         assert_eq!(normalize_spdx_key("MIT"), "mit");
         assert_eq!(normalize_spdx_key("MIT_LICENSE"), "mit-license");
         assert_eq!(normalize_spdx_key("MIT__LICENSE"), "mit--license");
+    }
+
+    #[test]
+    fn test_spdx_key_lookup_gpl_2_0_plus() {
+        let path =
+            std::path::Path::new("reference/scancode-toolkit/src/licensedcode/data/licenses");
+        if !path.exists() {
+            eprintln!("Skipping test: reference directory not found");
+            return;
+        }
+
+        let licenses = crate::license_detection::rules::load_licenses_from_directory(path, false)
+            .expect("Failed to load licenses");
+        let rules = crate::license_detection::rules::load_rules_from_directory(
+            std::path::Path::new("reference/scancode-toolkit/src/licensedcode/data/rules"),
+            false,
+        )
+        .expect("Failed to load rules");
+
+        let index = crate::license_detection::index::build_index(rules, licenses);
+
+        assert!(
+            !index.rid_by_spdx_key.is_empty(),
+            "Should have SPDX key mappings"
+        );
+
+        assert!(
+            index.rid_by_spdx_key.contains_key("gpl-2.0+"),
+            "Should have gpl-2.0+ in SPDX key mappings"
+        );
+
+        if let Some(&rid) = index.rid_by_spdx_key.get("gpl-2.0+") {
+            let rule = &index.rules_by_rid[rid];
+            assert_eq!(
+                rule.license_expression, "gpl-2.0-plus",
+                "GPL-2.0+ should map to gpl-2.0-plus rule"
+            );
+        }
     }
 }

@@ -78,6 +78,8 @@ fn build_rule_from_license(license: &License) -> Option<Rule> {
         is_small: false,
         is_tiny: false,
         is_deprecated: license.is_deprecated,
+        spdx_license_key: license.spdx_license_key.clone(),
+        other_spdx_license_keys: license.other_spdx_license_keys.clone(),
     })
 }
 
@@ -210,6 +212,8 @@ pub fn build_index(rules: Vec<Rule>, licenses: Vec<License>) -> LicenseIndex {
     let mut all_rules: Vec<Rule> = license_rules.into_iter().chain(rules).collect();
     all_rules.sort();
 
+    let mut rid_by_spdx_key: HashMap<String, usize> = HashMap::new();
+
     for (rid, mut rule) in all_rules.into_iter().enumerate() {
         let rule_tokens = tokenize(&rule.text);
         let mut rule_token_ids: Vec<u16> = Vec::with_capacity(rule_tokens.len());
@@ -301,6 +305,13 @@ pub fn build_index(rules: Vec<Rule>, licenses: Vec<License>) -> LicenseIndex {
         rule.min_matched_length_unique = min_matched_length_unique;
         rule.min_high_matched_length_unique = min_high_matched_length_unique;
 
+        if let Some(ref spdx_key) = rule.spdx_license_key {
+            rid_by_spdx_key.insert(spdx_key.to_lowercase(), rid);
+        }
+        for alias in &rule.other_spdx_license_keys {
+            rid_by_spdx_key.insert(alias.to_lowercase(), rid);
+        }
+
         rules_by_rid.push(rule);
         tids_by_rid.push(rule_token_ids);
     }
@@ -345,6 +356,7 @@ pub fn build_index(rules: Vec<Rule>, licenses: Vec<License>) -> LicenseIndex {
         approx_matchable_rids,
         licenses_by_key,
         pattern_id_to_rid,
+        rid_by_spdx_key,
     }
 }
 
@@ -410,6 +422,8 @@ mod tests {
             is_small: false,
             is_tiny: false,
             is_deprecated: false,
+            spdx_license_key: None,
+            other_spdx_license_keys: vec![],
         }
     }
 
@@ -418,6 +432,7 @@ mod tests {
             key: key.to_string(),
             name: name.to_string(),
             spdx_license_key: Some(key.to_uppercase()),
+            other_spdx_license_keys: vec![],
             category: Some("Permissive".to_string()),
             text: format!("{} license text", name),
             reference_urls: vec![],
