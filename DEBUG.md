@@ -120,6 +120,76 @@ The 27 new passes include:
 
 ---
 
+### PLAN-006: Match Filtering Fix (Implemented)
+
+**Commit:** `65312944`
+
+**The Bug:**
+
+- Rust passed `matchables(false)` → only high_matchables
+- Python passes `matchables` → high_matchables | low_matchables
+- This prevented `extend_match` from extending matches into low-token areas
+
+**Fix:**
+Changed `query_run.matchables(false)` to `query_run.matchables(true)` at `seq_match.rs:445`.
+
+**Golden Test Results:**
+
+| Metric | Before | After | Change |
+|--------|--------|-------|--------|
+| Passed | 2,911 | 2,910 | -1 |
+| Failed | 1,449 | 1,450 | +1 |
+
+**Breakdown:**
+
+- 16 tests now pass that failed before
+- 19 tests now fail that passed before
+
+**Regression Analysis:**
+
+The 19 new failures fall into categories:
+
+| Category | Count | Example | Issue |
+|----------|-------|---------|-------|
+| Detection order reversed | ~12 | `bsd-new_and_gpl-2.0-plus.txt` | Detections in wrong line order |
+| Extra detection | ~4 | `jdatasrc.c` | Detecting additional licenses |
+| Missing detection | ~3 | `pure.h` | Edge case with unclear license text |
+
+**Root Cause: Detection Ordering**
+
+Example: `bsd-new_and_gpl-2.0-plus.txt`
+
+- Expected: `["gpl-2.0-plus", "bsd-new"]` (GPL at lines 6-18, BSD at lines 354-376)
+- Actual: `["bsd-new", "gpl-2.0-plus"]` (order reversed)
+
+Both licenses ARE detected correctly. The issue is ordering.
+
+**Python sorts matches by `qstart` (query position):**
+
+```python
+matches.sort()  # Sort by qstart (line order)
+```
+
+**Why PLAN-006 Changed This:**
+
+- Including low tokens allows `extend_match` to extend matches further
+- Different match lengths change merge behavior
+- Different matchers may find different candidates
+- Detection ordering depends on non-deterministic HashSet iteration
+
+**Recommended Fix:**
+Sort detections by minimum line number (earliest match first):
+
+```rust
+detections.sort_by(|a, b| {
+    let min_line_a = a.matches.iter().map(|m| m.start_line).min().unwrap_or(0);
+    let min_line_b = b.matches.iter().map(|m| m.start_line).min().unwrap_or(0);
+    min_line_a.cmp(&min_line_b)
+});
+```
+
+---
+
 ### Unicode Tokenizer (Implemented)
 
 **Change:** Updated tokenizer pattern from `[A-Za-z0-9]+` (ASCII) to `[^_\W]+` (Unicode) to match Python's `re.UNICODE` behavior.
