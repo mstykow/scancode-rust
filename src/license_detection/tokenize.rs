@@ -101,14 +101,15 @@ static STOPWORDS: Lazy<HashSet<&'static str>> = Lazy::new(|| {
 /// Splits on whitespace and punctuation: keep only characters and numbers and + when in the middle or end of a word.
 ///
 /// The pattern is equivalent to Python's: `[^_\W]+\+?[^_\W]*`
-/// - `[^_\W]+` - one or more characters that are NOT underscore and NOT non-word (i.e., alphanumeric)
+/// - `[^_\W]+` - one or more characters that are NOT underscore and NOT non-word (i.e., alphanumeric including Unicode)
 /// - `\+?` - optional plus sign (important for license names like "GPL2+")
-/// - `[^_\W]*` - zero or more alphanumeric characters
+/// - `[^_\W]*` - zero or more alphanumeric characters (including Unicode)
 ///
 /// This matches word-like sequences while preserving trailing `+` characters.
+/// Uses Unicode-aware matching to match Python's `re.UNICODE` behavior.
 #[allow(dead_code)]
 static QUERY_PATTERN: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"[A-Za-z0-9]+\+?[A-Za-z0-9]*").expect("Invalid regex pattern"));
+    Lazy::new(|| Regex::new(r"[^_\W]+\+?[^_\W]*").expect("Invalid regex pattern"));
 
 /// Tokenizes text to match index rules and queries.
 ///
@@ -304,11 +305,9 @@ mod tests {
 
     #[test]
     fn test_tokenize_unicode_characters() {
-        // Note: Current implementation only matches ASCII [A-Za-z0-9]
-        // Python uses [^_\W] with re.UNICODE which matches Unicode letters
-        // Non-ASCII characters are not tokenized
+        // With Unicode pattern [^_\W], we match Unicode letters like Python's re.UNICODE
         let result = tokenize("hello 世界 мир");
-        assert_eq!(result, vec!["hello"]);
+        assert_eq!(result, vec!["hello", "世界", "мир"]);
     }
 
     #[test]
@@ -377,9 +376,9 @@ mod tests {
 
     #[test]
     fn test_tokenize_without_stopwords_unicode() {
-        // Note: Current implementation only matches ASCII [A-Za-z0-9]
+        // With Unicode pattern [^_\W], we match Unicode letters like Python's re.UNICODE
         let result = tokenize_without_stopwords("hello 世界");
-        assert_eq!(result, vec!["hello"]);
+        assert_eq!(result, vec!["hello", "世界"]);
     }
 
     #[test]
