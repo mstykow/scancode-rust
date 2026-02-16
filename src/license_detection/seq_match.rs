@@ -352,6 +352,8 @@ pub fn seq_match(index: &LicenseIndex, query_run: &QueryRun) -> Vec<LicenseMatch
                     rule_url: String::new(),
                     matched_text: Some(matched_text),
                     referenced_filenames: candidate.rule.referenced_filenames.clone(),
+                    is_license_intro: candidate.rule.is_license_intro,
+                    is_license_clue: candidate.rule.is_license_clue,
                 };
 
                 matches.push(license_match);

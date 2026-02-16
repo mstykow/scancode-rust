@@ -113,6 +113,8 @@ pub fn hash_match(index: &LicenseIndex, query_run: &QueryRun) -> Vec<LicenseMatc
             rule_url: String::new(),
             matched_text: Some(matched_text),
             referenced_filenames: rule.referenced_filenames.clone(),
+            is_license_intro: rule.is_license_intro,
+            is_license_clue: rule.is_license_clue,
         };
 
         matches.push(license_match);

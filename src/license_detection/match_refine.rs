@@ -288,6 +288,8 @@ mod tests {
             rule_url: "https://example.com".to_string(),
             matched_text: None,
             referenced_filenames: None,
+            is_license_intro: false,
+            is_license_clue: false,
         }
     }
 

@@ -303,6 +303,8 @@ fn create_unknown_match(
         rule_url: String::new(),
         matched_text: Some(matched_text),
         referenced_filenames: None,
+        is_license_intro: false,
+        is_license_clue: false,
     }
     .into()
 }
@@ -478,6 +480,8 @@ mod tests {
             rule_url: String::new(),
             matched_text: Some("some license text".to_string()),
             referenced_filenames: None,
+            is_license_intro: false,
+            is_license_clue: false,
         }];
 
         let covered = compute_covered_positions(&query, &known_matches);
@@ -539,6 +543,8 @@ mod tests {
             rule_url: String::new(),
             matched_text: Some("some text".to_string()),
             referenced_filenames: None,
+            is_license_intro: false,
+            is_license_clue: false,
         }];
 
         let matches = unknown_match(&index, &query, &known_matches);

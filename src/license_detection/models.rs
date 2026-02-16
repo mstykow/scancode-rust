@@ -215,6 +215,12 @@ pub struct LicenseMatch {
     /// Filenames referenced by this match (e.g., ["LICENSE"] for "See LICENSE file")
     /// Populated from rule.referenced_filenames when rule matches
     pub referenced_filenames: Option<Vec<String>>,
+
+    /// True if this match is from a license intro rule
+    pub is_license_intro: bool,
+
+    /// True if this match is from a license clue rule
+    pub is_license_clue: bool,
 }
 
 #[cfg(test)]
@@ -299,6 +305,8 @@ mod tests {
             rule_url: "https://scancode-licensedb.aboutcode.org/mit".to_string(),
             matched_text: Some("MIT License text...".to_string()),
             referenced_filenames: None,
+            is_license_intro: false,
+            is_license_clue: false,
         }
     }
 
@@ -685,6 +693,8 @@ mod tests {
             rule_url: String::new(),
             matched_text: None,
             referenced_filenames: None,
+            is_license_intro: false,
+            is_license_clue: false,
         };
 
         assert!(match_result.from_file.is_none());
@@ -775,7 +785,9 @@ mod tests {
             "rule_identifier": "apache-2.0.LICENSE",
             "rule_url": "https://example.org/apache-2.0",
             "matched_text": "Apache License",
-            "referenced_filenames": ["NOTICE"]
+            "referenced_filenames": ["NOTICE"],
+            "is_license_intro": false,
+            "is_license_clue": false
         }"#;
 
         let match_result: LicenseMatch = serde_json::from_str(json).unwrap();
@@ -816,6 +828,8 @@ mod tests {
             rule_url: "https://scancode-licensedb.aboutcode.org/mit".to_string(),
             matched_text: Some("MIT License text...".to_string()),
             referenced_filenames: Some(vec!["LICENSE".to_string(), "COPYING".to_string()]),
+            is_license_intro: false,
+            is_license_clue: false,
         };
 
         assert_eq!(
