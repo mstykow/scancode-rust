@@ -646,4 +646,154 @@ mod tests {
         assert_eq!(matches.len(), 1);
         assert!((matches[0].score - 0.8).abs() < 0.01);
     }
+
+    #[test]
+    fn test_split_license_expression_with_with() {
+        let expr = "GPL-2.0 WITH Classpath-exception-2.0";
+        let keys = split_license_expression(expr);
+        assert_eq!(keys.len(), 2);
+        assert!(keys.contains(&"GPL-2.0".to_string()));
+        assert!(keys.contains(&"Classpath-exception-2.0".to_string()));
+    }
+
+    #[test]
+    fn test_split_license_expression_with_plus() {
+        let expr = "GPL-2.0+";
+        let keys = split_license_expression(expr);
+        assert_eq!(keys.len(), 1);
+        assert!(keys.contains(&"GPL-2.0+".to_string()));
+    }
+
+    #[test]
+    fn test_split_license_expression_complex_with_operators() {
+        let expr = "(MIT OR Apache-2.0) AND BSD-3-Clause";
+        let keys = split_license_expression(expr);
+        assert_eq!(keys.len(), 3);
+        assert!(keys.contains(&"MIT".to_string()));
+        assert!(keys.contains(&"Apache-2.0".to_string()));
+        assert!(keys.contains(&"BSD-3-Clause".to_string()));
+    }
+
+    #[test]
+    fn test_clean_spdx_text_empty_result() {
+        let clean = clean_spdx_text("");
+        assert_eq!(clean, "");
+
+        let clean = clean_spdx_text("   ");
+        assert_eq!(clean, "");
+    }
+
+    #[test]
+    fn test_extract_spdx_expressions_with_plus() {
+        let text = "SPDX-License-Identifier: GPL-2.0+";
+        let exprs = extract_spdx_expressions(text);
+        assert_eq!(exprs, vec!["GPL-2.0+"]);
+    }
+
+    #[test]
+    fn test_extract_spdx_expressions_with_with_operator() {
+        let text = "SPDX-License-Identifier: GPL-2.0 WITH Classpath-exception-2.0";
+        let exprs = extract_spdx_expressions(text);
+        assert_eq!(exprs, vec!["GPL-2.0 WITH Classpath-exception-2.0"]);
+    }
+
+    #[test]
+    fn test_spdx_lid_match_with_operator() {
+        let mut index = create_test_index(&[("mit", 0)], 1);
+        index
+            .rules_by_rid
+            .push(create_mock_rule_simple("gpl-2.0", 100));
+        index
+            .rules_by_rid
+            .push(create_mock_rule_simple("classpath-exception-2.0", 100));
+
+        let text = "SPDX-License-Identifier: GPL-2.0 WITH Classpath-exception-2.0";
+        let matches = spdx_lid_match(&index, text);
+
+        assert!(
+            !matches.is_empty(),
+            "Should match WITH expression components"
+        );
+    }
+
+    #[test]
+    fn test_extract_spdx_expressions_multiple_on_same_line() {
+        let text = "SPDX-License-Identifier: MIT  SPDX-License-Identifier: Apache-2.0";
+        let exprs = extract_spdx_expressions(text);
+
+        assert!(!exprs.is_empty(), "Should extract at least one expression");
+    }
+
+    #[test]
+    fn test_clean_spdx_text_with_angle_brackets() {
+        let clean = clean_spdx_text("<MIT>");
+        assert!(!clean.contains('<'));
+        assert!(!clean.contains('>'));
+    }
+
+    #[test]
+    fn test_split_spdx_lid_typo_variants() {
+        let variants = [
+            "SPDX-License-Identifier: MIT",
+            "SPDX-License-Identifier MIT",
+            "SPDX-License-Identifier:  MIT",
+            "SPDX license identifier: MIT",
+            "SPDX Licence Identifier: MIT",
+            "SPDZ-License-Identifier: MIT",
+        ];
+
+        for variant in variants {
+            let (prefix, expr) = split_spdx_lid(variant);
+            assert!(prefix.is_some(), "Should match variant: {}", variant);
+            assert_eq!(expr, "MIT", "Should extract MIT from: {}", variant);
+        }
+    }
+
+    #[test]
+    fn test_spdx_lid_match_empty_text() {
+        let index = create_test_index(&[("mit", 0)], 1);
+
+        let text = "";
+        let matches = spdx_lid_match(&index, text);
+
+        assert!(matches.is_empty(), "Empty text should produce no matches");
+    }
+
+    #[test]
+    fn test_spdx_lid_match_whitespace_only() {
+        let index = create_test_index(&[("mit", 0)], 1);
+
+        let text = "   \n\t  ";
+        let matches = spdx_lid_match(&index, text);
+
+        assert!(
+            matches.is_empty(),
+            "Whitespace-only text should produce no matches"
+        );
+    }
+
+    #[test]
+    fn test_extract_matched_text_from_lines() {
+        let text = "line1\nline2\nline3\nline4\nline5";
+
+        let matched = extract_matched_text_from_lines(text, 2, 2);
+        assert_eq!(matched, "line2");
+
+        let matched = extract_matched_text_from_lines(text, 2, 4);
+        assert_eq!(matched, "line2\nline3\nline4");
+
+        let matched = extract_matched_text_from_lines(text, 0, 2);
+        assert_eq!(matched, "");
+
+        let matched = extract_matched_text_from_lines(text, 3, 1);
+        assert_eq!(matched, "");
+    }
+
+    #[test]
+    fn test_normalize_spdx_key_edge_cases() {
+        assert_eq!(normalize_spdx_key(""), "");
+        assert_eq!(normalize_spdx_key("MIT"), "mit");
+        assert_eq!(normalize_spdx_key("MIT_LICENSE"), "mit-license");
+        assert_eq!(normalize_spdx_key("MIT__LICENSE"), "mit--license");
+    }
 }

@@ -301,4 +301,168 @@ mod tests {
         let result = tokenize("{{}some }}Text with   spAces! + _ -");
         assert_eq!(result, vec!["some", "text", "with", "spaces"]);
     }
+
+    #[test]
+    fn test_tokenize_unicode_characters() {
+        // Note: Current implementation only matches ASCII [A-Za-z0-9]
+        // Python uses [^_\W] with re.UNICODE which matches Unicode letters
+        // Non-ASCII characters are not tokenized
+        let result = tokenize("hello 世界 мир");
+        assert_eq!(result, vec!["hello"]);
+    }
+
+    #[test]
+    fn test_tokenize_only_special_chars() {
+        let result = tokenize("!@#$%^&*()");
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_tokenize_only_punctuation() {
+        let result = tokenize(".,;:!?-_=+[]{}()");
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_tokenize_only_stopwords() {
+        let result = tokenize("div p a br");
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_tokenize_mixed_stopwords_and_words() {
+        let result = tokenize("div hello p world a test");
+        assert_eq!(result, vec!["hello", "world", "test"]);
+    }
+
+    #[test]
+    fn test_tokenize_very_long_text() {
+        let words: Vec<String> = (0..1000).map(|i| format!("word{}", i)).collect();
+        let text = words.join(" ");
+        let result = tokenize(&text);
+        assert_eq!(result.len(), 1000);
+        assert_eq!(result[0], "word0");
+        assert_eq!(result[999], "word999");
+    }
+
+    #[test]
+    fn test_tokenize_with_newlines_and_tabs() {
+        let result = tokenize("hello\nworld\ttest");
+        assert_eq!(result, vec!["hello", "world", "test"]);
+    }
+
+    #[test]
+    fn test_tokenize_with_carriage_return() {
+        let result = tokenize("hello\r\nworld\rtest");
+        assert_eq!(result, vec!["hello", "world", "test"]);
+    }
+
+    #[test]
+    fn test_tokenize_trailing_plus() {
+        let result = tokenize("GPL2+ LGPL3+");
+        assert_eq!(result, vec!["gpl2+", "lgpl3+"]);
+    }
+
+    #[test]
+    fn test_tokenize_leading_plus() {
+        let result = tokenize("+hello +world");
+        assert_eq!(result, vec!["hello", "world"]);
+    }
+
+    #[test]
+    fn test_tokenize_without_stopwords_preserves_all() {
+        let result = tokenize_without_stopwords("div p a br");
+        assert_eq!(result, vec!["div", "p", "a", "br"]);
+    }
+
+    #[test]
+    fn test_tokenize_without_stopwords_unicode() {
+        // Note: Current implementation only matches ASCII [A-Za-z0-9]
+        let result = tokenize_without_stopwords("hello 世界");
+        assert_eq!(result, vec!["hello"]);
+    }
+
+    #[test]
+    fn test_tokenize_without_stopwords_only_special() {
+        let result = tokenize_without_stopwords("!@#$%");
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_tokenize_consecutive_plus() {
+        let result = tokenize("a++b");
+        assert_eq!(result, vec!["a+", "b"]);
+    }
+
+    #[test]
+    fn test_tokenize_hyphenated_words() {
+        let result = tokenize("some-thing foo-bar");
+        assert_eq!(result, vec!["some", "thing", "foo", "bar"]);
+    }
+
+    #[test]
+    fn test_tokenize_email_address() {
+        let result = tokenize("test@example.com");
+        assert_eq!(result, vec!["test", "example", "com"]);
+    }
+
+    #[test]
+    fn test_tokenize_url() {
+        let result = tokenize("https://example.com/path");
+        assert_eq!(result, vec!["https", "example", "com", "path"]);
+    }
+
+    #[test]
+    fn test_tokenize_version_number() {
+        let result = tokenize("version 1.2.3");
+        assert_eq!(result, vec!["version", "1", "2", "3"]);
+    }
+
+    #[test]
+    fn test_tokenize_xml_entities() {
+        let result = tokenize("&lt;div&gt;hello&lt;/div&gt;");
+        assert_eq!(result, vec!["hello"]);
+    }
+
+    #[test]
+    fn test_tokenize_whitespace_only() {
+        let result = tokenize("   \t\n\r   ");
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_tokenize_single_char() {
+        let result = tokenize("a");
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_tokenize_single_word() {
+        let result = tokenize("hello");
+        assert_eq!(result, vec!["hello"]);
+    }
+
+    #[test]
+    fn test_tokenize_numbers_only() {
+        let result = tokenize("123 456 789");
+        assert_eq!(result, vec!["123", "456", "789"]);
+    }
+
+    #[test]
+    fn test_tokenize_alphanumeric_mixed() {
+        let result = tokenize("abc123 def456");
+        assert_eq!(result, vec!["abc123", "def456"]);
+    }
+
+    #[test]
+    fn test_tokenize_underscore_separated() {
+        let result = tokenize("hello_world foo_bar_baz");
+        assert_eq!(result, vec!["hello", "world", "foo", "bar", "baz"]);
+    }
+
+    #[test]
+    fn test_tokenize_all_stopwords_from_list() {
+        let result = tokenize("amp lt gt nbsp quot");
+        assert!(result.is_empty());
+    }
 }

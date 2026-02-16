@@ -457,4 +457,181 @@ mod tests {
         assert_eq!(MATCH_AHO, "2-aho");
         assert_eq!(MATCH_AHO_ORDER, 2);
     }
+
+    #[test]
+    fn test_aho_match_overlapping_patterns() {
+        let mut index = create_test_index_default();
+
+        let pattern1 = tokens_to_bytes(&[0u16, 1, 2]);
+        let pattern2 = tokens_to_bytes(&[1u16, 2]);
+
+        let automaton = AhoCorasickBuilder::new()
+            .build([pattern1.as_slice(), pattern2.as_slice()])
+            .unwrap();
+
+        index.rules_automaton = automaton;
+        index
+            .rules_by_rid
+            .push(create_mock_rule("mit-full", vec![0, 1, 2], true, false));
+        index
+            .rules_by_rid
+            .push(create_mock_rule("mit-partial", vec![1, 2], true, false));
+        index.tids_by_rid.push(vec![0, 1, 2]);
+        index.tids_by_rid.push(vec![1, 2]);
+        index.pattern_id_to_rid.push(0);
+        index.pattern_id_to_rid.push(1);
+
+        let query = crate::license_detection::query::Query {
+            text: String::new(),
+            tokens: vec![0, 1, 2],
+            line_by_pos: vec![1, 1, 1],
+            unknowns_by_pos: std::collections::HashMap::new(),
+            stopwords_by_pos: std::collections::HashMap::new(),
+            shorts_and_digits_pos: std::collections::HashSet::new(),
+            high_matchables: (0..3).collect(),
+            low_matchables: std::collections::HashSet::new(),
+            has_long_lines: false,
+            is_binary: false,
+            query_runs: Vec::new(),
+            index: &index,
+        };
+
+        let run = query.whole_query_run();
+        let matches = aho_match(run.get_index(), &run);
+
+        assert!(!matches.is_empty(), "Should find overlapping matches");
+    }
+
+    #[test]
+    fn test_aho_match_zero_length_pattern() {
+        let mut index = create_test_index_default();
+
+        let pattern = tokens_to_bytes(&[0u16]);
+
+        let automaton = AhoCorasickBuilder::new()
+            .build(std::iter::once(pattern.as_slice()))
+            .unwrap();
+
+        index.rules_automaton = automaton;
+        index
+            .rules_by_rid
+            .push(create_mock_rule("single-token", vec![0], false, false));
+        index.tids_by_rid.push(vec![0]);
+        index.pattern_id_to_rid.push(0);
+
+        let query = crate::license_detection::query::Query {
+            text: String::new(),
+            tokens: vec![0],
+            line_by_pos: vec![1],
+            unknowns_by_pos: std::collections::HashMap::new(),
+            stopwords_by_pos: std::collections::HashMap::new(),
+            shorts_and_digits_pos: std::collections::HashSet::new(),
+            high_matchables: std::collections::HashSet::new(),
+            low_matchables: std::collections::HashSet::new(),
+            has_long_lines: false,
+            is_binary: false,
+            query_runs: Vec::new(),
+            index: &index,
+        };
+
+        let run = query.whole_query_run();
+        let matches = aho_match(run.get_index(), &run);
+
+        assert!(
+            matches.is_empty(),
+            "Should not match single low-value token"
+        );
+    }
+
+    #[test]
+    fn test_aho_match_long_query() {
+        let mut index = create_test_index_default();
+
+        let pattern = tokens_to_bytes(&[0u16, 1]);
+
+        let automaton = AhoCorasickBuilder::new()
+            .build(std::iter::once(pattern.as_slice()))
+            .unwrap();
+
+        index.rules_automaton = automaton;
+        index
+            .rules_by_rid
+            .push(create_mock_rule("mit", vec![0, 1], true, false));
+        index.tids_by_rid.push(vec![0, 1]);
+        index.pattern_id_to_rid.push(0);
+
+        let tokens: Vec<u16> = (0..1000).map(|i| i % 2).collect();
+        let line_by_pos: Vec<usize> = (0..1000).map(|i| i / 80 + 1).collect();
+
+        let query = crate::license_detection::query::Query {
+            text: String::new(),
+            tokens,
+            line_by_pos,
+            unknowns_by_pos: std::collections::HashMap::new(),
+            stopwords_by_pos: std::collections::HashMap::new(),
+            shorts_and_digits_pos: std::collections::HashSet::new(),
+            high_matchables: (0..1000).collect(),
+            low_matchables: std::collections::HashSet::new(),
+            has_long_lines: false,
+            is_binary: false,
+            query_runs: Vec::new(),
+            index: &index,
+        };
+
+        let run = query.whole_query_run();
+        let matches = aho_match(run.get_index(), &run);
+
+        assert!(
+            matches.len() > 1,
+            "Should find multiple matches in long query"
+        );
+    }
+
+    #[test]
+    fn test_aho_match_score_calculation() {
+        let mut index = create_test_index_default();
+
+        let rule_tokens = vec![0u16, 1, 2, 3, 4];
+        let pattern_bytes = tokens_to_bytes(&rule_tokens);
+
+        let automaton = AhoCorasickBuilder::new()
+            .build(std::iter::once(pattern_bytes.as_slice()))
+            .unwrap();
+
+        index.rules_automaton = automaton;
+        index.rules_by_rid.push(create_mock_rule(
+            "apache-2.0",
+            vec![0, 1, 2, 3, 4],
+            true,
+            false,
+        ));
+        index.tids_by_rid.push(vec![0, 1, 2, 3, 4]);
+        index.pattern_id_to_rid.push(0);
+
+        let query = crate::license_detection::query::Query {
+            text: String::new(),
+            tokens: vec![0, 1, 2, 3, 4],
+            line_by_pos: vec![1, 1, 1, 1, 1],
+            unknowns_by_pos: std::collections::HashMap::new(),
+            stopwords_by_pos: std::collections::HashMap::new(),
+            shorts_and_digits_pos: std::collections::HashSet::new(),
+            high_matchables: (0..5).collect(),
+            low_matchables: std::collections::HashSet::new(),
+            has_long_lines: false,
+            is_binary: false,
+            query_runs: Vec::new(),
+            index: &index,
+        };
+
+        let run = query.whole_query_run();
+        let matches = aho_match(run.get_index(), &run);
+
+        assert_eq!(matches.len(), 1);
+        assert!(
+            (matches[0].score - 1.0).abs() < 0.001,
+            "Full match should have score 1.0"
+        );
+        assert_eq!(matches[0].matched_length, 5);
+        assert_eq!(matches[0].match_coverage, 100.0);
+    }
 }

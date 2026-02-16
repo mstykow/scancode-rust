@@ -325,4 +325,77 @@ mod tests {
         let hash2 = compute_hash(&tokens);
         assert_eq!(hash, hash2);
     }
+
+    #[test]
+    fn test_match_hash_single_token() {
+        let tokens = vec![42u16];
+        let hash = compute_hash(&tokens);
+
+        assert_eq!(hash.len(), 20);
+
+        let hash2 = compute_hash(&tokens);
+        assert_eq!(hash, hash2, "Same single token should produce same hash");
+    }
+
+    #[test]
+    fn test_match_hash_max_token_values() {
+        let tokens = vec![u16::MAX, u16::MAX - 1, 0];
+        let hash = compute_hash(&tokens);
+
+        assert_eq!(hash.len(), 20);
+
+        let tokens2 = vec![u16::MAX, u16::MAX - 1, 0];
+        let hash2 = compute_hash(&tokens2);
+
+        assert_eq!(
+            hash, hash2,
+            "Same max token values should produce same hash"
+        );
+    }
+
+    #[test]
+    fn test_hash_match_multiple_rules_same_hash() {
+        let mut index =
+            create_test_index(&[("mit", 0), ("license", 1), ("apache", 2), ("2.0", 3)], 2);
+
+        let rules_by_rid = create_test_rules_by_rid();
+        let tids_by_rid: Vec<Vec<u16>> = vec![vec![0, 1], vec![2, 3, 4]];
+
+        index.rid_by_hash.insert(compute_hash(&[0, 1]), 0);
+        index.rid_by_hash.insert(compute_hash(&[0, 1]), 1);
+        index.rules_by_rid = rules_by_rid;
+        index.tids_by_rid = tids_by_rid;
+
+        let query_index = create_test_index(&[("token", 0)], 1);
+        let query = create_mock_query_with_tokens(&[0, 1], &query_index);
+        let matches = hash_match(&index, &query.whole_query_run());
+
+        assert_eq!(
+            matches.len(),
+            1,
+            "Should return only one match even with hash collision"
+        );
+    }
+
+    #[test]
+    fn test_hash_match_returns_correct_license_expression() {
+        let mut index = create_test_index(&[("mit", 0), ("license", 1)], 2);
+
+        let rules_by_rid = create_test_rules_by_rid();
+        let tids_by_rid: Vec<Vec<u16>> = vec![vec![0, 1]];
+
+        index.rid_by_hash.insert(compute_hash(&[0, 1]), 0);
+        index.rules_by_rid = rules_by_rid;
+        index.tids_by_rid = tids_by_rid;
+
+        let query_index = create_test_index(&[("token", 0)], 1);
+        let query = create_mock_query_with_tokens(&[0, 1], &query_index);
+        let matches = hash_match(&index, &query.whole_query_run());
+
+        assert_eq!(matches.len(), 1);
+        assert_eq!(matches[0].license_expression, "mit");
+        assert_eq!(matches[0].matcher, MATCH_HASH);
+        assert_eq!(matches[0].score, 1.0);
+        assert_eq!(matches[0].match_coverage, 100.0);
+    }
 }

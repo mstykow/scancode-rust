@@ -209,9 +209,8 @@ pub struct LicenseMatch {
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_license_basic() {
-        let license = License {
+    fn create_license() -> License {
+        License {
             key: "mit".to_string(),
             name: "MIT License".to_string(),
             spdx_license_key: Some("MIT".to_string()),
@@ -227,15 +226,11 @@ mod tests {
             ignorable_authors: None,
             ignorable_urls: None,
             ignorable_emails: None,
-        };
-
-        assert_eq!(license.key, "mit");
-        assert_eq!(license.name, "MIT License");
+        }
     }
 
-    #[test]
-    fn test_rule_basic() {
-        let rule = Rule {
+    fn create_rule() -> Rule {
+        Rule {
             identifier: "mit.LICENSE".to_string(),
             license_expression: "mit".to_string(),
             text: "MIT License".to_string(),
@@ -269,16 +264,11 @@ mod tests {
             min_high_matched_length_unique: 0,
             is_small: false,
             is_tiny: false,
-        };
-
-        assert_eq!(rule.license_expression, "mit");
-        assert!(rule.is_license_notice);
-        assert_eq!(rule.relevance, 90);
+        }
     }
 
-    #[test]
-    fn test_license_match_basic() {
-        let match_result = LicenseMatch {
+    fn create_license_match() -> LicenseMatch {
+        LicenseMatch {
             license_expression: "mit".to_string(),
             license_expression_spdx: "MIT".to_string(),
             from_file: Some("README.md".to_string()),
@@ -293,11 +283,516 @@ mod tests {
             rule_url: "https://scancode-licensedb.aboutcode.org/mit".to_string(),
             matched_text: Some("MIT License text...".to_string()),
             referenced_filenames: None,
+        }
+    }
+
+    #[test]
+    fn test_license_creation_with_all_fields() {
+        let license = create_license();
+
+        assert_eq!(license.key, "mit");
+        assert_eq!(license.name, "MIT License");
+        assert_eq!(license.spdx_license_key, Some("MIT".to_string()));
+        assert_eq!(license.category, Some("Permissive".to_string()));
+        assert!(!license.is_deprecated);
+        assert!(license.replaced_by.is_empty());
+    }
+
+    #[test]
+    fn test_license_creation_with_minimal_fields() {
+        let license = License {
+            key: "unknown".to_string(),
+            name: String::new(),
+            spdx_license_key: None,
+            category: None,
+            text: String::new(),
+            reference_urls: vec![],
+            notes: None,
+            is_deprecated: false,
+            replaced_by: vec![],
+            minimum_coverage: None,
+            ignorable_copyrights: None,
+            ignorable_holders: None,
+            ignorable_authors: None,
+            ignorable_urls: None,
+            ignorable_emails: None,
         };
 
+        assert_eq!(license.key, "unknown");
+        assert!(license.name.is_empty());
+        assert!(license.spdx_license_key.is_none());
+        assert!(license.reference_urls.is_empty());
+    }
+
+    #[test]
+    fn test_license_deprecated_with_replaced_by() {
+        let license = License {
+            key: "old-license".to_string(),
+            name: "Old License".to_string(),
+            spdx_license_key: None,
+            category: None,
+            text: String::new(),
+            reference_urls: vec![],
+            notes: Some("Deprecated in favor of new-license".to_string()),
+            is_deprecated: true,
+            replaced_by: vec!["new-license".to_string()],
+            minimum_coverage: None,
+            ignorable_copyrights: None,
+            ignorable_holders: None,
+            ignorable_authors: None,
+            ignorable_urls: None,
+            ignorable_emails: None,
+        };
+
+        assert!(license.is_deprecated);
+        assert_eq!(license.replaced_by, vec!["new-license"]);
+    }
+
+    #[test]
+    fn test_license_clone_trait() {
+        let license = create_license();
+        let cloned = license.clone();
+
+        assert_eq!(license, cloned);
+    }
+
+    #[test]
+    fn test_license_debug_trait() {
+        let license = create_license();
+        let debug_str = format!("{:?}", license);
+
+        assert!(debug_str.contains("License"));
+        assert!(debug_str.contains("key: \"mit\""));
+    }
+
+    #[test]
+    fn test_license_partial_eq_trait() {
+        let license1 = create_license();
+        let license2 = create_license();
+        let mut license3 = create_license();
+        license3.key = "different".to_string();
+
+        assert_eq!(license1, license2);
+        assert_ne!(license1, license3);
+    }
+
+    #[test]
+    fn test_license_with_ignorable_fields() {
+        let license = License {
+            key: "apache-2.0".to_string(),
+            name: "Apache 2.0".to_string(),
+            spdx_license_key: Some("Apache-2.0".to_string()),
+            category: Some("Permissive".to_string()),
+            text: "Apache License text...".to_string(),
+            reference_urls: vec![],
+            notes: None,
+            is_deprecated: false,
+            replaced_by: vec![],
+            minimum_coverage: Some(95),
+            ignorable_copyrights: Some(vec!["Copyright 2000 Apache".to_string()]),
+            ignorable_holders: Some(vec!["Apache Software Foundation".to_string()]),
+            ignorable_authors: Some(vec!["Apache".to_string()]),
+            ignorable_urls: Some(vec!["https://apache.org".to_string()]),
+            ignorable_emails: Some(vec!["legal@apache.org".to_string()]),
+        };
+
+        assert_eq!(license.minimum_coverage, Some(95));
+        assert_eq!(
+            license.ignorable_copyrights,
+            Some(vec!["Copyright 2000 Apache".to_string()])
+        );
+        assert_eq!(
+            license.ignorable_holders,
+            Some(vec!["Apache Software Foundation".to_string()])
+        );
+    }
+
+    #[test]
+    fn test_rule_creation_with_all_fields() {
+        let rule = create_rule();
+
+        assert_eq!(rule.identifier, "mit.LICENSE");
+        assert_eq!(rule.license_expression, "mit");
+        assert!(rule.is_license_notice);
+        assert!(!rule.is_license_text);
+        assert!(!rule.is_license_reference);
+        assert!(!rule.is_license_tag);
+        assert_eq!(rule.relevance, 90);
+    }
+
+    #[test]
+    fn test_rule_creation_with_minimal_fields() {
+        let rule = Rule {
+            identifier: String::new(),
+            license_expression: String::new(),
+            text: String::new(),
+            tokens: vec![],
+            is_license_text: false,
+            is_license_notice: false,
+            is_license_reference: false,
+            is_license_tag: false,
+            is_license_intro: false,
+            is_license_clue: false,
+            is_false_positive: false,
+            is_required_phrase: false,
+            is_from_license: false,
+            relevance: 0,
+            minimum_coverage: None,
+            is_continuous: false,
+            referenced_filenames: None,
+            ignorable_urls: None,
+            ignorable_emails: None,
+            ignorable_copyrights: None,
+            ignorable_holders: None,
+            ignorable_authors: None,
+            language: None,
+            notes: None,
+            length_unique: 0,
+            high_length_unique: 0,
+            high_length: 0,
+            min_matched_length: 0,
+            min_high_matched_length: 0,
+            min_matched_length_unique: 0,
+            min_high_matched_length_unique: 0,
+            is_small: false,
+            is_tiny: false,
+        };
+
+        assert!(rule.identifier.is_empty());
+        assert!(rule.license_expression.is_empty());
+        assert_eq!(rule.relevance, 0);
+    }
+
+    #[test]
+    fn test_rule_license_flags_mutually_exclusive() {
+        let mut rule = create_rule();
+        assert!(rule.is_license_notice);
+
+        rule.is_license_notice = false;
+        rule.is_license_text = true;
+        assert!(rule.is_license_text);
+        assert!(!rule.is_license_notice);
+
+        let flag_count = [
+            rule.is_license_text,
+            rule.is_license_notice,
+            rule.is_license_reference,
+            rule.is_license_tag,
+            rule.is_license_intro,
+            rule.is_license_clue,
+        ]
+        .iter()
+        .filter(|&&f| f)
+        .count();
+        assert_eq!(flag_count, 1);
+    }
+
+    #[test]
+    fn test_rule_clone_trait() {
+        let rule = create_rule();
+        let cloned = rule.clone();
+
+        assert_eq!(rule, cloned);
+    }
+
+    #[test]
+    fn test_rule_debug_trait() {
+        let rule = create_rule();
+        let debug_str = format!("{:?}", rule);
+
+        assert!(debug_str.contains("Rule"));
+        assert!(debug_str.contains("identifier: \"mit.LICENSE\""));
+    }
+
+    #[test]
+    fn test_rule_partial_eq_trait() {
+        let rule1 = create_rule();
+        let rule2 = create_rule();
+        let mut rule3 = create_rule();
+        rule3.identifier = "different".to_string();
+
+        assert_eq!(rule1, rule2);
+        assert_ne!(rule1, rule3);
+    }
+
+    #[test]
+    fn test_rule_ord_trait() {
+        let mut rule1 = create_rule();
+        rule1.identifier = "aaa.LICENSE".to_string();
+        let mut rule2 = create_rule();
+        rule2.identifier = "bbb.LICENSE".to_string();
+
+        assert!(rule1 < rule2);
+        assert!(rule2 > rule1);
+    }
+
+    #[test]
+    fn test_rule_with_tokens() {
+        let rule = Rule {
+            identifier: "test.RULE".to_string(),
+            license_expression: "test".to_string(),
+            text: "test text".to_string(),
+            tokens: vec![1, 2, 3, 4, 5],
+            is_license_text: false,
+            is_license_notice: true,
+            is_license_reference: false,
+            is_license_tag: false,
+            is_license_intro: false,
+            is_license_clue: false,
+            is_false_positive: false,
+            is_required_phrase: false,
+            is_from_license: false,
+            relevance: 100,
+            minimum_coverage: None,
+            is_continuous: false,
+            referenced_filenames: None,
+            ignorable_urls: None,
+            ignorable_emails: None,
+            ignorable_copyrights: None,
+            ignorable_holders: None,
+            ignorable_authors: None,
+            language: None,
+            notes: None,
+            length_unique: 5,
+            high_length_unique: 0,
+            high_length: 0,
+            min_matched_length: 0,
+            min_high_matched_length: 0,
+            min_matched_length_unique: 0,
+            min_high_matched_length_unique: 0,
+            is_small: true,
+            is_tiny: false,
+        };
+
+        assert_eq!(rule.tokens.len(), 5);
+        assert!(rule.is_small);
+    }
+
+    #[test]
+    fn test_rule_small_and_tiny_flags() {
+        let mut rule = create_rule();
+
+        rule.is_small = true;
+        rule.is_tiny = true;
+        assert!(rule.is_small);
+        assert!(rule.is_tiny);
+
+        rule.is_tiny = false;
+        assert!(rule.is_small);
+        assert!(!rule.is_tiny);
+    }
+
+    #[test]
+    fn test_rule_threshold_fields() {
+        let rule = Rule {
+            identifier: "complex.RULE".to_string(),
+            license_expression: "complex".to_string(),
+            text: "complex text".to_string(),
+            tokens: vec![],
+            is_license_text: false,
+            is_license_notice: true,
+            is_license_reference: false,
+            is_license_tag: false,
+            is_license_intro: false,
+            is_license_clue: false,
+            is_false_positive: false,
+            is_required_phrase: false,
+            is_from_license: false,
+            relevance: 100,
+            minimum_coverage: Some(80),
+            is_continuous: true,
+            referenced_filenames: Some(vec!["LICENSE".to_string()]),
+            ignorable_urls: Some(vec!["https://example.com".to_string()]),
+            ignorable_emails: Some(vec!["test@example.com".to_string()]),
+            ignorable_copyrights: None,
+            ignorable_holders: None,
+            ignorable_authors: None,
+            language: Some("en".to_string()),
+            notes: Some("Test rule".to_string()),
+            length_unique: 10,
+            high_length_unique: 5,
+            high_length: 8,
+            min_matched_length: 4,
+            min_high_matched_length: 2,
+            min_matched_length_unique: 3,
+            min_high_matched_length_unique: 1,
+            is_small: false,
+            is_tiny: false,
+        };
+
+        assert_eq!(rule.minimum_coverage, Some(80));
+        assert_eq!(rule.referenced_filenames, Some(vec!["LICENSE".to_string()]));
+        assert_eq!(rule.length_unique, 10);
+        assert_eq!(rule.high_length, 8);
+        assert_eq!(rule.min_matched_length, 4);
+    }
+
+    #[test]
+    fn test_license_match_creation_with_all_fields() {
+        let match_result = create_license_match();
+
         assert_eq!(match_result.license_expression, "mit");
+        assert_eq!(match_result.license_expression_spdx, "MIT");
+        assert_eq!(match_result.from_file, Some("README.md".to_string()));
         assert_eq!(match_result.start_line, 1);
         assert_eq!(match_result.end_line, 5);
+        assert_eq!(match_result.matcher, "1-hash");
         assert!((match_result.score - 0.95).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_license_match_creation_with_minimal_fields() {
+        let match_result = LicenseMatch {
+            license_expression: "mit".to_string(),
+            license_expression_spdx: "MIT".to_string(),
+            from_file: None,
+            start_line: 0,
+            end_line: 0,
+            matcher: String::new(),
+            score: 0.0,
+            matched_length: 0,
+            match_coverage: 0.0,
+            rule_relevance: 0,
+            rule_identifier: String::new(),
+            rule_url: String::new(),
+            matched_text: None,
+            referenced_filenames: None,
+        };
+
+        assert!(match_result.from_file.is_none());
+        assert_eq!(match_result.start_line, 0);
+        assert_eq!(match_result.score, 0.0);
+        assert!(match_result.matched_text.is_none());
+    }
+
+    #[test]
+    fn test_license_match_score_boundaries() {
+        let mut match_result = create_license_match();
+
+        match_result.score = 0.0;
+        assert_eq!(match_result.score, 0.0);
+
+        match_result.score = 1.0;
+        assert_eq!(match_result.score, 1.0);
+
+        match_result.score = 0.5;
+        assert!((match_result.score - 0.5).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_license_match_coverage_boundaries() {
+        let mut match_result = create_license_match();
+
+        match_result.match_coverage = 0.0;
+        assert_eq!(match_result.match_coverage, 0.0);
+
+        match_result.match_coverage = 100.0;
+        assert_eq!(match_result.match_coverage, 100.0);
+
+        match_result.match_coverage = 50.0;
+        assert_eq!(match_result.match_coverage, 50.0);
+    }
+
+    #[test]
+    fn test_license_match_clone_trait() {
+        let match_result = create_license_match();
+        let cloned = match_result.clone();
+
+        assert_eq!(match_result, cloned);
+    }
+
+    #[test]
+    fn test_license_match_debug_trait() {
+        let match_result = create_license_match();
+        let debug_str = format!("{:?}", match_result);
+
+        assert!(debug_str.contains("LicenseMatch"));
+        assert!(debug_str.contains("license_expression: \"mit\""));
+    }
+
+    #[test]
+    fn test_license_match_partial_eq_trait() {
+        let match1 = create_license_match();
+        let match2 = create_license_match();
+        let mut match3 = create_license_match();
+        match3.start_line = 99;
+
+        assert_eq!(match1, match2);
+        assert_ne!(match1, match3);
+    }
+
+    #[test]
+    fn test_license_match_serialization() {
+        let match_result = create_license_match();
+        let json = serde_json::to_string(&match_result).unwrap();
+
+        assert!(json.contains("\"license_expression\":\"mit\""));
+        assert!(json.contains("\"license_expression_spdx\":\"MIT\""));
+        assert!(json.contains("\"start_line\":1"));
+    }
+
+    #[test]
+    fn test_license_match_deserialization() {
+        let json = r#"{
+            "license_expression": "apache-2.0",
+            "license_expression_spdx": "Apache-2.0",
+            "from_file": "LICENSE",
+            "start_line": 10,
+            "end_line": 20,
+            "matcher": "2-hash",
+            "score": 0.99,
+            "matched_length": 500,
+            "match_coverage": 99.0,
+            "rule_relevance": 95,
+            "rule_identifier": "apache-2.0.LICENSE",
+            "rule_url": "https://example.org/apache-2.0",
+            "matched_text": "Apache License",
+            "referenced_filenames": ["NOTICE"]
+        }"#;
+
+        let match_result: LicenseMatch = serde_json::from_str(json).unwrap();
+
+        assert_eq!(match_result.license_expression, "apache-2.0");
+        assert_eq!(match_result.start_line, 10);
+        assert_eq!(match_result.end_line, 20);
+        assert!((match_result.score - 0.99).abs() < 0.001);
+        assert_eq!(
+            match_result.referenced_filenames,
+            Some(vec!["NOTICE".to_string()])
+        );
+    }
+
+    #[test]
+    fn test_license_match_roundtrip_serialization() {
+        let original = create_license_match();
+        let json = serde_json::to_string(&original).unwrap();
+        let deserialized: LicenseMatch = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(original, deserialized);
+    }
+
+    #[test]
+    fn test_license_match_with_referenced_filenames() {
+        let match_result = LicenseMatch {
+            license_expression: "mit".to_string(),
+            license_expression_spdx: "MIT".to_string(),
+            from_file: Some("README.md".to_string()),
+            start_line: 1,
+            end_line: 5,
+            matcher: "1-hash".to_string(),
+            score: 0.95,
+            matched_length: 100,
+            match_coverage: 95.0,
+            rule_relevance: 100,
+            rule_identifier: "mit.LICENSE".to_string(),
+            rule_url: "https://scancode-licensedb.aboutcode.org/mit".to_string(),
+            matched_text: Some("MIT License text...".to_string()),
+            referenced_filenames: Some(vec!["LICENSE".to_string(), "COPYING".to_string()]),
+        };
+
+        assert_eq!(
+            match_result.referenced_filenames,
+            Some(vec!["LICENSE".to_string(), "COPYING".to_string()])
+        );
     }
 }

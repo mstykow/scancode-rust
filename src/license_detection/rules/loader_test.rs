@@ -363,3 +363,326 @@ fn test_parse_license_with_trailing_whitespace_on_delimiter() {
     let license = result.unwrap();
     assert!(license.text.contains("Text"));
 }
+
+#[test]
+fn test_parse_license_key_mismatch() {
+    let content = r#"---
+key: wrong-key
+name: Test License
+---
+Text."#;
+
+    let result = parse_license_from_str(content, "correct-key.LICENSE");
+    assert!(result.is_err(), "Key mismatch should fail");
+    let err = result.unwrap_err().to_string();
+    assert!(
+        err.contains("key mismatch"),
+        "Error should mention key mismatch: {}",
+        err
+    );
+}
+
+#[test]
+fn test_parse_rule_missing_license_expression() {
+    let content = r#"---
+is_license_text: yes
+---
+Some text."#;
+
+    let result = parse_rule_from_str(content, "no-expr.RULE");
+    assert!(
+        result.is_err(),
+        "Missing license_expression should fail for non-false-positive"
+    );
+    let err = result.unwrap_err().to_string();
+    assert!(
+        err.contains("license_expression"),
+        "Error should mention license_expression: {}",
+        err
+    );
+}
+
+#[test]
+fn test_parse_rule_false_positive_without_expression() {
+    let content = r#"---
+is_false_positive: yes
+---
+Some text."#;
+
+    let result = parse_rule_from_str(content, "fp-no-expr.RULE");
+    assert!(
+        result.is_ok(),
+        "False positive rule can omit license_expression"
+    );
+    let rule = result.unwrap();
+    assert!(rule.is_false_positive);
+    assert_eq!(rule.license_expression, "unknown");
+}
+
+#[test]
+fn test_parse_license_content_too_short() {
+    let content = "abc";
+
+    let result = parse_license_from_str(content, "short.LICENSE");
+    assert!(result.is_err(), "Content too short should fail");
+    let err = result.unwrap_err().to_string();
+    assert!(
+        err.contains("too short"),
+        "Error should mention too short: {}",
+        err
+    );
+}
+
+#[test]
+fn test_parse_rule_content_too_short() {
+    let content = "abc";
+
+    let result = parse_rule_from_str(content, "short.RULE");
+    assert!(result.is_err(), "Content too short should fail");
+}
+
+#[test]
+fn test_parse_license_missing_delimiter() {
+    let content = r#"key: no-delim
+name: Test
+This is text without delimiters."#;
+
+    let result = parse_license_from_str(content, "no-delim.LICENSE");
+    assert!(result.is_err(), "Missing delimiter should fail");
+    let err = result.unwrap_err().to_string();
+    assert!(
+        err.contains("delimiter"),
+        "Error should mention delimiter: {}",
+        err
+    );
+}
+
+#[test]
+fn test_parse_rule_missing_delimiter() {
+    let content = r#"license_expression: mit
+This is text without delimiters."#;
+
+    let result = parse_rule_from_str(content, "no-delim.RULE");
+    assert!(result.is_err(), "Missing delimiter should fail");
+}
+
+#[test]
+fn test_parse_license_with_ignorable_fields() {
+    let content = r#"---
+key: ignorable
+name: Test License
+ignorable_copyrights:
+    - Copyright (c) Example
+ignorable_holders:
+    - Example Corp
+ignorable_authors:
+    - John Doe
+ignorable_urls:
+    - http://example.com
+ignorable_emails:
+    - test@example.com
+---
+License text."#;
+
+    let result = parse_license_from_str(content, "ignorable.LICENSE");
+    assert!(result.is_ok());
+    let license = result.unwrap();
+    assert!(license.ignorable_copyrights.is_some());
+    assert!(license.ignorable_holders.is_some());
+    assert!(license.ignorable_authors.is_some());
+    assert!(license.ignorable_urls.is_some());
+    assert!(license.ignorable_emails.is_some());
+}
+
+#[test]
+fn test_parse_rule_with_ignorable_fields() {
+    let content = r#"---
+license_expression: test
+ignorable_urls:
+    - http://example.com
+ignorable_emails:
+    - test@example.com
+ignorable_copyrights:
+    - Copyright (c) Example
+ignorable_holders:
+    - Example Corp
+ignorable_authors:
+    - John Doe
+---
+Rule text."#;
+
+    let result = parse_rule_from_str(content, "ignorable.RULE");
+    assert!(result.is_ok());
+    let rule = result.unwrap();
+    assert!(rule.ignorable_urls.is_some());
+    assert!(rule.ignorable_emails.is_some());
+    assert!(rule.ignorable_copyrights.is_some());
+    assert!(rule.ignorable_holders.is_some());
+    assert!(rule.ignorable_authors.is_some());
+}
+
+#[test]
+fn test_parse_rule_with_referenced_filenames() {
+    let content = r#"---
+license_expression: mit
+referenced_filenames:
+    - MIT.txt
+    - LICENSE
+---
+MIT License"#;
+
+    let result = parse_rule_from_str(content, "ref-files.RULE");
+    assert!(result.is_ok());
+    let rule = result.unwrap();
+    assert!(rule.referenced_filenames.is_some());
+    let refs = rule.referenced_filenames.unwrap();
+    assert_eq!(refs.len(), 2);
+    assert!(refs.contains(&"MIT.txt".to_string()));
+}
+
+#[test]
+fn test_parse_rule_relevance_field() {
+    let content = r#"---
+license_expression: mit
+relevance: 85
+---
+MIT License"#;
+
+    let result = parse_rule_from_str(content, "relevance.RULE");
+    assert!(result.is_ok());
+    let rule = result.unwrap();
+    assert_eq!(rule.relevance, 85);
+}
+
+#[test]
+fn test_parse_rule_relevance_default() {
+    let content = r#"---
+license_expression: mit
+---
+MIT License"#;
+
+    let result = parse_rule_from_str(content, "relevance-default.RULE");
+    assert!(result.is_ok());
+    let rule = result.unwrap();
+    assert_eq!(rule.relevance, 100);
+}
+
+#[test]
+fn test_parse_license_with_urls() {
+    let content = r#"---
+key: url-test
+name: Test License
+homepage_url: http://example.com
+text_urls:
+    - http://text.example.com
+osi_url: http://osi.example.com
+faq_url: http://faq.example.com
+other_urls:
+    - http://other.example.com
+---
+License text."#;
+
+    let result = parse_license_from_str(content, "url-test.LICENSE");
+    assert!(result.is_ok());
+    let license = result.unwrap();
+    assert!(!license.reference_urls.is_empty());
+}
+
+#[test]
+fn test_parse_license_replaced_by() {
+    let content = r#"---
+key: deprecated-replaced
+name: Deprecated License
+is_deprecated: yes
+replaced_by:
+    - mit
+    - apache-2.0
+---
+"#;
+
+    let result = parse_license_from_str(content, "deprecated-replaced.LICENSE");
+    assert!(result.is_ok());
+    let license = result.unwrap();
+    assert!(license.is_deprecated);
+    assert_eq!(license.replaced_by.len(), 2);
+}
+
+#[test]
+fn test_parse_rule_notes_field() {
+    let content = r#"---
+license_expression: test
+notes: This is a test note.
+---
+Rule text."#;
+
+    let result = parse_rule_from_str(content, "notes.RULE");
+    assert!(result.is_ok());
+    let rule = result.unwrap();
+    assert!(rule.notes.is_some());
+    assert!(rule.notes.unwrap().contains("test note"));
+}
+
+#[test]
+fn test_parse_rule_language_field() {
+    let content = r#"---
+license_expression: test
+language: en
+---
+Rule text."#;
+
+    let result = parse_rule_from_str(content, "language.RULE");
+    assert!(result.is_ok());
+    let rule = result.unwrap();
+    assert_eq!(rule.language, Some("en".to_string()));
+}
+
+#[test]
+fn test_parse_license_uses_short_name_as_name_fallback() {
+    let content = r#"---
+key: short-name-test
+short_name: Short Name
+---
+License text."#;
+
+    let result = parse_license_from_str(content, "short-name-test.LICENSE");
+    assert!(result.is_ok());
+    let license = result.unwrap();
+    assert_eq!(license.name, "Short Name");
+}
+
+#[test]
+fn test_parse_license_name_fallback_to_key() {
+    let content = r#"---
+key: key-as-name
+---
+License text."#;
+
+    let result = parse_license_from_str(content, "key-as-name.LICENSE");
+    assert!(result.is_ok());
+    let license = result.unwrap();
+    assert_eq!(license.name, "key-as-name");
+}
+
+#[test]
+fn test_parse_bool_variants() {
+    let content = r#"---
+license_expression: test
+is_license_text: true
+is_license_notice: "yes"
+is_license_reference: "1"
+is_license_tag: false
+is_license_intro: "no"
+is_license_clue: "0"
+---
+Text."#;
+
+    let result = parse_rule_from_str(content, "bool-variants.RULE");
+    assert!(result.is_ok());
+    let rule = result.unwrap();
+    assert!(rule.is_license_text);
+    assert!(rule.is_license_notice);
+    assert!(rule.is_license_reference);
+    assert!(!rule.is_license_tag);
+    assert!(!rule.is_license_intro);
+    assert!(!rule.is_license_clue);
+}

@@ -192,4 +192,128 @@ mod tests {
         let span = Span::default();
         assert!(span.is_empty());
     }
+
+    #[test]
+    fn test_span_from_iterator_contiguous() {
+        let span = Span::from_iterator(vec![1, 2, 3, 4, 5]);
+        assert_eq!(span.len(), 1);
+        assert_eq!(span.total_length(), 5);
+    }
+
+    #[test]
+    fn test_span_from_iterator_non_contiguous() {
+        let span = Span::from_iterator(vec![1, 2, 3, 10, 11, 12]);
+        assert_eq!(span.len(), 2);
+        assert_eq!(span.total_length(), 6);
+    }
+
+    #[test]
+    fn test_span_from_iterator_unsorted() {
+        let span = Span::from_iterator(vec![5, 1, 3, 2, 4]);
+        assert_eq!(span.len(), 1);
+        assert_eq!(span.total_length(), 5);
+    }
+
+    #[test]
+    fn test_span_from_iterator_with_duplicates() {
+        let span = Span::from_iterator(vec![1, 2, 2, 3, 3, 3, 4]);
+        assert_eq!(span.len(), 1);
+        assert_eq!(span.total_length(), 4);
+    }
+
+    #[test]
+    fn test_span_from_iterator_empty() {
+        let span: Span = Span::from_iterator(vec![]);
+        assert!(span.is_empty());
+        assert_eq!(span.total_length(), 0);
+    }
+
+    #[test]
+    fn test_span_from_iterator_single_element() {
+        let span = Span::from_iterator(vec![42]);
+        assert_eq!(span.len(), 1);
+        assert_eq!(span.total_length(), 1);
+    }
+
+    #[test]
+    fn test_span_add_to_empty() {
+        let mut span = Span::new();
+        span.add(5..10);
+
+        assert_eq!(span.len(), 1);
+        assert_eq!(span.total_length(), 5);
+    }
+
+    #[test]
+    fn test_span_add_contained_within_existing() {
+        let mut span = Span::new();
+        span.add(1..20);
+        span.add(5..10);
+
+        assert_eq!(span.len(), 1);
+        assert_eq!(span.total_length(), 19);
+    }
+
+    #[test]
+    fn test_span_add_existing_contained_in_new() {
+        let mut span = Span::new();
+        span.add(5..10);
+        span.add(1..20);
+
+        assert_eq!(span.len(), 1);
+        assert_eq!(span.total_length(), 19);
+    }
+
+    #[test]
+    fn test_span_add_chain_of_overlaps() {
+        let mut span = Span::new();
+        span.add(1..5);
+        span.add(4..8);
+        span.add(7..12);
+        span.add(11..15);
+
+        assert_eq!(span.len(), 1);
+        assert_eq!(span.total_length(), 14);
+    }
+
+    #[test]
+    fn test_span_multiple_separate_ranges() {
+        let mut span = Span::new();
+        span.add(1..5);
+        span.add(10..15);
+        span.add(20..25);
+
+        assert_eq!(span.len(), 3);
+        assert_eq!(span.total_length(), 14);
+    }
+
+    #[test]
+    fn test_span_ranges_overlap_touching() {
+        let span = Span::new();
+        assert!(span.ranges_overlap(&(1..5), &(4..8)));
+        assert!(span.ranges_overlap(&(4..8), &(1..5)));
+    }
+
+    #[test]
+    fn test_span_ranges_overlap_non_touching() {
+        let span = Span::new();
+        assert!(!span.ranges_overlap(&(1..5), &(6..10)));
+        assert!(!span.ranges_overlap(&(1..5), &(10..15)));
+    }
+
+    #[test]
+    fn test_span_merge_ranges_basic() {
+        let span = Span::new();
+        let merged = span.merge_ranges(&(1..5), &(3..8));
+        assert_eq!(merged.start, 1);
+        assert_eq!(merged.end, 8);
+    }
+
+    #[test]
+    fn test_span_merge_ranges_disjoint() {
+        let span = Span::new();
+        let merged = span.merge_ranges(&(1..5), &(10..15));
+        assert_eq!(merged.start, 1);
+        assert_eq!(merged.end, 15);
+    }
 }

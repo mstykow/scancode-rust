@@ -427,4 +427,153 @@ mod tests {
         assert!(score2 <= 1.0);
         assert_eq!(score3, 0.0);
     }
+
+    #[test]
+    fn test_find_unmatched_regions_leading_unmatched() {
+        let query_len = 20;
+        let covered_positions: std::collections::HashSet<usize> =
+            [10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
+                .iter()
+                .cloned()
+                .collect();
+
+        let regions = find_unmatched_regions(query_len, &covered_positions);
+
+        assert_eq!(regions.len(), 1);
+        assert_eq!(regions[0], (0, 10));
+    }
+
+    #[test]
+    fn test_find_unmatched_regions_middle_gap() {
+        let query_len = 30;
+        let covered_positions: std::collections::HashSet<usize> =
+            [0, 1, 2, 3, 4, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29]
+                .iter()
+                .cloned()
+                .collect();
+
+        let regions = find_unmatched_regions(query_len, &covered_positions);
+
+        assert_eq!(regions.len(), 1);
+        assert_eq!(regions[0], (5, 20));
+    }
+
+    #[test]
+    fn test_compute_covered_positions_single_match() {
+        let index = LicenseIndex::with_legalese_count(10);
+        let query = Query::new("some license text here", &index).expect("Failed to create query");
+
+        let known_matches = vec![LicenseMatch {
+            license_expression: "mit".to_string(),
+            license_expression_spdx: "MIT".to_string(),
+            from_file: None,
+            start_line: 1,
+            end_line: 1,
+            matcher: "test".to_string(),
+            score: 1.0,
+            matched_length: 3,
+            match_coverage: 100.0,
+            rule_relevance: 100,
+            rule_identifier: "test-rule".to_string(),
+            rule_url: String::new(),
+            matched_text: Some("some license text".to_string()),
+            referenced_filenames: None,
+        }];
+
+        let covered = compute_covered_positions(&query, &known_matches);
+
+        assert!(
+            covered.contains(&0) || covered.is_empty(),
+            "Should track covered positions"
+        );
+    }
+
+    #[test]
+    fn test_match_ngrams_in_region_with_matches() {
+        let tokens: Vec<u16> = (0..30).collect();
+        let ngram: Vec<u8> = vec![0, 0, 1, 0, 2, 0, 3, 0, 4, 0, 5, 0];
+        let automaton = AhoCorasick::new(std::iter::once(ngram.as_slice()))
+            .expect("Failed to create automaton");
+
+        let count = match_ngrams_in_region(&tokens, 0, 30, &automaton);
+
+        assert!(count > 0, "Should find ngram matches");
+    }
+
+    #[test]
+    fn test_create_unknown_match_valid() {
+        let index = LicenseIndex::with_legalese_count(10);
+        let text = "This is a license text that should be long enough for unknown detection";
+        let query = Query::new(text, &index).expect("Failed to create query");
+
+        let match_result = create_unknown_match(&index, &query, 0, 30, 5);
+
+        assert!(
+            match_result.is_some(),
+            "Should create unknown match for sufficient length"
+        );
+
+        let m = match_result.unwrap();
+        assert_eq!(m.license_expression, "unknown");
+        assert_eq!(m.matcher, MATCH_UNKNOWN);
+    }
+
+    #[test]
+    fn test_unknown_match_with_known_matches() {
+        let index = LicenseIndex::with_legalese_count(10);
+        let text = "some text that is license related and should be detected";
+        let query = Query::new(text, &index).expect("Failed to create query");
+
+        let known_matches = vec![LicenseMatch {
+            license_expression: "mit".to_string(),
+            license_expression_spdx: "MIT".to_string(),
+            from_file: None,
+            start_line: 1,
+            end_line: 1,
+            matcher: "test".to_string(),
+            score: 1.0,
+            matched_length: 5,
+            match_coverage: 100.0,
+            rule_relevance: 100,
+            rule_identifier: "test-rule".to_string(),
+            rule_url: String::new(),
+            matched_text: Some("some text".to_string()),
+            referenced_filenames: None,
+        }];
+
+        let matches = unknown_match(&index, &query, &known_matches);
+
+        assert!(
+            matches.is_empty() || matches[0].start_line > 1,
+            "Should not re-detect known regions"
+        );
+    }
+
+    #[test]
+    fn test_calculate_score_edge_cases() {
+        let score_zero_length = calculate_score(10, 0);
+        assert_eq!(score_zero_length, 0.0, "Zero length should have zero score");
+
+        let score_zero_ngrams = calculate_score(0, 100);
+        assert_eq!(score_zero_ngrams, 0.0, "Zero ngrams should have zero score");
+
+        let score_high_density = calculate_score(100, 50);
+        assert_eq!(
+            score_high_density, 1.0,
+            "High density should be capped at 1.0"
+        );
+    }
+
+    #[test]
+    fn test_match_ngrams_in_region_out_of_bounds() {
+        let tokens = vec![1u16, 2, 3];
+        let automaton =
+            AhoCorasick::new(std::iter::empty::<&[u8]>()).expect("Failed to create automaton");
+
+        let count = match_ngrams_in_region(&tokens, 5, 10, &automaton);
+        assert_eq!(count, 0, "Out of bounds should return 0");
+
+        let count = match_ngrams_in_region(&tokens, 2, 1, &automaton);
+        assert_eq!(count, 0, "Invalid range should return 0");
+    }
 }

@@ -681,4 +681,212 @@ mod tests {
         let filtered = filter_short_gpl_matches(&matches);
         assert_eq!(filtered.len(), 1);
     }
+
+    #[test]
+    fn test_filter_short_gpl_matches_boundary_threshold() {
+        let matches = vec![
+            LicenseMatch {
+                license_expression: "gpl-2.0".to_string(),
+                license_expression_spdx: "GPL-2.0".to_string(),
+                matched_length: 3,
+                ..create_test_match("#1", 1, 1, 1.0, 100.0, 100)
+            },
+            LicenseMatch {
+                license_expression: "gpl-3.0".to_string(),
+                license_expression_spdx: "GPL-3.0".to_string(),
+                matched_length: 4,
+                ..create_test_match("#2", 5, 10, 1.0, 100.0, 100)
+            },
+        ];
+
+        let filtered = filter_short_gpl_matches(&matches);
+        assert_eq!(filtered.len(), 1);
+        assert_eq!(filtered[0].matched_length, 4);
+    }
+
+    #[test]
+    fn test_filter_short_gpl_matches_case_insensitive() {
+        let matches = vec![LicenseMatch {
+            license_expression: "GPL-2.0".to_string(),
+            license_expression_spdx: "GPL-2.0".to_string(),
+            matched_length: 2,
+            ..create_test_match("#1", 1, 1, 1.0, 100.0, 100)
+        }];
+
+        let filtered = filter_short_gpl_matches(&matches);
+        assert_eq!(filtered.len(), 0);
+    }
+
+    #[test]
+    fn test_merge_partially_overlapping_matches_same_rule() {
+        let matches = vec![
+            create_test_match("#1", 1, 15, 0.9, 90.0, 100),
+            create_test_match("#1", 10, 25, 0.85, 85.0, 100),
+        ];
+
+        let merged = merge_overlapping_matches(&matches);
+
+        assert_eq!(merged.len(), 1);
+        assert_eq!(merged[0].start_line, 1);
+        assert_eq!(merged[0].end_line, 25);
+    }
+
+    #[test]
+    fn test_merge_matches_with_gap_larger_than_one() {
+        let matches = vec![
+            create_test_match("#1", 1, 10, 0.9, 90.0, 100),
+            create_test_match("#1", 15, 25, 0.85, 85.0, 100),
+        ];
+
+        let merged = merge_overlapping_matches(&matches);
+
+        assert_eq!(merged.len(), 2);
+        assert_eq!(merged[0].start_line, 1);
+        assert_eq!(merged[0].end_line, 10);
+        assert_eq!(merged[1].start_line, 15);
+        assert_eq!(merged[1].end_line, 25);
+    }
+
+    #[test]
+    fn test_merge_preserves_max_score() {
+        let matches = vec![
+            create_test_match("#1", 1, 10, 0.7, 70.0, 100),
+            create_test_match("#1", 5, 15, 0.95, 95.0, 100),
+            create_test_match("#1", 12, 20, 0.8, 80.0, 100),
+        ];
+
+        let merged = merge_overlapping_matches(&matches);
+
+        assert_eq!(merged.len(), 1);
+        assert_eq!(merged[0].score, 0.95);
+    }
+
+    #[test]
+    fn test_filter_contained_matches_partial_overlap_no_containment() {
+        let mut m1 = create_test_match("#1", 1, 20, 0.9, 90.0, 100);
+        m1.matched_length = 150;
+        let mut m2 = create_test_match("#2", 15, 30, 0.85, 85.0, 100);
+        m2.matched_length = 100;
+        let matches = vec![m1, m2];
+
+        let filtered = filter_contained_matches(&matches);
+
+        assert_eq!(filtered.len(), 2);
+    }
+
+    #[test]
+    fn test_filter_contained_matches_equal_start_different_end() {
+        let mut m1 = create_test_match("#1", 1, 30, 0.9, 90.0, 100);
+        m1.matched_length = 200;
+        let mut m2 = create_test_match("#2", 1, 15, 0.85, 85.0, 100);
+        m2.matched_length = 100;
+        let matches = vec![m1, m2];
+
+        let filtered = filter_contained_matches(&matches);
+
+        assert_eq!(filtered.len(), 1);
+        assert_eq!(filtered[0].end_line, 30);
+    }
+
+    #[test]
+    fn test_filter_contained_matches_nested_containment() {
+        let mut outer = create_test_match("#1", 1, 50, 0.9, 90.0, 100);
+        outer.matched_length = 300;
+        let mut middle = create_test_match("#2", 10, 40, 0.85, 85.0, 100);
+        middle.matched_length = 200;
+        let mut inner = create_test_match("#3", 15, 35, 0.8, 80.0, 100);
+        inner.matched_length = 100;
+        let matches = vec![inner, middle, outer];
+
+        let filtered = filter_contained_matches(&matches);
+
+        assert_eq!(filtered.len(), 1);
+        assert_eq!(filtered[0].start_line, 1);
+        assert_eq!(filtered[0].end_line, 50);
+    }
+
+    #[test]
+    fn test_filter_contained_matches_same_boundaries_different_matched_length() {
+        let mut m1 = create_test_match("#1", 1, 10, 0.9, 90.0, 100);
+        m1.matched_length = 200;
+        let mut m2 = create_test_match("#2", 1, 10, 0.85, 85.0, 100);
+        m2.matched_length = 100;
+        let matches = vec![m1, m2];
+
+        let filtered = filter_contained_matches(&matches);
+
+        assert_eq!(filtered.len(), 1);
+        assert_eq!(filtered[0].matched_length, 200);
+    }
+
+    #[test]
+    fn test_refine_matches_pipeline_preserves_non_overlapping_different_rules() {
+        let index = LicenseIndex::with_legalese_count(10);
+
+        let matches = vec![
+            create_test_match("#1", 1, 10, 0.9, 90.0, 100),
+            create_test_match("#2", 20, 30, 0.85, 85.0, 100),
+            create_test_match("#3", 40, 50, 0.8, 80.0, 100),
+        ];
+
+        let query = Query::new("test text", &index).unwrap();
+        let refined = refine_matches(&index, matches, &query);
+
+        assert_eq!(refined.len(), 3);
+    }
+
+    #[test]
+    fn test_refine_matches_complex_scenario() {
+        let mut index = LicenseIndex::with_legalese_count(10);
+        let _ = index.false_positive_rids.insert(999);
+
+        let mut m1 = create_test_match("#1", 1, 10, 0.7, 70.0, 100);
+        m1.matched_length = 100;
+        let mut m2 = create_test_match("#1", 8, 15, 0.8, 80.0, 100);
+        m2.matched_length = 100;
+        let mut m3 = create_test_match("#2", 20, 50, 0.9, 90.0, 100);
+        m3.matched_length = 300;
+        let mut m4 = create_test_match("#2", 25, 45, 0.85, 85.0, 100);
+        m4.matched_length = 150;
+        let m5 = create_test_match("#999", 60, 70, 0.9, 90.0, 100);
+
+        let matches = vec![m1, m2, m3, m4, m5];
+
+        let query = Query::new("test text", &index).unwrap();
+        let refined = refine_matches(&index, matches, &query);
+
+        assert_eq!(refined.len(), 2);
+
+        let rule1_match = refined.iter().find(|m| m.rule_identifier == "#1").unwrap();
+        assert_eq!(rule1_match.start_line, 1);
+        assert_eq!(rule1_match.end_line, 15);
+
+        let rule2_match = refined.iter().find(|m| m.rule_identifier == "#2").unwrap();
+        assert_eq!(rule2_match.start_line, 20);
+        assert_eq!(rule2_match.end_line, 50);
+    }
+
+    #[test]
+    fn test_parse_rule_id_with_whitespace() {
+        assert_eq!(parse_rule_id("  #42  "), Some(42));
+        assert_eq!(parse_rule_id("  42  "), Some(42));
+    }
+
+    #[test]
+    fn test_filter_false_positive_matches_mixed_identifiers() {
+        let mut index = LicenseIndex::with_legalese_count(10);
+        let _ = index.false_positive_rids.insert(42);
+
+        let matches = vec![
+            create_test_match("#42", 1, 10, 0.9, 90.0, 100),
+            create_test_match("mit.LICENSE", 15, 25, 0.85, 85.0, 100),
+            create_test_match("#1", 30, 40, 0.8, 80.0, 100),
+        ];
+
+        let filtered = filter_false_positive_matches(&index, &matches);
+
+        assert_eq!(filtered.len(), 2);
+        assert!(filtered.iter().any(|m| m.rule_identifier == "mit.LICENSE"));
+        assert!(filtered.iter().any(|m| m.rule_identifier == "#1"));
+    }
 }

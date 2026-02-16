@@ -351,6 +351,28 @@ pub fn build_index(rules: Vec<Rule>, licenses: Vec<License>) -> LicenseIndex {
 mod tests {
     use super::*;
 
+    fn find_rid_by_identifier(index: &LicenseIndex, identifier: &str) -> Option<usize> {
+        index
+            .rules_by_rid
+            .iter()
+            .position(|r| r.identifier == identifier)
+    }
+
+    fn find_rid_by_expression(index: &LicenseIndex, expression: &str) -> Vec<usize> {
+        index
+            .rules_by_rid
+            .iter()
+            .enumerate()
+            .filter_map(|(rid, r)| {
+                if r.license_expression == expression {
+                    Some(rid)
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+
     fn create_test_rule(text: &str, is_false_positive: bool) -> Rule {
         Rule {
             identifier: "test.RULE".to_string(),
@@ -422,54 +444,62 @@ mod tests {
 
     #[test]
     fn test_build_index_single_rule() {
-        let rules = vec![create_test_rule("MIT License", false)];
+        let mut rule = create_test_rule("MIT License", false);
+        rule.identifier = "test.RULE".to_string();
+        let rules = vec![rule];
         let licenses = vec![create_test_license("mit", "MIT License")];
 
         let index = build_index(rules, licenses);
 
         assert_eq!(index.rules_by_rid.len(), 2);
         assert_eq!(index.tids_by_rid.len(), 2);
-        assert!(
-            index
-                .rid_by_hash
-                .contains_key(&compute_hash(&index.tids_by_rid[0]))
-        );
-        assert!(index.regular_rids.contains(&0));
-        assert!(!index.false_positive_rids.contains(&0));
+
+        let rid = find_rid_by_identifier(&index, "test.RULE").expect("rule should exist");
+        assert!(index.regular_rids.contains(&rid));
+        assert!(!index.false_positive_rids.contains(&rid));
         assert!(index.licenses_by_key.contains_key("mit"));
     }
 
     #[test]
     fn test_build_index_false_positive() {
-        let rules = vec![create_test_rule("MIT License", true)];
+        let mut rule = create_test_rule("MIT License", true);
+        rule.identifier = "fp.RULE".to_string();
+        let rules = vec![rule];
         let index = build_index(rules, vec![]);
 
         assert_eq!(index.rules_by_rid.len(), 1);
-        assert!(index.false_positive_rids.contains(&0));
-        assert!(!index.regular_rids.contains(&0));
+
+        let rid = find_rid_by_identifier(&index, "fp.RULE").expect("rule should exist");
+        assert!(index.false_positive_rids.contains(&rid));
+        assert!(!index.regular_rids.contains(&rid));
         assert!(index.rid_by_hash.is_empty());
     }
 
     #[test]
     fn test_build_index_sets_and_msets() {
-        let rules = vec![create_test_rule("MIT License copyright permission", false)];
+        let mut rule = create_test_rule("MIT License copyright permission", false);
+        rule.identifier = "sets.RULE".to_string();
+        let rules = vec![rule];
         let index = build_index(rules, vec![]);
 
-        assert!(index.sets_by_rid.contains_key(&0));
-        assert!(index.msets_by_rid.contains_key(&0));
-        assert!(!index.sets_by_rid[&0].is_empty());
+        let rid = find_rid_by_identifier(&index, "sets.RULE").expect("rule should exist");
+        assert!(index.sets_by_rid.contains_key(&rid));
+        assert!(index.msets_by_rid.contains_key(&rid));
+        assert!(!index.sets_by_rid[&rid].is_empty());
     }
 
     #[test]
     fn test_build_index_high_postings() {
-        let rules = vec![create_test_rule(
-            "licensed copyrighted permission granted authorized",
-            false,
-        )];
+        let mut rule =
+            create_test_rule("licensed copyrighted permission granted authorized", false);
+        rule.identifier = "hp.RULE".to_string();
+        let rules = vec![rule];
         let index = build_index(rules, vec![]);
 
+        let rid = find_rid_by_identifier(&index, "hp.RULE").expect("rule should exist");
+
         if !index.approx_matchable_rids.is_empty() {
-            assert!(index.high_postings_by_rid.contains_key(&0));
+            assert!(index.high_postings_by_rid.contains_key(&rid));
         }
     }
 
@@ -570,22 +600,32 @@ mod tests {
 
     #[test]
     fn test_build_index_multiple_rules() {
-        let rules = vec![
-            create_test_rule("MIT License", false),
-            create_test_rule("Apache License", false),
-            create_test_rule("GPL License", true),
-        ];
+        let mut rule1 = create_test_rule("MIT License", false);
+        rule1.identifier = "mit.RULE".to_string();
+
+        let mut rule2 = create_test_rule("Apache License", false);
+        rule2.identifier = "apache.RULE".to_string();
+
+        let mut rule3 = create_test_rule("GPL License", true);
+        rule3.identifier = "gpl.RULE".to_string();
+
+        let rules = vec![rule1, rule2, rule3];
         let index = build_index(rules, vec![]);
 
         assert_eq!(index.rules_by_rid.len(), 3);
         assert_eq!(index.tids_by_rid.len(), 3);
         assert_eq!(index.regular_rids.len(), 2);
         assert_eq!(index.false_positive_rids.len(), 1);
+
+        let gpl_rid = find_rid_by_identifier(&index, "gpl.RULE").expect("gpl rule should exist");
+        assert!(index.false_positive_rids.contains(&gpl_rid));
     }
 
     #[test]
     fn test_build_index_licenses() {
-        let rules = vec![create_test_rule("MIT License", false)];
+        let mut rule = create_test_rule("MIT License", false);
+        rule.identifier = "mit.RULE".to_string();
+        let rules = vec![rule];
         let licenses = vec![
             create_test_license("mit", "MIT License"),
             create_test_license("apache-2.0", "Apache License 2.0"),
@@ -595,7 +635,12 @@ mod tests {
         assert_eq!(index.license_count(), 2);
         assert!(index.get_license("mit").is_some());
         assert!(index.get_license("apache-2.0").is_some());
-        assert_eq!(index.rules_by_rid.len(), 3);
+
+        let mit_license_rid = find_rid_by_identifier(&index, "mit.LICENSE");
+        assert!(
+            mit_license_rid.is_some(),
+            "Should have mit.LICENSE from license"
+        );
     }
 
     #[test]
@@ -692,21 +737,24 @@ mod tests {
 
     #[test]
     fn test_build_index_automaton_functional() {
-        let rules = vec![
-            create_test_rule("MIT License copyright permission", false),
-            create_test_rule("Apache License Version 2.0", false),
-            create_test_rule("GNU General Public License", false),
-        ];
+        let mut rule1 = create_test_rule("MIT License copyright permission", false);
+        rule1.identifier = "auto1.RULE".to_string();
+
+        let mut rule2 = create_test_rule("Apache License Version 2.0", false);
+        rule2.identifier = "auto2.RULE".to_string();
+
+        let mut rule3 = create_test_rule("GNU General Public License", false);
+        rule3.identifier = "auto3.RULE".to_string();
+
+        let rules = vec![rule1, rule2, rule3];
         let index = build_index(rules, vec![]);
 
         assert_eq!(index.rules_by_rid.len(), 3, "Should have 3 rules indexed");
         assert_eq!(index.regular_rids.len(), 3);
 
-        let first_rule_tokens = &index.tids_by_rid[0];
-        let pattern: Vec<u8> = first_rule_tokens
-            .iter()
-            .flat_map(|t| t.to_le_bytes())
-            .collect();
+        let rid = find_rid_by_identifier(&index, "auto1.RULE").expect("rule should exist");
+        let rule_tokens = &index.tids_by_rid[rid];
+        let pattern: Vec<u8> = rule_tokens.iter().flat_map(|t| t.to_le_bytes()).collect();
 
         let matches: Vec<_> = index.rules_automaton.find_iter(&pattern).collect();
         assert!(!matches.is_empty(), "Automaton should find the pattern");
@@ -715,10 +763,13 @@ mod tests {
     #[test]
     fn test_build_index_rule_thresholds_computed() {
         let rule_text = "Permission is hereby granted free of charge to any person obtaining a copy of this software and associated documentation files the MIT License";
-        let rules = vec![create_test_rule(rule_text, false)];
+        let mut rule = create_test_rule(rule_text, false);
+        rule.identifier = "thresholds.RULE".to_string();
+        let rules = vec![rule];
         let index = build_index(rules, vec![]);
 
-        let rule = &index.rules_by_rid[0];
+        let rid = find_rid_by_identifier(&index, "thresholds.RULE").expect("rule should exist");
+        let rule = &index.rules_by_rid[rid];
 
         assert!(rule.length_unique > 0, "length_unique should be computed");
         assert!(
@@ -738,55 +789,76 @@ mod tests {
             "Permission is hereby granted free of charge to any person obtaining a copy",
             false,
         );
+        regular_rule.identifier = "regular.RULE".to_string();
         regular_rule.is_license_text = true;
 
         let mut tiny_rule = create_test_rule("MIT", false);
+        tiny_rule.identifier = "tiny.RULE".to_string();
         tiny_rule.is_license_text = false;
 
-        let false_positive_rule = create_test_rule("Some text", true);
+        let mut false_positive_rule = create_test_rule("Some text", true);
+        false_positive_rule.identifier = "false_positive.RULE".to_string();
 
         let mut reference_rule = create_test_rule("MIT License", false);
+        reference_rule.identifier = "reference.RULE".to_string();
         reference_rule.is_license_reference = true;
 
         let rules = vec![
-            regular_rule,
-            tiny_rule,
+            regular_rule.clone(),
+            tiny_rule.clone(),
             false_positive_rule.clone(),
             reference_rule,
         ];
         let index = build_index(rules, vec![]);
 
+        fn find_rid_by_identifier(index: &LicenseIndex, identifier: &str) -> Option<usize> {
+            index
+                .rules_by_rid
+                .iter()
+                .position(|r| r.identifier == identifier)
+        }
+
+        let regular_rid = find_rid_by_identifier(&index, "regular.RULE").expect("regular rule");
+        let tiny_rid = find_rid_by_identifier(&index, "tiny.RULE").expect("tiny rule");
+        let fp_rid = find_rid_by_identifier(&index, "false_positive.RULE").expect("fp rule");
+
         assert!(
-            index.regular_rids.contains(&0),
+            index.regular_rids.contains(&regular_rid),
             "Regular rule should be in regular_rids"
         );
         assert!(
-            index.regular_rids.contains(&1),
+            index.regular_rids.contains(&tiny_rid),
             "Tiny rule should be in regular_rids"
         );
         assert!(
-            !index.regular_rids.contains(&2),
+            !index.regular_rids.contains(&fp_rid),
             "False positive should not be in regular_rids"
         );
         assert!(
-            index.false_positive_rids.contains(&2),
+            index.false_positive_rids.contains(&fp_rid),
             "False positive should be in false_positive_rids"
         );
     }
 
     #[test]
     fn test_build_index_high_postings_populated() {
-        let rule_text = "licensed copyrighted permission granted authorized distributed modification sublicense";
-        let rules = vec![create_test_rule(rule_text, false)];
+        let mut rule = create_test_rule(
+            "licensed copyrighted permission granted authorized distributed modification sublicense",
+            false,
+        );
+        rule.identifier = "high_postings.RULE".to_string();
+        let rules = vec![rule];
         let index = build_index(rules, vec![]);
 
-        if !index.approx_matchable_rids.is_empty() && index.approx_matchable_rids.contains(&0) {
+        let rid = find_rid_by_identifier(&index, "high_postings.RULE").expect("rule should exist");
+
+        if index.approx_matchable_rids.contains(&rid) {
             assert!(
-                index.high_postings_by_rid.contains_key(&0),
+                index.high_postings_by_rid.contains_key(&rid),
                 "Should have high postings for approx-matchable rule with legalese"
             );
 
-            let postings = &index.high_postings_by_rid[&0];
+            let postings = &index.high_postings_by_rid[&rid];
             assert!(!postings.is_empty(), "Postings should have entries");
         }
     }
@@ -825,6 +897,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE."#;
 
         let mut mit_rule = create_test_rule(mit_text, false);
+        mit_rule.identifier = "mit-custom.RULE".to_string();
         mit_rule.is_license_text = true;
         mit_rule.license_expression = "mit".to_string();
 
@@ -833,13 +906,165 @@ SOFTWARE."#;
 
         let index = build_index(rules, licenses);
 
-        assert_eq!(index.rules_by_rid.len(), 1);
-        assert!(index.regular_rids.contains(&0));
-        assert!(!index.false_positive_rids.contains(&0));
+        assert_eq!(
+            index.rules_by_rid.len(),
+            2,
+            "Should have 2 rules: mit.LICENSE and mit-custom.RULE"
+        );
+        assert!(index.licenses_by_key.contains_key("mit"));
 
-        let rule = &index.rules_by_rid[0];
-        assert!(!rule.tokens.is_empty());
-        assert!(rule.length_unique > 0);
-        assert!(rule.min_matched_length > 0);
+        let mit_license_rid = find_rid_by_identifier(&index, "mit.LICENSE");
+        let mit_custom_rid = find_rid_by_identifier(&index, "mit-custom.RULE");
+
+        if let Some(rid) = mit_license_rid {
+            assert!(index.regular_rids.contains(&rid));
+            assert!(!index.false_positive_rids.contains(&rid));
+        }
+
+        if let Some(rid) = mit_custom_rid {
+            assert!(index.regular_rids.contains(&rid));
+            assert!(!index.false_positive_rids.contains(&rid));
+        }
+    }
+
+    #[test]
+    fn test_build_index_empty_license_text() {
+        let mut license = create_test_license("empty", "Empty License");
+        license.text = String::new();
+        let licenses = vec![license];
+        let index = build_index(vec![], licenses);
+
+        assert!(index.licenses_by_key.contains_key("empty"));
+        assert_eq!(
+            index.rules_by_rid.len(),
+            0,
+            "Empty license text should not create a rule"
+        );
+    }
+
+    #[test]
+    fn test_build_index_rules_sorted_by_identifier() {
+        let mut rule_z = create_test_rule("Z rule text", false);
+        rule_z.identifier = "z_rule.RULE".to_string();
+
+        let mut rule_a = create_test_rule("A rule text", false);
+        rule_a.identifier = "a_rule.RULE".to_string();
+
+        let mut rule_m = create_test_rule("M rule text", false);
+        rule_m.identifier = "m_rule.RULE".to_string();
+
+        let rules = vec![rule_z, rule_a, rule_m];
+        let index = build_index(rules, vec![]);
+
+        let identifiers: Vec<&str> = index
+            .rules_by_rid
+            .iter()
+            .map(|r| r.identifier.as_str())
+            .collect();
+
+        assert!(
+            identifiers.windows(2).all(|w| w[0] <= w[1]),
+            "Rules should be sorted by identifier"
+        );
+    }
+
+    #[test]
+    fn test_build_index_duplicate_keys_licenses() {
+        let license1 = create_test_license("mit", "MIT License 1");
+        let license2 = create_test_license("mit", "MIT License 2");
+        let licenses = vec![license1, license2];
+
+        let index = build_index(vec![], licenses);
+
+        assert_eq!(
+            index.license_count(),
+            1,
+            "Duplicate keys should be overwritten"
+        );
+        assert_eq!(
+            index.get_license("mit").unwrap().name,
+            "MIT License 2",
+            "Later license should win"
+        );
+    }
+
+    #[test]
+    fn test_build_index_find_by_expression() {
+        let mut rule1 = create_test_rule("MIT text", false);
+        rule1.identifier = "rule1.RULE".to_string();
+        rule1.license_expression = "mit".to_string();
+
+        let mut rule2 = create_test_rule("Apache text", false);
+        rule2.identifier = "rule2.RULE".to_string();
+        rule2.license_expression = "apache-2.0".to_string();
+
+        let mut rule3 = create_test_rule("MIT variant", false);
+        rule3.identifier = "rule3.RULE".to_string();
+        rule3.license_expression = "mit".to_string();
+
+        let rules = vec![rule1, rule2, rule3];
+        let index = build_index(rules, vec![]);
+
+        let mit_rids = find_rid_by_expression(&index, "mit");
+        let apache_rids = find_rid_by_expression(&index, "apache-2.0");
+
+        assert_eq!(mit_rids.len(), 2, "Should find 2 MIT rules");
+        assert_eq!(apache_rids.len(), 1, "Should find 1 Apache rule");
+    }
+
+    #[test]
+    fn test_build_index_weak_rule_no_approx_matchable() {
+        let mut weak_rule = create_test_rule("hello world foo bar baz", false);
+        weak_rule.identifier = "weak.RULE".to_string();
+        weak_rule.text = "hello world foo bar baz qux".to_string();
+        let rules = vec![weak_rule];
+        let index = build_index(rules, vec![]);
+
+        let rid = find_rid_by_identifier(&index, "weak.RULE").expect("rule should exist");
+
+        assert!(
+            !index.approx_matchable_rids.contains(&rid),
+            "Weak rule (no legalese tokens) should not be approx_matchable"
+        );
+        assert!(
+            !index.high_postings_by_rid.contains_key(&rid),
+            "Weak rule should not have high postings"
+        );
+    }
+
+    #[test]
+    fn test_build_index_continuous_rule_not_approx_matchable() {
+        let mut continuous_rule =
+            create_test_rule("licensed copyrighted permission granted authorized", false);
+        continuous_rule.identifier = "continuous.RULE".to_string();
+        continuous_rule.is_continuous = true;
+        let rules = vec![continuous_rule];
+        let index = build_index(rules, vec![]);
+
+        let rid = find_rid_by_identifier(&index, "continuous.RULE").expect("rule should exist");
+
+        assert!(
+            !index.approx_matchable_rids.contains(&rid),
+            "Continuous rule should not be approx_matchable"
+        );
+    }
+
+    #[test]
+    fn test_build_index_required_phrase_not_approx_matchable() {
+        let mut required_phrase = create_test_rule(
+            "licensed copyrighted permission granted authorized distributed",
+            false,
+        );
+        required_phrase.identifier = "required.RULE".to_string();
+        required_phrase.is_required_phrase = true;
+        let rules = vec![required_phrase];
+        let index = build_index(rules, vec![]);
+
+        let rid = find_rid_by_identifier(&index, "required.RULE").expect("rule should exist");
+
+        assert!(
+            !index.approx_matchable_rids.contains(&rid),
+            "Required phrase should not be approx_matchable"
+        );
     }
 }

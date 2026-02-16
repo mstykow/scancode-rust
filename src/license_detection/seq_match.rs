@@ -665,4 +665,211 @@ mod tests {
         assert_eq!(MATCH_SEQ, "3-seq");
         assert_eq!(MATCH_SEQ_ORDER, 3);
     }
+
+    #[test]
+    fn test_compute_set_similarity_partial() {
+        let mut set1 = HashSet::new();
+        set1.insert(0);
+        set1.insert(1);
+        set1.insert(2);
+
+        let mut mset1 = HashMap::new();
+        mset1.insert(0, 1);
+        mset1.insert(1, 1);
+        mset1.insert(2, 1);
+
+        let mut set2 = HashSet::new();
+        set2.insert(0);
+        set2.insert(1);
+        set2.insert(10);
+
+        let mut mset2 = HashMap::new();
+        mset2.insert(0, 1);
+        mset2.insert(1, 1);
+        mset2.insert(10, 1);
+
+        let result = compute_set_similarity(&set1, &mset1, &set2, &mset2, 5);
+
+        assert!(result.is_some());
+        let (_rounded, full) = result.unwrap();
+        assert!(full.containment > 0.0 && full.containment <= 1.0);
+    }
+
+    #[test]
+    fn test_align_sequences_with_gap() {
+        let query_tokens = vec![0, 1, 99, 2, 3];
+        let rule_tokens = vec![0, 1, 2, 3];
+        let mut high_postings: HashMap<u16, Vec<usize>> = HashMap::new();
+        high_postings.insert(0, vec![0]);
+        high_postings.insert(1, vec![1]);
+        high_postings.insert(2, vec![2]);
+        high_postings.insert(3, vec![3]);
+
+        let blocks = align_sequences(&query_tokens, &rule_tokens, 5, &high_postings);
+
+        assert!(
+            !blocks.is_empty(),
+            "Should find at least one block despite gap"
+        );
+    }
+
+    #[test]
+    fn test_align_sequences_empty_rule() {
+        let query_tokens = vec![0, 1, 2];
+        let rule_tokens: Vec<u16> = vec![];
+        let high_postings: HashMap<u16, Vec<usize>> = HashMap::new();
+
+        let blocks = align_sequences(&query_tokens, &rule_tokens, 5, &high_postings);
+
+        assert!(
+            blocks.is_empty(),
+            "Should return empty blocks for empty rule"
+        );
+    }
+
+    #[test]
+    fn test_select_candidates_empty_tokens() {
+        let index = create_seq_match_test_index();
+
+        let text = "";
+        let query = Query::new(text, &index).unwrap();
+        let query_run = query.whole_query_run();
+
+        let candidates = select_candidates(&index, &query_run, 10);
+
+        assert!(
+            candidates.is_empty(),
+            "Should return empty candidates for empty query"
+        );
+    }
+
+    #[test]
+    fn test_seq_match_with_no_legalese_intersection() {
+        let mut index = create_test_index(&[("word1", 10), ("word2", 11), ("word3", 12)], 5);
+
+        add_test_rule(&mut index, "word1 word2 word3", "test-license");
+
+        let text = "word1 word2 word3";
+        let query = Query::new(text, &index).unwrap();
+        let query_run = query.whole_query_run();
+
+        let matches = seq_match(&index, &query_run);
+
+        assert!(
+            matches.is_empty(),
+            "Should not match when tokens are not legalese (above len_legalese)"
+        );
+    }
+
+    #[test]
+    fn test_candidate_ordering() {
+        let candidate1 = Candidate {
+            score_vec_rounded: ScoresVector {
+                is_highly_resemblant: true,
+                containment: 0.9,
+                resemblance: 0.8,
+                matched_length: 10.0,
+            },
+            score_vec_full: ScoresVector {
+                is_highly_resemblant: true,
+                containment: 0.9,
+                resemblance: 0.8,
+                matched_length: 10.0,
+            },
+            rid: 0,
+            rule: Rule {
+                identifier: "test1".to_string(),
+                license_expression: "mit".to_string(),
+                text: String::new(),
+                tokens: vec![],
+                is_license_text: true,
+                is_license_notice: false,
+                is_license_reference: false,
+                is_license_tag: false,
+                is_license_intro: false,
+                is_license_clue: false,
+                is_false_positive: false,
+                is_required_phrase: false,
+                is_from_license: false,
+                relevance: 100,
+                minimum_coverage: None,
+                is_continuous: true,
+                referenced_filenames: None,
+                ignorable_urls: None,
+                ignorable_emails: None,
+                ignorable_copyrights: None,
+                ignorable_holders: None,
+                ignorable_authors: None,
+                language: None,
+                notes: None,
+                length_unique: 0,
+                high_length_unique: 0,
+                high_length: 0,
+                min_matched_length: 0,
+                min_high_matched_length: 0,
+                min_matched_length_unique: 0,
+                min_high_matched_length_unique: 0,
+                is_small: false,
+                is_tiny: false,
+            },
+            high_set_intersection: HashSet::new(),
+        };
+
+        let candidate2 = Candidate {
+            score_vec_rounded: ScoresVector {
+                is_highly_resemblant: false,
+                containment: 0.5,
+                resemblance: 0.3,
+                matched_length: 5.0,
+            },
+            score_vec_full: ScoresVector {
+                is_highly_resemblant: false,
+                containment: 0.5,
+                resemblance: 0.3,
+                matched_length: 5.0,
+            },
+            rid: 1,
+            rule: Rule {
+                identifier: "test2".to_string(),
+                license_expression: "apache".to_string(),
+                text: String::new(),
+                tokens: vec![],
+                is_license_text: true,
+                is_license_notice: false,
+                is_license_reference: false,
+                is_license_tag: false,
+                is_license_intro: false,
+                is_license_clue: false,
+                is_false_positive: false,
+                is_required_phrase: false,
+                is_from_license: false,
+                relevance: 100,
+                minimum_coverage: None,
+                is_continuous: true,
+                referenced_filenames: None,
+                ignorable_urls: None,
+                ignorable_emails: None,
+                ignorable_copyrights: None,
+                ignorable_holders: None,
+                ignorable_authors: None,
+                language: None,
+                notes: None,
+                length_unique: 0,
+                high_length_unique: 0,
+                high_length: 0,
+                min_matched_length: 0,
+                min_high_matched_length: 0,
+                min_matched_length_unique: 0,
+                min_high_matched_length_unique: 0,
+                is_small: false,
+                is_tiny: false,
+            },
+            high_set_intersection: HashSet::new(),
+        };
+
+        assert!(
+            candidate1 > candidate2,
+            "Higher containment candidate should rank higher"
+        );
+    }
 }

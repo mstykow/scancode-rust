@@ -1072,4 +1072,163 @@ mod tests {
         let output = expression_to_string(&expr);
         assert_eq!(output, "(gpl-2.0 WITH classpath-exception-2.0) OR mit");
     }
+
+    #[test]
+    fn test_parse_gpl_or_later_license() {
+        let expr = parse_expression("gpl-2.0-plus").unwrap();
+        assert_eq!(expr, LicenseExpression::License("gpl-2.0-plus".to_string()));
+    }
+    #[test]
+    fn test_parse_gpl_plus_license() {
+        let expr = parse_expression("GPL-2.0+").unwrap();
+        assert_eq!(expr, LicenseExpression::License("gpl-2.0+".to_string()));
+    }
+
+    #[test]
+    fn test_parse_complex_nested_expression() {
+        let input = "(MIT OR Apache-2.0) AND (GPL-2.0 OR BSD-3-Clause)";
+        let expr = parse_expression(input).unwrap();
+        assert!(matches!(expr, LicenseExpression::And { .. }));
+        let keys = expr.license_keys();
+        assert_eq!(keys.len(), 4);
+    }
+
+    #[test]
+    fn test_parse_multiple_with_expressions() {
+        let expr = parse_expression(
+            "GPL-2.0 WITH Classpath-exception-2.0 AND GPL-2.0 WITH GCC-exception-2.0",
+        )
+        .unwrap();
+        assert!(matches!(expr, LicenseExpression::And { .. }));
+        let keys = expr.license_keys();
+        assert!(keys.contains(&"gpl-2.0".to_string()));
+        assert!(keys.contains(&"classpath-exception-2.0".to_string()));
+        assert!(keys.contains(&"gcc-exception-2.0".to_string()));
+    }
+
+    #[test]
+    fn test_parse_with_inside_and_inside_or() {
+        let expr = parse_expression("MIT OR (Apache-2.0 AND GPL-2.0 WITH Classpath-exception-2.0)")
+            .unwrap();
+        assert!(matches!(expr, LicenseExpression::Or { .. }));
+    }
+
+    #[test]
+    fn test_parse_operator_at_start_error() {
+        let result = parse_expression("AND MIT");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_operator_at_end_error() {
+        let result = parse_expression("MIT AND");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_double_operator_error() {
+        let result = parse_expression("MIT AND AND Apache-2.0");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_license_with_dots() {
+        let expr = parse_expression("LicenseRef-scancode-1.0").unwrap();
+        assert_eq!(
+            expr,
+            LicenseExpression::LicenseRef("licenseref-scancode-1.0".to_string())
+        );
+    }
+
+    #[test]
+    fn test_combine_expressions_with_existing_and() {
+        let result = combine_expressions(
+            &["mit AND apache-2.0", "gpl-2.0"],
+            CombineRelation::And,
+            true,
+        )
+        .unwrap();
+        assert!(result.contains("mit"));
+        assert!(result.contains("apache-2.0"));
+        assert!(result.contains("gpl-2.0"));
+    }
+
+    #[test]
+    fn test_combine_expressions_with_existing_or() {
+        let result =
+            combine_expressions(&["mit OR apache-2.0", "gpl-2.0"], CombineRelation::Or, true)
+                .unwrap();
+        assert!(result.contains("mit"));
+        assert!(result.contains("apache-2.0"));
+        assert!(result.contains("gpl-2.0"));
+    }
+
+    #[test]
+    fn test_expression_to_string_and_inside_with() {
+        let and_expr = LicenseExpression::And {
+            left: Box::new(LicenseExpression::License("mit".to_string())),
+            right: Box::new(LicenseExpression::License("apache-2.0".to_string())),
+        };
+        let with_expr = LicenseExpression::With {
+            left: Box::new(and_expr),
+            right: Box::new(LicenseExpression::License("exception".to_string())),
+        };
+        assert_eq!(
+            expression_to_string(&with_expr),
+            "(mit AND apache-2.0) WITH exception"
+        );
+    }
+
+    #[test]
+    fn test_parse_deeply_nested_expression() {
+        let input = "((MIT OR Apache-2.0) AND GPL-2.0) OR BSD-3-Clause";
+        let expr = parse_expression(input).unwrap();
+        assert!(matches!(expr, LicenseExpression::Or { .. }));
+        let keys = expr.license_keys();
+        assert_eq!(keys.len(), 4);
+    }
+
+    #[test]
+    fn test_validate_expression_empty_known_keys() {
+        let expr = parse_expression("MIT AND Apache-2.0").unwrap();
+        let known = HashSet::new();
+
+        let result = validate_expression(&expr, &known);
+        assert!(matches!(result, ValidationResult::UnknownKeys { .. }));
+        if let ValidationResult::UnknownKeys { unknown } = result {
+            assert_eq!(unknown.len(), 2);
+        }
+    }
+
+    #[test]
+    fn test_parse_case_insensitive_operators() {
+        let expr1 = parse_expression("MIT and Apache-2.0").unwrap();
+        let expr2 = parse_expression("MIT AND Apache-2.0").unwrap();
+        let expr3 = parse_expression("MIT And Apache-2.0").unwrap();
+        assert_eq!(expression_to_string(&expr1), "mit AND apache-2.0");
+        assert_eq!(expression_to_string(&expr2), "mit AND apache-2.0");
+        assert_eq!(expression_to_string(&expr3), "mit AND apache-2.0");
+    }
+
+    #[test]
+    fn test_parse_or_case_insensitive() {
+        let expr1 = parse_expression("MIT or Apache-2.0").unwrap();
+        let expr2 = parse_expression("MIT OR Apache-2.0").unwrap();
+        assert_eq!(expression_to_string(&expr1), "mit OR apache-2.0");
+        assert_eq!(expression_to_string(&expr2), "mit OR apache-2.0");
+    }
+
+    #[test]
+    fn test_parse_with_case_insensitive() {
+        let expr1 = parse_expression("GPL-2.0 with Classpath-exception-2.0").unwrap();
+        let expr2 = parse_expression("GPL-2.0 WITH Classpath-exception-2.0").unwrap();
+        assert_eq!(
+            expression_to_string(&expr1),
+            "gpl-2.0 WITH classpath-exception-2.0"
+        );
+        assert_eq!(
+            expression_to_string(&expr2),
+            "gpl-2.0 WITH classpath-exception-2.0"
+        );
+    }
 }
