@@ -2,7 +2,7 @@
 
 ## Current Status
 
-**Last Updated:** After implementing PLAN-001, PLAN-002, PLAN-003
+**Last Updated:** After implementing PLAN-001, PLAN-002, PLAN-003, PLAN-004
 
 ### Unit Tests
 
@@ -11,25 +11,26 @@ All unit tests passing. Key improvements:
 - `test_spdx_with_plus` - ✅ FIXED (PLAN-001)
 - Deprecated rule filtering - ✅ IMPLEMENTED (PLAN-003)
 - License intro filtering - ✅ IMPLEMENTED (PLAN-002)
+- Overlapping match filtering - ✅ IMPLEMENTED (PLAN-004)
 
 ### Golden Tests
 
-| Metric | Before | After | Change |
-|--------|--------|-------|--------|
-| Passed | 2,679 | 2,928 | **+249** |
-| Failed | 1,684 | 1,435 | **-249** |
+| Metric | Initial | After Plans 1-3 | After Plan 4 | Total Change |
+|--------|---------|-----------------|--------------|--------------|
+| Passed | 2,679 | 2,928 | 2,952 | **+273** |
+| Failed | 1,684 | 1,435 | 1,411 | **-273** |
 
-**Improvement:** 15% reduction in failing tests
+**Total Improvement:** 16% reduction in failing tests
 
-Breakdown by directory:
+Breakdown by directory (final):
 
 | Directory | Passed | Failed |
 |-----------|--------|--------|
-| lic1 | 174 | 117 |
-| lic2 | 703 | 150 |
+| lic1 | 173 | 118 |
+| lic2 | 704 | 149 |
 | lic3 | 201 | 91 |
-| lic4 | 213 | 137 |
-| external | 1,635 | 932 |
+| lic4 | 216 | 134 |
+| external | 1,656 | 911 |
 | unknown | 2 | 8 |
 
 Test data: 4,367 test files across 6 directories
@@ -69,6 +70,20 @@ Test data: 4,367 test files across 6 directories
 
 **Remaining Issue:** The `double_isc.txt` test still shows "unknown" because the DARPA text isn't being matched as "sudo" - this is a separate seq_match algorithm issue.
 
+### Issue 4: Overlapping Match Filtering (FIXED in `15b07829`)
+
+**Problem:** Complex overlap scenarios between matches caused incorrect expression combinations.
+
+**Solution:**
+
+- Added `overlap()`, `overlap_ratio()`, `union_span()`, `intersects()` methods to Span
+- Added `matcher_order()`, `hilen()`, `surround()` methods to LicenseMatch
+- Implemented `filter_overlapping_matches()` with 4 overlap thresholds (10%, 40%, 70%, 90%)
+- Implemented `restore_non_overlapping()` to recover non-conflicting discarded matches
+- Updated `refine_matches()` pipeline
+
+**Golden test improvement:** +24 passed
+
 ---
 
 ## Open Issues
@@ -100,8 +115,6 @@ The current tokenizer regex `[A-Za-z0-9]+\+?[A-Za-z0-9]*` only matches ASCII cha
 
 | Function | Python Location | Purpose |
 |----------|-----------------|---------|
-| `filter_overlapping_matches` | `match.py` | Complex overlap ratio logic |
-| `restore_non_overlapping` | `match.py` | Restore non-overlapping matches |
 | `has_low_rule_relevance()` | `detection.py` | Low relevance detection |
 | `is_license_reference_local_file()` | `detection.py` | Local file reference detection |
 | `use_referenced_license_expression()` | `detection.py` | Use referenced expression |

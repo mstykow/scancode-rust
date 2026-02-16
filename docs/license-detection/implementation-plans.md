@@ -11,7 +11,7 @@ This document outlines the implementation plans to close the gaps between the Ru
 | PLAN-001 | SPDX `+` Suffix Support | High | Medium | ✅ Done |
 | PLAN-002 | License Intro Filtering | High | Medium | ✅ Done |
 | PLAN-003 | Deprecated Rule Filtering | Medium | Low | ✅ Done |
-| PLAN-004 | Overlapping Match Filtering | Medium | High | 📋 Planned |
+| PLAN-004 | Overlapping Match Filtering | Medium | High | ✅ Done |
 
 ---
 
@@ -391,7 +391,9 @@ Should see improved pass rate. The test `camellia_bsd.c` should produce `bsd-2-c
 
 ---
 
-## PLAN-004: Overlapping Match Filtering 📋
+## PLAN-004: Overlapping Match Filtering ✅
+
+**Status:** Completed in commit `15b07829`
 
 ### Problem
 
@@ -686,7 +688,20 @@ Golden tests should show improved pass rate, especially for files with multiple 
 1. ~~PLAN-003~~ (Deprecated Rule Filtering) - ✅ Done
 2. ~~PLAN-001~~ (SPDX `+` Suffix) - ✅ Done
 3. ~~PLAN-002~~ (License Intro Filtering) - ✅ Done
-4. **PLAN-004** (Overlapping Match Filtering) - 📋 Next
+4. ~~PLAN-004~~ (Overlapping Match Filtering) - ✅ Done
+
+---
+
+## Summary
+
+All 4 implementation plans completed. Golden test improvement:
+
+| Metric | Initial | Final | Change |
+|--------|---------|-------|--------|
+| Passed | 2,679 | 2,952 | **+273** |
+| Failed | 1,684 | 1,411 | **-273** |
+
+**Total Improvement:** 16% reduction in failing tests
 
 ---
 
