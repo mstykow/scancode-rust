@@ -2,181 +2,95 @@
 
 ## Current Status
 
-**Last Updated:** After comprehensive test audit (commit pending)
+**Last Updated:** After implementing PLAN-001, PLAN-002, PLAN-003
 
 ### Unit Tests
 
-| Module | Tests | Status |
-|--------|-------|--------|
-| `models.rs` | 28 | ✅ All passing |
-| `query.rs` | 53 | ✅ All passing |
-| `tokenize.rs` | 42 | ✅ All passing |
-| `index/mod.rs` | 12 | ✅ All passing |
-| `index/builder.rs` | 25 | ✅ All passing |
-| `index/dictionary.rs` | 14 | ✅ All passing |
-| `index/token_sets.rs` | 7 | ✅ All passing |
-| `hash_match.rs` | 12 | ✅ All passing |
-| `aho_match.rs` | 16 | ✅ All passing |
-| `seq_match.rs` | 20 | ✅ All passing |
-| `unknown_match.rs` | 17 | ✅ All passing |
-| `spdx_lid.rs` | 57 | ✅ All passing |
-| `detection.rs` | 123 | ✅ All passing |
-| `expression.rs` | 73 | ✅ All passing |
-| `match_refine.rs` | 44 | ✅ All passing |
-| `spans.rs` | 22 | ✅ All passing |
-| `spdx_mapping.rs` | 33 | ✅ All passing |
-| `loader_test.rs` | 38 | ✅ All passing |
-| `thresholds.rs` | 18 | ✅ All passing |
-| `legalese.rs` | 8 | ✅ All passing |
-| **Total** | **682** | ✅ **All passing** |
+All unit tests passing. Key improvements:
+
+- `test_spdx_with_plus` - ✅ FIXED (PLAN-001)
+- Deprecated rule filtering - ✅ IMPLEMENTED (PLAN-003)
+- License intro filtering - ✅ IMPLEMENTED (PLAN-002)
 
 ### Golden Tests
 
-**Status:** 142 passed, 149 failed
+| Metric | Before | After | Change |
+|--------|--------|-------|--------|
+| Passed | 2,679 | 2,928 | **+249** |
+| Failed | 1,684 | 1,435 | **-249** |
 
-Test data: 4,367 test files across 6 directories (lic1, lic2, lic3, lic4, external, unknown)
+**Improvement:** 15% reduction in failing tests
+
+Breakdown by directory:
+
+| Directory | Passed | Failed |
+|-----------|--------|--------|
+| lic1 | 174 | 117 |
+| lic2 | 703 | 150 |
+| lic3 | 201 | 91 |
+| lic4 | 213 | 137 |
+| external | 1,635 | 932 |
+| unknown | 2 | 8 |
+
+Test data: 4,367 test files across 6 directories
+
+---
+
+## Completed Issues
+
+### Issue 0: SPDX `+` Suffix (FIXED in `9b47b558`)
+
+**Problem:** SPDX identifiers with `+` suffix (e.g., `GPL-2.0+`) were not detected.
+
+**Solution:**
+
+- Added `spdx_license_key` and `other_spdx_license_keys` fields to Rule
+- Built `rid_by_spdx_key` lookup table in LicenseIndex
+- Updated `find_best_matching_rule()` to use SPDX key lookup
+
+### Issue 2: Deprecated Rules (FIXED in `3b5ea424`)
+
+**Problem:** Deprecated rules were being used for detection.
+
+**Solution:**
+
+- Added `with_deprecated` parameter to loader functions
+- Deprecated items filtered by default
+
+### Issue 1: License Intro Filtering (PARTIALLY FIXED in `f93270b6`)
+
+**Problem:** License expressions incorrectly included "unknown" from intro matches.
+
+**Solution:**
+
+- Added `is_license_intro`, `is_license_clue` fields to LicenseMatch
+- Implemented `filter_license_intros()` function
+- Updated detection pipeline to filter intros
+
+**Remaining Issue:** The `double_isc.txt` test still shows "unknown" because the DARPA text isn't being matched as "sudo" - this is a separate seq_match algorithm issue.
 
 ---
 
 ## Open Issues
 
-### Issue 0: SPDX `+` Suffix Not Detected (High Priority)
+### Issue 3: Partial License Text Not Detected
 
-**Problem:** SPDX identifiers with `+` suffix (e.g., `GPL-2.0+`) are not detected.
+**Problem:** The `double_isc.txt` test produces `["isc", "isc AND unknown"]` instead of expected `["isc", "isc", "sudo"]`.
 
-**Test:** `test_spdx_with_plus` fails
+**Root Cause:** The DARPA text at the end of the file matches the `sudo` license text, but the `seq_match` algorithm isn't detecting it properly. This is a sequence alignment / partial matching issue.
 
-```rust
-let text = "SPDX-License-Identifier: GPL-2.0+";
-let detections = engine.detect(text).expect("Detection should succeed");
-assert!(!detections.is_empty(), "Should detect license from SPDX identifier with plus");
-```
+**Files to Investigate:**
 
-**Root Cause:** Rust's `find_best_matching_rule()` only matches `rule.license_expression`, not SPDX-specific keys. Python has a lookup table mapping SPDX keys (including `GPL-2.0+`) to ScanCode keys (`gpl-2.0-plus`).
-
-**Python Implementation:**
-
-- License files have `spdx_license_key` and `other_spdx_license_keys` fields
-- `build_spdx_symbols()` builds a lookup table for SPDX → License mapping
-- `GPL-2.0+` maps to `gpl-2.0-plus` license
-
-**Files Affected:**
-
-| File | Change |
-|------|--------|
-| `src/license_detection/models.rs` | Add `spdx_license_key`, `other_spdx_license_keys` fields |
-| `src/license_detection/rules/loader.rs` | Parse SPDX fields from .LICENSE files |
-| `src/license_detection/index/builder.rs` | Build `rid_by_spdx_key` lookup table |
-| `src/license_detection/spdx_lid.rs` | Update `find_best_matching_rule()` |
-
----
-
-### Issue 1: Unknown License Intros Appear in Expressions (Medium Priority)
-
-**Problem:** Files produce detections with "unknown" in license expressions when they shouldn't.
-
-**Example:** `COPYING.gplv3`
-
-- **Expected:** `["gpl-3.0"]`
-- **Actual:** 8 detections including `"gpl-3.0 AND unknown"`
-
-**Root Cause:** Rust builds license expressions from ALL matches, including license intro matches that should be filtered.
-
-**Python Behavior:** Python filters intros through two-step process (`detection.py`):
-
-1. **`analyze_detection()`** (line 1760): Returns category `UNKNOWN_INTRO_BEFORE_DETECTION` when an unknown intro is followed by a proper license match.
-
-2. **`get_detected_license_expression()`** (lines 1510-1514): Filters intros before building expression:
-
-   ```python
-   elif analysis == DetectionCategory.UNKNOWN_INTRO_BEFORE_DETECTION.value:
-       matches_for_expression = filter_license_intros(license_matches)
-   ```
-
-3. **`is_license_intro()`** (lines 1349-1365): A match is an intro if:
-   - Rule has `is_license_intro` OR `is_license_clue` OR `license_expression == 'free-unknown'`
-   - AND matcher is exact (`MATCH_AHO_EXACT`) OR coverage is 100%
-
-**Recommended Fix:**
-
-1. **Reorder `create_detection_from_group()`** in `src/license_detection/detection.rs`:
-   - Analyze category FIRST
-   - Filter matches based on category
-   - THEN build expression
-
-2. **Fix `is_unknown_intro()` to match Python**:
-
-   ```rust
-   fn is_unknown_intro(m: &LicenseMatch) -> bool {
-       let is_intro = m.is_license_intro || m.is_license_clue || 
-                      m.license_expression == "free-unknown";
-       let is_exact = m.matcher == "2-aho" || m.match_coverage >= 99.99;
-       is_intro && is_exact
-   }
-   ```
-
-3. **Ensure `is_license_intro` is populated** in `LicenseMatch` from rule data.
-
-**Files Affected:**
-
-| File | Location |
-|------|----------|
-| `src/license_detection/detection.rs` | `create_detection_from_group()` - reorder logic |
-| `src/license_detection/models.rs` | `LicenseMatch` - needs `is_license_intro`, `is_license_clue` fields |
-| `reference/scancode-toolkit/src/licensedcode/detection.py` | Lines 1349-1365, 1510-1514 |
-
----
-
-### Issue 2: Deprecated Rules Handling (Low Priority)
-
-**Problem:** Test `camellia_bsd.c` expected `bsd-2-clause-first-lines`, got `freebsd-doc` (a deprecated rule).
-
-**Python Behavior:** Python **skips deprecated rules by default** (`models.py:1103-1104`):
-
-```python
-# always skip deprecated rules
-rules = [r for r in rules if not r.is_deprecated]
-```
-
-Deprecated rules have `replaced_by` pointing to the new license key.
-
-**Previous Fix Attempt:** Skip deprecated rules during index building.
-
-**Result:** 19-test regression (160 → 141 passed).
-
-**Why it failed:**
-
-- Some tests explicitly expect deprecated license expressions (e.g., `freebsd-doc_*.txt` tests)
-- The `freebsd-doc.LICENSE` file is NOT deprecated - only `freebsd-doc_5.RULE` is deprecated
-- Tests should match against the non-deprecated LICENSE file
-
-**Recommended Fix:**
-
-1. **Keep skipping deprecated rules** (matches Python's default behavior)
-2. **Update golden tests** that expect deprecated expressions to expect the replacement expressions
-3. **Alternative:** Add `--with-deprecated` flag for backwards compatibility
-
-**Files Affected:**
-
-| File | Location |
-|------|----------|
-| `src/license_detection/index/builder.rs` | Rule loading - filter deprecated |
-| `src/license_detection/rules/loader.rs` | Load `is_deprecated` from rule files |
-| `testdata/license-golden/datadriven/lic1/freebsd-doc_*.txt.EXPECTED` | May need updates |
+| File | Purpose |
+|------|---------|
+| `src/license_detection/seq_match.rs` | Sequence alignment matching |
+| `reference/scancode-toolkit/src/licensedcode/data/licenses/sudo.LICENSE` | Contains the DARPA text |
 
 ---
 
 ## Test Coverage Gaps
 
 The following areas have been identified as needing additional test coverage or implementation work:
-
-### SPDX `+` Suffix Support
-
-SPDX identifiers with `+` suffix (meaning "or later") are not detected. Requires:
-
-- `spdx_license_key` and `other_spdx_license_keys` fields on Rule/License
-- SPDX-to-RID lookup table in index
-- Updated `find_best_matching_rule()` to use SPDX key lookup
 
 ### Unicode Support in Tokenizer
 
@@ -189,15 +103,13 @@ The current tokenizer regex `[A-Za-z0-9]+\+?[A-Za-z0-9]*` only matches ASCII cha
 | `filter_overlapping_matches` | `match.py` | Complex overlap ratio logic |
 | `restore_non_overlapping` | `match.py` | Restore non-overlapping matches |
 | `has_low_rule_relevance()` | `detection.py` | Low relevance detection |
-| `filter_license_intros()` | `detection.py` | Filter intro matches |
 | `is_license_reference_local_file()` | `detection.py` | Local file reference detection |
 | `use_referenced_license_expression()` | `detection.py` | Use referenced expression |
 
 ### SPDX Mapping Limitations
 
-1. `other_spdx_license_keys` field not supported - Python has alternative SPDX identifiers
-2. Case sensitivity in reverse lookup - Python lowercases SPDX keys
-3. No integration tests with real SPDX license data from `resources/licenses/`
+1. Case sensitivity in reverse lookup - Python lowercases SPDX keys
+2. No integration tests with real SPDX license data from `resources/licenses/`
 
 ---
 
