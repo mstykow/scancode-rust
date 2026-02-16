@@ -837,6 +837,19 @@ pub fn rank_detections(mut detections: Vec<LicenseDetection>) -> Vec<LicenseDete
     detections
 }
 
+/// Sort detections by minimum line number (earliest match first).
+///
+/// This matches Python's qstart ordering, ensuring detections
+/// earlier in the file come first in the results.
+pub fn sort_detections_by_line(mut detections: Vec<LicenseDetection>) -> Vec<LicenseDetection> {
+    detections.sort_by(|a, b| {
+        let min_line_a = a.matches.iter().map(|m| m.start_line).min().unwrap_or(0);
+        let min_line_b = b.matches.iter().map(|m| m.start_line).min().unwrap_or(0);
+        min_line_a.cmp(&min_line_b)
+    });
+    detections
+}
+
 /// Compute detection coverage from matches.
 ///
 /// Average of match_coverage weighted by matched_length.
@@ -964,7 +977,8 @@ pub fn post_process_detections(
     let filtered = filter_detections_by_score(detections, min_score);
     let deduplicated = remove_duplicate_detections(filtered);
     let preferred = apply_detection_preferences(deduplicated);
-    rank_detections(preferred)
+    let ranked = rank_detections(preferred);
+    sort_detections_by_line(ranked)
 }
 
 #[cfg(test)]
@@ -4046,5 +4060,70 @@ mod tests {
                 .detection_log
                 .contains(&"unknown-intro-followed-by-match".to_string())
         );
+    }
+
+    #[test]
+    fn test_sort_detections_by_line() {
+        fn create_detection(
+            license_expr: &str,
+            start_line: usize,
+            end_line: usize,
+        ) -> LicenseDetection {
+            LicenseDetection {
+                license_expression: Some(license_expr.to_string()),
+                license_expression_spdx: Some(license_expr.to_uppercase()),
+                matches: vec![LicenseMatch {
+                    license_expression: license_expr.to_string(),
+                    license_expression_spdx: license_expr.to_uppercase(),
+                    from_file: None,
+                    start_line,
+                    end_line,
+                    matcher: "1-hash".to_string(),
+                    score: 0.95,
+                    matched_length: 100,
+                    match_coverage: 95.0,
+                    rule_relevance: 100,
+                    rule_identifier: format!("{}.LICENSE", license_expr),
+                    rule_url: String::new(),
+                    matched_text: None,
+                    referenced_filenames: None,
+                    is_license_intro: false,
+                    is_license_clue: false,
+                }],
+                detection_log: vec![],
+                identifier: None,
+                file_region: None,
+            }
+        }
+
+        let detection1 = create_detection("mit", 50, 60);
+        let detection2 = create_detection("apache-2.0", 10, 20);
+        let detection3 = create_detection("bsd-3-clause", 30, 40);
+
+        let detections = vec![detection1.clone(), detection2.clone(), detection3.clone()];
+        let sorted = sort_detections_by_line(detections);
+
+        assert_eq!(sorted.len(), 3);
+        assert_eq!(sorted[0].license_expression, Some("apache-2.0".to_string()));
+        assert_eq!(
+            sorted[1].license_expression,
+            Some("bsd-3-clause".to_string())
+        );
+        assert_eq!(sorted[2].license_expression, Some("mit".to_string()));
+    }
+
+    #[test]
+    fn test_sort_detections_by_line_empty_matches() {
+        let detection = LicenseDetection {
+            license_expression: Some("mit".to_string()),
+            license_expression_spdx: None,
+            matches: vec![],
+            detection_log: vec![],
+            identifier: None,
+            file_region: None,
+        };
+
+        let sorted = sort_detections_by_line(vec![detection.clone()]);
+        assert_eq!(sorted.len(), 1);
     }
 }
