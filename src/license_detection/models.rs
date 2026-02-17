@@ -271,6 +271,13 @@ impl LicenseMatch {
     }
 
     pub fn qcontains(&self, other: &LicenseMatch) -> bool {
+        if self.start_token == 0
+            && self.end_token == 0
+            && other.start_token == 0
+            && other.end_token == 0
+        {
+            return self.start_line <= other.start_line && self.end_line >= other.end_line;
+        }
         self.start_token <= other.start_token && self.end_token >= other.end_token
     }
 }
@@ -1136,5 +1143,104 @@ mod tests {
         };
         assert!(!a.qcontains(&b));
         assert!(b.qcontains(&a));
+    }
+
+    #[test]
+    fn test_qcontains_zero_tokens_fallback_line_contained() {
+        let outer = LicenseMatch {
+            start_token: 0,
+            end_token: 0,
+            start_line: 1,
+            end_line: 20,
+            ..create_license_match()
+        };
+        let inner = LicenseMatch {
+            start_token: 0,
+            end_token: 0,
+            start_line: 5,
+            end_line: 15,
+            ..create_license_match()
+        };
+        assert!(outer.qcontains(&inner));
+        assert!(!inner.qcontains(&outer));
+    }
+
+    #[test]
+    fn test_qcontains_zero_tokens_fallback_same_lines() {
+        let a = LicenseMatch {
+            start_token: 0,
+            end_token: 0,
+            start_line: 1,
+            end_line: 10,
+            ..create_license_match()
+        };
+        let b = LicenseMatch {
+            start_token: 0,
+            end_token: 0,
+            start_line: 1,
+            end_line: 10,
+            ..create_license_match()
+        };
+        assert!(a.qcontains(&b));
+        assert!(b.qcontains(&a));
+    }
+
+    #[test]
+    fn test_qcontains_zero_tokens_fallback_no_containment() {
+        let a = LicenseMatch {
+            start_token: 0,
+            end_token: 0,
+            start_line: 1,
+            end_line: 10,
+            ..create_license_match()
+        };
+        let b = LicenseMatch {
+            start_token: 0,
+            end_token: 0,
+            start_line: 5,
+            end_line: 15,
+            ..create_license_match()
+        };
+        assert!(!a.qcontains(&b));
+        assert!(!b.qcontains(&a));
+    }
+
+    #[test]
+    fn test_qcontains_zero_tokens_fallback_different_lines() {
+        let a = LicenseMatch {
+            start_token: 0,
+            end_token: 0,
+            start_line: 1,
+            end_line: 5,
+            ..create_license_match()
+        };
+        let b = LicenseMatch {
+            start_token: 0,
+            end_token: 0,
+            start_line: 10,
+            end_line: 15,
+            ..create_license_match()
+        };
+        assert!(!a.qcontains(&b));
+        assert!(!b.qcontains(&a));
+    }
+
+    #[test]
+    fn test_qcontains_mixed_tokens_uses_token_positions() {
+        let a = LicenseMatch {
+            start_token: 0,
+            end_token: 0,
+            start_line: 1,
+            end_line: 20,
+            ..create_license_match()
+        };
+        let b = LicenseMatch {
+            start_token: 5,
+            end_token: 10,
+            start_line: 5,
+            end_line: 15,
+            ..create_license_match()
+        };
+        assert!(!a.qcontains(&b));
     }
 }

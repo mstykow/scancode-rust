@@ -62,14 +62,17 @@ def get_matching_regions(
 ```
 
 **Key insight**: Python separates matches into new regions when:
+
 - Token gap > 10 **OR** line gap > 3
 
 This means matches stay together when BOTH:
+
 - Token gap <= 10 **AND** line gap <= 3
 
 ### The Bug
 
 Rust only checks line gap, ignoring token gap. This causes:
+
 1. **False separations**: Matches with small token gaps but large line gaps get separated (should stay together)
 2. **False groupings**: Matches with small line gaps but large token gaps stay together (should be separated)
 
@@ -301,6 +304,7 @@ pub struct LicenseMatch {
 ```
 
 **Missing fields** (compared to Python):
+
 - `start_token` / `end_token` - Token position range
 - Token span for calculating token distance
 
@@ -488,6 +492,7 @@ fn group_matches_by_region_with_threshold(
 Each matcher needs to track token positions:
 
 **Files to modify**:
+
 - `src/license_detection/hash_match.rs`
 - `src/license_detection/aho_match.rs`
 - `src/license_detection/seq_match.rs`
@@ -606,6 +611,7 @@ mod tests {
 After implementation:
 
 1. Run the full golden test suite:
+
    ```bash
    cargo test --test license_detection_golden_test
    ```
@@ -645,16 +651,164 @@ The following golden test files are known to be affected by this issue (from pre
 ## 7. References
 
 ### Python Source Files
+
 - `reference/scancode-toolkit/src/licensedcode/match.py:2325-2395` - `get_matching_regions()`
 - `reference/scancode-toolkit/src/licensedcode/detection.py:1820-1868` - `group_matches()`
 - `reference/scancode-toolkit/src/licensedcode/query.py:106-108` - `LINES_THRESHOLD`
 - `reference/scancode-toolkit/src/licensedcode/spans.py:402-435` - `Span.distance_to()`
 
 ### Rust Source Files
+
 - `src/license_detection/detection.rs` - Current implementation
 - `src/license_detection/models.rs` - `LicenseMatch` struct
 - `src/license_detection/spans.rs` - `Span` struct
 
 ### Related Documentation
+
 - `docs/ARCHITECTURE.md` - Overall architecture
 - `docs/license-detection/GOLDEN_TEST_PLAN.md` - Testing approach
+
+---
+
+## 8. Analysis Results (2026-02-17)
+
+### What Was Implemented
+
+The dual-criteria grouping logic has been **partially implemented** in `src/license_detection/detection.rs`:
+
+1. **Constants added** (lines 11-23):
+   - `LINES_THRESHOLD: usize = 4` (existing)
+   - `TOKENS_THRESHOLD: usize = 10` (new)
+   - `LINES_GAP_THRESHOLD: usize = 3` (new)
+
+2. **Token position tracking added to `LicenseMatch`** (`models.rs:195-203`):
+   - `start_token: usize` (0-indexed)
+   - `end_token: usize` (0-indexed, exclusive)
+
+3. **`should_group_together()` function implemented** (lines 218-234):
+   - Uses dual-criteria: `token_gap <= TOKENS_THRESHOLD && line_gap <= LINES_GAP_THRESHOLD`
+   - Correctly implements OR logic for separation
+
+4. **`calculate_token_gap()` and `calculate_line_gap()` helper functions** (lines 236-260)
+
+### Critical Bug Still Present: `is_license_intro_match()` and `is_license_clue_match()`
+
+**The functions at lines 272-279 use string-based heuristics instead of the actual boolean fields:**
+
+```rust
+// CURRENT (WRONG):
+fn is_license_intro_match(match_item: &LicenseMatch) -> bool {
+    match_item.matcher.starts_with("5-unknown") || match_item.rule_identifier.contains("intro")
+}
+
+fn is_license_clue_match(match_item: &LicenseMatch) -> bool {
+    match_item.matcher == "5-unknown" || match_item.rule_identifier.contains("clue")
+}
+```
+
+**Python's implementation (correct):**
+
+```python
+if previous_match.rule.is_license_intro:  # Uses actual boolean field
+    group_of_license_matches.append(license_match)
+elif license_match.rule.is_license_intro:  # Uses actual boolean field
+    yield group_of_license_matches
+    group_of_license_matches = [license_match]
+elif license_match.rule.is_license_clue:   # Uses actual boolean field
+    yield group_of_license_matches
+    yield [license_match]
+    group_of_license_matches = []
+```
+
+**The boolean fields exist on `LicenseMatch`:**
+- `is_license_intro: bool` (line 239)
+- `is_license_clue: bool` (line 242)
+
+And are properly populated by matchers (`hash_match.rs:119`, `aho_match.rs:175`, `seq_match.rs:508`, etc.).
+
+### Why This Bug Causes Failures
+
+1. **`is_license_intro_match()`** checks for `"5-unknown"` prefix which misses actual intros from other matchers
+2. **`is_license_intro_match()`** checks for `"intro"` in rule_identifier which catches false positives
+3. **`is_license_clue_match()`** has the same issues with `"5-unknown"` and `"clue"` string checks
+
+This causes:
+- Matches that ARE intros (with `is_license_intro: true`) to not trigger intro handling
+- Non-intro matches to incorrectly trigger intro handling
+- Same issues with license clues
+
+### Impact on Failing Tests
+
+From FAILURES.md, tests mentioning grouping issues:
+
+| Test | Root Cause |
+|------|------------|
+| `checker-2200.txt` | String heuristics in `is_license_intro/clue_match()` |
+| `cjdict-liconly.txt` | Same - heuristics vs boolean fields |
+| `e2fsprogs.txt` | Same |
+| `e2fsprogs_1.txt` | Same |
+| `eclipse-openj9.LICENSE` | Dual-threshold not effective due to intro/clue bug |
+| `gfdl-1.1_1.RULE` | Same |
+| `godot2_COPYRIGHT.txt` | Mentioned as dual-criteria issue, but intro/clue bug is likely the real cause |
+| `gpl-2.0-plus_41.txt` | Grouping issue with intro handling |
+
+---
+
+## 9. Remaining TODOs
+
+### Priority 1: Fix `is_license_intro_match()` and `is_license_clue_match()` (HIGH IMPACT)
+
+**File:** `src/license_detection/detection.rs:272-279`
+
+**Change:**
+
+```rust
+// CORRECT:
+fn is_license_intro_match(match_item: &LicenseMatch) -> bool {
+    match_item.is_license_intro
+}
+
+fn is_license_clue_match(match_item: &LicenseMatch) -> bool {
+    match_item.is_license_clue
+}
+```
+
+This simple fix should resolve ~10-15 failing tests.
+
+### Priority 2: Verify Token Position Population
+
+Ensure all matchers populate `start_token` and `end_token` correctly:
+- [ ] Verify `hash_match.rs` populates token positions
+- [ ] Verify `aho_match.rs` populates token positions
+- [ ] Verify `seq_match.rs` populates token positions
+- [ ] Verify `spdx_lid.rs` populates token positions
+- [ ] Verify `unknown_match.rs` populates token positions
+
+### Priority 3: Add Unit Tests for Grouping Logic
+
+Add tests in `detection_test.rs`:
+- [ ] Test that intros create new groups regardless of proximity
+- [ ] Test that clues are yielded as separate groups
+- [ ] Test dual-criteria threshold boundaries
+- [ ] Test interaction of intro/clue handling with proximity thresholds
+
+### Priority 4: Run Golden Test Suite
+
+After fixing the intro/clue functions:
+```bash
+cargo test --lib license_detection::golden_test
+```
+
+Expected: ~10-15 tests should now pass.
+
+---
+
+## 10. Summary
+
+**PLAN-013 was partially implemented:**
+- ✅ Token position tracking added to `LicenseMatch`
+- ✅ Dual-criteria constants added
+- ✅ `should_group_together()` implemented with dual-criteria
+- ❌ **Bug: `is_license_intro_match()` and `is_license_clue_match()` still use string heuristics**
+
+**The fix is trivial:** Replace the string-based checks with the actual boolean fields that already exist on `LicenseMatch`. This single fix should resolve the majority of grouping-related test failures.

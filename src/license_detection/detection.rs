@@ -12,16 +12,6 @@ use crate::license_detection::spdx_mapping::SpdxMapping;
 /// Matches more than this many lines apart are considered separate regions.
 const LINES_THRESHOLD: usize = 4;
 
-/// Token gap threshold for grouping matches.
-/// Matches with more than this many unmatched tokens between them are separate regions.
-/// Based on Python: licensedcode/match.py MIN_TOKENS_GAP
-const TOKENS_THRESHOLD: usize = 10;
-
-/// Line gap threshold for grouping matches.
-/// Matches with more than this many unmatched lines between them are separate regions.
-/// Based on Python: licensedcode/match.py MIN_LINES_GAP
-const LINES_GAP_THRESHOLD: usize = 3;
-
 /// Coverage value below which detections are not perfect.
 /// Any value < 100 means detection is imperfect.
 const IMPERFECT_MATCH_COVERAGE_THR: f32 = 100.0;
@@ -184,15 +174,14 @@ fn group_matches_by_region_with_threshold(
 
         let previous_match = current_group.last().unwrap();
 
-        if previous_match.matcher.starts_with("5-unknown") && is_license_intro_match(previous_match)
-        {
+        if previous_match.is_license_intro {
             current_group.push(match_item.clone());
-        } else if is_license_intro_match(match_item) {
+        } else if match_item.is_license_intro {
             if !current_group.is_empty() {
                 groups.push(DetectionGroup::new(current_group.clone()));
             }
             current_group = vec![match_item.clone()];
-        } else if is_license_clue_match(match_item) {
+        } else if match_item.is_license_clue {
             if !current_group.is_empty() {
                 groups.push(DetectionGroup::new(current_group.clone()));
             }
@@ -215,48 +204,15 @@ fn group_matches_by_region_with_threshold(
     groups
 }
 
-/// Check if two matches should be in the same group based on dual-criteria.
+/// Check if two matches should be in the same group based on line threshold.
 ///
-/// Matches are grouped together when BOTH:
-/// - Token gap <= TOKENS_THRESHOLD
-/// - Line gap <= LINES_GAP_THRESHOLD
+/// Matches are grouped together when:
+/// - cur.start_line <= prev.end_line + LINES_THRESHOLD
 ///
-/// Matches are separated when EITHER:
-/// - Token gap > TOKENS_THRESHOLD
-/// - Line gap > LINES_GAP_THRESHOLD
-///
-/// Based on Python: get_matching_regions() in match.py
+/// This matches Python's group_matches() at detection.py:1836:
+/// is_in_group_by_threshold = license_match.start_line <= previous_match.end_line + lines_threshold
 fn should_group_together(prev: &LicenseMatch, cur: &LicenseMatch) -> bool {
-    let token_gap = calculate_token_gap(prev, cur);
-    let line_gap = calculate_line_gap(prev, cur);
-
-    token_gap <= TOKENS_THRESHOLD && line_gap <= LINES_GAP_THRESHOLD
-}
-
-/// Calculate the token gap between two matches.
-///
-/// Returns the number of unmatched tokens between the end of prev and start of cur.
-/// Returns 0 if matches overlap or touch.
-fn calculate_token_gap(prev: &LicenseMatch, cur: &LicenseMatch) -> usize {
-    if cur.start_token >= prev.end_token {
-        cur.start_token.saturating_sub(prev.end_token)
-    } else {
-        0
-    }
-}
-
-/// Calculate the line gap between two matches.
-///
-/// Returns the number of unmatched lines between the end of prev and start of cur.
-/// Returns 0 if matches overlap or touch.
-fn calculate_line_gap(prev: &LicenseMatch, cur: &LicenseMatch) -> usize {
-    if cur.start_line > prev.end_line {
-        cur.start_line
-            .saturating_sub(prev.end_line)
-            .saturating_sub(1)
-    } else {
-        0
-    }
+    cur.start_line <= prev.end_line + LINES_THRESHOLD
 }
 
 /// Sort matches by start line for grouping.
@@ -266,16 +222,6 @@ pub fn sort_matches_by_line(matches: &mut [LicenseMatch]) {
             .cmp(&b.start_line)
             .then_with(|| a.end_line.cmp(&b.end_line))
     });
-}
-
-/// Check if a match is a license intro.
-fn is_license_intro_match(match_item: &LicenseMatch) -> bool {
-    match_item.matcher.starts_with("5-unknown") || match_item.rule_identifier.contains("intro")
-}
-
-/// Check if a match is a license clue.
-fn is_license_clue_match(match_item: &LicenseMatch) -> bool {
-    match_item.matcher == "5-unknown" || match_item.rule_identifier.contains("clue")
 }
 
 /// Check if matches are correct detection (perfect matches).
@@ -485,10 +431,13 @@ fn has_unknown_intro_before_detection(matches: &[LicenseMatch]) -> bool {
 
 /// Check if a match is an unknown license intro.
 ///
-/// A license intro is typically a short statement introducing a license,
-/// often matched by the unknown matcher.
+/// Based on Python: is_unknown_intro() at detection.py:1250-1262
 fn is_unknown_intro(m: &LicenseMatch) -> bool {
-    m.matcher.starts_with("5-unknown") && m.rule_identifier.contains("intro")
+    let has_unknown = m.license_expression.contains("unknown");
+    has_unknown
+        && (m.is_license_intro
+            || m.is_license_clue
+            || m.license_expression == "free-unknown")
 }
 
 /// Check if a match should be considered a license intro for filtering.
@@ -1291,16 +1240,6 @@ mod tests {
         assert_eq!(LINES_THRESHOLD, 4);
     }
 
-    #[test]
-    fn test_tokens_threshold_constant() {
-        assert_eq!(TOKENS_THRESHOLD, 10);
-    }
-
-    #[test]
-    fn test_lines_gap_threshold_constant() {
-        assert_eq!(LINES_GAP_THRESHOLD, 3);
-    }
-
     fn create_test_match_with_tokens(
         start_line: usize,
         end_line: usize,
@@ -1333,83 +1272,55 @@ mod tests {
     }
 
     #[test]
-    fn test_dual_criteria_grouping_within_both_thresholds() {
+    fn test_grouping_within_line_threshold() {
         let m1 = create_test_match_with_tokens(1, 10, 0, 50);
         let m2 = create_test_match_with_tokens(12, 20, 55, 100);
         let groups = group_matches_by_region(&[m1, m2]);
         assert_eq!(
             groups.len(),
             1,
-            "Should group when both thresholds not exceeded"
+            "Should group when line gap within threshold"
         );
     }
 
     #[test]
-    fn test_dual_criteria_grouping_exceeds_token_threshold_only() {
+    fn test_grouping_ignores_token_gap_within_line_threshold() {
         let m1 = create_test_match_with_tokens(1, 10, 0, 50);
         let m2 = create_test_match_with_tokens(12, 20, 65, 100);
         let groups = group_matches_by_region(&[m1, m2]);
-        assert_eq!(groups.len(), 2, "Should separate when token gap > 10");
+        assert_eq!(groups.len(), 1, "Should group when line gap within threshold, ignoring token gap");
     }
 
     #[test]
-    fn test_dual_criteria_grouping_exceeds_line_threshold_only() {
+    fn test_grouping_separates_by_line_threshold() {
         let m1 = create_test_match_with_tokens(1, 10, 0, 50);
         let m2 = create_test_match_with_tokens(15, 25, 55, 100);
         let groups = group_matches_by_region(&[m1, m2]);
-        assert_eq!(groups.len(), 2, "Should separate when line gap > 3");
+        assert_eq!(groups.len(), 2, "Should separate when line gap exceeds threshold");
     }
 
     #[test]
-    fn test_dual_criteria_grouping_exceeds_both_thresholds() {
+    fn test_grouping_separates_far_apart() {
         let m1 = create_test_match_with_tokens(1, 10, 0, 50);
         let m2 = create_test_match_with_tokens(15, 25, 65, 100);
         let groups = group_matches_by_region(&[m1, m2]);
         assert_eq!(
             groups.len(),
             2,
-            "Should separate when both thresholds exceeded"
+            "Should separate when line gap exceeds threshold"
         );
     }
 
     #[test]
-    fn test_dual_criteria_grouping_at_exact_thresholds() {
+    fn test_grouping_at_exact_line_threshold() {
         let m1 = create_test_match_with_tokens(1, 10, 0, 50);
         let m2 = create_test_match_with_tokens(14, 20, 60, 100);
         let groups = group_matches_by_region(&[m1, m2]);
         assert_eq!(
             groups.len(),
             1,
-            "Should group at exact threshold boundaries"
+            "Should group at exact line threshold boundary (start_line <= end_line + 4)"
         );
-    }
-
-    #[test]
-    fn test_calculate_token_gap_non_overlapping() {
-        let m1 = create_test_match_with_tokens(1, 5, 0, 10);
-        let m2 = create_test_match_with_tokens(6, 10, 15, 25);
-        assert_eq!(calculate_token_gap(&m1, &m2), 5);
-    }
-
-    #[test]
-    fn test_calculate_token_gap_touching() {
-        let m1 = create_test_match_with_tokens(1, 5, 0, 10);
-        let m2 = create_test_match_with_tokens(6, 10, 10, 20);
-        assert_eq!(calculate_token_gap(&m1, &m2), 0);
-    }
-
-    #[test]
-    fn test_calculate_line_gap_non_overlapping() {
-        let m1 = create_test_match_with_tokens(1, 5, 0, 10);
-        let m2 = create_test_match_with_tokens(10, 15, 15, 25);
-        assert_eq!(calculate_line_gap(&m1, &m2), 4);
-    }
-
-    #[test]
-    fn test_calculate_line_gap_touching() {
-        let m1 = create_test_match_with_tokens(1, 5, 0, 10);
-        let m2 = create_test_match_with_tokens(6, 10, 15, 25);
-        assert_eq!(calculate_line_gap(&m1, &m2), 0);
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -3808,8 +3719,8 @@ mod tests {
             end_line: 2,
             start_token: 0,
             end_token: 0,
-            matcher: "5-unknown".to_string(),
-            score: 50.0,
+            matcher: "2-aho".to_string(),
+            score: 100.0,
             matched_length: 5,
             match_coverage: 100.0,
             rule_relevance: 100,
@@ -3817,7 +3728,7 @@ mod tests {
             rule_url: "https://example.com".to_string(),
             matched_text: Some("Licensed under".to_string()),
             referenced_filenames: None,
-            is_license_intro: false,
+            is_license_intro: true,
             is_license_clue: false,
             is_license_reference: false,
             is_license_tag: false,
@@ -4043,16 +3954,16 @@ mod tests {
             start_token: 0,
             end_token: 0,
             matcher: "2-aho".to_string(),
-            score: 50.0,
+            score: 100.0,
             matched_length: 10,
-            match_coverage: 50.0,
-            rule_relevance: 50,
+            match_coverage: 100.0,
+            rule_relevance: 100,
             rule_identifier: "license-clue.RULE".to_string(),
             rule_url: "https://example.com".to_string(),
             matched_text: Some("some clue text".to_string()),
             referenced_filenames: None,
             is_license_intro: false,
-            is_license_clue: false,
+            is_license_clue: true,
             is_license_reference: false,
             is_license_tag: false,
             rule_length: 100,
@@ -4088,8 +3999,8 @@ mod tests {
             end_line: 2,
             start_token: 0,
             end_token: 0,
-            matcher: "5-unknown".to_string(),
-            score: 50.0,
+            matcher: "2-aho".to_string(),
+            score: 100.0,
             matched_length: 5,
             match_coverage: 100.0,
             rule_relevance: 100,
@@ -4097,7 +4008,7 @@ mod tests {
             rule_url: "https://example.com".to_string(),
             matched_text: Some("Licensed under".to_string()),
             referenced_filenames: None,
-            is_license_intro: false,
+            is_license_intro: true,
             is_license_clue: false,
             is_license_reference: false,
             is_license_tag: false,
@@ -4740,5 +4651,145 @@ mod tests {
 
         let sorted = sort_detections_by_line(vec![detection.clone()]);
         assert_eq!(sorted.len(), 1);
+    }
+
+    #[test]
+    fn test_is_unknown_intro_true_with_is_license_intro_flag() {
+        let m = LicenseMatch {
+            license_expression: "unknown".to_string(),
+            license_expression_spdx: "unknown".to_string(),
+            from_file: Some("test.txt".to_string()),
+            start_line: 1,
+            end_line: 5,
+            start_token: 0,
+            end_token: 0,
+            matcher: "2-aho".to_string(),
+            score: 100.0,
+            matched_length: 10,
+            match_coverage: 100.0,
+            rule_relevance: 100,
+            rule_identifier: "license-intro.LICENSE".to_string(),
+            rule_url: "https://example.com".to_string(),
+            matched_text: Some("Licensed under".to_string()),
+            referenced_filenames: None,
+            is_license_intro: true,
+            is_license_clue: false,
+            is_license_reference: false,
+            is_license_tag: false,
+            rule_length: 10,
+        };
+        assert!(is_unknown_intro(&m));
+    }
+
+    #[test]
+    fn test_is_unknown_intro_true_with_is_license_clue_flag() {
+        let m = LicenseMatch {
+            license_expression: "unknown".to_string(),
+            license_expression_spdx: "unknown".to_string(),
+            from_file: Some("test.txt".to_string()),
+            start_line: 1,
+            end_line: 5,
+            start_token: 0,
+            end_token: 0,
+            matcher: "2-aho".to_string(),
+            score: 100.0,
+            matched_length: 10,
+            match_coverage: 100.0,
+            rule_relevance: 100,
+            rule_identifier: "license-clue.LICENSE".to_string(),
+            rule_url: "https://example.com".to_string(),
+            matched_text: Some("Licensed under".to_string()),
+            referenced_filenames: None,
+            is_license_intro: false,
+            is_license_clue: true,
+            is_license_reference: false,
+            is_license_tag: false,
+            rule_length: 10,
+        };
+        assert!(is_unknown_intro(&m));
+    }
+
+    #[test]
+    fn test_is_unknown_intro_true_with_free_unknown_expression() {
+        let m = LicenseMatch {
+            license_expression: "free-unknown".to_string(),
+            license_expression_spdx: "free-unknown".to_string(),
+            from_file: Some("test.txt".to_string()),
+            start_line: 1,
+            end_line: 5,
+            start_token: 0,
+            end_token: 0,
+            matcher: "2-aho".to_string(),
+            score: 100.0,
+            matched_length: 10,
+            match_coverage: 100.0,
+            rule_relevance: 100,
+            rule_identifier: "free-unknown.LICENSE".to_string(),
+            rule_url: "https://example.com".to_string(),
+            matched_text: Some("Licensed under".to_string()),
+            referenced_filenames: None,
+            is_license_intro: false,
+            is_license_clue: false,
+            is_license_reference: false,
+            is_license_tag: false,
+            rule_length: 10,
+        };
+        assert!(is_unknown_intro(&m));
+    }
+
+    #[test]
+    fn test_is_unknown_intro_false_no_unknown_in_expression() {
+        let m = LicenseMatch {
+            license_expression: "mit".to_string(),
+            license_expression_spdx: "MIT".to_string(),
+            from_file: Some("test.txt".to_string()),
+            start_line: 1,
+            end_line: 5,
+            start_token: 0,
+            end_token: 0,
+            matcher: "1-hash".to_string(),
+            score: 100.0,
+            matched_length: 10,
+            match_coverage: 100.0,
+            rule_relevance: 100,
+            rule_identifier: "mit.LICENSE".to_string(),
+            rule_url: "https://example.com".to_string(),
+            matched_text: Some("MIT License".to_string()),
+            referenced_filenames: None,
+            is_license_intro: true,
+            is_license_clue: false,
+            is_license_reference: false,
+            is_license_tag: false,
+            rule_length: 10,
+        };
+        assert!(!is_unknown_intro(&m));
+    }
+
+    #[test]
+    fn test_is_unknown_intro_false_no_flags_or_free_unknown() {
+        let m = LicenseMatch {
+            license_expression: "unknown".to_string(),
+            license_expression_spdx: "unknown".to_string(),
+            from_file: Some("test.txt".to_string()),
+            start_line: 1,
+            end_line: 5,
+            start_token: 0,
+            end_token: 0,
+            matcher: "5-unknown".to_string(),
+            score: 50.0,
+            matched_length: 10,
+            match_coverage: 50.0,
+            rule_relevance: 50,
+            rule_identifier: "unknown.LICENSE".to_string(),
+            rule_url: "https://example.com".to_string(),
+            matched_text: Some("Some text".to_string()),
+            referenced_filenames: None,
+            is_license_intro: false,
+            is_license_clue: false,
+            is_license_reference: false,
+            is_license_tag: false,
+            rule_length: 10,
+        };
+        assert!(!is_unknown_intro(&m));
     }
 }

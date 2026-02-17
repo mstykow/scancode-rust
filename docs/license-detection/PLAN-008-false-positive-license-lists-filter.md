@@ -48,6 +48,7 @@ The filter is designed for files with 15+ tag/reference matches forming a "licen
 | `gpl_18.txt` | `["gpl-1.0-plus"]` | `["gpl-1.0-plus", "borceux"]` | Single spurious match |
 
 The `filter_false_positive_license_lists_matches()` only activates when:
+
 - There are 15+ matches total (line 546-548 in match_refine.rs)
 - Or for long lists (150+ matches) with 95% candidates
 
@@ -84,11 +85,103 @@ But the failures have 1-2 extra matches, not 15+ candidate matches.
 
 ---
 
+## Deep Dive Analysis (Feb 17, 2026)
+
+### Test Case Analysis: `gpl-2.0-plus_11.txt`
+
+**Expected**: `["gpl-2.0-plus"]`
+
+**Actual**: `["gpl-2.0-plus", "borceux"]`
+
+**File Content**: Linux kernel header file with GPL-2.0+ license notice at lines 7-19.
+
+**Spurious Match Details**:
+```json
+{
+  "license_expression": "borceux",
+  "start_line": 188,
+  "end_line": 188,
+  "matcher": "2-aho",
+  "matched_length": 1,
+  "match_coverage": 100.0,
+  "rule_relevance": 50,
+  "rule_identifier": "#34598"
+}
+```
+
+**Why the borceux rule matches**:
+- Rule `spdx_license_id_borceux_for_borceux.RULE` has:
+  - `is_license_reference: yes`
+  - `relevance: 50`
+  - Text: just the word "borceux"
+- The rule matches a word in the source code that happens to look like "borceux" (possibly "printk" or similar being tokenized)
+
+**Why it's not filtered**:
+
+1. **`filter_false_positive_license_lists_matches` threshold too high**:
+   - Filter requires 15+ matches to activate (`MIN_SHORT_FP_LIST_LENGTH = 15`)
+   - This file has only 2 matches total
+   - The filter early-exits at line 541-543: `if len_matches < MIN_SHORT_FP_LIST_LENGTH { return (matches, vec![]); }`
+
+2. **`is_false_positive()` in detection.rs missing `is_license_reference` check**:
+   - Python's `is_false_positive()` checks `is_license_tag` at line 1236:
+     ```python
+     if matches_is_license_tag_flags and all_match_rule_length_one:
+         return True
+     ```
+   - But it does NOT check `is_license_reference`
+   - Rust's `is_false_positive()` only checks `is_license_tag` at lines 415-418:
+     ```rust
+     if all_is_license_tag && all_rule_length_one {
+         return true;
+     }
+     ```
+   - The borceux match has `is_license_reference=true` (not `is_license_tag`)
+
+3. **The borceux match characteristics**:
+   - `is_license_reference: true` ✓
+   - `rule_relevance: 50` (< 60, low relevance) ✓
+   - `matched_length: 1` (rule length 1) ✓
+   - `match_coverage: 100.0` ✓
+   - But NOT: `is_license_tag`, `is_bare_rule`, or `is_gpl`
+   - So none of the existing false positive checks catch it!
+
+### Threshold Analysis
+
+The `MIN_SHORT_FP_LIST_LENGTH = 15` threshold is designed for files like:
+- SPDX license list JSON files
+- Package manager license selection code
+- License detection library test data
+
+But the failing tests have small numbers of spurious matches (1-2), not 15+ candidate matches.
+
+### The Missing Check
+
+**Both Python and Rust are missing a check for `is_license_reference`** in `is_false_positive()`:
+
+```python
+# Python detection.py:1236 - only checks is_license_tag
+if matches_is_license_tag_flags and all_match_rule_length_one:
+    return True
+```
+
+```rust
+// Rust detection.rs:415-418 - only checks is_license_tag
+if all_is_license_tag && all_rule_length_one {
+    return true;
+}
+```
+
+**However**, Python must be filtering these somewhere else (possibly in match refinement or a different detection path), as the golden tests show Python produces only `["gpl-2.0-plus"]`.
+
+---
+
 ## 1. Problem Statement
 
 Approximately 15 golden tests are currently failing because spurious license matches from license tag/reference/intro/clue rules are not being filtered out. These matches occur when the scanner processes files containing lists of license identifiers (e.g., SPDX license lists in tools like `spdx-license-list`, package manager code, or license detection libraries).
 
 **Example scenario**: A file containing a list of SPDX license identifiers like:
+
 ```json
 ["MIT", "Apache-2.0", "GPL-3.0", "BSD-3-Clause", ...]
 ```
@@ -96,6 +189,7 @@ Approximately 15 golden tests are currently failing because spurious license mat
 Each identifier matches a license tag or reference rule, producing dozens of false positive matches. The Rust implementation currently lacks the `filter_false_positive_license_lists_matches` function that the Python implementation uses to detect and filter these patterns.
 
 **Why this matters**:
+
 - Users scanning license-related tools or data files get incorrect results
 - The noise-to-signal ratio is unacceptably high for certain file types
 - Feature parity with Python ScanCode Toolkit is incomplete
@@ -129,6 +223,7 @@ def filter_false_positive_license_lists_matches(
 ```
 
 **Key logic**:
+
 1. **Early exit** if fewer than `min_matches` (15) matches exist
 2. **Fast path for long lists** (>150 matches): If 95% are candidates, discard all
 3. **Detailed procedure** for medium lists (15-150 matches):
@@ -170,6 +265,7 @@ def is_candidate_false_positive(
 ```
 
 **Conditions for being a candidate false positive**:
+
 1. Rule is one of: `is_license_reference`, `is_license_tag`, `is_license_intro`, or `is_license_clue`
 2. Matcher is NOT `'1-spdx-id'` (explicit SPDX ID matches are legitimate)
 3. Coverage is exactly 100% (exact matches only)
@@ -225,6 +321,7 @@ def is_list_of_false_positives(
 ```
 
 **Conditions for a list being false positives**:
+
 1. At least `min_matches` (default 15) matches
 2. Either:
    - Proportion of unique license expressions > 1/3, OR
@@ -246,6 +343,7 @@ def qdistance_to(self, other):
 ```
 
 The `distance_to` method on spans (from `spans.py:402-435`):
+
 - Returns 0 if spans overlap
 - Returns 1 if spans touch (adjacent)
 - Otherwise returns the gap between them
@@ -303,6 +401,7 @@ pub fn refine_matches(
 ```
 
 **Current filters present**:
+
 - `filter_short_gpl_matches` - Filters GPL matches with very short matched_length
 - `filter_false_positive_matches` - Filters matches by rule ID in false_positive_rids set
 - `filter_contained_matches` - Filters matches contained within other matches
@@ -336,6 +435,7 @@ pub struct LicenseMatch {
 ```
 
 **Missing fields needed for filtering**:
+
 - `is_license_reference: bool` - Not present on LicenseMatch
 - `is_license_tag: bool` - Not present on LicenseMatch
 
@@ -395,6 +495,7 @@ pub struct LicenseMatch {
 Update the following files to propagate the new fields:
 
 **File**: `src/license_detection/aho_match.rs` (line ~172)
+
 ```rust
 let license_match = LicenseMatch {
     // ... existing fields ...
@@ -406,11 +507,13 @@ let license_match = LicenseMatch {
 ```
 
 **File**: `src/license_detection/hash_match.rs` (lines ~141-142, ~179-180)
+
 ```rust
 // Add is_license_reference and is_license_tag to both match creation sites
 ```
 
 **File**: `src/license_detection/seq_match.rs` (line ~505)
+
 ```rust
 is_license_intro: candidate.rule.is_license_intro,
 is_license_clue: candidate.rule.is_license_clue,
@@ -419,6 +522,7 @@ is_license_tag: candidate.rule.is_license_tag,              // ADD
 ```
 
 **File**: `src/license_detection/unknown_match.rs` (line ~306)
+
 ```rust
 is_license_intro: false,
 is_license_clue: false,
@@ -986,3 +1090,77 @@ cargo run -- /tmp/license_list.json -o /tmp/output.json
 - Python implementation: `reference/scancode-toolkit/src/licensedcode/match.py:2408-2648`
 - Python span distance: `reference/scancode-toolkit/src/licensedcode/spans.py:402-435`
 - Python refine_matches: `reference/scancode-toolkit/src/licensedcode/match.py:2691-2833`
+
+---
+
+## Remaining TODOs
+
+### TODO 1: Add `is_license_reference` check to `is_false_positive()` in detection.rs
+
+**Location**: `src/license_detection/detection.rs:359-421`
+
+**Problem**: The `is_false_positive()` function only checks `is_license_tag` for single-token rule filtering, but not `is_license_reference`. The Python reference also only checks `is_license_tag`, so this may be a missing filter in both implementations.
+
+**Proposed Fix**: Add check for `is_license_reference` matches with low relevance and short rule length:
+
+```rust
+// Check 5: License reference matches with length == 1 and low relevance
+let all_is_license_reference = matches.iter().all(|m| m.is_license_reference);
+if all_is_license_reference && all_rule_length_one && all_low_relevance {
+    return true;
+}
+```
+
+**Affected tests**: `gpl-2.0-plus_11.txt`, `gpl_18.txt`, `gpl_26.txt`, `gpl_35.txt`, `gpl_36.txt`, `gpl_40.txt`, `gpl_48.txt`, `gpl_57.txt`, `fsf-unlimited-no-warranty_with_line_numbers.pl`, `complex.el`
+
+### TODO 2: Investigate why Python produces correct output
+
+**Problem**: The Python reference also only checks `is_license_tag` in `is_false_positive()`, yet Python produces the correct output for these tests. There may be additional filtering happening in:
+- `filter_false_positive_license_lists_matches()` being called with different parameters
+- Detection grouping removing isolated low-relevance matches
+- A different code path entirely
+
+**Action**: Trace through Python execution on `gpl-2.0-plus_11.txt` to find where the borceux match is filtered.
+
+### TODO 3: Lower `MIN_SHORT_FP_LIST_LENGTH` threshold (optional)
+
+**Current value**: 15
+
+**Problem**: Tests with 1-2 spurious matches are not filtered because threshold is too high.
+
+**Risk**: Lowering threshold may cause false negatives on legitimate license lists.
+
+**Recommendation**: Only do this after investigating TODO 2. The correct solution may be adding `is_license_reference` check (TODO 1) rather than changing threshold.
+
+### TODO 4: Add unit test for single spurious `is_license_reference` match
+
+Add test to `detection.rs`:
+
+```rust
+#[test]
+fn test_is_false_positive_single_license_reference() {
+    let matches = vec![LicenseMatch {
+        license_expression: "borceux".to_string(),
+        license_expression_spdx: "Borceux".to_string(),
+        from_file: None,
+        start_line: 188,
+        end_line: 188,
+        matcher: "2-aho".to_string(),
+        score: 50.0,
+        matched_length: 1,
+        rule_length: 1,
+        match_coverage: 100.0,
+        rule_relevance: 50,
+        rule_identifier: "spdx_license_id_borceux_for_borceux.RULE".to_string(),
+        rule_url: String::new(),
+        matched_text: None,
+        referenced_filenames: None,
+        is_license_intro: false,
+        is_license_clue: false,
+        is_license_reference: true,
+        is_license_tag: false,
+    }];
+    // After TODO 1 fix, this should return true
+    assert!(is_false_positive(&matches));
+}
+```

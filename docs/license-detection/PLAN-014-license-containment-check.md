@@ -1,9 +1,10 @@
 # PLAN-014: License Expression Containment Checking
 
-> **Status**: Not Started
+> **Status**: REGRESSION IDENTIFIED — Requires Fix
 > **Priority**: P1 — Critical Correctness Issue
 > **Estimated Effort**: 2-3 days
 > **Created**: 2026-02-17
+> **Updated**: 2026-02-17
 
 ## Problem Statement
 
@@ -46,6 +47,7 @@ def qcontains(self, other):
 ```
 
 The key difference:
+
 - **qspan**: Query span - positions in the input text's token stream
 - **ispan**: Index span - positions in the rule's token stream
 - Both use **token positions**, not line numbers
@@ -283,6 +285,7 @@ pub struct LicenseMatch {
 ```
 
 **Missing Fields**:
+
 - `qstart` - Start token position in query
 - `qend` - End token position in query
 - `ispan_start` - Start position in rule
@@ -538,6 +541,7 @@ Ensure the `Query` and `QueryRun` structs properly track token positions:
 **File**: `src/license_detection/query.rs`
 
 The `QueryRun` already has position tracking. Verify that:
+
 - `start` is the absolute token position in the query
 - `end` is the absolute token position in the query
 - `line_for_pos()` correctly maps token positions to line numbers
@@ -642,6 +646,7 @@ cargo test license_detection_golden
 ```
 
 The specific failing tests should now pass. Look for tests involving:
+
 - Overlapping license matches
 - License expression containment (e.g., "MIT OR Apache" vs "MIT")
 - Multi-license files
@@ -680,6 +685,7 @@ cd reference/scancode-toolkit
 ### 1. License Expression Parsing Complexity
 
 The `license_expression` Python library has sophisticated logic for:
+
 - Parsing SPDX expressions
 - Handling operators (AND, OR, WITH)
 - Exception handling (e.g., "GPL-2.0 WITH Classpath-exception-2.0")
@@ -712,6 +718,167 @@ Some edge cases may not be covered by existing tests.
 3. `licensing_contains` properly checks license expression containment
 4. Unit tests cover containment logic with >90% coverage
 5. No performance regression (verify with benchmarks)
+
+---
+
+## Analysis Results
+
+### Status: REGRESSION IDENTIFIED
+
+The PLAN-014 implementation caused a regression in the golden tests. The commit message claims:
+> lic1: 174 passed, 117 failed -> 177 passed, 114 failed
+
+However, this is misleading. The 3 additional "passes" are likely from different tests, while other tests regressed.
+
+### Root Cause: SPDX-LID Matches Have `start_token = 0, end_token = 0`
+
+**The Problem:**
+
+In `src/license_detection/spdx_lid.rs:279-280`, SPDX-LID matches are created with:
+```rust
+start_token: 0,
+end_token: 0,
+```
+
+This means **all SPDX-LID matches appear to occupy the same token span (0, 0)**.
+
+**The Impact on `qcontains()`:**
+
+The `qcontains()` method in `models.rs:273-275`:
+```rust
+pub fn qcontains(&self, other: &LicenseMatch) -> bool {
+    self.start_token <= other.start_token && self.end_token >= other.end_token
+}
+```
+
+With all SPDX matches having `start_token = 0, end_token = 0`:
+- **Every SPDX match appears to contain every other SPDX match** (since 0 <= 0 and 0 >= 0)
+- `filter_contained_matches()` incorrectly filters SPDX matches as duplicates
+
+**Example Regression:**
+
+Test file: `gpl_or_mit_1.txt`
+- Expected: `["mit OR gpl-2.0"]`
+- Actual: `[]` (empty - both matches were filtered!)
+
+This happens because:
+1. SPDX-LID detects both "MIT" and "GPL-2.0" as separate matches
+2. Both have `start_token = 0, end_token = 0`
+3. `qcontains()` returns true for both directions
+4. `filter_contained_matches()` removes one, keeping only the first
+5. Further refinement may remove the remaining one
+
+### Other Matchers Populate Token Positions Correctly
+
+| Matcher | `start_token` | `end_token` | Correct? |
+|---------|--------------|-------------|----------|
+| hash_match | `query_run.start` | `query_run.end + 1` | Yes |
+| aho_match | `qbegin + byte_pos_to_token_pos(byte_start)` | `qbegin + byte_pos_to_token_pos(byte_end)` | Yes |
+| seq_match | `qpos` | `qpos + mlen` | Yes |
+| unknown_match | `start` | `end` | Yes |
+| **spdx_lid_match** | **0** | **0** | **NO** |
+
+### Edge Case: Matches with Zero-Length Token Spans
+
+When `start_token == end_token == 0`:
+- The match has no valid token position
+- It represents a tag/reference, not actual matched text
+- These should NOT be filtered by `qcontains()` as they represent different semantic matches
+
+### Why the Line-Based Check Didn't Have This Problem
+
+The old line-based check in `filter_contained_matches()`:
+```rust
+current.start_line >= kept_match.start_line
+    && current.end_line <= kept_match.end_line
+    && current.matched_length <= kept_match.matched_length
+```
+
+This used line numbers which are correctly populated for SPDX matches. A match at line 1 is different from a match at line 5, so they weren't incorrectly filtered.
+
+---
+
+## Remaining TODOs
+
+### 1. Fix SPDX-LID Token Position Tracking (CRITICAL)
+
+**File:** `src/license_detection/spdx_lid.rs`
+
+SPDX-LID matches need accurate token positions. Options:
+
+**Option A:** Track token positions during parsing
+- Find where the SPDX expression appears in the tokenized query
+- Set `start_token` and `end_token` to actual token positions
+
+**Option B:** Use unique sentinel values
+- Set `start_token = line_num * 1000000` (ensures uniqueness per line)
+- Set `end_token = start_token + 1`
+- Prevents false containment between different SPDX matches
+
+**Option C:** Skip token-based containment for SPDX matches
+- Add a flag `is_license_tag` and skip `qcontains()` check for these
+- Fall back to line-based containment for SPDX matches
+
+### 2. Fix `qcontains()` Edge Case Handling
+
+**File:** `src/license_detection/models.rs`
+
+When both matches have `start_token == 0 && end_token == 0`:
+- Return `false` (they don't contain each other)
+- They are separate semantic matches that should both be kept
+
+```rust
+pub fn qcontains(&self, other: &LicenseMatch) -> bool {
+    // Edge case: zero-length token spans (e.g., SPDX-LID matches)
+    // These should not be considered as containing each other
+    if self.start_token == 0 && self.end_token == 0
+        && other.start_token == 0 && other.end_token == 0
+    {
+        return false;
+    }
+    self.start_token <= other.start_token && self.end_token >= other.end_token
+}
+```
+
+**Note:** This is a band-aid fix. The proper fix is Option A or C above.
+
+### 3. Add Unit Tests for Edge Cases
+
+**File:** `src/license_detection/match_refine_test.rs`
+
+```rust
+#[test]
+fn test_filter_contained_matches_spdx_matches_not_filtered() {
+    // Two SPDX-LID matches at different lines should both be kept
+    let matches = vec![
+        LicenseMatch {
+            start_line: 1, end_line: 1,
+            start_token: 0, end_token: 0,
+            license_expression: "mit".to_string(),
+            ..create_test_match("#1", 1, 1, 1.0, 100.0, 100)
+        },
+        LicenseMatch {
+            start_line: 5, end_line: 5,
+            start_token: 0, end_token: 0,
+            license_expression: "apache-2.0".to_string(),
+            ..create_test_match("#2", 5, 5, 1.0, 100.0, 100)
+        },
+    ];
+    let filtered = filter_contained_matches(&matches);
+    assert_eq!(filtered.len(), 2, "Both SPDX matches should be kept");
+}
+```
+
+### 4. Verify Fix Against Golden Tests
+
+Run the golden test suite after implementing fixes:
+```bash
+cargo test license_detection::golden_test::golden_tests::test_golden_lic1
+```
+
+The specific test `gpl_or_mit_1.txt` should pass:
+- Expected: `["mit OR gpl-2.0"]`
+- Should not be filtered to `[]`
 
 ---
 

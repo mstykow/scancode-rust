@@ -1,9 +1,10 @@
 # PLAN-009: Fix `is_false_positive()` Function
 
-**Status:** Draft  
+**Status:** Partially Implemented  
 **Priority:** P3 (HIGH IMPACT)  
 **Estimated Effort:** Medium  
 **Affected Tests:** ~10 golden tests  
+**Last Updated:** 2026-02-17  
 
 ## 1. Problem Statement
 
@@ -19,6 +20,7 @@ The Rust `is_false_positive()` function in `src/license_detection/detection.rs` 
 ### Failing Tests
 
 From `FAILURES.md`:
+
 - gpl-2.0_30.txt
 - gpl_48.txt  
 - gpl_12.txt
@@ -34,9 +36,11 @@ From `FAILURES.md`:
 ## 2. Python Reference Analysis
 
 ### Location
+
 `reference/scancode-toolkit/src/licensedcode/detection.py:1162-1239`
 
 ### Key Constants
+
 ```python
 # detection.py:96
 FALSE_POSITIVE_RULE_LENGTH_THRESHOLD = 3
@@ -46,6 +50,7 @@ FALSE_POSITIVE_START_LINE_THRESHOLD = 1000
 ```
 
 ### Python Implementation
+
 ```python
 def is_false_positive(license_matches, package_license=False):
     """
@@ -145,6 +150,7 @@ def is_false_positive(license_matches, package_license=False):
 ## 3. Rust Code Analysis
 
 ### Current Implementation
+
 **Location:** `src/license_detection/detection.rs:307-346`
 
 ```rust
@@ -196,17 +202,20 @@ fn is_false_positive(matches: &[LicenseMatch]) -> bool {
 ### Data Model Issue
 
 **Rule struct** (`src/license_detection/models.rs:58-171`):
+
 - Has `length_unique: usize` (unique token count)
 - Has `high_length: usize` (legalese token occurrences)
 - **MISSING**: Plain `length: usize` field (total token count including duplicates)
 
 **LicenseMatch struct** (`src/license_detection/models.rs:174-224`):
+
 - Has `matched_length: usize` - documented as "Length of matched text in characters"
 - **MISSING**: `rule_length: usize` field to store the rule's token count
 
 ### Python's Rule.length Field
 
 From `reference/scancode-toolkit/src/licensedcode/models.py:1699-1704`:
+
 ```python
 length = attr.ib(
     default=0,
@@ -278,6 +287,7 @@ pub struct LicenseMatch {
 ### 4.4 Populate `rule_length` in Match Creators
 
 **Files to update:**
+
 - `src/license_detection/hash_match.rs`
 - `src/license_detection/aho_match.rs`
 - `src/license_detection/seq_match.rs`
@@ -537,47 +547,63 @@ fn test_parity_with_python_is_false_positive() {
 ## 6. Implementation Checklist
 
 ### Phase 1: Data Model Changes
-- [ ] Add `length: usize` field to `Rule` struct in `models.rs`
-- [ ] Add `rule_length: usize` field to `LicenseMatch` struct in `models.rs`
-- [ ] Update `create_test_match_with_params` helper function
+
+- [x] Add `length: usize` field to `Rule` struct in `models.rs` (already exists as tokens.len())
+- [x] Add `rule_length: usize` field to `LicenseMatch` struct in `models.rs`
+- [x] Update `create_test_match_with_params` helper function
 
 ### Phase 2: Populate Data
-- [ ] Set `rule.length` in `index/builder.rs` during index building
-- [ ] Set `rule_length` in `hash_match.rs` when creating matches
-- [ ] Set `rule_length` in `aho_match.rs` when creating matches
-- [ ] Set `rule_length` in `seq_match.rs` when creating matches
-- [ ] Update `test_utils.rs` match creation helpers
+
+- [x] Set `rule.length` in `index/builder.rs` during index building (via tokens.len())
+- [x] Set `rule_length` in `hash_match.rs` when creating matches
+- [x] Set `rule_length` in `aho_match.rs` when creating matches
+- [x] Set `rule_length` in `seq_match.rs` when creating matches
+- [x] Update `test_utils.rs` match creation helpers
 
 ### Phase 3: Fix the Function
-- [ ] Add `has_full_relevance` early-return check
-- [ ] Change from `matched_length` to `rule_length` for all checks
-- [ ] Change GPL check from `all_short` (≤ 3) to `all_rule_length_one` (== 1)
-- [ ] Change late match check from `all()` to `any()` for rule length
-- [ ] (Optional) Add `is_license_tag` check if that field is propagated
+
+- [x] Add `has_full_relevance` early-return check
+- [x] Change from `matched_length` to `rule_length` for all checks
+- [x] Change GPL check from `all_short` (≤ 3) to `all_rule_length_one` (== 1)
+- [x] Change late match check from `all()` to `any()` for rule length
+- [x] Add `is_license_tag` check for short rules
 
 ### Phase 4: Tests
-- [ ] Update existing unit tests with `rule_length` parameter
-- [ ] Add new unit tests for edge cases
-- [ ] Run golden tests to verify ~10 failing tests now pass
+
+- [x] Update existing unit tests with `rule_length` parameter
+- [x] Add new unit tests for edge cases
+- [ ] Run golden tests to verify ~10 failing tests now pass (STILL FAILING)
 - [ ] Run full test suite to ensure no regressions
 
 ### Phase 5: Documentation
+
 - [ ] Update doc comments on `Rule.length` and `LicenseMatch.rule_length`
 - [ ] Document the change in CHANGELOG or commit message
+
+### Phase 6: Missing Implementations (Identified 2026-02-17)
+
+- [ ] **CRITICAL**: Implement `filter_false_positive_license_lists_matches`
+- [ ] **CRITICAL**: Implement `is_candidate_false_positive`
+- [ ] Investigate `exif_not_lgpl3.txt` empty detection issue
+- [ ] Add copyright word check to `is_false_positive()`
+- [ ] Verify `rule_length` population for all match types
 
 ---
 
 ## 7. Risk Assessment
 
 ### Low Risk
+
 - Adding new fields to structs is backward compatible for internal use
 - Unit test changes are isolated
 
 ### Medium Risk
+
 - Changing the false positive logic could affect other tests not yet identified
 - The `any()` vs `all()` change in late match detection needs careful testing
 
 ### Mitigation
+
 - Run full golden test suite after changes
 - Compare output against Python reference for a sample of real-world files
 - Consider incremental rollout (fix one check at a time)
@@ -599,3 +625,129 @@ fn test_parity_with_python_is_false_positive() {
 - Rust implementation: `src/license_detection/detection.rs:307-346`
 - Rust constants: `src/license_detection/detection.rs:24-28`
 - FAILURES.md section: Lines 270-276
+
+---
+
+## 10. Analysis Results (2026-02-17)
+
+### What Was Implemented
+
+The Rust `is_false_positive()` function has been updated to include:
+
+1. **`has_full_relevance` early-return check** - Returns `false` if all matches have `rule_relevance == 100`
+2. **`rule_length` field** - Added to `LicenseMatch` struct (line 217) and populated in match creators
+3. **Correct token count check** - Uses `rule_length` (token count) instead of `matched_length` (character count)
+4. **GPL check with `== 1`** - Checks `all_rule_length_one` (exactly 1) instead of `all_short` (≤ 3)
+5. **`any()` semantics for late match** - Uses `any()` for rule length check in late match detection
+6. **`is_license_tag` check** - Added check for license tag matches with `rule_length == 1`
+
+### Why Tests Still Fail
+
+The `is_false_positive()` function changes are **insufficient** to fix the failing tests because:
+
+#### 1. Different False Positive Functions for Different Purposes
+
+There are **two separate false positive functions**:
+
+| Function | Location | Purpose | Checks |
+|----------|----------|---------|--------|
+| `is_false_positive(matches: &[LicenseMatch])` | `detection.rs:359` | Detection-level filtering | rule_length, relevance, GPL patterns |
+| `is_false_positive(m: &LicenseMatch, index: &LicenseIndex)` | `match_refine.rs:233` | Match-level filtering | `false_positive_rids` set |
+
+The detection-level function was fixed, but the match-level function is a **simple set lookup** that checks if the rule identifier is in `false_positive_rids`. This is populated from rules with `is_false_positive: yes` in their YAML frontmatter.
+
+#### 2. Missing `filter_false_positive_license_lists_matches`
+
+The FAILURES.md analysis reveals that many failing tests (gpl_18.txt, gpl_26.txt, gpl_35.txt, gpl_40.txt, gpl_48.txt, gpl_57.txt, gpl-2.0-plus_11.txt, gpl-2.0-plus_17.txt, gpl-2.0-plus_28.txt) are failing due to **spurious `borceux` matches**.
+
+The `borceux_1.RULE` has:
+```yaml
+license_expression: borceux
+is_license_reference: yes
+relevance: 100
+```
+
+Python filters these via `filter_false_positive_license_lists_matches()` (match.py:2408-2539) which:
+1. Checks for sequences of short `is_license_reference` or `is_license_tag` matches
+2. Uses `is_candidate_false_positive()` (match.py:2651-2688) to identify candidates
+3. Discards matches that form "license lists" (like lists of license identifiers in tools)
+
+**Rust does not implement `filter_false_positive_license_lists_matches`**.
+
+#### 3. Test-Specific Issues
+
+| Test | Expected | Actual | Root Cause |
+|------|----------|--------|------------|
+| `gpl_48.txt` | `gpl-1.0-plus` | `gpl-1.0-plus, borceux` | Missing `filter_false_positive_license_lists_matches` |
+| `gpl-2.0_30.txt` | `gpl-1.0-plus` | `[]` | GPL match filtered by `is_false_positive` when it shouldn't be |
+| `exif_not_lgpl3.txt` | `lgpl-2.1` | `[]` | Short LGPL reference filtered as false positive |
+| `flex-readme.txt` | 3x `flex-2.5` | `cc-by-nc-sa-2.0, flex-2.5...` | Missing `is_license_tag` check wasn't the issue |
+
+### Key Insight: `is_false_positive` is Too Aggressive
+
+The `is_false_positive()` function is being called on detection groups that **should not be filtered**:
+
+- `exif_not_lgpl3.txt` contains "libexif is LGPLv2.1" - a legitimate license reference
+- The `lgpl-2.1` match has `rule_length > 1` and shouldn't trigger the GPL check
+- But something in the detection pipeline is causing it to be filtered
+
+The issue may be in **when** `is_false_positive()` is called, not just **how** it works.
+
+### Another Issue: `has_full_relevance` Check Logic
+
+Python's `is_false_positive()` returns `false` if **all** matches have `relevance == 100`:
+
+```python
+has_full_relevance = all(
+    license_match.rule.relevance == 100
+    for license_match in license_matches
+)
+if has_copyrights or has_full_relevance:
+    return False
+```
+
+Rust implemented this correctly, but the `borceux` rule has `relevance: 100`, which means matches to `is_license_reference` rules with `relevance: 100` would pass through `is_false_positive()` - they need to be filtered elsewhere (via `filter_false_positive_license_lists_matches`).
+
+---
+
+## 11. Remaining TODOs
+
+### Critical (Required to Fix Failing Tests)
+
+- [ ] **Implement `filter_false_positive_license_lists_matches`** 
+  - Location: `src/license_detection/match_refine.rs`
+  - Python reference: `match.py:2408-2539`
+  - Affects: gpl_18.txt, gpl_26.txt, gpl_35.txt, gpl_40.txt, gpl_48.txt, gpl_57.txt, gpl-2.0-plus_11.txt, gpl-2.0-plus_17.txt, gpl-2.0-plus_28.txt, and more
+
+- [ ] **Implement `is_candidate_false_positive`**
+  - Checks if a match is a candidate for license list false positive
+  - Criteria: `is_license_reference || is_license_tag || is_license_intro || is_license_clue`, exact match, short length
+
+- [ ] **Investigate why `exif_not_lgpl3.txt` returns empty**
+  - The LGPL reference should be detected and not filtered
+  - May be an issue with detection grouping or filtering order
+
+### Medium Priority
+
+- [ ] **Add copyright word check to `is_false_positive()`**
+  - Python checks for "copyright" or "(c)" in matched text
+  - Requires `matched_text` to be available
+
+- [ ] **Verify `rule_length` is populated correctly for all match types**
+  - Check `hash_match.rs`, `aho_match.rs`, `seq_match.rs`, `unknown_match.rs`
+  - Some tests show `rule_length: 100` which suggests hardcoded fallback
+
+### Low Priority
+
+- [ ] **Add integration tests for false positive detection**
+  - Test specific false positive scenarios directly
+  - Verify parity with Python for edge cases
+
+---
+
+## 12. Implementation Order Recommendation
+
+1. **First**: Implement `filter_false_positive_license_lists_matches` - this is the missing piece causing most "extra borceux" failures
+2. **Second**: Investigate `exif_not_lgpl3.txt` empty detection - may reveal another filtering issue
+3. **Third**: Verify `rule_length` population in all match creators
+4. **Fourth**: Add copyright word check for completeness

@@ -1,6 +1,6 @@
 # PLAN-012: Fix Parentheses Logic in `expression_to_string`
 
-**Status**: Draft  
+**Status**: Implemented  
 **Priority**: High  
 **Component**: License Expression Rendering  
 **Related**: Python parity, Golden test alignment
@@ -119,6 +119,7 @@ fn expression_to_string_internal(
 ### 3.2 The Bug
 
 For WITH inside OR:
+
 1. `parent_prec = Some(Precedence::Or)`
 2. Condition: `Or != With` = **true**
 3. Result: Incorrectly adds parentheses: `(gpl-2.0 WITH classpath-exception-2.0) OR mit`
@@ -249,13 +250,13 @@ cargo clippy --all-targets --all-features -- -D warnings
 
 ## 6. Implementation Checklist
 
-- [ ] Modify WITH branch in `expression_to_string_internal` (remove parentheses logic)
-- [ ] Update expected value in `test_expression_to_string_with_inside_or`
-- [ ] Update expected value in `test_expression_to_string_with_inside_and`
-- [ ] Update test `test_expression_to_string_roundtrip_or_with`
-- [ ] Run `cargo test --lib` to verify all tests pass
-- [ ] Run `cargo clippy` to ensure no warnings
-- [ ] Verify output matches Python reference
+- [x] Modify WITH branch in `expression_to_string_internal` (remove parentheses logic)
+- [x] Update expected value in `test_expression_to_string_with_inside_or`
+- [x] Update expected value in `test_expression_to_string_with_inside_and`
+- [x] Update test `test_expression_to_string_roundtrip_or_with`
+- [x] Run `cargo test --lib` to verify all tests pass
+- [x] Run `cargo clippy` to ensure no warnings
+- [x] Verify output matches Python reference
 
 ---
 
@@ -264,7 +265,64 @@ cargo clippy --all-targets --all-features -- -D warnings
 | Item | Details |
 |------|---------|
 | **Root Cause** | WITH expressions incorrectly add parentheses when inside OR/AND |
-| **Fix Location** | `src/license_detection/expression.rs:327-336` |
+| **Fix Location** | `src/license_detection/expression.rs:426-430` |
 | **Fix Type** | Remove parentheses logic from WITH branch |
-| **Tests Affected** | 3 tests need expected value updates |
+| **Tests Affected** | 3 tests updated with correct expected values |
 | **Complexity** | Low - single code block simplification |
+
+---
+
+## 8. Analysis Results
+
+### 8.1 Implementation Verification
+
+The fix has been successfully implemented. The current code at `expression.rs:426-430`:
+
+```rust
+LicenseExpression::With { left, right } => {
+    let left_str = expression_to_string_internal(left, Some(Precedence::With));
+    let right_str = expression_to_string_internal(right, Some(Precedence::With));
+    format!("{} WITH {}", left_str, right_str)
+}
+```
+
+No parentheses logic is present - WITH expressions are rendered as atomic symbols.
+
+### 8.2 Test Results
+
+All 19 `expression_to_string` tests pass:
+
+```
+test license_detection::expression::tests::test_expression_to_string_with_inside_or ... ok
+test license_detection::expression::tests::test_expression_to_string_with_inside_and ... ok
+test license_detection::expression::tests::test_expression_to_string_roundtrip_or_with ... ok
+test license_detection::expression::tests::test_expression_to_string_or_inside_with ... ok
+test license_detection::expression::tests::test_expression_to_string_and_inside_with ... ok
+```
+
+### 8.3 Edge Cases Verified
+
+| Case | Input | Output | Status |
+|------|-------|--------|--------|
+| WITH inside OR | `(gpl-2.0 WITH exception) OR mit` | `gpl-2.0 WITH exception OR mit` | Correct |
+| WITH inside AND | `(gpl-2.0 WITH exception) AND mit` | `gpl-2.0 WITH exception AND mit` | Correct |
+| OR inside WITH | `(mit OR apache) WITH exception` | `(mit OR apache) WITH exception` | Correct |
+| AND inside WITH | `(mit AND apache) WITH exception` | `(mit AND apache) WITH exception` | Correct |
+| Multiple WITH in OR | `a WITH x OR b WITH y` | `a WITH x OR b WITH y` | Correct |
+| WITH on both sides of AND | `a WITH x AND b WITH y` | `a WITH x AND b WITH y` | Correct |
+
+### 8.4 Remaining Golden Test Failures
+
+The FAILURES.md still lists tests with parentheses issues (lines 133, 158-162), but these entries are **stale** - they reflect the pre-fix state. The underlying golden tests may have other issues (grouping, unknown-license-reference, etc.) but the expression rendering fix is complete.
+
+Key remaining golden test issues are unrelated to parentheses:
+- Match grouping logic (license intro/clue detection)
+- Unknown license reference filtering
+- HTML demarkup preprocessing
+- License deduplication
+
+---
+
+## 9. Conclusion
+
+PLAN-012 has been successfully implemented. The WITH expression parentheses fix is complete and verified. All unit tests pass. The fix correctly treats WITH expressions as atomic symbols that never need outer parentheses based on parent operator precedence.

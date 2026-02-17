@@ -37,6 +37,7 @@ These functions are called in `group_matches_by_region_with_threshold()` (lines 
 - **Line 187-192**: Current match checked - if `is_license_clue_match()`, creates a separate singleton group
 
 The incorrect heuristics cause:
+
 - Intro matches to not be properly identified (they're not grouped with subsequent proper matches)
 - Clue matches to be incorrectly identified or missed
 - Detection grouping to produce wrong results
@@ -108,6 +109,7 @@ def is_license_intro(license_match):
 ```
 
 **Key observations:**
+
 1. Checks `license_match.rule.is_license_intro` - the **rule flag**, not string matching
 2. Also checks `license_match.rule.is_license_clue` - both flags are considered for intro detection
 3. Also checks `license_match.rule.license_expression == 'free-unknown'` - special case
@@ -132,6 +134,7 @@ def is_unknown_intro(license_match):
 ```
 
 **Key observations:**
+
 1. Uses `license_match.rule.is_license_intro` and `license_match.rule.is_license_clue` - the **rule flags**
 2. Also checks `license_match.rule.has_unknown` for the rule
 
@@ -293,6 +296,7 @@ The fix is straightforward: Replace the incorrect `is_license_intro_match()` and
 **Line:** 220-222
 
 **Before:**
+
 ```rust
 /// Check if a match is a license intro.
 fn is_license_intro_match(match_item: &LicenseMatch) -> bool {
@@ -301,6 +305,7 @@ fn is_license_intro_match(match_item: &LicenseMatch) -> bool {
 ```
 
 **After:**
+
 ```rust
 /// Check if a match is a license intro for grouping purposes.
 ///
@@ -325,6 +330,7 @@ fn is_license_intro_match(match_item: &LicenseMatch) -> bool {
 **Line:** 225-227
 
 **Before:**
+
 ```rust
 /// Check if a match is a license clue.
 fn is_license_clue_match(match_item: &LicenseMatch) -> bool {
@@ -333,6 +339,7 @@ fn is_license_clue_match(match_item: &LicenseMatch) -> bool {
 ```
 
 **After:**
+
 ```rust
 /// Check if a match is a license clue for grouping purposes.
 ///
@@ -493,16 +500,19 @@ cargo test --lib license_detection::golden_test
 ### How to Verify the Fix Works
 
 1. **Run all license detection tests:**
+
    ```bash
    cargo test --lib license_detection::
    ```
 
 2. **Run golden tests specifically:**
+
    ```bash
    cargo test --lib license_detection::golden_test
    ```
 
 3. **Run on test data and compare with Python output:**
+
    ```bash
    # Run Rust version
    cargo run -- testdata/some-dir -o rust-output.json
@@ -563,3 +573,139 @@ This is a low-risk change because:
 - Rust detection grouping: `src/license_detection/detection.rs:148-208`
 - Rust LicenseMatch struct: `src/license_detection/models.rs:174-224`
 - Rust Rule struct: `src/license_detection/models.rs:58-171`
+
+---
+
+## Analysis Results
+
+### Status: FIX WAS NEVER IMPLEMENTED
+
+Despite commit `41f08305` claiming to fix PLAN-007, the actual implementation was **never applied**. The code still uses the incorrect string-based heuristics.
+
+### Evidence
+
+The current implementation at `detection.rs:271-279` still reads:
+
+```rust
+fn is_license_intro_match(match_item: &LicenseMatch) -> bool {
+    match_item.matcher.starts_with("5-unknown") || match_item.rule_identifier.contains("intro")
+}
+
+fn is_license_clue_match(match_item: &LicenseMatch) -> bool {
+    match_item.matcher == "5-unknown" || match_item.rule_identifier.contains("clue")
+}
+```
+
+These are the **exact same incorrect heuristics** that PLAN-007 was supposed to fix.
+
+### Why Golden Tests Showed Minimal Improvement
+
+The commit message claimed "24 fewer failures" but this was due to OTHER fixes in the same commit (PLAN-008 through PLAN-014), not PLAN-007. The PLAN-007 changes were simply never applied.
+
+### Root Cause Analysis
+
+1. **Commit claimed fix but didn't apply it**: The commit `41f08305` modified the grouping logic to use `should_group_together()` (PLAN-013) but never replaced the `is_license_intro_match()` and `is_license_clue_match()` implementations.
+
+2. **Multiple layers of intro/clue detection**: There are THREE different functions with similar purposes:
+   - `is_license_intro_match()` (line 272) - Used in grouping logic - **BROKEN (string heuristics)**
+   - `is_unknown_intro()` (line 490) - Used in `has_unknown_intro_before_detection()` - **BROKEN (string heuristics)**
+   - `is_license_intro()` (line 501) - Used in `filter_license_intros()` - **CORRECT (uses boolean flags)**
+
+3. **Missing `has_unknown` field**: Python's `is_unknown_intro()` checks `license_match.rule.has_unknown`, which is a property that returns `True` if `'unknown' in license_expression`. The Rust implementation lacks this field and the corresponding logic.
+
+### Python vs Rust Comparison
+
+| Function | Python Implementation | Rust Implementation | Status |
+|----------|----------------------|---------------------|--------|
+| `is_unknown_intro()` | `rule.has_unknown AND (rule.is_license_intro OR rule.is_license_clue OR expr == 'free-unknown')` | `matcher.starts_with("5-unknown") && rule_identifier.contains("intro")` | **WRONG** |
+| `is_license_intro()` | `(rule.is_license_intro OR rule.is_license_clue OR expr == 'free-unknown') AND (matcher == "2-aho" OR coverage == 100)` | `(is_license_intro OR is_license_clue OR expr == 'free-unknown') AND (matcher == "2-aho" OR coverage >= 99.99)` | **CORRECT** |
+| `is_license_clue_match()` | `rule.is_license_clue` | `matcher == "5-unknown" OR rule_identifier.contains("clue")` | **WRONG** |
+
+### Affected Test Cases
+
+Tests that should be fixed by PLAN-007 (from FAILURES.md):
+
+1. **cjdict-liconly.txt**: "Fails due to incorrect license intro detection in grouping logic - the Rust implementation uses a heuristic-based function instead of using the actual `is_license_intro` boolean field from LicenseMatch."
+
+2. **CRC32.java**: "Fails due to `is_license_clue_match()` checking `matcher == "5-unknown"` or `rule_identifier.contains("clue")` instead of the `is_license_clue` boolean field from the rule."
+
+3. **checker-2200.txt**: "Fails due to incorrect grouping logic where `is_license_intro_match()` and `is_license_clue_match()` functions use heuristics instead of checking the actual `is_license_intro` and `is_license_clue` fields."
+
+4. **cpl-1.0_5.txt**: "Fails due to incorrect `is_license_intro_match()` function using string heuristics instead of the actual `is_license_intro` field from the LicenseMatch."
+
+5. **diaspora_copyright.txt**: "Fails due to the `is_license_intro_match` and `is_license_clue_match` functions using heuristic checks instead of the actual boolean fields from `LicenseMatch`."
+
+6. **discourse_COPYRIGHT.txt**: "Fails due to `group_matches_by_region_with_threshold` using string-based heuristics instead of the `is_license_intro` and `is_license_clue` boolean fields."
+
+---
+
+## Remaining TODOs
+
+### Must Fix
+
+1. **Replace `is_license_intro_match()` implementation** (`detection.rs:272-274`):
+   ```rust
+   fn is_license_intro_match(match_item: &LicenseMatch) -> bool {
+       match_item.is_license_intro
+           || match_item.is_license_clue
+           || match_item.license_expression == "free-unknown"
+   }
+   ```
+
+2. **Replace `is_license_clue_match()` implementation** (`detection.rs:277-279`):
+   ```rust
+   fn is_license_clue_match(match_item: &LicenseMatch) -> bool {
+       match_item.is_license_clue
+   }
+   ```
+
+3. **Fix `is_unknown_intro()` implementation** (`detection.rs:490-492`):
+   - Add `has_unknown` computed property or inline check
+   - Python checks: `rule.has_unknown AND (rule.is_license_intro OR rule.is_license_clue OR expr == 'free-unknown')`
+   - `has_unknown` is `True` when `'unknown' in license_expression`
+   
+   ```rust
+   fn is_unknown_intro(m: &LicenseMatch) -> bool {
+       let has_unknown = m.license_expression.contains("unknown");
+       has_unknown && (m.is_license_intro || m.is_license_clue || m.license_expression == "free-unknown")
+   }
+   ```
+
+### Should Add
+
+4. **Add `has_unknown` field to Rule struct** (`models.rs`):
+   - Alternatively, compute inline since it's just `license_expression.contains("unknown")`
+
+5. **Add unit tests** for the fixed functions:
+   - `test_is_license_intro_match_with_flag`
+   - `test_is_license_intro_match_with_clue_flag`
+   - `test_is_license_intro_match_free_unknown`
+   - `test_is_license_clue_match_with_flag`
+   - `test_is_unknown_intro_with_has_unknown`
+
+6. **Verify `is_license_intro` and `is_license_clue` are populated correctly**:
+   - Check `aho_match.rs`, `hash_match.rs`, `seq_match.rs`, `spdx_lid.rs`, `unknown_match.rs`
+   - All should copy these fields from Rule to LicenseMatch
+
+### Validation
+
+7. **Run golden tests after fix**:
+   ```bash
+   cargo test --lib license_detection::golden_test::golden_tests::test_golden_lic1
+   ```
+
+8. **Verify specific test cases pass**:
+   - cjdict-liconly.txt
+   - CRC32.java  
+   - checker-2200.txt
+   - cpl-1.0_5.txt
+   - diaspora_copyright.txt
+   - discourse_COPYRIGHT.txt
+
+---
+
+## Estimated Impact
+
+After implementing the above fixes, expect:
+- **~15-20 additional golden tests to pass** (tests failing due to incorrect intro/clue detection)
+- No regressions (the current implementation is already broken for these cases)

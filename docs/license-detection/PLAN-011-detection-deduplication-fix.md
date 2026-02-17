@@ -1,6 +1,6 @@
 # PLAN-011: Fix `remove_duplicate_detections` to Use Content-Based Identifier
 
-## Status: DRAFT
+## Status: IMPLEMENTED (PARTIAL FIX)
 
 ## Summary
 
@@ -314,6 +314,7 @@ fn python_safe_name(s: &str) -> String {
 ```
 
 **Dependencies to add to `Cargo.toml`:**
+
 ```toml
 sha1 = "0.10"
 hex = "0.4"
@@ -690,3 +691,167 @@ Uuid::parse_str(&hex_string[..32])?.to_string()
 - **Testing:** 1-2 hours
 - **Verification & Debugging:** 1-2 hours
 - **Total:** 4-8 hours
+
+---
+
+## 10. Analysis Results (Post-Implementation)
+
+### 10.1 Implementation Status
+
+The fix was implemented in commit `41f08305`:
+- `remove_duplicate_detections()` now deduplicates by identifier (expression + content hash)
+- `compute_detection_identifier()` generates identifiers from matches
+- `compute_content_identifier()` creates UUID from rule_identifier, score, and matched_text
+
+### 10.2 Remaining Issues
+
+Despite the fix, several tests still fail with the same symptoms:
+
+| Test | Expected | Actual | Root Cause |
+|------|----------|--------|------------|
+| `ecos-license.html` | 2 detections | 1 detection | Match grouping combines matches |
+| `edl-1.0.txt` | 2 detections | 1 detection | Match grouping combines matches |
+| `gpl-2.0_82.RULE` | 3 detections | 1 detection | Match grouping combines matches |
+| `gpl_65.txt` | 2 detections | 1 detection | Match grouping combines matches |
+
+### 10.3 Root Cause Analysis
+
+**The issue is NOT in `remove_duplicate_detections()`.** The identifier-based deduplication is working correctly.
+
+**The actual issue is in match grouping (`group_matches_by_region_with_threshold`).**
+
+Evidence from `gpl-2.0_82.RULE`:
+- File contains ~311 lines with GPL-2.0 text at multiple locations
+- Lines 1-30: Short GPL-2.0 reference (lines 15-26)
+- Lines 32+: Full GPL-2.0 license text
+- Python produces 3 separate detections
+- Rust produces 1 combined detection
+
+The problem is in `should_group_together()`:
+```rust
+fn should_group_together(prev: &LicenseMatch, cur: &LicenseMatch) -> bool {
+    let token_gap = calculate_token_gap(prev, cur);
+    let line_gap = calculate_line_gap(prev, cur);
+    token_gap <= TOKENS_THRESHOLD && line_gap <= LINES_GAP_THRESHOLD
+}
+```
+
+This uses AND logic (both conditions must be met), but Python may use OR logic for different cases. When the token gap is small but the matches are semantically different sections, they should NOT be grouped.
+
+### 10.4 Additional Issues Found
+
+1. **`identifier` not set during detection creation**: In `populate_detection_from_group()` and `create_detection_from_group()`, the identifier is set to `None`. The identifier is only computed in `remove_duplicate_detections()`.
+
+2. **Missing `query_tokenizer` for matched_text**: Python tokenizes matched_text before hashing:
+   ```python
+   tokenized_matched_text = tuple(query_tokenizer(matched_text))
+   ```
+   Rust uses raw matched_text strings, which may produce different identifiers.
+
+3. **Match grouping threshold issue**: The dual-criteria `AND` logic in `should_group_together()` may be too aggressive, combining matches that should be separate.
+
+---
+
+## 11. Remaining TODOs
+
+### Priority 1: Fix Match Grouping Logic (HIGH IMPACT)
+
+**Issue**: Matches are being incorrectly grouped into single detections.
+
+**Location**: `src/license_detection/detection.rs:172-216` (`group_matches_by_region_with_threshold`)
+
+**Actions**:
+1. Verify Python's `get_matching_regions()` behavior in `licensedcode/match.py`
+2. Check if Python uses `OR` logic for min_tokens_gap vs min_lines_gap
+3. Compare actual match positions between Python and Rust
+
+### Priority 2: Compute Identifier During Detection Creation
+
+**Issue**: `identifier` is `None` until `remove_duplicate_detections()` runs.
+
+**Location**: 
+- `src/license_detection/detection.rs:747` (`populate_detection_from_group`)
+- `src/license_detection/detection.rs:834` (`create_detection_from_group`)
+
+**Fix**: Call `compute_detection_identifier()` after setting matches:
+```rust
+detection.identifier = Some(compute_detection_identifier(&detection));
+```
+
+### Priority 3: Implement Tokenization for Identifier Computation
+
+**Issue**: Python tokenizes matched_text before computing identifier hash.
+
+**Location**: `src/license_detection/detection.rs:967-977` (`compute_content_identifier`)
+
+**Fix**: Tokenize matched_text before including in hash:
+```rust
+fn compute_content_identifier(matches: &[LicenseMatch]) -> String {
+    let content: Vec<(&str, f32, Vec<String>)> = matches
+        .iter()
+        .map(|m| {
+            let matched_text = m.matched_text.as_deref().unwrap_or("");
+            let tokens = query_tokenize(matched_text); // Add this
+            (m.rule_identifier.as_str(), m.score, tokens)
+        })
+        .collect();
+    get_uuid_on_content(&content)
+}
+```
+
+### Priority 4: Investigate Duplicate Detection Expectations
+
+**Question**: Why do tests expect multiple detections of the same license?
+
+For `edl-1.0.txt`:
+- File is only 12 lines
+- Contains single BSD-New license text
+- Python expects 2 detections of `bsd-new`
+- This suggests Python is detecting the same text twice (possibly different rule matches)
+
+**Action**: Run Python detection on these files to understand the expected behavior.
+
+---
+
+## 12. Test Case Deep Dive
+
+### `edl-1.0.txt`
+
+**File content**: 12 lines of Eclipse Distribution License v1.0 (BSD-New style)
+
+**Expected**: `["bsd-new", "bsd-new"]`
+
+**Actual**: `["bsd-new"]`
+
+**Hypothesis**: Python may match both:
+1. The EDL-1.0 rule (which maps to bsd-new)
+2. A generic BSD-New rule
+
+Rust matches only one rule due to overlap filtering or match deduplication.
+
+### `gpl-2.0_82.RULE`
+
+**File content**: 311 lines with:
+- Lines 1-30: Intro text with short GPL-2.0 reference
+- Lines 32-311: Full GPL-2.0 license text
+
+**Expected**: `["gpl-2.0", "gpl-2.0", "gpl-2.0"]`
+
+**Actual**: `["gpl-2.0"]`
+
+**Analysis**: The three detections in Python likely correspond to:
+1. Short GPL-2.0 reference (lines 15-26)
+2. GPL-2.0 preamble (lines 32-50)
+3. Full GPL-2.0 terms
+
+Rust groups all matches together due to proximity threshold.
+
+### `gpl_65.txt`
+
+**File content**: Configuration file with multiple GPL references
+
+**Expected**: `["gpl-1.0-plus", "gpl-1.0-plus"]`
+
+**Actual**: `["gpl-1.0-plus"]`
+
+**Analysis**: Similar grouping issue - multiple GPL references in same file are merged.
