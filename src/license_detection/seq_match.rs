@@ -5,10 +5,21 @@
 //!
 //! Based on Python ScanCode Toolkit implementation at:
 //! reference/scancode-toolkit/src/licensedcode/match_seq.py
+//!
+//! ## Near-Duplicate Detection
+//!
+//! This module implements Phase 2 of Python's 3-phase matching pipeline:
+//! 1. Phase 1: Hash & Aho-Corasick (exact matches)
+//! 2. Phase 2: Near-duplicate detection - check whole file for high-resemblance candidates
+//! 3. Phase 3: Query run matching (if no near-duplicates found)
+//!
+//! The near-duplicate detection finds rules with high resemblance (>= 0.8) to the
+//! entire query, which helps match combined rules instead of partial rules.
 
 use crate::license_detection::index::LicenseIndex;
 use crate::license_detection::index::token_sets::{
-    build_set_and_mset, high_tids_set_subset, multiset_counter, tids_set_counter,
+    build_set_and_mset, high_multiset_subset, high_tids_set_subset, multiset_counter,
+    tids_set_counter,
 };
 use crate::license_detection::models::{LicenseMatch, Rule};
 use crate::license_detection::query::QueryRun;
@@ -18,21 +29,27 @@ pub const MATCH_SEQ: &str = "3-seq";
 #[allow(dead_code)]
 pub const MATCH_SEQ_ORDER: u8 = 3;
 
+/// Default threshold for high resemblance (0.8 = 80% similarity).
+pub const HIGH_RESEMBLANCE_THRESHOLD: f32 = 0.8;
+
+/// Default number of top near-duplicate candidates to consider.
+pub const MAX_NEAR_DUPE_CANDIDATES: usize = 10;
+
 /// Score vector for ranking candidates using set similarity.
 ///
 /// Contains metrics computed from set/multiset intersections.
 ///
 /// Corresponds to Python: `ScoresVector` namedtuple in match_set.py (line 458)
 #[derive(Debug, Clone, PartialEq)]
-struct ScoresVector {
+pub struct ScoresVector {
     /// True if the sets are highly similar (resemblance >= threshold)
-    is_highly_resemblant: bool,
+    pub is_highly_resemblant: bool,
     /// Containment ratio (how much of rule is in query)
-    containment: f32,
+    pub containment: f32,
     /// Amplified resemblance (squared to boost high values)
-    resemblance: f32,
+    pub resemblance: f32,
     /// Number of matched tokens (normalized for ranking)
-    matched_length: f32,
+    pub matched_length: f32,
 }
 
 impl PartialOrd for ScoresVector {
@@ -66,17 +83,17 @@ impl Ord for ScoresVector {
 ///
 /// Corresponds to the tuple structure used in Python: (scores_vectors, rid, rule, high_set_intersection)
 #[derive(Debug, Clone, PartialEq)]
-struct Candidate {
+pub struct Candidate {
     /// Rounded score vector for display/grouping
-    score_vec_rounded: ScoresVector,
+    pub score_vec_rounded: ScoresVector,
     /// Full score vector for sorting
-    score_vec_full: ScoresVector,
+    pub score_vec_full: ScoresVector,
     /// Rule ID
-    rid: usize,
+    pub rid: usize,
     /// Reference to the rule
-    rule: Rule,
+    pub rule: Rule,
     /// Set of high-value (legalese) tokens in the intersection
-    high_set_intersection: HashSet<u16>,
+    pub high_set_intersection: HashSet<u16>,
 }
 
 impl PartialOrd for Candidate {
@@ -91,6 +108,29 @@ impl Ord for Candidate {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.score_vec_full.cmp(&other.score_vec_full)
     }
+}
+
+/// Compute intersection of two multisets.
+///
+/// For each token ID present in both multisets, the intersection value is the
+/// smaller of the occurrence counts.
+///
+/// Corresponds to Python: `multisets_intersector()` in match_set.py (line 119)
+pub fn multisets_intersector(
+    qmset: &HashMap<u16, usize>,
+    imset: &HashMap<u16, usize>,
+) -> HashMap<u16, usize> {
+    let (set1, set2) = if qmset.len() < imset.len() {
+        (qmset, imset)
+    } else {
+        (imset, qmset)
+    };
+
+    set1.iter()
+        .filter_map(|(&tid, &count1)| {
+            set2.get(&tid).map(|&count2| (tid, count1.min(count2)))
+        })
+        .collect()
 }
 
 /// Compute set similarity between query and rule token sets.
@@ -129,13 +169,20 @@ fn compute_set_similarity(
         return None;
     }
 
-    let _high_matched_length = tids_set_counter(&high_intersection);
+    // matched_length = count of tokens in intersection (using multiset counts)
+    let matched_length: usize = intersection
+        .iter()
+        .map(|&tid| query_mset.get(&tid).copied().unwrap_or(0).min(rule_mset.get(&tid).copied().unwrap_or(0)))
+        .sum();
 
-    let matched_length = multiset_counter(query_mset);
-    let rule_length = multiset_counter(rule_mset);
-    let query_length = multiset_counter(query_mset);
+    if matched_length == 0 {
+        return None;
+    }
 
-    if matched_length == 0 || rule_length == 0 {
+    let query_length: usize = query_mset.values().sum();
+    let rule_length: usize = rule_mset.values().sum();
+
+    if query_length == 0 || rule_length == 0 {
         return None;
     }
 
@@ -145,20 +192,278 @@ fn compute_set_similarity(
     let amplified_resemblance = resemblance.powi(2);
 
     let score_vec_rounded = ScoresVector {
-        is_highly_resemblant: resemblance >= 0.8,
+        is_highly_resemblant: (resemblance * 10.0).round() / 10.0 >= HIGH_RESEMBLANCE_THRESHOLD,
         containment: (containment * 10.0).round() / 10.0,
         resemblance: (amplified_resemblance * 10.0).round() / 10.0,
-        matched_length: (matched_length as f32 / 20.0),
+        matched_length: (matched_length as f32 / 20.0).round(),
     };
 
     let score_vec_full = ScoresVector {
-        is_highly_resemblant: resemblance >= 0.8,
+        is_highly_resemblant: resemblance >= HIGH_RESEMBLANCE_THRESHOLD,
         containment,
         resemblance: amplified_resemblance,
         matched_length: matched_length as f32,
     };
 
     Some((score_vec_rounded, score_vec_full))
+}
+
+/// Compute near-duplicate candidates for a query run.
+///
+/// This is the key function for Phase 2 (near-duplicate detection) of the matching pipeline.
+/// It computes resemblance between the query and all rules, returning top candidates
+/// filtered by high resemblance if requested.
+///
+/// Corresponds to Python: `compute_candidates()` in match_set.py (line 244-367)
+///
+/// # Arguments
+///
+/// * `index` - License index containing rule token sets
+/// * `query_run` - Query run to match (typically the whole file)
+/// * `high_resemblance` - If true, only return candidates with resemblance >= 0.8
+/// * `top_n` - Number of top candidates to return
+///
+/// # Returns
+///
+/// Vector of top-N candidates sorted by (squared) resemblance score.
+/// If `high_resemblance=true`, only candidates with resemblance >= 0.8 are returned.
+pub fn compute_candidates(
+    index: &LicenseIndex,
+    query_run: &QueryRun,
+    high_resemblance: bool,
+    top_n: usize,
+) -> Vec<Candidate> {
+    let query_tokens = query_run.matchable_tokens();
+    if query_tokens.is_empty() {
+        return Vec::new();
+    }
+
+    let query_token_ids: Vec<u16> = query_tokens
+        .iter()
+        .filter_map(|&tid| if tid >= 0 { Some(tid as u16) } else { None })
+        .collect();
+
+    if query_token_ids.is_empty() {
+        return Vec::new();
+    }
+
+    let (query_set, query_mset) = build_set_and_mset(&query_token_ids);
+    let len_legalese = index.len_legalese;
+
+    let mut sortable_candidates: Vec<Candidate> = Vec::new();
+
+    for (rid, rule) in index.rules_by_rid.iter().enumerate() {
+        if !index.approx_matchable_rids.contains(&rid) {
+            continue;
+        }
+
+        let Some(rule_set) = index.sets_by_rid.get(&rid) else {
+            continue;
+        };
+        let Some(rule_mset) = index.msets_by_rid.get(&rid) else {
+            continue;
+        };
+
+        let Some((score_vec_rounded, score_vec_full)) =
+            compute_set_similarity(&query_set, &query_mset, rule_set, rule_mset, len_legalese)
+        else {
+            continue;
+        };
+
+        if high_resemblance {
+            if !score_vec_rounded.is_highly_resemblant || !score_vec_full.is_highly_resemblant {
+                continue;
+            }
+        }
+
+        let intersection: HashSet<u16> = query_set.intersection(rule_set).copied().collect();
+        let high_set_intersection = high_tids_set_subset(&intersection, len_legalese);
+
+        sortable_candidates.push(Candidate {
+            score_vec_rounded,
+            score_vec_full,
+            rid,
+            rule: rule.clone(),
+            high_set_intersection,
+        });
+    }
+
+    if sortable_candidates.is_empty() {
+        return Vec::new();
+    }
+
+    sortable_candidates.sort_by(|a, b| b.cmp(a));
+    sortable_candidates.truncate(top_n);
+
+    sortable_candidates
+}
+
+/// Compute multiset-based candidates (Phase 2 refinement).
+///
+/// After selecting candidates using sets, this refines the ranking using multisets.
+///
+/// Corresponds to Python: `compute_candidates()` step 2 in match_set.py (line 311-350)
+pub fn compute_candidates_with_msets(
+    index: &LicenseIndex,
+    query_run: &QueryRun,
+    high_resemblance: bool,
+    top_n: usize,
+) -> Vec<Candidate> {
+    let query_tokens = query_run.matchable_tokens();
+    if query_tokens.is_empty() {
+        return Vec::new();
+    }
+
+    let query_token_ids: Vec<u16> = query_tokens
+        .iter()
+        .filter_map(|&tid| if tid >= 0 { Some(tid as u16) } else { None })
+        .collect();
+
+    if query_token_ids.is_empty() {
+        return Vec::new();
+    }
+
+    let (query_set, query_mset) = build_set_and_mset(&query_token_ids);
+    let len_legalese = index.len_legalese;
+
+    let mut step1_candidates: Vec<(ScoresVector, ScoresVector, usize, Rule, HashSet<u16>)> =
+        Vec::new();
+
+    for (rid, rule) in index.rules_by_rid.iter().enumerate() {
+        if !index.approx_matchable_rids.contains(&rid) {
+            continue;
+        }
+
+        let Some(rule_set) = index.sets_by_rid.get(&rid) else {
+            continue;
+        };
+        let Some(_rule_mset) = index.msets_by_rid.get(&rid) else {
+            continue;
+        };
+
+        let intersection: HashSet<u16> = query_set.intersection(rule_set).copied().collect();
+        if intersection.is_empty() {
+            continue;
+        }
+
+        let high_set_intersection = high_tids_set_subset(&intersection, len_legalese);
+        if high_set_intersection.is_empty() {
+            continue;
+        }
+
+        // Check high token threshold (this is separate from matched_length!)
+        let high_matched_length = tids_set_counter(&high_set_intersection);
+        if high_matched_length < rule.min_high_matched_length_unique {
+            continue;
+        }
+
+        // Check total intersection threshold
+        let matched_length = tids_set_counter(&intersection);
+        if matched_length < rule.min_matched_length_unique {
+            continue;
+        }
+
+        // Compute resemblance using TOTAL intersection, not just high
+        let qset_len = query_set.len();
+        let iset_len = rule.length_unique;
+        if qset_len == 0 || iset_len == 0 {
+            continue;
+        }
+
+        let union_len = qset_len + iset_len - matched_length;
+        let resemblance = matched_length as f32 / union_len as f32;
+        let containment = matched_length as f32 / iset_len as f32;
+        let amplified_resemblance = resemblance.powi(2);
+
+        let svr = ScoresVector {
+            is_highly_resemblant: (resemblance * 10.0).round() / 10.0 >= HIGH_RESEMBLANCE_THRESHOLD,
+            containment: (containment * 10.0).round() / 10.0,
+            resemblance: (amplified_resemblance * 10.0).round() / 10.0,
+            matched_length: (matched_length as f32 / 20.0).round(),
+        };
+
+        let svf = ScoresVector {
+            is_highly_resemblant: resemblance >= HIGH_RESEMBLANCE_THRESHOLD,
+            containment,
+            resemblance: amplified_resemblance,
+            matched_length: matched_length as f32,
+        };
+
+        if high_resemblance && (!svr.is_highly_resemblant || !svf.is_highly_resemblant) {
+            continue;
+        }
+
+        step1_candidates.push((svr, svf, rid, rule.clone(), high_set_intersection));
+    }
+
+    if step1_candidates.is_empty() {
+        return Vec::new();
+    }
+
+    step1_candidates.sort_by(|a, b| b.1.cmp(&a.1));
+    step1_candidates.truncate(top_n * 10);
+
+    let mut sortable_candidates: Vec<Candidate> = Vec::new();
+
+    for (_svr, _svf, rid, rule, high_set_intersection) in step1_candidates {
+        let Some(rule_mset) = index.msets_by_rid.get(&rid) else {
+            continue;
+        };
+
+        let query_high_mset = high_multiset_subset(&query_mset, len_legalese);
+        let rule_high_mset = high_multiset_subset(rule_mset, len_legalese);
+
+        let intersection_mset = multisets_intersector(&query_high_mset, &rule_high_mset);
+        if intersection_mset.is_empty() {
+            continue;
+        }
+
+        let matched_length: usize = intersection_mset.values().sum();
+        let qset_len: usize = query_high_mset.values().sum();
+        let iset_len: usize = rule_high_mset.values().sum();
+
+        if qset_len == 0 || iset_len == 0 {
+            continue;
+        }
+
+        let union_len = qset_len + iset_len - matched_length;
+        let resemblance = matched_length as f32 / union_len as f32;
+        let containment = matched_length as f32 / iset_len as f32;
+        let amplified_resemblance = resemblance.powi(2);
+
+        let score_vec_rounded = ScoresVector {
+            is_highly_resemblant: (resemblance * 10.0).round() / 10.0 >= HIGH_RESEMBLANCE_THRESHOLD,
+            containment: (containment * 10.0).round() / 10.0,
+            resemblance: (amplified_resemblance * 10.0).round() / 10.0,
+            matched_length: (matched_length as f32 / 20.0).round(),
+        };
+
+        let score_vec_full = ScoresVector {
+            is_highly_resemblant: resemblance >= HIGH_RESEMBLANCE_THRESHOLD,
+            containment,
+            resemblance: amplified_resemblance,
+            matched_length: matched_length as f32,
+        };
+
+        if high_resemblance
+            && (!score_vec_rounded.is_highly_resemblant || !score_vec_full.is_highly_resemblant)
+        {
+            continue;
+        }
+
+        sortable_candidates.push(Candidate {
+            score_vec_rounded,
+            score_vec_full,
+            rid,
+            rule,
+            high_set_intersection,
+        });
+    }
+
+    sortable_candidates.sort_by(|a, b| b.cmp(a));
+    sortable_candidates.truncate(top_n);
+
+    sortable_candidates
 }
 
 /// Select top-N candidate rules for sequence matching.
@@ -524,6 +829,121 @@ pub fn seq_match(index: &LicenseIndex, query_run: &QueryRun) -> Vec<LicenseMatch
     matches
 }
 
+/// Sequence matching against pre-selected candidates.
+///
+/// Used by Phase 2 (near-duplicate detection) to match the whole file
+/// against a small set of high-resemblance candidates.
+///
+/// # Arguments
+///
+/// * `index` - License index
+/// * `query_run` - Query run to match (typically the whole file)
+/// * `candidates` - Pre-selected candidates from `compute_candidates()`
+///
+/// # Returns
+///
+/// Vector of LicenseMatch results
+pub fn seq_match_with_candidates(
+    index: &LicenseIndex,
+    query_run: &QueryRun,
+    candidates: &[Candidate],
+) -> Vec<LicenseMatch> {
+    let mut matches = Vec::new();
+
+    for candidate in candidates {
+        let rid = candidate.rid;
+        let rule_tokens = index.tids_by_rid.get(rid);
+        let high_postings = index.high_postings_by_rid.get(&rid);
+
+        if let (Some(rule_tokens), Some(high_postings)) = (rule_tokens, high_postings) {
+            let query_tokens = query_run.tokens();
+            let len_legalese = index.len_legalese;
+
+            let qbegin = query_run.start;
+            let qfinish = query_run.end.unwrap_or(qbegin);
+
+            let matchables = query_run.matchables(true);
+
+            let mut qstart = qbegin;
+
+            while qstart <= qfinish {
+                let blocks = match_blocks(
+                    query_tokens,
+                    rule_tokens,
+                    qstart,
+                    qfinish + 1,
+                    high_postings,
+                    len_legalese,
+                    &matchables,
+                );
+
+                if blocks.is_empty() {
+                    break;
+                }
+
+                let mut max_qend = qstart;
+
+                for (qpos, _ipos, mlen) in blocks {
+                    if mlen < 1 {
+                        continue;
+                    }
+
+                    if mlen == 1 && query_tokens[qpos] >= len_legalese as u16 {
+                        continue;
+                    }
+
+                    let rule_length = rule_tokens.len();
+                    if rule_length == 0 {
+                        continue;
+                    }
+
+                    let match_coverage = (mlen as f32 / rule_length as f32) * 100.0;
+
+                    let qend = qpos + mlen - 1;
+                    let start_line = query_run.line_for_pos(qpos).unwrap_or(1);
+                    let end_line = query_run.line_for_pos(qend).unwrap_or(start_line);
+
+                    let score = (match_coverage * candidate.rule.relevance as f32) / 100.0;
+
+                    let matched_text = query_run.matched_text(start_line, end_line);
+
+                    let license_match = LicenseMatch {
+                        license_expression: candidate.rule.license_expression.clone(),
+                        license_expression_spdx: candidate.rule.license_expression.clone(),
+                        from_file: None,
+                        start_line,
+                        end_line,
+                        start_token: qpos,
+                        end_token: qpos + mlen,
+                        matcher: MATCH_SEQ.to_string(),
+                        score,
+                        matched_length: mlen,
+                        rule_length,
+                        match_coverage,
+                        rule_relevance: candidate.rule.relevance,
+                        rule_identifier: format!("#{}", rid),
+                        rule_url: String::new(),
+                        matched_text: Some(matched_text),
+                        referenced_filenames: candidate.rule.referenced_filenames.clone(),
+                        is_license_intro: candidate.rule.is_license_intro,
+                        is_license_clue: candidate.rule.is_license_clue,
+                        is_license_reference: candidate.rule.is_license_reference,
+                        is_license_tag: candidate.rule.is_license_tag,
+                    };
+
+                    matches.push(license_match);
+
+                    max_qend = max_qend.max(qend + 1);
+                }
+
+                qstart = max_qend;
+            }
+        }
+    }
+
+    matches
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -603,6 +1023,7 @@ mod tests {
 
         index.rules_by_rid.push(rule.clone());
         index.tids_by_rid.push(tokens);
+        index.approx_matchable_rids.insert(rid);
 
         rid
     }

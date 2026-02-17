@@ -462,9 +462,7 @@ fn has_unknown_intro_before_detection(matches: &[LicenseMatch]) -> bool {
 fn is_unknown_intro(m: &LicenseMatch) -> bool {
     let has_unknown = m.license_expression.contains("unknown");
     has_unknown
-        && (m.is_license_intro
-            || m.is_license_clue
-            || m.license_expression == "free-unknown")
+        && (m.is_license_intro || m.is_license_clue || m.license_expression == "free-unknown")
 }
 
 /// Check if a match should be considered a license intro for filtering.
@@ -1242,7 +1240,11 @@ mod tests {
         let matches = vec![match1, match2];
         let groups = group_matches_by_region(&matches);
 
-        assert_eq!(groups.len(), 2, "Line gap 4 (9-5=4) exceeds threshold 3, should separate");
+        assert_eq!(
+            groups.len(),
+            2,
+            "Line gap 4 (9-5=4) exceeds threshold 3, should separate"
+        );
     }
 
     #[test]
@@ -1369,7 +1371,11 @@ mod tests {
         let m1 = create_test_match_with_tokens(1, 10, 0, 50);
         let m2 = create_test_match_with_tokens(15, 25, 55, 100);
         let groups = group_matches_by_region(&[m1, m2]);
-        assert_eq!(groups.len(), 2, "Should separate when line gap (5) exceeds threshold (3)");
+        assert_eq!(
+            groups.len(),
+            2,
+            "Should separate when line gap (5) exceeds threshold (3)"
+        );
     }
 
     #[test]
@@ -1377,7 +1383,11 @@ mod tests {
         let m1 = create_test_match_with_tokens(1, 10, 0, 50);
         let m2 = create_test_match_with_tokens(12, 20, 65, 100);
         let groups = group_matches_by_region(&[m1, m2]);
-        assert_eq!(groups.len(), 2, "Should separate when token gap (15) exceeds threshold (10)");
+        assert_eq!(
+            groups.len(),
+            2,
+            "Should separate when token gap (15) exceeds threshold (10)"
+        );
     }
 
     #[test]
@@ -1856,7 +1866,10 @@ mod tests {
         m.is_license_reference = true;
         m.rule_length = 10;
         let matches = vec![m];
-        assert!(!is_false_positive(&matches), "Long rule_length should not be filtered");
+        assert!(
+            !is_false_positive(&matches),
+            "Long rule_length should not be filtered"
+        );
     }
 
     #[test]
@@ -1876,7 +1889,10 @@ mod tests {
         m.is_license_reference = true;
         m.rule_length = 1;
         let matches = vec![m];
-        assert!(!is_false_positive(&matches), "Full relevance should not be filtered");
+        assert!(
+            !is_false_positive(&matches),
+            "Full relevance should not be filtered"
+        );
     }
 
     #[test]
@@ -4984,7 +5000,11 @@ mod tests {
 
     #[test]
     fn test_is_license_reference_local_file_true_multiple() {
-        let m = create_test_match_with_reference(1, 5, Some(vec!["LICENSE".to_string(), "COPYING".to_string()]));
+        let m = create_test_match_with_reference(
+            1,
+            5,
+            Some(vec!["LICENSE".to_string(), "COPYING".to_string()]),
+        );
         assert!(is_license_reference_local_file(&m));
     }
 
@@ -5006,9 +5026,9 @@ mod tests {
         let m2 = create_test_match_with_reference(6, 10, Some(vec!["LICENSE".to_string()]));
         let m3 = create_test_match_with_reference(11, 15, None);
         let matches = vec![m1.clone(), m2, m3.clone()];
-        
+
         let filtered = filter_license_references(&matches);
-        
+
         assert_eq!(filtered.len(), 2);
         assert_eq!(filtered[0].start_line, 1);
         assert_eq!(filtered[1].start_line, 11);
@@ -5019,9 +5039,9 @@ mod tests {
         let m1 = create_test_match_with_reference(1, 5, Some(vec!["LICENSE".to_string()]));
         let m2 = create_test_match_with_reference(6, 10, Some(vec!["COPYING".to_string()]));
         let matches = vec![m1, m2];
-        
+
         let filtered = filter_license_references(&matches);
-        
+
         assert_eq!(filtered.len(), 2);
     }
 
@@ -5030,9 +5050,9 @@ mod tests {
         let m1 = create_test_match_with_reference(1, 5, None);
         let m2 = create_test_match_with_reference(6, 10, None);
         let matches = vec![m1.clone(), m2.clone()];
-        
+
         let filtered = filter_license_references(&matches);
-        
+
         assert_eq!(filtered.len(), 2);
     }
 
@@ -5042,13 +5062,13 @@ mod tests {
         m1.is_license_intro = true;
         m1.matcher = "2-aho".to_string();
         m1.match_coverage = 100.0;
-        
+
         let m2 = create_test_match_with_reference(6, 10, Some(vec!["LICENSE".to_string()]));
         let m3 = create_test_match_with_reference(11, 15, None);
         let matches = vec![m1, m2, m3.clone()];
-        
+
         let filtered = filter_license_intros_and_references(&matches);
-        
+
         assert_eq!(filtered.len(), 1);
         assert_eq!(filtered[0].start_line, 11);
     }
@@ -5060,16 +5080,19 @@ mod tests {
         m2.match_coverage = 100.0;
         m2.matcher = "1-hash".to_string();
         m2.score = 100.0;
-        
+
         let group = DetectionGroup {
             matches: vec![m1.clone(), m2],
             start_line: 1,
             end_line: 10,
         };
-        
+
         let detection = create_detection_from_group(&group);
-        
-        assert_eq!(detection.detection_log, vec!["unknown-reference-to-local-file"]);
+
+        assert_eq!(
+            detection.detection_log,
+            vec!["unknown-reference-to-local-file"]
+        );
         assert_eq!(detection.matches.len(), 1);
         assert_eq!(detection.matches[0].start_line, 1);
     }

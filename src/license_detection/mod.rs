@@ -43,7 +43,7 @@ pub use detection::LicenseDetection;
 pub use aho_match::aho_match;
 pub use hash_match::hash_match;
 pub use match_refine::refine_matches;
-pub use seq_match::seq_match;
+pub use seq_match::{compute_candidates_with_msets, seq_match, seq_match_with_candidates, MAX_NEAR_DUPE_CANDIDATES};
 pub use spdx_lid::spdx_lid_match;
 pub use unknown_match::unknown_match;
 
@@ -94,10 +94,13 @@ impl LicenseDetectionEngine {
     ///
     /// This runs the full detection pipeline:
     /// 1. Create a Query from the text
-    /// 2. Run matchers in priority order (hash, SPDX-LID, Aho-Corasick, sequence, unknown)
-    /// 3. Refine matches
-    /// 4. Group matches by region
-    /// 5. Create LicenseDetection objects
+    /// 2. Run matchers in priority order (hash, SPDX-LID, Aho-Corasick)
+    /// 3. Phase 2: Near-duplicate detection (ALWAYS runs, even with exact matches)
+    /// 4. Phase 3: Regular sequence matching (if no near-duplicates)
+    /// 5. Unknown matching
+    /// 6. Refine matches
+    /// 7. Group matches by region
+    /// 8. Create LicenseDetection objects
     ///
     /// # Arguments
     /// * `text` - The text to analyze
@@ -106,20 +109,36 @@ impl LicenseDetectionEngine {
     /// A Result containing a vector of LicenseDetection objects
     pub fn detect(&self, text: &str) -> Result<Vec<LicenseDetection>> {
         let query = Query::new(text, &self.index)?;
-        let query_run = query.whole_query_run();
+        let whole_run = query.whole_query_run();
 
         let mut all_matches = Vec::new();
 
-        let hash_matches = hash_match(&self.index, &query_run);
+        let hash_matches = hash_match(&self.index, &whole_run);
         all_matches.extend(hash_matches);
 
         let spdx_matches = spdx_lid_match(&self.index, text);
         all_matches.extend(spdx_matches);
 
-        let aho_matches = aho_match(&self.index, &query_run);
+        let aho_matches = aho_match(&self.index, &whole_run);
         all_matches.extend(aho_matches);
 
-        let seq_matches = seq_match(&self.index, &query_run);
+        // Phase 2: Near-duplicate detection - ALWAYS run, not conditional on exact matches
+        // This matches Python's behavior in index.py line 745-765
+        let near_dupe_candidates = compute_candidates_with_msets(
+            &self.index,
+            &whole_run,
+            true,
+            MAX_NEAR_DUPE_CANDIDATES,
+        );
+
+        if !near_dupe_candidates.is_empty() {
+            let near_dupe_matches =
+                seq_match_with_candidates(&self.index, &whole_run, &near_dupe_candidates);
+            all_matches.extend(near_dupe_matches);
+        }
+
+        // Phase 3: Regular sequence matching
+        let seq_matches = seq_match(&self.index, &whole_run);
         all_matches.extend(seq_matches);
 
         let unknown_matches = unknown_match(&self.index, &query, &all_matches);
