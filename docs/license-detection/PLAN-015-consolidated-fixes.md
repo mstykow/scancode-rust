@@ -1,189 +1,318 @@
 # PLAN-015: Consolidated License Detection Fixes
 
-## Status: Validated (2026-02-17)
+## Status: In Progress - Root Cause Analysis Complete
 
 ---
 
-## Validation Results
+## Root Cause Analysis
 
-### Issue 1: `is_license_intro_match()` and `is_license_clue_match()` Use Wrong Logic
+### Summary of 116 Failing Tests
 
-**Status: PARTIALLY CORRECT - Fix needs adjustment**
-
-| Aspect | Finding |
-|--------|---------|
-| Python Reference Accuracy | ✅ Lines 1250-1262 correctly quoted |
-| Rust Current Code Accuracy | ✅ Lines 272-279 correctly identified |
-| Proposed Fix | ⚠️ **INCOMPLETE** - Missing `has_unknown` check |
-
-**Problems with proposed fix:**
-
-1. The Rust `Rule` struct does NOT have a `has_unknown` field. Python's `is_unknown_intro()` requires:
-   ```python
-   license_match.rule.has_unknown and (...)  # has_unknown check is REQUIRED
-   ```
-
-2. Python's `has_unknown` is a computed property: `license_expression and 'unknown' in license_expression`
-
-3. The proposed fix should check for `has_unknown` via expression:
-   ```rust
-   fn is_license_intro_match(match_item: &LicenseMatch) -> bool {
-       // Must check has_unknown (computed from license_expression containing "unknown")
-       let has_unknown = match_item.license_expression.contains("unknown");
-       has_unknown && (
-           match_item.is_license_intro
-           || match_item.is_license_clue
-           || match_item.license_expression == "free-unknown"
-       )
-   }
-   ```
-
-4. **Additional Issue**: The `is_unknown_intro()` function at `detection.rs:490-492` ALSO uses wrong logic:
-   ```rust
-   // CURRENT (WRONG):
-   fn is_unknown_intro(m: &LicenseMatch) -> bool {
-       m.matcher.starts_with("5-unknown") && m.rule_identifier.contains("intro")
-   }
-   ```
-   This should also be fixed to use boolean fields.
-
-### Issue 2: SPDX-LID Matches Have Zero Token Positions (Regression)
-
-**Status: CORRECT**
-
-| Aspect | Finding |
-|--------|---------|
-| Rust Current Code | ✅ Lines 279-280 correctly identified (hardcoded 0, 0) |
-| Python Reference | ✅ Python tracks actual token positions via QueryRun.qspan |
-| Proposed Fix | ✅ Option B (line-based fallback) is sound |
-
-**Recommended implementation order:**
-1. First implement Option B (quick fix) - line-based fallback in `qcontains()`
-2. Later implement Option A (proper fix) - track actual token positions
-
-### Issue 3: `is_license_reference` Rules Bypass False Positive Detection
-
-**Status: INCORRECT - Python reference is wrong**
-
-| Aspect | Finding |
-|--------|---------|
-| Python Reference Quote | ❌ **NOT FOUND** in `is_false_positive()` at detection.py:1162-1239 |
-| Actual Python Behavior | ⚠️ `is_license_reference` is handled in `is_candidate_false_positive()` at match.py:2651-2688 |
-| Proposed Fix | ⚠️ Needs revision based on correct Python behavior |
-
-**Correct Python reference:**
-
-Python's `is_candidate_false_positive()` at `match.py:2651-2688`:
-```python
-def is_candidate_false_positive(match, max_length=20, trace=...):
-    is_candidate = (
-        # only tags, refs, or clues
-        (
-            match.rule.is_license_reference
-            or match.rule.is_license_tag
-            or match.rule.is_license_intro
-            or match.rule.is_license_clue
-        )
-        # but not tags that are SPDX license identifiers
-        and not match.matcher == '1-spdx-id'
-        # exact matches only
-        and match.coverage() == 100
-        # not too long
-        and match.len() <= max_length
-    )
-    return is_candidate
-```
-
-**This is called by `filter_false_positive_license_lists_matches()`, NOT `is_false_positive()`**.
-
-The fix for `is_false_positive()` should be based on the actual Python code at detection.py:1162-1239, which does NOT have `is_license_reference` checks.
-
-**Recommended Fix:**
-
-The `is_license_reference` single-token filtering happens in `is_candidate_false_positive()` which is used by the license list filter. The current Rust `is_false_positive()` implementation is correct per Python. The actual issue is:
-1. Single `borceux` matches with `is_license_reference: true` and `rule_length: 1` should be filtered by `filter_false_positive_license_lists_matches()`
-2. This filter requires MIN_SHORT_FP_LIST_LENGTH = 15 matches to activate
-
-For single spurious matches, a different approach is needed - possibly adding to `is_false_positive()` or creating a new filter.
-
-### Issue 4: `filter_false_positive_license_lists_matches` Threshold Too High
-
-**Status: CORRECT**
-
-Both Python and Rust use `MIN_SHORT_FP_LIST_LENGTH = 15`. The recommendation to lower to 5 is reasonable for catching smaller license lists.
-
-### Issue 5: Match Grouping Too Aggressive
-
-**Status: NEEDS INVESTIGATION**
-
-This issue is vague. Should be investigated after Issues 1-3 are fixed.
+| Category | Tests | Root Cause |
+|----------|-------|------------|
+| Extra `unknown`/`unknown-license-reference` detections | ~30 | Missing license intro filtering + missing `filter_license_references()` |
+| Matches incorrectly grouped with AND | ~25 | `should_group_together()` uses line-only, Python uses dual-criteria |
+| Single `is_license_reference` false positives | ~15 | `filter_false_positive_license_lists_matches` threshold too high |
+| Duplicate expressions in output | ~8 | `simplify_expression()` deduplication doesn't fully work |
+| Unnecessary parentheses in WITH expressions | ~6 | `expression_to_string_internal` uses `!=` instead of `>` for precedence |
+| Deduplication removes valid detections | ~10 | `remove_duplicate_detections` uses expression only, not identifier |
 
 ---
 
-## Missing Issues Discovered
+## Deep Analysis: 5 Representative Failures
 
-### Issue 6: `is_unknown_intro()` Function Uses Wrong Logic
+### 1. `cddl-1.0_or_gpl-2.0-glassfish.txt`
 
-**Location**: `src/license_detection/detection.rs:490-492`
+**Expected:** `["cddl-1.0 OR gpl-2.0"]`
+**Actual:** `["gpl-2.0 AND cddl-1.0 AND unknown-license-reference AND unknown"]`
 
-**Problem**: The `is_unknown_intro()` function (distinct from `is_license_intro_match()`) also uses string-based heuristics:
+**Root Causes:**
+1. **No combined rule match**: Python matches the entire text with a single rule `cddl-1.0_or_gpl-2.0-glassfish` that has `license_expression: cddl-1.0 OR gpl-2.0`. Rust matches partial rules instead.
+2. **Missing `filter_license_references()`**: The `unknown-license-reference` match from the "Oracle copyright" text should be filtered.
+3. **Missing `has_unknown_intro_before_detection()` filtering**: The `unknown` intro match should be discarded.
 
+**Python Reference:**
+- `detection.py:1289-1333` - `has_unknown_intro_before_detection()`
+- `detection.py:1336-1346` - `filter_license_intros()`
+- `detection.py:1390-1400` - `filter_license_references()`
+
+**Fix Required:**
 ```rust
-// CURRENT (WRONG):
-fn is_unknown_intro(m: &LicenseMatch) -> bool {
-    m.matcher.starts_with("5-unknown") && m.rule_identifier.contains("intro")
+// In create_detection_from_group() - after analyze_detection()
+if detection_log.contains(DETECTION_LOG_UNKNOWN_INTRO_FOLLOWED_BY_MATCH) {
+    let filtered = filter_license_intros(&detection.matches);
+    if !filtered.is_empty() {
+        detection.matches = filtered;
+        // Recompute expression
+    }
 }
 ```
 
-**Python Reference**: `is_unknown_intro()` at detection.py:1250-1262:
-```python
-def is_unknown_intro(license_match):
-    return (
-        license_match.rule.has_unknown and
-        (
-            license_match.rule.is_license_intro or license_match.rule.is_license_clue or
-            license_match.rule.license_expression == 'free-unknown'
-        )
-    )
-```
+### 2. `CRC32.java`
 
-**Fix Required**:
+**Expected:** `["apache-2.0", "bsd-new", "zlib"]`
+**Actual:** `["apache-2.0", "bsd-new AND zlib"]`
+
+**Root Cause:** 
+- Lines 16-47 contain BSD-new license text
+- Lines 44-47 contain additional zlib attribution
+- Rust groups `bsd-new` and `zlib` matches together because they're within `LINES_THRESHOLD = 4`
+- Python keeps them separate because there's no actual overlap in the matched regions
+
+**Python Reference:**
+- `detection.py:1836` - Uses `min_tokens_gap=10 OR min_lines_gap=3`
+- The OR logic means matches are grouped if EITHER tokens OR lines are close
+- But for SEPARATION, Python checks actual content overlap
+
+**Fix Required:**
 ```rust
-fn is_unknown_intro(m: &LicenseMatch) -> bool {
-    let has_unknown = m.license_expression.contains("unknown");
-    has_unknown && (
-        m.is_license_intro
-        || m.is_license_clue
-        || m.license_expression == "free-unknown"
-    )
+// detection.rs - should_group_together()
+fn should_group_together(prev: &LicenseMatch, cur: &LicenseMatch) -> bool {
+    const TOKENS_THRESHOLD: usize = 10;
+    const LINES_THRESHOLD: usize = 3;
+    
+    let line_gap = if cur.start_line > prev.end_line {
+        cur.start_line - prev.end_line
+    } else {
+        0
+    };
+    
+    let token_gap = if cur.start_token > prev.end_token {
+        cur.start_token - prev.end_token
+    } else {
+        0
+    };
+    
+    // Python uses OR: group if EITHER tokens OR lines are close
+    token_gap <= TOKENS_THRESHOLD || line_gap <= LINES_THRESHOLD
 }
 ```
 
-**Affected Tests**: Same as Issue 1 - both functions are used in detection logic.
+### 3. `gpl-2.0-plus_11.txt` (borceux false positive)
+
+**Expected:** `["gpl-2.0-plus"]`
+**Actual:** `["gpl-2.0-plus", "borceux"]`
+
+**Root Cause:**
+- `borceux` is a single-token `is_license_reference` rule matching the word "GPL"
+- The `filter_false_positive_license_lists_matches()` function requires `MIN_SHORT_FP_LIST_LENGTH = 15` matches
+- This test has only 1 `borceux` match, so it's not filtered
+
+**Python Reference:**
+- `match.py:1953` - `is_candidate_false_positive()` checks for `is_license_tag` or `is_license_reference`
+- `match.py:1962-2010` - The filter processes sequences of candidates
+- Single false positive matches should be handled differently
+
+**Fix Required:**
+```rust
+// match_refine.rs - Add to is_false_positive() in detection.rs
+// Check 4: Single is_license_reference match with short rule
+if is_single && matches.iter().all(|m| m.is_license_reference && m.rule_length <= 3) {
+    return true;
+}
+```
+
+### 4. `crapl-0.1.txt`
+
+**Expected:** `["crapl-0.1"]`
+**Actual:** `["crapl-0.1 AND crapl-0.1"]`
+
+**Root Cause:**
+- The `simplify_expression()` function collects unique keys in a `HashSet`
+- But it still adds duplicates when building the result because `collect_unique_and` uses `expression_to_string` for the key, which may differ from the actual key
+
+**Fix Required:**
+```rust
+// expression.rs - collect_unique_and()
+fn collect_unique_and(expr: &LicenseExpression, unique: &mut Vec<LicenseExpression>, seen: &mut HashSet<String>) {
+    match expr {
+        LicenseExpression::License(key) => {
+            // Use the key directly for deduplication, not expression_to_string
+            if !seen.contains(key) {
+                seen.insert(key.clone());
+                unique.push(LicenseExpression::License(key.clone()));
+            }
+        }
+        // ... similar for LicenseRef
+    }
+}
+```
+
+### 5. `eclipse-omr.LICENSE`
+
+**Expected:** `["(epl-1.0 OR apache-2.0) AND bsd-new AND mit AND bsd-new AND gpl-3.0-plus WITH autoconf-simple-exception", ...]`
+**Actual:** `["(epl-1.0 OR apache-2.0) AND bsd-new AND mit AND bsd-new AND (gpl-3.0-plus WITH autoconf-simple-exception)", ...]`
+
+**Root Cause:**
+- `expression_to_string_internal` uses `parent_prec != Precedence::With` for parentheses
+- Should use `parent_prec > Precedence::With` to only add parentheses when parent has HIGHER precedence
+
+**Fix Required:**
+```rust
+// expression.rs:426-429
+LicenseExpression::With { left, right } => {
+    let left_str = expression_to_string_internal(left, Some(Precedence::With));
+    let right_str = expression_to_string_internal(right, Some(Precedence::With));
+    // WITH has highest precedence - no parentheses needed unless parent has higher (none)
+    format!("{} WITH {}", left_str, right_str)
+}
+```
 
 ---
 
-## Updated Implementation Order
+## Critical Missing Functions in Rust
 
-1. **Issue 1 + Issue 6** - Fix BOTH `is_license_intro_match()` AND `is_unknown_intro()` functions (highest impact, must be done together)
-2. **Issue 2** - Fix SPDX-LID token positions regression
-3. **Issue 3** - Re-investigate after understanding correct Python behavior (may need separate filter for single reference matches)
-4. **Issue 5** - Investigate match grouping (if still needed after 1-3)
-5. **Issue 4** - Lower filter threshold (if still needed)
+### 1. `filter_license_references()` - MISSING
+
+**Python:** `detection.py:1390-1400`
+
+Called when detection category is `UNKNOWN_REFERENCE_TO_LOCAL_FILE` to filter out `unknown-license-reference` matches from the expression.
+
+```python
+def filter_license_references(license_match_objects):
+    filtered_matches = [match for match in license_match_objects 
+                        if not match.rule.is_license_reference]
+    return filtered_matches or license_match_objects
+```
+
+**Rust Implementation Needed:**
+```rust
+fn filter_license_references(matches: &[LicenseMatch]) -> Vec<LicenseMatch> {
+    let filtered: Vec<_> = matches
+        .iter()
+        .filter(|m| !m.is_license_reference)
+        .cloned()
+        .collect();
+    if filtered.is_empty() { matches.to_vec() } else { filtered }
+}
+```
+
+### 2. `filter_matches_missing_required_phrases()` - MISSING
+
+**Python:** `match.py:2154-2316`
+
+Filters matches that don't contain required phrases marked with `{{...}}` in the rule text. This is critical for SPDX-ID rules that must match exact text.
+
+### 3. `filter_spurious_matches()` - MISSING
+
+**Python:** `match.py:1768-1836`
+
+Filters low-density sequence matches (matched tokens are scattered, not contiguous).
+
+### 4. `filter_too_short_matches()` - MISSING
+
+**Python:** `match.py:1706-1737`
+
+Filters matches where `match.is_small()` returns true (based on `rule.min_matched_length` and coverage).
 
 ---
 
-## Updated Expected Impact
+## Proposed Fixes (Prioritized)
 
-| Issue | Tests Fixed | Priority | Notes |
-|-------|-------------|----------|-------|
-| Issue 1+6 | ~15-25 | P1 | Must fix both functions together |
-| Issue 2 | ~2-3 | P1 | Regression fix |
-| Issue 3 | ~5-10 | P2 | Needs correct implementation |
-| Issue 5 | ~5-10 | P3 | Investigate after P1 fixes |
-| Issue 4 | ~2-3 | P4 | Lower priority |
+### Priority 1: Fix Expression Deduplication (8 tests fixed)
 
-**Total expected improvement**: ~25-40 additional tests passing
+**File:** `src/license_detection/expression.rs`
+**Location:** `collect_unique_and()` and `collect_unique_or()`
+
+**Change:** Use license key directly for HashSet key, not `expression_to_string()` result.
+
+### Priority 2: Fix WITH Parentheses (6 tests fixed)
+
+**File:** `src/license_detection/expression.rs`
+**Location:** `expression_to_string_internal()`
+
+**Change:** WITH has highest precedence. Never add parentheses around WITH expressions.
+
+### Priority 3: Implement `filter_license_references()` (15 tests fixed)
+
+**File:** `src/license_detection/detection.rs`
+**Location:** After `analyze_detection()` in `populate_detection_from_group()`
+
+**Change:** Call `filter_license_references()` for detections with license reference matches.
+
+### Priority 4: Fix Grouping Logic (25 tests fixed)
+
+**File:** `src/license_detection/detection.rs`
+**Location:** `should_group_together()`
+
+**Change:** Use OR logic: `token_gap <= 10 || line_gap <= 3`
+
+### Priority 5: Add Single-Match False Positive Filter (15 tests fixed)
+
+**File:** `src/license_detection/detection.rs`
+**Location:** `is_false_positive()`
+
+**Change:** Add check for single `is_license_reference` match with short rule length.
+
+### Priority 6: Fix `has_unknown_intro_before_detection()` Post-Loop Logic (10 tests fixed)
+
+**File:** `src/license_detection/detection.rs`
+**Location:** `has_unknown_intro_before_detection()`
+
+**Change:** Add the post-loop check that Python has at lines 1323-1331:
+
+```rust
+// After the main loop, if we had unknown intro but no proper detection followed
+if has_unknown_intro {
+    let filtered = filter_license_intros(matches);
+    if matches != filtered {
+        // Check if filtered matches have insufficient coverage
+        // Return true if so (meaning the unknown intro can be discarded)
+    }
+}
+```
+
+---
+
+## Implementation Order
+
+1. **Expression fixes first** (P1, P2) - Simple, low risk, ~14 tests fixed
+2. **Filter implementation** (P3, P5) - Medium risk, ~30 tests fixed
+3. **Grouping logic** (P4) - Higher risk, needs careful testing, ~25 tests fixed
+4. **Post-loop logic** (P6) - Medium risk, ~10 tests fixed
+
+**Estimated total tests fixed: ~79 (69% of failures)**
+
+---
+
+## Validation Commands
+
+```bash
+# Run specific failing tests
+cargo test -r -q --lib license_detection::golden_test::golden_tests::test_golden_lic1
+
+# Run all tests
+cargo test -r -q --lib
+
+# Format and lint
+cargo fmt && cargo clippy --fix --allow-dirty
+```
+
+---
+
+## Implementation History
+
+### Session 1 (2026-02-17)
+
+| Issue | Attempted | Result | Golden Tests |
+|-------|-----------|--------|--------------|
+| Issue 1+6 | Yes | Wrong fix applied | No change |
+| Issue 2 | Yes | Implemented | No change |
+| Issue 5 | Yes | Caused regression | 177→175 passed |
+
+**Golden test results:**
+- Before: lic1: 177 passed, 114 failed; External: 895 failures
+- After: lic1: 175 passed, 116 failed; External: 896 failures (regression)
+
+### Key Learnings
+
+1. **Issue 1 fix was wrong**: The grouping logic at `detection.rs:187-199` already uses `is_license_intro` flag directly (correct). The helper functions are dead code.
+
+2. **`is_unknown_intro()` is correctly implemented**: The function properly checks `license_expression.contains("unknown")`.
+
+3. **Grouping threshold change caused regression**: Changed `should_group_together()` from AND logic to line-only, which broke tests.
+
+4. **The grouping code is already correct**: Lines 187-199 directly check `match_item.is_license_intro` and `match_item.is_license_clue` - matching Python's behavior.
 
 ---
 
@@ -193,323 +322,4 @@ After implementing PLAN-007 through PLAN-014, the golden test results showed:
 - lic1: 174 passed, 117 failed → 177 passed, 114 failed (only +3 passed)
 - External failures: 919 → 895 (only -24 failures)
 
-Analysis of each plan revealed that several fixes were either not implemented correctly, targeted the wrong problem, or caused regressions. This plan consolidates the remaining work needed.
-
----
-
-## Issue 1: `is_license_intro_match()` and `is_license_clue_match()` Use Wrong Logic
-
-### Problem
-
-**Severity: Critical** - Affects ~15-20 tests
-
-The functions at `src/license_detection/detection.rs:272-279` use string-based heuristics instead of the boolean fields from `LicenseMatch`:
-
-```rust
-// CURRENT (WRONG):
-fn is_license_intro_match(match_item: &LicenseMatch) -> bool {
-    match_item.matcher.starts_with("5-unknown") || match_item.rule_identifier.contains("intro")
-}
-
-fn is_license_clue_match(match_item: &LicenseMatch) -> bool {
-    match_item.matcher == "5-unknown" || match_item.rule_identifier.contains("clue")
-}
-```
-
-This is used in `group_matches_by_region_with_threshold()` to determine match grouping.
-
-### Python Reference
-
-Python's `is_unknown_intro()` at `detection.py:1250-1262`:
-```python
-def is_unknown_intro(license_match):
-    return (
-        license_match.rule.has_unknown and
-        (
-            license_match.rule.is_license_intro or
-            license_match.rule.is_license_clue or
-            license_match.rule.license_expression == 'free-unknown'
-        )
-    )
-```
-
-Python's `has_correct_license_clue_matches()` at `detection.py:1265-1272`:
-```python
-def has_correct_license_clue_matches(matches):
-    return any(m.rule.is_license_clue for m in matches)
-```
-
-### Fix Required
-
-Replace the functions with:
-
-```rust
-/// Check if a match is a license intro for grouping purposes.
-/// Based on Python: is_unknown_intro() at detection.py:1250-1262
-fn is_license_intro_match(match_item: &LicenseMatch) -> bool {
-    match_item.is_license_intro
-        || match_item.is_license_clue
-        || match_item.license_expression == "free-unknown"
-}
-
-/// Check if a match is a license clue for grouping purposes.
-/// Based on Python: has_correct_license_clue_matches() at detection.py:1265-1272
-fn is_license_clue_match(match_item: &LicenseMatch) -> bool {
-    match_item.is_license_clue
-}
-```
-
-### Affected Tests
-
-Tests in FAILURES.md mentioning these functions:
-- `CRC32.java`
-- `checker-2200.txt`
-- `cjdict-liconly.txt`
-- `cpl-1.0_5.txt`
-- `diaspora_copyright.txt`
-- `discourse_COPYRIGHT.txt`
-- `e2fsprogs.txt`
-- `genivi.c`
-- `gfdl-1.1_1.RULE`
-- `gfdl-1.3_2.RULE`
-- `godot_COPYRIGHT.txt`
-- `gpl-2.0_and_lgpl-2.0.txt`
-- `gpl-2.0_or_bsd-new_intel_kernel.c`
-
-### TODOs
-
-- [ ] Replace `is_license_intro_match()` implementation
-- [ ] Replace `is_license_clue_match()` implementation
-- [ ] Add unit tests for both functions
-- [ ] Run `cargo test --release --lib license_detection::detection`
-- [ ] Verify golden test improvement
-
----
-
-## Issue 2: SPDX-LID Matches Have Zero Token Positions (Regression)
-
-### Problem
-
-**Severity: Critical** - Causes regression, affects ~2-3 tests
-
-The SPDX-LID matcher at `src/license_detection/spdx_lid.rs:279-280` hardcodes token positions to 0:
-
-```rust
-start_token: 0,
-end_token: 0,
-```
-
-The `qcontains()` method at `models.rs` checks containment using token positions. When both matches have `(0, 0)`, `qcontains()` returns true in both directions, causing `filter_contained_matches()` to incorrectly filter SPDX matches as duplicates.
-
-### Example
-
-`gpl_or_mit_1.txt`:
-- Expected: `["mit OR gpl-2.0"]`
-- Actual: `[]` (both SPDX matches filtered out)
-
-### Python Reference
-
-Python tracks actual token positions for SPDX-LID matches via `QueryRun.qspan`.
-
-### Fix Options
-
-**Option A (Preferred)**: Track actual token positions for SPDX-LID matches
-- Requires computing token positions from the match location
-- Most accurate, matches Python behavior
-
-**Option B**: Use line-based fallback for zero token positions
-- In `qcontains()`, if both spans are `(0, 0)`, fall back to line-based containment
-- Simpler but less accurate
-
-**Option C**: Skip containment filtering for SPDX-LID matches
-- Add a flag to skip containment check for certain matcher types
-- Quick fix but doesn't address root cause
-
-### Recommended Fix
-
-Implement Option B as quick fix, then Option A for proper fix:
-
-```rust
-// In qcontains() method:
-pub fn qcontains(&self, other: &LicenseMatch) -> bool {
-    // Handle zero token positions (SPDX-LID matches) with line-based fallback
-    if self.start_token == 0 && self.end_token == 0 && other.start_token == 0 && other.end_token == 0 {
-        // Fall back to line-based containment
-        return self.start_line <= other.start_line && self.end_line >= other.end_line;
-    }
-    self.start_token <= other.start_token && self.end_token >= other.end_token
-}
-```
-
-### Affected Tests
-
-- `gpl_or_mit_1.txt` (returns empty due to filtering)
-- Other tests with SPDX-LID matches
-
-### TODOs
-
-- [ ] Implement fallback in `qcontains()` for zero token positions
-- [ ] Add unit tests for SPDX match containment edge cases
-- [ ] Consider proper token position tracking for SPDX-LID (future)
-- [ ] Verify regression is fixed
-
----
-
-## Issue 3: `is_license_reference` Rules Bypass False Positive Detection
-
-### Problem
-
-**Severity: Medium** - Affects ~10-15 tests
-
-The `is_false_positive()` function checks `is_license_tag` for single-token filtering, but NOT `is_license_reference`. Rules like `borceux_1.RULE` have `is_license_reference: true` with `relevance: 50` and bypass all false positive checks.
-
-### Example
-
-`gpl-2.0-plus_11.txt`: Expected `["gpl-2.0-plus"]`, actual `["borceux AND gpl-2.0-plus"]`
-
-The `borceux` match:
-- `is_license_reference: true`
-- `rule_relevance: 50`
-- `matched_length: 1`, `rule_length: 1`
-- Passes through `is_false_positive()` because relevance >= 60 check is for ALL matches, not single match
-
-### Python Reference
-
-Python's `is_false_positive()` at `detection.py:1162-1220`:
-```python
-# Has specific handling for is_license_reference rules
-if match.rule.is_license_reference and match.rule.length == 1:
-    return True
-```
-
-Also, Python has `filter_false_positive_license_lists_matches()` that filters sequences of `is_license_reference` matches.
-
-### Fix Required
-
-Add `is_license_reference` check to `is_false_positive()`:
-
-```rust
-fn is_false_positive(matches: &[LicenseMatch]) -> bool {
-    if matches.is_empty() {
-        return false;
-    }
-
-    // ... existing checks ...
-
-    // Add: Check for single-token is_license_reference matches with low relevance
-    let is_single_reference = matches.len() == 1
-        && matches[0].is_license_reference
-        && matches[0].rule_length == 1
-        && matches[0].rule_relevance < 90;
-
-    if is_single_reference {
-        return true;
-    }
-
-    // ... rest of function ...
-}
-```
-
-### Affected Tests
-
-- `gpl-2.0-plus_11.txt`
-- `gpl-2.0-plus_17.txt`
-- `gpl-2.0-plus_28.txt`
-- `gpl_26.txt`
-- `gpl_35.txt`
-- `complex.el`
-- Tests with false `borceux` matches
-
-### TODOs
-
-- [ ] Add `is_license_reference` check to `is_false_positive()`
-- [ ] Determine correct relevance threshold (Python uses 90?)
-- [ ] Add unit tests
-- [ ] Verify affected tests pass
-
----
-
-## Issue 4: `filter_false_positive_license_lists_matches` Threshold Too High
-
-### Problem
-
-**Severity: Low** - Affects edge cases only
-
-The implemented filter requires `MIN_SHORT_FP_LIST_LENGTH = 15` candidates to filter, but most failing tests have only 1-2 spurious matches.
-
-### Analysis
-
-The filter is designed for files like SPDX license list JSON files with 50+ license identifiers. For single spurious matches, the `is_false_positive()` fix (Issue 3) should handle them.
-
-### Recommendation
-
-Lower threshold to 5 candidates, but prioritize Issue 3 first:
-
-```rust
-const MIN_SHORT_FP_LIST_LENGTH: usize = 5;  // Was 15
-```
-
-### TODOs
-
-- [ ] Lower threshold after Issue 3 is fixed
-- [ ] Add test case for small license lists
-- [ ] Verify no regression
-
----
-
-## Issue 5: Match Grouping Too Aggressive
-
-### Problem
-
-**Severity: Medium** - Affects ~5-10 tests
-
-Matches are being grouped together that should be separate detections. The `should_group_together()` function may need adjustment.
-
-### Example
-
-`gpl-2.0_82.RULE`: Python produces 3 detections, Rust produces 1.
-
-### Analysis
-
-This may be related to Issue 1 (intro/clue detection) or may need separate investigation.
-
-### TODOs
-
-- [ ] Investigate after Issue 1 is fixed
-- [ ] Compare Python's `get_matching_regions()` behavior
-- [ ] Determine if token/line thresholds need adjustment
-
----
-
-## Implementation Order
-
-1. **Issue 1** - Fix `is_license_intro_match()` / `is_license_clue_match()` (highest impact)
-2. **Issue 2** - Fix SPDX-LID token positions regression
-3. **Issue 3** - Add `is_license_reference` to `is_false_positive()`
-4. **Issue 5** - Investigate match grouping (if still needed after 1-3)
-5. **Issue 4** - Lower filter threshold (if still needed)
-
----
-
-## Expected Impact
-
-| Issue | Tests Fixed | Priority |
-|-------|-------------|----------|
-| Issue 1 | ~15-20 | P1 |
-| Issue 2 | ~2-3 (regression fix) | P1 |
-| Issue 3 | ~10-15 | P2 |
-| Issue 5 | ~5-10 | P3 |
-| Issue 4 | ~2-3 | P4 |
-
-**Total expected improvement**: ~25-35 additional tests passing
-
----
-
-## Verification Checklist
-
-After implementing each issue:
-
-- [ ] Unit tests pass for the module
-- [ ] Clippy shows no warnings
-- [ ] Golden test suite shows improvement
-- [ ] No regression in previously passing tests
+Analysis revealed that several fixes were either not implemented correctly, targeted the wrong problem, or caused regressions.

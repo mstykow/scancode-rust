@@ -1472,4 +1472,14 @@ mod tests {
             "mit OR (apache-2.0 AND gpl-2.0)"
         );
     }
+
+    #[test]
+    fn test_expression_to_string_with_no_outer_parens_in_complex_and() {
+        let input = "bsd-new AND mit AND gpl-3.0-plus WITH autoconf-simple-exception";
+        let expr = parse_expression(input).unwrap();
+        assert_eq!(
+            expression_to_string(&expr),
+            "bsd-new AND mit AND gpl-3.0-plus WITH autoconf-simple-exception"
+        );
+    }
 }
