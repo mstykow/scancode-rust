@@ -108,7 +108,7 @@ impl LicenseDetectionEngine {
     /// # Returns
     /// A Result containing a vector of LicenseDetection objects
     pub fn detect(&self, text: &str) -> Result<Vec<LicenseDetection>> {
-        let query = Query::new(text, &self.index)?;
+        let mut query = Query::new(text, &self.index)?;
 
         let mut all_matches = Vec::new();
 
@@ -142,13 +142,14 @@ impl LicenseDetectionEngine {
                 let near_dupe_matches =
                     seq_match_with_candidates(&self.index, &whole_run, &near_dupe_candidates);
                 
-                // TODO: Re-enable subtraction once token positions are verified correct
-                // for all match types. Currently disabled to prevent regressions.
+                // Subtract matched positions from query to prevent double-matching.
                 // Corresponds to Python: index.py:767-771
-                // for m in &near_dupe_matches {
-                //     let span = query::PositionSpan::new(m.start_token, m.end_token);
-                //     query.subtract(&span);
-                // }
+                for m in &near_dupe_matches {
+                    if m.end_token > m.start_token {
+                        let span = query::PositionSpan::new(m.start_token, m.end_token - 1);
+                        query.subtract(&span);
+                    }
+                }
                 
                 all_matches.extend(near_dupe_matches);
             }
