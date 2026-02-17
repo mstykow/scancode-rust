@@ -1129,6 +1129,455 @@ pub fn detect(&self, text: &str) -> Result<Vec<LicenseDetection>> {
 
 ---
 
+## Issue 10: Query Span Subtraction (Critical for Query Run Matching)
+
+### Problem
+
+Python uses span subtraction to prevent **double-matching** - the same content being matched by both the near-duplicate phase and query run phases. Without subtraction, when a near-duplicate match covers the whole file, query run matching may also match overlapping content, leading to duplicate or conflicting detections.
+
+### Python's Actual Pipeline (Verified from `index.py:741-812`)
+
+```python
+# Lines 739-741: Initialize tracking
+already_matched_qspans = matched_qspans[:]
+MAX_NEAR_DUPE_CANDIDATES = 10
+
+# Lines 744-765: Phase 1 - Near-duplicate detection
+whole_query_run = query.whole_query_run()
+near_dupe_candidates = match_set.compute_candidates(
+    query_run=whole_query_run,
+    idx=self,
+    matchable_rids=matchable_rids,
+    top=MAX_NEAR_DUPE_CANDIDATES,
+    high_resemblance=True,
+)
+
+if near_dupe_candidates:
+    matched = self.get_query_run_approximate_matches(
+        whole_query_run, near_dupe_candidates, already_matched_qspans, deadline)
+    matches.extend(matched)
+
+    # Lines 767-771: CRITICAL - Subtract matched positions
+    for match in matched:
+        qspan = match.qspan
+        query.subtract(qspan)
+        already_matched_qspans.append(qspan)
+
+# Lines 786-812: Phase 2 - Query run matching
+MAX_CANDIDATES = 70
+for query_run in query.query_runs:
+    candidates = match_set.compute_candidates(
+        query_run=query_run,
+        idx=self,
+        matchable_rids=matchable_rids,
+        top=MAX_CANDIDATES,
+        high_resemblance=False,  # NOTE: Different from near-duplicate
+    )
+
+    # Line 803: Note - passes matched_qspans (original), not already_matched_qspans
+    matched = self.get_query_run_approximate_matches(
+        query_run, candidates, matched_qspans, deadline)
+    matches.extend(matched)
+```
+
+**KEY INSIGHT**: Python's `get_query_run_approximate_matches()` internally checks `is_matchable()` at line 828:
+
+```python
+# match.py:828
+if not query_run.is_matchable(include_low=False, qspans=matched_qspans):
+    return matches  # Empty - skip this query run
+```
+
+### What is `qspan`?
+
+**`qspan`** (Query Span) is a `Span` object containing the set of token positions in the query that were matched. Python's `Span` uses efficient `intbitset` storage.
+
+**In Python's LicenseMatch** (`match.py:179-184`):
+```python
+qspan = attr.ib(
+    metadata=dict(
+        help='query text matched Span, start at zero which is the absolute '
+             'query start (not the query_run start)'
+    )
+)
+```
+
+### Python's Subtraction Logic (`query.py:328-334`)
+
+```python
+def subtract(self, qspan):
+    """Subtract the qspan matched positions from the query matchable positions."""
+    if qspan:
+        self.high_matchables.difference_update(qspan)
+        self.low_matchables.difference_update(qspan)
+```
+
+**Important**: Subtraction modifies `high_matchables` AND `low_matchables` in-place. This is a **mutation** of the Query object, not a creation of a new Query.
+
+### Why Subtraction Matters
+
+**Without Subtraction:**
+1. Near-duplicate matches tokens 0-100 with `gpl-2.0`
+2. Query run phase also matches tokens 10-50 with a different rule
+3. Result: Conflicting or duplicate detections
+
+**With Subtraction:**
+1. Near-duplicate matches tokens 0-100 with `gpl-2.0`
+2. `query.subtract(Span(0, 100))` removes positions from matchables
+3. `is_matchable()` returns `False` for query runs in that range
+4. Result: Single clean detection
+
+### Rust's Current State (Verified from source)
+
+**What Rust ALREADY HAS:**
+- ✅ `Query.high_matchables: HashSet<usize>` (`query.rs:220-221`)
+- ✅ `Query.low_matchables: HashSet<usize>` (`query.rs:227-228`)
+- ✅ `PositionSpan` struct (`query.rs:16-50`)
+- ✅ `Query.subtract(&mut self, span: &PositionSpan)` (`query.rs:713-724`)
+- ✅ `QueryRun.is_matchable(include_low, exclude_positions)` (`query.rs:879-897`)
+- ✅ `QueryRun.matchables(include_low)` (`query.rs:905-913`)
+
+**What Rust is MISSING:**
+1. ❌ `qspan` field in `LicenseMatch` struct (`models.rs:179-251` has no qspan)
+2. ❌ Calling `query.subtract()` in detection pipeline (`mod.rs:134-138` doesn't subtract)
+3. ❌ Tracking matched positions list
+4. ❌ Passing exclude positions to `is_matchable()` before query run matching
+
+### Current Rust Detection Pipeline (`mod.rs:110-164`)
+
+```rust
+pub fn detect(&self, text: &str) -> Result<Vec<LicenseDetection>> {
+    let query = Query::new(text, &self.index)?;  // NOT mutable
+    // ...
+    
+    // Phase 2: Near-duplicate detection
+    let near_dupe_candidates = compute_candidates_with_msets(
+        &self.index, &whole_run, true, MAX_NEAR_DUPE_CANDIDATES,
+    );
+    if !near_dupe_candidates.is_empty() {
+        let near_dupe_matches = seq_match_with_candidates(...);
+        all_matches.extend(near_dupe_matches);
+        // MISSING: No subtraction here!
+    }
+
+    // Phase 3: Query run matching
+    for query_run in query.query_runs().iter() {
+        // MISSING: No is_matchable() check!
+        let candidates = compute_candidates_with_msets(...);
+        if !candidates.is_empty() {
+            let matches = seq_match_with_candidates(...);
+            all_matches.extend(matches);
+        }
+    }
+}
+```
+
+### Implementation Plan
+
+#### Step 1: Add `matched_token_positions` Field to `LicenseMatch` (models.rs)
+
+**Why a different name than `qspan`:**
+- Python's `qspan` is a `Span` object (set-like), not a range
+- Rust's `LicenseMatch` already has `start_token` and `end_token`
+- We need the **set of matched positions** for non-contiguous matches (sequence matching)
+- Use `matched_token_positions: Vec<usize>` for simplicity
+
+**Current (`models.rs:179-251`):**
+```rust
+pub struct LicenseMatch {
+    pub start_token: usize,
+    pub end_token: usize,
+    // ... other fields ...
+}
+```
+
+**Add field:**
+```rust
+pub struct LicenseMatch {
+    pub start_token: usize,
+    pub end_token: usize,
+    /// Token positions matched by this license (for span subtraction).
+    /// Populated during matching to enable double-match prevention.
+    /// None means contiguous range [start_token, end_token].
+    #[serde(skip)]
+    pub matched_token_positions: Option<Vec<usize>>,
+    // ... other fields ...
+}
+```
+
+**Note**: For contiguous matches, `matched_token_positions` can remain `None` and the subtraction logic can use `start_token..=end_token`. Only non-contiguous matches (from sequence matching) need explicit position tracking.
+
+#### Step 2: Populate `matched_token_positions` in Matchers
+
+**Hash Match (`hash_match.rs`):** Matches are always contiguous - no explicit positions needed.
+```rust
+// No change needed - contiguous match implied by start_token/end_token
+LicenseMatch {
+    start_token: query_run.start,
+    end_token: query_run.end.unwrap_or(query_run.start),
+    matched_token_positions: None,  // Contiguous
+    // ...
+}
+```
+
+**Aho-Corasick Match (`aho_match.rs`):** Typically contiguous - similar to hash match.
+
+**Sequence Match (`seq_match.rs`):** May have non-contiguous matches due to token skipping:
+```rust
+// After computing matched positions from match blocks
+let matched_positions: Vec<usize> = match_blocks.iter()
+    .flat_map(|(qstart, qend, _istart, _iend)| *qstart..=*qend)
+    .collect();
+
+LicenseMatch {
+    start_token: *matched_positions.first().unwrap_or(&0),
+    end_token: *matched_positions.last().unwrap_or(&0),
+    matched_token_positions: Some(matched_positions),
+    // ...
+}
+```
+
+#### Step 3: Add Subtraction to Detection Pipeline (`mod.rs`)
+
+**Key Changes:**
+1. Make `query` mutable
+2. Track matched positions
+3. Call `subtract()` after near-duplicate matches
+4. Check `is_matchable()` before query run matching
+
+```rust
+pub fn detect(&self, text: &str) -> Result<Vec<LicenseDetection>> {
+    let mut query = Query::new(text, &self.index)?;  // NOW MUTABLE
+    let whole_run = query.whole_query_run();
+
+    let mut all_matches = Vec::new();
+    let mut matched_positions: Vec<PositionSpan> = Vec::new();  // NEW
+
+    // Phase 1: Hash, SPDX, Aho-Corasick (unchanged)
+    let hash_matches = hash_match(&self.index, &whole_run);
+    all_matches.extend(hash_matches.clone());
+    // Track matched positions from hash matches
+    for m in &hash_matches {
+        matched_positions.push(PositionSpan::new(m.start_token, m.end_token));
+    }
+    // ... similar for spdx, aho ...
+
+    // Phase 2: Near-duplicate detection
+    let near_dupe_candidates = compute_candidates_with_msets(
+        &self.index, &whole_run, true, MAX_NEAR_DUPE_CANDIDATES,
+    );
+    if !near_dupe_candidates.is_empty() {
+        let near_dupe_matches = seq_match_with_candidates(&self.index, &whole_run, &near_dupe_candidates);
+        
+        // NEW: Subtract matched positions
+        for m in &near_dupe_matches {
+            let span = PositionSpan::new(m.start_token, m.end_token);
+            query.subtract(&span);
+            matched_positions.push(span);
+        }
+        
+        all_matches.extend(near_dupe_matches);
+    }
+
+    // Phase 3: Query run matching
+    for query_run in query.query_runs().iter() {
+        // Skip the whole_run (already matched in Phase 2)
+        if query_run.start == whole_run.start && query_run.end == whole_run.end {
+            continue;
+        }
+
+        // NEW: Check if query run has matchable tokens
+        if !query_run.is_matchable(false, &matched_positions) {
+            continue;  // All tokens already matched
+        }
+
+        let candidates = compute_candidates_with_msets(
+            &self.index, query_run, false, MAX_QUERY_RUN_CANDIDATES,
+        );
+        if !candidates.is_empty() {
+            let matches = seq_match_with_candidates(&self.index, query_run, &candidates);
+            all_matches.extend(matches);
+        }
+    }
+
+    // ... rest unchanged ...
+}
+```
+
+#### Step 4: Verify `is_matchable()` Implementation
+
+**Current implementation (`query.rs:879-897`):**
+```rust
+pub fn is_matchable(&self, include_low: bool, exclude_positions: &[PositionSpan]) -> bool {
+    // Check if query run has digits only
+    if self.is_digits_only() {
+        return false;
+    }
+
+    let matchables = self.matchables(include_low);
+
+    if exclude_positions.is_empty() {
+        return !matchables.is_empty();
+    }
+
+    let mut matchable_set = matchables;
+    for span in exclude_positions {
+        let span_positions = span.positions();
+        matchable_set = matchable_set.difference(&span_positions).copied().collect();
+    }
+
+    !matchable_set.is_empty()
+}
+```
+
+**This is already correctly implemented!** It:
+1. Returns false for digits-only runs
+2. Subtracts exclude_positions from matchables
+3. Returns true if any matchable positions remain
+
+#### Step 5: Unit Tests
+
+Add to `src/license_detection/query_test.rs`:
+
+```rust
+#[test]
+fn test_query_subtract_removes_positions() {
+    let index = create_test_index(&[("license", 0), ("copyright", 1), ("permission", 2)], 3);
+    let mut query = Query::new("license copyright permission", &index).unwrap();
+
+    assert!(query.high_matchables.contains(&0));
+    assert!(query.high_matchables.contains(&1));
+
+    let span = PositionSpan::new(0, 1);
+    query.subtract(&span);
+
+    assert!(!query.high_matchables.contains(&0));
+    assert!(!query.high_matchables.contains(&1));
+    assert!(query.high_matchables.contains(&2));
+}
+
+#[test]
+fn test_query_run_is_matchable_with_exclusions() {
+    let index = create_test_index(&[("license", 0), ("copyright", 1), ("permission", 2)], 3);
+    let query = Query::new("license copyright permission", &index).unwrap();
+    let run = query.whole_query_run();
+
+    // Initially matchable
+    assert!(run.is_matchable(false, &[]));
+
+    // Exclude positions 0-1, position 2 remains
+    let exclude = vec![PositionSpan::new(0, 1)];
+    assert!(run.is_matchable(false, &exclude));
+
+    // Exclude all positions
+    let exclude_all = vec![PositionSpan::new(0, 2)];
+    assert!(!run.is_matchable(false, &exclude_all));
+}
+
+#[test]
+fn test_subtraction_after_near_duplicate_match() {
+    // Simulate: near-duplicate matches whole file, query run should be skipped
+    let index = create_test_index(&[("license", 0), ("copyright", 1)], 2);
+    let mut query = Query::new("license copyright license copyright", &index).unwrap();
+    let whole_run = query.whole_query_run();
+
+    // Simulate near-duplicate match covering positions 0-1
+    let near_dupe_span = PositionSpan::new(0, 1);
+    query.subtract(&near_dupe_span);
+
+    // Query run for same range should not be matchable
+    assert!(!whole_run.is_matchable(false, &[near_dupe_span]));
+}
+```
+
+### Edge Cases to Handle
+
+1. **Empty span**: `PositionSpan::new(0, 0)` - subtracts single position. Python handles `if qspan:` check.
+2. **Span outside query range**: Should not happen if matchers generate correct positions.
+3. **Overlapping spans**: Subtraction is idempotent - same position removed twice has no effect.
+4. **Partial overlap**: Query run partially covered by subtraction → remaining positions are still matchable.
+5. **All tokens subtracted**: `is_matchable()` returns `false`, query run is skipped.
+6. **Non-contiguous matches**: Sequence matches may skip tokens; must track actual matched positions.
+
+### Performance Considerations
+
+1. **HashSet operations**: `subtract()` iterates through span positions and removes from HashSets - O(n) per subtraction.
+2. **Memory**: `matched_positions: Vec<PositionSpan>` stores only ranges, not full position sets.
+3. **No additional allocations**: `is_matchable()` reuses existing `high_matchables`/`low_matchables` from QueryRun.
+
+### Python References (Verified)
+
+| Component | Location | Description |
+|-----------|----------|-------------|
+| `Span` class | `spans.py:42-475` | Position set with `intbitset` storage |
+| `Query.subtract()` | `query.py:328-334` | Subtracts from high/low matchables |
+| `QueryRun.is_matchable()` | `query.py:798-818` | Checks with exclusion spans |
+| Near-duplicate subtraction | `index.py:767-771` | Subtracts after near-duplicate matches |
+| Query run matching | `index.py:786-812` | Iterates query runs with `high_resemblance=False` |
+| `get_query_run_approximate_matches` | `index.py:814-860` | Internal check of `is_matchable()` at line 828 |
+
+### Rust Implementation Checklist
+
+- [ ] **Step 1**: Add `matched_token_positions: Option<Vec<usize>>` field to `LicenseMatch` in `models.rs`
+  - Use `Option` to avoid allocation for contiguous matches
+  - Add `#[serde(skip)]` since this is internal-only
+
+- [ ] **Step 2**: Populate `matched_token_positions` in sequence matching (`seq_match.rs`)
+  - Hash and Aho-Corasick matches are always contiguous (use `None`)
+  - Sequence matches may be non-contiguous (use `Some(positions)`)
+
+- [ ] **Step 3**: Modify `detect()` pipeline in `mod.rs`:
+  - Make `query` mutable
+  - Add `matched_positions: Vec<PositionSpan>` tracking
+  - Call `query.subtract()` after near-duplicate matches
+  - Call `is_matchable()` before query run matching
+
+- [ ] **Step 4**: Add unit tests for subtraction behavior in `query_test.rs`
+
+- [ ] **Step 5**: Run golden tests to verify no regressions:
+  ```bash
+  cargo test -r -q --lib license_detection::golden_test::golden_tests::test_golden_lic1
+  ```
+
+### Expected Impact
+
+**Primary benefit**: Prevents double-matching when near-duplicate detection matches whole file.
+
+**Tests that may improve**: Files where near-duplicate phase matches whole content but query run phase would also match:
+- Combined rule cases
+- Files with single dominant license
+
+**Why This is Critical for Issue 9:**
+
+Issue 9 (Query Run Matching) requires this to work correctly. Without subtraction:
+1. Near-duplicate phase matches whole file
+2. Query run phase matches overlapping content again
+3. Result: Duplicate/conflicting detections
+
+With subtraction:
+1. Near-duplicate phase matches whole file
+2. Subtraction marks tokens as "already matched"
+3. `is_matchable()` returns false for query runs in that range
+4. Result: Clean, non-overlapping detections
+
+### Verification Steps
+
+After implementation:
+
+1. **Unit tests pass**: `cargo test -q --lib query_test`
+2. **Golden tests stable**: Should not regress existing passing tests
+3. **Debug logging**: Add temporary logging to verify subtraction is called:
+   ```rust
+   if !near_dupe_matches.is_empty() {
+       eprintln!("Near-duplicate matches: {}", near_dupe_matches.len());
+       for m in &near_dupe_matches {
+           eprintln!("  Subtracting: {}-{}", m.start_token, m.end_token);
+       }
+   }
+   ```
+
+---
+
 ## Background
 
 After implementing PLAN-007 through PLAN-014, the golden test results showed:

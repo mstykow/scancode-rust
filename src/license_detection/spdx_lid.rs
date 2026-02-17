@@ -292,6 +292,7 @@ pub fn spdx_lid_match(index: &LicenseIndex, text: &str) -> Vec<LicenseMatch> {
                     is_license_clue: rule.is_license_clue,
                     is_license_reference: rule.is_license_reference,
                     is_license_tag: rule.is_license_tag,
+                    matched_token_positions: None,
                 };
 
                 matches.push(license_match);

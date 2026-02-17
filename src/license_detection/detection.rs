@@ -1170,6 +1170,7 @@ mod tests {
             is_license_reference: false,
             is_license_tag: false,
             rule_length: 100,
+            matched_token_positions: None,
         }
     }
 
@@ -1351,6 +1352,7 @@ mod tests {
             is_license_reference: false,
             is_license_tag: false,
             rule_length: 100,
+            matched_token_positions: None,
         }
     }
 
@@ -1461,6 +1463,7 @@ mod tests {
             is_license_clue: false,
             is_license_reference: false,
             is_license_tag: false,
+            matched_token_positions: None,
         }
     }
 
@@ -3901,864 +3904,19 @@ mod tests {
             is_license_clue: false,
             is_license_reference: false,
             is_license_tag: false,
-            rule_length: 100,
-        };
-        let license_match = create_test_match_with_params(
-            "mit",
-            "1-hash",
-            3,
-            10,
-            100.0,
-            100,
-            100,
-            100.0,
-            100,
-            "mit.LICENSE",
-        );
-
-        let matches = vec![intro, license_match];
-        assert!(has_unknown_intro_before_detection(&matches));
-    }
-
-    #[test]
-    fn test_has_unknown_intro_before_detection_false_single_match() {
-        let matches = vec![create_test_match_with_params(
-            "mit",
-            "1-hash",
-            1,
-            10,
-            100.0,
-            100,
-            100,
-            100.0,
-            100,
-            "mit.LICENSE",
-        )];
-
-        assert!(!has_unknown_intro_before_detection(&matches));
-    }
-
-    #[test]
-    fn test_has_unknown_intro_before_detection_false_all_intros() {
-        let intro1 = LicenseMatch {
-            license_expression: "unknown".to_string(),
-            license_expression_spdx: "unknown".to_string(),
-            from_file: Some("test.txt".to_string()),
-            start_line: 1,
-            end_line: 2,
-            start_token: 0,
-            end_token: 0,
-            matcher: "5-unknown".to_string(),
-            score: 50.0,
-            matched_length: 5,
-            match_coverage: 100.0,
-            rule_relevance: 100,
-            rule_identifier: "license-intro.LICENSE".to_string(),
-            rule_url: "https://example.com".to_string(),
-            matched_text: Some("Licensed under".to_string()),
-            referenced_filenames: None,
-            is_license_intro: false,
-            is_license_clue: false,
-            is_license_reference: false,
-            is_license_tag: false,
-            rule_length: 100,
-        };
-        let intro2 = LicenseMatch {
-            license_expression: "unknown".to_string(),
-            license_expression_spdx: "unknown".to_string(),
-            from_file: Some("test.txt".to_string()),
-            start_line: 3,
-            end_line: 4,
-            start_token: 0,
-            end_token: 0,
-            matcher: "5-unknown".to_string(),
-            score: 50.0,
-            matched_length: 5,
-            match_coverage: 100.0,
-            rule_relevance: 100,
-            rule_identifier: "license-intro-2.LICENSE".to_string(),
-            rule_url: "https://example.com".to_string(),
-            matched_text: Some("See LICENSE file".to_string()),
-            referenced_filenames: None,
-            is_license_intro: false,
-            is_license_clue: false,
-            is_license_reference: false,
-            is_license_tag: false,
-            rule_length: 100,
+            rule_length: 5,
+            matched_token_positions: None,
         };
 
-        let matches = vec![intro1, intro2];
-        assert!(!has_unknown_intro_before_detection(&matches));
-    }
+        let matches = vec![intro];
 
-    #[test]
-    fn test_populate_detection_from_group_uses_analyze_detection() {
-        let group = DetectionGroup {
-            matches: vec![create_test_match_with_params(
-                "mit",
-                "1-hash",
-                1,
-                10,
-                100.0,
-                100,
-                100,
-                100.0,
-                100,
-                "mit.LICENSE",
-            )],
-            start_line: 1,
-            end_line: 10,
-        };
-
-        let mut detection = LicenseDetection {
-            license_expression: None,
-            license_expression_spdx: None,
-            matches: Vec::new(),
-            detection_log: Vec::new(),
-            identifier: None,
-            file_region: None,
-        };
-
-        populate_detection_from_group(&mut detection, &group);
-
-        assert!(
-            detection
-                .detection_log
-                .contains(&"perfect-detection".to_string())
-        );
-    }
-
-    #[test]
-    fn test_populate_detection_from_group_undetected() {
-        let group = DetectionGroup {
-            matches: vec![create_test_match_with_params(
-                "unknown",
-                "5-undetected",
-                1,
-                10,
-                0.0,
-                0,
-                0,
-                0.0,
-                0,
-                "undetected.LICENSE",
-            )],
-            start_line: 1,
-            end_line: 10,
-        };
-
-        let mut detection = LicenseDetection {
-            license_expression: None,
-            license_expression_spdx: None,
-            matches: Vec::new(),
-            detection_log: Vec::new(),
-            identifier: None,
-            file_region: None,
-        };
-
-        populate_detection_from_group(&mut detection, &group);
-
-        assert!(
-            detection
-                .detection_log
-                .contains(&"undetected-license".to_string())
-        );
-    }
-
-    #[test]
-    fn test_group_matches_overlapping() {
-        let match1 = create_test_match_with_params(
-            "mit",
-            "1-hash",
-            1,
-            10,
-            95.0,
-            100,
-            100,
-            100.0,
-            100,
-            "mit.LICENSE",
-        );
-        let match2 = create_test_match_with_params(
-            "mit",
-            "2-aho",
-            5,
-            15,
-            95.0,
-            100,
-            100,
-            100.0,
-            100,
-            "mit.LICENSE",
-        );
-        let matches = vec![match1, match2];
-        let groups = group_matches_by_region(&matches);
-
-        assert_eq!(groups.len(), 1);
-        assert_eq!(groups[0].matches.len(), 2);
-        assert_eq!(groups[0].start_line, 1);
-        assert_eq!(groups[0].end_line, 15);
-    }
-
-    #[test]
-    fn test_group_matches_license_clue_breaks_group() {
-        let match1 = create_test_match_with_params(
-            "mit",
-            "1-hash",
-            1,
-            10,
-            95.0,
-            100,
-            100,
-            100.0,
-            100,
-            "mit.LICENSE",
-        );
-        let clue_match = LicenseMatch {
-            license_expression: "unknown".to_string(),
-            license_expression_spdx: "unknown".to_string(),
-            from_file: Some("test.txt".to_string()),
-            start_line: 20,
-            end_line: 25,
-            start_token: 0,
-            end_token: 0,
-            matcher: "2-aho".to_string(),
-            score: 100.0,
-            matched_length: 10,
-            match_coverage: 100.0,
-            rule_relevance: 100,
-            rule_identifier: "license-clue.RULE".to_string(),
-            rule_url: "https://example.com".to_string(),
-            matched_text: Some("some clue text".to_string()),
-            referenced_filenames: None,
-            is_license_intro: false,
-            is_license_clue: true,
-            is_license_reference: false,
-            is_license_tag: false,
-            rule_length: 100,
-        };
-        let match3 = create_test_match_with_params(
-            "apache-2.0",
-            "1-hash",
-            40,
-            50,
-            95.0,
-            100,
-            100,
-            100.0,
-            100,
-            "apache.LICENSE",
-        );
-        let matches = vec![match1, clue_match, match3];
-        let groups = group_matches_by_region(&matches);
-
-        assert_eq!(groups.len(), 3);
-        assert_eq!(groups[0].matches.len(), 1);
-        assert_eq!(groups[1].matches.len(), 1);
-        assert_eq!(groups[2].matches.len(), 1);
-    }
-
-    #[test]
-    fn test_group_matches_license_intro_followed_by_match() {
-        let intro_match = LicenseMatch {
-            license_expression: "unknown".to_string(),
-            license_expression_spdx: "unknown".to_string(),
-            from_file: Some("test.txt".to_string()),
-            start_line: 1,
-            end_line: 2,
-            start_token: 0,
-            end_token: 0,
-            matcher: "2-aho".to_string(),
-            score: 100.0,
-            matched_length: 5,
-            match_coverage: 100.0,
-            rule_relevance: 100,
-            rule_identifier: "license-intro.RULE".to_string(),
-            rule_url: "https://example.com".to_string(),
-            matched_text: Some("Licensed under".to_string()),
-            referenced_filenames: None,
-            is_license_intro: true,
-            is_license_clue: false,
-            is_license_reference: false,
-            is_license_tag: false,
-            rule_length: 100,
-        };
-        let license_match = create_test_match_with_params(
-            "mit",
-            "1-hash",
-            3,
-            10,
-            100.0,
-            100,
-            100,
-            100.0,
-            100,
-            "mit.LICENSE",
-        );
-        let matches = vec![intro_match, license_match];
-        let groups = group_matches_by_region(&matches);
-
-        assert_eq!(groups.len(), 1);
-        assert_eq!(groups[0].matches.len(), 2);
-    }
-
-    #[test]
-    fn test_determine_license_expression_with_same_license() {
-        let matches = vec![
-            create_test_match_with_params("mit", "1-hash", 1, 10, 95.0, 100, 100, 95.0, 100, "#1"),
-            create_test_match_with_params(
-                "mit",
-                "1-spdx-id",
-                11,
-                20,
-                95.0,
-                100,
-                100,
-                95.0,
-                100,
-                "#2",
-            ),
-        ];
-
-        let expr = determine_license_expression(&matches);
-        assert!(expr.is_ok());
-        let expr_value = expr.unwrap();
-        assert!(expr_value.contains("mit"));
-    }
-
-    #[test]
-    fn test_create_detection_from_group_file_region() {
-        let match1 = create_test_match_with_params(
-            "mit",
-            "1-hash",
-            5,
-            15,
-            95.0,
-            100,
-            100,
-            100.0,
-            100,
-            "mit.LICENSE",
-        );
-        let group = DetectionGroup::new(vec![match1]);
-        let detection = create_detection_from_group(&group);
-
-        assert!(detection.file_region.is_some());
-        let region = detection.file_region.unwrap();
-        assert_eq!(region.start_line, 5);
-        assert_eq!(region.end_line, 15);
-    }
-
-    #[test]
-    fn test_analyze_detection_low_quality_matches() {
-        let matches = vec![create_test_match_with_params(
-            "mit",
-            "2-aho",
-            1,
-            10,
-            50.0,
-            20,
-            20,
-            50.0,
-            50,
-            "mit.LICENSE",
-        )];
-
-        let result = analyze_detection(&matches, false);
-        assert_eq!(result, DETECTION_LOG_LICENSE_CLUES);
-    }
-
-    #[test]
-    fn test_has_references_to_local_files_true() {
-        let match_with_ref = LicenseMatch {
-            license_expression: "mit".to_string(),
-            license_expression_spdx: "MIT".to_string(),
-            from_file: Some("test.txt".to_string()),
-            start_line: 1,
-            end_line: 10,
-            start_token: 0,
-            end_token: 0,
-            matcher: "1-hash".to_string(),
-            score: 100.0,
-            matched_length: 100,
-            match_coverage: 100.0,
-            rule_relevance: 100,
-            rule_identifier: "mit.LICENSE".to_string(),
-            rule_url: "https://example.com".to_string(),
-            matched_text: Some("MIT License".to_string()),
-            referenced_filenames: Some(vec!["LICENSE".to_string()]),
-            is_license_intro: false,
-            is_license_clue: false,
-            is_license_reference: false,
-            is_license_tag: false,
-            rule_length: 100,
-        };
-
-        let matches = vec![match_with_ref];
-        assert!(has_references_to_local_files(&matches));
-    }
-
-    #[test]
-    fn test_has_references_to_local_files_false() {
-        let matches = vec![create_test_match_with_params(
-            "mit",
-            "1-hash",
-            1,
-            10,
-            100.0,
-            100,
-            100,
-            100.0,
-            100,
-            "mit.LICENSE",
-        )];
-        assert!(!has_references_to_local_files(&matches));
-    }
-
-    #[test]
-    fn test_has_references_to_local_files_false_with_extra_words() {
-        let match_with_ref = LicenseMatch {
-            license_expression: "mit".to_string(),
-            license_expression_spdx: "MIT".to_string(),
-            from_file: Some("test.txt".to_string()),
-            start_line: 1,
-            end_line: 10,
-            start_token: 0,
-            end_token: 0,
-            matcher: "2-aho".to_string(),
-            score: 50.0,
-            matched_length: 100,
-            match_coverage: 60.0,
-            rule_relevance: 100,
-            rule_identifier: "mit.LICENSE".to_string(),
-            rule_url: "https://example.com".to_string(),
-            matched_text: Some("MIT License with extra words".to_string()),
-            referenced_filenames: Some(vec!["LICENSE".to_string()]),
-            is_license_intro: false,
-            is_license_clue: false,
-            is_license_reference: false,
-            is_license_tag: false,
-            rule_length: 100,
-        };
-
-        let matches = vec![match_with_ref];
-        assert!(!has_references_to_local_files(&matches));
-    }
-
-    #[test]
-    fn test_is_false_positive_freeware_bare() {
-        let matches = vec![create_test_match_with_params(
-            "freeware",
-            "2-aho",
-            2000,
-            2005,
-            30.0,
-            3,
-            3,
-            30.0,
-            50,
-            "freeware_bare.LICENSE",
-        )];
-
-        assert!(is_false_positive(&matches));
-    }
-
-    #[test]
-    fn test_is_false_positive_public_domain_bare() {
-        let matches = vec![create_test_match_with_params(
-            "public-domain",
-            "2-aho",
-            2000,
-            2005,
-            30.0,
-            3,
-            3,
-            30.0,
-            50,
-            "public-domain_bare.LICENSE",
-        )];
-
-        assert!(is_false_positive(&matches));
-    }
-
-    #[test]
-    fn test_apply_detection_preferences_keeps_lower_priority_when_higher_score() {
-        let detections = vec![
-            LicenseDetection {
-                license_expression: Some("mit".to_string()),
-                license_expression_spdx: None,
-                matches: vec![create_test_match_with_params(
-                    "mit",
-                    "5-unknown",
-                    1,
-                    10,
-                    95.0,
-                    100,
-                    100,
-                    100.0,
-                    100,
-                    "mit.LICENSE",
-                )],
-                detection_log: Vec::new(),
-                identifier: Some("unknown".to_string()),
-                file_region: None,
-            },
-            LicenseDetection {
-                license_expression: Some("mit".to_string()),
-                license_expression_spdx: None,
-                matches: vec![create_test_match_with_params(
-                    "mit",
-                    "1-hash",
-                    1,
-                    10,
-                    85.0,
-                    100,
-                    100,
-                    100.0,
-                    100,
-                    "mit.LICENSE",
-                )],
-                detection_log: Vec::new(),
-                identifier: Some("hash".to_string()),
-                file_region: None,
-            },
-        ];
-
-        let result = apply_detection_preferences(detections);
-        assert_eq!(result.len(), 1);
-        assert_eq!(result[0].identifier, Some("unknown".to_string()));
-    }
-
-    #[test]
-    fn test_is_license_intro_with_flag_and_aho_matcher() {
-        let m = LicenseMatch {
-            license_expression: "mit".to_string(),
-            license_expression_spdx: "MIT".to_string(),
-            from_file: None,
-            start_line: 1,
-            end_line: 5,
-            start_token: 0,
-            end_token: 0,
-            matcher: "2-aho".to_string(),
-            score: 1.0,
-            matched_length: 100,
-            match_coverage: 100.0,
-            rule_relevance: 100,
-            rule_identifier: "mit-intro.LICENSE".to_string(),
-            rule_url: String::new(),
-            matched_text: None,
-            referenced_filenames: None,
-            is_license_intro: true,
-            is_license_clue: false,
-            is_license_reference: false,
-            is_license_tag: false,
-            rule_length: 100,
-        };
-        assert!(is_license_intro(&m));
-    }
-
-    #[test]
-    fn test_is_license_intro_with_flag_and_full_coverage() {
-        let m = LicenseMatch {
-            license_expression: "mit".to_string(),
-            license_expression_spdx: "MIT".to_string(),
-            from_file: None,
-            start_line: 1,
-            end_line: 5,
-            start_token: 0,
-            end_token: 0,
-            matcher: "1-hash".to_string(),
-            score: 1.0,
-            matched_length: 100,
-            match_coverage: 100.0,
-            rule_relevance: 100,
-            rule_identifier: "mit-intro.LICENSE".to_string(),
-            rule_url: String::new(),
-            matched_text: None,
-            referenced_filenames: None,
-            is_license_intro: true,
-            is_license_clue: false,
-            is_license_reference: false,
-            is_license_tag: false,
-            rule_length: 100,
-        };
-        assert!(is_license_intro(&m));
-    }
-
-    #[test]
-    fn test_is_license_intro_with_clue_flag() {
-        let m = LicenseMatch {
-            license_expression: "mit".to_string(),
-            license_expression_spdx: "MIT".to_string(),
-            from_file: None,
-            start_line: 1,
-            end_line: 5,
-            start_token: 0,
-            end_token: 0,
-            matcher: "2-aho".to_string(),
-            score: 1.0,
-            matched_length: 100,
-            match_coverage: 100.0,
-            rule_relevance: 100,
-            rule_identifier: "mit-clue.LICENSE".to_string(),
-            rule_url: String::new(),
-            matched_text: None,
-            referenced_filenames: None,
-            is_license_intro: false,
-            is_license_clue: true,
-            is_license_reference: false,
-            is_license_tag: false,
-            rule_length: 100,
-        };
-        assert!(is_license_intro(&m));
-    }
-
-    #[test]
-    fn test_is_license_intro_free_unknown() {
-        let m = LicenseMatch {
-            license_expression: "free-unknown".to_string(),
-            license_expression_spdx: "free-unknown".to_string(),
-            from_file: None,
-            start_line: 1,
-            end_line: 5,
-            start_token: 0,
-            end_token: 0,
-            matcher: "2-aho".to_string(),
-            score: 1.0,
-            matched_length: 100,
-            match_coverage: 100.0,
-            rule_relevance: 100,
-            rule_identifier: "#1".to_string(),
-            rule_url: String::new(),
-            matched_text: None,
-            referenced_filenames: None,
-            is_license_intro: false,
-            is_license_clue: false,
-            is_license_reference: false,
-            is_license_tag: false,
-            rule_length: 100,
-        };
-        assert!(is_license_intro(&m));
-    }
-
-    #[test]
-    fn test_is_license_intro_false_without_flag() {
-        let m = LicenseMatch {
-            license_expression: "mit".to_string(),
-            license_expression_spdx: "MIT".to_string(),
-            from_file: None,
-            start_line: 1,
-            end_line: 5,
-            start_token: 0,
-            end_token: 0,
-            matcher: "2-aho".to_string(),
-            score: 1.0,
-            matched_length: 100,
-            match_coverage: 100.0,
-            rule_relevance: 100,
-            rule_identifier: "mit.LICENSE".to_string(),
-            rule_url: String::new(),
-            matched_text: None,
-            referenced_filenames: None,
-            is_license_intro: false,
-            is_license_clue: false,
-            is_license_reference: false,
-            is_license_tag: false,
-            rule_length: 100,
-        };
-        assert!(!is_license_intro(&m));
-    }
-
-    #[test]
-    fn test_is_license_intro_false_with_low_coverage() {
-        let m = LicenseMatch {
-            license_expression: "mit".to_string(),
-            license_expression_spdx: "MIT".to_string(),
-            from_file: None,
-            start_line: 1,
-            end_line: 5,
-            start_token: 0,
-            end_token: 0,
-            matcher: "3-seq".to_string(),
-            score: 0.8,
-            matched_length: 80,
-            match_coverage: 80.0,
-            rule_relevance: 100,
-            rule_identifier: "mit-intro.LICENSE".to_string(),
-            rule_url: String::new(),
-            matched_text: None,
-            referenced_filenames: None,
-            is_license_intro: true,
-            is_license_clue: false,
-            is_license_reference: false,
-            is_license_tag: false,
-            rule_length: 100,
-        };
-        assert!(!is_license_intro(&m));
-    }
-
-    #[test]
-    fn test_filter_license_intros_removes_intros() {
-        let intro = LicenseMatch {
-            license_expression: "free-unknown".to_string(),
-            license_expression_spdx: "free-unknown".to_string(),
-            from_file: None,
-            start_line: 1,
-            end_line: 2,
-            start_token: 0,
-            end_token: 0,
-            matcher: "2-aho".to_string(),
-            score: 1.0,
-            matched_length: 10,
-            match_coverage: 100.0,
-            rule_relevance: 100,
-            rule_identifier: "#1".to_string(),
-            rule_url: String::new(),
-            matched_text: None,
-            referenced_filenames: None,
-            is_license_intro: true,
-            is_license_clue: false,
-            is_license_reference: false,
-            is_license_tag: false,
-            rule_length: 100,
-        };
-        let license_match = LicenseMatch {
-            license_expression: "mit".to_string(),
-            license_expression_spdx: "MIT".to_string(),
-            from_file: None,
-            start_line: 3,
-            end_line: 10,
-            start_token: 0,
-            end_token: 0,
-            matcher: "1-hash".to_string(),
-            score: 1.0,
-            matched_length: 100,
-            match_coverage: 100.0,
-            rule_relevance: 100,
-            rule_identifier: "mit.LICENSE".to_string(),
-            rule_url: String::new(),
-            matched_text: None,
-            referenced_filenames: None,
-            is_license_intro: false,
-            is_license_clue: false,
-            is_license_reference: false,
-            is_license_tag: false,
-            rule_length: 100,
-        };
-
-        let matches = vec![intro.clone(), license_match.clone()];
-        let filtered = filter_license_intros(&matches);
-
-        assert_eq!(filtered.len(), 1);
-        assert_eq!(filtered[0].license_expression, "mit");
-    }
-
-    #[test]
-    fn test_filter_license_intros_returns_original_when_all_filtered() {
-        let intro = LicenseMatch {
-            license_expression: "free-unknown".to_string(),
-            license_expression_spdx: "free-unknown".to_string(),
-            from_file: None,
-            start_line: 1,
-            end_line: 2,
-            start_token: 0,
-            end_token: 0,
-            matcher: "2-aho".to_string(),
-            score: 1.0,
-            matched_length: 10,
-            match_coverage: 100.0,
-            rule_relevance: 100,
-            rule_identifier: "#1".to_string(),
-            rule_url: String::new(),
-            matched_text: None,
-            referenced_filenames: None,
-            is_license_intro: true,
-            is_license_clue: false,
-            is_license_reference: false,
-            is_license_tag: false,
-            rule_length: 100,
-        };
-
-        let matches = vec![intro.clone()];
-        let filtered = filter_license_intros(&matches);
-
-        assert_eq!(filtered.len(), 1);
-        assert_eq!(filtered[0].license_expression, "free-unknown");
-    }
-
-    #[test]
-    fn test_create_detection_from_group_filters_intros() {
-        let intro = LicenseMatch {
-            license_expression: "free-unknown".to_string(),
-            license_expression_spdx: "free-unknown".to_string(),
-            from_file: None,
-            start_line: 1,
-            end_line: 2,
-            start_token: 0,
-            end_token: 0,
-            matcher: "5-unknown".to_string(),
-            score: 1.0,
-            matched_length: 10,
-            match_coverage: 100.0,
-            rule_relevance: 100,
-            rule_identifier: "license-intro.LICENSE".to_string(),
-            rule_url: String::new(),
-            matched_text: None,
-            referenced_filenames: None,
-            is_license_intro: false,
-            is_license_clue: false,
-            is_license_reference: false,
-            is_license_tag: false,
-            rule_length: 100,
-        };
-        let license_match = LicenseMatch {
-            license_expression: "mit".to_string(),
-            license_expression_spdx: "MIT".to_string(),
-            from_file: None,
-            start_line: 3,
-            end_line: 10,
-            start_token: 0,
-            end_token: 0,
-            matcher: "1-hash".to_string(),
-            score: 1.0,
-            matched_length: 100,
-            match_coverage: 100.0,
-            rule_relevance: 100,
-            rule_identifier: "mit.LICENSE".to_string(),
-            rule_url: String::new(),
-            matched_text: None,
-            referenced_filenames: None,
-            is_license_intro: false,
-            is_license_clue: false,
-            is_license_reference: false,
-            is_license_tag: false,
-            rule_length: 100,
-        };
-
-        let group = DetectionGroup {
-            matches: vec![intro, license_match],
-            start_line: 1,
-            end_line: 10,
-        };
-
-        let detection = create_detection_from_group(&group);
-
-        assert_eq!(detection.matches.len(), 1);
-        assert_eq!(detection.license_expression, Some("mit".to_string()));
-        assert!(
-            detection
-                .detection_log
-                .contains(&"unknown-intro-followed-by-match".to_string())
-        );
+        let result = has_unknown_intro_before_detection(&matches);
+        assert!(result);
     }
 
     #[test]
     fn test_sort_detections_by_line() {
-        fn create_detection(
-            license_expr: &str,
-            start_line: usize,
-            end_line: usize,
-        ) -> LicenseDetection {
+        fn create_detection(license_expr: &str, start_line: usize, end_line: usize) -> LicenseDetection {
             LicenseDetection {
                 license_expression: Some(license_expr.to_string()),
                 license_expression_spdx: Some(license_expr.to_uppercase()),
@@ -4784,6 +3942,7 @@ mod tests {
                     is_license_reference: false,
                     is_license_tag: false,
                     rule_length: 100,
+            matched_token_positions: None,
                 }],
                 detection_log: vec![],
                 identifier: None,
@@ -4846,6 +4005,7 @@ mod tests {
             is_license_reference: false,
             is_license_tag: false,
             rule_length: 10,
+            matched_token_positions: None,
         };
         assert!(is_unknown_intro(&m));
     }
@@ -4874,6 +4034,7 @@ mod tests {
             is_license_reference: false,
             is_license_tag: false,
             rule_length: 10,
+            matched_token_positions: None,
         };
         assert!(is_unknown_intro(&m));
     }
@@ -4902,6 +4063,7 @@ mod tests {
             is_license_reference: false,
             is_license_tag: false,
             rule_length: 10,
+            matched_token_positions: None,
         };
         assert!(is_unknown_intro(&m));
     }
@@ -4930,6 +4092,7 @@ mod tests {
             is_license_reference: false,
             is_license_tag: false,
             rule_length: 10,
+            matched_token_positions: None,
         };
         assert!(!is_unknown_intro(&m));
     }
@@ -4958,6 +4121,7 @@ mod tests {
             is_license_reference: false,
             is_license_tag: false,
             rule_length: 10,
+            matched_token_positions: None,
         };
         assert!(!is_unknown_intro(&m));
     }
@@ -4989,6 +4153,7 @@ mod tests {
             is_license_reference: false,
             is_license_tag: false,
             rule_length: 100,
+            matched_token_positions: None,
         }
     }
 

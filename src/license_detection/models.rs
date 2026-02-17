@@ -248,6 +248,43 @@ pub struct LicenseMatch {
     /// True if this match is from a license tag rule
     #[serde(default)]
     pub is_license_tag: bool,
+
+    /// Token positions matched by this license (for span subtraction).
+    ///
+    /// Populated during matching to enable double-match prevention.
+    /// None means contiguous range [start_token, end_token).
+    /// Some(positions) contains the exact positions for non-contiguous matches.
+    #[serde(skip)]
+    pub matched_token_positions: Option<Vec<usize>>,
+}
+
+impl Default for LicenseMatch {
+    fn default() -> Self {
+        LicenseMatch {
+            license_expression: String::new(),
+            license_expression_spdx: String::new(),
+            from_file: None,
+            start_line: 0,
+            end_line: 0,
+            start_token: 0,
+            end_token: 0,
+            matcher: String::new(),
+            score: 0.0,
+            matched_length: 0,
+            rule_length: 0,
+            match_coverage: 0.0,
+            rule_relevance: 0,
+            rule_identifier: String::new(),
+            rule_url: String::new(),
+            matched_text: None,
+            referenced_filenames: None,
+            is_license_intro: false,
+            is_license_clue: false,
+            is_license_reference: false,
+            is_license_tag: false,
+            matched_token_positions: None,
+        }
+    }
 }
 
 impl LicenseMatch {
@@ -361,6 +398,7 @@ mod tests {
             score: 0.95,
             matched_length: 100,
             rule_length: 100,
+            matched_token_positions: None,
             match_coverage: 95.0,
             rule_relevance: 100,
             rule_identifier: "mit.LICENSE".to_string(),
@@ -764,6 +802,7 @@ mod tests {
             is_license_clue: false,
             is_license_reference: false,
             is_license_tag: false,
+            matched_token_positions: None,
         };
 
         assert!(match_result.from_file.is_none());
@@ -894,6 +933,7 @@ mod tests {
             score: 0.95,
             matched_length: 100,
             rule_length: 100,
+            matched_token_positions: None,
             match_coverage: 95.0,
             rule_relevance: 100,
             rule_identifier: "mit.LICENSE".to_string(),

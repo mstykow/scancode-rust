@@ -695,6 +695,7 @@ mod tests {
             score,
             matched_length: 100,
             rule_length: 100,
+            matched_token_positions: None,
             match_coverage: coverage,
             rule_relevance: relevance,
             rule_identifier: rule_identifier.to_string(),
@@ -736,6 +737,7 @@ mod tests {
             is_license_clue: false,
             is_license_reference: false,
             is_license_tag: false,
+            matched_token_positions: None,
         }
     }
 
@@ -1802,6 +1804,7 @@ mod tests {
             is_license_clue,
             is_license_reference,
             is_license_tag,
+            matched_token_positions: None,
         }
     }
 

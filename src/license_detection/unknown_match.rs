@@ -310,6 +310,7 @@ fn create_unknown_match(
         is_license_clue: false,
         is_license_reference: false,
         is_license_tag: false,
+        matched_token_positions: None,
     }
     .into()
 }
@@ -482,6 +483,7 @@ mod tests {
             score: 1.0,
             matched_length: 3,
             rule_length: 3,
+            matched_token_positions: None,
             match_coverage: 100.0,
             rule_relevance: 100,
             rule_identifier: "test-rule".to_string(),
@@ -550,6 +552,7 @@ mod tests {
             score: 1.0,
             matched_length: 5,
             rule_length: 5,
+            matched_token_positions: None,
             match_coverage: 100.0,
             rule_relevance: 100,
             rule_identifier: "test-rule".to_string(),

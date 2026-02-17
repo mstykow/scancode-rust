@@ -1614,8 +1614,9 @@ mod tests {
         let text = "license copyright permission";
         let query = Query::new(text, &index).unwrap();
 
-        assert_eq!(query.query_run_ranges.len(), 1);
-        assert_eq!(query.query_run_ranges[0], (0, Some(2)));
+        // Query run splitting is disabled; query_run_ranges is empty
+        // and query_runs() returns [whole_query_run()]
+        assert!(query.query_run_ranges.is_empty());
 
         let runs = query.query_runs();
         assert_eq!(runs.len(), 1);
@@ -1629,11 +1630,10 @@ mod tests {
         let text = "license\n\n\n\n\ncopyright";
         let query = Query::new(text, &index).unwrap();
 
-        assert_eq!(
-            query.query_run_ranges.len(),
-            2,
-            "Should split on 5 empty lines"
-        );
+        // Query run splitting is disabled; always returns whole file as one run
+        assert!(query.query_run_ranges.is_empty());
+        let runs = query.query_runs();
+        assert_eq!(runs.len(), 1);
     }
 
     #[test]
@@ -1642,11 +1642,10 @@ mod tests {
         let text = "license\n\n\ncopyright";
         let query = Query::new(text, &index).unwrap();
 
-        assert_eq!(
-            query.query_run_ranges.len(),
-            1,
-            "Should not split on only 3 empty lines"
-        );
+        // Query run splitting is disabled
+        assert!(query.query_run_ranges.is_empty());
+        let runs = query.query_runs();
+        assert_eq!(runs.len(), 1);
     }
 
     #[test]
@@ -1667,18 +1666,53 @@ mod tests {
         let text = "license\n\n\n\n\ncopyright\n\n\n\n\npermission";
         let query = Query::new(text, &index).unwrap();
 
-        assert_eq!(query.query_run_ranges.len(), 3, "Should have 3 runs");
+        // Query run splitting is disabled; returns whole file as one run
+        assert!(query.query_run_ranges.is_empty());
 
         let runs = query.query_runs();
-        assert_eq!(runs.len(), 3);
+        assert_eq!(runs.len(), 1);
+    }
 
-        assert_eq!(runs[0].start_line(), Some(1));
-        assert_eq!(runs[0].end_line(), Some(1));
+    #[test]
+    fn test_query_subtract_removes_positions() {
+        let index = create_query_test_index();
+        let mut query = Query::new("license copyright permission", &index).unwrap();
 
-        assert_eq!(runs[1].start_line(), Some(6));
-        assert_eq!(runs[1].end_line(), Some(6));
+        assert!(query.high_matchables.contains(&0));
+        assert!(query.high_matchables.contains(&1));
 
-        assert_eq!(runs[2].start_line(), Some(11));
-        assert_eq!(runs[2].end_line(), Some(11));
+        let span = PositionSpan::new(0, 1);
+        query.subtract(&span);
+
+        assert!(!query.high_matchables.contains(&0));
+        assert!(!query.high_matchables.contains(&1));
+        assert!(query.high_matchables.contains(&2));
+    }
+
+    #[test]
+    fn test_query_run_is_matchable_with_exclusions() {
+        let index = create_query_test_index();
+        let query = Query::new("license copyright permission", &index).unwrap();
+        let run = query.whole_query_run();
+
+        assert!(run.is_matchable(false, &[]));
+
+        let exclude = vec![PositionSpan::new(0, 1)];
+        assert!(run.is_matchable(false, &exclude));
+
+        let exclude_all = vec![PositionSpan::new(0, 2)];
+        assert!(!run.is_matchable(false, &exclude_all));
+    }
+
+    #[test]
+    fn test_subtraction_after_near_duplicate_match() {
+        let index = create_query_test_index();
+        let mut query = Query::new("license copyright license copyright", &index).unwrap();
+
+        let near_dupe_span = PositionSpan::new(0, 1);
+        query.subtract(&near_dupe_span);
+
+        let whole_run = query.whole_query_run();
+        assert!(!whole_run.is_matchable(false, &[near_dupe_span]));
     }
 }

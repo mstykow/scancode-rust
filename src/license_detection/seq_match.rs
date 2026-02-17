@@ -820,6 +820,7 @@ pub fn seq_match(index: &LicenseIndex, query_run: &QueryRun) -> Vec<LicenseMatch
                         is_license_clue: candidate.rule.is_license_clue,
                         is_license_reference: candidate.rule.is_license_reference,
                         is_license_tag: candidate.rule.is_license_tag,
+                        matched_token_positions: None,
                     };
 
                     matches.push(license_match);
@@ -941,6 +942,7 @@ pub fn seq_match_with_candidates(
                         is_license_clue: candidate.rule.is_license_clue,
                         is_license_reference: candidate.rule.is_license_reference,
                         is_license_tag: candidate.rule.is_license_tag,
+                        matched_token_positions: None,
                     };
 
                     matches.push(license_match);

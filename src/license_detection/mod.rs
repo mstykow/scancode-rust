@@ -109,57 +109,75 @@ impl LicenseDetectionEngine {
     /// A Result containing a vector of LicenseDetection objects
     pub fn detect(&self, text: &str) -> Result<Vec<LicenseDetection>> {
         let query = Query::new(text, &self.index)?;
-        let whole_run = query.whole_query_run();
 
         let mut all_matches = Vec::new();
 
-        let hash_matches = hash_match(&self.index, &whole_run);
-        all_matches.extend(hash_matches);
+        // Phase 1: Hash, SPDX, Aho-Corasick matching
+        {
+            let whole_run = query.whole_query_run();
 
-        let spdx_matches = spdx_lid_match(&self.index, text);
-        all_matches.extend(spdx_matches);
+            let hash_matches = hash_match(&self.index, &whole_run);
+            all_matches.extend(hash_matches);
 
-        let aho_matches = aho_match(&self.index, &whole_run);
-        all_matches.extend(aho_matches);
+            let spdx_matches = spdx_lid_match(&self.index, text);
+            all_matches.extend(spdx_matches);
 
-        // Phase 2: Near-duplicate detection - ALWAYS run, not conditional on exact matches
-        // This matches Python's behavior in index.py line 745-765
-        let near_dupe_candidates = compute_candidates_with_msets(
-            &self.index,
-            &whole_run,
-            true,
-            MAX_NEAR_DUPE_CANDIDATES,
-        );
+            let aho_matches = aho_match(&self.index, &whole_run);
+            all_matches.extend(aho_matches);
+        }
 
-        if !near_dupe_candidates.is_empty() {
-            let near_dupe_matches =
-                seq_match_with_candidates(&self.index, &whole_run, &near_dupe_candidates);
-            all_matches.extend(near_dupe_matches);
+        // TODO: Subtract matched positions after Phase 1
+        // DISABLED: SPDX matches have start_token=0, end_token=0 which incorrectly
+        // removes position 0 from matchables. Need proper token position tracking
+        // for all match types before enabling subtraction.
+        // See: PLAN-015 Issue 9, Bug: SPDX matches subtract position 0 incorrectly
+
+        // Phase 2: Near-duplicate detection
+        {
+            let whole_run = query.whole_query_run();
+            let near_dupe_candidates = compute_candidates_with_msets(
+                &self.index,
+                &whole_run,
+                true,
+                MAX_NEAR_DUPE_CANDIDATES,
+            );
+
+            if !near_dupe_candidates.is_empty() {
+                let near_dupe_matches =
+                    seq_match_with_candidates(&self.index, &whole_run, &near_dupe_candidates);
+                all_matches.extend(near_dupe_matches);
+            }
         }
 
         // Phase 3: Regular sequence matching
-        let seq_matches = seq_match(&self.index, &whole_run);
-        all_matches.extend(seq_matches);
+        {
+            let whole_run = query.whole_query_run();
+            let seq_matches = seq_match(&self.index, &whole_run);
+            all_matches.extend(seq_matches);
+        }
 
         // Phase 4: Query run matching (high_resemblance=False, top 70)
         // This is essential for matching combined rules like "cddl-1.0_or_gpl-2.0-glassfish"
         // Corresponds to Python: index.py:786-812
         // Note: This is in addition to Phase 3, not a replacement
         const MAX_QUERY_RUN_CANDIDATES: usize = 70;
-        for query_run in query.query_runs().iter() {
-            // Skip the whole_run since it was already matched in Phase 2 and 3
-            if query_run.start == whole_run.start && query_run.end == whole_run.end {
-                continue;
-            }
-            let candidates = compute_candidates_with_msets(
-                &self.index,
-                query_run,
-                false,
-                MAX_QUERY_RUN_CANDIDATES,
-            );
-            if !candidates.is_empty() {
-                let matches = seq_match_with_candidates(&self.index, query_run, &candidates);
-                all_matches.extend(matches);
+        {
+            let whole_run = query.whole_query_run();
+            for query_run in query.query_runs().iter() {
+                // Skip the whole_run since it was already matched in Phase 2 and 3
+                if query_run.start == whole_run.start && query_run.end == whole_run.end {
+                    continue;
+                }
+                let candidates = compute_candidates_with_msets(
+                    &self.index,
+                    query_run,
+                    false,
+                    MAX_QUERY_RUN_CANDIDATES,
+                );
+                if !candidates.is_empty() {
+                    let matches = seq_match_with_candidates(&self.index, query_run, &candidates);
+                    all_matches.extend(matches);
+                }
             }
         }
 

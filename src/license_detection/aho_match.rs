@@ -176,6 +176,7 @@ pub fn aho_match(index: &LicenseIndex, query_run: &QueryRun) -> Vec<LicenseMatch
             is_license_clue: rule.is_license_clue,
             is_license_reference: rule.is_license_reference,
             is_license_tag: rule.is_license_tag,
+            matched_token_positions: None,
         };
 
         matches.push(license_match);
