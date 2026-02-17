@@ -237,12 +237,12 @@ pub struct Query<'a> {
     /// Corresponds to Python: `self.is_binary = False` (line 225)
     pub is_binary: bool,
 
-    /// List of QueryRun objects (populated during tokenization)
+    /// Raw query run ranges (start, end) computed during tokenization.
     ///
-    /// These are the query runs computed during query construction.
+    /// QueryRuns are created on-demand from these ranges.
     ///
     /// Corresponds to Python: `self.query_runs = []` (line 274)
-    pub query_runs: Vec<QueryRun<'a>>,
+    pub(crate) query_run_ranges: Vec<(usize, Option<usize>)>,
 
     /// Reference to the license index for dictionary access and metadata
     pub index: &'a LicenseIndex,
@@ -267,6 +267,23 @@ impl<'a> Query<'a> {
         Self::with_options(text, index, 4)
     }
 
+    /// Iterate over query runs.
+    ///
+    /// If query runs is empty (not yet computed), returns a single run
+    /// covering the whole query.
+    ///
+    /// Corresponds to Python: `query.query_runs` property iteration
+    pub fn query_runs(&self) -> Vec<QueryRun<'_>> {
+        if self.query_run_ranges.is_empty() {
+            vec![self.whole_query_run()]
+        } else {
+            self.query_run_ranges
+                .iter()
+                .map(|&(start, end)| QueryRun::new(self, start, end))
+                .collect()
+        }
+    }
+
     /// Create a new query with custom line threshold.
     ///
     /// # Arguments
@@ -281,7 +298,7 @@ impl<'a> Query<'a> {
     pub fn with_options(
         text: &str,
         index: &'a LicenseIndex,
-        _line_threshold: usize,
+        line_threshold: usize,
     ) -> Result<Self, anyhow::Error> {
         let is_binary = Self::detect_binary(text)?;
         let has_long_lines = Self::detect_long_lines(text);
@@ -295,13 +312,17 @@ impl<'a> Query<'a> {
         let mut shorts_and_digits_pos = HashSet::new();
 
         let len_legalese = index.len_legalese;
+        let digit_only_tids = &index.digit_only_tids;
 
         let mut known_pos = -1i32;
         let mut started = false;
         let mut current_line = 1usize;
 
+        let mut tokens_by_line: Vec<Vec<u16>> = Vec::new();
+
         for line in text.lines() {
             let line = line.trim();
+            let mut line_tokens: Vec<u16> = Vec::new();
 
             for token in tokenize_without_stopwords(line) {
                 let is_stopword = stopwords_set.contains(token.as_str());
@@ -313,6 +334,7 @@ impl<'a> Query<'a> {
                         started = true;
                         tokens.push(tid);
                         line_by_pos.push(current_line);
+                        line_tokens.push(tid);
 
                         if token.len() == 1 || token.chars().all(|c| c.is_ascii_digit()) {
                             let _ = shorts_and_digits_pos.insert(known_pos as usize);
@@ -329,6 +351,7 @@ impl<'a> Query<'a> {
                 }
             }
 
+            tokens_by_line.push(line_tokens);
             current_line += 1;
         }
 
@@ -346,6 +369,14 @@ impl<'a> Query<'a> {
             .map(|(pos, _tid)| pos)
             .collect();
 
+        let query_runs = Self::compute_query_runs(
+            &tokens,
+            &tokens_by_line,
+            line_threshold,
+            len_legalese,
+            digit_only_tids,
+        );
+
         Ok(Query {
             text: text.to_string(),
             tokens,
@@ -357,9 +388,80 @@ impl<'a> Query<'a> {
             low_matchables,
             has_long_lines,
             is_binary,
-            query_runs: Vec::new(),
+            query_run_ranges: query_runs,
             index,
         })
+    }
+
+    /// Compute query runs by analyzing line-by-line tokenization.
+    ///
+    /// Breaks the query into runs when we encounter `line_threshold` consecutive
+    /// "junk" lines. A junk line is one that:
+    /// - Is empty (no known tokens)
+    /// - Contains only unknown tokens
+    /// - Contains only digit-only tokens
+    /// - Contains no high-value legalese tokens
+    ///
+    /// Based on Python: `Query._tokenize_and_build_runs()` at lines 568-641
+    fn compute_query_runs(
+        tokens: &[u16],
+        tokens_by_line: &[Vec<u16>],
+        line_threshold: usize,
+        len_legalese: usize,
+        digit_only_tids: &HashSet<u16>,
+    ) -> Vec<(usize, Option<usize>)> {
+        if tokens.is_empty() {
+            return Vec::new();
+        }
+
+        let mut query_runs: Vec<(usize, Option<usize>)> = Vec::new();
+        let mut empty_lines = 0usize;
+        let mut pos = 0usize;
+        let mut run_start = 0usize;
+        let mut run_end: Option<usize> = None;
+
+        for line_tokens in tokens_by_line {
+            if run_end.is_some() && empty_lines >= line_threshold {
+                query_runs.push((run_start, run_end));
+                run_start = pos;
+                empty_lines = 0;
+            }
+
+            if line_tokens.is_empty() {
+                empty_lines += 1;
+                continue;
+            }
+
+            let line_is_all_digit = line_tokens.iter().all(|tid| digit_only_tids.contains(tid));
+            let line_has_good_tokens = line_tokens.iter().any(|tid| (*tid as usize) < len_legalese);
+
+            for _tid in line_tokens {
+                run_end = Some(pos);
+                pos += 1;
+            }
+
+            if line_is_all_digit {
+                empty_lines += 1;
+                continue;
+            }
+
+            if line_has_good_tokens {
+                empty_lines = 0;
+            } else {
+                empty_lines += 1;
+            }
+        }
+
+        if let Some(end) = run_end {
+            let run_all_digits = tokens[run_start..=end]
+                .iter()
+                .all(|tid| digit_only_tids.contains(tid));
+            if !run_all_digits {
+                query_runs.push((run_start, run_end));
+            }
+        }
+
+        query_runs
     }
 
     /// Detect if text is binary content.
@@ -1500,5 +1602,79 @@ mod tests {
 
         let low = run.low_matchables();
         assert!(low.is_empty());
+    }
+
+    #[test]
+    fn test_query_run_splitting_single_run() {
+        let index = create_query_test_index();
+        let text = "license copyright permission";
+        let query = Query::new(text, &index).unwrap();
+
+        assert_eq!(query.query_run_ranges.len(), 1);
+        assert_eq!(query.query_run_ranges[0], (0, Some(2)));
+
+        let runs = query.query_runs();
+        assert_eq!(runs.len(), 1);
+        assert_eq!(runs[0].start, 0);
+        assert_eq!(runs[0].end, Some(2));
+    }
+
+    #[test]
+    fn test_query_run_splitting_with_empty_lines() {
+        let index = create_query_test_index();
+        let text = "license\n\n\n\n\ncopyright";
+        let query = Query::new(text, &index).unwrap();
+
+        assert_eq!(
+            query.query_run_ranges.len(),
+            2,
+            "Should split on 5 empty lines"
+        );
+    }
+
+    #[test]
+    fn test_query_run_splitting_below_threshold() {
+        let index = create_query_test_index();
+        let text = "license\n\n\ncopyright";
+        let query = Query::new(text, &index).unwrap();
+
+        assert_eq!(
+            query.query_run_ranges.len(),
+            1,
+            "Should not split on only 3 empty lines"
+        );
+    }
+
+    #[test]
+    fn test_query_run_splitting_empty_query() {
+        let index = create_query_test_index();
+        let query = Query::new("", &index).unwrap();
+
+        assert!(query.query_run_ranges.is_empty());
+
+        let runs = query.query_runs();
+        assert_eq!(runs.len(), 1);
+        assert_eq!(runs[0].end, None);
+    }
+
+    #[test]
+    fn test_query_run_splitting_multiple_segments() {
+        let index = create_query_test_index();
+        let text = "license\n\n\n\n\ncopyright\n\n\n\n\npermission";
+        let query = Query::new(text, &index).unwrap();
+
+        assert_eq!(query.query_run_ranges.len(), 3, "Should have 3 runs");
+
+        let runs = query.query_runs();
+        assert_eq!(runs.len(), 3);
+
+        assert_eq!(runs[0].start_line(), Some(1));
+        assert_eq!(runs[0].end_line(), Some(1));
+
+        assert_eq!(runs[1].start_line(), Some(6));
+        assert_eq!(runs[1].end_line(), Some(6));
+
+        assert_eq!(runs[2].start_line(), Some(11));
+        assert_eq!(runs[2].end_line(), Some(11));
     }
 }

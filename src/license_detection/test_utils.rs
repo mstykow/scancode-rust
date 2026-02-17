@@ -5,8 +5,8 @@
 
 use std::collections::{HashMap, HashSet};
 
-use crate::license_detection::index::LicenseIndex;
 use crate::license_detection::index::dictionary::TokenDictionary;
+use crate::license_detection::index::LicenseIndex;
 use crate::license_detection::models::Rule;
 use crate::license_detection::query::{Query, QueryRun};
 
@@ -166,7 +166,7 @@ pub fn create_mock_query_with_tokens<'a>(tokens: &[u16], index: &'a LicenseIndex
         low_matchables: HashSet::new(),
         has_long_lines: false,
         is_binary: false,
-        query_runs: Vec::new(),
+        query_run_ranges: Vec::new(),
         index,
     }
 }

@@ -744,10 +744,14 @@ pub fn seq_match(index: &LicenseIndex, query_run: &QueryRun) -> Vec<LicenseMatch
             let query_tokens = query_run.tokens();
             let len_legalese = index.len_legalese;
 
-            let qbegin = query_run.start;
-            let qfinish = query_run.end.unwrap_or(qbegin);
+            let qbegin = 0usize;
+            let qfinish = query_tokens.len().saturating_sub(1);
 
-            let matchables = query_run.matchables(true);
+            let matchables: HashSet<usize> = query_run
+                .matchables(true)
+                .into_iter()
+                .map(|pos| pos - query_run.start)
+                .collect();
 
             let mut qstart = qbegin;
 
@@ -785,8 +789,10 @@ pub fn seq_match(index: &LicenseIndex, query_run: &QueryRun) -> Vec<LicenseMatch
                     let match_coverage = (mlen as f32 / rule_length as f32) * 100.0;
 
                     let qend = qpos + mlen - 1;
-                    let start_line = query_run.line_for_pos(qpos).unwrap_or(1);
-                    let end_line = query_run.line_for_pos(qend).unwrap_or(start_line);
+                    let abs_qpos = qpos + query_run.start;
+                    let abs_qend = qend + query_run.start;
+                    let start_line = query_run.line_for_pos(abs_qpos).unwrap_or(1);
+                    let end_line = query_run.line_for_pos(abs_qend).unwrap_or(start_line);
 
                     let score = (match_coverage * candidate.rule.relevance as f32) / 100.0;
 
@@ -798,8 +804,8 @@ pub fn seq_match(index: &LicenseIndex, query_run: &QueryRun) -> Vec<LicenseMatch
                         from_file: None,
                         start_line,
                         end_line,
-                        start_token: qpos,
-                        end_token: qpos + mlen,
+                        start_token: abs_qpos,
+                        end_token: abs_qend + 1,
                         matcher: MATCH_SEQ.to_string(),
                         score,
                         matched_length: mlen,
@@ -859,10 +865,14 @@ pub fn seq_match_with_candidates(
             let query_tokens = query_run.tokens();
             let len_legalese = index.len_legalese;
 
-            let qbegin = query_run.start;
-            let qfinish = query_run.end.unwrap_or(qbegin);
+            let qbegin = 0usize;
+            let qfinish = query_tokens.len().saturating_sub(1);
 
-            let matchables = query_run.matchables(true);
+            let matchables: HashSet<usize> = query_run
+                .matchables(true)
+                .into_iter()
+                .map(|pos| pos - query_run.start)
+                .collect();
 
             let mut qstart = qbegin;
 
@@ -900,8 +910,10 @@ pub fn seq_match_with_candidates(
                     let match_coverage = (mlen as f32 / rule_length as f32) * 100.0;
 
                     let qend = qpos + mlen - 1;
-                    let start_line = query_run.line_for_pos(qpos).unwrap_or(1);
-                    let end_line = query_run.line_for_pos(qend).unwrap_or(start_line);
+                    let abs_qpos = qpos + query_run.start;
+                    let abs_qend = qend + query_run.start;
+                    let start_line = query_run.line_for_pos(abs_qpos).unwrap_or(1);
+                    let end_line = query_run.line_for_pos(abs_qend).unwrap_or(start_line);
 
                     let score = (match_coverage * candidate.rule.relevance as f32) / 100.0;
 
@@ -913,8 +925,8 @@ pub fn seq_match_with_candidates(
                         from_file: None,
                         start_line,
                         end_line,
-                        start_token: qpos,
-                        end_token: qpos + mlen,
+                        start_token: abs_qpos,
+                        end_token: abs_qend + 1,
                         matcher: MATCH_SEQ.to_string(),
                         score,
                         matched_length: mlen,

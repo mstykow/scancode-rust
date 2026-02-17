@@ -276,7 +276,7 @@ mod tests {
             low_matchables: std::collections::HashSet::new(),
             has_long_lines: false,
             is_binary: false,
-            query_runs: Vec::new(),
+            query_run_ranges: Vec::new(),
             index: &index,
         };
 
@@ -318,7 +318,7 @@ mod tests {
             low_matchables: std::collections::HashSet::new(),
             has_long_lines: false,
             is_binary: false,
-            query_runs: Vec::new(),
+            query_run_ranges: Vec::new(),
             index: &index,
         };
 
@@ -364,7 +364,7 @@ mod tests {
             low_matchables: std::collections::HashSet::new(),
             has_long_lines: false,
             is_binary: false,
-            query_runs: Vec::new(),
+            query_run_ranges: Vec::new(),
             index: &index,
         };
 
@@ -406,7 +406,7 @@ mod tests {
             low_matchables: std::collections::HashSet::new(),
             has_long_lines: false,
             is_binary: false,
-            query_runs: Vec::new(),
+            query_run_ranges: Vec::new(),
             index: &index,
         };
 
@@ -447,7 +447,7 @@ mod tests {
             low_matchables: std::collections::HashSet::new(),
             has_long_lines: false,
             is_binary: false,
-            query_runs: Vec::new(),
+            query_run_ranges: Vec::new(),
             index: &index,
         };
 
@@ -499,7 +499,7 @@ mod tests {
             low_matchables: std::collections::HashSet::new(),
             has_long_lines: false,
             is_binary: false,
-            query_runs: Vec::new(),
+            query_run_ranges: Vec::new(),
             index: &index,
         };
 
@@ -537,7 +537,7 @@ mod tests {
             low_matchables: std::collections::HashSet::new(),
             has_long_lines: false,
             is_binary: false,
-            query_runs: Vec::new(),
+            query_run_ranges: Vec::new(),
             index: &index,
         };
 
@@ -581,7 +581,7 @@ mod tests {
             low_matchables: std::collections::HashSet::new(),
             has_long_lines: false,
             is_binary: false,
-            query_runs: Vec::new(),
+            query_run_ranges: Vec::new(),
             index: &index,
         };
 
@@ -626,7 +626,7 @@ mod tests {
             low_matchables: std::collections::HashSet::new(),
             has_long_lines: false,
             is_binary: false,
-            query_runs: Vec::new(),
+            query_run_ranges: Vec::new(),
             index: &index,
         };
 

@@ -96,7 +96,7 @@ impl LicenseDetectionEngine {
     /// 1. Create a Query from the text
     /// 2. Run matchers in priority order (hash, SPDX-LID, Aho-Corasick)
     /// 3. Phase 2: Near-duplicate detection (ALWAYS runs, even with exact matches)
-    /// 4. Phase 3: Regular sequence matching (if no near-duplicates)
+    /// 4. Phase 3: Query run matching (per-run with high_resemblance=False)
     /// 5. Unknown matching
     /// 6. Refine matches
     /// 7. Group matches by region
@@ -140,6 +140,28 @@ impl LicenseDetectionEngine {
         // Phase 3: Regular sequence matching
         let seq_matches = seq_match(&self.index, &whole_run);
         all_matches.extend(seq_matches);
+
+        // Phase 4: Query run matching (high_resemblance=False, top 70)
+        // This is essential for matching combined rules like "cddl-1.0_or_gpl-2.0-glassfish"
+        // Corresponds to Python: index.py:786-812
+        // Note: This is in addition to Phase 3, not a replacement
+        const MAX_QUERY_RUN_CANDIDATES: usize = 70;
+        for query_run in query.query_runs().iter() {
+            // Skip the whole_run since it was already matched in Phase 2 and 3
+            if query_run.start == whole_run.start && query_run.end == whole_run.end {
+                continue;
+            }
+            let candidates = compute_candidates_with_msets(
+                &self.index,
+                query_run,
+                false,
+                MAX_QUERY_RUN_CANDIDATES,
+            );
+            if !candidates.is_empty() {
+                let matches = seq_match_with_candidates(&self.index, query_run, &candidates);
+                all_matches.extend(matches);
+            }
+        }
 
         let unknown_matches = unknown_match(&self.index, &query, &all_matches);
         all_matches.extend(unknown_matches);
