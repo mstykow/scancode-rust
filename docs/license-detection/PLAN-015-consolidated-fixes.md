@@ -1,19 +1,17 @@
 # PLAN-015: Consolidated License Detection Fixes
 
-## Status: Partially Complete - Session 2
+## Status: In Progress - Session 3
 
 ---
 
-## Implementation Results (Session 2)
+## Implementation Results
 
-### Golden Test Improvement
+### Session 2 (P1-P5)
 
 | Metric | Before | After | Change |
 |--------|--------|-------|--------|
 | lic1 passed | 175 | 187 | **+12** |
 | lic1 failed | 116 | 104 | **-12** |
-
-### Priority Implementation Status
 
 | Priority | Fix | Status | Tests Fixed |
 |----------|-----|--------|-------------|
@@ -23,13 +21,93 @@
 | P4 | Grouping logic (AND) | ✅ Implemented | ~10 |
 | P5 | Single-match false positive filter | ✅ Implemented | ~15 |
 
-**Note on P4**: The analysis recommended OR logic but implementing AND logic improved tests. This needs further investigation.
+### Session 3 (Near-Duplicate Detection)
+
+| Metric | Before | After | Change |
+|--------|--------|-------|--------|
+| lic1 passed | 187 | 187 | 0 |
+| lic1 failed | 104 | 104 | 0 |
+
+**Near-duplicate detection implemented but no improvement because:**
+
+The combined rule's resemblance (0.2333) is below the 0.8 threshold. Python uses a **different approach**:
+
+| Aspect | Python | Rust |
+|--------|--------|------|
+| Query runs | Splits query into runs | Not fully implemented |
+| Near-duplicate | `high_resemblance=True` on whole file | Same |
+| **Query run matching** | `high_resemblance=False` on each run | **Missing** |
 
 ### Remaining Issues (~104 failures)
 
-1. **P6 not implemented**: `has_unknown_intro_before_detection()` post-loop logic
-2. **Missing combined rule matching**: Some tests fail because Rust matches partial rules while Python matches combined rules
+1. **Query run matching not implemented**: Python splits queries into runs and matches each with `high_resemblance=False`
+2. **P6 not implemented**: `has_unknown_intro_before_detection()` post-loop logic
 3. **Other missing filters**: `filter_matches_missing_required_phrases()`, `filter_spurious_matches()`, `filter_too_short_matches()`
+
+---
+
+## Issue 9: Query Run Matching (NEW - Critical)
+
+### Problem
+
+Python matches the combined rule `cddl-1.0_or_gpl-2.0-glassfish.RULE` via **query-run-level matching with `high_resemblance=False`**, not near-duplicate detection.
+
+### Python's Actual Pipeline
+
+**From `index.py:786-796`:**
+```python
+for query_run in query.query_runs:
+    candidates = match_set.compute_candidates(
+        query_run=query_run,
+        idx=self,
+        top=MAX_CANDIDATES,
+        high_resemblance=False,  # KEY: lower threshold for individual runs
+    )
+    matched = self.get_query_run_approximate_matches(query_run, candidates, ...)
+```
+
+### Key Differences
+
+| Phase | Python | Rust |
+|-------|--------|------|
+| Near-duplicate (whole file) | `high_resemblance=True` (0.8) | ✅ Implemented |
+| Query run matching | `high_resemblance=False` | ❌ NOT Implemented |
+| Query run splitting | `Query.query_runs` property | Needs implementation |
+
+### Fix Required
+
+1. **Implement query run splitting**:
+   - Python's `Query.query_runs` property splits on 4+ empty/junk lines
+   - Each run is a contiguous block of content
+
+2. **Add query run matching phase**:
+   ```rust
+   // Phase 3: Query run matching with high_resemblance=false
+   for query_run in query.query_runs() {
+       let candidates = compute_candidates_with_msets(
+           &self.index,
+           &query_run,
+           false,  // high_resemblance=False for query runs
+           MAX_CANDIDATES,
+       );
+       let matches = seq_match_with_candidates(&self.index, &query_run, &candidates);
+       all_matches.extend(matches);
+   }
+   ```
+
+### Python References
+
+| Component | Location |
+|-----------|----------|
+| Query run property | `query.py:596-600` |
+| Query run matching | `index.py:786-796` |
+| LINES_THRESHOLD | `query.py:108` (value: 4) |
+
+### Estimated Tests Fixed
+
+~20 tests where combined rules should match:
+- `cddl-1.0_or_gpl-2.0-glassfish.txt`
+- `cddl-1.1_or_gpl-2.0-classpath_and_apache-2.0-glassfish_*.txt`
 
 ---
 
