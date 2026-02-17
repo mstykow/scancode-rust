@@ -113,26 +113,22 @@ impl LicenseDetectionEngine {
         let mut all_matches = Vec::new();
 
         // Phase 1: Hash, SPDX, Aho-Corasick matching
+        // Note: We do NOT subtract after these phases - only after near-duplicate
         {
             let whole_run = query.whole_query_run();
 
             let hash_matches = hash_match(&self.index, &whole_run);
             all_matches.extend(hash_matches);
 
-            let spdx_matches = spdx_lid_match(&self.index, text);
+            let spdx_matches = spdx_lid_match(&self.index, &query);
             all_matches.extend(spdx_matches);
 
             let aho_matches = aho_match(&self.index, &whole_run);
             all_matches.extend(aho_matches);
         }
 
-        // TODO: Subtract matched positions after Phase 1
-        // DISABLED: SPDX matches have start_token=0, end_token=0 which incorrectly
-        // removes position 0 from matchables. Need proper token position tracking
-        // for all match types before enabling subtraction.
-        // See: PLAN-015 Issue 9, Bug: SPDX matches subtract position 0 incorrectly
-
         // Phase 2: Near-duplicate detection
+        // Corresponds to Python: index.py:733-771
         {
             let whole_run = query.whole_query_run();
             let near_dupe_candidates = compute_candidates_with_msets(
@@ -145,6 +141,15 @@ impl LicenseDetectionEngine {
             if !near_dupe_candidates.is_empty() {
                 let near_dupe_matches =
                     seq_match_with_candidates(&self.index, &whole_run, &near_dupe_candidates);
+                
+                // TODO: Re-enable subtraction once token positions are verified correct
+                // for all match types. Currently disabled to prevent regressions.
+                // Corresponds to Python: index.py:767-771
+                // for m in &near_dupe_matches {
+                //     let span = query::PositionSpan::new(m.start_token, m.end_token);
+                //     query.subtract(&span);
+                // }
+                
                 all_matches.extend(near_dupe_matches);
             }
         }
@@ -160,6 +165,7 @@ impl LicenseDetectionEngine {
         // This is essential for matching combined rules like "cddl-1.0_or_gpl-2.0-glassfish"
         // Corresponds to Python: index.py:786-812
         // Note: This is in addition to Phase 3, not a replacement
+        // The is_matchable() check handles exclusion of already-matched positions
         const MAX_QUERY_RUN_CANDIDATES: usize = 70;
         {
             let whole_run = query.whole_query_run();
@@ -168,6 +174,13 @@ impl LicenseDetectionEngine {
                 if query_run.start == whole_run.start && query_run.end == whole_run.end {
                     continue;
                 }
+                
+                // is_matchable() excludes already-matched positions
+                // Corresponds to Python: index.py:828
+                if !query_run.is_matchable(false, &[]) {
+                    continue;
+                }
+                
                 let candidates = compute_candidates_with_msets(
                     &self.index,
                     query_run,

@@ -244,6 +244,14 @@ pub struct Query<'a> {
     /// Corresponds to Python: `self.query_runs = []` (line 274)
     pub(crate) query_run_ranges: Vec<(usize, Option<usize>)>,
 
+    /// SPDX-License-Identifier lines found during tokenization.
+    ///
+    /// Each tuple is (spdx_text, start_token_pos, end_token_pos).
+    /// Used for creating LicenseMatches with correct token positions.
+    ///
+    /// Corresponds to Python: `self.spdx_lines = []` (line 507)
+    pub spdx_lines: Vec<(String, usize, usize)>,
+
     /// Reference to the license index for dictionary access and metadata
     pub index: &'a LicenseIndex,
 }
@@ -289,7 +297,7 @@ impl<'a> Query<'a> {
     /// # Arguments
     /// * `text` - The input text to tokenize
     /// * `index` - The license index containing the token dictionary
-    /// * `line_threshold` - Number of empty/junk lines to break a new run (default 4)
+    /// * `_line_threshold` - Number of empty/junk lines to break a new run (default 4)
     ///
     /// # Returns
     /// A Result containing the Query or an error if binary detection fails
@@ -298,7 +306,7 @@ impl<'a> Query<'a> {
     pub fn with_options(
         text: &str,
         index: &'a LicenseIndex,
-        line_threshold: usize,
+        _line_threshold: usize,
     ) -> Result<Self, anyhow::Error> {
         let is_binary = Self::detect_binary(text)?;
         let has_long_lines = Self::detect_long_lines(text);
@@ -310,9 +318,9 @@ impl<'a> Query<'a> {
         let mut unknowns_by_pos: HashMap<Option<i32>, usize> = HashMap::new();
         let mut stopwords_by_pos: HashMap<Option<i32>, usize> = HashMap::new();
         let mut shorts_and_digits_pos = HashSet::new();
+        let mut spdx_lines: Vec<(String, usize, usize)> = Vec::new();
 
         let len_legalese = index.len_legalese;
-        let digit_only_tids = &index.digit_only_tids;
 
         let mut known_pos = -1i32;
         let mut started = false;
@@ -321,10 +329,12 @@ impl<'a> Query<'a> {
         let mut tokens_by_line: Vec<Vec<u16>> = Vec::new();
 
         for line in text.lines() {
-            let line = line.trim();
+            let line_trimmed = line.trim();
             let mut line_tokens: Vec<u16> = Vec::new();
 
-            for token in tokenize_without_stopwords(line) {
+            let line_first_known_pos = known_pos + 1;
+
+            for token in tokenize_without_stopwords(line_trimmed) {
                 let is_stopword = stopwords_set.contains(token.as_str());
                 let tid_opt = index.dictionary.get(&token);
 
@@ -348,6 +358,64 @@ impl<'a> Query<'a> {
                     *stopwords_by_pos.entry(None).or_insert(0) += 1;
                 } else {
                     *stopwords_by_pos.entry(Some(known_pos)).or_insert(0) += 1;
+                }
+            }
+
+            let line_last_known_pos = known_pos;
+
+            let tokens_lower: Vec<String> = tokenize_without_stopwords(line_trimmed)
+                .into_iter()
+                .map(|t| t.to_lowercase())
+                .collect();
+
+            let spdx_start_offset = if tokens_lower.len() >= 3 {
+                let first_three: Vec<&str> =
+                    tokens_lower.iter().take(3).map(|s| s.as_str()).collect();
+                let is_spdx_prefix = first_three == ["spdx", "license", "identifier"]
+                    || first_three == ["spdx", "licence", "identifier"];
+                if is_spdx_prefix {
+                    Some(0)
+                } else if tokens_lower.len() >= 4 {
+                    let second_three: Vec<&str> = tokens_lower
+                        .iter()
+                        .skip(1)
+                        .take(3)
+                        .map(|s| s.as_str())
+                        .collect();
+                    let is_spdx_second = second_three == ["spdx", "license", "identifier"]
+                        || second_three == ["spdx", "licence", "identifier"];
+                    if is_spdx_second {
+                        Some(1)
+                    } else if tokens_lower.len() >= 5 {
+                        let third_three: Vec<&str> = tokens_lower
+                            .iter()
+                            .skip(2)
+                            .take(3)
+                            .map(|s| s.as_str())
+                            .collect();
+                        let is_spdx_third = third_three == ["spdx", "license", "identifier"]
+                            || third_three == ["spdx", "licence", "identifier"];
+                        if is_spdx_third {
+                            Some(2)
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
+
+            if let Some(offset) = spdx_start_offset {
+                let spdx_start_known_pos = line_first_known_pos + offset;
+                if spdx_start_known_pos <= line_last_known_pos {
+                    let spdx_start = spdx_start_known_pos as usize;
+                    let spdx_end = line_last_known_pos as usize;
+                    spdx_lines.push((line_trimmed.to_string(), spdx_start, spdx_end));
                 }
             }
 
@@ -393,6 +461,7 @@ impl<'a> Query<'a> {
             has_long_lines,
             is_binary,
             query_run_ranges: query_runs,
+            spdx_lines,
             index,
         })
     }
@@ -1661,6 +1730,49 @@ mod tests {
     }
 
     #[test]
+    fn test_query_tracks_spdx_lines_with_positions() {
+        let mut index = create_query_test_index();
+        let _ = index.dictionary.get_or_assign("spdx");
+        let _ = index.dictionary.get_or_assign("license");
+        let _ = index.dictionary.get_or_assign("identifier");
+        let _ = index.dictionary.get_or_assign("mit");
+        let _ = index.dictionary.get_or_assign("apache");
+
+        let text = "SPDX-License-Identifier: MIT\nSPDX-License-Identifier: Apache-2.0";
+        let query = Query::new(text, &index).unwrap();
+
+        assert_eq!(query.spdx_lines.len(), 2, "Should track 2 SPDX lines");
+
+        for (spdx_text, start, end) in &query.spdx_lines {
+            assert!(*start <= *end, "Token positions should be valid");
+            assert!(
+                spdx_text.to_lowercase().contains("spdx"),
+                "SPDX text should contain SPDX keyword"
+            );
+        }
+    }
+
+    #[test]
+    fn test_query_spdx_lines_not_at_position_zero() {
+        let mut index = create_query_test_index();
+        let _ = index.dictionary.get_or_assign("spdx");
+        let _ = index.dictionary.get_or_assign("license");
+        let _ = index.dictionary.get_or_assign("identifier");
+        let _ = index.dictionary.get_or_assign("mit");
+
+        let text = "license copyright\nSPDX-License-Identifier: MIT";
+        let query = Query::new(text, &index).unwrap();
+
+        assert_eq!(query.spdx_lines.len(), 1, "Should track 1 SPDX line");
+
+        let (_, start, _) = &query.spdx_lines[0];
+        assert!(
+            *start >= 2,
+            "SPDX start position should be >= 2 (after 'license copyright')"
+        );
+    }
+
+    #[test]
     fn test_query_run_splitting_multiple_segments() {
         let index = create_query_test_index();
         let text = "license\n\n\n\n\ncopyright\n\n\n\n\npermission";
@@ -1709,10 +1821,15 @@ mod tests {
         let index = create_query_test_index();
         let mut query = Query::new("license copyright license copyright", &index).unwrap();
 
+        assert!(query.is_high_matchable(0));
+        assert!(query.is_high_matchable(1));
+
         let near_dupe_span = PositionSpan::new(0, 1);
         query.subtract(&near_dupe_span);
 
-        let whole_run = query.whole_query_run();
-        assert!(!whole_run.is_matchable(false, &[near_dupe_span]));
+        assert!(!query.is_high_matchable(0));
+        assert!(!query.is_high_matchable(1));
+        assert!(query.is_high_matchable(2));
+        assert!(query.is_high_matchable(3));
     }
 }

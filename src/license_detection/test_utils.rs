@@ -167,6 +167,7 @@ pub fn create_mock_query_with_tokens<'a>(tokens: &[u16], index: &'a LicenseIndex
         has_long_lines: false,
         is_binary: false,
         query_run_ranges: Vec::new(),
+        spdx_lines: Vec::new(),
         index,
     }
 }

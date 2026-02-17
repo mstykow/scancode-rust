@@ -1578,6 +1578,323 @@ After implementation:
 
 ---
 
+## Issue 11: Proper Query Subtraction Implementation (Critical Fix)
+
+### Problem Summary
+
+The previous implementation of Issue 10 caused a 40-test regression because SPDX-LID matches had `start_token=0, end_token=0` hardcoded. When subtraction was enabled, position 0 was incorrectly removed from matchables, breaking detection for files where the first token was part of a license match.
+
+### Root Cause Analysis
+
+#### How Python Computes SPDX-LID Token Positions
+
+**From `reference/scancode-toolkit/src/licensedcode/query.py:499-507`:**
+
+```python
+if spdx_start_offset is not None:
+    # Keep the line, start/end known pos for SPDX matching
+    spdx_prefix, spdx_expression = split_spdx_lid(line)
+    spdx_text = ''.join([spdx_prefix or '', spdx_expression])
+    spdx_start_known_pos = line_first_known_pos + spdx_start_offset
+
+    if spdx_start_known_pos <= line_last_known_pos:
+        self.spdx_lines.append((spdx_text, spdx_start_known_pos, line_last_known_pos))
+```
+
+**From `reference/scancode-toolkit/src/licensedcode/match_spdx_lid.py:99-101`:**
+
+```python
+# Build match from parsed expression
+# Collect match start and end: e.g. the whole text
+qspan = Span(range(match_start, query_run.end + 1))
+```
+
+**Key Insight:** Python tracks SPDX lines during tokenization with their token position ranges. The `spdx_id_match()` function uses `query_run.start` and `query_run.end` to create the `qspan`.
+
+#### How Rust Currently Creates SPDX Matches
+
+**From `src/license_detection/spdx_lid.rs:279-280`:**
+
+```rust
+start_token: 0,
+end_token: 0,
+```
+
+**This is wrong!** Rust hardcodes `0, 0` instead of computing actual token positions.
+
+### Python's Subtraction Logic
+
+**From `reference/scancode-toolkit/src/licensedcode/index.py:767-771`:**
+
+```python
+# Subtract these
+for match in matched:
+    qspan = match.qspan
+    query.subtract(qspan)
+    already_matched_qspans.append(qspan)
+```
+
+**Critical Points:**
+1. Python subtracts ALL near-duplicate matches, regardless of coverage
+2. Python does NOT subtract hash/aho matches - only near-duplicate matches
+3. The `qspan` contains actual token positions from the match
+
+### Implementation Plan
+
+#### Step 1: Track SPDX Lines During Query Tokenization
+
+**File:** `src/license_detection/query.rs`
+
+**Add field to Query struct:**
+
+```rust
+pub struct Query<'a> {
+    // ... existing fields ...
+    
+    /// SPDX-License-Identifier lines found during tokenization.
+    /// Each tuple is (spdx_text, start_token_pos, end_token_pos).
+    /// Corresponds to Python: `self.spdx_lines` at query.py:507
+    pub spdx_lines: Vec<(String, usize, usize)>,
+}
+```
+
+**Modify tokenization in `Query::with_options()`:**
+
+```rust
+// During tokenization, track SPDX lines
+// Corresponds to Python: query.py:486-507
+
+let spdx_lid_token_ids: Vec<Vec<Option<u16>>> = vec![
+    // "spdx", "license", "identifier" token IDs
+    vec![spdx_tid, license_tid, identifier_tid],
+];
+
+for line in text.lines() {
+    // ... existing tokenization ...
+    
+    // Check if this line starts with SPDX-License-Identifier
+    // Python checks: line_tokens[:3] in spdx_lid_token_ids
+    // This means first 3 tokens match "spdx license identifier"
+    
+    let line_tokens_lower: Vec<String> = tokenize_without_stopwords(line)
+        .map(|t| t.to_lowercase())
+        .collect();
+    
+    if line_tokens_lower.len() >= 3 {
+        let first_three: Vec<&str> = line_tokens_lower.iter().take(3).map(|s| s.as_str()).collect();
+        
+        // Check if starts with "spdx license identifier" (case-insensitive)
+        let is_spdx_line = first_three == ["spdx", "license", "identifier"] ||
+                           first_three == ["spdx", "licence", "identifier"];
+        
+        if is_spdx_line {
+            // Record SPDX line with token positions
+            // spdx_start_offset accounts for comment prefixes like "// " or "# "
+            let spdx_start_offset = 0; // For now, assume SPDX starts at position 0
+            
+            if let (Some(&start_pos), Some(&end_pos)) = 
+                (line_by_pos.first(), line_by_pos.last()) 
+            {
+                let (_, expression) = split_spdx_lid(line);
+                spdx_lines.push((expression, start_pos, end_pos));
+            }
+        }
+    }
+}
+```
+
+#### Step 2: Modify `spdx_lid_match()` to Use Token Positions
+
+**File:** `src/license_detection/spdx_lid.rs`
+
+**Change function signature:**
+
+```rust
+/// SPDX-License-Identifier detection using query's tracked SPDX lines.
+///
+/// # Arguments
+/// * `index` - The license index
+/// * `query` - The query with pre-computed SPDX lines
+///
+/// Returns LicenseMatches with correct token positions from query.spdx_lines.
+pub fn spdx_lid_match(index: &LicenseIndex, query: &Query) -> Vec<LicenseMatch> {
+    let mut matches = Vec::new();
+
+    for (spdx_text, start_token, end_token) in &query.spdx_lines {
+        let spdx_expression = clean_spdx_text(spdx_text);
+        let license_keys = split_license_expression(&spdx_expression);
+
+        for license_key in license_keys {
+            if let Some(rid) = find_best_matching_rule(index, &license_key) {
+                let rule = &index.rules_by_rid[rid];
+                let score = rule.relevance as f32 / 100.0;
+
+                // Get line number from query's line_by_pos
+                let start_line = query.line_for_pos(*start_token).unwrap_or(1);
+                let end_line = query.line_for_pos(*end_token).unwrap_or(start_line);
+
+                // Extract matched text using line positions
+                let matched_text = query.matched_text(start_line, end_line);
+
+                let license_match = LicenseMatch {
+                    license_expression: rule.license_expression.clone(),
+                    license_expression_spdx: spdx_expression.clone(),
+                    from_file: None,
+                    start_line,
+                    end_line,
+                    start_token: *start_token,  // NOW CORRECT
+                    end_token: *end_token,       // NOW CORRECT
+                    matcher: MATCH_SPDX_ID.to_string(),
+                    score,
+                    matched_length: spdx_expression.len(),
+                    rule_length: rule.tokens.len(),
+                    match_coverage: 100.0,
+                    rule_relevance: rule.relevance,
+                    rule_identifier: format!("#{}", rid),
+                    rule_url: String::new(),
+                    matched_text: Some(matched_text),
+                    referenced_filenames: rule.referenced_filenames.clone(),
+                    is_license_intro: rule.is_license_intro,
+                    is_license_clue: rule.is_license_clue,
+                    is_license_reference: rule.is_license_reference,
+                    is_license_tag: rule.is_license_tag,
+                    matched_token_positions: None, // Contiguous match
+                };
+
+                matches.push(license_match);
+            }
+        }
+    }
+
+    matches
+}
+```
+
+#### Step 3: Update Detection Pipeline
+
+**File:** `src/license_detection/mod.rs`
+
+**Change SPDX match call:**
+
+```rust
+pub fn detect(&self, text: &str) -> Result<Vec<LicenseDetection>> {
+    let query = Query::new(text, &self.index)?;
+
+    let mut all_matches = Vec::new();
+
+    // Phase 1: Hash, SPDX, Aho-Corasick
+    {
+        let whole_run = query.whole_query_run();
+
+        let hash_matches = hash_match(&self.index, &whole_run);
+        all_matches.extend(hash_matches);
+
+        // PASS QUERY INSTEAD OF TEXT - enables token position lookup
+        let spdx_matches = spdx_lid_match(&self.index, &query);
+        all_matches.extend(spdx_matches);
+
+        let aho_matches = aho_match(&self.index, &whole_run);
+        all_matches.extend(aho_matches);
+    }
+    
+    // ... rest unchanged ...
+}
+```
+
+#### Step 4: Add Unit Tests for Token Position Tracking
+
+**File:** `src/license_detection/spdx_lid_test.rs`
+
+```rust
+#[test]
+fn test_spdx_match_has_correct_token_positions() {
+    let mut index = create_test_index(&[("mit", 0)], 1);
+    index.rules_by_rid.push(create_mock_rule_simple("mit", 100));
+
+    // Text where SPDX is NOT at position 0
+    let text = "Some preamble text\nSPDX-License-Identifier: MIT\nMore text";
+    let query = Query::new(text, &index).unwrap();
+    
+    let matches = spdx_lid_match(&index, &query);
+    
+    assert_eq!(matches.len(), 1);
+    // Token positions should NOT be 0,0
+    // They should reflect actual position of SPDX line in token stream
+    assert!(matches[0].start_token >= 0);
+    assert!(matches[0].end_token >= matches[0].start_token);
+}
+
+#[test]
+fn test_query_tracks_spdx_lines_with_positions() {
+    let index = create_test_index(&[("license", 0)], 1);
+    
+    let text = "SPDX-License-Identifier: MIT\nSPDX-License-Identifier: Apache-2.0";
+    let query = Query::new(text, &index).unwrap();
+    
+    assert_eq!(query.spdx_lines.len(), 2);
+    
+    // Both SPDX lines should have valid token positions
+    for (_, start, end) in &query.spdx_lines {
+        assert!(*start <= *end);
+    }
+}
+```
+
+### Subtraction Conditions (Clarified)
+
+Based on Python's actual implementation:
+
+| Phase | Subtracts? | Condition |
+|-------|------------|-----------|
+| Hash match | ❌ No | N/A |
+| SPDX-LID match | ❌ No | N/A |
+| Aho-Corasick match | ❌ No | N/A |
+| **Near-duplicate match** | ✅ **Yes** | All matches subtracted |
+| Query run match | ❌ No | But `is_matchable()` excludes already-matched positions |
+
+**Key Insight:** Python does NOT subtract after hash/aho/SPDX matching. It only subtracts after near-duplicate matching. The `is_matchable()` check in query run matching handles the exclusion.
+
+### Python References
+
+| Component | Location | Description |
+|-----------|----------|-------------|
+| `spdx_lines` tracking | `query.py:486-507` | Records SPDX lines during tokenization |
+| `spdx_id_match()` | `match_spdx_lid.py:65-119` | Creates match with token positions |
+| `qspan` creation | `match_spdx_lid.py:101` | `Span(range(match_start, query_run.end + 1))` |
+| Subtraction | `index.py:767-771` | Only after near-duplicate matches |
+| `is_matchable()` check | `index.py:828` | Excludes already-matched positions |
+
+### Expected Impact
+
+| Before | After |
+|--------|-------|
+| SPDX matches have `start_token=0, end_token=0` | SPDX matches have correct token positions |
+| Subtraction removes position 0 incorrectly | Subtraction removes correct positions |
+| Files with license at position 0 broken | All files work correctly |
+
+**Tests Fixed:** The 40 tests that regressed when subtraction was previously enabled.
+
+### Verification Steps
+
+1. **Run SPDX unit tests:**
+   ```bash
+   cargo test -q --lib spdx_lid_test
+   ```
+
+2. **Verify token positions are non-zero for non-first SPDX lines:**
+   ```bash
+   cargo test -q --lib test_spdx_match_has_correct_token_positions
+   ```
+
+3. **Run golden tests:**
+   ```bash
+   cargo test -r -q --lib license_detection::golden_test::golden_tests::test_golden_lic1
+   ```
+
+4. **Expected result:** No regressions, same pass/fail count as before subtraction was attempted.
+
+---
+
 ## Background
 
 After implementing PLAN-007 through PLAN-014, the golden test results showed:

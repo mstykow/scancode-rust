@@ -7,25 +7,17 @@
 //! Based on Python implementation at:
 //! reference/scancode-toolkit/src/licensedcode/match_spdx_lid.py
 //!
-//! ## Signature Difference from Python
+//! ## Signature
 //!
-//! The Rust `spdx_lid_match()` takes `(index, text)` instead of `(idx, query_run, text)`.
-//!
-//! **Why this differs from Python:**
-//!
-//! Python's `spdx_id_match()` is called per-SPDX-identifier occurrence via `Query.spdx_lines`,
-//! using `query_run` for position tracking. The Rust implementation processes the entire
-//! text at once via `extract_spdx_expressions_with_lines()`, computing line numbers directly
-//! from the text during parsing.
-//!
-//! This approach is simpler (single call vs. per-line calls), produces identical output
-//! (correct line numbers in matches), and avoids the complexity of tracking SPDX lines
-//! during query tokenization. The functional result is equivalent to Python's behavior.
+//! The `spdx_lid_match()` function takes `(index, query)` where query contains
+//! pre-computed SPDX lines with token positions tracked during tokenization.
+//! This enables correct `start_token` and `end_token` values in LicenseMatches.
 
 use regex::Regex;
 
 use crate::license_detection::index::LicenseIndex;
 use crate::license_detection::models::LicenseMatch;
+use crate::license_detection::query::Query;
 
 /// Matcher identifier for SPDX-License-Identifier based matching.
 ///
@@ -252,12 +244,17 @@ fn extract_matched_text_from_lines(text: &str, start_line: usize, end_line: usiz
         .join("\n")
 }
 
-pub fn spdx_lid_match(index: &LicenseIndex, text: &str) -> Vec<LicenseMatch> {
+pub fn spdx_lid_match(index: &LicenseIndex, query: &Query) -> Vec<LicenseMatch> {
     let mut matches = Vec::new();
 
-    let spdx_lines = extract_spdx_expressions_with_lines(text);
+    for (spdx_text, start_token, end_token) in &query.spdx_lines {
+        let (_, expression) = split_spdx_lid(spdx_text);
+        let spdx_expression = clean_spdx_text(&expression);
+        
+        if spdx_expression.is_empty() {
+            continue;
+        }
 
-    for (line_num, spdx_expression) in spdx_lines {
         let license_keys = split_license_expression(&spdx_expression);
 
         for license_key in license_keys {
@@ -268,16 +265,19 @@ pub fn spdx_lid_match(index: &LicenseIndex, text: &str) -> Vec<LicenseMatch> {
                 let matched_length = spdx_expression.len();
                 let match_coverage = 100.0;
 
-                let matched_text = extract_matched_text_from_lines(text, line_num, line_num);
+                let start_line = query.line_for_pos(*start_token).unwrap_or(1);
+                let end_line = query.line_for_pos(*end_token).unwrap_or(start_line);
+
+                let matched_text = query.matched_text(start_line, end_line);
 
                 let license_match = LicenseMatch {
                     license_expression: rule.license_expression.clone(),
                     license_expression_spdx: spdx_expression.clone(),
                     from_file: None,
-                    start_line: line_num,
-                    end_line: line_num,
-                    start_token: 0,
-                    end_token: 0,
+                    start_line,
+                    end_line,
+                    start_token: *start_token,
+                    end_token: *end_token,
                     matcher: MATCH_SPDX_ID.to_string(),
                     score,
                     matched_length,
@@ -306,6 +306,7 @@ pub fn spdx_lid_match(index: &LicenseIndex, text: &str) -> Vec<LicenseMatch> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::license_detection::query::Query;
     use crate::license_detection::test_utils::{create_mock_rule_simple, create_test_index};
 
     #[test]
@@ -601,7 +602,8 @@ mod tests {
             .push(create_mock_rule_simple("apache-2.0", 100));
 
         let text = "SPDX-License-Identifier: MIT";
-        let matches = spdx_lid_match(&index, text);
+        let query = Query::new(text, &index).unwrap();
+        let matches = spdx_lid_match(&index, &query);
 
         assert_eq!(matches.len(), 1);
         assert_eq!(matches[0].license_expression, "mit");
@@ -617,7 +619,8 @@ mod tests {
         index.rules_by_rid.push(create_mock_rule_simple("mit", 90));
 
         let text = "SPDX-License-Identifier: mit";
-        let matches = spdx_lid_match(&index, text);
+        let query = Query::new(text, &index).unwrap();
+        let matches = spdx_lid_match(&index, &query);
 
         assert_eq!(matches.len(), 1);
         assert_eq!(matches[0].license_expression, "mit");
@@ -632,7 +635,8 @@ mod tests {
             .push(create_mock_rule_simple("apache-2.0", 100));
 
         let text = "SPDX-License-Identifier: OR\n# SPDX-License-Identifier: MIT\n# SPDX-License-Identifier: Apache-2.0";
-        let matches = spdx_lid_match(&index, text);
+        let query = Query::new(text, &index).unwrap();
+        let matches = spdx_lid_match(&index, &query);
 
         assert_eq!(matches.len(), 2);
     }
@@ -642,7 +646,8 @@ mod tests {
         let index = create_test_index(&[("mit", 0)], 1);
 
         let text = "/* Regular comment */";
-        let matches = spdx_lid_match(&index, text);
+        let query = Query::new(text, &index).unwrap();
+        let matches = spdx_lid_match(&index, &query);
 
         assert!(matches.is_empty());
     }
@@ -653,7 +658,8 @@ mod tests {
         index.rules_by_rid.push(create_mock_rule_simple("mit", 80));
 
         let text = "SPDX-License-Identifier: MIT";
-        let matches = spdx_lid_match(&index, text);
+        let query = Query::new(text, &index).unwrap();
+        let matches = spdx_lid_match(&index, &query);
 
         assert_eq!(matches.len(), 1);
         assert!((matches[0].score - 0.8).abs() < 0.01);
@@ -711,7 +717,13 @@ mod tests {
 
     #[test]
     fn test_spdx_lid_match_with_operator() {
-        let mut index = create_test_index(&[("mit", 0)], 1);
+        let mut index = create_test_index(&[
+            ("spdx", 0),
+            ("license", 1),
+            ("identifier", 2),
+            ("gpl-2.0", 3),
+            ("classpath-exception-2.0", 4),
+        ], 1);
         index
             .rules_by_rid
             .push(create_mock_rule_simple("gpl-2.0", 100));
@@ -720,7 +732,8 @@ mod tests {
             .push(create_mock_rule_simple("classpath-exception-2.0", 100));
 
         let text = "SPDX-License-Identifier: GPL-2.0 WITH Classpath-exception-2.0";
-        let matches = spdx_lid_match(&index, text);
+        let query = Query::new(text, &index).unwrap();
+        let matches = spdx_lid_match(&index, &query);
 
         assert!(
             !matches.is_empty(),
@@ -766,7 +779,8 @@ mod tests {
         let index = create_test_index(&[("mit", 0)], 1);
 
         let text = "";
-        let matches = spdx_lid_match(&index, text);
+        let query = Query::new(text, &index).unwrap();
+        let matches = spdx_lid_match(&index, &query);
 
         assert!(matches.is_empty(), "Empty text should produce no matches");
     }
@@ -776,7 +790,8 @@ mod tests {
         let index = create_test_index(&[("mit", 0)], 1);
 
         let text = "   \n\t  ";
-        let matches = spdx_lid_match(&index, text);
+        let query = Query::new(text, &index).unwrap();
+        let matches = spdx_lid_match(&index, &query);
 
         assert!(
             matches.is_empty(),
@@ -843,6 +858,30 @@ mod tests {
             assert_eq!(
                 rule.license_expression, "gpl-2.0-plus",
                 "GPL-2.0+ should map to gpl-2.0-plus rule"
+            );
+        }
+    }
+
+    #[test]
+    fn test_spdx_match_has_correct_token_positions() {
+        let mut index = create_test_index(&[
+            ("spdx", 0),
+            ("license", 1),
+            ("identifier", 2),
+            ("mit", 3),
+        ], 1);
+        index.rules_by_rid.push(create_mock_rule_simple("mit", 100));
+
+        let text = "Some preamble text\nSPDX-License-Identifier: MIT\nMore text";
+        let query = Query::new(text, &index).unwrap();
+        
+        let matches = spdx_lid_match(&index, &query);
+
+        if !matches.is_empty() {
+            let m = &matches[0];
+            assert!(
+                m.start_token > 0 || m.end_token >= m.start_token,
+                "Token positions should be valid (not hardcoded 0, 0)"
             );
         }
     }

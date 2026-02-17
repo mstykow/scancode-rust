@@ -278,6 +278,7 @@ mod tests {
             has_long_lines: false,
             is_binary: false,
             query_run_ranges: Vec::new(),
+            spdx_lines: Vec::new(),
             index: &index,
         };
 
@@ -320,6 +321,7 @@ mod tests {
             has_long_lines: false,
             is_binary: false,
             query_run_ranges: Vec::new(),
+            spdx_lines: Vec::new(),
             index: &index,
         };
 
@@ -366,6 +368,7 @@ mod tests {
             has_long_lines: false,
             is_binary: false,
             query_run_ranges: Vec::new(),
+            spdx_lines: Vec::new(),
             index: &index,
         };
 
@@ -408,6 +411,7 @@ mod tests {
             has_long_lines: false,
             is_binary: false,
             query_run_ranges: Vec::new(),
+            spdx_lines: Vec::new(),
             index: &index,
         };
 
@@ -449,6 +453,7 @@ mod tests {
             has_long_lines: false,
             is_binary: false,
             query_run_ranges: Vec::new(),
+            spdx_lines: Vec::new(),
             index: &index,
         };
 
@@ -501,6 +506,7 @@ mod tests {
             has_long_lines: false,
             is_binary: false,
             query_run_ranges: Vec::new(),
+            spdx_lines: Vec::new(),
             index: &index,
         };
 
@@ -539,6 +545,7 @@ mod tests {
             has_long_lines: false,
             is_binary: false,
             query_run_ranges: Vec::new(),
+            spdx_lines: Vec::new(),
             index: &index,
         };
 
@@ -583,6 +590,7 @@ mod tests {
             has_long_lines: false,
             is_binary: false,
             query_run_ranges: Vec::new(),
+            spdx_lines: Vec::new(),
             index: &index,
         };
 
@@ -628,6 +636,7 @@ mod tests {
             has_long_lines: false,
             is_binary: false,
             query_run_ranges: Vec::new(),
+            spdx_lines: Vec::new(),
             index: &index,
         };
 
