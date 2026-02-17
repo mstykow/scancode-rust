@@ -147,6 +147,7 @@ pub fn multisets_intersector(
 /// # Returns
 ///
 /// Option containing (rounded ScoresVector, full ScoresVector) or None if intersection is too small
+#[allow(dead_code)]
 fn compute_set_similarity(
     query_set: &HashSet<u16>,
     query_mset: &HashMap<u16, usize>,
@@ -394,6 +395,7 @@ pub fn compute_candidates_with_msets(
 /// # Returns
 ///
 /// Vector of top-N candidates sorted by similarity score
+#[allow(dead_code)]
 fn select_candidates(index: &LicenseIndex, query_run: &QueryRun, top_n: usize) -> Vec<Candidate> {
     let mut candidates = Vec::new();
 
@@ -643,6 +645,7 @@ fn match_blocks(
 /// # Returns
 ///
 /// Vector of LicenseMatch results
+#[allow(dead_code)]
 pub fn seq_match(index: &LicenseIndex, query_run: &QueryRun) -> Vec<LicenseMatch> {
     let mut matches = Vec::new();
 
@@ -685,7 +688,7 @@ pub fn seq_match(index: &LicenseIndex, query_run: &QueryRun) -> Vec<LicenseMatch
 
                 let mut max_qend = qstart;
 
-                for (qpos, _ipos, mlen) in blocks {
+                for (qpos, ipos, mlen) in blocks {
                     if mlen < 1 {
                         continue;
                     }
@@ -698,6 +701,10 @@ pub fn seq_match(index: &LicenseIndex, query_run: &QueryRun) -> Vec<LicenseMatch
                     if rule_length == 0 {
                         continue;
                     }
+
+                    let hispan_count = (ipos..ipos + mlen)
+                        .filter(|&p| rule_tokens.get(p).is_some_and(|t| *t < len_legalese as u16))
+                        .count();
 
                     let match_coverage = (mlen as f32 / rule_length as f32) * 100.0;
 
@@ -734,6 +741,7 @@ pub fn seq_match(index: &LicenseIndex, query_run: &QueryRun) -> Vec<LicenseMatch
                         is_license_reference: candidate.rule.is_license_reference,
                         is_license_tag: candidate.rule.is_license_tag,
                         matched_token_positions: None,
+                        hilen: hispan_count,
                     };
 
                     matches.push(license_match);
@@ -807,7 +815,7 @@ pub fn seq_match_with_candidates(
 
                 let mut max_qend = qstart;
 
-                for (qpos, _ipos, mlen) in blocks {
+                for (qpos, ipos, mlen) in blocks {
                     if mlen < 1 {
                         continue;
                     }
@@ -820,6 +828,10 @@ pub fn seq_match_with_candidates(
                     if rule_length == 0 {
                         continue;
                     }
+
+                    let hispan_count = (ipos..ipos + mlen)
+                        .filter(|&p| rule_tokens.get(p).is_some_and(|t| *t < len_legalese as u16))
+                        .count();
 
                     let match_coverage = (mlen as f32 / rule_length as f32) * 100.0;
 
@@ -856,6 +868,7 @@ pub fn seq_match_with_candidates(
                         is_license_reference: candidate.rule.is_license_reference,
                         is_license_tag: candidate.rule.is_license_tag,
                         matched_token_positions: None,
+                        hilen: hispan_count,
                     };
 
                     matches.push(license_match);

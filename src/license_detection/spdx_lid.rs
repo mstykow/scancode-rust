@@ -277,6 +277,7 @@ pub fn spdx_lid_match(index: &LicenseIndex, query: &Query) -> Vec<LicenseMatch> 
                     is_license_reference: rule.is_license_reference,
                     is_license_tag: rule.is_license_tag,
                     matched_token_positions: None,
+                    hilen: 0,
                 };
 
                 matches.push(license_match);

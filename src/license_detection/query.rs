@@ -435,8 +435,8 @@ impl<'a> Query<'a> {
 
         // TODO: Re-enable query run splitting once the matching algorithm
         // properly tracks matched qspans across phases.
-        // Currently causes double-matching because Phase 3 doesn't track
-        // matched positions for Phase 4's is_matchable() check.
+        // Currently causes double-matching because is_matchable() logic
+        // doesn't correctly prevent re-matching of already-matched positions.
         // See: reference/scancode-toolkit/src/licensedcode/index.py:1056
         // let query_runs = Self::compute_query_runs(
         //     &tokens,

@@ -113,19 +113,36 @@ impl LicenseDetectionEngine {
         let mut query = Query::new(text, &self.index)?;
 
         let mut all_matches = Vec::new();
+        let mut matched_qspans: Vec<query::PositionSpan> = Vec::new();
 
         // Phase 1: Hash, SPDX, Aho-Corasick matching
-        // Note: We do NOT subtract after these phases - only after near-duplicate
+        // Track 100% coverage matches for Phase 3's is_matchable() check
+        // Corresponds to Python: index.py:1056-1057
         {
             let whole_run = query.whole_query_run();
 
             let hash_matches = hash_match(&self.index, &whole_run);
+            for m in &hash_matches {
+                if m.match_coverage >= 99.99 && m.end_token > m.start_token {
+                    matched_qspans.push(query::PositionSpan::new(m.start_token, m.end_token - 1));
+                }
+            }
             all_matches.extend(hash_matches);
 
             let spdx_matches = spdx_lid_match(&self.index, &query);
+            for m in &spdx_matches {
+                if m.match_coverage >= 99.99 && m.end_token > m.start_token {
+                    matched_qspans.push(query::PositionSpan::new(m.start_token, m.end_token - 1));
+                }
+            }
             all_matches.extend(spdx_matches);
 
             let aho_matches = aho_match(&self.index, &whole_run);
+            for m in &aho_matches {
+                if m.match_coverage >= 99.99 && m.end_token > m.start_token {
+                    matched_qspans.push(query::PositionSpan::new(m.start_token, m.end_token - 1));
+                }
+            }
             all_matches.extend(aho_matches);
         }
 
@@ -146,6 +163,8 @@ impl LicenseDetectionEngine {
 
                 // Subtract matched positions from query to prevent double-matching.
                 // Corresponds to Python: index.py:767-771
+                // Note: We do NOT add to matched_qspans here - those are only for
+                // Phase 1 matches. Query run matching uses the original matched_qspans.
                 for m in &near_dupe_matches {
                     if m.end_token > m.start_token {
                         let span = query::PositionSpan::new(m.start_token, m.end_token - 1);
@@ -179,8 +198,8 @@ impl LicenseDetectionEngine {
                 }
 
                 // is_matchable() excludes already-matched positions
-                // Corresponds to Python: index.py:828
-                if !query_run.is_matchable(false, &[]) {
+                // Corresponds to Python: index.py:1061-1064
+                if !query_run.is_matchable(false, &matched_qspans) {
                     continue;
                 }
 

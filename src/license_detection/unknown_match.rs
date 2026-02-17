@@ -311,6 +311,7 @@ fn create_unknown_match(
         is_license_reference: false,
         is_license_tag: false,
         matched_token_positions: None,
+        hilen: 0,
     }
     .into()
 }
@@ -494,6 +495,7 @@ mod tests {
             is_license_clue: false,
             is_license_reference: false,
             is_license_tag: false,
+            hilen: 1,
         }];
 
         let covered = compute_covered_positions(&query, &known_matches);
@@ -563,6 +565,7 @@ mod tests {
             is_license_clue: false,
             is_license_reference: false,
             is_license_tag: false,
+            hilen: 2,
         }];
 
         let matches = unknown_match(&index, &query, &known_matches);

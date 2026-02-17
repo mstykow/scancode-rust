@@ -126,7 +126,7 @@ pub fn aho_match(index: &LicenseIndex, query_run: &QueryRun) -> Vec<LicenseMatch
             100.0
         };
 
-        let _hispan_count = (0..matched_length)
+        let hispan_count = (0..matched_length)
             .filter(|&p| {
                 rule_tids
                     .get(p)
@@ -134,7 +134,6 @@ pub fn aho_match(index: &LicenseIndex, query_run: &QueryRun) -> Vec<LicenseMatch
             })
             .count();
 
-        // Use match positions (qstart, qend-1) not query run boundaries
         let start_line = query_run.line_for_pos(qstart).unwrap_or(1);
 
         let end_line = if qend > qstart {
@@ -177,6 +176,7 @@ pub fn aho_match(index: &LicenseIndex, query_run: &QueryRun) -> Vec<LicenseMatch
             is_license_reference: rule.is_license_reference,
             is_license_tag: rule.is_license_tag,
             matched_token_positions: None,
+            hilen: hispan_count,
         };
 
         matches.push(license_match);

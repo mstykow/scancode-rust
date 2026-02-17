@@ -256,6 +256,13 @@ pub struct LicenseMatch {
     /// Some(positions) contains the exact positions for non-contiguous matches.
     #[serde(skip)]
     pub matched_token_positions: Option<Vec<usize>>,
+
+    /// Count of matched high-value legalese tokens (token IDs < len_legalese).
+    ///
+    /// Corresponds to Python's `len(self.hispan)` - the number of matched positions
+    /// where the token ID is a high-value legalese token.
+    #[serde(default)]
+    pub hilen: usize,
 }
 
 impl Default for LicenseMatch {
@@ -283,6 +290,7 @@ impl Default for LicenseMatch {
             is_license_reference: false,
             is_license_tag: false,
             matched_token_positions: None,
+            hilen: 0,
         }
     }
 }
@@ -291,16 +299,81 @@ impl LicenseMatch {
     pub fn matcher_order(&self) -> u8 {
         match self.matcher.as_str() {
             "1-hash" => 1,
+            "1-spdx-id" => 1,
             "2-aho" => 2,
-            "3-spdx" => 3,
-            "4-seq" => 4,
+            "3-seq" => 3,
             "5-unknown" => 5,
             _ => 9,
         }
     }
 
     pub fn hilen(&self) -> usize {
-        self.matched_length / 2
+        self.hilen
+    }
+
+    #[allow(dead_code)]
+    pub fn is_small(
+        &self,
+        min_matched_len: usize,
+        min_high_matched_len: usize,
+        rule_is_small: bool,
+    ) -> bool {
+        if self.matched_length < min_matched_len || self.hilen() < min_high_matched_len {
+            return true;
+        }
+        if rule_is_small && self.match_coverage < 80.0 {
+            return true;
+        }
+        false
+    }
+
+    #[allow(dead_code)]
+    pub fn len(&self) -> usize {
+        if let Some(positions) = &self.matched_token_positions {
+            positions.len()
+        } else {
+            self.end_token.saturating_sub(self.start_token)
+        }
+    }
+
+    #[allow(dead_code)]
+    fn qregion_len(&self) -> usize {
+        if let Some(positions) = &self.matched_token_positions {
+            if positions.is_empty() {
+                return 0;
+            }
+            let min_pos = *positions.iter().min().unwrap_or(&0);
+            let max_pos = *positions.iter().max().unwrap_or(&0);
+            max_pos - min_pos + 1
+        } else {
+            self.end_token.saturating_sub(self.start_token)
+        }
+    }
+
+    #[allow(dead_code)]
+    pub fn qdensity(&self) -> f32 {
+        let mlen = self.len();
+        if mlen == 0 {
+            return 0.0;
+        }
+        let qregion = self.qregion_len();
+        if qregion == 0 {
+            return 0.0;
+        }
+        mlen as f32 / qregion as f32
+    }
+
+    #[allow(dead_code)]
+    pub fn idensity(&self) -> f32 {
+        let mlen = self.len();
+        if mlen == 0 {
+            return 0.0;
+        }
+        let qregion = self.qregion_len();
+        if qregion == 0 {
+            return 1.0;
+        }
+        mlen as f32 / qregion as f32
     }
 
     pub fn surround(&self, other: &LicenseMatch) -> bool {
@@ -409,6 +482,7 @@ mod tests {
             is_license_clue: false,
             is_license_reference: false,
             is_license_tag: false,
+            hilen: 50,
         }
     }
 
@@ -803,6 +877,7 @@ mod tests {
             is_license_reference: false,
             is_license_tag: false,
             matched_token_positions: None,
+            hilen: 0,
         };
 
         assert!(match_result.from_file.is_none());
@@ -944,6 +1019,7 @@ mod tests {
             is_license_clue: false,
             is_license_reference: false,
             is_license_tag: false,
+            hilen: 50,
         };
 
         assert_eq!(
@@ -1002,15 +1078,80 @@ mod tests {
     #[test]
     fn test_hilen_zero() {
         let mut match_result = create_license_match();
-        match_result.matched_length = 0;
+        match_result.hilen = 0;
         assert_eq!(match_result.hilen(), 0);
     }
 
     #[test]
-    fn test_hilen_odd() {
+    fn test_hilen_value() {
         let mut match_result = create_license_match();
-        match_result.matched_length = 99;
-        assert_eq!(match_result.hilen(), 49);
+        match_result.hilen = 25;
+        assert_eq!(match_result.hilen(), 25);
+    }
+
+    #[test]
+    fn test_len_contiguous() {
+        let match_result = create_license_match();
+        assert_eq!(match_result.len(), 100);
+    }
+
+    #[test]
+    fn test_len_non_contiguous() {
+        let mut match_result = create_license_match();
+        match_result.matched_token_positions = Some(vec![0, 2, 5, 10]);
+        assert_eq!(match_result.len(), 4);
+    }
+
+    #[test]
+    fn test_len_zero() {
+        let mut match_result = create_license_match();
+        match_result.start_token = 0;
+        match_result.end_token = 0;
+        assert_eq!(match_result.len(), 0);
+    }
+
+    #[test]
+    fn test_qdensity_contiguous() {
+        let match_result = create_license_match();
+        assert!((match_result.qdensity() - 1.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_qdensity_sparse() {
+        let mut match_result = create_license_match();
+        match_result.matched_token_positions = Some(vec![0, 10]);
+        let expected = 2.0 / 11.0;
+        assert!((match_result.qdensity() - expected).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_qdensity_zero() {
+        let mut match_result = create_license_match();
+        match_result.start_token = 0;
+        match_result.end_token = 0;
+        assert_eq!(match_result.qdensity(), 0.0);
+    }
+
+    #[test]
+    fn test_idensity_contiguous() {
+        let match_result = create_license_match();
+        assert!((match_result.idensity() - 1.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_idensity_sparse() {
+        let mut match_result = create_license_match();
+        match_result.matched_token_positions = Some(vec![0, 10]);
+        let expected = 2.0 / 11.0;
+        assert!((match_result.idensity() - expected).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_idensity_zero() {
+        let mut match_result = create_license_match();
+        match_result.start_token = 0;
+        match_result.end_token = 0;
+        assert_eq!(match_result.idensity(), 0.0);
     }
 
     #[test]

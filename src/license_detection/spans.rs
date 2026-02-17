@@ -34,6 +34,7 @@ impl Span {
     ///
     /// # Arguments
     /// * `positions` - Iterator over positions to include in the span
+    #[allow(dead_code)]
     pub fn from_iterator(positions: impl IntoIterator<Item = usize>) -> Self {
         let mut sorted: Vec<usize> = positions.into_iter().collect();
         sorted.sort_unstable();

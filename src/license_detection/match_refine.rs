@@ -42,6 +42,30 @@ fn filter_short_gpl_matches(matches: &[LicenseMatch]) -> Vec<LicenseMatch> {
         .collect()
 }
 
+fn filter_too_short_matches(index: &LicenseIndex, matches: &[LicenseMatch]) -> Vec<LicenseMatch> {
+    matches
+        .iter()
+        .filter(|m| {
+            if m.matcher != "3-seq" {
+                return true;
+            }
+
+            if let Some(rid) = parse_rule_id(&m.rule_identifier)
+                && let Some(rule) = index.rules_by_rid.get(rid)
+            {
+                return !m.is_small(
+                    rule.min_matched_length,
+                    rule.min_high_matched_length,
+                    rule.is_small,
+                );
+            }
+
+            true
+        })
+        .cloned()
+        .collect()
+}
+
 /// Parse rule ID from rule_identifier string.
 ///
 /// Rule identifiers typically have the format "#42" where the numeric portion is the rule ID.
@@ -234,6 +258,49 @@ fn is_false_positive(m: &LicenseMatch, index: &LicenseIndex) -> bool {
     parse_rule_id(&m.rule_identifier)
         .map(|rid| index.false_positive_rids.contains(&rid))
         .unwrap_or(false)
+}
+
+/// Filter spurious matches with low density.
+///
+/// Spurious matches are matches with low density (where the matched tokens
+/// are separated by many unmatched tokens). This filter only applies to
+/// sequence and unknown matcher types - exact matches are always kept.
+///
+/// Based on Python: `filter_spurious_matches()` (match.py:1768-1836)
+fn filter_spurious_matches(matches: &[LicenseMatch]) -> Vec<LicenseMatch> {
+    matches
+        .iter()
+        .filter(|m| {
+            let is_seq_or_unknown = m.matcher == "3-seq" || m.matcher == "5-unknown";
+            if !is_seq_or_unknown {
+                return true;
+            }
+
+            let qdens = m.qdensity();
+            let idens = m.idensity();
+            let mlen = m.matched_length;
+            let hilen = m.hilen();
+
+            if mlen < 10 && (qdens < 0.1 || idens < 0.1) {
+                return false;
+            }
+            if mlen < 15 && (qdens < 0.2 || idens < 0.2) {
+                return false;
+            }
+            if mlen < 20 && hilen < 5 && (qdens < 0.3 || idens < 0.3) {
+                return false;
+            }
+            if mlen < 30 && hilen < 8 && (qdens < 0.4 || idens < 0.4) {
+                return false;
+            }
+            if qdens < 0.4 || idens < 0.4 {
+                return false;
+            }
+
+            true
+        })
+        .cloned()
+        .collect()
 }
 
 fn calculate_overlap(a: &LicenseMatch, b: &LicenseMatch) -> usize {
@@ -615,25 +682,314 @@ pub fn filter_false_positive_license_lists_matches(
     (kept, discarded)
 }
 
+/// Filter matches below rule's minimum_coverage threshold.
+///
+/// Rules can have a `minimum_coverage` attribute that specifies the minimum
+/// match coverage required for the match to be valid. Matches with coverage
+/// below this threshold should be discarded.
+///
+/// This filter only applies to sequence matches (matcher == "3-seq").
+/// Exact matches (hash, aho, spdx) are always kept.
+///
+/// # Arguments
+/// * `index` - LicenseIndex containing rules_by_rid
+/// * `matches` - Slice of LicenseMatch to filter
+///
+/// # Returns
+/// Vector of LicenseMatch with below-minimum-coverage matches removed
+///
+/// Based on Python: `filter_below_rule_minimum_coverage()` (lines 1551-1587)
+fn filter_below_rule_minimum_coverage(
+    index: &LicenseIndex,
+    matches: &[LicenseMatch],
+) -> Vec<LicenseMatch> {
+    matches
+        .iter()
+        .filter(|m| {
+            if m.matcher != "3-seq" {
+                return true;
+            }
+
+            if let Some(rid) = parse_rule_id(&m.rule_identifier)
+                && let Some(rule) = index.rules_by_rid.get(rid)
+                && let Some(min_cov) = rule.minimum_coverage
+            {
+                return m.match_coverage >= min_cov as f32;
+            }
+
+            true
+        })
+        .cloned()
+        .collect()
+}
+
+/// Filter short matches scattered on too many lines.
+///
+/// Short matches that are scattered across more lines than their token count
+/// are likely spurious and should be filtered. For example, a 3-token match
+/// spanning 50 lines is probably not a valid license reference.
+///
+/// This filter only applies to small rules (rule.is_small == true).
+/// License tag rules get a +2 tolerance on matched_len comparison.
+///
+/// # Arguments
+/// * `index` - LicenseIndex containing rules_by_rid
+/// * `matches` - Slice of LicenseMatch to filter
+///
+/// # Returns
+/// Vector of LicenseMatch with scattered matches removed
+///
+/// Based on Python: `filter_short_matches_scattered_on_too_many_lines()` (lines 1931-1972)
+fn filter_short_matches_scattered_on_too_many_lines(
+    index: &LicenseIndex,
+    matches: &[LicenseMatch],
+) -> Vec<LicenseMatch> {
+    if matches.len() == 1 {
+        return matches.to_vec();
+    }
+
+    matches
+        .iter()
+        .filter(|m| {
+            if let Some(rid) = parse_rule_id(&m.rule_identifier)
+                && let Some(rule) = index.rules_by_rid.get(rid)
+                && rule.is_small
+            {
+                let matched_len = m.len();
+                let line_span = m.end_line.saturating_sub(m.start_line) + 1;
+
+                let effective_matched_len = if rule.is_license_tag {
+                    matched_len + 2
+                } else {
+                    matched_len
+                };
+
+                if line_span > effective_matched_len {
+                    return false;
+                }
+            }
+            true
+        })
+        .cloned()
+        .collect()
+}
+
+/// Filter single-token matches surrounded by many unknown/short/digit tokens.
+///
+/// A "spurious" single token match is a match to a single token that is
+/// surrounded on both sides by at least `unknown_count` tokens that are either
+/// unknown tokens, short tokens composed of a single character, tokens
+/// composed only of digits or several punctuations and stopwords.
+///
+/// This filter only applies to sequence matches (matcher == "3-seq") with
+/// exactly 1 matched token.
+///
+/// # Arguments
+/// * `matches` - Slice of LicenseMatch to filter
+/// * `query` - Query object containing unknowns_by_pos and shorts_and_digits_pos
+/// * `unknown_count` - Minimum number of surrounding unknown/short tokens (default: 5)
+///
+/// # Returns
+/// Vector of LicenseMatch with spurious single-token matches removed
+///
+/// Based on Python: `filter_matches_to_spurious_single_token()` (lines 1622-1700)
+fn filter_matches_to_spurious_single_token(
+    matches: &[LicenseMatch],
+    query: &Query,
+    unknown_count: usize,
+) -> Vec<LicenseMatch> {
+    matches
+        .iter()
+        .filter(|m| {
+            if m.matcher != "3-seq" {
+                return true;
+            }
+            if m.len() != 1 {
+                return true;
+            }
+
+            let qstart = m.start_token;
+
+            let before = query
+                .unknowns_by_pos
+                .get(&Some(qstart as i32 - 1))
+                .copied()
+                .unwrap_or(0)
+                + (qstart.saturating_sub(unknown_count)..qstart)
+                    .filter(|p| query.shorts_and_digits_pos.contains(p))
+                    .count();
+
+            if before < unknown_count {
+                return true;
+            }
+
+            let after = query
+                .unknowns_by_pos
+                .get(&Some(qstart as i32))
+                .copied()
+                .unwrap_or(0)
+                + (qstart + 1..qstart + 1 + unknown_count)
+                    .filter(|p| query.shorts_and_digits_pos.contains(p))
+                    .count();
+
+            if after >= unknown_count {
+                return false;
+            }
+
+            true
+        })
+        .cloned()
+        .collect()
+}
+
+/// Check if a matched text is a valid short match.
+///
+/// A short match is valid if:
+/// - The matched text equals the rule text (exact match)
+/// - The matched text equals rule text when normalized (whitespace)
+/// - For rules >= 5 chars, all matches are considered valid
+/// - Length difference equals max_diff (allowed extra chars)
+/// - Matched text is title case or same case throughout
+/// - Rule text is contained in matched text
+///
+/// # Arguments
+/// * `matched_text` - The matched text from the document
+/// * `rule_text` - The rule text to compare against
+/// * `max_diff` - Maximum allowed length difference
+///
+/// Based on Python: `is_valid_short_match()` (lines 1975-2123)
+fn is_valid_short_match(matched_text: &str, rule_text: &str, max_diff: usize) -> bool {
+    let matched = matched_text.trim();
+    let rule = rule_text.trim();
+
+    if matched == rule {
+        return true;
+    }
+
+    let normalized_matched: String = matched.split_whitespace().collect::<Vec<_>>().join(" ");
+    let normalized_rule: String = rule.split_whitespace().collect::<Vec<_>>().join(" ");
+
+    if normalized_matched == normalized_rule {
+        return true;
+    }
+
+    if normalized_rule.len() >= 5 {
+        return true;
+    }
+
+    let diff_len = normalized_matched.len().abs_diff(normalized_rule.len());
+    if diff_len > 0 && diff_len != max_diff {
+        return false;
+    }
+
+    let (matched_check, rule_check) = if rule.ends_with('+') {
+        (matched.trim_end_matches('+'), rule.trim_end_matches('+'))
+    } else {
+        (matched, rule)
+    };
+
+    let is_title_case = matched_check
+        .chars()
+        .next()
+        .map(|c| c.is_ascii_uppercase())
+        .unwrap_or(false)
+        && matched_check
+            .chars()
+            .skip(1)
+            .all(|c| !c.is_ascii_uppercase());
+
+    if is_title_case {
+        return true;
+    }
+
+    let is_same_case = matched_check.to_lowercase() == matched_check
+        || matched_check.to_uppercase() == matched_check;
+
+    if is_same_case {
+        return true;
+    }
+
+    if matched_check.contains(rule_check) {
+        return true;
+    }
+
+    false
+}
+
+/// Filter invalid matches to single-word gibberish in binary files.
+///
+/// Filters gibberish matches considered as invalid under these conditions:
+/// - The scanned file is a binary file
+/// - The matched rule has a single word (length_unique == 1)
+/// - The matched rule "is_license_reference" or "is_license_clue"
+/// - The matched rule has a low relevance (< 80)
+/// - The matched text has leading/trailing punctuation or mixed case issues
+///
+/// # Arguments
+/// * `index` - LicenseIndex containing rules_by_rid
+/// * `matches` - Slice of LicenseMatch to filter
+/// * `query` - Query object with is_binary flag
+///
+/// # Returns
+/// Vector of LicenseMatch with gibberish matches removed
+///
+/// Based on Python: `filter_invalid_matches_to_single_word_gibberish()` (lines 1839-1901)
+fn filter_invalid_matches_to_single_word_gibberish(
+    index: &LicenseIndex,
+    matches: &[LicenseMatch],
+    query: &Query,
+) -> Vec<LicenseMatch> {
+    if !query.is_binary {
+        return matches.to_vec();
+    }
+
+    matches
+        .iter()
+        .filter(|m| {
+            if let Some(rid) = parse_rule_id(&m.rule_identifier)
+                && let Some(rule) = index.rules_by_rid.get(rid)
+                && rule.length_unique == 1
+                && (rule.is_license_reference || rule.is_license_clue)
+                && let Some(matched_text) = &m.matched_text
+            {
+                let max_diff = if rule.relevance >= 80 { 1 } else { 0 };
+
+                if !is_valid_short_match(matched_text, &rule.text, max_diff) {
+                    return false;
+                }
+            }
+            true
+        })
+        .cloned()
+        .collect()
+}
+
 /// Main refinement function - applies all refinement operations to match results.
 ///
-/// This is the main entry point for Phase 4.6 match refinement. It:
-/// 1. Filters short GPL false positives
-/// 2. Merges overlapping/adjacent matches
-/// 3. Filters contained matches
-/// 4. Filters overlapping matches (with sophisticated overlap handling)
-/// 5. Restores non-overlapping discarded matches
-/// 6. Combines kept + restored matches
-/// 7. Filters false positive matches
-/// 8. Filters false positive license list matches
-/// 9. Updates match scores
+/// This is the main entry point for Phase 4.6 match refinement. It applies
+/// filters in the same order as Python's refine_matches():
+///
+/// 1. Filter short GPL false positives
+/// 2. Filter spurious matches (low density)
+/// 3. Filter below rule minimum coverage
+/// 4. Filter spurious single-token matches
+/// 5. Filter too short matches
+/// 6. Filter scattered short matches
+/// 7. Filter invalid single-word gibberish (binary files)
+/// 8. Merge overlapping/adjacent matches
+/// 9. Filter contained matches
+/// 10. Filter overlapping matches
+/// 11. Restore non-overlapping discarded matches
+/// 12. Filter false positive matches
+/// 13. Filter false positive license list matches
+/// 14. Update match scores
 ///
 /// The operations are applied in sequence to produce final refined matches.
 ///
 /// # Arguments
-/// * `index` - LicenseIndex containing false_positive_rids
+/// * `index` - LicenseIndex containing false_positive_rids and rules_by_rid
 /// * `matches` - Vector of raw LicenseMatch from all strategies
-/// * `_query` - Query (unused but kept for API compatibility)
+/// * `query` - Query object for spurious/gibberish filtering
 ///
 /// # Returns
 /// Vector of refined LicenseMatch ready for detection assembly
@@ -642,7 +998,7 @@ pub fn filter_false_positive_license_lists_matches(
 pub fn refine_matches(
     index: &LicenseIndex,
     matches: Vec<LicenseMatch>,
-    _query: &Query,
+    query: &Query,
 ) -> Vec<LicenseMatch> {
     if matches.is_empty() {
         return Vec::new();
@@ -650,7 +1006,20 @@ pub fn refine_matches(
 
     let filtered = filter_short_gpl_matches(&matches);
 
-    let merged = merge_overlapping_matches(&filtered);
+    let non_spurious = filter_spurious_matches(&filtered);
+
+    let above_min_cov = filter_below_rule_minimum_coverage(index, &non_spurious);
+
+    let non_single_spurious = filter_matches_to_spurious_single_token(&above_min_cov, query, 5);
+
+    let non_short = filter_too_short_matches(index, &non_single_spurious);
+
+    let non_scattered = filter_short_matches_scattered_on_too_many_lines(index, &non_short);
+
+    let non_gibberish =
+        filter_invalid_matches_to_single_word_gibberish(index, &non_scattered, query);
+
+    let merged = merge_overlapping_matches(&non_gibberish);
 
     let non_contained = filter_contained_matches(&merged);
 
@@ -706,6 +1075,7 @@ mod tests {
             is_license_clue: false,
             is_license_reference: false,
             is_license_tag: false,
+            hilen: 50,
         }
     }
 
@@ -738,6 +1108,7 @@ mod tests {
             is_license_reference: false,
             is_license_tag: false,
             matched_token_positions: None,
+            hilen: matched_length / 2,
         }
     }
 
@@ -1164,6 +1535,87 @@ mod tests {
         }];
 
         let filtered = filter_short_gpl_matches(&matches);
+        assert_eq!(filtered.len(), 0);
+    }
+
+    #[test]
+    fn test_filter_spurious_matches_keeps_non_seq_matchers() {
+        let matches = vec![
+            LicenseMatch {
+                matcher: "1-hash".to_string(),
+                matched_length: 5,
+                ..create_test_match("#1", 1, 10, 1.0, 100.0, 100)
+            },
+            LicenseMatch {
+                matcher: "2-aho".to_string(),
+                matched_length: 5,
+                ..create_test_match("#2", 1, 10, 1.0, 100.0, 100)
+            },
+        ];
+
+        let filtered = filter_spurious_matches(&matches);
+        assert_eq!(filtered.len(), 2);
+    }
+
+    #[test]
+    fn test_filter_spurious_matches_keeps_high_density_seq() {
+        let mut m = create_test_match("#1", 1, 10, 1.0, 100.0, 100);
+        m.matcher = "3-seq".to_string();
+        m.matched_length = 50;
+        m.matched_token_positions = Some((0..50).collect());
+
+        let matches = vec![m];
+        let filtered = filter_spurious_matches(&matches);
+        assert_eq!(filtered.len(), 1);
+    }
+
+    #[test]
+    fn test_filter_spurious_matches_filters_low_density_short() {
+        let mut m = create_test_match("#1", 1, 10, 1.0, 100.0, 100);
+        m.matcher = "3-seq".to_string();
+        m.matched_length = 5;
+        m.start_token = 0;
+        m.end_token = 100;
+        m.matched_token_positions = Some(vec![0, 50, 75, 80, 99]);
+
+        let matches = vec![m];
+        let filtered = filter_spurious_matches(&matches);
+        assert_eq!(filtered.len(), 0);
+    }
+
+    #[test]
+    fn test_filter_spurious_matches_filters_unknown_matcher() {
+        let mut m = create_test_match("#1", 1, 10, 1.0, 100.0, 100);
+        m.matcher = "5-unknown".to_string();
+        m.matched_length = 5;
+        m.start_token = 0;
+        m.end_token = 100;
+        m.matched_token_positions = Some(vec![0, 50, 75, 80, 99]);
+
+        let matches = vec![m];
+        let filtered = filter_spurious_matches(&matches);
+        assert_eq!(filtered.len(), 0);
+    }
+
+    #[test]
+    fn test_filter_spurious_matches_keeps_medium_length() {
+        let mut m = create_test_match("#1", 1, 10, 1.0, 100.0, 100);
+        m.matcher = "3-seq".to_string();
+        m.matched_length = 25;
+        m.start_token = 0;
+        m.end_token = 30;
+        m.matched_token_positions = Some((0..25).collect());
+        m.hilen = 10;
+
+        let matches = vec![m];
+        let filtered = filter_spurious_matches(&matches);
+        assert_eq!(filtered.len(), 1);
+    }
+
+    #[test]
+    fn test_filter_spurious_matches_empty() {
+        let matches: Vec<LicenseMatch> = vec![];
+        let filtered = filter_spurious_matches(&matches);
         assert_eq!(filtered.len(), 0);
     }
 
@@ -1805,6 +2257,7 @@ mod tests {
             is_license_reference,
             is_license_tag,
             matched_token_positions: None,
+            hilen: matched_length / 2,
         }
     }
 
@@ -2072,5 +2525,331 @@ mod tests {
             ),
         ];
         assert_eq!(count_unique_licenses(&matches), 2);
+    }
+
+    #[test]
+    fn test_filter_too_short_matches_non_seq_match_kept() {
+        let index = LicenseIndex::with_legalese_count(10);
+
+        let mut m = create_test_match("#1", 1, 10, 0.9, 50.0, 100);
+        m.matcher = "2-aho".to_string();
+        m.matched_length = 2;
+
+        let matches = vec![m];
+        let filtered = filter_too_short_matches(&index, &matches);
+
+        assert_eq!(filtered.len(), 1);
+    }
+
+    #[test]
+    fn test_filter_too_short_matches_small_seq_match_filtered() {
+        let mut index = LicenseIndex::with_legalese_count(10);
+        index
+            .rules_by_rid
+            .push(crate::license_detection::models::Rule {
+                identifier: "test".to_string(),
+                license_expression: "mit".to_string(),
+                text: "test".to_string(),
+                tokens: vec![],
+                is_license_text: false,
+                is_license_notice: false,
+                is_license_reference: false,
+                is_license_tag: false,
+                is_license_intro: false,
+                is_license_clue: false,
+                is_false_positive: false,
+                is_required_phrase: false,
+                is_from_license: false,
+                relevance: 100,
+                minimum_coverage: None,
+                is_continuous: true,
+                referenced_filenames: None,
+                ignorable_urls: None,
+                ignorable_emails: None,
+                ignorable_copyrights: None,
+                ignorable_holders: None,
+                ignorable_authors: None,
+                language: None,
+                notes: None,
+                length_unique: 0,
+                high_length_unique: 0,
+                high_length: 0,
+                min_matched_length: 10,
+                min_high_matched_length: 5,
+                min_matched_length_unique: 0,
+                min_high_matched_length_unique: 0,
+                is_small: true,
+                is_tiny: false,
+                is_deprecated: false,
+                spdx_license_key: None,
+                other_spdx_license_keys: vec![],
+            });
+
+        let mut m = create_test_match("#0", 1, 10, 0.9, 50.0, 100);
+        m.matcher = "3-seq".to_string();
+        m.matched_length = 5;
+        m.hilen = 2;
+
+        let matches = vec![m];
+        let filtered = filter_too_short_matches(&index, &matches);
+
+        assert_eq!(filtered.len(), 0);
+    }
+
+    #[test]
+    fn test_filter_too_short_matches_large_seq_match_kept() {
+        let mut index = LicenseIndex::with_legalese_count(10);
+        index
+            .rules_by_rid
+            .push(crate::license_detection::models::Rule {
+                identifier: "test".to_string(),
+                license_expression: "mit".to_string(),
+                text: "test".to_string(),
+                tokens: vec![],
+                is_license_text: false,
+                is_license_notice: false,
+                is_license_reference: false,
+                is_license_tag: false,
+                is_license_intro: false,
+                is_license_clue: false,
+                is_false_positive: false,
+                is_required_phrase: false,
+                is_from_license: false,
+                relevance: 100,
+                minimum_coverage: None,
+                is_continuous: true,
+                referenced_filenames: None,
+                ignorable_urls: None,
+                ignorable_emails: None,
+                ignorable_copyrights: None,
+                ignorable_holders: None,
+                ignorable_authors: None,
+                language: None,
+                notes: None,
+                length_unique: 0,
+                high_length_unique: 0,
+                high_length: 0,
+                min_matched_length: 10,
+                min_high_matched_length: 5,
+                min_matched_length_unique: 0,
+                min_high_matched_length_unique: 0,
+                is_small: true,
+                is_tiny: false,
+                is_deprecated: false,
+                spdx_license_key: None,
+                other_spdx_license_keys: vec![],
+            });
+
+        let mut m = create_test_match("#0", 1, 10, 0.9, 90.0, 100);
+        m.matcher = "3-seq".to_string();
+        m.matched_length = 15;
+        m.hilen = 8;
+
+        let matches = vec![m];
+        let filtered = filter_too_short_matches(&index, &matches);
+
+        assert_eq!(filtered.len(), 1);
+    }
+
+    #[test]
+    fn test_filter_below_rule_minimum_coverage_keeps_non_seq() {
+        let index = LicenseIndex::with_legalese_count(10);
+        let mut m = create_test_match("#0", 1, 10, 0.9, 50.0, 100);
+        m.matcher = "2-aho".to_string();
+
+        let matches = vec![m];
+        let filtered = filter_below_rule_minimum_coverage(&index, &matches);
+
+        assert_eq!(filtered.len(), 1);
+    }
+
+    #[test]
+    fn test_filter_below_rule_minimum_coverage_filters_low_coverage() {
+        use crate::license_detection::models::Rule;
+
+        let mut index = LicenseIndex::with_legalese_count(10);
+        index.rules_by_rid.push(Rule {
+            identifier: "test".to_string(),
+            license_expression: "mit".to_string(),
+            text: "test".to_string(),
+            tokens: vec![],
+            is_license_text: false,
+            is_license_notice: false,
+            is_license_reference: false,
+            is_license_tag: false,
+            is_license_intro: false,
+            is_license_clue: false,
+            is_false_positive: false,
+            is_required_phrase: false,
+            is_from_license: false,
+            relevance: 100,
+            minimum_coverage: Some(80),
+            is_continuous: true,
+            referenced_filenames: None,
+            ignorable_urls: None,
+            ignorable_emails: None,
+            ignorable_copyrights: None,
+            ignorable_holders: None,
+            ignorable_authors: None,
+            language: None,
+            notes: None,
+            length_unique: 0,
+            high_length_unique: 0,
+            high_length: 0,
+            min_matched_length: 10,
+            min_high_matched_length: 5,
+            min_matched_length_unique: 0,
+            min_high_matched_length_unique: 0,
+            is_small: false,
+            is_tiny: false,
+            is_deprecated: false,
+            spdx_license_key: None,
+            other_spdx_license_keys: vec![],
+        });
+
+        let mut m = create_test_match("#0", 1, 10, 0.9, 50.0, 100);
+        m.matcher = "3-seq".to_string();
+
+        let matches = vec![m];
+        let filtered = filter_below_rule_minimum_coverage(&index, &matches);
+
+        assert_eq!(filtered.len(), 0);
+    }
+
+    #[test]
+    fn test_filter_scattered_keeps_concentrated() {
+        use crate::license_detection::models::Rule;
+
+        let mut index = LicenseIndex::with_legalese_count(10);
+        index.rules_by_rid.push(Rule {
+            identifier: "test".to_string(),
+            license_expression: "mit".to_string(),
+            text: "test".to_string(),
+            tokens: vec![],
+            is_license_text: false,
+            is_license_notice: false,
+            is_license_reference: false,
+            is_license_tag: false,
+            is_license_intro: false,
+            is_license_clue: false,
+            is_false_positive: false,
+            is_required_phrase: false,
+            is_from_license: false,
+            relevance: 100,
+            minimum_coverage: None,
+            is_continuous: true,
+            referenced_filenames: None,
+            ignorable_urls: None,
+            ignorable_emails: None,
+            ignorable_copyrights: None,
+            ignorable_holders: None,
+            ignorable_authors: None,
+            language: None,
+            notes: None,
+            length_unique: 0,
+            high_length_unique: 0,
+            high_length: 0,
+            min_matched_length: 10,
+            min_high_matched_length: 5,
+            min_matched_length_unique: 0,
+            min_high_matched_length_unique: 0,
+            is_small: true,
+            is_tiny: false,
+            is_deprecated: false,
+            spdx_license_key: None,
+            other_spdx_license_keys: vec![],
+        });
+
+        let m1 = create_test_match_with_tokens("#0", 0, 10, 10);
+        let m2 = create_test_match_with_tokens("#0", 20, 30, 10);
+
+        let matches = vec![m1, m2];
+        let filtered = filter_short_matches_scattered_on_too_many_lines(&index, &matches);
+
+        assert_eq!(filtered.len(), 2);
+    }
+
+    #[test]
+    fn test_filter_scattered_filters_scattered() {
+        use crate::license_detection::models::Rule;
+
+        let mut index = LicenseIndex::with_legalese_count(10);
+        index.rules_by_rid.push(Rule {
+            identifier: "test".to_string(),
+            license_expression: "mit".to_string(),
+            text: "test".to_string(),
+            tokens: vec![],
+            is_license_text: false,
+            is_license_notice: false,
+            is_license_reference: false,
+            is_license_tag: false,
+            is_license_intro: false,
+            is_license_clue: false,
+            is_false_positive: false,
+            is_required_phrase: false,
+            is_from_license: false,
+            relevance: 100,
+            minimum_coverage: None,
+            is_continuous: true,
+            referenced_filenames: None,
+            ignorable_urls: None,
+            ignorable_emails: None,
+            ignorable_copyrights: None,
+            ignorable_holders: None,
+            ignorable_authors: None,
+            language: None,
+            notes: None,
+            length_unique: 0,
+            high_length_unique: 0,
+            high_length: 0,
+            min_matched_length: 10,
+            min_high_matched_length: 5,
+            min_matched_length_unique: 0,
+            min_high_matched_length_unique: 0,
+            is_small: true,
+            is_tiny: false,
+            is_deprecated: false,
+            spdx_license_key: None,
+            other_spdx_license_keys: vec![],
+        });
+
+        let mut m = create_test_match_with_tokens("#0", 0, 3, 3);
+        m.start_line = 1;
+        m.end_line = 50;
+
+        let mut m2 = create_test_match_with_tokens("#0", 10, 13, 3);
+        m2.start_line = 1;
+        m2.end_line = 50;
+
+        let matches = vec![m, m2];
+        let filtered = filter_short_matches_scattered_on_too_many_lines(&index, &matches);
+
+        assert_eq!(filtered.len(), 0);
+    }
+
+    #[test]
+    fn test_is_valid_short_match_exact() {
+        assert!(is_valid_short_match("GPL", "GPL", 0));
+        assert!(is_valid_short_match("gpl", "GPL", 0));
+        assert!(is_valid_short_match("MIT", "MIT", 0));
+    }
+
+    #[test]
+    fn test_is_valid_short_match_with_diff() {
+        assert!(is_valid_short_match("gpl~", "GPL", 1));
+        assert!(!is_valid_short_match("gpl~", "GPL", 0));
+    }
+
+    #[test]
+    fn test_is_valid_short_match_rejects_punctuation() {
+        assert!(!is_valid_short_match("~gpl", "GPL", 0));
+        assert!(!is_valid_short_match("gpl)", "GPL", 0));
+        assert!(is_valid_short_match("gpl+", "gpl+", 0));
+    }
+
+    #[test]
+    fn test_is_valid_short_match_rejects_mixed_case() {
+        assert!(!is_valid_short_match("gPl", "GPL", 0));
+        assert!(is_valid_short_match("Gpl", "GPL", 0));
     }
 }

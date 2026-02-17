@@ -453,6 +453,19 @@ fn has_unknown_intro_before_detection(matches: &[LicenseMatch]) -> bool {
         }
     }
 
+    if has_unknown_intro {
+        let filtered_matches = filter_license_intros(matches);
+        if filtered_matches.len() != matches.len()
+            && is_match_coverage_below_threshold(
+                &filtered_matches,
+                IMPERFECT_MATCH_COVERAGE_THR,
+                false,
+            )
+        {
+            return true;
+        }
+    }
+
     false
 }
 
@@ -1171,6 +1184,7 @@ mod tests {
             is_license_tag: false,
             rule_length: 100,
             matched_token_positions: None,
+            hilen: 50,
         }
     }
 
@@ -1353,6 +1367,7 @@ mod tests {
             is_license_tag: false,
             rule_length: 100,
             matched_token_positions: None,
+            hilen: 50,
         }
     }
 
@@ -1464,6 +1479,7 @@ mod tests {
             is_license_reference: false,
             is_license_tag: false,
             matched_token_positions: None,
+            hilen: matched_length / 2,
         }
     }
 
@@ -3882,7 +3898,7 @@ mod tests {
     }
 
     #[test]
-    fn test_has_unknown_intro_before_detection_true() {
+    fn test_has_unknown_intro_before_detection_single_match_returns_false() {
         let intro = LicenseMatch {
             license_expression: "unknown".to_string(),
             license_expression_spdx: "unknown".to_string(),
@@ -3906,12 +3922,76 @@ mod tests {
             is_license_tag: false,
             rule_length: 5,
             matched_token_positions: None,
+            hilen: 2,
         };
 
         let matches = vec![intro];
 
         let result = has_unknown_intro_before_detection(&matches);
-        assert!(result);
+        assert!(!result, "Single match should return false");
+    }
+
+    #[test]
+    fn test_has_unknown_intro_before_detection_post_loop_returns_true() {
+        let intro = LicenseMatch {
+            license_expression: "unknown".to_string(),
+            license_expression_spdx: "unknown".to_string(),
+            from_file: Some("test.txt".to_string()),
+            start_line: 1,
+            end_line: 2,
+            start_token: 0,
+            end_token: 0,
+            matcher: "2-aho".to_string(),
+            score: 100.0,
+            matched_length: 5,
+            match_coverage: 100.0,
+            rule_relevance: 100,
+            rule_identifier: "license-intro.LICENSE".to_string(),
+            rule_url: "https://example.com".to_string(),
+            matched_text: Some("Licensed under".to_string()),
+            referenced_filenames: None,
+            is_license_intro: true,
+            is_license_clue: false,
+            is_license_reference: false,
+            is_license_tag: false,
+            rule_length: 5,
+            matched_token_positions: None,
+            hilen: 2,
+        };
+
+        let low_coverage_match = LicenseMatch {
+            license_expression: "mit".to_string(),
+            license_expression_spdx: "MIT".to_string(),
+            from_file: Some("test.txt".to_string()),
+            start_line: 3,
+            end_line: 10,
+            start_token: 5,
+            end_token: 50,
+            matcher: "2-aho".to_string(),
+            score: 50.0,
+            matched_length: 10,
+            match_coverage: 50.0,
+            rule_relevance: 100,
+            rule_identifier: "mit.LICENSE".to_string(),
+            rule_url: "https://example.com".to_string(),
+            matched_text: Some("MIT License".to_string()),
+            referenced_filenames: None,
+            is_license_intro: false,
+            is_license_clue: false,
+            is_license_reference: false,
+            is_license_tag: false,
+            rule_length: 20,
+            matched_token_positions: None,
+            hilen: 5,
+        };
+
+        let matches = vec![intro, low_coverage_match];
+
+        let result = has_unknown_intro_before_detection(&matches);
+        assert!(
+            result,
+            "Unknown intro + low coverage match should return true"
+        );
     }
 
     #[test]
@@ -3947,6 +4027,7 @@ mod tests {
                     is_license_tag: false,
                     rule_length: 100,
                     matched_token_positions: None,
+                    hilen: 50,
                 }],
                 detection_log: vec![],
                 identifier: None,
@@ -4010,6 +4091,7 @@ mod tests {
             is_license_tag: false,
             rule_length: 10,
             matched_token_positions: None,
+            hilen: 5,
         };
         assert!(is_unknown_intro(&m));
     }
@@ -4039,6 +4121,7 @@ mod tests {
             is_license_tag: false,
             rule_length: 10,
             matched_token_positions: None,
+            hilen: 5,
         };
         assert!(is_unknown_intro(&m));
     }
@@ -4068,6 +4151,7 @@ mod tests {
             is_license_tag: false,
             rule_length: 10,
             matched_token_positions: None,
+            hilen: 5,
         };
         assert!(is_unknown_intro(&m));
     }
@@ -4097,6 +4181,7 @@ mod tests {
             is_license_tag: false,
             rule_length: 10,
             matched_token_positions: None,
+            hilen: 5,
         };
         assert!(!is_unknown_intro(&m));
     }
@@ -4126,6 +4211,7 @@ mod tests {
             is_license_tag: false,
             rule_length: 10,
             matched_token_positions: None,
+            hilen: 5,
         };
         assert!(!is_unknown_intro(&m));
     }
@@ -4158,6 +4244,7 @@ mod tests {
             is_license_tag: false,
             rule_length: 100,
             matched_token_positions: None,
+            hilen: 50,
         }
     }
 
