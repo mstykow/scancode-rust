@@ -434,6 +434,170 @@ This fix addresses ~20 tests where combined rules should match:
 
 ---
 
+## Issue 8: Query Run Tokenization - Investigation Results
+
+### The "53 vs 150" Discrepancy Explained
+
+**This is NOT a tokenization bug.** The discrepancy comes from a misunderstanding of what "tokens" means in different contexts.
+
+#### Token Count Analysis for `cddl-1.0_or_gpl-2.0-glassfish.txt`
+
+| Metric | Python | Rust | Notes |
+|--------|--------|------|-------|
+| Raw tokens (word_splitter) | 273 | 273 | Identical - regex pattern matches |
+| After stopwords filter | 270 | 270 | 3 stopwords found ('a' appears 3x) |
+| Known tokens (in dictionary) | ~262 | ~262 | Same dictionary used |
+| Query.tokens length | 262 | 262 | Only known tokens are stored |
+
+**The 53 token count in the original analysis was incorrect** - it referred to something else (possibly a partial rule match, not the query).
+
+#### How Python and Rust Tokenize
+
+Both use identical tokenization logic:
+
+**Python** (`reference/scancode-toolkit/src/licensedcode/tokenize.py:78-79`):
+```python
+query_pattern = '[^_\\W]+\\+?[^_\\W]*'
+word_splitter = re.compile(query_pattern, re.UNICODE).findall
+```
+
+**Rust** (`src/license_detection/tokenize.rs:111-112`):
+```rust
+static QUERY_PATTERN: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"[^_\W]+\+?[^_\W]*").expect("Invalid regex pattern"));
+```
+
+Both:
+1. Split text on whitespace and punctuation
+2. Keep alphanumeric characters and Unicode letters
+3. Preserve trailing `+` (important for license names like "GPL2+")
+4. Convert to lowercase
+5. Filter stopwords (HTML tags, XML entities, comment markers)
+
+#### What Query.tokens Actually Contains
+
+Per Python's `query.py:388-389`:
+```python
+# note: positions start at zero
+# absolute position in a query, including only known tokens
+known_pos = -1
+```
+
+Both Python and Rust only store tokens that exist in the dictionary. Unknown tokens are tracked separately in `unknowns_by_pos`.
+
+### The Real Problem: Missing Near-Duplicate Detection
+
+The actual issue is **not tokenization** - it's the **matching pipeline**.
+
+#### Python's Three-Phase Pipeline
+
+**Phase 1**: Hash & Aho-Corasick exact matching
+
+**Phase 2**: Near-duplicate detection (`index.py:741-775`):
+```python
+whole_query_run = query.whole_query_run()
+near_dupe_candidates = match_set.compute_candidates(
+    query_run=whole_query_run,
+    high_resemblance=True,  # Only keep resemblance >= 0.8
+    top=10,
+)
+if near_dupe_candidates:
+    matched = self.get_query_run_approximate_matches(
+        whole_query_run, near_dupe_candidates, ...)
+```
+
+**Phase 3**: Query run matching (if no near-duplicates found)
+
+#### Why Python Matches the Combined Rule
+
+1. The whole file is processed as one query run
+2. Near-duplicate detection finds high-resemblance candidates (resemblance >= 0.8)
+3. The combined rule `cddl-1.0_or_gpl-2.0-glassfish.RULE` has 262 tokens
+4. Squared resemblance scoring (`resemblance ** 2`) naturally favors larger matches
+
+#### Why Rust Matches Partial Rules
+
+Rust's current pipeline (`src/license_detection/mod.rs:107-126`):
+```rust
+let query = Query::new(text, &self.index)?;
+let query_run = query.whole_query_run();
+
+let hash_matches = hash_match(&self.index, &query_run);
+let aho_matches = aho_match(&self.index, &query_run);
+let seq_matches = seq_match(&self.index, &query_run);
+// ...
+```
+
+Rust matches:
+- `gpl-2.0_476.RULE` (21 tokens, `is_license_notice: true`)
+- `cddl-1.0_53.RULE` (6 tokens, `is_license_reference: true`)
+
+Instead of the combined rule because:
+1. **No near-duplicate detection phase** - Rust goes straight to sequence matching
+2. **No resemblance threshold filtering** - Any match above minimum coverage is accepted
+3. **First match wins** - Partial rules match first and prevent combined rule from matching
+
+### The Fix: Implement Near-Duplicate Detection
+
+Add Phase 2 to Rust's detection pipeline:
+
+```rust
+// In detect() or detect_licenses()
+
+// Phase 2: Near-duplicate detection (NEW)
+let whole_run = query.whole_query_run();
+let near_dupe_candidates = compute_candidates(
+    query_run: &whole_run,
+    high_resemblance: true,  // Only keep resemblance >= 0.8
+    top_n: 10,
+);
+
+if !near_dupe_candidates.is_empty() {
+    // Match whole file against only these high-resemblance candidates
+    return match_against_candidates(&whole_run, &near_dupe_candidates);
+}
+
+// Phase 3: Regular matching (existing code)
+for query_run in query.query_runs() {
+    // ... existing logic
+}
+```
+
+#### Required Implementations
+
+1. **`compute_candidates()`** (`match_set.py:260-350`):
+   - Compute resemblance between query and all rules
+   - Filter by `high_resemblance` (>= 0.8)
+   - Return top N candidates sorted by resemblance
+
+2. **`is_highly_resemblant`** property:
+   - Python: `resemblance >= 0.8`
+   - Rust: Need to add this check
+
+3. **Squared resemblance scoring** (`match_set.py:427`):
+   - `amplified_resemblance = resemblance ** 2`
+   - This naturally favors larger matches
+
+### Code References
+
+| Component | Python Location | Rust Location |
+|-----------|----------------|---------------|
+| Query tokenization | `query.py:417-481` | `query.rs:306-330` |
+| `whole_query_run()` | `query.py:306-317` | `query.rs:503-508` |
+| `compute_candidates()` | `match_set.py:260-350` | **NOT IMPLEMENTED** |
+| Near-duplicate phase | `index.py:741-775` | **NOT IMPLEMENTED** |
+| Squared resemblance | `match_set.py:427` | **NOT IMPLEMENTED** |
+| `is_highly_resemblant` | `match_set.py:295-297` | **NOT IMPLEMENTED** |
+
+### Estimated Tests Fixed
+
+This fix addresses ~20 tests where combined rules should match:
+- `cddl-1.0_or_gpl-2.0-glassfish.txt`
+- `cddl-1.1_or_gpl-2.0-classpath_and_apache-2.0-glassfish_*.txt`
+- Similar dual-license header cases
+
+---
+
 ## Validation Commands
 
 ```bash
