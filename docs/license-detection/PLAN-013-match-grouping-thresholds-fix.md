@@ -721,6 +721,7 @@ elif license_match.rule.is_license_clue:   # Uses actual boolean field
 ```
 
 **The boolean fields exist on `LicenseMatch`:**
+
 - `is_license_intro: bool` (line 239)
 - `is_license_clue: bool` (line 242)
 
@@ -733,6 +734,7 @@ And are properly populated by matchers (`hash_match.rs:119`, `aho_match.rs:175`,
 3. **`is_license_clue_match()`** has the same issues with `"5-unknown"` and `"clue"` string checks
 
 This causes:
+
 - Matches that ARE intros (with `is_license_intro: true`) to not trigger intro handling
 - Non-intro matches to incorrectly trigger intro handling
 - Same issues with license clues
@@ -778,6 +780,7 @@ This simple fix should resolve ~10-15 failing tests.
 ### Priority 2: Verify Token Position Population
 
 Ensure all matchers populate `start_token` and `end_token` correctly:
+
 - [ ] Verify `hash_match.rs` populates token positions
 - [ ] Verify `aho_match.rs` populates token positions
 - [ ] Verify `seq_match.rs` populates token positions
@@ -787,6 +790,7 @@ Ensure all matchers populate `start_token` and `end_token` correctly:
 ### Priority 3: Add Unit Tests for Grouping Logic
 
 Add tests in `detection_test.rs`:
+
 - [ ] Test that intros create new groups regardless of proximity
 - [ ] Test that clues are yielded as separate groups
 - [ ] Test dual-criteria threshold boundaries
@@ -795,6 +799,7 @@ Add tests in `detection_test.rs`:
 ### Priority 4: Run Golden Test Suite
 
 After fixing the intro/clue functions:
+
 ```bash
 cargo test --lib license_detection::golden_test
 ```
@@ -806,6 +811,7 @@ Expected: ~10-15 tests should now pass.
 ## 10. Summary
 
 **PLAN-013 was partially implemented:**
+
 - ✅ Token position tracking added to `LicenseMatch`
 - ✅ Dual-criteria constants added
 - ✅ `should_group_together()` implemented with dual-criteria

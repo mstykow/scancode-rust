@@ -395,11 +395,7 @@ impl<'a> Query<'a> {
                             .collect();
                         let is_spdx_third = third_three == ["spdx", "license", "identifier"]
                             || third_three == ["spdx", "licence", "identifier"];
-                        if is_spdx_third {
-                            Some(2)
-                        } else {
-                            None
-                        }
+                        if is_spdx_third { Some(2) } else { None }
                     } else {
                         None
                     }

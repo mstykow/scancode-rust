@@ -96,6 +96,7 @@ But the failures have 1-2 extra matches, not 15+ candidate matches.
 **File Content**: Linux kernel header file with GPL-2.0+ license notice at lines 7-19.
 
 **Spurious Match Details**:
+
 ```json
 {
   "license_expression": "borceux",
@@ -110,6 +111,7 @@ But the failures have 1-2 extra matches, not 15+ candidate matches.
 ```
 
 **Why the borceux rule matches**:
+
 - Rule `spdx_license_id_borceux_for_borceux.RULE` has:
   - `is_license_reference: yes`
   - `relevance: 50`
@@ -125,17 +127,21 @@ But the failures have 1-2 extra matches, not 15+ candidate matches.
 
 2. **`is_false_positive()` in detection.rs missing `is_license_reference` check**:
    - Python's `is_false_positive()` checks `is_license_tag` at line 1236:
+
      ```python
      if matches_is_license_tag_flags and all_match_rule_length_one:
          return True
      ```
+
    - But it does NOT check `is_license_reference`
    - Rust's `is_false_positive()` only checks `is_license_tag` at lines 415-418:
+
      ```rust
      if all_is_license_tag && all_rule_length_one {
          return true;
      }
      ```
+
    - The borceux match has `is_license_reference=true` (not `is_license_tag`)
 
 3. **The borceux match characteristics**:
@@ -149,6 +155,7 @@ But the failures have 1-2 extra matches, not 15+ candidate matches.
 ### Threshold Analysis
 
 The `MIN_SHORT_FP_LIST_LENGTH = 15` threshold is designed for files like:
+
 - SPDX license list JSON files
 - Package manager license selection code
 - License detection library test data
@@ -1116,6 +1123,7 @@ if all_is_license_reference && all_rule_length_one && all_low_relevance {
 ### TODO 2: Investigate why Python produces correct output
 
 **Problem**: The Python reference also only checks `is_license_tag` in `is_false_positive()`, yet Python produces the correct output for these tests. There may be additional filtering happening in:
+
 - `filter_false_positive_license_lists_matches()` being called with different parameters
 - Detection grouping removing isolated low-relevance matches
 - A different code path entirely

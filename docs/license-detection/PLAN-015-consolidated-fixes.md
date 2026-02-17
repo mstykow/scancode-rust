@@ -1,6 +1,6 @@
 # PLAN-015: Consolidated License Detection Fixes
 
-## Status: In Progress - Session 3
+## Status: In Progress - Session 4
 
 ---
 
@@ -28,21 +28,43 @@
 | lic1 passed | 187 | 187 | 0 |
 | lic1 failed | 104 | 104 | 0 |
 
-**Near-duplicate detection implemented but no improvement because:**
+Near-duplicate detection implemented but no improvement because combined rule resemblance (0.2333) is below 0.8 threshold.
 
-The combined rule's resemblance (0.2333) is below the 0.8 threshold. Python uses a **different approach**:
+### Session 4 (Query Subtraction)
 
-| Aspect | Python | Rust |
-|--------|--------|------|
-| Query runs | Splits query into runs | Not fully implemented |
-| Near-duplicate | `high_resemblance=True` on whole file | Same |
-| **Query run matching** | `high_resemblance=False` on each run | **Missing** |
+| Metric | Before | After | Change |
+|--------|--------|-------|--------|
+| lic1 passed | 187 | 188 | **+1** |
+| lic1 failed | 104 | 103 | **-1** |
 
-### Remaining Issues (~104 failures)
+| Issue | Fix | Status |
+|-------|-----|--------|
+| Issue 10 | Span subtraction infrastructure | ✅ Implemented |
+| Issue 11 | SPDX token position tracking | ✅ Implemented |
+| Span subtraction | After near-duplicate matches | ✅ Enabled |
+| Query run splitting | Per-run matching | ❌ Disabled (causes double-matching) |
 
-1. **Query run matching not implemented**: Python splits queries into runs and matches each with `high_resemblance=False`
+### Current Implementation Status
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| SPDX token positions | ✅ Fixed | No more hardcoded 0, 0 |
+| Span subtraction | ✅ Enabled | After near-duplicate phase |
+| Query run splitting | ❌ Disabled | Needs matched position tracking across phases |
+
+### Dead Code Cleanup Needed
+
+| Function | Reason | Action |
+|----------|--------|--------|
+| `compute_candidates()` | Superseded by `compute_candidates_with_msets()` | Remove |
+| `extract_spdx_expressions_with_lines()` | Superseded by `query.spdx_lines` | Remove |
+
+### Remaining Issues (~103 failures)
+
+1. **Query run matching not enabled**: Cannot enable due to missing matched position tracking across phases
 2. **P6 not implemented**: `has_unknown_intro_before_detection()` post-loop logic
-3. **Other missing filters**: `filter_matches_missing_required_phrases()`, `filter_spurious_matches()`, `filter_too_short_matches()`
+3. **Dead code investigation**: `compute_candidates()` and `extract_spdx_expressions_with_lines()` are unused
+4. **Other missing filters**: `filter_matches_missing_required_phrases()`, `filter_spurious_matches()`, `filter_too_short_matches()`
 
 ---
 
@@ -55,6 +77,7 @@ Python matches the combined rule `cddl-1.0_or_gpl-2.0-glassfish.RULE` via **quer
 ### Python's Actual Pipeline
 
 **From `index.py:786-796`:**
+
 ```python
 for query_run in query.query_runs:
     candidates = match_set.compute_candidates(
@@ -81,6 +104,7 @@ for query_run in query.query_runs:
    - Each run is a contiguous block of content
 
 2. **Add query run matching phase**:
+
    ```rust
    // Phase 3: Query run matching with high_resemblance=false
    for query_run in query.query_runs() {
@@ -106,6 +130,7 @@ for query_run in query.query_runs:
 ### Estimated Tests Fixed
 
 ~20 tests where combined rules should match:
+
 - `cddl-1.0_or_gpl-2.0-glassfish.txt`
 - `cddl-1.1_or_gpl-2.0-classpath_and_apache-2.0-glassfish_*.txt`
 
@@ -134,16 +159,19 @@ for query_run in query.query_runs:
 **Actual:** `["gpl-2.0 AND cddl-1.0 AND unknown-license-reference AND unknown"]`
 
 **Root Causes:**
+
 1. **No combined rule match**: Python matches the entire text with a single rule `cddl-1.0_or_gpl-2.0-glassfish` that has `license_expression: cddl-1.0 OR gpl-2.0`. Rust matches partial rules instead.
 2. **Missing `filter_license_references()`**: The `unknown-license-reference` match from the "Oracle copyright" text should be filtered.
 3. **Missing `has_unknown_intro_before_detection()` filtering**: The `unknown` intro match should be discarded.
 
 **Python Reference:**
+
 - `detection.py:1289-1333` - `has_unknown_intro_before_detection()`
 - `detection.py:1336-1346` - `filter_license_intros()`
 - `detection.py:1390-1400` - `filter_license_references()`
 
 **Fix Required:**
+
 ```rust
 // In create_detection_from_group() - after analyze_detection()
 if detection_log.contains(DETECTION_LOG_UNKNOWN_INTRO_FOLLOWED_BY_MATCH) {
@@ -160,18 +188,21 @@ if detection_log.contains(DETECTION_LOG_UNKNOWN_INTRO_FOLLOWED_BY_MATCH) {
 **Expected:** `["apache-2.0", "bsd-new", "zlib"]`
 **Actual:** `["apache-2.0", "bsd-new AND zlib"]`
 
-**Root Cause:** 
+**Root Cause:**
+
 - Lines 16-47 contain BSD-new license text
 - Lines 44-47 contain additional zlib attribution
 - Rust groups `bsd-new` and `zlib` matches together because they're within `LINES_THRESHOLD = 4`
 - Python keeps them separate because there's no actual overlap in the matched regions
 
 **Python Reference:**
+
 - `detection.py:1836` - Uses `min_tokens_gap=10 OR min_lines_gap=3`
 - The OR logic means matches are grouped if EITHER tokens OR lines are close
 - But for SEPARATION, Python checks actual content overlap
 
 **Fix Required:**
+
 ```rust
 // detection.rs - should_group_together()
 fn should_group_together(prev: &LicenseMatch, cur: &LicenseMatch) -> bool {
@@ -201,16 +232,19 @@ fn should_group_together(prev: &LicenseMatch, cur: &LicenseMatch) -> bool {
 **Actual:** `["gpl-2.0-plus", "borceux"]`
 
 **Root Cause:**
+
 - `borceux` is a single-token `is_license_reference` rule matching the word "GPL"
 - The `filter_false_positive_license_lists_matches()` function requires `MIN_SHORT_FP_LIST_LENGTH = 15` matches
 - This test has only 1 `borceux` match, so it's not filtered
 
 **Python Reference:**
+
 - `match.py:1953` - `is_candidate_false_positive()` checks for `is_license_tag` or `is_license_reference`
 - `match.py:1962-2010` - The filter processes sequences of candidates
 - Single false positive matches should be handled differently
 
 **Fix Required:**
+
 ```rust
 // match_refine.rs - Add to is_false_positive() in detection.rs
 // Check 4: Single is_license_reference match with short rule
@@ -225,10 +259,12 @@ if is_single && matches.iter().all(|m| m.is_license_reference && m.rule_length <
 **Actual:** `["crapl-0.1 AND crapl-0.1"]`
 
 **Root Cause:**
+
 - The `simplify_expression()` function collects unique keys in a `HashSet`
 - But it still adds duplicates when building the result because `collect_unique_and` uses `expression_to_string` for the key, which may differ from the actual key
 
 **Fix Required:**
+
 ```rust
 // expression.rs - collect_unique_and()
 fn collect_unique_and(expr: &LicenseExpression, unique: &mut Vec<LicenseExpression>, seen: &mut HashSet<String>) {
@@ -251,10 +287,12 @@ fn collect_unique_and(expr: &LicenseExpression, unique: &mut Vec<LicenseExpressi
 **Actual:** `["(epl-1.0 OR apache-2.0) AND bsd-new AND mit AND bsd-new AND (gpl-3.0-plus WITH autoconf-simple-exception)", ...]`
 
 **Root Cause:**
+
 - `expression_to_string_internal` uses `parent_prec != Precedence::With` for parentheses
 - Should use `parent_prec > Precedence::With` to only add parentheses when parent has HIGHER precedence
 
 **Fix Required:**
+
 ```rust
 // expression.rs:426-429
 LicenseExpression::With { left, right } => {
@@ -283,6 +321,7 @@ def filter_license_references(license_match_objects):
 ```
 
 **Rust Implementation Needed:**
+
 ```rust
 fn filter_license_references(matches: &[LicenseMatch]) -> Vec<LicenseMatch> {
     let filtered: Vec<_> = matches
@@ -399,6 +438,7 @@ Python uses a **three-phase matching pipeline**:
 
 1. **Phase 1: Hash & Aho-Corasick** - Exact matches
 2. **Phase 2: Near-Duplicate Detection** (`index.py:741-775`):
+
    ```python
    whole_query_run = query.whole_query_run()
    near_dupe_candidates = match_set.compute_candidates(
@@ -410,9 +450,11 @@ Python uses a **three-phase matching pipeline**:
        matched = self.get_query_run_approximate_matches(
            whole_query_run, near_dupe_candidates, ...)
    ```
+
 3. **Phase 3: Query Run Matching** - Break into runs if no near-duplicates
 
 Python matches the **combined rule** because:
+
 - The whole file is processed as one query run
 - Near-duplicate detection finds high-resemblance candidates
 - `resemblance ** 2` scoring naturally favors larger matches
@@ -437,6 +479,7 @@ Rust matches **partial rules** instead:
 ### Python Reference
 
 **Near-duplicate detection** (`index.py:741-775`):
+
 ```python
 whole_query_run = query.whole_query_run()
 near_dupe_candidates = match_set.compute_candidates(
@@ -446,6 +489,7 @@ near_dupe_candidates = match_set.compute_candidates(
 ```
 
 **High-resemblance filter** (`match_set.py:295-297`):
+
 ```python
 if (not high_resemblance
     or (high_resemblance and svr.is_highly_resemblant and svf.is_highly_resemblant)):
@@ -453,6 +497,7 @@ if (not high_resemblance
 ```
 
 **Squared resemblance scoring** (`match_set.py:427`):
+
 ```python
 amplified_resemblance = resemblance ** 2
 ```
@@ -460,6 +505,7 @@ amplified_resemblance = resemblance ** 2
 ### Correct Fix (NOT score boosting)
 
 ❌ **WRONG APPROACH** (previously proposed):
+
 ```rust
 // DO NOT do this - not how Python works
 let is_combined = rule.tokens.len() > 100 && rule.is_license_notice;
@@ -506,6 +552,7 @@ for query_run in query.query_runs() {
 ### Estimated Tests Fixed
 
 This fix addresses ~20 tests where combined rules should match:
+
 - `cddl-1.0_or_gpl-2.0-glassfish.txt`
 - `cddl-1.1_or_gpl-2.0-classpath_and_apache-2.0-glassfish_*.txt`
 - Similar dual-license header cases
@@ -534,18 +581,21 @@ This fix addresses ~20 tests where combined rules should match:
 Both use identical tokenization logic:
 
 **Python** (`reference/scancode-toolkit/src/licensedcode/tokenize.py:78-79`):
+
 ```python
 query_pattern = '[^_\\W]+\\+?[^_\\W]*'
 word_splitter = re.compile(query_pattern, re.UNICODE).findall
 ```
 
 **Rust** (`src/license_detection/tokenize.rs:111-112`):
+
 ```rust
 static QUERY_PATTERN: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"[^_\W]+\+?[^_\W]*").expect("Invalid regex pattern"));
 ```
 
 Both:
+
 1. Split text on whitespace and punctuation
 2. Keep alphanumeric characters and Unicode letters
 3. Preserve trailing `+` (important for license names like "GPL2+")
@@ -555,6 +605,7 @@ Both:
 #### What Query.tokens Actually Contains
 
 Per Python's `query.py:388-389`:
+
 ```python
 # note: positions start at zero
 # absolute position in a query, including only known tokens
@@ -572,6 +623,7 @@ The actual issue is **not tokenization** - it's the **matching pipeline**.
 **Phase 1**: Hash & Aho-Corasick exact matching
 
 **Phase 2**: Near-duplicate detection (`index.py:741-775`):
+
 ```python
 whole_query_run = query.whole_query_run()
 near_dupe_candidates = match_set.compute_candidates(
@@ -596,6 +648,7 @@ if near_dupe_candidates:
 #### Why Rust Matches Partial Rules
 
 Rust's current pipeline (`src/license_detection/mod.rs:107-126`):
+
 ```rust
 let query = Query::new(text, &self.index)?;
 let query_run = query.whole_query_run();
@@ -607,10 +660,12 @@ let seq_matches = seq_match(&self.index, &query_run);
 ```
 
 Rust matches:
+
 - `gpl-2.0_476.RULE` (21 tokens, `is_license_notice: true`)
 - `cddl-1.0_53.RULE` (6 tokens, `is_license_reference: true`)
 
 Instead of the combined rule because:
+
 1. **No near-duplicate detection phase** - Rust goes straight to sequence matching
 2. **No resemblance threshold filtering** - Any match above minimum coverage is accepted
 3. **First match wins** - Partial rules match first and prevent combined rule from matching
@@ -670,6 +725,7 @@ for query_run in query.query_runs() {
 ### Estimated Tests Fixed
 
 This fix addresses ~20 tests where combined rules should match:
+
 - `cddl-1.0_or_gpl-2.0-glassfish.txt`
 - `cddl-1.1_or_gpl-2.0-classpath_and_apache-2.0-glassfish_*.txt`
 - Similar dual-license header cases
@@ -702,6 +758,7 @@ cargo fmt && cargo clippy --fix --allow-dirty
 | Issue 5 | Yes | Caused regression | 177→175 passed |
 
 **Golden test results:**
+
 - Before: lic1: 177 passed, 114 failed; External: 895 failures
 - After: lic1: 175 passed, 116 failed; External: 896 failures (regression)
 
@@ -728,12 +785,14 @@ Python matches combined rules (like `cddl-1.0_or_gpl-2.0-glassfish.RULE`) via **
 #### Python's Algorithm (`query.py:568-641`)
 
 **Constant:**
+
 ```python
 # query.py:108
 LINES_THRESHOLD = 4
 ```
 
 **Algorithm:**
+
 ```python
 # query.py:568-641
 def _tokenize_and_build_runs(self, tokens_by_line, line_threshold=4):
@@ -794,22 +853,26 @@ def _tokenize_and_build_runs(self, tokens_by_line, line_threshold=4):
 ```
 
 **Break Conditions (line is "junk" and counts toward empty_lines):**
+
 1. Line has no tokens at all (empty line)
 2. Line has only digit-only tokens
 3. Line has no known tokens (all unknown)
 4. Line has known tokens but none are "good" (legalese tokens with ID < len_legalese)
 
 **Reset Condition:**
+
 - Line has at least one "good" token (legalese) → reset `empty_lines = 0`
 
 #### Rust's Current State (`query.rs:281-363`)
 
 Rust has `QueryRun` struct but:
+
 1. **`query_runs` field exists but is never populated** - always empty `Vec::new()`
 2. **`whole_query_run()` exists** - returns single run covering entire query
 3. **No query run splitting logic implemented**
 
 **Current Query construction (`query.rs:281-363`):**
+
 ```rust
 pub fn with_options(
     text: &str,
@@ -977,6 +1040,7 @@ for query_run in query.query_runs:
 ```
 
 **Key Parameters:**
+
 - `high_resemblance=False` - No 0.8 threshold filter
 - `top=MAX_CANDIDATES` (70) - More candidates than near-duplicate (10)
 - Each query run is matched independently
@@ -1016,6 +1080,7 @@ pub fn detect(&self, text: &str) -> Result<Vec<LicenseDetection>> {
 ```
 
 **Missing:**
+
 - No iteration over `query.query_runs`
 - `seq_match` only called once on whole file
 - `high_resemblance=False` matching not done per query run
@@ -1108,11 +1173,13 @@ pub fn detect(&self, text: &str) -> Result<Vec<LicenseDetection>> {
 ### 4. Expected Impact
 
 **Tests Fixed:** ~20 tests involving combined rules:
+
 - `cddl-1.0_or_gpl-2.0-glassfish.txt`
 - `cddl-1.1_or_gpl-2.0-classpath_and_apache-2.0-glassfish_*.txt`
 - Similar dual-license header cases
 
 **Why This Helps:**
+
 1. Query run matching uses `high_resemblance=False` → lower threshold for candidate selection
 2. More candidates considered per run (70 vs 10 for near-duplicate)
 3. Combined rules have high token overlap with full query but may not reach 0.8 resemblance
@@ -1193,6 +1260,7 @@ if not query_run.is_matchable(include_low=False, qspans=matched_qspans):
 **`qspan`** (Query Span) is a `Span` object containing the set of token positions in the query that were matched. Python's `Span` uses efficient `intbitset` storage.
 
 **In Python's LicenseMatch** (`match.py:179-184`):
+
 ```python
 qspan = attr.ib(
     metadata=dict(
@@ -1217,11 +1285,13 @@ def subtract(self, qspan):
 ### Why Subtraction Matters
 
 **Without Subtraction:**
+
 1. Near-duplicate matches tokens 0-100 with `gpl-2.0`
 2. Query run phase also matches tokens 10-50 with a different rule
 3. Result: Conflicting or duplicate detections
 
 **With Subtraction:**
+
 1. Near-duplicate matches tokens 0-100 with `gpl-2.0`
 2. `query.subtract(Span(0, 100))` removes positions from matchables
 3. `is_matchable()` returns `False` for query runs in that range
@@ -1230,6 +1300,7 @@ def subtract(self, qspan):
 ### Rust's Current State (Verified from source)
 
 **What Rust ALREADY HAS:**
+
 - ✅ `Query.high_matchables: HashSet<usize>` (`query.rs:220-221`)
 - ✅ `Query.low_matchables: HashSet<usize>` (`query.rs:227-228`)
 - ✅ `PositionSpan` struct (`query.rs:16-50`)
@@ -1238,6 +1309,7 @@ def subtract(self, qspan):
 - ✅ `QueryRun.matchables(include_low)` (`query.rs:905-913`)
 
 **What Rust is MISSING:**
+
 1. ❌ `qspan` field in `LicenseMatch` struct (`models.rs:179-251` has no qspan)
 2. ❌ Calling `query.subtract()` in detection pipeline (`mod.rs:134-138` doesn't subtract)
 3. ❌ Tracking matched positions list
@@ -1277,12 +1349,14 @@ pub fn detect(&self, text: &str) -> Result<Vec<LicenseDetection>> {
 #### Step 1: Add `matched_token_positions` Field to `LicenseMatch` (models.rs)
 
 **Why a different name than `qspan`:**
+
 - Python's `qspan` is a `Span` object (set-like), not a range
 - Rust's `LicenseMatch` already has `start_token` and `end_token`
 - We need the **set of matched positions** for non-contiguous matches (sequence matching)
 - Use `matched_token_positions: Vec<usize>` for simplicity
 
 **Current (`models.rs:179-251`):**
+
 ```rust
 pub struct LicenseMatch {
     pub start_token: usize,
@@ -1292,6 +1366,7 @@ pub struct LicenseMatch {
 ```
 
 **Add field:**
+
 ```rust
 pub struct LicenseMatch {
     pub start_token: usize,
@@ -1310,6 +1385,7 @@ pub struct LicenseMatch {
 #### Step 2: Populate `matched_token_positions` in Matchers
 
 **Hash Match (`hash_match.rs`):** Matches are always contiguous - no explicit positions needed.
+
 ```rust
 // No change needed - contiguous match implied by start_token/end_token
 LicenseMatch {
@@ -1323,6 +1399,7 @@ LicenseMatch {
 **Aho-Corasick Match (`aho_match.rs`):** Typically contiguous - similar to hash match.
 
 **Sequence Match (`seq_match.rs`):** May have non-contiguous matches due to token skipping:
+
 ```rust
 // After computing matched positions from match blocks
 let matched_positions: Vec<usize> = match_blocks.iter()
@@ -1340,6 +1417,7 @@ LicenseMatch {
 #### Step 3: Add Subtraction to Detection Pipeline (`mod.rs`)
 
 **Key Changes:**
+
 1. Make `query` mutable
 2. Track matched positions
 3. Call `subtract()` after near-duplicate matches
@@ -1407,6 +1485,7 @@ pub fn detect(&self, text: &str) -> Result<Vec<LicenseDetection>> {
 #### Step 4: Verify `is_matchable()` Implementation
 
 **Current implementation (`query.rs:879-897`):**
+
 ```rust
 pub fn is_matchable(&self, include_low: bool, exclude_positions: &[PositionSpan]) -> bool {
     // Check if query run has digits only
@@ -1431,6 +1510,7 @@ pub fn is_matchable(&self, include_low: bool, exclude_positions: &[PositionSpan]
 ```
 
 **This is already correctly implemented!** It:
+
 1. Returns false for digits-only runs
 2. Subtracts exclude_positions from matchables
 3. Returns true if any matchable positions remain
@@ -1535,6 +1615,7 @@ fn test_subtraction_after_near_duplicate_match() {
 - [ ] **Step 4**: Add unit tests for subtraction behavior in `query_test.rs`
 
 - [ ] **Step 5**: Run golden tests to verify no regressions:
+
   ```bash
   cargo test -r -q --lib license_detection::golden_test::golden_tests::test_golden_lic1
   ```
@@ -1544,17 +1625,20 @@ fn test_subtraction_after_near_duplicate_match() {
 **Primary benefit**: Prevents double-matching when near-duplicate detection matches whole file.
 
 **Tests that may improve**: Files where near-duplicate phase matches whole content but query run phase would also match:
+
 - Combined rule cases
 - Files with single dominant license
 
 **Why This is Critical for Issue 9:**
 
 Issue 9 (Query Run Matching) requires this to work correctly. Without subtraction:
+
 1. Near-duplicate phase matches whole file
 2. Query run phase matches overlapping content again
 3. Result: Duplicate/conflicting detections
 
 With subtraction:
+
 1. Near-duplicate phase matches whole file
 2. Subtraction marks tokens as "already matched"
 3. `is_matchable()` returns false for query runs in that range
@@ -1567,6 +1651,7 @@ After implementation:
 1. **Unit tests pass**: `cargo test -q --lib query_test`
 2. **Golden tests stable**: Should not regress existing passing tests
 3. **Debug logging**: Add temporary logging to verify subtraction is called:
+
    ```rust
    if !near_dupe_matches.is_empty() {
        eprintln!("Near-duplicate matches: {}", near_dupe_matches.len());
@@ -1635,6 +1720,7 @@ for match in matched:
 ```
 
 **Critical Points:**
+
 1. Python subtracts ALL near-duplicate matches, regardless of coverage
 2. Python does NOT subtract hash/aho matches - only near-duplicate matches
 3. The `qspan` contains actual token positions from the match
@@ -1877,16 +1963,19 @@ Based on Python's actual implementation:
 ### Verification Steps
 
 1. **Run SPDX unit tests:**
+
    ```bash
    cargo test -q --lib spdx_lid_test
    ```
 
 2. **Verify token positions are non-zero for non-first SPDX lines:**
+
    ```bash
    cargo test -q --lib test_spdx_match_has_correct_token_positions
    ```
 
 3. **Run golden tests:**
+
    ```bash
    cargo test -r -q --lib license_detection::golden_test::golden_tests::test_golden_lic1
    ```
@@ -1898,6 +1987,7 @@ Based on Python's actual implementation:
 ## Background
 
 After implementing PLAN-007 through PLAN-014, the golden test results showed:
+
 - lic1: 174 passed, 117 failed → 177 passed, 114 failed (only +3 passed)
 - External failures: 919 → 895 (only -24 failures)
 

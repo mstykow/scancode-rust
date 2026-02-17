@@ -397,7 +397,9 @@ mod golden_tests {
             }
         };
 
-        let text = match std::fs::read_to_string("testdata/license-golden/datadriven/lic1/cddl-1.0_or_gpl-2.0-glassfish.txt") {
+        let text = match std::fs::read_to_string(
+            "testdata/license-golden/datadriven/lic1/cddl-1.0_or_gpl-2.0-glassfish.txt",
+        ) {
             Ok(t) => t,
             Err(e) => {
                 eprintln!("Could not read glassfish test file: {}", e);
@@ -415,8 +417,14 @@ mod golden_tests {
 
         eprintln!("=== Glassfish File Token Analysis ===");
         eprintln!("Query tokens (known only): {}", query.tokens.len());
-        eprintln!("Unknown tokens total: {}", query.unknowns_by_pos.values().sum::<usize>());
-        eprintln!("Stopwords total: {}", query.stopwords_by_pos.values().sum::<usize>());
+        eprintln!(
+            "Unknown tokens total: {}",
+            query.unknowns_by_pos.values().sum::<usize>()
+        );
+        eprintln!(
+            "Stopwords total: {}",
+            query.stopwords_by_pos.values().sum::<usize>()
+        );
         eprintln!("High matchables: {}", query.high_matchables.len());
         eprintln!("Low matchables: {}", query.low_matchables.len());
         eprintln!("len_legalese: {}", engine.index().len_legalese);
@@ -433,7 +441,9 @@ mod golden_tests {
             return;
         };
 
-        let text = match std::fs::read_to_string("testdata/license-golden/datadriven/lic1/cddl-1.0_or_gpl-2.0-glassfish.txt") {
+        let text = match std::fs::read_to_string(
+            "testdata/license-golden/datadriven/lic1/cddl-1.0_or_gpl-2.0-glassfish.txt",
+        ) {
             Ok(t) => t,
             Err(e) => {
                 eprintln!("Could not read glassfish test file: {}", e);
@@ -442,7 +452,7 @@ mod golden_tests {
         };
 
         let detections = engine.detect(&text).unwrap();
-        
+
         let actual: Vec<&str> = detections
             .iter()
             .map(|d| d.license_expression.as_deref().unwrap_or(""))
@@ -450,13 +460,15 @@ mod golden_tests {
 
         eprintln!("Expected: {:?}", vec!["cddl-1.0 OR gpl-2.0"]);
         eprintln!("Actual:   {:?}", actual);
-        
+
         for (i, d) in detections.iter().enumerate() {
             eprintln!("\nDetection {}:", i + 1);
             eprintln!("  expression: {:?}", d.license_expression);
             for m in &d.matches {
-                eprintln!("    match: {} score={:.1} matcher={} lines={}-{}", 
-                    m.license_expression, m.score, m.matcher, m.start_line, m.end_line);
+                eprintln!(
+                    "    match: {} score={:.1} matcher={} lines={}-{}",
+                    m.license_expression, m.score, m.matcher, m.start_line, m.end_line
+                );
             }
         }
     }

@@ -145,23 +145,6 @@ fn fix_unbalanced_parens(text: &mut String) {
     }
 }
 
-pub fn extract_spdx_expressions_with_lines(text: &str) -> Vec<(usize, String)> {
-    text.lines()
-        .enumerate()
-        .filter_map(|(line_num, line)| {
-            let line_num_1indexed = line_num + 1;
-            let (prefix, expression) = split_spdx_lid(line.trim());
-            prefix.as_ref()?;
-            let cleaned = clean_spdx_text(&expression);
-            if cleaned.is_empty() {
-                None
-            } else {
-                Some((line_num_1indexed, cleaned))
-            }
-        })
-        .collect()
-}
-
 fn normalize_spdx_key(key: &str) -> String {
     key.to_lowercase().replace("_", "-")
 }
@@ -225,6 +208,7 @@ fn split_license_expression(license_expression: &str) -> Vec<String> {
         .collect()
 }
 
+#[cfg(test)]
 fn extract_matched_text_from_lines(text: &str, start_line: usize, end_line: usize) -> String {
     if start_line == 0 || end_line == 0 || start_line > end_line {
         return String::new();
@@ -250,7 +234,7 @@ pub fn spdx_lid_match(index: &LicenseIndex, query: &Query) -> Vec<LicenseMatch> 
     for (spdx_text, start_token, end_token) in &query.spdx_lines {
         let (_, expression) = split_spdx_lid(spdx_text);
         let spdx_expression = clean_spdx_text(&expression);
-        
+
         if spdx_expression.is_empty() {
             continue;
         }
@@ -518,31 +502,6 @@ mod tests {
     }
 
     #[test]
-    fn test_extract_spdx_expressions_with_lines() {
-        let text = "# SPDX-License-Identifier: MIT\n# SPDX-License-Identifier: Apache-2.0";
-        let exprs = extract_spdx_expressions_with_lines(text);
-        assert_eq!(exprs.len(), 2);
-        assert_eq!(exprs[0], (1, "MIT".to_string()));
-        assert_eq!(exprs[1], (2, "Apache-2.0".to_string()));
-    }
-
-    #[test]
-    fn test_extract_spdx_expressions_with_lines_single() {
-        let text = "// SPDX-License-Identifier: GPL-2.0-or-later";
-        let exprs = extract_spdx_expressions_with_lines(text);
-        assert_eq!(exprs.len(), 1);
-        assert_eq!(exprs[0].0, 1);
-        assert_eq!(exprs[0].1, "GPL-2.0-or-later");
-    }
-
-    #[test]
-    fn test_extract_spdx_expressions_with_lines_no_match() {
-        let text = "/* Regular comment with no SPDX identifier */";
-        let exprs = extract_spdx_expressions_with_lines(text);
-        assert!(exprs.is_empty());
-    }
-
-    #[test]
     fn test_normalize_spdx_key() {
         assert_eq!(normalize_spdx_key("MIT"), "mit");
         assert_eq!(normalize_spdx_key("Apache-2.0"), "apache-2.0");
@@ -717,13 +676,16 @@ mod tests {
 
     #[test]
     fn test_spdx_lid_match_with_operator() {
-        let mut index = create_test_index(&[
-            ("spdx", 0),
-            ("license", 1),
-            ("identifier", 2),
-            ("gpl-2.0", 3),
-            ("classpath-exception-2.0", 4),
-        ], 1);
+        let mut index = create_test_index(
+            &[
+                ("spdx", 0),
+                ("license", 1),
+                ("identifier", 2),
+                ("gpl-2.0", 3),
+                ("classpath-exception-2.0", 4),
+            ],
+            1,
+        );
         index
             .rules_by_rid
             .push(create_mock_rule_simple("gpl-2.0", 100));
@@ -864,17 +826,15 @@ mod tests {
 
     #[test]
     fn test_spdx_match_has_correct_token_positions() {
-        let mut index = create_test_index(&[
-            ("spdx", 0),
-            ("license", 1),
-            ("identifier", 2),
-            ("mit", 3),
-        ], 1);
+        let mut index = create_test_index(
+            &[("spdx", 0), ("license", 1), ("identifier", 2), ("mit", 3)],
+            1,
+        );
         index.rules_by_rid.push(create_mock_rule_simple("mit", 100));
 
         let text = "Some preamble text\nSPDX-License-Identifier: MIT\nMore text";
         let query = Query::new(text, &index).unwrap();
-        
+
         let matches = spdx_lid_match(&index, &query);
 
         if !matches.is_empty() {

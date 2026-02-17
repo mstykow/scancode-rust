@@ -661,6 +661,7 @@ The detection-level function was fixed, but the match-level function is a **simp
 The FAILURES.md analysis reveals that many failing tests (gpl_18.txt, gpl_26.txt, gpl_35.txt, gpl_40.txt, gpl_48.txt, gpl_57.txt, gpl-2.0-plus_11.txt, gpl-2.0-plus_17.txt, gpl-2.0-plus_28.txt) are failing due to **spurious `borceux` matches**.
 
 The `borceux_1.RULE` has:
+
 ```yaml
 license_expression: borceux
 is_license_reference: yes
@@ -668,6 +669,7 @@ relevance: 100
 ```
 
 Python filters these via `filter_false_positive_license_lists_matches()` (match.py:2408-2539) which:
+
 1. Checks for sequences of short `is_license_reference` or `is_license_tag` matches
 2. Uses `is_candidate_false_positive()` (match.py:2651-2688) to identify candidates
 3. Discards matches that form "license lists" (like lists of license identifiers in tools)
@@ -714,7 +716,7 @@ Rust implemented this correctly, but the `borceux` rule has `relevance: 100`, wh
 
 ### Critical (Required to Fix Failing Tests)
 
-- [ ] **Implement `filter_false_positive_license_lists_matches`** 
+- [ ] **Implement `filter_false_positive_license_lists_matches`**
   - Location: `src/license_detection/match_refine.rs`
   - Python reference: `match.py:2408-2539`
   - Affects: gpl_18.txt, gpl_26.txt, gpl_35.txt, gpl_40.txt, gpl_48.txt, gpl_57.txt, gpl-2.0-plus_11.txt, gpl-2.0-plus_17.txt, gpl-2.0-plus_28.txt, and more

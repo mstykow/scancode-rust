@@ -565,7 +565,7 @@ The `simplify_expression` function has been completely rewritten using the colle
 
 All 11 unit tests for `simplify_expression` pass:
 
-```
+```text
 test_simplify_and_duplicates              ... ok
 test_simplify_or_duplicates               ... ok
 test_simplify_expression_no_change        ... ok

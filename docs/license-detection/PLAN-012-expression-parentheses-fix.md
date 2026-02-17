@@ -292,7 +292,7 @@ No parentheses logic is present - WITH expressions are rendered as atomic symbol
 
 All 19 `expression_to_string` tests pass:
 
-```
+```text
 test license_detection::expression::tests::test_expression_to_string_with_inside_or ... ok
 test license_detection::expression::tests::test_expression_to_string_with_inside_and ... ok
 test license_detection::expression::tests::test_expression_to_string_roundtrip_or_with ... ok
@@ -316,6 +316,7 @@ test license_detection::expression::tests::test_expression_to_string_and_inside_
 The FAILURES.md still lists tests with parentheses issues (lines 133, 158-162), but these entries are **stale** - they reflect the pre-fix state. The underlying golden tests may have other issues (grouping, unknown-license-reference, etc.) but the expression rendering fix is complete.
 
 Key remaining golden test issues are unrelated to parentheses:
+
 - Match grouping logic (license intro/clue detection)
 - Unknown license reference filtering
 - HTML demarkup preprocessing

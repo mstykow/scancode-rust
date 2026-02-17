@@ -735,6 +735,7 @@ However, this is misleading. The 3 additional "passes" are likely from different
 **The Problem:**
 
 In `src/license_detection/spdx_lid.rs:279-280`, SPDX-LID matches are created with:
+
 ```rust
 start_token: 0,
 end_token: 0,
@@ -745,6 +746,7 @@ This means **all SPDX-LID matches appear to occupy the same token span (0, 0)**.
 **The Impact on `qcontains()`:**
 
 The `qcontains()` method in `models.rs:273-275`:
+
 ```rust
 pub fn qcontains(&self, other: &LicenseMatch) -> bool {
     self.start_token <= other.start_token && self.end_token >= other.end_token
@@ -752,16 +754,19 @@ pub fn qcontains(&self, other: &LicenseMatch) -> bool {
 ```
 
 With all SPDX matches having `start_token = 0, end_token = 0`:
+
 - **Every SPDX match appears to contain every other SPDX match** (since 0 <= 0 and 0 >= 0)
 - `filter_contained_matches()` incorrectly filters SPDX matches as duplicates
 
 **Example Regression:**
 
 Test file: `gpl_or_mit_1.txt`
+
 - Expected: `["mit OR gpl-2.0"]`
 - Actual: `[]` (empty - both matches were filtered!)
 
 This happens because:
+
 1. SPDX-LID detects both "MIT" and "GPL-2.0" as separate matches
 2. Both have `start_token = 0, end_token = 0`
 3. `qcontains()` returns true for both directions
@@ -781,6 +786,7 @@ This happens because:
 ### Edge Case: Matches with Zero-Length Token Spans
 
 When `start_token == end_token == 0`:
+
 - The match has no valid token position
 - It represents a tag/reference, not actual matched text
 - These should NOT be filtered by `qcontains()` as they represent different semantic matches
@@ -788,6 +794,7 @@ When `start_token == end_token == 0`:
 ### Why the Line-Based Check Didn't Have This Problem
 
 The old line-based check in `filter_contained_matches()`:
+
 ```rust
 current.start_line >= kept_match.start_line
     && current.end_line <= kept_match.end_line
@@ -807,15 +814,18 @@ This used line numbers which are correctly populated for SPDX matches. A match a
 SPDX-LID matches need accurate token positions. Options:
 
 **Option A:** Track token positions during parsing
+
 - Find where the SPDX expression appears in the tokenized query
 - Set `start_token` and `end_token` to actual token positions
 
 **Option B:** Use unique sentinel values
+
 - Set `start_token = line_num * 1000000` (ensures uniqueness per line)
 - Set `end_token = start_token + 1`
 - Prevents false containment between different SPDX matches
 
 **Option C:** Skip token-based containment for SPDX matches
+
 - Add a flag `is_license_tag` and skip `qcontains()` check for these
 - Fall back to line-based containment for SPDX matches
 
@@ -824,6 +834,7 @@ SPDX-LID matches need accurate token positions. Options:
 **File:** `src/license_detection/models.rs`
 
 When both matches have `start_token == 0 && end_token == 0`:
+
 - Return `false` (they don't contain each other)
 - They are separate semantic matches that should both be kept
 
@@ -872,11 +883,13 @@ fn test_filter_contained_matches_spdx_matches_not_filtered() {
 ### 4. Verify Fix Against Golden Tests
 
 Run the golden test suite after implementing fixes:
+
 ```bash
 cargo test license_detection::golden_test::golden_tests::test_golden_lic1
 ```
 
 The specific test `gpl_or_mit_1.txt` should pass:
+
 - Expected: `["mit OR gpl-2.0"]`
 - Should not be filtered to `[]`
 

@@ -699,6 +699,7 @@ Uuid::parse_str(&hex_string[..32])?.to_string()
 ### 10.1 Implementation Status
 
 The fix was implemented in commit `41f08305`:
+
 - `remove_duplicate_detections()` now deduplicates by identifier (expression + content hash)
 - `compute_detection_identifier()` generates identifiers from matches
 - `compute_content_identifier()` creates UUID from rule_identifier, score, and matched_text
@@ -721,6 +722,7 @@ Despite the fix, several tests still fail with the same symptoms:
 **The actual issue is in match grouping (`group_matches_by_region_with_threshold`).**
 
 Evidence from `gpl-2.0_82.RULE`:
+
 - File contains ~311 lines with GPL-2.0 text at multiple locations
 - Lines 1-30: Short GPL-2.0 reference (lines 15-26)
 - Lines 32+: Full GPL-2.0 license text
@@ -728,6 +730,7 @@ Evidence from `gpl-2.0_82.RULE`:
 - Rust produces 1 combined detection
 
 The problem is in `should_group_together()`:
+
 ```rust
 fn should_group_together(prev: &LicenseMatch, cur: &LicenseMatch) -> bool {
     let token_gap = calculate_token_gap(prev, cur);
@@ -743,9 +746,11 @@ This uses AND logic (both conditions must be met), but Python may use OR logic f
 1. **`identifier` not set during detection creation**: In `populate_detection_from_group()` and `create_detection_from_group()`, the identifier is set to `None`. The identifier is only computed in `remove_duplicate_detections()`.
 
 2. **Missing `query_tokenizer` for matched_text**: Python tokenizes matched_text before hashing:
+
    ```python
    tokenized_matched_text = tuple(query_tokenizer(matched_text))
    ```
+
    Rust uses raw matched_text strings, which may produce different identifiers.
 
 3. **Match grouping threshold issue**: The dual-criteria `AND` logic in `should_group_together()` may be too aggressive, combining matches that should be separate.
@@ -761,6 +766,7 @@ This uses AND logic (both conditions must be met), but Python may use OR logic f
 **Location**: `src/license_detection/detection.rs:172-216` (`group_matches_by_region_with_threshold`)
 
 **Actions**:
+
 1. Verify Python's `get_matching_regions()` behavior in `licensedcode/match.py`
 2. Check if Python uses `OR` logic for min_tokens_gap vs min_lines_gap
 3. Compare actual match positions between Python and Rust
@@ -769,11 +775,13 @@ This uses AND logic (both conditions must be met), but Python may use OR logic f
 
 **Issue**: `identifier` is `None` until `remove_duplicate_detections()` runs.
 
-**Location**: 
+**Location**:
+
 - `src/license_detection/detection.rs:747` (`populate_detection_from_group`)
 - `src/license_detection/detection.rs:834` (`create_detection_from_group`)
 
 **Fix**: Call `compute_detection_identifier()` after setting matches:
+
 ```rust
 detection.identifier = Some(compute_detection_identifier(&detection));
 ```
@@ -785,6 +793,7 @@ detection.identifier = Some(compute_detection_identifier(&detection));
 **Location**: `src/license_detection/detection.rs:967-977` (`compute_content_identifier`)
 
 **Fix**: Tokenize matched_text before including in hash:
+
 ```rust
 fn compute_content_identifier(matches: &[LicenseMatch]) -> String {
     let content: Vec<(&str, f32, Vec<String>)> = matches
@@ -804,6 +813,7 @@ fn compute_content_identifier(matches: &[LicenseMatch]) -> String {
 **Question**: Why do tests expect multiple detections of the same license?
 
 For `edl-1.0.txt`:
+
 - File is only 12 lines
 - Contains single BSD-New license text
 - Python expects 2 detections of `bsd-new`
@@ -824,6 +834,7 @@ For `edl-1.0.txt`:
 **Actual**: `["bsd-new"]`
 
 **Hypothesis**: Python may match both:
+
 1. The EDL-1.0 rule (which maps to bsd-new)
 2. A generic BSD-New rule
 
@@ -832,6 +843,7 @@ Rust matches only one rule due to overlap filtering or match deduplication.
 ### `gpl-2.0_82.RULE`
 
 **File content**: 311 lines with:
+
 - Lines 1-30: Intro text with short GPL-2.0 reference
 - Lines 32-311: Full GPL-2.0 license text
 
@@ -840,6 +852,7 @@ Rust matches only one rule due to overlap filtering or match deduplication.
 **Actual**: `["gpl-2.0"]`
 
 **Analysis**: The three detections in Python likely correspond to:
+
 1. Short GPL-2.0 reference (lines 15-26)
 2. GPL-2.0 preamble (lines 32-50)
 3. Full GPL-2.0 terms

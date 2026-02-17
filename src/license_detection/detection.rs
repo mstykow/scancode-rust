@@ -3916,7 +3916,11 @@ mod tests {
 
     #[test]
     fn test_sort_detections_by_line() {
-        fn create_detection(license_expr: &str, start_line: usize, end_line: usize) -> LicenseDetection {
+        fn create_detection(
+            license_expr: &str,
+            start_line: usize,
+            end_line: usize,
+        ) -> LicenseDetection {
             LicenseDetection {
                 license_expression: Some(license_expr.to_string()),
                 license_expression_spdx: Some(license_expr.to_uppercase()),
@@ -3942,7 +3946,7 @@ mod tests {
                     is_license_reference: false,
                     is_license_tag: false,
                     rule_length: 100,
-            matched_token_positions: None,
+                    matched_token_positions: None,
                 }],
                 detection_log: vec![],
                 identifier: None,

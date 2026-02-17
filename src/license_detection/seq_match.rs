@@ -18,8 +18,7 @@
 
 use crate::license_detection::index::LicenseIndex;
 use crate::license_detection::index::token_sets::{
-    build_set_and_mset, high_multiset_subset, high_tids_set_subset, multiset_counter,
-    tids_set_counter,
+    build_set_and_mset, high_multiset_subset, high_tids_set_subset, tids_set_counter,
 };
 use crate::license_detection::models::{LicenseMatch, Rule};
 use crate::license_detection::query::QueryRun;
@@ -127,9 +126,7 @@ pub fn multisets_intersector(
     };
 
     set1.iter()
-        .filter_map(|(&tid, &count1)| {
-            set2.get(&tid).map(|&count2| (tid, count1.min(count2)))
-        })
+        .filter_map(|(&tid, &count1)| set2.get(&tid).map(|&count2| (tid, count1.min(count2))))
         .collect()
 }
 
@@ -172,7 +169,13 @@ fn compute_set_similarity(
     // matched_length = count of tokens in intersection (using multiset counts)
     let matched_length: usize = intersection
         .iter()
-        .map(|&tid| query_mset.get(&tid).copied().unwrap_or(0).min(rule_mset.get(&tid).copied().unwrap_or(0)))
+        .map(|&tid| {
+            query_mset
+                .get(&tid)
+                .copied()
+                .unwrap_or(0)
+                .min(rule_mset.get(&tid).copied().unwrap_or(0))
+        })
         .sum();
 
     if matched_length == 0 {
@@ -206,96 +209,6 @@ fn compute_set_similarity(
     };
 
     Some((score_vec_rounded, score_vec_full))
-}
-
-/// Compute near-duplicate candidates for a query run.
-///
-/// This is the key function for Phase 2 (near-duplicate detection) of the matching pipeline.
-/// It computes resemblance between the query and all rules, returning top candidates
-/// filtered by high resemblance if requested.
-///
-/// Corresponds to Python: `compute_candidates()` in match_set.py (line 244-367)
-///
-/// # Arguments
-///
-/// * `index` - License index containing rule token sets
-/// * `query_run` - Query run to match (typically the whole file)
-/// * `high_resemblance` - If true, only return candidates with resemblance >= 0.8
-/// * `top_n` - Number of top candidates to return
-///
-/// # Returns
-///
-/// Vector of top-N candidates sorted by (squared) resemblance score.
-/// If `high_resemblance=true`, only candidates with resemblance >= 0.8 are returned.
-pub fn compute_candidates(
-    index: &LicenseIndex,
-    query_run: &QueryRun,
-    high_resemblance: bool,
-    top_n: usize,
-) -> Vec<Candidate> {
-    let query_tokens = query_run.matchable_tokens();
-    if query_tokens.is_empty() {
-        return Vec::new();
-    }
-
-    let query_token_ids: Vec<u16> = query_tokens
-        .iter()
-        .filter_map(|&tid| if tid >= 0 { Some(tid as u16) } else { None })
-        .collect();
-
-    if query_token_ids.is_empty() {
-        return Vec::new();
-    }
-
-    let (query_set, query_mset) = build_set_and_mset(&query_token_ids);
-    let len_legalese = index.len_legalese;
-
-    let mut sortable_candidates: Vec<Candidate> = Vec::new();
-
-    for (rid, rule) in index.rules_by_rid.iter().enumerate() {
-        if !index.approx_matchable_rids.contains(&rid) {
-            continue;
-        }
-
-        let Some(rule_set) = index.sets_by_rid.get(&rid) else {
-            continue;
-        };
-        let Some(rule_mset) = index.msets_by_rid.get(&rid) else {
-            continue;
-        };
-
-        let Some((score_vec_rounded, score_vec_full)) =
-            compute_set_similarity(&query_set, &query_mset, rule_set, rule_mset, len_legalese)
-        else {
-            continue;
-        };
-
-        if high_resemblance {
-            if !score_vec_rounded.is_highly_resemblant || !score_vec_full.is_highly_resemblant {
-                continue;
-            }
-        }
-
-        let intersection: HashSet<u16> = query_set.intersection(rule_set).copied().collect();
-        let high_set_intersection = high_tids_set_subset(&intersection, len_legalese);
-
-        sortable_candidates.push(Candidate {
-            score_vec_rounded,
-            score_vec_full,
-            rid,
-            rule: rule.clone(),
-            high_set_intersection,
-        });
-    }
-
-    if sortable_candidates.is_empty() {
-        return Vec::new();
-    }
-
-    sortable_candidates.sort_by(|a, b| b.cmp(a));
-    sortable_candidates.truncate(top_n);
-
-    sortable_candidates
 }
 
 /// Compute multiset-based candidates (Phase 2 refinement).

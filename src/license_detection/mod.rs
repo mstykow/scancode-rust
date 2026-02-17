@@ -43,7 +43,9 @@ pub use detection::LicenseDetection;
 pub use aho_match::aho_match;
 pub use hash_match::hash_match;
 pub use match_refine::refine_matches;
-pub use seq_match::{compute_candidates_with_msets, seq_match, seq_match_with_candidates, MAX_NEAR_DUPE_CANDIDATES};
+pub use seq_match::{
+    MAX_NEAR_DUPE_CANDIDATES, compute_candidates_with_msets, seq_match, seq_match_with_candidates,
+};
 pub use spdx_lid::spdx_lid_match;
 pub use unknown_match::unknown_match;
 
@@ -141,7 +143,7 @@ impl LicenseDetectionEngine {
             if !near_dupe_candidates.is_empty() {
                 let near_dupe_matches =
                     seq_match_with_candidates(&self.index, &whole_run, &near_dupe_candidates);
-                
+
                 // Subtract matched positions from query to prevent double-matching.
                 // Corresponds to Python: index.py:767-771
                 for m in &near_dupe_matches {
@@ -150,7 +152,7 @@ impl LicenseDetectionEngine {
                         query.subtract(&span);
                     }
                 }
-                
+
                 all_matches.extend(near_dupe_matches);
             }
         }
@@ -175,13 +177,13 @@ impl LicenseDetectionEngine {
                 if query_run.start == whole_run.start && query_run.end == whole_run.end {
                     continue;
                 }
-                
+
                 // is_matchable() excludes already-matched positions
                 // Corresponds to Python: index.py:828
                 if !query_run.is_matchable(false, &[]) {
                     continue;
                 }
-                
+
                 let candidates = compute_candidates_with_msets(
                     &self.index,
                     query_run,

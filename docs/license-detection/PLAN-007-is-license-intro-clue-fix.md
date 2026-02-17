@@ -644,6 +644,7 @@ Tests that should be fixed by PLAN-007 (from FAILURES.md):
 ### Must Fix
 
 1. **Replace `is_license_intro_match()` implementation** (`detection.rs:272-274`):
+
    ```rust
    fn is_license_intro_match(match_item: &LicenseMatch) -> bool {
        match_item.is_license_intro
@@ -653,6 +654,7 @@ Tests that should be fixed by PLAN-007 (from FAILURES.md):
    ```
 
 2. **Replace `is_license_clue_match()` implementation** (`detection.rs:277-279`):
+
    ```rust
    fn is_license_clue_match(match_item: &LicenseMatch) -> bool {
        match_item.is_license_clue
@@ -663,7 +665,7 @@ Tests that should be fixed by PLAN-007 (from FAILURES.md):
    - Add `has_unknown` computed property or inline check
    - Python checks: `rule.has_unknown AND (rule.is_license_intro OR rule.is_license_clue OR expr == 'free-unknown')`
    - `has_unknown` is `True` when `'unknown' in license_expression`
-   
+
    ```rust
    fn is_unknown_intro(m: &LicenseMatch) -> bool {
        let has_unknown = m.license_expression.contains("unknown");
@@ -673,28 +675,29 @@ Tests that should be fixed by PLAN-007 (from FAILURES.md):
 
 ### Should Add
 
-4. **Add `has_unknown` field to Rule struct** (`models.rs`):
+1. **Add `has_unknown` field to Rule struct** (`models.rs`):
    - Alternatively, compute inline since it's just `license_expression.contains("unknown")`
 
-5. **Add unit tests** for the fixed functions:
+2. **Add unit tests** for the fixed functions:
    - `test_is_license_intro_match_with_flag`
    - `test_is_license_intro_match_with_clue_flag`
    - `test_is_license_intro_match_free_unknown`
    - `test_is_license_clue_match_with_flag`
    - `test_is_unknown_intro_with_has_unknown`
 
-6. **Verify `is_license_intro` and `is_license_clue` are populated correctly**:
+3. **Verify `is_license_intro` and `is_license_clue` are populated correctly**:
    - Check `aho_match.rs`, `hash_match.rs`, `seq_match.rs`, `spdx_lid.rs`, `unknown_match.rs`
    - All should copy these fields from Rule to LicenseMatch
 
 ### Validation
 
-7. **Run golden tests after fix**:
+1. **Run golden tests after fix**:
+
    ```bash
    cargo test --lib license_detection::golden_test::golden_tests::test_golden_lic1
    ```
 
-8. **Verify specific test cases pass**:
+2. **Verify specific test cases pass**:
    - cjdict-liconly.txt
    - CRC32.java  
    - checker-2200.txt
@@ -707,5 +710,6 @@ Tests that should be fixed by PLAN-007 (from FAILURES.md):
 ## Estimated Impact
 
 After implementing the above fixes, expect:
+
 - **~15-20 additional golden tests to pass** (tests failing due to incorrect intro/clue detection)
 - No regressions (the current implementation is already broken for these cases)
