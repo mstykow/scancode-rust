@@ -369,13 +369,17 @@ impl<'a> Query<'a> {
             .map(|(pos, _tid)| pos)
             .collect();
 
-        let query_runs = Self::compute_query_runs(
-            &tokens,
-            &tokens_by_line,
-            line_threshold,
-            len_legalese,
-            digit_only_tids,
-        );
+        // TODO: Re-enable query run splitting once span subtraction is implemented
+        // to prevent double-matching between whole file and query runs.
+        // See: https://github.com/aboutcode-org/scancode-rust/issues/XXX
+        // let query_runs = Self::compute_query_runs(
+        //     &tokens,
+        //     &tokens_by_line,
+        //     line_threshold,
+        //     len_legalese,
+        //     digit_only_tids,
+        // );
+        let query_runs: Vec<(usize, Option<usize>)> = Vec::new();
 
         Ok(Query {
             text: text.to_string(),
