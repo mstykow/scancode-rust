@@ -437,15 +437,17 @@ impl<'a> Query<'a> {
             .map(|(pos, _tid)| pos)
             .collect();
 
-        // TODO: Re-enable query run splitting once span subtraction is implemented
-        // to prevent double-matching between whole file and query runs.
-        // See: https://github.com/aboutcode-org/scancode-rust/issues/XXX
+        // TODO: Re-enable query run splitting once the matching algorithm
+        // properly tracks matched qspans across phases.
+        // Currently causes double-matching because Phase 3 doesn't track
+        // matched positions for Phase 4's is_matchable() check.
+        // See: reference/scancode-toolkit/src/licensedcode/index.py:1056
         // let query_runs = Self::compute_query_runs(
         //     &tokens,
         //     &tokens_by_line,
-        //     line_threshold,
+        //     _line_threshold,
         //     len_legalese,
-        //     digit_only_tids,
+        //     &index.digit_only_tids,
         // );
         let query_runs: Vec<(usize, Option<usize>)> = Vec::new();
 
@@ -1722,6 +1724,7 @@ mod tests {
         let index = create_query_test_index();
         let query = Query::new("", &index).unwrap();
 
+        // Empty query has no runs
         assert!(query.query_run_ranges.is_empty());
 
         let runs = query.query_runs();
