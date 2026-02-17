@@ -163,12 +163,14 @@ impl LicenseDetectionEngine {
 
                 // Subtract matched positions from query to prevent double-matching.
                 // Corresponds to Python: index.py:767-771
-                // Note: We do NOT add to matched_qspans here - those are only for
-                // Phase 1 matches. Query run matching uses the original matched_qspans.
+                // Note: Python adds ALL near-dupe matches to already_matched_qspans,
+                // not just 100% coverage matches. This is crucial for Phase 4's
+                // is_matchable() check to prevent double-matching.
                 for m in &near_dupe_matches {
                     if m.end_token > m.start_token {
                         let span = query::PositionSpan::new(m.start_token, m.end_token - 1);
                         query.subtract(&span);
+                        matched_qspans.push(span);
                     }
                 }
 

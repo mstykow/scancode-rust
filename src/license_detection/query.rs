@@ -433,10 +433,9 @@ impl<'a> Query<'a> {
             .map(|(pos, _tid)| pos)
             .collect();
 
-        // TODO: Re-enable query run splitting once the matching algorithm
-        // properly tracks matched qspans across phases.
-        // Currently causes double-matching because is_matchable() logic
-        // doesn't correctly prevent re-matching of already-matched positions.
+        // TODO: Query run splitting is currently disabled because it causes
+        // double-matching. The is_matchable() check with matched_qspans helps
+        // but doesn't fully prevent the issue. Further investigation needed.
         // See: reference/scancode-toolkit/src/licensedcode/index.py:1056
         // let query_runs = Self::compute_query_runs(
         //     &tokens,

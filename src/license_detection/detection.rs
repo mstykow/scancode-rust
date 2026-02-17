@@ -12,11 +12,8 @@ use crate::license_detection::spdx_mapping::SpdxMapping;
 /// Matches with token gap > this are considered separate regions.
 const TOKENS_THRESHOLD: usize = 10;
 
-/// Line gap threshold for grouping matches.
-/// Matches with line gap > this are considered separate regions.
 const LINES_GAP_THRESHOLD: usize = 3;
 
-/// Legacy proximity threshold for API compatibility.
 const LINES_THRESHOLD: usize = 4;
 
 /// Coverage value below which detections are not perfect.
