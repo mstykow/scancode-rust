@@ -304,6 +304,126 @@ if has_unknown_intro {
 
 ---
 
+## Issue 7: Combined Rule Matching - `cddl-1.0_or_gpl-2.0-glassfish.txt`
+
+### Test Case
+
+**File:** `testdata/license-golden/datadriven/lic1/cddl-1.0_or_gpl-2.0-glassfish.txt`
+
+**Expected:** `["cddl-1.0 OR gpl-2.0"]`
+**Actual:** `["gpl-2.0 AND cddl-1.0", "unknown-license-reference AND unknown"]`
+
+### Root Cause Analysis
+
+#### Why Python Gets It Right
+
+Python matches the **combined rule** `cddl-1.0_or_gpl-2.0-glassfish.RULE`:
+- `license_expression: cddl-1.0 OR gpl-2.0`
+- `is_license_notice: true`
+- 262 tokens
+
+This is a license notice rule designed to match the entire Glassfish dual-license header.
+
+#### Why Rust Gets It Wrong
+
+Rust matches **partial rules** instead:
+
+| Rule | Expression | Tokens | Flags |
+|------|------------|--------|-------|
+| `gpl-2.0_476.RULE` | `gpl-2.0` | 21 | `is_license_notice: true` |
+| `cddl-1.0_53.RULE` | `cddl-1.0` | 6 | `is_license_reference: true` |
+
+The combined rule is NOT matched because:
+
+1. **Hash match fails**: Test file has extra copyright line (`* Copyright YYYY Sun Microsystems, Inc.`) not in the rule
+2. **Aho-Corasick fails**: Token sequences differ due to the extra line
+3. **Sequence matching fails**: Query has only 53 tokens vs combined rule's 262 tokens
+
+#### Key Differences
+
+| Aspect | Python | Rust |
+|--------|--------|------|
+| Token overlap | ~90%+ | 53/262 = 20% |
+| Matcher used | Sequence (3-seq) | Aho-Corasick (2-aho) |
+| Expression | `cddl-1.0 OR gpl-2.0` | `gpl-2.0 AND cddl-1.0` |
+
+### The Real Problem: Query Run Size
+
+Looking at the debug output:
+```
+Query tokens: 53
+Combined rule tokens: 262
+Intersection: 28 tokens
+High intersection: 28 tokens
+```
+
+The query run only contains 53 tokens - this suggests the query is being **broken into smaller query runs**. Python processes the entire text as one query run, while Rust may be splitting it.
+
+### Why Partial Rules Match
+
+The partial rules are short patterns that exist in the middle of the text:
+- `gpl-2.0_476.RULE`: Matches "The contents of this file are subject to the terms of either the GNU General Public License Version 2 only ("GPL")"
+- `cddl-1.0_53.RULE`: Matches "Common Development and Distribution License (CDDL)"
+
+These are found by Aho-Corasick because they are substrings of the full text.
+
+### Fix Required
+
+#### Fix 1: Ensure Full Text Query Run
+
+In `src/license_detection/mod.rs`, the detection pipeline creates a single query run:
+```rust
+let query_run = query.whole_query_run();
+```
+
+But sequence matching may need the full text, not a broken-up query run.
+
+#### Fix 2: Candidate Selection for Large Rules
+
+In `src/license_detection/seq_match.rs`, the `select_candidates()` function needs to prioritize larger rules when there's high token overlap:
+
+```rust
+// Current: Only selects top-N by score
+// Needed: Also consider rule length - prefer larger rules with good overlap
+```
+
+#### Fix 3: Expression Combination for OR Cases
+
+When two matches represent an "either/or" choice in the license text (like "either the GPL or the CDDL"), they should be combined with OR, not AND.
+
+The key indicator is the word "either" in the matched text:
+```
+subject to the terms of either the GNU General Public License Version 2 only ("GPL") or the Common Development and Distribution License("CDDL")
+```
+
+This requires semantic understanding of the license text.
+
+### Immediate Fix: Candidate Prioritization
+
+The sequence matcher should prioritize the combined rule when:
+1. Token overlap is significant (even if not 100%)
+2. The combined rule is much larger than partial matches
+3. The combined rule's expression is semantically equivalent to combining partial matches
+
+```rust
+// In select_candidates(), add:
+// Boost candidates that represent combined rules
+let is_combined = rule.tokens.len() > 100 && rule.is_license_notice;
+if is_combined {
+    // Boost score to ensure it's selected
+    score_vec_full.containment *= 1.5;
+}
+```
+
+### Estimated Tests Fixed
+
+This fix addresses ~20 tests where combined rules should match instead of partial rules:
+- `cddl-1.0_or_gpl-2.0-glassfish.txt`
+- `cddl-1.1_or_gpl-2.0-classpath_and_apache-2.0-glassfish_*.txt`
+- Similar dual-license header cases
+
+---
+
 ## Validation Commands
 
 ```bash
