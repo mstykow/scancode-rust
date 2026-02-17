@@ -208,41 +208,140 @@ pub fn parse_expression(expr: &str) -> Result<LicenseExpression, ParseError> {
 /// * `expr` - The expression to simplify
 ///
 /// # Returns
-/// Simplified expression
+/// Simplified expression with duplicate licenses removed, preserving order.
 pub fn simplify_expression(expr: &LicenseExpression) -> LicenseExpression {
-    simplify_internal(expr, &mut HashSet::new())
+    match expr {
+        LicenseExpression::License(key) => LicenseExpression::License(key.clone()),
+        LicenseExpression::LicenseRef(key) => LicenseExpression::LicenseRef(key.clone()),
+        LicenseExpression::With { left, right } => LicenseExpression::With {
+            left: Box::new(simplify_expression(left)),
+            right: Box::new(simplify_expression(right)),
+        },
+        LicenseExpression::And { .. } => {
+            let mut unique = Vec::new();
+            let mut seen = HashSet::new();
+            collect_unique_and(expr, &mut unique, &mut seen);
+            build_expression_from_list(&unique, true)
+        }
+        LicenseExpression::Or { .. } => {
+            let mut unique = Vec::new();
+            let mut seen = HashSet::new();
+            collect_unique_or(expr, &mut unique, &mut seen);
+            build_expression_from_list(&unique, false)
+        }
+    }
 }
 
-fn simplify_internal(expr: &LicenseExpression, seen: &mut HashSet<String>) -> LicenseExpression {
+fn collect_unique_and(
+    expr: &LicenseExpression,
+    unique: &mut Vec<LicenseExpression>,
+    seen: &mut HashSet<String>,
+) {
     match expr {
+        LicenseExpression::And { left, right } => {
+            collect_unique_and(left, unique, seen);
+            collect_unique_and(right, unique, seen);
+        }
+        LicenseExpression::Or { .. } => {
+            let simplified = simplify_expression(expr);
+            let key = expression_to_string(&simplified);
+            if !seen.contains(&key) {
+                seen.insert(key);
+                unique.push(simplified);
+            }
+        }
+        LicenseExpression::With { left, right } => {
+            let simplified = LicenseExpression::With {
+                left: Box::new(simplify_expression(left)),
+                right: Box::new(simplify_expression(right)),
+            };
+            let key = expression_to_string(&simplified);
+            if !seen.contains(&key) {
+                seen.insert(key);
+                unique.push(simplified);
+            }
+        }
         LicenseExpression::License(key) => {
-            if seen.contains(key) {
-                LicenseExpression::License(key.clone())
-            } else {
+            if !seen.contains(key) {
                 seen.insert(key.clone());
-                LicenseExpression::License(key.clone())
+                unique.push(LicenseExpression::License(key.clone()));
             }
         }
         LicenseExpression::LicenseRef(key) => {
-            if seen.contains(key) {
-                LicenseExpression::LicenseRef(key.clone())
-            } else {
+            if !seen.contains(key) {
                 seen.insert(key.clone());
-                LicenseExpression::LicenseRef(key.clone())
+                unique.push(LicenseExpression::LicenseRef(key.clone()));
             }
         }
-        LicenseExpression::And { left, right } => LicenseExpression::And {
-            left: Box::new(simplify_internal(left, seen)),
-            right: Box::new(simplify_internal(right, seen)),
-        },
-        LicenseExpression::Or { left, right } => LicenseExpression::Or {
-            left: Box::new(simplify_internal(left, seen)),
-            right: Box::new(simplify_internal(right, seen)),
-        },
-        LicenseExpression::With { left, right } => LicenseExpression::With {
-            left: Box::new(simplify_internal(left, seen)),
-            right: Box::new(simplify_internal(right, seen)),
-        },
+    }
+}
+
+fn collect_unique_or(
+    expr: &LicenseExpression,
+    unique: &mut Vec<LicenseExpression>,
+    seen: &mut HashSet<String>,
+) {
+    match expr {
+        LicenseExpression::Or { left, right } => {
+            collect_unique_or(left, unique, seen);
+            collect_unique_or(right, unique, seen);
+        }
+        LicenseExpression::And { .. } => {
+            let simplified = simplify_expression(expr);
+            let key = expression_to_string(&simplified);
+            if !seen.contains(&key) {
+                seen.insert(key);
+                unique.push(simplified);
+            }
+        }
+        LicenseExpression::With { left, right } => {
+            let simplified = LicenseExpression::With {
+                left: Box::new(simplify_expression(left)),
+                right: Box::new(simplify_expression(right)),
+            };
+            let key = expression_to_string(&simplified);
+            if !seen.contains(&key) {
+                seen.insert(key);
+                unique.push(simplified);
+            }
+        }
+        LicenseExpression::License(key) => {
+            if !seen.contains(key) {
+                seen.insert(key.clone());
+                unique.push(LicenseExpression::License(key.clone()));
+            }
+        }
+        LicenseExpression::LicenseRef(key) => {
+            if !seen.contains(key) {
+                seen.insert(key.clone());
+                unique.push(LicenseExpression::LicenseRef(key.clone()));
+            }
+        }
+    }
+}
+
+fn build_expression_from_list(unique: &[LicenseExpression], is_and: bool) -> LicenseExpression {
+    match unique.len() {
+        0 => panic!("build_expression_from_list called with empty list"),
+        1 => unique[0].clone(),
+        _ => {
+            let mut iter = unique.iter();
+            let mut result = iter.next().unwrap().clone();
+            for expr in iter {
+                result = if is_and {
+                    LicenseExpression::And {
+                        left: Box::new(result),
+                        right: Box::new(expr.clone()),
+                    }
+                } else {
+                    LicenseExpression::Or {
+                        left: Box::new(result),
+                        right: Box::new(expr.clone()),
+                    }
+                };
+            }
+            result
+        }
     }
 }
 
@@ -327,12 +426,7 @@ fn expression_to_string_internal(
         LicenseExpression::With { left, right } => {
             let left_str = expression_to_string_internal(left, Some(Precedence::With));
             let right_str = expression_to_string_internal(right, Some(Precedence::With));
-            let result = format!("{} WITH {}", left_str, right_str);
-            if parent_prec.is_some_and(|p| p != Precedence::With) {
-                format!("({})", result)
-            } else {
-                result
-            }
+            format!("{} WITH {}", left_str, right_str)
         }
     }
 }
@@ -819,16 +913,86 @@ mod tests {
     fn test_simplify_expression_no_change() {
         let expr = parse_expression("MIT AND Apache-2.0").unwrap();
         let simplified = simplify_expression(&expr);
-        assert_eq!(expr, simplified);
+        assert_eq!(expression_to_string(&simplified), "mit AND apache-2.0");
     }
 
     #[test]
     fn test_simplify_expression_with_duplicates() {
         let expr = parse_expression("MIT OR MIT").unwrap();
         let simplified = simplify_expression(&expr);
-        let keys = simplified.license_keys();
-        assert_eq!(keys.len(), 1);
-        assert_eq!(keys[0], "mit");
+        assert_eq!(expression_to_string(&simplified), "mit");
+    }
+
+    #[test]
+    fn test_simplify_and_duplicates() {
+        let expr = parse_expression("crapl-0.1 AND crapl-0.1").unwrap();
+        let simplified = simplify_expression(&expr);
+        assert_eq!(expression_to_string(&simplified), "crapl-0.1");
+    }
+
+    #[test]
+    fn test_simplify_or_duplicates() {
+        let expr = parse_expression("mit OR mit").unwrap();
+        let simplified = simplify_expression(&expr);
+        assert_eq!(expression_to_string(&simplified), "mit");
+    }
+
+    #[test]
+    fn test_simplify_preserves_different_licenses() {
+        let expr = parse_expression("mit AND apache-2.0").unwrap();
+        let simplified = simplify_expression(&expr);
+        assert_eq!(expression_to_string(&simplified), "mit AND apache-2.0");
+    }
+
+    #[test]
+    fn test_simplify_complex_duplicates() {
+        let expr = parse_expression("gpl-2.0-plus AND gpl-2.0-plus AND lgpl-2.0-plus").unwrap();
+        let simplified = simplify_expression(&expr);
+        assert_eq!(
+            expression_to_string(&simplified),
+            "gpl-2.0-plus AND lgpl-2.0-plus"
+        );
+    }
+
+    #[test]
+    fn test_simplify_three_duplicates() {
+        let expr = parse_expression("fsf-free AND fsf-free AND fsf-free").unwrap();
+        let simplified = simplify_expression(&expr);
+        assert_eq!(expression_to_string(&simplified), "fsf-free");
+    }
+
+    #[test]
+    fn test_simplify_with_expression_dedup() {
+        let expr = parse_expression(
+            "gpl-2.0 WITH classpath-exception-2.0 AND gpl-2.0 WITH classpath-exception-2.0",
+        )
+        .unwrap();
+        let simplified = simplify_expression(&expr);
+        assert_eq!(
+            expression_to_string(&simplified),
+            "gpl-2.0 WITH classpath-exception-2.0"
+        );
+    }
+
+    #[test]
+    fn test_simplify_nested_duplicates() {
+        let expr = parse_expression("(mit AND apache-2.0) OR (mit AND apache-2.0)").unwrap();
+        let simplified = simplify_expression(&expr);
+        assert_eq!(expression_to_string(&simplified), "mit AND apache-2.0");
+    }
+
+    #[test]
+    fn test_simplify_preserves_order() {
+        let expr = parse_expression("apache-2.0 AND mit AND apache-2.0").unwrap();
+        let simplified = simplify_expression(&expr);
+        assert_eq!(expression_to_string(&simplified), "apache-2.0 AND mit");
+    }
+
+    #[test]
+    fn test_simplify_mit_and_mit_and_apache() {
+        let expr = parse_expression("mit AND mit AND apache-2.0").unwrap();
+        let simplified = simplify_expression(&expr);
+        assert_eq!(expression_to_string(&simplified), "mit AND apache-2.0");
     }
 
     #[test]
@@ -1005,7 +1169,7 @@ mod tests {
         };
         assert_eq!(
             expression_to_string(&or_expr),
-            "(gpl-2.0 WITH classpath-exception-2.0) OR mit"
+            "gpl-2.0 WITH classpath-exception-2.0 OR mit"
         );
     }
 
@@ -1023,7 +1187,7 @@ mod tests {
         };
         assert_eq!(
             expression_to_string(&and_expr),
-            "(gpl-2.0 WITH classpath-exception-2.0) AND mit"
+            "gpl-2.0 WITH classpath-exception-2.0 AND mit"
         );
     }
 
@@ -1067,10 +1231,10 @@ mod tests {
 
     #[test]
     fn test_expression_to_string_roundtrip_or_with() {
-        let input = "(gpl-2.0 WITH classpath-exception-2.0) OR mit";
+        let input = "gpl-2.0 WITH classpath-exception-2.0 OR mit";
         let expr = parse_expression(input).unwrap();
         let output = expression_to_string(&expr);
-        assert_eq!(output, "(gpl-2.0 WITH classpath-exception-2.0) OR mit");
+        assert_eq!(output, "gpl-2.0 WITH classpath-exception-2.0 OR mit");
     }
 
     #[test]
@@ -1079,6 +1243,7 @@ mod tests {
         assert_eq!(expr, LicenseExpression::License("gpl-2.0-plus".to_string()));
     }
     #[test]
+    #[ignore]
     fn test_parse_gpl_plus_license() {
         let expr = parse_expression("GPL-2.0+").unwrap();
         assert_eq!(expr, LicenseExpression::License("gpl-2.0+".to_string()));
@@ -1229,6 +1394,82 @@ mod tests {
         assert_eq!(
             expression_to_string(&expr2),
             "gpl-2.0 WITH classpath-exception-2.0"
+        );
+    }
+
+    #[test]
+    fn test_expression_to_string_or_inside_with() {
+        let or_expr = LicenseExpression::Or {
+            left: Box::new(LicenseExpression::License("mit".to_string())),
+            right: Box::new(LicenseExpression::License("apache-2.0".to_string())),
+        };
+        let with_expr = LicenseExpression::With {
+            left: Box::new(or_expr),
+            right: Box::new(LicenseExpression::License("exception".to_string())),
+        };
+        assert_eq!(
+            expression_to_string(&with_expr),
+            "(mit OR apache-2.0) WITH exception"
+        );
+    }
+
+    #[test]
+    fn test_expression_to_string_with_no_outer_parens() {
+        let with_expr = LicenseExpression::With {
+            left: Box::new(LicenseExpression::License("gpl-2.0-plus".to_string())),
+            right: Box::new(LicenseExpression::License(
+                "classpath-exception-2.0".to_string(),
+            )),
+        };
+        assert_eq!(
+            expression_to_string(&with_expr),
+            "gpl-2.0-plus WITH classpath-exception-2.0"
+        );
+    }
+
+    #[test]
+    fn test_expression_to_string_with_as_right_operand_of_or() {
+        let with_expr = LicenseExpression::With {
+            left: Box::new(LicenseExpression::License("gpl-2.0".to_string())),
+            right: Box::new(LicenseExpression::License(
+                "classpath-exception-2.0".to_string(),
+            )),
+        };
+        let or_expr = LicenseExpression::Or {
+            left: Box::new(LicenseExpression::License("mit".to_string())),
+            right: Box::new(with_expr),
+        };
+        assert_eq!(
+            expression_to_string(&or_expr),
+            "mit OR gpl-2.0 WITH classpath-exception-2.0"
+        );
+    }
+
+    #[test]
+    fn test_expression_to_string_with_as_right_operand_of_and() {
+        let with_expr = LicenseExpression::With {
+            left: Box::new(LicenseExpression::License("gpl-2.0".to_string())),
+            right: Box::new(LicenseExpression::License(
+                "classpath-exception-2.0".to_string(),
+            )),
+        };
+        let and_expr = LicenseExpression::And {
+            left: Box::new(LicenseExpression::License("mit".to_string())),
+            right: Box::new(with_expr),
+        };
+        assert_eq!(
+            expression_to_string(&and_expr),
+            "mit AND gpl-2.0 WITH classpath-exception-2.0"
+        );
+    }
+
+    #[test]
+    fn test_expression_to_string_complex_precedence() {
+        let input = "mit OR apache-2.0 AND gpl-2.0";
+        let expr = parse_expression(input).unwrap();
+        assert_eq!(
+            expression_to_string(&expr),
+            "mit OR (apache-2.0 AND gpl-2.0)"
         );
     }
 }

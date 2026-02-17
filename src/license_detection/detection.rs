@@ -12,6 +12,16 @@ use crate::license_detection::spdx_mapping::SpdxMapping;
 /// Matches more than this many lines apart are considered separate regions.
 const LINES_THRESHOLD: usize = 4;
 
+/// Token gap threshold for grouping matches.
+/// Matches with more than this many unmatched tokens between them are separate regions.
+/// Based on Python: licensedcode/match.py MIN_TOKENS_GAP
+const TOKENS_THRESHOLD: usize = 10;
+
+/// Line gap threshold for grouping matches.
+/// Matches with more than this many unmatched lines between them are separate regions.
+/// Based on Python: licensedcode/match.py MIN_LINES_GAP
+const LINES_GAP_THRESHOLD: usize = 3;
+
 /// Coverage value below which detections are not perfect.
 /// Any value < 100 means detection is imperfect.
 const IMPERFECT_MATCH_COVERAGE_THR: f32 = 100.0;
@@ -154,14 +164,14 @@ pub fn group_matches_by_region(matches: &[LicenseMatch]) -> Vec<DetectionGroup> 
 /// # Arguments
 ///
 /// * `matches` - List of license matches to group, should be sorted by start_line
-/// * `proximity_threshold` - Maximum line gap between matches to be in the same group
+/// * `_proximity_threshold` - Maximum line gap between matches to be in the same group (kept for API compatibility, not used)
 ///
 /// # Returns
 ///
 /// A vector of DetectionGroup objects, each containing matches that form a region
 fn group_matches_by_region_with_threshold(
     matches: &[LicenseMatch],
-    proximity_threshold: usize,
+    _proximity_threshold: usize,
 ) -> Vec<DetectionGroup> {
     let mut groups = Vec::new();
     let mut current_group: Vec<LicenseMatch> = Vec::new();
@@ -173,8 +183,6 @@ fn group_matches_by_region_with_threshold(
         }
 
         let previous_match = current_group.last().unwrap();
-        let is_in_group_by_threshold =
-            match_item.start_line <= previous_match.end_line + proximity_threshold;
 
         if previous_match.matcher.starts_with("5-unknown") && is_license_intro_match(previous_match)
         {
@@ -190,7 +198,7 @@ fn group_matches_by_region_with_threshold(
             }
             groups.push(DetectionGroup::new(vec![match_item.clone()]));
             current_group = Vec::new();
-        } else if is_in_group_by_threshold {
+        } else if should_group_together(previous_match, match_item) {
             current_group.push(match_item.clone());
         } else {
             if !current_group.is_empty() {
@@ -205,6 +213,50 @@ fn group_matches_by_region_with_threshold(
     }
 
     groups
+}
+
+/// Check if two matches should be in the same group based on dual-criteria.
+///
+/// Matches are grouped together when BOTH:
+/// - Token gap <= TOKENS_THRESHOLD
+/// - Line gap <= LINES_GAP_THRESHOLD
+///
+/// Matches are separated when EITHER:
+/// - Token gap > TOKENS_THRESHOLD
+/// - Line gap > LINES_GAP_THRESHOLD
+///
+/// Based on Python: get_matching_regions() in match.py
+fn should_group_together(prev: &LicenseMatch, cur: &LicenseMatch) -> bool {
+    let token_gap = calculate_token_gap(prev, cur);
+    let line_gap = calculate_line_gap(prev, cur);
+
+    token_gap <= TOKENS_THRESHOLD && line_gap <= LINES_GAP_THRESHOLD
+}
+
+/// Calculate the token gap between two matches.
+///
+/// Returns the number of unmatched tokens between the end of prev and start of cur.
+/// Returns 0 if matches overlap or touch.
+fn calculate_token_gap(prev: &LicenseMatch, cur: &LicenseMatch) -> usize {
+    if cur.start_token >= prev.end_token {
+        cur.start_token.saturating_sub(prev.end_token)
+    } else {
+        0
+    }
+}
+
+/// Calculate the line gap between two matches.
+///
+/// Returns the number of unmatched lines between the end of prev and start of cur.
+/// Returns 0 if matches overlap or touch.
+fn calculate_line_gap(prev: &LicenseMatch, cur: &LicenseMatch) -> usize {
+    if cur.start_line > prev.end_line {
+        cur.start_line
+            .saturating_sub(prev.end_line)
+            .saturating_sub(1)
+    } else {
+        0
+    }
 }
 
 /// Sort matches by start line for grouping.
@@ -309,6 +361,12 @@ fn is_false_positive(matches: &[LicenseMatch]) -> bool {
         return false;
     }
 
+    // Early return if all matches have full relevance (100)
+    let has_full_relevance = matches.iter().all(|m| m.rule_relevance == 100);
+    if has_full_relevance {
+        return false;
+    }
+
     let start_line = matches.iter().map(|m| m.start_line).min().unwrap_or(0);
 
     let bare_rules = ["gpl_bare", "freeware_bare", "public-domain_bare"];
@@ -322,23 +380,40 @@ fn is_false_positive(matches: &[LicenseMatch]) -> bool {
         .iter()
         .all(|m| m.rule_identifier.to_lowercase().contains("gpl"));
 
-    let all_short = matches
-        .iter()
-        .all(|m| m.matched_length <= FALSE_POSITIVE_RULE_LENGTH_THRESHOLD);
+    // Use rule_length (token count) instead of matched_length (character count)
+    let rule_length_values: Vec<usize> = matches.iter().map(|m| m.rule_length).collect();
+
+    let all_rule_length_one = rule_length_values.iter().all(|&l| l == 1);
 
     let all_low_relevance = matches.iter().all(|m| m.rule_relevance < 60);
 
     let is_single = matches.len() == 1;
 
+    // Check if all matches are license tags with length == 1
+    let all_is_license_tag = matches.iter().all(|m| m.is_license_tag);
+
+    // Check 1: Single bare rule with low relevance
     if is_single && is_bare_rule && all_low_relevance {
         return true;
     }
 
-    if is_gpl && all_short {
+    // Check 2: GPL with all rules having length == 1 (token count)
+    if is_gpl && all_rule_length_one {
         return true;
     }
 
-    if all_low_relevance && start_line > FALSE_POSITIVE_START_LINE_THRESHOLD && all_short {
+    // Check 3: Late match with low relevance and any short rule
+    if all_low_relevance
+        && start_line > FALSE_POSITIVE_START_LINE_THRESHOLD
+        && rule_length_values
+            .iter()
+            .any(|&l| l <= FALSE_POSITIVE_RULE_LENGTH_THRESHOLD)
+    {
+        return true;
+    }
+
+    // Check 4: License tag matches with length == 1
+    if all_is_license_tag && all_rule_length_one {
         return true;
     }
 
@@ -784,34 +859,33 @@ pub fn filter_detections_by_score(
         .collect()
 }
 
-/// Remove duplicate detections (same license expression).
+/// Remove duplicate detections (same identifier).
 ///
-/// When multiple detections have the same license_expression, keeps only
-/// the one with the highest score. If scores are equal, keeps the first one.
+/// Groups detections by their identifier (license expression + content hash).
+/// Detections with the same identifier represent the same license at the same
+/// location. Detections with the same expression but different identifiers
+/// represent the same license at DIFFERENT locations and should be kept separate.
 ///
-/// Based on Python deduplication logic in detection.py.
+/// Based on Python get_detections_by_id behavior in detection.py.
 pub fn remove_duplicate_detections(detections: Vec<LicenseDetection>) -> Vec<LicenseDetection> {
-    let mut unique_detections: std::collections::HashMap<String, LicenseDetection> =
+    let mut detections_by_id: std::collections::HashMap<String, LicenseDetection> =
         std::collections::HashMap::new();
 
     for detection in detections {
-        let expr = detection
-            .license_expression
+        let identifier = detection
+            .identifier
             .clone()
-            .unwrap_or_else(String::new);
+            .unwrap_or_else(|| compute_detection_identifier(&detection));
 
-        let score = compute_detection_score(&detection.matches);
-        let should_keep = unique_detections
-            .get(&expr)
-            .map(|existing| score >= compute_detection_score(&existing.matches))
-            .unwrap_or(true);
-
-        if should_keep {
-            unique_detections.insert(expr, detection);
+        let entry = detections_by_id.entry(identifier.clone());
+        if let std::collections::hash_map::Entry::Vacant(e) = entry {
+            let mut detection = detection;
+            detection.identifier = Some(identifier);
+            e.insert(detection);
         }
     }
 
-    unique_detections.into_values().collect()
+    detections_by_id.into_values().collect()
 }
 
 /// Rank detections by score and coverage.
@@ -848,6 +922,69 @@ pub fn sort_detections_by_line(mut detections: Vec<LicenseDetection>) -> Vec<Lic
         min_line_a.cmp(&min_line_b)
     });
     detections
+}
+
+fn python_safe_name(s: &str) -> String {
+    let mut result = String::new();
+    let mut prev_underscore = false;
+
+    for c in s.chars() {
+        if c.is_alphanumeric() {
+            result.push(c);
+            prev_underscore = false;
+        } else if !prev_underscore {
+            result.push('_');
+            prev_underscore = true;
+        }
+    }
+
+    let trimmed = result.trim_matches('_');
+    if trimmed.is_empty() {
+        String::new()
+    } else {
+        trimmed.to_string()
+    }
+}
+
+fn get_uuid_on_content(content: &[(&str, f32, &str)]) -> String {
+    let content_tuple: Vec<(&str, f32, &str)> = content.to_vec();
+
+    let repr_str = format!("{:?}", content_tuple);
+
+    use sha1::{Digest, Sha1};
+    let mut hasher = Sha1::new();
+    hasher.update(repr_str.as_bytes());
+    let hash = hasher.finalize();
+    let hex_str = hex::encode(hash);
+
+    let uuid_hex = &hex_str[..32];
+
+    uuid::Uuid::parse_str(uuid_hex)
+        .map(|u| u.to_string())
+        .unwrap_or_else(|_| uuid_hex.to_string())
+}
+
+fn compute_content_identifier(matches: &[LicenseMatch]) -> String {
+    let content: Vec<(&str, f32, &str)> = matches
+        .iter()
+        .map(|m| {
+            let matched_text = m.matched_text.as_deref().unwrap_or("");
+            (m.rule_identifier.as_str(), m.score, matched_text)
+        })
+        .collect();
+
+    get_uuid_on_content(&content)
+}
+
+pub fn compute_detection_identifier(detection: &LicenseDetection) -> String {
+    let expression = detection
+        .license_expression
+        .as_ref()
+        .map(|s| python_safe_name(s))
+        .unwrap_or_default();
+
+    let content_uuid = compute_content_identifier(&detection.matches);
+    format!("{}-{}", expression, content_uuid)
 }
 
 /// Compute detection coverage from matches.
@@ -999,6 +1136,8 @@ mod tests {
             from_file: Some("test.txt".to_string()),
             start_line,
             end_line,
+            start_token: 0,
+            end_token: 0,
             matcher: matcher.to_string(),
             score: 0.95,
             matched_length: 100,
@@ -1010,6 +1149,9 @@ mod tests {
             referenced_filenames: None,
             is_license_intro: false,
             is_license_clue: false,
+            is_license_reference: false,
+            is_license_tag: false,
+            rule_length: 100,
         }
     }
 
@@ -1149,6 +1291,127 @@ mod tests {
         assert_eq!(LINES_THRESHOLD, 4);
     }
 
+    #[test]
+    fn test_tokens_threshold_constant() {
+        assert_eq!(TOKENS_THRESHOLD, 10);
+    }
+
+    #[test]
+    fn test_lines_gap_threshold_constant() {
+        assert_eq!(LINES_GAP_THRESHOLD, 3);
+    }
+
+    fn create_test_match_with_tokens(
+        start_line: usize,
+        end_line: usize,
+        start_token: usize,
+        end_token: usize,
+    ) -> LicenseMatch {
+        LicenseMatch {
+            license_expression: "mit".to_string(),
+            license_expression_spdx: "MIT".to_string(),
+            from_file: Some("test.txt".to_string()),
+            start_line,
+            end_line,
+            start_token,
+            end_token,
+            matcher: "1-hash".to_string(),
+            score: 0.95,
+            matched_length: 100,
+            match_coverage: 95.0,
+            rule_relevance: 100,
+            rule_identifier: "mit.LICENSE".to_string(),
+            rule_url: "https://example.com".to_string(),
+            matched_text: Some("MIT License".to_string()),
+            referenced_filenames: None,
+            is_license_intro: false,
+            is_license_clue: false,
+            is_license_reference: false,
+            is_license_tag: false,
+            rule_length: 100,
+        }
+    }
+
+    #[test]
+    fn test_dual_criteria_grouping_within_both_thresholds() {
+        let m1 = create_test_match_with_tokens(1, 10, 0, 50);
+        let m2 = create_test_match_with_tokens(12, 20, 55, 100);
+        let groups = group_matches_by_region(&[m1, m2]);
+        assert_eq!(
+            groups.len(),
+            1,
+            "Should group when both thresholds not exceeded"
+        );
+    }
+
+    #[test]
+    fn test_dual_criteria_grouping_exceeds_token_threshold_only() {
+        let m1 = create_test_match_with_tokens(1, 10, 0, 50);
+        let m2 = create_test_match_with_tokens(12, 20, 65, 100);
+        let groups = group_matches_by_region(&[m1, m2]);
+        assert_eq!(groups.len(), 2, "Should separate when token gap > 10");
+    }
+
+    #[test]
+    fn test_dual_criteria_grouping_exceeds_line_threshold_only() {
+        let m1 = create_test_match_with_tokens(1, 10, 0, 50);
+        let m2 = create_test_match_with_tokens(15, 25, 55, 100);
+        let groups = group_matches_by_region(&[m1, m2]);
+        assert_eq!(groups.len(), 2, "Should separate when line gap > 3");
+    }
+
+    #[test]
+    fn test_dual_criteria_grouping_exceeds_both_thresholds() {
+        let m1 = create_test_match_with_tokens(1, 10, 0, 50);
+        let m2 = create_test_match_with_tokens(15, 25, 65, 100);
+        let groups = group_matches_by_region(&[m1, m2]);
+        assert_eq!(
+            groups.len(),
+            2,
+            "Should separate when both thresholds exceeded"
+        );
+    }
+
+    #[test]
+    fn test_dual_criteria_grouping_at_exact_thresholds() {
+        let m1 = create_test_match_with_tokens(1, 10, 0, 50);
+        let m2 = create_test_match_with_tokens(14, 20, 60, 100);
+        let groups = group_matches_by_region(&[m1, m2]);
+        assert_eq!(
+            groups.len(),
+            1,
+            "Should group at exact threshold boundaries"
+        );
+    }
+
+    #[test]
+    fn test_calculate_token_gap_non_overlapping() {
+        let m1 = create_test_match_with_tokens(1, 5, 0, 10);
+        let m2 = create_test_match_with_tokens(6, 10, 15, 25);
+        assert_eq!(calculate_token_gap(&m1, &m2), 5);
+    }
+
+    #[test]
+    fn test_calculate_token_gap_touching() {
+        let m1 = create_test_match_with_tokens(1, 5, 0, 10);
+        let m2 = create_test_match_with_tokens(6, 10, 10, 20);
+        assert_eq!(calculate_token_gap(&m1, &m2), 0);
+    }
+
+    #[test]
+    fn test_calculate_line_gap_non_overlapping() {
+        let m1 = create_test_match_with_tokens(1, 5, 0, 10);
+        let m2 = create_test_match_with_tokens(10, 15, 15, 25);
+        assert_eq!(calculate_line_gap(&m1, &m2), 4);
+    }
+
+    #[test]
+    fn test_calculate_line_gap_touching() {
+        let m1 = create_test_match_with_tokens(1, 5, 0, 10);
+        let m2 = create_test_match_with_tokens(6, 10, 15, 25);
+        assert_eq!(calculate_line_gap(&m1, &m2), 0);
+    }
+
     #[allow(clippy::too_many_arguments)]
     fn create_test_match_with_params(
         license_expression: &str,
@@ -1157,6 +1420,7 @@ mod tests {
         end_line: usize,
         score: f32,
         matched_length: usize,
+        rule_length: usize,
         match_coverage: f32,
         rule_relevance: u8,
         rule_identifier: &str,
@@ -1167,9 +1431,12 @@ mod tests {
             from_file: Some("test.txt".to_string()),
             start_line,
             end_line,
+            start_token: 0,
+            end_token: 0,
             matcher: matcher.to_string(),
             score,
             matched_length,
+            rule_length,
             match_coverage,
             rule_relevance,
             rule_identifier: rule_identifier.to_string(),
@@ -1178,6 +1445,8 @@ mod tests {
             referenced_filenames: None,
             is_license_intro: false,
             is_license_clue: false,
+            is_license_reference: false,
+            is_license_tag: false,
         }
     }
 
@@ -1189,6 +1458,7 @@ mod tests {
             1,
             10,
             95.0,
+            100,
             100,
             100.0,
             100,
@@ -1207,6 +1477,7 @@ mod tests {
             10,
             95.0,
             100,
+            100,
             100.0,
             100,
             "apache-2.0.LICENSE",
@@ -1224,6 +1495,7 @@ mod tests {
             10,
             95.0,
             100,
+            100,
             100.0,
             100,
             "gpl-2.0.LICENSE",
@@ -1235,13 +1507,14 @@ mod tests {
     #[test]
     fn test_is_correct_detection_multiple_perfect() {
         let matches = vec![
-            create_test_match_with_params("mit", "1-hash", 1, 10, 95.0, 100, 100.0, 100, "#1"),
+            create_test_match_with_params("mit", "1-hash", 1, 10, 95.0, 100, 100, 100.0, 100, "#1"),
             create_test_match_with_params(
                 "apache-2.0",
                 "1-spdx-id",
                 11,
                 20,
                 95.0,
+                100,
                 100,
                 100.0,
                 100,
@@ -1261,6 +1534,7 @@ mod tests {
             10,
             85.0,
             100,
+            100,
             95.0,
             100,
             "mit.LICENSE",
@@ -1277,6 +1551,7 @@ mod tests {
             1,
             10,
             50.0,
+            50,
             50,
             50.0,
             50,
@@ -1301,6 +1576,7 @@ mod tests {
             10,
             95.0,
             100,
+            100,
             100.0,
             100,
             "mit.LICENSE",
@@ -1317,6 +1593,7 @@ mod tests {
             1,
             10,
             95.0,
+            100,
             100,
             80.0,
             100,
@@ -1335,6 +1612,7 @@ mod tests {
             10,
             65.0,
             100,
+            100,
             65.0,
             100,
             "mit.LICENSE",
@@ -1351,6 +1629,7 @@ mod tests {
             1,
             10,
             60.0,
+            100,
             100,
             60.0,
             100,
@@ -1375,6 +1654,7 @@ mod tests {
             10,
             95.0,
             100,
+            100,
             100.0,
             100,
             "mit.LICENSE",
@@ -1391,6 +1671,7 @@ mod tests {
             1,
             10,
             50.0,
+            50,
             50,
             50.0,
             50,
@@ -1409,6 +1690,7 @@ mod tests {
             10,
             75.0,
             75,
+            75,
             75.0,
             75,
             "#42",
@@ -1425,6 +1707,7 @@ mod tests {
             1,
             10,
             100.0,
+            100,
             100,
             100.0,
             100,
@@ -1443,6 +1726,7 @@ mod tests {
             10,
             50.0,
             100,
+            100,
             60.0,
             100,
             "mit.LICENSE",
@@ -1460,6 +1744,7 @@ mod tests {
             2005,
             30.0,
             3,
+            3,
             30.0,
             50,
             "gpl_bare.LICENSE",
@@ -1470,6 +1755,7 @@ mod tests {
 
     #[test]
     fn test_is_false_positive_gpl_short() {
+        // GPL with rule_length == 1 and low relevance should be filtered
         let matches = vec![create_test_match_with_params(
             "gpl-2.0",
             "2-aho",
@@ -1477,8 +1763,9 @@ mod tests {
             10,
             50.0,
             2,
+            1,
             50.0,
-            100,
+            50,
             "gpl-2.0.LICENSE",
         )];
 
@@ -1487,12 +1774,14 @@ mod tests {
 
     #[test]
     fn test_is_false_positive_late_short_low_relevance() {
+        // Late match with low relevance and short rule_length should be filtered
         let matches = vec![create_test_match_with_params(
             "mit",
             "2-aho",
             1500,
             1505,
             30.0,
+            3,
             3,
             30.0,
             50,
@@ -1510,6 +1799,7 @@ mod tests {
             1,
             10,
             95.0,
+            100,
             100,
             100.0,
             100,
@@ -1534,6 +1824,7 @@ mod tests {
             10,
             40.0,
             20,
+            20,
             40.0,
             80,
             "mit.LICENSE",
@@ -1550,6 +1841,7 @@ mod tests {
             1,
             10,
             95.0,
+            100,
             100,
             100.0,
             100,
@@ -1574,6 +1866,7 @@ mod tests {
             10,
             95.0,
             100,
+            100,
             95.0,
             100,
             "mit.LICENSE",
@@ -1586,13 +1879,14 @@ mod tests {
     #[test]
     fn test_compute_detection_score_multiple_equal() {
         let matches = vec![
-            create_test_match_with_params("mit", "1-hash", 1, 10, 95.0, 100, 95.0, 100, "#1"),
+            create_test_match_with_params("mit", "1-hash", 1, 10, 95.0, 100, 100, 95.0, 100, "#1"),
             create_test_match_with_params(
                 "apache-2.0",
                 "1-spdx-id",
                 11,
                 20,
                 85.0,
+                100,
                 100,
                 85.0,
                 100,
@@ -1607,13 +1901,14 @@ mod tests {
     #[test]
     fn test_compute_detection_score_weighted() {
         let matches = vec![
-            create_test_match_with_params("mit", "1-hash", 1, 10, 95.0, 200, 95.0, 100, "#1"),
+            create_test_match_with_params("mit", "1-hash", 1, 10, 95.0, 200, 200, 95.0, 100, "#1"),
             create_test_match_with_params(
                 "apache-2.0",
                 "1-spdx-id",
                 11,
                 15,
                 85.0,
+                50,
                 50,
                 85.0,
                 100,
@@ -1641,6 +1936,7 @@ mod tests {
             10,
             150.0,
             100,
+            100,
             100.0,
             100,
             "mit.LICENSE",
@@ -1659,6 +1955,7 @@ mod tests {
             10,
             95.0,
             100,
+            100,
             95.0,
             100,
             "mit.LICENSE",
@@ -1672,13 +1969,14 @@ mod tests {
     #[test]
     fn test_determine_license_expression_multiple() {
         let matches = vec![
-            create_test_match_with_params("mit", "1-hash", 1, 10, 95.0, 100, 95.0, 100, "#1"),
+            create_test_match_with_params("mit", "1-hash", 1, 10, 95.0, 100, 100, 95.0, 100, "#1"),
             create_test_match_with_params(
                 "apache-2.0",
                 "1-spdx-id",
                 11,
                 20,
                 85.0,
+                100,
                 100,
                 85.0,
                 100,
@@ -1712,6 +2010,7 @@ mod tests {
                 10,
                 95.0,
                 100,
+                100,
                 100.0,
                 100,
                 "mit.LICENSE",
@@ -1736,6 +2035,7 @@ mod tests {
                 10,
                 30.0,
                 50,
+                50,
                 30.0,
                 50,
                 "mit.LICENSE",
@@ -1759,6 +2059,7 @@ mod tests {
                 2000,
                 2005,
                 30.0,
+                3,
                 3,
                 30.0,
                 50,
@@ -1798,6 +2099,7 @@ mod tests {
                 10,
                 85.0,
                 100,
+                100,
                 100.0,
                 100,
                 "mit.LICENSE",
@@ -1823,6 +2125,7 @@ mod tests {
                 10,
                 95.0,
                 100,
+                100,
                 100.0,
                 100,
                 "mit.LICENSE",
@@ -1844,6 +2147,7 @@ mod tests {
                 1,
                 10,
                 100.0,
+                100,
                 100,
                 100.0,
                 100,
@@ -1907,6 +2211,7 @@ mod tests {
                 2005,
                 30.0,
                 3,
+                3,
                 30.0,
                 50,
                 "gpl_bare.LICENSE",
@@ -1964,6 +2269,7 @@ mod tests {
             10,
             95.0,
             100,
+            100,
             95.0,
             100,
             "mit.LICENSE",
@@ -1977,13 +2283,14 @@ mod tests {
     #[test]
     fn test_determine_spdx_expression_multiple() {
         let matches = vec![
-            create_test_match_with_params("mit", "1-hash", 1, 10, 95.0, 100, 95.0, 100, "#1"),
+            create_test_match_with_params("mit", "1-hash", 1, 10, 95.0, 100, 100, 95.0, 100, "#1"),
             create_test_match_with_params(
                 "apache-2.0",
                 "1-spdx-id",
                 11,
                 20,
                 85.0,
+                100,
                 100,
                 85.0,
                 100,
@@ -2148,6 +2455,7 @@ mod tests {
                 10,
                 100.0,
                 100,
+                100,
                 100.0,
                 100,
                 "mit.LICENSE",
@@ -2250,13 +2558,16 @@ mod tests {
 
         let group = DetectionGroup {
             matches: vec![
-                create_test_match_with_params("mit", "1-hash", 1, 10, 100.0, 100, 100.0, 100, "#1"),
+                create_test_match_with_params(
+                    "mit", "1-hash", 1, 10, 100.0, 100, 100, 100.0, 100, "#1",
+                ),
                 create_test_match_with_params(
                     "apache-2.0",
                     "1-spdx-id",
                     11,
                     20,
                     100.0,
+                    100,
                     100,
                     100.0,
                     100,
@@ -2322,9 +2633,10 @@ mod tests {
                 "2-aho",
                 1,
                 10,
-                95.0,
+                100.0,
                 100,
-                95.0,
+                100,
+                100.0,
                 100,
                 "custom-1.LICENSE",
             )],
@@ -2363,9 +2675,10 @@ mod tests {
                 10,
                 95.0,
                 100,
+                100,
                 100.0,
                 100,
-                "mit.LICENSE",
+                "custom-1.LICENSE",
             )],
             start_line: 1,
             end_line: 10,
@@ -2402,6 +2715,7 @@ mod tests {
                     10,
                     95.0,
                     100,
+                    100,
                     100.0,
                     100,
                     "mit.LICENSE",
@@ -2419,6 +2733,7 @@ mod tests {
                     1,
                     10,
                     90.0,
+                    100,
                     100,
                     100.0,
                     100,
@@ -2447,6 +2762,7 @@ mod tests {
                     10,
                     95.0,
                     100,
+                    100,
                     100.0,
                     100,
                     "mit.LICENSE",
@@ -2464,6 +2780,7 @@ mod tests {
                     1,
                     10,
                     30.0,
+                    100,
                     100,
                     30.0,
                     50,
@@ -2491,6 +2808,7 @@ mod tests {
                 1,
                 10,
                 30.0,
+                100,
                 100,
                 30.0,
                 50,
@@ -2525,6 +2843,7 @@ mod tests {
                     10,
                     95.0,
                     100,
+                    100,
                     100.0,
                     100,
                     "mit.LICENSE",
@@ -2543,6 +2862,7 @@ mod tests {
                     10,
                     90.0,
                     100,
+                    100,
                     100.0,
                     100,
                     "#1",
@@ -2558,7 +2878,8 @@ mod tests {
     }
 
     #[test]
-    fn test_remove_duplicate_detections_same_expression_keeps_best() {
+    fn test_remove_duplicate_detections_same_identifier_removed() {
+        let identifier = "mit-abc123".to_string();
         let detections = vec![
             LicenseDetection {
                 license_expression: Some("mit".to_string()),
@@ -2569,6 +2890,55 @@ mod tests {
                     1,
                     10,
                     95.0,
+                    100,
+                    100,
+                    100.0,
+                    100,
+                    "mit.LICENSE",
+                )],
+                detection_log: Vec::new(),
+                identifier: Some(identifier.clone()),
+                file_region: None,
+            },
+            LicenseDetection {
+                license_expression: Some("mit".to_string()),
+                license_expression_spdx: None,
+                matches: vec![create_test_match_with_params(
+                    "mit",
+                    "2-aho",
+                    1,
+                    10,
+                    85.0,
+                    100,
+                    100,
+                    85.0,
+                    100,
+                    "mit.LICENSE",
+                )],
+                detection_log: Vec::new(),
+                identifier: Some(identifier.clone()),
+                file_region: None,
+            },
+        ];
+
+        let result = remove_duplicate_detections(detections);
+        assert_eq!(result.len(), 1, "Same identifier should dedupe");
+        assert_eq!(result[0].identifier, Some(identifier));
+    }
+
+    #[test]
+    fn test_remove_duplicate_detections_same_expression_different_identifier() {
+        let detections = vec![
+            LicenseDetection {
+                license_expression: Some("mit".to_string()),
+                license_expression_spdx: None,
+                matches: vec![create_test_match_with_params(
+                    "mit",
+                    "1-hash",
+                    1,
+                    10,
+                    95.0,
+                    100,
                     100,
                     100.0,
                     100,
@@ -2584,9 +2954,10 @@ mod tests {
                 matches: vec![create_test_match_with_params(
                     "mit",
                     "2-aho",
-                    1,
-                    10,
+                    100,
+                    110,
                     85.0,
+                    100,
                     100,
                     85.0,
                     100,
@@ -2599,9 +2970,11 @@ mod tests {
         ];
 
         let result = remove_duplicate_detections(detections);
-        assert_eq!(result.len(), 1);
-        assert_eq!(result[0].license_expression, Some("mit".to_string()));
-        assert_eq!(result[0].identifier, Some("id1".to_string()));
+        assert_eq!(
+            result.len(),
+            2,
+            "Different identifiers should be kept separate"
+        );
     }
 
     #[test]
@@ -2624,6 +2997,7 @@ mod tests {
                     10,
                     85.0,
                     100,
+                    100,
                     85.0,
                     100,
                     "mit.LICENSE",
@@ -2641,6 +3015,7 @@ mod tests {
                     1,
                     10,
                     90.0,
+                    100,
                     100,
                     100.0,
                     100,
@@ -2671,6 +3046,7 @@ mod tests {
                     10,
                     90.0,
                     100,
+                    100,
                     85.0,
                     100,
                     "mit.LICENSE",
@@ -2688,6 +3064,7 @@ mod tests {
                     1,
                     10,
                     90.0,
+                    100,
                     100,
                     90.0,
                     100,
@@ -2709,6 +3086,96 @@ mod tests {
         let detections: Vec<LicenseDetection> = vec![];
         let result = rank_detections(detections);
         assert_eq!(result.len(), 0);
+    }
+
+    #[test]
+    fn test_compute_detection_identifier_deterministic() {
+        let detection = LicenseDetection {
+            license_expression: Some("mit".to_string()),
+            license_expression_spdx: None,
+            matches: vec![create_test_match_with_params(
+                "mit",
+                "1-hash",
+                1,
+                10,
+                95.0,
+                100,
+                100,
+                100.0,
+                100,
+                "mit.LICENSE",
+            )],
+            detection_log: Vec::new(),
+            identifier: None,
+            file_region: None,
+        };
+
+        let id1 = compute_detection_identifier(&detection);
+        let id2 = compute_detection_identifier(&detection);
+        assert_eq!(id1, id2, "Identifier should be deterministic");
+        assert!(
+            id1.starts_with("mit-"),
+            "Identifier should start with expression"
+        );
+    }
+
+    #[test]
+    fn test_compute_detection_identifier_different_content() {
+        let detection1 = LicenseDetection {
+            license_expression: Some("mit".to_string()),
+            license_expression_spdx: None,
+            matches: vec![create_test_match_with_params(
+                "mit",
+                "1-hash",
+                1,
+                10,
+                95.0,
+                100,
+                100,
+                100.0,
+                100,
+                "mit.LICENSE",
+            )],
+            detection_log: Vec::new(),
+            identifier: None,
+            file_region: None,
+        };
+
+        let detection2 = LicenseDetection {
+            license_expression: Some("mit".to_string()),
+            license_expression_spdx: None,
+            matches: vec![create_test_match_with_params(
+                "mit",
+                "2-aho",
+                100,
+                110,
+                85.0,
+                100,
+                100,
+                85.0,
+                100,
+                "mit.LICENSE",
+            )],
+            detection_log: Vec::new(),
+            identifier: None,
+            file_region: None,
+        };
+
+        let id1 = compute_detection_identifier(&detection1);
+        let id2 = compute_detection_identifier(&detection2);
+        assert_ne!(
+            id1, id2,
+            "Different content should produce different identifiers"
+        );
+    }
+
+    #[test]
+    fn test_python_safe_name() {
+        assert_eq!(python_safe_name("mit"), "mit");
+        assert_eq!(python_safe_name("gpl-2.0"), "gpl_2_0");
+        assert_eq!(python_safe_name("apache-2.0"), "apache_2_0");
+        assert_eq!(python_safe_name(""), "");
+        assert_eq!(python_safe_name("---"), "");
     }
 
     #[test]
@@ -2734,6 +3201,7 @@ mod tests {
                     10,
                     90.0,
                     100,
+                    100,
                     100.0,
                     100,
                     "mit.LICENSE",
@@ -2751,6 +3219,7 @@ mod tests {
                     1,
                     10,
                     90.0,
+                    100,
                     100,
                     100.0,
                     100,
@@ -2780,6 +3249,7 @@ mod tests {
                     10,
                     85.0,
                     100,
+                    100,
                     85.0,
                     100,
                     "#42",
@@ -2797,6 +3267,7 @@ mod tests {
                     1,
                     10,
                     95.0,
+                    100,
                     100,
                     100.0,
                     100,
@@ -2826,6 +3297,7 @@ mod tests {
                     10,
                     90.0,
                     100,
+                    100,
                     100.0,
                     100,
                     "mit.LICENSE",
@@ -2843,6 +3315,7 @@ mod tests {
                     1,
                     10,
                     90.0,
+                    100,
                     100,
                     100.0,
                     100,
@@ -2878,6 +3351,7 @@ mod tests {
                     10,
                     95.0,
                     100,
+                    100,
                     100.0,
                     100,
                     "mit.LICENSE",
@@ -2895,6 +3369,7 @@ mod tests {
                     1,
                     10,
                     85.0,
+                    100,
                     100,
                     85.0,
                     100,
@@ -2914,6 +3389,7 @@ mod tests {
                     10,
                     30.0,
                     100,
+                    100,
                     30.0,
                     50,
                     "unknown.LICENSE",
@@ -2931,6 +3407,7 @@ mod tests {
                     1,
                     10,
                     92.0,
+                    100,
                     100,
                     100.0,
                     100,
@@ -2959,6 +3436,7 @@ mod tests {
                 1,
                 10,
                 30.0,
+                100,
                 100,
                 30.0,
                 50,
@@ -2989,6 +3467,7 @@ mod tests {
             10,
             95.0,
             100,
+            100,
             95.0,
             100,
             "mit.LICENSE",
@@ -3001,13 +3480,14 @@ mod tests {
     #[test]
     fn test_compute_detection_coverage_multiple_equal() {
         let matches = vec![
-            create_test_match_with_params("mit", "1-hash", 1, 10, 95.0, 100, 95.0, 100, "#1"),
+            create_test_match_with_params("mit", "1-hash", 1, 10, 95.0, 100, 100, 95.0, 100, "#1"),
             create_test_match_with_params(
                 "apache-2.0",
                 "1-spdx-id",
                 11,
                 20,
                 85.0,
+                100,
                 100,
                 85.0,
                 100,
@@ -3022,13 +3502,14 @@ mod tests {
     #[test]
     fn test_compute_detection_coverage_weighted() {
         let matches = vec![
-            create_test_match_with_params("mit", "1-hash", 1, 10, 95.0, 200, 95.0, 100, "#1"),
+            create_test_match_with_params("mit", "1-hash", 1, 10, 95.0, 200, 200, 95.0, 100, "#1"),
             create_test_match_with_params(
                 "apache-2.0",
                 "1-spdx-id",
                 11,
                 15,
                 85.0,
+                50,
                 50,
                 85.0,
                 100,
@@ -3055,6 +3536,7 @@ mod tests {
             1,
             10,
             100.0,
+            100,
             100,
             100.0,
             100,
@@ -3094,6 +3576,7 @@ mod tests {
             10,
             0.0,
             0,
+            0,
             0.0,
             0,
             "undetected.LICENSE",
@@ -3111,6 +3594,7 @@ mod tests {
             10,
             95.0,
             100,
+            100,
             100.0,
             100,
             "mit.LICENSE",
@@ -3122,7 +3606,7 @@ mod tests {
     #[test]
     fn test_is_undetected_license_matches_multiple() {
         let matches = vec![
-            create_test_match_with_params("mit", "1-hash", 1, 10, 95.0, 100, 100.0, 100, "#1"),
+            create_test_match_with_params("mit", "1-hash", 1, 10, 95.0, 100, 100, 100.0, 100, "#1"),
             create_test_match_with_params(
                 "apache-2.0",
                 "1-spdx-id",
@@ -3130,7 +3614,8 @@ mod tests {
                 20,
                 85.0,
                 100,
-                100.0,
+                100,
+                85.0,
                 100,
                 "#2",
             ),
@@ -3154,6 +3639,7 @@ mod tests {
             10,
             0.0,
             0,
+            0,
             0.0,
             0,
             "undetected.LICENSE",
@@ -3173,6 +3659,7 @@ mod tests {
             1,
             10,
             100.0,
+            100,
             100,
             100.0,
             100,
@@ -3194,6 +3681,7 @@ mod tests {
             2005,
             30.0,
             3,
+            3,
             30.0,
             50,
             "gpl_bare.LICENSE",
@@ -3213,6 +3701,7 @@ mod tests {
             2000,
             2005,
             30.0,
+            3,
             3,
             30.0,
             50,
@@ -3234,6 +3723,7 @@ mod tests {
             10,
             40.0,
             20,
+            20,
             40.0,
             80,
             "mit.LICENSE",
@@ -3253,6 +3743,7 @@ mod tests {
             1,
             10,
             80.0,
+            50,
             50,
             80.0,
             100,
@@ -3274,6 +3765,7 @@ mod tests {
             10,
             85.0,
             100,
+            100,
             85.0,
             100,
             "mit.LICENSE",
@@ -3294,6 +3786,7 @@ mod tests {
             10,
             90.0,
             100,
+            100,
             100.0,
             100,
             "mit.LICENSE",
@@ -3313,6 +3806,8 @@ mod tests {
             from_file: Some("test.txt".to_string()),
             start_line: 1,
             end_line: 2,
+            start_token: 0,
+            end_token: 0,
             matcher: "5-unknown".to_string(),
             score: 50.0,
             matched_length: 5,
@@ -3324,6 +3819,9 @@ mod tests {
             referenced_filenames: None,
             is_license_intro: false,
             is_license_clue: false,
+            is_license_reference: false,
+            is_license_tag: false,
+            rule_length: 100,
         };
         let license_match = create_test_match_with_params(
             "mit",
@@ -3331,6 +3829,7 @@ mod tests {
             3,
             10,
             100.0,
+            100,
             100,
             100.0,
             100,
@@ -3350,6 +3849,7 @@ mod tests {
             10,
             100.0,
             100,
+            100,
             100.0,
             100,
             "mit.LICENSE",
@@ -3366,6 +3866,8 @@ mod tests {
             from_file: Some("test.txt".to_string()),
             start_line: 1,
             end_line: 2,
+            start_token: 0,
+            end_token: 0,
             matcher: "5-unknown".to_string(),
             score: 50.0,
             matched_length: 5,
@@ -3377,6 +3879,9 @@ mod tests {
             referenced_filenames: None,
             is_license_intro: false,
             is_license_clue: false,
+            is_license_reference: false,
+            is_license_tag: false,
+            rule_length: 100,
         };
         let intro2 = LicenseMatch {
             license_expression: "unknown".to_string(),
@@ -3384,6 +3889,8 @@ mod tests {
             from_file: Some("test.txt".to_string()),
             start_line: 3,
             end_line: 4,
+            start_token: 0,
+            end_token: 0,
             matcher: "5-unknown".to_string(),
             score: 50.0,
             matched_length: 5,
@@ -3395,6 +3902,9 @@ mod tests {
             referenced_filenames: None,
             is_license_intro: false,
             is_license_clue: false,
+            is_license_reference: false,
+            is_license_tag: false,
+            rule_length: 100,
         };
 
         let matches = vec![intro1, intro2];
@@ -3410,6 +3920,7 @@ mod tests {
                 1,
                 10,
                 100.0,
+                100,
                 100,
                 100.0,
                 100,
@@ -3447,6 +3958,7 @@ mod tests {
                 10,
                 0.0,
                 0,
+                0,
                 0.0,
                 0,
                 "undetected.LICENSE",
@@ -3482,6 +3994,7 @@ mod tests {
             10,
             95.0,
             100,
+            100,
             100.0,
             100,
             "mit.LICENSE",
@@ -3492,6 +4005,7 @@ mod tests {
             5,
             15,
             95.0,
+            100,
             100,
             100.0,
             100,
@@ -3515,6 +4029,7 @@ mod tests {
             10,
             95.0,
             100,
+            100,
             100.0,
             100,
             "mit.LICENSE",
@@ -3525,6 +4040,8 @@ mod tests {
             from_file: Some("test.txt".to_string()),
             start_line: 20,
             end_line: 25,
+            start_token: 0,
+            end_token: 0,
             matcher: "2-aho".to_string(),
             score: 50.0,
             matched_length: 10,
@@ -3536,6 +4053,9 @@ mod tests {
             referenced_filenames: None,
             is_license_intro: false,
             is_license_clue: false,
+            is_license_reference: false,
+            is_license_tag: false,
+            rule_length: 100,
         };
         let match3 = create_test_match_with_params(
             "apache-2.0",
@@ -3543,6 +4063,7 @@ mod tests {
             40,
             50,
             95.0,
+            100,
             100,
             100.0,
             100,
@@ -3565,6 +4086,8 @@ mod tests {
             from_file: Some("test.txt".to_string()),
             start_line: 1,
             end_line: 2,
+            start_token: 0,
+            end_token: 0,
             matcher: "5-unknown".to_string(),
             score: 50.0,
             matched_length: 5,
@@ -3576,6 +4099,9 @@ mod tests {
             referenced_filenames: None,
             is_license_intro: false,
             is_license_clue: false,
+            is_license_reference: false,
+            is_license_tag: false,
+            rule_length: 100,
         };
         let license_match = create_test_match_with_params(
             "mit",
@@ -3583,6 +4109,7 @@ mod tests {
             3,
             10,
             100.0,
+            100,
             100,
             100.0,
             100,
@@ -3598,8 +4125,19 @@ mod tests {
     #[test]
     fn test_determine_license_expression_with_same_license() {
         let matches = vec![
-            create_test_match_with_params("mit", "1-hash", 1, 10, 95.0, 100, 95.0, 100, "#1"),
-            create_test_match_with_params("mit", "1-spdx-id", 11, 20, 95.0, 100, 95.0, 100, "#2"),
+            create_test_match_with_params("mit", "1-hash", 1, 10, 95.0, 100, 100, 95.0, 100, "#1"),
+            create_test_match_with_params(
+                "mit",
+                "1-spdx-id",
+                11,
+                20,
+                95.0,
+                100,
+                100,
+                95.0,
+                100,
+                "#2",
+            ),
         ];
 
         let expr = determine_license_expression(&matches);
@@ -3616,6 +4154,7 @@ mod tests {
             5,
             15,
             95.0,
+            100,
             100,
             100.0,
             100,
@@ -3639,6 +4178,7 @@ mod tests {
             10,
             50.0,
             20,
+            20,
             50.0,
             50,
             "mit.LICENSE",
@@ -3656,6 +4196,8 @@ mod tests {
             from_file: Some("test.txt".to_string()),
             start_line: 1,
             end_line: 10,
+            start_token: 0,
+            end_token: 0,
             matcher: "1-hash".to_string(),
             score: 100.0,
             matched_length: 100,
@@ -3667,6 +4209,9 @@ mod tests {
             referenced_filenames: Some(vec!["LICENSE".to_string()]),
             is_license_intro: false,
             is_license_clue: false,
+            is_license_reference: false,
+            is_license_tag: false,
+            rule_length: 100,
         };
 
         let matches = vec![match_with_ref];
@@ -3681,6 +4226,7 @@ mod tests {
             1,
             10,
             100.0,
+            100,
             100,
             100.0,
             100,
@@ -3697,6 +4243,8 @@ mod tests {
             from_file: Some("test.txt".to_string()),
             start_line: 1,
             end_line: 10,
+            start_token: 0,
+            end_token: 0,
             matcher: "2-aho".to_string(),
             score: 50.0,
             matched_length: 100,
@@ -3708,6 +4256,9 @@ mod tests {
             referenced_filenames: Some(vec!["LICENSE".to_string()]),
             is_license_intro: false,
             is_license_clue: false,
+            is_license_reference: false,
+            is_license_tag: false,
+            rule_length: 100,
         };
 
         let matches = vec![match_with_ref];
@@ -3722,6 +4273,7 @@ mod tests {
             2000,
             2005,
             30.0,
+            3,
             3,
             30.0,
             50,
@@ -3739,6 +4291,7 @@ mod tests {
             2000,
             2005,
             30.0,
+            3,
             3,
             30.0,
             50,
@@ -3761,6 +4314,7 @@ mod tests {
                     10,
                     95.0,
                     100,
+                    100,
                     100.0,
                     100,
                     "mit.LICENSE",
@@ -3778,6 +4332,7 @@ mod tests {
                     1,
                     10,
                     85.0,
+                    100,
                     100,
                     100.0,
                     100,
@@ -3802,6 +4357,8 @@ mod tests {
             from_file: None,
             start_line: 1,
             end_line: 5,
+            start_token: 0,
+            end_token: 0,
             matcher: "2-aho".to_string(),
             score: 1.0,
             matched_length: 100,
@@ -3813,6 +4370,9 @@ mod tests {
             referenced_filenames: None,
             is_license_intro: true,
             is_license_clue: false,
+            is_license_reference: false,
+            is_license_tag: false,
+            rule_length: 100,
         };
         assert!(is_license_intro(&m));
     }
@@ -3825,6 +4385,8 @@ mod tests {
             from_file: None,
             start_line: 1,
             end_line: 5,
+            start_token: 0,
+            end_token: 0,
             matcher: "1-hash".to_string(),
             score: 1.0,
             matched_length: 100,
@@ -3836,6 +4398,9 @@ mod tests {
             referenced_filenames: None,
             is_license_intro: true,
             is_license_clue: false,
+            is_license_reference: false,
+            is_license_tag: false,
+            rule_length: 100,
         };
         assert!(is_license_intro(&m));
     }
@@ -3848,6 +4413,8 @@ mod tests {
             from_file: None,
             start_line: 1,
             end_line: 5,
+            start_token: 0,
+            end_token: 0,
             matcher: "2-aho".to_string(),
             score: 1.0,
             matched_length: 100,
@@ -3859,6 +4426,9 @@ mod tests {
             referenced_filenames: None,
             is_license_intro: false,
             is_license_clue: true,
+            is_license_reference: false,
+            is_license_tag: false,
+            rule_length: 100,
         };
         assert!(is_license_intro(&m));
     }
@@ -3871,6 +4441,8 @@ mod tests {
             from_file: None,
             start_line: 1,
             end_line: 5,
+            start_token: 0,
+            end_token: 0,
             matcher: "2-aho".to_string(),
             score: 1.0,
             matched_length: 100,
@@ -3882,6 +4454,9 @@ mod tests {
             referenced_filenames: None,
             is_license_intro: false,
             is_license_clue: false,
+            is_license_reference: false,
+            is_license_tag: false,
+            rule_length: 100,
         };
         assert!(is_license_intro(&m));
     }
@@ -3894,6 +4469,8 @@ mod tests {
             from_file: None,
             start_line: 1,
             end_line: 5,
+            start_token: 0,
+            end_token: 0,
             matcher: "2-aho".to_string(),
             score: 1.0,
             matched_length: 100,
@@ -3905,6 +4482,9 @@ mod tests {
             referenced_filenames: None,
             is_license_intro: false,
             is_license_clue: false,
+            is_license_reference: false,
+            is_license_tag: false,
+            rule_length: 100,
         };
         assert!(!is_license_intro(&m));
     }
@@ -3917,6 +4497,8 @@ mod tests {
             from_file: None,
             start_line: 1,
             end_line: 5,
+            start_token: 0,
+            end_token: 0,
             matcher: "3-seq".to_string(),
             score: 0.8,
             matched_length: 80,
@@ -3928,6 +4510,9 @@ mod tests {
             referenced_filenames: None,
             is_license_intro: true,
             is_license_clue: false,
+            is_license_reference: false,
+            is_license_tag: false,
+            rule_length: 100,
         };
         assert!(!is_license_intro(&m));
     }
@@ -3940,6 +4525,8 @@ mod tests {
             from_file: None,
             start_line: 1,
             end_line: 2,
+            start_token: 0,
+            end_token: 0,
             matcher: "2-aho".to_string(),
             score: 1.0,
             matched_length: 10,
@@ -3951,6 +4538,9 @@ mod tests {
             referenced_filenames: None,
             is_license_intro: true,
             is_license_clue: false,
+            is_license_reference: false,
+            is_license_tag: false,
+            rule_length: 100,
         };
         let license_match = LicenseMatch {
             license_expression: "mit".to_string(),
@@ -3958,6 +4548,8 @@ mod tests {
             from_file: None,
             start_line: 3,
             end_line: 10,
+            start_token: 0,
+            end_token: 0,
             matcher: "1-hash".to_string(),
             score: 1.0,
             matched_length: 100,
@@ -3969,6 +4561,9 @@ mod tests {
             referenced_filenames: None,
             is_license_intro: false,
             is_license_clue: false,
+            is_license_reference: false,
+            is_license_tag: false,
+            rule_length: 100,
         };
 
         let matches = vec![intro.clone(), license_match.clone()];
@@ -3986,6 +4581,8 @@ mod tests {
             from_file: None,
             start_line: 1,
             end_line: 2,
+            start_token: 0,
+            end_token: 0,
             matcher: "2-aho".to_string(),
             score: 1.0,
             matched_length: 10,
@@ -3997,6 +4594,9 @@ mod tests {
             referenced_filenames: None,
             is_license_intro: true,
             is_license_clue: false,
+            is_license_reference: false,
+            is_license_tag: false,
+            rule_length: 100,
         };
 
         let matches = vec![intro.clone()];
@@ -4014,6 +4614,8 @@ mod tests {
             from_file: None,
             start_line: 1,
             end_line: 2,
+            start_token: 0,
+            end_token: 0,
             matcher: "5-unknown".to_string(),
             score: 1.0,
             matched_length: 10,
@@ -4025,6 +4627,9 @@ mod tests {
             referenced_filenames: None,
             is_license_intro: false,
             is_license_clue: false,
+            is_license_reference: false,
+            is_license_tag: false,
+            rule_length: 100,
         };
         let license_match = LicenseMatch {
             license_expression: "mit".to_string(),
@@ -4032,6 +4637,8 @@ mod tests {
             from_file: None,
             start_line: 3,
             end_line: 10,
+            start_token: 0,
+            end_token: 0,
             matcher: "1-hash".to_string(),
             score: 1.0,
             matched_length: 100,
@@ -4043,6 +4650,9 @@ mod tests {
             referenced_filenames: None,
             is_license_intro: false,
             is_license_clue: false,
+            is_license_reference: false,
+            is_license_tag: false,
+            rule_length: 100,
         };
 
         let group = DetectionGroup {
@@ -4078,6 +4688,8 @@ mod tests {
                     from_file: None,
                     start_line,
                     end_line,
+                    start_token: 0,
+                    end_token: 0,
                     matcher: "1-hash".to_string(),
                     score: 0.95,
                     matched_length: 100,
@@ -4089,6 +4701,9 @@ mod tests {
                     referenced_filenames: None,
                     is_license_intro: false,
                     is_license_clue: false,
+                    is_license_reference: false,
+                    is_license_tag: false,
+                    rule_length: 100,
                 }],
                 detection_log: vec![],
                 identifier: None,

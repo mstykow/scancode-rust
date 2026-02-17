@@ -104,9 +104,12 @@ pub fn hash_match(index: &LicenseIndex, query_run: &QueryRun) -> Vec<LicenseMatc
             from_file: None,
             start_line,
             end_line,
+            start_token: query_run.start,
+            end_token: query_run.end.map_or(query_run.start, |e| e + 1),
             matcher: MATCH_HASH.to_string(),
             score: 1.0,
             matched_length,
+            rule_length,
             match_coverage,
             rule_relevance: rule.relevance,
             rule_identifier: format!("#{}", rid),
@@ -115,6 +118,8 @@ pub fn hash_match(index: &LicenseIndex, query_run: &QueryRun) -> Vec<LicenseMatc
             referenced_filenames: rule.referenced_filenames.clone(),
             is_license_intro: rule.is_license_intro,
             is_license_clue: rule.is_license_clue,
+            is_license_reference: rule.is_license_reference,
+            is_license_tag: rule.is_license_tag,
         };
 
         matches.push(license_match);

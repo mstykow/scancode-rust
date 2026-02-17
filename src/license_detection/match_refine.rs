@@ -17,6 +17,12 @@ const OVERLAP_MEDIUM: f64 = 0.40;
 const OVERLAP_LARGE: f64 = 0.70;
 const OVERLAP_EXTRA_LARGE: f64 = 0.90;
 
+const MIN_SHORT_FP_LIST_LENGTH: usize = 15;
+const MIN_LONG_FP_LIST_LENGTH: usize = 150;
+const MIN_UNIQUE_LICENSES_PROPORTION: f64 = 1.0 / 3.0;
+const MAX_CANDIDATE_LENGTH: usize = 20;
+const MAX_DISTANCE_BETWEEN_CANDIDATES: usize = 10;
+
 /// Filter GPL matches with very short matched_length.
 ///
 /// GPL rules that match only a tiny number of tokens are typically false positives
@@ -134,9 +140,9 @@ fn merge_overlapping_matches(matches: &[LicenseMatch]) -> Vec<LicenseMatch> {
 /// Filter matches that are contained within other matches.
 ///
 /// A match A is contained in match B if:
-/// - A.start_line >= B.start_line
-/// - A.end_line <= B.end_line
-/// - A.matched_length <= B.matched_length
+/// - A's qspan (token positions) is contained in B's qspan
+/// - This uses token positions (start_token/end_token) instead of line numbers
+///   for more precise containment detection, matching Python's qcontains behavior.
 ///
 /// The containing (larger) match is kept, the contained (smaller) match is removed.
 /// This function does NOT group by rule_identifier - matches from different rules
@@ -148,7 +154,7 @@ fn merge_overlapping_matches(matches: &[LicenseMatch]) -> Vec<LicenseMatch> {
 /// # Returns
 /// Vector of LicenseMatch with contained matches removed
 ///
-/// Based on Python: `filter_contained_matches()` (lines 950-1070)
+/// Based on Python: `filter_contained_matches()` using qspan containment
 fn filter_contained_matches(matches: &[LicenseMatch]) -> Vec<LicenseMatch> {
     if matches.len() < 2 {
         return matches.to_vec();
@@ -156,19 +162,17 @@ fn filter_contained_matches(matches: &[LicenseMatch]) -> Vec<LicenseMatch> {
 
     let mut sorted: Vec<&LicenseMatch> = matches.iter().collect();
     sorted.sort_by(|a, b| {
-        a.start_line
-            .cmp(&b.start_line)
-            .then_with(|| b.matched_length.cmp(&a.matched_length))
+        a.start_token
+            .cmp(&b.start_token)
+            .then_with(|| b.end_token.cmp(&a.end_token))
     });
 
     let mut kept = Vec::new();
 
     for current in sorted {
-        let is_contained = kept.iter().any(|kept_match: &&LicenseMatch| {
-            current.start_line >= kept_match.start_line
-                && current.end_line <= kept_match.end_line
-                && current.matched_length <= kept_match.matched_length
-        });
+        let is_contained = kept
+            .iter()
+            .any(|kept_match: &&LicenseMatch| kept_match.qcontains(current));
 
         if !is_contained {
             kept.push(current);
@@ -456,6 +460,161 @@ pub fn restore_non_overlapping(
     (to_keep, to_discard)
 }
 
+fn is_candidate_false_positive(m: &LicenseMatch) -> bool {
+    let is_tag_or_ref =
+        m.is_license_reference || m.is_license_tag || m.is_license_intro || m.is_license_clue;
+
+    let is_not_spdx_id = m.matcher != "1-spdx-id";
+    let is_exact_match = (m.match_coverage - 100.0).abs() < f32::EPSILON;
+    let is_short = m.matched_length <= MAX_CANDIDATE_LENGTH;
+
+    is_tag_or_ref && is_not_spdx_id && is_exact_match && is_short
+}
+
+fn count_unique_licenses(matches: &[LicenseMatch]) -> usize {
+    let mut seen = std::collections::HashSet::new();
+    for m in matches {
+        seen.insert(&m.license_expression);
+    }
+    seen.len()
+}
+
+fn is_list_of_false_positives(
+    matches: &[LicenseMatch],
+    min_matches: usize,
+    min_unique_licenses_proportion: f64,
+    min_candidate_proportion: f64,
+) -> bool {
+    if matches.is_empty() {
+        return false;
+    }
+
+    let len_matches = matches.len();
+
+    let is_long_enough_sequence = len_matches >= min_matches;
+
+    let len_unique_licenses = count_unique_licenses(matches);
+    let unique_proportion = len_unique_licenses as f64 / len_matches as f64;
+    let mut has_enough_licenses = unique_proportion > min_unique_licenses_proportion;
+
+    if !has_enough_licenses {
+        has_enough_licenses = len_unique_licenses >= min_matches / 3;
+    }
+
+    let has_enough_candidates = if min_candidate_proportion > 0.0 {
+        let candidates_count = matches
+            .iter()
+            .filter(|m| is_candidate_false_positive(m))
+            .count();
+        (candidates_count as f64 / len_matches as f64) > min_candidate_proportion
+    } else {
+        true
+    };
+
+    is_long_enough_sequence && has_enough_licenses && has_enough_candidates
+}
+
+fn match_distance(a: &LicenseMatch, b: &LicenseMatch) -> usize {
+    if a.start_line <= b.end_line && b.start_line <= a.end_line {
+        return 0;
+    }
+
+    let a_end = a.end_line + 1;
+    let b_end = b.end_line + 1;
+
+    if a_end == b.start_line || b_end == a.start_line {
+        return 1;
+    }
+
+    if a_end < b.start_line {
+        b.start_line - a_end
+    } else {
+        a.start_line - b_end
+    }
+}
+
+pub fn filter_false_positive_license_lists_matches(
+    matches: Vec<LicenseMatch>,
+) -> (Vec<LicenseMatch>, Vec<LicenseMatch>) {
+    let len_matches = matches.len();
+
+    if len_matches < MIN_SHORT_FP_LIST_LENGTH {
+        return (matches, vec![]);
+    }
+
+    if len_matches > MIN_LONG_FP_LIST_LENGTH
+        && is_list_of_false_positives(
+            &matches,
+            MIN_LONG_FP_LIST_LENGTH,
+            MIN_UNIQUE_LICENSES_PROPORTION,
+            0.95,
+        )
+    {
+        return (vec![], matches);
+    }
+
+    let mut kept = Vec::new();
+    let mut discarded = Vec::new();
+    let mut candidates: Vec<&LicenseMatch> = Vec::new();
+
+    for match_item in &matches {
+        let is_candidate = is_candidate_false_positive(match_item);
+
+        if is_candidate {
+            let is_close_enough = candidates
+                .last()
+                .map(|last| match_distance(last, match_item) <= MAX_DISTANCE_BETWEEN_CANDIDATES)
+                .unwrap_or(true);
+
+            if is_close_enough {
+                candidates.push(match_item);
+            } else {
+                let owned: Vec<LicenseMatch> = candidates.iter().map(|m| (*m).clone()).collect();
+                if is_list_of_false_positives(
+                    &owned,
+                    MIN_SHORT_FP_LIST_LENGTH,
+                    MIN_UNIQUE_LICENSES_PROPORTION,
+                    0.0,
+                ) {
+                    discarded.extend(owned);
+                } else {
+                    kept.extend(owned);
+                }
+                candidates.clear();
+                candidates.push(match_item);
+            }
+        } else {
+            let owned: Vec<LicenseMatch> = candidates.iter().map(|m| (*m).clone()).collect();
+            if is_list_of_false_positives(
+                &owned,
+                MIN_SHORT_FP_LIST_LENGTH,
+                MIN_UNIQUE_LICENSES_PROPORTION,
+                0.0,
+            ) {
+                discarded.extend(owned);
+            } else {
+                kept.extend(owned);
+            }
+            candidates.clear();
+            kept.push(match_item.clone());
+        }
+    }
+
+    let owned: Vec<LicenseMatch> = candidates.iter().map(|m| (*m).clone()).collect();
+    if is_list_of_false_positives(
+        &owned,
+        MIN_SHORT_FP_LIST_LENGTH,
+        MIN_UNIQUE_LICENSES_PROPORTION,
+        0.0,
+    ) {
+        discarded.extend(owned);
+    } else {
+        kept.extend(owned);
+    }
+
+    (kept, discarded)
+}
+
 /// Main refinement function - applies all refinement operations to match results.
 ///
 /// This is the main entry point for Phase 4.6 match refinement. It:
@@ -466,7 +625,8 @@ pub fn restore_non_overlapping(
 /// 5. Restores non-overlapping discarded matches
 /// 6. Combines kept + restored matches
 /// 7. Filters false positive matches
-/// 8. Updates match scores
+/// 8. Filters false positive license list matches
+/// 9. Updates match scores
 ///
 /// The operations are applied in sequence to produce final refined matches.
 ///
@@ -503,7 +663,9 @@ pub fn refine_matches(
 
     let non_fp = filter_false_positive_matches(index, &final_matches);
 
-    let mut scored = non_fp;
+    let (kept, _discarded) = filter_false_positive_license_lists_matches(non_fp);
+
+    let mut scored = kept;
     update_match_scores(&mut scored);
 
     scored
@@ -527,9 +689,12 @@ mod tests {
             from_file: None,
             start_line,
             end_line,
+            start_token: start_line,
+            end_token: end_line + 1,
             matcher: "2-aho".to_string(),
             score,
             matched_length: 100,
+            rule_length: 100,
             match_coverage: coverage,
             rule_relevance: relevance,
             rule_identifier: rule_identifier.to_string(),
@@ -538,6 +703,39 @@ mod tests {
             referenced_filenames: None,
             is_license_intro: false,
             is_license_clue: false,
+            is_license_reference: false,
+            is_license_tag: false,
+        }
+    }
+
+    fn create_test_match_with_tokens(
+        rule_identifier: &str,
+        start_token: usize,
+        end_token: usize,
+        matched_length: usize,
+    ) -> LicenseMatch {
+        LicenseMatch {
+            license_expression: "mit".to_string(),
+            license_expression_spdx: "MIT".to_string(),
+            from_file: None,
+            start_line: start_token,
+            end_line: end_token.saturating_sub(1),
+            start_token,
+            end_token,
+            matcher: "2-aho".to_string(),
+            score: 1.0,
+            matched_length,
+            rule_length: matched_length,
+            match_coverage: 100.0,
+            rule_relevance: 100,
+            rule_identifier: rule_identifier.to_string(),
+            rule_url: "https://example.com".to_string(),
+            matched_text: None,
+            referenced_filenames: None,
+            is_license_intro: false,
+            is_license_clue: false,
+            is_license_reference: false,
+            is_license_tag: false,
         }
     }
 
@@ -1070,6 +1268,81 @@ mod tests {
     }
 
     #[test]
+    fn test_filter_contained_matches_token_positions_fully_contained() {
+        let outer = create_test_match_with_tokens("#1", 0, 20, 20);
+        let inner = create_test_match_with_tokens("#2", 5, 15, 10);
+        let matches = vec![outer, inner];
+
+        let filtered = filter_contained_matches(&matches);
+
+        assert_eq!(filtered.len(), 1);
+        assert_eq!(filtered[0].start_token, 0);
+        assert_eq!(filtered[0].end_token, 20);
+    }
+
+    #[test]
+    fn test_filter_contained_matches_token_positions_partial_overlap_not_contained() {
+        let m1 = create_test_match_with_tokens("#1", 0, 10, 10);
+        let m2 = create_test_match_with_tokens("#2", 5, 15, 10);
+        let matches = vec![m1, m2];
+
+        let filtered = filter_contained_matches(&matches);
+
+        assert_eq!(filtered.len(), 2);
+    }
+
+    #[test]
+    fn test_filter_contained_matches_token_positions_non_overlapping() {
+        let m1 = create_test_match_with_tokens("#1", 0, 10, 10);
+        let m2 = create_test_match_with_tokens("#2", 20, 30, 10);
+        let matches = vec![m1, m2];
+
+        let filtered = filter_contained_matches(&matches);
+
+        assert_eq!(filtered.len(), 2);
+    }
+
+    #[test]
+    fn test_filter_contained_matches_token_positions_nested_containment() {
+        let outer = create_test_match_with_tokens("#1", 0, 50, 50);
+        let middle = create_test_match_with_tokens("#2", 10, 40, 30);
+        let inner = create_test_match_with_tokens("#3", 15, 35, 20);
+        let matches = vec![inner, middle, outer];
+
+        let filtered = filter_contained_matches(&matches);
+
+        assert_eq!(filtered.len(), 1);
+        assert_eq!(filtered[0].start_token, 0);
+        assert_eq!(filtered[0].end_token, 50);
+    }
+
+    #[test]
+    fn test_filter_contained_matches_token_positions_same_boundaries() {
+        let m1 = create_test_match_with_tokens("#1", 0, 10, 10);
+        let m2 = create_test_match_with_tokens("#2", 0, 10, 10);
+        let matches = vec![m1, m2];
+
+        let filtered = filter_contained_matches(&matches);
+
+        assert_eq!(filtered.len(), 1);
+    }
+
+    #[test]
+    fn test_filter_contained_matches_token_positions_multiple_contained() {
+        let outer = create_test_match_with_tokens("#1", 0, 100, 100);
+        let inner1 = create_test_match_with_tokens("#2", 10, 20, 10);
+        let inner2 = create_test_match_with_tokens("#3", 30, 40, 10);
+        let inner3 = create_test_match_with_tokens("#4", 50, 60, 10);
+        let matches = vec![outer, inner1, inner2, inner3];
+
+        let filtered = filter_contained_matches(&matches);
+
+        assert_eq!(filtered.len(), 1);
+        assert_eq!(filtered[0].start_token, 0);
+        assert_eq!(filtered[0].end_token, 100);
+    }
+
+    #[test]
     fn test_refine_matches_pipeline_preserves_non_overlapping_different_rules() {
         let index = LicenseIndex::with_legalese_count(10);
 
@@ -1490,5 +1763,311 @@ mod tests {
         let m2 = create_test_match("#2", 11, 20, 0.85, 85.0, 100);
 
         assert_eq!(calculate_overlap(&m1, &m2), 0);
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn create_test_match_with_flags(
+        rule_identifier: &str,
+        start_line: usize,
+        end_line: usize,
+        is_license_reference: bool,
+        is_license_tag: bool,
+        is_license_intro: bool,
+        is_license_clue: bool,
+        matcher: &str,
+        match_coverage: f32,
+        matched_length: usize,
+        rule_length: usize,
+        license_expression: &str,
+    ) -> LicenseMatch {
+        LicenseMatch {
+            license_expression: license_expression.to_string(),
+            license_expression_spdx: license_expression.to_string(),
+            from_file: None,
+            start_line,
+            end_line,
+            start_token: 0,
+            end_token: 0,
+            matcher: matcher.to_string(),
+            score: 1.0,
+            matched_length,
+            rule_length,
+            match_coverage,
+            rule_relevance: 100,
+            rule_identifier: rule_identifier.to_string(),
+            rule_url: String::new(),
+            matched_text: None,
+            referenced_filenames: None,
+            is_license_intro,
+            is_license_clue,
+            is_license_reference,
+            is_license_tag,
+        }
+    }
+
+    #[test]
+    fn test_is_candidate_false_positive_tag_match() {
+        let m = create_test_match_with_flags(
+            "#1", 1, 1, false, true, false, false, "2-aho", 100.0, 5, 5, "mit",
+        );
+        assert!(is_candidate_false_positive(&m));
+    }
+
+    #[test]
+    fn test_is_candidate_false_positive_reference_match() {
+        let m = create_test_match_with_flags(
+            "#2",
+            1,
+            1,
+            true,
+            false,
+            false,
+            false,
+            "2-aho",
+            100.0,
+            3,
+            3,
+            "apache-2.0",
+        );
+        assert!(is_candidate_false_positive(&m));
+    }
+
+    #[test]
+    fn test_is_candidate_false_positive_spdx_id_excluded() {
+        let m = create_test_match_with_flags(
+            "#3",
+            1,
+            1,
+            true,
+            false,
+            false,
+            false,
+            "1-spdx-id",
+            100.0,
+            3,
+            3,
+            "mit",
+        );
+        assert!(!is_candidate_false_positive(&m));
+    }
+
+    #[test]
+    fn test_is_candidate_false_partial_coverage_excluded() {
+        let m = create_test_match_with_flags(
+            "#4", 1, 1, true, false, false, false, "2-aho", 80.0, 5, 5, "mit",
+        );
+        assert!(!is_candidate_false_positive(&m));
+    }
+
+    #[test]
+    fn test_is_candidate_false_long_match_excluded() {
+        let m = create_test_match_with_flags(
+            "#5", 1, 1, true, false, false, false, "2-aho", 100.0, 25, 25, "mit",
+        );
+        assert!(!is_candidate_false_positive(&m));
+    }
+
+    #[test]
+    fn test_filter_short_list_not_filtered() {
+        let matches: Vec<LicenseMatch> = (0..10)
+            .map(|i| {
+                create_test_match_with_flags(
+                    &format!("#{}", i),
+                    i + 1,
+                    i + 1,
+                    true,
+                    false,
+                    false,
+                    false,
+                    "2-aho",
+                    100.0,
+                    3,
+                    3,
+                    &format!("license-{}", i),
+                )
+            })
+            .collect();
+
+        let (kept, discarded) = filter_false_positive_license_lists_matches(matches);
+        assert_eq!(kept.len(), 10);
+        assert_eq!(discarded.len(), 0);
+    }
+
+    #[test]
+    fn test_filter_long_list_all_candidates() {
+        let matches: Vec<LicenseMatch> = (0..160)
+            .map(|i| {
+                create_test_match_with_flags(
+                    &format!("#{}", i),
+                    i + 1,
+                    i + 1,
+                    true,
+                    false,
+                    false,
+                    false,
+                    "2-aho",
+                    100.0,
+                    3,
+                    3,
+                    &format!("license-{}", i),
+                )
+            })
+            .collect();
+
+        let (kept, discarded) = filter_false_positive_license_lists_matches(matches);
+        assert_eq!(kept.len(), 0);
+        assert_eq!(discarded.len(), 160);
+    }
+
+    #[test]
+    fn test_filter_mixed_list_keeps_non_candidates() {
+        let mut matches = Vec::new();
+
+        for i in 0..15 {
+            matches.push(create_test_match_with_flags(
+                &format!("#{}", i),
+                i + 1,
+                i + 1,
+                true,
+                false,
+                false,
+                false,
+                "2-aho",
+                100.0,
+                3,
+                3,
+                &format!("license-{}", i),
+            ));
+        }
+
+        for i in 0..5 {
+            matches.push(create_test_match_with_flags(
+                &format!("#{}", 100 + i),
+                100 + i,
+                100 + i + 20,
+                false,
+                false,
+                false,
+                false,
+                "2-aho",
+                100.0,
+                100,
+                100,
+                "gpl-3.0",
+            ));
+        }
+
+        let (kept, discarded) = filter_false_positive_license_lists_matches(matches);
+
+        assert_eq!(kept.len(), 5);
+        assert_eq!(discarded.len(), 15);
+    }
+
+    #[test]
+    fn test_filter_candidates_with_real_license() {
+        let mut matches = Vec::new();
+
+        for i in 0..15 {
+            matches.push(create_test_match_with_flags(
+                &format!("#{}", i),
+                i + 1,
+                i + 1,
+                true,
+                false,
+                false,
+                false,
+                "2-aho",
+                100.0,
+                3,
+                3,
+                &format!("license-{}", i),
+            ));
+        }
+
+        matches.push(create_test_match_with_flags(
+            "#real", 100, 150, false, false, false, false, "2-aho", 100.0, 200, 200, "mit",
+        ));
+
+        for i in 0..15 {
+            matches.push(create_test_match_with_flags(
+                &format!("#{}", 200 + i),
+                200 + i,
+                200 + i,
+                true,
+                false,
+                false,
+                false,
+                "2-aho",
+                100.0,
+                3,
+                3,
+                &format!("license-{}", 200 + i),
+            ));
+        }
+
+        let (kept, discarded) = filter_false_positive_license_lists_matches(matches);
+
+        assert_eq!(kept.len(), 1);
+        assert_eq!(discarded.len(), 30);
+    }
+
+    #[test]
+    fn test_match_distance_overlapping() {
+        let a = create_test_match_with_flags(
+            "#1", 1, 10, false, false, false, false, "2-aho", 100.0, 10, 10, "mit",
+        );
+        let b = create_test_match_with_flags(
+            "#2", 5, 15, false, false, false, false, "2-aho", 100.0, 10, 10, "mit",
+        );
+        assert_eq!(match_distance(&a, &b), 0);
+    }
+
+    #[test]
+    fn test_match_distance_touching() {
+        let a = create_test_match_with_flags(
+            "#1", 1, 10, false, false, false, false, "2-aho", 100.0, 10, 10, "mit",
+        );
+        let b = create_test_match_with_flags(
+            "#2", 11, 20, false, false, false, false, "2-aho", 100.0, 10, 10, "mit",
+        );
+        assert_eq!(match_distance(&a, &b), 1);
+    }
+
+    #[test]
+    fn test_match_distance_gap() {
+        let a = create_test_match_with_flags(
+            "#1", 1, 10, false, false, false, false, "2-aho", 100.0, 10, 10, "mit",
+        );
+        let b = create_test_match_with_flags(
+            "#2", 15, 25, false, false, false, false, "2-aho", 100.0, 10, 10, "mit",
+        );
+        assert_eq!(match_distance(&a, &b), 4);
+    }
+
+    #[test]
+    fn test_count_unique_licenses() {
+        let matches = vec![
+            create_test_match_with_flags(
+                "#1", 1, 1, false, false, false, false, "2-aho", 100.0, 5, 5, "mit",
+            ),
+            create_test_match_with_flags(
+                "#2", 2, 2, false, false, false, false, "2-aho", 100.0, 5, 5, "mit",
+            ),
+            create_test_match_with_flags(
+                "#3",
+                3,
+                3,
+                false,
+                false,
+                false,
+                false,
+                "2-aho",
+                100.0,
+                5,
+                5,
+                "apache-2.0",
+            ),
+        ];
+        assert_eq!(count_unique_licenses(&matches), 2);
     }
 }

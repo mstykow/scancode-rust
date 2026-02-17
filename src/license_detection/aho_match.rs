@@ -160,9 +160,12 @@ pub fn aho_match(index: &LicenseIndex, query_run: &QueryRun) -> Vec<LicenseMatch
             from_file: None,
             start_line,
             end_line,
+            start_token: qstart,
+            end_token: qend,
             matcher: MATCH_AHO.to_string(),
             score,
             matched_length,
+            rule_length,
             match_coverage,
             rule_relevance: rule.relevance,
             rule_identifier: format!("#{}", rid),
@@ -171,6 +174,8 @@ pub fn aho_match(index: &LicenseIndex, query_run: &QueryRun) -> Vec<LicenseMatch
             referenced_filenames: rule.referenced_filenames.clone(),
             is_license_intro: rule.is_license_intro,
             is_license_clue: rule.is_license_clue,
+            is_license_reference: rule.is_license_reference,
+            is_license_tag: rule.is_license_tag,
         };
 
         matches.push(license_match);

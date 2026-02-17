@@ -1849,6 +1849,7 @@ dependencies = [
  "derive_builder",
  "flate2",
  "glob",
+ "hex",
  "indicatif",
  "inventory",
  "lazy_static",

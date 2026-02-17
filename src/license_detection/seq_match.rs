@@ -493,9 +493,12 @@ pub fn seq_match(index: &LicenseIndex, query_run: &QueryRun) -> Vec<LicenseMatch
                         from_file: None,
                         start_line,
                         end_line,
+                        start_token: qpos,
+                        end_token: qpos + mlen,
                         matcher: MATCH_SEQ.to_string(),
                         score,
                         matched_length: mlen,
+                        rule_length,
                         match_coverage,
                         rule_relevance: candidate.rule.relevance,
                         rule_identifier: format!("#{}", rid),
@@ -504,6 +507,8 @@ pub fn seq_match(index: &LicenseIndex, query_run: &QueryRun) -> Vec<LicenseMatch
                         referenced_filenames: candidate.rule.referenced_filenames.clone(),
                         is_license_intro: candidate.rule.is_license_intro,
                         is_license_clue: candidate.rule.is_license_clue,
+                        is_license_reference: candidate.rule.is_license_reference,
+                        is_license_tag: candidate.rule.is_license_tag,
                     };
 
                     matches.push(license_match);

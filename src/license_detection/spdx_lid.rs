@@ -276,9 +276,12 @@ pub fn spdx_lid_match(index: &LicenseIndex, text: &str) -> Vec<LicenseMatch> {
                     from_file: None,
                     start_line: line_num,
                     end_line: line_num,
+                    start_token: 0,
+                    end_token: 0,
                     matcher: MATCH_SPDX_ID.to_string(),
                     score,
                     matched_length,
+                    rule_length: rule.tokens.len(),
                     match_coverage,
                     rule_relevance: rule.relevance,
                     rule_identifier: format!("#{}", rid),
@@ -287,6 +290,8 @@ pub fn spdx_lid_match(index: &LicenseIndex, text: &str) -> Vec<LicenseMatch> {
                     referenced_filenames: rule.referenced_filenames.clone(),
                     is_license_intro: rule.is_license_intro,
                     is_license_clue: rule.is_license_clue,
+                    is_license_reference: rule.is_license_reference,
+                    is_license_tag: rule.is_license_tag,
                 };
 
                 matches.push(license_match);

@@ -2,6 +2,10 @@
 
 use serde::{Deserialize, Serialize};
 
+fn default_rule_length() -> usize {
+    0
+}
+
 /// License metadata loaded from .LICENSE files.
 #[derive(Debug, Clone, PartialEq)]
 pub struct License {
@@ -188,6 +192,16 @@ pub struct LicenseMatch {
     /// End line number (1-indexed)
     pub end_line: usize,
 
+    /// Start token position (0-indexed in query token stream)
+    /// Used for dual-criteria match grouping with token gap threshold.
+    #[serde(default)]
+    pub start_token: usize,
+
+    /// End token position (0-indexed, exclusive)
+    /// Used for dual-criteria match grouping with token gap threshold.
+    #[serde(default)]
+    pub end_token: usize,
+
     /// Name of the matching strategy used
     pub matcher: String,
 
@@ -196,6 +210,11 @@ pub struct LicenseMatch {
 
     /// Length of matched text in characters
     pub matched_length: usize,
+
+    /// Token count of the matched rule (from rule.tokens.len())
+    /// Used for false positive detection instead of matched_length.
+    #[serde(default = "default_rule_length")]
+    pub rule_length: usize,
 
     /// Match coverage as percentage 0.0-100.0
     pub match_coverage: f32,
@@ -221,6 +240,14 @@ pub struct LicenseMatch {
 
     /// True if this match is from a license clue rule
     pub is_license_clue: bool,
+
+    /// True if this match is from a license reference rule
+    #[serde(default)]
+    pub is_license_reference: bool,
+
+    /// True if this match is from a license tag rule
+    #[serde(default)]
+    pub is_license_tag: bool,
 }
 
 impl LicenseMatch {
@@ -241,6 +268,10 @@ impl LicenseMatch {
 
     pub fn surround(&self, other: &LicenseMatch) -> bool {
         self.start_line < other.start_line && self.end_line > other.end_line
+    }
+
+    pub fn qcontains(&self, other: &LicenseMatch) -> bool {
+        self.start_token <= other.start_token && self.end_token >= other.end_token
     }
 }
 
@@ -317,9 +348,12 @@ mod tests {
             from_file: Some("README.md".to_string()),
             start_line: 1,
             end_line: 5,
+            start_token: 0,
+            end_token: 100,
             matcher: "1-hash".to_string(),
             score: 0.95,
             matched_length: 100,
+            rule_length: 100,
             match_coverage: 95.0,
             rule_relevance: 100,
             rule_identifier: "mit.LICENSE".to_string(),
@@ -328,6 +362,8 @@ mod tests {
             referenced_filenames: None,
             is_license_intro: false,
             is_license_clue: false,
+            is_license_reference: false,
+            is_license_tag: false,
         }
     }
 
@@ -705,9 +741,12 @@ mod tests {
             from_file: None,
             start_line: 0,
             end_line: 0,
+            start_token: 0,
+            end_token: 0,
             matcher: String::new(),
             score: 0.0,
             matched_length: 0,
+            rule_length: 0,
             match_coverage: 0.0,
             rule_relevance: 0,
             rule_identifier: String::new(),
@@ -716,6 +755,8 @@ mod tests {
             referenced_filenames: None,
             is_license_intro: false,
             is_license_clue: false,
+            is_license_reference: false,
+            is_license_tag: false,
         };
 
         assert!(match_result.from_file.is_none());
@@ -840,9 +881,12 @@ mod tests {
             from_file: Some("README.md".to_string()),
             start_line: 1,
             end_line: 5,
+            start_token: 0,
+            end_token: 100,
             matcher: "1-hash".to_string(),
             score: 0.95,
             matched_length: 100,
+            rule_length: 100,
             match_coverage: 95.0,
             rule_relevance: 100,
             rule_identifier: "mit.LICENSE".to_string(),
@@ -851,6 +895,8 @@ mod tests {
             referenced_filenames: Some(vec!["LICENSE".to_string(), "COPYING".to_string()]),
             is_license_intro: false,
             is_license_clue: false,
+            is_license_reference: false,
+            is_license_tag: false,
         };
 
         assert_eq!(
@@ -994,5 +1040,101 @@ mod tests {
         };
         assert!(!first.surround(&second));
         assert!(!second.surround(&first));
+    }
+
+    #[test]
+    fn test_qcontains_simple_contained() {
+        let outer = LicenseMatch {
+            start_token: 0,
+            end_token: 20,
+            ..create_license_match()
+        };
+        let inner = LicenseMatch {
+            start_token: 5,
+            end_token: 15,
+            ..create_license_match()
+        };
+        assert!(outer.qcontains(&inner));
+        assert!(!inner.qcontains(&outer));
+    }
+
+    #[test]
+    fn test_qcontains_same_boundaries() {
+        let a = LicenseMatch {
+            start_token: 0,
+            end_token: 10,
+            ..create_license_match()
+        };
+        let b = LicenseMatch {
+            start_token: 0,
+            end_token: 10,
+            ..create_license_match()
+        };
+        assert!(a.qcontains(&b));
+        assert!(b.qcontains(&a));
+    }
+
+    #[test]
+    fn test_qcontains_overlapping_not_contained() {
+        let a = LicenseMatch {
+            start_token: 0,
+            end_token: 10,
+            ..create_license_match()
+        };
+        let b = LicenseMatch {
+            start_token: 5,
+            end_token: 15,
+            ..create_license_match()
+        };
+        assert!(!a.qcontains(&b));
+        assert!(!b.qcontains(&a));
+    }
+
+    #[test]
+    fn test_qcontains_no_overlap() {
+        let a = LicenseMatch {
+            start_token: 0,
+            end_token: 5,
+            ..create_license_match()
+        };
+        let b = LicenseMatch {
+            start_token: 10,
+            end_token: 15,
+            ..create_license_match()
+        };
+        assert!(!a.qcontains(&b));
+        assert!(!b.qcontains(&a));
+    }
+
+    #[test]
+    fn test_qcontains_start_overlap_only() {
+        let a = LicenseMatch {
+            start_token: 0,
+            end_token: 10,
+            ..create_license_match()
+        };
+        let b = LicenseMatch {
+            start_token: 0,
+            end_token: 15,
+            ..create_license_match()
+        };
+        assert!(!a.qcontains(&b));
+        assert!(b.qcontains(&a));
+    }
+
+    #[test]
+    fn test_qcontains_end_overlap_only() {
+        let a = LicenseMatch {
+            start_token: 5,
+            end_token: 15,
+            ..create_license_match()
+        };
+        let b = LicenseMatch {
+            start_token: 0,
+            end_token: 15,
+            ..create_license_match()
+        };
+        assert!(!a.qcontains(&b));
+        assert!(b.qcontains(&a));
     }
 }

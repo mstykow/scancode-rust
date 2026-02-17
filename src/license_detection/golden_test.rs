@@ -133,7 +133,7 @@ mod golden_tests {
 
             if actual != expected {
                 return Err(format!(
-                    "license_expressions mismatch for {}:\n  Expected: {:?}\n  Actual:   {:?}",
+                    "license_expressions mismatch for {}:  Expected: {:?}  Actual:   {:?}",
                     self.name, expected, actual
                 ));
             }

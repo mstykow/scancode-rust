@@ -294,9 +294,12 @@ fn create_unknown_match(
         from_file: None,
         start_line,
         end_line,
+        start_token: start,
+        end_token: end,
         matcher: MATCH_UNKNOWN.to_string(),
         score,
         matched_length,
+        rule_length: region_length,
         match_coverage,
         rule_relevance: 50,
         rule_identifier: "unknown".to_string(),
@@ -305,6 +308,8 @@ fn create_unknown_match(
         referenced_filenames: None,
         is_license_intro: false,
         is_license_clue: false,
+        is_license_reference: false,
+        is_license_tag: false,
     }
     .into()
 }
@@ -471,9 +476,12 @@ mod tests {
             from_file: None,
             start_line: 1,
             end_line: 1,
+            start_token: 0,
+            end_token: 3,
             matcher: "test".to_string(),
             score: 1.0,
             matched_length: 3,
+            rule_length: 3,
             match_coverage: 100.0,
             rule_relevance: 100,
             rule_identifier: "test-rule".to_string(),
@@ -482,6 +490,8 @@ mod tests {
             referenced_filenames: None,
             is_license_intro: false,
             is_license_clue: false,
+            is_license_reference: false,
+            is_license_tag: false,
         }];
 
         let covered = compute_covered_positions(&query, &known_matches);
@@ -534,9 +544,12 @@ mod tests {
             from_file: None,
             start_line: 1,
             end_line: 1,
+            start_token: 0,
+            end_token: 5,
             matcher: "test".to_string(),
             score: 1.0,
             matched_length: 5,
+            rule_length: 5,
             match_coverage: 100.0,
             rule_relevance: 100,
             rule_identifier: "test-rule".to_string(),
@@ -545,6 +558,8 @@ mod tests {
             referenced_filenames: None,
             is_license_intro: false,
             is_license_clue: false,
+            is_license_reference: false,
+            is_license_tag: false,
         }];
 
         let matches = unknown_match(&index, &query, &known_matches);
