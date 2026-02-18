@@ -2,16 +2,18 @@
 
 ## Status: In Progress
 
-### Current Test Results
+### Current Test Results (Stable after PLAN-018 flakiness fix)
 
-| Test Suite | Baseline | PLAN-016 | PLAN-017 | Change |
-|------------|----------|----------|----------|--------|
-| lic1 | 213/78 | 219/72 | 229/62 | +16 |
-| lic2 | 759/94 | 773/80 | 777/76 | +18 |
-| lic3 | 242/50 | 251/41 | 253/39 | +11 |
-| lic4 | 265/85 | 282/68 | 282/68 | +17 |
-| external | 1935/632 | 1880/687 | 1895/672 | -40 |
-| unknown | 2/8 | 2/8 | 2/8 | 0 |
+| Test Suite | Baseline | Current | Change |
+|------------|----------|---------|--------|
+| lic1 | 213/78 | 228/63 | +15 |
+| lic2 | 759/94 | 776/77 | +17 |
+| lic3 | 242/50 | 251/41 | +9 |
+| lic4 | 265/85 | 281/69 | +16 |
+| external | 1935/632 | 1882/685 | -53 |
+| unknown | 2/8 | 2/8 | 0 |
+
+**Note**: PLAN-018 fixed golden test flakiness - all results are now deterministic.
 
 ---
 
