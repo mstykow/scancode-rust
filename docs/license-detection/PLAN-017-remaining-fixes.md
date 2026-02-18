@@ -1,95 +1,34 @@
 # PLAN-017: Remaining License Detection Fixes
 
-## Status: Verified Against Python Reference
+## Status: In Progress
 
-### Summary
+### Current Test Results
 
-| Test Suite | Passed | Failed | Pass Rate |
-|------------|-------|--------|-----------|
-| lic1 | 213 | 78 | 73% |
-| lic2 | 759 | 94 | 89% |
-| lic3 | 242 | 50 | 83% |
-| lic4 | 265 | 85 | 76% |
-| external | 1935 | 632 | 75% |
-| unknown | 2 | 8 | 20% |
-| **TOTAL** | **3416** | **947** | **78%** |
-
----
-
-## Issue 1: Expression Over-Combination
-
-**Status**: ❌ **NOT A BUG** - Current behavior matches Python
-
-### Investigation Finding
-
-The proposed fix was to add subset detection in `collect_unique_and()`. However, verification against Python shows:
-
-**Python's behavior** (`license-expression` library docstring):
-
-```python
->>> str(combine_expressions(('mit WITH foo', 'gpl', 'mit',)))
-'mit WITH foo AND gpl AND mit'  # Note: 'mit' appears twice
-```
-
-**Python explicitly documents**: "Choices (as in 'MIT or GPL') are kept as-is and not treated as simplifiable. This avoids dropping important choice options in complex expressions which is never desirable."
-
-### Conclusion
-
-- Rust's output of `"(gpl-2.0 OR mit) AND mit"` is **correct behavior matching Python**
-- The test expectations may be wrong, OR this is a different issue
-- **No fix needed** for expression combination
-
-### Action
-
-Investigate whether the test expectations are correct. Compare Python's actual output for these test files.
+| Test Suite | Baseline | After Fixes | Status |
+|------------|----------|-------------|--------|
+| lic1 | 213/78 | 219/72 | +6 passed |
+| lic2 | 759/94 | 773/80 | +14 passed |
+| lic3 | 242/50 | 251/41 | +9 passed |
+| lic4 | 265/85 | 282/68 | +17 passed |
+| external | 1935/632 | 1880/687 | -55 (regression) |
+| unknown | 2/8 | 2/8 | no change |
 
 ---
 
-## Issue 2: Golden Test Comparison Bug ✅ READY
+## Completed Fixes
 
-**Status**: ✅ **VERIFIED - Test Bug, Not Detection Bug**
+### Issue 2: Golden Test Comparison ✅ DONE
 
-### Root Cause
-
-**File**: `src/license_detection/golden_test.rs:122-125`
-
-The Rust test compares **detection expressions** (combined):
+**Fix**: Changed test to flatten `detection.matches` instead of comparing detection expressions.
 
 ```rust
-let actual: Vec<&str> = detections
-    .iter()
-    .map(|d| d.license_expression.as_deref().unwrap_or(""))
-    .collect();
-```
-
-But Python's test compares **match expressions** (per-match):
-
-```python
-detected_expressions = [match.rule.license_expression for match in matches]
-```
-
-### Evidence
-
-Looking at `.yml` expected files:
-
-```yaml
-license_expressions:
-  - gpl-1.0-plus   # Each entry is ONE MATCH's expression
-  - gpl-2.0-plus   # Not a combined detection expression
-```
-
-### Fix
-
-**File**: `src/license_detection/golden_test.rs:122-125`
-
-```rust
-// BEFORE (wrong):
+// BEFORE:
 let actual: Vec<&str> = detections
     .iter()
     .map(|d| d.license_expression.as_deref().unwrap_or(""))
     .collect();
 
-// AFTER (correct - matches Python):
+// AFTER:
 let actual: Vec<&str> = detections
     .iter()
     .flat_map(|d| d.matches.iter())
@@ -97,242 +36,89 @@ let actual: Vec<&str> = detections
     .collect();
 ```
 
-### Expected Impact
+**Impact**: +49 tests passed on lic1-4, but -56 regression on external.
 
-- **~20+ tests** that were "failing" due to wrong comparison will now pass
-- This is a **test bug**, not a detection bug
+### Detection.matches Storage Fix ✅ DONE
+
+**Fix**: Store raw matches in `detection.matches`, use filtered matches only for expression computation.
+
+**Impact**: Minimal change (within noise margin).
 
 ---
 
-## Issue 3: Missing Detections ✅ READY
+## External Regression Analysis
 
-**Status**: ✅ **VERIFIED - Remove Wrong Filter**
+### Root Cause: Missing Filter
 
-### Root Cause
+**Missing filter**: `filter_matches_missing_required_phrases`
+
+Python calls this filter FIRST in the pipeline. It removes matches where:
+
+- `is_continuous: true` but match has gaps
+- `{{...}}` required phrase markers weren't matched
+
+**Stats**:
+
+- 3317 rules have `is_continuous: yes`
+- 1927 rules have `is_required_phrase: yes`
+- 4 licenses have `{{...}}` required phrase markers
+
+### Regression Breakdown
+
+| Category | Count | % of Failures |
+|----------|-------|---------------|
+| MORE matches than expected | 376 | 56% |
+| FEWER matches than expected | 228 | 34% |
+| Same count, different expressions | 61 | 9% |
+
+---
+
+## Remaining Issues
+
+### Issue 3: Remove filter_short_gpl_matches ✅ READY
 
 **File**: `src/license_detection/match_refine.rs:31-43`
 
-Rust has a custom `filter_short_gpl_matches()` that Python does NOT have:
+Delete `filter_short_gpl_matches()` function and its call. Python does NOT have this filter.
 
-```rust
-fn filter_short_gpl_matches(matches: &[LicenseMatch]) -> Vec<LicenseMatch> {
-    const GPL_SHORT_THRESHOLD: usize = 3;
-    matches.iter().filter(|m| {
-        let is_gpl = m.license_expression.to_lowercase().contains("gpl");
-        let is_short = m.matched_length <= GPL_SHORT_THRESHOLD;
-        !(is_gpl && is_short)  // Filters out valid matches!
-    }).cloned().collect()
-}
-```
+### Issue 4: Query Run Lazy Evaluation ✅ READY
 
-**Python's approach** (`detection.py:1227`):
+**File**: `src/license_detection/query.rs`
 
-- No early GPL filter
-- GPL filtering happens in `is_false_positive()` using `rule.length` (not `matched_length`)
+Change `QueryRun` to store `&Query` reference and compute `high_matchables()`/`low_matchables()` on-demand.
 
-### Why It's Wrong
-
-| Metric | Rust uses | Python uses |
-|--------|-----------|-------------|
-| GPL filter metric | `matched_length` (tokens matched) | `rule.length` (tokens in rule template) |
-
-Example: `License: GPL` has:
-
-- `matched_length = 2` (two tokens matched)
-- `rule.length = 2` (two tokens in rule)
-
-Rust incorrectly filters this as "short GPL" when it's a valid license tag.
-
-### Fix
+### Issue 5: Add Unknown License Filter ✅ READY
 
 **File**: `src/license_detection/match_refine.rs`
 
-1. **Delete** `filter_short_gpl_matches()` function (lines 31-43)
-2. **Remove** call in `refine_matches()` (line ~1002)
-3. **Keep** existing GPL check in `is_false_positive()` (detection.rs:350-354) - it's correct
+Add `filter_invalid_contained_unknown_matches()` function and call it after `unknown_match()`.
 
-```rust
-// DELETE THIS FUNCTION:
-fn filter_short_gpl_matches(matches: &[LicenseMatch]) -> Vec<LicenseMatch> { ... }
-```
+### Issue 6: Add filter_matches_missing_required_phrases ⚠️ NEW
 
-### Expected Impact
+**File**: `src/license_detection/match_refine.rs`
 
-- `gpl-2.0_30.txt` will detect `gpl-1.0-plus` from `License: GPL`
-- Other short GPL license tags will be detected correctly
+Add filter that removes matches where required phrases weren't matched. This requires:
 
----
+1. Parse `{{...}}` markers from rule text
+2. Track required phrase spans during matching
+3. Filter matches missing required phrases
 
-## Issue 4: Query Run Stale References ✅ READY
-
-**Status**: ✅ **VERIFIED - Lazy Evaluation Pattern**
-
-### Root Cause
-
-**File**: `src/license_detection/query.rs`
-
-`QueryRun` stores references to `Query.high_matchables`, but `Query.subtract()` creates a NEW `HashSet`, leaving dangling references.
-
-**Python's approach** (`query.py:845-861`):
-
-```python
-def __init__(self, query, start, end=None):
-    self._high_matchables = None  # Lazy init
-    
-@property
-def high_matchables(self):
-    if not self._high_matchables:
-        self._high_matchables = intbitset(
-            [pos for pos in self.query.high_matchables
-             if self.start <= pos <= self.end])
-    return self._high_matchables
-```
-
-Python lazily evaluates `high_matchables` from parent query.
-
-### Fix
-
-**File**: `src/license_detection/query.rs`
-
-1. Change `QueryRun` to store parent query reference:
-
-```rust
-pub struct QueryRun<'a> {
-    query: &'a Query<'a>,
-    pub start: usize,
-    pub end: Option<usize>,
-}
-```
-
-1. Implement `high_matchables()` and `low_matchables()` as on-demand methods:
-
-```rust
-impl<'a> QueryRun<'a> {
-    pub fn high_matchables(&self) -> HashSet<usize> {
-        self.query.high_matchables
-            .iter()
-            .filter(|&&pos| pos >= self.start && pos <= self.end.unwrap_or(usize::MAX))
-            .copied()
-            .collect()
-    }
-    
-    pub fn low_matchables(&self) -> HashSet<usize> {
-        self.query.low_matchables
-            .iter()
-            .filter(|&&pos| pos >= self.start && pos <= self.end.unwrap_or(usize::MAX))
-            .copied()
-            .collect()
-    }
-}
-```
-
-1. Access other fields via `self.query`: `tokens`, `line_by_pos`, `text`, `index`
-
-### Expected Impact
-
-- Query runs will work correctly when enabled
-- Safe to re-enable query runs in detection pipeline
-
----
-
-## Issue 5: Unknown License Filtering ✅ READY
-
-**Status**: ✅ **VERIFIED - Add Post-Filter**
-
-### Root Cause
-
-**File**: `src/license_detection/mod.rs:223-224`
-
-Python has a post-filter that Rust is missing:
-
-```python
-# index.py:1111-1114
-unknown_matches = match.filter_invalid_contained_unknown_matches(
-    unknown_matches=unknown_matches,
-    good_matches=good_matches,
-)
-```
-
-This filters out unknown matches that are contained within known matches.
-
-### Note: Coverage Calculation is Already Correct
-
-The investigation found that `compute_covered_positions()` is already correct:
-
-- Uses `start_token..end_token` which matches Python's `qregion()` approach
-- No changes needed to coverage calculation
-
-### Fix
-
-**File**: `src/license_detection/match_refine.rs` or `unknown_match.rs`
-
-Add new function:
-
-```rust
-/// Filter unknown matches that are contained within known matches.
-///
-/// An unknown match should be discarded if its qspan is fully contained
-/// within any known match's qregion.
-///
-/// Based on Python: filter_invalid_contained_unknown_matches() at match.py:1904-1928
-pub fn filter_invalid_contained_unknown_matches(
-    unknown_matches: Vec<LicenseMatch>,
-    good_matches: &[LicenseMatch],
-) -> Vec<LicenseMatch> {
-    unknown_matches
-        .into_iter()
-        .filter(|unknown| {
-            let unknown_start = unknown.start_token;
-            let unknown_end = unknown.end_token;
-            
-            // Check if unknown is contained in any known match's qregion
-            !good_matches.iter().any(|good| {
-                good.start_token <= unknown_start && good.end_token >= unknown_end
-            })
-        })
-        .collect()
-}
-```
-
-**File**: `src/license_detection/mod.rs:223-224`
-
-```rust
-// BEFORE:
-let unknown_matches = unknown_match(&self.index, &query, &all_matches);
-all_matches.extend(unknown_matches);
-
-// AFTER:
-let unknown_matches = unknown_match(&self.index, &query, &all_matches);
-let unknown_matches = filter_invalid_contained_unknown_matches(unknown_matches, &all_matches);
-all_matches.extend(unknown_matches);
-```
-
-### Expected Impact
-
-- Removes spurious `unknown` and `unknown-license-reference` matches
-- Fixes `gpl-2.0-plus_21.txt`, `gpl-2.0_and_gpl-2.0_and_gpl-2.0-plus.txt`
+**This is the likely cause of external regression.**
 
 ---
 
 ## Implementation Order
 
-1. **Issue 2** (Golden test fix) - Simplest, will "fix" many tests immediately
-2. **Issue 3** (Remove filter_short_gpl_matches) - Simple deletion
-3. **Issue 5** (Add unknown filter) - Add one function and one call
-4. **Issue 4** (Query Run lazy eval) - More complex, affects struct layout
-5. **Issue 1** (Investigate test expectations) - May not need a fix
+1. **Issue 3** (Remove filter_short_gpl_matches) - Simple deletion
+2. **Issue 5** (Add unknown filter) - Simple addition
+3. **Issue 6** (Add required phrases filter) - More complex, may fix external regression
+4. **Issue 4** (Query Run lazy eval) - Architectural change
 
 ---
 
 ## Verification Commands
 
 ```bash
-# Run lic1 tests
-cargo test --release -q --lib license_detection::golden_test::golden_tests::test_golden_lic1
-
-# Run all golden tests
 cargo test --release -q --lib license_detection::golden_test
-
-# Format and lint
 cargo fmt && cargo clippy --all-targets --all-features -- -D warnings
 ```
