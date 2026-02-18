@@ -835,14 +835,17 @@ pub fn create_detection_from_group(group: &DetectionGroup) -> LicenseDetection {
         group.matches.clone()
     };
 
-    detection.matches = matches_for_expression.clone();
+    // Store RAW matches in detection.matches (matching Python behavior)
+    // Python's LicenseDetection.from_matches() stores original unfiltered matches
+    detection.matches = group.matches.clone();
 
     let _score = compute_detection_score(&detection.matches);
 
-    if let Ok(expr) = determine_license_expression(&detection.matches) {
+    // Use FILTERED matches for expression computation (matching Python behavior)
+    if let Ok(expr) = determine_license_expression(&matches_for_expression) {
         detection.license_expression = Some(expr.clone());
 
-        if let Ok(spdx_expr) = determine_spdx_expression(&detection.matches) {
+        if let Ok(spdx_expr) = determine_spdx_expression(&matches_for_expression) {
             detection.license_expression_spdx = Some(spdx_expr);
         }
     }
