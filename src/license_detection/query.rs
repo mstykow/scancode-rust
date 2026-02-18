@@ -833,17 +833,9 @@ impl<'a> Query<'a> {
 /// reference/scancode-toolkit/src/licensedcode/query.py (lines 720-914)
 #[derive(Debug)]
 pub struct QueryRun<'a> {
-    index: &'a LicenseIndex,
-    tokens: &'a [u16],
-    line_by_pos: &'a [usize],
-    text: &'a str,
-    high_matchables: &'a HashSet<usize>,
-    low_matchables: &'a HashSet<usize>,
-    digit_only_tids: &'a HashSet<u16>,
+    query: &'a Query<'a>,
     pub start: usize,
     pub end: Option<usize>,
-    #[allow(dead_code)]
-    len_legalese: usize,
 }
 
 #[allow(dead_code)]
@@ -857,37 +849,27 @@ impl<'a> QueryRun<'a> {
     ///
     /// Corresponds to Python: `QueryRun.__init__()` (lines 735-749)
     pub fn new(query: &'a Query<'a>, start: usize, end: Option<usize>) -> Self {
-        Self {
-            index: query.index,
-            tokens: &query.tokens,
-            line_by_pos: &query.line_by_pos,
-            text: &query.text,
-            high_matchables: &query.high_matchables,
-            low_matchables: &query.low_matchables,
-            digit_only_tids: &query.index.digit_only_tids,
-            start,
-            end,
-            len_legalese: query.index.len_legalese,
-        }
+        Self { query, start, end }
     }
 
     /// Get the license index used by this query run.
     pub fn get_index(&self) -> &LicenseIndex {
-        self.index
+        self.query.index
     }
 
     /// Get the start line number of this query run.
     ///
     /// Corresponds to Python: `start_line` property (lines 771-773)
     pub fn start_line(&self) -> Option<usize> {
-        self.line_by_pos.get(self.start).copied()
+        self.query.line_by_pos.get(self.start).copied()
     }
 
     /// Get the end line number of this query run.
     ///
     /// Corresponds to Python: `end_line` property (lines 775-777)
     pub fn end_line(&self) -> Option<usize> {
-        self.end.and_then(|e| self.line_by_pos.get(e).copied())
+        self.end
+            .and_then(|e| self.query.line_by_pos.get(e).copied())
     }
 
     /// Get the line number for a specific token position.
@@ -898,7 +880,7 @@ impl<'a> QueryRun<'a> {
     /// # Returns
     /// The line number (1-based), or None if position is out of range
     pub fn line_for_pos(&self, pos: usize) -> Option<usize> {
-        self.line_by_pos.get(pos).copied()
+        self.query.line_by_pos.get(pos).copied()
     }
 
     /// Get the sequence of token IDs for this run.
@@ -908,7 +890,7 @@ impl<'a> QueryRun<'a> {
     /// Corresponds to Python: `tokens` property (lines 779-786)
     pub fn tokens(&self) -> &[u16] {
         match self.end {
-            Some(end) => &self.tokens[self.start..=end],
+            Some(end) => &self.query.tokens[self.start..=end],
             None => &[],
         }
     }
@@ -930,7 +912,7 @@ impl<'a> QueryRun<'a> {
     pub fn is_digits_only(&self) -> bool {
         self.tokens()
             .iter()
-            .all(|tid| self.digit_only_tids.contains(tid))
+            .all(|tid| self.query.index.digit_only_tids.contains(tid))
     }
 
     /// Check if this query run has matchable tokens.
@@ -1013,7 +995,8 @@ impl<'a> QueryRun<'a> {
     ///
     /// Corresponds to Python: `high_matchables` property (lines 851-861)
     pub fn high_matchables(&self) -> HashSet<usize> {
-        self.high_matchables
+        self.query
+            .high_matchables
             .iter()
             .filter(|&&pos| pos >= self.start && pos <= self.end.unwrap_or(usize::MAX))
             .copied()
@@ -1026,7 +1009,8 @@ impl<'a> QueryRun<'a> {
     ///
     /// Corresponds to Python: `low_matchables` property (lines 839-849)
     pub fn low_matchables(&self) -> HashSet<usize> {
-        self.low_matchables
+        self.query
+            .low_matchables
             .iter()
             .filter(|&&pos| pos >= self.start && pos <= self.end.unwrap_or(usize::MAX))
             .copied()
@@ -1044,23 +1028,7 @@ impl<'a> QueryRun<'a> {
     /// # Returns
     /// The matched text, or empty string if lines are out of range
     pub fn matched_text(&self, start_line: usize, end_line: usize) -> String {
-        if start_line == 0 || end_line == 0 || start_line > end_line {
-            return String::new();
-        }
-
-        self.text
-            .lines()
-            .enumerate()
-            .filter_map(|(idx, line)| {
-                let line_num = idx + 1;
-                if line_num >= start_line && line_num <= end_line {
-                    Some(line)
-                } else {
-                    None
-                }
-            })
-            .collect::<Vec<_>>()
-            .join("\n")
+        self.query.matched_text(start_line, end_line)
     }
 }
 
