@@ -119,9 +119,13 @@ mod golden_tests {
                 format!("Detection failed for {}: {:?}", self.test_file.display(), e)
             })?;
 
+            // Flatten matches from all detections to get individual match expressions.
+            // This matches Python's test behavior which extracts expressions per-match,
+            // not per-detection-group.
             let actual: Vec<&str> = detections
                 .iter()
-                .map(|d| d.license_expression.as_deref().unwrap_or(""))
+                .flat_map(|d| d.matches.iter())
+                .map(|m| m.license_expression.as_str())
                 .collect();
 
             let expected: Vec<&str> = self
@@ -468,6 +472,42 @@ mod golden_tests {
                 eprintln!(
                     "    match: {} score={:.1} matcher={} lines={}-{}",
                     m.license_expression, m.score, m.matcher, m.start_line, m.end_line
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn debug_gpl_12() {
+        let Some(engine) = ensure_engine() else {
+            eprintln!("Engine not available");
+            return;
+        };
+
+        let text =
+            fs::read_to_string("testdata/license-golden/datadriven/lic1/gpl_12.txt").unwrap();
+        let detections = engine.detect(&text).unwrap();
+
+        eprintln!("Expected: {:?}", vec!["gpl-1.0-plus", "gpl-2.0-plus"]);
+        eprintln!(
+            "Actual:   {:?}",
+            detections
+                .iter()
+                .map(|d| d.license_expression.as_deref().unwrap_or(""))
+                .collect::<Vec<_>>()
+        );
+
+        for (i, d) in detections.iter().enumerate() {
+            eprintln!(
+                "\nDetection {}: {:?} ({} matches)",
+                i,
+                d.license_expression,
+                d.matches.len()
+            );
+            for m in &d.matches {
+                eprintln!(
+                    "  Match: {} lines {}-{} score={:.1}",
+                    m.license_expression, m.start_line, m.end_line, m.score
                 );
             }
         }
