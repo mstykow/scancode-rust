@@ -4,14 +4,14 @@
 
 ### Current Test Results
 
-| Test Suite | Baseline | After Fixes | Status |
-|------------|----------|-------------|--------|
-| lic1 | 213/78 | 219/72 | +6 passed |
-| lic2 | 759/94 | 773/80 | +14 passed |
-| lic3 | 242/50 | 251/41 | +9 passed |
-| lic4 | 265/85 | 282/68 | +17 passed |
-| external | 1935/632 | 1880/687 | -55 (regression) |
-| unknown | 2/8 | 2/8 | no change |
+| Test Suite | Baseline | PLAN-016 | PLAN-017 | Change |
+|------------|----------|----------|----------|--------|
+| lic1 | 213/78 | 219/72 | 229/62 | +10 |
+| lic2 | 759/94 | 773/80 | 777/76 | +4 |
+| lic3 | 242/50 | 251/41 | 252/40 | +1 |
+| lic4 | 265/85 | 282/68 | 282/68 | 0 |
+| external | 1935/632 | 1880/687 | 1897/670 | +17 |
+| unknown | 2/8 | 2/8 | 2/8 | 0 |
 
 ---
 
@@ -44,42 +44,25 @@ let actual: Vec<&str> = detections
 
 **Impact**: Minimal change (within noise margin).
 
----
+### Issue 3: Remove filter_short_gpl_matches ✅ DONE
 
-## External Regression Analysis
+**File**: `src/license_detection/match_refine.rs`
 
-### Root Cause: Missing Filter
+**Fix**: Deleted `filter_short_gpl_matches()` function and its call. Python does NOT have this filter - it was incorrectly added.
 
-**Missing filter**: `filter_matches_missing_required_phrases`
+**Impact**: +8 tests passed on lic1, +2 on lic2, +4 on external.
 
-Python calls this filter FIRST in the pipeline. It removes matches where:
+### Issue 5: Add Unknown License Filter ✅ DONE
 
-- `is_continuous: true` but match has gaps
-- `{{...}}` required phrase markers weren't matched
+**File**: `src/license_detection/match_refine.rs`, `src/license_detection/mod.rs`
 
-**Stats**:
+**Fix**: Added `filter_invalid_contained_unknown_matches()` function that filters unknown matches contained within good matches' qregion (token span).
 
-- 3317 rules have `is_continuous: yes`
-- 1927 rules have `is_required_phrase: yes`
-- 4 licenses have `{{...}}` required phrase markers
-
-### Regression Breakdown
-
-| Category | Count | % of Failures |
-|----------|-------|---------------|
-| MORE matches than expected | 376 | 56% |
-| FEWER matches than expected | 228 | 34% |
-| Same count, different expressions | 61 | 9% |
+**Impact**: +2 tests passed on lic1, +2 on lic2, +13 on external.
 
 ---
 
 ## Remaining Issues
-
-### Issue 3: Remove filter_short_gpl_matches ✅ READY
-
-**File**: `src/license_detection/match_refine.rs:31-43`
-
-Delete `filter_short_gpl_matches()` function and its call. Python does NOT have this filter.
 
 ### Issue 4: Query Run Lazy Evaluation ✅ READY
 
@@ -87,13 +70,7 @@ Delete `filter_short_gpl_matches()` function and its call. Python does NOT have 
 
 Change `QueryRun` to store `&Query` reference and compute `high_matchables()`/`low_matchables()` on-demand.
 
-### Issue 5: Add Unknown License Filter ✅ READY
-
-**File**: `src/license_detection/match_refine.rs`
-
-Add `filter_invalid_contained_unknown_matches()` function and call it after `unknown_match()`.
-
-### Issue 6: Add filter_matches_missing_required_phrases ⚠️ NEW
+### Issue 6: Add filter_matches_missing_required_phrases ⚠️ COMPLEX
 
 **File**: `src/license_detection/match_refine.rs`
 
@@ -102,16 +79,20 @@ Add filter that removes matches where required phrases weren't matched. This req
 1. Parse `{{...}}` markers from rule text
 2. Track required phrase spans during matching
 3. Filter matches missing required phrases
+4. Handle `is_continuous` rules (3317 rules)
+5. Handle `is_required_phrase` rules (1927 rules)
 
-**This is the likely cause of external regression.**
+**Python implementation**: `reference/scancode-toolkit/src/licensedcode/match.py:2154-2328`
+
+**This filter is called FIRST in Python's refine pipeline.**
 
 ---
 
 ## Implementation Order
 
-1. **Issue 3** (Remove filter_short_gpl_matches) - Simple deletion
-2. **Issue 5** (Add unknown filter) - Simple addition
-3. **Issue 6** (Add required phrases filter) - More complex, may fix external regression
+1. ~~**Issue 3** (Remove filter_short_gpl_matches)~~ ✅ DONE
+2. ~~**Issue 5** (Add unknown filter)~~ ✅ DONE
+3. **Issue 6** (Add required phrases filter) - Complex, requires rule parsing changes
 4. **Issue 4** (Query Run lazy eval) - Architectural change
 
 ---

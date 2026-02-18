@@ -23,20 +23,35 @@ const MIN_UNIQUE_LICENSES_PROPORTION: f64 = 1.0 / 3.0;
 const MAX_CANDIDATE_LENGTH: usize = 20;
 const MAX_DISTANCE_BETWEEN_CANDIDATES: usize = 10;
 
-/// Filter GPL matches with very short matched_length.
+/// Filter unknown matches contained within good matches' qregion.
 ///
-/// GPL rules that match only a tiny number of tokens are typically false positives
-/// (e.g., matching "Copyright" in a comment). These should be filtered before merging
-/// to prevent them from being combined with legitimate matches.
-fn filter_short_gpl_matches(matches: &[LicenseMatch]) -> Vec<LicenseMatch> {
-    const GPL_SHORT_THRESHOLD: usize = 3;
-
-    matches
+/// Unknown license matches that are fully contained within the qregion
+/// (token span from start_token to end_token) of a known good match
+/// should be discarded as they are redundant.
+///
+/// # Arguments
+/// * `unknown_matches` - Slice of unknown license matches to filter
+/// * `good_matches` - Slice of known good matches to check containment against
+///
+/// # Returns
+/// Vector of unknown LicenseMatch with contained matches removed
+///
+/// Based on Python: `filter_invalid_contained_unknown_matches()` (match.py:1904-1926)
+pub fn filter_invalid_contained_unknown_matches(
+    unknown_matches: &[LicenseMatch],
+    good_matches: &[LicenseMatch],
+) -> Vec<LicenseMatch> {
+    unknown_matches
         .iter()
-        .filter(|m| {
-            let is_gpl = m.license_expression.to_lowercase().contains("gpl");
-            let is_short = m.matched_length <= GPL_SHORT_THRESHOLD;
-            !(is_gpl && is_short)
+        .filter(|unknown| {
+            let unknown_start = unknown.start_token;
+            let unknown_end = unknown.end_token;
+
+            let is_contained = good_matches
+                .iter()
+                .any(|good| good.start_token <= unknown_start && good.end_token >= unknown_end);
+
+            !is_contained
         })
         .cloned()
         .collect()
@@ -999,9 +1014,7 @@ pub fn refine_matches(
         return Vec::new();
     }
 
-    let filtered = filter_short_gpl_matches(&matches);
-
-    let non_spurious = filter_spurious_matches(&filtered);
+    let non_spurious = filter_spurious_matches(&matches);
 
     let above_min_cov = filter_below_rule_minimum_coverage(index, &non_spurious);
 
@@ -1448,89 +1461,6 @@ mod tests {
         let refined = refine_matches(&index, matches, &query);
 
         assert_eq!(refined.len(), 2);
-    }
-
-    #[test]
-    fn test_filter_short_gpl_matches_removes_short_gpl() {
-        let matches = vec![
-            LicenseMatch {
-                license_expression: "gpl-2.0".to_string(),
-                license_expression_spdx: "GPL-2.0".to_string(),
-                matched_length: 1,
-                ..create_test_match("#1", 1, 1, 1.0, 100.0, 100)
-            },
-            LicenseMatch {
-                license_expression: "mit".to_string(),
-                license_expression_spdx: "MIT".to_string(),
-                matched_length: 1,
-                ..create_test_match("#2", 5, 10, 1.0, 100.0, 100)
-            },
-        ];
-
-        let filtered = filter_short_gpl_matches(&matches);
-        assert_eq!(filtered.len(), 1);
-        assert_eq!(filtered[0].license_expression, "mit");
-    }
-
-    #[test]
-    fn test_filter_short_gpl_matches_keeps_long_gpl() {
-        let matches = vec![LicenseMatch {
-            license_expression: "gpl-2.0".to_string(),
-            license_expression_spdx: "GPL-2.0".to_string(),
-            matched_length: 10,
-            ..create_test_match("#1", 1, 10, 1.0, 100.0, 100)
-        }];
-
-        let filtered = filter_short_gpl_matches(&matches);
-        assert_eq!(filtered.len(), 1);
-    }
-
-    #[test]
-    fn test_filter_short_gpl_matches_keeps_short_non_gpl() {
-        let matches = vec![LicenseMatch {
-            license_expression: "mit".to_string(),
-            license_expression_spdx: "MIT".to_string(),
-            matched_length: 1,
-            ..create_test_match("#1", 1, 1, 1.0, 100.0, 100)
-        }];
-
-        let filtered = filter_short_gpl_matches(&matches);
-        assert_eq!(filtered.len(), 1);
-    }
-
-    #[test]
-    fn test_filter_short_gpl_matches_boundary_threshold() {
-        let matches = vec![
-            LicenseMatch {
-                license_expression: "gpl-2.0".to_string(),
-                license_expression_spdx: "GPL-2.0".to_string(),
-                matched_length: 3,
-                ..create_test_match("#1", 1, 1, 1.0, 100.0, 100)
-            },
-            LicenseMatch {
-                license_expression: "gpl-3.0".to_string(),
-                license_expression_spdx: "GPL-3.0".to_string(),
-                matched_length: 4,
-                ..create_test_match("#2", 5, 10, 1.0, 100.0, 100)
-            },
-        ];
-
-        let filtered = filter_short_gpl_matches(&matches);
-        assert_eq!(filtered.len(), 1);
-        assert_eq!(filtered[0].matched_length, 4);
-    }
-
-    #[test]
-    fn test_filter_short_gpl_matches_case_insensitive() {
-        let matches = vec![LicenseMatch {
-            license_expression: "GPL-2.0".to_string(),
-            license_expression_spdx: "GPL-2.0".to_string(),
-            matched_length: 2,
-            ..create_test_match("#1", 1, 1, 1.0, 100.0, 100)
-        }];
-
-        let filtered = filter_short_gpl_matches(&matches);
-        assert_eq!(filtered.len(), 0);
     }
 
     #[test]
