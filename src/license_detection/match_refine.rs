@@ -141,6 +141,9 @@ fn merge_overlapping_matches(matches: &[LicenseMatch]) -> Vec<LicenseMatch> {
             .push(m);
     }
 
+    let mut grouped: Vec<_> = grouped.into_iter().collect();
+    grouped.sort_by(|a, b| a.0.cmp(&b.0));
+
     let mut merged = Vec::new();
 
     for (_rid, rule_matches) in grouped {
@@ -205,6 +208,7 @@ fn filter_contained_matches(matches: &[LicenseMatch]) -> Vec<LicenseMatch> {
             .cmp(&b.start_token)
             .then_with(|| b.hilen.cmp(&a.hilen))
             .then_with(|| b.matched_length.cmp(&a.matched_length))
+            .then_with(|| a.rule_identifier.cmp(&b.rule_identifier))
     });
 
     let mut kept = Vec::new();
@@ -340,6 +344,7 @@ pub fn filter_overlapping_matches(
             .then_with(|| b.hilen.cmp(&a.hilen))
             .then_with(|| b.matched_length.cmp(&a.matched_length))
             .then_with(|| a.matcher_order().cmp(&b.matcher_order()))
+            .then_with(|| a.rule_identifier.cmp(&b.rule_identifier))
     });
 
     let mut i = 0;

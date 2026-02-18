@@ -927,6 +927,7 @@ pub fn rank_detections(mut detections: Vec<LicenseDetection>) -> Vec<LicenseDete
             .partial_cmp(&score_a)
             .unwrap()
             .then_with(|| coverage_b.partial_cmp(&coverage_a).unwrap())
+            .then_with(|| a.identifier.cmp(&b.identifier))
     });
 
     detections
@@ -940,7 +941,9 @@ pub fn sort_detections_by_line(mut detections: Vec<LicenseDetection>) -> Vec<Lic
     detections.sort_by(|a, b| {
         let min_line_a = a.matches.iter().map(|m| m.start_line).min().unwrap_or(0);
         let min_line_b = b.matches.iter().map(|m| m.start_line).min().unwrap_or(0);
-        min_line_a.cmp(&min_line_b)
+        min_line_a
+            .cmp(&min_line_b)
+            .then_with(|| a.identifier.cmp(&b.identifier))
     });
     detections
 }

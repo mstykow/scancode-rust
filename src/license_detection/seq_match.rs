@@ -49,6 +49,8 @@ pub struct ScoresVector {
     pub resemblance: f32,
     /// Number of matched tokens (normalized for ranking)
     pub matched_length: f32,
+    /// Rule ID for tie-breaking
+    pub rid: usize,
 }
 
 impl PartialOrd for ScoresVector {
@@ -75,6 +77,7 @@ impl Ord for ScoresVector {
                     .unwrap_or(std::cmp::Ordering::Equal)
             })
             .then_with(|| self.is_highly_resemblant.cmp(&other.is_highly_resemblant))
+            .then_with(|| self.rid.cmp(&other.rid))
     }
 }
 
@@ -200,6 +203,7 @@ fn compute_set_similarity(
         containment: (containment * 10.0).round() / 10.0,
         resemblance: (amplified_resemblance * 10.0).round() / 10.0,
         matched_length: (matched_length as f32 / 20.0).round(),
+        rid: 0,
     };
 
     let score_vec_full = ScoresVector {
@@ -207,6 +211,7 @@ fn compute_set_similarity(
         containment,
         resemblance: amplified_resemblance,
         matched_length: matched_length as f32,
+        rid: 0,
     };
 
     Some((score_vec_rounded, score_vec_full))
@@ -294,6 +299,7 @@ pub fn compute_candidates_with_msets(
             containment: (containment * 10.0).round() / 10.0,
             resemblance: (amplified_resemblance * 10.0).round() / 10.0,
             matched_length: (matched_length as f32 / 20.0).round(),
+            rid,
         };
 
         let svf = ScoresVector {
@@ -301,6 +307,7 @@ pub fn compute_candidates_with_msets(
             containment,
             resemblance: amplified_resemblance,
             matched_length: matched_length as f32,
+            rid,
         };
 
         if high_resemblance && (!svr.is_highly_resemblant || !svf.is_highly_resemblant) {
@@ -350,6 +357,7 @@ pub fn compute_candidates_with_msets(
             containment: (containment * 10.0).round() / 10.0,
             resemblance: (amplified_resemblance * 10.0).round() / 10.0,
             matched_length: (matched_length as f32 / 20.0).round(),
+            rid,
         };
 
         let score_vec_full = ScoresVector {
@@ -357,6 +365,7 @@ pub fn compute_candidates_with_msets(
             containment,
             resemblance: amplified_resemblance,
             matched_length: matched_length as f32,
+            rid,
         };
 
         if high_resemblance
@@ -975,6 +984,7 @@ mod tests {
             containment: 0.9,
             resemblance: 0.8,
             matched_length: 10.0,
+            rid: 0,
         };
 
         let sv2 = ScoresVector {
@@ -982,6 +992,7 @@ mod tests {
             containment: 0.8,
             resemblance: 0.6,
             matched_length: 5.0,
+            rid: 1,
         };
 
         assert!(sv1 > sv2);
@@ -1594,12 +1605,14 @@ mod tests {
                 containment: 0.9,
                 resemblance: 0.8,
                 matched_length: 10.0,
+                rid: 0,
             },
             score_vec_full: ScoresVector {
                 is_highly_resemblant: true,
                 containment: 0.9,
                 resemblance: 0.8,
                 matched_length: 10.0,
+                rid: 0,
             },
             rid: 0,
             rule: Rule {
@@ -1649,12 +1662,14 @@ mod tests {
                 containment: 0.5,
                 resemblance: 0.3,
                 matched_length: 5.0,
+                rid: 1,
             },
             score_vec_full: ScoresVector {
                 is_highly_resemblant: false,
                 containment: 0.5,
                 resemblance: 0.3,
                 matched_length: 5.0,
+                rid: 1,
             },
             rid: 1,
             rule: Rule {

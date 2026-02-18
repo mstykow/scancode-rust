@@ -85,8 +85,9 @@ impl LicenseDetectionEngine {
         let rules = load_rules_from_directory(&rules_dir, false)?;
         let licenses = load_licenses_from_directory(&licenses_dir, false)?;
         let index = build_index(rules, licenses);
-        let spdx_mapping =
-            build_spdx_mapping(&index.licenses_by_key.values().cloned().collect::<Vec<_>>());
+        let mut license_vec: Vec<_> = index.licenses_by_key.values().cloned().collect();
+        license_vec.sort_by(|a, b| a.key.cmp(&b.key));
+        let spdx_mapping = build_spdx_mapping(&license_vec);
 
         Ok(Self {
             index: Arc::new(index),
