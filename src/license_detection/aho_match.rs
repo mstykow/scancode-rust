@@ -93,6 +93,10 @@ pub fn aho_match(index: &LicenseIndex, query_run: &QueryRun) -> Vec<LicenseMatch
         let byte_start = ac_match.start();
         let byte_end = ac_match.end();
 
+        if byte_start % 2 != 0 {
+            continue;
+        }
+
         let qstart = qbegin + byte_pos_to_token_pos(byte_start);
         let qend = qbegin + byte_pos_to_token_pos(byte_end);
 
@@ -650,5 +654,112 @@ mod tests {
         );
         assert_eq!(matches[0].matched_length, 5);
         assert_eq!(matches[0].match_coverage, 100.0);
+    }
+
+    #[test]
+    fn test_aho_match_token_boundary_bug() {
+        use aho_corasick::AhoCorasickBuilder;
+
+        let mut index = create_test_index_default();
+
+        let pattern_tid: u16 = 12575;
+        let pattern_bytes = pattern_tid.to_le_bytes().to_vec();
+
+        let automaton = AhoCorasickBuilder::new()
+            .build(std::iter::once(pattern_bytes.as_slice()))
+            .unwrap();
+
+        index.rules_automaton = automaton;
+        index.rules_by_rid.push(create_mock_rule(
+            "cc-by-nc-sa-2.0",
+            vec![pattern_tid],
+            true,
+            false,
+        ));
+        index.tids_by_rid.push(vec![pattern_tid]);
+        index.pattern_id_to_rid.push(0);
+
+        let exit_tid: u16 = 8045;
+        let next_tid: u16 = 18993;
+
+        assert_eq!(exit_tid.to_le_bytes(), [109, 31]);
+        assert_eq!(next_tid.to_le_bytes(), [49, 74]);
+        assert_eq!(pattern_tid.to_le_bytes(), [31, 49]);
+
+        let query = crate::license_detection::query::Query {
+            text: String::new(),
+            tokens: vec![exit_tid, next_tid],
+            line_by_pos: vec![1, 1],
+            unknowns_by_pos: std::collections::HashMap::new(),
+            stopwords_by_pos: std::collections::HashMap::new(),
+            shorts_and_digits_pos: std::collections::HashSet::new(),
+            high_matchables: (0..2).collect(),
+            low_matchables: std::collections::HashSet::new(),
+            has_long_lines: false,
+            is_binary: false,
+            query_run_ranges: Vec::new(),
+            spdx_lines: Vec::new(),
+            index: &index,
+        };
+
+        let run = query.whole_query_run();
+        let matches = aho_match(run.get_index(), &run);
+
+        assert!(
+            matches.is_empty(),
+            "Should NOT match across token boundaries! Pattern [31, 49] (token {}) appears at bytes 1-2 (crossing token boundary), but should not match. Got {} matches",
+            pattern_tid,
+            matches.len()
+        );
+    }
+
+    #[test]
+    fn test_aho_match_single_token_matches_correctly() {
+        use aho_corasick::AhoCorasickBuilder;
+
+        let mut index = create_test_index_default();
+
+        let pattern_tid: u16 = 12575;
+        let pattern_bytes = pattern_tid.to_le_bytes().to_vec();
+
+        let automaton = AhoCorasickBuilder::new()
+            .build(std::iter::once(pattern_bytes.as_slice()))
+            .unwrap();
+
+        index.rules_automaton = automaton;
+        index.rules_by_rid.push(create_mock_rule(
+            "cc-by-nc-sa-2.0",
+            vec![pattern_tid],
+            true,
+            false,
+        ));
+        index.tids_by_rid.push(vec![pattern_tid]);
+        index.pattern_id_to_rid.push(0);
+
+        let query = crate::license_detection::query::Query {
+            text: String::new(),
+            tokens: vec![0, 1, pattern_tid, 2, 3],
+            line_by_pos: vec![1, 1, 1, 1, 1],
+            unknowns_by_pos: std::collections::HashMap::new(),
+            stopwords_by_pos: std::collections::HashMap::new(),
+            shorts_and_digits_pos: std::collections::HashSet::new(),
+            high_matchables: (0..5).collect(),
+            low_matchables: std::collections::HashSet::new(),
+            has_long_lines: false,
+            is_binary: false,
+            query_run_ranges: Vec::new(),
+            spdx_lines: Vec::new(),
+            index: &index,
+        };
+
+        let run = query.whole_query_run();
+        let matches = aho_match(run.get_index(), &run);
+
+        assert_eq!(
+            matches.len(),
+            1,
+            "Should match the single token at position 2"
+        );
+        assert_eq!(matches[0].matched_length, 1);
     }
 }

@@ -390,6 +390,21 @@ impl LicenseMatch {
         }
         self.start_token <= other.start_token && self.end_token >= other.end_token
     }
+
+    pub fn qoverlap(&self, other: &LicenseMatch) -> usize {
+        if self.start_token == 0
+            && self.end_token == 0
+            && other.start_token == 0
+            && other.end_token == 0
+        {
+            let start = self.start_line.max(other.start_line);
+            let end = self.end_line.min(other.end_line);
+            return if start <= end { end - start + 1 } else { 0 };
+        }
+        let start = self.start_token.max(other.start_token);
+        let end = self.end_token.min(other.end_token);
+        end.saturating_sub(start)
+    }
 }
 
 #[cfg(test)]

@@ -188,7 +188,8 @@ fn filter_contained_matches(matches: &[LicenseMatch]) -> Vec<LicenseMatch> {
     sorted.sort_by(|a, b| {
         a.start_token
             .cmp(&b.start_token)
-            .then_with(|| b.end_token.cmp(&a.end_token))
+            .then_with(|| b.hilen.cmp(&a.hilen))
+            .then_with(|| b.matched_length.cmp(&a.matched_length))
     });
 
     let mut kept = Vec::new();
@@ -303,12 +304,6 @@ fn filter_spurious_matches(matches: &[LicenseMatch]) -> Vec<LicenseMatch> {
         .collect()
 }
 
-fn calculate_overlap(a: &LicenseMatch, b: &LicenseMatch) -> usize {
-    let start = a.start_line.max(b.start_line);
-    let end = a.end_line.min(b.end_line);
-    if start <= end { end - start + 1 } else { 0 }
-}
-
 fn licensing_contains_approx(current: &LicenseMatch, other: &LicenseMatch) -> bool {
     current.matched_length >= other.matched_length * 2
 }
@@ -325,9 +320,9 @@ pub fn filter_overlapping_matches(
     let mut discarded: Vec<LicenseMatch> = vec![];
 
     matches.sort_by(|a, b| {
-        a.start_line
-            .cmp(&b.start_line)
-            .then_with(|| b.hilen().cmp(&a.hilen()))
+        a.start_token
+            .cmp(&b.start_token)
+            .then_with(|| b.hilen.cmp(&a.hilen))
             .then_with(|| b.matched_length.cmp(&a.matched_length))
             .then_with(|| a.matcher_order().cmp(&b.matcher_order()))
     });
@@ -336,10 +331,10 @@ pub fn filter_overlapping_matches(
     while i < matches.len().saturating_sub(1) {
         let mut j = i + 1;
         while j < matches.len() {
-            let current_end = matches[i].end_line;
-            let next_start = matches[j].start_line;
+            let current_end = matches[i].end_token;
+            let next_start = matches[j].start_token;
 
-            if next_start > current_end {
+            if next_start >= current_end {
                 break;
             }
 
@@ -350,7 +345,7 @@ pub fn filter_overlapping_matches(
                 continue;
             }
 
-            let overlap = calculate_overlap(&matches[i], &matches[j]);
+            let overlap = matches[i].qoverlap(&matches[j]);
             if overlap == 0 {
                 j += 1;
                 continue;
@@ -464,18 +459,18 @@ pub fn filter_overlapping_matches(
             }
 
             if i > 0 {
-                let prev_end = matches[i - 1].end_line;
-                let next_match_start = matches[j].start_line;
+                let prev_end = matches[i - 1].end_token;
+                let next_match_start = matches[j].start_token;
 
-                let prev_next_overlap = if prev_end >= next_match_start {
-                    prev_end - next_match_start.max(matches[i - 1].start_line) + 1
+                let prev_next_overlap = if prev_end > next_match_start {
+                    prev_end.saturating_sub(next_match_start.max(matches[i - 1].start_token))
                 } else {
                     0
                 };
 
                 if prev_next_overlap == 0 {
-                    let cpo = calculate_overlap(&matches[i], &matches[i - 1]);
-                    let cno = calculate_overlap(&matches[i], &matches[j]);
+                    let cpo = matches[i].qoverlap(&matches[i - 1]);
+                    let cno = matches[i].qoverlap(&matches[j]);
 
                     if cpo > 0 && cno > 0 {
                         let overlap_len = cpo + cno;
@@ -1797,6 +1792,111 @@ mod tests {
     }
 
     #[test]
+    fn test_filter_contained_matches_gpl_variant_issue() {
+        // Simulate the GPL issue: gpl-2.0-plus should contain gpl-1.0-plus
+        // gpl-1.0-plus: 9 tokens, lines 13-14
+        // gpl-2.0-plus: 22 tokens, lines 13-15 (longer, should be kept)
+
+        // With token positions set (same start, different end)
+        let gpl_1_0 = create_test_match_with_tokens("#20560", 10, 19, 9);
+        let gpl_2_0 = create_test_match_with_tokens("#16218", 10, 32, 22);
+        let matches = vec![gpl_1_0.clone(), gpl_2_0.clone()];
+
+        let filtered = filter_contained_matches(&matches);
+
+        // gpl-2.0-plus should be kept, gpl-1.0-plus should be filtered
+        assert_eq!(filtered.len(), 1, "Should filter contained GPL match");
+        assert_eq!(
+            filtered[0].rule_identifier, "#16218",
+            "Should keep gpl-2.0-plus"
+        );
+        assert_eq!(filtered[0].end_token, 32, "Should have correct end_token");
+    }
+
+    #[test]
+    fn test_filter_contained_matches_gpl_variant_zero_tokens() {
+        // Same test but with zero tokens (fallback to line-based)
+        let mut gpl_1_0 = create_test_match_with_tokens("#20560", 0, 0, 9);
+        gpl_1_0.start_line = 13;
+        gpl_1_0.end_line = 14;
+
+        let mut gpl_2_0 = create_test_match_with_tokens("#16218", 0, 0, 22);
+        gpl_2_0.start_line = 13;
+        gpl_2_0.end_line = 15;
+
+        let matches = vec![gpl_1_0.clone(), gpl_2_0.clone()];
+
+        let filtered = filter_contained_matches(&matches);
+
+        // Even with zero tokens, line-based containment should work
+        assert_eq!(
+            filtered.len(),
+            1,
+            "Should filter contained GPL match (line-based)"
+        );
+        assert_eq!(
+            filtered[0].rule_identifier, "#16218",
+            "Should keep gpl-2.0-plus"
+        );
+    }
+
+    #[test]
+    fn debug_gpl_token_positions_real() {
+        use crate::license_detection::aho_match;
+        use crate::license_detection::index::build_index;
+        use crate::license_detection::query::Query;
+        use crate::license_detection::rules::{
+            load_licenses_from_directory, load_rules_from_directory,
+        };
+
+        let rules_path =
+            std::path::Path::new("reference/scancode-toolkit/src/licensedcode/data/rules");
+        let licenses_path =
+            std::path::Path::new("reference/scancode-toolkit/src/licensedcode/data/licenses");
+        let rules = load_rules_from_directory(rules_path, false).expect("Failed to load rules");
+        let licenses =
+            load_licenses_from_directory(licenses_path, false).expect("Failed to load licenses");
+        let index = build_index(rules, licenses);
+
+        let text =
+            std::fs::read_to_string("testdata/license-golden/datadriven/lic1/gpl-2.0-plus_1.txt")
+                .unwrap();
+        let query = Query::new(&text, &index).unwrap();
+        let run = query.whole_query_run();
+
+        let matches = aho_match::aho_match(&index, &run);
+
+        let gpl_matches: Vec<_> = matches
+            .iter()
+            .filter(|m| m.license_expression.to_lowercase().contains("gpl"))
+            .collect();
+
+        println!("\nGPL matches with token positions:");
+        for m in &gpl_matches {
+            println!(
+                "  {} start_token={}, end_token={}, lines {}-{}, len={}",
+                m.license_expression,
+                m.start_token,
+                m.end_token,
+                m.start_line,
+                m.end_line,
+                m.matched_length
+            );
+        }
+
+        if gpl_matches.len() >= 2 {
+            let m1 = &gpl_matches[0];
+            let m2 = &gpl_matches[1];
+
+            let same_start = m1.start_token == m2.start_token;
+            println!("\nSame start_token? {}", same_start);
+
+            println!("m1.qcontains(m2): {}", m1.qcontains(m2));
+            println!("m2.qcontains(m1): {}", m2.qcontains(m1));
+        }
+    }
+
+    #[test]
     fn test_refine_matches_pipeline_preserves_non_overlapping_different_rules() {
         let index = LicenseIndex::with_legalese_count(10);
 
@@ -2181,8 +2281,8 @@ mod tests {
         let m1 = create_test_match("#1", 1, 10, 0.9, 90.0, 100);
         let m2 = create_test_match("#2", 20, 30, 0.85, 85.0, 100);
 
-        assert_eq!(calculate_overlap(&m1, &m2), 0);
-        assert_eq!(calculate_overlap(&m2, &m1), 0);
+        assert_eq!(m1.qoverlap(&m2), 0);
+        assert_eq!(m2.qoverlap(&m1), 0);
     }
 
     #[test]
@@ -2190,8 +2290,8 @@ mod tests {
         let m1 = create_test_match("#1", 1, 10, 0.9, 90.0, 100);
         let m2 = create_test_match("#2", 5, 15, 0.85, 85.0, 100);
 
-        assert_eq!(calculate_overlap(&m1, &m2), 6);
-        assert_eq!(calculate_overlap(&m2, &m1), 6);
+        assert_eq!(m1.qoverlap(&m2), 6);
+        assert_eq!(m2.qoverlap(&m1), 6);
     }
 
     #[test]
@@ -2199,8 +2299,8 @@ mod tests {
         let m1 = create_test_match("#1", 1, 20, 0.9, 90.0, 100);
         let m2 = create_test_match("#2", 5, 15, 0.85, 85.0, 100);
 
-        assert_eq!(calculate_overlap(&m1, &m2), 11);
-        assert_eq!(calculate_overlap(&m2, &m1), 11);
+        assert_eq!(m1.qoverlap(&m2), 11);
+        assert_eq!(m2.qoverlap(&m1), 11);
     }
 
     #[test]
@@ -2208,7 +2308,7 @@ mod tests {
         let m1 = create_test_match("#1", 1, 10, 0.9, 90.0, 100);
         let m2 = create_test_match("#2", 1, 10, 0.85, 85.0, 100);
 
-        assert_eq!(calculate_overlap(&m1, &m2), 10);
+        assert_eq!(m1.qoverlap(&m2), 10);
     }
 
     #[test]
@@ -2216,7 +2316,7 @@ mod tests {
         let m1 = create_test_match("#1", 1, 10, 0.9, 90.0, 100);
         let m2 = create_test_match("#2", 11, 20, 0.85, 85.0, 100);
 
-        assert_eq!(calculate_overlap(&m1, &m2), 0);
+        assert_eq!(m1.qoverlap(&m2), 0);
     }
 
     #[allow(clippy::too_many_arguments)]

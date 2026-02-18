@@ -7,6 +7,8 @@ pub mod aho_match;
 mod detection;
 pub mod expression;
 #[cfg(test)]
+mod glassfish_debug_test;
+#[cfg(test)]
 mod golden_test;
 pub mod hash_match;
 pub mod index;
@@ -959,6 +961,39 @@ copies of the Software."#;
             println!("  tokens: {:?}", rule.tokens);
             println!("  is_small: {}", rule.is_small);
             println!("  is_tiny: {}", rule.is_tiny);
+        }
+    }
+
+    #[test]
+    fn test_no_token_boundary_false_positives() {
+        let Some(engine) = create_engine_from_reference() else {
+            eprintln!("Skipping test: reference directory not found");
+            return;
+        };
+
+        let test_file = std::path::PathBuf::from(
+            "testdata/license-golden/datadriven/lic1/config.guess-gpl2.txt",
+        );
+        let text = match std::fs::read_to_string(&test_file) {
+            Ok(t) => t,
+            Err(e) => {
+                eprintln!("Skipping test: cannot read test file: {}", e);
+                return;
+            }
+        };
+
+        let detections = engine.detect(&text).expect("Detection should succeed");
+
+        for detection in &detections {
+            for m in &detection.matches {
+                assert!(
+                    !m.license_expression.contains("cc-by-nc-sa"),
+                    "Found false positive cc-by-nc-sa match at lines {}-{} with matched_text: {:?}",
+                    m.start_line,
+                    m.end_line,
+                    m.matched_text
+                );
+            }
         }
     }
 }
