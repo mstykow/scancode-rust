@@ -991,7 +991,11 @@ impl<'a> QueryRun<'a> {
             return Vec::new();
         }
 
-        let matchables = self.matchables(false);
+        // Use ALL matchables (high + low), not just high matchables.
+        // This is critical for Phase 2 (near-duplicate detection) to find
+        // combined rules like "cddl-1.0 OR gpl-2.0-glassfish".
+        // Python: `self.matchables` includes both high and low.
+        let matchables = self.matchables(true);
         self.tokens_with_pos()
             .map(|(pos, tid)| {
                 if matchables.contains(&pos) {

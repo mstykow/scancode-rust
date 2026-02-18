@@ -8,12 +8,9 @@ use crate::license_detection::expression::{CombineRelation, combine_expressions}
 use crate::license_detection::models::LicenseMatch;
 use crate::license_detection::spdx_mapping::SpdxMapping;
 
-/// Token gap threshold for grouping matches.
-/// Matches with token gap > this are considered separate regions.
-const TOKENS_THRESHOLD: usize = 10;
-
-const LINES_GAP_THRESHOLD: usize = 3;
-
+/// Line gap threshold for grouping matches.
+/// Matches with line gap > this are considered separate groups.
+/// Corresponds to Python's LINES_THRESHOLD = 4 (query.py:108)
 const LINES_THRESHOLD: usize = 4;
 
 /// Coverage value below which detections are not perfect.
@@ -208,26 +205,19 @@ fn group_matches_by_region_with_threshold(
     groups
 }
 
-/// Check if two matches should be in the same group based on dual-criteria.
+/// Check if two matches should be in the same group based on line proximity.
 ///
-/// Matches are grouped together when BOTH token gap AND line gap are within thresholds.
+/// Matches are grouped together when line gap is within threshold.
 ///
-/// Based on Python's get_matching_regions() at match.py:2377-2387:
+/// Based on Python's group_matches() at detection.py:1820-1868:
 /// ```python
-/// if (prev_region.distance_to(cur_region) > min_tokens_gap
-///     or prev_region_lines.distance_to(cur_region_lines) > min_lines_gap
-/// ):
-///     # SEPARATE - start new region
-/// else:
-///     # GROUP - extend current region
+/// is_in_group_by_threshold = license_match.start_line <= previous_match.end_line + lines_threshold
 /// ```
 ///
-/// This means: GROUP if token_gap <= 10 AND line_gap <= 3
+/// This means: GROUP if start_line <= prev_end_line + 4 (equivalent to line_gap <= 4)
 fn should_group_together(prev: &LicenseMatch, cur: &LicenseMatch) -> bool {
     let line_gap = cur.start_line.saturating_sub(prev.end_line);
-    let token_gap = cur.start_token.saturating_sub(prev.end_token);
-
-    token_gap <= TOKENS_THRESHOLD && line_gap <= LINES_GAP_THRESHOLD
+    line_gap <= LINES_THRESHOLD
 }
 
 /// Sort matches by start line for grouping.

@@ -149,27 +149,24 @@ pub fn unknown_match(
 
 /// Compute the set of query positions covered by known matches.
 ///
+/// Uses token positions (start_token, end_token) for precise coverage,
+/// matching Python's qspan-based approach.
+///
 /// # Arguments
-/// * `query` - The query object
+/// * `_query` - The query object (unused, kept for API compatibility)
 /// * `known_matches` - Previously found matches
 ///
 /// # Returns
 /// A HashSet of token positions that are covered by known matches
 fn compute_covered_positions(
-    query: &Query,
+    _query: &Query,
     known_matches: &[LicenseMatch],
 ) -> std::collections::HashSet<usize> {
     let mut covered = std::collections::HashSet::new();
 
-    for match_result in known_matches {
-        let start_line = match_result.start_line;
-        let end_line = match_result.end_line;
-
-        for pos in 0..query.line_by_pos.len() {
-            let line = query.line_by_pos[pos];
-            if line >= start_line && line <= end_line {
-                covered.insert(pos);
-            }
+    for m in known_matches {
+        for pos in m.start_token..m.end_token {
+            covered.insert(pos);
         }
     }
 
@@ -262,7 +259,7 @@ fn match_ngrams_in_region(
 /// # Returns
 /// Option containing the LicenseMatch, or None if the region doesn't meet thresholds
 fn create_unknown_match(
-    _index: &LicenseIndex,
+    index: &LicenseIndex,
     query: &Query,
     start: usize,
     end: usize,
@@ -271,6 +268,21 @@ fn create_unknown_match(
     let region_length = end.saturating_sub(start);
 
     if region_length < UNKNOWN_NGRAM_LENGTH * 4 {
+        return None;
+    }
+
+    // Compute hispan: count high-value legalese tokens.
+    // Python: `len(hispan) < 5` check at match_unknown.py:220
+    let hispan = (start..end)
+        .filter(|&pos| {
+            query
+                .tokens
+                .get(pos)
+                .is_some_and(|&tid| (tid as usize) < index.len_legalese)
+        })
+        .count();
+
+    if hispan < 5 {
         return None;
     }
 
@@ -311,7 +323,7 @@ fn create_unknown_match(
         is_license_reference: false,
         is_license_tag: false,
         matched_token_positions: None,
-        hilen: 0,
+        hilen: hispan,
     }
     .into()
 }
