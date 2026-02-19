@@ -206,6 +206,10 @@ fn merge_overlapping_matches(matches: &[LicenseMatch]) -> Vec<LicenseMatch> {
                 accum.rule_start_token = new_rule_start_token;
                 accum.matched_length = merged_qspan.len();
                 accum.hilen = merged_hispan.len();
+                if accum.rule_length > 0 {
+                    accum.match_coverage = (accum.matched_length.min(accum.rule_length) as f32
+                        / accum.rule_length as f32) * 100.0;
+                }
                 accum.start_line = accum.start_line.min(next_match.start_line);
                 accum.end_line = accum.end_line.max(next_match.end_line);
                 accum.score = accum.score.max(next_match.score);

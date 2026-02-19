@@ -442,6 +442,12 @@ impl LicenseMatch {
     }
 
     pub fn qcontains(&self, other: &LicenseMatch) -> bool {
+        if let (Some(self_positions), Some(other_positions)) =
+            (&self.qspan_positions, &other.qspan_positions)
+        {
+            return other_positions.iter().all(|p| self_positions.contains(p));
+        }
+
         if self.start_token == 0
             && self.end_token == 0
             && other.start_token == 0
