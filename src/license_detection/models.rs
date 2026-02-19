@@ -1,6 +1,8 @@
 //! Core data structures for license detection.
 
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::ops::Range;
 
 fn default_rule_length() -> usize {
     0
@@ -59,7 +61,7 @@ pub struct License {
 }
 
 /// Rule metadata loaded from .LICENSE and .RULE files.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Rule {
     /// Unique identifier for this rule (e.g., "mit.LICENSE", "gpl-2.0_12.RULE")
     /// Used for sorting to match Python's attr.s field order.
@@ -112,6 +114,14 @@ pub struct Rule {
 
     /// Tokens must appear in order if true
     pub is_continuous: bool,
+
+    /// Token position spans for required phrases parsed from {{...}} markers.
+    /// Each span represents positions in the rule text that MUST be matched.
+    pub required_phrase_spans: Vec<Range<usize>>,
+
+    /// Mapping from token position to count of stopwords at that position.
+    /// Used for required phrase validation.
+    pub stopwords_by_pos: HashMap<usize, usize>,
 
     /// Filenames where this rule should be considered
     pub referenced_filenames: Option<Vec<String>>,
@@ -172,6 +182,18 @@ pub struct Rule {
 
     /// Alternative SPDX license identifiers (aliases)
     pub other_spdx_license_keys: Vec<String>,
+}
+
+impl PartialOrd for Rule {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for Rule {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.identifier.cmp(&other.identifier)
+    }
 }
 
 /// License match result from a matching strategy.
@@ -263,6 +285,28 @@ pub struct LicenseMatch {
     /// where the token ID is a high-value legalese token.
     #[serde(default)]
     pub hilen: usize,
+
+    /// Rule-side start position (where in the rule text the match starts).
+    ///
+    /// This is Python's "istart" - the position in the rule, not the query.
+    /// Used by `ispan()` to return rule-side positions for required phrase checking.
+    ///
+    /// For exact matches (hash, aho), this is always 0.
+    /// For approximate matches (seq), this is the position in the rule where alignment begins.
+    #[serde(default)]
+    pub rule_start_token: usize,
+
+    /// Token positions matched in the query text.
+    /// None means contiguous range [start_token, end_token).
+    /// Some(positions) contains exact positions for non-contiguous matches (after merge).
+    #[serde(skip)]
+    pub qspan_positions: Option<Vec<usize>>,
+
+    /// Token positions matched in the rule text.
+    /// None means contiguous range [rule_start_token, rule_start_token + matched_length).
+    /// Some(positions) contains exact positions for non-contiguous matches (after merge).
+    #[serde(skip)]
+    pub ispan_positions: Option<Vec<usize>>,
 }
 
 impl Default for LicenseMatch {
@@ -291,6 +335,9 @@ impl Default for LicenseMatch {
             is_license_tag: false,
             matched_token_positions: None,
             hilen: 0,
+            rule_start_token: 0,
+            qspan_positions: None,
+            ispan_positions: None,
         }
     }
 }
@@ -302,6 +349,8 @@ impl LicenseMatch {
             "1-spdx-id" => 1,
             "2-aho" => 2,
             "3-seq" => 3,
+            "3-spdx" => 3,
+            "4-seq" => 4,
             "5-unknown" => 5,
             _ => 9,
         }
@@ -329,7 +378,9 @@ impl LicenseMatch {
 
     #[allow(dead_code)]
     pub fn len(&self) -> usize {
-        if let Some(positions) = &self.matched_token_positions {
+        if let Some(positions) = &self.qspan_positions {
+            positions.len()
+        } else if let Some(positions) = &self.matched_token_positions {
             positions.len()
         } else {
             self.end_token.saturating_sub(self.start_token)
@@ -348,6 +399,16 @@ impl LicenseMatch {
         } else {
             self.end_token.saturating_sub(self.start_token)
         }
+    }
+
+    /// Return the query magnitude: qregion_len + unknowns in matched range.
+    /// Python: qmagnitude = qregion_len + sum(unknowns_by_pos for pos in qspan[:-1])
+    pub fn qmagnitude(&self, query: &crate::license_detection::query::Query) -> usize {
+        let qregion_len = self.qregion_len();
+        let unknowns_in_match = (self.start_token..self.end_token)
+            .filter(|&pos| query.unknowns_by_pos.contains_key(&Some(pos as i32)))
+            .count();
+        qregion_len + unknowns_in_match
     }
 
     #[allow(dead_code)]
@@ -405,6 +466,39 @@ impl LicenseMatch {
         let end = self.end_token.min(other.end_token);
         end.saturating_sub(start)
     }
+
+    /// Return true if all matched tokens are continuous without gaps or unknowns.
+    /// Python: len() == qregion_len() == qmagnitude()
+    pub fn is_continuous(&self, query: &crate::license_detection::query::Query) -> bool {
+        if self.matched_token_positions.is_some() {
+            return false;
+        }
+        let len = self.len();
+        let qregion_len = self.qregion_len();
+        let qmagnitude = self.qmagnitude(query);
+        len == qregion_len && qregion_len == qmagnitude
+    }
+
+    pub fn ispan(&self) -> Vec<usize> {
+        if let Some(positions) = &self.ispan_positions {
+            positions.clone()
+        } else {
+            (self.rule_start_token..self.rule_start_token + self.matched_length).collect()
+        }
+    }
+
+    pub fn qspan(&self) -> Vec<usize> {
+        if let Some(positions) = &self.qspan_positions {
+            positions.clone()
+        } else {
+            (self.start_token..self.end_token).collect()
+        }
+    }
+
+    #[allow(dead_code)]
+    pub fn has_gaps(&self) -> bool {
+        self.qspan_positions.is_some() || self.ispan_positions.is_some()
+    }
 }
 
 #[cfg(test)]
@@ -450,6 +544,8 @@ mod tests {
             relevance: 90,
             minimum_coverage: None,
             is_continuous: true,
+            required_phrase_spans: vec![],
+            stopwords_by_pos: HashMap::new(),
             referenced_filenames: None,
             ignorable_urls: None,
             ignorable_emails: None,
@@ -498,6 +594,9 @@ mod tests {
             is_license_reference: false,
             is_license_tag: false,
             hilen: 50,
+            rule_start_token: 0,
+            qspan_positions: None,
+            ispan_positions: None,
         }
     }
 
@@ -657,6 +756,8 @@ mod tests {
             relevance: 0,
             minimum_coverage: None,
             is_continuous: false,
+            required_phrase_spans: vec![],
+            stopwords_by_pos: HashMap::new(),
             referenced_filenames: None,
             ignorable_urls: None,
             ignorable_emails: None,
@@ -766,6 +867,8 @@ mod tests {
             relevance: 100,
             minimum_coverage: None,
             is_continuous: false,
+            required_phrase_spans: vec![],
+            stopwords_by_pos: HashMap::new(),
             referenced_filenames: None,
             ignorable_urls: None,
             ignorable_emails: None,
@@ -845,6 +948,8 @@ mod tests {
             is_deprecated: false,
             spdx_license_key: None,
             other_spdx_license_keys: vec![],
+            required_phrase_spans: vec![],
+            stopwords_by_pos: std::collections::HashMap::new(),
         };
 
         assert_eq!(rule.minimum_coverage, Some(80));
@@ -893,6 +998,9 @@ mod tests {
             is_license_tag: false,
             matched_token_positions: None,
             hilen: 0,
+            rule_start_token: 0,
+            qspan_positions: None,
+            ispan_positions: None,
         };
 
         assert!(match_result.from_file.is_none());
@@ -1035,6 +1143,9 @@ mod tests {
             is_license_reference: false,
             is_license_tag: false,
             hilen: 50,
+            rule_start_token: 0,
+            qspan_positions: None,
+            ispan_positions: None,
         };
 
         assert_eq!(

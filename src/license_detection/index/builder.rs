@@ -21,7 +21,7 @@ use crate::license_detection::rules::legalese;
 use crate::license_detection::rules::thresholds::{
     SMALL_RULE, TINY_RULE, compute_thresholds_occurrences, compute_thresholds_unique,
 };
-use crate::license_detection::tokenize::tokenize;
+use crate::license_detection::tokenize::{parse_required_phrase_spans, tokenize_with_stopwords};
 
 const UNKNOWN_NGRAM_LENGTH: usize = 6;
 
@@ -60,6 +60,8 @@ fn build_rule_from_license(license: &License) -> Option<Rule> {
             None
         },
         is_continuous: false,
+        required_phrase_spans: vec![],
+        stopwords_by_pos: HashMap::new(),
         referenced_filenames: None,
         ignorable_urls: license.ignorable_urls.clone(),
         ignorable_emails: license.ignorable_emails.clone(),
@@ -215,7 +217,9 @@ pub fn build_index(rules: Vec<Rule>, licenses: Vec<License>) -> LicenseIndex {
     let mut rid_by_spdx_key: HashMap<String, usize> = HashMap::new();
 
     for (rid, mut rule) in all_rules.into_iter().enumerate() {
-        let rule_tokens = tokenize(&rule.text);
+        rule.required_phrase_spans = parse_required_phrase_spans(&rule.text);
+        let (rule_tokens, stopwords_by_pos) = tokenize_with_stopwords(&rule.text);
+        rule.stopwords_by_pos = stopwords_by_pos;
         let mut rule_token_ids: Vec<u16> = Vec::with_capacity(rule_tokens.len());
 
         let mut is_weak = true;
@@ -424,6 +428,8 @@ mod tests {
             is_deprecated: false,
             spdx_license_key: None,
             other_spdx_license_keys: vec![],
+            required_phrase_spans: vec![],
+            stopwords_by_pos: std::collections::HashMap::new(),
         }
     }
 

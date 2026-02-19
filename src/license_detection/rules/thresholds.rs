@@ -209,6 +209,7 @@ mod integration_tests {
     use super::super::super::index::token_sets::*;
     use super::super::super::models::Rule;
     use super::*;
+    use std::collections::HashMap;
 
     /// Helper function to create a rule with mock tokens and compute thresholds.
     #[allow(dead_code)]
@@ -235,6 +236,8 @@ mod integration_tests {
             relevance: 100,
             minimum_coverage,
             is_continuous: false,
+            required_phrase_spans: vec![],
+            stopwords_by_pos: HashMap::new(),
             referenced_filenames: None,
             ignorable_urls: None,
             ignorable_emails: None,

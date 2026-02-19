@@ -512,4 +512,435 @@ mod golden_tests {
             }
         }
     }
+
+    #[test]
+    fn debug_crapl_0_1() {
+        let Some(engine) = ensure_engine() else {
+            eprintln!("Engine not available");
+            return;
+        };
+
+        let text =
+            fs::read_to_string("testdata/license-golden/datadriven/lic1/crapl-0.1.txt").unwrap();
+        let detections = engine.detect(&text).unwrap();
+
+        eprintln!("\n========================================");
+        eprintln!("DEBUG: crapl-0.1.txt detection");
+        eprintln!("========================================");
+        eprintln!("Text:\n{}", text);
+        eprintln!();
+
+        eprintln!("Expected: {:?}", vec!["crapl-0.1"]);
+        eprintln!(
+            "Actual:   {:?}",
+            detections
+                .iter()
+                .map(|d| d.license_expression.as_deref().unwrap_or(""))
+                .collect::<Vec<_>>()
+        );
+
+        for (i, d) in detections.iter().enumerate() {
+            eprintln!(
+                "\nDetection {}: {:?} ({} matches)",
+                i,
+                d.license_expression,
+                d.matches.len()
+            );
+            for m in &d.matches {
+                eprintln!(
+                    "  Match: {} lines {}-{} score={:.1} matcher={}",
+                    m.license_expression, m.start_line, m.end_line, m.score, m.matcher
+                );
+            }
+        }
+
+        let index = engine.index();
+        let crapl_rules: Vec<_> = index
+            .rules_by_rid
+            .iter()
+            .filter(|r| r.license_expression.contains("crapl"))
+            .collect();
+
+        eprintln!("\n========================================");
+        eprintln!("CRAPL rules in index:");
+        eprintln!("========================================");
+        for rule in &crapl_rules {
+            eprintln!(
+                "  {} - tokens: {}, is_license_notice: {}",
+                rule.identifier,
+                rule.tokens.len(),
+                rule.is_license_notice
+            );
+        }
+
+        eprintln!("\n========================================");
+        eprintln!("Checking automaton for crapl rules:");
+        eprintln!("========================================");
+
+        for rule in &crapl_rules {
+            let rid = index
+                .rules_by_rid
+                .iter()
+                .position(|r| r.identifier == rule.identifier)
+                .unwrap();
+            let tokens = &index.tids_by_rid[rid];
+            let pattern: Vec<u8> = tokens.iter().flat_map(|t| t.to_le_bytes()).collect();
+
+            let matches: Vec<_> = index.rules_automaton.find_iter(&pattern).collect();
+            eprintln!(
+                "  {} (rid={}): {} automaton matches",
+                rule.identifier,
+                rid,
+                matches.len()
+            );
+        }
+
+        eprintln!("\n========================================");
+        eprintln!("Query tokenization check:");
+        eprintln!("========================================");
+
+        let crapl_3_rid = index
+            .rules_by_rid
+            .iter()
+            .position(|r| r.identifier == "crapl-0.1_3.RULE")
+            .expect("crapl-0.1_3.RULE not found");
+        let crapl_3_tokens = &index.tids_by_rid[crapl_3_rid];
+        eprintln!(
+            "crapl-0.1_3.RULE tokens ({}): {:?}",
+            crapl_3_tokens.len(),
+            crapl_3_tokens
+        );
+
+        let query = crate::license_detection::query::Query::new(&text, index)
+            .expect("Failed to create query");
+        eprintln!("Query tokens ({}): {:?}", query.tokens.len(), &query.tokens);
+
+        if !crapl_3_tokens.is_empty() {
+            let first_tid = crapl_3_tokens[0];
+            let positions: Vec<_> = query
+                .tokens
+                .iter()
+                .enumerate()
+                .filter(|(_, t)| **t == first_tid)
+                .map(|(i, _)| i)
+                .collect();
+            eprintln!(
+                "First token {} appears at positions: {:?}",
+                first_tid, positions
+            );
+
+            for pos in positions {
+                let mut match_len = 0;
+                for (i, &rule_tid) in crapl_3_tokens.iter().enumerate() {
+                    if pos + i < query.tokens.len() && query.tokens[pos + i] == rule_tid {
+                        match_len += 1;
+                    } else {
+                        break;
+                    }
+                }
+                eprintln!(
+                    "  At pos {}: {} tokens match (need {})",
+                    pos,
+                    match_len,
+                    crapl_3_tokens.len()
+                );
+                if match_len == crapl_3_tokens.len() {
+                    eprintln!("    FULL MATCH FOUND!");
+                }
+            }
+        }
+
+        eprintln!("\n========================================");
+        eprintln!("Matchables check:");
+        eprintln!("========================================");
+        let whole_run = query.whole_query_run();
+        let matchables = whole_run.matchables(true);
+        eprintln!("Matchables: {:?}", matchables);
+        eprintln!("Matchables len: {}", matchables.len());
+
+        let crapl_3_rid = index
+            .rules_by_rid
+            .iter()
+            .position(|r| r.identifier == "crapl-0.1_3.RULE")
+            .unwrap();
+        let crapl_3_tokens = &index.tids_by_rid[crapl_3_rid];
+
+        let first_tid = crapl_3_tokens[0];
+        let positions: Vec<_> = query
+            .tokens
+            .iter()
+            .enumerate()
+            .filter(|(_, t)| **t == first_tid)
+            .map(|(i, _)| i)
+            .collect();
+
+        for pos in positions {
+            if pos + crapl_3_tokens.len() <= query.tokens.len() {
+                let all_match = crapl_3_tokens
+                    .iter()
+                    .enumerate()
+                    .all(|(i, &tid)| query.tokens[pos + i] == tid);
+                if all_match {
+                    let qstart = pos;
+                    let qend = pos + crapl_3_tokens.len();
+                    let is_matchable = (qstart..qend).all(|p| matchables.contains(&p));
+                    eprintln!("Full match at pos {}: is_matchable = {}", pos, is_matchable);
+                    if !is_matchable {
+                        eprintln!("  Non-matchable positions:");
+                        for p in qstart..qend {
+                            if !matchables.contains(&p) {
+                                eprintln!(
+                                    "    Position {} is NOT matchable (token {})",
+                                    p, query.tokens[p]
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        eprintln!("\n========================================");
+        eprintln!("Running Aho-Corasick match directly:");
+        eprintln!("========================================");
+        let aho_matches = crate::license_detection::aho_match::aho_match(index, &whole_run);
+        eprintln!("Aho matches found: {}", aho_matches.len());
+        for m in &aho_matches {
+            eprintln!(
+                "  {} lines {}-{} score={:.1} rule_id={}",
+                m.license_expression, m.start_line, m.end_line, m.score, m.rule_identifier
+            );
+        }
+
+        eprintln!("\n========================================");
+        eprintln!("Checking refine_matches filters:");
+        eprintln!("========================================");
+
+        // Check filter_false_positive_matches
+        for m in &aho_matches {
+            if let Some(rid) = m
+                .rule_identifier
+                .strip_prefix('#')
+                .and_then(|s| s.parse::<usize>().ok())
+            {
+                eprintln!(
+                    "Rule {} (rid={}): is_false_positive = {}",
+                    m.rule_identifier,
+                    rid,
+                    index.false_positive_rids.contains(&rid)
+                );
+            }
+        }
+
+        // Check filter_contained_matches
+        eprintln!("\nChecking containment:");
+        for i in 0..aho_matches.len() {
+            for j in 0..aho_matches.len() {
+                if i != j {
+                    let a = &aho_matches[i];
+                    let b = &aho_matches[j];
+                    if a.start_token <= b.start_token && a.end_token >= b.end_token {
+                        eprintln!(
+                            "  {} (lines {}-{}, tokens {}-{}) CONTAINS {} (lines {}-{}, tokens {}-{})",
+                            a.rule_identifier,
+                            a.start_line,
+                            a.end_line,
+                            a.start_token,
+                            a.end_token,
+                            b.rule_identifier,
+                            b.start_line,
+                            b.end_line,
+                            b.start_token,
+                            b.end_token
+                        );
+                    }
+                }
+            }
+        }
+
+        eprintln!("\n========================================");
+        eprintln!("Running refine_matches:");
+        eprintln!("========================================");
+        let all_matches: Vec<_> = aho_matches.clone();
+        let refined =
+            crate::license_detection::match_refine::refine_matches(index, all_matches, &query);
+        eprintln!("Refined matches: {}", refined.len());
+        for m in &refined {
+            eprintln!(
+                "  {} lines {}-{} score={:.1} rule_id={}",
+                m.license_expression, m.start_line, m.end_line, m.score, m.rule_identifier
+            );
+        }
+
+        eprintln!("\n========================================");
+        eprintln!("Running detection grouping:");
+        eprintln!("========================================");
+        use crate::license_detection::detection::{
+            create_detection_from_group, group_matches_by_region,
+            populate_detection_from_group_with_spdx,
+        };
+
+        let mut sorted = refined.clone();
+        crate::license_detection::detection::sort_matches_by_line(&mut sorted);
+
+        let groups = group_matches_by_region(&sorted);
+        eprintln!("Number of groups: {}", groups.len());
+        for (i, group) in groups.iter().enumerate() {
+            eprintln!(
+                "Group {} (lines {}-{}):",
+                i, group.start_line, group.end_line
+            );
+            for m in &group.matches {
+                eprintln!(
+                    "  {} lines {}-{} is_license_intro={} is_license_clue={}",
+                    m.license_expression,
+                    m.start_line,
+                    m.end_line,
+                    m.is_license_intro,
+                    m.is_license_clue
+                );
+            }
+
+            let mut detection = create_detection_from_group(group);
+            populate_detection_from_group_with_spdx(&mut detection, group, engine.spdx_mapping());
+            eprintln!("  Detection: {:?}", detection.license_expression);
+            eprintln!("  Detection log: {:?}", detection.detection_log);
+        }
+
+        eprintln!("\n========================================");
+        eprintln!("Running post_process_detections:");
+        eprintln!("========================================");
+        let detections: Vec<_> = groups
+            .iter()
+            .map(|group| {
+                let mut detection = create_detection_from_group(group);
+                populate_detection_from_group_with_spdx(
+                    &mut detection,
+                    group,
+                    engine.spdx_mapping(),
+                );
+                detection
+            })
+            .collect();
+
+        eprintln!(
+            "Before post_process_detections: {} detections",
+            detections.len()
+        );
+        for (i, d) in detections.iter().enumerate() {
+            eprintln!("  Detection {}: {:?}", i, d.license_expression);
+        }
+
+        let processed =
+            crate::license_detection::detection::post_process_detections(detections, 0.0);
+        eprintln!(
+            "After post_process_detections: {} detections",
+            processed.len()
+        );
+        for (i, d) in processed.iter().enumerate() {
+            eprintln!("  Detection {}: {:?}", i, d.license_expression);
+            for m in &d.matches {
+                eprintln!("    Match: {}", m.license_expression);
+            }
+        }
+
+        eprintln!("\n========================================");
+        eprintln!("Comparing with engine.detect():");
+        eprintln!("========================================");
+
+        // Let's manually trace through the engine.detect() pipeline
+        let query = crate::license_detection::query::Query::new(&text, index).unwrap();
+        let mut all_matches = Vec::new();
+        let mut matched_qspans = Vec::new();
+
+        // Phase 1: Hash, SPDX, Aho-Corasick matching
+        let whole_run = query.whole_query_run();
+
+        let hash_matches = crate::license_detection::hash_match::hash_match(index, &whole_run);
+        eprintln!("Hash matches: {}", hash_matches.len());
+        all_matches.extend(hash_matches);
+
+        let spdx_matches = crate::license_detection::spdx_lid::spdx_lid_match(index, &query);
+        eprintln!("SPDX matches: {}", spdx_matches.len());
+        all_matches.extend(spdx_matches);
+
+        let aho_matches = crate::license_detection::aho_match::aho_match(index, &whole_run);
+        eprintln!("Aho matches: {}", aho_matches.len());
+        for m in &aho_matches {
+            eprintln!(
+                "  Aho: {} lines {}-{} coverage={}",
+                m.license_expression, m.start_line, m.end_line, m.match_coverage
+            );
+            if m.match_coverage >= 99.99 && m.end_token > m.start_token {
+                matched_qspans.push(crate::license_detection::query::PositionSpan::new(
+                    m.start_token,
+                    m.end_token - 1,
+                ));
+            }
+        }
+        all_matches.extend(aho_matches);
+
+        eprintln!("\nMatched qspans after Phase 1: {}", matched_qspans.len());
+
+        // Check what happens after Phase 2 (near-dupe detection)
+        let near_dupe_candidates =
+            crate::license_detection::seq_match::compute_candidates_with_msets(
+                index,
+                &whole_run,
+                true,
+                crate::license_detection::seq_match::MAX_NEAR_DUPE_CANDIDATES,
+            );
+        eprintln!("\nNear-dupe candidates: {}", near_dupe_candidates.len());
+
+        if !near_dupe_candidates.is_empty() {
+            let near_dupe_matches = crate::license_detection::seq_match::seq_match_with_candidates(
+                index,
+                &whole_run,
+                &near_dupe_candidates,
+            );
+            eprintln!("Near-dupe matches: {}", near_dupe_matches.len());
+            for m in &near_dupe_matches {
+                eprintln!(
+                    "  Near-dupe: {} lines {}-{} coverage={}",
+                    m.license_expression, m.start_line, m.end_line, m.match_coverage
+                );
+            }
+        }
+
+        // Phase 3: Regular sequence matching
+        let seq_matches = crate::license_detection::seq_match::seq_match(index, &whole_run);
+        eprintln!("\nSeq matches: {}", seq_matches.len());
+        for m in &seq_matches {
+            eprintln!(
+                "  Seq: {} lines {}-{} coverage={}",
+                m.license_expression, m.start_line, m.end_line, m.match_coverage
+            );
+        }
+        all_matches.extend(seq_matches.clone());
+
+        // Now let's run refine_matches on ALL matches
+        eprintln!("\n========================================");
+        eprintln!("Refining ALL matches:");
+        eprintln!("========================================");
+
+        let refined_all = crate::license_detection::match_refine::refine_matches(
+            index,
+            all_matches.clone(),
+            &query,
+        );
+        eprintln!("\nRefined matches (from all phases): {}", refined_all.len());
+        for m in refined_all.iter().take(10) {
+            eprintln!(
+                "  {} lines {}-{} coverage={:.1} rule_id={}",
+                m.license_expression, m.start_line, m.end_line, m.match_coverage, m.rule_identifier
+            );
+        }
+
+        // Now let's see what the actual engine.detect() returns
+        let engine_detections = engine.detect(&text).unwrap();
+        eprintln!(
+            "\nengine.detect() returned {} detections",
+            engine_detections.len()
+        );
+    }
 }

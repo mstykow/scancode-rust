@@ -43,3 +43,5 @@ output.json
 .env
 .env.*
 !.env.example
+
+scancode-playground/

@@ -10,7 +10,7 @@ use crate::license_detection::index::LicenseIndex;
 use crate::license_detection::models::LicenseMatch;
 use crate::license_detection::query::Query;
 use crate::license_detection::spans::Span;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 const OVERLAP_SMALL: f64 = 0.10;
 const OVERLAP_MEDIUM: f64 = 0.40;
@@ -153,26 +153,69 @@ fn merge_overlapping_matches(matches: &[LicenseMatch]) -> Vec<LicenseMatch> {
         }
 
         let mut sorted_matches = rule_matches.clone();
-        sorted_matches.sort_by_key(|m| (m.start_line, m.end_line));
+        sorted_matches.sort_by_key(|m| (m.start_token, std::cmp::Reverse(m.matched_length)));
 
         let mut accum = sorted_matches[0].clone();
 
-        for next_match in &sorted_matches[1..] {
-            let is_adjacent = accum.end_line + 1 >= next_match.start_line;
-            let is_overlapping =
-                accum.start_line <= next_match.end_line && accum.end_line >= next_match.start_line;
+        for next_match in sorted_matches.into_iter().skip(1) {
+            let should_merge = accum.end_token >= next_match.start_token;
 
-            if is_adjacent || is_overlapping {
+            if should_merge {
+                let accum_qspan: HashSet<usize> = accum.qspan().into_iter().collect();
+                let next_qspan: HashSet<usize> = next_match.qspan().into_iter().collect();
+                let mut merged_qspan: Vec<usize> =
+                    accum_qspan.union(&next_qspan).copied().collect();
+                merged_qspan.sort();
+
+                let accum_ispan: HashSet<usize> = accum.ispan().into_iter().collect();
+                let next_ispan: HashSet<usize> = next_match.ispan().into_iter().collect();
+                let mut merged_ispan: Vec<usize> =
+                    accum_ispan.union(&next_ispan).copied().collect();
+                merged_ispan.sort();
+
+                let accum_hispan: HashSet<usize> = (accum.rule_start_token
+                    ..accum.rule_start_token + accum.hilen)
+                    .filter(|&p| accum.ispan().contains(&p))
+                    .collect();
+                let next_hispan: HashSet<usize> = (next_match.rule_start_token
+                    ..next_match.rule_start_token + next_match.hilen)
+                    .filter(|&p| next_match.ispan().contains(&p))
+                    .collect();
+                let merged_hispan: HashSet<usize> =
+                    accum_hispan.union(&next_hispan).copied().collect();
+
+                let new_start_token = merged_qspan
+                    .iter()
+                    .min()
+                    .copied()
+                    .unwrap_or(accum.start_token);
+                let new_end_token = merged_qspan
+                    .iter()
+                    .max()
+                    .copied()
+                    .unwrap_or(accum.end_token)
+                    + 1;
+                let new_rule_start_token = merged_ispan
+                    .iter()
+                    .min()
+                    .copied()
+                    .unwrap_or(accum.rule_start_token);
+
+                accum.start_token = new_start_token;
+                accum.end_token = new_end_token;
+                accum.rule_start_token = new_rule_start_token;
+                accum.matched_length = merged_qspan.len();
+                accum.hilen = merged_hispan.len();
                 accum.start_line = accum.start_line.min(next_match.start_line);
                 accum.end_line = accum.end_line.max(next_match.end_line);
-                accum.matched_length = accum.matched_length.max(next_match.matched_length);
                 accum.score = accum.score.max(next_match.score);
+                accum.qspan_positions = Some(merged_qspan);
+                accum.ispan_positions = Some(merged_ispan);
             } else {
                 merged.push(accum);
-                accum = (*next_match).clone();
+                accum = next_match.clone();
             }
         }
-
         merged.push(accum);
     }
 
@@ -789,6 +832,219 @@ fn filter_short_matches_scattered_on_too_many_lines(
         .collect()
 }
 
+/// Filter matches that are missing required phrases.
+///
+/// A match to a rule with required phrases ({{...}} markers) must contain
+/// all those required phrases in the matched region. If any required phrase
+/// is missing or interrupted by unknown/stopwords, the match is discarded.
+///
+/// This also handles:
+/// - `is_continuous` rules: the entire match must be continuous
+/// - `is_required_phrase` rules: same as is_continuous
+///
+/// # Arguments
+/// * `index` - LicenseIndex containing rules_by_rid
+/// * `matches` - Slice of LicenseMatch to filter
+/// * `query` - Query object for unknowns_by_pos and stopwords_by_pos
+///
+/// # Returns
+/// Tuple of (kept matches, discarded matches)
+///
+/// Based on Python: `filter_matches_missing_required_phrases()` (match.py:2154-2328)
+fn filter_matches_missing_required_phrases(
+    index: &LicenseIndex,
+    matches: &[LicenseMatch],
+    query: &Query,
+) -> (Vec<LicenseMatch>, Vec<LicenseMatch>) {
+    if matches.is_empty() {
+        return (Vec::new(), Vec::new());
+    }
+
+    // NOTE: Python has a solo match exception at lines 2172-2175, but it has a bug:
+    // `rule = matches[0]` assigns a LicenseMatch (not a Rule), so `rule.is_continuous`
+    // is a method object (always truthy). The exception never triggers.
+    // We intentionally skip the solo exception to match Python's actual behavior.
+
+    let mut kept = Vec::new();
+    let mut discarded = Vec::new();
+
+    for m in matches {
+        let rid = match parse_rule_id(&m.rule_identifier) {
+            Some(rid) => rid,
+            None => {
+                kept.push(m.clone());
+                continue;
+            }
+        };
+
+        let rule = match index.rules_by_rid.get(rid) {
+            Some(r) => r,
+            None => {
+                kept.push(m.clone());
+                continue;
+            }
+        };
+
+        let is_continuous = rule.is_continuous || rule.is_required_phrase;
+        let ikey_spans = &rule.required_phrase_spans;
+
+        // No required phrases and not continuous -> always keep
+        if ikey_spans.is_empty() && !is_continuous {
+            kept.push(m.clone());
+            continue;
+        }
+
+        // is_continuous but match is not continuous -> discard
+        if is_continuous && !m.is_continuous(query) {
+            discarded.push(m.clone());
+            continue;
+        }
+
+        let ispan = m.ispan();
+        let ispan_set: HashSet<usize> = ispan.iter().copied().collect();
+        let qspan = m.qspan();
+
+        // Determine the actual spans to check
+        if is_continuous {
+            if !ispan.is_empty() {
+                let qkey_span: Vec<usize> = qspan.clone();
+
+                if let Some(_qkey_end) = qkey_span.last() {
+                    let contains_unknown = qkey_span
+                        .iter()
+                        .take(qkey_span.len() - 1)
+                        .any(|&qpos| query.unknowns_by_pos.contains_key(&Some(qpos as i32)));
+
+                    if contains_unknown {
+                        discarded.push(m.clone());
+                        continue;
+                    }
+                }
+
+                let qkey_span_set: HashSet<usize> = qkey_span.iter().copied().collect();
+                let qkey_span_end = qkey_span.last().copied();
+
+                let has_same_stopwords = {
+                    let mut ok = true;
+                    for (&qpos, &ipos) in qspan.iter().zip(ispan.iter()) {
+                        if !qkey_span_set.contains(&qpos) || Some(qpos) == qkey_span_end {
+                            continue;
+                        }
+
+                        let i_stop = rule.stopwords_by_pos.get(&ipos).copied().unwrap_or(0);
+                        let q_stop = query
+                            .stopwords_by_pos
+                            .get(&Some(qpos as i32))
+                            .copied()
+                            .unwrap_or(0);
+
+                        if i_stop != q_stop {
+                            ok = false;
+                            break;
+                        }
+                    }
+                    ok
+                };
+
+                if !has_same_stopwords {
+                    discarded.push(m.clone());
+                    continue;
+                }
+            }
+            kept.push(m.clone());
+            continue;
+        }
+
+        // Non-continuous case: check if all required phrase spans are contained in ispan
+        let all_contained = ikey_spans
+            .iter()
+            .all(|span| (span.start..span.end).all(|pos| ispan_set.contains(&pos)));
+
+        if !all_contained {
+            discarded.push(m.clone());
+            continue;
+        }
+
+        let mut is_valid = true;
+
+        for ikey_span in ikey_spans {
+            let qkey_span: Vec<usize> = qspan
+                .iter()
+                .zip(ispan.iter())
+                .filter_map(|(&qpos, &ipos)| {
+                    if ikey_span.contains(&ipos) {
+                        Some(qpos)
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+
+            if qkey_span.len() > 1 {
+                for i in 1..qkey_span.len() {
+                    if qkey_span[i] != qkey_span[i - 1] + 1 {
+                        is_valid = false;
+                        break;
+                    }
+                }
+                if !is_valid {
+                    break;
+                }
+            }
+
+            if let Some(_qkey_end) = qkey_span.last() {
+                let contains_unknown = qkey_span
+                    .iter()
+                    .take(qkey_span.len() - 1)
+                    .any(|&qpos| query.unknowns_by_pos.contains_key(&Some(qpos as i32)));
+
+                if contains_unknown {
+                    is_valid = false;
+                    break;
+                }
+            }
+
+            let qkey_span_set: HashSet<usize> = qkey_span.iter().copied().collect();
+            let qkey_span_end = qkey_span.last().copied();
+
+            let has_same_stopwords = {
+                let mut ok = true;
+                for (&qpos, &ipos) in qspan.iter().zip(ispan.iter()) {
+                    if !qkey_span_set.contains(&qpos) || Some(qpos) == qkey_span_end {
+                        continue;
+                    }
+
+                    let i_stop = rule.stopwords_by_pos.get(&ipos).copied().unwrap_or(0);
+                    let q_stop = query
+                        .stopwords_by_pos
+                        .get(&Some(qpos as i32))
+                        .copied()
+                        .unwrap_or(0);
+
+                    if i_stop != q_stop {
+                        ok = false;
+                        break;
+                    }
+                }
+                ok
+            };
+
+            if !has_same_stopwords {
+                is_valid = false;
+                break;
+            }
+        }
+
+        if is_valid {
+            kept.push(m.clone());
+        } else {
+            discarded.push(m.clone());
+        }
+    }
+
+    (kept, discarded)
+}
+
 /// Filter single-token matches surrounded by many unknown/short/digit tokens.
 ///
 /// A "spurious" single token match is a match to a single token that is
@@ -984,7 +1240,7 @@ fn filter_invalid_matches_to_single_word_gibberish(
 /// This is the main entry point for Phase 4.6 match refinement. It applies
 /// filters in the same order as Python's refine_matches():
 ///
-/// 1. Filter short GPL false positives
+/// 1. Filter matches missing required phrases
 /// 2. Filter spurious matches (low density)
 /// 3. Filter below rule minimum coverage
 /// 4. Filter spurious single-token matches
@@ -1019,7 +1275,14 @@ pub fn refine_matches(
         return Vec::new();
     }
 
-    let non_spurious = filter_spurious_matches(&matches);
+    // Python: merge_matches FIRST (line 2719), then filter, then merge again (line 2773)
+    let merged = merge_overlapping_matches(&matches);
+
+    // Filter matches missing required phrases
+    let (with_required_phrases, _missing_phrases) =
+        filter_matches_missing_required_phrases(index, &merged, query);
+
+    let non_spurious = filter_spurious_matches(&with_required_phrases);
 
     let above_min_cov = filter_below_rule_minimum_coverage(index, &non_spurious);
 
@@ -1032,9 +1295,10 @@ pub fn refine_matches(
     let non_gibberish =
         filter_invalid_matches_to_single_word_gibberish(index, &non_scattered, query);
 
-    let merged = merge_overlapping_matches(&non_gibberish);
+    // Python: merge_matches again at line 2773
+    let merged_again = merge_overlapping_matches(&non_gibberish);
 
-    let non_contained = filter_contained_matches(&merged);
+    let non_contained = filter_contained_matches(&merged_again);
 
     let (kept, discarded) = filter_overlapping_matches(non_contained, index);
 
@@ -1089,6 +1353,9 @@ mod tests {
             is_license_reference: false,
             is_license_tag: false,
             hilen: 50,
+            rule_start_token: 0,
+            qspan_positions: None,
+            ispan_positions: None,
         }
     }
 
@@ -1122,6 +1389,9 @@ mod tests {
             is_license_tag: false,
             matched_token_positions: None,
             hilen: matched_length / 2,
+            rule_start_token: 0,
+            qspan_positions: None,
+            ispan_positions: None,
         }
     }
 
@@ -2293,6 +2563,9 @@ mod tests {
             is_license_tag,
             matched_token_positions: None,
             hilen: matched_length / 2,
+            rule_start_token: 0,
+            qspan_positions: None,
+            ispan_positions: None,
         }
     }
 
@@ -2618,6 +2891,8 @@ mod tests {
                 is_deprecated: false,
                 spdx_license_key: None,
                 other_spdx_license_keys: vec![],
+                required_phrase_spans: vec![],
+                stopwords_by_pos: std::collections::HashMap::new(),
             });
 
         let mut m = create_test_match("#0", 1, 10, 0.9, 50.0, 100);
@@ -2673,6 +2948,8 @@ mod tests {
                 is_deprecated: false,
                 spdx_license_key: None,
                 other_spdx_license_keys: vec![],
+                required_phrase_spans: vec![],
+                stopwords_by_pos: std::collections::HashMap::new(),
             });
 
         let mut m = create_test_match("#0", 1, 10, 0.9, 90.0, 100);
@@ -2740,6 +3017,8 @@ mod tests {
             is_deprecated: false,
             spdx_license_key: None,
             other_spdx_license_keys: vec![],
+            required_phrase_spans: vec![],
+            stopwords_by_pos: std::collections::HashMap::new(),
         });
 
         let mut m = create_test_match("#0", 1, 10, 0.9, 50.0, 100);
@@ -2793,6 +3072,8 @@ mod tests {
             is_deprecated: false,
             spdx_license_key: None,
             other_spdx_license_keys: vec![],
+            required_phrase_spans: vec![],
+            stopwords_by_pos: std::collections::HashMap::new(),
         });
 
         let m1 = create_test_match_with_tokens("#0", 0, 10, 10);
@@ -2846,6 +3127,8 @@ mod tests {
             is_deprecated: false,
             spdx_license_key: None,
             other_spdx_license_keys: vec![],
+            required_phrase_spans: vec![],
+            stopwords_by_pos: std::collections::HashMap::new(),
         });
 
         let mut m = create_test_match_with_tokens("#0", 0, 3, 3);
@@ -2886,5 +3169,175 @@ mod tests {
     fn test_is_valid_short_match_rejects_mixed_case() {
         assert!(!is_valid_short_match("gPl", "GPL", 0));
         assert!(is_valid_short_match("Gpl", "GPL", 0));
+    }
+
+    #[test]
+    fn debug_gpl_2_0_9_required_phrases_filter() {
+        use crate::license_detection::aho_match;
+        use crate::license_detection::index::build_index;
+        use crate::license_detection::query::Query;
+        use crate::license_detection::rules::{
+            load_licenses_from_directory, load_rules_from_directory,
+        };
+
+        let rules_path =
+            std::path::Path::new("reference/scancode-toolkit/src/licensedcode/data/rules");
+        let licenses_path =
+            std::path::Path::new("reference/scancode-toolkit/src/licensedcode/data/licenses");
+        let rules = load_rules_from_directory(rules_path, false).expect("Failed to load rules");
+        let licenses =
+            load_licenses_from_directory(licenses_path, false).expect("Failed to load licenses");
+        let index = build_index(rules, licenses);
+
+        let text = std::fs::read_to_string("testdata/license-golden/datadriven/lic1/gpl-2.0_9.txt")
+            .unwrap();
+
+        println!("\n=== ORIGINAL TEXT lines 45-46 ===");
+        for (i, line) in text.lines().enumerate() {
+            if (44..=46).contains(&i) {
+                println!("{}: {:?}", i + 1, line);
+            }
+        }
+
+        let query = Query::new(&text, &index).unwrap();
+        let run = query.whole_query_run();
+
+        // Check rule #20733 (gpl_66.RULE) details
+        let rule_20733 = index.rules_by_rid.get(20733);
+        if let Some(rule) = rule_20733 {
+            println!("\n=== RULE #20733 (gpl_66.RULE) ===");
+            println!("license_expression: {}", rule.license_expression);
+            println!("text: {:?}", rule.text);
+            println!("required_phrase_spans: {:?}", rule.required_phrase_spans);
+            println!("is_license_notice: {}", rule.is_license_notice);
+            println!("\n=== RULE #20733 STOPWORDS ===");
+            for (&pos, &count) in &rule.stopwords_by_pos {
+                println!("  pos {}: {} stopwords after", pos, count);
+            }
+        }
+
+        let matches = aho_match::aho_match(&index, &run);
+
+        println!("\n=== ALL MATCHES ({}) ===", matches.len());
+        for m in &matches {
+            let rule = index.rules_by_rid.get(
+                m.rule_identifier
+                    .as_str()
+                    .trim_start_matches('#')
+                    .parse::<usize>()
+                    .unwrap_or(0),
+            );
+            println!(
+                "  {} (rid={}): lines {}-{}, start_token={}, end_token={}, len={}",
+                m.license_expression,
+                m.rule_identifier,
+                m.start_line,
+                m.end_line,
+                m.start_token,
+                m.end_token,
+                m.matched_length
+            );
+            if let Some(r) = rule {
+                println!("    required_phrase_spans: {:?}", r.required_phrase_spans);
+            }
+        }
+
+        // Check the gpl-1.0-plus match specifically (rid=#20733)
+        let gpl_1_0_plus_match = matches.iter().find(|m| m.rule_identifier == "#20733");
+        if let Some(m) = gpl_1_0_plus_match {
+            println!("\n=== GPL-1.0-PLUS MATCH #20733 DETAILS ===");
+            println!("start_token={}, end_token={}", m.start_token, m.end_token);
+            println!(
+                "matched_length={}, rule_start_token={}",
+                m.matched_length, m.rule_start_token
+            );
+
+            // Show the ispan
+            let ispan = m.ispan();
+            println!("ispan: {:?}", ispan);
+
+            // Show the qspan
+            let qspan = m.qspan();
+            println!("qspan: {:?}", qspan);
+
+            // Check required phrase spans
+            let rule = index.rules_by_rid.get(20733);
+            if let Some(r) = rule {
+                println!(
+                    "\nChecking required_phrase_spans: {:?}",
+                    r.required_phrase_spans
+                );
+                for rp_span in &r.required_phrase_spans {
+                    let in_ispan = rp_span.clone().into_iter().all(|pos| ispan.contains(&pos));
+                    println!("  span {:?} in ispan? {}", rp_span, in_ispan);
+
+                    // Check qspan continuity for this required phrase
+                    let qkey_positions: Vec<_> = qspan
+                        .iter()
+                        .zip(ispan.iter())
+                        .filter(|(_, ipos)| rp_span.contains(*ipos))
+                        .map(|(qpos, _)| *qpos)
+                        .collect();
+                    println!("    qkey_positions for this span: {:?}", qkey_positions);
+
+                    // Check if continuous
+                    if !qkey_positions.is_empty() {
+                        let is_continuous = qkey_positions.windows(2).all(|w| w[1] == w[0] + 1);
+                        println!("    is continuous in qspan? {}", is_continuous);
+                    }
+                }
+            }
+        }
+
+        // Check the gpl-2.0 match #17911 (gpl-2.0_7.RULE)
+        let gpl_2_0_match = matches.iter().find(|m| m.rule_identifier == "#17911");
+        if let Some(m) = gpl_2_0_match {
+            println!("\n=== GPL-2.0 MATCH #17911 DETAILS ===");
+            println!("start_token={}, end_token={}", m.start_token, m.end_token);
+            println!(
+                "matched_length={}, rule_start_token={}",
+                m.matched_length, m.rule_start_token
+            );
+
+            let ispan = m.ispan();
+            println!("ispan length: {}", ispan.len());
+            println!(
+                "ispan first 30: {:?}",
+                ispan.iter().take(30).collect::<Vec<_>>()
+            );
+            println!(
+                "ispan last 10: {:?}",
+                ispan.iter().rev().take(10).collect::<Vec<_>>()
+            );
+
+            // Check required phrase spans for rule #17911
+            let rule = index.rules_by_rid.get(17911);
+            if let Some(r) = rule {
+                println!(
+                    "\nChecking required_phrase_spans: {:?}",
+                    r.required_phrase_spans
+                );
+                for rp_span in &r.required_phrase_spans {
+                    let in_ispan = rp_span.clone().into_iter().all(|pos| ispan.contains(&pos));
+                    println!("  span {:?} in ispan? {}", rp_span, in_ispan);
+
+                    // Show which positions are missing
+                    let missing: Vec<_> =
+                        rp_span.clone().filter(|pos| !ispan.contains(pos)).collect();
+                    if !missing.is_empty() {
+                        println!("    MISSING positions: {:?}", missing);
+                    }
+                }
+            }
+        }
+
+        let refined = refine_matches(&index, matches.clone(), &query);
+        println!("\n=== FINAL REFINED ({}) ===", refined.len());
+        for m in &refined {
+            println!(
+                "  {} (rid={}): lines {}-{}",
+                m.license_expression, m.rule_identifier, m.start_line, m.end_line
+            );
+        }
     }
 }

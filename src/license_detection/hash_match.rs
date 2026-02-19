@@ -120,6 +120,9 @@ pub fn hash_match(index: &LicenseIndex, query_run: &QueryRun) -> Vec<LicenseMatc
             is_license_tag: rule.is_license_tag,
             matched_token_positions: None,
             hilen: hispan.count(),
+            rule_start_token: 0,
+            qspan_positions: None,
+            ispan_positions: None,
         };
 
         matches.push(license_match);
@@ -173,6 +176,8 @@ mod tests {
                 is_deprecated: false,
                 spdx_license_key: None,
                 other_spdx_license_keys: vec![],
+                required_phrase_spans: vec![],
+                stopwords_by_pos: std::collections::HashMap::new(),
             },
             Rule {
                 identifier: "apache-2.0.LICENSE".to_string(),
@@ -211,6 +216,8 @@ mod tests {
                 is_deprecated: false,
                 spdx_license_key: None,
                 other_spdx_license_keys: vec![],
+                required_phrase_spans: vec![],
+                stopwords_by_pos: std::collections::HashMap::new(),
             },
         ]
     }

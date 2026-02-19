@@ -479,6 +479,152 @@ Recommend: **Option A** - consistent with existing pattern.
 
 4. **Rule identifier parsing**: Current code parses `rule_identifier` like `"#42"` to get `rid`. This must be reliable for all match types.
 
+### Critical Bugs Found During Implementation
+
+After initial implementation, golden tests regressed significantly (lic1: 228→146, lic2: 776→733). Investigation revealed fundamental bugs:
+
+#### Bug 1: `is_continuous()` is completely wrong (models.rs)
+
+**Python implementation** (match.py:529-536):
+
+```python
+def is_continuous(self):
+    return self.len() == self.qregion_len() == self.qmagnitude()
+```
+
+**Current Rust implementation** (WRONG):
+
+```rust
+pub fn is_continuous(&self) -> bool {
+    self.matched_token_positions.is_none()  // Just checks if positions were stored
+}
+```
+
+**Fix**: Implement proper continuity check using query data.
+
+#### Bug 2: Missing rule-side positions (`istart`/`ipos`)
+
+**Python stores TWO position ranges**:
+
+- `qspan`: query-side positions (where in input text)
+- `ispan`: rule-side positions (where in rule text)
+
+**Rust only stores query-side positions**:
+
+- `start_token`/`end_token` are query-side only
+- No field for rule-side start position (`istart` in Python)
+
+**Impact**: The required phrase containment check compares rule-side `required_phrase_spans` against query-side `ispan()` - meaningless comparison.
+
+#### Bug 3: `ispan()` returns wrong values
+
+**Current (WRONG)**:
+
+```rust
+pub fn ispan(&self) -> Range<usize> {
+    self.start_token..self.end_token  // Query-side positions!
+}
+```
+
+**Should be**:
+
+```rust
+pub fn ispan(&self) -> Range<usize> {
+    self.rule_start_token..self.rule_start_token + self.matched_length
+}
+```
+
+#### Required Fix
+
+1. **Add `rule_start_token` field to `LicenseMatch`** - stores where in the rule the match starts (Python's `istart`)
+
+2. **Fix `ispan()`** to return rule-side positions
+
+3. **Fix `is_continuous()`** to properly check continuity using query data
+
+4. **Update all match creators** to populate `rule_start_token`:
+   - `src/license_detection/seq_match.rs`
+   - `src/license_detection/aho_match.rs`
+   - `src/license_detection/hash_match.rs`
+   - `src/license_detection/spdx_lid.rs`
+   - `src/license_detection/unknown_match.rs`
+
+### Additional Bugs Found During Testing (Round 2)
+
+After fixing the above bugs, tests still regressed. Further investigation found:
+
+#### Bug 4: Incorrect reinstatement logic (match_refine.rs:967-970)
+
+**Python** (match.py:2316):
+
+```python
+if discarded and not kept:
+    logger_debug('    ==> REINSTATING DISCARDED MISSING REQUIRED PHRASES')
+```
+
+This is a DEBUG LOG, NOT actual reinstatement. Python returns `(kept, discarded)` without reinstating.
+
+**Rust (WRONG)**:
+
+```rust
+// If all matches were discarded, reinstate them (avoid empty results)
+if kept.is_empty() && !discarded.is_empty() {
+    return (discarded, Vec::new());  // BUG: Reinstates ALL discarded matches!
+}
+```
+
+**Impact**: False positives - matches that should be filtered are kept.
+
+**Fix**: Remove the reinstatement logic.
+
+#### Bug 5: Pipeline order mismatch - merge should happen BEFORE required phrases filter
+
+**Python pipeline** (match.py:2718-2744):
+
+```python
+if merge:
+    matches = merge_matches(matches)   # MERGE FIRST
+# ...
+matches, discarded = filter_matches_missing_required_phrases(matches)  # THEN FILTER
+```
+
+**Rust pipeline (WRONG)**:
+
+```rust
+// Filter matches missing required phrases FIRST
+let (with_required_phrases, _missing_phrases) =
+    filter_matches_missing_required_phrases(index, &matches, query);  // FILTER FIRST
+// ...
+let merged = merge_overlapping_matches(&non_gibberish);  // MERGE LATER
+```
+
+**Impact**: When matches merge, their `ispan` is unioned, which can change whether `required_phrase_spans` are contained. Filtering before merge discards matches that would be valid after merge.
+
+**Fix**: Move merge before the required phrases filter.
+
+#### Bug 6: `merge_overlapping_matches` doesn't update `rule_start_token`
+
+When merging matches, `ispan()` uses `rule_start_token`, but merge only updates `start_line`, `end_line`, `matched_length`, and `score`. The `rule_start_token` is left unchanged.
+
+**Fix**: Either update `rule_start_token` during merge, or compute `ispan` differently for merged matches.
+
+**Detailed Plan**: See `docs/license-detection/BUG-006-merge-positions-fix.md`
+
+#### Bug 6 Summary
+
+**Root Cause**: Python's `combine()` creates UNION of qspan/ispan positions using `Span` (a set-like structure that can represent non-contiguous positions). Rust's merge only uses `max()` on line ranges and doesn't properly combine token positions.
+
+**Recommended Solution**: Add `qspan_positions: Option<Vec<usize>>` and `ispan_positions: Option<Vec<usize>>` fields to `LicenseMatch`. During merge, compute the actual union of positions using `HashSet`.
+
+**Key Changes**:
+
+1. Add new position fields to `LicenseMatch`
+2. Update `ispan()`/`qspan()` to return `Vec<usize>` from stored fields
+3. Update `merge_overlapping_matches()` to compute unions using `HashSet`
+4. Update `filter_matches_missing_required_phrases()` to handle `Vec<usize>`
+
+**Estimated Effort**: 7-8 hours
+
 ---
 
 ## Issue 4: Detailed Plan

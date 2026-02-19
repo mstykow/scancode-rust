@@ -1178,6 +1178,9 @@ mod tests {
             rule_length: 100,
             matched_token_positions: None,
             hilen: 50,
+            rule_start_token: 0,
+            qspan_positions: None,
+            ispan_positions: None,
         }
     }
 
@@ -1361,6 +1364,9 @@ mod tests {
             rule_length: 100,
             matched_token_positions: None,
             hilen: 50,
+            rule_start_token: 0,
+            qspan_positions: None,
+            ispan_positions: None,
         }
     }
 
@@ -1473,6 +1479,9 @@ mod tests {
             is_license_tag: false,
             matched_token_positions: None,
             hilen: matched_length / 2,
+            rule_start_token: 0,
+            qspan_positions: None,
+            ispan_positions: None,
         }
     }
 
@@ -3916,6 +3925,9 @@ mod tests {
             rule_length: 5,
             matched_token_positions: None,
             hilen: 2,
+            rule_start_token: 0,
+            qspan_positions: None,
+            ispan_positions: None,
         };
 
         let matches = vec![intro];
@@ -3950,6 +3962,9 @@ mod tests {
             rule_length: 5,
             matched_token_positions: None,
             hilen: 2,
+            rule_start_token: 0,
+            qspan_positions: None,
+            ispan_positions: None,
         };
 
         let low_coverage_match = LicenseMatch {
@@ -3976,6 +3991,9 @@ mod tests {
             rule_length: 20,
             matched_token_positions: None,
             hilen: 5,
+            rule_start_token: 0,
+            qspan_positions: None,
+            ispan_positions: None,
         };
 
         let matches = vec![intro, low_coverage_match];
@@ -4021,6 +4039,9 @@ mod tests {
                     rule_length: 100,
                     matched_token_positions: None,
                     hilen: 50,
+                    rule_start_token: 0,
+                    qspan_positions: None,
+                    ispan_positions: None,
                 }],
                 detection_log: vec![],
                 identifier: None,
@@ -4085,6 +4106,9 @@ mod tests {
             rule_length: 10,
             matched_token_positions: None,
             hilen: 5,
+            rule_start_token: 0,
+            qspan_positions: None,
+            ispan_positions: None,
         };
         assert!(is_unknown_intro(&m));
     }
@@ -4115,6 +4139,9 @@ mod tests {
             rule_length: 10,
             matched_token_positions: None,
             hilen: 5,
+            rule_start_token: 0,
+            qspan_positions: None,
+            ispan_positions: None,
         };
         assert!(is_unknown_intro(&m));
     }
@@ -4145,6 +4172,9 @@ mod tests {
             rule_length: 10,
             matched_token_positions: None,
             hilen: 5,
+            rule_start_token: 0,
+            qspan_positions: None,
+            ispan_positions: None,
         };
         assert!(is_unknown_intro(&m));
     }
@@ -4175,6 +4205,9 @@ mod tests {
             rule_length: 10,
             matched_token_positions: None,
             hilen: 5,
+            rule_start_token: 0,
+            qspan_positions: None,
+            ispan_positions: None,
         };
         assert!(!is_unknown_intro(&m));
     }
@@ -4205,6 +4238,9 @@ mod tests {
             rule_length: 10,
             matched_token_positions: None,
             hilen: 5,
+            rule_start_token: 0,
+            qspan_positions: None,
+            ispan_positions: None,
         };
         assert!(!is_unknown_intro(&m));
     }
@@ -4238,6 +4274,9 @@ mod tests {
             rule_length: 100,
             matched_token_positions: None,
             hilen: 50,
+            rule_start_token: 0,
+            qspan_positions: None,
+            ispan_positions: None,
         }
     }
 
