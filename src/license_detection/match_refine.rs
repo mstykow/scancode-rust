@@ -1311,14 +1311,17 @@ pub fn refine_matches(
     let mut final_matches = kept;
     final_matches.extend(restored);
 
-    let non_fp = filter_false_positive_matches(index, &final_matches);
+    let non_contained_final = filter_contained_matches(&final_matches);
+
+    let non_fp = filter_false_positive_matches(index, &non_contained_final);
 
     let (kept, _discarded) = filter_false_positive_license_lists_matches(non_fp);
 
-    let mut scored = kept;
-    update_match_scores(&mut scored);
+    let merged_final = merge_overlapping_matches(&kept);
+    let mut final_scored = merged_final;
+    update_match_scores(&mut final_scored);
 
-    scored
+    final_scored
 }
 
 #[cfg(test)]
@@ -1356,6 +1359,7 @@ mod tests {
             is_license_clue: false,
             is_license_reference: false,
             is_license_tag: false,
+            is_license_text: false,
             hilen: 50,
             rule_start_token: 0,
             qspan_positions: None,
@@ -1391,6 +1395,7 @@ mod tests {
             is_license_clue: false,
             is_license_reference: false,
             is_license_tag: false,
+            is_license_text: false,
             matched_token_positions: None,
             hilen: matched_length / 2,
             rule_start_token: 0,
@@ -2565,6 +2570,7 @@ mod tests {
             is_license_clue,
             is_license_reference,
             is_license_tag,
+            is_license_text: false,
             matched_token_positions: None,
             hilen: matched_length / 2,
             rule_start_token: 0,

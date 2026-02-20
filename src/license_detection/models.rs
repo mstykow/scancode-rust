@@ -271,6 +271,10 @@ pub struct LicenseMatch {
     #[serde(default)]
     pub is_license_tag: bool,
 
+    /// True if this match is from a license text rule (full license text, not notice)
+    #[serde(default)]
+    pub is_license_text: bool,
+
     /// Token positions matched by this license (for span subtraction).
     ///
     /// Populated during matching to enable double-match prevention.
@@ -333,6 +337,7 @@ impl Default for LicenseMatch {
             is_license_clue: false,
             is_license_reference: false,
             is_license_tag: false,
+            is_license_text: false,
             matched_token_positions: None,
             hilen: 0,
             rule_start_token: 0,
@@ -599,6 +604,7 @@ mod tests {
             is_license_clue: false,
             is_license_reference: false,
             is_license_tag: false,
+            is_license_text: false,
             hilen: 50,
             rule_start_token: 0,
             qspan_positions: None,
@@ -1002,6 +1008,7 @@ mod tests {
             is_license_clue: false,
             is_license_reference: false,
             is_license_tag: false,
+            is_license_text: false,
             matched_token_positions: None,
             hilen: 0,
             rule_start_token: 0,
@@ -1148,6 +1155,7 @@ mod tests {
             is_license_clue: false,
             is_license_reference: false,
             is_license_tag: false,
+            is_license_text: false,
             hilen: 50,
             rule_start_token: 0,
             qspan_positions: None,

@@ -149,6 +149,14 @@ impl LicenseDetectionEngine {
             all_matches.extend(aho_matches);
         }
 
+        for m in all_matches
+            .iter()
+            .filter(|m| m.is_license_text && m.rule_length > 120 && m.match_coverage > 98.0)
+        {
+            let span = query::PositionSpan::new(m.start_token, m.end_token.saturating_sub(1));
+            query.subtract(&span);
+        }
+
         // Phase 2: Near-duplicate detection
         // Corresponds to Python: index.py:733-771
         {
@@ -998,5 +1006,53 @@ copies of the Software."#;
                 );
             }
         }
+    }
+
+    #[test]
+    fn test_is_license_text_subtraction_triggers() {
+        let is_license_text = true;
+        let rule_length: usize = 150;
+        let match_coverage: f32 = 99.0;
+
+        assert!(
+            is_license_text && rule_length > 120 && match_coverage > 98.0,
+            "Subtraction should trigger for long license text with high coverage"
+        );
+    }
+
+    #[test]
+    fn test_is_license_text_subtraction_skips_short() {
+        let is_license_text = true;
+        let rule_length: usize = 100;
+        let match_coverage: f32 = 99.0;
+
+        assert!(
+            !(is_license_text && rule_length > 120 && match_coverage > 98.0),
+            "Subtraction should NOT trigger for short rules"
+        );
+    }
+
+    #[test]
+    fn test_is_license_text_subtraction_skips_low_coverage() {
+        let is_license_text = true;
+        let rule_length: usize = 150;
+        let match_coverage: f32 = 95.0;
+
+        assert!(
+            !(is_license_text && rule_length > 120 && match_coverage > 98.0),
+            "Subtraction should NOT trigger for low coverage"
+        );
+    }
+
+    #[test]
+    fn test_is_license_text_subtraction_skips_non_text() {
+        let is_license_text = false;
+        let rule_length: usize = 150;
+        let match_coverage: f32 = 99.0;
+
+        assert!(
+            !(is_license_text && rule_length > 120 && match_coverage > 98.0),
+            "Subtraction should NOT trigger when is_license_text is false"
+        );
     }
 }
