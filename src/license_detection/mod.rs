@@ -130,7 +130,8 @@ impl LicenseDetectionEngine {
                     matched_qspans.push(query::PositionSpan::new(m.start_token, m.end_token - 1));
                 }
                 if m.is_license_text && m.rule_length > 120 && m.match_coverage > 98.0 {
-                    let span = query::PositionSpan::new(m.start_token, m.end_token.saturating_sub(1));
+                    let span =
+                        query::PositionSpan::new(m.start_token, m.end_token.saturating_sub(1));
                     query.subtract(&span);
                 }
             }
@@ -144,7 +145,8 @@ impl LicenseDetectionEngine {
                     matched_qspans.push(query::PositionSpan::new(m.start_token, m.end_token - 1));
                 }
                 if m.is_license_text && m.rule_length > 120 && m.match_coverage > 98.0 {
-                    let span = query::PositionSpan::new(m.start_token, m.end_token.saturating_sub(1));
+                    let span =
+                        query::PositionSpan::new(m.start_token, m.end_token.saturating_sub(1));
                     query.subtract(&span);
                 }
             }
@@ -159,7 +161,8 @@ impl LicenseDetectionEngine {
                     matched_qspans.push(query::PositionSpan::new(m.start_token, m.end_token - 1));
                 }
                 if m.is_license_text && m.rule_length > 120 && m.match_coverage > 98.0 {
-                    let span = query::PositionSpan::new(m.start_token, m.end_token.saturating_sub(1));
+                    let span =
+                        query::PositionSpan::new(m.start_token, m.end_token.saturating_sub(1));
                     query.subtract(&span);
                 }
             }

@@ -26,6 +26,7 @@
 #[cfg(test)]
 mod golden_tests {
     use crate::license_detection::LicenseDetectionEngine;
+    use content_inspector::{ContentType, inspect};
     use once_cell::sync::Lazy;
     use serde::Deserialize;
     use std::fs;
@@ -105,9 +106,10 @@ mod golden_tests {
             })
         }
 
-        /// Run this test against the detection engine
-        fn run(&self, engine: &LicenseDetectionEngine) -> Result<(), String> {
-            let text = fs::read_to_string(&self.test_file).map_err(|e| {
+        /// Read file content, handling non-UTF-8 and binary files gracefully.
+        /// Returns None for files that should be skipped (true binaries).
+        fn read_test_file_content(&self) -> Result<Option<String>, String> {
+            let bytes = fs::read(&self.test_file).map_err(|e| {
                 format!(
                     "Failed to read test file {}: {}",
                     self.test_file.display(),
@@ -115,13 +117,62 @@ mod golden_tests {
                 )
             })?;
 
+            let content_type = inspect(&bytes);
+
+            if matches!(
+                content_type,
+                ContentType::BINARY
+                    | ContentType::UTF_16LE
+                    | ContentType::UTF_16BE
+                    | ContentType::UTF_32LE
+                    | ContentType::UTF_32BE
+            ) {
+                let ext = self
+                    .test_file
+                    .extension()
+                    .and_then(|e| e.to_str())
+                    .unwrap_or("");
+
+                if matches!(
+                    ext,
+                    "jar" | "zip" | "gz" | "tar" | "gif" | "png" | "jpg" | "jpeg" | "class" | "pdf"
+                ) {
+                    return Ok(None);
+                }
+            }
+
+            match String::from_utf8(bytes.clone()) {
+                Ok(s) => Ok(Some(s)),
+                Err(_) => Ok(Some(String::from_utf8_lossy(&bytes).into_owned())),
+            }
+        }
+
+        /// Run this test against the detection engine
+        fn run(&self, engine: &LicenseDetectionEngine) -> Result<(), String> {
+            let text = match self.read_test_file_content()? {
+                Some(t) => t,
+                None => {
+                    let expected: Vec<&str> = self
+                        .yaml
+                        .license_expressions
+                        .iter()
+                        .map(|s| s.as_str())
+                        .collect();
+
+                    if !expected.is_empty() {
+                        return Err(format!(
+                            "Binary file {} has unexpected non-empty license_expressions: {:?}",
+                            self.name, expected
+                        ));
+                    }
+                    return Ok(());
+                }
+            };
+
             let detections = engine.detect(&text).map_err(|e| {
                 format!("Detection failed for {}: {:?}", self.test_file.display(), e)
             })?;
 
-            // Flatten matches from all detections to get individual match expressions.
-            // This matches Python's test behavior which extracts expressions per-match,
-            // not per-detection-group.
             let actual: Vec<&str> = detections
                 .iter()
                 .flat_map(|d| d.matches.iter())

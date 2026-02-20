@@ -208,7 +208,8 @@ fn merge_overlapping_matches(matches: &[LicenseMatch]) -> Vec<LicenseMatch> {
                 accum.hilen = merged_hispan.len();
                 if accum.rule_length > 0 {
                     accum.match_coverage = (accum.matched_length.min(accum.rule_length) as f32
-                        / accum.rule_length as f32) * 100.0;
+                        / accum.rule_length as f32)
+                        * 100.0;
                 }
                 accum.start_line = accum.start_line.min(next_match.start_line);
                 accum.end_line = accum.end_line.max(next_match.end_line);
@@ -1323,7 +1324,8 @@ pub fn refine_matches(
     let mut final_matches = matches_after_first_restore.clone();
 
     if !discarded_overlapping.is_empty() {
-        let (restored_overlapping, _) = restore_non_overlapping(&matches_after_first_restore, discarded_overlapping);
+        let (restored_overlapping, _) =
+            restore_non_overlapping(&matches_after_first_restore, discarded_overlapping);
         final_matches.extend(restored_overlapping);
     }
 
