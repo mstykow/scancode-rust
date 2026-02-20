@@ -6,11 +6,12 @@
 //! Based on the Python ScanCode Toolkit implementation at:
 //! reference/scancode-toolkit/src/licensedcode/match.py
 
+use crate::license_detection::expression::licensing_contains;
 use crate::license_detection::index::LicenseIndex;
 use crate::license_detection::models::LicenseMatch;
 use crate::license_detection::query::Query;
 use crate::license_detection::spans::Span;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
 const OVERLAP_SMALL: f64 = 0.10;
 const OVERLAP_MEDIUM: f64 = 0.40;
@@ -19,9 +20,11 @@ const OVERLAP_EXTRA_LARGE: f64 = 0.90;
 
 const MIN_SHORT_FP_LIST_LENGTH: usize = 15;
 const MIN_LONG_FP_LIST_LENGTH: usize = 150;
+const MIN_UNIQUE_LICENSES: usize = MIN_SHORT_FP_LIST_LENGTH / 3;
 const MIN_UNIQUE_LICENSES_PROPORTION: f64 = 1.0 / 3.0;
 const MAX_CANDIDATE_LENGTH: usize = 20;
 const MAX_DISTANCE_BETWEEN_CANDIDATES: usize = 10;
+const MAX_DIST: usize = 100;
 
 /// Filter unknown matches contained within good matches' qregion.
 ///
@@ -107,22 +110,52 @@ fn parse_rule_id(rule_identifier: &str) -> Option<usize> {
     }
 }
 
+fn combine_matches(a: &LicenseMatch, b: &LicenseMatch) -> LicenseMatch {
+    let mut merged = a.clone();
+
+    let mut qspan: HashSet<usize> = a.qspan().into_iter().collect();
+    qspan.extend(b.qspan());
+    let mut qspan_vec: Vec<usize> = qspan.into_iter().collect();
+    qspan_vec.sort();
+
+    let mut ispan: HashSet<usize> = a.ispan().into_iter().collect();
+    ispan.extend(b.ispan());
+    let mut ispan_vec: Vec<usize> = ispan.into_iter().collect();
+    ispan_vec.sort();
+
+    let a_hispan: HashSet<usize> = (a.rule_start_token..a.rule_start_token + a.hilen)
+        .filter(|&p| a.ispan().contains(&p))
+        .collect();
+    let b_hispan: HashSet<usize> = (b.rule_start_token..b.rule_start_token + b.hilen)
+        .filter(|&p| b.ispan().contains(&p))
+        .collect();
+    let combined_hispan: HashSet<usize> = a_hispan.union(&b_hispan).copied().collect();
+    let hilen = combined_hispan.len();
+
+    merged.start_token = *qspan_vec.first().unwrap_or(&a.start_token);
+    merged.end_token = qspan_vec.last().map(|&x| x + 1).unwrap_or(a.end_token);
+    merged.rule_start_token = *ispan_vec.first().unwrap_or(&a.rule_start_token);
+    merged.matched_length = qspan_vec.len();
+    merged.hilen = hilen;
+    merged.start_line = a.start_line.min(b.start_line);
+    merged.end_line = a.end_line.max(b.end_line);
+    merged.score = a.score.max(b.score);
+    merged.qspan_positions = Some(qspan_vec);
+    merged.ispan_positions = Some(ispan_vec);
+
+    if merged.rule_length > 0 {
+        merged.match_coverage = (merged.matched_length.min(merged.rule_length) as f32
+            / merged.rule_length as f32)
+            * 100.0;
+    }
+
+    merged
+}
+
 /// Merge overlapping and adjacent matches for the same rule.
 ///
-/// This function combines matches that:
-/// - Have the same rule_identifier
-/// - Are adjacent (end_line + 1 == next.start_line)
-/// - Overlap in their line ranges
-///
-/// When merging, the combined match covers the union of all line ranges.
-///
-/// # Arguments
-/// * `matches` - Slice of LicenseMatch to potentially merge
-///
-/// # Returns
-/// Vector of merged LicenseMatch with no overlaps/adjacency for same rule
-///
-/// Based on Python: `merge_matches()` (lines 800-910)
+/// Based on Python: `merge_matches()` (match.py:869-1068)
+/// Uses distance-based merging with multiple merge conditions.
 fn merge_overlapping_matches(matches: &[LicenseMatch]) -> Vec<LicenseMatch> {
     if matches.is_empty() {
         return Vec::new();
@@ -132,96 +165,134 @@ fn merge_overlapping_matches(matches: &[LicenseMatch]) -> Vec<LicenseMatch> {
         return matches.to_vec();
     }
 
-    let mut grouped: HashMap<String, Vec<&LicenseMatch>> = HashMap::new();
+    let mut sorted: Vec<&LicenseMatch> = matches.iter().collect();
+    sorted.sort_by(|a, b| {
+        a.rule_identifier
+            .cmp(&b.rule_identifier)
+            .then_with(|| a.start_token.cmp(&b.start_token))
+            .then_with(|| b.hilen.cmp(&a.hilen))
+            .then_with(|| b.matched_length.cmp(&a.matched_length))
+    });
 
-    for m in matches {
-        grouped
-            .entry(m.rule_identifier.clone())
-            .or_default()
-            .push(m);
+    let mut grouped: Vec<Vec<&LicenseMatch>> = Vec::new();
+    let mut current_group: Vec<&LicenseMatch> = Vec::new();
+
+    for m in sorted {
+        if current_group.is_empty() || current_group[0].rule_identifier == m.rule_identifier {
+            current_group.push(m);
+        } else {
+            grouped.push(current_group);
+            current_group = vec![m];
+        }
     }
-
-    let mut grouped: Vec<_> = grouped.into_iter().collect();
-    grouped.sort_by(|a, b| a.0.cmp(&b.0));
+    if !current_group.is_empty() {
+        grouped.push(current_group);
+    }
 
     let mut merged = Vec::new();
 
-    for (_rid, rule_matches) in grouped {
+    for rule_matches in grouped {
         if rule_matches.len() == 1 {
             merged.push(rule_matches[0].clone());
             continue;
         }
 
-        let mut sorted_matches = rule_matches.clone();
-        sorted_matches.sort_by_key(|m| (m.start_token, std::cmp::Reverse(m.matched_length)));
+        let rule_length = rule_matches[0].rule_length;
+        let max_rule_side_dist = std::cmp::min(std::cmp::max(rule_length / 2, 1), MAX_DIST);
 
-        let mut accum = sorted_matches[0].clone();
+        let mut rule_matches: Vec<LicenseMatch> =
+            rule_matches.iter().map(|m| (*m).clone()).collect();
+        let mut i = 0;
 
-        for next_match in sorted_matches.into_iter().skip(1) {
-            let should_merge = accum.end_token >= next_match.start_token;
+        while i < rule_matches.len().saturating_sub(1) {
+            let mut j = i + 1;
 
-            if should_merge {
-                let accum_qspan: HashSet<usize> = accum.qspan().into_iter().collect();
-                let next_qspan: HashSet<usize> = next_match.qspan().into_iter().collect();
-                let mut merged_qspan: Vec<usize> =
-                    accum_qspan.union(&next_qspan).copied().collect();
-                merged_qspan.sort();
+            while j < rule_matches.len() {
+                let current = rule_matches[i].clone();
+                let next = rule_matches[j].clone();
 
-                let accum_ispan: HashSet<usize> = accum.ispan().into_iter().collect();
-                let next_ispan: HashSet<usize> = next_match.ispan().into_iter().collect();
-                let mut merged_ispan: Vec<usize> =
-                    accum_ispan.union(&next_ispan).copied().collect();
-                merged_ispan.sort();
-
-                let accum_hispan: HashSet<usize> = (accum.rule_start_token
-                    ..accum.rule_start_token + accum.hilen)
-                    .filter(|&p| accum.ispan().contains(&p))
-                    .collect();
-                let next_hispan: HashSet<usize> = (next_match.rule_start_token
-                    ..next_match.rule_start_token + next_match.hilen)
-                    .filter(|&p| next_match.ispan().contains(&p))
-                    .collect();
-                let merged_hispan: HashSet<usize> =
-                    accum_hispan.union(&next_hispan).copied().collect();
-
-                let new_start_token = merged_qspan
-                    .iter()
-                    .min()
-                    .copied()
-                    .unwrap_or(accum.start_token);
-                let new_end_token = merged_qspan
-                    .iter()
-                    .max()
-                    .copied()
-                    .unwrap_or(accum.end_token)
-                    + 1;
-                let new_rule_start_token = merged_ispan
-                    .iter()
-                    .min()
-                    .copied()
-                    .unwrap_or(accum.rule_start_token);
-
-                accum.start_token = new_start_token;
-                accum.end_token = new_end_token;
-                accum.rule_start_token = new_rule_start_token;
-                accum.matched_length = merged_qspan.len();
-                accum.hilen = merged_hispan.len();
-                if accum.rule_length > 0 {
-                    accum.match_coverage = (accum.matched_length.min(accum.rule_length) as f32
-                        / accum.rule_length as f32)
-                        * 100.0;
+                if current.qdistance_to(&next) > max_rule_side_dist
+                    || current.idistance_to(&next) > max_rule_side_dist
+                {
+                    break;
                 }
-                accum.start_line = accum.start_line.min(next_match.start_line);
-                accum.end_line = accum.end_line.max(next_match.end_line);
-                accum.score = accum.score.max(next_match.score);
-                accum.qspan_positions = Some(merged_qspan);
-                accum.ispan_positions = Some(merged_ispan);
-            } else {
-                merged.push(accum);
-                accum = next_match.clone();
+
+                if current.qspan() == next.qspan() && current.ispan() == next.ispan() {
+                    rule_matches.remove(j);
+                    continue;
+                }
+
+                if current.ispan() == next.ispan() && current.qoverlap(&next) > 0 {
+                    if current.matched_length >= next.matched_length {
+                        rule_matches.remove(j);
+                        continue;
+                    } else {
+                        rule_matches.remove(i);
+                        i = i.saturating_sub(1);
+                        break;
+                    }
+                }
+
+                if current.qcontains(&next) {
+                    rule_matches.remove(j);
+                    continue;
+                }
+                if next.qcontains(&current) {
+                    rule_matches.remove(i);
+                    i = i.saturating_sub(1);
+                    break;
+                }
+
+                if current.surround(&next) {
+                    let combined = combine_matches(&current, &next);
+                    if combined.qspan().len() == combined.ispan().len() {
+                        rule_matches[i] = combined;
+                        rule_matches.remove(j);
+                        continue;
+                    }
+                }
+                if next.surround(&current) {
+                    let combined = combine_matches(&current, &next);
+                    if combined.qspan().len() == combined.ispan().len() {
+                        rule_matches[j] = combined;
+                        rule_matches.remove(i);
+                        i = i.saturating_sub(1);
+                        break;
+                    }
+                }
+
+                if next.is_after(&current) {
+                    rule_matches[i] = combine_matches(&current, &next);
+                    rule_matches.remove(j);
+                    continue;
+                }
+
+                let (cur_qstart, cur_qend) = current.qspan_bounds();
+                let (next_qstart, next_qend) = next.qspan_bounds();
+                let (cur_istart, cur_iend) = current.ispan_bounds();
+                let (next_istart, next_iend) = next.ispan_bounds();
+
+                if cur_qstart <= next_qstart
+                    && cur_qend <= next_qend
+                    && cur_istart <= next_istart
+                    && cur_iend <= next_iend
+                {
+                    let qoverlap = current.qoverlap(&next);
+                    if qoverlap > 0 {
+                        let ioverlap = current.ispan_overlap(&next);
+                        if qoverlap == ioverlap {
+                            rule_matches[i] = combine_matches(&current, &next);
+                            rule_matches.remove(j);
+                            continue;
+                        }
+                    }
+                }
+
+                j += 1;
             }
+            i += 1;
         }
-        merged.push(accum);
+        merged.extend(rule_matches);
     }
 
     merged
@@ -378,8 +449,11 @@ fn filter_spurious_matches(matches: &[LicenseMatch]) -> Vec<LicenseMatch> {
         .collect()
 }
 
-fn licensing_contains_approx(current: &LicenseMatch, other: &LicenseMatch) -> bool {
-    current.matched_length >= other.matched_length * 2
+fn licensing_contains_match(current: &LicenseMatch, other: &LicenseMatch) -> bool {
+    if current.license_expression.is_empty() || other.license_expression.is_empty() {
+        return current.matched_length >= other.matched_length * 2;
+    }
+    licensing_contains(&current.license_expression, &other.license_expression)
 }
 
 pub fn filter_overlapping_matches(
@@ -475,7 +549,7 @@ pub fn filter_overlapping_matches(
             }
 
             if medium_next {
-                if licensing_contains_approx(&matches[i], &matches[j])
+                if licensing_contains_match(&matches[i], &matches[j])
                     && current_len_val >= next_len_val
                     && current_hilen >= next_hilen
                 {
@@ -483,7 +557,7 @@ pub fn filter_overlapping_matches(
                     continue;
                 }
 
-                if licensing_contains_approx(&matches[j], &matches[i])
+                if licensing_contains_match(&matches[j], &matches[i])
                     && current_len_val <= next_len_val
                     && current_hilen <= next_hilen
                 {
@@ -491,10 +565,29 @@ pub fn filter_overlapping_matches(
                     i = i.saturating_sub(1);
                     break;
                 }
+
+                if next_len_val == 2
+                    && current_len_val >= next_len_val + 2
+                    && current_hilen >= next_hilen
+                {
+                    let current_ends = parse_rule_id(&matches[i].rule_identifier)
+                        .and_then(|rid| index.rules_by_rid.get(rid))
+                        .map(|r| r.ends_with_license)
+                        .unwrap_or(false);
+                    let next_starts = parse_rule_id(&matches[j].rule_identifier)
+                        .and_then(|rid| index.rules_by_rid.get(rid))
+                        .map(|r| r.starts_with_license)
+                        .unwrap_or(false);
+
+                    if current_ends && next_starts {
+                        discarded.push(matches.remove(j));
+                        continue;
+                    }
+                }
             }
 
             if medium_current {
-                if licensing_contains_approx(&matches[i], &matches[j])
+                if licensing_contains_match(&matches[i], &matches[j])
                     && current_len_val >= next_len_val
                     && current_hilen >= next_hilen
                 {
@@ -502,7 +595,7 @@ pub fn filter_overlapping_matches(
                     continue;
                 }
 
-                if licensing_contains_approx(&matches[j], &matches[i])
+                if licensing_contains_match(&matches[j], &matches[i])
                     && current_len_val <= next_len_val
                     && current_hilen <= next_hilen
                 {
@@ -514,7 +607,7 @@ pub fn filter_overlapping_matches(
 
             if small_next
                 && matches[i].surround(&matches[j])
-                && licensing_contains_approx(&matches[i], &matches[j])
+                && licensing_contains_match(&matches[i], &matches[j])
                 && current_len_val >= next_len_val
                 && current_hilen >= next_hilen
             {
@@ -524,7 +617,7 @@ pub fn filter_overlapping_matches(
 
             if small_current
                 && matches[j].surround(&matches[i])
-                && licensing_contains_approx(&matches[j], &matches[i])
+                && licensing_contains_match(&matches[j], &matches[i])
                 && current_len_val <= next_len_val
                 && current_hilen <= next_hilen
             {
@@ -619,6 +712,7 @@ fn count_unique_licenses(matches: &[LicenseMatch]) -> usize {
 fn is_list_of_false_positives(
     matches: &[LicenseMatch],
     min_matches: usize,
+    min_unique_licenses: usize,
     min_unique_licenses_proportion: f64,
     min_candidate_proportion: f64,
 ) -> bool {
@@ -635,7 +729,7 @@ fn is_list_of_false_positives(
     let mut has_enough_licenses = unique_proportion > min_unique_licenses_proportion;
 
     if !has_enough_licenses {
-        has_enough_licenses = len_unique_licenses >= min_matches / 3;
+        has_enough_licenses = len_unique_licenses >= min_unique_licenses;
     }
 
     let has_enough_candidates = if min_candidate_proportion > 0.0 {
@@ -651,6 +745,7 @@ fn is_list_of_false_positives(
     is_long_enough_sequence && has_enough_licenses && has_enough_candidates
 }
 
+#[allow(dead_code)]
 fn match_distance(a: &LicenseMatch, b: &LicenseMatch) -> usize {
     if a.start_line <= b.end_line && b.start_line <= a.end_line {
         return 0;
@@ -683,6 +778,7 @@ pub fn filter_false_positive_license_lists_matches(
         && is_list_of_false_positives(
             &matches,
             MIN_LONG_FP_LIST_LENGTH,
+            MIN_LONG_FP_LIST_LENGTH,
             MIN_UNIQUE_LICENSES_PROPORTION,
             0.95,
         )
@@ -700,7 +796,7 @@ pub fn filter_false_positive_license_lists_matches(
         if is_candidate {
             let is_close_enough = candidates
                 .last()
-                .map(|last| match_distance(last, match_item) <= MAX_DISTANCE_BETWEEN_CANDIDATES)
+                .map(|last| last.qdistance_to(match_item) <= MAX_DISTANCE_BETWEEN_CANDIDATES)
                 .unwrap_or(true);
 
             if is_close_enough {
@@ -710,6 +806,7 @@ pub fn filter_false_positive_license_lists_matches(
                 if is_list_of_false_positives(
                     &owned,
                     MIN_SHORT_FP_LIST_LENGTH,
+                    MIN_UNIQUE_LICENSES,
                     MIN_UNIQUE_LICENSES_PROPORTION,
                     0.0,
                 ) {
@@ -725,6 +822,7 @@ pub fn filter_false_positive_license_lists_matches(
             if is_list_of_false_positives(
                 &owned,
                 MIN_SHORT_FP_LIST_LENGTH,
+                MIN_UNIQUE_LICENSES,
                 MIN_UNIQUE_LICENSES_PROPORTION,
                 0.0,
             ) {
@@ -741,6 +839,7 @@ pub fn filter_false_positive_license_lists_matches(
     if is_list_of_false_positives(
         &owned,
         MIN_SHORT_FP_LIST_LENGTH,
+        MIN_UNIQUE_LICENSES,
         MIN_UNIQUE_LICENSES_PROPORTION,
         0.0,
     ) {
@@ -2856,6 +2955,24 @@ mod tests {
     }
 
     #[test]
+    fn test_min_unique_licenses_fallback() {
+        let matches: Vec<LicenseMatch> = (0..20)
+            .map(|i| {
+                let mut m = create_test_match("#1", 10, 10, 1.0, 100.0, 100);
+                m.license_expression = format!("license-{}", i % 4);
+                m.is_license_reference = true;
+                m
+            })
+            .collect();
+
+        // 20 matches, 4 unique licenses
+        // Proportion = 4/20 = 0.2 < 1/3, so proportion check fails
+        // Fallback uses min_unique_licenses
+        assert!(is_list_of_false_positives(&matches, 15, 3, 1.0/3.0, 0.0));  // 4 >= 3
+        assert!(!is_list_of_false_positives(&matches, 15, 5, 1.0/3.0, 0.0)); // 4 < 5
+    }
+
+    #[test]
     fn test_filter_too_short_matches_non_seq_match_kept() {
         let index = LicenseIndex::with_legalese_count(10);
 
@@ -2908,6 +3025,8 @@ mod tests {
                 min_high_matched_length_unique: 0,
                 is_small: true,
                 is_tiny: false,
+                starts_with_license: false,
+                ends_with_license: false,
                 is_deprecated: false,
                 spdx_license_key: None,
                 other_spdx_license_keys: vec![],
@@ -2965,6 +3084,8 @@ mod tests {
                 min_high_matched_length_unique: 0,
                 is_small: true,
                 is_tiny: false,
+                starts_with_license: false,
+                ends_with_license: false,
                 is_deprecated: false,
                 spdx_license_key: None,
                 other_spdx_license_keys: vec![],
@@ -3034,6 +3155,8 @@ mod tests {
             min_high_matched_length_unique: 0,
             is_small: false,
             is_tiny: false,
+                starts_with_license: false,
+                ends_with_license: false,
             is_deprecated: false,
             spdx_license_key: None,
             other_spdx_license_keys: vec![],
@@ -3089,6 +3212,8 @@ mod tests {
             min_high_matched_length_unique: 0,
             is_small: true,
             is_tiny: false,
+                starts_with_license: false,
+                ends_with_license: false,
             is_deprecated: false,
             spdx_license_key: None,
             other_spdx_license_keys: vec![],
@@ -3144,6 +3269,8 @@ mod tests {
             min_high_matched_length_unique: 0,
             is_small: true,
             is_tiny: false,
+                starts_with_license: false,
+                ends_with_license: false,
             is_deprecated: false,
             spdx_license_key: None,
             other_spdx_license_keys: vec![],

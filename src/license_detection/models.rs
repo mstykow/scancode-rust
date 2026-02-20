@@ -174,6 +174,12 @@ pub struct Rule {
     /// True if rule length < TINY_RULE (6 tokens)
     pub is_tiny: bool,
 
+    /// True if the rule's first token is "license", "licence", or "licensed"
+    pub starts_with_license: bool,
+
+    /// True if the rule's last token is "license", "licence", or "licensed"
+    pub ends_with_license: bool,
+
     /// Whether this rule is deprecated
     pub is_deprecated: bool,
 
@@ -443,7 +449,9 @@ impl LicenseMatch {
     }
 
     pub fn surround(&self, other: &LicenseMatch) -> bool {
-        self.start_line < other.start_line && self.end_line > other.end_line
+        let (self_start, self_end) = self.qspan_bounds();
+        let (other_start, other_end) = other.qspan_bounds();
+        self_start <= other_start && self_end >= other_end
     }
 
     pub fn qcontains(&self, other: &LicenseMatch) -> bool {
@@ -510,6 +518,103 @@ impl LicenseMatch {
     pub fn has_gaps(&self) -> bool {
         self.qspan_positions.is_some() || self.ispan_positions.is_some()
     }
+
+    pub fn qdistance_to(&self, other: &LicenseMatch) -> usize {
+        if self.qoverlap(other) > 0 {
+            return 0;
+        }
+
+        let (self_start, self_end) = self.qspan_bounds();
+        let (other_start, other_end) = other.qspan_bounds();
+
+        if self_end == other_start || other_end == self_start {
+            return 1;
+        }
+
+        if self_end < other_start {
+            other_start - self_end
+        } else {
+            self_start - other_end
+        }
+    }
+
+    pub fn qspan_bounds(&self) -> (usize, usize) {
+        if let Some(positions) = &self.qspan_positions {
+            if positions.is_empty() {
+                return (0, 0);
+            }
+            (
+                *positions.iter().min().unwrap(),
+                *positions.iter().max().unwrap() + 1,
+            )
+        } else {
+            (self.start_token, self.end_token)
+        }
+    }
+
+    pub fn ispan_bounds(&self) -> (usize, usize) {
+        if let Some(positions) = &self.ispan_positions {
+            if positions.is_empty() {
+                return (0, 0);
+            }
+            (
+                *positions.iter().min().unwrap(),
+                *positions.iter().max().unwrap() + 1,
+            )
+        } else {
+            (
+                self.rule_start_token,
+                self.rule_start_token + self.matched_length,
+            )
+        }
+    }
+
+    pub fn idistance_to(&self, other: &LicenseMatch) -> usize {
+        let (self_start, self_end) = self.ispan_bounds();
+        let (other_start, other_end) = other.ispan_bounds();
+
+        if self_start < other_end && other_start < self_end {
+            return 0;
+        }
+
+        if self_end == other_start || other_end == self_start {
+            return 1;
+        }
+
+        if self_end <= other_start {
+            other_start - self_end
+        } else {
+            self_start - other_end
+        }
+    }
+
+    pub fn is_after(&self, other: &LicenseMatch) -> bool {
+        let (self_qstart, self_qend) = self.qspan_bounds();
+        let (other_qstart, other_qend) = other.qspan_bounds();
+
+        let q_after = self_qstart > other_qend;
+
+        let (self_istart, self_iend) = self.ispan_bounds();
+        let (other_istart, other_iend) = other.ispan_bounds();
+
+        let i_after = self_istart > other_iend;
+
+        q_after && i_after
+    }
+
+    pub fn ispan_overlap(&self, other: &LicenseMatch) -> usize {
+        let (self_start, self_end) = self.ispan_bounds();
+        let (other_start, other_end) = other.ispan_bounds();
+
+        let overlap_start = self_start.max(other_start);
+        let overlap_end = self_end.min(other_end);
+
+        if overlap_start < overlap_end {
+            overlap_end - overlap_start
+        } else {
+            0
+        }
+    }
 }
 
 #[cfg(test)]
@@ -574,6 +679,8 @@ mod tests {
             min_high_matched_length_unique: 0,
             is_small: false,
             is_tiny: false,
+            starts_with_license: false,
+            ends_with_license: false,
             is_deprecated: false,
             spdx_license_key: None,
             other_spdx_license_keys: vec![],
@@ -787,6 +894,8 @@ mod tests {
             min_high_matched_length_unique: 0,
             is_small: false,
             is_tiny: false,
+            starts_with_license: false,
+            ends_with_license: false,
             is_deprecated: false,
             spdx_license_key: None,
             other_spdx_license_keys: vec![],
@@ -898,6 +1007,8 @@ mod tests {
             min_high_matched_length_unique: 0,
             is_small: true,
             is_tiny: false,
+            starts_with_license: false,
+            ends_with_license: false,
             is_deprecated: false,
             spdx_license_key: None,
             other_spdx_license_keys: vec![],
@@ -957,6 +1068,8 @@ mod tests {
             min_high_matched_length_unique: 1,
             is_small: false,
             is_tiny: false,
+            starts_with_license: false,
+            ends_with_license: false,
             is_deprecated: false,
             spdx_license_key: None,
             other_spdx_license_keys: vec![],
@@ -1563,5 +1676,41 @@ mod tests {
             ..create_license_match()
         };
         assert!(!a.qcontains(&b));
+    }
+
+    #[test]
+    fn test_qdistance_to_overlapping() {
+        let mut a = create_license_match();
+        a.start_token = 0;
+        a.end_token = 10;
+        let mut b = create_license_match();
+        b.start_token = 5;
+        b.end_token = 15;
+        assert_eq!(a.qdistance_to(&b), 0);
+        assert_eq!(b.qdistance_to(&a), 0);
+    }
+
+    #[test]
+    fn test_qdistance_to_touching() {
+        let mut a = create_license_match();
+        a.start_token = 0;
+        a.end_token = 10;
+        let mut b = create_license_match();
+        b.start_token = 10;
+        b.end_token = 20;
+        assert_eq!(a.qdistance_to(&b), 1);
+        assert_eq!(b.qdistance_to(&a), 1);
+    }
+
+    #[test]
+    fn test_qdistance_to_separated() {
+        let mut a = create_license_match();
+        a.start_token = 0;
+        a.end_token = 5;
+        let mut b = create_license_match();
+        b.start_token = 15;
+        b.end_token = 20;
+        assert_eq!(a.qdistance_to(&b), 10);
+        assert_eq!(b.qdistance_to(&a), 10);
     }
 }

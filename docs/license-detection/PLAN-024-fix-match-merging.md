@@ -1,7 +1,7 @@
 # PLAN-024: Fix Match Merging/Deduplication Logic
 
 **Date**: 2026-02-20
-**Status**: Planning Complete (Validated)
+**Status**: Implemented (Phase 1-2 Complete)
 **Priority**: 1 (Highest Impact - ~80 failures across all suites)
 **Pattern**: A from PLAN-023-failure-analysis-summary.md
 
@@ -749,3 +749,41 @@ The `remove_duplicate_detections()` function appears to be correct - it groups b
 - Python `combine()`: `reference/scancode-toolkit/src/licensedcode/match.py:638-687`
 - Python Span `distance_to()`: `reference/scancode-toolkit/src/licensedcode/spans.py:402-435`
 - Python Span `is_after()`: `reference/scancode-toolkit/src/licensedcode/spans.py:381-382`
+
+---
+
+## Implementation Results
+
+**Date**: 2026-02-20
+
+### Changes Made
+
+1. **models.rs**:
+   - Added `ispan_bounds()` helper
+   - Added `idistance_to()` method
+   - Added `is_after()` method
+   - Added `ispan_overlap()` method
+   - Fixed `surround()` to use token positions instead of line positions
+   - Made `qspan_bounds()` and `ispan_bounds()` public
+
+2. **match_refine.rs**:
+   - Added `MAX_DIST = 100` constant
+   - Added `combine_matches()` helper function
+   - Rewrote `merge_overlapping_matches()` with distance-based merging
+
+### Test Results
+
+| Suite | Before PLAN-028 | After PLAN-028 | After PLAN-024 | Delta |
+|-------|-----------------|----------------|----------------|-------|
+| lic1 | 224 passed, 67 failed | 227 passed, 64 failed | 231 passed, 60 failed | +4 |
+| lic2 | 775 passed, 78 failed | 777 passed, 76 failed | 796 passed, 57 failed | +19 |
+| lic3 | 250 passed, 42 failed | 250 passed, 42 failed | 255 passed, 37 failed | +5 |
+| lic4 | 285 passed, 65 failed | 287 passed, 63 failed | 299 passed, 51 failed | +12 |
+
+**Total improvement from PLAN-024: +40 tests passing**
+
+### Remaining Issues
+
+- Some tests still merging too aggressively
+- Expression combination issues remain (PLAN-027)
+- Some edge cases in distance threshold calculation
