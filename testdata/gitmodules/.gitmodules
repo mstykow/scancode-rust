@@ -1,0 +1,15 @@
+[submodule "lib/deps/dep1"]
+    path = lib/deps/dep1
+    url = https://github.com/example/dep1.git
+
+[submodule "vendor/lib2"]
+    path = vendor/lib2
+    url = git@github.com:org/lib2.git
+
+[submodule "gitlab-dep"]
+    path = external/gitlab-lib
+    url = https://gitlab.com/company/project.git
+
+[submodule "custom-vcs"]
+    path = custom
+    url = https://custom.example.com/repo.git

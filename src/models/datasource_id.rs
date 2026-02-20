@@ -251,6 +251,9 @@ pub enum DatasourceId {
 
     // ── Yarn ──
     YarnLock,
+
+    // ── Git ──
+    Gitmodules,
 }
 
 impl DatasourceId {
@@ -450,6 +453,9 @@ impl DatasourceId {
 
             // Yarn
             Self::YarnLock => "yarn_lock",
+
+            // Git
+            Self::Gitmodules => "gitmodules",
         }
     }
 }
