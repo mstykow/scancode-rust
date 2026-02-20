@@ -54,12 +54,25 @@ macro_rules! file_recognizer {
 
 // Java Archives
 
-file_recognizer!(
-    JavaJarRecognizer,
-    PackageType::Jar,
-    DatasourceId::JavaJar,
-    |path: &Path| path.extension().and_then(|e| e.to_str()) == Some("jar")
-);
+pub struct JavaJarRecognizer;
+
+impl PackageParser for JavaJarRecognizer {
+    const PACKAGE_TYPE: PackageType = PackageType::Jar;
+
+    fn is_match(path: &Path) -> bool {
+        path.extension().and_then(|e| e.to_str()) == Some("jar") && magic::is_zip(path)
+    }
+
+    fn extract_packages(path: &Path) -> Vec<PackageData> {
+        let _ = path;
+        vec![PackageData {
+            package_type: Some(PackageType::Jar),
+            datasource_id: Some(DatasourceId::JavaJar),
+            primary_language: Some("Java".to_string()),
+            ..Default::default()
+        }]
+    }
+}
 
 file_recognizer!(
     IvyXmlRecognizer,
