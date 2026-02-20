@@ -121,40 +121,49 @@ impl LicenseDetectionEngine {
         // Phase 1: Hash, SPDX, Aho-Corasick matching
         // Track 100% coverage matches for Phase 3's is_matchable() check
         // Corresponds to Python: index.py:1056-1057
+
         {
             let whole_run = query.whole_query_run();
-
             let hash_matches = hash_match(&self.index, &whole_run);
             for m in &hash_matches {
                 if m.match_coverage >= 99.99 && m.end_token > m.start_token {
                     matched_qspans.push(query::PositionSpan::new(m.start_token, m.end_token - 1));
                 }
+                if m.is_license_text && m.rule_length > 120 && m.match_coverage > 98.0 {
+                    let span = query::PositionSpan::new(m.start_token, m.end_token.saturating_sub(1));
+                    query.subtract(&span);
+                }
             }
             all_matches.extend(hash_matches);
+        }
 
+        {
             let spdx_matches = spdx_lid_match(&self.index, &query);
             for m in &spdx_matches {
                 if m.match_coverage >= 99.99 && m.end_token > m.start_token {
                     matched_qspans.push(query::PositionSpan::new(m.start_token, m.end_token - 1));
                 }
+                if m.is_license_text && m.rule_length > 120 && m.match_coverage > 98.0 {
+                    let span = query::PositionSpan::new(m.start_token, m.end_token.saturating_sub(1));
+                    query.subtract(&span);
+                }
             }
             all_matches.extend(spdx_matches);
+        }
 
+        {
+            let whole_run = query.whole_query_run();
             let aho_matches = aho_match(&self.index, &whole_run);
             for m in &aho_matches {
                 if m.match_coverage >= 99.99 && m.end_token > m.start_token {
                     matched_qspans.push(query::PositionSpan::new(m.start_token, m.end_token - 1));
                 }
+                if m.is_license_text && m.rule_length > 120 && m.match_coverage > 98.0 {
+                    let span = query::PositionSpan::new(m.start_token, m.end_token.saturating_sub(1));
+                    query.subtract(&span);
+                }
             }
             all_matches.extend(aho_matches);
-        }
-
-        for m in all_matches
-            .iter()
-            .filter(|m| m.is_license_text && m.rule_length > 120 && m.match_coverage > 98.0)
-        {
-            let span = query::PositionSpan::new(m.start_token, m.end_token.saturating_sub(1));
-            query.subtract(&span);
         }
 
         // Phase 2: Near-duplicate detection

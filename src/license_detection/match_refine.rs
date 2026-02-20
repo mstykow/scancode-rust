@@ -241,12 +241,16 @@ fn merge_overlapping_matches(matches: &[LicenseMatch]) -> Vec<LicenseMatch> {
 /// * `matches` - Slice of LicenseMatch to filter
 ///
 /// # Returns
-/// Vector of LicenseMatch with contained matches removed
+/// Tuple of (kept matches, discarded matches)
 ///
 /// Based on Python: `filter_contained_matches()` using qspan containment
-fn filter_contained_matches(matches: &[LicenseMatch]) -> Vec<LicenseMatch> {
-    if matches.len() < 2 {
-        return matches.to_vec();
+fn filter_contained_matches(matches: &[LicenseMatch]) -> (Vec<LicenseMatch>, Vec<LicenseMatch>) {
+    if matches.is_empty() {
+        return (Vec::new(), Vec::new());
+    }
+
+    if matches.len() == 1 {
+        return (matches.to_vec(), Vec::new());
     }
 
     let mut sorted: Vec<&LicenseMatch> = matches.iter().collect();
@@ -259,6 +263,7 @@ fn filter_contained_matches(matches: &[LicenseMatch]) -> Vec<LicenseMatch> {
     });
 
     let mut kept = Vec::new();
+    let mut discarded = Vec::new();
 
     for current in sorted {
         let is_contained = kept
@@ -267,10 +272,12 @@ fn filter_contained_matches(matches: &[LicenseMatch]) -> Vec<LicenseMatch> {
 
         if !is_contained {
             kept.push(current);
+        } else {
+            discarded.push(current.clone());
         }
     }
 
-    kept.into_iter().cloned().collect()
+    (kept.into_iter().cloned().collect(), discarded)
 }
 
 /// Filter matches to false positive rules.
@@ -1302,16 +1309,25 @@ pub fn refine_matches(
     // Python: merge_matches again at line 2773
     let merged_again = merge_overlapping_matches(&non_gibberish);
 
-    let non_contained = filter_contained_matches(&merged_again);
+    let (non_contained, discarded_contained) = filter_contained_matches(&merged_again);
 
-    let (kept, discarded) = filter_overlapping_matches(non_contained, index);
+    let (kept, discarded_overlapping) = filter_overlapping_matches(non_contained, index);
 
-    let (restored, _) = restore_non_overlapping(&kept, discarded);
+    let mut matches_after_first_restore = kept.clone();
 
-    let mut final_matches = kept;
-    final_matches.extend(restored);
+    if !discarded_contained.is_empty() {
+        let (restored_contained, _) = restore_non_overlapping(&kept, discarded_contained);
+        matches_after_first_restore.extend(restored_contained);
+    }
 
-    let non_contained_final = filter_contained_matches(&final_matches);
+    let mut final_matches = matches_after_first_restore.clone();
+
+    if !discarded_overlapping.is_empty() {
+        let (restored_overlapping, _) = restore_non_overlapping(&matches_after_first_restore, discarded_overlapping);
+        final_matches.extend(restored_overlapping);
+    }
+
+    let (non_contained_final, _) = filter_contained_matches(&final_matches);
 
     let non_fp = filter_false_positive_matches(index, &non_contained_final);
 
@@ -1524,7 +1540,7 @@ mod tests {
             create_test_match("#1", 5, 15, 0.85, 85.0, 100),
         ];
 
-        let filtered = filter_contained_matches(&matches);
+        let (filtered, _) = filter_contained_matches(&matches);
 
         assert_eq!(filtered.len(), 1);
         assert_eq!(filtered[0].start_line, 1);
@@ -1539,7 +1555,7 @@ mod tests {
             create_test_match("#1", 15, 20, 0.85, 85.0, 100),
         ];
 
-        let filtered = filter_contained_matches(&matches);
+        let (filtered, _) = filter_contained_matches(&matches);
 
         assert_eq!(filtered.len(), 1);
         assert_eq!(filtered[0].start_line, 1);
@@ -1555,7 +1571,7 @@ mod tests {
         matches[0].matched_length = 200;
         matches[1].matched_length = 100;
 
-        let filtered = filter_contained_matches(&matches);
+        let (filtered, _) = filter_contained_matches(&matches);
 
         assert_eq!(filtered.len(), 1);
         assert_eq!(filtered[0].rule_identifier, "#1");
@@ -1568,7 +1584,7 @@ mod tests {
             create_test_match("#1", 15, 25, 0.85, 85.0, 100),
         ];
 
-        let filtered = filter_contained_matches(&matches);
+        let (filtered, _) = filter_contained_matches(&matches);
 
         assert_eq!(filtered.len(), 2);
     }
@@ -1576,14 +1592,14 @@ mod tests {
     #[test]
     fn test_filter_contained_matches_empty() {
         let matches: Vec<LicenseMatch> = vec![];
-        let filtered = filter_contained_matches(&matches);
+        let (filtered, _) = filter_contained_matches(&matches);
         assert_eq!(filtered.len(), 0);
     }
 
     #[test]
     fn test_filter_contained_matches_single() {
         let matches = vec![create_test_match("#1", 1, 10, 0.9, 90.0, 100)];
-        let filtered = filter_contained_matches(&matches);
+        let (filtered, _) = filter_contained_matches(&matches);
         assert_eq!(filtered.len(), 1);
     }
 
@@ -1880,7 +1896,7 @@ mod tests {
         m2.matched_length = 100;
         let matches = vec![m1, m2];
 
-        let filtered = filter_contained_matches(&matches);
+        let (filtered, _) = filter_contained_matches(&matches);
 
         assert_eq!(filtered.len(), 2);
     }
@@ -1893,7 +1909,7 @@ mod tests {
         m2.matched_length = 100;
         let matches = vec![m1, m2];
 
-        let filtered = filter_contained_matches(&matches);
+        let (filtered, _) = filter_contained_matches(&matches);
 
         assert_eq!(filtered.len(), 1);
         assert_eq!(filtered[0].end_line, 30);
@@ -1909,7 +1925,7 @@ mod tests {
         inner.matched_length = 100;
         let matches = vec![inner, middle, outer];
 
-        let filtered = filter_contained_matches(&matches);
+        let (filtered, _) = filter_contained_matches(&matches);
 
         assert_eq!(filtered.len(), 1);
         assert_eq!(filtered[0].start_line, 1);
@@ -1924,7 +1940,7 @@ mod tests {
         m2.matched_length = 100;
         let matches = vec![m1, m2];
 
-        let filtered = filter_contained_matches(&matches);
+        let (filtered, _) = filter_contained_matches(&matches);
 
         assert_eq!(filtered.len(), 1);
         assert_eq!(filtered[0].matched_length, 200);
@@ -1936,7 +1952,7 @@ mod tests {
         let inner = create_test_match_with_tokens("#2", 5, 15, 10);
         let matches = vec![outer, inner];
 
-        let filtered = filter_contained_matches(&matches);
+        let (filtered, _) = filter_contained_matches(&matches);
 
         assert_eq!(filtered.len(), 1);
         assert_eq!(filtered[0].start_token, 0);
@@ -1949,7 +1965,7 @@ mod tests {
         let m2 = create_test_match_with_tokens("#2", 5, 15, 10);
         let matches = vec![m1, m2];
 
-        let filtered = filter_contained_matches(&matches);
+        let (filtered, _) = filter_contained_matches(&matches);
 
         assert_eq!(filtered.len(), 2);
     }
@@ -1960,7 +1976,7 @@ mod tests {
         let m2 = create_test_match_with_tokens("#2", 20, 30, 10);
         let matches = vec![m1, m2];
 
-        let filtered = filter_contained_matches(&matches);
+        let (filtered, _) = filter_contained_matches(&matches);
 
         assert_eq!(filtered.len(), 2);
     }
@@ -1972,7 +1988,7 @@ mod tests {
         let inner = create_test_match_with_tokens("#3", 15, 35, 20);
         let matches = vec![inner, middle, outer];
 
-        let filtered = filter_contained_matches(&matches);
+        let (filtered, _) = filter_contained_matches(&matches);
 
         assert_eq!(filtered.len(), 1);
         assert_eq!(filtered[0].start_token, 0);
@@ -1985,7 +2001,7 @@ mod tests {
         let m2 = create_test_match_with_tokens("#2", 0, 10, 10);
         let matches = vec![m1, m2];
 
-        let filtered = filter_contained_matches(&matches);
+        let (filtered, _) = filter_contained_matches(&matches);
 
         assert_eq!(filtered.len(), 1);
     }
@@ -1998,7 +2014,7 @@ mod tests {
         let inner3 = create_test_match_with_tokens("#4", 50, 60, 10);
         let matches = vec![outer, inner1, inner2, inner3];
 
-        let filtered = filter_contained_matches(&matches);
+        let (filtered, _) = filter_contained_matches(&matches);
 
         assert_eq!(filtered.len(), 1);
         assert_eq!(filtered[0].start_token, 0);
@@ -2007,18 +2023,12 @@ mod tests {
 
     #[test]
     fn test_filter_contained_matches_gpl_variant_issue() {
-        // Simulate the GPL issue: gpl-2.0-plus should contain gpl-1.0-plus
-        // gpl-1.0-plus: 9 tokens, lines 13-14
-        // gpl-2.0-plus: 22 tokens, lines 13-15 (longer, should be kept)
-
-        // With token positions set (same start, different end)
         let gpl_1_0 = create_test_match_with_tokens("#20560", 10, 19, 9);
         let gpl_2_0 = create_test_match_with_tokens("#16218", 10, 32, 22);
         let matches = vec![gpl_1_0.clone(), gpl_2_0.clone()];
 
-        let filtered = filter_contained_matches(&matches);
+        let (filtered, _) = filter_contained_matches(&matches);
 
-        // gpl-2.0-plus should be kept, gpl-1.0-plus should be filtered
         assert_eq!(filtered.len(), 1, "Should filter contained GPL match");
         assert_eq!(
             filtered[0].rule_identifier, "#16218",
@@ -2029,7 +2039,6 @@ mod tests {
 
     #[test]
     fn test_filter_contained_matches_gpl_variant_zero_tokens() {
-        // Same test but with zero tokens (fallback to line-based)
         let mut gpl_1_0 = create_test_match_with_tokens("#20560", 0, 0, 9);
         gpl_1_0.start_line = 13;
         gpl_1_0.end_line = 14;
@@ -2040,9 +2049,8 @@ mod tests {
 
         let matches = vec![gpl_1_0.clone(), gpl_2_0.clone()];
 
-        let filtered = filter_contained_matches(&matches);
+        let (filtered, _) = filter_contained_matches(&matches);
 
-        // Even with zero tokens, line-based containment should work
         assert_eq!(
             filtered.len(),
             1,

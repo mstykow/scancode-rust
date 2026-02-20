@@ -320,3 +320,80 @@ After implementing all changes:
 | Proper `licensing_contains()` | Correct overlap filtering |
 | `#[serde(skip)]` for flags | Match Python JSON output |
 Estimated improvement: **50-100 additional tests passing** across all suites.
+
+---
+
+## Verification Results (Post-Implementation)
+
+### Issue Found: `is_license_text` Subtraction Timing
+
+**Python**: Subtracts after **each matcher** (hash, then spdx, then aho)
+**Rust**: Subtracts after **all Phase 1 matchers complete**
+
+**Python code** (index.py:1040-1049):
+```python
+for matcher in matchers:
+    matched = matcher.match(qry)
+    matched = match.merge_matches(matched)
+    matches.extend(matched)
+    
+    # SUBTRACT IMMEDIATELY after this matcher
+    for mtch in matched:
+        if (mtch.rule.is_license_text and ...):
+            qry.subtract(mtch.qspan)
+```
+
+**Rust code** (mod.rs:152-158):
+```rust
+// After ALL Phase 1 matchers complete
+for m in all_matches.iter().filter(...) {
+    query.subtract(&span);
+}
+```
+
+**Impact**: If hash finds a long license text, Python subtracts BEFORE spdx/aho run. Rust runs all three, then subtracts. This could cause extra spurious matches.
+
+**Fix Required**: Move subtraction inside Phase 1, after each matcher.
+
+---
+
+### Issue Found: Missing First `restore_non_overlapping()` Call
+
+**Python**: Calls `restore_non_overlapping()` **twice**:
+1. For `discarded_contained` from first `filter_contained_matches()` (line 2794)
+2. For `discarded_overlapping` from `filter_overlapping_matches()` (line 2800)
+
+**Rust**: Only calls **once** with `discarded` from `filter_overlapping_matches()`
+
+**Python code** (match.py:2793-2803):
+```python
+if discarded_contained:
+    to_keep, discarded_contained = restore_non_overlapping(matches, discarded_contained)
+    matches.extend(to_keep)
+    
+if discarded_overlapping:
+    to_keep, discarded_overlapping = restore_non_overlapping(matches, discarded_overlapping)
+    matches.extend(to_keep)
+```
+
+**Rust code** (match_refine.rs:1309-1312):
+```rust
+let (restored, _) = restore_non_overlapping(&kept, discarded);
+let mut final_matches = kept;
+final_matches.extend(restored);
+```
+
+**Impact**: Matches discarded by the first `filter_contained_matches()` that don't overlap with kept matches are never restored in Rust.
+
+**Fix Required**: Add first `restore_non_overlapping()` call for `discarded_contained`.
+
+---
+
+### Summary of Remaining Differences
+
+| Issue | Severity | Impact |
+|-------|----------|--------|
+| `is_license_text` subtraction timing | Medium | Extra spurious matches in license text files |
+| Missing first `restore_non_overlapping()` | Medium | Some valid matches incorrectly discarded |
+
+Both issues should be fixed to achieve full parity with Python.
