@@ -368,15 +368,6 @@ fn is_false_positive(matches: &[LicenseMatch]) -> bool {
         return true;
     }
 
-    // Check 5: Single is_license_reference match with short rule length
-    // This filters false positives like "borceux" matching the word "GPL"
-    if is_single
-        && matches[0].is_license_reference
-        && matches[0].rule_length <= FALSE_POSITIVE_RULE_LENGTH_THRESHOLD
-    {
-        return true;
-    }
-
     false
 }
 

@@ -529,6 +529,28 @@ mod golden_tests {
     }
 
     #[test]
+    fn debug_short_license_detection() {
+        let Some(engine) = ensure_engine() else {
+            eprintln!("Engine not available");
+            return;
+        };
+
+        // Test the lgpl bare word detection
+        let lgpl_text =
+            std::fs::read_to_string("testdata/license-golden/datadriven/lic4/lgpl_21.txt").unwrap();
+        let detections = engine.detect(&lgpl_text).unwrap();
+        let actual: Vec<&str> = detections
+            .iter()
+            .map(|d| d.license_expression.as_deref().unwrap_or(""))
+            .collect();
+        eprintln!("lgpl_21.txt: Expected: lgpl-2.0-plus, Actual: {:?}", actual);
+        assert!(
+            actual.contains(&"lgpl-2.0-plus"),
+            "lgpl_21.txt should detect lgpl-2.0-plus"
+        );
+    }
+
+    #[test]
     fn debug_gpl_12() {
         let Some(engine) = ensure_engine() else {
             eprintln!("Engine not available");

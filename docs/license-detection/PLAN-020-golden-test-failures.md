@@ -139,7 +139,7 @@ Matches that should be combined after filtering remain separate in Rust
 
 ### Medium Priority
 
-4. **Add final `merge_matches()` call**
+1. **Add final `merge_matches()` call**
    - See PLAN-019 Part 3 for details
 2. **Investigate missing detections**
    - Check if rules like `other-permissive` are loaded

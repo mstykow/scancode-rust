@@ -219,7 +219,7 @@ Same approach, but the underlying match merging/filtering differs.
 
 ### Medium Priority
 
-3. **Missing Detection** - Pattern 2
+1. **Missing Detection** - Pattern 2
    - Debug why `bsd-new_61.txt` and similar files fail completely
    - Check encoding handling in tokenization
 
@@ -228,7 +228,7 @@ Same approach, but the underlying match merging/filtering differs.
 
 ### Low Priority
 
-5. **Rule Selection** - Pattern 4
+1. **Rule Selection** - Pattern 4
    - Single case, may resolve with other fixes
 
 ---

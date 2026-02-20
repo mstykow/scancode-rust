@@ -23,6 +23,6 @@
     "target/**",
     ".sisyphus/**",
     "resources/licenses/**",
-    "docs/archived/**"
+    "docs/archived/**",
   ]
 }
