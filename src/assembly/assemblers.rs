@@ -333,6 +333,7 @@ pub static UNASSEMBLED_DATASOURCE_IDS: &[DatasourceId] = &[
     DatasourceId::Readme,
     DatasourceId::AboutFile,
     DatasourceId::EtcOsRelease,
+    DatasourceId::Gitmodules,
     // Binary archives (require external extraction via ExtractCode before scanning)
     DatasourceId::AlpineApkArchive,
     DatasourceId::AndroidAarLibrary,

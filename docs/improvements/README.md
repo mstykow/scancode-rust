@@ -52,6 +52,8 @@ Python has unsafe patterns (code execution, DoS vulnerabilities), we use safe al
 | [CPAN dist.ini](cpan-dist-ini-parser.md) | ✨ New Feature | Stub-only handler (returns empty) | Full INI parsing with dependency scopes | Perl Dist::Zilla metadata extraction |
 | [Swift Dependencies](swift-show-dependencies-parser.md) | 🔍 Enhanced | Only extracts root package name | Full dependency graph with versions + direct/transitive | Complete Swift dependency visibility |
 | [Maven](maven-parser.md) | 🔍 Enhanced | SCM fields merged, no inception_year | SCM separation + inception_year + consistent keys | Data preservation + SBOM completeness |
+| [npm Git URLs](npm-git-url-dependencies.md) | 🐛 Bug Fix | Git URLs treated as pinned versions | Correct is_pinned=false for non-version deps | Valid PURLs + correct dependency resolution status |
+| [Gitmodules](gitmodules-parser.md) | ✨ New Feature | No .gitmodules parser | Full submodule dependency extraction | Complete dependency graphs for projects using submodules |
 | All Parsers | 🛡️ Security | No DoS limits | File size + iteration limits | Protection against resource exhaustion |
 
 ## Per-Parser Documentation
@@ -77,6 +79,8 @@ Each parser with improvements has a dedicated document:
 - **[cpan-makefile-pl-parser.md](cpan-makefile-pl-parser.md)** — ✨ New Feature: Makefile.PL WriteMakefile extraction (Python has no parse method)
 - **[osgi-manifest-parser.md](osgi-manifest-parser.md)** — ✨ New Feature: OSGi bundle metadata extraction (Python has empty patterns)
 - **[maven-parser.md](maven-parser.md)** — 🔍 Enhanced Extraction: SCM field separation, inception_year, consistent extra_data keys
+- **[npm-git-url-dependencies.md](npm-git-url-dependencies.md)** — 🐛 Bug Fix: Correct handling of Git URLs, GitHub shortcuts, and local paths (Python treats them as pinned versions)
+- **[gitmodules-parser.md](gitmodules-parser.md)** — ✨ New Feature: Git submodule dependency extraction (Python has no equivalent parser)
 
 ## Verification
 

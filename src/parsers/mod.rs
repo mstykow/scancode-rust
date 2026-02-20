@@ -71,6 +71,7 @@ mod debian_test;
 mod freebsd;
 #[cfg(test)]
 mod freebsd_test;
+mod gitmodules;
 mod go;
 #[cfg(test)]
 mod go_golden_test;
@@ -293,6 +294,7 @@ pub use self::debian::{
     DebianMd5sumInPackageParser, DebianOrigTarParser,
 };
 pub use self::freebsd::FreebsdCompactManifestParser;
+pub use self::gitmodules::GitmodulesParser;
 pub use self::go::{GoModParser, GoSumParser, GodepsParser};
 pub use self::gradle::GradleParser;
 pub use self::gradle_lock::GradleLockfileParser;
@@ -435,6 +437,7 @@ register_package_handlers! {
         GemfileParser,
         GemMetadataExtractedParser,
         GemspecParser,
+        GitmodulesParser,
         GodepsParser,
         GoModParser,
         GoSumParser,
