@@ -1,56 +1,23 @@
 [
   {
     "type": "nuget",
-    "namespace": null,
     "name": "jQuery.UI.Combined",
     "version": "1.11.4",
-    "qualifiers": {},
-    "subpath": null,
-    "primary_language": null,
     "description": "jQuery UI (Combined Library)\nThe full jQuery UI library as a single combined file. Includes the base theme.\njQuery UI is an open source library of interface components — interactions, full-featured widgets, and animation effects — based on the stellar jQuery javascript library . Each component is built according to jQuery's event-driven architecture (find something, manipulate it) and is themeable, making it easy for developers of any skill level to integrate and extend into their own code.\n    NOTE: This package is maintained on behalf of the library owners by the NuGet Community Packages project at http://nugetpackages.codeplex.com/",
-    "release_date": null,
     "parties": [
       {
-        "type": null,
+        "type": "person",
         "role": "author",
-        "name": "jQuery UI Team",
-        "email": null,
-        "url": null
+        "name": "jQuery UI Team"
       },
       {
-        "type": null,
+        "type": "person",
         "role": "owner",
-        "name": "jQuery UI Team",
-        "email": null,
-        "url": null
+        "name": "jQuery UI Team"
       }
     ],
-    "keywords": [],
     "homepage_url": "http://jqueryui.com/",
-    "download_url": null,
-    "size": null,
-    "sha1": null,
-    "md5": null,
-    "sha256": null,
-    "sha512": null,
-    "bug_tracking_url": null,
-    "code_view_url": null,
-    "vcs_url": null,
-    "copyright": null,
-    "holder": null,
-    "declared_license_expression": null,
-    "declared_license_expression_spdx": null,
-    "license_detections": [],
-    "other_license_expression": null,
-    "other_license_expression_spdx": null,
-    "other_license_detections": [],
     "extracted_license_statement": "http://jquery.org/license",
-    "notice_text": null,
-    "source_packages": [],
-    "file_references": [],
-    "is_private": false,
-    "is_virtual": false,
-    "extra_data": {},
     "dependencies": [
       {
         "purl": "pkg:nuget/jQuery",
@@ -59,9 +26,7 @@
         "is_runtime": true,
         "is_optional": false,
         "is_pinned": false,
-        "is_direct": true,
-        "resolved_package": {},
-        "extra_data": {}
+        "is_direct": true
       }
     ],
     "repository_homepage_url": "https://www.nuget.org/packages/jQuery.UI.Combined/1.11.4",
