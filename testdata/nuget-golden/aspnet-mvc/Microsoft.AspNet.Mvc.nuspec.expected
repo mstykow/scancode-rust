@@ -1,56 +1,24 @@
 [
   {
     "type": "nuget",
-    "namespace": null,
     "name": "Microsoft.AspNet.Mvc",
     "version": "6.0.0-beta7",
-    "qualifiers": {},
-    "subpath": null,
-    "primary_language": null,
     "description": "ASP.NET MVC is a web framework that gives you a powerful, patterns-based way to build dynamic websites and Web APIs. ASP.NET MVC enables a clean separation of concerns and gives you full control over markup.",
-    "release_date": null,
     "parties": [
       {
-        "type": null,
+        "type": "organization",
         "role": "author",
-        "name": "Microsoft",
-        "email": null,
-        "url": null
+        "name": "Microsoft"
       },
       {
-        "type": null,
+        "type": "organization",
         "role": "owner",
-        "name": "Microsoft",
-        "email": null,
-        "url": null
+        "name": "Microsoft"
       }
     ],
-    "keywords": [],
     "homepage_url": "http://www.asp.net/",
-    "download_url": null,
-    "size": null,
-    "sha1": null,
-    "md5": null,
-    "sha256": null,
-    "sha512": null,
-    "bug_tracking_url": null,
-    "code_view_url": null,
-    "vcs_url": null,
     "copyright": "Copyright © Microsoft Corporation",
-    "holder": null,
-    "declared_license_expression": null,
-    "declared_license_expression_spdx": null,
-    "license_detections": [],
-    "other_license_expression": null,
-    "other_license_expression_spdx": null,
-    "other_license_detections": [],
     "extracted_license_statement": "http://www.microsoft.com/web/webpi/eula/net_library_eula_enu.htm",
-    "notice_text": null,
-    "source_packages": [],
-    "file_references": [],
-    "is_private": false,
-    "is_virtual": false,
-    "extra_data": {},
     "dependencies": [
       {
         "purl": "pkg:nuget/Microsoft.AspNet.Mvc.ApiExplorer",
@@ -60,7 +28,6 @@
         "is_optional": false,
         "is_pinned": false,
         "is_direct": true,
-        "resolved_package": {},
         "extra_data": {
           "framework": "DNX4.5.1"
         }
@@ -73,7 +40,6 @@
         "is_optional": false,
         "is_pinned": false,
         "is_direct": true,
-        "resolved_package": {},
         "extra_data": {
           "framework": "DNX4.5.1"
         }
@@ -86,7 +52,6 @@
         "is_optional": false,
         "is_pinned": false,
         "is_direct": true,
-        "resolved_package": {},
         "extra_data": {
           "framework": "DNX4.5.1"
         }
@@ -99,7 +64,6 @@
         "is_optional": false,
         "is_pinned": false,
         "is_direct": true,
-        "resolved_package": {},
         "extra_data": {
           "framework": "DNX4.5.1"
         }
@@ -112,7 +76,6 @@
         "is_optional": false,
         "is_pinned": false,
         "is_direct": true,
-        "resolved_package": {},
         "extra_data": {
           "framework": "DNX4.5.1"
         }
@@ -125,7 +88,6 @@
         "is_optional": false,
         "is_pinned": false,
         "is_direct": true,
-        "resolved_package": {},
         "extra_data": {
           "framework": "DNX4.5.1"
         }
@@ -138,7 +100,6 @@
         "is_optional": false,
         "is_pinned": false,
         "is_direct": true,
-        "resolved_package": {},
         "extra_data": {
           "framework": "DNX4.5.1"
         }
@@ -151,7 +112,6 @@
         "is_optional": false,
         "is_pinned": false,
         "is_direct": true,
-        "resolved_package": {},
         "extra_data": {
           "framework": "DNX4.5.1"
         }
@@ -164,7 +124,6 @@
         "is_optional": false,
         "is_pinned": false,
         "is_direct": true,
-        "resolved_package": {},
         "extra_data": {
           "framework": "DNX4.5.1"
         }
@@ -177,7 +136,6 @@
         "is_optional": false,
         "is_pinned": false,
         "is_direct": true,
-        "resolved_package": {},
         "extra_data": {
           "framework": "DNXCore5.0"
         }
@@ -190,7 +148,6 @@
         "is_optional": false,
         "is_pinned": false,
         "is_direct": true,
-        "resolved_package": {},
         "extra_data": {
           "framework": "DNXCore5.0"
         }
@@ -203,7 +160,6 @@
         "is_optional": false,
         "is_pinned": false,
         "is_direct": true,
-        "resolved_package": {},
         "extra_data": {
           "framework": "DNXCore5.0"
         }
@@ -216,7 +172,6 @@
         "is_optional": false,
         "is_pinned": false,
         "is_direct": true,
-        "resolved_package": {},
         "extra_data": {
           "framework": "DNXCore5.0"
         }
@@ -229,7 +184,6 @@
         "is_optional": false,
         "is_pinned": false,
         "is_direct": true,
-        "resolved_package": {},
         "extra_data": {
           "framework": "DNXCore5.0"
         }
@@ -242,7 +196,6 @@
         "is_optional": false,
         "is_pinned": false,
         "is_direct": true,
-        "resolved_package": {},
         "extra_data": {
           "framework": "DNXCore5.0"
         }
@@ -255,7 +208,6 @@
         "is_optional": false,
         "is_pinned": false,
         "is_direct": true,
-        "resolved_package": {},
         "extra_data": {
           "framework": "DNXCore5.0"
         }
@@ -268,7 +220,6 @@
         "is_optional": false,
         "is_pinned": false,
         "is_direct": true,
-        "resolved_package": {},
         "extra_data": {
           "framework": "DNXCore5.0"
         }
@@ -281,7 +232,6 @@
         "is_optional": false,
         "is_pinned": false,
         "is_direct": true,
-        "resolved_package": {},
         "extra_data": {
           "framework": "DNXCore5.0"
         }

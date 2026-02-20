@@ -2,13 +2,200 @@
 mod tests {
     use super::super::PackageParser;
     use super::super::nuget::{
-        NupkgParser, NuspecParser, PackagesConfigParser, PackagesLockParser,
+        NupkgParser, NuspecParser, PackagesConfigParser, PackagesLockParser, infer_party_type,
+        parse_license_element,
     };
     use crate::models::DatasourceId;
     use crate::models::PackageType;
     use std::io::Write;
     use std::path::PathBuf;
     use tempfile::NamedTempFile;
+
+    #[test]
+    fn test_parse_license_element() {
+        assert_eq!(
+            parse_license_element(Some("expression"), Some("MIT")),
+            Some("MIT".to_string())
+        );
+        assert_eq!(
+            parse_license_element(Some("file"), Some("LICENSE.txt")),
+            Some("file:LICENSE.txt".to_string())
+        );
+        assert_eq!(
+            parse_license_element(None, Some("Apache-2.0")),
+            Some("Apache-2.0".to_string())
+        );
+        assert_eq!(
+            parse_license_element(Some("expression"), Some("(MIT OR Apache-2.0)")),
+            Some("(MIT OR Apache-2.0)".to_string())
+        );
+        assert_eq!(parse_license_element(None, None), None);
+        assert_eq!(parse_license_element(Some("unknown"), Some("text")), None);
+    }
+
+    #[test]
+    fn test_nuspec_license_expression() {
+        let xml = r#"<?xml version="1.0"?>
+        <package>
+          <metadata>
+            <id>TestPackage</id>
+            <version>1.0.0</version>
+            <license type="expression">MIT</license>
+          </metadata>
+        </package>"#;
+
+        let mut temp_file = NamedTempFile::new().unwrap();
+        temp_file.write_all(xml.as_bytes()).unwrap();
+        let path = temp_file.path();
+
+        let package_data = NuspecParser::extract_first_package(path);
+        assert_eq!(
+            package_data.extracted_license_statement,
+            Some("MIT".to_string())
+        );
+    }
+
+    #[test]
+    fn test_nuspec_license_file_reference() {
+        let xml = r#"<?xml version="1.0"?>
+        <package>
+          <metadata>
+            <id>TestPackage</id>
+            <version>1.0.0</version>
+            <license type="file">LICENSE.txt</license>
+          </metadata>
+        </package>"#;
+
+        let mut temp_file = NamedTempFile::new().unwrap();
+        temp_file.write_all(xml.as_bytes()).unwrap();
+        let path = temp_file.path();
+
+        let package_data = NuspecParser::extract_first_package(path);
+        assert_eq!(
+            package_data.extracted_license_statement,
+            Some("file:LICENSE.txt".to_string())
+        );
+    }
+
+    #[test]
+    fn test_nuspec_license_plain_text() {
+        let xml = r#"<?xml version="1.0"?>
+        <package>
+          <metadata>
+            <id>TestPackage</id>
+            <version>1.0.0</version>
+            <license>Apache-2.0</license>
+          </metadata>
+        </package>"#;
+
+        let mut temp_file = NamedTempFile::new().unwrap();
+        temp_file.write_all(xml.as_bytes()).unwrap();
+        let path = temp_file.path();
+
+        let package_data = NuspecParser::extract_first_package(path);
+        assert_eq!(
+            package_data.extracted_license_statement,
+            Some("Apache-2.0".to_string())
+        );
+    }
+
+    #[test]
+    fn test_nuspec_license_expression_complex() {
+        let xml = r#"<?xml version="1.0"?>
+        <package>
+          <metadata>
+            <id>TestPackage</id>
+            <version>1.0.0</version>
+            <license type="expression">(MIT OR Apache-2.0)</license>
+          </metadata>
+        </package>"#;
+
+        let mut temp_file = NamedTempFile::new().unwrap();
+        temp_file.write_all(xml.as_bytes()).unwrap();
+        let path = temp_file.path();
+
+        let package_data = NuspecParser::extract_first_package(path);
+        assert_eq!(
+            package_data.extracted_license_statement,
+            Some("(MIT OR Apache-2.0)".to_string())
+        );
+    }
+
+    #[test]
+    fn test_nuspec_license_expression_with_version() {
+        let xml = r#"<?xml version="1.0"?>
+        <package>
+          <metadata>
+            <id>TestPackage</id>
+            <version>1.0.0</version>
+            <license type="expression">Apache-2.0</license>
+          </metadata>
+        </package>"#;
+
+        let mut temp_file = NamedTempFile::new().unwrap();
+        temp_file.write_all(xml.as_bytes()).unwrap();
+        let path = temp_file.path();
+
+        let package_data = NuspecParser::extract_first_package(path);
+        assert_eq!(
+            package_data.extracted_license_statement,
+            Some("Apache-2.0".to_string())
+        );
+    }
+
+    #[test]
+    fn test_infer_party_type_organization() {
+        assert_eq!(infer_party_type("Microsoft"), "organization");
+        assert_eq!(infer_party_type("Twitter, Inc."), "organization");
+        assert_eq!(
+            infer_party_type("Castle Project Contributors"),
+            "organization"
+        );
+        assert_eq!(infer_party_type("Google LLC"), "organization");
+        assert_eq!(
+            infer_party_type("Apache Software Foundation"),
+            "organization"
+        );
+        assert_eq!(infer_party_type("Red Hat, Inc."), "organization");
+        assert_eq!(infer_party_type("JetBrains s.r.o."), "organization");
+    }
+
+    #[test]
+    fn test_infer_party_type_person() {
+        assert_eq!(infer_party_type("James Newton-King"), "person");
+        assert_eq!(
+            infer_party_type("Sam Saffron,Marc Gravell,Nick Craver"),
+            "person"
+        );
+        assert_eq!(infer_party_type("John Doe"), "person");
+        assert_eq!(infer_party_type("Jane Smith"), "person");
+    }
+
+    #[test]
+    fn test_nuspec_party_types_populated() {
+        let xml = r#"<?xml version="1.0"?>
+        <package>
+          <metadata>
+            <id>TestPackage</id>
+            <version>1.0.0</version>
+            <authors>Twitter, Inc.</authors>
+            <owners>bootstrap</owners>
+          </metadata>
+        </package>"#;
+
+        let mut temp_file = NamedTempFile::new().unwrap();
+        temp_file.write_all(xml.as_bytes()).unwrap();
+        let path = temp_file.path();
+
+        let package_data = NuspecParser::extract_first_package(path);
+        let parties = &package_data.parties;
+
+        assert_eq!(parties.len(), 2);
+        assert_eq!(parties[0].r#type, Some("organization".to_string()));
+        assert_eq!(parties[0].role, Some("author".to_string()));
+        assert_eq!(parties[1].r#type, Some("person".to_string()));
+        assert_eq!(parties[1].role, Some("owner".to_string()));
+    }
 
     #[test]
     fn test_packages_config_is_match() {

@@ -1,0 +1,28 @@
+[
+  {
+    "type": "nuget",
+    "name": "Microsoft.WindowsPackageManager.Utils",
+    "version": "1.0.0",
+    "description": "Windows Package Manager Utils\nUtility functions for Windows Package Manager.",
+    "parties": [
+      {
+        "type": "organization",
+        "role": "author",
+        "name": "Microsoft"
+      },
+      {
+        "type": "organization",
+        "role": "owner",
+        "name": "Microsoft"
+      }
+    ],
+    "homepage_url": "https://github.com/microsoft/winget-cli",
+    "copyright": "© Microsoft Corporation. All rights reserved.",
+    "extracted_license_statement": "MIT",
+    "repository_homepage_url": "https://www.nuget.org/packages/Microsoft.WindowsPackageManager.Utils/1.0.0",
+    "repository_download_url": "https://www.nuget.org/api/v2/package/Microsoft.WindowsPackageManager.Utils/1.0.0",
+    "api_data_url": "https://api.nuget.org/v3/registration3/microsoft.windowspackagemanager.utils/1.0.0.json",
+    "datasource_id": "nuget_nupsec",
+    "purl": "pkg:nuget/Microsoft.WindowsPackageManager.Utils@1.0.0"
+  }
+]
