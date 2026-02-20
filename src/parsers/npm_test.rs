@@ -2487,7 +2487,7 @@ mod tests {
         assert!(!package_data.is_virtual);
     }
 
-        #[test]
+    #[test]
     fn test_git_url_dependencies() {
         let content = r#"
 {
