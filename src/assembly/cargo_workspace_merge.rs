@@ -28,6 +28,7 @@ struct WorkspaceRoot {
     workspace_data: WorkspaceData,
 }
 
+#[derive(Default)]
 struct WorkspaceData {
     package: HashMap<String, serde_json::Value>,
     dependencies: HashMap<String, serde_json::Value>,
@@ -481,12 +482,16 @@ fn assign_for_packages(
     member_indices: &[usize],
     member_uids: &[String],
 ) {
-    let mut member_dirs: Vec<PathBuf> = Vec::new();
-    for &idx in member_indices {
-        if let Some(parent) = Path::new(&files[idx].path).parent() {
-            member_dirs.push(parent.to_path_buf());
+    let mut member_pairs: Vec<(PathBuf, String)> = Vec::new();
+    for (i, &idx) in member_indices.iter().enumerate() {
+        if let Some(parent) = Path::new(&files[idx].path).parent()
+            && i < member_uids.len()
+        {
+            member_pairs.push((parent.to_path_buf(), member_uids[i].clone()));
         }
     }
+
+    member_pairs.sort_by(|a, b| b.0.as_os_str().len().cmp(&a.0.as_os_str().len()));
 
     for file in files.iter_mut() {
         let path = Path::new(&file.path);
@@ -497,9 +502,9 @@ fn assign_for_packages(
         file.for_packages.clear();
 
         let mut assigned = false;
-        for (i, member_dir) in member_dirs.iter().enumerate() {
+        for (member_dir, member_uid) in &member_pairs {
             if path.starts_with(member_dir) {
-                file.for_packages.push(member_uids[i].clone());
+                file.for_packages.push(member_uid.clone());
                 assigned = true;
                 break;
             }
@@ -516,8 +521,223 @@ fn assign_for_packages(
             continue;
         }
 
-        for uid in member_uids {
-            file.for_packages.push(uid.clone());
+        for (_, member_uid) in &member_pairs {
+            file.for_packages.push(member_uid.clone());
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::{FileType, PackageData};
+
+    fn create_test_file(path: &str, datasource_id: Option<DatasourceId>) -> FileInfo {
+        FileInfo {
+            name: path.rsplit('/').next().unwrap_or(path).to_string(),
+            base_name: path.rsplit('/').next().unwrap_or(path).to_string(),
+            extension: path.rsplit('.').next().unwrap_or("").to_string(),
+            path: path.to_string(),
+            file_type: FileType::File,
+            mime_type: None,
+            size: 100,
+            date: None,
+            sha1: None,
+            md5: None,
+            sha256: None,
+            programming_language: None,
+            package_data: vec![PackageData {
+                datasource_id,
+                purl: None,
+                ..Default::default()
+            }],
+            license_expression: None,
+            license_detections: vec![],
+            copyrights: vec![],
+            urls: vec![],
+            for_packages: vec![],
+            scan_errors: vec![],
+        }
+    }
+
+    #[test]
+    fn test_assign_for_packages_member_files() {
+        let mut files = vec![
+            create_test_file("workspace/Cargo.toml", Some(DatasourceId::CargoToml)),
+            create_test_file("workspace/LICENSE", None),
+            create_test_file(
+                "workspace/crates/core/Cargo.toml",
+                Some(DatasourceId::CargoToml),
+            ),
+            create_test_file("workspace/crates/core/LICENSE", None),
+            create_test_file("workspace/crates/core/src/lib.rs", None),
+            create_test_file(
+                "workspace/crates/cli/Cargo.toml",
+                Some(DatasourceId::CargoToml),
+            ),
+            create_test_file("workspace/crates/cli/src/main.rs", None),
+            create_test_file("workspace/target/debug/binary", None),
+        ];
+
+        let workspace_root = WorkspaceRoot {
+            root_dir: PathBuf::from("workspace"),
+            root_cargo_toml_idx: 0,
+            members: vec!["crates/core".to_string(), "crates/cli".to_string()],
+            workspace_data: WorkspaceData {
+                package: HashMap::new(),
+                dependencies: HashMap::new(),
+            },
+        };
+
+        let member_indices = vec![2, 5];
+        let member_uids = vec![
+            "pkg:cargo/core@1.0.0?uuid=core-uid".to_string(),
+            "pkg:cargo/cli@1.0.0?uuid=cli-uid".to_string(),
+        ];
+
+        assign_for_packages(&mut files, &workspace_root, &member_indices, &member_uids);
+
+        assert_eq!(files[1].for_packages.len(), 2);
+        assert!(files[1].for_packages.contains(&member_uids[0]));
+        assert!(files[1].for_packages.contains(&member_uids[1]));
+
+        assert_eq!(files[3].for_packages, vec![member_uids[0].clone()]);
+        assert_eq!(files[4].for_packages, vec![member_uids[0].clone()]);
+
+        assert_eq!(files[6].for_packages, vec![member_uids[1].clone()]);
+
+        assert!(files[7].for_packages.is_empty());
+    }
+
+    #[test]
+    fn test_assign_for_packages_nested_members() {
+        let mut files = vec![
+            create_test_file("workspace/Cargo.toml", Some(DatasourceId::CargoToml)),
+            create_test_file(
+                "workspace/crates/core/Cargo.toml",
+                Some(DatasourceId::CargoToml),
+            ),
+            create_test_file("workspace/crates/core/src/lib.rs", None),
+            create_test_file(
+                "workspace/crates/core/utils/Cargo.toml",
+                Some(DatasourceId::CargoToml),
+            ),
+            create_test_file("workspace/crates/core/utils/src/lib.rs", None),
+        ];
+
+        let workspace_root = WorkspaceRoot {
+            root_dir: PathBuf::from("workspace"),
+            root_cargo_toml_idx: 0,
+            members: vec!["crates/core".to_string(), "crates/core/utils".to_string()],
+            workspace_data: WorkspaceData::default(),
+        };
+
+        let member_indices = vec![1, 3];
+        let member_uids = vec![
+            "pkg:cargo/core@1.0.0?uuid=core-uid".to_string(),
+            "pkg:cargo/core-utils@1.0.0?uuid=utils-uid".to_string(),
+        ];
+
+        assign_for_packages(&mut files, &workspace_root, &member_indices, &member_uids);
+
+        assert_eq!(files[2].for_packages, vec![member_uids[0].clone()]);
+
+        assert_eq!(files[4].for_packages, vec![member_uids[1].clone()]);
+    }
+
+    #[test]
+    fn test_assign_for_packages_glob_pattern_members() {
+        let mut files = vec![
+            create_test_file("workspace/Cargo.toml", Some(DatasourceId::CargoToml)),
+            create_test_file(
+                "workspace/plugins/plugin-a/Cargo.toml",
+                Some(DatasourceId::CargoToml),
+            ),
+            create_test_file("workspace/plugins/plugin-a/src/lib.rs", None),
+            create_test_file(
+                "workspace/plugins/plugin-b/Cargo.toml",
+                Some(DatasourceId::CargoToml),
+            ),
+            create_test_file("workspace/plugins/plugin-b/src/lib.rs", None),
+        ];
+
+        let workspace_root = WorkspaceRoot {
+            root_dir: PathBuf::from("workspace"),
+            root_cargo_toml_idx: 0,
+            members: vec!["plugins/*".to_string()],
+            workspace_data: WorkspaceData::default(),
+        };
+
+        let member_indices = vec![1, 3];
+        let member_uids = vec![
+            "pkg:cargo/plugin-a@1.0.0?uuid=plugin-a-uid".to_string(),
+            "pkg:cargo/plugin-b@1.0.0?uuid=plugin-b-uid".to_string(),
+        ];
+
+        assign_for_packages(&mut files, &workspace_root, &member_indices, &member_uids);
+
+        assert_eq!(files[2].for_packages, vec![member_uids[0].clone()]);
+        assert_eq!(files[4].for_packages, vec![member_uids[1].clone()]);
+    }
+
+    #[test]
+    fn test_assign_for_packages_nested_members_order_independent() {
+        let mut files = vec![
+            create_test_file("workspace/Cargo.toml", Some(DatasourceId::CargoToml)),
+            create_test_file(
+                "workspace/crates/core/utils/Cargo.toml",
+                Some(DatasourceId::CargoToml),
+            ),
+            create_test_file("workspace/crates/core/utils/src/lib.rs", None),
+            create_test_file(
+                "workspace/crates/core/Cargo.toml",
+                Some(DatasourceId::CargoToml),
+            ),
+            create_test_file("workspace/crates/core/src/lib.rs", None),
+        ];
+
+        let workspace_root = WorkspaceRoot {
+            root_dir: PathBuf::from("workspace"),
+            root_cargo_toml_idx: 0,
+            members: vec!["crates/core/utils".to_string(), "crates/core".to_string()],
+            workspace_data: WorkspaceData::default(),
+        };
+
+        let member_indices = vec![1, 3];
+        let member_uids = vec![
+            "pkg:cargo/core-utils@1.0.0?uuid=utils-uid".to_string(),
+            "pkg:cargo/core@1.0.0?uuid=core-uid".to_string(),
+        ];
+
+        assign_for_packages(&mut files, &workspace_root, &member_indices, &member_uids);
+
+        assert_eq!(files[2].for_packages, vec![member_uids[0].clone()]);
+
+        assert_eq!(files[4].for_packages, vec![member_uids[1].clone()]);
+    }
+
+    #[test]
+    fn test_assign_for_packages_single_member() {
+        let mut files = vec![
+            create_test_file("workspace/Cargo.toml", Some(DatasourceId::CargoToml)),
+            create_test_file("workspace/LICENSE", None),
+            create_test_file("workspace/member/Cargo.toml", Some(DatasourceId::CargoToml)),
+            create_test_file("workspace/member/src/lib.rs", None),
+        ];
+
+        let workspace_root = WorkspaceRoot {
+            root_dir: PathBuf::from("workspace"),
+            root_cargo_toml_idx: 0,
+            members: vec!["member".to_string()],
+            workspace_data: WorkspaceData::default(),
+        };
+
+        let member_indices = vec![2];
+        let member_uids = vec!["pkg:cargo/member@1.0.0?uuid=member-uid".to_string()];
+
+        assign_for_packages(&mut files, &workspace_root, &member_indices, &member_uids);
+
+        assert_eq!(files[1].for_packages, vec![member_uids[0].clone()]);
+        assert_eq!(files[3].for_packages, vec![member_uids[0].clone()]);
     }
 }

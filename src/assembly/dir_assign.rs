@@ -281,4 +281,71 @@ mod tests {
         assert!(files[2].for_packages.is_empty());
         assert!(files[3].for_packages.is_empty());
     }
+
+    #[test]
+    fn test_cargo_single_crate_files_assigned() {
+        let mut files = vec![
+            create_file_info("project/Cargo.toml"),
+            create_file_info("project/Cargo.lock"),
+            create_file_info("project/LICENSE"),
+            create_file_info("project/README.md"),
+            create_file_info("project/src/lib.rs"),
+        ];
+        let packages = vec![Package {
+            package_type: Some(PackageType::Cargo),
+            datafile_paths: vec!["project/Cargo.toml".to_string()],
+            package_uid: "pkg:cargo/my-crate@1.0.0?uuid=test".to_string(),
+            purl: Some("pkg:cargo/my-crate@1.0.0".to_string()),
+            datasource_ids: vec![crate::models::DatasourceId::CargoToml],
+            ..create_package("my-crate", "project/Cargo.toml")
+        }];
+
+        assign_files_to_packages(&mut files, &packages);
+
+        assert!(
+            files[2]
+                .for_packages
+                .contains(&"pkg:cargo/my-crate@1.0.0?uuid=test".to_string())
+        );
+        assert!(
+            files[3]
+                .for_packages
+                .contains(&"pkg:cargo/my-crate@1.0.0?uuid=test".to_string())
+        );
+        assert!(
+            files[4]
+                .for_packages
+                .contains(&"pkg:cargo/my-crate@1.0.0?uuid=test".to_string())
+        );
+    }
+
+    #[test]
+    fn test_cargo_crate_deep_nested_src_assigned() {
+        let mut files = vec![
+            create_file_info("project/Cargo.toml"),
+            create_file_info("project/src/lib.rs"),
+            create_file_info("project/src/foo/bar/baz.rs"),
+        ];
+        let packages = vec![Package {
+            package_type: Some(PackageType::Cargo),
+            datafile_paths: vec!["project/Cargo.toml".to_string()],
+            package_uid: "pkg:cargo/my-crate@1.0.0?uuid=test".to_string(),
+            purl: Some("pkg:cargo/my-crate@1.0.0".to_string()),
+            datasource_ids: vec![crate::models::DatasourceId::CargoToml],
+            ..create_package("my-crate", "project/Cargo.toml")
+        }];
+
+        assign_files_to_packages(&mut files, &packages);
+
+        assert!(
+            files[1]
+                .for_packages
+                .contains(&"pkg:cargo/my-crate@1.0.0?uuid=test".to_string())
+        );
+        assert!(
+            files[2]
+                .for_packages
+                .contains(&"pkg:cargo/my-crate@1.0.0?uuid=test".to_string())
+        );
+    }
 }
