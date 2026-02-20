@@ -301,9 +301,13 @@ fn merge_overlapping_matches(matches: &[LicenseMatch]) -> Vec<LicenseMatch> {
 /// Filter matches that are contained within other matches.
 ///
 /// A match A is contained in match B if:
-/// - A's qspan (token positions) is contained in B's qspan
-/// - This uses token positions (start_token/end_token) instead of line numbers
-///   for more precise containment detection, matching Python's qcontains behavior.
+/// - A's qspan (token positions) is contained in B's qspan, OR
+/// - B's license expression subsumes A's expression (e.g., "gpl-2.0 WITH exception" subsumes "gpl-2.0")
+///
+/// This uses token positions (start_token/end_token) instead of line numbers
+/// for more precise containment detection, matching Python's qcontains behavior.
+/// Expression subsumption handles WITH expressions where the base license should
+/// not appear separately when the WITH expression is detected.
 ///
 /// The containing (larger) match is kept, the contained (smaller) match is removed.
 /// This function does NOT group by rule_identifier - matches from different rules
@@ -315,7 +319,7 @@ fn merge_overlapping_matches(matches: &[LicenseMatch]) -> Vec<LicenseMatch> {
 /// # Returns
 /// Tuple of (kept matches, discarded matches)
 ///
-/// Based on Python: `filter_contained_matches()` using qspan containment
+/// Based on Python: `filter_contained_matches()` using qspan containment and expression subsumption
 fn filter_contained_matches(matches: &[LicenseMatch]) -> (Vec<LicenseMatch>, Vec<LicenseMatch>) {
     if matches.len() < 2 {
         return (matches.to_vec(), Vec::new());
@@ -354,11 +358,11 @@ fn filter_contained_matches(matches: &[LicenseMatch]) -> (Vec<LicenseMatch>, Vec
                 }
             }
 
-            if current.qcontains(&next) {
+            if current.qcontains(&next) || licensing_contains_match(&current, &next) {
                 discarded.push(matches.remove(j));
                 continue;
             }
-            if next.qcontains(&current) {
+            if next.qcontains(&current) || licensing_contains_match(&next, &current) {
                 discarded.push(matches.remove(i));
                 i = i.saturating_sub(1);
                 break;
