@@ -2070,4 +2070,162 @@ mod tests {
             lodash_dep.is_optional
         );
     }
+
+    #[test]
+    fn test_git_url_dependencies() {
+        let content = r#"
+{
+  "name": "test-package",
+  "version": "1.0.0",
+  "dependencies": {
+    "express": "git://github.com/expressjs/express.git",
+    "lodash": "git+https://github.com/lodash/lodash.git#v4.17.21",
+    "underscore": "git@github.com:jashkenas/underscore.git",
+    "moment": "github:moment/moment",
+    "axios": "axios/axios#v1.0.0"
+  }
+}
+"#;
+        let (_temp_file, package_path) = create_temp_package_json(content);
+        let package_data = NpmParser::extract_first_package(&package_path);
+
+        assert_eq!(package_data.dependencies.len(), 5);
+
+        for dep in &package_data.dependencies {
+            assert!(
+                dep.is_pinned == Some(false),
+                "Git URL dependencies should not be pinned: {:?}",
+                dep.purl
+            );
+            assert!(
+                dep.extracted_requirement.is_some(),
+                "Git URL dependencies should have extracted_requirement"
+            );
+        }
+    }
+
+    #[test]
+    fn test_url_dependencies() {
+        let content = r#"
+{
+  "name": "test-package",
+  "version": "1.0.0",
+  "dependencies": {
+    "my-package": "https://example.com/package.tgz",
+    "another": "http://example.com/another.tgz"
+  }
+}
+"#;
+        let (_temp_file, package_path) = create_temp_package_json(content);
+        let package_data = NpmParser::extract_first_package(&package_path);
+
+        assert_eq!(package_data.dependencies.len(), 2);
+
+        for dep in &package_data.dependencies {
+            assert!(
+                dep.is_pinned == Some(false),
+                "URL dependencies should not be pinned: {:?}",
+                dep.purl
+            );
+        }
+    }
+
+    #[test]
+    fn test_local_path_dependencies() {
+        let content = r#"
+{
+  "name": "test-package",
+  "version": "1.0.0",
+  "dependencies": {
+    "local-pkg": "file:../local-pkg",
+    "linked-pkg": "link:../linked-pkg"
+  }
+}
+"#;
+        let (_temp_file, package_path) = create_temp_package_json(content);
+        let package_data = NpmParser::extract_first_package(&package_path);
+
+        assert_eq!(package_data.dependencies.len(), 2);
+
+        for dep in &package_data.dependencies {
+            assert!(
+                dep.is_pinned == Some(false),
+                "Local path dependencies should not be pinned: {:?}",
+                dep.purl
+            );
+        }
+    }
+
+    #[test]
+    fn test_mixed_dependencies() {
+        let content = r#"
+{
+  "name": "test-package",
+  "version": "1.0.0",
+  "dependencies": {
+    "regular": "^4.17.0",
+    "exact": "2.0.0",
+    "git-dep": "git+https://github.com/org/repo.git",
+    "url-dep": "https://example.com/package.tgz",
+    "github-dep": "user/repo#main"
+  }
+}
+"#;
+        let (_temp_file, package_path) = create_temp_package_json(content);
+        let package_data = NpmParser::extract_first_package(&package_path);
+
+        assert_eq!(package_data.dependencies.len(), 5);
+
+        let regular = package_data
+            .dependencies
+            .iter()
+            .find(|d| {
+                d.purl
+                    .as_ref()
+                    .map(|p| p.contains("regular"))
+                    .unwrap_or(false)
+            })
+            .expect("Should find regular dependency");
+        assert_eq!(
+            regular.is_pinned,
+            Some(false),
+            "Semver range should not be pinned"
+        );
+
+        let exact = package_data
+            .dependencies
+            .iter()
+            .find(|d| {
+                d.purl
+                    .as_ref()
+                    .map(|p| p.contains("exact"))
+                    .unwrap_or(false)
+            })
+            .expect("Should find exact dependency");
+        assert_eq!(
+            exact.is_pinned,
+            Some(true),
+            "Exact version should be pinned"
+        );
+        assert!(
+            exact.purl.as_ref().unwrap().contains("@2.0.0"),
+            "Exact version should include version in PURL"
+        );
+
+        let git_dep = package_data
+            .dependencies
+            .iter()
+            .find(|d| {
+                d.purl
+                    .as_ref()
+                    .map(|p| p.contains("git-dep"))
+                    .unwrap_or(false)
+            })
+            .expect("Should find git-dep dependency");
+        assert_eq!(
+            git_dep.is_pinned,
+            Some(false),
+            "Git dependency should not be pinned"
+        );
+    }
 }

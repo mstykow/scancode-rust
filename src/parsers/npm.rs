@@ -941,14 +941,74 @@ fn strip_version_modifier(version: &str) -> String {
 }
 
 fn is_exact_version(version: &str) -> bool {
-    !version.starts_with('~')
-        && !version.starts_with('^')
-        && !version.starts_with('>')
-        && !version.starts_with('<')
-        && !version.starts_with('=')
-        && !version.starts_with('*')
-        && !version.contains("||")
-        && !version.contains(" - ")
+    if version.is_empty() {
+        return false;
+    }
+
+    if version.starts_with('~')
+        || version.starts_with('^')
+        || version.starts_with('>')
+        || version.starts_with('<')
+        || version.starts_with('=')
+        || version.starts_with('*')
+        || version.contains("||")
+        || version.contains(" - ")
+    {
+        return false;
+    }
+
+    if is_non_version_dependency(version) {
+        return false;
+    }
+
+    true
+}
+
+fn is_non_version_dependency(version: &str) -> bool {
+    let v = version.trim();
+
+    if v.is_empty() {
+        return false;
+    }
+
+    if v.starts_with("http://")
+        || v.starts_with("https://")
+        || v.starts_with("git://")
+        || v.starts_with("git+ssh://")
+        || v.starts_with("git+http://")
+        || v.starts_with("git+https://")
+        || v.starts_with("git@")
+        || v.starts_with("file:")
+        || v.starts_with("link:")
+        || v.starts_with("portal:")
+    {
+        return true;
+    }
+
+    if v.starts_with("github:")
+        || v.starts_with("gitlab:")
+        || v.starts_with("bitbucket:")
+        || v.starts_with("gist:")
+    {
+        return true;
+    }
+
+    if v.contains('/') && !v.starts_with('@') {
+        if let Some((_, after_hash)) = v.rsplit_once('#')
+            && after_hash
+                .chars()
+                .all(|c| c.is_alphanumeric() || c == '.' || c == '-' || c == '_' || c == '/')
+            && !after_hash.starts_with(">=^~<>*")
+        {
+            return true;
+        }
+        if !v.contains(':') && v.chars().filter(|&c| c == '/').count() == 1 && !v.contains(">=^~<*")
+        {
+            return true;
+        }
+    }
+
+    false
 }
 
 crate::register_parser!(
