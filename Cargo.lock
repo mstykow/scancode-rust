@@ -1741,9 +1741,9 @@ dependencies = [
 
 [[package]]
 name = "rpm"
-version = "0.18.4"
+version = "0.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "834393db3afd30c31d6ecde41d8dad7f081ac692f82c5a7a05fc0a0915343e6b"
+checksum = "95c0e45982d67e35e3bbffb24d95e3d0282211ac2dad755b2ab24b9ffc07b199"
 dependencies = [
  "base64",
  "bitflags",

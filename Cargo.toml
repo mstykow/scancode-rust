@@ -80,7 +80,7 @@ blake3 = "1.8.3"
 
 # Linux package parsers
 ar = "0.9"           # Unix ar archive format (for .deb)
-rpm = { version = "0.18.4", default-features = false, features = ["gzip-compression", "xz-compression", "zstd-compression", "bzip2-compression"] }
+rpm = { version = "0.19.0", default-features = false, features = ["gzip-compression", "xz-compression", "zstd-compression", "bzip2-compression"] }
 cpio-archive = "0.10" # CPIO archive extraction (for .rpm)
 rusqlite = { version = "0.37.0", optional = true }  # RPM SQLite database (pinned for rpmdb compat)
 rpmdb = { git = "https://github.com/yybit/rpmdb-rs", rev = "8a20c8b8" }  # RPM database reading (BDB, NDB, SQLite) - pinned to commit with rusqlite 0.37 support
