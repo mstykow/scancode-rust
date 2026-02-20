@@ -255,6 +255,8 @@ mod integration_tests {
             min_high_matched_length_unique: 0,
             is_small: false,
             is_tiny: false,
+            starts_with_license: false,
+            ends_with_license: false,
             is_deprecated: false,
             spdx_license_key: None,
             other_spdx_license_keys: vec![],

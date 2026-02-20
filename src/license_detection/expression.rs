@@ -345,6 +345,166 @@ fn build_expression_from_list(unique: &[LicenseExpression], is_and: bool) -> Lic
     }
 }
 
+fn get_flat_args(expr: &LicenseExpression) -> Vec<LicenseExpression> {
+    match expr {
+        LicenseExpression::And { left, right } => {
+            let mut args = Vec::new();
+            collect_flat_and_args(left, &mut args);
+            collect_flat_and_args(right, &mut args);
+            args
+        }
+        LicenseExpression::Or { left, right } => {
+            let mut args = Vec::new();
+            collect_flat_or_args(left, &mut args);
+            collect_flat_or_args(right, &mut args);
+            args
+        }
+        _ => vec![expr.clone()],
+    }
+}
+
+fn collect_flat_and_args(expr: &LicenseExpression, args: &mut Vec<LicenseExpression>) {
+    match expr {
+        LicenseExpression::And { left, right } => {
+            collect_flat_and_args(left, args);
+            collect_flat_and_args(right, args);
+        }
+        _ => args.push(expr.clone()),
+    }
+}
+
+fn collect_flat_or_args(expr: &LicenseExpression, args: &mut Vec<LicenseExpression>) {
+    match expr {
+        LicenseExpression::Or { left, right } => {
+            collect_flat_or_args(left, args);
+            collect_flat_or_args(right, args);
+        }
+        _ => args.push(expr.clone()),
+    }
+}
+
+fn decompose_expr(expr: &LicenseExpression) -> Vec<LicenseExpression> {
+    match expr {
+        LicenseExpression::With { left, right } => {
+            let mut parts = decompose_expr(left);
+            parts.extend(decompose_expr(right));
+            parts
+        }
+        _ => vec![expr.clone()],
+    }
+}
+
+fn expressions_equal(a: &LicenseExpression, b: &LicenseExpression) -> bool {
+    match (a, b) {
+        (LicenseExpression::License(ka), LicenseExpression::License(kb)) => ka == kb,
+        (LicenseExpression::LicenseRef(ka), LicenseExpression::LicenseRef(kb)) => ka == kb,
+        (
+            LicenseExpression::With {
+                left: l1,
+                right: r1,
+            },
+            LicenseExpression::With {
+                left: l2,
+                right: r2,
+            },
+        ) => expressions_equal(l1, l2) && expressions_equal(r1, r2),
+        (LicenseExpression::And { .. }, LicenseExpression::And { .. }) => {
+            let args_a = get_flat_args(a);
+            let args_b = get_flat_args(b);
+            args_a.len() == args_b.len()
+                && args_b
+                    .iter()
+                    .all(|b_arg| args_a.iter().any(|a_arg| expressions_equal(a_arg, b_arg)))
+        }
+        (LicenseExpression::Or { .. }, LicenseExpression::Or { .. }) => {
+            let args_a = get_flat_args(a);
+            let args_b = get_flat_args(b);
+            args_a.len() == args_b.len()
+                && args_b
+                    .iter()
+                    .all(|b_arg| args_a.iter().any(|a_arg| expressions_equal(a_arg, b_arg)))
+        }
+        _ => false,
+    }
+}
+
+fn expr_in_args(expr: &LicenseExpression, args: &[LicenseExpression]) -> bool {
+    if args.iter().any(|a| expressions_equal(a, expr)) {
+        return true;
+    }
+    let decomposed = decompose_expr(expr);
+    if decomposed.len() == 1 {
+        return false;
+    }
+    decomposed
+        .iter()
+        .any(|d| args.iter().any(|a| expressions_equal(a, d)))
+}
+
+pub fn licensing_contains(container: &str, contained: &str) -> bool {
+    let container = container.trim();
+    let contained = contained.trim();
+    if container.is_empty() || contained.is_empty() {
+        return false;
+    }
+
+    if container.to_lowercase() == contained.to_lowercase() {
+        return true;
+    }
+
+    let Ok(parsed_container) = parse_expression(container) else {
+        return false;
+    };
+    let Ok(parsed_contained) = parse_expression(contained) else {
+        return false;
+    };
+
+    let simplified_container = simplify_expression(&parsed_container);
+    let simplified_contained = simplify_expression(&parsed_contained);
+
+    match (&simplified_container, &simplified_contained) {
+        (LicenseExpression::And { .. }, LicenseExpression::And { .. })
+        | (LicenseExpression::Or { .. }, LicenseExpression::Or { .. }) => {
+            let container_args = get_flat_args(&simplified_container);
+            let contained_args = get_flat_args(&simplified_contained);
+            contained_args
+                .iter()
+                .all(|c| container_args.iter().any(|ca| expressions_equal(ca, c)))
+        }
+        (
+            LicenseExpression::And { .. } | LicenseExpression::Or { .. },
+            LicenseExpression::License(_) | LicenseExpression::LicenseRef(_),
+        ) => {
+            let container_args = get_flat_args(&simplified_container);
+            expr_in_args(&simplified_contained, &container_args)
+        }
+        (LicenseExpression::And { .. } | LicenseExpression::Or { .. }, _) => {
+            let container_args = get_flat_args(&simplified_container);
+            container_args
+                .iter()
+                .any(|ca| expressions_equal(ca, &simplified_contained))
+        }
+        (
+            LicenseExpression::With { .. },
+            LicenseExpression::License(_) | LicenseExpression::LicenseRef(_),
+        ) => {
+            let decomposed = decompose_expr(&simplified_container);
+            decomposed
+                .iter()
+                .any(|d| expressions_equal(d, &simplified_contained))
+        }
+        (
+            LicenseExpression::License(_) | LicenseExpression::LicenseRef(_),
+            LicenseExpression::And { .. }
+            | LicenseExpression::Or { .. }
+            | LicenseExpression::With { .. },
+        ) => false,
+        (LicenseExpression::License(k1), LicenseExpression::License(k2)) => k1 == k2,
+        (LicenseExpression::LicenseRef(k1), LicenseExpression::LicenseRef(k2)) => k1 == k2,
+        _ => false,
+    }
+}
+
 /// Validate a license expression against known license keys.
 ///
 /// # Arguments
@@ -1481,5 +1641,102 @@ mod tests {
             expression_to_string(&expr),
             "bsd-new AND mit AND gpl-3.0-plus WITH autoconf-simple-exception"
         );
+    }
+}
+
+#[cfg(test)]
+mod contains_tests {
+    use super::*;
+
+    #[test]
+    fn test_basic_containment() {
+        assert!(licensing_contains("mit", "mit"));
+        assert!(!licensing_contains("mit", "apache"));
+    }
+
+    #[test]
+    fn test_or_containment() {
+        assert!(licensing_contains("mit OR apache", "mit"));
+        assert!(licensing_contains("mit OR apache", "apache"));
+        assert!(!licensing_contains("mit OR apache", "gpl"));
+    }
+
+    #[test]
+    fn test_and_containment() {
+        assert!(licensing_contains("mit AND apache", "mit"));
+        assert!(licensing_contains("mit AND apache", "apache"));
+        assert!(!licensing_contains("mit", "mit AND apache"));
+    }
+
+    #[test]
+    fn test_expression_subset() {
+        assert!(licensing_contains(
+            "mit AND apache AND bsd",
+            "mit AND apache"
+        ));
+        assert!(!licensing_contains(
+            "mit AND apache",
+            "mit AND apache AND bsd"
+        ));
+        assert!(licensing_contains("mit OR apache OR bsd", "mit OR apache"));
+        assert!(!licensing_contains("mit OR apache", "mit OR apache OR bsd"));
+    }
+
+    #[test]
+    fn test_order_independence() {
+        assert!(licensing_contains("mit AND apache", "apache AND mit"));
+        assert!(licensing_contains("mit OR apache", "apache OR mit"));
+    }
+
+    #[test]
+    fn test_plus_suffix_no_containment() {
+        assert!(!licensing_contains("gpl-2.0-plus", "gpl-2.0"));
+        assert!(!licensing_contains("gpl-2.0", "gpl-2.0-plus"));
+    }
+
+    #[test]
+    fn test_with_decomposition() {
+        assert!(licensing_contains(
+            "gpl-2.0 WITH classpath-exception",
+            "gpl-2.0"
+        ));
+        assert!(licensing_contains(
+            "gpl-2.0 WITH classpath-exception",
+            "classpath-exception"
+        ));
+        assert!(!licensing_contains(
+            "gpl-2.0",
+            "gpl-2.0 WITH classpath-exception"
+        ));
+    }
+
+    #[test]
+    fn test_mixed_operators() {
+        assert!(!licensing_contains("mit OR apache", "mit AND apache"));
+        assert!(!licensing_contains("mit AND apache", "mit OR apache"));
+    }
+
+    #[test]
+    fn test_nested_expressions() {
+        assert!(!licensing_contains("(mit OR apache) AND bsd", "mit"));
+        assert!(licensing_contains(
+            "(mit OR apache) AND bsd",
+            "mit OR apache"
+        ));
+        assert!(licensing_contains("(mit OR apache) AND bsd", "bsd"));
+    }
+
+    #[test]
+    fn test_empty_expressions() {
+        assert!(!licensing_contains("", "mit"));
+        assert!(!licensing_contains("mit", ""));
+        assert!(!licensing_contains("", ""));
+        assert!(!licensing_contains("   ", "mit"));
+    }
+
+    #[test]
+    fn test_invalid_expressions() {
+        assert!(!licensing_contains("mit AND", "mit"));
+        assert!(!licensing_contains("mit", "AND apache"));
     }
 }

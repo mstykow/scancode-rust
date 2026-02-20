@@ -589,13 +589,13 @@ impl LicenseMatch {
     }
 
     pub fn is_after(&self, other: &LicenseMatch) -> bool {
-        let (self_qstart, self_qend) = self.qspan_bounds();
-        let (other_qstart, other_qend) = other.qspan_bounds();
+        let (self_qstart, _self_qend) = self.qspan_bounds();
+        let (_other_qstart, other_qend) = other.qspan_bounds();
 
         let q_after = self_qstart > other_qend;
 
-        let (self_istart, self_iend) = self.ispan_bounds();
-        let (other_istart, other_iend) = other.ispan_bounds();
+        let (self_istart, _self_iend) = self.ispan_bounds();
+        let (_other_istart, other_iend) = other.ispan_bounds();
 
         let i_after = self_istart > other_iend;
 
@@ -609,11 +609,7 @@ impl LicenseMatch {
         let overlap_start = self_start.max(other_start);
         let overlap_end = self_end.min(other_end);
 
-        if overlap_start < overlap_end {
-            overlap_end - overlap_start
-        } else {
-            0
-        }
+        overlap_end.saturating_sub(overlap_start)
     }
 }
 

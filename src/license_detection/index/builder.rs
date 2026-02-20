@@ -24,6 +24,7 @@ use crate::license_detection::rules::thresholds::{
 use crate::license_detection::tokenize::{parse_required_phrase_spans, tokenize_with_stopwords};
 
 const UNKNOWN_NGRAM_LENGTH: usize = 6;
+const LICENSE_TOKEN_STRINGS: &[&str] = &["license", "licence", "licensed"];
 
 fn prepare_rule_text(text: &str) -> String {
     text.lines()
@@ -79,6 +80,8 @@ fn build_rule_from_license(license: &License) -> Option<Rule> {
         min_high_matched_length_unique: 0,
         is_small: false,
         is_tiny: false,
+        starts_with_license: false,
+        ends_with_license: false,
         is_deprecated: license.is_deprecated,
         spdx_license_key: license.spdx_license_key.clone(),
         other_spdx_license_keys: license.other_spdx_license_keys.clone(),
@@ -188,6 +191,11 @@ pub fn build_index(rules: Vec<Rule>, licenses: Vec<License>) -> LicenseIndex {
     let mut dictionary = TokenDictionary::new_with_legalese(&legalese_words);
     let len_legalese = dictionary.legalese_count();
 
+    let license_token_ids: HashSet<u16> = LICENSE_TOKEN_STRINGS
+        .iter()
+        .filter_map(|&token| dictionary.get(token))
+        .collect();
+
     let mut digit_only_tids = HashSet::new();
     let mut rid_by_hash: HashMap<[u8; 20], usize> = HashMap::new();
     let mut rules_by_rid: Vec<Rule> = Vec::with_capacity(rules.len());
@@ -233,6 +241,15 @@ pub fn build_index(rules: Vec<Rule>, licenses: Vec<License>) -> LicenseIndex {
 
         let rule_length = rule_token_ids.len();
         rule.tokens = rule_token_ids.clone();
+
+        rule.starts_with_license = rule_token_ids
+            .first()
+            .map(|&tid| license_token_ids.contains(&tid))
+            .unwrap_or(false);
+        rule.ends_with_license = rule_token_ids
+            .last()
+            .map(|&tid| license_token_ids.contains(&tid))
+            .unwrap_or(false);
 
         let rule_hash = compute_hash(&rule_token_ids);
 
@@ -425,6 +442,8 @@ mod tests {
             min_high_matched_length_unique: 0,
             is_small: false,
             is_tiny: false,
+            starts_with_license: false,
+            ends_with_license: false,
             is_deprecated: false,
             spdx_license_key: None,
             other_spdx_license_keys: vec![],

@@ -198,7 +198,7 @@ fn merge_overlapping_matches(matches: &[LicenseMatch]) -> Vec<LicenseMatch> {
         }
 
         let rule_length = rule_matches[0].rule_length;
-        let max_rule_side_dist = std::cmp::min(std::cmp::max(rule_length / 2, 1), MAX_DIST);
+        let max_rule_side_dist = (rule_length / 2).clamp(1, MAX_DIST);
 
         let mut rule_matches: Vec<LicenseMatch> =
             rule_matches.iter().map(|m| (*m).clone()).collect();
@@ -2968,8 +2968,8 @@ mod tests {
         // 20 matches, 4 unique licenses
         // Proportion = 4/20 = 0.2 < 1/3, so proportion check fails
         // Fallback uses min_unique_licenses
-        assert!(is_list_of_false_positives(&matches, 15, 3, 1.0/3.0, 0.0));  // 4 >= 3
-        assert!(!is_list_of_false_positives(&matches, 15, 5, 1.0/3.0, 0.0)); // 4 < 5
+        assert!(is_list_of_false_positives(&matches, 15, 3, 1.0 / 3.0, 0.0)); // 4 >= 3
+        assert!(!is_list_of_false_positives(&matches, 15, 5, 1.0 / 3.0, 0.0)); // 4 < 5
     }
 
     #[test]
@@ -3155,8 +3155,8 @@ mod tests {
             min_high_matched_length_unique: 0,
             is_small: false,
             is_tiny: false,
-                starts_with_license: false,
-                ends_with_license: false,
+            starts_with_license: false,
+            ends_with_license: false,
             is_deprecated: false,
             spdx_license_key: None,
             other_spdx_license_keys: vec![],
@@ -3212,8 +3212,8 @@ mod tests {
             min_high_matched_length_unique: 0,
             is_small: true,
             is_tiny: false,
-                starts_with_license: false,
-                ends_with_license: false,
+            starts_with_license: false,
+            ends_with_license: false,
             is_deprecated: false,
             spdx_license_key: None,
             other_spdx_license_keys: vec![],
@@ -3269,8 +3269,8 @@ mod tests {
             min_high_matched_length_unique: 0,
             is_small: true,
             is_tiny: false,
-                starts_with_license: false,
-                ends_with_license: false,
+            starts_with_license: false,
+            ends_with_license: false,
             is_deprecated: false,
             spdx_license_key: None,
             other_spdx_license_keys: vec![],
