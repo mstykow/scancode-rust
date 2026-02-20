@@ -589,13 +589,21 @@ fn default_package_data() -> PackageData {
     }
 }
 
+fn is_git_url(version_str: &str) -> bool {
+    version_str.starts_with("git+")
+        || version_str.starts_with("git://")
+        || version_str.starts_with("github:")
+        || version_str.starts_with("gitlab:")
+        || version_str.starts_with("bitbucket:")
+}
+
 fn parse_alias_adapter(version_str: &str) -> Option<(&str, &str)> {
-    if version_str.contains(':') && version_str.contains('@') {
-        let (aliased_package_part, constraint) = version_str.rsplit_once('@')?;
-        let (_, actual_package_name) = aliased_package_part.rsplit_once(':')?;
-        return Some((actual_package_name, constraint));
+    if !version_str.starts_with("npm:") {
+        return None;
     }
-    None
+    let after_npm = version_str.strip_prefix("npm:")?;
+    let (package_part, constraint) = after_npm.rsplit_once('@')?;
+    Some((package_part, constraint))
 }
 
 fn generate_npm_api_url(
@@ -668,6 +676,22 @@ fn extract_dependency_group(
                             scope: Some(scope.to_string()),
                             is_runtime: Some(is_runtime),
                             is_optional: is_opt,
+                            is_pinned: Some(false),
+                            is_direct: Some(true),
+                            resolved_package: None,
+                            extra_data: None,
+                        });
+                    }
+
+                    if is_git_url(version_str) {
+                        let package_url =
+                            PackageUrl::new(NpmParser::PACKAGE_TYPE.as_str(), name).ok()?;
+                        return Some(Dependency {
+                            purl: Some(package_url.to_string()),
+                            extracted_requirement: Some(version_str.to_string()),
+                            scope: Some(scope.to_string()),
+                            is_runtime: Some(is_runtime),
+                            is_optional: Some(is_optional),
                             is_pinned: Some(false),
                             is_direct: Some(true),
                             resolved_package: None,

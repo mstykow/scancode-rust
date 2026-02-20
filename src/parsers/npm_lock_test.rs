@@ -107,9 +107,12 @@ mod tests {
         // Should have dependencies
         assert!(!package_data.dependencies.is_empty());
 
-        // All dependencies should be pinned
+        // Dependencies with resolved packages should be pinned
+        // Transitive deps from "requires" field have version ranges and are not pinned
         for dep in &package_data.dependencies {
-            assert_eq!(dep.is_pinned, Some(true));
+            if dep.resolved_package.is_some() {
+                assert_eq!(dep.is_pinned, Some(true));
+            }
         }
     }
 
@@ -569,6 +572,202 @@ mod tests {
         assert_eq!(
             direct_count, 2,
             "BUG: Both foo instances are marked is_direct=true. Only root-level should be direct. See CODE_QUALITY_IMPROVEMENTS.md #4"
+        );
+    }
+
+    #[test]
+    fn test_v1_lockfile_requires_field_parsed() {
+        let content = r#"
+        {
+            "name": "test",
+            "version": "1.0.0",
+            "lockfileVersion": 1,
+            "dependencies": {
+                "ws": {
+                    "version": "3.3.3",
+                    "requires": {
+                        "async-limiter": "~1.0.0",
+                        "safe-buffer": "~5.1.0"
+                    }
+                }
+            }
+        }
+        "#;
+
+        let (_temp, path) = create_temp_lock_file(content);
+        let package_data = NpmLockParser::extract_first_package(&path);
+
+        let async_limiter = package_data
+            .dependencies
+            .iter()
+            .find(|d| {
+                d.purl
+                    .as_ref()
+                    .map(|p| p.contains("async-limiter"))
+                    .unwrap_or(false)
+            })
+            .expect("Should have async-limiter from requires field");
+
+        assert_eq!(
+            async_limiter.is_pinned,
+            Some(false),
+            "Version range from requires should have is_pinned=false"
+        );
+        assert_eq!(
+            async_limiter.is_direct,
+            Some(false),
+            "Transitive dependency from requires should have is_direct=false"
+        );
+        assert!(
+            !async_limiter.purl.as_ref().unwrap().contains('~'),
+            "PURL should not contain version range: {:?}",
+            async_limiter.purl
+        );
+        assert_eq!(
+            async_limiter.extracted_requirement,
+            Some("~1.0.0".to_string())
+        );
+    }
+
+    #[test]
+    fn test_v2_lockfile_requires_field_parsed() {
+        let content = r#"
+        {
+            "name": "test",
+            "version": "1.0.0",
+            "lockfileVersion": 2,
+            "packages": {
+                "": {
+                    "name": "test",
+                    "version": "1.0.0"
+                },
+                "node_modules/ws": {
+                    "version": "3.3.3",
+                    "requires": {
+                        "async-limiter": "~1.0.0"
+                    }
+                }
+            }
+        }
+        "#;
+
+        let (_temp, path) = create_temp_lock_file(content);
+        let package_data = NpmLockParser::extract_first_package(&path);
+
+        let async_limiter = package_data
+            .dependencies
+            .iter()
+            .find(|d| {
+                d.purl
+                    .as_ref()
+                    .map(|p| p.contains("async-limiter"))
+                    .unwrap_or(false)
+            })
+            .expect("Should have async-limiter from requires field");
+
+        assert_eq!(
+            async_limiter.is_pinned,
+            Some(false),
+            "Version range from requires should have is_pinned=false"
+        );
+        assert_eq!(
+            async_limiter.is_direct,
+            Some(false),
+            "Transitive dependency from requires should have is_direct=false"
+        );
+        assert_eq!(
+            async_limiter.extracted_requirement,
+            Some("~1.0.0".to_string())
+        );
+    }
+
+    #[test]
+    fn test_version_range_formats_unpinned() {
+        let content = r#"
+        {
+            "name": "test",
+            "version": "1.0.0",
+            "lockfileVersion": 2,
+            "packages": {
+                "": {
+                    "name": "test",
+                    "version": "1.0.0"
+                },
+                "node_modules/parent": {
+                    "version": "1.0.0",
+                    "requires": {
+                        "tilde-dep": "~1.0.0",
+                        "caret-dep": "^2.0.0",
+                        "range-dep": ">=1.0.0 <2.0.0",
+                        "star-dep": "*",
+                        "or-dep": "^1.0.0 || ^2.0.0"
+                    }
+                }
+            }
+        }
+        "#;
+
+        let (_temp, path) = create_temp_lock_file(content);
+        let package_data = NpmLockParser::extract_first_package(&path);
+
+        for dep in &package_data.dependencies {
+            if dep
+                .extracted_requirement
+                .as_ref()
+                .map(|r| {
+                    r.starts_with('~')
+                        || r.starts_with('^')
+                        || r.starts_with('>')
+                        || r.starts_with('*')
+                        || r.contains("||")
+                })
+                .unwrap_or(false)
+            {
+                assert_eq!(
+                    dep.is_pinned,
+                    Some(false),
+                    "Version range {:?} should have is_pinned=false",
+                    dep.extracted_requirement
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_resolved_package_none_for_version_ranges() {
+        let content = r#"
+        {
+            "name": "test",
+            "version": "1.0.0",
+            "lockfileVersion": 1,
+            "dependencies": {
+                "ws": {
+                    "version": "3.3.3",
+                    "requires": {
+                        "async-limiter": "~1.0.0"
+                    }
+                }
+            }
+        }
+        "#;
+
+        let (_temp, path) = create_temp_lock_file(content);
+        let package_data = NpmLockParser::extract_first_package(&path);
+
+        let async_limiter = package_data
+            .dependencies
+            .iter()
+            .find(|d| {
+                d.purl
+                    .as_ref()
+                    .map(|p| p.contains("async-limiter"))
+                    .unwrap_or(false)
+            })
+            .expect("Should have async-limiter from requires field");
+
+        assert!(
+            async_limiter.resolved_package.is_none(),
+            "Version range dependencies should not have resolved_package"
         );
     }
 }

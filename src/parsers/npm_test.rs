@@ -2072,6 +2072,353 @@ mod tests {
     }
 
     #[test]
+    fn test_git_ssh_url_dependency() {
+        let content = r#"
+        {
+          "name": "test-package",
+          "version": "1.0.0",
+          "dependencies": {
+            "private-lib": "git+ssh://git@github.com:org/repo.git#v1.0.0"
+          }
+        }
+        "#;
+
+        let (_temp, path) = create_temp_package_json(content);
+        let package_data = NpmParser::extract_first_package(&path);
+
+        let dep = package_data
+            .dependencies
+            .iter()
+            .find(|d| {
+                d.purl
+                    .as_ref()
+                    .map(|p| p.contains("private-lib"))
+                    .unwrap_or(false)
+            })
+            .expect("Should have private-lib dependency");
+
+        assert!(
+            dep.purl.as_ref().unwrap().contains("private-lib"),
+            "PURL should use the dependency name, not 'git': {:?}",
+            dep.purl
+        );
+        assert!(
+            dep.extracted_requirement
+                .as_ref()
+                .unwrap()
+                .contains("git+ssh")
+        );
+        assert_eq!(dep.is_pinned, Some(false));
+    }
+
+    #[test]
+    fn test_git_https_url_dependency() {
+        let content = r#"
+        {
+          "name": "test-package",
+          "version": "1.0.0",
+          "dependencies": {
+            "my-dep": "git+https://github.com/user/repo.git"
+          }
+        }
+        "#;
+
+        let (_temp, path) = create_temp_package_json(content);
+        let package_data = NpmParser::extract_first_package(&path);
+
+        let dep = package_data
+            .dependencies
+            .iter()
+            .find(|d| {
+                d.purl
+                    .as_ref()
+                    .map(|p| p.contains("my-dep"))
+                    .unwrap_or(false)
+            })
+            .expect("Should have my-dep dependency");
+
+        assert!(
+            dep.purl.as_ref().unwrap().contains("my-dep"),
+            "PURL should use the dependency name: {:?}",
+            dep.purl
+        );
+        assert_eq!(
+            dep.extracted_requirement.as_deref(),
+            Some("git+https://github.com/user/repo.git")
+        );
+        assert_eq!(dep.is_pinned, Some(false));
+    }
+
+    #[test]
+    fn test_git_protocol_url_dependency() {
+        let content = r#"
+        {
+          "name": "test-package",
+          "version": "1.0.0",
+          "dependencies": {
+            "git-dep": "git://github.com/user/repo.git"
+          }
+        }
+        "#;
+
+        let (_temp, path) = create_temp_package_json(content);
+        let package_data = NpmParser::extract_first_package(&path);
+
+        let dep = package_data
+            .dependencies
+            .iter()
+            .find(|d| {
+                d.purl
+                    .as_ref()
+                    .map(|p| p.contains("git-dep"))
+                    .unwrap_or(false)
+            })
+            .expect("Should have git-dep dependency");
+
+        assert!(dep.purl.as_ref().unwrap().contains("git-dep"));
+        assert_eq!(
+            dep.extracted_requirement.as_deref(),
+            Some("git://github.com/user/repo.git")
+        );
+        assert_eq!(dep.is_pinned, Some(false));
+    }
+
+    #[test]
+    fn test_github_shortcut_dependency() {
+        let content = r#"
+        {
+          "name": "test-package",
+          "version": "1.0.0",
+          "dependencies": {
+            "github-dep": "github:user/repo"
+          }
+        }
+        "#;
+
+        let (_temp, path) = create_temp_package_json(content);
+        let package_data = NpmParser::extract_first_package(&path);
+
+        let dep = package_data
+            .dependencies
+            .iter()
+            .find(|d| {
+                d.purl
+                    .as_ref()
+                    .map(|p| p.contains("github-dep"))
+                    .unwrap_or(false)
+            })
+            .expect("Should have github-dep dependency");
+
+        assert!(dep.purl.as_ref().unwrap().contains("github-dep"));
+        assert_eq!(
+            dep.extracted_requirement.as_deref(),
+            Some("github:user/repo")
+        );
+        assert_eq!(dep.is_pinned, Some(false));
+    }
+
+    #[test]
+    fn test_gitlab_shortcut_dependency() {
+        let content = r#"
+        {
+          "name": "test-package",
+          "version": "1.0.0",
+          "dependencies": {
+            "gitlab-dep": "gitlab:user/repo"
+          }
+        }
+        "#;
+
+        let (_temp, path) = create_temp_package_json(content);
+        let package_data = NpmParser::extract_first_package(&path);
+
+        let dep = package_data
+            .dependencies
+            .iter()
+            .find(|d| {
+                d.purl
+                    .as_ref()
+                    .map(|p| p.contains("gitlab-dep"))
+                    .unwrap_or(false)
+            })
+            .expect("Should have gitlab-dep dependency");
+
+        assert!(dep.purl.as_ref().unwrap().contains("gitlab-dep"));
+        assert_eq!(
+            dep.extracted_requirement.as_deref(),
+            Some("gitlab:user/repo")
+        );
+        assert_eq!(dep.is_pinned, Some(false));
+    }
+
+    #[test]
+    fn test_bitbucket_shortcut_dependency() {
+        let content = r#"
+        {
+          "name": "test-package",
+          "version": "1.0.0",
+          "dependencies": {
+            "bitbucket-dep": "bitbucket:user/repo"
+          }
+        }
+        "#;
+
+        let (_temp, path) = create_temp_package_json(content);
+        let package_data = NpmParser::extract_first_package(&path);
+
+        let dep = package_data
+            .dependencies
+            .iter()
+            .find(|d| {
+                d.purl
+                    .as_ref()
+                    .map(|p| p.contains("bitbucket-dep"))
+                    .unwrap_or(false)
+            })
+            .expect("Should have bitbucket-dep dependency");
+
+        assert!(dep.purl.as_ref().unwrap().contains("bitbucket-dep"));
+        assert_eq!(
+            dep.extracted_requirement.as_deref(),
+            Some("bitbucket:user/repo")
+        );
+        assert_eq!(dep.is_pinned, Some(false));
+    }
+
+    #[test]
+    fn test_git_url_with_semver_constraint() {
+        let content = r#"
+        {
+          "name": "test-package",
+          "version": "1.0.0",
+          "dependencies": {
+            "semver-dep": "git+ssh://git@github.com:org/repo.git#semver:^1.0.0"
+          }
+        }
+        "#;
+
+        let (_temp, path) = create_temp_package_json(content);
+        let package_data = NpmParser::extract_first_package(&path);
+
+        let dep = package_data
+            .dependencies
+            .iter()
+            .find(|d| {
+                d.purl
+                    .as_ref()
+                    .map(|p| p.contains("semver-dep"))
+                    .unwrap_or(false)
+            })
+            .expect("Should have semver-dep dependency");
+
+        assert!(dep.purl.as_ref().unwrap().contains("semver-dep"));
+        assert_eq!(dep.is_pinned, Some(false));
+    }
+
+    #[test]
+    fn test_npm_alias_not_confused_with_git() {
+        let content = r#"
+        {
+          "name": "test-package",
+          "version": "1.0.0",
+          "dependencies": {
+            "my-alias": "npm:@scope/package@1.0.0"
+          }
+        }
+        "#;
+
+        let (_temp, path) = create_temp_package_json(content);
+        let package_data = NpmParser::extract_first_package(&path);
+
+        let dep = package_data
+            .dependencies
+            .iter()
+            .find(|d| d.extracted_requirement.as_deref() == Some("npm:@scope/package@1.0.0"))
+            .expect("Should have alias dependency");
+
+        assert!(
+            dep.purl.as_ref().unwrap().contains("@scope/package")
+                || dep.purl.as_ref().unwrap().contains("%40scope%2Fpackage"),
+            "PURL should reference aliased package: {:?}",
+            dep.purl
+        );
+        assert_eq!(
+            dep.extracted_requirement.as_deref(),
+            Some("npm:@scope/package@1.0.0")
+        );
+    }
+
+    #[test]
+    fn test_api_url_scoped_with_version() {
+        let content = r#"
+        {
+          "name": "@babel/core",
+          "version": "7.0.0"
+        }
+        "#;
+
+        let (_temp, path) = create_temp_package_json(content);
+        let package_data = NpmParser::extract_first_package(&path);
+
+        assert_eq!(
+            package_data.api_data_url,
+            Some("https://registry.npmjs.org/@babel%2fcore/7.0.0".to_string())
+        );
+    }
+
+    #[test]
+    fn test_api_url_scoped_without_version() {
+        let content = r#"
+        {
+          "name": "@types/node"
+        }
+        "#;
+
+        let (_temp, path) = create_temp_package_json(content);
+        let package_data = NpmParser::extract_first_package(&path);
+
+        assert_eq!(
+            package_data.api_data_url,
+            Some("https://registry.npmjs.org/@types%2fnode".to_string())
+        );
+    }
+
+    #[test]
+    fn test_api_url_unscoped_with_version() {
+        let content = r#"
+        {
+          "name": "express",
+          "version": "4.17.1"
+        }
+        "#;
+
+        let (_temp, path) = create_temp_package_json(content);
+        let package_data = NpmParser::extract_first_package(&path);
+
+        assert_eq!(
+            package_data.api_data_url,
+            Some("https://registry.npmjs.org/express/4.17.1".to_string())
+        );
+    }
+
+    #[test]
+    fn test_api_url_unscoped_without_version() {
+        let content = r#"
+        {
+          "name": "lodash"
+        }
+        "#;
+
+        let (_temp, path) = create_temp_package_json(content);
+        let package_data = NpmParser::extract_first_package(&path);
+
+        assert_eq!(
+            package_data.api_data_url,
+            Some("https://registry.npmjs.org/lodash".to_string())
+        );
+    }
+
+        #[test]
     fn test_git_url_dependencies() {
         let content = r#"
 {

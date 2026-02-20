@@ -40,6 +40,11 @@ const RPM_DATASOURCE_IDS: &[DatasourceId] = &[
     DatasourceId::RpmInstalledDatabaseSqlite,
 ];
 
+const NPM_DATASOURCE_IDS: &[DatasourceId] = &[
+    DatasourceId::NpmPackageJson,
+    DatasourceId::NpmPackageLockJson,
+];
+
 pub fn resolve_file_references(
     files: &mut [FileInfo],
     packages: &mut [Package],
@@ -112,6 +117,98 @@ pub fn resolve_file_references(
             }
         }
     }
+
+    resolve_node_modules_refs(files, packages);
+}
+
+fn resolve_node_modules_refs(files: &mut [FileInfo], packages: &[Package]) {
+    let mut node_modules_packages: HashMap<String, (usize, String)> = HashMap::new();
+
+    for (idx, file) in files.iter().enumerate() {
+        if is_node_modules_package_json(&file.path)
+            && let Some(pkg_data) = file.package_data.first()
+            && pkg_data.purl.is_some()
+            && let Some(parent_pkg) = find_parent_package_for_node_modules(&file.path, packages)
+        {
+            let pkg_dir = extract_node_modules_package_dir(&file.path);
+            node_modules_packages.insert(pkg_dir, (idx, parent_pkg.package_uid.clone()));
+        }
+    }
+
+    for file in files.iter_mut() {
+        if let Some(pkg_dir) = find_containing_node_modules_package(&file.path)
+            && let Some((_, package_uid)) = node_modules_packages.get(&pkg_dir)
+            && !file.for_packages.contains(package_uid)
+        {
+            file.for_packages.push(package_uid.clone());
+        }
+    }
+}
+
+fn is_node_modules_package_json(path: &str) -> bool {
+    path.ends_with("/package.json") && path.contains("/node_modules/")
+}
+
+fn extract_node_modules_package_dir(path: &str) -> String {
+    if let Some(pos) = path.rfind("/package.json") {
+        return path[..pos].to_string();
+    }
+    path.to_string()
+}
+
+fn find_parent_package_for_node_modules<'a>(
+    node_modules_path: &str,
+    packages: &'a [Package],
+) -> Option<&'a Package> {
+    for package in packages {
+        if !is_npm_package(package) {
+            continue;
+        }
+        for datafile_path in &package.datafile_paths {
+            if let Some(nm_pos) = node_modules_path.find("/node_modules/") {
+                let project_root = &node_modules_path[..nm_pos];
+                if datafile_path.starts_with(project_root)
+                    && !datafile_path.contains("/node_modules/")
+                {
+                    return Some(package);
+                }
+            }
+        }
+    }
+    packages.first()
+}
+
+fn find_containing_node_modules_package(path: &str) -> Option<String> {
+    if let Some(nm_pos) = path.find("/node_modules/") {
+        let after_nm = &path[nm_pos + "/node_modules/".len()..];
+        let package_part = if after_nm.starts_with('@') {
+            let parts: Vec<&str> = after_nm.splitn(3, '/').collect();
+            if parts.len() >= 2 {
+                format!("{}/{}", parts[0], parts[1])
+            } else {
+                after_nm.split('/').next()?.to_string()
+            }
+        } else {
+            after_nm.split('/').next()?.to_string()
+        };
+        return Some(format!(
+            "{}node_modules/{}",
+            &path[..nm_pos + 1],
+            package_part
+        ));
+    }
+    None
+}
+
+fn is_npm_package(package: &Package) -> bool {
+    for &dsid in &package.datasource_ids {
+        for &npm_dsid in NPM_DATASOURCE_IDS {
+            if npm_dsid == dsid {
+                return true;
+            }
+        }
+    }
+    false
 }
 
 fn build_path_index(files: &[FileInfo]) -> HashMap<String, usize> {
@@ -752,6 +849,278 @@ mod tests {
         assert_eq!(
             files[1].for_packages[0],
             "pkg:alpine/test@1.0?uuid=test-uuid"
+        );
+    }
+
+    #[test]
+    fn test_node_modules_files_assigned_to_correct_package() {
+        let mut files = vec![
+            FileInfo {
+                name: "package.json".to_string(),
+                base_name: "package".to_string(),
+                extension: "json".to_string(),
+                path: "project/package.json".to_string(),
+                file_type: FileType::File,
+                mime_type: None,
+                size: 100,
+                date: None,
+                sha1: None,
+                md5: None,
+                sha256: None,
+                programming_language: None,
+                package_data: vec![PackageData {
+                    datasource_id: Some(DatasourceId::NpmPackageJson),
+                    purl: Some("pkg:npm/project@1.0.0".to_string()),
+                    name: Some("project".to_string()),
+                    version: Some("1.0.0".to_string()),
+                    ..Default::default()
+                }],
+                license_expression: None,
+                license_detections: vec![],
+                copyrights: vec![],
+                urls: vec![],
+                for_packages: vec![],
+                scan_errors: vec![],
+            },
+            FileInfo {
+                name: "package.json".to_string(),
+                base_name: "package".to_string(),
+                extension: "json".to_string(),
+                path: "project/node_modules/express/package.json".to_string(),
+                file_type: FileType::File,
+                mime_type: None,
+                size: 100,
+                date: None,
+                sha1: None,
+                md5: None,
+                sha256: None,
+                programming_language: None,
+                package_data: vec![PackageData {
+                    datasource_id: Some(DatasourceId::NpmPackageJson),
+                    purl: Some("pkg:npm/express@4.18.0".to_string()),
+                    name: Some("express".to_string()),
+                    version: Some("4.18.0".to_string()),
+                    ..Default::default()
+                }],
+                license_expression: None,
+                license_detections: vec![],
+                copyrights: vec![],
+                urls: vec![],
+                for_packages: vec![],
+                scan_errors: vec![],
+            },
+            FileInfo {
+                name: "index.js".to_string(),
+                base_name: "index".to_string(),
+                extension: "js".to_string(),
+                path: "project/node_modules/express/index.js".to_string(),
+                file_type: FileType::File,
+                mime_type: None,
+                size: 200,
+                date: None,
+                sha1: None,
+                md5: None,
+                sha256: None,
+                programming_language: None,
+                package_data: vec![],
+                license_expression: None,
+                license_detections: vec![],
+                copyrights: vec![],
+                urls: vec![],
+                for_packages: vec![],
+                scan_errors: vec![],
+            },
+        ];
+
+        let mut packages = vec![Package {
+            package_type: Some(PackageType::Npm),
+            namespace: None,
+            name: Some("project".to_string()),
+            version: Some("1.0.0".to_string()),
+            qualifiers: None,
+            subpath: None,
+            primary_language: None,
+            description: None,
+            release_date: None,
+            parties: vec![],
+            keywords: vec![],
+            homepage_url: None,
+            download_url: None,
+            size: None,
+            sha1: None,
+            md5: None,
+            sha256: None,
+            sha512: None,
+            bug_tracking_url: None,
+            code_view_url: None,
+            vcs_url: None,
+            copyright: None,
+            holder: None,
+            declared_license_expression: None,
+            declared_license_expression_spdx: None,
+            license_detections: vec![],
+            other_license_expression: None,
+            other_license_expression_spdx: None,
+            other_license_detections: vec![],
+            extracted_license_statement: None,
+            notice_text: None,
+            source_packages: vec![],
+            is_private: false,
+            is_virtual: false,
+            extra_data: None,
+            repository_homepage_url: None,
+            repository_download_url: None,
+            api_data_url: None,
+            purl: Some("pkg:npm/project@1.0.0".to_string()),
+            package_uid: "pkg:npm/project@1.0.0?uuid=root-uuid".to_string(),
+            datafile_paths: vec!["project/package.json".to_string()],
+            datasource_ids: vec![DatasourceId::NpmPackageJson],
+        }];
+
+        let mut dependencies = vec![];
+
+        resolve_file_references(&mut files, &mut packages, &mut dependencies);
+
+        assert!(
+            files[2]
+                .for_packages
+                .contains(&"pkg:npm/project@1.0.0?uuid=root-uuid".to_string()),
+            "Files in node_modules should be assigned to parent package UID"
+        );
+    }
+
+    #[test]
+    fn test_node_modules_scoped_packages() {
+        let mut files = vec![
+            FileInfo {
+                name: "package.json".to_string(),
+                base_name: "package".to_string(),
+                extension: "json".to_string(),
+                path: "project/package.json".to_string(),
+                file_type: FileType::File,
+                mime_type: None,
+                size: 100,
+                date: None,
+                sha1: None,
+                md5: None,
+                sha256: None,
+                programming_language: None,
+                package_data: vec![PackageData {
+                    datasource_id: Some(DatasourceId::NpmPackageJson),
+                    purl: Some("pkg:npm/project@1.0.0".to_string()),
+                    name: Some("project".to_string()),
+                    ..Default::default()
+                }],
+                license_expression: None,
+                license_detections: vec![],
+                copyrights: vec![],
+                urls: vec![],
+                for_packages: vec![],
+                scan_errors: vec![],
+            },
+            FileInfo {
+                name: "package.json".to_string(),
+                base_name: "package".to_string(),
+                extension: "json".to_string(),
+                path: "project/node_modules/@types/node/package.json".to_string(),
+                file_type: FileType::File,
+                mime_type: None,
+                size: 100,
+                date: None,
+                sha1: None,
+                md5: None,
+                sha256: None,
+                programming_language: None,
+                package_data: vec![PackageData {
+                    datasource_id: Some(DatasourceId::NpmPackageJson),
+                    purl: Some("pkg:npm/%40types/node@18.0.0".to_string()),
+                    name: Some("@types/node".to_string()),
+                    ..Default::default()
+                }],
+                license_expression: None,
+                license_detections: vec![],
+                copyrights: vec![],
+                urls: vec![],
+                for_packages: vec![],
+                scan_errors: vec![],
+            },
+            FileInfo {
+                name: "index.d.ts".to_string(),
+                base_name: "index".to_string(),
+                extension: "d.ts".to_string(),
+                path: "project/node_modules/@types/node/index.d.ts".to_string(),
+                file_type: FileType::File,
+                mime_type: None,
+                size: 200,
+                date: None,
+                sha1: None,
+                md5: None,
+                sha256: None,
+                programming_language: None,
+                package_data: vec![],
+                license_expression: None,
+                license_detections: vec![],
+                copyrights: vec![],
+                urls: vec![],
+                for_packages: vec![],
+                scan_errors: vec![],
+            },
+        ];
+
+        let mut packages = vec![Package {
+            package_type: Some(PackageType::Npm),
+            namespace: None,
+            name: Some("project".to_string()),
+            version: Some("1.0.0".to_string()),
+            qualifiers: None,
+            subpath: None,
+            primary_language: None,
+            description: None,
+            release_date: None,
+            parties: vec![],
+            keywords: vec![],
+            homepage_url: None,
+            download_url: None,
+            size: None,
+            sha1: None,
+            md5: None,
+            sha256: None,
+            sha512: None,
+            bug_tracking_url: None,
+            code_view_url: None,
+            vcs_url: None,
+            copyright: None,
+            holder: None,
+            declared_license_expression: None,
+            declared_license_expression_spdx: None,
+            license_detections: vec![],
+            other_license_expression: None,
+            other_license_expression_spdx: None,
+            other_license_detections: vec![],
+            extracted_license_statement: None,
+            notice_text: None,
+            source_packages: vec![],
+            is_private: false,
+            is_virtual: false,
+            extra_data: None,
+            repository_homepage_url: None,
+            repository_download_url: None,
+            api_data_url: None,
+            purl: Some("pkg:npm/project@1.0.0".to_string()),
+            package_uid: "pkg:npm/project@1.0.0?uuid=test-uuid".to_string(),
+            datafile_paths: vec!["project/package.json".to_string()],
+            datasource_ids: vec![DatasourceId::NpmPackageJson],
+        }];
+
+        let mut dependencies = vec![];
+
+        resolve_file_references(&mut files, &mut packages, &mut dependencies);
+
+        assert!(
+            files[2]
+                .for_packages
+                .contains(&"pkg:npm/project@1.0.0?uuid=test-uuid".to_string()),
+            "Scoped package files should be assigned to parent package UID"
         );
     }
 }
