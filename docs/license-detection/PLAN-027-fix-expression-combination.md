@@ -1,9 +1,10 @@
 # PLAN-027: Fix Expression Combination Logic
 
 **Date**: 2026-02-20
-**Status**: Partially Implemented
+**Status**: Phase 1 Completed (Differs from Python)
 **Priority**: 4 (Pattern D - ~60 failures in lic1)
 **Related**: PLAN-023-failure-analysis-summary.md
+**Last Updated**: 2026-02-20 (Post-implementation validation)
 
 ## Executive Summary
 
@@ -17,19 +18,52 @@ License expressions are being combined incorrectly in ~60 golden test cases (lic
 
 ## Current Implementation Status
 
-### Already Implemented
+### Completed (Phase 1)
 
 1. **`licensing_contains()` function** (expression.rs:444-506) - Handles expression-based subsumption including WITH expressions.
 
-2. **`licensing_contains_match()` helper** (match_refine.rs:452-457) - Wraps `licensing_contains()` for use in filtering.
+2. **`licensing_contains_match()` helper** (match_refine.rs:476-481) - Wraps `licensing_contains()` for use in filtering.
 
-3. **`filter_overlapping_matches()` uses `licensing_contains_match()`** (match_refine.rs:551-606) - The overlap filtering already includes expression-based subsumption checks.
+3. **`filter_overlapping_matches()` uses `licensing_contains_match()`** (match_refine.rs:483-686) - The overlap filtering already includes expression-based subsumption checks.
 
 4. **Expression rendering is correct** - `expression_to_string_internal()` correctly handles parentheses. Tests verify this.
 
+5. **✅ Expression subsumption in `filter_contained_matches()`** (match_refine.rs:323-377) - **NOW IMPLEMENTED**. The function now uses `licensing_contains_match()` alongside `qcontains()` for containment detection.
+
+### Implementation Details (Phase 1)
+
+The `filter_contained_matches()` function at match_refine.rs:323-377 now includes expression subsumption:
+
+```rust
+if current.qcontains(&next) || licensing_contains_match(&current, &next) {
+    discarded.push(matches.remove(j));
+    continue;
+}
+if next.qcontains(&current) || licensing_contains_match(&next, &current) {
+    discarded.push(matches.remove(i));
+    i = i.saturating_sub(1);
+    break;
+}
+```
+
+### ⚠️ Important: Differs from Python Reference
+
+**Python's `filter_contained_matches()` (match.py:1075-1184) does NOT use expression subsumption.** Python only uses `qcontains()` for token-based containment:
+
+```python
+# Python only uses qcontains:
+if current_match.qcontains(next_match):
+    discarded_append(matches_pop(j))
+    continue
+```
+
+Python's expression subsumption via `licensing_contains()` is ONLY used in `filter_overlapping_matches()` (match.py:1374, 1404, 1424, 1437, 1453, 1468).
+
+**Rust implementation is MORE AGGRESSIVE** - it applies expression subsumption in both `filter_contained_matches()` AND `filter_overlapping_matches()`. This may cause additional filtering compared to Python.
+
 ### NOT Yet Implemented
 
-1. **Expression subsumption in `filter_contained_matches()`** - This function (match_refine.rs:319-353) uses only token-based `qcontains()` and does NOT use `licensing_contains()`.
+1. **Phase 2: Deduplication logic** - Investigation needed for cases where matches at different locations are being merged incorrectly.
 
 ## Problem Analysis
 
@@ -175,50 +209,44 @@ def group_matches(license_matches, lines_threshold=LINES_THRESHOLD):
 
 ## Implementation Plan
 
-### Phase 1: Fix WITH Expression Subsumption in Containment Filtering
+### Phase 1: Fix WITH Expression Subsumption in Containment Filtering ✅ COMPLETED
 
 **File**: `src/license_detection/match_refine.rs`
 
-**Current Code** (`match_refine.rs:319-353`):
+**Status**: Implemented (differs from Python)
+
+**Changes Made**:
+
+1. ✅ Modified `filter_contained_matches()` to use `licensing_contains_match()` alongside `qcontains()`:
 
 ```rust
-fn filter_contained_matches(matches: &[LicenseMatch]) -> (Vec<LicenseMatch>, Vec<LicenseMatch>) {
-    // ... uses qcontains() only ...
+if current.qcontains(&next) || licensing_contains_match(&current, &next) {
+    discarded.push(matches.remove(j));
+    continue;
+}
+if next.qcontains(&current) || licensing_contains_match(&next, &current) {
+    discarded.push(matches.remove(i));
+    i = i.saturating_sub(1);
+    break;
 }
 ```
 
-**Changes**:
+2. ✅ The `licensing_contains_match()` helper already existed at match_refine.rs:476-481.
 
-1. Modify `filter_contained_matches()` to also consider expression subsumption:
+**Implementation Result**:
 
-```rust
-fn filter_contained_matches(matches: &[LicenseMatch]) -> (Vec<LicenseMatch>, Vec<LicenseMatch>) {
-    // ... existing token-based containment ...
-    
-    // Additionally check expression subsumption:
-    // If match A has expression "X WITH Y" and match B has expression "X",
-    // then A subsumes B
-}
-```
+- The implementation is MORE AGGRESSIVE than Python's `filter_contained_matches()`.
+- Python only uses expression subsumption in `filter_overlapping_matches()`, not in `filter_contained_matches()`.
+- This may cause Rust to filter more matches than Python in some cases.
+- Need to run golden tests to verify if this improves or degrades results.
 
-1. Add helper function (already exists as `licensing_contains_match()`):
-
-```rust
-fn expression_subsumes_match(container: &LicenseMatch, contained: &LicenseMatch) -> bool {
-    if container.license_expression.is_empty() || contained.license_expression.is_empty() {
-        return false;
-    }
-    licensing_contains(&container.license_expression, &contained.license_expression)
-}
-```
-
-**Test Cases**:
+**Test Cases to Verify**:
 
 - `gpl-2.0-plus_4.txt` - should not have extra `gpl-2.0-plus` alongside `gpl-2.0-plus AND free-unknown`
 - `gpl-2.0_and_lgpl-2.0-plus.txt` - should not have extra `gpl-2.0-plus`
 - Unit test: `gpl-2.0 WITH exception` should subsume `gpl-2.0`
 
-### Phase 2: Investigate and Fix Deduplication Logic
+### Phase 2: Investigate and Fix Deduplication Logic ⏳ NOT STARTED
 
 **File**: `src/license_detection/match_refine.rs` and `src/license_detection/detection.rs`
 
@@ -319,10 +347,46 @@ cargo test --release -q --lib license_detection::golden_tests
 
 ## Estimated Impact
 
-- Phase 1 (WITH subsumption in filter_contained_matches): ~5-10 tests fixed
-- Phase 2 (Deduplication): ~15-25 tests fixed
+- Phase 1 (WITH subsumption in filter_contained_matches): **IMPLEMENTED** - May be MORE aggressive than Python
+- Phase 2 (Deduplication): ~15-25 tests potentially affected
 
 **Total Estimated Fix**: ~20-35 tests (covering most of Pattern D failures related to expression/match issues)
+
+## Validation Results (2026-02-20)
+
+### What Was Correctly Implemented
+
+1. ✅ **Expression subsumption in `filter_contained_matches()`** - The function now calls `licensing_contains_match()` for both `current → next` and `next → current` containment checks.
+
+2. ✅ **Implementation is consistent** - Uses the same pattern as `filter_overlapping_matches()` for expression subsumption.
+
+3. ✅ **Documentation updated** - Function docstring correctly describes both token-based and expression-based containment.
+
+### Deviations from Plan
+
+1. ⚠️ **Differs from Python** - Python's `filter_contained_matches()` does NOT use `licensing_contains()`. Python only applies expression subsumption in `filter_overlapping_matches()`.
+
+2. ⚠️ **More aggressive filtering** - Rust now applies expression subsumption in TWO places (`filter_contained_matches` AND `filter_overlapping_matches`), while Python only applies it in ONE place (`filter_overlapping_matches`).
+
+### Potential Impact of Deviation
+
+- **Positive**: May correctly filter more cases where WITH expressions should subsume component licenses.
+- **Negative**: May over-filter in cases where Python keeps matches that Rust discards.
+- **Action needed**: Run golden tests to determine if this improves overall pass rate.
+
+### Remaining Work
+
+1. **Run golden tests** to verify Phase 1 impact:
+   ```bash
+   cargo test --release -q --lib license_detection::golden_tests
+   ```
+
+2. **Phase 2: Investigate deduplication** - Some tests still expect multiple matches at different locations:
+   - `gpl-2.0_82.RULE`: Expected 3 matches, Actual 1 match
+   - `gpl-2.0_complex.txt`: Expected 2 matches, Actual 1 match
+   - These may require investigation into the merge logic, not containment filtering.
+
+3. **Consider matching Python exactly** - If golden tests show regressions, consider removing expression subsumption from `filter_contained_matches()` to match Python's behavior exactly.
 
 ## Appendix: What Was Correct in Original Plan
 
@@ -347,9 +411,53 @@ cargo test --release -q --lib license_detection::golden_tests
 ## Appendix: Implementation Changes Since Plan Creation
 
 1. **`licensing_contains()` implemented** - expression.rs:444-506
-2. **`licensing_contains_match()` helper added** - match_refine.rs:452-457
-3. **`filter_overlapping_matches()` now uses expression subsumption** - match_refine.rs:551-606
-4. **Line numbers shifted** - `filter_contained_matches()` is now at match_refine.rs:319-353
+2. **`licensing_contains_match()` helper added** - match_refine.rs:476-481
+3. **`filter_overlapping_matches()` now uses expression subsumption** - match_refine.rs:483-686
+4. **`filter_contained_matches()` now uses expression subsumption** - match_refine.rs:323-377 ✅ NEW
+
+## Appendix: Python Code Reference
+
+### Python's `filter_contained_matches()` (match.py:1075-1184)
+
+**Key point**: Python ONLY uses `qcontains()` for containment, NOT `licensing_contains()`:
+
+```python
+# Python lines 1157-1176 - containment checks only use qcontains:
+if current_match.qcontains(next_match):
+    discarded_append(matches_pop(j))
+    continue
+
+if next_match.qcontains(current_match):
+    discarded_append(matches_pop(i))
+    i -= 1
+    break
+```
+
+### Python's `filter_overlapping_matches()` (match.py:1187-1523)
+
+**Key point**: Python uses `licensing_contains()` for MEDIUM and SMALL overlap cases:
+
+```python
+# Python lines 1374-1377 - MEDIUM overlap with expression subsumption:
+if (current_match.licensing_contains(next_match)
+    and current_match.len() >= next_match.len()
+    and current_match.hilen() >= next_match.hilen()
+):
+    discarded_append(matches_pop(j))
+    continue
+
+# Also at lines: 1404-1407, 1424-1427, 1437-1440, 1451-1456, 1466-1471
+```
+
+### Python's `licensing_contains()` method (match.py:388-392)
+
+Defined on LicenseMatch class, delegates to Rule:
+
+```python
+def licensing_contains(self, other):
+    """Return True if this match licensing contains the other match licensing."""
+    return self.rule.licensing_contains(other.rule)
+```
 
 ## Appendix: Missing Test Coverage
 
