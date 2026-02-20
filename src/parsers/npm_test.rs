@@ -2418,6 +2418,75 @@ mod tests {
         );
     }
 
+    #[test]
+    fn test_npm_workspace_root_without_name_is_virtual() {
+        let content = r#"
+        {
+          "workspaces": ["packages/*"]
+        }
+        "#;
+
+        let (_temp, path) = create_temp_package_json(content);
+        let package_data = NpmParser::extract_first_package(&path);
+
+        assert!(
+            package_data.is_virtual,
+            "Workspace root without name/version should be virtual"
+        );
+    }
+
+    #[test]
+    fn test_npm_workspace_root_with_name_not_virtual() {
+        let content = r#"
+        {
+          "name": "root",
+          "version": "1.0.0",
+          "workspaces": ["packages/*"]
+        }
+        "#;
+
+        let (_temp, path) = create_temp_package_json(content);
+        let package_data = NpmParser::extract_first_package(&path);
+
+        assert!(
+            !package_data.is_virtual,
+            "Workspace root with name/version should NOT be virtual"
+        );
+    }
+
+    #[test]
+    fn test_npm_regular_package_not_virtual() {
+        let content = r#"
+        {
+          "name": "my-app",
+          "version": "1.0.0"
+        }
+        "#;
+
+        let (_temp, path) = create_temp_package_json(content);
+        let package_data = NpmParser::extract_first_package(&path);
+
+        assert!(
+            !package_data.is_virtual,
+            "Regular package should NOT be virtual"
+        );
+    }
+
+    #[test]
+    fn test_npm_no_workspaces_not_virtual() {
+        let content = r#"
+        {
+          "name": "regular-package",
+          "version": "2.0.0"
+        }
+        "#;
+
+        let (_temp, path) = create_temp_package_json(content);
+        let package_data = NpmParser::extract_first_package(&path);
+
+        assert!(!package_data.is_virtual);
+    }
+
         #[test]
     fn test_git_url_dependencies() {
         let content = r#"

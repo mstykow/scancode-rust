@@ -154,6 +154,10 @@ impl PackageParser for NpmParser {
                 }
             });
 
+        let has_workspaces = json.get(FIELD_WORKSPACES).is_some_and(|w| !w.is_null());
+        let has_own_package = name.is_some() && version.is_some();
+        let is_virtual = has_workspaces && !has_own_package;
+
         let api_data_url = generate_npm_api_url(&namespace, &package_name, &version);
         let repository_homepage_url = generate_repository_homepage_url(&package_name);
         let repository_download_url = generate_repository_download_url(&package_name, &version);
@@ -200,7 +204,7 @@ impl PackageParser for NpmParser {
                 .get("private")
                 .and_then(|v| v.as_bool())
                 .unwrap_or(false),
-            is_virtual: false,
+            is_virtual,
             extra_data,
             dependencies: [
                 dependencies,
