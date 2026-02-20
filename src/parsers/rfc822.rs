@@ -38,6 +38,8 @@ pub struct Rfc822Metadata {
     /// Body content after the first blank line separator.
     /// Empty string if no body is present.
     pub body: String,
+    /// Absolute line number where this paragraph starts (1-indexed).
+    pub start_line: usize,
 }
 
 /// Parses RFC822-style metadata content into headers and body.
@@ -113,7 +115,11 @@ pub fn parse_rfc822_content(content: &str) -> Rfc822Metadata {
     let mut body = body_lines.join("\n");
     body = body.trim_end_matches(['\n', '\r']).to_string();
 
-    Rfc822Metadata { headers, body }
+    Rfc822Metadata {
+        headers,
+        body,
+        start_line: 1,
+    }
 }
 
 /// Parses multi-paragraph RFC822-style content (e.g., debian/control, dpkg/status).
@@ -132,27 +138,30 @@ pub fn parse_rfc822_content(content: &str) -> Rfc822Metadata {
 pub fn parse_rfc822_paragraphs(content: &str) -> Vec<Rfc822Metadata> {
     let mut paragraphs = Vec::new();
     let mut current_paragraph = String::new();
+    let mut paragraph_start_line = 1;
+    let mut current_line = 1;
 
     for line in content.lines() {
         if line.is_empty() {
             if !current_paragraph.is_empty() {
-                // Parse the accumulated paragraph as a single-paragraph RFC822
-                // (no body separation - treat entire content as headers)
-                let metadata = parse_paragraph_headers(&current_paragraph);
+                let mut metadata = parse_paragraph_headers(&current_paragraph);
+                metadata.start_line = paragraph_start_line;
                 paragraphs.push(metadata);
                 current_paragraph.clear();
             }
+            paragraph_start_line = current_line + 1;
         } else {
             if !current_paragraph.is_empty() {
                 current_paragraph.push('\n');
             }
             current_paragraph.push_str(line);
         }
+        current_line += 1;
     }
 
-    // Flush last paragraph
     if !current_paragraph.is_empty() {
-        let metadata = parse_paragraph_headers(&current_paragraph);
+        let mut metadata = parse_paragraph_headers(&current_paragraph);
+        metadata.start_line = paragraph_start_line;
         paragraphs.push(metadata);
     }
 
@@ -200,6 +209,7 @@ fn parse_paragraph_headers(content: &str) -> Rfc822Metadata {
     Rfc822Metadata {
         headers,
         body: String::new(),
+        start_line: 1,
     }
 }
 
@@ -647,5 +657,50 @@ Description: easy-to-use client-side URL transfer library
             get_header_first(&paragraphs[2].headers, "multi-arch"),
             Some("same".to_string())
         );
+    }
+
+    // ====== Line number tracking tests (Issue #2643) ======
+
+    #[test]
+    fn test_rfc822_paragraph_absolute_line_numbers() {
+        let content = "Header1: value1\n\nHeader2: value2\nHeader3: value3";
+        let paragraphs = parse_rfc822_paragraphs(content);
+        assert_eq!(paragraphs.len(), 2);
+        assert_eq!(paragraphs[0].start_line, 1);
+        assert_eq!(paragraphs[1].start_line, 3);
+    }
+
+    #[test]
+    fn test_rfc822_paragraph_line_numbers_with_continuation() {
+        let content = "Header1: value1\n continuation\n\nHeader2: value2";
+        let paragraphs = parse_rfc822_paragraphs(content);
+        assert_eq!(paragraphs.len(), 2);
+        assert_eq!(paragraphs[0].start_line, 1);
+        assert_eq!(paragraphs[1].start_line, 4);
+    }
+
+    #[test]
+    fn test_rfc822_paragraph_line_numbers_leading_blank_lines() {
+        let content = "\n\nHeader1: value1";
+        let paragraphs = parse_rfc822_paragraphs(content);
+        assert_eq!(paragraphs.len(), 1);
+        assert_eq!(paragraphs[0].start_line, 3);
+    }
+
+    #[test]
+    fn test_rfc822_single_paragraph() {
+        let content = "Header1: value1";
+        let paragraphs = parse_rfc822_paragraphs(content);
+        assert_eq!(paragraphs.len(), 1);
+        assert_eq!(paragraphs[0].start_line, 1);
+    }
+
+    #[test]
+    fn test_rfc822_multiple_blank_lines_between_paragraphs() {
+        let content = "Header1: value1\n\n\n\nHeader2: value2";
+        let paragraphs = parse_rfc822_paragraphs(content);
+        assert_eq!(paragraphs.len(), 2);
+        assert_eq!(paragraphs[0].start_line, 1);
+        assert_eq!(paragraphs[1].start_line, 5);
     }
 }
