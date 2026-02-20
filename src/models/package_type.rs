@@ -34,8 +34,7 @@ use std::str::FromStr;
 /// assert_eq!(pt.as_ref(), "npm");
 /// assert_eq!(pt.to_string(), "npm");
 /// ```
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum PackageType {
     About,
     Alpine,
@@ -70,9 +69,7 @@ pub enum PackageType {
     Iso,
     Ivy,
     Jar,
-    #[serde(rename = "jboss-service")]
     JbossService,
-    #[serde(rename = "linux-distro")]
     LinuxDistro,
     Maven,
     Meteor,
@@ -82,7 +79,6 @@ pub enum PackageType {
     Nuget,
     Opam,
     Osgi,
-    #[serde(rename = "pnpm-lock")]
     PnpmLock,
     Pubspec,
     Pypi,
@@ -92,8 +88,8 @@ pub enum PackageType {
     Squashfs,
     Swift,
     War,
-    #[serde(rename = "windows-update")]
     WindowsUpdate,
+    Unknown,
 }
 
 impl PackageType {
@@ -155,7 +151,27 @@ impl PackageType {
             Self::Swift => "swift",
             Self::War => "war",
             Self::WindowsUpdate => "windows-update",
+            Self::Unknown => "unknown",
         }
+    }
+}
+
+impl Serialize for PackageType {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+impl<'de> Deserialize<'de> for PackageType {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        Ok(Self::from_str(&s).unwrap())
     }
 }
 
@@ -172,11 +188,66 @@ impl fmt::Display for PackageType {
 }
 
 impl FromStr for PackageType {
-    type Err = String;
+    type Err = std::convert::Infallible;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let json = format!("\"{}\"", s);
-        serde_json::from_str(&json).map_err(|_| format!("unknown package type: {}", s))
+        match s {
+            "about" => Ok(PackageType::About),
+            "alpine" => Ok(PackageType::Alpine),
+            "android" => Ok(PackageType::Android),
+            "android_lib" => Ok(PackageType::AndroidLib),
+            "autotools" => Ok(PackageType::Autotools),
+            "axis2" => Ok(PackageType::Axis2),
+            "bazel" => Ok(PackageType::Bazel),
+            "bower" => Ok(PackageType::Bower),
+            "buck" => Ok(PackageType::Buck),
+            "cab" => Ok(PackageType::Cab),
+            "cargo" => Ok(PackageType::Cargo),
+            "chef" => Ok(PackageType::Chef),
+            "chrome" => Ok(PackageType::Chrome),
+            "cocoapods" => Ok(PackageType::Cocoapods),
+            "composer" => Ok(PackageType::Composer),
+            "conan" => Ok(PackageType::Conan),
+            "conda" => Ok(PackageType::Conda),
+            "cpan" => Ok(PackageType::Cpan),
+            "cran" => Ok(PackageType::Cran),
+            "dart" => Ok(PackageType::Dart),
+            "deb" => Ok(PackageType::Deb),
+            "dmg" => Ok(PackageType::Dmg),
+            "ear" => Ok(PackageType::Ear),
+            "freebsd" => Ok(PackageType::Freebsd),
+            "gem" => Ok(PackageType::Gem),
+            "github" => Ok(PackageType::Github),
+            "golang" => Ok(PackageType::Golang),
+            "haxe" => Ok(PackageType::Haxe),
+            "installshield" => Ok(PackageType::Installshield),
+            "ios" => Ok(PackageType::Ios),
+            "iso" => Ok(PackageType::Iso),
+            "ivy" => Ok(PackageType::Ivy),
+            "jar" => Ok(PackageType::Jar),
+            "jboss-service" => Ok(PackageType::JbossService),
+            "linux-distro" => Ok(PackageType::LinuxDistro),
+            "maven" => Ok(PackageType::Maven),
+            "meteor" => Ok(PackageType::Meteor),
+            "mozilla" => Ok(PackageType::Mozilla),
+            "npm" => Ok(PackageType::Npm),
+            "nsis" => Ok(PackageType::Nsis),
+            "nuget" => Ok(PackageType::Nuget),
+            "opam" => Ok(PackageType::Opam),
+            "osgi" => Ok(PackageType::Osgi),
+            "pnpm-lock" => Ok(PackageType::PnpmLock),
+            "pubspec" => Ok(PackageType::Pubspec),
+            "pypi" => Ok(PackageType::Pypi),
+            "readme" => Ok(PackageType::Readme),
+            "rpm" => Ok(PackageType::Rpm),
+            "shar" => Ok(PackageType::Shar),
+            "squashfs" => Ok(PackageType::Squashfs),
+            "swift" => Ok(PackageType::Swift),
+            "war" => Ok(PackageType::War),
+            "windows-update" => Ok(PackageType::WindowsUpdate),
+            "unknown" => Ok(PackageType::Unknown),
+            _ => Ok(PackageType::Unknown),
+        }
     }
 }
 
@@ -259,5 +330,43 @@ mod tests {
 
         let pt: PackageType = serde_json::from_str(r#""windows-update""#).unwrap();
         assert_eq!(pt, PackageType::WindowsUpdate);
+    }
+
+    #[test]
+    fn test_unknown_type_from_str_never_fails() {
+        let pt = PackageType::from_str("nonexistent_type").unwrap();
+        assert_eq!(pt, PackageType::Unknown);
+
+        let pt = PackageType::from_str("").unwrap();
+        assert_eq!(pt, PackageType::Unknown);
+    }
+
+    #[test]
+    fn test_unknown_type_serializes_correctly() {
+        assert_eq!(PackageType::Unknown.as_str(), "unknown");
+
+        let json = serde_json::to_string(&PackageType::Unknown).unwrap();
+        assert_eq!(json, r#""unknown""#);
+
+        let pt: PackageType = serde_json::from_str(r#""unknown""#).unwrap();
+        assert_eq!(pt, PackageType::Unknown);
+    }
+
+    #[test]
+    fn test_unknown_type_deserialization() {
+        let pt: PackageType = serde_json::from_str(r#""nonexistent_type""#).unwrap();
+        assert_eq!(pt, PackageType::Unknown);
+    }
+
+    #[test]
+    fn test_known_types_still_work() {
+        let pt = PackageType::from_str("npm").unwrap();
+        assert_eq!(pt, PackageType::Npm);
+
+        let pt = PackageType::from_str("cargo").unwrap();
+        assert_eq!(pt, PackageType::Cargo);
+
+        let pt = PackageType::from_str("pypi").unwrap();
+        assert_eq!(pt, PackageType::Pypi);
     }
 }
