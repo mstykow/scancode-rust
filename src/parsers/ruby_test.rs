@@ -1956,4 +1956,202 @@ platform: ruby
         assert_eq!(rspec.scope, Some("development".to_string()));
         assert_eq!(rspec.is_runtime, Some(false));
     }
+
+    // ==========================================================================
+    // Bug #2513: Multiple .freeze suffix stripping
+    // ==========================================================================
+    #[test]
+    fn test_strip_freeze_suffix_multiple() {
+        assert_eq!(strip_freeze_suffix("name"), "name");
+        assert_eq!(strip_freeze_suffix("name.freeze"), "name");
+        assert_eq!(strip_freeze_suffix("name.freeze.freeze"), "name");
+        assert_eq!(strip_freeze_suffix("name.freeze.freeze.freeze"), "name");
+        assert_eq!(strip_freeze_suffix("freeze.value"), "freeze.value");
+        assert_eq!(
+            strip_freeze_suffix("some.freeze.value"),
+            "some.freeze.value"
+        );
+    }
+
+    #[test]
+    fn test_extract_ruby_array_with_multiple_freeze() {
+        use crate::parsers::ruby::extract_ruby_array;
+        let result = extract_ruby_array("[\"MIT\".freeze.freeze, \"BSD-2-Clause\".freeze]");
+        assert_eq!(result, vec!["MIT", "BSD-2-Clause"]);
+    }
+
+    // ==========================================================================
+    // Bug #2781: GIT dependency vcs_url in extra_data
+    // ==========================================================================
+    #[test]
+    fn test_git_dependency_vcs_url_in_extra_data() {
+        let lockfile_path = PathBuf::from("testdata/ruby/Gemfile_with_git");
+        let package_data = GemfileLockParser::extract_first_package(&lockfile_path);
+
+        let git_gem = package_data
+            .dependencies
+            .iter()
+            .find(|d| d.purl.as_ref().is_some_and(|p| p.contains("my-git-gem")));
+
+        assert!(git_gem.is_some(), "Should find GIT gem");
+        let gem = git_gem.unwrap();
+
+        assert!(gem.extra_data.is_some(), "GIT gem should have extra_data");
+        let extra = gem.extra_data.as_ref().unwrap();
+
+        assert_eq!(
+            extra.get("source_type").and_then(|v| v.as_str()),
+            Some("GIT"),
+            "source_type should be GIT"
+        );
+
+        assert!(
+            extra.get("vcs_url").is_some(),
+            "GIT gem should have vcs_url in extra_data"
+        );
+
+        let vcs_url = extra.get("vcs_url").and_then(|v| v.as_str()).unwrap();
+        assert!(
+            vcs_url.starts_with("git+"),
+            "vcs_url should start with git+"
+        );
+        assert!(
+            vcs_url.contains("abc123def456789"),
+            "vcs_url should contain revision"
+        );
+    }
+
+    #[test]
+    fn test_build_git_vcs_url_normalization() {
+        use crate::parsers::ruby::GemInfo;
+        use crate::parsers::ruby::build_git_vcs_url;
+
+        let gem = GemInfo {
+            name: "test".to_string(),
+            gem_type: "GIT".to_string(),
+            remote: Some("git@github.com:user/repo.git".to_string()),
+            revision: Some("abc123".to_string()),
+            ..Default::default()
+        };
+        let vcs_url = build_git_vcs_url(&gem);
+        assert_eq!(
+            vcs_url,
+            Some("git+https://github.com/user/repo.git@abc123".to_string())
+        );
+
+        let gem2 = GemInfo {
+            name: "test".to_string(),
+            gem_type: "GIT".to_string(),
+            remote: Some("git://github.com/user/repo.git".to_string()),
+            revision: Some("def456".to_string()),
+            ..Default::default()
+        };
+        let vcs_url2 = build_git_vcs_url(&gem2);
+        assert_eq!(
+            vcs_url2,
+            Some("git+https://github.com/user/repo.git@def456".to_string())
+        );
+
+        let gem3 = GemInfo {
+            name: "test".to_string(),
+            gem_type: "GIT".to_string(),
+            remote: Some("https://github.com/user/repo.git".to_string()),
+            revision: Some("ghi789".to_string()),
+            ..Default::default()
+        };
+        let vcs_url3 = build_git_vcs_url(&gem3);
+        assert_eq!(
+            vcs_url3,
+            Some("git+https://github.com/user/repo.git@ghi789".to_string())
+        );
+    }
+
+    // ==========================================================================
+    // Bug #3088: is_valid_gem_name validation
+    // ==========================================================================
+    #[test]
+    fn test_is_valid_gem_name() {
+        use crate::parsers::ruby::is_valid_gem_name;
+
+        assert!(is_valid_gem_name("rails"));
+        assert!(is_valid_gem_name("active-support"));
+        assert!(is_valid_gem_name("json"));
+        assert!(is_valid_gem_name("net-http"));
+        assert!(is_valid_gem_name("rack.test"));
+        assert!(is_valid_gem_name("a"));
+        assert!(is_valid_gem_name("A"));
+
+        assert!(!is_valid_gem_name(""));
+        assert!(!is_valid_gem_name("this is prose"));
+        assert!(!is_valid_gem_name("This is a description"));
+        assert!(!is_valid_gem_name("-invalid-start"));
+        assert!(!is_valid_gem_name("_invalid-start"));
+        assert!(!is_valid_gem_name(&"a".repeat(101)));
+        assert!(!is_valid_gem_name("name with spaces"));
+    }
+
+    #[test]
+    fn test_gemspec_description_not_parsed_as_dependency() {
+        use crate::parsers::ruby::GemspecParser;
+        let content = r#"
+Gem::Specification.new do |spec|
+  spec.name = "test-gem"
+  spec.description = "This adapter provides an implementation of something"
+  spec.add_dependency "rails", "~> 7.0"
+end
+"#;
+        let (_temp_dir, gemspec_path) = create_temp_gemspec(content);
+
+        let package_data = GemspecParser::extract_first_package(&gemspec_path);
+
+        assert_eq!(
+            package_data.dependencies.len(),
+            1,
+            "Should have exactly 1 dependency, got {:?}",
+            package_data
+                .dependencies
+                .iter()
+                .map(|d| &d.purl)
+                .collect::<Vec<_>>()
+        );
+        assert!(
+            package_data.dependencies[0]
+                .purl
+                .as_ref()
+                .unwrap()
+                .contains("rails")
+        );
+    }
+
+    #[test]
+    fn test_gemspec_description_edge_case_from_file() {
+        use crate::parsers::ruby::GemspecParser;
+        let gemspec_path = PathBuf::from("testdata/ruby/description_edge_case.gemspec");
+        let package_data = GemspecParser::extract_first_package(&gemspec_path);
+
+        assert_eq!(
+            package_data.name,
+            Some("logstash-mixin-ecs_compatibility_support".to_string())
+        );
+        assert_eq!(package_data.version, Some("1.0.0".to_string()));
+
+        // Should have exactly 1 dependency (logstash-core), NOT the description text
+        assert_eq!(
+            package_data.dependencies.len(),
+            1,
+            "Should have exactly 1 dependency, got {:?}",
+            package_data
+                .dependencies
+                .iter()
+                .map(|d| &d.purl)
+                .collect::<Vec<_>>()
+        );
+        assert!(
+            package_data.dependencies[0]
+                .purl
+                .as_ref()
+                .unwrap()
+                .contains("logstash-core")
+        );
+    }
 }
