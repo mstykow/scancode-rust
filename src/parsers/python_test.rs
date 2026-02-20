@@ -1306,4 +1306,97 @@ setup(
         const { assert!(MAX_FILE_SIZE < MAX_ARCHIVE_SIZE) };
         const { assert!(MAX_COMPRESSION_RATIO > 1.0) };
     }
+
+    #[test]
+    fn test_is_requirement_pinned_exact_version() {
+        assert!(crate::parsers::python::is_requirement_pinned("foo==1.0.0"));
+        assert!(crate::parsers::python::is_requirement_pinned("foo===1.0.0"));
+        assert!(crate::parsers::python::is_requirement_pinned(
+            "foo==1.0.0rc1"
+        ));
+    }
+
+    #[test]
+    fn test_is_requirement_pinned_wildcard_not_pinned() {
+        assert!(!crate::parsers::python::is_requirement_pinned("foo==1.0.*"));
+        assert!(!crate::parsers::python::is_requirement_pinned(
+            "foo==0.19.*"
+        ));
+    }
+
+    #[test]
+    fn test_is_requirement_pinned_range_not_pinned() {
+        assert!(!crate::parsers::python::is_requirement_pinned("foo>=1.0.0"));
+        assert!(!crate::parsers::python::is_requirement_pinned(
+            "foo>=1.0.0,<2.0.0"
+        ));
+        assert!(!crate::parsers::python::is_requirement_pinned("foo~=1.0.0"));
+        assert!(!crate::parsers::python::is_requirement_pinned("foo!=1.0.0"));
+    }
+
+    #[test]
+    fn test_is_requirement_pinned_no_version_not_pinned() {
+        assert!(!crate::parsers::python::is_requirement_pinned("foo"));
+        assert!(!crate::parsers::python::is_requirement_pinned("foo[extra]"));
+    }
+
+    #[test]
+    fn test_is_requirement_pinned_with_markers() {
+        assert!(crate::parsers::python::is_requirement_pinned(
+            "foo==1.0.0; python_version >= '3.8'"
+        ));
+        assert!(!crate::parsers::python::is_requirement_pinned(
+            "foo>=1.0.0; sys_platform == 'win32'"
+        ));
+    }
+
+    #[test]
+    fn test_setup_cfg_dependency_is_pinned_computed() {
+        let content = r#"
+[metadata]
+name = test-package
+version = 1.0.0
+
+[options]
+install_requires =
+    requests==2.28.0
+    pytest>=7.0.0
+    Flask
+"#;
+        let (_temp_dir, file_path) = create_temp_file(content, "setup.cfg");
+        let package_data = PythonParser::extract_first_package(&file_path);
+
+        let deps: Vec<_> = package_data.dependencies.iter().collect();
+        assert_eq!(deps.len(), 3);
+
+        let requests_dep = deps
+            .iter()
+            .find(|d| d.purl.as_ref().unwrap().contains("requests"))
+            .unwrap();
+        assert_eq!(
+            requests_dep.is_pinned,
+            Some(true),
+            "requests==2.28.0 should be pinned"
+        );
+
+        let pytest_dep = deps
+            .iter()
+            .find(|d| d.purl.as_ref().unwrap().contains("pytest"))
+            .unwrap();
+        assert_eq!(
+            pytest_dep.is_pinned,
+            Some(false),
+            "pytest>=7.0.0 should not be pinned"
+        );
+
+        let flask_dep = deps
+            .iter()
+            .find(|d| d.purl.as_ref().unwrap().contains("flask"))
+            .unwrap();
+        assert_eq!(
+            flask_dep.is_pinned,
+            Some(false),
+            "Flask without version should not be pinned"
+        );
+    }
 }
