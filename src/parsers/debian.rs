@@ -30,16 +30,21 @@
 //! - Multi-paragraph records separated by blank lines
 //! - Graceful error handling with `warn!()` logs
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
 use log::warn;
 use packageurl::PackageUrl;
 use regex::Regex;
 
-use crate::models::{DatasourceId, Dependency, FileReference, PackageData, PackageType, Party};
+use crate::askalono::{ScanStrategy, TextData};
+use crate::models::{
+    DatasourceId, Dependency, FileReference, LicenseDetection, Match, PackageData, PackageType,
+    Party,
+};
 use crate::parsers::rfc822::{self, Rfc822Metadata};
 use crate::parsers::utils::{read_file_to_string, split_name_email};
+use crate::utils::spdx::get_license_store;
 
 use super::PackageParser;
 
@@ -1265,7 +1270,7 @@ fn extract_package_name_from_path(path: &Path) -> Option<String> {
     None
 }
 
-fn parse_copyright_file(content: &str, package_name: Option<&str>) -> PackageData {
+pub(crate) fn parse_copyright_file(content: &str, package_name: Option<&str>) -> PackageData {
     let paragraphs = rfc822::parse_rfc822_paragraphs(content);
 
     let is_dep5 = paragraphs
@@ -1276,6 +1281,8 @@ fn parse_copyright_file(content: &str, package_name: Option<&str>) -> PackageDat
     let namespace = Some("debian".to_string());
     let mut parties = Vec::new();
     let mut license_statements = Vec::new();
+    let mut seen_license_symbols = HashSet::new();
+    let mut license_detections = Vec::new();
 
     if is_dep5 {
         for para in &paragraphs {
@@ -1296,12 +1303,24 @@ fn parse_copyright_file(content: &str, package_name: Option<&str>) -> PackageDat
                 }
             }
 
-            if let Some(license) = rfc822::get_header_first(&para.headers, "license") {
-                let license_name = license.lines().next().unwrap_or(&license).trim();
+            if let Some(license_text) = rfc822::get_header_first(&para.headers, "license") {
+                let license_name = license_text.lines().next().unwrap_or(&license_text).trim();
+
                 if !license_name.is_empty()
-                    && !license_statements.contains(&license_name.to_string())
+                    && seen_license_symbols.insert(license_name.to_lowercase())
                 {
                     license_statements.push(license_name.to_string());
+                }
+
+                let license_body: String =
+                    license_text.lines().skip(1).collect::<Vec<_>>().join("\n");
+                let trimmed_body = license_body.trim();
+
+                if trimmed_body.len() > 50
+                    && let Some(detection) =
+                        detect_license_in_copyright_paragraph(trimmed_body, para.start_line + 1)
+                {
+                    license_detections.push(detection);
                 }
             }
         }
@@ -1326,7 +1345,10 @@ fn parse_copyright_file(content: &str, package_name: Option<&str>) -> PackageDat
 
         let license_block = extract_unstructured_field(content, "License:");
         if let Some(text) = license_block {
-            license_statements.push(text.lines().next().unwrap_or(&text).trim().to_string());
+            let license_name = text.lines().next().unwrap_or(&text).trim();
+            if !license_name.is_empty() {
+                license_statements.push(license_name.to_string());
+            }
         }
     }
 
@@ -1342,10 +1364,45 @@ fn parse_copyright_file(content: &str, package_name: Option<&str>) -> PackageDat
         namespace: namespace.clone(),
         name: package_name.map(|s| s.to_string()),
         parties,
+        license_detections,
         extracted_license_statement,
         purl: package_name.and_then(|n| build_debian_purl(n, None, namespace.as_deref(), None)),
         ..Default::default()
     }
+}
+
+fn detect_license_in_copyright_paragraph(
+    text: &str,
+    start_line: usize,
+) -> Option<LicenseDetection> {
+    let store = get_license_store();
+    let strategy = ScanStrategy::new(store).confidence_threshold(0.9);
+
+    let result = strategy.scan(&TextData::from(text)).ok()?;
+    let license = result.license?;
+
+    let line_count = text.lines().count().max(1);
+
+    Some(LicenseDetection {
+        license_expression: license.name.to_lowercase(),
+        license_expression_spdx: license.name.to_string(),
+        matches: vec![Match {
+            license_expression: license.name.to_lowercase(),
+            license_expression_spdx: license.name.to_string(),
+            from_file: None,
+            start_line,
+            end_line: start_line + line_count - 1,
+            score: result.score as f64,
+            matcher: Some("2-aho".to_string()),
+            matched_length: None,
+            match_coverage: None,
+            rule_relevance: None,
+            rule_identifier: None,
+            rule_url: None,
+            matched_text: Some(text.to_string()),
+        }],
+        identifier: None,
+    })
 }
 
 fn parse_copyright_holders(text: &str) -> Vec<String> {

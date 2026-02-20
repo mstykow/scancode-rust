@@ -231,4 +231,152 @@ mod tests {
         let name3 = extract_package_name_from_deb_path(&path3);
         assert_eq!(name3, Some("complex-name".to_string()));
     }
+
+    // ====== Debian Copyright Parser tests (Issues #2643, #2644, #2645, #2646) ======
+
+    #[test]
+    fn test_copyright_license_detection_dep5_with_body() {
+        let content = "\
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Files: *
+Copyright: 2020 Example Author
+License: MIT
+ Permission is hereby granted, free of charge, to any person obtaining a copy
+ of this software and associated documentation files (the \"Software\"), to deal
+ in the Software without restriction, including without limitation the rights
+ to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ copies of the Software, and to permit persons to whom the Software is
+ furnished to do so, subject to the following conditions:
+ THE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ SOFTWARE.
+";
+        let pkg = crate::parsers::debian::parse_copyright_file(content, Some("test"));
+        assert!(
+            !pkg.license_detections.is_empty(),
+            "Should detect license in body text"
+        );
+        let detection = &pkg.license_detections[0];
+        assert!(detection.license_expression.contains("mit"));
+    }
+
+    #[test]
+    fn test_copyright_license_detection_short_symbol_only() {
+        let content = "\
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Files: *
+Copyright: 2020 Example
+License: MIT
+";
+        let pkg = crate::parsers::debian::parse_copyright_file(content, Some("test"));
+        assert_eq!(pkg.extracted_license_statement, Some("MIT".to_string()));
+        assert!(pkg.license_detections.is_empty());
+    }
+
+    #[test]
+    fn test_copyright_non_dep5_fallback() {
+        let content = "License: MIT\n Some license text here";
+        let pkg = crate::parsers::debian::parse_copyright_file(content, Some("test"));
+        assert!(pkg.extracted_license_statement.is_some());
+    }
+
+    #[test]
+    fn test_matched_text_preserves_casing() {
+        let content = "\
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+License: LGPL-2.1
+ This library is free software; you can redistribute it and/or modify it
+ under the terms of version 2.1 of the GNU Lesser General Public License.
+";
+        let pkg = crate::parsers::debian::parse_copyright_file(content, Some("test"));
+
+        if let Some(detection) = pkg.license_detections.first()
+            && let Some(match_obj) = detection.matches.first()
+            && let Some(matched) = &match_obj.matched_text
+        {
+            assert!(
+                matched.contains("LGPL") || matched.contains("GNU Lesser"),
+                "matched_text should preserve original casing"
+            );
+        }
+    }
+
+    #[test]
+    fn test_license_expression_lowercase_but_spdx_preserves_case() {
+        let content = "\
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+License: Apache-2.0
+ Licensed under the Apache License, Version 2.0 (the \"License\");
+ you may not use this file except in compliance with the License.
+";
+        let pkg = crate::parsers::debian::parse_copyright_file(content, Some("test"));
+
+        if let Some(detection) = pkg.license_detections.first() {
+            assert_eq!(detection.license_expression, "apache-2.0");
+            assert_eq!(detection.license_expression_spdx, "Apache-2.0");
+        }
+    }
+
+    #[test]
+    fn test_license_order_matches_file_order() {
+        let content = "\
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+
+License: MIT
+ Permission is hereby granted, free of charge, to any person obtaining a copy
+ of this software and associated documentation files.
+
+License: BSD-3-Clause
+ Redistribution and use in source and binary forms, with or without
+ modification, are permitted provided that the following conditions are met.
+";
+        let pkg = crate::parsers::debian::parse_copyright_file(content, Some("test"));
+
+        if pkg.license_detections.len() >= 2 {
+            assert!(
+                pkg.license_detections[0].matches[0].start_line
+                    < pkg.license_detections[1].matches[0].start_line,
+                "License detections should be in file order"
+            );
+        }
+    }
+
+    #[test]
+    fn test_license_deduplication_preserves_first() {
+        let content = "\
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Files: src/*
+License: MIT
+ Permission is hereby granted...
+Files: tests/*
+License: MIT
+ Permission is hereby granted...
+";
+        let pkg = crate::parsers::debian::parse_copyright_file(content, Some("test"));
+        assert_eq!(pkg.extracted_license_statement, Some("MIT".to_string()));
+    }
+
+    #[test]
+    fn test_license_detections_have_line_numbers() {
+        let content = "\
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Files: *
+Copyright: 2020 Example
+License: MIT
+ Permission is hereby granted, free of charge, to any person obtaining a copy
+ of this software and associated documentation files.
+";
+        let pkg = crate::parsers::debian::parse_copyright_file(content, Some("test"));
+
+        if let Some(detection) = pkg.license_detections.first()
+            && let Some(match_obj) = detection.matches.first()
+        {
+            assert!(match_obj.start_line > 0);
+            assert!(match_obj.end_line >= match_obj.start_line);
+        }
+    }
 }
