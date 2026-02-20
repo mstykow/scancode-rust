@@ -141,6 +141,10 @@ fn parse_alpine_package_paragraph(
     let homepage_url = get_first(headers, "U");
     let architecture = get_first(headers, "A");
 
+    let is_virtual = description
+        .as_ref()
+        .is_some_and(|d| d == "virtual meta package");
+
     let namespace = Some("alpine".to_string());
     let mut parties = Vec::new();
 
@@ -188,6 +192,10 @@ fn parse_alpine_package_paragraph(
     }
 
     let mut extra_data = HashMap::new();
+
+    if is_virtual {
+        extra_data.insert("is_virtual".to_string(), true.into());
+    }
 
     if let Some(checksum) = get_first(headers, "C") {
         extra_data.insert("checksum".to_string(), checksum.into());
@@ -791,6 +799,35 @@ p:so:libtest.so.1
         )));
         assert!(!AlpineApkParser::is_match(&PathBuf::from("package.tar.gz")));
         assert!(!AlpineApkParser::is_match(&PathBuf::from("installed")));
+    }
+
+    #[test]
+    fn test_parse_alpine_virtual_package() {
+        let content = "P:.postgis-rundeps
+V:20210104.190748
+A:noarch
+S:0
+I:0
+T:virtual meta package
+U:
+L:
+D:json-c geos gdal proj protobuf-c libstdc++
+
+";
+        let (_dir, path) = create_temp_installed_db(content);
+        let pkg = AlpineInstalledParser::extract_first_package(&path);
+        assert_eq!(pkg.name, Some(".postgis-rundeps".to_string()));
+        assert_eq!(pkg.version, Some("20210104.190748".to_string()));
+        assert_eq!(pkg.description, Some("virtual meta package".to_string()));
+        assert!(pkg.extra_data.is_some());
+        let extra = pkg.extra_data.as_ref().unwrap();
+        assert_eq!(
+            extra.get("is_virtual").and_then(|v| v.as_bool()),
+            Some(true)
+        );
+        assert_eq!(pkg.dependencies.len(), 6);
+        assert!(pkg.homepage_url.is_none());
+        assert!(pkg.extracted_license_statement.is_none());
     }
 }
 
