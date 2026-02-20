@@ -22,10 +22,12 @@
 **Description**: Rust produces fewer OR more license detections than Python expects.
 
 **Sub-patterns**:
+
 - **Fewer detections** (10 cases): Rust merges/combines matches that Python keeps separate
 - **More detections** (12 cases): Rust produces duplicate expressions Python doesn't
 
 **Examples**:
+
 | File | Expected | Actual | Issue |
 |------|----------|--------|-------|
 | `gpl-2.0-plus_and_gpl-2.0-plus.txt` | 2× gpl-2.0-plus | 1× gpl-2.0-plus | Merged identical matches |
@@ -37,6 +39,7 @@
 **Root Cause**: `merge_overlapping_matches()` and `filter_contained_matches()` logic differs from Python. Python's `merge_matches()` uses `qdistance_to()` and `idistance_to()` with `max_rule_side_dist` to control merge distance, while Rust merges more aggressively based on token overlap only.
 
 **Code Locations**:
+
 - `src/license_detection/match_refine.rs:128-229` - `merge_overlapping_matches()`
 - `reference/scancode-toolkit/src/licensedcode/match.py:869-1068` - Python `merge_matches()`
 
@@ -49,6 +52,7 @@
 **Description**: Rust produces no license detection where Python finds one.
 
 **Examples**:
+
 | File | Expected | Actual |
 |------|----------|--------|
 | `isc_only.txt` | isc | (empty) |
@@ -58,6 +62,7 @@
 | `proprietary_9.txt` | proprietary-license | (empty) |
 
 **Root Cause Analysis**:
+
 - `isc_only.txt`: Contains only "Copyright: ISC" in an RPM spec file - Python detects ISC license from this reference
 - `warranty-disclaimer_1.txt`: Contains a short Microsoft warranty disclaimer - Python detects it, Rust doesn't
 - `lgpl_21.txt`: Contains just "lgpl" text - Python detects lgpl-2.0-plus, Rust doesn't
@@ -65,6 +70,7 @@
 **Root Cause**: License tag/reference detection differs. Python has rules that match short license references like "ISC", "lgpl" alone, while Rust may filter these as too short or not match them at all.
 
 **Code Locations**:
+
 - `src/license_detection/aho_match.rs` - Aho-Corasick matching
 - `src/license_detection/match_refine.rs:62-84` - `filter_too_short_matches()`
 - License rules in `resources/licenses/rules/`
@@ -78,6 +84,7 @@
 **Description**: Rust detects a different license expression than Python expects.
 
 **Examples**:
+
 | File | Expected | Actual | Issue |
 |------|----------|--------|-------|
 | `airo.c` | gpl-2.0 OR bsd-new | unknown-license-reference, unknown-license-reference | No detection |
@@ -86,21 +93,25 @@
 | `zip_not_gpl.c` | warranty-disclaimer | proprietary-license | Wrong license |
 
 **Root Cause Analysis**:
+
 - `airo.c`: Text says "released under both GPL version 2 and BSD licenses" but Rust can't parse this dual-license pattern
 - `openjdk-assembly-exception.html`: Rust combines openjdk-exception with gpl-2.0 differently than Python
 - RTF/PDF files: Text extraction or preprocessing may differ
 
-**Root Cause**: 
+**Root Cause**:
+
 1. Dual-license text parsing ("both X and Y" → "X OR Y") not implemented
 2. Exception combination logic differs
 3. RTF/PDF text extraction may be missing or different
 
 **Code Locations**:
+
 - `src/license_detection/expression.rs` - Expression combination
 - `src/license_detection/detection.rs` - Detection assembly
 - Text extraction for RTF/PDF
 
-**Recommendation**: 
+**Recommendation**:
+
 1. Add handling for "both X and Y" dual-license patterns
 2. Compare openjdk-exception rule handling between Python and Rust
 
@@ -111,6 +122,7 @@
 **Description**: Rust produces extra "unknown-license-reference" or "warranty-disclaimer" detections not in Python output.
 
 **Examples**:
+
 | File | Expected | Actual |
 |------|----------|--------|
 | `gpl-2.0-plus_and_gfdl-1.1_debian.txt` | gpl-2.0-plus, gfdl-1.1-plus | gpl-2.0-plus, unknown-license-reference, gfdl-1.1-plus |
@@ -120,6 +132,7 @@
 **Root Cause**: Rust's unknown license matching and warranty-disclaimer detection is more aggressive than Python's, producing matches that Python filters out.
 
 **Code Locations**:
+
 - `src/license_detection/unknown_match.rs` - Unknown license matching
 - `src/license_detection/match_refine.rs:42-60` - `filter_invalid_contained_unknown_matches()`
 
@@ -132,6 +145,7 @@
 **Description**: License expression rendered with different parentheses.
 
 **Example**:
+
 | File | Expected | Actual |
 |------|----------|--------|
 | `plantuml_license_notice.txt` | mit OR apache-2.0 OR epl-2.0 OR lgpl-3.0-plus OR gpl-3.0-plus | (mit OR apache-2.0 OR epl-2.0 OR lgpl-3.0-plus OR gpl-3.0-plus) |
@@ -139,6 +153,7 @@
 **Root Cause**: Rust adds outer parentheses to OR expressions when they shouldn't be there. PLAN-012 fixed this for WITH expressions but OR expressions in certain contexts still get wrapped.
 
 **Code Locations**:
+
 - `src/license_detection/expression.rs:426-430` - Expression rendering
 
 **Recommendation**: Check if this is from expression parsing (input has parens) or rendering (output adds parens).
@@ -150,6 +165,7 @@
 **Description**: Test files contain binary data and can't be read as UTF-8.
 
 **Examples**:
+
 | File | Error |
 |------|-------|
 | `NamespaceNode.class` | stream did not contain valid UTF-8 |
@@ -168,6 +184,7 @@
 **Description**: The sequence of detected licenses differs between Python and Rust in non-trivial ways.
 
 **Examples**:
+
 | File | Issue |
 |------|-------|
 | `openssh.LICENSE` | Expected 14 detections, actual 13; different license at position 6 |
@@ -176,12 +193,14 @@
 | `url_badge.md` | Expected 33 detections, actual 27; CC license duplicates missing |
 
 **Root Cause**: Complex interaction between:
+
 - Match grouping by region
 - License intro/clue detection
 - False positive filtering
 - Expression combination
 
 **Code Locations**:
+
 - `src/license_detection/detection.rs:136-199` - `group_matches_by_region()`
 - `src/license_detection/match_refine.rs:698-775` - `filter_false_positive_license_lists_matches()`
 
@@ -218,20 +237,20 @@
 
 ### Medium Priority
 
-3. **Unknown License Filtering**
+1. **Unknown License Filtering**
    - Tighten thresholds in `unknown_match.rs`
    - Add more containment filtering
 
-4. **Binary File Handling**
+2. **Binary File Handling**
    - Add PDF text extraction (e.g., pdf-extract crate)
    - Add class file handling or skip gracefully
 
 ### Low Priority
 
-5. **Expression Parentheses**
+1. **Expression Parentheses**
    - Investigate single remaining case in plantuml test
 
-6. **Complex Interaction Debugging**
+2. **Complex Interaction Debugging**
    - Add detailed logging for match-by-match comparison
    - Create test harness for Python/Rust diff output
 

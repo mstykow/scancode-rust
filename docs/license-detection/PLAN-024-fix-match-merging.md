@@ -8,6 +8,7 @@
 ## Executive Summary
 
 Rust's `merge_overlapping_matches()` differs fundamentally from Python's distance-based merging logic, causing:
+
 - Rust merges matches that Python keeps separate → fewer detections
 - Rust keeps separate matches that Python merges → duplicate expressions
 
@@ -68,6 +69,7 @@ This is the single largest source of golden test failures.
 **Purpose**: Get start/end bounds of ispan for distance calculations, matching Python's Span behavior.
 
 **Implementation**:
+
 ```rust
 fn ispan_bounds(&self) -> (usize, usize) {
     if let Some(positions) = &self.ispan_positions {
@@ -89,17 +91,20 @@ fn ispan_bounds(&self) -> (usize, usize) {
 **Location**: `src/license_detection/models.rs:537` (after `qdistance_to()`)
 
 **Python Reference** (match.py:458-464):
+
 ```python
 def idistance_to(self, other):
     return self.ispan.distance_to(other.ispan)
 ```
 
 **Python Span.distance_to()** (spans.py:402-435):
+
 - Overlapping → 0
 - Touching (self.end == other.start - 1 or other.end == self.start - 1) → 1
 - Otherwise → gap between spans
 
 **Implementation**:
+
 ```rust
 pub fn idistance_to(&self, other: &LicenseMatch) -> usize {
     let (self_start, self_end) = self.ispan_bounds();
@@ -129,18 +134,21 @@ pub fn idistance_to(&self, other: &LicenseMatch) -> usize {
 **Location**: `src/license_detection/models.rs` (after `idistance_to()`)
 
 **Python Reference** (match.py:632-636):
+
 ```python
 def is_after(self, other):
     return self.qspan.is_after(other.qspan) and self.ispan.is_after(other.ispan)
 ```
 
 **Python Span.is_after()** (spans.py:381-382):
+
 ```python
 def is_after(self, other):
     return self.start > other.end
 ```
 
 **Implementation**:
+
 ```rust
 pub fn is_after(&self, other: &LicenseMatch) -> bool {
     let (self_qstart, self_qend) = self.qspan_bounds();
@@ -162,6 +170,7 @@ pub fn is_after(&self, other: &LicenseMatch) -> bool {
 **Location**: `src/license_detection/models.rs:451-453`
 
 **Current Implementation**:
+
 ```rust
 pub fn surround(&self, other: &LicenseMatch) -> bool {
     self.start_line < other.start_line && self.end_line > other.end_line
@@ -169,12 +178,14 @@ pub fn surround(&self, other: &LicenseMatch) -> bool {
 ```
 
 **Python Reference** (match.py:621-630):
+
 ```python
 def surround(self, other):
     return self.qstart <= other.qstart and self.qend >= other.qend
 ```
 
 **Fixed Implementation**:
+
 ```rust
 pub fn surround(&self, other: &LicenseMatch) -> bool {
     let (self_start, self_end) = self.qspan_bounds();
@@ -190,6 +201,7 @@ pub fn surround(&self, other: &LicenseMatch) -> bool {
 **Purpose**: Calculate overlap between ispans for alignment verification.
 
 **Implementation**:
+
 ```rust
 pub fn ispan_overlap(&self, other: &LicenseMatch) -> usize {
     let (self_start, self_end) = self.ispan_bounds();
@@ -221,6 +233,7 @@ const MAX_DIST: usize = 100;
 **Location**: `src/license_detection/match_refine.rs:128-229`
 
 **Key changes**:
+
 1. Add distance-based merge threshold
 2. Implement all merge conditions from Python
 3. Use proper `surround()`, `is_after()` methods
@@ -228,6 +241,7 @@ const MAX_DIST: usize = 100;
 5. Fix sort order to match Python
 
 **Implementation**:
+
 ```rust
 fn merge_overlapping_matches(matches: &[LicenseMatch]) -> Vec<LicenseMatch> {
     if matches.len() < 2 {
@@ -384,6 +398,7 @@ fn merge_overlapping_matches(matches: &[LicenseMatch]) -> Vec<LicenseMatch> {
 **Location**: `src/license_detection/match_refine.rs` (before `merge_overlapping_matches()`)
 
 **Python Reference** (match.py:638-687):
+
 ```python
 def combine(self, other):
     combined = LicenseMatch(
@@ -397,6 +412,7 @@ def combine(self, other):
 ```
 
 **Implementation**:
+
 ```rust
 fn combine_matches(a: &LicenseMatch, b: &LicenseMatch) -> LicenseMatch {
     let mut merged = a.clone();

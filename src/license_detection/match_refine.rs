@@ -317,39 +317,59 @@ fn merge_overlapping_matches(matches: &[LicenseMatch]) -> Vec<LicenseMatch> {
 ///
 /// Based on Python: `filter_contained_matches()` using qspan containment
 fn filter_contained_matches(matches: &[LicenseMatch]) -> (Vec<LicenseMatch>, Vec<LicenseMatch>) {
-    if matches.is_empty() {
-        return (Vec::new(), Vec::new());
-    }
-
-    if matches.len() == 1 {
+    if matches.len() < 2 {
         return (matches.to_vec(), Vec::new());
     }
 
-    let mut sorted: Vec<&LicenseMatch> = matches.iter().collect();
-    sorted.sort_by(|a, b| {
+    let mut matches: Vec<LicenseMatch> = matches.to_vec();
+    let mut discarded = Vec::new();
+
+    matches.sort_by(|a, b| {
         a.start_token
             .cmp(&b.start_token)
             .then_with(|| b.hilen.cmp(&a.hilen))
             .then_with(|| b.matched_length.cmp(&a.matched_length))
-            .then_with(|| a.rule_identifier.cmp(&b.rule_identifier))
+            .then_with(|| a.matcher_order().cmp(&b.matcher_order()))
     });
 
-    let mut kept = Vec::new();
-    let mut discarded = Vec::new();
+    let mut i = 0;
+    while i < matches.len().saturating_sub(1) {
+        let mut j = i + 1;
+        while j < matches.len() {
+            let current = matches[i].clone();
+            let next = matches[j].clone();
 
-    for current in sorted {
-        let is_contained = kept
-            .iter()
-            .any(|kept_match: &&LicenseMatch| kept_match.qcontains(current));
+            if next.end_token > current.end_token {
+                break;
+            }
 
-        if !is_contained {
-            kept.push(current);
-        } else {
-            discarded.push(current.clone());
+            if current.start_token == next.start_token && current.end_token == next.end_token {
+                if current.match_coverage >= next.match_coverage {
+                    discarded.push(matches.remove(j));
+                    continue;
+                } else {
+                    discarded.push(matches.remove(i));
+                    i = i.saturating_sub(1);
+                    break;
+                }
+            }
+
+            if current.qcontains(&next) {
+                discarded.push(matches.remove(j));
+                continue;
+            }
+            if next.qcontains(&current) {
+                discarded.push(matches.remove(i));
+                i = i.saturating_sub(1);
+                break;
+            }
+
+            j += 1;
         }
+        i += 1;
     }
 
-    (kept.into_iter().cloned().collect(), discarded)
+    (matches, discarded)
 }
 
 /// Filter matches to false positive rules.
@@ -451,7 +471,7 @@ fn filter_spurious_matches(matches: &[LicenseMatch]) -> Vec<LicenseMatch> {
 
 fn licensing_contains_match(current: &LicenseMatch, other: &LicenseMatch) -> bool {
     if current.license_expression.is_empty() || other.license_expression.is_empty() {
-        return current.matched_length >= other.matched_length * 2;
+        return false;
     }
     licensing_contains(&current.license_expression, &other.license_expression)
 }

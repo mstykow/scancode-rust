@@ -26,21 +26,25 @@ The lic1 golden test suite has 67 failures across multiple categories. The failu
 **Symptoms**: Rust produces more matches than Python expects.
 
 **Examples**:
+
 - `COPYING.gplv3`: Expected `["gpl-3.0"]`, Got `["gpl-3.0", "gpl-3.0", "gpl-3.0-plus", "warranty-disclaimer", "gpl-1.0-plus", ...]`
 - `gpl-2.0-plus_1.txt`: Expected `["gpl-2.0-plus"]`, Got `["gpl-1.0-plus", "gpl-2.0-plus"]`
 - `gfdl-1.1_9.RULE`: Expected `["gfdl-1.1", "gpl-1.0-plus"]`, Got `["gfdl-1.1", "gfdl-1.1-plus", ...]`
 
 **Root Cause**:
+
 1. **GPL family rules are hierarchical** - The `gpl-1.0-plus` rule is matching text that Python only matches with `gpl-2.0-plus`. This suggests rule ordering or containment filtering differences.
 
 2. **Embedded license detection** - Files like `COPYING.gplv3` contain embedded license snippets (GPLv3 preamble references older GPL versions). Rust is detecting these as separate matches.
 
 **Code Files to Investigate**:
+
 - `src/license_detection/match_refine.rs` - `filter_contained_matches()`, `merge_overlapping_matches()`
 - `src/license_detection/detection.rs` - `is_false_positive()`, `analyze_detection()`
 - `src/license_detection/aho_match.rs` - Match collection logic
 
 **Python Reference**:
+
 - `reference/scancode-toolkit/src/licensedcode/match.py` - Lines 800-1000 for match filtering
 - `reference/scancode-toolkit/src/licensedcode/detection.py` - Lines 1162-1380 for false positive detection
 
@@ -49,16 +53,19 @@ The lic1 golden test suite has 67 failures across multiple categories. The failu
 **Symptoms**: Rust produces fewer matches than Python expects.
 
 **Examples**:
+
 - `gpl-2.0-plus_33.txt`: Expected 6 matches, Got 1 match
 - `do-not-skip-short-gpl-matches.txt`: Expected 6 matches, Got 5 matches
 - `gpl-2.0_82.RULE`: Expected 3 matches, Got 1 match
 
 **Root Cause**:
+
 1. **Match merging too aggressive** - Multiple occurrences of the same license are being merged into single matches when they should remain separate.
 
 2. **Short match filtering** - The `filter_too_short_matches()` function in `match_refine.rs` may be incorrectly filtering valid short GPL matches.
 
 **Representative Test - `gpl-2.0-plus_33.txt`**:
+
 ```
 Expected: ["gpl-2.0-plus", "gpl-2.0-plus", "gpl-1.0-plus", "gpl-1.0-plus", "gpl-2.0-plus", "gpl-1.0-plus"]
 Actual:   ["gpl-2.0-plus"]
@@ -67,6 +74,7 @@ Actual:   ["gpl-2.0-plus"]
 The file contains multiple "License: GPLv2" markers that should each be detected separately.
 
 **Code Files to Investigate**:
+
 - `src/license_detection/match_refine.rs:128-250` - `merge_overlapping_matches()` function
 - `src/license_detection/match_refine.rs:62-84` - `filter_too_short_matches()` function
 
@@ -75,6 +83,7 @@ The file contains multiple "License: GPLv2" markers that should each be detected
 **Symptoms**: License expressions are combined differently between Rust and Python.
 
 **Examples**:
+
 - `eclipse-openj9_html2.html`:
   - Expected: `epl-2.0 OR apache-2.0 OR gpl-2.0 WITH classpath-exception-2.0 OR gpl-2.0 WITH openjdk-exception`
   - Actual: `epl-2.0 OR apache-2.0 OR (gpl-2.0 WITH classpath-exception-2.0 AND gpl-2.0 WITH openjdk-exception)`
@@ -84,12 +93,14 @@ The file contains multiple "License: GPLv2" markers that should each be detected
   - Actual: `["gpl-1.0-plus", "lgpl-2.0-plus", "gfdl-1.2"]` (separate expressions)
 
 **Root Cause**:
+
 1. **Detection grouping logic** - The `group_matches_by_region()` function may be incorrectly splitting or combining matches that should be in the same detection group.
 
 2. **Expression combination for AND/OR** - The `combine_expressions()` function or the logic that calls it may differ from Python.
 
 **Representative Test - `eclipse-openj9_html2.html`**:
 The HTML file contains a complex multi-choice license statement:
+
 ```
 EPL-2.0 OR Apache-2.0 OR (GPL-2.0 WITH Classpath-exception AND GPL-2.0 WITH OpenJDK-exception)
 ```
@@ -97,6 +108,7 @@ EPL-2.0 OR Apache-2.0 OR (GPL-2.0 WITH Classpath-exception AND GPL-2.0 WITH Open
 Python correctly parses this as a flat OR. Rust is creating nested AND inside OR.
 
 **Code Files to Investigate**:
+
 - `src/license_detection/detection.rs:149-206` - `group_matches_by_region()`
 - `src/license_detection/expression.rs:628-666` - `combine_expressions()`
 - `src/license_detection/detection.rs:651-663` - `determine_license_expression()`
@@ -106,6 +118,7 @@ Python correctly parses this as a flat OR. Rust is creating nested AND inside OR
 **Symptoms**: Test fails with "stream did not contain valid UTF-8".
 
 **Files Affected**:
+
 - `do-not_detect-licenses-in-archive.jar`
 - `ecl-1.0.txt`
 - `flt9.gif`
@@ -115,6 +128,7 @@ Python correctly parses this as a flat OR. Rust is creating nested AND inside OR
 The golden test framework reads files with `fs::read_to_string()` which fails for non-UTF-8 content. The Python implementation handles binary files differently.
 
 **Code Files to Investigate**:
+
 - `src/license_detection/golden_test.rs:110-116` - File reading logic
 - Consider using `fs::read()` for binary detection
 
@@ -123,11 +137,13 @@ The golden test framework reads files with `fs::read_to_string()` which fails fo
 **Symptoms**: Either too few or too many of the same license detected.
 
 **Examples**:
+
 - `fsf-free_and_fsf-free_and_fsf-free.txt`: Expected 3 `fsf-free`, Got 1
 - `gpl-2.0_and_lgpl-2.0-plus.txt`: Expected combined expression, Got 2 separate detections
 - `godot_COPYRIGHT.txt`: Expected 83 matches, Got 46 matches
 
 **Root Cause**:
+
 1. **Deduplication threshold** - The `remove_duplicate_detections()` function may be using incorrect criteria for determining if two detections are duplicates.
 
 2. **Match coverage calculation** - The `compute_detection_coverage()` may affect how detections are ranked and filtered.
@@ -136,6 +152,7 @@ The golden test framework reads files with `fs::read_to_string()` which fails fo
 The file contains three separate "fsf-free" license statements. Python detects all three separately. Rust merges them into one.
 
 **Code Files to Investigate**:
+
 - `src/license_detection/detection.rs:891-909` - `remove_duplicate_detections()`
 - `src/license_detection/detection.rs:1003-1012` - `compute_detection_identifier()`
 
@@ -144,11 +161,13 @@ The file contains three separate "fsf-free" license statements. Python detects a
 ### A. GPL Family License Issues (20+ failures)
 
 GPL-related tests show the most failures due to:
+
 1. Hierarchical rule structure (`gpl-1.0-plus` vs `gpl-2.0-plus` vs `gpl-3.0-plus`)
 2. Embedded license text detection
 3. Short match handling for GPL notices
 
 **Specific Tests**:
+
 - `gpl_19.txt`: Expected `gpl-1.0-plus`, Got `gpl-2.0` (version selection)
 - `gpl-2.0_44.txt`: Expected `gpl-2.0`, Got `gpl-2.0-plus` (plus suffix handling)
 - `gpl_12.txt`: Expected `["gpl-1.0-plus", "gpl-2.0-plus"]`, Got `["gpl-3.0-plus", "gpl-2.0-plus"]`
@@ -156,18 +175,21 @@ GPL-related tests show the most failures due to:
 ### B. GFDL License Issues (5 failures)
 
 GFDL files have embedded text that triggers multiple license rules:
+
 - `gfdl-1.1_1.RULE`: Expected 3 expressions, Got 10 (spurious matches)
 - `gfdl-1.3_2.RULE`: Expected 2 expressions, Got 11
 
 ### C. Complex Expression Tests (8 failures)
 
 Tests with compound license expressions (AND/OR/WITH):
+
 - `eclipse-omr2.LICENSE`: Complex nested OR/AND expression
 - `eclipse-openj9.LICENSE`: Multi-clause license with exceptions
 
 ### D. Large File Tests (2 failures)
 
 Large copyright files with many license entries:
+
 - `godot_COPYRIGHT.txt`: 83 expected → 46 actual
 - `godot2_COPYRIGHT.txt`: 88 expected → 43 actual
 
@@ -177,7 +199,8 @@ Large copyright files with many license entries:
 
 The `merge_overlapping_matches()` function in `match_refine.rs` appears to be too aggressive, merging matches that should remain separate.
 
-**Action**: 
+**Action**:
+
 1. Review Python's `merge_matches()` at `match.py:800-910`
 2. Compare containment detection logic
 3. Add debug logging to track merge decisions
@@ -187,6 +210,7 @@ The `merge_overlapping_matches()` function in `match_refine.rs` appears to be to
 The `is_false_positive()` function in `detection.rs` may not be correctly identifying all false positives.
 
 **Action**:
+
 1. Compare with Python's `is_false_positive()` at `detection.py:1162-1380`
 2. Verify rule relevance and length thresholds match
 3. Test edge cases with short GPL rules
@@ -196,6 +220,7 @@ The `is_false_positive()` function in `detection.rs` may not be correctly identi
 For complex expressions, the grouping and combination logic differs from Python.
 
 **Action**:
+
 1. Review `group_matches_by_region()` threshold handling
 2. Compare `combine_expressions()` with Python's `combine_expressions()`
 3. Add tests for complex nested expressions
@@ -205,6 +230,7 @@ For complex expressions, the grouping and combination logic differs from Python.
 Add proper handling for non-UTF-8 files in the test framework.
 
 **Action**:
+
 1. Update `golden_test.rs` to use binary detection
 2. Skip or handle binary files appropriately
 3. Match Python's behavior for jar/gif/etc. files

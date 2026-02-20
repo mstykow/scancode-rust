@@ -27,6 +27,7 @@ fn run(&self, engine: &LicenseDetectionEngine) -> Result<(), String> {
 ```
 
 This fails for:
+
 - Binary files (`.class`, `.pdf`, `.gif`, `.jar`)
 - Text files with non-UTF-8 encoding (ISO-8859, Latin-1)
 - Files with mixed/invalid encoding
@@ -68,6 +69,7 @@ if T.is_text → unicode_text_lines() with encoding fallbacks
    - Returns `FileType` object with `is_binary`, `contains_text`, `is_pdf` flags
 
 2. **`unicode_text_lines()`** (`textcode/analysis.py:251-284`) - Handles text files with encoding fallbacks:
+
    ```python
    try:
        s = line.decode('UTF-8')
@@ -125,6 +127,7 @@ let rtf_text = String::from_utf8_lossy(&rtf_bytes);
 ### Existing Dependency
 
 The `content_inspector` crate is already a dependency:
+
 ```
 content_inspector v0.2.4
 └── memchr v2.8.0
@@ -137,11 +140,13 @@ content_inspector v0.2.4
 ### Strategy: Leverage Existing Patterns
 
 **Phase 1: Quick Fix (Immediate)**
+
 - Use `fs::read()` + `String::from_utf8_lossy()` for golden tests
 - This matches the existing `debug_rtf_test.rs` pattern
 - Enables ISO-8859 files to be read (lossy conversion preserves most text)
 
 **Phase 2: Binary Detection (Recommended)**
+
 - Use existing `content_inspector` crate to detect binary files
 - Skip license detection for true binaries (archives, images)
 - Consistent with scanner's production behavior
@@ -260,6 +265,7 @@ fn run(&self, engine: &LicenseDetectionEngine) -> Result<(), String> {
 **Line**: After line 32 (after existing imports)
 
 Add:
+
 ```rust
 use content_inspector::{ContentType, inspect};
 ```
@@ -315,6 +321,7 @@ content_inspector = "0.2.4"  # Already in use
 ### Future Optional Dependencies (Phase 3)
 
 For PDF text extraction:
+
 ```toml
 [dependencies]
 lopdf = "0.32"  # Or pdf-extract = "0.7"
