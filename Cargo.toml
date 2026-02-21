@@ -34,7 +34,7 @@ publish = true
 
 [dependencies]
 # askalono
-anyhow = "1.0.101"
+anyhow = "1.0.102"
 flate2 = "1.1.9"
 lazy_static = "1.5.0"
 log = "0.4.29"
