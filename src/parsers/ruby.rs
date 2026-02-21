@@ -55,7 +55,11 @@ const PACKAGE_TYPE: PackageType = PackageType::Gem;
 /// assert_eq!(strip_freeze_suffix("'1.0.0'.freeze"), "'1.0.0'");
 /// ```
 pub fn strip_freeze_suffix(s: &str) -> &str {
-    s.trim_end_matches(".freeze")
+    let mut result = s;
+    while result.ends_with(".freeze") {
+        result = &result[..result.len() - 7];
+    }
+    result
 }
 
 // =============================================================================
@@ -295,18 +299,18 @@ enum ParseState {
 /// - `name`, `version`, `platform`, `pinned`: Used for dependency PURL and metadata generation
 /// - `requirements`: Stored as extracted_requirement for version constraints
 #[derive(Debug, Clone, Default)]
-struct GemInfo {
-    name: String,
-    version: Option<String>,
-    platform: Option<String>,
-    gem_type: String,
-    remote: Option<String>,
-    revision: Option<String>,
-    ref_field: Option<String>,
-    branch: Option<String>,
-    tag: Option<String>,
-    pinned: bool,
-    requirements: Vec<String>,
+pub(crate) struct GemInfo {
+    pub(crate) name: String,
+    pub(crate) version: Option<String>,
+    pub(crate) platform: Option<String>,
+    pub(crate) gem_type: String,
+    pub(crate) remote: Option<String>,
+    pub(crate) revision: Option<String>,
+    pub(crate) ref_field: Option<String>,
+    pub(crate) branch: Option<String>,
+    pub(crate) tag: Option<String>,
+    pub(crate) pinned: bool,
+    pub(crate) requirements: Vec<String>,
 }
 
 /// Parses Gemfile.lock content using a state machine.
@@ -649,7 +653,28 @@ fn build_gem_source_extra_data(gem: &GemInfo) -> Option<HashMap<String, serde_js
         extra.insert("tag".to_string(), serde_json::Value::String(tag.clone()));
     }
 
+    if gem.gem_type == "GIT"
+        && let Some(vcs_url) = build_git_vcs_url(gem)
+    {
+        extra.insert("vcs_url".to_string(), serde_json::Value::String(vcs_url));
+    }
+
     Some(extra)
+}
+
+pub(crate) fn build_git_vcs_url(gem: &GemInfo) -> Option<String> {
+    let remote = gem.remote.as_ref()?;
+    let revision = gem.revision.as_ref()?;
+
+    let normalized_remote = if remote.starts_with("git@") {
+        remote.replace(":", "/").replace("git@", "https://")
+    } else if remote.starts_with("git://") {
+        remote.replace("git://", "https://")
+    } else {
+        remote.clone()
+    };
+
+    Some(format!("git+{}@{}", normalized_remote, revision))
 }
 
 /// Parses version and platform from a combined string.
@@ -835,11 +860,33 @@ fn clean_gemspec_value(s: &str) -> String {
     s.to_string()
 }
 
+pub(crate) fn is_valid_gem_name(name: &str) -> bool {
+    if name.is_empty() || name.len() > 100 {
+        return false;
+    }
+
+    if name.contains(' ') {
+        return false;
+    }
+
+    if !name
+        .chars()
+        .next()
+        .map(|c| c.is_alphanumeric())
+        .unwrap_or(false)
+    {
+        return false;
+    }
+
+    name.chars()
+        .all(|c| c.is_alphanumeric() || c == '-' || c == '_' || c == '.')
+}
+
 /// Extracts items from a Ruby array literal like `["a", "b", "c"]`.
-fn extract_ruby_array(s: &str) -> Vec<String> {
+pub(crate) fn extract_ruby_array(s: &str) -> Vec<String> {
     let s = strip_freeze_suffix(s.trim());
     let s = s.trim_start_matches('[').trim_end_matches(']');
-    let item_re = match Regex::new(r#"["']([^"']*?)["'](?:\.freeze)?"#) {
+    let item_re = match Regex::new(r#"["\']([^"\']*?)["\'](?:(?:\.freeze)+)?"#) {
         Ok(r) => r,
         Err(_) => return Vec::new(),
     };
@@ -1061,6 +1108,11 @@ fn parse_gemspec(content: &str) -> PackageData {
             None => continue,
         };
 
+        if !is_valid_gem_name(&dep_name) {
+            warn!("Skipping invalid gem name: {}", dep_name);
+            continue;
+        }
+
         let mut version_parts = Vec::new();
         if let Some(v) = caps.get(2) {
             version_parts.push(clean_gemspec_value(v.as_str()));
@@ -1096,6 +1148,11 @@ fn parse_gemspec(content: &str) -> PackageData {
             Some(m) => clean_gemspec_value(m.as_str()),
             None => continue,
         };
+
+        if !is_valid_gem_name(&dep_name) {
+            warn!("Skipping invalid gem name: {}", dep_name);
+            continue;
+        }
 
         let mut version_parts = Vec::new();
         if let Some(v) = caps.get(2) {

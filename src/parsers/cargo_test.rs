@@ -481,4 +481,59 @@ cc = "1.0"
             Some("1.0.0".to_string())
         );
     }
+
+    #[test]
+    fn test_cargo_workspace_only_is_virtual() {
+        let content = r#"
+[workspace]
+members = ["crates/*"]
+"#;
+
+        let (_temp_file, cargo_path) = create_temp_cargo_toml(content);
+        let package_data = CargoParser::extract_first_package(&cargo_path);
+
+        assert!(
+            package_data.is_virtual,
+            "Workspace-only Cargo.toml should be virtual"
+        );
+        assert_eq!(package_data.name, None);
+    }
+
+    #[test]
+    fn test_cargo_workspace_with_package_not_virtual() {
+        let content = r#"
+[package]
+name = "my-workspace-root"
+version = "1.0.0"
+
+[workspace]
+members = ["crates/*"]
+"#;
+
+        let (_temp_file, cargo_path) = create_temp_cargo_toml(content);
+        let package_data = CargoParser::extract_first_package(&cargo_path);
+
+        assert!(
+            !package_data.is_virtual,
+            "Cargo.toml with both [package] and [workspace] should NOT be virtual"
+        );
+        assert_eq!(package_data.name, Some("my-workspace-root".to_string()));
+    }
+
+    #[test]
+    fn test_cargo_regular_package_not_virtual() {
+        let content = r#"
+[package]
+name = "regular-package"
+version = "0.1.0"
+"#;
+
+        let (_temp_file, cargo_path) = create_temp_cargo_toml(content);
+        let package_data = CargoParser::extract_first_package(&cargo_path);
+
+        assert!(
+            !package_data.is_virtual,
+            "Regular package should NOT be virtual"
+        );
+    }
 }

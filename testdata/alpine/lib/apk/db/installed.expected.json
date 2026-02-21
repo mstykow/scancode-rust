@@ -81,6 +81,7 @@
         "sha1": "e2ea73ded7e7371664204b148569fb5e88b0f7a8"
       }
     ],
+    "vcs_url": "git+https://git.alpinelinux.org/aports/commit/?id=cb70ca5c6d6db0399d2dd09189c5d57827bce5cd",
     "extra_data": {
       "installed_size": "73728",
       "compressed_size": "11435",

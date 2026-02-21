@@ -35,6 +35,107 @@ use crate::models::{DatasourceId, Dependency, PackageData, PackageType, Party};
 
 use super::PackageParser;
 
+/// Parses license information from a nuspec license element.
+///
+/// NuGet supports three license formats:
+/// - `<license type="expression">MIT</license>` - SPDX expression
+/// - `<license type="file">LICENSE.txt</license>` - File reference
+/// - `<license>MIT</license>` - Plain text (legacy/simple)
+///
+/// # Examples
+///
+/// ```ignore
+/// use scancode_rust::parsers::nuget::parse_license_element;
+///
+/// assert_eq!(parse_license_element(Some("expression"), Some("MIT")), Some("MIT".to_string()));
+/// assert_eq!(parse_license_element(Some("file"), Some("LICENSE.txt")), Some("file:LICENSE.txt".to_string()));
+/// assert_eq!(parse_license_element(None, Some("Apache-2.0")), Some("Apache-2.0".to_string()));
+/// ```
+pub fn parse_license_element(element_type: Option<&str>, text: Option<&str>) -> Option<String> {
+    match (element_type, text) {
+        (Some("expression"), Some(expr)) => Some(expr.to_string()),
+        (Some("file"), Some(path)) => Some(format!("file:{}", path)),
+        (None, Some(text)) => Some(text.to_string()),
+        _ => None,
+    }
+}
+
+/// Determines if a party name is likely an organization or person.
+///
+/// Uses simple heuristics based on common patterns. This is a best-effort
+/// inference and may not always be correct.
+///
+/// # Examples
+///
+/// ```ignore
+/// use scancode_rust::parsers::nuget::infer_party_type;
+///
+/// assert_eq!(infer_party_type("Microsoft"), "organization");
+/// assert_eq!(infer_party_type("Twitter, Inc."), "organization");
+/// assert_eq!(infer_party_type("James Newton-King"), "person");
+/// ```
+pub fn infer_party_type(name: &str) -> &'static str {
+    let name_lower = name.to_lowercase();
+
+    const ORG_INDICATORS: &[&str] = &[
+        "inc.",
+        "inc",
+        "llc",
+        "ltd",
+        "corp",
+        "corporation",
+        "company",
+        "co.",
+        "foundation",
+        "project",
+        "gmbh",
+        "limited",
+        "s.a.",
+        "s.r.l.",
+        "ag",
+        "n.v.",
+        "b.v.",
+    ];
+
+    const KNOWN_ORGS: &[&str] = &[
+        "microsoft",
+        "google",
+        "amazon",
+        "apple",
+        "facebook",
+        "twitter",
+        "netflix",
+        "adobe",
+        "oracle",
+        "ibm",
+        "red hat",
+        "canonical",
+        "jetbrains",
+        "docker",
+        "apache",
+        "linux foundation",
+        "elastic",
+    ];
+
+    for indicator in ORG_INDICATORS {
+        if name_lower.contains(indicator) {
+            return "organization";
+        }
+    }
+
+    for org in KNOWN_ORGS {
+        if name_lower.contains(org) {
+            return "organization";
+        }
+    }
+
+    if name.contains(',') {
+        return "person";
+    }
+
+    "person"
+}
+
 fn build_nuget_description(
     summary: Option<&str>,
     description: Option<&str>,
@@ -165,6 +266,7 @@ impl PackageParser for NuspecParser {
         let mut extracted_license_statement = None;
         let mut copyright = None;
         let mut vcs_url = None;
+        let mut license_type: Option<String> = None;
 
         let mut buf = Vec::new();
         let mut current_element = String::new();
@@ -187,6 +289,12 @@ impl PackageParser for NuspecParser {
                             .attributes()
                             .filter_map(|a| a.ok())
                             .find(|attr| attr.key.as_ref() == b"targetFramework")
+                            .and_then(|attr| String::from_utf8(attr.value.to_vec()).ok());
+                    } else if tag_name == "license" && in_metadata {
+                        license_type = e
+                            .attributes()
+                            .filter_map(|a| a.ok())
+                            .find(|attr| attr.key.as_ref() == b"type")
                             .and_then(|attr| String::from_utf8(attr.value.to_vec()).ok());
                     } else if tag_name == "repository" && in_metadata {
                         let mut repo_type = None;
@@ -262,8 +370,9 @@ impl PackageParser for NuspecParser {
                             "title" => title = Some(text),
                             "projectUrl" => homepage_url = Some(text),
                             "authors" => {
+                                let party_type = infer_party_type(&text);
                                 parties.push(Party {
-                                    r#type: None,
+                                    r#type: Some(party_type.to_string()),
                                     role: Some("author".to_string()),
                                     name: Some(text),
                                     email: None,
@@ -274,8 +383,9 @@ impl PackageParser for NuspecParser {
                                 });
                             }
                             "owners" => {
+                                let party_type = infer_party_type(&text);
                                 parties.push(Party {
-                                    r#type: None,
+                                    r#type: Some(party_type.to_string()),
                                     role: Some("owner".to_string()),
                                     name: Some(text),
                                     email: None,
@@ -286,7 +396,9 @@ impl PackageParser for NuspecParser {
                                 });
                             }
                             "license" => {
-                                extracted_license_statement = Some(text);
+                                extracted_license_statement =
+                                    parse_license_element(license_type.as_deref(), Some(&text));
+                                license_type = None;
                             }
                             "licenseUrl" => {
                                 if extracted_license_statement.is_none() {
@@ -307,6 +419,8 @@ impl PackageParser for NuspecParser {
                         in_dependencies = false;
                     } else if tag_name == "group" {
                         current_group_framework = None;
+                    } else if tag_name == "license" {
+                        license_type = None;
                     }
 
                     current_element.clear();
@@ -693,6 +807,7 @@ fn parse_nuspec_content(content: &str) -> Result<PackageData, String> {
     let mut extracted_license_statement = None;
     let mut copyright = None;
     let mut vcs_url = None;
+    let mut license_type: Option<String> = None;
 
     let mut buf = Vec::new();
     let mut current_element = String::new();
@@ -715,6 +830,12 @@ fn parse_nuspec_content(content: &str) -> Result<PackageData, String> {
                         .attributes()
                         .filter_map(|a| a.ok())
                         .find(|attr| attr.key.as_ref() == b"targetFramework")
+                        .and_then(|attr| String::from_utf8(attr.value.to_vec()).ok());
+                } else if tag_name == "license" && in_metadata {
+                    license_type = e
+                        .attributes()
+                        .filter_map(|a| a.ok())
+                        .find(|attr| attr.key.as_ref() == b"type")
                         .and_then(|attr| String::from_utf8(attr.value.to_vec()).ok());
                 } else if tag_name == "repository" && in_metadata {
                     let mut repo_type = None;
@@ -780,8 +901,9 @@ fn parse_nuspec_content(content: &str) -> Result<PackageData, String> {
                         "description" => description = Some(text),
                         "projectUrl" => homepage_url = Some(text),
                         "authors" => {
+                            let party_type = infer_party_type(&text);
                             parties.push(Party {
-                                r#type: None,
+                                r#type: Some(party_type.to_string()),
                                 role: Some("author".to_string()),
                                 name: Some(text),
                                 email: None,
@@ -792,8 +914,9 @@ fn parse_nuspec_content(content: &str) -> Result<PackageData, String> {
                             });
                         }
                         "owners" => {
+                            let party_type = infer_party_type(&text);
                             parties.push(Party {
-                                r#type: None,
+                                r#type: Some(party_type.to_string()),
                                 role: Some("owner".to_string()),
                                 name: Some(text),
                                 email: None,
@@ -804,7 +927,9 @@ fn parse_nuspec_content(content: &str) -> Result<PackageData, String> {
                             });
                         }
                         "license" => {
-                            extracted_license_statement = Some(text);
+                            extracted_license_statement =
+                                parse_license_element(license_type.as_deref(), Some(&text));
+                            license_type = None;
                         }
                         "licenseUrl" => {
                             if extracted_license_statement.is_none() {
@@ -825,6 +950,8 @@ fn parse_nuspec_content(content: &str) -> Result<PackageData, String> {
                     in_dependencies = false;
                 } else if tag_name == "group" {
                     current_group_framework = None;
+                } else if tag_name == "license" {
+                    license_type = None;
                 }
 
                 current_element.clear();

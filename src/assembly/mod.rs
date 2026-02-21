@@ -2,6 +2,7 @@ mod assemblers;
 #[cfg(test)]
 mod assembly_golden_test;
 mod cargo_workspace_merge;
+mod dir_assign;
 pub mod file_ref_resolve;
 mod nested_merge;
 mod sibling_merge;
@@ -156,6 +157,9 @@ pub fn assemble(files: &mut [FileInfo]) -> AssemblyResult {
 
     // Post-processing: resolve file references from package database entries
     file_ref_resolve::resolve_file_references(files, &mut packages, &mut dependencies);
+
+    // Post-processing: assign files to packages based on directory proximity
+    dir_assign::assign_files_to_packages(files, &packages);
 
     // Post-processing: workspace assembly for npm/pnpm monorepos
     workspace_merge::assemble_workspaces(files, &mut packages, &mut dependencies);

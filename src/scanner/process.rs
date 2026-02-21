@@ -101,7 +101,12 @@ fn process_file(path: &Path, metadata: &fs::Metadata, scan_strategy: &ScanStrate
     let mut scan_errors: Vec<String> = vec![];
     let mut file_info_builder = FileInfoBuilder::default();
 
-    if let Err(e) = extract_information_from_content(&mut file_info_builder, path, scan_strategy) {
+    if let Err(e) = extract_information_from_content(
+        &mut file_info_builder,
+        path,
+        scan_strategy,
+        &mut scan_errors,
+    ) {
         scan_errors.push(e.to_string());
     };
 
@@ -136,6 +141,7 @@ fn extract_information_from_content(
     file_info_builder: &mut FileInfoBuilder,
     path: &Path,
     scan_strategy: &ScanStrategy,
+    scan_errors: &mut Vec<String>,
 ) -> Result<(), Error> {
     let buffer = fs::read(path)?;
 
@@ -146,6 +152,13 @@ fn extract_information_from_content(
         .programming_language(Some(detect_language(path, &buffer)));
 
     if let Some(package_data) = try_parse_file(path) {
+        for pkg in &package_data {
+            if let Some(ref extra) = pkg.extra_data
+                && let Some(error) = extra.get("parse_error").and_then(|v| v.as_str())
+            {
+                scan_errors.push(format!("Parse error in {}: {}", path.display(), error));
+            }
+        }
         file_info_builder.package_data(package_data);
         Ok(())
     } else if inspect(&buffer) == ContentType::UTF_8 {

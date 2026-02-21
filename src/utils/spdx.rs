@@ -1,5 +1,36 @@
 use std::collections::HashSet;
 
+use include_dir::{Dir, include_dir};
+use once_cell::sync::Lazy;
+use serde_json::{Value, from_str};
+
+use crate::askalono::{Store, TextData};
+
+const LICENSES_DIR: Dir = include_dir!("resources/licenses/json/details");
+
+static LICENSE_STORE: Lazy<Store> = Lazy::new(|| {
+    let mut store = Store::new();
+    for file in LICENSES_DIR.files() {
+        if let Some(string_content) = file.contents_utf8()
+            && let Ok(value) = from_str::<Value>(string_content)
+        {
+            if value["isDeprecatedLicenseId"].as_bool().unwrap_or(false) {
+                continue;
+            }
+            if let (Some(name), Some(text)) =
+                (value["licenseId"].as_str(), value["licenseText"].as_str())
+            {
+                store.add_license(name.to_string(), TextData::new(text));
+            }
+        }
+    }
+    store
+});
+
+pub fn get_license_store() -> &'static Store {
+    &LICENSE_STORE
+}
+
 /// Combines multiple license expressions into a single SPDX expression.
 /// Deduplicates, sorts, and combines the expressions with " AND ".
 pub fn combine_license_expressions(

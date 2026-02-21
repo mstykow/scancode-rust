@@ -829,4 +829,121 @@ mod tests {
             Some("https://example.com/2.5.0".to_string())
         );
     }
+
+    #[test]
+    fn test_single_license_clean_string() {
+        let content = r#"
+<project>
+    <groupId>com.test</groupId>
+    <artifactId>test-license</artifactId>
+    <version>1.0</version>
+    <licenses>
+        <license>
+            <name>Apache License, Version 2.0</name>
+            <url>https://www.apache.org/licenses/LICENSE-2.0</url>
+        </license>
+    </licenses>
+</project>
+        "#;
+
+        let (_temp_dir, pom_path) = create_temp_pom_xml(content);
+        let package_data = MavenParser::extract_first_package(&pom_path);
+
+        assert_eq!(
+            package_data.extracted_license_statement,
+            Some("Apache License, Version 2.0".to_string())
+        );
+    }
+
+    #[test]
+    fn test_multiple_licenses_joined_with_or() {
+        let content = r#"
+<project>
+    <groupId>com.test</groupId>
+    <artifactId>test-multi-license</artifactId>
+    <version>1.0</version>
+    <licenses>
+        <license>
+            <name>MIT License</name>
+        </license>
+        <license>
+            <name>Apache License, Version 2.0</name>
+        </license>
+    </licenses>
+</project>
+        "#;
+
+        let (_temp_dir, pom_path) = create_temp_pom_xml(content);
+        let package_data = MavenParser::extract_first_package(&pom_path);
+
+        assert_eq!(
+            package_data.extracted_license_statement,
+            Some("MIT License OR Apache License, Version 2.0".to_string())
+        );
+    }
+
+    #[test]
+    fn test_no_licenses_returns_none() {
+        let content = r#"
+<project>
+    <groupId>com.test</groupId>
+    <artifactId>test-no-license</artifactId>
+    <version>1.0</version>
+</project>
+        "#;
+
+        let (_temp_dir, pom_path) = create_temp_pom_xml(content);
+        let package_data = MavenParser::extract_first_package(&pom_path);
+
+        assert_eq!(package_data.extracted_license_statement, None);
+    }
+
+    #[test]
+    fn test_developer_role_spelling() {
+        let content = r#"
+<project>
+    <groupId>com.test</groupId>
+    <artifactId>test-dev</artifactId>
+    <version>1.0</version>
+    <developers>
+        <developer>
+            <name>John Doe</name>
+            <email>john@example.com</email>
+        </developer>
+    </developers>
+</project>
+        "#;
+
+        let (_temp_dir, pom_path) = create_temp_pom_xml(content);
+        let package_data = MavenParser::extract_first_package(&pom_path);
+
+        assert_eq!(package_data.parties.len(), 1);
+        assert_eq!(package_data.parties[0].role, Some("developer".to_string()));
+    }
+
+    #[test]
+    fn test_contributor_role_spelling() {
+        let content = r#"
+<project>
+    <groupId>com.test</groupId>
+    <artifactId>test-contrib</artifactId>
+    <version>1.0</version>
+    <contributors>
+        <contributor>
+            <name>Jane Smith</name>
+            <email>jane@example.com</email>
+        </contributor>
+    </contributors>
+</project>
+        "#;
+
+        let (_temp_dir, pom_path) = create_temp_pom_xml(content);
+        let package_data = MavenParser::extract_first_package(&pom_path);
+
+        assert_eq!(package_data.parties.len(), 1);
+        assert_eq!(
+            package_data.parties[0].role,
+            Some("contributor".to_string())
+        );
+    }
 }

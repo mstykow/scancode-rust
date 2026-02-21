@@ -69,6 +69,24 @@
         "pkg:cargo/test-crate@0.1.0?uuid=fixed-uid-done-for-testing-5642512d1758"
       ],
       "path": "Cargo.toml"
+    },
+    {
+      "for_packages": [
+        "pkg:cargo/test-crate@0.1.0?uuid=fixed-uid-done-for-testing-5642512d1758"
+      ],
+      "path": "LICENSE"
+    },
+    {
+      "for_packages": [
+        "pkg:cargo/test-crate@0.1.0?uuid=fixed-uid-done-for-testing-5642512d1758"
+      ],
+      "path": "README.md"
+    },
+    {
+      "for_packages": [
+        "pkg:cargo/test-crate@0.1.0?uuid=fixed-uid-done-for-testing-5642512d1758"
+      ],
+      "path": "src/lib.rs"
     }
   ],
   "packages": [
