@@ -293,7 +293,8 @@ fn has_unknown_matches(matches: &[LicenseMatch]) -> bool {
 /// and has_extra_words() at detection.py:1139
 fn has_extra_words(matches: &[LicenseMatch]) -> bool {
     matches.iter().any(|m| {
-        let score_coverage_relevance = m.match_coverage * m.rule_relevance as f32 / 100.0;
+        let coverage = m.icoverage() * 100.0;
+        let score_coverage_relevance = coverage * m.rule_relevance as f32 / 100.0;
         score_coverage_relevance - m.score > 0.01
     })
 }

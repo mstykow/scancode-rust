@@ -475,6 +475,13 @@ impl LicenseMatch {
         ispan_len as f32 / ispan_magnitude as f32
     }
 
+    pub fn icoverage(&self) -> f32 {
+        if self.rule_length == 0 {
+            return 0.0;
+        }
+        self.len() as f32 / self.rule_length as f32
+    }
+
     pub fn surround(&self, other: &LicenseMatch) -> bool {
         let (self_start, self_end) = self.qspan_bounds();
         let (other_start, other_end) = other.qspan_bounds();
@@ -1600,14 +1607,18 @@ mod tests {
         let outer = LicenseMatch {
             start_line: 1,
             end_line: 20,
+            start_token: 1,
+            end_token: 20,
             ..create_license_match()
         };
         let inner = LicenseMatch {
             start_line: 1,
             end_line: 15,
+            start_token: 1,
+            end_token: 15,
             ..create_license_match()
         };
-        assert!(!outer.surround(&inner));
+        assert!(outer.surround(&inner));
     }
 
     #[test]
@@ -1615,14 +1626,18 @@ mod tests {
         let outer = LicenseMatch {
             start_line: 1,
             end_line: 20,
+            start_token: 1,
+            end_token: 20,
             ..create_license_match()
         };
         let inner = LicenseMatch {
             start_line: 5,
             end_line: 20,
+            start_token: 5,
+            end_token: 20,
             ..create_license_match()
         };
-        assert!(!outer.surround(&inner));
+        assert!(outer.surround(&inner));
     }
 
     #[test]
@@ -1630,11 +1645,15 @@ mod tests {
         let outer = LicenseMatch {
             start_line: 5,
             end_line: 15,
+            start_token: 5,
+            end_token: 15,
             ..create_license_match()
         };
         let inner = LicenseMatch {
             start_line: 1,
             end_line: 20,
+            start_token: 1,
+            end_token: 20,
             ..create_license_match()
         };
         assert!(!outer.surround(&inner));
@@ -1645,11 +1664,15 @@ mod tests {
         let first = LicenseMatch {
             start_line: 1,
             end_line: 10,
+            start_token: 1,
+            end_token: 10,
             ..create_license_match()
         };
         let second = LicenseMatch {
             start_line: 11,
             end_line: 20,
+            start_token: 11,
+            end_token: 20,
             ..create_license_match()
         };
         assert!(!first.surround(&second));
