@@ -1,8 +1,8 @@
 # PLAN-036: Fix Equal ISpan Match Selection to Use Magnitude
 
-**Status**: Validated  
-**Priority**: High  
-**Component**: License Detection / Match Refinement  
+**Status**: COMPLETE
+**Priority**: High
+**Component**: License Detection / Match Refinement
 **Created**: 2026-02-23
 **Updated**: 2026-02-23
 
@@ -633,13 +633,74 @@ The existing tests should NOT be affected because:
 
 ## Implementation Checklist
 
-- [ ] Add `qspan_magnitude()` method to `LicenseMatch` in `src/license_detection/models.rs`
-- [ ] Update comparison in `merge_overlapping_matches()` at `src/license_detection/match_refine.rs:225-234`
-- [ ] Add NEW unit tests for `qspan_magnitude()` method
-- [ ] Add NEW unit tests specifically for equal-ispan selection scenarios
-- [ ] Run existing test suite: `cargo test` (should all pass)
-- [ ] Run golden tests: `cargo test --test license_detection_golden_test`
-- [ ] Verify behavior matches Python on sample files
+- [x] Add `qspan_magnitude()` method to `LicenseMatch` in `src/license_detection/models.rs`
+- [x] Update comparison in `merge_overlapping_matches()` at `src/license_detection/match_refine.rs:225-234`
+- [x] Add NEW unit tests for `qspan_magnitude()` method
+- [x] Add NEW unit tests specifically for equal-ispan selection scenarios
+- [x] Run existing test suite: `cargo test` (should all pass)
+- [x] Run golden tests: `cargo test --test license_detection_golden_test`
+- [x] Verify behavior matches Python on sample files
+
+---
+
+## Implementation Notes (2026-02-23)
+
+### Final Implementation
+
+The fix was successfully implemented with the following changes:
+
+#### 1. `qspan_magnitude()` Method (models.rs:589-592)
+
+```rust
+pub fn qspan_magnitude(&self) -> usize {
+    let (start, end) = self.qspan_bounds();
+    end.saturating_sub(start)
+}
+```
+
+This method returns the span extent from first to last position, matching Python's `qspan.magnitude()`.
+
+#### 2. Updated Comparison (match_refine.rs:226-237)
+
+```rust
+if current.ispan() == next.ispan() && current.qoverlap(&next) > 0 {
+    let current_mag = current.qspan_magnitude();
+    let next_mag = next.qspan_magnitude();
+    if current_mag <= next_mag {
+        rule_matches.remove(j);
+        continue;
+    } else {
+        rule_matches.remove(i);
+        i = i.saturating_sub(1);
+        break;
+    }
+}
+```
+
+The comparison now uses `qspan_magnitude()` with `<=` to prefer the smaller magnitude (denser span), matching Python's behavior.
+
+#### 3. Tests Added
+
+Six new tests were added to verify the implementation:
+
+- `test_qspan_magnitude_contiguous` - Verifies magnitude for contiguous spans
+- `test_qspan_magnitude_non_contiguous` - Verifies magnitude for sparse spans (e.g., [4, 8] -> 5)
+- `test_qspan_magnitude_empty` - Verifies magnitude for empty spans returns 0
+- `test_merge_equal_ispan_dense_vs_sparse` - Dense match preferred over sparse
+- `test_merge_equal_ispan_dense_vs_sparse_reversed` - Order independence
+- `test_merge_equal_ispan_same_magnitude` - Either match kept when equal
+
+### Test Results
+
+All tests pass:
+- 3 `qspan_magnitude` tests: PASSED
+- 3 `merge_equal_ispan` tests: PASSED
+
+### Python Parity Achieved
+
+The Rust implementation now matches Python's behavior for equal-ispan selection:
+- Python: `if cqmag <= nqmag: del rule_matches[j]`
+- Rust: `if current_mag <= next_mag { rule_matches.remove(j); }`
 
 ---
 
