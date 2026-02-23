@@ -1,9 +1,9 @@
 # PLAN-030: Fix `restore_non_overlapping()` Token Position Usage
 
 **Date**: 2026-02-23
-**Status**: Analysis Complete - Implementation Pending
+**Status**: Validation Complete - Ready for Implementation
 **Priority**: 1 (Critical - Identified as #1 difference in PLAN-029)
-**Impact**: ~100+ golden test failures
+**Impact**: ~100+ golden test failures expected to improve
 **Related**: PLAN-029 (Comprehensive Difference Analysis)
 
 ---
@@ -238,11 +238,13 @@ Then:
 
 ## 4. Proposed Changes
 
-### 4.1 Primary Fix: Use Token Positions
+### 4.1 Primary Fix: Use Token Positions with Fallback
 
-**Location**: `src/license_detection/match_refine.rs:688-715`
+**Location**: `src/license_detection/match_refine.rs:715-742`
 
-**Change the helper function:**
+**Critical insight**: The naive fix (simply using `start_token..end_token`) fails because some matches have uninitialized token positions (`start_token == 0 && end_token == 0`). The fix must handle this case.
+
+**Change the helper function with fallback logic:**
 
 ```rust
 // BEFORE:
@@ -250,9 +252,24 @@ fn match_to_span(m: &LicenseMatch) -> Span {
     Span::from_range(m.start_line..m.end_line + 1)
 }
 
-// AFTER:
+// AFTER (with fallback for uninitialized tokens):
 fn match_to_qspan(m: &LicenseMatch) -> Span {
-    // Use token positions, which are the correct semantic for overlap detection
+    // Case 1: Non-contiguous positions from merged match
+    if let Some(positions) = &m.qspan_positions {
+        if !positions.is_empty() {
+            return Span::from_iterator(positions.iter().copied());
+        }
+    }
+
+    // Case 2: Check if token positions are initialized
+    // Following the pattern from qcontains() and qoverlap() in models.rs:498-506
+    if m.start_token == 0 && m.end_token == 0 {
+        // Fallback to line positions when tokens not set
+        // This handles test matches with uninitialized token positions
+        return Span::from_range(m.start_line..m.end_line + 1);
+    }
+
+    // Case 3: Normal contiguous token range
     Span::from_range(m.start_token..m.end_token)
 }
 ```
@@ -288,7 +305,7 @@ pub fn restore_non_overlapping(
 
 // AFTER:
 pub fn restore_non_overlapping(
-    matches: &[LicenseMatch],
+    matches: &[LicenseMatch],  // Renamed from 'kept' for Python parity
     discarded: Vec<LicenseMatch>,
 ) -> (Vec<LicenseMatch>, Vec<LicenseMatch>) {
     // Build union of all matched token positions
@@ -318,7 +335,25 @@ pub fn restore_non_overlapping(
 }
 ```
 
-### 4.2 Handle Non-Contiguous Token Positions (Optional Enhancement)
+### 4.2 Why Fallback Logic is Required
+
+The fallback logic is **not optional** - it's required because:
+
+1. **Test helpers** (e.g., `create_test_match()` in `detection.rs:1166-1167`) create matches with `start_token: 0, end_token: 0`
+
+2. **Existing functions** (`qcontains()` and `qoverlap()` in `models.rs:498-521`) already implement this fallback pattern:
+   ```rust
+   if self.start_token == 0 && self.end_token == 0
+       && other.start_token == 0 && other.end_token == 0
+   {
+       // Fall back to line-based comparison
+       return self.start_line <= other.start_line && self.end_line >= other.end_line;
+   }
+   ```
+
+3. **Without the fallback**, matches with `start_token=0, end_token=0` create empty spans `0..0`, which never intersect with anything, causing incorrect restoration of all discarded matches.
+
+### 4.3 Handle Non-Contiguous Token Positions
 
 The `LicenseMatch` struct has fields for non-contiguous positions:
 
@@ -330,31 +365,9 @@ The `LicenseMatch` struct has fields for non-contiguous positions:
 pub qspan_positions: Option<Vec<usize>>,
 ```
 
-For maximum accuracy, we should use these when available:
+When `merge_overlapping_matches()` merges matches, it sets `qspan_positions` with the union of all token positions. This is handled in Case 1 of the implementation above.
 
-```rust
-fn match_to_qspan(m: &LicenseMatch) -> Span {
-    if let Some(positions) = &m.qspan_positions {
-        // Non-contiguous match: use exact positions
-        Span::from_iterator(positions.iter().copied())
-    } else {
-        // Contiguous match: use range
-        Span::from_range(m.start_token..m.end_token)
-    }
-}
-```
-
-**Note**: The current `Span::from_iterator()` implementation exists but may need verification for performance with large position sets.
-
-### 4.3 Variable Naming Alignment (Minor)
-
-Consider renaming `kept` to `matches` to match Python parameter name:
-
-```rust
-pub fn restore_non_overlapping(
-    matches: &[LicenseMatch],  // Was: kept
-    discarded: Vec<LicenseMatch>,
-) -> (Vec<LicenseMatch>, Vec<LicenseMatch>)
+**Implementation note**: `Span::from_iterator()` already exists and handles non-contiguous positions correctly by coalescing adjacent positions into ranges.
 ```
 
 Update call sites (lines 1443, 1451):
@@ -732,8 +745,313 @@ let (restored_overlapping, _) =
 
 ---
 
-## 12. Document History
+## 12. Validation Report: Why Previous Implementation Caused Regressions
+
+### 12.1 Executive Summary
+
+The naive fix (simply changing `match_to_span()` to use token positions) causes 6 test regressions because:
+
+1. **Some matches have uninitialized token positions** (`start_token == 0 && end_token == 0`)
+2. **The Span intersection semantics differ** between Python's set-based approach and Rust's range-based approach
+3. **Test helpers use unrealistic token position values** that break when token-based checking is enabled
+
+### 12.2 Root Cause Analysis
+
+#### Issue 1: Uninitialized Token Positions
+
+Several code paths create matches with `start_token: 0, end_token: 0`:
+
+**From `src/license_detection/detection.rs:1166-1167`:**
+```rust
+start_token: 0,
+end_token: 0,
+```
+
+This appears in test helper `create_test_match()` which is used extensively in unit tests.
+
+**The problem**: When `start_token == 0 && end_token == 0`, the naive fix creates an empty span `0..0`, which:
+- Never intersects with anything (all discarded matches get restored incorrectly)
+- Or intersects with token 0 matches (incorrect false positives)
+
+**Evidence from `src/license_detection/models.rs:498-506`:**
+```rust
+pub fn qcontains(&self, other: &LicenseMatch) -> bool {
+    // ...
+    if self.start_token == 0
+        && self.end_token == 0
+        && other.start_token == 0
+        && other.end_token == 0
+    {
+        return self.start_line <= other.start_line && self.end_line >= other.end_line;
+    }
+    self.start_token <= other.start_token && self.end_token >= other.end_token
+}
+```
+
+This shows that other functions (like `qcontains` and `qoverlap`) **already have fallback logic** for the zero-token case.
+
+#### Issue 2: Span Intersection Semantics Differ
+
+**Python's Span (`spans.py:137-138`):**
+```python
+def __and__(self, *others):
+    return Span(self._set.intersection(*[o._set for o in others]))
+```
+
+Python uses an `intbitset` internally, so `not disc.qspan & all_matched_qspans` tests if the **intersection set is empty**.
+
+**Rust's Span (`spans.rs:155-164`):**
+```rust
+pub fn intersects(&self, other: &Span) -> bool {
+    for self_range in &self.ranges {
+        for other_range in &other.ranges {
+            if self_range.start < other_range.end && other_range.start < self_range.end {
+                return true;
+            }
+        }
+    }
+    false
+}
+```
+
+Rust checks if any **ranges overlap**.
+
+**Critical difference for non-contiguous spans:**
+- Python: `Span([1, 2, 10, 11])` is stored as `{1, 2, 10, 11}` in an intbitset
+- Rust: `Span::from_iterator([1, 2, 10, 11])` becomes ranges `[1..3, 10..12]`
+
+For the intersection check, both are equivalent because:
+- Python: `{1, 2, 10, 11} & {5, 6} = {}` (empty set, no intersection)
+- Rust: ranges `[1..3, 10..12]` vs `[5..7]` → no range overlap → `intersects()` returns false
+
+**However**, if we create spans incorrectly (e.g., `0..0`), Rust's range check gives wrong results.
+
+#### Issue 3: Test Helper Token Position Values
+
+**From `src/license_detection/match_refine.rs:1515-1516`:**
+```rust
+start_token: start_line,
+end_token: end_line + 1,
+```
+
+This test helper sets token positions equal to line positions (offset by 1). This is **unrealistic** because:
+- In real matches, `start_token` and `start_line` are unrelated
+- Token positions depend on how many tokens are in the file before this match
+- Line positions depend on line breaks in the source text
+
+**Example test that would fail with naive fix:**
+
+```rust
+// test_restore_non_overlapping_touching_is_overlapping
+let kept = vec![create_test_match("#1", 1, 10, ...)];  // start_token=1, end_token=11
+let discarded = vec![create_test_match("#2", 10, 20, ...)];  // start_token=10, end_token=21
+
+// With line-based spans:
+// kept: lines 1..11, discarded: lines 10..21
+// Lines 10 overlaps → discarded stays discarded ✓
+
+// With naive token-based spans:
+// kept: tokens 1..11, discarded: tokens 10..21
+// Tokens 10 overlaps → discarded stays discarded ✓ (ACCIDENTALLY CORRECT)
+
+// But if test helper set start_token=start_line, end_token=end_line+1, and line=10:
+// kept ends at token 11, discarded starts at token 10
+// They overlap at token 10-11 ✓
+```
+
+**The real problem case:**
+```rust
+// Test helper with lines but zero tokens (from detection.rs)
+let match = LicenseMatch {
+    start_line: 10,
+    end_line: 20,
+    start_token: 0,  // ← Zero!
+    end_token: 0,    // ← Zero!
+    ...
+};
+```
+
+With naive token fix: Span `0..0` is empty, so it never intersects → incorrectly restored.
+
+### 12.3 Specific Failing Test Cases
+
+#### Test 1: `test_restore_non_overlapping_touching_is_overlapping`
+
+**Location**: `src/license_detection/match_refine.rs:2538-2547`
+
+**With naive fix:**
+- `kept`: `create_test_match("#1", 1, 10, ...)` → start_token=1, end_token=11
+- `discarded`: `create_test_match("#2", 10, 20, ...)` → start_token=10, end_token=21
+- Token spans: `1..11` vs `10..21` → **overlap at 10-11** ✓
+
+This test passes accidentally because the helper sets `start_token = start_line`.
+
+#### Test 2: `test_restore_non_overlapping_adjacent_not_overlapping`
+
+**Location**: `src/license_detection/match_refine.rs:2527-2536`
+
+**With naive fix:**
+- `kept`: lines 1-10 → tokens 1..11
+- `discarded`: lines 11-20 → tokens 11..21
+- Token spans: `1..11` vs `11..21` → **adjacent, no overlap** ✓
+
+This test also passes accidentally.
+
+#### Test 3: Tests using `create_test_match()` from `detection.rs`
+
+**Location**: `src/license_detection/detection.rs:1154-1189`
+
+This helper sets `start_token: 0, end_token: 0`, creating empty spans.
+
+**With naive fix:**
+- All matches from this helper have empty `0..0` span
+- Empty spans never intersect
+- All discarded matches get restored → tests fail
+
+### 12.4 The Real Solution
+
+The fix must handle **three cases**:
+
+1. **Normal case**: Token positions are set (`start_token != end_token` or both non-zero)
+   - Use `Span::from_range(start_token..end_token)`
+
+2. **Non-contiguous case**: `qspan_positions` is `Some(positions)`
+   - Use `Span::from_iterator(positions)`
+
+3. **Fallback case**: Token positions are not set (`start_token == 0 && end_token == 0`)
+   - Fall back to line positions: `Span::from_range(start_line..end_line + 1)`
+   - This matches the fallback logic in `qcontains()` and `qoverlap()`
+
+### 12.5 Implementation Details
+
+#### Corrected `match_to_qspan()` Function
+
+```rust
+fn match_to_qspan(m: &LicenseMatch) -> Span {
+    // Case 1: Non-contiguous positions from merged match
+    if let Some(positions) = &m.qspan_positions {
+        if !positions.is_empty() {
+            return Span::from_iterator(positions.iter().copied());
+        }
+    }
+
+    // Case 2: Check if token positions are initialized
+    // Following the pattern from qcontains() and qoverlap() in models.rs
+    if m.start_token == 0 && m.end_token == 0 {
+        // Fallback to line positions when tokens not set
+        // This handles test matches and any edge cases
+        return Span::from_range(m.start_line..m.end_line + 1);
+    }
+
+    // Case 3: Normal contiguous token range
+    Span::from_range(m.start_token..m.end_token)
+}
+```
+
+This mirrors the fallback logic already present in `qcontains()` and `qoverlap()`:
+```rust
+// From models.rs:498-505
+if self.start_token == 0
+    && self.end_token == 0
+    && other.start_token == 0
+    && other.end_token == 0
+{
+    return self.start_line <= other.start_line && self.end_line >= other.end_line;
+}
+```
+
+### 12.6 Why This Won't Break Golden Tests
+
+Golden tests use real matches created by actual matching strategies:
+
+1. **Hash matches** (`hash_match.rs:105-106`): `start_token: query_run.start, end_token: query_run.end.map_or(query_run.start, |e| e + 1)`
+
+2. **Aho matches** (`aho_match.rs:166-167`): `start_token: qstart, end_token: qend`
+
+3. **Seq matches** (`seq_match.rs`): Token positions computed from alignment
+
+4. **SPDX-LID matches** (`spdx_lid.rs:280-281`): `start_token: *start_token, end_token: *end_token`
+
+5. **Unknown matches** (`unknown_match.rs:309-310`): `start_token: start, end_token: end`
+
+All real matches have proper token positions set, so they will use the token-based span correctly.
+
+---
+
+## 13. Pre-Implementation Validation Steps
+
+Before implementing the fix:
+
+### Step 1: Audit Token Position Initialization
+
+Verify that all match creation sites properly set token positions:
+
+```bash
+# Find all places where LicenseMatch is created
+grep -rn "LicenseMatch {" src/license_detection/
+```
+
+**Expected result**: All production code paths set proper token positions. Only test helpers may use zero.
+
+### Step 2: Verify `qspan_positions` Handling in `merge_overlapping_matches()`
+
+**Location**: `src/license_detection/match_refine.rs:143`
+
+```rust
+merged.qspan_positions = Some(qspan_vec);
+```
+
+This correctly sets `qspan_positions` when matches are merged, so non-contiguous spans will be handled correctly.
+
+### Step 3: Run Current Tests
+
+```bash
+cargo test restore_non_overlapping
+```
+
+Record which tests pass/fail with current line-based implementation.
+
+### Step 4: Verify Span::from_iterator Works
+
+Run the existing span tests:
+
+```bash
+cargo test spans
+```
+
+Ensure `Span::from_iterator()` correctly handles non-contiguous positions.
+
+---
+
+## 14. Revised Implementation Checklist
+
+- [ ] **Step 1**: Implement `match_to_qspan()` with fallback logic (see Section 12.5)
+- [ ] **Step 2**: Update `restore_non_overlapping()` to use `match_to_qspan()`
+- [ ] **Step 3**: Add unit tests for edge cases:
+  - [ ] Token positions set (normal case)
+  - [ ] Token positions zero (fallback to lines)
+  - [ ] `qspan_positions` set (non-contiguous)
+- [ ] **Step 4**: Run unit tests: `cargo test restore_non_overlapping`
+- [ ] **Step 5**: Run full test suite: `cargo test`
+- [ ] **Step 6**: Run golden tests and compare with baseline
+- [ ] **Step 7**: Verify specific Python test case from `test_match.py:1027-1037`
+
+---
+
+## 15. Success Criteria
+
+1. **All unit tests pass** with the new implementation
+2. **Golden test pass rate improves** (no regressions, potentially +10-20 passes)
+3. **Python parity test passes**: The test from `test_match.py:1027-1037` produces correct results
+4. **Code passes `cargo clippy`** without warnings
+5. **Code formatted with `cargo fmt`**
+
+---
+
+## 16. Document History
 
 | Date | Author | Changes |
 |------|--------|---------|
 | 2026-02-23 | AI Agent | Initial plan creation |
+| 2026-02-23 | AI Agent | Added validation report with regression analysis |
+| 2026-02-23 | AI Agent | Added corrected implementation with fallback logic |
