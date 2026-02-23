@@ -26,6 +26,50 @@ use crate::license_detection::tokenize::{parse_required_phrase_spans, tokenize_w
 const UNKNOWN_NGRAM_LENGTH: usize = 6;
 const LICENSE_TOKEN_STRINGS: &[&str] = &["license", "licence", "licensed"];
 
+const DEPRECATED_SPDX_SUBS: &[(&str, &str)] = &[
+    ("ecos-2.0", "gpl-2.0-or-later with ecos-exception-2.0"),
+    (
+        "gpl-2.0-with-autoconf-exception",
+        "gpl-2.0-only with autoconf-exception-2.0",
+    ),
+    (
+        "gpl-2.0-with-bison-exception",
+        "gpl-2.0-only with bison-exception-2.2",
+    ),
+    (
+        "gpl-2.0-with-classpath-exception",
+        "gpl-2.0-only with classpath-exception-2.0",
+    ),
+    (
+        "gpl-2.0-with-font-exception",
+        "gpl-2.0-only with font-exception-2.0",
+    ),
+    (
+        "gpl-2.0-with-gcc-exception",
+        "gpl-2.0-only with gcc-exception-2.0",
+    ),
+    (
+        "gpl-3.0-with-autoconf-exception",
+        "gpl-3.0-only with autoconf-exception-3.0",
+    ),
+    (
+        "gpl-3.0-with-gcc-exception",
+        "gpl-3.0-only with gcc-exception-3.1",
+    ),
+    (
+        "wxwindows",
+        "lgpl-2.0-or-later with wxwindows-exception-3.1",
+    ),
+];
+
+fn add_deprecated_spdx_aliases(rid_by_spdx_key: &mut HashMap<String, usize>) {
+    for (deprecated, replacement) in DEPRECATED_SPDX_SUBS {
+        if let Some(&rid) = rid_by_spdx_key.get(*replacement) {
+            rid_by_spdx_key.insert(deprecated.to_string(), rid);
+        }
+    }
+}
+
 fn prepare_rule_text(text: &str) -> String {
     text.lines()
         .map(|line| line.trim())
@@ -34,16 +78,18 @@ fn prepare_rule_text(text: &str) -> String {
 }
 
 fn build_rule_from_license(license: &License) -> Option<Rule> {
-    if license.text.is_empty() {
-        return None;
-    }
-
     let minimum_coverage = license.minimum_coverage.unwrap_or(0);
+
+    let text = if license.text.is_empty() {
+        "unknown-spdx license identifier".to_string()
+    } else {
+        prepare_rule_text(&license.text)
+    };
 
     Some(Rule {
         identifier: format!("{}.LICENSE", license.key),
         license_expression: license.key.clone(),
-        text: prepare_rule_text(&license.text),
+        text,
         tokens: vec![],
         is_license_text: true,
         is_license_notice: false,
@@ -223,6 +269,7 @@ pub fn build_index(rules: Vec<Rule>, licenses: Vec<License>) -> LicenseIndex {
     all_rules.sort();
 
     let mut rid_by_spdx_key: HashMap<String, usize> = HashMap::new();
+    let mut unknown_spdx_rid: Option<usize> = None;
 
     for (rid, mut rule) in all_rules.into_iter().enumerate() {
         rule.required_phrase_spans = parse_required_phrase_spans(&rule.text);
@@ -333,6 +380,10 @@ pub fn build_index(rules: Vec<Rule>, licenses: Vec<License>) -> LicenseIndex {
             rid_by_spdx_key.insert(alias.to_lowercase(), rid);
         }
 
+        if rule.license_expression == "unknown-spdx" {
+            unknown_spdx_rid = Some(rid);
+        }
+
         rules_by_rid.push(rule);
         tids_by_rid.push(rule_token_ids);
     }
@@ -342,6 +393,8 @@ pub fn build_index(rules: Vec<Rule>, licenses: Vec<License>) -> LicenseIndex {
             digit_only_tids.insert(tid);
         }
     }
+
+    add_deprecated_spdx_aliases(&mut rid_by_spdx_key);
 
     let rules_automaton = AhoCorasickBuilder::new()
         .match_kind(aho_corasick::MatchKind::Standard)
@@ -378,6 +431,7 @@ pub fn build_index(rules: Vec<Rule>, licenses: Vec<License>) -> LicenseIndex {
         licenses_by_key,
         pattern_id_to_rid,
         rid_by_spdx_key,
+        unknown_spdx_rid,
     }
 }
 

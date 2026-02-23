@@ -184,6 +184,13 @@ pub struct LicenseIndex {
     ///
     /// Corresponds to Python: `self.licenses_by_spdx_key` in cache.py
     pub rid_by_spdx_key: HashMap<String, usize>,
+
+    /// Rule ID for the unknown-spdx license.
+    ///
+    /// Used as a fallback when an SPDX identifier is not recognized.
+    ///
+    /// Corresponds to Python: `get_unknown_spdx_symbol()` in cache.py
+    pub unknown_spdx_rid: Option<usize>,
 }
 
 impl LicenseIndex {
@@ -281,6 +288,7 @@ impl LicenseIndex {
             licenses_by_key: HashMap::new(),
             pattern_id_to_rid: Vec::new(),
             rid_by_spdx_key: HashMap::new(),
+            unknown_spdx_rid: None,
         }
     }
 
