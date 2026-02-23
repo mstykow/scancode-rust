@@ -586,6 +586,11 @@ impl LicenseMatch {
         }
     }
 
+    pub fn qspan_magnitude(&self) -> usize {
+        let (start, end) = self.qspan_bounds();
+        end.saturating_sub(start)
+    }
+
     pub fn ispan_bounds(&self) -> (usize, usize) {
         if let Some(positions) = &self.ispan_positions {
             if positions.is_empty() {

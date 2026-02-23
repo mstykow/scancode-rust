@@ -223,7 +223,9 @@ fn merge_overlapping_matches(matches: &[LicenseMatch]) -> Vec<LicenseMatch> {
                 }
 
                 if current.ispan() == next.ispan() && current.qoverlap(&next) > 0 {
-                    if current.matched_length >= next.matched_length {
+                    let current_mag = current.qspan_magnitude();
+                    let next_mag = next.qspan_magnitude();
+                    if current_mag <= next_mag {
                         rule_matches.remove(j);
                         continue;
                     } else {
@@ -2088,6 +2090,79 @@ mod tests {
 
         assert_eq!(merged.len(), 1);
         assert_eq!(merged[0].score, 0.95);
+    }
+
+    #[test]
+    fn test_qspan_magnitude_contiguous() {
+        let mut m = create_test_match("#1", 1, 10, 0.9, 90.0, 100);
+        m.start_token = 5;
+        m.end_token = 15;
+        assert_eq!(m.qspan_magnitude(), 10);
+    }
+
+    #[test]
+    fn test_qspan_magnitude_non_contiguous() {
+        let mut m = create_test_match("#1", 1, 10, 0.9, 90.0, 100);
+        m.qspan_positions = Some(vec![4, 8]);
+        assert_eq!(m.qspan_magnitude(), 5);
+    }
+
+    #[test]
+    fn test_qspan_magnitude_empty() {
+        let mut m = create_test_match("#1", 1, 10, 0.9, 90.0, 100);
+        m.qspan_positions = Some(vec![]);
+        assert_eq!(m.qspan_magnitude(), 0);
+    }
+
+    #[test]
+    fn test_merge_equal_ispan_dense_vs_sparse() {
+        let mut dense = create_test_match_with_tokens("#1", 1, 11, 100);
+        dense.rule_start_token = 0;
+        dense.matched_length = 100;
+        dense.qspan_positions = None;
+
+        let mut sparse = create_test_match_with_tokens("#1", 1, 11, 100);
+        sparse.rule_start_token = 0;
+        sparse.matched_length = 100;
+        sparse.qspan_positions = Some(vec![1, 5, 10, 20, 50]);
+
+        let merged = merge_overlapping_matches(&[dense.clone(), sparse.clone()]);
+
+        assert_eq!(merged.len(), 1);
+        assert_eq!(merged[0].qspan_magnitude(), 10);
+    }
+
+    #[test]
+    fn test_merge_equal_ispan_dense_vs_sparse_reversed() {
+        let mut dense = create_test_match_with_tokens("#1", 1, 11, 100);
+        dense.rule_start_token = 0;
+        dense.matched_length = 100;
+        dense.qspan_positions = None;
+
+        let mut sparse = create_test_match_with_tokens("#1", 1, 11, 100);
+        sparse.rule_start_token = 0;
+        sparse.matched_length = 100;
+        sparse.qspan_positions = Some(vec![1, 5, 10, 20, 50]);
+
+        let merged = merge_overlapping_matches(&[sparse.clone(), dense.clone()]);
+
+        assert_eq!(merged.len(), 1);
+        assert_eq!(merged[0].qspan_magnitude(), 10);
+    }
+
+    #[test]
+    fn test_merge_equal_ispan_same_magnitude() {
+        let mut m1 = create_test_match_with_tokens("#1", 1, 11, 100);
+        m1.rule_start_token = 0;
+        m1.matched_length = 100;
+
+        let mut m2 = create_test_match_with_tokens("#1", 1, 11, 100);
+        m2.rule_start_token = 0;
+        m2.matched_length = 100;
+
+        let merged = merge_overlapping_matches(&[m1, m2]);
+
+        assert_eq!(merged.len(), 1);
     }
 
     #[test]
