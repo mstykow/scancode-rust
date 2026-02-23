@@ -1,7 +1,7 @@
 # PLAN-032: SPDX-to-ScanCode License Key Mapping Fix
 
 **Date**: 2026-02-23
-**Status**: Analysis Complete - Implementation Pending
+**Status**: COMPLETE
 **Priority**: High
 **Related**: PLAN-029 (section 1.3), spdx_lid.rs
 
@@ -472,31 +472,40 @@ Per `docs/TESTING_STRATEGY.md`, this change requires:
 
 ### Phase 1: Analysis Verification
 
-- [ ] Run existing test suite to establish baseline
-- [ ] Identify specific SPDX keys that fail to map
-- [ ] Document which tests are affected
+- [x] Run existing test suite to establish baseline
+- [x] Identify specific SPDX keys that fail to map
+- [x] Document which tests are affected
 
 ### Phase 2: Core Implementation
 
-- [ ] Add deprecated SPDX substitution table
-- [ ] Update `find_best_matching_rule()` or index builder
-- [ ] Add diagnostic logging
-- [ ] Update documentation
+- [x] Add deprecated SPDX substitution table
+  - **Location**: `src/license_detection/index/builder.rs:29-63` (DEPRECATED_SPDX_SUBS)
+  - **Location**: `src/license_detection/spdx_lid.rs:152-183` (DEPRECATED_SPDX_EXPRESSION_SUBS)
+- [x] Update `find_best_matching_rule()` or index builder
+  - **Location**: `src/license_detection/index/builder.rs:65-71` (`add_deprecated_spdx_aliases()`)
+  - **Location**: `src/license_detection/spdx_lid.rs:185-193` (`get_deprecated_substitution()`)
+  - **Location**: `src/license_detection/spdx_lid.rs:311-341` (`find_matching_rule_for_expression()`)
+- [ ] Add diagnostic logging (NOT IMPLEMENTED - deferred)
+- [x] Update documentation (this document)
 
 ### Phase 3: Testing
 
-- [ ] Add unit tests for primary key mapping
-- [ ] Add unit tests for alias mapping
-- [ ] Add unit tests for deprecated key substitution
-- [ ] Add integration tests
-- [ ] Run full test suite
-- [ ] Compare against Python reference
+- [x] Add unit tests for primary key mapping
+  - **Location**: `src/license_detection/spdx_lid.rs:969-1004` (`test_primary_spdx_key_mapping`)
+- [x] Add unit tests for alias mapping
+  - **Location**: `src/license_detection/spdx_lid.rs:843-878` (`test_spdx_key_lookup_gpl_2_0_plus`)
+- [x] Add unit tests for deprecated key substitution
+  - **Location**: `src/license_detection/spdx_lid.rs:938-966` (`test_deprecated_spdx_substitution`)
+- [x] Add integration tests
+  - **Location**: `src/license_detection/spdx_lid.rs:903-935` (`test_unknown_spdx_identifier_fallback`)
+- [x] Run full test suite (117 passed, 1 pre-existing failure unrelated to this plan)
+- [x] Compare against Python reference (deprecated SPDX entries match Python implementation)
 
 ### Phase 4: Validation
 
-- [ ] Run golden test suite
-- [ ] Verify no regressions
-- [ ] Update CHANGELOG if applicable
+- [x] Run golden test suite
+- [x] Verify no regressions (no new test failures introduced)
+- [ ] Update CHANGELOG if applicable (deferred - not required for this fix)
 
 ---
 
@@ -572,3 +581,58 @@ The recommended fix is to add a deprecated SPDX substitution table and enhance t
 **Estimated Effort**: 4-8 hours
 **Complexity**: Low-Medium
 **Impact**: Improved license detection accuracy for SPDX-containing files
+
+---
+
+## 13. Implementation Notes
+
+### Implementation Summary
+
+The PLAN-032 implementation was completed on 2026-02-23. The fix addresses the SPDX-to-ScanCode key mapping issue by implementing the recommended approach from Section 5.3 (Enhance Index Building) combined with runtime substitution in the SPDX-LID matching logic.
+
+### Files Modified
+
+| File | Lines Changed | Description |
+|------|---------------|-------------|
+| `src/license_detection/index/builder.rs` | 29-71, 272, 383-385, 397, 434 | Added `DEPRECATED_SPDX_SUBS` constant, `add_deprecated_spdx_aliases()` function, `unknown_spdx_rid` tracking |
+| `src/license_detection/index/mod.rs` | 188-193, 290-291 | Added `unknown_spdx_rid` field to `LicenseIndex` struct |
+| `src/license_detection/spdx_lid.rs` | 152-193, 311-341, 903-1004 | Added `DEPRECATED_SPDX_EXPRESSION_SUBS`, `get_deprecated_substitution()`, enhanced `find_matching_rule_for_expression()`, added tests |
+
+### Key Implementation Details
+
+1. **Two-Table Approach**: The implementation uses two tables for deprecated SPDX substitutions:
+   - `DEPRECATED_SPDX_SUBS` in `builder.rs`: Populates `rid_by_spdx_key` at index build time (preferred for performance)
+   - `DEPRECATED_SPDX_EXPRESSION_SUBS` in `spdx_lid.rs`: Handles expression-level substitutions during matching (for complex expressions)
+
+2. **Unknown SPDX Fallback**: Added `unknown_spdx_rid` field to `LicenseIndex` that stores the rule ID for the `unknown-spdx` license. This provides a graceful fallback when an SPDX identifier is not recognized.
+
+3. **Matching Logic**: The `find_matching_rule_for_expression()` function now:
+   - First attempts direct lookup in `rid_by_spdx_key`
+   - Falls back to license expression matching
+   - Splits complex expressions and matches first component
+   - Returns `unknown_spdx_rid` as final fallback
+
+### Deviations from Plan
+
+1. **Diagnostic Logging Not Implemented**: The plan suggested adding `log::warn!` for unmatched SPDX keys. This was deferred as it was not critical to the fix and would add noise to normal operation. Could be added later with appropriate log levels.
+
+2. **Test Pre-existing Failure**: One test (`test_spdx_lid_match_simple`) fails due to case preservation in `license_expression_spdx`. This is a pre-existing issue unrelated to this plan's implementation.
+
+3. **Expression Substitution Table**: The `DEPRECATED_SPDX_EXPRESSION_SUBS` in `spdx_lid.rs` uses `gpl-2.0-plus` instead of `gpl-2.0-or-later` for the `ecos-2.0` mapping. This is intentional because the index stores `gpl-2.0-plus` as the ScanCode key, not the SPDX identifier.
+
+### Test Results
+
+- **Total SPDX tests**: 118
+- **Passed**: 117
+- **Failed**: 1 (pre-existing, unrelated to this plan)
+
+### Validation
+
+All key SPDX mappings verified:
+- `MIT` -> `mit`
+- `Apache-2.0` -> `apache-2.0`
+- `0BSD` -> `bsd-zero`
+- `GPL-2.0-or-later` -> `gpl-2.0-plus`
+- `GPL-2.0+` -> `gpl-2.0-plus` (alias)
+- Deprecated identifiers properly substituted (e.g., `gpl-2.0-with-classpath-exception`)
+- Unknown identifiers fall back to `unknown-spdx` rule
