@@ -231,7 +231,7 @@ if next.qcontains(&current) || licensing_contains_match(&next, &current) {
 }
 ```
 
-2. ✅ The `licensing_contains_match()` helper already existed at match_refine.rs:476-481.
+1. ✅ The `licensing_contains_match()` helper already existed at match_refine.rs:476-481.
 
 **Implementation Result**:
 
@@ -377,6 +377,7 @@ cargo test --release -q --lib license_detection::golden_tests
 ### Remaining Work
 
 1. **Run golden tests** to verify Phase 1 impact:
+
    ```bash
    cargo test --release -q --lib license_detection::golden_tests
    ```

@@ -34,6 +34,7 @@ use crate::license_detection::index::build_index;
 use crate::license_detection::query::Query;
 use crate::license_detection::rules::{load_licenses_from_directory, load_rules_from_directory};
 use crate::license_detection::spdx_mapping::{SpdxMapping, build_spdx_mapping};
+use crate::utils::text::strip_utf8_bom_str;
 
 use crate::license_detection::detection::{
     create_detection_from_group, group_matches_by_region, populate_detection_from_group_with_spdx,
@@ -113,7 +114,8 @@ impl LicenseDetectionEngine {
     /// # Returns
     /// A Result containing a vector of LicenseDetection objects
     pub fn detect(&self, text: &str) -> Result<Vec<LicenseDetection>> {
-        let mut query = Query::new(text, &self.index)?;
+        let clean_text = strip_utf8_bom_str(text);
+        let mut query = Query::new(clean_text, &self.index)?;
 
         let mut all_matches = Vec::new();
         let mut matched_qspans: Vec<query::PositionSpan> = Vec::new();
@@ -1065,6 +1067,73 @@ copies of the Software."#;
         assert!(
             !(is_license_text && rule_length > 120 && match_coverage > 98.0),
             "Subtraction should NOT trigger when is_license_text is false"
+        );
+    }
+
+    #[test]
+    fn test_detect_mit_license_with_utf8_bom() {
+        let Some(engine) = create_engine_from_reference() else {
+            eprintln!("Skipping test: reference directory not found");
+            return;
+        };
+
+        let mit_with_bom =
+            "\u{FEFF}Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the \"Software\"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.";
+
+        let detections = engine
+            .detect(mit_with_bom)
+            .expect("Detection should succeed");
+
+        assert!(
+            !detections.is_empty(),
+            "Should detect at least one license in MIT text with BOM"
+        );
+
+        let mit_related = detections.iter().any(|d| {
+            d.license_expression
+                .as_ref()
+                .map(|e| e.contains("mit") || e.contains("unknown"))
+                .unwrap_or(false)
+        });
+        assert!(
+            mit_related,
+            "Should detect MIT or unknown license with BOM, got: {:?}",
+            detections
+                .iter()
+                .map(|d| d.license_expression.as_deref().unwrap_or("none"))
+                .collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn test_detect_spdx_identifier_with_utf8_bom() {
+        let Some(engine) = create_engine_from_reference() else {
+            eprintln!("Skipping test: reference directory not found");
+            return;
+        };
+
+        let text = "\u{FEFF}SPDX-License-Identifier: MIT";
+        let detections = engine.detect(text).expect("Detection should succeed");
+
+        assert!(
+            !detections.is_empty(),
+            "Should detect SPDX identifier even with BOM"
         );
     }
 }

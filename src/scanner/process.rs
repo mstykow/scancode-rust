@@ -5,6 +5,7 @@ use crate::scanner::ProcessResult;
 use crate::utils::file::{get_creation_date, is_path_excluded};
 use crate::utils::hash::{calculate_md5, calculate_sha1, calculate_sha256};
 use crate::utils::language::detect_language;
+use crate::utils::text::strip_utf8_bom_bytes;
 use anyhow::Error;
 use content_inspector::{ContentType, inspect};
 use glob::Pattern;
@@ -157,15 +158,19 @@ fn extract_information_from_content(
     if let Some(package_data) = try_parse_file(path) {
         file_info_builder.package_data(package_data);
         Ok(())
-    } else if inspect(&buffer) == ContentType::UTF_8 {
-        extract_license_information(
-            file_info_builder,
-            String::from_utf8_lossy(&buffer).into_owned(),
-            license_engine,
-            include_text,
-        )
     } else {
-        Ok(())
+        let content_type = inspect(&buffer);
+        if content_type == ContentType::UTF_8 || content_type == ContentType::UTF_8_BOM {
+            let clean_buffer = strip_utf8_bom_bytes(&buffer);
+            extract_license_information(
+                file_info_builder,
+                String::from_utf8_lossy(clean_buffer).into_owned(),
+                license_engine,
+                include_text,
+            )
+        } else {
+            Ok(())
+        }
     }
 }
 

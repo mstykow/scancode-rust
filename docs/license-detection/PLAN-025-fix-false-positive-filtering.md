@@ -385,6 +385,7 @@ The original plan proposed adding a new `filter_contained_license_expressions()`
 **`licensing_contains_match()` (match_refine.rs:472-477)**
 
 Rust implementation:
+
 ```rust
 fn licensing_contains_match(current: &LicenseMatch, other: &LicenseMatch) -> bool {
     if current.license_expression.is_empty() || other.license_expression.is_empty() {
@@ -395,6 +396,7 @@ fn licensing_contains_match(current: &LicenseMatch, other: &LicenseMatch) -> boo
 ```
 
 Python equivalent (models.py:2065-2073):
+
 ```python
 def licensing_contains(self, other):
     if self.license_expression and other.license_expression:

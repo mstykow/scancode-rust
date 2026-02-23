@@ -1,10 +1,12 @@
 use content_inspector::{ContentType, inspect};
 use std::path::Path;
 
-/// Detect programming language based on file extension and contents
+fn is_utf8_text(content_type: ContentType) -> bool {
+    content_type == ContentType::UTF_8 || content_type == ContentType::UTF_8_BOM
+}
+
 pub fn detect_language(path: &Path, content: &[u8]) -> String {
-    // Skip binary files
-    if content.len() > 32 && inspect(content) != ContentType::UTF_8 {
+    if content.len() > 32 && !is_utf8_text(inspect(content)) {
         return "Binary".to_string();
     }
 
@@ -88,9 +90,7 @@ pub fn detect_language(path: &Path, content: &[u8]) -> String {
         return "Ruby".to_string();
     }
 
-    // Content-based detection as a fallback for plain text files
-    if inspect(content) == ContentType::UTF_8 {
-        // Check for common patterns in the content
+    if is_utf8_text(inspect(content)) {
         let text_sample = String::from_utf8_lossy(&content[..std::cmp::min(content.len(), 1000)]);
 
         if text_sample.contains("<?php") {

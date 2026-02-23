@@ -155,14 +155,14 @@ pub fn group_matches_by_region(matches: &[LicenseMatch]) -> Vec<DetectionGroup> 
 /// # Arguments
 ///
 /// * `matches` - List of license matches to group, should be sorted by start_line
-/// * `_proximity_threshold` - Maximum line gap between matches to be in the same group (kept for API compatibility, not used)
+/// * `proximity_threshold` - Maximum line gap between matches to be in the same group
 ///
 /// # Returns
 ///
 /// A vector of DetectionGroup objects, each containing matches that form a region
 fn group_matches_by_region_with_threshold(
     matches: &[LicenseMatch],
-    _proximity_threshold: usize,
+    proximity_threshold: usize,
 ) -> Vec<DetectionGroup> {
     let mut groups = Vec::new();
     let mut current_group: Vec<LicenseMatch> = Vec::new();
@@ -188,7 +188,7 @@ fn group_matches_by_region_with_threshold(
             }
             groups.push(DetectionGroup::new(vec![match_item.clone()]));
             current_group = Vec::new();
-        } else if should_group_together(previous_match, match_item) {
+        } else if should_group_together(previous_match, match_item, proximity_threshold) {
             current_group.push(match_item.clone());
         } else {
             if !current_group.is_empty() {
@@ -215,9 +215,9 @@ fn group_matches_by_region_with_threshold(
 /// ```
 ///
 /// This means: GROUP if start_line <= prev_end_line + 4 (equivalent to line_gap <= 4)
-fn should_group_together(prev: &LicenseMatch, cur: &LicenseMatch) -> bool {
+fn should_group_together(prev: &LicenseMatch, cur: &LicenseMatch, threshold: usize) -> bool {
     let line_gap = cur.start_line.saturating_sub(prev.end_line);
-    line_gap <= LINES_THRESHOLD
+    line_gap <= threshold
 }
 
 /// Sort matches by start line for grouping.
@@ -312,9 +312,20 @@ fn is_false_positive(matches: &[LicenseMatch]) -> bool {
         return false;
     }
 
-    // Early return if all matches have full relevance (100)
     let has_full_relevance = matches.iter().all(|m| m.rule_relevance == 100);
-    if has_full_relevance {
+
+    let copyright_words = ["copyright", "(c)"];
+    let has_copyrights = matches.iter().all(|m| {
+        m.matched_text
+            .as_ref()
+            .map(|text| {
+                let text_lower = text.to_lowercase();
+                copyright_words.iter().any(|word| text_lower.contains(word))
+            })
+            .unwrap_or(false)
+    });
+
+    if has_copyrights || has_full_relevance {
         return false;
     }
 
@@ -1435,6 +1446,55 @@ mod tests {
         );
     }
 
+    #[test]
+    fn test_group_matches_with_custom_threshold_zero() {
+        let m1 = create_test_match(1, 5, "1-hash", "mit.LICENSE");
+        let m2 = create_test_match(5, 10, "1-hash", "mit.LICENSE");
+        let m3 = create_test_match(12, 15, "1-hash", "apache.LICENSE");
+
+        let groups =
+            group_matches_by_region_with_threshold(&[m1.clone(), m2.clone(), m3.clone()], 0);
+
+        assert_eq!(groups.len(), 2, "Threshold 0 should only group gap=0");
+        assert_eq!(groups[0].matches.len(), 2);
+        assert_eq!(groups[1].matches.len(), 1);
+    }
+
+    #[test]
+    fn test_group_matches_with_custom_threshold_large() {
+        let m1 = create_test_match(1, 5, "1-hash", "mit.LICENSE");
+        let m2 = create_test_match(50, 55, "1-hash", "mit.LICENSE");
+
+        let groups = group_matches_by_region_with_threshold(&[m1, m2], 100);
+
+        assert_eq!(
+            groups.len(),
+            1,
+            "Large threshold should group distant matches"
+        );
+    }
+
+    #[test]
+    fn test_group_matches_threshold_exactly_at_boundary() {
+        let m1 = create_test_match(1, 5, "1-hash", "mit.LICENSE");
+        let m2_at_boundary = create_test_match(10, 15, "1-hash", "mit.LICENSE");
+
+        let groups =
+            group_matches_by_region_with_threshold(&[m1.clone(), m2_at_boundary.clone()], 4);
+        assert_eq!(
+            groups.len(),
+            2,
+            "Threshold 4: start 10 > end 5 + 4, should not group"
+        );
+
+        let groups = group_matches_by_region_with_threshold(&[m1, m2_at_boundary], 5);
+        assert_eq!(
+            groups.len(),
+            1,
+            "Threshold 5: start 10 <= end 5 + 5, should group"
+        );
+    }
+
     #[allow(clippy::too_many_arguments)]
     fn create_test_match_with_params(
         license_expression: &str,
@@ -1907,6 +1967,193 @@ mod tests {
         assert!(
             !is_false_positive(&matches),
             "Full relevance should not be filtered"
+        );
+    }
+
+    #[test]
+    fn test_is_false_positive_with_copyright_word() {
+        let mut m = create_test_match_with_params(
+            "gpl-2.0",
+            "2-aho",
+            1,
+            10,
+            50.0,
+            100,
+            1,
+            50.0,
+            50,
+            "gpl-2.0.LICENSE",
+        );
+        m.matched_text = Some("This is copyrighted material under GPL".to_string());
+        let matches = vec![m];
+        assert!(
+            !is_false_positive(&matches),
+            "Match with 'copyright' should not be false positive"
+        );
+    }
+
+    #[test]
+    fn test_is_false_positive_with_c_symbol() {
+        let mut m = create_test_match_with_params(
+            "mit", "2-aho", 1500, 1510, 30.0, 10, 2, 30.0, 50, "mit.RULE",
+        );
+        m.matched_text = Some("Licensed under MIT (c) 2024".to_string());
+        let matches = vec![m];
+        assert!(
+            !is_false_positive(&matches),
+            "Match with '(c)' should not be false positive"
+        );
+    }
+
+    #[test]
+    fn test_is_false_positive_without_copyright_word() {
+        let mut m = create_test_match_with_params(
+            "gpl-2.0",
+            "2-aho",
+            1,
+            10,
+            50.0,
+            5,
+            1,
+            50.0,
+            50,
+            "gpl-2.0.LICENSE",
+        );
+        m.matched_text = Some("GPL licensed software".to_string());
+        let matches = vec![m];
+        assert!(
+            is_false_positive(&matches),
+            "GPL with rule_length=1 should still be false positive without copyright word"
+        );
+    }
+
+    #[test]
+    fn test_is_false_positive_partial_copyright() {
+        let mut m1 = create_test_match_with_params(
+            "gpl-2.0",
+            "2-aho",
+            1,
+            5,
+            50.0,
+            10,
+            1,
+            50.0,
+            50,
+            "gpl-2.0.LICENSE",
+        );
+        m1.matched_text = Some("Copyright GPL".to_string());
+
+        let mut m2 = create_test_match_with_params(
+            "gpl-2.0",
+            "2-aho",
+            6,
+            10,
+            50.0,
+            10,
+            1,
+            50.0,
+            50,
+            "gpl-2.0.LICENSE",
+        );
+        m2.matched_text = Some("GPL licensed".to_string());
+
+        let matches = vec![m1, m2];
+        assert!(
+            is_false_positive(&matches),
+            "Not ALL matches have copyright word, GPL rule_length=1 should still be false positive"
+        );
+    }
+
+    #[test]
+    fn test_is_false_positive_all_matches_with_copyright() {
+        let mut m1 = create_test_match_with_params(
+            "gpl-2.0",
+            "2-aho",
+            1,
+            5,
+            50.0,
+            10,
+            1,
+            50.0,
+            50,
+            "gpl-2.0.LICENSE",
+        );
+        m1.matched_text = Some("Copyright GPL".to_string());
+
+        let mut m2 = create_test_match_with_params(
+            "gpl-2.0",
+            "2-aho",
+            6,
+            10,
+            50.0,
+            10,
+            1,
+            50.0,
+            50,
+            "gpl-2.0.LICENSE",
+        );
+        m2.matched_text = Some("(c) GPL".to_string());
+
+        let matches = vec![m1, m2];
+        assert!(
+            !is_false_positive(&matches),
+            "ALL matches have copyright word, should NOT be false positive even for GPL with rule_length=1"
+        );
+    }
+
+    #[test]
+    fn test_is_false_positive_matched_text_none() {
+        let mut m = create_test_match_with_params(
+            "gpl-2.0",
+            "2-aho",
+            1,
+            10,
+            50.0,
+            5,
+            1,
+            50.0,
+            50,
+            "gpl-2.0.LICENSE",
+        );
+        m.matched_text = None;
+        let matches = vec![m];
+        assert!(
+            is_false_positive(&matches),
+            "With matched_text=None, copyright check fails, GPL short rule should be filtered"
+        );
+    }
+
+    #[test]
+    fn test_is_false_positive_copyright_case_insensitive() {
+        let mut m =
+            create_test_match_with_params("mit", "2-aho", 1, 10, 50.0, 10, 1, 50.0, 50, "mit.RULE");
+        m.matched_text = Some("COPYRIGHT HOLDER NAME".to_string());
+        let matches = vec![m];
+        assert!(
+            !is_false_positive(&matches),
+            "COPYRIGHT (uppercase) should match case-insensitively"
+        );
+    }
+
+    #[test]
+    fn test_is_false_positive_copyright_empty_string() {
+        let mut m = create_test_match_with_params(
+            "gpl-2.0",
+            "2-aho",
+            1,
+            10,
+            50.0,
+            5,
+            1,
+            50.0,
+            50,
+            "gpl-2.0.LICENSE",
+        );
+        m.matched_text = Some("".to_string());
+        let matches = vec![m];
+        assert!(
+            is_false_positive(&matches),
+            "Empty matched_text should not satisfy copyright check"
         );
     }
 

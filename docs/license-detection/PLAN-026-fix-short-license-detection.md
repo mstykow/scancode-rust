@@ -41,6 +41,7 @@ if is_single
 **Why this was wrong**:
 
 Python's `is_false_positive()` at `detection.py:1162-1239` does NOT have this check. Python only filters:
+
 1. Bare rules (gpl_bare, freeware_bare, public-domain_bare) with low relevance
 2. GPL with all rules having length == 1
 3. Late matches with low relevance and short rules
@@ -94,6 +95,7 @@ Contains text `Copyright: ISC` in an RPM spec file. The file has "ISC" as a copy
 #### `warranty-disclaimer_1.txt`
 
 Contains the text:
+
 ```
 THIS CODE AND INFORMATION IS PROVIDED "AS IS" WITHOUT WARRANTY OF
 ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED TO
