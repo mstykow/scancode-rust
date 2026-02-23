@@ -1,16 +1,18 @@
 # PLAN-030: Fix `restore_non_overlapping()` Token Position Usage
 
 **Date**: 2026-02-23
-**Status**: Validated - Root Cause Identified, Implementation Strategy Confirmed
-**Priority**: 1 (Critical - Identified as #1 difference in PLAN-029)
-**Impact**: ~100+ golden test failures expected to improve
+**Status**: Deferred - Fix is correct but does not address root cause of golden test failures
+**Priority**: 2 (Not the root cause - see investigation in Section 19)
+**Impact**: No change in golden test pass rate (397 failures before and after fix)
 **Related**: PLAN-029 (Comprehensive Difference Analysis)
 
-**Key Finding**: Previous implementation attempts failed due to test helpers with unrealistic token positions (not a fundamental issue with the approach). The correct implementation requires fallback logic for zero-token cases, mirroring the pattern already used in `qcontains()` and `qoverlap()`.
+**Key Finding**: Investigation revealed that this fix is technically correct (all unit tests pass, no new regressions), but it does NOT address the root cause of the golden test failures. The actual issues are in detection grouping and license expression assembly. See Section 19 for detailed analysis.
 
 ---
 
 ## Executive Summary
+
+**INVESTIGATION CONCLUSION**: The proposed 3-case `match_to_qspan()` implementation with fallback logic is correct and passes all unit tests, but does not change golden test results because the failures are caused by other issues in the detection pipeline.
 
 The Rust implementation of `restore_non_overlapping()` uses **line-based spans** while the Python reference uses **token-based spans**. This fundamental mismatch causes incorrect match restoration - matches may be incorrectly restored when they overlap on line boundaries but not token boundaries, or incorrectly discarded when they overlap on token boundaries but not line boundaries.
 
@@ -1358,7 +1360,77 @@ If tests fail due to test helper token values:
 
 ---
 
-## 19. Document History
+## 19. Investigation Report: Fix Does Not Cause Regressions
+
+### 19.1 Executive Summary
+
+**Key Finding: The proposed fix does NOT cause additional regressions.**
+
+Testing revealed:
+- **Baseline (without fix)**: 397 external golden test failures
+- **With 3-case fix applied**: 397 external golden test failures (same count)
+- **All unit tests pass** with the fix applied
+
+### 19.2 Methodology
+
+1. Applied the 3-case `match_to_qspan()` implementation with fallback for zero tokens
+2. Ran `cargo test restore_non_overlapping` - all 11 tests passed
+3. Ran `cargo test test_golden_external` - 397 failures (same as baseline)
+4. Compared specific failing tests (e.g., `ipheth.c`, `ISC.t2`) - identical behavior before and after
+
+### 19.3 Specific Test Case Analysis
+
+#### Case 1: `ipheth.c` (external/slic-tests/2/ipheth.c)
+
+**Expected**: `["bsd-new OR gpl-2.0", "bsd-new OR gpl-2.0"]`
+**Actual (baseline)**: `["bsd-new", "bsd-new OR gpl-2.0"]`
+**Actual (with fix)**: `["bsd-new", "bsd-new OR gpl-2.0"]` (identical)
+
+**Root cause is NOT in `restore_non_overlapping`**:
+- The GPL match at tokens 132-140 (lines 20-21) is being filtered or merged away
+- The `bsd-new` match spans tokens 15-291 (lines 7-38)
+- These matches have OVERLAPPING token ranges (15-291 contains 132-140)
+- Therefore the GPL match correctly stays discarded (overlaps with kept match)
+- The issue is that Python produces `["bsd-new OR gpl-2.0", "bsd-new OR gpl-2.0"]` which means there should be TWO separate detections
+
+#### Case 2: `ISC.t2` (external/glc/ISC.t2)
+
+**Expected**: `["isc", "isc"]`
+**Actual (baseline)**: `["isc"]`
+**Actual (with fix)**: `["isc"]` (identical)
+
+**Root cause is NOT in `restore_non_overlapping`**:
+- Refined matches show: `isc lines 7-17 tokens 21-132` and `isc lines 1-1 tokens 0-2`
+- The `isc lines 1-1 tokens 0-2` match IS being kept (separate from the main match)
+- But only ONE detection is output instead of TWO
+- The issue is in detection grouping/assembly, not in `restore_non_overlapping`
+
+### 19.4 Evidence That Fix Is Correct
+
+1. **Unit tests pass**: All 11 `restore_non_overlapping` tests pass with the fix
+2. **No new regressions**: Test failure count unchanged (397 → 397)
+3. **No behavior change**: Individual failing tests show identical results
+
+### 19.5 Root Cause of Test Failures
+
+The golden test failures are NOT caused by `restore_non_overlapping`. Analysis shows:
+
+1. **Detection grouping issue**: Multiple matches on same file are being grouped incorrectly
+2. **Assembly issue**: Expected multiple detections are being merged into single detection
+3. **License expression handling**: `bsd-new OR gpl-2.0` expression not being preserved in output
+
+### 19.6 Recommendation
+
+**DEFER THIS FIX** - The `restore_non_overlapping` fix is technically correct but does not address the actual root cause of the golden test failures.
+
+**Priority should shift to**:
+1. Investigate `filter_contained_matches()` - may be incorrectly filtering matches
+2. Investigate detection grouping in `detection.rs` - multiple matches grouped as single detection
+3. Investigate license expression assembly - compound expressions not being preserved
+
+---
+
+## 20. Document History
 
 | Date | Author | Changes |
 |------|--------|---------|
@@ -1366,3 +1438,4 @@ If tests fail due to test helper token values:
 | 2026-02-23 | AI Agent | Added validation report with regression analysis |
 | 2026-02-23 | AI Agent | Added corrected implementation with fallback logic |
 | 2026-02-23 | AI Agent | Deep validation analysis - identified test helper issues, golden test patterns, matcher verification |
+| 2026-02-23 | AI Agent | **Investigation complete**: Fix does NOT cause regressions. Root cause is in detection grouping/assembly, not `restore_non_overlapping`. Recommendation: Defer this fix and investigate grouping/assembly issues. |

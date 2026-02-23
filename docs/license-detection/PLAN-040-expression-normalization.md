@@ -1,10 +1,40 @@
 # PLAN-040: Expression Normalization Implementation
 
 **Date**: 2026-02-23
-**Status**: VERIFICATION COMPLETE - Re-prioritization Needed
-**Priority**: MEDIUM (Lowered from HIGH after verification)
+**Status**: CLOSED - No Implementation Needed
+**Priority**: N/A (Plan Closed)
 **Related**: PLAN-029 Section 2.6, PLAN-010, PLAN-027
-**Estimated Effort**: Small (Single phase, optional feature)
+**Estimated Effort**: N/A (No implementation required)
+
+---
+
+## Closure Summary
+
+### Why This Was Investigated
+
+This plan was created based on analysis in PLAN-029 Section 2.6, which hypothesized that differences in license expression normalization between Python and Rust were causing ~50+ golden test failures. The initial assumption was that Python's `simplify()` method (with boolean absorption, elimination, and canonical sorting) was being applied during detection, and that Rust's simpler deduplication-only approach was causing output differences.
+
+### Why No Implementation Is Needed
+
+**The hypothesis was incorrect.** After thorough verification of the Python codebase:
+
+1. **Python does NOT apply `simplify()` during detection** - The `simplify()` method is only called in summary/post-processing code (`summarycode/summarizer.py`, `score.py`, `plugin_consolidate.py`), never in the detection phase.
+
+2. **Python's detection uses simple deduplication** - During detection, Python only uses `combine_expressions(unique=True)` which performs string-based deduplication, exactly matching Rust's current `simplify_expression()` behavior.
+
+3. **Rust's current implementation is correct** - Rust's `simplify_expression()` is functionally equivalent to Python's `combine_expressions(unique=True)` for the detection use case.
+
+### The Actual Root Cause
+
+**The golden test failures are caused by match detection and grouping differences, NOT expression normalization:**
+
+| Issue | Root Cause | Evidence |
+|-------|------------|----------|
+| Fewer matches detected | Match detection logic differs | `gpl-2.0_82.RULE`: Expected 3 matches, got 1 |
+| Separate vs combined detections | Match grouping logic differs | `gpl_and_lgpl_and_gfdl-1.2.txt`: Expected combined expression, got separate |
+| Match count mismatches | Detection aggregation differs | Tests compare individual match expressions, not combined |
+
+**The focus should shift to investigating match detection and grouping logic**, not expression normalization.
 
 ---
 
@@ -18,11 +48,13 @@
 3. Golden tests compare individual match expressions, NOT combined detection expressions
 4. Most failures are match detection/grouping issues, not expression normalization
 
-**Recommendation**: This plan should be deprioritized. Focus should shift to match detection and grouping logic differences.
+**Recommendation**: **PLAN CLOSED** - No implementation needed. Rust's expression handling matches Python's detection-phase behavior. Focus should shift to match detection and grouping logic (separate investigation required).
 
 ---
 
 ## 0. Verification Report (2026-02-23)
+
+> **KEY FINDING**: Expression normalization is NOT the root cause of golden test failures. This plan is closed with no implementation needed.
 
 ### 0.1 Python Analysis Verification
 
@@ -89,10 +121,10 @@ The `lzma-sdk-2006` example from PLAN-029 appears to be illustrative, not actual
 
 ### 0.5 Recommendations
 
-1. **Close this plan as NOT THE ROOT CAUSE** - Expression normalization is not the issue
-2. **Investigate match detection/grouping** - This is where the real differences lie
-3. **Keep Rust's current expression handling** - It matches Python's detection-phase behavior
-4. **Consider simplification for summary/post-processing** - Only if needed for summary output parity
+1. **~~Close this plan as NOT THE ROOT CAUSE~~** - DONE. Plan is CLOSED with no implementation needed.
+2. **Investigate match detection/grouping** - This is where the real differences lie (separate investigation required)
+3. **Keep Rust's current expression handling** - It matches Python's detection-phase behavior exactly
+4. **Consider simplification for summary/post-processing** - Only if needed for summary output parity in the future
 
 ---
 
@@ -600,6 +632,8 @@ Compare Python and Rust output for specific expressions:
 
 ### Priority Assessment (Updated After Verification)
 
+> **STATUS: PLAN CLOSED** - No implementation required. Expression normalization was not the root cause.
+
 Based on the verification analysis:
 
 **Key Question**: Does Python actually apply boolean simplification during detection?
@@ -613,7 +647,7 @@ Based on the verification analysis:
 
 ### Recommended Approach (Updated)
 
-1. **CLOSE THIS PLAN** - Expression normalization is not the root cause
+1. **~~CLOSE THIS PLAN~~** - **DONE**. Expression normalization is not the root cause
 2. **INVESTIGATE MATCH DETECTION** - The real differences are in:
    - How matches are discovered and scored
    - How matches are grouped into detections
@@ -624,7 +658,7 @@ Based on the verification analysis:
 
 | Phase | Priority | Estimated Tests Fixed | Risk | Status |
 |-------|----------|----------------------|------|--------|
-| Close this plan | N/A | 0 | None | **RECOMMENDED** |
+| ~~Close this plan~~ | N/A | 0 | None | **CLOSED** |
 | Investigate match grouping | Critical | ~50+ | Low | **NEEDED** |
 | License equivalence | Low | ~5-10 | Medium | Optional |
 | Boolean absorption | Very Low | ~0-5 | Medium | Optional |
@@ -634,21 +668,23 @@ Based on the verification analysis:
 
 ## 9. Action Items
 
-### Immediate (Updated)
+### Immediate (Updated) - ALL COMPLETE
 
 - [x] Run golden tests with verbose output to identify actual expression-related failures
 - [x] Compare Python's `combine_expressions()` output with Rust's for same inputs
 - [x] Verify Python does NOT apply `simplify()` during detection phase
 - [x] **CONCLUSION: Expression normalization is NOT the root cause**
+- [x] **PLAN CLOSED with no implementation needed**
 
-### Next Steps (Updated)
+### Next Steps (Updated) - Separate Investigation Required
 
+- [ ] Create new plan for match detection/grouping investigation
 - [ ] Investigate match detection differences between Python and Rust
 - [ ] Compare match grouping logic (how matches become detections)
 - [ ] Analyze why some tests expect combined expressions vs separate match expressions
 - [ ] Document intentional differences in match/detection behavior
 
-### Implementation (Lower Priority)
+### Implementation (Lower Priority) - OPTIONAL, Not Required for Parity
 
 - [ ] Add license equivalence mapping based on SPDX data (optional)
 - [ ] Add absorption rules for summary/post-processing (optional)
@@ -658,12 +694,17 @@ Based on the verification analysis:
 ### Documentation
 
 - [x] Document verification findings in this plan
+- [x] Update plan status to CLOSED
 - [ ] Create new plan for match detection/grouping investigation
 - [ ] Update PLAN-029 with correct root cause
 
 ---
 
 ## 10. Conclusion (Updated After Verification)
+
+> **PLAN STATUS: CLOSED - No Implementation Needed**
+>
+> Expression normalization was thoroughly investigated and confirmed NOT to be the root cause of golden test failures.
 
 The expression normalization issue described in PLAN-029 Section 2.6 has been **thoroughly investigated**:
 
@@ -684,11 +725,11 @@ The expression normalization issue described in PLAN-029 Section 2.6 has been **
    - Match grouping (how matches become detections)
    - Match expression collection (tests expect individual match expressions, not combined detection expressions)
 
-### Final Recommendation
+### Final Decision
 
-**CLOSE THIS PLAN** without implementation. Expression normalization is working correctly for detection parity. The focus should shift to investigating match detection and grouping differences, which are the actual root cause of the golden test failures.
+**PLAN CLOSED** without implementation. Expression normalization is working correctly for detection parity. The focus should shift to investigating match detection and grouping differences, which are the actual root cause of the golden test failures.
 
-This plan remains valuable as documentation of Python's expression handling behavior and could be referenced if summary/post-processing output parity becomes a requirement.
+This plan remains valuable as documentation of Python's expression handling behavior and could be referenced if summary/post-processing output parity becomes a requirement in the future.
 
 ---
 
@@ -906,3 +947,4 @@ This compares individual match expressions, NOT combined detection expressions. 
 |------|--------|---------|
 | 2026-02-23 | AI Agent | Initial plan creation from PLAN-029 analysis |
 | 2026-02-23 | AI Agent | Verification complete: Root cause corrected, priority lowered, added Appendix C evidence |
+| 2026-02-23 | AI Agent | **PLAN CLOSED**: Added closure summary, confirmed no implementation needed, root cause is match detection/grouping (not expressions) |
