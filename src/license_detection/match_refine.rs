@@ -156,7 +156,7 @@ fn combine_matches(a: &LicenseMatch, b: &LicenseMatch) -> LicenseMatch {
 ///
 /// Based on Python: `merge_matches()` (match.py:869-1068)
 /// Uses distance-based merging with multiple merge conditions.
-fn merge_overlapping_matches(matches: &[LicenseMatch]) -> Vec<LicenseMatch> {
+pub fn merge_overlapping_matches(matches: &[LicenseMatch]) -> Vec<LicenseMatch> {
     if matches.is_empty() {
         return Vec::new();
     }

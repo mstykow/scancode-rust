@@ -45,7 +45,9 @@ pub use detection::LicenseDetection;
 
 pub use aho_match::aho_match;
 pub use hash_match::hash_match;
-pub use match_refine::{filter_invalid_contained_unknown_matches, refine_matches};
+pub use match_refine::{
+    filter_invalid_contained_unknown_matches, merge_overlapping_matches, refine_matches,
+};
 pub use seq_match::{
     MAX_NEAR_DUPE_CANDIDATES, compute_candidates_with_msets, seq_match, seq_match_with_candidates,
 };
@@ -120,29 +122,39 @@ impl LicenseDetectionEngine {
         let mut all_matches = Vec::new();
         let mut matched_qspans: Vec<query::PositionSpan> = Vec::new();
 
-        // Phase 1: Hash, SPDX, Aho-Corasick matching
-        // Track 100% coverage matches for Phase 3's is_matchable() check
-        // Corresponds to Python: index.py:1056-1057
-
+        // Phase 1a: Hash matching
+        // Python returns immediately if hash matches found (index.py:987-991)
         {
             let whole_run = query.whole_query_run();
             let hash_matches = hash_match(&self.index, &whole_run);
-            for m in &hash_matches {
-                if m.match_coverage >= 99.99 && m.end_token > m.start_token {
-                    matched_qspans.push(query::PositionSpan::new(m.start_token, m.end_token - 1));
-                }
-                if m.is_license_text && m.rule_length > 120 && m.match_coverage > 98.0 {
-                    let span =
-                        query::PositionSpan::new(m.start_token, m.end_token.saturating_sub(1));
-                    query.subtract(&span);
-                }
+
+            if !hash_matches.is_empty() {
+                let mut matches = hash_matches;
+                sort_matches_by_line(&mut matches);
+
+                let groups = group_matches_by_region(&matches);
+                let detections: Vec<LicenseDetection> = groups
+                    .iter()
+                    .map(|group| {
+                        let mut detection = create_detection_from_group(group);
+                        populate_detection_from_group_with_spdx(
+                            &mut detection,
+                            group,
+                            &self.spdx_mapping,
+                        );
+                        detection
+                    })
+                    .collect();
+
+                return Ok(post_process_detections(detections, 0.0));
             }
-            all_matches.extend(hash_matches);
         }
 
+        // Phase 1b: SPDX-LID matching
         {
             let spdx_matches = spdx_lid_match(&self.index, &query);
-            for m in &spdx_matches {
+            let merged_spdx = merge_overlapping_matches(&spdx_matches);
+            for m in &merged_spdx {
                 if m.match_coverage >= 99.99 && m.end_token > m.start_token {
                     matched_qspans.push(query::PositionSpan::new(m.start_token, m.end_token - 1));
                 }
@@ -152,13 +164,15 @@ impl LicenseDetectionEngine {
                     query.subtract(&span);
                 }
             }
-            all_matches.extend(spdx_matches);
+            all_matches.extend(merged_spdx);
         }
 
+        // Phase 1c: Aho-Corasick matching
         {
             let whole_run = query.whole_query_run();
             let aho_matches = aho_match(&self.index, &whole_run);
-            for m in &aho_matches {
+            let merged_aho = merge_overlapping_matches(&aho_matches);
+            for m in &merged_aho {
                 if m.match_coverage >= 99.99 && m.end_token > m.start_token {
                     matched_qspans.push(query::PositionSpan::new(m.start_token, m.end_token - 1));
                 }
@@ -168,11 +182,15 @@ impl LicenseDetectionEngine {
                     query.subtract(&span);
                 }
             }
-            all_matches.extend(aho_matches);
+            all_matches.extend(merged_aho);
         }
 
+        // Phases 2-4: Sequence matching (near_dupe + seq + query_runs)
+        // Collect all sequence matches, merge ONCE after all phases
+        // Corresponds to Python's single `approx` matcher (index.py:724-812)
+        let mut seq_all_matches = Vec::new();
+
         // Phase 2: Near-duplicate detection
-        // Corresponds to Python: index.py:733-771
         {
             let whole_run = query.whole_query_run();
             let near_dupe_candidates = compute_candidates_with_msets(
@@ -186,11 +204,6 @@ impl LicenseDetectionEngine {
                 let near_dupe_matches =
                     seq_match_with_candidates(&self.index, &whole_run, &near_dupe_candidates);
 
-                // Subtract matched positions from query to prevent double-matching.
-                // Corresponds to Python: index.py:767-771
-                // Note: Python adds ALL near-dupe matches to already_matched_qspans,
-                // not just 100% coverage matches. This is crucial for Phase 4's
-                // is_matchable() check to prevent double-matching.
                 for m in &near_dupe_matches {
                     if m.end_token > m.start_token {
                         let span = query::PositionSpan::new(m.start_token, m.end_token - 1);
@@ -199,7 +212,7 @@ impl LicenseDetectionEngine {
                     }
                 }
 
-                all_matches.extend(near_dupe_matches);
+                seq_all_matches.extend(near_dupe_matches);
             }
         }
 
@@ -207,25 +220,18 @@ impl LicenseDetectionEngine {
         {
             let whole_run = query.whole_query_run();
             let seq_matches = seq_match(&self.index, &whole_run);
-            all_matches.extend(seq_matches);
+            seq_all_matches.extend(seq_matches);
         }
 
-        // Phase 4: Query run matching (high_resemblance=False, top 70)
-        // This is essential for matching combined rules like "cddl-1.0_or_gpl-2.0-glassfish"
-        // Corresponds to Python: index.py:786-812
-        // Note: This is in addition to Phase 3, not a replacement
-        // The is_matchable() check handles exclusion of already-matched positions
+        // Phase 4: Query run matching
         const MAX_QUERY_RUN_CANDIDATES: usize = 70;
         {
             let whole_run = query.whole_query_run();
             for query_run in query.query_runs().iter() {
-                // Skip the whole_run since it was already matched in Phase 2 and 3
                 if query_run.start == whole_run.start && query_run.end == whole_run.end {
                     continue;
                 }
 
-                // is_matchable() excludes already-matched positions
-                // Corresponds to Python: index.py:1061-1064
                 if !query_run.is_matchable(false, &matched_qspans) {
                     continue;
                 }
@@ -238,10 +244,14 @@ impl LicenseDetectionEngine {
                 );
                 if !candidates.is_empty() {
                     let matches = seq_match_with_candidates(&self.index, query_run, &candidates);
-                    all_matches.extend(matches);
+                    seq_all_matches.extend(matches);
                 }
             }
         }
+
+        // Merge all sequence matches ONCE (like Python's approx matcher)
+        let merged_seq = merge_overlapping_matches(&seq_all_matches);
+        all_matches.extend(merged_seq);
 
         let unknown_matches = unknown_match(&self.index, &query, &all_matches);
         let filtered_unknown_matches =
