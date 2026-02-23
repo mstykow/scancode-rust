@@ -1,23 +1,57 @@
 # PLAN-037: Add Post-Phase `merge_matches()` Calls
 
 **Date**: 2026-02-23
-**Status**: Planning Complete - Ready for Implementation (Dependencies Identified)
+**Status**: VERIFIED - Ready for Implementation (Prerequisites Resolved)
 **Priority**: HIGH
-**Related**: PLAN-024, PLAN-029 (Sections 2.4, 3.1), PLAN-036
-**Prerequisites**: Sort key fix (matcher_order), PLAN-036 (optional)
+**Related**: PLAN-024, PLAN-029 (Sections 2.4, 3.1)
+**Prerequisites**: ~~Sort key fix (matcher_order)~~ - RESOLVED, ~~PLAN-036~~ - RESOLVED
 
 ## Executive Summary
 
 Python's license detection calls `merge_matches()` after each matching phase to deduplicate overlapping matches before the next phase runs. Rust only merges at the end of `refine_matches()`, causing overlapping matches from different phases to remain as separate matches, leading to duplicate expressions and incorrect containment filtering.
 
-**Key Findings During Investigation**:
+**Verification Status (2026-02-23)**:
 
-1. **CRITICAL PREREQUISITE**: The `merge_overlapping_matches()` sort key is missing `matcher_order`, which must be fixed first
-2. **MISSING FEATURE**: Python returns immediately after `hash_match()` if a match is found - Rust should do the same
-3. **PHASE MAPPING CORRECTED**: Rust's Phases 2-4 (near_dupe, seq, query_runs) collectively correspond to Python's single `approx` matcher
-4. **PLAN-036 DEPENDENCY**: The equal ispan selection uses wrong metric (matched_length vs magnitude) - fix recommended but optional
+1. **PREREQUISITE RESOLVED**: The `merge_overlapping_matches()` sort key now includes `matcher_order` (line 175)
+2. **PLAN-036 RESOLVED**: Equal ispan selection now uses `qspan_magnitude()` (lines 226-237)
+3. **MISSING FEATURE**: Python returns immediately after `hash_match()` if a match is found - Rust should do the same
+4. **PHASE MAPPING VERIFIED**: Rust's Phases 2-4 (near_dupe, seq, query_runs) collectively correspond to Python's single `approx` matcher
+5. **FUNCTION VISIBILITY**: `merge_overlapping_matches()` is still private and needs `pub` keyword
 
 **Expected Impact**: ~200+ test improvements across external tests
+
+---
+
+## Verification Summary (2026-02-23)
+
+### Key Findings
+
+1. **ALL PREREQUISITES RESOLVED**: 
+   - `matcher_order` in sort key: VERIFIED at line 175
+   - `qspan_magnitude()` for equal ispan: VERIFIED at lines 226-237
+
+2. **FUNCTION VISIBILITY ISSUE**: 
+   - `merge_overlapping_matches()` is still private
+   - Needs `pub` keyword added at line 159
+
+3. **HASH MATCH EARLY RETURN MISSING**:
+   - Python returns immediately after hash_match() (index.py:987-991)
+   - Rust continues to other phases, causing duplicate matches
+   - Need to add early return
+
+4. **PHASE MAPPING VERIFIED**:
+   - Rust Phases 2-4 (near_dupe + seq + query_runs) = Python's single `approx` matcher
+   - Should merge ONCE after all sequence matching combined, not after each sub-phase
+
+### Remaining Implementation
+
+| Step | File | Lines | Action |
+|------|------|-------|--------|
+| 1 | match_refine.rs | 159 | Add `pub` keyword |
+| 2 | mod.rs | 127-141 | Add hash early return |
+| 3 | mod.rs | 143-156 | Add merge after SPDX-LID |
+| 4 | mod.rs | 158-172 | Add merge after Aho |
+| 5 | mod.rs | 174-244 | Collect all seq matches, merge once |
 
 ---
 
@@ -38,58 +72,80 @@ Rust accumulates all matches from different phases (hash, SPDX-LID, Aho-Corasick
 
 ---
 
-## 2. Current State Analysis
+## 2. Current State Analysis (VERIFIED 2026-02-23)
 
-### 2.1 Rust Implementation (mod.rs:117-271)
+### 2.1 Rust Implementation (mod.rs:117-271) - VERIFIED
 
 ```rust
-// Phase 1: Hash matching
+// Phase 1a: Hash matching (lines 127-141)
 let hash_matches = hash_match(&self.index, &whole_run);
-// ... process matched_qspans ...
-all_matches.extend(hash_matches);  // NO MERGE
+for m in &hash_matches {
+    // track matched_qspans, subtract license_text
+}
+all_matches.extend(hash_matches);  // NO MERGE, NO EARLY RETURN
 
-// Phase 1b: SPDX-LID matching
+// Phase 1b: SPDX-LID matching (lines 143-156)
 let spdx_matches = spdx_lid_match(&self.index, &query);
+for m in &spdx_matches {
+    // track matched_qspans, subtract license_text
+}
 all_matches.extend(spdx_matches);  // NO MERGE
 
-// Phase 1c: Aho-Corasick matching
+// Phase 1c: Aho-Corasick matching (lines 158-172)
 let aho_matches = aho_match(&self.index, &whole_run);
+for m in &aho_matches {
+    // track matched_qspans, subtract license_text
+}
 all_matches.extend(aho_matches);  // NO MERGE
 
-// Phase 2: Near-duplicate detection
+// Phase 2: Near-duplicate detection (lines 174-204)
 let near_dupe_matches = seq_match_with_candidates(...);
+for m in &near_dupe_matches {
+    // subtract, track matched_qspans
+}
 all_matches.extend(near_dupe_matches);  // NO MERGE
 
-// Phase 3: Regular sequence matching
+// Phase 3: Regular sequence matching (lines 206-211)
 let seq_matches = seq_match(&self.index, &whole_run);
 all_matches.extend(seq_matches);  // NO MERGE
 
-// Phase 4: Query run matching
-// ... multiple query_runs processed ...
-all_matches.extend(matches);  // NO MERGE
+// Phase 4: Query run matching (lines 213-244)
+for query_run in query.query_runs().iter() {
+    // is_matchable check, compute candidates
+    let matches = seq_match_with_candidates(...);
+    all_matches.extend(matches);  // NO MERGE
+}
 
-// Phase 5: Unknown matching
+// Phase 5: Unknown matching (lines 246-249)
 let unknown_matches = unknown_match(&self.index, &query, &all_matches);
+let filtered_unknown_matches = filter_invalid_contained_unknown_matches(&unknown_matches, &all_matches);
 all_matches.extend(filtered_unknown_matches);  // NO MERGE
 
-// ONLY NOW - merge happens inside refine_matches()
+// ONLY NOW - merge happens inside refine_matches() (line 251)
 let refined = refine_matches(&self.index, all_matches, &query);
 ```
 
-**Location**: `src/license_detection/mod.rs:117-271`
+**Location**: `src/license_detection/mod.rs:117-271` (VERIFIED accurate)
 
-### 2.2 Python Reference (index.py:1010-1058)
+### 2.2 Python Reference (index.py:987-1058) - VERIFIED
 
 ```python
+# Pre-phase: Hash matching with EARLY RETURN (lines 987-991)
+if not _skip_hash_match:
+    matches = match_hash.hash_match(self, whole_query_run)
+    if matches:
+        match.set_matched_lines(matches, qry.line_by_pos)
+        return matches  # EARLY RETURN - skip all other phases
+
+# Matcher loop (lines 1010-1057)
 matchers = [
-    Matcher(function=get_spdx_id_matches, ...),
-    Matcher(function=self.get_exact_matches, ...),  # Aho-Corasick
-    Matcher(function=approx, ...),  # Sequence matching
+    Matcher(function=get_spdx_id_matches, ..., name='spdx_lid', continue_matching=True),
+    Matcher(function=self.get_exact_matches, ..., name='aho', continue_matching=False),
+    Matcher(function=approx, ..., name='seq', continue_matching=False),  # only if approximate=True
 ]
 
 already_matched_qspans = []
 for matcher in matchers:
-    # Get matches from this matcher
     matched = matcher.function(
         qry,
         matched_qspans=already_matched_qspans,
@@ -97,23 +153,28 @@ for matcher in matchers:
         deadline=deadline,
     )
 
-    # MERGE IMMEDIATELY after each phase
+    # MERGE IMMEDIATELY after each phase (line 1040)
     matched = match.merge_matches(matched)  # <-- KEY DIFFERENCE
     matches.extend(matched)
 
-    # Subtract matched positions for license_text
+    # Subtract matched positions for license_text (lines 1044-1049)
     for mtch in matched:
         if (mtch.rule.is_license_text
             and mtch.rule.length > 120
             and mtch.coverage() > 98):
             qry.subtract(mtch.qspan)
 
-    # Track 100% coverage matches
+    # Track 100% coverage matches (lines 1056-1057)
     already_matched_qspans.extend(
         mtch.qspan for mtch in matched if mtch.coverage() == 100)
 ```
 
-**Location**: `reference/scancode-toolkit/src/licensedcode/index.py:1010-1058`
+**Location**: `reference/scancode-toolkit/src/licensedcode/index.py:987-1058` (VERIFIED accurate)
+
+**Key Observation**: Python's `approx` matcher (index.py:724-812) performs:
+1. Near-duplicate detection (lines 741-775) - corresponds to Rust Phase 2
+2. Query run matching (lines 787-812) - corresponds to Rust Phases 3+4
+3. Returns ALL matches combined - merged ONCE after the loop
 
 ### 2.3 Key Difference
 
@@ -126,11 +187,28 @@ for matcher in matchers:
 
 ---
 
-## 3. Equivalence Analysis
+## 3. Equivalence Analysis (VERIFIED 2026-02-23)
 
 ### 3.1 Is Rust's `merge_overlapping_matches()` Equivalent to Python's `merge_matches()`?
 
-**YES** - After PLAN-024 implementation, they are functionally equivalent.
+**YES** - After PLAN-024 and PLAN-036 implementation, they are functionally equivalent.
+
+**VERIFIED SORT KEY** (`match_refine.rs:169-176`):
+```rust
+sorted.sort_by(|a, b| {
+    a.rule_identifier
+        .cmp(&b.rule_identifier)
+        .then_with(|| a.start_token.cmp(&b.start_token))
+        .then_with(|| b.hilen.cmp(&a.hilen))
+        .then_with(|| b.matched_length.cmp(&a.matched_length))
+        .then_with(|| a.matcher_order().cmp(&b.matcher_order()))  // FIXED - was missing
+});
+```
+
+**Python sort key** (`match.py:882`):
+```python
+sorter = lambda m: (m.rule.identifier, m.qspan.start, -m.hilen(), -m.len(), m.matcher_order)
+```
 
 Both functions implement:
 
@@ -140,36 +218,37 @@ Both functions implement:
 4. `qdistance_to()` and `idistance_to()` checks
 5. Ispan alignment verification (`qoverlap == ioverlap`)
 
-**Location**: `src/license_detection/match_refine.rs:159-299`
-
-### 3.2 Verification
-
-The function was rewritten in PLAN-024 to match Python's logic:
-
+**VERIFIED EQUAL ISPAN SELECTION** (`match_refine.rs:226-237`):
 ```rust
-// Rust (match_refine.rs:159-299)
-fn merge_overlapping_matches(matches: &[LicenseMatch]) -> Vec<LicenseMatch> {
-    // Distance threshold
-    let max_rule_side_dist = (rule_length / 2).clamp(1, MAX_DIST);
-
-    // Check both qdistance and idistance
-    if current.qdistance_to(&next) > max_rule_side_dist
-        || current.idistance_to(&next) > max_rule_side_dist {
+if current.ispan() == next.ispan() && current.qoverlap(&next) > 0 {
+    let current_mag = current.qspan_magnitude();  // FIXED - was matched_length
+    let next_mag = next.qspan_magnitude();
+    if current_mag <= next_mag {
+        rule_matches.remove(j);
+        continue;
+    } else {
+        rule_matches.remove(i);
+        i = i.saturating_sub(1);
         break;
     }
-
-    // All merge conditions match Python...
 }
 ```
 
+**Python** (`match.py:948-970`):
 ```python
-# Python (match.py:869-1068)
-max_rule_side_dist = min((rule_length // 2) or 1, max_dist)
-
-if (current_match.qdistance_to(next_match) > max_rule_side_dist
-    or current_match.idistance_to(next_match) > max_rule_side_dist):
-    break
+if current_match.ispan == next_match.ispan and current_match.overlap(next_match):
+    cqmag = current_match.qspan.magnitude()
+    nqmag = next_match.qspan.magnitude()
+    if cqmag <= nqmag:
+        del rule_matches[j]
+        continue
+    else:
+        del rule_matches[i]
+        i -= 1
+        break
 ```
+
+**Location**: `src/license_detection/match_refine.rs:159-302`
 
 **Conclusion**: We can use the existing `merge_overlapping_matches()` function for post-phase merging.
 
@@ -560,99 +639,92 @@ If issues arise:
 
 ---
 
-## 9. Dependency Analysis (CRITICAL - Read Before Implementation)
+## 9. Verification Summary (2026-02-23)
 
-### 9.1 Prerequisite: Sort Key Missing `matcher_order`
+### 9.1 Prerequisite: Sort Key - RESOLVED
 
-**CRITICAL ISSUE**: The current `merge_overlapping_matches()` sort key does NOT include `matcher_order`.
+**STATUS**: `matcher_order` is now included in the sort key.
 
-**Python Sort Key** (`match.py:882`):
+**Verified Current Rust Sort Key** (`match_refine.rs:169-176`):
+```rust
+sorted.sort_by(|a, b| {
+    a.rule_identifier
+        .cmp(&b.rule_identifier)
+        .then_with(|| a.start_token.cmp(&b.start_token))
+        .then_with(|| b.hilen.cmp(&a.hilen))
+        .then_with(|| b.matched_length.cmp(&a.matched_length))
+        .then_with(|| a.matcher_order().cmp(&b.matcher_order()))  // VERIFIED PRESENT
+});
+```
+
+**Python sort key** (`match.py:882`):
 ```python
 sorter = lambda m: (m.rule.identifier, m.qspan.start, -m.hilen(), -m.len(), m.matcher_order)
 ```
 
-**Current Rust Sort Key** (`match_refine.rs:169-175`):
+**Match confirmed** - no action needed.
+
+### 9.2 Prerequisite: Equal ISpan Selection - RESOLVED
+
+**STATUS**: Now uses `qspan_magnitude()` instead of `matched_length`.
+
+**Verified Current Rust** (`match_refine.rs:226-237`):
 ```rust
-sorted.sort_by(|a, b| {
-    a.rule_identifier
-        .cmp(&b.rule_identifier)
-        .then_with(|| a.start_token.cmp(&b.start_token))
-        .then_with(|| b.hilen.cmp(&a.hilen))
-        .then_with(|| b.matched_length.cmp(&a.matched_length))
-    // MISSING: .then_with(|| a.matcher_order().cmp(&b.matcher_order()))
-});
+if current.ispan() == next.ispan() && current.qoverlap(&next) > 0 {
+    let current_mag = current.qspan_magnitude();  // VERIFIED CORRECT
+    let next_mag = next.qspan_magnitude();
+    if current_mag <= next_mag {
+        rule_matches.remove(j);
+        continue;
+    } else {
+        rule_matches.remove(i);
+        i = i.saturating_sub(1);
+        break;
+    }
+}
 ```
 
-**Impact**: Without `matcher_order` in the sort key, matches from different phases may be sorted incorrectly, causing incorrect merge decisions. This is a prerequisite fix that must be done FIRST.
-
-**Fix Location**: `src/license_detection/match_refine.rs:169-175`
-
-**Required Change**:
-```rust
-sorted.sort_by(|a, b| {
-    a.rule_identifier
-        .cmp(&b.rule_identifier)
-        .then_with(|| a.start_token.cmp(&b.start_token))
-        .then_with(|| b.hilen.cmp(&a.hilen))
-        .then_with(|| b.matched_length.cmp(&a.matched_length))
-        .then_with(|| a.matcher_order().cmp(&b.matcher_order()))  // ADD THIS LINE
-});
-```
-
-### 9.2 Prerequisite: Equal ISpan Selection Fix (PLAN-036)
-
-**CRITICAL ISSUE**: The `merge_overlapping_matches()` function uses `matched_length` instead of `qspan.magnitude()` for equal ispan selection.
-
-**Python** (`match.py:946-970`):
+**Python** (`match.py:948-970`):
 ```python
 if current_match.ispan == next_match.ispan and current_match.overlap(next_match):
     cqmag = current_match.qspan.magnitude()
     nqmag = next_match.qspan.magnitude()
-    if cqmag <= nqmag:  # Smaller magnitude wins
+    if cqmag <= nqmag:
         del rule_matches[j]
+        continue
+    else:
+        del rule_matches[i]
+        i -= 1
+        break
 ```
 
-**Current Rust** (`match_refine.rs:225-234`):
-```rust
-if current.ispan() == next.ispan() && current.qoverlap(&next) > 0 {
-    if current.matched_length >= next.matched_length {  // WRONG: uses matched_length
-        rule_matches.remove(j);
-```
+**Match confirmed** - no action needed.
 
-**Impact**: For non-contiguous matches, `magnitude` != `matched_length`, causing different matches to be kept.
-
-**Resolution**: PLAN-036 addresses this. Either:
-1. Implement PLAN-036 first, OR
-2. Accept this behavioral difference for now and document it
-
-**Recommendation**: Fix this as part of PLAN-037 implementation since it affects merge correctness.
-
-### 9.3 Phase Mapping Correction
-
-The current plan incorrectly maps Rust phases to Python phases. Here is the CORRECT mapping:
+### 9.3 Phase Mapping - VERIFIED
 
 | Python Phase | Python Matcher | Rust Equivalent | Rust Code Location |
 |--------------|----------------|-----------------|-------------------|
 | Pre-phase | `hash_match()` | `hash_match()` | `mod.rs:129` |
 | Matcher 1 | `get_spdx_id_matches` | `spdx_lid_match()` | `mod.rs:144` |
 | Matcher 2 | `get_exact_matches` (Aho) | `aho_match()` | `mod.rs:160` |
-| Matcher 3 | `approx` (seq) | `seq_match_with_candidates()` + `seq_match()` + query_runs | `mod.rs:186-243` |
+| Matcher 3 | `approx` (seq) | Near-dupe + seq + query_runs | `mod.rs:174-244` |
 
 **Key Observations**:
 
 1. **Python has 3 matchers in the loop** (SPDX-LID, Aho, seq), each followed by `merge_matches()`
 2. **Rust splits sequence matching** into near-duplicate (Phase 2), regular (Phase 3), and query runs (Phase 4)
-3. **Rust's Phase 2-4** collectively correspond to Python's single `approx` matcher
+3. **Rust's Phases 2-4** collectively correspond to Python's single `approx` matcher
+4. **Python's `approx`** (index.py:724-812) returns ALL matches from near-dupe + query_runs, which are then merged ONCE
 
 **Correct Post-Phase Merge Points for Rust**:
 
-1. After `hash_match()` - **NOT NEEDED** (Python returns early, see below)
+1. After `hash_match()` - **NOT NEEDED** (Python returns early)
 2. After `spdx_lid_match()` - **YES** (corresponds to Python matcher 1)
 3. After `aho_match()` - **YES** (corresponds to Python matcher 2)
-4. After **all** sequence matching (near_dupe + seq + query_runs) - **YES** (corresponds to Python matcher 3)
-5. After `unknown_match()` - **MAYBE** (Python doesn't merge unknown, they're handled separately)
+4. After **all** sequence matching (near_dupe + seq + query_runs combined) - **YES** (corresponds to Python matcher 3)
+5. After `unknown_match()` - **NO** (Python doesn't merge unknown, they're handled separately)
 
-### 9.4 Hash Match Early Return Decision
+### 9.4 Hash Match Early Return - NOT YET IMPLEMENTED
 
 **Python Behavior** (`index.py:987-991`):
 ```python
@@ -672,93 +744,242 @@ for m in &hash_matches {
 all_matches.extend(hash_matches);  // NO EARLY RETURN - continues to other phases
 ```
 
-**Question**: Should Rust add early return like Python?
+**Impact**: Rust continues to other phases after hash match, potentially finding overlapping matches that cause duplicate expressions.
 
-**Analysis**:
-- Python returns immediately on hash match because: exact 100% match found, no need for other matchers
-- Rust continues to other phases, potentially finding overlapping matches
-- This causes duplicate/overlapping matches for hash-matched content
+**Required Action**: Add early return after `hash_match()` when matches are found.
 
-**Recommendation**: **YES, add early return** after hash_match when matches are found.
+### 9.5 Function Visibility - NOT YET IMPLEMENTED
 
-**Code Change** (`mod.rs:129-141`):
-```rust
-let hash_matches = hash_match(&self.index, &whole_run);
-if !hash_matches.is_empty() {
-    // Hash match found - return immediately like Python
-    // Set matched lines and return
-    let mut matches = hash_matches;
-    sort_matches_by_line(&mut matches);
-    // ... create detection and return ...
-    return Ok(detections);
-}
-```
+**Current State**: `merge_overlapping_matches()` is private (no `pub` keyword).
 
-**Impact**: This eliminates an entire class of duplicate match issues where hash matches overlap with other matcher results.
+**Required Action**: Add `pub` to make it accessible from `mod.rs`.
 
-### 9.5 Summary: Prerequisites and Implementation Order
+### 9.6 Summary: Remaining Implementation Steps
 
-**MUST FIX BEFORE PLAN-037**:
-1. Add `matcher_order` to sort key in `merge_overlapping_matches()` (single line change)
-2. Consider PLAN-036 (magnitude vs matched_length) - can be done in parallel or accepted as known difference
+**NO PREREQUISITES REMAIN** - All blockers resolved.
 
-**INCLUDED IN PLAN-037**:
-1. Add hash_match early return (not mentioned in original plan)
-2. Add merge after spdx_lid_match
-3. Add merge after aho_match
-4. Add merge after ALL sequence matching (near_dupe + seq + query_runs combined)
-5. Unknown match handling (no merge needed - Python doesn't merge these)
+**IMPLEMENTATION NEEDED**:
+1. Make `merge_overlapping_matches()` public
+2. Add hash_match early return
+3. Add merge after `spdx_lid_match()`
+4. Add merge after `aho_match()`
+5. Add merge after ALL sequence matching combined (collect near_dupe + seq + query_runs, merge once)
 
 ---
 
-## 10. Corrected Implementation Order
+## 10. Implementation Steps (Updated 2026-02-23)
 
-### Phase 0: Prerequisite Fixes (Do First)
+### Step 1: Make `merge_overlapping_matches()` Public
 
-1. **Step 0.1**: Add `matcher_order` to sort key in `merge_overlapping_matches()`
-   - File: `src/license_detection/match_refine.rs:169-175`
-   - Add: `.then_with(|| a.matcher_order().cmp(&b.matcher_order()))`
-   - Run tests: `cargo test --lib license_detection`
+**File**: `src/license_detection/match_refine.rs:159`
 
-2. **Step 0.2**: (Optional) Implement PLAN-036 for magnitude-based selection
-   - OR document as known behavioral difference
+**Change**: Add `pub` keyword
+```rust
+/// Merge overlapping and adjacent matches for the same rule.
+///
+/// Based on Python: `merge_matches()` (match.py:869-1068)
+/// Uses distance-based merging with multiple merge conditions.
+pub fn merge_overlapping_matches(matches: &[LicenseMatch]) -> Vec<LicenseMatch> {
+    // ... existing implementation ...
+}
+```
 
-### Phase 1: Hash Match Early Return
+### Step 2: Add Hash Match Early Return
 
-3. **Step 1.1**: Add early return after `hash_match()` when matches found
-   - File: `src/license_detection/mod.rs:129-141`
-   - Match Python's behavior: return immediately on hash match
-   - Run tests: `cargo test --lib license_detection`
+**File**: `src/license_detection/mod.rs:127-141`
 
-### Phase 2: Post-Phase Merge Calls
+**Current**:
+```rust
+{
+    let whole_run = query.whole_query_run();
+    let hash_matches = hash_match(&self.index, &whole_run);
+    for m in &hash_matches {
+        // ... process ...
+    }
+    all_matches.extend(hash_matches);
+}
+```
 
-4. **Step 2.1**: Make `merge_overlapping_matches()` public
-   - File: `src/license_detection/match_refine.rs:159`
-   - Change `fn` to `pub fn`
+**Proposed**:
+```rust
+{
+    let whole_run = query.whole_query_run();
+    let hash_matches = hash_match(&self.index, &whole_run);
+    
+    if !hash_matches.is_empty() {
+        // Hash match found - return immediately like Python
+        // See Python: index.py:987-991
+        let mut matches = hash_matches;
+        sort_matches_by_line(&mut matches);
+        
+        let groups = group_matches_by_region(&matches);
+        let detections: Vec<LicenseDetection> = groups
+            .iter()
+            .map(|group| {
+                let mut detection = create_detection_from_group(group);
+                populate_detection_from_group_with_spdx(&mut detection, group, &self.spdx_mapping);
+                detection
+            })
+            .collect();
+        
+        return Ok(post_process_detections(detections, 0.0));
+    }
+}
+```
 
-5. **Step 2.2**: Add merge after `spdx_lid_match()`
-   - Merge before extending `all_matches`
-   - Run tests
+### Step 3: Add Merge After SPDX-LID Match
 
-6. **Step 2.3**: Add merge after `aho_match()`
-   - Merge before extending `all_matches`
-   - Run tests
+**File**: `src/license_detection/mod.rs:143-156`
 
-7. **Step 2.4**: Add merge after ALL sequence matching
-   - This includes: near_dupe + seq_match + query_runs
-   - Collect all sequence matches, merge once, then extend `all_matches`
-   - Run tests
+**Current**:
+```rust
+{
+    let spdx_matches = spdx_lid_match(&self.index, &query);
+    for m in &spdx_matches {
+        // ... process ...
+    }
+    all_matches.extend(spdx_matches);
+}
+```
 
-### Phase 3: Validation
+**Proposed**:
+```rust
+{
+    let spdx_matches = spdx_lid_match(&self.index, &query);
+    
+    // MERGE immediately after SPDX-LID matching
+    // See Python: index.py:1040
+    let merged_spdx = merge_overlapping_matches(&spdx_matches);
+    
+    for m in &merged_spdx {
+        if m.match_coverage >= 99.99 && m.end_token > m.start_token {
+            matched_qspans.push(query::PositionSpan::new(m.start_token, m.end_token - 1));
+        }
+        if m.is_license_text && m.rule_length > 120 && m.match_coverage > 98.0 {
+            let span = query::PositionSpan::new(m.start_token, m.end_token.saturating_sub(1));
+            query.subtract(&span);
+        }
+    }
+    all_matches.extend(merged_spdx);
+}
+```
 
-8. **Step 3.1**: Run full golden test suite
-   - `cargo test --release -q --lib license_detection::golden_test`
+### Step 4: Add Merge After Aho-Corasick Match
 
-9. **Step 3.2**: Compare results with baseline
-   - Document improvements
-   - Document any regressions
+**File**: `src/license_detection/mod.rs:158-172`
 
-10. **Step 3.3**: Update this plan with results
+**Current**:
+```rust
+{
+    let whole_run = query.whole_query_run();
+    let aho_matches = aho_match(&self.index, &whole_run);
+    for m in &aho_matches {
+        // ... process ...
+    }
+    all_matches.extend(aho_matches);
+}
+```
+
+**Proposed**:
+```rust
+{
+    let whole_run = query.whole_query_run();
+    let aho_matches = aho_match(&self.index, &whole_run);
+    
+    // MERGE immediately after Aho-Corasick matching
+    // See Python: index.py:1040
+    let merged_aho = merge_overlapping_matches(&aho_matches);
+    
+    for m in &merged_aho {
+        if m.match_coverage >= 99.99 && m.end_token > m.start_token {
+            matched_qspans.push(query::PositionSpan::new(m.start_token, m.end_token - 1));
+        }
+        if m.is_license_text && m.rule_length > 120 && m.match_coverage > 98.0 {
+            let span = query::PositionSpan::new(m.start_token, m.end_token.saturating_sub(1));
+            query.subtract(&span);
+        }
+    }
+    all_matches.extend(merged_aho);
+}
+```
+
+### Step 5: Add Merge After ALL Sequence Matching Combined
+
+**Important**: Python's `approx` matcher (which corresponds to Rust Phases 2, 3, and 4) returns ALL matches combined, and the loop merges ONCE after. We should follow this pattern.
+
+**File**: `src/license_detection/mod.rs:174-244`
+
+**Current**: Each phase extends `all_matches` separately without merge.
+
+**Proposed**: Collect all sequence matches, merge once, then extend.
+
+```rust
+// Collect all sequence matching results
+let mut seq_all_matches = Vec::new();
+
+// Phase 2: Near-duplicate detection
+{
+    let whole_run = query.whole_query_run();
+    let near_dupe_candidates = compute_candidates_with_msets(
+        &self.index,
+        &whole_run,
+        true,
+        MAX_NEAR_DUPE_CANDIDATES,
+    );
+
+    if !near_dupe_candidates.is_empty() {
+        let near_dupe_matches =
+            seq_match_with_candidates(&self.index, &whole_run, &near_dupe_candidates);
+
+        for m in &near_dupe_matches {
+            if m.end_token > m.start_token {
+                let span = query::PositionSpan::new(m.start_token, m.end_token - 1);
+                query.subtract(&span);
+                matched_qspans.push(span);
+            }
+        }
+
+        seq_all_matches.extend(near_dupe_matches);
+    }
+}
+
+// Phase 3: Regular sequence matching
+{
+    let whole_run = query.whole_query_run();
+    let seq_matches = seq_match(&self.index, &whole_run);
+    seq_all_matches.extend(seq_matches);
+}
+
+// Phase 4: Query run matching
+{
+    let whole_run = query.whole_query_run();
+    for query_run in query.query_runs().iter() {
+        if query_run.start == whole_run.start && query_run.end == whole_run.end {
+            continue;
+        }
+
+        if !query_run.is_matchable(false, &matched_qspans) {
+            continue;
+        }
+
+        let candidates = compute_candidates_with_msets(
+            &self.index,
+            query_run,
+            false,
+            MAX_QUERY_RUN_CANDIDATES,
+        );
+        if !candidates.is_empty() {
+            let matches = seq_match_with_candidates(&self.index, query_run, &candidates);
+            seq_all_matches.extend(matches);
+        }
+    }
+}
+
+// MERGE once after all sequence matching (like Python's approx matcher)
+// See Python: index.py:1040
+let merged_seq = merge_overlapping_matches(&seq_all_matches);
+all_matches.extend(merged_seq);
+```
 
 ---
 
@@ -790,19 +1011,18 @@ if !hash_matches.is_empty() {
 
 ---
 
-## 13. Acceptance Criteria
+## 13. Acceptance Criteria (Updated 2026-02-23)
 
-### Prerequisites (Must Complete First)
-- [ ] `matcher_order` added to sort key in `merge_overlapping_matches()` (match_refine.rs:169-175)
-- [ ] (Optional) PLAN-036 implemented for magnitude-based selection OR documented as known difference
+### Prerequisites (All Resolved)
+- [x] `matcher_order` added to sort key in `merge_overlapping_matches()` (VERIFIED at line 175)
+- [x] PLAN-036 implemented for magnitude-based selection (VERIFIED at lines 226-237)
 
-### Core Implementation
-- [ ] `merge_overlapping_matches()` is public and accessible
-- [ ] Hash match early return added (matching Python behavior)
+### Core Implementation (Remaining)
+- [ ] `merge_overlapping_matches()` is made public (add `pub` at line 159)
+- [ ] Hash match early return added (matching Python behavior at lines 127-141)
 - [ ] Merge called after `spdx_lid_match()` phase
 - [ ] Merge called after `aho_match()` phase
-- [ ] Merge called after all sequence matching (near_dupe + seq + query_runs)
-- [ ] Unknown matches handled correctly (no merge needed per Python behavior)
+- [ ] Merge called after all sequence matching combined (near_dupe + seq + query_runs)
 
 ### Validation
 - [ ] All unit tests pass
@@ -812,42 +1032,42 @@ if !hash_matches.is_empty() {
 
 ---
 
-## 14. Validation Report (To Be Filled After Implementation)
+## 14. Validation Report (Updated 2026-02-23)
 
-### Prerequisite Fixes Applied
+### Prerequisite Fixes - VERIFIED COMPLETE
 
 | Fix | Status | Date | Notes |
 |-----|--------|------|-------|
-| `matcher_order` in sort key | Pending | - | - |
-| PLAN-036 magnitude fix | Pending | - | - |
+| `matcher_order` in sort key | **COMPLETE** | 2026-02-23 | Verified at match_refine.rs:175 |
+| PLAN-036 magnitude fix | **COMPLETE** | 2026-02-23 | Verified at match_refine.rs:226-237 |
 
-### Implementation Results
+### Implementation Status
 
-| Phase | Status | Tests Passing | Notes |
-|-------|--------|---------------|-------|
-| Hash early return | Pending | - | - |
-| SPDX-LID merge | Pending | - | - |
-| Aho merge | Pending | - | - |
-| Sequence merge | Pending | - | - |
+| Step | Status | Notes |
+|------|--------|-------|
+| Step 1: Make merge public | PENDING | Add `pub` at line 159 |
+| Step 2: Hash early return | PENDING | Modify lines 127-141 |
+| Step 3: SPDX-LID merge | PENDING | Modify lines 143-156 |
+| Step 4: Aho merge | PENDING | Modify lines 158-172 |
+| Step 5: Sequence merge combined | PENDING | Restructure lines 174-244 |
 
-### Golden Test Impact
-
-| Metric | Before | After | Change |
-|--------|--------|-------|--------|
-| lic1 passing | ~60 | - | - |
-| lic2 passing | ~57 | - | - |
-| lic3 passing | ~37 | - | - |
-| lic4 passing | ~51 | - | - |
-| external passing | ~200 | - | - |
-| **Total** | ~405 | - | - |
-
-### Performance Impact
+### Golden Test Impact (To Be Measured After Implementation)
 
 | Metric | Before | After | Change |
 |--------|--------|-------|--------|
-| Merge calls per scan | 3 | 6-7 | +100-133% |
+| lic1 passing | TBD | - | - |
+| lic2 passing | TBD | - | - |
+| lic3 passing | TBD | - | - |
+| lic4 passing | TBD | - | - |
+| external passing | TBD | - | - |
+
+### Performance Impact (To Be Measured)
+
+| Metric | Before | After | Change |
+|--------|--------|-------|--------|
+| Merge calls per scan | 3 (in refine_matches) | 6 (3 new + 3 existing) | +100% |
 | Avg scan time | TBD | - | - |
 
-### Issues Found
+### Issues Found During Verification
 
-(To be filled during implementation)
+1. **None** - All prerequisites verified complete, implementation steps are clear.
