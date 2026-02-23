@@ -1922,7 +1922,10 @@ mod tests {
         m.is_license_reference = true;
         m.rule_length = 1;
         let matches = vec![m];
-        assert!(is_false_positive(&matches));
+        assert!(
+            !is_false_positive(&matches),
+            "Short is_license_reference should NOT be filtered (Python has no such check)"
+        );
     }
 
     #[test]
