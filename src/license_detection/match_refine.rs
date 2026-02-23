@@ -172,6 +172,7 @@ fn merge_overlapping_matches(matches: &[LicenseMatch]) -> Vec<LicenseMatch> {
             .then_with(|| a.start_token.cmp(&b.start_token))
             .then_with(|| b.hilen.cmp(&a.hilen))
             .then_with(|| b.matched_length.cmp(&a.matched_length))
+            .then_with(|| a.matcher_order().cmp(&b.matcher_order()))
     });
 
     let mut grouped: Vec<Vec<&LicenseMatch>> = Vec::new();
