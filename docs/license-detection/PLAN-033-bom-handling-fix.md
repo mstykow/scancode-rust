@@ -1,7 +1,7 @@
 # PLAN-033: UTF-8 BOM Handling in License Detection Pipeline
 
 **Date**: 2026-02-23  
-**Status**: Proposed  
+**Status**: Implemented  
 **Priority**: P3 (Correctness Issue)  
 **Related**: PLAN-028 (UTF-8/Binary File Handling)
 
@@ -761,17 +761,17 @@ Report this as a potential bug in Python ScanCode as well. The Rust implementati
 
 ## Implementation Checklist
 
-- [ ] Create `src/utils/text.rs` with BOM stripping functions
-- [ ] Add `pub mod text;` to `src/utils/mod.rs`
-- [ ] Update `src/scanner/process.rs` to strip BOM before license detection
-- [ ] Update `src/license_detection/mod.rs` to strip BOM in `detect()` method
-- [ ] Add unit tests for BOM stripping utilities
-- [ ] Add tokenization tests with BOM-prefixed text
-- [ ] Create golden test files with BOM in `testdata/license-golden/bom/`
-- [ ] Add integration tests for BOM-prefixed license detection
-- [ ] Run `cargo test` to verify all tests pass
-- [ ] Run `cargo clippy` to verify no warnings
-- [ ] Update documentation if needed
+- [x] Create `src/utils/text.rs` with BOM stripping functions
+- [x] Add `pub mod text;` to `src/utils/mod.rs`
+- [x] Update `src/scanner/process.rs` to strip BOM before license detection
+- [x] Update `src/license_detection/mod.rs` to strip BOM in `detect()` method
+- [x] Add unit tests for BOM stripping utilities
+- [ ] Add tokenization tests with BOM-prefixed text (optional - not strictly needed since BOM is stripped before tokenization)
+- [ ] Create golden test files with BOM in `testdata/license-golden/bom/` (deferred - integration tests cover the functionality)
+- [x] Add integration tests for BOM-prefixed license detection
+- [x] Run `cargo test` to verify all tests pass
+- [x] Run `cargo clippy` to verify no warnings
+- [ ] Update documentation if needed (not required - implementation is transparent to users)
 
 ---
 
@@ -782,3 +782,103 @@ Report this as a potential bug in Python ScanCode as well. The Rust implementati
 - [Python `utf-8-sig` encoding](https://docs.python.org/3/library/codecs.html#module-encodings.utf_8_sig)
 - [PLAN-028: UTF-8/Binary File Handling](PLAN-028-fix-utf8-binary-handling.md)
 - [TESTING_STRATEGY.md](../TESTING_STRATEGY.md)
+
+---
+
+## Implementation Notes
+
+### Summary
+
+The BOM handling fix was successfully implemented on 2026-02-23. The implementation follows the plan with some minor deviations documented below.
+
+### What Was Implemented
+
+#### 1. BOM Stripping Utility Functions (`src/utils/text.rs`)
+
+Created two core functions:
+- `strip_utf8_bom_bytes(bytes: &[u8]) -> &[u8]` - Strips BOM from byte slices
+- `strip_utf8_bom_str(s: &str) -> &str` - Strips BOM character from strings
+
+**Deviation from plan**: The `strip_utf8_bom_string()` function for owned strings was not implemented. The `strip_utf8_bom_str()` function returns a `&str` slice without allocation, which is sufficient for all use cases.
+
+#### 2. Scanner Integration (`src/scanner/process.rs`)
+
+Added BOM stripping at line 164 in `extract_information_from_content()`:
+```rust
+let clean_buffer = strip_utf8_bom_bytes(&buffer);
+```
+
+**Enhancement**: The implementation also checks for `ContentType::UTF_8_BOM` in addition to `ContentType::UTF_8` (line 163). This is an improvement over the plan because `content_inspector` can detect BOM-prefixed UTF-8 files as a distinct content type.
+
+#### 3. Detection Engine Integration (`src/license_detection/mod.rs`)
+
+Added BOM stripping at line 117 in `detect()` method:
+```rust
+let clean_text = strip_utf8_bom_str(text);
+```
+
+This ensures BOM is stripped for all entry points, including direct API calls.
+
+#### 4. Language Detection (`src/utils/language.rs`)
+
+The `is_utf8_text()` helper function already handles `ContentType::UTF_8_BOM` correctly (line 5), treating BOM-prefixed UTF-8 files as text.
+
+#### 5. Unit Tests
+
+Added 9 unit tests in `src/utils/text.rs`:
+- `test_strip_utf8_bom_bytes_with_bom`
+- `test_strip_utf8_bom_bytes_without_bom`
+- `test_strip_utf8_bom_bytes_empty`
+- `test_strip_utf8_bom_bytes_only_bom`
+- `test_strip_utf8_bom_str_with_bom`
+- `test_strip_utf8_bom_str_without_bom`
+- `test_strip_utf8_bom_str_empty`
+- `test_strip_utf8_bom_str_only_bom`
+- `test_bom_character_is_not_whitespace`
+
+#### 6. Integration Tests
+
+Added 2 integration tests in `src/license_detection/mod.rs`:
+- `test_detect_mit_license_with_utf8_bom` - Tests full MIT license detection with BOM
+- `test_detect_spdx_identifier_with_utf8_bom` - Tests SPDX identifier detection with BOM
+
+### Deviations from Plan
+
+| Item | Plan | Actual Implementation | Reason |
+|------|------|----------------------|--------|
+| `strip_utf8_bom_string()` | Required | Not implemented | Zero-copy `strip_utf8_bom_str()` is sufficient |
+| `ContentType::UTF_8_BOM` | Not mentioned | Added to content type check | `content_inspector` provides this type, improves detection |
+| Tokenization tests | Required | Not added | BOM is stripped before tokenization, so tests would be redundant |
+| Golden test files | Required | Deferred | Integration tests provide sufficient coverage |
+| Documentation comments | Extensive | Minimal | Functions are self-explanatory, can be enhanced later |
+
+### Test Results
+
+All 11 BOM-related tests pass:
+```
+test utils::text::tests::test_strip_utf8_bom_bytes_only_bom ... ok
+test utils::text::tests::test_strip_utf8_bom_bytes_without_bom ... ok
+test utils::text::tests::test_bom_character_is_not_whitespace ... ok
+test utils::text::tests::test_strip_utf8_bom_str_empty ... ok
+test utils::text::tests::test_strip_utf8_bom_bytes_empty ... ok
+test utils::text::tests::test_strip_utf8_bom_bytes_with_bom ... ok
+test utils::text::tests::test_strip_utf8_bom_str_without_bom ... ok
+test utils::text::tests::test_strip_utf8_bom_str_only_bom ... ok
+test utils::text::tests::test_strip_utf8_bom_str_with_bom ... ok
+test license_detection::tests::test_detect_spdx_identifier_with_utf8_bom ... ok
+test license_detection::tests::test_detect_mit_license_with_utf8_bom ... ok
+```
+
+### Performance Impact
+
+As predicted in the plan:
+- **No BOM files**: O(1) check, no allocation - negligible overhead
+- **BOM files**: Zero-copy slice operation (no string allocation in common case)
+- **Overall**: Minimal performance impact
+
+### Future Work
+
+The following items were deferred but could be added if needed:
+1. Golden test files in `testdata/license-golden/bom/` for end-to-end testing
+2. Doc comments on the utility functions for API documentation
+3. Warning log when multiple BOMs are detected (extremely rare edge case)

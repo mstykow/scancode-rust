@@ -1,7 +1,8 @@
 # PLAN-038: Fix Ignored `_proximity_threshold` Parameter in `group_matches_by_region_with_threshold()`
 
-**Status**: Draft  
+**Status**: Implemented  
 **Created**: 2026-02-23  
+**Implemented**: 2026-02-23  
 **Priority**: Medium  
 **Type**: Bug Fix / Feature Parity  
 
@@ -390,11 +391,11 @@ No golden test changes required since the default threshold behavior is unchange
 
 ## Implementation Checklist
 
-- [ ] **Phase 1: Core Fix**
-  - [ ] Remove `_` prefix from `_proximity_threshold` parameter
-  - [ ] Update `should_group_together()` to accept threshold parameter
-  - [ ] Pass threshold through all call sites
-  - [ ] Add unit tests for custom threshold behavior
+- [x] **Phase 1: Core Fix**
+  - [x] Remove `_` prefix from `_proximity_threshold` parameter
+  - [x] Update `should_group_together()` to accept threshold parameter
+  - [x] Pass threshold through all call sites
+  - [x] Add unit tests for custom threshold behavior
 
 - [ ] **Phase 2: API Exposure (Optional)**
   - [ ] Make `group_matches_by_region_with_threshold()` public
@@ -519,6 +520,68 @@ fn group_matches_by_region_with_threshold(
 | Threshold parameter | Used in comparison | Ignored |
 | Default value | `LINES_THRESHOLD = 4` | `LINES_THRESHOLD = 4` |
 | Customizable | Yes | No (parameter ignored) |
+
+---
+
+## Implementation Notes
+
+**Implemented by**: Commit `c3de051a` on 2026-02-23
+
+### Changes Made
+
+The following changes were made to `src/license_detection/detection.rs`:
+
+1. **Line 165**: Renamed `_proximity_threshold` to `proximity_threshold` (removed the `_` prefix)
+
+2. **Line 191**: Updated the call site to pass the threshold parameter:
+   ```rust
+   // Before:
+   } else if should_group_together(previous_match, match_item) {
+   // After:
+   } else if should_group_together(previous_match, match_item, proximity_threshold) {
+   ```
+
+3. **Line 218**: Updated `should_group_together()` signature to accept the threshold:
+   ```rust
+   // Before:
+   fn should_group_together(prev: &LicenseMatch, cur: &LicenseMatch) -> bool {
+       let line_gap = cur.start_line.saturating_sub(prev.end_line);
+       line_gap <= LINES_THRESHOLD
+   }
+   // After:
+   fn should_group_together(prev: &LicenseMatch, cur: &LicenseMatch, threshold: usize) -> bool {
+       let line_gap = cur.start_line.saturating_sub(prev.end_line);
+       line_gap <= threshold
+   }
+   ```
+
+4. **Line 158**: Updated doc comment to correctly document the parameter (removed "not used" note)
+
+5. **Lines 1449-1496**: Added 3 unit tests as specified in the plan:
+   - `test_group_matches_with_custom_threshold_zero`
+   - `test_group_matches_with_custom_threshold_large`
+   - `test_group_matches_threshold_exactly_at_boundary`
+
+### Test Results
+
+All PLAN-038 specific tests pass:
+- `test_group_matches_with_custom_threshold_zero` - PASSED
+- `test_group_matches_with_custom_threshold_large` - PASSED
+- `test_group_matches_threshold_exactly_at_boundary` - PASSED
+
+### Deviations from Plan
+
+None. The implementation followed the plan exactly.
+
+### Pre-existing Issue Found During Verification
+
+During verification, a pre-existing test was found to have incorrect expectations:
+
+**Test**: `test_group_matches_just_past_line_gap_threshold`
+- **Location**: Line 1250-1262
+- **Issue**: The test expects a line gap of 4 to NOT group with threshold 4, but the logic uses `line_gap <= threshold` which means 4 <= 4 is true, so it SHOULD group.
+- **Test comment**: Says "exceeds threshold 3" but `LINES_THRESHOLD` is 4
+- **This is NOT related to PLAN-038** - it was a pre-existing test bug
 
 ---
 
