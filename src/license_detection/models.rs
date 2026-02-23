@@ -400,7 +400,14 @@ impl LicenseMatch {
 
     #[allow(dead_code)]
     fn qregion_len(&self) -> usize {
-        if let Some(positions) = &self.matched_token_positions {
+        if let Some(positions) = &self.qspan_positions {
+            if positions.is_empty() {
+                return 0;
+            }
+            let min_pos = *positions.iter().min().unwrap_or(&0);
+            let max_pos = *positions.iter().max().unwrap_or(&0);
+            max_pos - min_pos + 1
+        } else if let Some(positions) = &self.matched_token_positions {
             if positions.is_empty() {
                 return 0;
             }
@@ -412,40 +419,60 @@ impl LicenseMatch {
         }
     }
 
-    /// Return the query magnitude: qregion_len + unknowns in matched range.
-    /// Python: qmagnitude = qregion_len + sum(unknowns_by_pos for pos in qspan[:-1])
     pub fn qmagnitude(&self, query: &crate::license_detection::query::Query) -> usize {
         let qregion_len = self.qregion_len();
-        let unknowns_in_match = (self.start_token..self.end_token)
-            .filter(|&pos| query.unknowns_by_pos.contains_key(&Some(pos as i32)))
-            .count();
+        let positions: Vec<usize> = if let Some(qspan_positions) = &self.qspan_positions {
+            qspan_positions.clone()
+        } else {
+            (self.start_token..self.end_token).collect()
+        };
+        if positions.is_empty() {
+            return qregion_len;
+        }
+        let max_pos = *positions.iter().max().unwrap_or(&0);
+        let unknowns_in_match: usize = positions
+            .iter()
+            .filter(|&&pos| pos != max_pos)
+            .filter_map(|&pos| query.unknowns_by_pos.get(&Some(pos as i32)))
+            .sum();
         qregion_len + unknowns_in_match
     }
 
-    #[allow(dead_code)]
-    pub fn qdensity(&self) -> f32 {
+    pub fn qdensity(&self, query: &crate::license_detection::query::Query) -> f32 {
         let mlen = self.len();
         if mlen == 0 {
             return 0.0;
         }
-        let qregion = self.qregion_len();
-        if qregion == 0 {
+        let qmag = self.qmagnitude(query);
+        if qmag == 0 {
             return 0.0;
         }
-        mlen as f32 / qregion as f32
+        mlen as f32 / qmag as f32
     }
 
-    #[allow(dead_code)]
     pub fn idensity(&self) -> f32 {
-        let mlen = self.len();
-        if mlen == 0 {
+        let ispan_len = if let Some(positions) = &self.ispan_positions {
+            positions.len()
+        } else {
+            self.matched_length
+        };
+        if ispan_len == 0 {
             return 0.0;
         }
-        let qregion = self.qregion_len();
-        if qregion == 0 {
-            return 1.0;
+        let ispan_magnitude = if let Some(positions) = &self.ispan_positions {
+            if positions.is_empty() {
+                return 0.0;
+            }
+            let min_pos = *positions.iter().min().unwrap();
+            let max_pos = *positions.iter().max().unwrap();
+            max_pos - min_pos + 1
+        } else {
+            self.matched_length
+        };
+        if ispan_magnitude == 0 {
+            return 0.0;
         }
-        mlen as f32 / qregion as f32
+        ispan_len as f32 / ispan_magnitude as f32
     }
 
     pub fn surround(&self, other: &LicenseMatch) -> bool {
@@ -616,6 +643,11 @@ impl LicenseMatch {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::license_detection::index::LicenseIndex;
+
+    fn create_test_index() -> LicenseIndex {
+        LicenseIndex::with_legalese_count(10)
+    }
 
     fn create_license() -> License {
         License {
@@ -1361,24 +1393,159 @@ mod tests {
 
     #[test]
     fn test_qdensity_contiguous() {
+        use std::collections::{HashMap, HashSet};
+        let index = create_test_index();
         let match_result = create_license_match();
-        assert!((match_result.qdensity() - 1.0).abs() < 0.001);
+        let query = crate::license_detection::query::Query {
+            text: String::new(),
+            tokens: vec![],
+            line_by_pos: vec![],
+            unknowns_by_pos: HashMap::new(),
+            stopwords_by_pos: HashMap::new(),
+            shorts_and_digits_pos: HashSet::new(),
+            high_matchables: HashSet::new(),
+            low_matchables: HashSet::new(),
+            has_long_lines: false,
+            is_binary: false,
+            query_run_ranges: vec![],
+            spdx_lines: vec![],
+            index: &index,
+        };
+        assert!((match_result.qdensity(&query) - 1.0).abs() < 0.001);
     }
 
     #[test]
     fn test_qdensity_sparse() {
+        use std::collections::{HashMap, HashSet};
+        let index = create_test_index();
         let mut match_result = create_license_match();
         match_result.matched_token_positions = Some(vec![0, 10]);
+        let query = crate::license_detection::query::Query {
+            text: String::new(),
+            tokens: vec![],
+            line_by_pos: vec![],
+            unknowns_by_pos: HashMap::new(),
+            stopwords_by_pos: HashMap::new(),
+            shorts_and_digits_pos: HashSet::new(),
+            high_matchables: HashSet::new(),
+            low_matchables: HashSet::new(),
+            has_long_lines: false,
+            is_binary: false,
+            query_run_ranges: vec![],
+            spdx_lines: vec![],
+            index: &index,
+        };
         let expected = 2.0 / 11.0;
-        assert!((match_result.qdensity() - expected).abs() < 0.001);
+        assert!((match_result.qdensity(&query) - expected).abs() < 0.001);
     }
 
     #[test]
     fn test_qdensity_zero() {
+        use std::collections::{HashMap, HashSet};
+        let index = create_test_index();
         let mut match_result = create_license_match();
         match_result.start_token = 0;
         match_result.end_token = 0;
-        assert_eq!(match_result.qdensity(), 0.0);
+        let query = crate::license_detection::query::Query {
+            text: String::new(),
+            tokens: vec![],
+            line_by_pos: vec![],
+            unknowns_by_pos: HashMap::new(),
+            stopwords_by_pos: HashMap::new(),
+            shorts_and_digits_pos: HashSet::new(),
+            high_matchables: HashSet::new(),
+            low_matchables: HashSet::new(),
+            has_long_lines: false,
+            is_binary: false,
+            query_run_ranges: vec![],
+            spdx_lines: vec![],
+            index: &index,
+        };
+        assert_eq!(match_result.qdensity(&query), 0.0);
+    }
+
+    #[test]
+    fn test_qdensity_with_unknowns() {
+        use std::collections::{HashMap, HashSet};
+        let index = create_test_index();
+        let mut match_result = create_license_match();
+        match_result.start_token = 0;
+        match_result.end_token = 10;
+        match_result.matched_token_positions = Some(vec![0, 5, 9]);
+        let mut unknowns_by_pos = HashMap::new();
+        unknowns_by_pos.insert(Some(0), 2);
+        unknowns_by_pos.insert(Some(5), 3);
+        let query = crate::license_detection::query::Query {
+            text: String::new(),
+            tokens: vec![],
+            line_by_pos: vec![],
+            unknowns_by_pos,
+            stopwords_by_pos: HashMap::new(),
+            shorts_and_digits_pos: HashSet::new(),
+            high_matchables: HashSet::new(),
+            low_matchables: HashSet::new(),
+            has_long_lines: false,
+            is_binary: false,
+            query_run_ranges: vec![],
+            spdx_lines: vec![],
+            index: &index,
+        };
+        let expected = 3.0 / (10.0 + 2.0 + 3.0);
+        assert!((match_result.qdensity(&query) - expected).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_qmagnitude_non_contiguous() {
+        use std::collections::{HashMap, HashSet};
+        let index = create_test_index();
+        let mut match_result = create_license_match();
+        match_result.qspan_positions = Some(vec![0, 5, 10]);
+        let mut unknowns_by_pos = HashMap::new();
+        unknowns_by_pos.insert(Some(0), 2);
+        unknowns_by_pos.insert(Some(5), 3);
+        let query = crate::license_detection::query::Query {
+            text: String::new(),
+            tokens: vec![],
+            line_by_pos: vec![],
+            unknowns_by_pos,
+            stopwords_by_pos: HashMap::new(),
+            shorts_and_digits_pos: HashSet::new(),
+            high_matchables: HashSet::new(),
+            low_matchables: HashSet::new(),
+            has_long_lines: false,
+            is_binary: false,
+            query_run_ranges: vec![],
+            spdx_lines: vec![],
+            index: &index,
+        };
+        let expected = 11 + 2 + 3;
+        assert_eq!(match_result.qmagnitude(&query), expected);
+    }
+
+    #[test]
+    fn test_qmagnitude_excludes_end_position() {
+        use std::collections::{HashMap, HashSet};
+        let index = create_test_index();
+        let mut match_result = create_license_match();
+        match_result.qspan_positions = Some(vec![0, 5, 10]);
+        let mut unknowns_by_pos = HashMap::new();
+        unknowns_by_pos.insert(Some(10), 100);
+        let query = crate::license_detection::query::Query {
+            text: String::new(),
+            tokens: vec![],
+            line_by_pos: vec![],
+            unknowns_by_pos,
+            stopwords_by_pos: HashMap::new(),
+            shorts_and_digits_pos: HashSet::new(),
+            high_matchables: HashSet::new(),
+            low_matchables: HashSet::new(),
+            has_long_lines: false,
+            is_binary: false,
+            query_run_ranges: vec![],
+            spdx_lines: vec![],
+            index: &index,
+        };
+        assert_eq!(match_result.qmagnitude(&query), 11);
     }
 
     #[test]
@@ -1388,18 +1555,28 @@ mod tests {
     }
 
     #[test]
-    fn test_idensity_sparse() {
+    fn test_idensity_sparse_ispan() {
         let mut match_result = create_license_match();
-        match_result.matched_token_positions = Some(vec![0, 10]);
+        match_result.matched_length = 2;
+        match_result.ispan_positions = Some(vec![0, 10]);
         let expected = 2.0 / 11.0;
         assert!((match_result.idensity() - expected).abs() < 0.001);
     }
 
     #[test]
-    fn test_idensity_zero() {
+    fn test_idensity_uses_ispan_not_qspan() {
         let mut match_result = create_license_match();
         match_result.start_token = 0;
-        match_result.end_token = 0;
+        match_result.end_token = 20;
+        match_result.matched_length = 5;
+        match_result.ispan_positions = Some(vec![0, 2, 4, 6, 8]);
+        assert!((match_result.idensity() - (5.0 / 9.0)).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_idensity_zero() {
+        let mut match_result = create_license_match();
+        match_result.matched_length = 0;
         assert_eq!(match_result.idensity(), 0.0);
     }
 

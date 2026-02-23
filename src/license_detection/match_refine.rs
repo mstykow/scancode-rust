@@ -437,7 +437,7 @@ fn is_false_positive(m: &LicenseMatch, index: &LicenseIndex) -> bool {
 /// sequence and unknown matcher types - exact matches are always kept.
 ///
 /// Based on Python: `filter_spurious_matches()` (match.py:1768-1836)
-fn filter_spurious_matches(matches: &[LicenseMatch]) -> Vec<LicenseMatch> {
+fn filter_spurious_matches(matches: &[LicenseMatch], query: &Query) -> Vec<LicenseMatch> {
     matches
         .iter()
         .filter(|m| {
@@ -446,7 +446,7 @@ fn filter_spurious_matches(matches: &[LicenseMatch]) -> Vec<LicenseMatch> {
                 return true;
             }
 
-            let qdens = m.qdensity();
+            let qdens = m.qdensity(query);
             let idens = m.idensity();
             let mlen = m.matched_length;
             let hilen = m.hilen();
@@ -1417,7 +1417,7 @@ pub fn refine_matches(
     let (with_required_phrases, _missing_phrases) =
         filter_matches_missing_required_phrases(index, &merged, query);
 
-    let non_spurious = filter_spurious_matches(&with_required_phrases);
+    let non_spurious = filter_spurious_matches(&with_required_phrases, query);
 
     let above_min_cov = filter_below_rule_minimum_coverage(index, &non_spurious);
 
@@ -1890,6 +1890,8 @@ mod tests {
 
     #[test]
     fn test_filter_spurious_matches_keeps_non_seq_matchers() {
+        let index = LicenseIndex::with_legalese_count(10);
+        let query = Query::new("test text", &index).unwrap();
         let matches = vec![
             LicenseMatch {
                 matcher: "1-hash".to_string(),
@@ -1903,24 +1905,28 @@ mod tests {
             },
         ];
 
-        let filtered = filter_spurious_matches(&matches);
+        let filtered = filter_spurious_matches(&matches, &query);
         assert_eq!(filtered.len(), 2);
     }
 
     #[test]
     fn test_filter_spurious_matches_keeps_high_density_seq() {
+        let index = LicenseIndex::with_legalese_count(10);
+        let query = Query::new("test text", &index).unwrap();
         let mut m = create_test_match("#1", 1, 10, 1.0, 100.0, 100);
         m.matcher = "3-seq".to_string();
         m.matched_length = 50;
         m.matched_token_positions = Some((0..50).collect());
 
         let matches = vec![m];
-        let filtered = filter_spurious_matches(&matches);
+        let filtered = filter_spurious_matches(&matches, &query);
         assert_eq!(filtered.len(), 1);
     }
 
     #[test]
     fn test_filter_spurious_matches_filters_low_density_short() {
+        let index = LicenseIndex::with_legalese_count(10);
+        let query = Query::new("test text", &index).unwrap();
         let mut m = create_test_match("#1", 1, 10, 1.0, 100.0, 100);
         m.matcher = "3-seq".to_string();
         m.matched_length = 5;
@@ -1929,12 +1935,14 @@ mod tests {
         m.matched_token_positions = Some(vec![0, 50, 75, 80, 99]);
 
         let matches = vec![m];
-        let filtered = filter_spurious_matches(&matches);
+        let filtered = filter_spurious_matches(&matches, &query);
         assert_eq!(filtered.len(), 0);
     }
 
     #[test]
     fn test_filter_spurious_matches_filters_unknown_matcher() {
+        let index = LicenseIndex::with_legalese_count(10);
+        let query = Query::new("test text", &index).unwrap();
         let mut m = create_test_match("#1", 1, 10, 1.0, 100.0, 100);
         m.matcher = "5-unknown".to_string();
         m.matched_length = 5;
@@ -1943,12 +1951,14 @@ mod tests {
         m.matched_token_positions = Some(vec![0, 50, 75, 80, 99]);
 
         let matches = vec![m];
-        let filtered = filter_spurious_matches(&matches);
+        let filtered = filter_spurious_matches(&matches, &query);
         assert_eq!(filtered.len(), 0);
     }
 
     #[test]
     fn test_filter_spurious_matches_keeps_medium_length() {
+        let index = LicenseIndex::with_legalese_count(10);
+        let query = Query::new("test text", &index).unwrap();
         let mut m = create_test_match("#1", 1, 10, 1.0, 100.0, 100);
         m.matcher = "3-seq".to_string();
         m.matched_length = 25;
@@ -1958,14 +1968,16 @@ mod tests {
         m.hilen = 10;
 
         let matches = vec![m];
-        let filtered = filter_spurious_matches(&matches);
+        let filtered = filter_spurious_matches(&matches, &query);
         assert_eq!(filtered.len(), 1);
     }
 
     #[test]
     fn test_filter_spurious_matches_empty() {
+        let index = LicenseIndex::with_legalese_count(10);
+        let query = Query::new("test text", &index).unwrap();
         let matches: Vec<LicenseMatch> = vec![];
-        let filtered = filter_spurious_matches(&matches);
+        let filtered = filter_spurious_matches(&matches, &query);
         assert_eq!(filtered.len(), 0);
     }
 
