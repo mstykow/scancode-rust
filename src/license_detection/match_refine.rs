@@ -223,7 +223,7 @@ fn merge_overlapping_matches(matches: &[LicenseMatch]) -> Vec<LicenseMatch> {
                 }
 
                 if current.ispan() == next.ispan() && current.qoverlap(&next) > 0 {
-                    if current.qspan_magnitude() <= next.qspan_magnitude() {
+                    if current.matched_length >= next.matched_length {
                         rule_matches.remove(j);
                         continue;
                     } else {
@@ -1583,7 +1583,7 @@ mod tests {
         assert_eq!(merged.len(), 1);
         assert_eq!(merged[0].rule_identifier, "#1");
         assert_eq!(merged[0].start_line, 1);
-        assert_eq!(merged[0].end_line, 10);
+        assert_eq!(merged[0].end_line, 15);
         assert_eq!(merged[0].score, 0.9);
     }
 

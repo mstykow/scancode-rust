@@ -596,18 +596,6 @@ impl LicenseMatch {
         }
     }
 
-    /// Returns the magnitude (extent) of the qspan.
-    ///
-    /// This is the difference between end and start of the qspan bounds,
-    /// equivalent to Python's `qspan.magnitude()`.
-    ///
-    /// Used for tie-breaking when two matches have equal ispan but overlapping qspan:
-    /// the match with smaller magnitude (more concentrated) is preferred.
-    pub fn qspan_magnitude(&self) -> usize {
-        let (start, end) = self.qspan_bounds();
-        end.saturating_sub(start)
-    }
-
     pub fn idistance_to(&self, other: &LicenseMatch) -> usize {
         let (self_start, self_end) = self.ispan_bounds();
         let (other_start, other_end) = other.ispan_bounds();
@@ -1897,34 +1885,5 @@ mod tests {
         b.end_token = 20;
         assert_eq!(a.qdistance_to(&b), 10);
         assert_eq!(b.qdistance_to(&a), 10);
-    }
-
-    #[test]
-    fn test_qspan_magnitude_contiguous() {
-        let mut m = create_license_match();
-        m.start_token = 5;
-        m.end_token = 15;
-        assert_eq!(m.qspan_magnitude(), 10);
-    }
-
-    #[test]
-    fn test_qspan_magnitude_non_contiguous() {
-        let mut m = create_license_match();
-        m.qspan_positions = Some(vec![0, 5, 10]);
-        assert_eq!(m.qspan_magnitude(), 11);
-    }
-
-    #[test]
-    fn test_qspan_magnitude_empty() {
-        let mut m = create_license_match();
-        m.qspan_positions = Some(vec![]);
-        assert_eq!(m.qspan_magnitude(), 0);
-    }
-
-    #[test]
-    fn test_qspan_magnitude_single_position() {
-        let mut m = create_license_match();
-        m.qspan_positions = Some(vec![5]);
-        assert_eq!(m.qspan_magnitude(), 1);
     }
 }
