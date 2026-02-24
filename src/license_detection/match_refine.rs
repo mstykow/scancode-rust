@@ -681,18 +681,11 @@ pub fn filter_overlapping_matches(
             }
 
             if i > 0 {
-                let prev_end = matches[i - 1].end_token;
-                let next_match_start = matches[j].start_token;
-
-                let prev_next_overlap = if prev_end > next_match_start {
-                    prev_end.saturating_sub(next_match_start.max(matches[i - 1].start_token))
-                } else {
-                    0
-                };
+                let prev_next_overlap = matches[i - 1].qspan_overlap(&matches[j]);
 
                 if prev_next_overlap == 0 {
-                    let cpo = matches[i].qoverlap(&matches[i - 1]);
-                    let cno = matches[i].qoverlap(&matches[j]);
+                    let cpo = matches[i].qspan_overlap(&matches[i - 1]);
+                    let cno = matches[i].qspan_overlap(&matches[j]);
 
                     if cpo > 0 && cno > 0 {
                         let overlap_len = cpo + cno;

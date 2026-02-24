@@ -1,7 +1,7 @@
 //! Core data structures for license detection.
 
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::ops::Range;
 
 fn default_rule_length() -> usize {
@@ -518,6 +518,12 @@ impl LicenseMatch {
         let start = self.start_token.max(other.start_token);
         let end = self.end_token.min(other.end_token);
         end.saturating_sub(start)
+    }
+
+    pub fn qspan_overlap(&self, other: &LicenseMatch) -> usize {
+        let self_qspan: HashSet<usize> = self.qspan().into_iter().collect();
+        let other_qspan: HashSet<usize> = other.qspan().into_iter().collect();
+        self_qspan.intersection(&other_qspan).count()
     }
 
     /// Return true if all matched tokens are continuous without gaps or unknowns.
