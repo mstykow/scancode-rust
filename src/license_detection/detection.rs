@@ -7,6 +7,7 @@
 use crate::license_detection::expression::{CombineRelation, combine_expressions};
 use crate::license_detection::models::LicenseMatch;
 use crate::license_detection::spdx_mapping::SpdxMapping;
+use crate::license_detection::tokenize::tokenize_without_stopwords;
 
 /// Line gap threshold for grouping matches.
 /// Matches with line gap > this are considered separate groups.
@@ -985,10 +986,8 @@ fn python_safe_name(s: &str) -> String {
     }
 }
 
-fn get_uuid_on_content(content: &[(&str, f32, &str)]) -> String {
-    let content_tuple: Vec<(&str, f32, &str)> = content.to_vec();
-
-    let repr_str = format!("{:?}", content_tuple);
+fn get_uuid_on_content(content: &[(&str, f32, Vec<String>)]) -> String {
+    let repr_str = format_python_tuple_repr(content);
 
     use sha1::{Digest, Sha1};
     let mut hasher = Sha1::new();
@@ -1004,15 +1003,72 @@ fn get_uuid_on_content(content: &[(&str, f32, &str)]) -> String {
 }
 
 fn compute_content_identifier(matches: &[LicenseMatch]) -> String {
-    let content: Vec<(&str, f32, &str)> = matches
+    let content: Vec<(&str, f32, Vec<String>)> = matches
         .iter()
         .map(|m| {
             let matched_text = m.matched_text.as_deref().unwrap_or("");
-            (m.rule_identifier.as_str(), m.score, matched_text)
+            let tokens = tokenize_without_stopwords(matched_text);
+            (m.rule_identifier.as_str(), m.score, tokens)
         })
         .collect();
 
     get_uuid_on_content(&content)
+}
+
+fn format_python_tuple_repr(content: &[(&str, f32, Vec<String>)]) -> String {
+    let mut result = String::from("(");
+
+    for (i, (rule_id, score, tokens)) in content.iter().enumerate() {
+        if i > 0 {
+            result.push_str(", ");
+        }
+        result.push_str(&format!(
+            "({}, {}, {})",
+            python_str_repr(rule_id),
+            format_score_for_repr(*score),
+            python_token_tuple_repr(tokens)
+        ));
+    }
+
+    if content.len() == 1 {
+        result.push(',');
+    }
+    result.push(')');
+
+    result
+}
+
+fn python_str_repr(s: &str) -> String {
+    if s.contains('\'') && !s.contains('"') {
+        format!("\"{}\"", s.replace('\\', "\\\\").replace('"', "\\\""))
+    } else {
+        format!("'{}'", s.replace('\\', "\\\\").replace('\'', "\\'"))
+    }
+}
+
+fn format_score_for_repr(score: f32) -> String {
+    format!("{:?}", score)
+}
+
+fn python_token_tuple_repr(tokens: &[String]) -> String {
+    if tokens.is_empty() {
+        return String::from("()");
+    }
+
+    let mut result = String::from("(");
+    for (i, token) in tokens.iter().enumerate() {
+        if i > 0 {
+            result.push_str(", ");
+        }
+        result.push_str(&python_str_repr(token));
+    }
+
+    if tokens.len() == 1 {
+        result.push(',');
+    }
+    result.push(')');
+
+    result
 }
 
 pub fn compute_detection_identifier(detection: &LicenseDetection) -> String {
@@ -4686,5 +4742,76 @@ mod tests {
         );
         assert_eq!(detection.matches.len(), 1);
         assert_eq!(detection.matches[0].start_line, 1);
+    }
+
+    #[test]
+    fn test_python_tuple_repr_format() {
+        let content: Vec<(&str, f32, Vec<String>)> = vec![(
+            "mit.LICENSE",
+            95.0,
+            vec!["mit".to_string(), "license".to_string()],
+        )];
+        let repr = format_python_tuple_repr(&content);
+        assert_eq!(repr, "(('mit.LICENSE', 95.0, ('mit', 'license')),)");
+
+        let content: Vec<(&str, f32, Vec<String>)> = vec![
+            (
+                "mit.LICENSE",
+                95.0,
+                vec!["mit".to_string(), "license".to_string()],
+            ),
+            ("apache.LICENSE", 90.5, vec!["apache".to_string()]),
+        ];
+        let repr = format_python_tuple_repr(&content);
+        assert_eq!(
+            repr,
+            "(('mit.LICENSE', 95.0, ('mit', 'license')), ('apache.LICENSE', 90.5, ('apache',)))"
+        );
+
+        let content: Vec<(&str, f32, Vec<String>)> = vec![("rule", 100.0, vec![])];
+        let repr = format_python_tuple_repr(&content);
+        assert_eq!(repr, "(('rule', 100.0, ()),)");
+
+        let content: Vec<(&str, f32, Vec<String>)> = vec![("rule", 95.0, vec!["mit".to_string()])];
+        let repr = format_python_tuple_repr(&content);
+        assert_eq!(repr, "(('rule', 95.0, ('mit',)),)");
+    }
+
+    #[test]
+    fn test_python_str_repr_escaping() {
+        assert_eq!(python_str_repr("hello"), "'hello'");
+        assert_eq!(python_str_repr("it's"), "\"it's\"");
+        assert_eq!(python_str_repr("say \"hello\""), "'say \"hello\"'");
+        assert_eq!(python_str_repr("path\\to\\file"), "'path\\\\to\\\\file'");
+    }
+
+    #[test]
+    fn test_score_repr_format() {
+        assert_eq!(format_score_for_repr(95.0), "95.0");
+        assert_eq!(format_score_for_repr(0.0), "0.0");
+        assert_eq!(format_score_for_repr(100.0), "100.0");
+        assert_eq!(format_score_for_repr(90.5), "90.5");
+    }
+
+    #[test]
+    fn test_uuid_generation_matches_python() {
+        let content: Vec<(&str, f32, Vec<String>)> = vec![(
+            "mit.LICENSE",
+            95.0,
+            vec!["mit".to_string(), "license".to_string()],
+        )];
+        let uuid = get_uuid_on_content(&content);
+        assert_eq!(uuid, "bfbe4410-8f6e-50d3-8fb1-8bc5a9596d52");
+
+        let content: Vec<(&str, f32, Vec<String>)> = vec![
+            (
+                "mit.LICENSE",
+                95.0,
+                vec!["mit".to_string(), "license".to_string()],
+            ),
+            ("apache.LICENSE", 90.5, vec!["apache".to_string()]),
+        ];
+        let uuid = get_uuid_on_content(&content);
+        assert_eq!(uuid, "0ac6197c-e8ad-ce94-bec7-2f28131fbb9d");
     }
 }
