@@ -448,7 +448,7 @@ pub fn licensing_contains(container: &str, contained: &str) -> bool {
         return false;
     }
 
-    if container.to_lowercase() == contained.to_lowercase() {
+    if container == contained {
         return true;
     }
 
