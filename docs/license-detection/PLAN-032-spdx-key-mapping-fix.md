@@ -629,6 +629,7 @@ The PLAN-032 implementation was completed on 2026-02-23. The fix addresses the S
 ### Validation
 
 All key SPDX mappings verified:
+
 - `MIT` -> `mit`
 - `Apache-2.0` -> `apache-2.0`
 - `0BSD` -> `bsd-zero`

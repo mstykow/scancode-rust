@@ -640,6 +640,7 @@ One pre-existing test fails: `test_is_false_positive_single_license_reference_sh
 ### Test Results
 
 All 15 copyright-related tests pass:
+
 - `test_is_false_positive_with_copyright_word` - PASS
 - `test_is_false_positive_with_c_symbol` - PASS
 - `test_is_false_positive_without_copyright_word` - PASS

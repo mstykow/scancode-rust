@@ -534,6 +534,7 @@ The following changes were made to `src/license_detection/detection.rs`:
 1. **Line 165**: Renamed `_proximity_threshold` to `proximity_threshold` (removed the `_` prefix)
 
 2. **Line 191**: Updated the call site to pass the threshold parameter:
+
    ```rust
    // Before:
    } else if should_group_together(previous_match, match_item) {
@@ -542,6 +543,7 @@ The following changes were made to `src/license_detection/detection.rs`:
    ```
 
 3. **Line 218**: Updated `should_group_together()` signature to accept the threshold:
+
    ```rust
    // Before:
    fn should_group_together(prev: &LicenseMatch, cur: &LicenseMatch) -> bool {
@@ -565,6 +567,7 @@ The following changes were made to `src/license_detection/detection.rs`:
 ### Test Results
 
 All PLAN-038 specific tests pass:
+
 - `test_group_matches_with_custom_threshold_zero` - PASSED
 - `test_group_matches_with_custom_threshold_large` - PASSED
 - `test_group_matches_threshold_exactly_at_boundary` - PASSED
@@ -578,6 +581,7 @@ None. The implementation followed the plan exactly.
 During verification, a pre-existing test was found to have incorrect expectations:
 
 **Test**: `test_group_matches_just_past_line_gap_threshold`
+
 - **Location**: Line 1250-1262
 - **Issue**: The test expects a line gap of 4 to NOT group with threshold 4, but the logic uses `line_gap <= threshold` which means 4 <= 4 is true, so it SHOULD group.
 - **Test comment**: Says "exceeds threshold 3" but `LINES_THRESHOLD` is 4

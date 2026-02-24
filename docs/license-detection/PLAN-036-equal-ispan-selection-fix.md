@@ -21,6 +21,7 @@ After implementing PLAN-036 (commit 9af7ac83), the implementation was reverted (
 1. **Test Setup Changed After PLAN-036 Implementation**: The test helper `create_test_match()` was modified in a subsequent commit (PLAN-031) to use dynamic `matched_length` and `rule_length` based on line span instead of hardcoded values.
 
 2. **Original Test Scenario (PLAN-036)**:
+
    ```rust
    // Both matches had matched_length=100 (hardcoded), rule_start_token=0
    // Result: ispan() returned [0..100] for BOTH matches (equal ispan!)
@@ -28,6 +29,7 @@ After implementing PLAN-036 (commit 9af7ac83), the implementation was reverted (
    ```
 
 3. **Current Test Scenario (After PLAN-031)**:
+
    ```rust
    // m1: matched_length=10, rule_start_token=0 -> ispan() = [0..10]
    // m2: matched_length=11, rule_start_token=4 -> ispan() = [4..15]
@@ -38,20 +40,24 @@ After implementing PLAN-036 (commit 9af7ac83), the implementation was reverted (
 ### Key Insight: The Equal-ISpan Condition is Rarely Met
 
 The equal-ispan condition (`current.ispan() == next.ispan()`) requires:
+
 - Same `rule_start_token`
 - Same `matched_length`
 
 This is **unlikely for typical overlapping matches** because:
+
 - Different matches usually start at different rule positions
 - Different matches have different matched lengths
 
 **The condition is primarily relevant for matches from the same rule that:**
+
 1. Were created with identical rule-side positions (e.g., from merging)
 2. Have non-contiguous query-side positions (qspan) with gaps
 
 ### Why Tests Still Pass Without the Fix
 
 With the current test setup:
+
 1. The equal-ispan condition is **never triggered** because `ispan()` values differ
 2. Other merge paths (`qcontains`, `is_after`, `surround`, etc.) handle the merging correctly
 3. The `matched_length` comparison in the equal-ispan path is irrelevant since the path is never executed
@@ -76,6 +82,7 @@ With the original PLAN-036 test setup (both matches with `matched_length=100`, `
 **Both approaches produce the SAME result in this case!**
 
 For non-contiguous matches where the difference matters:
+
 - Python: keeps smaller magnitude (denser span)
 - Rust (current): keeps larger matched_length (more positions)
 
@@ -625,6 +632,7 @@ fn test_merge_equal_ispan_same_magnitude() {
 #### Step 4: Verify Existing Tests Still Pass
 
 The existing tests should NOT be affected because:
+
 - They don't create matches with equal ispan
 - The equal-ispan path won't be triggered
 - Other merge paths will handle them as before
@@ -693,12 +701,14 @@ Six new tests were added to verify the implementation:
 ### Test Results
 
 All tests pass:
+
 - 3 `qspan_magnitude` tests: PASSED
 - 3 `merge_equal_ispan` tests: PASSED
 
 ### Python Parity Achieved
 
 The Rust implementation now matches Python's behavior for equal-ispan selection:
+
 - Python: `if cqmag <= nqmag: del rule_matches[j]`
 - Rust: `if current_mag <= next_mag { rule_matches.remove(j); }`
 

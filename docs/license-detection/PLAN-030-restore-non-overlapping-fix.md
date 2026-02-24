@@ -346,6 +346,7 @@ The fallback logic is **not optional** - it's required because:
 1. **Test helpers** (e.g., `create_test_match()` in `detection.rs:1166-1167`) create matches with `start_token: 0, end_token: 0`
 
 2. **Existing functions** (`qcontains()` and `qoverlap()` in `models.rs:498-521`) already implement this fallback pattern:
+
    ```rust
    if self.start_token == 0 && self.end_token == 0
        && other.start_token == 0 && other.end_token == 0
@@ -372,6 +373,7 @@ pub qspan_positions: Option<Vec<usize>>,
 When `merge_overlapping_matches()` merges matches, it sets `qspan_positions` with the union of all token positions. This is handled in Case 1 of the implementation above.
 
 **Implementation note**: `Span::from_iterator()` already exists and handles non-contiguous positions correctly by coalescing adjacent positions into ranges.
+
 ```
 
 Update call sites (lines 1443, 1451):
@@ -766,6 +768,7 @@ The naive fix (simply changing `match_to_span()` to use token positions) causes 
 Several code paths create matches with `start_token: 0, end_token: 0`:
 
 **From `src/license_detection/detection.rs:1166-1167`:**
+
 ```rust
 start_token: 0,
 end_token: 0,
@@ -774,10 +777,12 @@ end_token: 0,
 This appears in test helper `create_test_match()` which is used extensively in unit tests.
 
 **The problem**: When `start_token == 0 && end_token == 0`, the naive fix creates an empty span `0..0`, which:
+
 - Never intersects with anything (all discarded matches get restored incorrectly)
 - Or intersects with token 0 matches (incorrect false positives)
 
 **Evidence from `src/license_detection/models.rs:498-506`:**
+
 ```rust
 pub fn qcontains(&self, other: &LicenseMatch) -> bool {
     // ...
@@ -797,6 +802,7 @@ This shows that other functions (like `qcontains` and `qoverlap`) **already have
 #### Issue 2: Span Intersection Semantics Differ
 
 **Python's Span (`spans.py:137-138`):**
+
 ```python
 def __and__(self, *others):
     return Span(self._set.intersection(*[o._set for o in others]))
@@ -805,6 +811,7 @@ def __and__(self, *others):
 Python uses an `intbitset` internally, so `not disc.qspan & all_matched_qspans` tests if the **intersection set is empty**.
 
 **Rust's Span (`spans.rs:155-164`):**
+
 ```rust
 pub fn intersects(&self, other: &Span) -> bool {
     for self_range in &self.ranges {
@@ -821,10 +828,12 @@ pub fn intersects(&self, other: &Span) -> bool {
 Rust checks if any **ranges overlap**.
 
 **Critical difference for non-contiguous spans:**
+
 - Python: `Span([1, 2, 10, 11])` is stored as `{1, 2, 10, 11}` in an intbitset
 - Rust: `Span::from_iterator([1, 2, 10, 11])` becomes ranges `[1..3, 10..12]`
 
 For the intersection check, both are equivalent because:
+
 - Python: `{1, 2, 10, 11} & {5, 6} = {}` (empty set, no intersection)
 - Rust: ranges `[1..3, 10..12]` vs `[5..7]` → no range overlap → `intersects()` returns false
 
@@ -833,12 +842,14 @@ For the intersection check, both are equivalent because:
 #### Issue 3: Test Helper Token Position Values
 
 **From `src/license_detection/match_refine.rs:1515-1516`:**
+
 ```rust
 start_token: start_line,
 end_token: end_line + 1,
 ```
 
 This test helper sets token positions equal to line positions (offset by 1). This is **unrealistic** because:
+
 - In real matches, `start_token` and `start_line` are unrelated
 - Token positions depend on how many tokens are in the file before this match
 - Line positions depend on line breaks in the source text
@@ -864,6 +875,7 @@ let discarded = vec![create_test_match("#2", 10, 20, ...)];  // start_token=10, 
 ```
 
 **The real problem case:**
+
 ```rust
 // Test helper with lines but zero tokens (from detection.rs)
 let match = LicenseMatch {
@@ -884,6 +896,7 @@ With naive token fix: Span `0..0` is empty, so it never intersects → incorrect
 **Location**: `src/license_detection/match_refine.rs:2538-2547`
 
 **With naive fix:**
+
 - `kept`: `create_test_match("#1", 1, 10, ...)` → start_token=1, end_token=11
 - `discarded`: `create_test_match("#2", 10, 20, ...)` → start_token=10, end_token=21
 - Token spans: `1..11` vs `10..21` → **overlap at 10-11** ✓
@@ -895,6 +908,7 @@ This test passes accidentally because the helper sets `start_token = start_line`
 **Location**: `src/license_detection/match_refine.rs:2527-2536`
 
 **With naive fix:**
+
 - `kept`: lines 1-10 → tokens 1..11
 - `discarded`: lines 11-20 → tokens 11..21
 - Token spans: `1..11` vs `11..21` → **adjacent, no overlap** ✓
@@ -908,6 +922,7 @@ This test also passes accidentally.
 This helper sets `start_token: 0, end_token: 0`, creating empty spans.
 
 **With naive fix:**
+
 - All matches from this helper have empty `0..0` span
 - Empty spans never intersect
 - All discarded matches get restored → tests fail
@@ -953,6 +968,7 @@ fn match_to_qspan(m: &LicenseMatch) -> Span {
 ```
 
 This mirrors the fallback logic already present in `qcontains()` and `qoverlap()`:
+
 ```rust
 // From models.rs:498-505
 if self.start_token == 0
@@ -1086,11 +1102,13 @@ fn create_test_match(
 ```
 
 **Problem**: Token positions are set to line numbers. This is unrealistic because:
+
 - Real token positions depend on how many tokens are in the file before the match
 - Line 10 could be token 500 depending on file content
 - This breaks the token overlap logic when lines and tokens are different
 
 **Example failure**:
+
 - Match A: lines 1-10 → tokens 1..11
 - Match B: lines 11-20 → tokens 11..21
 - Adjacent on lines, also "adjacent" on tokens → test passes by ACCIDENT
@@ -1117,6 +1135,7 @@ fn create_test_match(
 **Problem**: Token positions are explicitly set to zero, creating empty spans.
 
 **With naive token-based fix**:
+
 - Span `0..0` is empty
 - Empty spans never intersect with anything
 - All discarded matches get restored → tests fail catastrophically
@@ -1131,11 +1150,13 @@ Actual:   ["gpl-2.0", "gpl-2.0 OR bsd-new"]
 ```
 
 **Analysis**:
+
 - Expected has 2 identical expressions (`gpl-2.0 OR bsd-new`)
 - Actual has 2 different expressions (`gpl-2.0` and `gpl-2.0 OR bsd-new`)
 - This suggests that a match for `gpl-2.0` is being RESTORED when it shouldn't be
 
 **Root Cause Hypothesis**:
+
 1. A match for `gpl-2.0` was discarded (contained in or overlapping with another match)
 2. After `filter_overlapping_matches()`, `restore_non_overlapping()` checks if it overlaps
 3. With LINE-based spans: it correctly sees overlap → stays discarded
@@ -1144,6 +1165,7 @@ Actual:   ["gpl-2.0", "gpl-2.0 OR bsd-new"]
 ### 17.4 The Real Problem: Token vs Line Semantics
 
 Consider this file:
+
 ```
 Line 1: // This is licensed under GPL-2.0 or BSD-New
 Line 2: // See LICENSE file for details
@@ -1153,11 +1175,13 @@ Line 2: // See LICENSE file for details
 **Match B** (discarded): "GPL-2.0" - tokens 5-6
 
 **With line-based spans (current Rust)**:
+
 - Match A: lines 1-1
 - Match B: lines 1-1
 - Overlap: YES (same line) → B stays discarded ✓
 
 **With token-based spans (correct)**:
+
 - Match A: tokens 5-8
 - Match B: tokens 5-6
 - Overlap: YES (tokens 5-6) → B stays discarded ✓
@@ -1165,6 +1189,7 @@ Line 2: // See LICENSE file for details
 Both are correct in this case because the tokens are on the same line.
 
 But consider:
+
 ```
 Line 1: // MIT License - see below
 Line 2: // Copyright 2024
@@ -1175,11 +1200,13 @@ Line 3: // Permission is hereby granted...
 **Match B** (discarded): "MIT License" text - tokens 1-3 (line 1 only)
 
 **With line-based spans (current Rust)**:
+
 - Match A: lines 1-3
 - Match B: lines 1-1
 - Overlap: YES (line 1) → B stays discarded ✓
 
 **With token-based spans (correct)**:
+
 - Match A: tokens 10-100
 - Match B: tokens 1-3
 - Overlap: NO → B gets restored ✓ (CORRECT! They don't share tokens)
@@ -1238,6 +1265,7 @@ fn match_to_qspan(m: &LicenseMatch) -> Span {
 ### 17.7 Span Intersection Semantics
 
 **Python's `Span.__and__`**:
+
 ```python
 def __and__(self, *others):
     return Span(self._set.intersection(*[o._set for o in others]))
@@ -1246,6 +1274,7 @@ def __and__(self, *others):
 Returns a **new Span** with the intersection. The check `not disc.qspan & all_matched_qspans` tests if the result is empty.
 
 **Rust's `Span.intersects`**:
+
 ```rust
 pub fn intersects(&self, other: &Span) -> bool {
     for self_range in &self.ranges {
@@ -1264,6 +1293,7 @@ Returns `true` if any ranges overlap.
 **For contiguous spans, these are equivalent**.
 
 **For non-contiguous spans**, both correctly detect overlap:
+
 - Python: `{1, 2, 10, 11} & {5, 6} = {}` (empty set)
 - Rust: ranges `[1..3, 10..12]` vs `[5..7]` → no overlap
 
@@ -1314,6 +1344,7 @@ The golden test regressions from previous attempts may have been caused by:
 3. **Subtle differences in how matches are created** - different matchers may have edge cases
 
 The fix needs to:
+
 1. Use token positions for overlap detection (correct behavior)
 2. Handle the zero-token fallback case (test compatibility)
 3. Ensure unit tests use realistic token values (or the fallback handles them)
@@ -1321,6 +1352,7 @@ The fix needs to:
 ### 17.11 Verification: Empty Span Behavior
 
 **Test from `spans.rs:556-562`:**
+
 ```rust
 #[test]
 fn test_intersects_empty() {
@@ -1354,6 +1386,7 @@ fn test_intersects_empty() {
 ### Phase 3: Update Test Helpers (Optional)
 
 If tests fail due to test helper token values:
+
 1. Update `create_test_match()` in `match_refine.rs` to use distinct token values
 2. Add explicit `create_test_match_with_tokens()` helper for tests needing control
 3. Keep the zero-token fallback for `detection.rs` tests
@@ -1367,6 +1400,7 @@ If tests fail due to test helper token values:
 **Key Finding: The proposed fix does NOT cause additional regressions.**
 
 Testing revealed:
+
 - **Baseline (without fix)**: 397 external golden test failures
 - **With 3-case fix applied**: 397 external golden test failures (same count)
 - **All unit tests pass** with the fix applied
@@ -1387,6 +1421,7 @@ Testing revealed:
 **Actual (with fix)**: `["bsd-new", "bsd-new OR gpl-2.0"]` (identical)
 
 **Root cause is NOT in `restore_non_overlapping`**:
+
 - The GPL match at tokens 132-140 (lines 20-21) is being filtered or merged away
 - The `bsd-new` match spans tokens 15-291 (lines 7-38)
 - These matches have OVERLAPPING token ranges (15-291 contains 132-140)
@@ -1400,6 +1435,7 @@ Testing revealed:
 **Actual (with fix)**: `["isc"]` (identical)
 
 **Root cause is NOT in `restore_non_overlapping`**:
+
 - Refined matches show: `isc lines 7-17 tokens 21-132` and `isc lines 1-1 tokens 0-2`
 - The `isc lines 1-1 tokens 0-2` match IS being kept (separate from the main match)
 - But only ONE detection is output instead of TWO
@@ -1424,6 +1460,7 @@ The golden test failures are NOT caused by `restore_non_overlapping`. Analysis s
 **DEFER THIS FIX** - The `restore_non_overlapping` fix is technically correct but does not address the actual root cause of the golden test failures.
 
 **Priority should shift to**:
+
 1. Investigate `filter_contained_matches()` - may be incorrectly filtering matches
 2. Investigate detection grouping in `detection.rs` - multiple matches grouped as single detection
 3. Investigate license expression assembly - compound expressions not being preserved

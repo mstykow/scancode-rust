@@ -29,10 +29,12 @@ All implementation steps have been successfully completed:
 ### File Changes Made
 
 **1. `src/license_detection/match_refine.rs`**
+
 - Line 159: Added `pub` keyword to `merge_overlapping_matches()` function
 - Function is now exported via `mod.rs` at line 49
 
 **2. `src/license_detection/mod.rs`**
+
 - Lines 125-151: Added hash match early return (matching Python's behavior at index.py:987-991)
   - If hash matches found, immediately return detections without running other phases
 - Line 156: Added `merge_overlapping_matches()` call after SPDX-LID matching
@@ -69,11 +71,11 @@ All core license detection tests pass. Code compiles successfully.
 
 ### Key Findings
 
-1. **ALL PREREQUISITES RESOLVED**: 
+1. **ALL PREREQUISITES RESOLVED**:
    - `matcher_order` in sort key: VERIFIED at line 175
    - `qspan_magnitude()` for equal ispan: VERIFIED at lines 226-237
 
-2. **FUNCTION VISIBILITY ISSUE**: 
+2. **FUNCTION VISIBILITY ISSUE**:
    - `merge_overlapping_matches()` is still private
    - Needs `pub` keyword added at line 159
 
@@ -215,6 +217,7 @@ for matcher in matchers:
 **Location**: `reference/scancode-toolkit/src/licensedcode/index.py:987-1058` (VERIFIED accurate)
 
 **Key Observation**: Python's `approx` matcher (index.py:724-812) performs:
+
 1. Near-duplicate detection (lines 741-775) - corresponds to Rust Phase 2
 2. Query run matching (lines 787-812) - corresponds to Rust Phases 3+4
 3. Returns ALL matches combined - merged ONCE after the loop
@@ -237,6 +240,7 @@ for matcher in matchers:
 **YES** - After PLAN-024 and PLAN-036 implementation, they are functionally equivalent.
 
 **VERIFIED SORT KEY** (`match_refine.rs:169-176`):
+
 ```rust
 sorted.sort_by(|a, b| {
     a.rule_identifier
@@ -249,6 +253,7 @@ sorted.sort_by(|a, b| {
 ```
 
 **Python sort key** (`match.py:882`):
+
 ```python
 sorter = lambda m: (m.rule.identifier, m.qspan.start, -m.hilen(), -m.len(), m.matcher_order)
 ```
@@ -262,6 +267,7 @@ Both functions implement:
 5. Ispan alignment verification (`qoverlap == ioverlap`)
 
 **VERIFIED EQUAL ISPAN SELECTION** (`match_refine.rs:226-237`):
+
 ```rust
 if current.ispan() == next.ispan() && current.qoverlap(&next) > 0 {
     let current_mag = current.qspan_magnitude();  // FIXED - was matched_length
@@ -278,6 +284,7 @@ if current.ispan() == next.ispan() && current.qoverlap(&next) > 0 {
 ```
 
 **Python** (`match.py:948-970`):
+
 ```python
 if current_match.ispan == next_match.ispan and current_match.overlap(next_match):
     cqmag = current_match.qspan.magnitude()
@@ -689,6 +696,7 @@ If issues arise:
 **STATUS**: `matcher_order` is now included in the sort key.
 
 **Verified Current Rust Sort Key** (`match_refine.rs:169-176`):
+
 ```rust
 sorted.sort_by(|a, b| {
     a.rule_identifier
@@ -701,6 +709,7 @@ sorted.sort_by(|a, b| {
 ```
 
 **Python sort key** (`match.py:882`):
+
 ```python
 sorter = lambda m: (m.rule.identifier, m.qspan.start, -m.hilen(), -m.len(), m.matcher_order)
 ```
@@ -712,6 +721,7 @@ sorter = lambda m: (m.rule.identifier, m.qspan.start, -m.hilen(), -m.len(), m.ma
 **STATUS**: Now uses `qspan_magnitude()` instead of `matched_length`.
 
 **Verified Current Rust** (`match_refine.rs:226-237`):
+
 ```rust
 if current.ispan() == next.ispan() && current.qoverlap(&next) > 0 {
     let current_mag = current.qspan_magnitude();  // VERIFIED CORRECT
@@ -728,6 +738,7 @@ if current.ispan() == next.ispan() && current.qoverlap(&next) > 0 {
 ```
 
 **Python** (`match.py:948-970`):
+
 ```python
 if current_match.ispan == next_match.ispan and current_match.overlap(next_match):
     cqmag = current_match.qspan.magnitude()
@@ -770,6 +781,7 @@ if current_match.ispan == next_match.ispan and current_match.overlap(next_match)
 ### 9.4 Hash Match Early Return - NOT YET IMPLEMENTED
 
 **Python Behavior** (`index.py:987-991`):
+
 ```python
 if not _skip_hash_match:
     matches = match_hash.hash_match(self, whole_query_run)
@@ -779,6 +791,7 @@ if not _skip_hash_match:
 ```
 
 **Current Rust Behavior** (`mod.rs:129-141`):
+
 ```rust
 let hash_matches = hash_match(&self.index, &whole_run);
 for m in &hash_matches {
@@ -802,6 +815,7 @@ all_matches.extend(hash_matches);  // NO EARLY RETURN - continues to other phase
 **NO PREREQUISITES REMAIN** - All blockers resolved.
 
 **IMPLEMENTATION NEEDED**:
+
 1. Make `merge_overlapping_matches()` public
 2. Add hash_match early return
 3. Add merge after `spdx_lid_match()`
@@ -817,6 +831,7 @@ all_matches.extend(hash_matches);  // NO EARLY RETURN - continues to other phase
 **File**: `src/license_detection/match_refine.rs:159`
 
 **Change**: Add `pub` keyword
+
 ```rust
 /// Merge overlapping and adjacent matches for the same rule.
 ///
@@ -832,6 +847,7 @@ pub fn merge_overlapping_matches(matches: &[LicenseMatch]) -> Vec<LicenseMatch> 
 **File**: `src/license_detection/mod.rs:127-141`
 
 **Current**:
+
 ```rust
 {
     let whole_run = query.whole_query_run();
@@ -844,6 +860,7 @@ pub fn merge_overlapping_matches(matches: &[LicenseMatch]) -> Vec<LicenseMatch> 
 ```
 
 **Proposed**:
+
 ```rust
 {
     let whole_run = query.whole_query_run();
@@ -875,6 +892,7 @@ pub fn merge_overlapping_matches(matches: &[LicenseMatch]) -> Vec<LicenseMatch> 
 **File**: `src/license_detection/mod.rs:143-156`
 
 **Current**:
+
 ```rust
 {
     let spdx_matches = spdx_lid_match(&self.index, &query);
@@ -886,6 +904,7 @@ pub fn merge_overlapping_matches(matches: &[LicenseMatch]) -> Vec<LicenseMatch> 
 ```
 
 **Proposed**:
+
 ```rust
 {
     let spdx_matches = spdx_lid_match(&self.index, &query);
@@ -912,6 +931,7 @@ pub fn merge_overlapping_matches(matches: &[LicenseMatch]) -> Vec<LicenseMatch> 
 **File**: `src/license_detection/mod.rs:158-172`
 
 **Current**:
+
 ```rust
 {
     let whole_run = query.whole_query_run();
@@ -924,6 +944,7 @@ pub fn merge_overlapping_matches(matches: &[LicenseMatch]) -> Vec<LicenseMatch> 
 ```
 
 **Proposed**:
+
 ```rust
 {
     let whole_run = query.whole_query_run();
@@ -1057,10 +1078,12 @@ all_matches.extend(merged_seq);
 ## 13. Acceptance Criteria (Updated 2026-02-23)
 
 ### Prerequisites (All Resolved)
+
 - [x] `matcher_order` added to sort key in `merge_overlapping_matches()` (VERIFIED at line 175)
 - [x] PLAN-036 implemented for magnitude-based selection (VERIFIED at lines 226-237)
 
 ### Core Implementation (All Complete)
+
 - [x] `merge_overlapping_matches()` is made public (VERIFIED at line 159)
 - [x] Hash match early return added (VERIFIED at lines 131-150)
 - [x] Merge called after `spdx_lid_match()` phase (VERIFIED at line 156)
@@ -1068,6 +1091,7 @@ all_matches.extend(merged_seq);
 - [x] Merge called after all sequence matching combined (VERIFIED at line 253)
 
 ### Validation
+
 - [x] All unit tests pass
 - [x] Golden test suite shows improvement (no regressions)
 - [x] Performance is acceptable (no significant slowdown)

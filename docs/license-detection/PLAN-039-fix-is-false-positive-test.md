@@ -46,6 +46,7 @@ Commit `1b6dece6` (PLAN-026) **intentionally removed** this check because it was
 > "Remove extra is_license_reference rule_length <= 3 check. This was incorrectly filtering valid short license reference matches. Fixes lgpl_21.txt detection: [] -> ["lgpl-2.0-plus"]"
 
 **Results after removal:**
+
 - lic1: 58->57 failures
 - lic2: 49->48 failures
 - lic4: 50->48 failures
@@ -84,6 +85,7 @@ The test was added to verify a custom Rust check that was later found to be inco
 The test expectation should be changed from `assert!(is_false_positive(&matches))` to `assert!(!is_false_positive(&matches))`.
 
 **Reasoning:**
+
 - The check was intentionally removed in PLAN-026
 - The removal fixed real detection failures (lgpl_21.txt)
 - Python reference does not have this check
@@ -125,10 +127,12 @@ fn test_is_false_positive_single_license_reference_short() {
 Since the test was specifically for a check that no longer exists, we could remove the test entirely.
 
 **Reasoning for removal:**
+
 - The test verifies behavior that was intentionally removed
 - There are similar tests for `is_license_tag` which IS the correct check
 
 **Reasons to keep (Option A preferred):**
+
 - The test documents expected behavior for `is_license_reference` matches
 - It serves as a regression test to prevent re-adding the incorrect check
 
@@ -162,6 +166,7 @@ cargo test --lib test_is_false_positive_single_license_reference
 ```
 
 This runs all three related tests:
+
 1. `test_is_false_positive_single_license_reference_short` - Should now pass
 2. `test_is_false_positive_single_license_reference_long_rule` - Should still pass
 3. `test_is_false_positive_single_license_reference_full_relevance` - Should still pass

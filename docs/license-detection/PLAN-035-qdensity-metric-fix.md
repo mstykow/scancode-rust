@@ -538,6 +538,7 @@ cargo fmt --check
 The implementation was completed successfully on 2026-02-23. The core changes were:
 
 #### 1. `qdensity()` Method (models.rs:441-451)
+
 - **Signature updated**: Now accepts `&Query` parameter
 - **Implementation corrected**: Uses `qmagnitude(query)` instead of `qregion_len()`
 - **Result**: Density now correctly includes unknown tokens in the denominator
@@ -557,20 +558,24 @@ pub fn qdensity(&self, query: &crate::license_detection::query::Query) -> f32 {
 ```
 
 #### 2. `qmagnitude()` Method (models.rs:422-439)
+
 - Already implemented correctly, no changes needed
 - Handles both `qspan_positions` and fallback to `start_token..end_token`
 - Correctly excludes end position from unknown count (matches Python behavior)
 
 #### 3. `idensity()` Method (models.rs:453-476)
+
 - Implemented for rule-side (ispan) density calculation
 - Uses `ispan_positions` when available, falls back to `matched_length`
 - No Query parameter needed (operates on rule side only)
 
 #### 4. `filter_spurious_matches()` (match_refine.rs:440-474)
+
 - **Signature updated**: Now accepts `&Query` parameter
 - Calls updated to use `m.qdensity(query)` instead of `m.qdensity()`
 
 #### 5. `refine_matches()` (match_refine.rs:1420)
+
 - Call site updated to pass `query` parameter
 
 ### Tests Added/Updated

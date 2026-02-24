@@ -395,6 +395,17 @@ fn is_low_quality_matches(matches: &[LicenseMatch]) -> bool {
         && is_match_coverage_below_threshold(matches, CLUES_MATCH_COVERAGE_THR, false)
 }
 
+/// Check if all matches are license clues with perfect detection.
+///
+/// This is distinct from low quality matches:
+/// - has_correct_license_clue_matches: Perfect coverage (100%) + all is_license_clue=true
+/// - is_low_quality_matches: NOT perfect coverage + coverage <= 60%
+///
+/// Based on Python: has_correct_license_clue_matches() at detection.py:1265-1272
+fn has_correct_license_clue_matches(matches: &[LicenseMatch]) -> bool {
+    is_correct_detection(matches) && matches.iter().all(|m| m.is_license_clue)
+}
+
 /// Check if matches represent an undetected license.
 ///
 /// Returns true if there is exactly one match and its matcher is "5-undetected".
@@ -582,7 +593,7 @@ fn analyze_detection(matches: &[LicenseMatch], package_license: bool) -> &'stati
         return DETECTION_LOG_FALSE_POSITIVE;
     }
 
-    if !package_license && is_low_quality_matches(matches) {
+    if !package_license && has_correct_license_clue_matches(matches) {
         return DETECTION_LOG_LICENSE_CLUES;
     }
 

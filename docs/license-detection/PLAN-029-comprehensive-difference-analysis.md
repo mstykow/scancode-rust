@@ -13,6 +13,7 @@ A thorough analysis of the Rust and Python implementations identified **50+ diff
 **Current State**: ~88% golden test pass rate (significant improvement from 86.1%)
 
 **Resolution Summary**:
+
 - **CRITICAL issues**: 3 of 4 resolved
 - **HIGH issues**: 5 of 6 resolved  
 - **MEDIUM issues**: 1 of 7 resolved (matcher_order in sort key)
@@ -86,7 +87,8 @@ fn compute_match_score(m: &LicenseMatch, query: &Query) -> f32 {
 
 **Location**: `src/license_detection/index/builder.rs:376-381`, `src/license_detection/spdx_lid.rs:152-183`
 
-**Resolution**: 
+**Resolution**:
+
 - `rid_by_spdx_key` properly populated at index build time
 - `DEPRECATED_SPDX_EXPRESSION_SUBS` table added for deprecated SPDX identifiers
 - `add_deprecated_spdx_aliases()` function adds deprecated aliases during index build
@@ -102,7 +104,8 @@ fn compute_match_score(m: &LicenseMatch, query: &Query) -> f32 {
 
 **Location**: `src/license_detection/mod.rs:117`, `src/utils/text.rs`
 
-**Resolution**: 
+**Resolution**:
+
 - `strip_utf8_bom_str()` utility function added
 - BOM stripped in `LicenseDetectionEngine::detect()` before tokenization
 - Scanner also strips BOM for file processing
@@ -164,7 +167,8 @@ if has_copyrights || has_full_relevance {
 
 **Location**: `src/license_detection/models.rs:441-451` - **NOW CORRECT**
 
-**Resolution**: 
+**Resolution**:
+
 - `qdensity()` signature updated to accept `&Query` parameter
 - Now uses `qmagnitude(query)` which correctly includes unknown tokens
 - `filter_spurious_matches()` updated to pass query parameter
@@ -198,7 +202,8 @@ if current.ispan() == next.ispan() && current.qoverlap(&next) > 0 {
 }
 ```
 
-**Resolution**: 
+**Resolution**:
+
 - `qspan_magnitude()` method added to LicenseMatch
 - Uses `qspan_magnitude()` instead of `matched_length`
 - Comparison direction fixed to `<=` (prefer smaller magnitude/denser span)
@@ -240,6 +245,7 @@ matches = match.merge_matches(matches)  # Called after each phase
 **Location**: `src/license_detection/detection.rs:163-166` - **NOW CORRECT**
 
 **Resolution**:
+
 - `_proximity_threshold` renamed to `proximity_threshold` (no underscore)
 - `should_group_together()` updated to accept threshold parameter
 - Parameter passed through call chain correctly
@@ -591,9 +597,9 @@ sorted.sort_by(|a, b| {
 
 ### Follow-up Actions
 
-3. Create plan for expression normalization
-4. Consider GPL-2.0+ support
-5. Run golden test comparison after each fix to measure impact
+1. Create plan for expression normalization
+2. Consider GPL-2.0+ support
+3. Run golden test comparison after each fix to measure impact
 
 ### Completed in This Session
 

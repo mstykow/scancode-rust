@@ -796,6 +796,7 @@ The BOM handling fix was successfully implemented on 2026-02-23. The implementat
 #### 1. BOM Stripping Utility Functions (`src/utils/text.rs`)
 
 Created two core functions:
+
 - `strip_utf8_bom_bytes(bytes: &[u8]) -> &[u8]` - Strips BOM from byte slices
 - `strip_utf8_bom_str(s: &str) -> &str` - Strips BOM character from strings
 
@@ -804,6 +805,7 @@ Created two core functions:
 #### 2. Scanner Integration (`src/scanner/process.rs`)
 
 Added BOM stripping at line 164 in `extract_information_from_content()`:
+
 ```rust
 let clean_buffer = strip_utf8_bom_bytes(&buffer);
 ```
@@ -813,6 +815,7 @@ let clean_buffer = strip_utf8_bom_bytes(&buffer);
 #### 3. Detection Engine Integration (`src/license_detection/mod.rs`)
 
 Added BOM stripping at line 117 in `detect()` method:
+
 ```rust
 let clean_text = strip_utf8_bom_str(text);
 ```
@@ -826,6 +829,7 @@ The `is_utf8_text()` helper function already handles `ContentType::UTF_8_BOM` co
 #### 5. Unit Tests
 
 Added 9 unit tests in `src/utils/text.rs`:
+
 - `test_strip_utf8_bom_bytes_with_bom`
 - `test_strip_utf8_bom_bytes_without_bom`
 - `test_strip_utf8_bom_bytes_empty`
@@ -839,6 +843,7 @@ Added 9 unit tests in `src/utils/text.rs`:
 #### 6. Integration Tests
 
 Added 2 integration tests in `src/license_detection/mod.rs`:
+
 - `test_detect_mit_license_with_utf8_bom` - Tests full MIT license detection with BOM
 - `test_detect_spdx_identifier_with_utf8_bom` - Tests SPDX identifier detection with BOM
 
@@ -855,6 +860,7 @@ Added 2 integration tests in `src/license_detection/mod.rs`:
 ### Test Results
 
 All 11 BOM-related tests pass:
+
 ```
 test utils::text::tests::test_strip_utf8_bom_bytes_only_bom ... ok
 test utils::text::tests::test_strip_utf8_bom_bytes_without_bom ... ok
@@ -872,6 +878,7 @@ test license_detection::tests::test_detect_mit_license_with_utf8_bom ... ok
 ### Performance Impact
 
 As predicted in the plan:
+
 - **No BOM files**: O(1) check, no allocation - negligible overhead
 - **BOM files**: Zero-copy slice operation (no string allocation in common case)
 - **Overall**: Minimal performance impact
@@ -879,6 +886,7 @@ As predicted in the plan:
 ### Future Work
 
 The following items were deferred but could be added if needed:
+
 1. Golden test files in `testdata/license-golden/bom/` for end-to-end testing
 2. Doc comments on the utility functions for API documentation
 3. Warning log when multiple BOMs are detected (extremely rare edge case)

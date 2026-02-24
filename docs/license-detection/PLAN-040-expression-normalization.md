@@ -43,6 +43,7 @@ This plan was created based on analysis in PLAN-029 Section 2.6, which hypothesi
 **VERIFICATION RESULT**: The Python analysis in this plan is accurate, but the root cause attribution is incorrect. The ~50+ golden test failures are NOT caused by expression normalization differences. They are caused by differences in match detection and match grouping logic.
 
 **Key Findings After Verification**:
+
 1. Python's `simplify()` is NOT called during detection - only in post-processing
 2. Rust's `simplify_expression()` is equivalent to Python's `combine_expressions(unique=True)` for detection
 3. Golden tests compare individual match expressions, NOT combined detection expressions
@@ -62,6 +63,7 @@ This plan was created based on analysis in PLAN-029 Section 2.6, which hypothesi
 **Status**: **VERIFIED CORRECT**
 
 Evidence from `reference/scancode-toolkit/src/licensedcode/detection.py`:
+
 - Line 451: `combine_expressions([...], unique=True, licensing=licensing)`
 - Line 882: `combine_expressions(expressions=..., relation='AND', unique=True, ...)`
 - Line 1594: `combine_expressions(expressions=[match.rule.license_expression...], licensing=...)`
@@ -70,6 +72,7 @@ Evidence from `reference/scancode-toolkit/src/licensedcode/detection.py`:
 All detection-phase calls use `combine_expressions()` with `unique=True`, which performs deduplication only.
 
 The `.simplify()` method is only called in `summarycode/`:
+
 - `summarizer.py:259`: `Licensing().parse(combined_declared_license_expression).simplify()`
 - `score.py:191`: `Licensing().parse(combined_declared_license_expression).simplify()`
 - `plugin_consolidate.py:80`: `Licensing().parse(combined_license_expression).simplify()`
@@ -80,6 +83,7 @@ The `.simplify()` method is only called in `summarycode/`:
 **Status**: **VERIFIED CORRECT**
 
 Evidence from `src/license_detection/expression.rs`:
+
 - `combine_expressions()` (lines 628-666) calls `simplify_expression()` when `unique=true`
 - `simplify_expression()` (lines 212-233) performs deduplication within AND/OR chains
 - This matches Python's `combine_expressions(unique=True)` behavior
@@ -90,6 +94,7 @@ Evidence from `src/license_detection/expression.rs`:
 **Status**: **INCORRECT - Root cause is different**
 
 The golden test at `src/license_detection/golden_test.rs:176-180` compares:
+
 ```rust
 let actual: Vec<&str> = detections
     .iter()
@@ -101,6 +106,7 @@ let actual: Vec<&str> = detections
 This compares **individual match expressions**, NOT combined detection expressions.
 
 Example failure analysis:
+
 - `gpl-2.0_82.RULE`: Expected 3 `gpl-2.0` matches, got 1 match
 - `gpl_and_lgpl_and_gfdl-1.2.txt`: Expected `gpl-1.0-plus AND lgpl-2.0-plus AND gfdl-1.2` (combined), got 3 separate expressions
 
@@ -112,6 +118,7 @@ The issue is **match grouping and detection logic**, not expression normalizatio
 **Status**: **PARTIALLY CORRECT**
 
 Evidence:
+
 - `key_aliases` exists in `models.py:282-287` as a field on License objects
 - However, `grep` shows it's only referenced in that one location
 - `build_spdx_license_expression()` in `cache.py:507-524` uses SPDX key mapping, not key_aliases
@@ -160,6 +167,7 @@ pub fn simplify_expression(expr: &LicenseExpression) -> LicenseExpression {
 ```
 
 **What Rust Does**:
+
 - Deduplicates within same operator (AND or OR)
 - Preserves order of first occurrence
 - Treats WITH expressions as atomic
@@ -167,6 +175,7 @@ pub fn simplify_expression(expr: &LicenseExpression) -> LicenseExpression {
 - No commutativity/sorting
 
 **What Rust Does NOT Do**:
+
 - Absorption: `A AND (A OR B)` -> `A`
 - Elimination: `(A AND B) OR (A AND NOT B)` -> `A`
 - Idempotence: Already handled for simple cases
@@ -405,6 +414,7 @@ fn collect_unique_and(
 **Investigation Result**: This specific transformation was NOT found in the codebase. The `lzma-sdk-2006` reference appears to be an example of potential license equivalence, not actual implemented behavior.
 
 **License equivalence handling in Python**:
+
 - Via `key_aliases` field in License model (`models.py:282-287`)
 - Used in `build_spdx_license_expression()` for SPDX key mapping
 - NOT used for automatic expression simplification
@@ -641,6 +651,7 @@ Based on the verification analysis:
 **Answer**: **No, confirmed.** Python's `detection.py` only uses `combine_expressions()` with `unique=True`, which performs deduplication. Boolean `simplify()` is only used in the summary/post-processing phase.
 
 **However**: The golden test failures are NOT caused by expression normalization. They are caused by:
+
 1. Different match detection results (more/fewer matches)
 2. Different match grouping into detections
 3. Different handling of duplicate/overlapping matches
@@ -720,7 +731,7 @@ The expression normalization issue described in PLAN-029 Section 2.6 has been **
 
 ### Root Cause Correction
 
-5. **The golden test failures are NOT caused by expression normalization.** They are caused by differences in:
+1. **The golden test failures are NOT caused by expression normalization.** They are caused by differences in:
    - Match detection (different number of matches found)
    - Match grouping (how matches become detections)
    - Match expression collection (tests expect individual match expressions, not combined detection expressions)
@@ -735,7 +746,7 @@ This plan remains valuable as documentation of Python's expression handling beha
 
 ## Appendix A: Python Code References
 
-### A.1 combine_expressions() in license_expression/__init__.py
+### A.1 combine_expressions() in license_expression/**init**.py
 
 ```python
 # Lines 1746-1802
@@ -762,7 +773,7 @@ def combine_expressions(
     return relation(*expressions)
 ```
 
-### A.2 Licensing.dedup() in license_expression/__init__.py
+### A.2 Licensing.dedup() in license_expression/**init**.py
 
 ```python
 # Lines 707-761
