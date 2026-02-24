@@ -339,9 +339,10 @@ fn is_false_positive(matches: &[LicenseMatch]) -> bool {
             .any(|bare| m.rule_identifier.to_lowercase().contains(bare))
     });
 
-    let is_gpl = matches
-        .iter()
-        .all(|m| m.rule_identifier.to_lowercase().contains("gpl"));
+    let is_gpl = matches.iter().all(|m| {
+        let id = m.rule_identifier.to_lowercase();
+        id.contains("gpl") && !id.contains("lgpl")
+    });
 
     // Use rule_length (token count) instead of matched_length (character count)
     let rule_length_values: Vec<usize> = matches.iter().map(|m| m.rule_length).collect();
@@ -1874,6 +1875,29 @@ mod tests {
         )];
 
         assert!(is_false_positive(&matches));
+    }
+
+    #[test]
+    fn test_is_false_positive_lgpl_short_not_filtered() {
+        // LGPL with rule_length == 1 should NOT be filtered as false positive
+        // (lgpl contains "gpl" as substring but is a different license)
+        let matches = vec![create_test_match_with_params(
+            "lgpl-2.0-plus",
+            "2-aho",
+            6,
+            8,
+            50.0,
+            1,
+            1,
+            100.0,
+            60,
+            "lgpl_bare_single_word.RULE",
+        )];
+
+        assert!(
+            !is_false_positive(&matches),
+            "LGPL should not be filtered as GPL false positive"
+        );
     }
 
     #[test]
