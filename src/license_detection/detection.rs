@@ -1169,6 +1169,7 @@ mod tests {
         rule_identifier: &str,
     ) -> LicenseMatch {
         LicenseMatch {
+            rid: 0,
             license_expression: "mit".to_string(),
             license_expression_spdx: "MIT".to_string(),
             from_file: Some("test.txt".to_string()),
@@ -1356,6 +1357,7 @@ mod tests {
         end_token: usize,
     ) -> LicenseMatch {
         LicenseMatch {
+            rid: 0,
             license_expression: "mit".to_string(),
             license_expression_spdx: "MIT".to_string(),
             from_file: Some("test.txt".to_string()),
@@ -1521,6 +1523,7 @@ mod tests {
         rule_identifier: &str,
     ) -> LicenseMatch {
         LicenseMatch {
+            rid: 0,
             license_expression: license_expression.to_string(),
             license_expression_spdx: license_expression.to_string(),
             from_file: Some("test.txt".to_string()),
@@ -4158,6 +4161,7 @@ mod tests {
     #[test]
     fn test_has_unknown_intro_before_detection_single_match_returns_false() {
         let intro = LicenseMatch {
+            rid: 0,
             license_expression: "unknown".to_string(),
             license_expression_spdx: "unknown".to_string(),
             from_file: Some("test.txt".to_string()),
@@ -4196,6 +4200,7 @@ mod tests {
     #[test]
     fn test_has_unknown_intro_before_detection_post_loop_returns_true() {
         let intro = LicenseMatch {
+            rid: 0,
             license_expression: "unknown".to_string(),
             license_expression_spdx: "unknown".to_string(),
             from_file: Some("test.txt".to_string()),
@@ -4226,6 +4231,7 @@ mod tests {
         };
 
         let low_coverage_match = LicenseMatch {
+            rid: 0,
             license_expression: "mit".to_string(),
             license_expression_spdx: "MIT".to_string(),
             from_file: Some("test.txt".to_string()),
@@ -4275,6 +4281,7 @@ mod tests {
                 license_expression: Some(license_expr.to_string()),
                 license_expression_spdx: Some(license_expr.to_uppercase()),
                 matches: vec![LicenseMatch {
+                    rid: 0,
                     license_expression: license_expr.to_string(),
                     license_expression_spdx: license_expr.to_uppercase(),
                     from_file: None,
@@ -4343,6 +4350,7 @@ mod tests {
     #[test]
     fn test_is_unknown_intro_true_with_is_license_intro_flag() {
         let m = LicenseMatch {
+            rid: 0,
             license_expression: "unknown".to_string(),
             license_expression_spdx: "unknown".to_string(),
             from_file: Some("test.txt".to_string()),
@@ -4377,6 +4385,7 @@ mod tests {
     #[test]
     fn test_is_unknown_intro_true_with_is_license_clue_flag() {
         let m = LicenseMatch {
+            rid: 0,
             license_expression: "unknown".to_string(),
             license_expression_spdx: "unknown".to_string(),
             from_file: Some("test.txt".to_string()),
@@ -4411,6 +4420,7 @@ mod tests {
     #[test]
     fn test_is_unknown_intro_true_with_free_unknown_expression() {
         let m = LicenseMatch {
+            rid: 0,
             license_expression: "free-unknown".to_string(),
             license_expression_spdx: "free-unknown".to_string(),
             from_file: Some("test.txt".to_string()),
@@ -4445,6 +4455,7 @@ mod tests {
     #[test]
     fn test_is_unknown_intro_false_no_unknown_in_expression() {
         let m = LicenseMatch {
+            rid: 0,
             license_expression: "mit".to_string(),
             license_expression_spdx: "MIT".to_string(),
             from_file: Some("test.txt".to_string()),
@@ -4479,6 +4490,7 @@ mod tests {
     #[test]
     fn test_is_unknown_intro_false_no_flags_or_free_unknown() {
         let m = LicenseMatch {
+            rid: 0,
             license_expression: "unknown".to_string(),
             license_expression_spdx: "unknown".to_string(),
             from_file: Some("test.txt".to_string()),
@@ -4516,6 +4528,7 @@ mod tests {
         referenced_filenames: Option<Vec<String>>,
     ) -> LicenseMatch {
         LicenseMatch {
+            rid: 0,
             license_expression: "mit".to_string(),
             license_expression_spdx: "MIT".to_string(),
             from_file: Some("test.txt".to_string()),

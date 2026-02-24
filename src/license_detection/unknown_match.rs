@@ -301,6 +301,7 @@ fn create_unknown_match(
     let matched_text = query.matched_text(start_line, end_line);
 
     LicenseMatch {
+        rid: 0,
         license_expression: "unknown".to_string(),
         license_expression_spdx: "unknown".to_string(),
         from_file: None,
@@ -489,6 +490,7 @@ mod tests {
         let query = Query::new("some license text here", &index).expect("Failed to create query");
 
         let known_matches = vec![LicenseMatch {
+            rid: 0,
             license_expression: "mit".to_string(),
             license_expression_spdx: "MIT".to_string(),
             from_file: None,
@@ -563,6 +565,7 @@ mod tests {
         let query = Query::new(text, &index).expect("Failed to create query");
 
         let known_matches = vec![LicenseMatch {
+            rid: 0,
             license_expression: "mit".to_string(),
             license_expression_spdx: "MIT".to_string(),
             from_file: None,

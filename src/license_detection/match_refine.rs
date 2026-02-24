@@ -68,9 +68,8 @@ fn filter_too_short_matches(index: &LicenseIndex, matches: &[LicenseMatch]) -> V
                 return true;
             }
 
-            if let Some(rid) = parse_rule_id(&m.rule_identifier)
-                && let Some(rule) = index.rules_by_rid.get(rid)
-            {
+            let rid = m.rid;
+            if let Some(rule) = index.rules_by_rid.get(rid) {
                 return !m.is_small(
                     rule.min_matched_length,
                     rule.min_high_matched_length,
@@ -86,7 +85,7 @@ fn filter_too_short_matches(index: &LicenseIndex, matches: &[LicenseMatch]) -> V
 
 /// Parse rule ID from rule_identifier string.
 ///
-/// Rule identifiers typically have the format "#42" where the numeric portion is the rule ID.
+/// Used only in tests to extract rid from legacy "#42" format for backward compatibility.
 ///
 /// # Arguments
 /// * `rule_identifier` - String like "#42" or "mit.LICENSE"
@@ -94,13 +93,7 @@ fn filter_too_short_matches(index: &LicenseIndex, matches: &[LicenseMatch]) -> V
 /// # Returns
 /// * `Some(usize)` - Parsed rule ID if valid
 /// * `None` - If rule_identifier is empty or doesn't contain a valid number
-///
-/// # Examples
-/// ```
-/// assert_eq!(parse_rule_id("#42"), Some(42));
-/// assert_eq!(parse_rule_id("#0"), Some(0));
-/// assert_eq!(parse_rule_id("invalid"), None);
-/// ```
+#[cfg(test)]
 fn parse_rule_id(rule_identifier: &str) -> Option<usize> {
     let trimmed = rule_identifier.trim();
     if let Some(stripped) = trimmed.strip_prefix('#') {
@@ -398,9 +391,8 @@ fn filter_false_positive_matches(
     let mut filtered = Vec::new();
 
     for m in matches {
-        if let Some(rid) = parse_rule_id(&m.rule_identifier)
-            && index.false_positive_rids.contains(&rid)
-        {
+        let rid = m.rid;
+        if index.false_positive_rids.contains(&rid) {
             continue;
         }
 
@@ -455,9 +447,7 @@ fn compute_match_score(m: &LicenseMatch, query: &Query) -> f32 {
 }
 
 fn is_false_positive(m: &LicenseMatch, index: &LicenseIndex) -> bool {
-    parse_rule_id(&m.rule_identifier)
-        .map(|rid| index.false_positive_rids.contains(&rid))
-        .unwrap_or(false)
+    index.false_positive_rids.contains(&m.rid)
 }
 
 /// Filter spurious matches with low density.
@@ -527,7 +517,6 @@ pub fn filter_overlapping_matches(
             .then_with(|| b.hilen.cmp(&a.hilen))
             .then_with(|| b.matched_length.cmp(&a.matched_length))
             .then_with(|| a.matcher_order().cmp(&b.matcher_order()))
-            .then_with(|| a.rule_identifier.cmp(&b.rule_identifier))
     });
 
     let mut i = 0;
@@ -624,12 +613,14 @@ pub fn filter_overlapping_matches(
                     && current_len_val >= next_len_val + 2
                     && current_hilen >= next_hilen
                 {
-                    let current_ends = parse_rule_id(&matches[i].rule_identifier)
-                        .and_then(|rid| index.rules_by_rid.get(rid))
+                    let current_ends = index
+                        .rules_by_rid
+                        .get(matches[i].rid)
                         .map(|r| r.ends_with_license)
                         .unwrap_or(false);
-                    let next_starts = parse_rule_id(&matches[j].rule_identifier)
-                        .and_then(|rid| index.rules_by_rid.get(rid))
+                    let next_starts = index
+                        .rules_by_rid
+                        .get(matches[j].rid)
                         .map(|r| r.starts_with_license)
                         .unwrap_or(false);
 
@@ -926,8 +917,8 @@ fn filter_below_rule_minimum_coverage(
                 return true;
             }
 
-            if let Some(rid) = parse_rule_id(&m.rule_identifier)
-                && let Some(rule) = index.rules_by_rid.get(rid)
+            let rid = m.rid;
+            if let Some(rule) = index.rules_by_rid.get(rid)
                 && let Some(min_cov) = rule.minimum_coverage
             {
                 return m.match_coverage >= min_cov as f32;
@@ -967,8 +958,8 @@ fn filter_short_matches_scattered_on_too_many_lines(
     matches
         .iter()
         .filter(|m| {
-            if let Some(rid) = parse_rule_id(&m.rule_identifier)
-                && let Some(rule) = index.rules_by_rid.get(rid)
+            let rid = m.rid;
+            if let Some(rule) = index.rules_by_rid.get(rid)
                 && rule.is_small
             {
                 let matched_len = m.len();
@@ -1027,13 +1018,7 @@ fn filter_matches_missing_required_phrases(
     let mut discarded = Vec::new();
 
     for m in matches {
-        let rid = match parse_rule_id(&m.rule_identifier) {
-            Some(rid) => rid,
-            None => {
-                kept.push(m.clone());
-                continue;
-            }
-        };
+        let rid = m.rid;
 
         let rule = match index.rules_by_rid.get(rid) {
             Some(r) => r,
@@ -1375,8 +1360,8 @@ fn filter_invalid_matches_to_single_word_gibberish(
     matches
         .iter()
         .filter(|m| {
-            if let Some(rid) = parse_rule_id(&m.rule_identifier)
-                && let Some(rule) = index.rules_by_rid.get(rid)
+            let rid = m.rid;
+            if let Some(rule) = index.rules_by_rid.get(rid)
                 && rule.length_unique == 1
                 && (rule.is_license_reference || rule.is_license_clue)
                 && let Some(matched_text) = &m.matched_text
@@ -1502,7 +1487,9 @@ mod tests {
     ) -> LicenseMatch {
         let matched_len = end_line - start_line + 1;
         let rule_len = matched_len;
+        let rid = parse_rule_id(rule_identifier).unwrap_or(0);
         LicenseMatch {
+            rid,
             license_expression: "mit".to_string(),
             license_expression_spdx: "MIT".to_string(),
             from_file: None,
@@ -1539,7 +1526,9 @@ mod tests {
         end_token: usize,
         matched_length: usize,
     ) -> LicenseMatch {
+        let rid = parse_rule_id(rule_identifier).unwrap_or(0);
         LicenseMatch {
+            rid,
             license_expression: "mit".to_string(),
             license_expression_spdx: "MIT".to_string(),
             from_file: None,
@@ -2833,7 +2822,9 @@ mod tests {
         rule_length: usize,
         license_expression: &str,
     ) -> LicenseMatch {
+        let rid = parse_rule_id(rule_identifier).unwrap_or(0);
         LicenseMatch {
+            rid,
             license_expression: license_expression.to_string(),
             license_expression_spdx: license_expression.to_string(),
             from_file: None,

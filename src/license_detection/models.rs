@@ -205,6 +205,11 @@ impl Ord for Rule {
 /// License match result from a matching strategy.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct LicenseMatch {
+    /// Internal rule ID for fast lookups (index into rules_by_rid).
+    /// Not serialized to JSON output.
+    #[serde(skip)]
+    pub rid: usize,
+
     /// License expression string using ScanCode license keys
     pub license_expression: String,
 
@@ -322,6 +327,7 @@ pub struct LicenseMatch {
 impl Default for LicenseMatch {
     fn default() -> Self {
         LicenseMatch {
+            rid: 0,
             license_expression: String::new(),
             license_expression_spdx: String::new(),
             from_file: None,
@@ -743,6 +749,7 @@ mod tests {
 
     fn create_license_match() -> LicenseMatch {
         LicenseMatch {
+            rid: 0,
             license_expression: "mit".to_string(),
             license_expression_spdx: "MIT".to_string(),
             from_file: Some("README.md".to_string()),
@@ -1154,6 +1161,7 @@ mod tests {
     #[test]
     fn test_license_match_creation_with_minimal_fields() {
         let match_result = LicenseMatch {
+            rid: 0,
             license_expression: "mit".to_string(),
             license_expression_spdx: "MIT".to_string(),
             from_file: None,
@@ -1300,6 +1308,7 @@ mod tests {
     #[test]
     fn test_license_match_with_referenced_filenames() {
         let match_result = LicenseMatch {
+            rid: 0,
             license_expression: "mit".to_string(),
             license_expression_spdx: "MIT".to_string(),
             from_file: Some("README.md".to_string()),
