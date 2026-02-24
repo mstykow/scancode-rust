@@ -96,10 +96,17 @@
   "files_with_packages": [
     {
       "for_packages": [
-        "pkg:cargo/myproject-cli@0.5.0?uuid=fixed-uid-done-for-testing-5642512d1758",
-        "pkg:cargo/myproject-core@0.5.0?uuid=fixed-uid-done-for-testing-5642512d1758"
+        "pkg:cargo/myproject-core@0.5.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+        "pkg:cargo/myproject-cli@0.5.0?uuid=fixed-uid-done-for-testing-5642512d1758"
       ],
       "path": "Cargo.toml"
+    },
+    {
+      "for_packages": [
+        "pkg:cargo/myproject-core@0.5.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+        "pkg:cargo/myproject-cli@0.5.0?uuid=fixed-uid-done-for-testing-5642512d1758"
+      ],
+      "path": "LICENSE"
     },
     {
       "for_packages": [
@@ -109,9 +116,27 @@
     },
     {
       "for_packages": [
+        "pkg:cargo/myproject-cli@0.5.0?uuid=fixed-uid-done-for-testing-5642512d1758"
+      ],
+      "path": "crates/cli/src/main.rs"
+    },
+    {
+      "for_packages": [
         "pkg:cargo/myproject-core@0.5.0?uuid=fixed-uid-done-for-testing-5642512d1758"
       ],
       "path": "crates/core/Cargo.toml"
+    },
+    {
+      "for_packages": [
+        "pkg:cargo/myproject-core@0.5.0?uuid=fixed-uid-done-for-testing-5642512d1758"
+      ],
+      "path": "crates/core/LICENSE"
+    },
+    {
+      "for_packages": [
+        "pkg:cargo/myproject-core@0.5.0?uuid=fixed-uid-done-for-testing-5642512d1758"
+      ],
+      "path": "crates/core/src/lib.rs"
     }
   ],
   "packages": [

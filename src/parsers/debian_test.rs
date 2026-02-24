@@ -231,4 +231,89 @@ mod tests {
         let name3 = extract_package_name_from_deb_path(&path3);
         assert_eq!(name3, Some("complex-name".to_string()));
     }
+
+    // ====== Debian Copyright Parser tests ======
+
+    #[test]
+    fn test_copyright_parser_is_match() {
+        assert!(DebianCopyrightParser::is_match(&PathBuf::from(
+            "/usr/share/doc/bash/copyright"
+        )));
+        assert!(DebianCopyrightParser::is_match(&PathBuf::from(
+            "debian/copyright"
+        )));
+        assert!(!DebianCopyrightParser::is_match(&PathBuf::from(
+            "copyright.txt"
+        )));
+        assert!(!DebianCopyrightParser::is_match(&PathBuf::from(
+            "/etc/copyright"
+        )));
+    }
+
+    #[test]
+    fn test_parse_copyright_dep5_format() {
+        let content = "Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: libseccomp
+Source: https://sourceforge.net/projects/libseccomp/
+
+Files: *
+Copyright: 2012 Paul Moore <pmoore@redhat.com>
+ 2012 Ashley Lai <adlai@us.ibm.com>
+License: LGPL-2.1
+
+License: LGPL-2.1
+ This library is free software
+";
+        let pkg = crate::parsers::debian::parse_copyright_file(content, Some("libseccomp"));
+        assert_eq!(pkg.name, Some("libseccomp".to_string()));
+        assert_eq!(pkg.namespace, Some("debian".to_string()));
+        assert_eq!(pkg.datasource_id, Some(DatasourceId::DebianCopyright));
+        assert_eq!(
+            pkg.extracted_license_statement,
+            Some("LGPL-2.1".to_string())
+        );
+        assert!(pkg.parties.len() >= 2);
+        assert_eq!(pkg.parties[0].role, Some("copyright-holder".to_string()));
+        assert!(pkg.parties[0].name.as_ref().unwrap().contains("Paul Moore"));
+    }
+
+    #[test]
+    fn test_parse_copyright_unstructured() {
+        let content = "This package was debianized by John Doe.
+
+Upstream Authors:
+    Jane Smith
+
+Copyright:
+    2009 10gen
+
+License:
+    SSPL
+";
+        let pkg = crate::parsers::debian::parse_copyright_file(content, Some("mongodb"));
+        assert_eq!(pkg.name, Some("mongodb".to_string()));
+        assert_eq!(pkg.extracted_license_statement, Some("SSPL".to_string()));
+        assert!(!pkg.parties.is_empty());
+    }
+
+    #[test]
+    fn test_parse_copyright_empty() {
+        let content = "This is just some text without proper copyright info.";
+        let pkg = crate::parsers::debian::parse_copyright_file(content, Some("test"));
+        assert_eq!(pkg.name, Some("test".to_string()));
+        assert!(pkg.extracted_license_statement.is_none());
+    }
+
+    #[test]
+    fn test_license_deduplication_case_insensitive() {
+        let content = "\
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Files: src/*
+License: MIT
+Files: tests/*
+License: mit
+";
+        let pkg = crate::parsers::debian::parse_copyright_file(content, Some("test"));
+        assert_eq!(pkg.extracted_license_statement, Some("MIT".to_string()));
+    }
 }

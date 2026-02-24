@@ -144,8 +144,9 @@ version: 2.0.0
 
         let result = AboutFileParser::extract_first_package(&file_path);
 
-        // Unknown type falls back to default "about" since "custom-type" is not a valid PackageType
-        assert_eq!(result.package_type, Some(PackageType::About));
+        // Unknown type now returns Unknown instead of falling back to About
+        // This is the correct behavior for bug #3884
+        assert_eq!(result.package_type, Some(PackageType::Unknown));
         assert_eq!(result.name, Some("mypackage".to_string()));
         assert_eq!(result.version, Some("2.0.0".to_string()));
     }

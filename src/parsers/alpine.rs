@@ -213,9 +213,15 @@ fn parse_alpine_package_paragraph(
         extra_data.insert("build_timestamp".to_string(), timestamp.into());
     }
 
-    if let Some(commit) = get_first(headers, "c") {
-        extra_data.insert("git_commit".to_string(), commit.into());
-    }
+    let vcs_url = if let Some(commit) = get_first(headers, "c") {
+        extra_data.insert("git_commit".to_string(), commit.clone().into());
+        Some(format!(
+            "git+https://git.alpinelinux.org/aports/commit/?id={}",
+            commit
+        ))
+    } else {
+        None
+    };
 
     let providers = extract_providers(raw_text);
     if !providers.is_empty() {
@@ -242,6 +248,7 @@ fn parse_alpine_package_paragraph(
         purl: name
             .as_ref()
             .and_then(|n| build_alpine_purl(n, version.as_deref(), architecture.as_deref())),
+        vcs_url,
         extra_data: if extra_data.is_empty() {
             None
         } else {
@@ -828,6 +835,38 @@ D:json-c geos gdal proj protobuf-c libstdc++
         assert_eq!(pkg.dependencies.len(), 6);
         assert!(pkg.homepage_url.is_none());
         assert!(pkg.extracted_license_statement.is_none());
+    }
+
+    #[test]
+    fn test_parse_alpine_vcs_url_extraction() {
+        let content = "P:test-package\nV:1.0\nc:cb70ca5c6d6db0399d2dd09189c5d57827bce5cd\n\n";
+        let (_dir, path) = create_temp_installed_db(content);
+        let pkg = AlpineInstalledParser::extract_first_package(&path);
+        assert_eq!(
+            pkg.vcs_url,
+            Some("git+https://git.alpinelinux.org/aports/commit/?id=cb70ca5c6d6db0399d2dd09189c5d57827bce5cd".to_string())
+        );
+        let extra = pkg.extra_data.as_ref().unwrap();
+        assert_eq!(
+            extra["git_commit"],
+            "cb70ca5c6d6db0399d2dd09189c5d57827bce5cd"
+        );
+    }
+
+    #[test]
+    fn test_parse_alpine_no_vcs_url_when_no_commit() {
+        let content = "P:test-package\nV:1.0\n\n";
+        let (_dir, path) = create_temp_installed_db(content);
+        let pkg = AlpineInstalledParser::extract_first_package(&path);
+        assert_eq!(pkg.vcs_url, None);
+    }
+
+    #[test]
+    fn test_parse_alpine_empty_commit_field() {
+        let content = "P:test-package\nV:1.0\nc:\n\n";
+        let (_dir, path) = create_temp_installed_db(content);
+        let pkg = AlpineInstalledParser::extract_first_package(&path);
+        assert_eq!(pkg.vcs_url, None);
     }
 }
 

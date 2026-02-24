@@ -1323,13 +1323,19 @@ fn parse_dependency_table(
                 package_url.with_version(v).ok()?;
             }
 
+            let req_str = if let Some(ref v) = version_str {
+                format!("{}{}", name, v)
+            } else {
+                name.clone()
+            };
+
             Some(Dependency {
                 purl: Some(package_url.to_string()),
                 extracted_requirement: None,
                 scope: scope.map(|s| s.to_string()),
                 is_runtime: Some(!is_optional),
                 is_optional: Some(is_optional),
-                is_pinned: None,
+                is_pinned: Some(is_requirement_pinned(&req_str)),
                 is_direct: Some(true),
                 resolved_package: None,
                 extra_data: None,
@@ -1369,7 +1375,7 @@ fn parse_dependency_array(
                 scope: scope.map(|s| s.to_string()),
                 is_runtime: Some(!is_optional),
                 is_optional: Some(is_optional),
-                is_pinned: None,
+                is_pinned: Some(is_requirement_pinned(dep_str)),
                 is_direct: Some(true),
                 resolved_package: None,
                 extra_data: None,
@@ -2540,7 +2546,7 @@ fn build_setup_cfg_dependency(req: &str, scope: &str, is_optional: bool) -> Opti
         scope: Some(scope.to_string()),
         is_runtime: Some(true),
         is_optional: Some(is_optional),
-        is_pinned: Some(false),
+        is_pinned: Some(is_requirement_pinned(trimmed)),
         is_direct: Some(true),
         resolved_package: None,
         extra_data: None,
@@ -2566,6 +2572,23 @@ fn extract_setup_cfg_dependency_name(req: &str) -> Option<String> {
 
 fn normalize_setup_cfg_requirement(req: &str) -> String {
     req.chars().filter(|c| !c.is_whitespace()).collect()
+}
+
+pub(crate) fn is_requirement_pinned(req: &str) -> bool {
+    let req = req.split(';').next().unwrap_or(req).trim();
+    let req = req.split('[').next().unwrap_or(req).trim();
+
+    if let Some(specifier_start) = req.find("===") {
+        let version_part = &req[specifier_start + 3..];
+        return !version_part.contains('*');
+    }
+    if let Some(specifier_start) = req.find("==")
+        && !req[specifier_start..].starts_with("===")
+    {
+        let version_part = &req[specifier_start + 2..];
+        return !version_part.contains('*');
+    }
+    false
 }
 
 fn extract_setup_value(content: &str, key: &str) -> Option<String> {
@@ -2666,7 +2689,7 @@ fn parse_setup_py_dep_list(deps_str: &str, scope: &str, is_optional: bool) -> Ve
                 scope: Some(scope.to_string()),
                 is_runtime: Some(true),
                 is_optional: Some(is_optional),
-                is_pinned: Some(false),
+                is_pinned: Some(is_requirement_pinned(dep_str)),
                 is_direct: Some(true),
                 resolved_package: None,
                 extra_data: None,

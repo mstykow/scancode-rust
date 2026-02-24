@@ -5,24 +5,79 @@ use crate::models::PackageType;
 use super::PackageParser;
 use super::misc::*;
 use crate::models::DatasourceId;
+use std::io::Write;
 use std::path::PathBuf;
+use tempfile::NamedTempFile;
 
 // ============================================================================
 // Java Archives
 // ============================================================================
 
 #[test]
-fn test_java_jar_recognizer() {
-    // Positive cases
-    assert!(JavaJarRecognizer::is_match(&PathBuf::from(
-        "lib/commons-lang3.jar"
-    )));
-    assert!(JavaJarRecognizer::is_match(&PathBuf::from(
-        "/usr/share/java/test.jar"
-    )));
-    assert!(JavaJarRecognizer::is_match(&PathBuf::from("example.jar")));
+fn test_jar_recognizer_valid_zip() {
+    let mut file = NamedTempFile::with_suffix(".jar").unwrap();
+    file.write_all(&[0x50, 0x4B, 0x03, 0x04, 0x00, 0x00])
+        .unwrap();
+    assert!(JavaJarRecognizer::is_match(file.path()));
+}
 
-    // Negative cases
+#[test]
+fn test_jar_recognizer_invalid_not_zip() {
+    let mut file = NamedTempFile::with_suffix(".jar").unwrap();
+    file.write_all(b"This is not a JAR file").unwrap();
+    assert!(!JavaJarRecognizer::is_match(file.path()));
+}
+
+#[test]
+fn test_jar_recognizer_empty_file() {
+    let file = NamedTempFile::with_suffix(".jar").unwrap();
+    assert!(!JavaJarRecognizer::is_match(file.path()));
+}
+
+#[test]
+fn test_jar_recognizer_truncated() {
+    let mut file = NamedTempFile::with_suffix(".jar").unwrap();
+    file.write_all(&[0x50, 0x4B]).unwrap();
+    assert!(!JavaJarRecognizer::is_match(file.path()));
+}
+
+#[test]
+fn test_jar_recognizer_nonexistent() {
+    assert!(!JavaJarRecognizer::is_match(&PathBuf::from(
+        "/nonexistent/file.jar"
+    )));
+}
+
+#[test]
+fn test_jar_recognizer_wrong_extension() {
+    let mut file = NamedTempFile::with_suffix(".war").unwrap();
+    file.write_all(&[0x50, 0x4B, 0x03, 0x04, 0x00, 0x00])
+        .unwrap();
+    assert!(!JavaJarRecognizer::is_match(file.path()));
+}
+
+#[test]
+fn test_jar_primary_language() {
+    let mut file = NamedTempFile::with_suffix(".jar").unwrap();
+    file.write_all(&[0x50, 0x4B, 0x03, 0x04, 0x00, 0x00])
+        .unwrap();
+    let packages = JavaJarRecognizer::extract_packages(file.path());
+    assert_eq!(packages.len(), 1);
+    assert_eq!(packages[0].package_type, Some(PackageType::Jar));
+    assert_eq!(packages[0].datasource_id, Some(DatasourceId::JavaJar));
+    assert_eq!(packages[0].primary_language, Some("Java".to_string()));
+}
+
+#[test]
+fn test_java_jar_recognizer() {
+    // Positive cases - need valid ZIP files
+    let mut valid_jar = NamedTempFile::with_suffix(".jar").unwrap();
+    valid_jar
+        .write_all(&[0x50, 0x4B, 0x03, 0x04, 0x00, 0x00])
+        .unwrap();
+    assert!(JavaJarRecognizer::is_match(valid_jar.path()));
+
+    // Negative cases - wrong extension
     assert!(!JavaJarRecognizer::is_match(&PathBuf::from(
         "lib/example.war"
     )));
@@ -31,8 +86,13 @@ fn test_java_jar_recognizer() {
     )));
     assert!(!JavaJarRecognizer::is_match(&PathBuf::from("README.md")));
 
+    // Negative case - .jar extension but not valid ZIP
+    let mut fake_jar = NamedTempFile::with_suffix(".jar").unwrap();
+    fake_jar.write_all(b"not a zip").unwrap();
+    assert!(!JavaJarRecognizer::is_match(fake_jar.path()));
+
     // Extract packages
-    let packages = JavaJarRecognizer::extract_packages(&PathBuf::from("test.jar"));
+    let packages = JavaJarRecognizer::extract_packages(valid_jar.path());
     assert_eq!(packages.len(), 1);
     assert_eq!(packages[0].package_type, Some(PackageType::Jar));
     assert_eq!(packages[0].datasource_id, Some(DatasourceId::JavaJar));
@@ -608,12 +668,17 @@ fn test_installshield_recognizer() {
 
 #[test]
 fn test_minimal_package_data_structure() {
-    let packages = JavaJarRecognizer::extract_packages(&PathBuf::from("test.jar"));
+    let mut valid_jar = NamedTempFile::with_suffix(".jar").unwrap();
+    valid_jar
+        .write_all(&[0x50, 0x4B, 0x03, 0x04, 0x00, 0x00])
+        .unwrap();
+    let packages = JavaJarRecognizer::extract_packages(valid_jar.path());
     let pkg = &packages[0];
 
-    // Should have package_type and datasource_id
+    // Should have package_type, datasource_id, and primary_language (for Java recognizers)
     assert!(pkg.package_type.is_some());
     assert!(pkg.datasource_id.is_some());
+    assert_eq!(pkg.primary_language, Some("Java".to_string()));
 
     // All other fields should be None/empty (default)
     assert!(pkg.name.is_none());

@@ -512,4 +512,110 @@ mod tests {
                 .any(|d| d.scope.as_deref() == Some("replace"))
         );
     }
+
+    #[test]
+    fn test_composer_lock_empty() {
+        let content = r#"
+{
+  "packages": [],
+  "packages-dev": []
+}
+"#;
+
+        let (_temp_dir, composer_path) = create_temp_file("composer.lock", content);
+        let package_data = ComposerLockParser::extract_first_package(&composer_path);
+
+        assert_eq!(package_data.dependencies.len(), 0);
+    }
+
+    #[test]
+    fn test_composer_lock_only_dev() {
+        let content = r#"
+{
+  "packages": [],
+  "packages-dev": [
+    {
+      "name": "acme/devpkg",
+      "version": "1.0.0"
+    }
+  ]
+}
+"#;
+
+        let (_temp_dir, composer_path) = create_temp_file("composer.lock", content);
+        let package_data = ComposerLockParser::extract_first_package(&composer_path);
+
+        assert_eq!(package_data.dependencies.len(), 1);
+        let dev_dep = find_dependency(&package_data.dependencies, "pkg:composer/acme/devpkg@1.0.0");
+        assert_eq!(dev_dep.scope.as_deref(), Some("require-dev"));
+        assert_eq!(dev_dep.is_runtime, Some(false));
+        assert_eq!(dev_dep.is_optional, Some(true));
+    }
+
+    #[test]
+    fn test_composer_lock_only_regular() {
+        let content = r#"
+{
+  "packages": [
+    {
+      "name": "acme/runtime",
+      "version": "2.0.0"
+    }
+  ],
+  "packages-dev": []
+}
+"#;
+
+        let (_temp_dir, composer_path) = create_temp_file("composer.lock", content);
+        let package_data = ComposerLockParser::extract_first_package(&composer_path);
+
+        assert_eq!(package_data.dependencies.len(), 1);
+        let runtime_dep = find_dependency(
+            &package_data.dependencies,
+            "pkg:composer/acme/runtime@2.0.0",
+        );
+        assert_eq!(runtime_dep.scope.as_deref(), Some("require"));
+        assert_eq!(runtime_dep.is_runtime, Some(true));
+        assert_eq!(runtime_dep.is_optional, Some(false));
+    }
+
+    #[test]
+    fn test_composer_lock_missing_packages_fields() {
+        let content = r#"
+{
+  "content-hash": "abc123"
+}
+"#;
+
+        let (_temp_dir, composer_path) = create_temp_file("composer.lock", content);
+        let package_data = ComposerLockParser::extract_first_package(&composer_path);
+
+        assert_eq!(package_data.dependencies.len(), 0);
+    }
+
+    #[test]
+    fn test_composer_lock_large_file() {
+        let mut packages = Vec::new();
+        for i in 0..1000 {
+            packages.push(format!(
+                r#"{{"name": "acme/pkg{}", "version": "1.{}.0"}}"#,
+                i,
+                i % 10
+            ));
+        }
+        let content = format!(
+            r#"
+{{
+  "packages": [{}],
+  "packages-dev": []
+}}
+"#,
+            packages.join(",")
+        );
+
+        let (_temp_dir, composer_path) = create_temp_file("composer.lock", &content);
+        let package_data = ComposerLockParser::extract_first_package(&composer_path);
+
+        assert_eq!(package_data.dependencies.len(), 1000);
+    }
 }

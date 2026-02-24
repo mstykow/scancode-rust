@@ -84,7 +84,7 @@ fn parse_rpm_package(pkg: &Package) -> PackageData {
     let description = metadata.get_description().ok().map(|s| s.to_string());
     let homepage_url = metadata.get_url().ok().map(|s| s.to_string());
 
-    let namespace = Some("fedora".to_string());
+    let namespace: Option<String> = None;
 
     let mut parties = Vec::new();
 
@@ -121,7 +121,7 @@ fn parse_rpm_package(pkg: &Package) -> PackageData {
 
     let extracted_license_statement = metadata.get_license().ok().map(|s| s.to_string());
 
-    let dependencies = extract_rpm_dependencies(pkg, namespace.as_deref());
+    let dependencies = extract_rpm_dependencies(pkg, None);
 
     let architecture = metadata.get_arch().ok().map(|s| s.to_string());
 
@@ -222,12 +222,18 @@ fn format_rpm_requirement(dep: &rpm::Dependency) -> String {
 fn build_evr_version(metadata: &PackageMetadata) -> Option<String> {
     let version = metadata.get_version().ok()?;
     let release = metadata.get_release().ok();
+    let epoch = metadata.get_epoch().ok();
 
-    let mut evr = String::from(version);
+    let mut evr = if let Some(r) = release {
+        format!("{}-{}", version, r)
+    } else {
+        version.to_string()
+    };
 
-    if let Some(r) = release {
-        evr.push('-');
-        evr.push_str(r);
+    if let Some(e) = epoch
+        && e > 0
+    {
+        evr = format!("{}:{}", e, evr);
     }
 
     Some(evr)
@@ -394,6 +400,36 @@ mod tests {
             assert_eq!(pkg.name, Some("fping".to_string()));
             assert!(pkg.version.is_some());
         }
+    }
+
+    #[test]
+    fn test_rpm_archive_namespace_is_none() {
+        let test_file = PathBuf::from("testdata/rpm/fping-2.4b2-10.fc12.x86_64.rpm");
+        if !test_file.exists() {
+            return;
+        }
+
+        let pkg = RpmParser::extract_first_package(&test_file);
+        assert_eq!(pkg.namespace, None);
+    }
+
+    #[test]
+    fn test_rpm_is_match_src_rpm() {
+        assert!(RpmParser::is_match(&PathBuf::from(
+            "setup-2.5.49-b1.src.rpm"
+        )));
+    }
+
+    #[test]
+    fn test_rpm_is_match_regular_rpm() {
+        assert!(RpmParser::is_match(&PathBuf::from(
+            "package-1.0.x86_64.rpm"
+        )));
+    }
+
+    #[test]
+    fn test_rpm_is_match_not_rpm() {
+        assert!(!RpmParser::is_match(&PathBuf::from("package.deb")));
     }
 }
 

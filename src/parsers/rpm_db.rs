@@ -124,7 +124,7 @@ fn parse_rpm_database(
 
                 let version = build_evr_version(pkg.epoch, &pkg.version, &pkg.release);
 
-                let namespace = Some("fedora".to_string());
+                let namespace: Option<String> = None;
 
                 let architecture = if pkg.arch.is_empty() {
                     None
@@ -384,6 +384,17 @@ mod tests {
             Some(DatasourceId::RpmInstalledDatabaseSqlite)
         );
         assert!(pkg.name.is_some());
+    }
+
+    #[test]
+    fn test_rpm_db_namespace_is_none() {
+        let test_file = PathBuf::from("testdata/rpm/rpmdb.sqlite");
+        if !test_file.exists() {
+            return;
+        }
+
+        let pkg = RpmSqliteDatabaseParser::extract_first_package(&test_file);
+        assert_eq!(pkg.namespace, None);
     }
 }
 

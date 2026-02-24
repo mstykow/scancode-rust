@@ -448,21 +448,34 @@ fn parse_block(tokens: &[Tok]) -> Vec<RawDep> {
         // PATTERN: scope ident.attr (variable reference / dotted identifier)
         // Note: Skip references starting with "dependencies." as Python's pygmars
         // relabels the "dependencies" token, breaking the DEPENDENCY-5 grammar rule.
+        // Also skip version catalog references (libs.*, versions.*, plugins.*, boms.*)
+        // as they cannot be resolved without the catalog file and would produce invalid PURLs.
         if next < tokens.len()
             && let Tok::Ident(ref val) = tokens[next]
             && val.contains('.')
-            && !val.starts_with("dependencies.")
-            && let Some(last_seg) = val.rsplit('.').next()
-            && !last_seg.is_empty()
         {
-            deps.push(RawDep {
-                namespace: String::new(),
-                name: last_seg.to_string(),
-                version: String::new(),
-                scope: scope_name.clone(),
-            });
-            i = next + 1;
-            continue;
+            let catalog_prefixes = ["libs.", "versions.", "plugins.", "boms."];
+            if catalog_prefixes
+                .iter()
+                .any(|prefix| val.starts_with(prefix))
+            {
+                i = next + 1;
+                continue;
+            }
+
+            if !val.starts_with("dependencies.")
+                && let Some(last_seg) = val.rsplit('.').next()
+                && !last_seg.is_empty()
+            {
+                deps.push(RawDep {
+                    namespace: String::new(),
+                    name: last_seg.to_string(),
+                    version: String::new(),
+                    scope: scope_name.clone(),
+                });
+                i = next + 1;
+                continue;
+            }
         }
 
         // PATTERN: scope project(':module') — project reference without parens
@@ -745,6 +758,30 @@ fn find_matching_bracket(tokens: &[Tok], start: usize) -> Option<usize> {
 // Dependency construction
 // ---------------------------------------------------------------------------
 
+fn classify_gradle_scope(scope: &str) -> (bool, bool) {
+    let scope_lower = scope.to_lowercase();
+
+    if scope_lower.contains("test") {
+        return (false, true);
+    }
+
+    let non_runtime = [
+        "compileonly",
+        "provided",
+        "annotationprocessor",
+        "apt",
+        "kapt",
+        "compileinclude",
+        "developmentonly",
+    ];
+
+    if non_runtime.iter().any(|s| scope_lower.contains(s)) {
+        return (false, false);
+    }
+
+    (true, false)
+}
+
 fn create_dependency(
     namespace: &str,
     name: &str,
@@ -765,9 +802,7 @@ fn create_dependency(
         purl.with_version(version).ok()?;
     }
 
-    let scope_lower = scope.to_lowercase();
-    let is_runtime = !scope_lower.contains("test");
-    let is_optional = scope_lower.contains("test");
+    let (is_runtime, is_optional) = classify_gradle_scope(scope);
     let is_pinned = !version.is_empty();
 
     let purl_string = purl.to_string().replace("$", "%24");
@@ -1014,5 +1049,206 @@ dependencies {
             Some("pkg:maven/org.hibernate/hibernate@3.0.5".to_string())
         );
         assert_eq!(deps[0].scope, Some("runtimeOnly".to_string()));
+    }
+
+    #[test]
+    fn test_compileonly_not_runtime() {
+        let content = r#"
+dependencies {
+    compileOnly 'org.projectlombok:lombok:1.18.28'
+}
+"#;
+        let tokens = lex(content);
+        let deps = extract_dependencies(&tokens);
+        assert_eq!(deps.len(), 1);
+        assert_eq!(deps[0].is_runtime, Some(false));
+        assert_eq!(deps[0].is_optional, Some(false));
+    }
+
+    #[test]
+    fn test_implementation_is_runtime() {
+        let content = r#"
+dependencies {
+    implementation 'com.google.guava:guava:31.1-jre'
+}
+"#;
+        let tokens = lex(content);
+        let deps = extract_dependencies(&tokens);
+        assert_eq!(deps.len(), 1);
+        assert_eq!(deps[0].is_runtime, Some(true));
+        assert_eq!(deps[0].is_optional, Some(false));
+    }
+
+    #[test]
+    fn test_annotationprocessor_not_runtime() {
+        let content = r#"
+dependencies {
+    annotationProcessor 'org.projectlombok:lombok:1.18.28'
+}
+"#;
+        let tokens = lex(content);
+        let deps = extract_dependencies(&tokens);
+        assert_eq!(deps.len(), 1);
+        assert_eq!(deps[0].is_runtime, Some(false));
+        assert_eq!(deps[0].is_optional, Some(false));
+    }
+
+    #[test]
+    fn test_provided_not_runtime() {
+        let content = r#"
+dependencies {
+    provided 'javax.servlet:servlet-api:4.0.1'
+}
+"#;
+        let tokens = lex(content);
+        let deps = extract_dependencies(&tokens);
+        assert_eq!(deps.len(), 1);
+        assert_eq!(deps[0].is_runtime, Some(false));
+        assert_eq!(deps[0].is_optional, Some(false));
+    }
+
+    #[test]
+    fn test_runtimeonly_is_runtime() {
+        let content = r#"
+dependencies {
+    runtimeOnly 'com.h2database:h2:2.1.214'
+}
+"#;
+        let tokens = lex(content);
+        let deps = extract_dependencies(&tokens);
+        assert_eq!(deps.len(), 1);
+        assert_eq!(deps[0].is_runtime, Some(true));
+        assert_eq!(deps[0].is_optional, Some(false));
+    }
+
+    #[test]
+    fn test_testimplementation_not_runtime() {
+        let content = r#"
+dependencies {
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.9.2'
+}
+"#;
+        let tokens = lex(content);
+        let deps = extract_dependencies(&tokens);
+        assert_eq!(deps.len(), 1);
+        assert_eq!(deps[0].is_runtime, Some(false));
+        assert_eq!(deps[0].is_optional, Some(true));
+    }
+
+    #[test]
+    fn test_kapt_not_runtime() {
+        let content = r#"
+dependencies {
+    kapt 'com.google.dagger:dagger-compiler:2.44'
+}
+"#;
+        let tokens = lex(content);
+        let deps = extract_dependencies(&tokens);
+        assert_eq!(deps.len(), 1);
+        assert_eq!(deps[0].is_runtime, Some(false));
+        assert_eq!(deps[0].is_optional, Some(false));
+    }
+
+    #[test]
+    fn test_developmentonly_not_runtime() {
+        let content = r#"
+dependencies {
+    developmentOnly 'org.springframework.boot:spring-boot-devtools:3.0.0'
+}
+"#;
+        let tokens = lex(content);
+        let deps = extract_dependencies(&tokens);
+        assert_eq!(deps.len(), 1);
+        assert_eq!(deps[0].is_runtime, Some(false));
+        assert_eq!(deps[0].is_optional, Some(false));
+    }
+
+    #[test]
+    fn test_api_is_runtime() {
+        let content = r#"
+dependencies {
+    api 'org.apache.commons:commons-lang3:3.12.0'
+}
+"#;
+        let tokens = lex(content);
+        let deps = extract_dependencies(&tokens);
+        assert_eq!(deps.len(), 1);
+        assert_eq!(deps[0].is_runtime, Some(true));
+        assert_eq!(deps[0].is_optional, Some(false));
+    }
+
+    #[test]
+    fn test_version_catalog_libs_skipped() {
+        let content = r#"
+dependencies {
+    implementation libs.androidx.appcompat
+}
+"#;
+        let tokens = lex(content);
+        let deps = extract_dependencies(&tokens);
+        assert_eq!(deps.len(), 0);
+    }
+
+    #[test]
+    fn test_version_catalog_versions_skipped() {
+        let content = r#"
+dependencies {
+    implementation versions.spring
+}
+"#;
+        let tokens = lex(content);
+        let deps = extract_dependencies(&tokens);
+        assert_eq!(deps.len(), 0);
+    }
+
+    #[test]
+    fn test_version_catalog_plugins_skipped() {
+        let content = r#"
+dependencies {
+    implementation plugins.kotlin
+}
+"#;
+        let tokens = lex(content);
+        let deps = extract_dependencies(&tokens);
+        assert_eq!(deps.len(), 0);
+    }
+
+    #[test]
+    fn test_version_catalog_boms_skipped() {
+        let content = r#"
+dependencies {
+    implementation boms.jackson
+}
+"#;
+        let tokens = lex(content);
+        let deps = extract_dependencies(&tokens);
+        assert_eq!(deps.len(), 0);
+    }
+
+    #[test]
+    fn test_normal_dotted_identifier_still_works() {
+        let content = r#"
+dependencies {
+    implementation my.custom.variable
+}
+"#;
+        let tokens = lex(content);
+        let deps = extract_dependencies(&tokens);
+        assert_eq!(deps.len(), 1);
+        assert_eq!(deps[0].purl, Some("pkg:maven/variable".to_string()));
+    }
+
+    #[test]
+    fn test_string_notation_unaffected_by_catalog_skip() {
+        let content = r#"
+dependencies {
+    implementation 'com.example:library:1.0'
+    implementation libs.something
+    testImplementation 'junit:junit:4.13'
+}
+"#;
+        let tokens = lex(content);
+        let deps = extract_dependencies(&tokens);
+        assert_eq!(deps.len(), 2);
     }
 }

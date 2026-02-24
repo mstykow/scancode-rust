@@ -39,6 +39,7 @@ const FIELD_INTEGRITY: &str = "integrity";
 const FIELD_DEV: &str = "dev";
 const FIELD_OPTIONAL: &str = "optional";
 const FIELD_DEV_OPTIONAL: &str = "devOptional";
+const FIELD_REQUIRES: &str = "requires";
 
 /// npm lockfile parser supporting package-lock.json v1, v2, and v3 formats.
 ///
@@ -194,6 +195,22 @@ fn parse_lockfile_v2_plus(
         );
 
         dependencies.push(dependency);
+
+        let requires_deps = value
+            .get(FIELD_REQUIRES)
+            .and_then(|v| v.as_object())
+            .map(|requires| {
+                requires
+                    .iter()
+                    .filter_map(|(name, version)| {
+                        let version_str = version.as_str()?;
+                        Some(build_unresolved_dependency(name, version_str))
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+
+        dependencies.extend(requires_deps);
     }
 
     PackageData {
@@ -353,7 +370,7 @@ fn parse_dependencies_v1_with_depth(
             package_name,
             version,
             is_dev,
-            false, // v1 lockfiles don't have devOptional flag
+            false,
             is_optional,
             resolved,
             integrity,
@@ -362,6 +379,22 @@ fn parse_dependencies_v1_with_depth(
         );
 
         dependencies.push(dependency);
+
+        let requires_deps = dep_data
+            .get(FIELD_REQUIRES)
+            .and_then(|v| v.as_object())
+            .map(|requires| {
+                requires
+                    .iter()
+                    .filter_map(|(name, version)| {
+                        let version_str = version.as_str()?;
+                        Some(build_unresolved_dependency(name, version_str))
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+
+        dependencies.extend(requires_deps);
     }
 
     dependencies
@@ -426,6 +459,33 @@ fn create_purl(namespace: &str, name: &str, version: &str) -> Option<String> {
         format!("{}/{}", namespace, name)
     };
     npm_purl(&full_name, Some(version))
+}
+
+fn create_purl_without_version(namespace: &str, name: &str) -> Option<String> {
+    let full_name = if namespace.is_empty() {
+        name.to_string()
+    } else {
+        format!("{}/{}", namespace, name)
+    };
+    npm_purl(&full_name, None)
+}
+
+fn build_unresolved_dependency(package_name: &str, version_range: &str) -> Dependency {
+    let (dep_namespace, dep_name) = extract_namespace_and_name(package_name);
+
+    let dep_purl = create_purl_without_version(&dep_namespace, &dep_name);
+
+    Dependency {
+        purl: dep_purl,
+        extracted_requirement: Some(version_range.to_string()),
+        scope: Some("dependencies".to_string()),
+        is_runtime: Some(true),
+        is_optional: Some(false),
+        is_pinned: Some(false),
+        is_direct: Some(false),
+        resolved_package: None,
+        extra_data: None,
+    }
 }
 
 /// Parse integrity field like "sha512-base64string==" or "sha1-base64string="
