@@ -371,6 +371,14 @@ impl LicenseMatch {
         self.hilen
     }
 
+    pub fn qstart(&self) -> usize {
+        if let Some(positions) = &self.qspan_positions {
+            positions.iter().copied().min().unwrap_or(self.start_token)
+        } else {
+            self.start_token
+        }
+    }
+
     #[allow(dead_code)]
     pub fn is_small(
         &self,

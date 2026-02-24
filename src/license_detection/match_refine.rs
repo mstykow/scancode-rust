@@ -169,7 +169,7 @@ pub fn merge_overlapping_matches(matches: &[LicenseMatch]) -> Vec<LicenseMatch> 
     sorted.sort_by(|a, b| {
         a.rule_identifier
             .cmp(&b.rule_identifier)
-            .then_with(|| a.start_token.cmp(&b.start_token))
+            .then_with(|| a.qstart().cmp(&b.qstart()))
             .then_with(|| b.hilen.cmp(&a.hilen))
             .then_with(|| b.matched_length.cmp(&a.matched_length))
             .then_with(|| a.matcher_order().cmp(&b.matcher_order()))
@@ -332,8 +332,8 @@ fn filter_contained_matches(matches: &[LicenseMatch]) -> (Vec<LicenseMatch>, Vec
     let mut discarded = Vec::new();
 
     matches.sort_by(|a, b| {
-        a.start_token
-            .cmp(&b.start_token)
+        a.qstart()
+            .cmp(&b.qstart())
             .then_with(|| b.hilen.cmp(&a.hilen))
             .then_with(|| b.matched_length.cmp(&a.matched_length))
             .then_with(|| a.matcher_order().cmp(&b.matcher_order()))
@@ -350,7 +350,7 @@ fn filter_contained_matches(matches: &[LicenseMatch]) -> (Vec<LicenseMatch>, Vec
                 break;
             }
 
-            if current.start_token == next.start_token && current.end_token == next.end_token {
+            if current.qstart() == next.qstart() && current.end_token == next.end_token {
                 if current.match_coverage >= next.match_coverage {
                     discarded.push(matches.remove(j));
                     continue;
@@ -522,8 +522,8 @@ pub fn filter_overlapping_matches(
     let mut discarded: Vec<LicenseMatch> = vec![];
 
     matches.sort_by(|a, b| {
-        a.start_token
-            .cmp(&b.start_token)
+        a.qstart()
+            .cmp(&b.qstart())
             .then_with(|| b.hilen.cmp(&a.hilen))
             .then_with(|| b.matched_length.cmp(&a.matched_length))
             .then_with(|| a.matcher_order().cmp(&b.matcher_order()))
