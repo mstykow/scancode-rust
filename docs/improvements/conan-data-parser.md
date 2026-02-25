@@ -19,11 +19,11 @@ def parse(cls, location, package_only=False):
         conandata = yaml.safe_load(loc)
 
     sources = conandata.get("sources") or {}
-    
+
     for version, source_data in sources.items():
         url = source_data.get("url")
         sha256 = source_data.get("sha256")
-        
+
         yield PackageData(
             type="conan",
             version=version,

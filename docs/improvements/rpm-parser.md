@@ -27,7 +27,7 @@ The RPM parser in scancode-rust **implements a missing feature** from the Python
 {
   "name": "bzip2",
   "version": "1.0.6-5",
-  "dependencies": []  // Always empty in Python
+  "dependencies": [] // Always empty in Python
 }
 ```
 
@@ -40,14 +40,14 @@ The RPM parser in scancode-rust **implements a missing feature** from the Python
 ```rust
 pub fn extract_package_data(path: &Path) -> PackageData {
     let pkg = rpm::Package::open(path)?;
-    
+
     // Extract dependencies using rpm crate's get_requires() API
     let dependencies = pkg.metadata
         .get_requires()
         .iter()
         .map(|dep| {
             let mut requirement = dep.name.clone();
-            
+
             // Format version constraint: "libc.so.6 >= 2.2.5"
             if let Some(version) = &dep.version {
                 requirement = format!(
@@ -57,10 +57,10 @@ pub fn extract_package_data(path: &Path) -> PackageData {
                     version
                 );
             }
-            
+
             // Generate PURL for dependency
             let purl = format!("pkg:rpm/{}", dep.name);
-            
+
             Dependency {
                 purl: Some(purl),
                 extracted_requirement: Some(requirement),
@@ -71,7 +71,7 @@ pub fn extract_package_data(path: &Path) -> PackageData {
             }
         })
         .collect();
-    
+
     PackageData {
         name: Some(pkg.metadata.get_name()?),
         version: Some(pkg.metadata.get_version()?),
@@ -143,10 +143,10 @@ fn test_rpm_dependency_extraction() {
     let result = RpmParser::extract_package_data(
         Path::new("testdata/rpm/bzip2-1.0.6-5.el7.x86_64.rpm")
     );
-    
+
     let deps = result.dependencies;
     assert!(deps.len() > 0, "Should extract dependencies");
-    
+
     // Verify dependency with version constraint
     let libc_dep = deps.iter()
         .find(|d| d.extracted_requirement
@@ -154,7 +154,7 @@ fn test_rpm_dependency_extraction() {
             .map(|r| r.contains("libc.so.6"))
             .unwrap_or(false))
         .expect("Should find libc.so.6 dependency");
-    
+
     assert!(
         libc_dep.extracted_requirement
             .as_ref()
@@ -162,12 +162,12 @@ fn test_rpm_dependency_extraction() {
             .contains(">="),
         "Should include version constraint operator"
     );
-    
+
     // Verify dependency without version constraint
     let bash_dep = deps.iter()
         .find(|d| d.extracted_requirement == &Some("bash".to_string()))
         .expect("Should find bash dependency");
-    
+
     assert_eq!(bash_dep.is_runtime, Some(true));
 }
 ```
@@ -192,13 +192,13 @@ DEPENDENCY_NAME [OPERATOR VERSION]
 
 ### Version Constraint Operators
 
-| RPM Flag | Our Format | Meaning |
-|----------|------------|---------|
-| `RPMFlags::GREATER \| EQUAL` | `>=` | Greater than or equal |
-| `RPMFlags::LESS \| EQUAL` | `<=` | Less than or equal |
-| `RPMFlags::EQUAL` | `=` | Exactly equal |
-| `RPMFlags::GREATER` | `>` | Strictly greater |
-| `RPMFlags::LESS` | `<` | Strictly less |
+| RPM Flag                     | Our Format | Meaning               |
+| ---------------------------- | ---------- | --------------------- |
+| `RPMFlags::GREATER \| EQUAL` | `>=`       | Greater than or equal |
+| `RPMFlags::LESS \| EQUAL`    | `<=`       | Less than or equal    |
+| `RPMFlags::EQUAL`            | `=`        | Exactly equal         |
+| `RPMFlags::GREATER`          | `>`        | Strictly greater      |
+| `RPMFlags::LESS`             | `<`        | Strictly less         |
 
 ### Dependency Scopes
 
@@ -275,6 +275,7 @@ Python implementation uses `rpmfile` library which is a pure-Python RPM reader. 
 - Dependency extraction not implemented
 
 **Comment from Python code** (line 218):
+
 > "TODO: also extract and report dependencies"
 
 This has been a TODO for years.

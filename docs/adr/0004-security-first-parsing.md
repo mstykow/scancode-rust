@@ -31,13 +31,13 @@ The Python ScanCode Toolkit has several security issues:
 
 Parsers **NEVER** execute user-provided code, regardless of ecosystem conventions.
 
-| ❌ FORBIDDEN | ✅ REQUIRED | Example |
-|-------------|------------|---------|
-| `eval()`, `exec()` | AST parsing | Python setup.py |
-| Subprocess calls | Static analysis | Shell scripts (APKBUILD) |
-| Ruby `instance_eval` | Regex/AST parsing | Ruby Gemfile/Podfile |
-| Groovy engine | Token-based lexer | Gradle build files |
-| Jinja2 template rendering | String interpolation preservation | Conan conanfile.py |
+| ❌ FORBIDDEN              | ✅ REQUIRED                       | Example                  |
+| ------------------------- | --------------------------------- | ------------------------ |
+| `eval()`, `exec()`        | AST parsing                       | Python setup.py          |
+| Subprocess calls          | Static analysis                   | Shell scripts (APKBUILD) |
+| Ruby `instance_eval`      | Regex/AST parsing                 | Ruby Gemfile/Podfile     |
+| Groovy engine             | Token-based lexer                 | Gradle build files       |
+| Jinja2 template rendering | String interpolation preservation | Conan conanfile.py       |
 
 **Rationale**:
 
@@ -49,12 +49,12 @@ Parsers **NEVER** execute user-provided code, regardless of ecosystem convention
 
 All parsers enforce explicit limits:
 
-| Resource | Limit | Enforcement | Example |
-|----------|-------|-------------|---------|
-| **File Size** | 100 MB default | Check before reading | Prevent memory exhaustion |
-| **Recursion Depth** | 50 levels | Track in parser state | Prevent stack overflow |
-| **Iteration Count** | 100,000 items | Break early with warning | Prevent infinite loops |
-| **String Length** | 10 MB per field | Truncate with warning | Prevent memory attacks |
+| Resource            | Limit           | Enforcement              | Example                   |
+| ------------------- | --------------- | ------------------------ | ------------------------- |
+| **File Size**       | 100 MB default  | Check before reading     | Prevent memory exhaustion |
+| **Recursion Depth** | 50 levels       | Track in parser state    | Prevent stack overflow    |
+| **Iteration Count** | 100,000 items   | Break early with warning | Prevent infinite loops    |
+| **String Length**   | 10 MB per field | Truncate with warning    | Prevent memory attacks    |
 
 ```rust
 const MAX_FILE_SIZE: usize = 100 * 1024 * 1024; // 100 MB
@@ -68,7 +68,7 @@ fn extract_package_data(path: &Path) -> PackageData {
         warn!("File too large: {} bytes", metadata.len());
         return default_package_data();
     }
-    
+
     // 2. Limit iterations
     for (i, dep) in dependencies.iter().enumerate() {
         if i >= MAX_ITERATIONS {
@@ -77,7 +77,7 @@ fn extract_package_data(path: &Path) -> PackageData {
         }
         // Process dependency
     }
-    
+
     // 3. Limit recursion (tracked in parser state)
     if recursion_depth > MAX_RECURSION_DEPTH {
         warn!("Exceeded max recursion depth");
@@ -90,44 +90,44 @@ fn extract_package_data(path: &Path) -> PackageData {
 
 For parsers that extract archives (.deb, .rpm, .apk, .gem, .whl):
 
-| Protection | Implementation | Threshold |
-|------------|---------------|-----------|
-| **Size Limits** | Check uncompressed size before extraction | 1 GB uncompressed |
-| **Compression Ratio** | Reject excessive compression (zip bombs) | 100:1 ratio max |
-| **Path Traversal** | Validate extracted paths don't escape temp dir | Block `../` patterns |
-| **Decompression Limits** | Stop decompression after size threshold | 1 GB limit |
+| Protection               | Implementation                                 | Threshold            |
+| ------------------------ | ---------------------------------------------- | -------------------- |
+| **Size Limits**          | Check uncompressed size before extraction      | 1 GB uncompressed    |
+| **Compression Ratio**    | Reject excessive compression (zip bombs)       | 100:1 ratio max      |
+| **Path Traversal**       | Validate extracted paths don't escape temp dir | Block `../` patterns |
+| **Decompression Limits** | Stop decompression after size threshold        | 1 GB limit           |
 
 ```rust
 fn extract_archive(path: &Path) -> Result<TempDir> {
     let archive = Archive::open(path)?;
-    
+
     // Check compression ratio
     let compressed_size = fs::metadata(path)?.len();
     let uncompressed_size = archive.total_uncompressed_size()?;
     let ratio = uncompressed_size / compressed_size;
-    
+
     if ratio > MAX_COMPRESSION_RATIO {
         return Err("Suspicious compression ratio (possible zip bomb)");
     }
-    
+
     // Check total uncompressed size
     if uncompressed_size > MAX_UNCOMPRESSED_SIZE {
         return Err("Archive too large when uncompressed");
     }
-    
+
     // Extract with path validation
     for entry in archive.entries()? {
         let path = entry.path()?;
-        
+
         // Prevent path traversal
         if path.components().any(|c| c == Component::ParentDir) {
             warn!("Skipping entry with parent dir: {:?}", path);
             continue;
         }
-        
+
         entry.unpack(temp_dir.path().join(path))?;
     }
-    
+
     Ok(temp_dir)
 }
 ```
@@ -136,13 +136,13 @@ fn extract_archive(path: &Path) -> Result<TempDir> {
 
 All parsers validate input before processing:
 
-| Validation | Check | Action on Failure |
-|------------|-------|-------------------|
-| **File Exists** | `fs::metadata()` | Return error, don't panic |
-| **UTF-8 Encoding** | `String::from_utf8()` | Log warning, try lossy conversion |
-| **JSON/YAML Validity** | `serde_json::from_str()` | Return default PackageData |
-| **Required Fields** | Check `name`, `version` presence | Populate with `None`, continue |
-| **URL Format** | Basic validation (not exhaustive) | Accept as-is, don't parse aggressively |
+| Validation             | Check                             | Action on Failure                      |
+| ---------------------- | --------------------------------- | -------------------------------------- |
+| **File Exists**        | `fs::metadata()`                  | Return error, don't panic              |
+| **UTF-8 Encoding**     | `String::from_utf8()`             | Log warning, try lossy conversion      |
+| **JSON/YAML Validity** | `serde_json::from_str()`          | Return default PackageData             |
+| **Required Fields**    | Check `name`, `version` presence  | Populate with `None`, continue         |
+| **URL Format**         | Basic validation (not exhaustive) | Accept as-is, don't parse aggressively |
 
 ```rust
 fn extract_package_data(path: &Path) -> PackageData {
@@ -154,7 +154,7 @@ fn extract_package_data(path: &Path) -> PackageData {
             return default_package_data();
         }
     };
-    
+
     // 2. Validate JSON
     let manifest: Value = match serde_json::from_str(&content) {
         Ok(v) => v,
@@ -163,11 +163,11 @@ fn extract_package_data(path: &Path) -> PackageData {
             return default_package_data();
         }
     };
-    
+
     // 3. Extract fields with fallbacks (no unwrap)
     let name = manifest["name"].as_str().map(String::from);
     let version = manifest["version"].as_str().map(String::from);
-    
+
     PackageData {
         name,
         version,
@@ -190,9 +190,9 @@ fn resolve_dependencies(
         warn!("Circular dependency detected: {}", package);
         return vec![];
     }
-    
+
     visited.insert(package.to_string());
-    
+
     // Resolve dependencies
     // ...
 }
@@ -257,7 +257,7 @@ fn extract_from_setup_py(path: &Path) -> PackageData {
         .arg("python")
         .arg(path)
         .output()?;
-    
+
     parse_output(output.stdout)
 }
 ```
@@ -329,14 +329,14 @@ match ecosystem {
 
 **Python Security Issues in Reference Implementation**:
 
-| Issue | Risk | Our Solution |
-|-------|------|--------------|
-| `exec()` in setup.py parsing | Arbitrary code execution | AST parsing only |
-| Ruby `instance_eval` | Code execution | Regex parsing |
-| Shell execution (APKBUILD) | Command injection | Not implemented |
-| Groovy engine for Gradle | Code execution | Custom lexer |
-| No DoS limits | Memory exhaustion | Explicit limits |
-| Incomplete zip bomb protection | DoS via decompression | Full protection |
+| Issue                          | Risk                     | Our Solution     |
+| ------------------------------ | ------------------------ | ---------------- |
+| `exec()` in setup.py parsing   | Arbitrary code execution | AST parsing only |
+| Ruby `instance_eval`           | Code execution           | Regex parsing    |
+| Shell execution (APKBUILD)     | Command injection        | Not implemented  |
+| Groovy engine for Gradle       | Code execution           | Custom lexer     |
+| No DoS limits                  | Memory exhaustion        | Explicit limits  |
+| Incomplete zip bomb protection | DoS via decompression    | Full protection  |
 
 **We significantly improve security compared to the Python reference.**
 

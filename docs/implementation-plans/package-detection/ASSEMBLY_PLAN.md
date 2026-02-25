@@ -109,17 +109,17 @@ Cargo workspace support: creates separate Package objects per workspace member, 
 
 ### Golden Tests (8 total)
 
-| Test | Ecosystem | Status |
-|------|-----------|--------|
-| npm-basic | npm | ✅ Pass |
-| cargo-basic | cargo | ✅ Pass |
-| go-basic | golang | ✅ Pass |
-| composer-basic | phpcomposer | ✅ Pass |
-| maven-basic | maven | ✅ Pass |
-| npm-workspace | npm (workspace) | ✅ Pass |
-| pnpm-workspace | npm (pnpm workspace) | ✅ Pass |
+| Test             | Ecosystem                          | Status  |
+| ---------------- | ---------------------------------- | ------- |
+| npm-basic        | npm                                | ✅ Pass |
+| cargo-basic      | cargo                              | ✅ Pass |
+| go-basic         | golang                             | ✅ Pass |
+| composer-basic   | phpcomposer                        | ✅ Pass |
+| maven-basic      | maven                              | ✅ Pass |
+| npm-workspace    | npm (workspace)                    | ✅ Pass |
+| pnpm-workspace   | npm (pnpm workspace)               | ✅ Pass |
 | alpine-file-refs | alpine (file reference resolution) | ✅ Pass |
-| cargo-workspace | cargo (workspace) | ✅ Pass |
+| cargo-workspace  | cargo (workspace)                  | ✅ Pass |
 
 ---
 
@@ -141,15 +141,15 @@ When ExtractCode extracts archives, it creates directories with a `-extract` suf
 
 **Current coverage**:
 
-| ExtractCode Pattern | Python Parser | Rust Status |
-|---|---|---|
-| `*/control.tar.{gz,xz}-extract/control` | `DebianControlFileInExtractedDebHandler` | ✅ Supported |
-| `*/control.tar.{gz,xz}-extract/md5sums` | `DebianMd5sumsInDebHandler` | ✅ Supported |
-| `*/metadata.gz-extract` | `GemArchiveHandler` | ✅ Supported |
-| `*/data.gz-extract/*.gemspec` | `GemspecInExtractedGemHandler` | ✅ Supported |
-| `*/data.gz-extract/Gemfile` | `GemfileInExtractedGemHandler` | ✅ Supported |
-| `*/data.gz-extract/Gemfile.lock` | `GemfileLockInExtractedGemHandler` | ✅ Supported |
-| `info/recipe.tar-extract/recipe/meta.yaml` | `CondaMetaYamlHandler` | ✅ Supported (by filename match) |
+| ExtractCode Pattern                        | Python Parser                            | Rust Status                      |
+| ------------------------------------------ | ---------------------------------------- | -------------------------------- |
+| `*/control.tar.{gz,xz}-extract/control`    | `DebianControlFileInExtractedDebHandler` | ✅ Supported                     |
+| `*/control.tar.{gz,xz}-extract/md5sums`    | `DebianMd5sumsInDebHandler`              | ✅ Supported                     |
+| `*/metadata.gz-extract`                    | `GemArchiveHandler`                      | ✅ Supported                     |
+| `*/data.gz-extract/*.gemspec`              | `GemspecInExtractedGemHandler`           | ✅ Supported                     |
+| `*/data.gz-extract/Gemfile`                | `GemfileInExtractedGemHandler`           | ✅ Supported                     |
+| `*/data.gz-extract/Gemfile.lock`           | `GemfileLockInExtractedGemHandler`       | ✅ Supported                     |
+| `info/recipe.tar-extract/recipe/meta.yaml` | `CondaMetaYamlHandler`                   | ✅ Supported (by filename match) |
 
 ### What Python's "Consolidation" Does (NOT Assembly)
 
@@ -205,12 +205,12 @@ File Enumeration → Parser Selection → Package Extraction → Assembly Phase 
 
 ### Assembly Modes
 
-| Mode | Behavior | Used By |
-|------|----------|---------|
-| `SiblingMerge` | Merge related files in same/nested directory | npm, cargo, maven, golang, etc. (23 configs) |
-| `OnePerPackageData` | Each file becomes independent packages | Alpine DB, RPM DB, Debian installed DB (3 configs) |
-| File ref resolution | Resolve file_references → `for_packages` linking | Alpine, RPM, Debian installed DBs |
-| Workspace assembly | Post-processing pass creating per-member packages | npm/pnpm workspaces, Cargo workspaces |
+| Mode                | Behavior                                          | Used By                                            |
+| ------------------- | ------------------------------------------------- | -------------------------------------------------- |
+| `SiblingMerge`      | Merge related files in same/nested directory      | npm, cargo, maven, golang, etc. (23 configs)       |
+| `OnePerPackageData` | Each file becomes independent packages            | Alpine DB, RPM DB, Debian installed DB (3 configs) |
+| File ref resolution | Resolve file_references → `for_packages` linking  | Alpine, RPM, Debian installed DBs                  |
+| Workspace assembly  | Post-processing pass creating per-member packages | npm/pnpm workspaces, Cargo workspaces              |
 
 ### Performance Optimizations
 
@@ -218,28 +218,28 @@ File Enumeration → Parser Selection → Package Extraction → Assembly Phase 
 
 ### Key Code Locations
 
-| File | Purpose |
-|------|---------|
-| `src/assembly/mod.rs` | Core pipeline (713 lines) |
-| `src/assembly/assemblers.rs` | 26 assembler configs (310 lines) |
-| `src/assembly/sibling_merge.rs` | Sibling pattern matching (102 lines) |
-| `src/assembly/nested_merge.rs` | Nested pattern matching (356 lines) |
-| `src/assembly/workspace_merge.rs` | npm/pnpm workspace assembly (859 lines) |
-| `src/assembly/cargo_workspace_merge.rs` | Cargo workspace assembly (524 lines) |
-| `src/assembly/file_ref_resolve.rs` | File reference resolution for DB packages (750 lines) |
-| `src/assembly/assembly_golden_test.rs` | 9 golden tests |
+| File                                    | Purpose                                               |
+| --------------------------------------- | ----------------------------------------------------- |
+| `src/assembly/mod.rs`                   | Core pipeline (713 lines)                             |
+| `src/assembly/assemblers.rs`            | 26 assembler configs (310 lines)                      |
+| `src/assembly/sibling_merge.rs`         | Sibling pattern matching (102 lines)                  |
+| `src/assembly/nested_merge.rs`          | Nested pattern matching (356 lines)                   |
+| `src/assembly/workspace_merge.rs`       | npm/pnpm workspace assembly (859 lines)               |
+| `src/assembly/cargo_workspace_merge.rs` | Cargo workspace assembly (524 lines)                  |
+| `src/assembly/file_ref_resolve.rs`      | File reference resolution for DB packages (750 lines) |
+| `src/assembly/assembly_golden_test.rs`  | 9 golden tests                                        |
 
 ---
 
 ## Python Reference
 
-| Resource | Location |
-|----------|----------|
-| Assembly framework | `reference/scancode-toolkit/src/packagedcode/models.py` |
-| npm assembly | `reference/scancode-toolkit/src/packagedcode/npm.py` |
-| Cargo assembly | `reference/scancode-toolkit/src/packagedcode/cargo.py` |
+| Resource             | Location                                                           |
+| -------------------- | ------------------------------------------------------------------ |
+| Assembly framework   | `reference/scancode-toolkit/src/packagedcode/models.py`            |
+| npm assembly         | `reference/scancode-toolkit/src/packagedcode/npm.py`               |
+| Cargo assembly       | `reference/scancode-toolkit/src/packagedcode/cargo.py`             |
 | Consolidation plugin | `reference/scancode-toolkit/src/summarycode/plugin_consolidate.py` |
-| Test data | `reference/scancode-toolkit/tests/packagedcode/data/` |
+| Test data            | `reference/scancode-toolkit/tests/packagedcode/data/`              |
 
 ### Python Helper Methods (for reference)
 

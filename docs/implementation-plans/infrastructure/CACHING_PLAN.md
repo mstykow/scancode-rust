@@ -73,12 +73,12 @@ Persistent caching of scan results and compiled data structures to speed up repe
 
 Python ScanCode's caching spans 4 files:
 
-| File | Lines | Purpose |
-|------|-------|---------|
-| `licensedcode/cache.py` | 567 | License index caching: `LicenseCache` class, pickle serialization, file locking |
-| `packagedcode/cache.py` | 278 | Package pattern caching: `PkgManifestPatternsCache`, regex patterns, pickle |
-| `scancode_config.py` | 223 | Cache directory configuration, environment variables, version detection |
-| `scancode/lockfile.py` | 34 | File locking wrapper around `fasteners.InterProcessLock` |
+| File                    | Lines | Purpose                                                                         |
+| ----------------------- | ----- | ------------------------------------------------------------------------------- |
+| `licensedcode/cache.py` | 567   | License index caching: `LicenseCache` class, pickle serialization, file locking |
+| `packagedcode/cache.py` | 278   | Package pattern caching: `PkgManifestPatternsCache`, regex patterns, pickle     |
+| `scancode_config.py`    | 223   | Cache directory configuration, environment variables, version detection         |
+| `scancode/lockfile.py`  | 34    | File locking wrapper around `fasteners.InterProcessLock`                        |
 
 Total: ~1,102 lines.
 
@@ -139,12 +139,12 @@ Compiled regex patterns for matching file paths to package handlers.
 
 ### Environment Variables
 
-| Variable | Default | Purpose |
-|----------|---------|---------|
-| `SCANCODE_CACHE` | `~/.cache/scancode-tk/<version>` | General cache directory (lock files, version check) |
-| `SCANCODE_LICENSE_INDEX_CACHE` | `<src>/licensedcode/data/cache` | License index cache location |
-| `SCANCODE_PACKAGE_INDEX_CACHE` | `<src>/packagedcode/data/cache` | Package pattern cache location |
-| `SCANCODE_TEMP` | System temp dir | Temporary files directory |
+| Variable                       | Default                          | Purpose                                             |
+| ------------------------------ | -------------------------------- | --------------------------------------------------- |
+| `SCANCODE_CACHE`               | `~/.cache/scancode-tk/<version>` | General cache directory (lock files, version check) |
+| `SCANCODE_LICENSE_INDEX_CACHE` | `<src>/licensedcode/data/cache`  | License index cache location                        |
+| `SCANCODE_PACKAGE_INDEX_CACHE` | `<src>/packagedcode/data/cache`  | Package pattern cache location                      |
+| `SCANCODE_TEMP`                | System temp dir                  | Temporary files directory                           |
 
 ### Serialization Format
 
@@ -571,12 +571,12 @@ src/
 
 ### Performance Benchmarks
 
-| Scenario | Baseline (no cache) | Expected (with cache) | Speedup |
-|----------|--------------------|-----------------------|---------|
-| License index load | 200-300ms | 20-50ms | 5-10x |
-| Full scan (1000 files) | 30-60s | 30-60s (first run) | 1x |
-| Repeated scan (1000 files, unchanged) | 30-60s | 2-5s | 10-20x |
-| Incremental scan (1000 files, 10 changed) | 30-60s | 1-3s | 20-50x |
+| Scenario                                  | Baseline (no cache) | Expected (with cache) | Speedup |
+| ----------------------------------------- | ------------------- | --------------------- | ------- |
+| License index load                        | 200-300ms           | 20-50ms               | 5-10x   |
+| Full scan (1000 files)                    | 30-60s              | 30-60s (first run)    | 1x      |
+| Repeated scan (1000 files, unchanged)     | 30-60s              | 2-5s                  | 10-20x  |
+| Incremental scan (1000 files, 10 changed) | 30-60s              | 1-3s                  | 20-50x  |
 
 ---
 
@@ -601,13 +601,13 @@ src/
 
 ## Dependency Summary
 
-| Crate | Version | Purpose | Status |
-|-------|---------|---------|--------|
-| `rmp-serde` | 1.3 | MessagePack serialization (already in Cargo.toml for askalono) | ✅ Existing |
-| `zstd` | 0.13 | Compression for license index cache (already in Cargo.toml) | ✅ Existing |
-| `sha2` | 0.10 | SHA256 hashing (already used for file hashing) | ✅ Existing |
-| `dirs` | 5.0 | XDG cache directory resolution | 🆕 New |
-| `fd-lock` | 4.0 | File locking for multi-process safety | 🆕 New |
+| Crate       | Version | Purpose                                                        | Status      |
+| ----------- | ------- | -------------------------------------------------------------- | ----------- |
+| `rmp-serde` | 1.3     | MessagePack serialization (already in Cargo.toml for askalono) | ✅ Existing |
+| `zstd`      | 0.13    | Compression for license index cache (already in Cargo.toml)    | ✅ Existing |
+| `sha2`      | 0.10    | SHA256 hashing (already used for file hashing)                 | ✅ Existing |
+| `dirs`      | 5.0     | XDG cache directory resolution                                 | 🆕 New      |
+| `fd-lock`   | 4.0     | File locking for multi-process safety                          | 🆕 New      |
 
 Only 2 new dependencies needed — both small, well-maintained, and widely used.
 
@@ -626,13 +626,13 @@ Only 2 new dependencies needed — both small, well-maintained, and widely used.
 
 ## Appendix: Python File Inventory
 
-| File | Lines | Purpose |
-|------|-------|---------|
-| `licensedcode/cache.py` | 567 | License index caching: LicenseCache class, pickle serialization, build/load lifecycle, SPDX symbol building |
-| `packagedcode/cache.py` | 278 | Package pattern caching: PkgManifestPatternsCache, multiregex pattern compilation, pickle serialization |
-| `scancode_config.py` | 223 | Cache directory config, 3 env vars (SCANCODE_CACHE, SCANCODE_LICENSE_INDEX_CACHE, SCANCODE_PACKAGE_INDEX_CACHE), version detection |
-| `scancode/lockfile.py` | 34 | File locking wrapper: FileLock class around fasteners.InterProcessLock with timeout |
-| `licensedcode/reindex.py` | 79 | CLI command: `scancode-reindex-licenses` with `--all-languages`, `--only-builtin` flags |
+| File                      | Lines | Purpose                                                                                                                            |
+| ------------------------- | ----- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `licensedcode/cache.py`   | 567   | License index caching: LicenseCache class, pickle serialization, build/load lifecycle, SPDX symbol building                        |
+| `packagedcode/cache.py`   | 278   | Package pattern caching: PkgManifestPatternsCache, multiregex pattern compilation, pickle serialization                            |
+| `scancode_config.py`      | 223   | Cache directory config, 3 env vars (SCANCODE_CACHE, SCANCODE_LICENSE_INDEX_CACHE, SCANCODE_PACKAGE_INDEX_CACHE), version detection |
+| `scancode/lockfile.py`    | 34    | File locking wrapper: FileLock class around fasteners.InterProcessLock with timeout                                                |
+| `licensedcode/reindex.py` | 79    | CLI command: `scancode-reindex-licenses` with `--all-languages`, `--only-builtin` flags                                            |
 
 ## Appendix: Existing Askalono Cache Format
 

@@ -147,17 +147,17 @@ Require-Bundle: org.apache.commons.lang3;bundle-version="[3.0.0,4.0.0)"
 
 ### OSGi Manifest Headers Supported
 
-| Header | PackageData Field | Notes |
-|--------|------------------|-------|
-| `Bundle-SymbolicName` | `name` | Unique bundle identifier (required) |
-| `Bundle-Version` | `version` | OSGi semantic version |
-| `Bundle-Name` | `description` | Human-readable name |
-| `Bundle-Description` | `description` | Detailed description (preferred) |
-| `Bundle-Vendor` | `parties` (role=`vendor`) | Bundle vendor |
-| `Bundle-License` | `declared_license_expression` | License identifier |
-| `Bundle-DocURL` | `homepage_url` | Documentation URL |
-| `Import-Package` | `dependencies` | Package imports with versions |
-| `Require-Bundle` | `dependencies` | Required bundles with versions |
+| Header                | PackageData Field             | Notes                               |
+| --------------------- | ----------------------------- | ----------------------------------- |
+| `Bundle-SymbolicName` | `name`                        | Unique bundle identifier (required) |
+| `Bundle-Version`      | `version`                     | OSGi semantic version               |
+| `Bundle-Name`         | `description`                 | Human-readable name                 |
+| `Bundle-Description`  | `description`                 | Detailed description (preferred)    |
+| `Bundle-Vendor`       | `parties` (role=`vendor`)     | Bundle vendor                       |
+| `Bundle-License`      | `declared_license_expression` | License identifier                  |
+| `Bundle-DocURL`       | `homepage_url`                | Documentation URL                   |
+| `Import-Package`      | `dependencies`                | Package imports with versions       |
+| `Require-Bundle`      | `dependencies`                | Required bundles with versions      |
 
 ### OSGi Version Ranges
 

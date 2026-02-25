@@ -160,17 +160,17 @@ Requires: package_name [operator version]
 
 ### Preamble Tags Supported
 
-| Tag | PackageData Field | Notes |
-|-----|------------------|-------|
-| `Name` | `name` | Package name |
-| `Version` | `version` | Package version |
-| `License` | `declared_license_expression` | SPDX expression |
-| `Summary` | `description` | Short description |
-| `URL` | `homepage_url` | Project homepage |
-| `Packager` | `parties` (role=`maintainer`) | Maintainer info |
-| `%description` | `description` | Long description (overrides Summary) |
-| `Requires` | `dependencies` (scope=`dependencies`) | Runtime deps |
-| `BuildRequires` | `dependencies` (scope=`build-dependencies`) | Build deps |
+| Tag             | PackageData Field                           | Notes                                |
+| --------------- | ------------------------------------------- | ------------------------------------ |
+| `Name`          | `name`                                      | Package name                         |
+| `Version`       | `version`                                   | Package version                      |
+| `License`       | `declared_license_expression`               | SPDX expression                      |
+| `Summary`       | `description`                               | Short description                    |
+| `URL`           | `homepage_url`                              | Project homepage                     |
+| `Packager`      | `parties` (role=`maintainer`)               | Maintainer info                      |
+| `%description`  | `description`                               | Long description (overrides Summary) |
+| `Requires`      | `dependencies` (scope=`dependencies`)       | Runtime deps                         |
+| `BuildRequires` | `dependencies` (scope=`build-dependencies`) | Build deps                           |
 
 ## Value
 

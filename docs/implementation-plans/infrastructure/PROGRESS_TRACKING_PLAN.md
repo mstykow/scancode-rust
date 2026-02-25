@@ -48,12 +48,12 @@ Enhanced progress reporting during scans: multi-phase progress bars, ETA, throug
 
 ### Source Files
 
-| File | Lines | Role |
-|------|-------|------|
-| `reference/scancode-toolkit/src/scancode/cli.py` | 1670+ | Main CLI with all progress orchestration |
-| `commoncode.cliutils` (external) | N/A | `progressmanager`, `path_progress_message` |
-| `reference/scancode-toolkit/src/scancode/interrupt.py` | ~100 | Per-file timeout handling |
-| `reference/scancode-toolkit/src/scancode/pool.py` | ~50 | Multiprocessing pool management |
+| File                                                   | Lines | Role                                       |
+| ------------------------------------------------------ | ----- | ------------------------------------------ |
+| `reference/scancode-toolkit/src/scancode/cli.py`       | 1670+ | Main CLI with all progress orchestration   |
+| `commoncode.cliutils` (external)                       | N/A   | `progressmanager`, `path_progress_message` |
+| `reference/scancode-toolkit/src/scancode/interrupt.py` | ~100  | Per-file timeout handling                  |
+| `reference/scancode-toolkit/src/scancode/pool.py`      | ~50   | Multiprocessing pool management            |
 
 ### Python Architecture: 7 Scanning Phases
 
@@ -75,10 +75,10 @@ Only phase 4 (Scan) gets a progress bar. All other phases use simple text messag
 
 Python supports three mutually exclusive output modes:
 
-| Mode | Flag | Behavior |
-|------|------|----------|
-| **Quiet** | `-q` / `--quiet` | No progress, no summary, no messages (only errors in red) |
-| **Default** | (none) | Progress bar for scan phase + summary at end |
+| Mode        | Flag               | Behavior                                                     |
+| ----------- | ------------------ | ------------------------------------------------------------ |
+| **Quiet**   | `-q` / `--quiet`   | No progress, no summary, no messages (only errors in red)    |
+| **Default** | (none)             | Progress bar for scan phase + summary at end                 |
 | **Verbose** | `-v` / `--verbose` | File-by-file path listing instead of bar + detailed messages |
 
 Key detail: `--quiet` and `--verbose` are **mutually exclusive** (enforced by Click's `conflicting_options`).
@@ -126,22 +126,22 @@ At completion, `collect_errors()` gathers both into a combined list. Verbose mod
 
 Python tracks timing at multiple granularities:
 
-| Scope | Storage | Contents |
-|-------|---------|----------|
-| Phase | `codebase.timings` | `{phase_name: seconds}` (setup, scan, post-scan, output, total) |
-| Plugin | `codebase.timings` | `{stage:plugin_name: seconds}` |
-| Per-file | `resource.scan_timings` | `{scanner_name: seconds}` (only if `--timing` flag) |
+| Scope    | Storage                 | Contents                                                        |
+| -------- | ----------------------- | --------------------------------------------------------------- |
+| Phase    | `codebase.timings`      | `{phase_name: seconds}` (setup, scan, post-scan, output, total) |
+| Plugin   | `codebase.timings`      | `{stage:plugin_name: seconds}`                                  |
+| Per-file | `resource.scan_timings` | `{scanner_name: seconds}` (only if `--timing` flag)             |
 
 ### Counters
 
 Python tracks counts at multiple stages:
 
-| Stage | Counter Keys |
-|-------|-------------|
-| Initial | `initial:files_count`, `initial:dirs_count`, `initial:size_count` |
-| Pre-scan | `pre-scan-scan:files_count`, `pre-scan-scan:size_count` |
-| Scan | `scan:files_count`, `scan:dirs_count`, `scan:size_count`, `scan:scanners` |
-| Final | `final:files_count`, `final:dirs_count`, `final:size_count` |
+| Stage    | Counter Keys                                                              |
+| -------- | ------------------------------------------------------------------------- |
+| Initial  | `initial:files_count`, `initial:dirs_count`, `initial:size_count`         |
+| Pre-scan | `pre-scan-scan:files_count`, `pre-scan-scan:size_count`                   |
+| Scan     | `scan:files_count`, `scan:dirs_count`, `scan:size_count`, `scan:scanners` |
+| Final    | `final:files_count`, `final:dirs_count`, `final:size_count`               |
 
 ### Human-Readable Size Formatting
 
@@ -202,18 +202,18 @@ println!("JSON output written to {}", cli.output_file);
 
 ### What's Missing
 
-| Feature | Status |
-|---------|--------|
-| `--quiet` flag | ❌ Not implemented |
-| `--verbose` flag | ❌ Not implemented |
-| Multi-phase progress | ❌ Only scanning phase has a bar |
-| Scan summary statistics | ❌ No summary at end |
-| Throughput metrics | ❌ No files/sec or bytes/sec |
-| Error display during scan | ❌ Errors only in JSON output |
-| Logging integration | ❌ `log` crate available but not wired to progress |
-| Assembly progress | ❌ Assembly phase is silent |
-| Size formatting | ❌ No human-readable size display |
-| Terminal detection | ❌ Progress bar always shown (no piped-output detection) |
+| Feature                   | Status                                                   |
+| ------------------------- | -------------------------------------------------------- |
+| `--quiet` flag            | ❌ Not implemented                                       |
+| `--verbose` flag          | ❌ Not implemented                                       |
+| Multi-phase progress      | ❌ Only scanning phase has a bar                         |
+| Scan summary statistics   | ❌ No summary at end                                     |
+| Throughput metrics        | ❌ No files/sec or bytes/sec                             |
+| Error display during scan | ❌ Errors only in JSON output                            |
+| Logging integration       | ❌ `log` crate available but not wired to progress       |
+| Assembly progress         | ❌ Assembly phase is silent                              |
+| Size formatting           | ❌ No human-readable size display                        |
+| Terminal detection        | ❌ Progress bar always shown (no piped-output detection) |
 
 ### Existing Dependencies
 
@@ -390,18 +390,18 @@ main.rs::run()
 
 ### Behavior by Mode
 
-| Action | Quiet | Default | Verbose |
-|--------|-------|---------|---------|
-| Discovery spinner | Hidden | Shown | "Collecting files..." message |
-| "Loading SPDX data..." | Hidden | Shown | Shown |
-| "Found N files..." | Hidden | Shown | Shown with size details |
-| Scan progress bar | Hidden | Shown | Hidden (replaced by per-file listing) |
-| Per-file path | Hidden | Hidden | Shown on stderr |
-| Per-file errors | Hidden | Shown via `println` on bar | Shown with path and detail |
-| Assembly progress | Hidden | Shown (bar) | "Assembling packages..." message |
-| "Writing output..." | Hidden | Shown | Shown |
-| Scan summary | Hidden | Shown | Shown with extended detail |
-| `log::warn!()` from parsers | Hidden | Shown above bar | Shown |
+| Action                      | Quiet  | Default                    | Verbose                               |
+| --------------------------- | ------ | -------------------------- | ------------------------------------- |
+| Discovery spinner           | Hidden | Shown                      | "Collecting files..." message         |
+| "Loading SPDX data..."      | Hidden | Shown                      | Shown                                 |
+| "Found N files..."          | Hidden | Shown                      | Shown with size details               |
+| Scan progress bar           | Hidden | Shown                      | Hidden (replaced by per-file listing) |
+| Per-file path               | Hidden | Hidden                     | Shown on stderr                       |
+| Per-file errors             | Hidden | Shown via `println` on bar | Shown with path and detail            |
+| Assembly progress           | Hidden | Shown (bar)                | "Assembling packages..." message      |
+| "Writing output..."         | Hidden | Shown                      | Shown                                 |
+| Scan summary                | Hidden | Shown                      | Shown with extended detail            |
+| `log::warn!()` from parsers | Hidden | Shown above bar            | Shown                                 |
 
 ### Module Structure
 
@@ -442,7 +442,7 @@ Timings:
 
 A `format_size` utility function, matching Python's output format:
 
-```rust
+````rust
 /// Format a byte count into a human-readable string.
 ///
 /// # Examples
@@ -453,7 +453,7 @@ A `format_size` utility function, matching Python's output format:
 /// assert_eq!(format_size(2567000), "2.45 MB");
 /// ```
 pub fn format_size(bytes: u64) -> String { ... }
-```
+````
 
 ---
 
@@ -644,15 +644,15 @@ Python only shows the error count in the final summary.
 
 ## Dependency Summary
 
-| Crate | Status | Purpose |
-|-------|--------|---------|
-| `indicatif` 0.18.3 | Already present | Progress bars, multi-bar, rayon integration |
-| `clap` 4.5.57 | Already present | CLI argument parsing |
-| `log` 0.4.29 | Already present | Logging facade |
-| `rayon` 1.11.0 | Already present | Parallel processing |
-| `chrono` 0.4.43 | Already present | Timestamps for summary |
-| `env_logger` 0.11.8 | Move to deps | Logger implementation for `RUST_LOG` |
-| `indicatif-log-bridge` ~0.2 | **New** | Route log messages above progress bars |
+| Crate                       | Status          | Purpose                                     |
+| --------------------------- | --------------- | ------------------------------------------- |
+| `indicatif` 0.18.3          | Already present | Progress bars, multi-bar, rayon integration |
+| `clap` 4.5.57               | Already present | CLI argument parsing                        |
+| `log` 0.4.29                | Already present | Logging facade                              |
+| `rayon` 1.11.0              | Already present | Parallel processing                         |
+| `chrono` 0.4.43             | Already present | Timestamps for summary                      |
+| `env_logger` 0.11.8         | Move to deps    | Logger implementation for `RUST_LOG`        |
+| `indicatif-log-bridge` ~0.2 | **New**         | Route log messages above progress bars      |
 
 **Total new crates**: 1 (`indicatif-log-bridge`). Plus moving `env_logger` from dev to regular deps.
 

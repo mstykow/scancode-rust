@@ -47,7 +47,7 @@ pub struct Party {
 
 pub fn extract_author_info(gemspec: &GemSpec) -> Vec<Party> {
     let mut parties = Vec::new();
-    
+
     // Authors: typically "Name <email>" format
     if let Some(authors) = &gemspec.authors {
         for author_str in authors {
@@ -56,7 +56,7 @@ pub fn extract_author_info(gemspec: &GemSpec) -> Vec<Party> {
             }
         }
     }
-    
+
     // Maintainers: similar format, different role
     if let Some(maintainers) = &gemspec.maintainers {
         for maint_str in maintainers {
@@ -66,14 +66,14 @@ pub fn extract_author_info(gemspec: &GemSpec) -> Vec<Party> {
             }
         }
     }
-    
+
     parties
 }
 
 fn parse_author_string(s: &str) -> Option<Party> {
     // Format: "John Doe <john@example.com>" or just "John Doe"
     // Extract both in one operation, preserving semantic relationship
-    
+
     if let Some(email_start) = s.find('<') {
         let name = s[..email_start].trim().to_string();
         let email = s[email_start + 1..s.len() - 1].trim().to_string();
@@ -242,7 +242,7 @@ fn parse_author_string(s: &str) -> Option<Party> {
             }
         }
     }
-    
+
     // Case 2: Just "Name" (no email)
     let trimmed = s.trim();
     if !trimmed.is_empty() {

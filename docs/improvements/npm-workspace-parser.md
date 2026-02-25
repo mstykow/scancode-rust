@@ -43,22 +43,18 @@ We implemented `NpmWorkspaceParser` which extracts workspace configuration data 
   "type": "npm",
   "extra_data": {
     "datasource_id": "pnpm_workspace_yaml",
-    "workspaces": [
-      "packages/*",
-      "apps/*",
-      "tools/*"
-    ]
+    "workspaces": ["packages/*", "apps/*", "tools/*"]
   }
 }
 ```
 
 ### What Gets Extracted
 
-| Field | Source | Description |
-|-------|--------|-------------|
-| `package_type` | hardcoded | `"npm"` (consistent with ecosystem) |
-| `extra_data.datasource_id` | hardcoded | `"pnpm_workspace_yaml"` |
-| `extra_data.workspaces` | `packages` field | Array of glob patterns defining workspace package locations |
+| Field                      | Source           | Description                                                 |
+| -------------------------- | ---------------- | ----------------------------------------------------------- |
+| `package_type`             | hardcoded        | `"npm"` (consistent with ecosystem)                         |
+| `extra_data.datasource_id` | hardcoded        | `"pnpm_workspace_yaml"`                                     |
+| `extra_data.workspaces`    | `packages` field | Array of glob patterns defining workspace package locations |
 
 ### Supported Patterns
 
@@ -86,18 +82,18 @@ Python's `BaseNpmHandler.assemble()` in `packagedcode/npm.py` handles workspace 
 
 Our workspace assembly (`src/assembly/workspace_merge.rs`) achieves full feature parity with Python and adds several improvements:
 
-| Feature | Python | Rust | Improvement |
-|---------|--------|------|-------------|
-| Workspace root detection | ✅ | ✅ | Equivalent |
-| Member discovery via globs | ✅ | ✅ | Three-tier matching (simple, single-star, complex) |
-| Per-member Package creation | ✅ | ✅ | Equivalent |
-| `workspace:*` version resolution | ✅ | ✅ | Equivalent |
-| `workspace:^` / `workspace:~` resolution | ✅ | ✅ | Equivalent |
-| `for_packages` assignment | ✅ | ✅ | Equivalent |
-| pnpm variant handling | ✅ | ✅ | Equivalent |
-| **Exclusion patterns** | ❌ | ✅ | 🆕 Respects `!pattern` negation in workspace globs |
-| **Sibling-merge cleanup** | ❌ | ✅ | 🆕 Removes duplicate packages from earlier assembly phases |
-| **Explicit dependency cleanup** | ❌ | ✅ | 🆕 Cleans up root dependencies after hoisting to members |
+| Feature                                  | Python | Rust | Improvement                                                |
+| ---------------------------------------- | ------ | ---- | ---------------------------------------------------------- |
+| Workspace root detection                 | ✅     | ✅   | Equivalent                                                 |
+| Member discovery via globs               | ✅     | ✅   | Three-tier matching (simple, single-star, complex)         |
+| Per-member Package creation              | ✅     | ✅   | Equivalent                                                 |
+| `workspace:*` version resolution         | ✅     | ✅   | Equivalent                                                 |
+| `workspace:^` / `workspace:~` resolution | ✅     | ✅   | Equivalent                                                 |
+| `for_packages` assignment                | ✅     | ✅   | Equivalent                                                 |
+| pnpm variant handling                    | ✅     | ✅   | Equivalent                                                 |
+| **Exclusion patterns**                   | ❌     | ✅   | 🆕 Respects `!pattern` negation in workspace globs         |
+| **Sibling-merge cleanup**                | ❌     | ✅   | 🆕 Removes duplicate packages from earlier assembly phases |
+| **Explicit dependency cleanup**          | ❌     | ✅   | 🆕 Cleans up root dependencies after hoisting to members   |
 
 ### Bugs Fixed from Python
 

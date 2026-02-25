@@ -23,13 +23,13 @@ Each ADR follows a consistent structure:
 
 ## Index of ADRs
 
-| ADR | Title | Status | Date |
-|-----|-------|--------|------|
-| [0001](0001-trait-based-parsers.md) | Trait-Based Parser Architecture | Accepted | 2026-02-08 |
+| ADR                                     | Title                              | Status   | Date       |
+| --------------------------------------- | ---------------------------------- | -------- | ---------- |
+| [0001](0001-trait-based-parsers.md)     | Trait-Based Parser Architecture    | Accepted | 2026-02-08 |
 | [0002](0002-extraction-vs-detection.md) | Extraction vs Detection Separation | Accepted | 2026-02-08 |
-| [0003](0003-golden-test-strategy.md) | Golden Test Strategy | Accepted | 2026-02-08 |
-| [0004](0004-security-first-parsing.md) | Security-First Parsing | Accepted | 2026-02-08 |
-| [0005](0005-auto-generated-docs.md) | Auto-Generated Documentation | Accepted | 2026-02-08 |
+| [0003](0003-golden-test-strategy.md)    | Golden Test Strategy               | Accepted | 2026-02-08 |
+| [0004](0004-security-first-parsing.md)  | Security-First Parsing             | Accepted | 2026-02-08 |
+| [0005](0005-auto-generated-docs.md)     | Auto-Generated Documentation       | Accepted | 2026-02-08 |
 
 ## Creating a New ADR
 
