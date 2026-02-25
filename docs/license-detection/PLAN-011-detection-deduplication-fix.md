@@ -1,10 +1,31 @@
 # PLAN-011: Fix `remove_duplicate_detections` to Use Content-Based Identifier
 
-## Status: IMPLEMENTED (PARTIAL FIX)
+## Status: COMPLETED
 
-## Summary
+## Implementation Summary
 
-Fix the `remove_duplicate_detections` function in Rust to use a content-based identifier for deduplication, matching Python's behavior. Currently, Rust deduplicates by `license_expression` alone, causing ~10 tests to fail as separate detections at different file locations are incorrectly merged.
+The `remove_duplicate_detections` function has been fully fixed to use content-based identifiers.
+
+### What Was Implemented
+
+1. **`compute_detection_identifier()`** (`detection.rs:1074-1093`):
+   - Computes unique identifier from license expression + content hash
+   - Creates deterministic UUID from match contents
+
+2. **`compute_content_identifier()`** (`detection.rs:1095-1117`):
+   - Creates SHA1-based UUID from rule_identifier, score, and matched_text
+
+3. **Updated `remove_duplicate_detections()`** (`detection.rs:907-926`):
+   - Groups detections by identifier (expression + content hash)
+   - Detections with same expression but different identifiers are kept separate
+   - Uses content-based deduplication instead of expression-only
+
+### Python Parity Achieved
+
+The implementation now matches Python's `get_detections_by_id` behavior:
+- Detections are grouped by their `identifier` (expression + content hash)
+- Different locations of the same license are preserved as separate detections
+- The `identifier` field is properly computed and stored on each detection
 
 ---
 

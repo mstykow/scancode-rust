@@ -1,6 +1,18 @@
 # PLAN-018: Fix Golden Test Flakiness
 
-## Status: In Progress
+## Status: PARTIALLY IMPLEMENTED
+
+### Implemented:
+- Fix 0: HashMap sorting by rule_identifier ✅
+- Fix 3: rank_detections identifier tie-breaker ✅
+- Fix 4: sort_detections_by_line identifier tie-breaker ✅
+- Fix 5: ScoresVector::Ord rid tie-breaker ✅
+
+### NOT Implemented:
+- Fix 1: filter_overlapping_matches - Missing `rule_identifier` tie-breaker
+- Fix 2: filter_contained_matches - Missing `rule_identifier` tie-breaker
+
+These missing tie-breakers may still cause non-deterministic ordering when matches have identical qstart, hilen, and matched_length.
 
 ## Problem Statement
 

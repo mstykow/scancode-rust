@@ -1,6 +1,9 @@
 # PLAN-017: Remaining License Detection Fixes
 
-## Status: In Progress
+## Status: MOSTLY COMPLETE - Issue 6 Pending
+
+**Completed**: Issues 2, 3, 4, 5
+**Pending**: Issue 6 (filter_matches_missing_required_phrases) - Complex, requires rule parsing changes and ispan/qspan position tracking fixes
 
 ### Current Test Results (Stable after PLAN-018 flakiness fix)
 

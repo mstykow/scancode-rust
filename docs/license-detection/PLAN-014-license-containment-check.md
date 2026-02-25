@@ -1,14 +1,44 @@
 # PLAN-014: License Expression Containment Checking
 
-> **Status**: REGRESSION IDENTIFIED — Requires Fix
+> **Status**: COMPLETED
 > **Priority**: P1 — Critical Correctness Issue
 > **Estimated Effort**: 2-3 days
 > **Created**: 2026-02-17
-> **Updated**: 2026-02-17
+> **Updated**: 2026-02-25
 
-## Problem Statement
+## Implementation Summary
 
-The Rust license detection implementation uses **line-based containment checks** instead of **token-position-based qspan containment**, causing approximately 5 golden tests to fail. This is a fundamental architectural difference in how Python and Rust determine whether one license match "contains" another.
+The license containment checking has been fully implemented with proper token position tracking and edge case handling.
+
+### What Was Implemented
+
+1. **Token Position Tracking** (`models.rs`):
+   - Added `start_token` and `end_token` fields to `LicenseMatch`
+   - All matchers (hash, aho, seq, spdx-lid, unknown) now populate these fields
+
+2. **`qcontains()` Method** (`models.rs:505-520`):
+   - Checks if this match's qspan contains the other match's qspan
+   - Handles edge case where both matches have `start_token == 0 && end_token == 0`:
+     - Falls back to line-based containment check
+   - Uses token positions for accurate containment detection
+
+3. **`qoverlap()` Method** (`models.rs:522-530`):
+   - Calculates overlap between matches using token positions
+   - Falls back to line-based calculation for zero-token spans
+
+4. **Updated `filter_contained_matches()`** (`match_refine.rs`):
+   - Uses token positions (start_token/end_token) instead of line numbers
+   - Properly handles SPDX-LID matches with zero token spans
+
+5. **SPDX-LID Token Position Tracking** (`spdx_lid.rs`):
+   - Now properly tracks token positions during parsing
+   - Uses `query.spdx_lines` to get accurate token positions
+
+### Edge Case Resolution
+
+The regression where SPDX-LID matches had `start_token = 0, end_token = 0` has been fixed:
+- The `qcontains()` method detects this case and falls back to line-based containment
+- This prevents false containment detection between different SPDX matches
 
 ### Current Behavior (Incorrect)
 

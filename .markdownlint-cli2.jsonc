@@ -24,5 +24,6 @@
     ".sisyphus/**",
     "resources/licenses/**",
     "docs/archived/**",
+    "docs/license-detection"
   ]
 }

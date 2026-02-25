@@ -1,9 +1,12 @@
 # PLAN-020: Golden Test Failure Investigation
 
-This document contains the findings from investigating remaining golden test failures
+## Status: INVESTIGATION DOCUMENT - Historical Reference
+
+This document contains findings from golden test failure analysis. Some recommendations have been implemented in later plans (PLAN-021, PLAN-022). The test results are outdated - current test results should be checked with `cargo test --release -q --lib license_detection::golden_test`.
+
 ---
 
-## Current Test Results
+## Historical Test Results (at time of writing)
 
 | Suite | Baseline | Current | Delta |
 |-------|----------|---------|-------|

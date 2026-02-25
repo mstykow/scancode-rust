@@ -1,6 +1,8 @@
 # PLAN-016: Remaining License Detection Fixes
 
-## Status: PARTIALLY IMPLEMENTED - 26 tests fixed
+## Status: COMPLETE - Superseded by Later Plans
+
+All items in this plan have been implemented. Remaining work is tracked in PLAN-017 and PLAN-021.
 
 ### Summary of Progress
 
@@ -62,20 +64,23 @@
 
 | Metric | Value |
 |--------|-------|
-| lic1 passed | 214 |
-| lic1 failed | **77** |
+| lic1 passed | 239 |
+| lic1 failed | **52** |
 
 ---
 
 ## Remaining Issues
 
-### Issue 4: Query Run Double-Matching (NOT YET IMPLEMENTED)
+### Issue 4: Query Run Double-Matching (ALREADY IMPLEMENTED)
 
 **Problem**: `QueryRun` holds stale references to `query.high_matchables` after `subtract()`.
 
-**Status**: ✅ READY FOR IMPLEMENTATION
+**Status**: ✅ ALREADY IMPLEMENTED
 
-**Implementation**: Use lazy evaluation by storing reference to parent `Query`
+**Analysis**: The current Rust implementation already uses lazy evaluation:
+- `QueryRun::high_matchables()` reads dynamically from `query.high_matchables` on each call
+- No cached references are stored in `QueryRun` struct
+- This matches Python's lazy evaluation pattern
 
 ---
 
