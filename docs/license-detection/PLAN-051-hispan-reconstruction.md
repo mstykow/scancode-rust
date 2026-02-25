@@ -1,6 +1,6 @@
 # PLAN-051: Fix Hispan Reconstruction in combine_matches()
 
-## Status: NOT IMPLEMENTED
+## Status: IMPLEMENTED
 
 ## Summary
 

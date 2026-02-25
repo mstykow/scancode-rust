@@ -322,6 +322,12 @@ pub struct LicenseMatch {
     /// Some(positions) contains exact positions for non-contiguous matches (after merge).
     #[serde(skip)]
     pub ispan_positions: Option<Vec<usize>>,
+
+    /// Token positions in the rule that are high-value legalese tokens.
+    /// None means hispan can be computed from rule_start_token (contiguous case).
+    /// Some(positions) contains exact positions for non-contiguous hispans (after merge).
+    #[serde(skip)]
+    pub hispan_positions: Option<Vec<usize>>,
 }
 
 impl Default for LicenseMatch {
@@ -355,6 +361,7 @@ impl Default for LicenseMatch {
             rule_start_token: 0,
             qspan_positions: None,
             ispan_positions: None,
+            hispan_positions: None,
         }
     }
 }
@@ -557,6 +564,14 @@ impl LicenseMatch {
             positions.clone()
         } else {
             (self.rule_start_token..self.rule_start_token + self.matched_length).collect()
+        }
+    }
+
+    pub fn hispan(&self) -> Vec<usize> {
+        if let Some(positions) = &self.hispan_positions {
+            positions.clone()
+        } else {
+            (self.rule_start_token..self.rule_start_token + self.hilen).collect()
         }
     }
 
@@ -777,6 +792,7 @@ mod tests {
             rule_start_token: 0,
             qspan_positions: None,
             ispan_positions: None,
+            hispan_positions: None,
         }
     }
 
@@ -1189,6 +1205,7 @@ mod tests {
             rule_start_token: 0,
             qspan_positions: None,
             ispan_positions: None,
+            hispan_positions: None,
         };
 
         assert!(match_result.from_file.is_none());
@@ -1336,6 +1353,7 @@ mod tests {
             rule_start_token: 0,
             qspan_positions: None,
             ispan_positions: None,
+            hispan_positions: None,
         };
 
         assert_eq!(

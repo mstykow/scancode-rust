@@ -1254,6 +1254,7 @@ mod tests {
             rule_start_token: 0,
             qspan_positions: None,
             ispan_positions: None,
+            hispan_positions: None,
         }
     }
 
@@ -1442,6 +1443,7 @@ mod tests {
             rule_start_token: 0,
             qspan_positions: None,
             ispan_positions: None,
+            hispan_positions: None,
         }
     }
 
@@ -1608,6 +1610,7 @@ mod tests {
             rule_start_token: 0,
             qspan_positions: None,
             ispan_positions: None,
+            hispan_positions: None,
         }
     }
 
@@ -4269,6 +4272,7 @@ mod tests {
             rule_start_token: 0,
             qspan_positions: None,
             ispan_positions: None,
+            hispan_positions: None,
         };
 
         let matches = vec![intro];
@@ -4308,6 +4312,7 @@ mod tests {
             rule_start_token: 0,
             qspan_positions: None,
             ispan_positions: None,
+            hispan_positions: None,
         };
 
         let low_coverage_match = LicenseMatch {
@@ -4339,6 +4344,7 @@ mod tests {
             rule_start_token: 0,
             qspan_positions: None,
             ispan_positions: None,
+            hispan_positions: None,
         };
 
         let matches = vec![intro, low_coverage_match];
@@ -4389,6 +4395,7 @@ mod tests {
                     rule_start_token: 0,
                     qspan_positions: None,
                     ispan_positions: None,
+                    hispan_positions: None,
                 }],
                 detection_log: vec![],
                 identifier: None,
@@ -4458,6 +4465,7 @@ mod tests {
             rule_start_token: 0,
             qspan_positions: None,
             ispan_positions: None,
+            hispan_positions: None,
         };
         assert!(is_unknown_intro(&m));
     }
@@ -4493,6 +4501,7 @@ mod tests {
             rule_start_token: 0,
             qspan_positions: None,
             ispan_positions: None,
+            hispan_positions: None,
         };
         assert!(is_unknown_intro(&m));
     }
@@ -4528,6 +4537,7 @@ mod tests {
             rule_start_token: 0,
             qspan_positions: None,
             ispan_positions: None,
+            hispan_positions: None,
         };
         assert!(is_unknown_intro(&m));
     }
@@ -4563,6 +4573,7 @@ mod tests {
             rule_start_token: 0,
             qspan_positions: None,
             ispan_positions: None,
+            hispan_positions: None,
         };
         assert!(!is_unknown_intro(&m));
     }
@@ -4598,6 +4609,7 @@ mod tests {
             rule_start_token: 0,
             qspan_positions: None,
             ispan_positions: None,
+            hispan_positions: None,
         };
         assert!(!is_unknown_intro(&m));
     }
@@ -4636,6 +4648,7 @@ mod tests {
             rule_start_token: 0,
             qspan_positions: None,
             ispan_positions: None,
+            hispan_positions: None,
         }
     }
 

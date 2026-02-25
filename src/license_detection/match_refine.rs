@@ -122,20 +122,23 @@ fn combine_matches(a: &LicenseMatch, b: &LicenseMatch) -> LicenseMatch {
     let mut ispan_vec: Vec<usize> = ispan.into_iter().collect();
     ispan_vec.sort();
 
-    let a_hispan: HashSet<usize> = (a.rule_start_token..a.rule_start_token + a.hilen)
-        .filter(|&p| a.ispan().contains(&p))
-        .collect();
-    let b_hispan: HashSet<usize> = (b.rule_start_token..b.rule_start_token + b.hilen)
-        .filter(|&p| b.ispan().contains(&p))
-        .collect();
+    let a_hispan: HashSet<usize> = a.hispan().into_iter().collect();
+    let b_hispan: HashSet<usize> = b.hispan().into_iter().collect();
     let combined_hispan: HashSet<usize> = a_hispan.union(&b_hispan).copied().collect();
-    let hilen = combined_hispan.len();
+    let mut hispan_vec: Vec<usize> = combined_hispan.into_iter().collect();
+    hispan_vec.sort();
+    let hilen = hispan_vec.len();
 
     merged.start_token = *qspan_vec.first().unwrap_or(&a.start_token);
     merged.end_token = qspan_vec.last().map(|&x| x + 1).unwrap_or(a.end_token);
     merged.rule_start_token = *ispan_vec.first().unwrap_or(&a.rule_start_token);
     merged.matched_length = qspan_vec.len();
     merged.hilen = hilen;
+    merged.hispan_positions = if hispan_vec.is_empty() {
+        None
+    } else {
+        Some(hispan_vec)
+    };
     merged.start_line = a.start_line.min(b.start_line);
     merged.end_line = a.end_line.max(b.end_line);
     merged.score = a.score.max(b.score);
@@ -1533,6 +1536,7 @@ mod tests {
             rule_start_token: 0,
             qspan_positions: None,
             ispan_positions: None,
+            hispan_positions: None,
         }
     }
 
@@ -1572,6 +1576,7 @@ mod tests {
             rule_start_token: 0,
             qspan_positions: None,
             ispan_positions: None,
+            hispan_positions: None,
         }
     }
 
@@ -2868,6 +2873,7 @@ mod tests {
             rule_start_token: 0,
             qspan_positions: None,
             ispan_positions: None,
+            hispan_positions: None,
         }
     }
 

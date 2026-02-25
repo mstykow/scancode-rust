@@ -329,6 +329,7 @@ fn create_unknown_match(
         rule_start_token: 0,
         qspan_positions: None,
         ispan_positions: None,
+        hispan_positions: None,
     }
     .into()
 }
@@ -518,6 +519,7 @@ mod tests {
             rule_start_token: 0,
             qspan_positions: None,
             ispan_positions: None,
+            hispan_positions: None,
         }];
 
         let covered = compute_covered_positions(&query, &known_matches);
@@ -593,6 +595,7 @@ mod tests {
             rule_start_token: 0,
             qspan_positions: None,
             ispan_positions: None,
+            hispan_positions: None,
         }];
 
         let matches = unknown_match(&index, &query, &known_matches);
