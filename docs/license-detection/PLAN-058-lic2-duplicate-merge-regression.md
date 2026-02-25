@@ -88,40 +88,222 @@ For `.c` files, Python calls `remove_verbatim_cr_lf_tab_chars()` which replaces:
 
 ---
 
+## Investigation Findings
+
+### 1. Where to Add Preprocessing
+
+**Primary location: `src/license_detection/query.rs` in `Query::with_options()`**
+
+The preprocessing should happen in the tokenization loop (line 331 onwards), where text is processed line-by-line:
+
+```rust
+for line in text.lines() {
+    let line_trimmed = line.trim();
+    // PREPROCESSING GOES HERE for source files
+    for token in tokenize_without_stopwords(line_trimmed) {
+        ...
+    }
+}
+```
+
+**Architecture consideration**: The `LicenseDetectionEngine::detect()` method currently receives only text content, not file path info. To enable file-type-aware preprocessing:
+
+**Option A (Recommended)**: Add preprocessing in scanner before calling detect:
+- `src/scanner/process.rs:187` - `engine.detect(&text_content)` becomes `engine.detect_with_options(&text_content, path)`
+- Simpler, keeps file path context available
+
+**Option B**: Add `is_source` parameter to `Query::new()` and propagate through call chain
+- Requires updating `LicenseDetectionEngine::detect()` signature
+- More invasive change
+
+### 2. Which File Types Need Preprocessing
+
+Python's `is_source()` function (lines 351-423) identifies source files by extension:
+
+**Core source extensions** (most likely to have string literals with escape sequences):
+- C/C++: `.c`, `.c++`, `.cc`, `.cpp`, `.cxx`, `.h`, `.hh`, `.hpp`, `.hxx`
+- Java: `.java`
+- JavaScript/TypeScript: `.js`, `.jsx`, `.ts`, `.jsp`
+- Python: `.py`
+- Rust: `.rs`
+- Go: `.go`
+- Ruby: `.rb`, `.ruby`
+- PHP: `.php`
+- Shell: `.sh`, `.ksh`, `.csh`, `.bat`
+- Others: `.cs`, `.swift`, `.kt`, `.scala`, `.rs`, `.pl`, `.lua`, `.m`, `.f`, `.f90`, `.pas`, `.ada`, `.adb`, `.el`, `.clj`, `.hs`, `.nim`, `.d`, `.s`, `.asm`
+
+**Rust implementation** should define a constant with these extensions:
+
+```rust
+const SOURCE_EXTENSIONS: &[&str] = &[
+    ".c", ".c++", ".cc", ".cpp", ".cxx", ".h", ".hh", ".hpp", ".hxx",
+    ".java", ".js", ".jsx", ".ts", ".jsp", ".py", ".rs", ".go", ".rb",
+    // ... (full list from Python)
+];
+
+fn is_source_file(path: &Path) -> bool {
+    path.extension()
+        .and_then(|ext| ext.to_str())
+        .map(|ext| SOURCE_EXTENSIONS.contains(&format!(".{}", ext).as_str()))
+        .unwrap_or(false)
+}
+```
+
+### 3. What Strings to Replace
+
+**Python's `remove_verbatim_cr_lf_tab_chars()` (lines 298-303)**:
+```python
+def remove_verbatim_cr_lf_tab_chars(s):
+    """Return a string replacing by a space any verbatim but escaped line endings
+    and tabs (such as a literal \n or \r \t).
+    """
+    return s.replace('\\r', ' ').replace('\\n', ' ').replace('\\t', ' ')
+```
+
+**Rust implementation**:
+```rust
+fn remove_verbatim_escape_sequences(s: &str) -> String {
+    s.replace("\\r", " ")
+     .replace("\\n", " ")
+     .replace("\\t", " ")
+}
+```
+
+**Important**: These are **literal backslash + character** pairs, NOT actual escape sequences:
+- `"\\n"` in Rust source = the two-character sequence `\n` (backslash followed by 'n')
+- This matches what appears in C string literals like `"modify\n"` in source code
+
+### 4. Investigation Test Results
+
+Running `cargo test duplicate_merge_investigation --lib -- --nocapture`:
+
+**bzip2.106.c** (confirmed root cause):
+- Token 8579 = "n" (from literal `\n` in C string)
+- Token 7054 = "it" (expected token from rule)
+- Query has `["modify", "n", "it", ...]` where rule expects `["modify", "it", ...]`
+- Match fails at offset 12: `query=8579, rule=7054, pos=96`
+
+**aladdin-md5_and_not_rsa-md5.txt** (DIFFERENT ROOT CAUSE - needs investigation):
+- File has `.txt` extension but contains C code with CRLF line endings
+- Python would NOT apply preprocessing (not a source extension)
+- File contains zlib-like license at lines 4-18
+- Rust matches lines 4-18 (one match), but Python expects 2 zlib matches
+- Second match location unclear - second comment block (lines 25-52) is a changelog, not license text
+- May need to investigate Python's actual output to understand expected behavior
+- Possible CRLF handling difference
+
+**apache-2.0_and_apache-2.0.txt** (DIFFERENT ROOT CAUSE - needs investigation):
+- Contains XML/maven file with CRLF line endings
+- Apache license in XML comment at lines 2-16
+- License metadata at lines 63-69
+- Rust matches lines 63-69 (one match), Python expects 2 apache-2.0 matches
+- Python likely matches BOTH the comment section (lines 2-16) AND the metadata section
+- Rust may not be matching the XML comment properly
+- May be XML/HTML comment handling issue, not escape sequence issue
+
+### 5. Implementation Approach
+
+**Step 1**: Add preprocessing function to `src/license_detection/query.rs`:
+```rust
+/// Replace literal escape sequences (\n, \r, \t) with spaces.
+/// These appear in source code string literals and should be treated as
+/// whitespace for license matching purposes.
+fn remove_verbatim_escape_sequences(s: &str) -> String {
+    s.replace("\\r", " ")
+     .replace("\\n", " ")
+     .replace("\\t", " ")
+}
+```
+
+**Step 2**: Add source file detection (choose location based on Option A or B above):
+```rust
+/// Source code extensions that may contain escape sequences in string literals.
+/// From Python: reference/scancode-toolkit/src/textcode/analysis.py:351-423
+const SOURCE_EXTENSIONS: &[&str] = &[
+    ".c", ".c++", ".cc", ".cpp", ".cxx", ".h", ".hh", ".hpp", ".hxx",
+    ".java", ".js", ".jsx", ".ts", ".jsp", ".py", ".rs", ".go", ".rb",
+    ".php", ".pl", ".sh", ".cs", ".swift", ".kt", ".scala", // ... full list
+];
+
+fn is_source_file(path: &Path) -> bool {
+    path.extension()
+        .and_then(|ext| ext.to_str())
+        .map(|ext| {
+            let ext_with_dot = format!(".{}", ext.to_lowercase());
+            SOURCE_EXTENSIONS.contains(&ext_with_dot.as_str())
+        })
+        .unwrap_or(false)
+}
+```
+
+**Step 3**: Apply preprocessing in detection pipeline:
+
+**If Option A (recommended)**, modify `src/scanner/process.rs`:
+```rust
+fn extract_license_information(
+    file_info_builder: &mut FileInfoBuilder,
+    text_content: String,
+    license_engine: Option<Arc<LicenseDetectionEngine>>,
+    include_text: bool,
+    path: &Path,  // Add path parameter
+) -> Result<(), Error> {
+    let Some(engine) = license_engine else {
+        return Ok(());
+    };
+    
+    let processed_text = if is_source_file(path) {
+        text_content.lines()
+            .map(remove_verbatim_escape_sequences)
+            .collect::<Vec<_>>()
+            .join("\n")
+    } else {
+        text_content
+    };
+    
+    match engine.detect(&processed_text) {
+        // ...
+    }
+}
+```
+
+**If Option B**, modify `src/license_detection/query.rs`:
+```rust
+pub fn with_options(
+    text: &str,
+    index: &LicenseIndex,
+    _line_threshold: usize,
+    is_source: bool,  // Add parameter
+) -> Result<Self, anyhow::Error> {
+    let processed_text = if is_source {
+        text.lines()
+            .map(|line| remove_verbatim_escape_sequences(line))
+            .collect::<Vec<_>>()
+            .join("\n")
+    } else {
+        text.to_string()
+    };
+    
+    // Continue with processed_text...
+}
+```
+
+---
+
 ## Fix Required
 
-### Implementation
+### Implementation Summary
 
-Add preprocessing for source files in Rust:
-
-1. **Add `remove_verbatim_cr_lf_tab_chars()` function** to `src/license_detection/query.rs` or new module:
-   ```rust
-   fn remove_verbatim_escape_sequences(s: &str) -> String {
-       s.replace("\\r", " ")
-        .replace("\\n", " ")
-        .replace("\\t", " ")
-   }
-   ```
-
-2. **Detect source files** and apply preprocessing before tokenization:
-   - Similar to Python's `is_source()` function
-   - Apply to files with source code extensions (`.c`, `.cpp`, `.h`, `.java`, etc.)
-
-3. **Apply in `Query::with_options()`** before the tokenization loop:
-   ```rust
-   let processed_text = if is_source_file {
-       remove_verbatim_escape_sequences(text)
-   } else {
-       text.to_string()
-   };
-   ```
+1. Add `remove_verbatim_escape_sequences()` function to `src/license_detection/query.rs`
+2. Add `SOURCE_EXTENSIONS` constant and `is_source_file()` function
+3. Apply preprocessing in the scanner (`process.rs`) before calling `engine.detect()`
+4. Process line-by-line to preserve line number tracking for match positions
 
 ### Affected Files
 
 | File | Change |
 |------|--------|
-| `src/license_detection/query.rs` | Add preprocessing function and source file detection |
-| `src/license_detection/tokenize.rs` | Optionally add helper function |
+| `src/license_detection/query.rs` | Add preprocessing function |
+| `src/scanner/process.rs` | Add source file detection, apply preprocessing before detect() |
 
 ### Reference Implementation
 
