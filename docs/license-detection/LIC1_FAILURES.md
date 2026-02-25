@@ -2,124 +2,165 @@
 
 ## Summary
 
-50 lic1 tests are failing. This document analyzes 20 representative failures.
+50 lic1 tests are failing. This document categorizes all failures.
 
 ---
 
-## Failure Categories
+## Failure Categories Overview
 
-| Category | Count | Description |
-|----------|-------|-------------|
-| CDDL Rule Selection | 8 | Wrong CDDL version (1.0 vs 1.1) selected |
-| Extra Detections | 5 | Additional unexpected license expressions |
-| Missing Detections | 4 | Fewer expressions than expected |
-| Wrong Expression | 2 | Correct count but wrong license |
-| Unknown License Reference | 1 | Returns unknown-license-reference instead of correct license |
+| Category | Count | Root Cause | Status |
+|----------|-------|------------|--------|
+| CDDL Rule Selection | 8 | Surround merge bug | Blocked by stricter-surround-merge |
+| Duplicate Detections Merged | 16 | Matches incorrectly combined | Needs investigation |
+| Extra Detections | 8 | Additional unexpected expressions | Needs investigation |
+| Missing Detections | 12 | Fewer expressions than expected | Needs investigation |
+| Wrong Detection | 6 | Completely different expression | Needs investigation |
 
 ---
 
-## Detailed Failures
+## Category 1: CDDL Rule Selection (8 tests)
 
-### 1. CDDL Rule Selection Issues (8 tests)
+**Root Cause**: Surround merge not checking overlap before combining. CDDL 1.1 matches incorrectly inflate and beat CDDL 1.0.
 
-These are blocked by the stricter-surround-merge improvement (deferred until Python parity).
+**Status**: Blocked by `improvements/stricter-surround-merge.md` (deferred until Python parity)
 
 | Test | Expected | Actual | Issue |
 |------|----------|--------|-------|
 | `cddl-1.0.txt` | `["cddl-1.0"]` | `["unknown-license-reference", "cddl-1.0"]` | Extra detection |
-| `cddl-1.0_or_gpl-2.0-classpath_and_apache-2.0-glassfish_1.txt` | `["(cddl-1.0 OR gpl-2.0 WITH classpath-exception-2.0) AND apache-2.0"]` | `["(cddl-1.1 OR ...) AND apache-2.0"]` | Wrong CDDL version |
-| `cddl-1.0_or_gpl-2.0-classpath_and_apache-2.0-glassfish_2.txt` | `["(cddl-1.0 OR ...) AND apache-2.0"]` | `["(cddl-1.1 OR ...) AND apache-2.0"]` | Wrong CDDL version |
-| `cddl-1.0_or_gpl-2.0-glassfish.txt` | `["cddl-1.0 OR gpl-2.0"]` | `["cddl-1.1 OR gpl-2.0 WITH classpath-exception-2.0"]` | Wrong CDDL version |
+| `cddl-1.0_or_gpl-2.0-classpath_and_apache-2.0-glassfish_1.txt` | `["(cddl-1.0 OR ...) AND apache-2.0"]` | `["(cddl-1.1 OR ...) AND apache-2.0"]` | Wrong version |
+| `cddl-1.0_or_gpl-2.0-classpath_and_apache-2.0-glassfish_2.txt` | `["(cddl-1.0 OR ...) AND apache-2.0"]` | `["(cddl-1.1 OR ...) AND apache-2.0"]` | Wrong version |
+| `cddl-1.0_or_gpl-2.0-glassfish.txt` | `["cddl-1.0 OR gpl-2.0"]` | `["cddl-1.1 OR gpl-2.0 WITH classpath-exception-2.0"]` | Wrong version |
 | `cddl-1.1.txt` | `["cddl-1.0"]` | `[]` | Missing detection |
-| `cddl-1.1_or_gpl-2.0-classpath_and_apache-2.0-glassfish_1.txt` | `["(cddl-1.1 OR ...) AND apache-2.0"]` | `[...cddl-1.1..., ...cddl-1.0...]` | Extra CDDL 1.0 detection |
-| `cddl-1.1_or_gpl-2.0-classpath_and_mit-glassfish.txt` | `["(cddl-1.1 OR ...) AND mit"]` | `[...apache-2.0..., ...mit...]` | Extra apache-2.0 detection |
-| `cddl-1.1_or_gpl-2.0-classpath_and_w3c-glassfish.txt` | `["(...w3c)"]` | `[...w3c, ...w3c]` | Duplicate detection |
-
-**Root Cause**: Surround merge not checking overlap before combining matches (see `improvements/stricter-surround-merge.md`).
+| `cddl-1.1_or_gpl-2.0-classpath_and_apache-2.0-glassfish_1.txt` | `["(cddl-1.1 OR ...) AND apache-2.0"]` | `[...cddl-1.1..., ...cddl-1.0...]` | Extra CDDL 1.0 |
+| `cddl-1.1_or_gpl-2.0-classpath_and_mit-glassfish.txt` | `["(...mit)"]` | `[...apache-2.0..., ...mit...]` | Extra detection |
+| `cddl-1.1_or_gpl-2.0-classpath_and_w3c-glassfish.txt` | `["(...w3c)"]` | `[...w3c, ...w3c]` | Duplicate |
 
 ---
 
-### 2. Extra Detections (5 tests)
+## Category 2: Duplicate Detections Merged (16 tests)
 
-| Test | Expected | Actual | Issue |
-|------|----------|--------|-------|
-| `com-oreilly-servlet.txt` | `["com-oreilly-servlet"]` | `["com-oreilly-servlet", "com-oreilly-servlet"]` | Duplicate detection |
-| `curl_2.txt` | `["curl"]` | `["unknown-license-reference", "curl"]` | Extra unknown detection |
-| `cpl-1.0_in_html.html` | `["cpl-1.0"]` | `["unknown-license-reference"]` | Wrong detection |
-| `complex.el` | 18 expressions | 19 expressions | Extra lgpl-2.0-plus at start |
-| `epl-2.0.html` | `["epl-2.0", "epl-2.0"]` | `["epl-2.0", "unknown-license-reference", "unknown-license-reference", "proprietary-license"]` | Extra detections |
+**Root Cause**: Multiple license instances in a file are being incorrectly merged into one detection.
 
-**Root Cause**: Unknown - needs investigation per test.
+**Pattern**: Expected N expressions, got N-1 or fewer.
 
----
-
-### 3. Missing Detections (4 tests)
-
-| Test | Expected | Actual | Issue |
-|------|----------|--------|-------|
-| `cjdict-liconly.txt` | 8 expressions | 5 expressions | Missing 3 bsd-new detections |
-| `e2fsprogs.txt` | 5 expressions | 4 expressions | Missing lgpl-2.1-plus |
-| `eclipse-openj9.LICENSE` | 9 expressions | 8 expressions | Missing zlib |
-| `eclipse-openj9_html.html` | 13 expressions | 11 expressions | Missing mit, zlib |
-
-**Root Cause**: Unknown - needs investigation per test.
-
----
-
-### 4. Wrong Expression (2 tests)
-
-| Test | Expected | Actual | Issue |
-|------|----------|--------|-------|
-| `d-zlib_and_gfdl-1.2_and_gpl_and_gpl_and_other.txt` | Contains `gpl-1.0-plus` only | Contains extra `lgpl-2.1-plus` | Wrong expression |
-| `ecos-license.html` | 2 expressions | 1 expression | Missing duplicate |
-
-**Root Cause**: Unknown - needs investigation per test.
+| Test | Expected Count | Actual Count | Missing |
+|------|----------------|--------------|---------|
+| `cjdict-liconly.txt` | 8 | 5 | 3 bsd-new |
+| `com-oreilly-servlet.txt` | 1 | 2 | Extra duplicate |
+| `e2fsprogs.txt` | 5 | 4 | 1 lgpl-2.1-plus |
+| `eclipse-openj9.LICENSE` | 9 | 8 | 1 zlib |
+| `eclipse-openj9_html.html` | 13 | 11 | 1 mit, 1 zlib |
+| `ecos-license.html` | 2 | 1 | 1 gpl-2.0-plus |
+| `edl-1.0.txt` | 2 | 1 | 1 bsd-new |
+| `flex-readme.txt` | 3 | 2 | 1 flex-2.5 |
+| `fsf-free_and_fsf-free_and_fsf-free.txt` | 3 | 1 | 2 fsf-free |
+| `fsf-free_and_fsf-free_and_fsf-free_and_gpl-2.0-autoconf_and_other.txt` | 4 | 2 | 2 fsf-free |
+| `fsf-free_and_fsf-free_and_fsf-free_and_gpl-2.0-autoconf_and_other_1.txt` | 4 | 2 | 2 fsf-free |
+| `fsf-unlimited-no-warranty_and_...txt` | 17 | 3 | 14 fsf-unlimited |
+| `gfdl-1.2_1.RULE` | 1 | 2 | Extra duplicate |
+| `gfdl-1.3_2.RULE` | 2 | 3 | Extra duplicate |
+| `gpl-2.0_82.RULE` | 3 | 1 | 2 gpl-2.0 |
+| `gpl_65.txt` | 2 | 1 | 1 gpl-1.0-plus |
 
 ---
 
-### 5. Merged Detections (1 test)
+## Category 3: Extra Detections (8 tests)
 
-| Test | Expected | Actual | Issue |
-|------|----------|--------|-------|
-| `edl-1.0.txt` | `["bsd-new", "bsd-new"]` | `["bsd-new"]` | Duplicates merged |
+**Root Cause**: Additional unexpected license expressions detected.
 
-**Root Cause**: Related to PLAN-058 (duplicate merge issue).
+**Pattern**: Expected N expressions, got N+1 or more.
 
----
-
-## Action Items
-
-### High Priority (Blocking CDDL)
-
-1. **Stricter surround merge** - Implement overlap check (deferred until Python parity)
-
-### Medium Priority (Investigation Needed)
-
-2. **Extra unknown-license-reference detections** - Investigate curl_2.txt, cpl-1.0_in_html.html, epl-2.0.html
-3. **Missing detections** - Investigate cjdict-liconly.txt, e2fsprogs.txt, eclipse-openj9 tests
-4. **Duplicate merging** - Investigate edl-1.0.txt (may be fixed by PLAN-058 preprocessing)
-
-### Low Priority
-
-5. **Complex.el extra detection** - Single extra expression, minor issue
-6. **D-zlib wrong expression** - Minor expression difference
+| Test | Expected Count | Actual Count | Extra |
+|------|----------------|--------------|-------|
+| `complex.el` | 18 | 19 | 1 lgpl-2.0-plus |
+| `curl_2.txt` | 1 | 2 | 1 unknown-license-reference |
+| `epl-2.0.html` | 2 | 4 | 2 unknown, 1 proprietary |
+| `gfdl-1.1-en_gnome_1.RULE` | 2 | 12 | 10 extra |
+| `gfdl-1.1_1.RULE` | 3 | 11 | 8 extra |
+| `gfdl-1.1_10.RULE` | 1 | 11 | 10 extra |
+| `gfdl-1.1_9.RULE` | 2 | 10 | 8 extra |
+| `gpl-2.0-plus_21.txt` | 1 | 3 | 2 extra |
 
 ---
 
-## Individual Test Plans Needed
+## Category 4: Missing Detections (12 tests)
 
-| Test | Priority | Status |
+**Root Cause**: Expected license expressions not detected.
+
+**Pattern**: Actual count significantly less than expected, or completely different licenses.
+
+| Test | Expected Count | Actual Count | Notes |
+|------|----------------|--------------|-------|
+| `cpl-1.0_in_html.html` | 1 | 1 | Wrong: unknown-license-reference |
+| `d-zlib_and_gfdl-1.2_and_gpl_and_gpl_and_other.txt` | 19 | 19 | 1 wrong expression |
+| `fsf-unlimited_not_fsf-unlimited-no-warranty.txt` | 1 | 1 | Wrong: fsfullrsd |
+| `godot2_COPYRIGHT.txt` | 95 | 44 | Many missing |
+| `godot_COPYRIGHT.txt` | 84 | 47 | Many missing |
+| `gpl-1.0-plus_or_artistic-1.0_licenses.txt` | 7 | 6 | 1 gpl-1.0 missing |
+| `gpl-2.0-plus_33.txt` | 6 | 5 | 1 missing |
+| `gpl-2.0_and_gpl-2.0-plus.txt` | 9 | 6 | 3 missing |
+| `gpl-2.0_and_gpl-2.0_and_gpl-2.0-plus.txt` | 6 | 4 | 2 missing |
+| `gpl-2.0_and_lgpl-2.0-plus.txt` | 1 | 2 | Extra gpl-2.0-plus |
+| `gpl-2.0_complex.txt` | 2 | 1 | 1 gpl-2.0 missing |
+| `gpl_and_gpl_and_gpl_and_lgpl-2.0_and_other.txt` | 5 | 7 | 2 warranty, 1 unknown |
+
+---
+
+## Category 5: Wrong Detection (6 tests)
+
+**Root Cause**: Completely different license expression detected.
+
+| Test | Expected | Actual |
 |------|----------|--------|
-| `cddl-*.txt` (8 tests) | HIGH | Blocked by stricter-surround-merge |
-| `curl_2.txt` | MEDIUM | Needs investigation |
-| `cpl-1.0_in_html.html` | MEDIUM | Needs investigation |
-| `epl-2.0.html` | MEDIUM | Needs investigation |
-| `cjdict-liconly.txt` | MEDIUM | Needs investigation |
-| `e2fsprogs.txt` | MEDIUM | Needs investigation |
-| `eclipse-openj9.LICENSE` | MEDIUM | Needs investigation |
-| `eclipse-openj9_html.html` | MEDIUM | Needs investigation |
-| `edl-1.0.txt` | MEDIUM | Related to PLAN-058 |
-| `com-oreilly-servlet.txt` | LOW | Needs investigation |
-| `complex.el` | LOW | Minor issue |
-| `d-zlib_and_gfdl-1.2_and_gpl_and_gpl_and_other.txt` | LOW | Minor issue |
-| `ecos-license.html` | LOW | Needs investigation |
+| `cpl-1.0_in_html.html` | `["cpl-1.0"]` | `["unknown-license-reference"]` |
+| `fsf-unlimited_not_fsf-unlimited-no-warranty.txt` | `["fsf-unlimited"]` | `["fsfullrsd"]` |
+| `gpl-2.0-plus_1.txt` | `["gpl-2.0-plus"]` | `["gpl-1.0-plus", "gpl-2.0-plus"]` |
+| `gpl-2.0-plus_4.txt` | `["gpl-2.0-plus AND free-unknown"]` | `[..., "gpl-2.0-plus"]` |
+| `gpl-2.0-plus_41.txt` | `["gpl-2.0-plus AND free-unknown"]` | `[..., "gpl-2.0-plus"]` |
+| `gpl_and_lgpl_and_gfdl-1.2.txt` | `["gpl-1.0-plus AND lgpl-2.0-plus AND gfdl-1.2"]` | `["gpl-1.0-plus", "lgpl-2.0-plus", "gfdl-1.2"]` |
+
+---
+
+## Cluster Analysis
+
+### High-Impact Clusters
+
+1. **CDDL (8 tests)** - Single root cause, blocked on Python parity
+2. **Duplicate Merging (16 tests)** - Likely single root cause in match merging logic
+3. **GFDL Extra Detections (4 tests)** - Pattern: gfdl-1.1 and gfdl-1.3 rules matching too broadly
+
+### Medium-Impact Clusters
+
+4. **godot tests (2 tests)** - Large COPYRIGHT files with many missing detections
+5. **gpl-2.0-plus tests (6 tests)** - Various expression handling issues
+
+### Low-Impact (Individual Investigation Needed)
+
+6. **fsf-free tests (3 tests)** - Duplicate merging pattern
+7. **Remaining tests (7 tests)** - No clear pattern
+
+---
+
+## Recommended Investigation Order
+
+### Phase 1: High-Impact Single Root Cause
+1. Duplicate merging (16 tests) - likely same fix for all
+2. GFDL extra detections (4 tests) - rule matching issue
+
+### Phase 2: Medium-Impact  
+3. godot COPYRIGHT files (2 tests)
+4. gpl-2.0-plus expression handling (6 tests)
+
+### Phase 3: Individual Investigation
+5. Remaining tests without clear pattern
+
+---
+
+## Files to Investigate
+
+| Category | Key Files |
+|----------|-----------|
+| Duplicate Merging | `src/license_detection/match_refine.rs` - merge/contain logic |
+| Extra Detections | `src/license_detection/match_refine.rs` - filter functions |
+| Missing Detections | `src/license_detection/detection.rs` - detection creation |
+| Wrong Detection | Rule matching, tokenization |
