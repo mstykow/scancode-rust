@@ -348,45 +348,42 @@ Investigation confirmed `whole_query_run()` returns identical token ranges in bo
 
 ### Step 1: Create SPDX Token Collection Function
 
-**Location**: `src/license_detection/index/builder.rs`
+**Location**: `src/license_detection/index/builder.rs` (add after line 142, after `build_rules_from_licenses`)
+
+**IMPORTANT**: The Rust `License` struct has `spdx_license_key: Option<String>` and `other_spdx_license_keys: Vec<String>` fields. We must collect from BOTH, matching Python's `License.spdx_keys()` method (models.py:559-566).
 
 ```rust
 /// Get essential SPDX tokens that must be pre-assigned.
 /// Based on Python: models.py:1188-1192
-fn get_essential_spdx_tokens() -> Vec<&'static str> {
-    vec!["spdx", "license", "licence", "identifier", "licenseref"]
-}
-
-/// Tokenize an SPDX key for token extraction.
-/// Based on Python: models.py:1203-1204 index_tokenizer()
-fn tokenize_spdx_key(key: &str) -> Vec<String> {
-    let lowercase = key.to_lowercase();
-    QUERY_PATTERN
-        .find_iter(&lowercase)
-        .filter_map(|cap| {
-            let token = cap.as_str();
-            if token.is_empty() || STOPWORDS.contains(token) {
-                None
-            } else {
-                Some(token.to_string())
-            }
-        })
-        .collect()
+fn get_essential_spdx_tokens() -> &'static [&'static str] {
+    &["spdx", "license", "licence", "identifier", "licenseref"]
 }
 
 /// Collect all SPDX tokens from licenses database.
 /// Based on Python: models.py:1195-1205 get_all_spdx_key_tokens()
+/// 
+/// Collects tokens from:
+/// 1. Essential SPDX tokens (spdx, license, licence, identifier, licenseref)
+/// 2. All SPDX license keys (spdx_license_key + other_spdx_license_keys)
 fn collect_spdx_tokens(licenses: &[License]) -> HashSet<String> {
     let mut tokens: HashSet<String> = HashSet::new();
     
     // Add essential tokens
-    for tok in get_essential_spdx_tokens() {
+    for &tok in get_essential_spdx_tokens() {
         tokens.insert(tok.to_string());
     }
     
     // Add tokens from all SPDX keys
+    // Python: License.spdx_keys() yields from spdx_license_key and other_spdx_license_keys
     for license in licenses {
-        for spdx_key in &license.spdx_keys {
+        // Primary SPDX key
+        if let Some(ref spdx_key) = license.spdx_license_key {
+            for token in tokenize_spdx_key(spdx_key) {
+                tokens.insert(token);
+            }
+        }
+        // Alternative SPDX keys
+        for spdx_key in &license.other_spdx_license_keys {
             for token in tokenize_spdx_key(spdx_key) {
                 tokens.insert(token);
             }
@@ -395,25 +392,41 @@ fn collect_spdx_tokens(licenses: &[License]) -> HashSet<String> {
     
     tokens
 }
+
+/// Tokenize an SPDX key using the same logic as index_tokenizer.
+/// Uses crate::license_detection::tokenize::tokenize() which applies
+/// QUERY_PATTERN and STOPWORDS filtering.
+fn tokenize_spdx_key(key: &str) -> Vec<String> {
+    tokenize::tokenize(key)
+}
 ```
 
 ### Step 2: Pre-Assign SPDX Tokens in build_index()
 
-**Location**: `src/license_detection/index/builder.rs:235-270`
+**Location**: `src/license_detection/index/builder.rs:235-240` (insert after `let len_legalese = ...`)
+
+**Critical**: Python iterates SPDX tokens in SORTED order (`for sts in sorted(_spdx_tokens)`). This ensures deterministic token ID assignment across runs.
 
 ```rust
 pub fn build_index(rules: Vec<Rule>, licenses: Vec<License>) -> LicenseIndex {
     let legalese_words = legalese::get_legalese_words();
     let mut dictionary = TokenDictionary::new_with_legalese(&legalese_words);
     let len_legalese = dictionary.legalese_count();
-    
+
     // CRITICAL FIX: Pre-assign SPDX tokens before processing rules
     // Based on Python: index.py:301-314
-    let spdx_tokens = collect_spdx_tokens(&licenses);
-    for token in spdx_tokens.iter().sorted() {
-        // Only assign if not already in dictionary (not legalese)
-        if dictionary.get(token).is_none() {
-            dictionary.get_or_assign(token);
+    // This ensures SPDX tokens get consistent IDs matching Python
+    {
+        let spdx_tokens = collect_spdx_tokens(&licenses);
+        let mut sorted_tokens: Vec<&String> = spdx_tokens.iter().collect();
+        sorted_tokens.sort();  // Must sort for deterministic ID assignment
+        
+        for token in sorted_tokens {
+            // Only assign if not already in dictionary (not legalese)
+            // Python checks: if stid is None (token not yet in dictionary)
+            if dictionary.get(token).is_none() {
+                dictionary.get_or_assign(token);
+            }
         }
     }
     
@@ -422,138 +435,329 @@ pub fn build_index(rules: Vec<Rule>, licenses: Vec<License>) -> LicenseIndex {
 }
 ```
 
+**Key Implementation Details**:
+
+1. **Sorted iteration**: Python uses `sorted(_spdx_tokens)` - this is CRITICAL for hash parity
+2. **Skip legalese**: Python's `if stid is None` skips tokens already in dictionary (legalese words)
+3. **Insertion point**: Must be BEFORE the rule processing loop (line 274)
+
 ### Step 3: Update Imports
 
-**Location**: `src/license_detection/index/builder.rs:1-30`
+**Location**: `src/license_detection/index/builder.rs:9-10`
+
+The existing imports already include `HashSet`. No new external crates needed (no itertools required - use standard `.sort()` on Vec instead of `.sorted()` from itertools).
 
 ```rust
+// Existing imports (already present)
 use std::collections::{HashMap, HashSet};
 
-// Add these imports for SPDX token handling
-use itertools::Itertools;  // for .sorted()
-
-use crate::license_detection::tokenize::{QUERY_PATTERN, STOPWORDS};
-// ... existing imports ...
+// Add import for tokenize function (used by tokenize_spdx_key)
+use crate::license_detection::tokenize;
 ```
 
-### Step 4: Verify License.spdx_keys Field Exists
+**Note**: The `tokenize` module is already imported at line 24:
+```rust
+use crate::license_detection::tokenize::{parse_required_phrase_spans, tokenize_with_stopwords};
+```
+Just add `tokenize` to use the public `tokenize()` function.
 
-Check that the `License` struct has a `spdx_keys` field. If not, add it:
+### Step 4: Verify License Struct Fields
 
-**Location**: `src/license_detection/models.rs`
+**Status**: ✅ ALREADY CORRECT - No changes needed.
+
+The Rust `License` struct at `src/license_detection/models.rs:13-61` already has the required fields:
 
 ```rust
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct License {
-    pub key: String,
-    pub spdx_keys: Vec<String>,  // Ensure this exists
-    // ... other fields ...
+    // ...
+    /// SPDX license identifier if available
+    pub spdx_license_key: Option<String>,
+    
+    /// Alternative SPDX license identifiers (aliases)
+    pub other_spdx_license_keys: Vec<String>,
+    // ...
 }
 ```
+
+These fields correspond to Python's `License.spdx_keys()` method (models.py:559-566) which yields from both:
+- `self.spdx_license_key`
+- `self.other_spdx_license_keys`
+
+The `collect_spdx_tokens()` function in Step 1 correctly iterates both fields.
 
 ---
 
-## 5. Verification Tests
+## 5. Testing Strategy
 
-### Test 1: SPDX Token Pre-Population
+This section follows the guidelines in `docs/TESTING_STRATEGY.md`.
+
+### 5.1 Unit Tests
+
+**Location**: `src/license_detection/index/builder.rs` (add to existing `#[cfg(test)] mod tests` block at line 438)
+
+These tests verify the component behavior in isolation:
 
 ```rust
 #[test]
-fn test_spdx_tokens_pre_populated() {
-    use crate::license_detection::index::build_index;
-    use crate::license_detection::rules::loader::load_licenses_from_resource;
+fn test_collect_spdx_tokens_includes_essential_tokens() {
+    let licenses = vec![License {
+        key: "test".to_string(),
+        name: "Test License".to_string(),
+        spdx_license_key: Some("MIT".to_string()),
+        other_spdx_license_keys: vec![],
+        category: None,
+        text: String::new(),
+        reference_urls: vec![],
+        notes: None,
+        is_deprecated: false,
+        replaced_by: vec![],
+        minimum_coverage: None,
+        ignorable_copyrights: None,
+        ignorable_holders: None,
+        ignorable_authors: None,
+        ignorable_urls: None,
+        ignorable_emails: None,
+    }];
     
-    let licenses = load_licenses_from_resource();
+    let tokens = collect_spdx_tokens(&licenses);
+    
+    // Essential tokens must always be present
+    assert!(tokens.contains("spdx"));
+    assert!(tokens.contains("license"));
+    assert!(tokens.contains("licence"));
+    assert!(tokens.contains("identifier"));
+    assert!(tokens.contains("licenseref"));
+    
+    // Tokens from SPDX keys
+    assert!(tokens.contains("mit"));
+}
+
+#[test]
+fn test_collect_spdx_tokens_from_both_key_types() {
+    let licenses = vec![License {
+        key: "test".to_string(),
+        name: "Test".to_string(),
+        spdx_license_key: Some("Apache-2.0".to_string()),
+        other_spdx_license_keys: vec!["MIT".to_string()],
+        category: None,
+        text: String::new(),
+        reference_urls: vec![],
+        notes: None,
+        is_deprecated: false,
+        replaced_by: vec![],
+        minimum_coverage: None,
+        ignorable_copyrights: None,
+        ignorable_holders: None,
+        ignorable_authors: None,
+        ignorable_urls: None,
+        ignorable_emails: None,
+    }];
+    
+    let tokens = collect_spdx_tokens(&licenses);
+    
+    // Both primary and alternative SPDX keys should contribute tokens
+    assert!(tokens.contains("apache"));  // from spdx_license_key
+    assert!(tokens.contains("mit"));      // from other_spdx_license_keys
+}
+
+#[test]
+fn test_spdx_tokens_pre_populated_in_dictionary() {
+    let licenses = vec![create_test_license("mit", "MIT License")];
     let index = build_index(vec![], licenses);
     
-    // Essential SPDX tokens should be in dictionary
     let dict = &index.dictionary;
+    let len_legalese = dict.legalese_count();
     
-    // "mit" is a common SPDX key token that must be pre-assigned
+    // "mit" should be in dictionary from SPDX pre-population
     let mit_id = dict.get("mit");
     assert!(mit_id.is_some(), "'mit' should be in dictionary");
     
-    // "gpl" should be pre-assigned (from GPL SPDX keys)
-    let gpl_id = dict.get("gpl");
-    assert!(gpl_id.is_some(), "'gpl' should be in dictionary");
-    
-    // Verify these are NOT legalese (they should have IDs >= len_legalese)
-    let len_legalese = dict.legalese_count();
-    assert!(!dict.is_legalese(mit_id.unwrap()), "'mit' should not be legalese");
-    assert!(!dict.is_legalese(gpl_id.unwrap()), "'gpl' should not be legalese");
+    // Verify "mit" is NOT legalese (ID >= len_legalese)
+    if let Some(id) = mit_id {
+        assert!(id as usize >= len_legalese, "'mit' should not be legalese");
+    }
 }
-```
 
-### Test 2: Token ID Stability
-
-```rust
 #[test]
-fn test_token_ids_stable_across_rebuilds() {
-    use crate::license_detection::index::build_index;
-    
-    let licenses1 = load_licenses_from_resource();
-    let licenses2 = load_licenses_from_resource();
+fn test_spdx_token_ids_are_deterministic() {
+    // Build index twice with same licenses
+    let licenses1 = vec![create_test_license("mit", "MIT"), create_test_license("apache-2.0", "Apache")];
+    let licenses2 = vec![create_test_license("mit", "MIT"), create_test_license("apache-2.0", "Apache")];
     
     let index1 = build_index(vec![], licenses1);
     let index2 = build_index(vec![], licenses2);
     
-    // Same tokens should have same IDs across rebuilds
-    for token in &["mit", "gpl", "apache", "bsd"] {
+    // Same SPDX tokens should have same IDs across rebuilds
+    for token in &["mit", "apache", "gpl", "bsd", "spdx", "license"] {
         let id1 = index1.dictionary.get(token);
         let id2 = index2.dictionary.get(token);
-        assert_eq!(id1, id2, "Token '{}' should have stable ID", token);
+        assert_eq!(id1, id2, "Token '{}' should have deterministic ID", token);
     }
 }
 ```
 
-### Test 3: Hash Match Success
+### 5.2 Integration Tests
+
+**Location**: `src/license_detection/hash_match_test.rs` (or add to existing hash tests)
+
+Test that hash matching works correctly with pre-populated SPDX tokens:
 
 ```rust
 #[test]
-fn test_hash_match_for_known_license() {
-    use crate::license_detection::DetectionEngine;
-    
+fn test_hash_match_with_prepopulated_spdx_tokens() {
     let engine = DetectionEngine::from_resource();
     
-    // Read MIT license text from reference
+    // Load MIT license text from reference
     let mit_text = std::fs::read_to_string(
         "reference/scancode-toolkit/src/licensedcode/data/licenses/mit.LICENSE"
-    ).unwrap();
+    ).expect("MIT license file should exist");
     
-    // Should get hash match
-    let detections = engine.detect(&mit_text).unwrap();
+    let detections = engine.detect(&mit_text).expect("Detection should succeed");
     
     assert!(!detections.is_empty(), "Should detect MIT license");
-    // The match should come from hash matching for exact license text
+    
+    // For exact license text, should get hash match (matcher = "1-hash")
+    let detection = &detections[0];
+    assert_eq!(detection.matcher, Some("1-hash".to_string()));
+    assert_eq!(detection.license_expression, Some("mit".to_string()));
 }
 ```
 
-### Test 4: Compare Dictionary Size with Python
+### 5.3 Golden Tests
+
+**Location**: Run existing golden tests to verify no regressions
+
+```bash
+# Run lic2 golden tests (the ones with regressions)
+cargo test test_golden_lic2 --lib
+
+# Run all license detection golden tests
+cargo test --lib license_detection::golden_test
+```
+
+**Expected behavior**:
+- Before fix: Hash matches fail, fallback to slower matching
+- After fix: Hash matches succeed for exact license texts, golden tests improve
+
+### 5.4 Comparison Tests
+
+**Location**: `src/license_detection/token_id_equivalence_test.rs`
+
+Add tests to verify token IDs match Python for key SPDX tokens:
 
 ```rust
 #[test]
-fn test_dictionary_size_matches_python() {
+fn test_spdx_token_ids_match_python_expected_range() {
     let engine = DetectionEngine::from_resource();
     let dict = &engine.index.dictionary;
+    let len_legalese = dict.legalese_count();
     
-    // Python dictionary after SPDX pre-population has known size
-    // This test documents the expected size
-    let total_tokens = dict.len();
-    let legalese_count = dict.legalese_count();
+    // These SPDX tokens should have IDs in the non-legalese range
+    // (after legalese, which is IDs 0 to len_legalese-1)
+    let spdx_tokens = ["spdx", "license", "licence", "identifier", "licenseref", "mit", "gpl", "apache", "bsd"];
     
-    // Non-legalese should include SPDX tokens
-    let non_legalese = total_tokens - legalese_count;
-    assert!(non_legalese > 0, "Should have non-legalese SPDX tokens");
-    
-    // Log for comparison with Python
-    println!("Dictionary: {} total, {} legalese, {} SPDX/other", 
-             total_tokens, legalese_count, non_legalese);
+    for token in &spdx_tokens {
+        if let Some(id) = dict.get(token) {
+            // Token should exist
+            assert!(id as usize >= len_legalese || dict.is_legalese(id), 
+                "Token '{}' has unexpected ID {}", token, id);
+        }
+    }
 }
 ```
+
+### 5.5 Test Execution Order
+
+1. **Unit tests first** (fast feedback):
+   ```bash
+   cargo test --lib license_detection::index::builder
+   ```
+
+2. **Integration tests**:
+   ```bash
+   cargo test --lib license_detection::hash_match
+   ```
+
+3. **Golden tests** (regression detection):
+   ```bash
+   cargo test --lib license_detection::golden_test
+   ```
+
+4. **Full test suite**:
+   ```bash
+   cargo test --all --lib
+   ```
 
 ---
 
-## 6. Expected Impact on Golden Tests
+## 7. Specific Code Changes Required
+
+### File: `src/license_detection/index/builder.rs`
+
+| Line | Change | Description |
+|------|--------|-------------|
+| 24 | Modify import | Add `tokenize` to existing import: `use crate::license_detection::tokenize::{parse_required_phrase_spans, tokenize_with_stopwords, tokenize};` |
+| 143 | Add functions | Insert `get_essential_spdx_tokens()`, `collect_spdx_tokens()`, `tokenize_spdx_key()` functions |
+| 239 | Insert block | Add SPDX token pre-population block after `let len_legalese = ...` |
+
+### Detailed Diff
+
+**At line 24, modify:**
+```rust
+// Before:
+use crate::license_detection::tokenize::{parse_required_phrase_spans, tokenize_with_stopwords};
+
+// After:
+use crate::license_detection::tokenize::{parse_required_phrase_spans, tokenize_with_stopwords, tokenize};
+```
+
+**At line 143 (after `build_rules_from_licenses` function), add:**
+```rust
+fn get_essential_spdx_tokens() -> &'static [&'static str] {
+    &["spdx", "license", "licence", "identifier", "licenseref"]
+}
+
+fn collect_spdx_tokens(licenses: &[License]) -> HashSet<String> {
+    let mut tokens: HashSet<String> = HashSet::new();
+    for &tok in get_essential_spdx_tokens() {
+        tokens.insert(tok.to_string());
+    }
+    for license in licenses {
+        if let Some(ref spdx_key) = license.spdx_license_key {
+            for token in tokenize(spdx_key) {
+                tokens.insert(token);
+            }
+        }
+        for spdx_key in &license.other_spdx_license_keys {
+            for token in tokenize(spdx_key) {
+                tokens.insert(token);
+            }
+        }
+    }
+    tokens
+}
+```
+
+**At line 239 (after `let len_legalese = dictionary.legalese_count();`), insert:**
+```rust
+    // Pre-assign SPDX tokens before processing rules (Python: index.py:301-314)
+    {
+        let spdx_tokens = collect_spdx_tokens(&licenses);
+        let mut sorted_tokens: Vec<&String> = spdx_tokens.iter().collect();
+        sorted_tokens.sort();
+        for token in sorted_tokens {
+            if dictionary.get(token).is_none() {
+                dictionary.get_or_assign(token);
+            }
+        }
+    }
+```
+
+**Note**: Use `&licenses` (the function parameter) directly. Do NOT use `licenses_by_key` here - it's populated later at line 260-263 and isn't available at this point.
+
+---
+
+## 8. Expected Impact on Golden Tests
 
 ### Before Fix
 
@@ -576,22 +780,20 @@ fn test_dictionary_size_matches_python() {
 
 ---
 
-## 7. Implementation Checklist
+## 9. Implementation Checklist
 
-- [ ] Add `collect_spdx_tokens()` function to builder.rs
-- [ ] Add `tokenize_spdx_key()` helper function
-- [ ] Add `get_essential_spdx_tokens()` function
-- [ ] Update `build_index()` to pre-assign SPDX tokens
-- [ ] Add required imports (itertools, QUERY_PATTERN, STOPWORDS)
-- [ ] Verify/extend License.spdx_keys field
-- [ ] Add verification tests
-- [ ] Run `cargo test --lib license_detection` to verify
+- [ ] **Import update** (line 24): Add `tokenize` to existing import
+- [ ] **Add helper functions** (after line 142): `get_essential_spdx_tokens()`, `collect_spdx_tokens()`
+- [ ] **Pre-populate SPDX tokens** (after line 239): Insert SPDX token pre-assignment block
+- [ ] **Add unit tests** to `#[cfg(test)] mod tests` block in builder.rs
+- [ ] Run `cargo test --lib license_detection::index::builder` to verify unit tests
+- [ ] Run `cargo test --lib license_detection::hash_match` to verify hash matching
 - [ ] Run golden tests: `cargo test test_golden_lic2 --lib`
 - [ ] Compare hash match success rate before/after
 
 ---
 
-## 8. Verification Commands
+## 10. Verification Commands
 
 ```bash
 # Run specific lic2 test with verbose output
@@ -609,7 +811,7 @@ cargo test test_token_id_equivalence --lib -- --nocapture
 
 ---
 
-## 8. References
+## 11. References
 
 - **PLAN-037**: `docs/license-detection/PLAN-037-post-phase-merge-fix.md`
 - **Python hash_match**: `reference/scancode-toolkit/src/licensedcode/match_hash.py:59-87`

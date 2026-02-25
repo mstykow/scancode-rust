@@ -372,7 +372,8 @@ impl<'a> Query<'a> {
                 let first_three: Vec<&str> =
                     tokens_lower.iter().take(3).map(|s| s.as_str()).collect();
                 let is_spdx_prefix = first_three == ["spdx", "license", "identifier"]
-                    || first_three == ["spdx", "licence", "identifier"];
+                    || first_three == ["spdx", "licence", "identifier"]
+                    || first_three == ["licenses", "nuget", "org"];
                 if is_spdx_prefix {
                     Some(0)
                 } else if tokens_lower.len() >= 4 {
@@ -383,7 +384,8 @@ impl<'a> Query<'a> {
                         .map(|s| s.as_str())
                         .collect();
                     let is_spdx_second = second_three == ["spdx", "license", "identifier"]
-                        || second_three == ["spdx", "licence", "identifier"];
+                        || second_three == ["spdx", "licence", "identifier"]
+                        || second_three == ["licenses", "nuget", "org"];
                     if is_spdx_second {
                         Some(1)
                     } else if tokens_lower.len() >= 5 {
@@ -394,7 +396,8 @@ impl<'a> Query<'a> {
                             .map(|s| s.as_str())
                             .collect();
                         let is_spdx_third = third_three == ["spdx", "license", "identifier"]
-                            || third_three == ["spdx", "licence", "identifier"];
+                            || third_three == ["spdx", "licence", "identifier"]
+                            || third_three == ["licenses", "nuget", "org"];
                         if is_spdx_third { Some(2) } else { None }
                     } else {
                         None

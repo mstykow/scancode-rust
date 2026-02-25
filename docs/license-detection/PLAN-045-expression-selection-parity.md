@@ -1,571 +1,561 @@
 # PLAN-045: Expression Selection Parity for Overlapping Matches
 
-**Status: ⚠️ IMPLEMENTATION ATTEMPTED - CAUSED REGRESSION**
+**Status: ⚠️ PLAN NEEDS REVISION - DIAGNOSIS IS INCORRECT**
 
-## Implementation Attempt (2026-02-24)
+## Executive Summary
 
-**Result:** Implementation caused regression - CDDL tests showed BOTH expressions instead of one.
+**⚠️ CRITICAL: The plan's diagnosis does NOT match actual behavior.**
+
+**Plan's Claim:**
+- CDDL 1.0 and CDDL 1.1 rules both match overlapping text
+- Both matches survive match refinement
+- Detection-level deduplication keeps both detections
+
+**Actual Behavior (verified by running tests):**
+- Test file: `cddl-1.0_or_gpl-2.0-glassfish.txt`
+- Expected: `cddl-1.0 OR gpl-2.0` (from YAML)
+- Actual: `cddl-1.1 OR gpl-2.0 WITH classpath-exception-2.0`
+- **Only ONE match is detected, NOT two overlapping matches**
+
+**Actual Issue:** The WRONG rule is matching. The CDDL 1.1 rule matches when the CDDL 1.0 rule should match. This is NOT a deduplication issue.
+
+**Root Cause:** Unknown - needs further investigation. Possibilities:
+1. CDDL 1.0 rule not matching at all (tokenization/matching issue)
+2. CDDL 1.1 rule matching with higher score and filtering out CDDL 1.0
+3. Rule selection logic preferring CDDL 1.1 over CDDL 1.0
+
+---
+
+## Investigation Results (VERIFIED 2026-02-25)
+
+### Current Behavior Analysis
+
+**Test file:** `testdata/license-golden/datadriven/lic1/cddl-1.0_or_gpl-2.0-glassfish.txt`
+
+**Content differences from CDDL 1.1 version:**
+- Has URL: `https://glassfish.dev.java.net/public/CDDL+GPL.html` (CDDL 1.0)
+- Does NOT have URL: `https://glassfish.dev.java.net/public/CDDL+GPL_1_1.html` (CDDL 1.1)
+- Does NOT have "GPL Classpath Exception" text section
+- Uses "Sun Microsystems" copyright, not "Oracle"
+
+**Expected behavior:**
+- Match `cddl-1.0_or_gpl-2.0-glassfish.RULE` → expression: `cddl-1.0 OR gpl-2.0`
+
+**Actual behavior:**
+- Matches `cddl-1.1_or_gpl-2.0-classpath_and_apache-2.0-glassfish_1.RULE`
+- Expression: `cddl-1.1 OR gpl-2.0 WITH classpath-exception-2.0`
+- Only ONE match detected
+
+### Verification Commands
+
+```bash
+# Run glassfish debug test
+cargo test debug_glassfish_detection -- --nocapture
+
+# Output shows:
+# Expected: ["cddl-1.0 OR gpl-2.0"]
+# Actual:   ["cddl-1.1 OR gpl-2.0 WITH classpath-exception-2.0"]
+#
+# Detection 1:
+#   expression: Some("cddl-1.1 OR gpl-2.0 WITH classpath-exception-2.0")
+#     match: cddl-1.1 OR gpl-2.0 WITH classpath-exception-2.0 score=86.0 matcher=3-seq lines=2-31
+```
+
+### Plan Diagnosis vs Actual Behavior
+
+| Plan Claim | Actual Behavior | Correct? |
+|------------|-----------------|----------|
+| CDDL 1.0 and CDDL 1.1 both match | Only CDDL 1.1 matches | ❌ NO |
+| Both survive match refinement | Only one match exists | ❌ NO |
+| Detection deduplication keeps both | Only one detection exists | ❌ NO |
+
+**Conclusion:** The plan's diagnosis is incorrect. The issue is NOT about deduplicating overlapping detections.
+
+---
+
+## Required Next Steps
+
+### Step 1: Investigate Why CDDL 1.0 Rule Doesn't Match
+
+**Hypothesis:** The CDDL 1.0 rule (`cddl-1.0_or_gpl-2.0-glassfish.RULE`) is not matching, or is being filtered out before detection.
+
+**Investigation needed:**
+1. Check if CDDL 1.0 rule matches at all during matching phase
+2. Check if CDDL 1.0 match is filtered during match refinement
+3. Compare token sets between the two rules and the query file
+
+**Debug approach:**
+```bash
+# Check if CDDL 1.0 rule exists and is loaded
+grep -r "cddl-1.0_or_gpl-2.0-glassfish" reference/scancode-toolkit/src/licensedcode/data/rules/
+
+# Add debug logging to see all matches before refinement
+# Check match_refine.rs for filtering logic
+```
+
+### Step 2: Understand Rule Selection
+
+The CDDL 1.1 rule should NOT match this file because:
+1. File has CDDL 1.0 URL, not CDDL 1.1 URL
+2. File does NOT have Classpath Exception text
+3. File uses Sun Microsystems copyright, not Oracle
+
+This suggests the matching algorithm is not correctly distinguishing between similar rules.
+
+---
+
+## Previous Implementation Attempt (2026-02-24)
 
 **What was tried:**
-
 1. Added `qspan_equal()` helper function using HashSet comparison
-2. Added `compare_match_quality()` function with coverage → score → hilen → len → matcher_order → rule_identifier
-3. Updated `filter_contained_matches()` to use qspan equality instead of bounds check
+2. Added `compare_match_quality()` function
+3. Updated `filter_contained_matches()` to use qspan equality
 
-**Regression observed:**
+**Why it caused regression:**
+- CDDL 1.0 and CDDL 1.1 have **different qspans** (different token positions in the license rules)
+- The qspan equality check correctly found them as NOT equal
+- Both matches passed through refinement correctly (according to original diagnosis)
+- **BUT:** This diagnosis appears to be incorrect based on actual test output
 
-- `cddl-1.0_or_gpl-2.0-classpath_and_apache-2.0-glassfish_1.txt`: Now outputs BOTH expressions
-- Tests regressed from baseline
+### Verified Root Cause Analysis
 
-**Root cause analysis:**
+#### CDDL 1.0 vs CDDL 1.1 Spans
 
-- The qspan equality check was finding matches equal when they shouldn't be
-- CDDL 1.0 and CDDL 1.1 rules have DIFFERENT qspans (different token positions)
-- The issue is NOT in `filter_contained_matches` - both matches survive because they have different qspans and different expressions
-- The issue may be in detection-level deduplication
+The CDDL 1.0 and CDDL 1.1 license rules have **different text** (the version identifier differs). When matched against the same query text:
 
-**Recommendation:** Investigate detection-level deduplication in `detection.rs` instead of match refinement.
+| Property | CDDL 1.0 Match | CDDL 1.1 Match |
+|----------|----------------|----------------|
+| `qspan` (query positions) | Different | Different |
+| `license_expression` | `cddl-1.0` | `cddl-1.1` |
+| `match_coverage` | May differ | May differ |
 
----
+Because:
+1. The rules have slightly different token sequences
+2. Matching produces different `ispan` and `qspan` values
+3. Neither expression subsumes the other via `licensing_contains()`
 
-## Summary
+#### Detection-Level Bug
 
-When multiple license rules match overlapping text with different license expressions (e.g., CDDL 1.0 vs CDDL 1.1), Python ScanCode selects a single "best" expression while the Rust implementation currently outputs both. This causes the CDDL glassfish golden test to fail with duplicate expressions.
-
-**Test Case**: `datadriven/lic1/cddl-1.0_or_gpl-2.0-classpath_and_apache-2.0-glassfish_1.txt`
-
-| Implementation | Output |
-|----------------|--------|
-| Python (Expected) | `["(cddl-1.0 OR gpl-2.0 WITH classpath-exception-2.0) AND apache-2.0"]` |
-| Rust (Actual) | `["(cddl-1.1 OR gpl-2.0 WITH classpath-exception-2.0) AND apache-2.0", "(cddl-1.0 OR gpl-2.0 WITH classpath-exception-2.0) AND apache-2.0"]` |
-
-The root cause: Rust creates two separate `LicenseDetection` objects from two different rules matching the same text region, while Python's match refinement pipeline filters out the inferior match during `filter_contained_matches()` or `filter_overlapping_matches()`.
-
----
-
-## Python's Approach (Verified)
-
-### 1. filter_contained_matches() - Lines 1075-1184
-
-**Exact Python code at lines 1137-1155:**
-
-```python
-# equals matched spans
-if current_match.qspan == next_match.qspan:
-    if current_match.coverage() >= next_match.coverage():
-        if trace:
-            logger_debug(
-                '    ---> ###filter_contained_matches: '
-                'next EQUALS current, '
-                'removed next with lower or equal coverage', matches[j])
-
-        discarded_append(matches_pop(j))
-        continue
-    else:
-        if trace:
-            logger_debug(
-                '    ---> ###filter_contained_matches: '
-                'next EQUALS current, '
-                'removed current with lower coverage', matches[i])
-        discarded_append(matches_pop(i))
-        i -= 1
-        break
-```
-
-**Sorting at line 1099:**
-
-```python
-sorter = lambda m: (m.qspan.start, -m.hilen(), -m.len(), m.matcher_order)
-```
-
-### 2. filter_overlapping_matches() - Lines 1187-1523
-
-**Overlap thresholds at lines 1213-1216:**
-
-```python
-OVERLAP_SMALL = 0.10
-OVERLAP_MEDIUM = 0.40
-OVERLAP_LARGE = 0.70
-OVERLAP_EXTRA_LARGE = 0.90
-```
-
-**Key filtering logic with licensing_contains() at lines 1374-1385:**
-
-```python
-if (current_match.licensing_contains(next_match)
-    and current_match.len() >= next_match.len()
-    and current_match.hilen() >= next_match.hilen()
-):
-    if trace:
-        logger_debug(
-            '      ---> ###filter_overlapping_matches: '
-            'MEDIUM next included with next licensing contained, '
-            'removed next', matches[j],)
-
-    discarded_append(matches_pop(j))
-    continue
-```
-
-**Similar patterns at lines:**
-
-- 1404-1416: MEDIUM next includes current
-- 1424-1435: MEDIUM current with licensing_contains
-- 1437-1449: MEDIUM current with reverse licensing_contains
-- 1451-1464: SMALL next surrounded with licensing_contains
-- 1466-1480: SMALL current surrounded with licensing_contains
-
-### 3. licensing_contains() Method - models.py:2065-2073
-
-**Exact Python code:**
-
-```python
-def licensing_contains(self, other):
-    """
-    Return True if this rule licensing contains the other rule licensing.
-    """
-    if self.license_expression and other.license_expression:
-        return self.licensing.contains(
-            expression1=self.license_expression_object,
-            expression2=other.license_expression_object,
-        )
-```
-
-**Called from LicenseMatch at match.py:388-392:**
-
-```python
-def licensing_contains(self, other):
-    """
-    Return True if this match licensing contains the other match licensing.
-    """
-    return self.rule.licensing_contains(other.rule)
-```
-
-### 4. Refinement Pipeline - match.py:2691-2833
-
-**Exact order verified:**
-
-```python
-def refine_matches(matches, query=None, min_score=0, ...):
-    # Line 2719: First merge
-    matches = merge_matches(matches)
-    
-    # Lines 2744-2769: Various filters
-    matches, discarded = filter_matches_missing_required_phrases(matches)
-    matches, discarded = filter_spurious_matches(matches)
-    matches, discarded = filter_below_rule_minimum_coverage(matches)
-    matches, discarded = filter_matches_to_spurious_single_token(matches, query)
-    matches, discarded = filter_too_short_matches(matches)
-    matches, discarded = filter_short_matches_scattered_on_too_many_lines(matches)
-    matches, discarded = filter_invalid_matches_to_single_word_gibberish(matches)
-    
-    # Line 2773: Second merge
-    matches = merge_matches(matches)
-    
-    # Line 2781: KEY - filter_contained_matches
-    matches, discarded_contained = filter_contained_matches(matches)
-    
-    # Line 2790: KEY - filter_overlapping_matches
-    matches, discarded_overlapping = filter_overlapping_matches(matches)
-    
-    # Lines 2793-2803: restore_non_overlapping for both
-    if discarded_contained:
-        to_keep, discarded_contained = restore_non_overlapping(matches, discarded_contained)
-        matches.extend(to_keep)
-    
-    if discarded_overlapping:
-        to_keep, discarded_overlapping = restore_non_overlapping(matches, discarded_overlapping)
-        matches.extend(to_keep)
-    
-    # Line 2805: Second pass of filter_contained_matches
-    matches, discarded_contained = filter_contained_matches(matches)
-    
-    # Lines 2809-2817: False positive filters
-    if filter_false_positive:
-        matches, discarded = filter_false_positive_matches(matches)
-        matches, discarded = filter_false_positive_license_lists_matches(matches)
-    
-    # Line 2825: Final merge
-    matches = merge_matches(matches)
-    
-    return matches, all_discarded
-```
-
----
-
-## Rust's Current Approach
-
-### 1. filter_contained_matches() - match_refine.rs:326-380
-
-**Current sorting:**
+**File:** `src/license_detection/detection.rs:1146-1184`
 
 ```rust
-matches.sort_by(|a, b| {
-    a.qstart()
-        .cmp(&b.qstart())
-        .then_with(|| b.hilen.cmp(&a.hilen))
-        .then_with(|| b.matched_length.cmp(&a.matched_length))
-        .then_with(|| a.matcher_order().cmp(&b.matcher_order()))
-});
+pub fn apply_detection_preferences(detections: Vec<LicenseDetection>) -> Vec<LicenseDetection> {
+    let mut processed: std::collections::HashMap<String, (f32, u8, LicenseDetection)> =
+        std::collections::HashMap::new();
+
+    for detection in detections {
+        let expr = detection
+            .license_expression
+            .clone()
+            .unwrap_or_else(String::new);
+        // ...
+        processed.insert(expr, (score, best_matcher_priority, detection));
+    }
+    // ...
+}
 ```
 
-**Equal span check (lines 353-362):**
+**Problem:** The key is `expr` (license expression string). Different expressions → different entries → both kept.
+
+#### Python's Approach
+
+Python does NOT have this problem because:
+
+1. **Match refinement removes one match before detection**: When two matches have equal or nearly-equal qspans, `filter_contained_matches()` or `filter_overlapping_matches()` removes the inferior one.
+
+2. **Key insight**: Python's `Span` object comparison includes the **actual positions**, not just bounds. If matches have identical position sets, they're considered equal regardless of expression.
+
+3. **But Python ALSO handles this at detection level**: The detection grouping uses `identifier` which is based on position hash, not just expression.
+
+---
+
+## Status: NOT READY FOR IMPLEMENTATION
+
+**The original implementation plan below is INCORRECT because:**
+1. The diagnosis does not match actual behavior
+2. The fix targets the wrong layer (detection vs matching)
+3. Unit tests in the plan assume the wrong problem
+
+**Before implementing any fix, we need to:**
+1. Determine why CDDL 1.0 rule doesn't match (or is filtered)
+2. Understand why CDDL 1.1 rule matches when it shouldn't
+3. Verify the root cause is in matching, refinement, or detection
+
+---
+
+## Original Implementation Plan (PROBABLY INCORRECT)
+
+*The following was the original plan. It is preserved for reference but should NOT be implemented without further investigation.*
+
+### Approach: Add Region-Based Deduplication at Detection Level
+
+The fix must handle cases where:
+- Two matches have **different expressions** that don't subsume each other
+- Two matches have **overlapping or identical file regions**
+- Both matches survive match refinement (correct behavior)
+
+### Step 1: Add Region Overlap Detection Helper
+
+**File:** `src/license_detection/detection.rs`
+
+Add a helper to detect when two detections represent the same file region:
 
 ```rust
-if current.qstart() == next.qstart() && current.end_token == next.end_token {
-    if current.match_coverage >= next.match_coverage {
-        discarded.push(matches.remove(j));
-        continue;
-    } else {
-        discarded.push(matches.remove(i));
-        i = i.saturating_sub(1);
-        break;
+fn detections_have_same_region(a: &LicenseDetection, b: &LicenseDetection) -> bool {
+    match (&a.file_region, &b.file_region) {
+        (Some(ra), Some(rb)) => {
+            ra.start_line == rb.start_line && ra.end_line == rb.end_line
+        }
+        _ => false,
     }
 }
-```
 
-### 2. filter_overlapping_matches() - match_refine.rs:513-716
-
-**Current sorting with rule_identifier tiebreaker (line 524-531):**
-
-```rust
-matches.sort_by(|a, b| {
-    a.qstart()
-        .cmp(&b.qstart())
-        .then_with(|| b.hilen.cmp(&a.hilen))
-        .then_with(|| b.matched_length.cmp(&a.matched_length))
-        .then_with(|| a.matcher_order().cmp(&b.matcher_order()))
-        .then_with(|| a.rule_identifier.cmp(&b.rule_identifier))
-});
-```
-
-**licensing_contains_match() helper at lines 506-511:**
-
-```rust
-fn licensing_contains_match(current: &LicenseMatch, other: &LicenseMatch) -> bool {
-    if current.license_expression.is_empty() || other.license_expression.is_empty() {
-        return false;
-    }
-    licensing_contains(&current.license_expression, &other.license_expression)
-}
-```
-
----
-
-## Gap Analysis
-
-### Issue 1: CDDL 1.0 vs CDDL 1.1 Are NOT Expression Subsumption
-
-The expressions:
-
-- `(cddl-1.0 OR gpl-2.0 WITH classpath-exception-2.0) AND apache-2.0`
-- `(cddl-1.1 OR gpl-2.0 WITH classpath-exception-2.0) AND apache-2.0`
-
-**These do NOT subsume each other** via `licensing_contains()`:
-
-- `cddl-1.0` != `cddl-1.1`
-- Neither expression contains all keys of the other
-
-This means `licensing_contains()` cannot help select between these two expressions.
-
-### Issue 2: Different Rules Match Same Text
-
-CDDL 1.0 and CDDL 1.1 rules match the **same or nearly identical text** with different expressions. This creates two matches with:
-
-- Nearly identical `qspan` (query token positions)
-- Different `license_expression`
-- Potentially different `coverage` values
-
-### Issue 3: Equal Span Check Uses Wrong Comparison
-
-**Python compares:** `current_match.qspan == next_match.qspan`
-
-**Rust compares:** `current.qstart() == next.qstart() && current.end_token == next.end_token`
-
-**Problem:** Rust uses bounds only, while Python compares the full qspan (which is a Span object). If matches have qspan_positions set, Python compares the actual positions, not just start/end bounds.
-
-### Issue 4: Matches May Have Slightly Different Spans
-
-If the CDDL 1.0 and CDDL 1.1 rules match slightly different token ranges, the equal span check fails. Then the filtering relies on:
-
-1. `qcontains()` - containment check
-2. `licensing_contains_match()` - expression subsumption
-
-But if spans are nearly equal but not identical, and expressions don't subsume, **both matches survive**.
-
-### Issue 5: Detection-Level Deduplication Uses Expression Key
-
-In `apply_detection_preferences()` (detection.rs:1089-1127):
-
-```rust
-let expr = detection.license_expression.clone().unwrap_or_else(String::new);
-// ...
-processed.insert(expr, (score, best_matcher_priority, detection));
-```
-
-Detections are keyed by `expr`. If CDDL 1.0 and CDDL 1.1 have **different expressions**, they are kept as separate detections!
-
----
-
-## Root Cause
-
-When two matches have **nearly identical qspans** (not exactly equal) with **different license expressions** that don't subsume each other, neither `filter_contained_matches` nor `filter_overlapping_matches` removes either match. Both survive to detection creation, where they create separate `LicenseDetection` objects with different expressions.
-
-Python handles this case by:
-
-1. Using exact `qspan` comparison (full position set, not just bounds)
-2. When qspans are equal, keeping the one with higher coverage
-3. If coverage is also equal, keeping the first one (stable sort)
-
----
-
-## Step-by-Step Implementation Plan
-
-### Step 1: Fix qspan Equality Check in filter_contained_matches
-
-**File:** `src/license_detection/match_refine.rs`
-
-**Current code (line 353):**
-
-```rust
-if current.qstart() == next.qstart() && current.end_token == next.end_token {
-```
-
-**Update to use full qspan comparison:**
-
-```rust
-if current.qspan() == next.qspan() {
-```
-
-This requires implementing `PartialEq` for the `qspan()` return type, or using a helper function:
-
-```rust
-fn qspan_equal(a: &LicenseMatch, b: &LicenseMatch) -> bool {
-    let a_qspan = a.qspan();
-    let b_qspan = b.qspan();
-    a_qspan.len() == b_qspan.len() && a_qspan == b_qspan
-}
-```
-
-### Step 2: Add Coverage + Score Tiebreaker for Equal Qspans
-
-When qspans are equal but coverage differs, keep higher coverage. When coverage is also equal, use score as tiebreaker:
-
-```rust
-if qspan_equal(&current, &next) {
-    // Compare coverage first
-    match current.match_coverage.partial_cmp(&next.match_coverage) {
-        Some(Ordering::Greater) | Some(Ordering::Equal) => {
-            discarded.push(matches.remove(j));
-            continue;
-        }
-        Some(Ordering::Less) => {
-            discarded.push(matches.remove(i));
-            i = i.saturating_sub(1);
-            break;
-        }
-        None => {
-            // NaN case - use score as fallback
-            if current.score >= next.score {
-                discarded.push(matches.remove(j));
-                continue;
-            } else {
-                discarded.push(matches.remove(i));
-                i = i.saturating_sub(1);
-                break;
+fn detections_overlap_significantly(a: &LicenseDetection, b: &LicenseDetection) -> bool {
+    match (&a.file_region, &b.file_region) {
+        (Some(ra), Some(rb)) => {
+            let overlap_start = ra.start_line.max(rb.start_line);
+            let overlap_end = ra.end_line.min(rb.end_line);
+            if overlap_start > overlap_end {
+                return false;
             }
+            let overlap = overlap_end - overlap_start + 1;
+            let a_len = ra.end_line - ra.start_line + 1;
+            let b_len = rb.end_line - rb.start_line + 1;
+            let min_len = a_len.min(b_len);
+            min_len > 0 && overlap as f64 / min_len as f64 >= 0.95
         }
+        _ => false,
     }
 }
 ```
 
-### Step 3: Add Near-Equal Qspan Handling for filter_overlapping_matches
+### Step 2: Add Match-Level Quality Comparison
 
-For matches with nearly identical spans (high overlap ratio), add special handling:
+**File:** `src/license_detection/detection.rs`
+
+Add a function to compare which detection is "better":
 
 ```rust
-// After existing overlap checks, add near-equal handling
-let overlap_ratio = overlap as f64 / current_len.min(next_len) as f64;
-if overlap_ratio >= 0.95 {
-    // Nearly identical spans - pick the better one
-    let current_better = current.match_coverage > next.match_coverage
-        || (current.match_coverage == next.match_coverage && current.score >= next.score);
+fn compare_detection_quality(a: &LicenseDetection, b: &LicenseDetection) -> std::cmp::Ordering {
+    use std::cmp::Ordering;
     
-    if current_better {
-        discarded.push(matches.remove(j));
-        continue;
-    } else {
-        discarded.push(matches.remove(i));
-        i = i.saturating_sub(1);
-        break;
+    let score_a = compute_detection_score(&a.matches);
+    let score_b = compute_detection_score(&b.matches);
+    
+    if (score_a - score_b).abs() > 0.01 {
+        return score_a.partial_cmp(&score_b).unwrap_or(Ordering::Equal);
+    }
+    
+    let coverage_a = compute_detection_coverage(&a.matches);
+    let coverage_b = compute_detection_coverage(&b.matches);
+    
+    if (coverage_a - coverage_b).abs() > 0.01 {
+        return coverage_a.partial_cmp(&coverage_b).unwrap_or(Ordering::Equal);
+    }
+    
+    let matcher_priority_a = a.matches.iter()
+        .map(|m| get_matcher_priority(&m.matcher))
+        .min()
+        .unwrap_or(5);
+    let matcher_priority_b = b.matches.iter()
+        .map(|m| get_matcher_priority(&m.matcher))
+        .min()
+        .unwrap_or(5);
+    
+    if matcher_priority_a != matcher_priority_b {
+        return matcher_priority_a.cmp(&matcher_priority_b);
+    }
+    
+    let rule_id_a = a.matches.first()
+        .map(|m| &m.rule_identifier)
+        .cloned()
+        .unwrap_or_default();
+    let rule_id_b = b.matches.first()
+        .map(|m| &m.rule_identifier)
+        .cloned()
+        .unwrap_or_default();
+    
+    rule_id_a.cmp(&rule_id_b)
+}
+```
+
+### Step 3: Update apply_detection_preferences()
+
+**File:** `src/license_detection/detection.rs`
+
+Modify `apply_detection_preferences()` to handle overlapping detections:
+
+```rust
+pub fn apply_detection_preferences(detections: Vec<LicenseDetection>) -> Vec<LicenseDetection> {
+    if detections.len() < 2 {
+        return detections;
+    }
+    
+    let mut processed: std::collections::HashMap<String, LicenseDetection> =
+        std::collections::HashMap::new();
+    
+    let mut sorted_detections: Vec<LicenseDetection> = detections;
+    sorted_detections.sort_by(|a, b| {
+        compare_detection_quality(b, a)
+    });
+    
+    for detection in sorted_detections {
+        let expr = detection
+            .license_expression
+            .clone()
+            .unwrap_or_else(String::new);
+        
+        let existing_with_same_expr = processed.get(&expr);
+        let existing_with_overlapping_region = processed.values()
+            .find(|existing| detections_overlap_significantly(existing, &detection));
+        
+        if let Some(existing) = existing_with_same_expr {
+            if compare_detection_quality(&detection, existing) == std::cmp::Ordering::Greater {
+                processed.insert(expr, detection);
+            }
+        } else if let Some(existing) = existing_with_overlapping_region {
+            if compare_detection_quality(&detection, existing) == std::cmp::Ordering::Greater {
+                let existing_expr = existing.license_expression.clone().unwrap_or_default();
+                processed.remove(&existing_expr);
+                processed.insert(expr, detection);
+            }
+        } else {
+            processed.insert(expr, detection);
+        }
+    }
+    
+    processed.into_values().collect()
+}
+```
+
+### Step 4: Add Unit Tests
+
+**File:** `src/license_detection/detection.rs` (in `#[cfg(test)] mod tests`)
+
+```rust
+#[test]
+fn test_deduplicate_overlapping_detections_different_expressions() {
+    let m1 = create_test_match_with_expression(1, 10, "cddl-1.0");
+    let m2 = create_test_match_with_expression(1, 10, "cddl-1.1");
+    
+    let d1 = create_detection_from_matches(vec![m1]);
+    let d2 = create_detection_from_matches(vec![m2]);
+    
+    let result = apply_detection_preferences(vec![d1, d2]);
+    
+    assert_eq!(result.len(), 1, "Should keep only one detection for same region");
+}
+
+#[test]
+fn test_keep_better_detection_when_overlapping() {
+    let m1 = create_test_match_with_score_and_coverage(1, 10, "cddl-1.0", 95.0, 90.0);
+    let m2 = create_test_match_with_score_and_coverage(1, 10, "cddl-1.1", 98.0, 95.0);
+    
+    let d1 = create_detection_from_matches(vec![m1]);
+    let d2 = create_detection_from_matches(vec![m2]);
+    
+    let result = apply_detection_preferences(vec![d1, d2]);
+    
+    assert_eq!(result.len(), 1);
+    assert!(result[0].license_expression.as_ref().unwrap().contains("cddl-1.1"));
+}
+
+#[test]
+fn test_keep_both_non_overlapping_detections() {
+    let m1 = create_test_match(1, 10, "1-hash", "mit.LICENSE");
+    let m2 = create_test_match(20, 30, "1-hash", "apache.LICENSE");
+    
+    let d1 = create_detection_from_matches(vec![m1]);
+    let d2 = create_detection_from_matches(vec![m2]);
+    
+    let result = apply_detection_preferences(vec![d1, d2]);
+    
+    assert_eq!(result.len(), 2, "Should keep both non-overlapping detections");
+}
+
+fn create_test_match_with_expression(start_line: usize, end_line: usize, expr: &str) -> LicenseMatch {
+    LicenseMatch {
+        rid: 0,
+        license_expression: expr.to_string(),
+        license_expression_spdx: expr.to_string(),
+        from_file: Some("test.txt".to_string()),
+        start_line,
+        end_line,
+        start_token: start_line,
+        end_token: end_line + 1,
+        matcher: "1-hash".to_string(),
+        score: 95.0,
+        matched_length: 100,
+        match_coverage: 95.0,
+        rule_relevance: 100,
+        rule_identifier: format!("{}.LICENSE", expr),
+        rule_url: "https://example.com".to_string(),
+        matched_text: Some(format!("{} license", expr)),
+        referenced_filenames: None,
+        is_license_intro: false,
+        is_license_clue: false,
+        is_license_reference: false,
+        is_license_tag: false,
+        is_license_text: false,
+        rule_length: 100,
+        matched_token_positions: None,
+        hilen: 50,
+        rule_start_token: 0,
+        qspan_positions: None,
+        ispan_positions: None,
+    }
+}
+
+fn create_detection_from_matches(matches: Vec<LicenseMatch>) -> LicenseDetection {
+    let start_line = matches.iter().map(|m| m.start_line).min().unwrap_or(0);
+    let end_line = matches.iter().map(|m| m.end_line).max().unwrap_or(0);
+    
+    let expr = matches.iter()
+        .map(|m| m.license_expression.as_str())
+        .collect::<Vec<_>>()
+        .join(" AND ");
+    
+    LicenseDetection {
+        license_expression: Some(expr.clone()),
+        license_expression_spdx: Some(expr),
+        matches,
+        detection_log: vec![],
+        identifier: None,
+        file_region: Some(FileRegion {
+            path: "test.txt".to_string(),
+            start_line,
+            end_line,
+        }),
     }
 }
 ```
 
-### Step 4: Add Rule Quality Comparison Function
-
-**File:** `src/license_detection/match_refine.rs`
-
-```rust
-/// Compare two matches by quality metrics.
-/// Returns Ordering::Greater if a is better than b.
-fn compare_match_quality(a: &LicenseMatch, b: &LicenseMatch) -> Ordering {
-    // 1. Higher coverage wins
-    let cov_cmp = a.match_coverage.partial_cmp(&b.match_coverage)
-        .unwrap_or(Ordering::Equal);
-    if cov_cmp != Ordering::Equal {
-        return cov_cmp;
-    }
-    
-    // 2. Higher score wins
-    let score_cmp = a.score.partial_cmp(&b.score)
-        .unwrap_or(Ordering::Equal);
-    if score_cmp != Ordering::Equal {
-        return score_cmp;
-    }
-    
-    // 3. Higher hilen (high-value tokens) wins
-    let hilen_cmp = a.hilen.cmp(&b.hilen);
-    if hilen_cmp != Ordering::Equal {
-        return hilen_cmp;
-    }
-    
-    // 4. Longer match wins
-    let len_cmp = a.matched_length.cmp(&b.matched_length);
-    if len_cmp != Ordering::Equal {
-        return len_cmp;
-    }
-    
-    // 5. Better matcher wins (lower order = better)
-    a.matcher_order().cmp(&b.matcher_order())
-}
-```
-
-### Step 5: Update filter_contained_matches to Use Quality Comparison
-
-```rust
-if qspan_equal(&current, &next) {
-    match compare_match_quality(&current, &next) {
-        Ordering::Greater | Ordering::Equal => {
-            discarded.push(matches.remove(j));
-            continue;
-        }
-        Ordering::Less => {
-            discarded.push(matches.remove(i));
-            i = i.saturating_sub(1);
-            break;
-        }
-    }
-}
-```
-
-### Step 6: Update filter_overlapping_matches for Near-Equal Cases
-
-Add handling for extra-large overlap cases where neither expression subsumes:
-
-```rust
-// After existing extra_large_next/current checks, add:
-if extra_large_next && extra_large_current {
-    // Both have extreme overlap - use quality comparison
-    match compare_match_quality(&matches[i], &matches[j]) {
-        Ordering::Greater | Ordering::Equal => {
-            discarded.push(matches.remove(j));
-            continue;
-        }
-        Ordering::Less => {
-            discarded.push(matches.remove(i));
-            i = i.saturating_sub(1);
-            break;
-        }
-    }
-}
-```
-
-### Step 7: Add Deterministic Tiebreaker
-
-For complete determinism when all metrics are equal, add rule_identifier as final tiebreaker in `compare_match_quality`:
-
-```rust
-// 6. Deterministic tiebreaker: rule_identifier
-a.rule_identifier.cmp(&b.rule_identifier)
-```
-
-### Step 8: Test with CDDL Glassfish File
+### Step 5: Verify with CDDL Golden Tests
 
 ```bash
 cargo test test_license_golden_cddl -- --nocapture
 ```
 
-Verify only one expression is returned.
+Expected: All CDDL glassfish tests should now pass with a single expression.
 
 ---
 
-## Expected Impact on Golden Tests
+## Testing Strategy
 
-### Tests That Should Pass After Fix
+Following `docs/TESTING_STRATEGY.md`:
 
-1. `datadriven/lic1/cddl-1.0_or_gpl-2.0-classpath_and_apache-2.0-glassfish_*.txt`
-   - Should return single expression (CDDL 1.0 or CDDL 1.1 based on quality)
+### Unit Tests
 
-### Tests That May Need Investigation
+**Location:** `src/license_detection/detection.rs` in `#[cfg(test)] mod tests`
 
-If any tests currently expect multiple similar expressions:
+| Test | Purpose |
+|------|---------|
+| `test_deduplicate_overlapping_detections_different_expressions` | Verify deduplication when expressions differ |
+| `test_keep_better_detection_when_overlapping` | Verify quality-based selection |
+| `test_keep_both_non_overlapping_detections` | Verify non-overlapping kept separate |
+| `test_detections_overlap_significantly` | Test overlap calculation |
+| `test_compare_detection_quality` | Test quality comparison logic |
 
-1. Verify Python behavior for those cases
-2. Update golden files to match Python output
-3. Document any edge cases found
+### Golden Tests
 
-### Tests That Should Not Change
+**Location:** `testdata/license-golden/datadriven/lic1/`
 
-- Tests with non-overlapping matches
-- Tests with clearly different expressions (e.g., MIT vs Apache)
-- Tests where expressions properly subsume each other
+| Test File | Expected Behavior |
+|-----------|-------------------|
+| `cddl-1.0_or_gpl-2.0-classpath_and_apache-2.0-glassfish_1.txt` | Single expression |
+| `cddl-1.0_or_gpl-2.0-classpath_and_apache-2.0-glassfish_2.txt` | Single expression |
+| `cddl-1.1_or_gpl-2.0-classpath_and_apache-2.0-glassfish_1.txt` | Single expression |
+| `cddl-1.1_or_gpl-2.0-classpath_and_apache-2.0-glassfish_2.txt` | Single expression |
+
+### Regression Tests
+
+Run all golden tests to ensure no regressions:
+
+```bash
+cargo test --test license_golden_test
+```
+
+---
+
+## Alternative Approaches Considered
+
+### Option A: Fix in match_refine.rs (Previous Attempt)
+
+**Problem:** CDDL 1.0 and CDDL 1.1 have different qspans, so qspan equality doesn't help.
+
+### Option B: Modify filter_overlapping_matches for Near-Equal Spans
+
+**Problem:** The overlap threshold approach is complex and may have unintended side effects on legitimate overlapping matches.
+
+### Option C: Detection-Level Region Deduplication (Recommended)
+
+**Advantages:**
+- Clean separation of concerns
+- Handles all cases where matches survive refinement
+- Easy to test and verify
+- Matches Python's detection-level behavior
 
 ---
 
 ## Key Files to Modify
 
-| File | Purpose |
-|------|---------|
-| `src/license_detection/match_refine.rs` | Fix qspan equality, add quality comparison |
-| `src/license_detection/models.rs` | Ensure `qspan()` returns comparable type |
+| File | Purpose | Lines |
+|------|---------|-------|
+| `src/license_detection/detection.rs` | Add region deduplication | ~50 new lines |
+| `src/license_detection/detection.rs` | Add unit tests | ~80 new lines |
 
 ---
 
 ## Verification Checklist
 
-- [ ] `qspan()` returns `Vec<usize>` that can be compared for equality
-- [ ] `filter_contained_matches` uses full qspan comparison
-- [ ] Quality comparison uses coverage → score → hilen → len → matcher_order → rule_identifier
-- [ ] Near-equal span handling in `filter_overlapping_matches`
+- [ ] `detections_overlap_significantly()` helper added
+- [ ] `compare_detection_quality()` helper added  
+- [ ] `apply_detection_preferences()` updated to handle overlapping regions
+- [ ] Unit tests for new functions pass
 - [ ] CDDL glassfish golden tests pass
 - [ ] No regressions in other golden tests
+- [ ] Code passes `cargo clippy`
+- [ ] Code formatted with `cargo fmt`
 
 ---
 
-## Appendix: Python Code References
+## Summary
+
+| Question | Answer |
+|----------|--------|
+| **Is the plan ready for implementation?** | ❌ NO |
+| **Why?** | Diagnosis does not match actual behavior |
+| **Actual issue?** | WRONG rule is matching (CDDL 1.1 instead of CDDL 1.0) |
+| **NOT an issue?** | Duplicate overlapping detections |
+| **Next step required?** | Investigate why CDDL 1.0 rule doesn't match |
+
+---
+
+## Verification Checklist (UPDATED)
+
+- [ ] **BLOCKED:** Determine why CDDL 1.0 rule doesn't match
+- [ ] **BLOCKED:** Understand why CDDL 1.1 rule matches when it shouldn't
+- [ ] **BLOCKED:** Identify correct root cause before implementing fix
+- [ ] ~~`detections_overlap_significantly()` helper added~~ (WRONG FIX)
+- [ ] ~~`compare_detection_quality()` helper added~~ (WRONG FIX)  
+- [ ] ~~`apply_detection_preferences()` updated~~ (WRONG FIX)
+- [ ] CDDL glassfish golden tests pass
+- [ ] No regressions in other golden tests
+- [ ] Code passes `cargo clippy`
+- [ ] Code formatted with `cargo fmt`
 
 | Function | File | Lines | Purpose |
 |----------|------|-------|---------|
-| `merge_matches()` | `match.py` | 869-1068 | Merge matches for same rule |
-| `filter_contained_matches()` | `match.py` | 1075-1184 | Remove contained matches |
+| `filter_contained_matches()` | `match.py` | 1075-1184 | Remove contained matches by qspan equality |
 | `filter_overlapping_matches()` | `match.py` | 1187-1523 | Remove overlapping matches |
-| `restore_non_overlapping()` | `match.py` | 1526-1548 | Restore non-overlapping discarded |
-| `refine_matches()` | `match.py` | 2691-2833 | Main refinement pipeline |
-| `licensing_contains()` | `models.py` | 2065-2073 | Expression subsumption check |
-| `LicenseMatch.licensing_contains()` | `match.py` | 388-392 | Match-level subsumption |
-
----
+| `get_detections_by_id()` | `detection.py` | ~950 | Group detections by identifier |
 
 ## Appendix: Rust Code References
 
 | Function | File | Lines | Purpose |
 |----------|------|-------|---------|
-| `merge_overlapping_matches()` | `match_refine.rs` | 159-302 | Merge matches for same rule |
-| `filter_contained_matches()` | `match_refine.rs` | 326-380 | Remove contained matches |
-| `filter_overlapping_matches()` | `match_refine.rs` | 513-716 | Remove overlapping matches |
-| `restore_non_overlapping()` | `match_refine.rs` | 722-745 | Restore non-overlapping discarded |
-| `refine_matches()` | `match_refine.rs` | 1434-1488 | Main refinement pipeline |
-| `licensing_contains()` | `expression.rs` | 444-506 | Expression subsumption check |
-| `licensing_contains_match()` | `match_refine.rs` | 506-511 | Match-level subsumption |
-| `qcontains()` | `models.rs` | 499-528 | Span containment check |
-| `qspan()` | `models.rs` | 557-565 | Get qspan positions |
+| `apply_detection_preferences()` | `detection.rs` | 1146-1184 | **MODIFY** - Add region deduplication |
+| `compute_detection_score()` | `detection.rs` | 634-658 | Detection scoring |
+| `compute_detection_coverage()` | `detection.rs` | 1091-1115 | Detection coverage |
+| `get_matcher_priority()` | `detection.rs` | 1123-1135 | Matcher preference |
+| `create_detection_from_group()` | `detection.rs` | 830-882 | Detection creation |
