@@ -1,6 +1,16 @@
 # PLAN-021: Remaining Part 3 Items - Detailed Implementation Plan
 
-## Status: ITEM 2 IMPLEMENTED - Item 1 Pending
+## Status: ✅ COMPLETE
+
+### Summary
+
+- **Item 1** (`min_score` filter): DEFERRED (LOW priority, default inactive)
+- **Item 2** (`licensing_contains`): ✅ IMPLEMENTED
+
+Item 1 is deferred because:
+- Default `min_score=0` means filter is inactive
+- Detection-level filtering already handles score-based filtering
+- CLI doesn't expose this option
 
 ---
 
