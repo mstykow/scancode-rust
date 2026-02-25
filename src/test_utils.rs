@@ -1,13 +1,13 @@
-#[cfg(test)]
+#[cfg(all(test, feature = "golden-tests"))]
 use crate::models::PackageData;
-#[cfg(test)]
+#[cfg(all(test, feature = "golden-tests"))]
 use serde_json::Value;
-#[cfg(test)]
+#[cfg(all(test, feature = "golden-tests"))]
 use std::fs;
-#[cfg(test)]
+#[cfg(all(test, feature = "golden-tests"))]
 use std::path::Path;
 
-#[cfg(test)]
+#[cfg(all(test, feature = "golden-tests"))]
 pub fn compare_package_data_parser_only(
     actual: &PackageData,
     expected_path: &Path,
@@ -29,7 +29,7 @@ pub fn compare_package_data_parser_only(
     compare_json_values_parser_only(&actual_json, expected_json, "")
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "golden-tests"))]
 fn compare_json_values_parser_only(
     actual: &Value,
     expected: &Value,

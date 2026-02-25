@@ -38,6 +38,10 @@ pub struct FileInfo {
     #[builder(default)]
     pub copyrights: Vec<Copyright>,
     #[builder(default)]
+    pub holders: Vec<Holder>,
+    #[builder(default)]
+    pub authors: Vec<Author>,
+    #[builder(default)]
     pub urls: Vec<OutputURL>,
     #[builder(default)]
     pub for_packages: Vec<String>,
@@ -64,6 +68,8 @@ impl FileInfoBuilder {
             self.license_expression.clone().flatten(),
             self.license_detections.clone().unwrap_or_default(),
             self.copyrights.clone().unwrap_or_default(),
+            self.holders.clone().unwrap_or_default(),
+            self.authors.clone().unwrap_or_default(),
             self.urls.clone().unwrap_or_default(),
             self.for_packages.clone().unwrap_or_default(),
             self.scan_errors.clone().unwrap_or_default(),
@@ -90,6 +96,8 @@ impl FileInfo {
         mut license_expression: Option<String>,
         mut license_detections: Vec<LicenseDetection>,
         copyrights: Vec<Copyright>,
+        holders: Vec<Holder>,
+        authors: Vec<Author>,
         urls: Vec<OutputURL>,
         for_packages: Vec<String>,
         scan_errors: Vec<String>,
@@ -134,6 +142,8 @@ impl FileInfo {
             license_expression,
             license_detections,
             copyrights,
+            holders,
+            authors,
             urls,
             for_packages,
             scan_errors,
@@ -297,6 +307,20 @@ pub struct Match {
 #[derive(Serialize, Debug, Clone)]
 pub struct Copyright {
     pub copyright: String,
+    pub start_line: usize,
+    pub end_line: usize,
+}
+
+#[derive(Serialize, Debug, Clone)]
+pub struct Holder {
+    pub holder: String,
+    pub start_line: usize,
+    pub end_line: usize,
+}
+
+#[derive(Serialize, Debug, Clone)]
+pub struct Author {
+    pub author: String,
     pub start_line: usize,
     pub end_line: usize,
 }

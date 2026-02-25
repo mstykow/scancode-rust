@@ -134,14 +134,8 @@ pub static ASSEMBLERS: &[AssemblerConfig] = &[
             DatasourceId::Gemfile,
             DatasourceId::GemfileLock,
             DatasourceId::GemArchive,
-            DatasourceId::GemArchiveExtracted,
         ],
-        sibling_file_patterns: &[
-            "*.gemspec",
-            "Gemfile",
-            "Gemfile.lock",
-            "metadata.gz-extract",
-        ],
+        sibling_file_patterns: &["*.gemspec", "Gemfile", "Gemfile.lock"],
         mode: AssemblyMode::SiblingMerge,
     },
     // Conda ecosystem
@@ -370,6 +364,7 @@ pub static UNASSEMBLED_DATASOURCE_IDS: &[DatasourceId] = &[
     DatasourceId::DebianInstalledMd5Sums,
     DatasourceId::DebianMd5SumsInExtractedDeb,
     DatasourceId::DebianSourceControlDsc,
+    DatasourceId::GemArchiveExtracted,
     DatasourceId::JavaEarApplicationXml,
     DatasourceId::JavaWarWebXml,
     DatasourceId::JbossServiceXml,

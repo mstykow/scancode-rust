@@ -259,38 +259,45 @@ fn extract_dependencies(
 }
 
 fn extract_lock_dependencies(json_content: &Value) -> Vec<Dependency> {
+    let mut dependencies = Vec::new();
+
     let packages = json_content
         .get(FIELD_PACKAGES)
         .and_then(|value| value.as_array())
-        .map(|arr| arr.as_slice())
-        .unwrap_or(&[]);
+        .cloned()
+        .unwrap_or_default();
     let packages_dev = json_content
         .get(FIELD_PACKAGES_DEV)
         .and_then(|value| value.as_array())
-        .map(|arr| arr.as_slice())
-        .unwrap_or(&[]);
+        .cloned()
+        .unwrap_or_default();
 
-    let total = packages.len() + packages_dev.len();
-    let mut dependencies = Vec::with_capacity(total);
-
-    extract_lock_package_list_into(&mut dependencies, packages, "require", true, false);
-    extract_lock_package_list_into(&mut dependencies, packages_dev, "require-dev", false, true);
+    dependencies.extend(extract_lock_package_list(&packages, "require", true, false));
+    dependencies.extend(extract_lock_package_list(
+        &packages_dev,
+        "require-dev",
+        false,
+        true,
+    ));
 
     dependencies
 }
 
-fn extract_lock_package_list_into(
-    dependencies: &mut Vec<Dependency>,
+fn extract_lock_package_list(
     packages: &[Value],
     scope: &str,
     is_runtime: bool,
     is_optional: bool,
-) {
+) -> Vec<Dependency> {
+    let mut dependencies = Vec::new();
+
     for package in packages {
         if let Some(dependency) = build_lock_dependency(package, scope, is_runtime, is_optional) {
             dependencies.push(dependency);
         }
     }
+
+    dependencies
 }
 
 fn build_lock_dependency(

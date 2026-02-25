@@ -30,7 +30,7 @@
 //! - Multi-paragraph records separated by blank lines
 //! - Graceful error handling with `warn!()` logs
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::path::Path;
 
 use log::warn;
@@ -1265,7 +1265,7 @@ fn extract_package_name_from_path(path: &Path) -> Option<String> {
     None
 }
 
-pub(crate) fn parse_copyright_file(content: &str, package_name: Option<&str>) -> PackageData {
+fn parse_copyright_file(content: &str, package_name: Option<&str>) -> PackageData {
     let paragraphs = rfc822::parse_rfc822_paragraphs(content);
 
     let is_dep5 = paragraphs
@@ -1276,7 +1276,6 @@ pub(crate) fn parse_copyright_file(content: &str, package_name: Option<&str>) ->
     let namespace = Some("debian".to_string());
     let mut parties = Vec::new();
     let mut license_statements = Vec::new();
-    let mut seen_license_symbols = HashSet::new();
 
     if is_dep5 {
         for para in &paragraphs {
@@ -1300,7 +1299,7 @@ pub(crate) fn parse_copyright_file(content: &str, package_name: Option<&str>) ->
             if let Some(license) = rfc822::get_header_first(&para.headers, "license") {
                 let license_name = license.lines().next().unwrap_or(&license).trim();
                 if !license_name.is_empty()
-                    && seen_license_symbols.insert(license_name.to_lowercase())
+                    && !license_statements.contains(&license_name.to_string())
                 {
                     license_statements.push(license_name.to_string());
                 }
