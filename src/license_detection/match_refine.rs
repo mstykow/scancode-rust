@@ -363,11 +363,11 @@ fn filter_contained_matches(matches: &[LicenseMatch]) -> (Vec<LicenseMatch>, Vec
                 }
             }
 
-            if current.qcontains(&next) || licensing_contains_match(&current, &next) {
+            if current.qcontains(&next) {
                 discarded.push(matches.remove(j));
                 continue;
             }
-            if next.qcontains(&current) || licensing_contains_match(&next, &current) {
+            if next.qcontains(&current) {
                 discarded.push(matches.remove(i));
                 i = i.saturating_sub(1);
                 break;
