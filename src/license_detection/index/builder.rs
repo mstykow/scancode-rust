@@ -21,7 +21,9 @@ use crate::license_detection::rules::legalese;
 use crate::license_detection::rules::thresholds::{
     SMALL_RULE, TINY_RULE, compute_thresholds_occurrences, compute_thresholds_unique,
 };
-use crate::license_detection::tokenize::{parse_required_phrase_spans, tokenize_with_stopwords};
+use crate::license_detection::tokenize::{
+    parse_required_phrase_spans, tokenize, tokenize_with_stopwords,
+};
 
 const UNKNOWN_NGRAM_LENGTH: usize = 6;
 const LICENSE_TOKEN_STRINGS: &[&str] = &["license", "licence", "licensed"];
@@ -141,6 +143,30 @@ fn build_rules_from_licenses(licenses: &[License]) -> Vec<Rule> {
         .collect()
 }
 
+fn get_essential_spdx_tokens() -> &'static [&'static str] {
+    &["spdx", "license", "licence", "identifier", "licenseref"]
+}
+
+fn collect_spdx_tokens(licenses: &[License]) -> HashSet<String> {
+    let mut tokens: HashSet<String> = HashSet::new();
+    for &tok in get_essential_spdx_tokens() {
+        tokens.insert(tok.to_string());
+    }
+    for license in licenses {
+        if let Some(ref spdx_key) = license.spdx_license_key {
+            for token in tokenize(spdx_key) {
+                tokens.insert(token);
+            }
+        }
+        for spdx_key in &license.other_spdx_license_keys {
+            for token in tokenize(spdx_key) {
+                tokens.insert(token);
+            }
+        }
+    }
+    tokens
+}
+
 const MARKERS: &[&str] = &[
     "copyright",
     "c",
@@ -236,6 +262,19 @@ pub fn build_index(rules: Vec<Rule>, licenses: Vec<License>) -> LicenseIndex {
     let legalese_words = legalese::get_legalese_words();
     let mut dictionary = TokenDictionary::new_with_legalese(&legalese_words);
     let len_legalese = dictionary.legalese_count();
+
+    // Pre-assign SPDX tokens before processing rules (Python: index.py:301-314)
+    // This ensures SPDX tokens get consistent IDs matching Python
+    {
+        let spdx_tokens = collect_spdx_tokens(&licenses);
+        let mut sorted_tokens: Vec<&String> = spdx_tokens.iter().collect();
+        sorted_tokens.sort();
+        for token in sorted_tokens {
+            if dictionary.get(token).is_none() {
+                dictionary.get_or_assign(token);
+            }
+        }
+    }
 
     let license_token_ids: HashSet<u16> = LICENSE_TOKEN_STRINGS
         .iter()
@@ -1034,9 +1073,11 @@ SOFTWARE."#;
         assert!(index.licenses_by_key.contains_key("empty"));
         assert_eq!(
             index.rules_by_rid.len(),
-            0,
-            "Empty license text should not create a rule"
+            1,
+            "Empty license text creates rule with 'unknown-spdx license identifier'"
         );
+        let rule = &index.rules_by_rid[0];
+        assert_eq!(rule.text, "unknown-spdx license identifier");
     }
 
     #[test]
