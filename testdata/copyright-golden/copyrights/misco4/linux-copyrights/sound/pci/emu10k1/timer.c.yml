@@ -1,0 +1,10 @@
+what:
+  - copyrights
+  - holders
+  - authors
+copyrights:
+  - (c) by Lee Revell <rlrevell@joe-job.com>
+  - Copyright (c) by Lee Revell <rlrevell@joe-job.com> Clemens Ladisch <clemens@ladisch.de>
+holders:
+  - Lee Revell Clemens Ladisch
+authors: []

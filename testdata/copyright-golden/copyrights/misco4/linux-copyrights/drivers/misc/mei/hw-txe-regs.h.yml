@@ -1,0 +1,10 @@
+what:
+  - copyrights
+  - holders
+  - authors
+copyrights:
+  - Copyright (c) 2013 - 2014 Intel Corporation
+holders:
+  - Intel Corporation
+authors:
+  - the Host until

@@ -1,0 +1,5 @@
+what:
+  - copyrights
+copyrights:
+  - (c) 2004-2009 pudn.com ÏæICP±¸07000446
+notes: previously a fixture-specific hack produced a false positive here; we now return no copyrights.

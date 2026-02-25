@@ -1,0 +1,15 @@
+what:
+  - copyrights
+  - holders
+  - holders_summary
+copyrights:
+  - Copyright (c) 2008 Andrzej Zaborowski
+  - Copyright (c) 2008 Fabrice Bellard
+holders:
+  - Andrzej Zaborowski
+  - Fabrice Bellard
+holders_summary:
+  - value: Andrzej Zaborowski
+    count: 1
+  - value: Fabrice Bellard
+    count: 1

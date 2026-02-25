@@ -11,11 +11,7 @@
       "description": "A C library for reading, creating, and modifying zip archives",
       "release_date": null,
       "parties": [],
-      "keywords": [
-        "zip",
-        "zip-archives",
-        "zip-editing"
-      ],
+      "keywords": ["zip", "zip-archives", "zip-editing"],
       "homepage_url": "https://github.com/nih-at/libzip",
       "download_url": "https://libzip.org/download/libzip-1.10.1.tar.gz",
       "size": null,
@@ -67,14 +63,8 @@
       "repository_download_url": null,
       "api_data_url": null,
       "package_uid": "pkg:conan/libzip@1.10.1?uuid=fixed-uid-done-for-testing-5642512d1758",
-      "datafile_paths": [
-        "conandata.yml",
-        "conanfile.py"
-      ],
-      "datasource_ids": [
-        "conan_conandata_yml",
-        "conan_conanfile_py"
-      ],
+      "datafile_paths": ["conandata.yml", "conanfile.py"],
+      "datasource_ids": ["conan_conandata_yml", "conan_conanfile_py"],
       "purl": "pkg:conan/libzip@1.10.1"
     },
     {
@@ -88,11 +78,7 @@
       "description": "A C library for reading, creating, and modifying zip archives",
       "release_date": null,
       "parties": [],
-      "keywords": [
-        "zip",
-        "zip-archives",
-        "zip-editing"
-      ],
+      "keywords": ["zip", "zip-archives", "zip-editing"],
       "homepage_url": "https://github.com/nih-at/libzip",
       "download_url": "https://libzip.org/download/libzip-1.9.2.tar.gz",
       "size": null,
@@ -144,14 +130,8 @@
       "repository_download_url": null,
       "api_data_url": null,
       "package_uid": "pkg:conan/libzip@1.9.2?uuid=fixed-uid-done-for-testing-5642512d1758",
-      "datafile_paths": [
-        "conandata.yml",
-        "conanfile.py"
-      ],
-      "datasource_ids": [
-        "conan_conandata_yml",
-        "conan_conanfile_py"
-      ],
+      "datafile_paths": ["conandata.yml", "conanfile.py"],
+      "datasource_ids": ["conan_conandata_yml", "conan_conanfile_py"],
       "purl": "pkg:conan/libzip@1.9.2"
     },
     {
@@ -165,11 +145,7 @@
       "description": "A C library for reading, creating, and modifying zip archives",
       "release_date": null,
       "parties": [],
-      "keywords": [
-        "zip",
-        "zip-archives",
-        "zip-editing"
-      ],
+      "keywords": ["zip", "zip-archives", "zip-editing"],
       "homepage_url": "https://github.com/nih-at/libzip",
       "download_url": "https://libzip.org/download/libzip-1.8.0.tar.gz",
       "size": null,
@@ -221,14 +197,8 @@
       "repository_download_url": null,
       "api_data_url": null,
       "package_uid": "pkg:conan/libzip@1.8.0?uuid=fixed-uid-done-for-testing-5642512d1758",
-      "datafile_paths": [
-        "conandata.yml",
-        "conanfile.py"
-      ],
-      "datasource_ids": [
-        "conan_conandata_yml",
-        "conan_conanfile_py"
-      ],
+      "datafile_paths": ["conandata.yml", "conanfile.py"],
+      "datasource_ids": ["conan_conandata_yml", "conan_conanfile_py"],
       "purl": "pkg:conan/libzip@1.8.0"
     },
     {
@@ -242,11 +212,7 @@
       "description": "A C library for reading, creating, and modifying zip archives",
       "release_date": null,
       "parties": [],
-      "keywords": [
-        "zip",
-        "zip-archives",
-        "zip-editing"
-      ],
+      "keywords": ["zip", "zip-archives", "zip-editing"],
       "homepage_url": "https://github.com/nih-at/libzip",
       "download_url": "https://libzip.org/download/libzip-1.7.3.tar.gz",
       "size": null,
@@ -298,14 +264,8 @@
       "repository_download_url": null,
       "api_data_url": null,
       "package_uid": "pkg:conan/libzip@1.7.3?uuid=fixed-uid-done-for-testing-5642512d1758",
-      "datafile_paths": [
-        "conandata.yml",
-        "conanfile.py"
-      ],
-      "datasource_ids": [
-        "conan_conandata_yml",
-        "conan_conanfile_py"
-      ],
+      "datafile_paths": ["conandata.yml", "conanfile.py"],
+      "datasource_ids": ["conan_conandata_yml", "conan_conanfile_py"],
       "purl": "pkg:conan/libzip@1.7.3"
     },
     {
@@ -319,11 +279,7 @@
       "description": "A C library for reading, creating, and modifying zip archives",
       "release_date": null,
       "parties": [],
-      "keywords": [
-        "zip",
-        "zip-archives",
-        "zip-editing"
-      ],
+      "keywords": ["zip", "zip-archives", "zip-editing"],
       "homepage_url": "https://github.com/nih-at/libzip",
       "download_url": null,
       "size": null,
@@ -375,12 +331,8 @@
       "repository_download_url": null,
       "api_data_url": null,
       "package_uid": "pkg:conan/libzip?uuid=fixed-uid-done-for-testing-5642512d1758",
-      "datafile_paths": [
-        "conanfile.py"
-      ],
-      "datasource_ids": [
-        "conan_conanfile_py"
-      ],
+      "datafile_paths": ["conanfile.py"],
+      "datasource_ids": ["conan_conanfile_py"],
       "purl": "pkg:conan/libzip"
     }
   ],
@@ -681,11 +633,7 @@
           "description": "A C library for reading, creating, and modifying zip archives",
           "release_date": null,
           "parties": [],
-          "keywords": [
-            "zip",
-            "zip-archives",
-            "zip-editing"
-          ],
+          "keywords": ["zip", "zip-archives", "zip-editing"],
           "homepage_url": "https://github.com/nih-at/libzip",
           "download_url": null,
           "size": null,
@@ -809,9 +757,7 @@
           "purl": "pkg:conan/libzip"
         }
       ],
-      "for_packages": [
-        "pkg:conan/libzip?uuid=fixed-uid-done-for-testing-5642512d1758"
-      ],
+      "for_packages": ["pkg:conan/libzip?uuid=fixed-uid-done-for-testing-5642512d1758"],
       "scan_errors": []
     }
   ]

@@ -1,0 +1,27 @@
+what:
+  - copyrights
+  - holders
+  - holders_summary
+copyrights:
+  - Copyright property of CompuServe Incorporated
+  - copyright (c) 1991-1998, Thomas G. Lane
+  - copyright by M.I.T.
+  - copyright by the Free Software Foundation
+  - copyright holder, Aladdin Enterprises of Menlo Park
+holders:
+  - Aladdin Enterprises of Menlo Park
+  - CompuServe Incorporated
+  - M.I.T.
+  - Thomas G. Lane
+  - the Free Software Foundation
+holders_summary:
+  - value: Aladdin Enterprises of Menlo Park
+    count: 1
+  - value: CompuServe Incorporated
+    count: 1
+  - value: Free Software Foundation
+    count: 1
+  - value: M.I.T.
+    count: 1
+  - value: Thomas G. Lane
+    count: 1

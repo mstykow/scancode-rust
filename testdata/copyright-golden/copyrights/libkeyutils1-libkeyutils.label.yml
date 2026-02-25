@@ -1,0 +1,15 @@
+what:
+  - copyrights
+  - holders
+  - holders_summary
+copyrights:
+  - Copyright (c) 2005 Red Hat http://www.redhat.com
+  - Copyright (c) 2006-2009 Daniel Baumann <daniel@debian.org>
+holders:
+  - Daniel Baumann
+  - Red Hat
+holders_summary:
+  - value: Red Hat
+    count: 2
+  - value: Daniel Baumann
+    count: 1

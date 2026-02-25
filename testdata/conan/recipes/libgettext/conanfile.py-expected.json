@@ -10,12 +10,7 @@
     "description": "An internationalization and localization system for multilingual programs",
     "release_date": null,
     "parties": [],
-    "keywords": [
-      "gettext",
-      "intl",
-      "libintl",
-      "i18n"
-    ],
+    "keywords": ["gettext", "intl", "libintl", "i18n"],
     "homepage_url": "https://www.gnu.org/software/gettext",
     "download_url": null,
     "size": null,

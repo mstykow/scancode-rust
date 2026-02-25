@@ -15,9 +15,7 @@
           },
           "productFilter": null,
           "requirement": {
-            "exact": [
-              "1.3.0"
-            ]
+            "exact": ["1.3.0"]
           }
         }
       ]
@@ -58,9 +56,7 @@
           },
           "productFilter": null,
           "requirement": {
-            "branch": [
-              "main"
-            ]
+            "branch": ["main"]
           }
         }
       ]
@@ -78,9 +74,7 @@
           },
           "productFilter": null,
           "requirement": {
-            "revision": [
-              "abcdef1234567890"
-            ]
+            "revision": ["abcdef1234567890"]
           }
         }
       ]
@@ -88,9 +82,7 @@
   ],
   "name": "TestPackage",
   "packageKind": {
-    "root": [
-      "/workspace"
-    ]
+    "root": ["/workspace"]
   },
   "pkgConfig": null,
   "platforms": [

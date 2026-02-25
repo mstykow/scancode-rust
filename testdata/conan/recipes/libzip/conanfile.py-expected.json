@@ -10,11 +10,7 @@
     "description": "A C library for reading, creating, and modifying zip archives",
     "release_date": null,
     "parties": [],
-    "keywords": [
-      "zip",
-      "zip-archives",
-      "zip-editing"
-    ],
+    "keywords": ["zip", "zip-archives", "zip-editing"],
     "homepage_url": "https://github.com/nih-at/libzip",
     "download_url": null,
     "size": null,

@@ -1,0 +1,12 @@
+what:
+  - copyrights
+  - holders
+  - holders_summary
+  - authors
+copyrights:
+  - Copyright 2013-2020
+holders: []
+holders_summary:
+  - value: OCamlPro
+    count: 1
+authors: []

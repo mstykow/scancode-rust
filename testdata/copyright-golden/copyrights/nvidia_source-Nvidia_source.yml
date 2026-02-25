@@ -1,0 +1,13 @@
+what:
+  - copyrights
+  - holders
+  - holders_summary
+copyrights:
+  - Copyright (c) 1996-1998 NVIDIA, Corp.
+  - Copyright (c) 1996-1998 NVIDIA, Corp. NVIDIA design patents pending in the U.S. and foreign countries
+holders:
+  - NVIDIA, Corp.
+  - NVIDIA, Corp. NVIDIA design patents pending in the U.S. and foreign countries
+holders_summary:
+  - value: NVIDIA, Corp.
+    count: 2

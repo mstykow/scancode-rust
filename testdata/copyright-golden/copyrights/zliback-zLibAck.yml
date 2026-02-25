@@ -1,0 +1,19 @@
+what:
+  - copyrights
+  - holders
+  - holders_summary
+copyrights:
+  - Copyright (c) 2000-2002 Philip A. Craig
+  - Copyright (c) 2002-2004 James W. Newkirk, Michael C. Two, Alexei A. Vorontsov
+  - Portions Copyright (c) 2002-2007 Charlie Poole
+holders:
+  - Charlie Poole
+  - James W. Newkirk, Michael C. Two, Alexei A. Vorontsov
+  - Philip A. Craig
+holders_summary:
+  - value: Charlie Poole
+    count: 1
+  - value: James W. Newkirk, Michael C. Two, Alexei A. Vorontsov
+    count: 1
+  - value: Philip A. Craig
+    count: 1

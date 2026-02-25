@@ -1,0 +1,12 @@
+what:
+  - copyrights
+  - holders
+  - authors
+copyrights:
+  - (c) by Jaroslav Kysela <perex@perex.cz>
+  - Copyright (c) by James Courtier-Dutton <James@superbug.co.uk>
+  - Copyright (c) by Jaroslav Kysela <perex@perex.cz> Creative Labs, Inc. Routines
+holders:
+  - James Courtier-Dutton
+  - Jaroslav Kysela Creative Labs, Inc. Routines
+authors: []

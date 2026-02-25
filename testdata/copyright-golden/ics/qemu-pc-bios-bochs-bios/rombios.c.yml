@@ -1,0 +1,20 @@
+what:
+  - copyrights
+  - holders
+  - holders_summary
+copyrights:
+  - (c) 2002 MandrakeSoft S.A.
+  - (c) by Joseph Gil
+  - (c) by Joseph Gil found at ftp://ftp.simtel.net/pub/simtelnet/msdos/screen/fntcol16.zip
+  - Copyright (c) 2002 MandrakeSoft S.A.
+holders:
+  - Joseph Gil
+  - Joseph Gil found at
+  - MandrakeSoft S.A.
+holders_summary:
+  - value: MandrakeSoft S.A.
+    count: 2
+  - value: Joseph Gil
+    count: 1
+  - value: Joseph Gil found at
+    count: 1

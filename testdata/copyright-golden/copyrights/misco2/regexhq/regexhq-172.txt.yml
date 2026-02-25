@@ -1,0 +1,11 @@
+what:
+  - copyrights
+  - holders
+  - authors
+copyrights:
+  - Copyright (c) 2014 'Cowboy ' Ben Alman
+  - Copyright (c) 2014 Cowboy Ben Alman
+holders:
+  - Cowboy ' Ben Alman
+  - Cowboy Ben Alman
+authors: []

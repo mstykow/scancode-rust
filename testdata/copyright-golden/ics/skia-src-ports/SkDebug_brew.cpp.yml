@@ -1,0 +1,15 @@
+what:
+  - copyrights
+  - holders
+  - holders_summary
+copyrights:
+  - Copyright 2009, Company 100, Inc.
+  - Copyright 2009, The Android Open Source Project
+holders:
+  - Company 100, Inc.
+  - The Android Open Source Project
+holders_summary:
+  - value: Android Open Source Project
+    count: 1
+  - value: Company 100, Inc.
+    count: 1

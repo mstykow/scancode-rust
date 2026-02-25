@@ -99,10 +99,7 @@
         "assembly/opt/conda/conda-meta/requests-2.32.3-py312h06a4308_1.json",
         "assembly/opt/conda/pkgs/requests-2.32.3-py312h06a4308_1/info/recipe/meta.yaml"
       ],
-      "datasource_ids": [
-        "conda_meta_json",
-        "conda_meta_yaml"
-      ],
+      "datasource_ids": ["conda_meta_json", "conda_meta_yaml"],
       "purl": "pkg:conda/requests@2.32.3"
     },
     {
@@ -187,9 +184,7 @@
       "datafile_paths": [
         "assembly/opt/conda/lib/python3.12/site-packages/requests-2.32.3.dist-info/METADATA"
       ],
-      "datasource_ids": [
-        "pypi_wheel_metadata"
-      ],
+      "datasource_ids": ["pypi_wheel_metadata"],
       "purl": "pkg:pypi/requests@2.32.3"
     }
   ],
@@ -366,9 +361,7 @@
           "purl": "pkg:conda/requests@2.32.3"
         }
       ],
-      "for_packages": [
-        "pkg:conda/requests@2.32.3?uuid=fixed-uid-done-for-testing-5642512d1758"
-      ],
+      "for_packages": ["pkg:conda/requests@2.32.3?uuid=fixed-uid-done-for-testing-5642512d1758"],
       "scan_errors": []
     },
     {
@@ -410,9 +403,7 @@
       "path": "assembly/opt/conda/lib/python3.12/site-packages/requests-2.32.3.dist-info/LICENSE",
       "type": "file",
       "package_data": [],
-      "for_packages": [
-        "pkg:conda/requests@2.32.3?uuid=fixed-uid-done-for-testing-5642512d1758"
-      ],
+      "for_packages": ["pkg:conda/requests@2.32.3?uuid=fixed-uid-done-for-testing-5642512d1758"],
       "scan_errors": []
     },
     {
@@ -525,9 +516,7 @@
       "path": "assembly/opt/conda/lib/python3.12/site-packages/requests/__init__.py",
       "type": "file",
       "package_data": [],
-      "for_packages": [
-        "pkg:conda/requests@2.32.3?uuid=fixed-uid-done-for-testing-5642512d1758"
-      ],
+      "for_packages": ["pkg:conda/requests@2.32.3?uuid=fixed-uid-done-for-testing-5642512d1758"],
       "scan_errors": []
     },
     {
@@ -541,27 +530,21 @@
       "path": "assembly/opt/conda/pkgs/requests-2.32.3-py312h06a4308_1",
       "type": "directory",
       "package_data": [],
-      "for_packages": [
-        "pkg:conda/requests@2.32.3?uuid=fixed-uid-done-for-testing-5642512d1758"
-      ],
+      "for_packages": ["pkg:conda/requests@2.32.3?uuid=fixed-uid-done-for-testing-5642512d1758"],
       "scan_errors": []
     },
     {
       "path": "assembly/opt/conda/pkgs/requests-2.32.3-py312h06a4308_1/info",
       "type": "directory",
       "package_data": [],
-      "for_packages": [
-        "pkg:conda/requests@2.32.3?uuid=fixed-uid-done-for-testing-5642512d1758"
-      ],
+      "for_packages": ["pkg:conda/requests@2.32.3?uuid=fixed-uid-done-for-testing-5642512d1758"],
       "scan_errors": []
     },
     {
       "path": "assembly/opt/conda/pkgs/requests-2.32.3-py312h06a4308_1/info/recipe",
       "type": "directory",
       "package_data": [],
-      "for_packages": [
-        "pkg:conda/requests@2.32.3?uuid=fixed-uid-done-for-testing-5642512d1758"
-      ],
+      "for_packages": ["pkg:conda/requests@2.32.3?uuid=fixed-uid-done-for-testing-5642512d1758"],
       "scan_errors": []
     },
     {
@@ -670,54 +653,42 @@
           "purl": "pkg:conda/requests@2.32.3"
         }
       ],
-      "for_packages": [
-        "pkg:conda/requests@2.32.3?uuid=fixed-uid-done-for-testing-5642512d1758"
-      ],
+      "for_packages": ["pkg:conda/requests@2.32.3?uuid=fixed-uid-done-for-testing-5642512d1758"],
       "scan_errors": []
     },
     {
       "path": "assembly/opt/conda/pkgs/requests-2.32.3-py312h06a4308_1/lib",
       "type": "directory",
       "package_data": [],
-      "for_packages": [
-        "pkg:conda/requests@2.32.3?uuid=fixed-uid-done-for-testing-5642512d1758"
-      ],
+      "for_packages": ["pkg:conda/requests@2.32.3?uuid=fixed-uid-done-for-testing-5642512d1758"],
       "scan_errors": []
     },
     {
       "path": "assembly/opt/conda/pkgs/requests-2.32.3-py312h06a4308_1/lib/python3.12",
       "type": "directory",
       "package_data": [],
-      "for_packages": [
-        "pkg:conda/requests@2.32.3?uuid=fixed-uid-done-for-testing-5642512d1758"
-      ],
+      "for_packages": ["pkg:conda/requests@2.32.3?uuid=fixed-uid-done-for-testing-5642512d1758"],
       "scan_errors": []
     },
     {
       "path": "assembly/opt/conda/pkgs/requests-2.32.3-py312h06a4308_1/lib/python3.12/site-packages",
       "type": "directory",
       "package_data": [],
-      "for_packages": [
-        "pkg:conda/requests@2.32.3?uuid=fixed-uid-done-for-testing-5642512d1758"
-      ],
+      "for_packages": ["pkg:conda/requests@2.32.3?uuid=fixed-uid-done-for-testing-5642512d1758"],
       "scan_errors": []
     },
     {
       "path": "assembly/opt/conda/pkgs/requests-2.32.3-py312h06a4308_1/lib/python3.12/site-packages/requests",
       "type": "directory",
       "package_data": [],
-      "for_packages": [
-        "pkg:conda/requests@2.32.3?uuid=fixed-uid-done-for-testing-5642512d1758"
-      ],
+      "for_packages": ["pkg:conda/requests@2.32.3?uuid=fixed-uid-done-for-testing-5642512d1758"],
       "scan_errors": []
     },
     {
       "path": "assembly/opt/conda/pkgs/requests-2.32.3-py312h06a4308_1/lib/python3.12/site-packages/requests/__init__.py",
       "type": "file",
       "package_data": [],
-      "for_packages": [
-        "pkg:conda/requests@2.32.3?uuid=fixed-uid-done-for-testing-5642512d1758"
-      ],
+      "for_packages": ["pkg:conda/requests@2.32.3?uuid=fixed-uid-done-for-testing-5642512d1758"],
       "scan_errors": []
     }
   ]

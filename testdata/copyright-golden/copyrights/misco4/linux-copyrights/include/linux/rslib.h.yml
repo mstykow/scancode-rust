@@ -1,0 +1,12 @@
+what:
+  - copyrights
+  - holders
+  - authors
+copyrights:
+  - Copyright (c) 2004 Thomas Gleixner (tglx@linutronix.de)
+  - Copyright 2002 Phil Karn, KA9Q
+holders:
+  - Phil Karn, KA9Q
+  - Thomas Gleixner
+authors:
+  - Phil Karn

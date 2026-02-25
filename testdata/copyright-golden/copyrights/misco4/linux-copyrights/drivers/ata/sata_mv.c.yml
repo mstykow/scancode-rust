@@ -1,0 +1,14 @@
+what:
+  - copyrights
+  - holders
+  - authors
+copyrights:
+  - Copyright 2005 EMC Corporation
+  - Copyright 2005 Red Hat, Inc.
+  - Copyright 2008-2009 Marvell Corporation
+holders:
+  - EMC Corporation
+  - Marvell Corporation
+  - Red Hat, Inc.
+authors:
+  - Brett Russ. Extensive overhaul and enhancement by Mark Lord <mlord@pobox.com>

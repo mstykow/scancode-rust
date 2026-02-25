@@ -1,0 +1,12 @@
+what:
+  - copyrights
+  - holders
+  - holders_summary
+copyrights:
+  - Copyright (c) 2005 Company IBRIX
+holders:
+  - Company
+  - Company IBRIX
+holders_summary:
+  - value: Company
+    count: 1

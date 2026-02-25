@@ -1,0 +1,18 @@
+what:
+  - copyrights
+  - holders
+  - holders_summary
+  - authors
+copyrights:
+  - Copyright (c) 2011-2015 by Hanns Holger Rutz
+  - Copyright (c) by Ayman Al-Sairafi
+holders:
+  - Ayman Al-Sairafi
+  - Hanns Holger Rutz
+  - opyright
+holders_summary:
+  - value: Ayman Al-Sairafi
+    count: 1
+  - value: Hanns Holger Rutz
+    count: 1
+authors: []

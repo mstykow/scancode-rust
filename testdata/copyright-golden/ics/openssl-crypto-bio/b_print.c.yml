@@ -1,0 +1,19 @@
+what:
+  - copyrights
+  - holders
+  - holders_summary
+copyrights:
+  - Copyright (c) 1995-1998 Eric Young (eay@cryptsoft.com)
+  - Copyright Patrick Powell 1995
+  - holder is Tim Hudson (tjh@cryptsoft.com)
+holders:
+  - Eric Young
+  - Patrick Powell
+  - Tim Hudson
+holders_summary:
+  - value: Eric Young
+    count: 1
+  - value: Patrick Powell
+    count: 1
+  - value: Tim Hudson
+    count: 1

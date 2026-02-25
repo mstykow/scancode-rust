@@ -1,0 +1,12 @@
+what:
+  - copyrights
+  - holders
+  - holders_summary
+copyrights:
+  - Copyright 2018 (c) DistributedLock
+  - Copyright 2018 (c) DistributedLock is licensed under the MIT License
+holders:
+  - DistributedLock
+holders_summary:
+  - value: DistributedLock
+    count: 1

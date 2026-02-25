@@ -1,0 +1,16 @@
+what:
+  - copyrights
+  - holders
+  - authors
+authors:
+  - Adeodato Simó <dato@net.com.org.es>
+  - Andres Salomon <dilinger@debian.org>
+  - Jeff Bailey <jbailey@raspberryginger.com>
+  - Jelmer Vernooij <jelmer@samba.org>
+  - Lars Wirzenius <liw@iki.fi>
+  - Norbert Tretkowski <nobse@debian.org>
+  - Rob Weir <rweir@ertius.org>
+  - Wouter van Heyst <larstiq@larstiq.dyndns.org>
+  - the pkg-bazaar team
+copyrights: []
+holders: []

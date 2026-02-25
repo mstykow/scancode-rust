@@ -1,0 +1,11 @@
+what:
+  - copyrights
+  - holders
+  - authors
+copyrights:
+  - Copyright (c) 2000, 2001 Lineo, by David McCullough <davidm@lineo.com>
+  - Copyright (c) 2002 SnapGear
+holders:
+  - Lineo, by David McCullough
+  - SnapGear
+authors: []

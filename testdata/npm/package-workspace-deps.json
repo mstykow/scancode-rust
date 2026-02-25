@@ -2,9 +2,7 @@
   "name": "test-workspace-package",
   "version": "1.0.0",
   "private": true,
-  "workspaces": [
-    "packages/*"
-  ],
+  "workspaces": ["packages/*"],
   "dependencies": {
     "shared-utils": "workspace:^",
     "react": "^18.0.0"

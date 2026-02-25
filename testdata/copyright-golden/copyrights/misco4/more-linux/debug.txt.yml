@@ -1,0 +1,11 @@
+what:
+  - copyrights
+  - holders
+  - authors
+copyrights:
+  - David Rientjes, Copyright (c) 2015
+  - Ingo Molnar, Copyright (c) 2001
+holders:
+  - David Rientjes
+  - Ingo Molnar
+authors: []

@@ -1,0 +1,15 @@
+what:
+  - copyrights
+  - holders
+  - holders_summary
+copyrights:
+  - Copyright (c) 2000- (insert then current year) OCLC OCLC Research and others
+  - Copyright (c) 2000. OCLC Research
+holders:
+  - OCLC OCLC Research and others
+  - OCLC Research
+holders_summary:
+  - value: OCLC OCLC Research and others
+    count: 1
+  - value: OCLC Research
+    count: 1

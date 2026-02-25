@@ -1,0 +1,15 @@
+what:
+  - copyrights
+  - holders
+  - authors
+copyrights:
+  - Copyright (c) 1999 The Puffin Group David Kennedy and Alex
+  - Copyright (c) 1999 The Puffin Group David Kennedy and Alex deVries
+  - Copyright (c) 2001 Matthew Wilcox
+  - Copyright (c) 2001 Matthew Wilcox for Hewlett-Packard
+holders:
+  - Matthew Wilcox
+  - Matthew Wilcox for Hewlett-Packard
+  - The Puffin Group David Kennedy and Alex
+  - The Puffin Group David Kennedy and Alex deVries
+authors: []

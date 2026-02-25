@@ -1,0 +1,23 @@
+what:
+  - copyrights
+  - holders
+  - holders_summary
+copyrights:
+  - Copyright (c) 1993, 1994 Andrew Moore, Talke Studio
+  - Copyright (c) 1993, 2006, 2007 Free Software Foundation, Inc.
+  - Copyright (c) 1997-2007 James Troup
+  - Copyright (c) 2006, 2007 Antonio Diaz Diaz
+holders:
+  - Andrew Moore, Talke Studio
+  - Antonio Diaz Diaz
+  - Free Software Foundation, Inc.
+  - James Troup
+holders_summary:
+  - value: Andrew Moore, Talke Studio
+    count: 1
+  - value: Antonio Diaz Diaz
+    count: 1
+  - value: Free Software Foundation
+    count: 1
+  - value: James Troup
+    count: 1

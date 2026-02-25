@@ -64,14 +64,8 @@
   "packages": [
     {
       "api_data_url": "https://repo1.maven.org/maven2/com/example/test-library/1.0.0/test-library-1.0.0.pom",
-      "datafile_paths": [
-        "pom.xml",
-        "META-INF/MANIFEST.MF"
-      ],
-      "datasource_ids": [
-        "maven_pom",
-        "java_jar_manifest"
-      ],
+      "datafile_paths": ["pom.xml", "META-INF/MANIFEST.MF"],
+      "datasource_ids": ["maven_pom", "java_jar_manifest"],
       "extracted_license_statement": "Apache License 2.0",
       "homepage_url": "https://github.com/example/test-library",
       "name": "test-library",

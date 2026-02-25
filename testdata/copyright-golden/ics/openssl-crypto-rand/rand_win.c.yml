@@ -1,0 +1,23 @@
+what:
+  - copyrights
+  - holders
+  - holders_summary
+copyrights:
+  - (c) Copyright Microsoft Corp. 1993
+  - Copyright (c) 1995-1998 Eric Young (eay@cryptsoft.com)
+  - Copyright (c) 1998-2000 The OpenSSL Project
+  - holder is Tim Hudson (tjh@cryptsoft.com)
+holders:
+  - Eric Young
+  - Microsoft Corp.
+  - The OpenSSL Project
+  - Tim Hudson
+holders_summary:
+  - value: Eric Young
+    count: 1
+  - value: Microsoft
+    count: 1
+  - value: The OpenSSL Project
+    count: 1
+  - value: Tim Hudson
+    count: 1

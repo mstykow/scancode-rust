@@ -71,12 +71,8 @@
       "repository_download_url": "https://github.com/aws-amplify/amplify-ios/archive/refs/tags/$AMPLIFY_VERSION.zip",
       "api_data_url": "https://raw.githubusercontent.com/CocoaPods/Specs/blob/master/Specs/b/1/e/CoreMLPredictionsPlugin/$AMPLIFY_VERSION/CoreMLPredictionsPlugin.podspec.json",
       "package_uid": "pkg:cocoapods/CoreMLPredictionsPlugin@%24AMPLIFY_VERSION?uuid=fixed-uid-done-for-testing-5642512d1758",
-      "datafile_paths": [
-        "many-podspecs/CoreMLPredictionsPlugin.podspec"
-      ],
-      "datasource_ids": [
-        "cocoapods_podspec"
-      ],
+      "datafile_paths": ["many-podspecs/CoreMLPredictionsPlugin.podspec"],
+      "datasource_ids": ["cocoapods_podspec"],
       "purl": "pkg:cocoapods/CoreMLPredictionsPlugin@%24AMPLIFY_VERSION"
     },
     {
@@ -150,12 +146,8 @@
       "repository_download_url": "https://github.com/aws-amplify/amplify-ios/archive/refs/tags/$AMPLIFY_VERSION.zip",
       "api_data_url": "https://raw.githubusercontent.com/CocoaPods/Specs/blob/master/Specs/9/c/5/Amplify/$AMPLIFY_VERSION/Amplify.podspec.json",
       "package_uid": "pkg:cocoapods/Amplify@%24AMPLIFY_VERSION?uuid=fixed-uid-done-for-testing-5642512d1758",
-      "datafile_paths": [
-        "many-podspecs/Amplify.podspec"
-      ],
-      "datasource_ids": [
-        "cocoapods_podspec"
-      ],
+      "datafile_paths": ["many-podspecs/Amplify.podspec"],
+      "datasource_ids": ["cocoapods_podspec"],
       "purl": "pkg:cocoapods/Amplify@%24AMPLIFY_VERSION"
     },
     {
@@ -229,12 +221,8 @@
       "repository_download_url": "https://github.com/aws-amplify/amplify-ios/archive/refs/tags/$AMPLIFY_VERSION.zip",
       "api_data_url": "https://raw.githubusercontent.com/CocoaPods/Specs/blob/master/Specs/5/1/8/AmplifyPlugins/$AMPLIFY_VERSION/AmplifyPlugins.podspec.json",
       "package_uid": "pkg:cocoapods/AmplifyPlugins@%24AMPLIFY_VERSION?uuid=fixed-uid-done-for-testing-5642512d1758",
-      "datafile_paths": [
-        "many-podspecs/AmplifyPlugins.podspec"
-      ],
-      "datasource_ids": [
-        "cocoapods_podspec"
-      ],
+      "datafile_paths": ["many-podspecs/AmplifyPlugins.podspec"],
+      "datasource_ids": ["cocoapods_podspec"],
       "purl": "pkg:cocoapods/AmplifyPlugins@%24AMPLIFY_VERSION"
     },
     {
@@ -308,12 +296,8 @@
       "repository_download_url": "https://github.com/aws-amplify/amplify-ios/archive/refs/tags/$AMPLIFY_VERSION.zip",
       "api_data_url": "https://raw.githubusercontent.com/CocoaPods/Specs/blob/master/Specs/1/4/f/AmplifyTestCommon/$AMPLIFY_VERSION/AmplifyTestCommon.podspec.json",
       "package_uid": "pkg:cocoapods/AmplifyTestCommon@%24AMPLIFY_VERSION?uuid=fixed-uid-done-for-testing-5642512d1758",
-      "datafile_paths": [
-        "many-podspecs/AmplifyTestCommon.podspec"
-      ],
-      "datasource_ids": [
-        "cocoapods_podspec"
-      ],
+      "datafile_paths": ["many-podspecs/AmplifyTestCommon.podspec"],
+      "datasource_ids": ["cocoapods_podspec"],
       "purl": "pkg:cocoapods/AmplifyTestCommon@%24AMPLIFY_VERSION"
     },
     {
@@ -387,12 +371,8 @@
       "repository_download_url": "https://github.com/aws-amplify/amplify-ios/archive/refs/tags/$AMPLIFY_VERSION.zip",
       "api_data_url": "https://raw.githubusercontent.com/CocoaPods/Specs/blob/master/Specs/c/7/7/AWSPluginsCore/$AMPLIFY_VERSION/AWSPluginsCore.podspec.json",
       "package_uid": "pkg:cocoapods/AWSPluginsCore@%24AMPLIFY_VERSION?uuid=fixed-uid-done-for-testing-5642512d1758",
-      "datafile_paths": [
-        "many-podspecs/AWSPluginsCore.podspec"
-      ],
-      "datasource_ids": [
-        "cocoapods_podspec"
-      ],
+      "datafile_paths": ["many-podspecs/AWSPluginsCore.podspec"],
+      "datasource_ids": ["cocoapods_podspec"],
       "purl": "pkg:cocoapods/AWSPluginsCore@%24AMPLIFY_VERSION"
     },
     {
@@ -466,12 +446,8 @@
       "repository_download_url": "https://github.com/aws-amplify/amplify-ios/archive/refs/tags/$AMPLIFY_VERSION.zip",
       "api_data_url": "https://raw.githubusercontent.com/CocoaPods/Specs/blob/master/Specs/5/6/0/AWSPredictionsPlugin/$AMPLIFY_VERSION/AWSPredictionsPlugin.podspec.json",
       "package_uid": "pkg:cocoapods/AWSPredictionsPlugin@%24AMPLIFY_VERSION?uuid=fixed-uid-done-for-testing-5642512d1758",
-      "datafile_paths": [
-        "many-podspecs/AWSPredictionsPlugin.podspec"
-      ],
-      "datasource_ids": [
-        "cocoapods_podspec"
-      ],
+      "datafile_paths": ["many-podspecs/AWSPredictionsPlugin.podspec"],
+      "datasource_ids": ["cocoapods_podspec"],
       "purl": "pkg:cocoapods/AWSPredictionsPlugin@%24AMPLIFY_VERSION"
     }
   ],

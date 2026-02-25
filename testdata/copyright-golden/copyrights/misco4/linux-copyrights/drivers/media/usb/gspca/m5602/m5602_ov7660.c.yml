@@ -1,0 +1,17 @@
+what:
+  - copyrights
+  - holders
+  - authors
+copyrights:
+  - Copyright (c) 2005 m5603x Linux Driver Project <m5602@x3ng.com.br>
+  - Copyright (c) 2006 Willem Duinker
+  - Copyright (c) 2007 Ilyes Gouta
+  - Copyright (c) 2007 Ilyes Gouta. Based on the m5603x Linux Driver Project
+  - Copyright (c) 2009 Erik Andrén
+holders:
+  - Erik Andrén
+  - Ilyes Gouta
+  - Ilyes Gouta. Based on the m5603x Linux Driver Project
+  - Willem Duinker
+  - m5603x Linux Driver Project
+authors: []

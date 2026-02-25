@@ -1,0 +1,16 @@
+what:
+  - copyrights
+  - holders
+  - authors
+copyrights:
+  - (c) 1997 M. Kirkwood Converted to
+  - Copyright 1998 Ben Pfaff
+holders:
+  - Ben Pfaff
+  - M. Kirkwood Converted
+authors:
+  - Alan Cox <alan@lxorguk.ukuu.org.uk>
+  - Hans Verkuil <hans.verkuil@cisco.com>
+  - Hans Verkuil <hans.verkuil@cisco.com> Converted
+  - Mauro Carvalho Chehab <mchehab@kernel.org>
+  - Russell Kroll <rkroll@exploits.org>

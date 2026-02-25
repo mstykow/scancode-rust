@@ -5,13 +5,8 @@
   "author": null,
   "homepage_url": "https://www.boost.org",
   "vcs_url": "https://github.com/conan-io/conan-center-index",
-  "license": [
-    "BSL-1.0"
-  ],
-  "keywords": [
-    "libraries",
-    "cpp"
-  ],
+  "license": ["BSL-1.0"],
+  "keywords": ["libraries", "cpp"],
   "requires": [
     "zlib/[>=1.2.11 <2]",
     "bzip2/1.0.8",

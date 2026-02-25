@@ -106,14 +106,8 @@
   "packages": [
     {
       "api_data_url": "https://packagist.org/p/packages/test/package.json",
-      "datafile_paths": [
-        "composer.json",
-        "composer.lock"
-      ],
-      "datasource_ids": [
-        "php_composer_json",
-        "php_composer_lock"
-      ],
+      "datafile_paths": ["composer.json", "composer.lock"],
+      "datasource_ids": ["php_composer_json", "php_composer_lock"],
       "description": "A test PHP package",
       "name": "package",
       "namespace": "test",

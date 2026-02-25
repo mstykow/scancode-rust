@@ -1,0 +1,9 @@
+what:
+  - copyrights
+  - holders
+  - authors
+copyrights:
+  - (c), SI-19(4) NIST.800.53.R5-RedshiftClusterMaintenanceSettings
+holders:
+  - SI-19(4) NIST.800.53.R5-RedshiftClusterMaintenanceSettings
+authors: []

@@ -1,0 +1,15 @@
+what:
+  - copyrights
+  - holders
+  - authors
+copyrights:
+  - Copyright (c) 2011 - 2012 Michal Simek <monstr@monstr.eu>
+  - Copyright (c) 2012 Wind River Systems, Inc.
+  - Copyright (c) 2013 Pengutronix e.K.
+  - Copyright (c) 2013 Xilinx Inc.
+holders:
+  - Michal Simek
+  - Pengutronix e.K.
+  - Wind River Systems, Inc.
+  - Xilinx Inc.
+authors: []

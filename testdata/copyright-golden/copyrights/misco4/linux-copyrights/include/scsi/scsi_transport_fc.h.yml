@@ -1,0 +1,11 @@
+what:
+  - copyrights
+  - holders
+  - authors
+copyrights:
+  - Copyright (c) 2003 Silicon Graphics, Inc.
+  - Copyright (c) 2004-2007 James Smart, Emulex Corporation Rewrite
+holders:
+  - James Smart, Emulex Corporation Rewrite
+  - Silicon Graphics, Inc.
+authors: []

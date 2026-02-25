@@ -1,0 +1,49 @@
+what:
+  - copyrights
+  - holders
+  - holders_summary
+copyrights:
+  - (c) 1999-2003
+  - (c) 1999-2003. http://xml.apache.org/dist/LICENSE.txt
+  - (c) 2001-2004
+  - (c) 2001-2004 http://commons.apache.org/logging
+  - (c) 2001-2004 http://ws.apache.org/axis2
+  - (c) 2001-2004 http://xerces.apache.org
+  - (c) 2001-2004 http://xml.apache.org/xalan-j
+  - Copyright (c) 2000-2005 INRIA, France Telecom
+  - Copyright (c) 2004, Didier Donsez
+  - Copyright (c) 2004, Richard S. Hall
+  - Copyright (c) OSGi Alliance (2000, 2009)
+  - Copyright 2003-2010 The Knopflerfish Project http://www.knopflerfish.org
+holders:
+  - Didier Donsez
+  - INRIA, France Telecom
+  - OSGi Alliance
+  - Richard S. Hall
+  - The Knopflerfish Project
+  - http://commons.apache.org/logging
+  - http://ws.apache.org/axis2
+  - http://xerces.apache.org
+  - http://xml.apache.org/dist/LICENSE.txt
+  - http://xml.apache.org/xalan-j
+holders_summary:
+  - value: Didier Donsez
+    count: 1
+  - value: INRIA, France Telecom
+    count: 1
+  - value: OSGi Alliance
+    count: 1
+  - value: Richard S. Hall
+    count: 1
+  - value: The Knopflerfish Project
+    count: 1
+  - value: http://commons.apache.org/logging
+    count: 1
+  - value: http://ws.apache.org/axis2
+    count: 1
+  - value: http://xerces.apache.org
+    count: 1
+  - value: http://xml.apache.org/dist/LICENSE.txt
+    count: 1
+  - value: http://xml.apache.org/xalan-j
+    count: 1

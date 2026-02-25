@@ -1,0 +1,15 @@
+what:
+  - copyrights
+  - holders
+  - holders_summary
+copyrights:
+  - Copyright 2009 Neal Norwitz
+  - Portions Copyright 2009 Google Inc.
+holders:
+  - Google Inc.
+  - Neal Norwitz
+holders_summary:
+  - value: Google
+    count: 1
+  - value: Neal Norwitz
+    count: 1

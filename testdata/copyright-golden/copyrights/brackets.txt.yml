@@ -1,0 +1,8 @@
+what:
+  - copyrights
+  - holders
+copyrights:
+  - Copyright (c) 2010-2012 Ciaran Jessup
+holders:
+  - Ciaran Jessup
+notes: we only get Copyright (c) <2010-2012> as a detection for now.

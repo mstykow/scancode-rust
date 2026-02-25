@@ -1,0 +1,13 @@
+what:
+  - copyrights
+  - holders
+  - authors
+copyrights:
+  - Copyright (c) 1995, 1996 Russell King
+  - Copyright (c) 2012 ARM Ltd.
+  - Copyright (c) People
+holders:
+  - ARM Ltd.
+  - People
+  - Russell King
+authors: []

@@ -36,12 +36,7 @@
     "is_private": true,
     "is_virtual": false,
     "extra_data": {
-      "channels": [
-        "anaconda",
-        "pytorch",
-        "conda-forge",
-        "defaults"
-      ]
+      "channels": ["anaconda", "pytorch", "conda-forge", "defaults"]
     },
     "dependencies": [
       {

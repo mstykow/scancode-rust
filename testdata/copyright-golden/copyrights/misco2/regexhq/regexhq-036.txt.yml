@@ -1,0 +1,9 @@
+what:
+  - copyrights
+  - holders
+  - authors
+copyrights:
+  - copyright http://www.w3.org/Consortium/Legal/ipr-notice-20000612
+holders:
+  - http://www.w3.org/Consortium/Legal/ipr-notice-20000612
+authors: []

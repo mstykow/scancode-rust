@@ -24,4 +24,4 @@ dependencies:
   - conda-forge::typer
   - conda-forge::wandb
   - pip:
-    - ray
+      - ray
