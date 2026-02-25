@@ -1,12 +1,16 @@
-# PLAN-056: CDDL Rule Selection Investigation
+# Improvement: Stricter Surround Merge with Overlap Check
 
-## Status: INVESTIGATION_COMPLETE - FIX NOT YET APPLIED
+## Status: DEFERRED (Blocked by Parity)
 
-**Investigation completed on 2026-02-25. Root cause identified but fix not yet applied to the `surround()` merge blocks.**
+**This improvement is deferred until we achieve parity with Python reference.**
+
+The fix would improve CDDL rule selection but diverges from Python's behavior, potentially causing golden test regressions.
+
+---
 
 ## Problem Statement
 
-The CDDL 1.0 and CDDL 1.1 rule selection is incorrect. When scanning files that should match CDDL 1.0 rules, the Rust implementation incorrectly matches CDDL 1.1 rules instead.
+When scanning files that should match CDDL 1.0 rules, the Rust implementation incorrectly matches CDDL 1.1 rules instead.
 
 ### Manifestation in Golden Tests
 
@@ -25,11 +29,6 @@ The issue is in the handling of `qspan_positions` when comparing matches with di
 
 1. **CDDL 1.0 matches**: Have `qspan_positions: None` (contiguous range 18-270, 252 positions)
 2. **CDDL 1.1 matches**: Have `qspan_positions: Some([...])` (174 scattered positions in range 0-270)
-
-When comparing these matches in `filter_overlapping_matches`, the overlap ratio calculation was incorrect because:
-
-1. **`qoverlap()`** was computing range overlap instead of actual position overlap
-2. **`qcontains()`** was using range containment instead of set containment
 
 ### Key Metrics from Investigation
 
@@ -66,7 +65,7 @@ When comparing these matches in `filter_overlapping_matches`, the overlap ratio 
 
 ---
 
-## Final Fix
+## Proposed Fix (Diverges from Python)
 
 ### Root Cause #2: Incorrect Merge in `surround()` Check
 
@@ -78,7 +77,7 @@ After fixing `qcontains()` and `qoverlap()`, CDDL 1.0 was still being lost. The 
 
 When `m1.surround(m2)` returned true (0 <= 18 && 270 >= 143), the code combined them, creating a false inflated match with 255 positions and 86.4% coverage, which then beat CDDL 1.0 in `filter_overlapping_matches()`.
 
-**Fix**: Added `qoverlap > 0` check before merging surrounded matches:
+**Fix**: Add `qoverlap > 0` check before merging surrounded matches:
 
 ```rust
 if current.surround(&next) {
@@ -94,29 +93,40 @@ if current.surround(&next) {
 }
 ```
 
-This matches the Python FIXME comment at match.py:996: "qsurround is too weak. We want to check also isurround". The overlap check ensures we only merge when the matches actually share token positions.
+---
+
+## Why This Diverges from Python
+
+This fix matches the Python FIXME comment at `match.py:996`:
+
+```python
+# FIXME: qsurround is too weak. We want to check also isurround
+```
+
+Python has a known bug/limitation where `surround()` doesn't verify actual position overlap. The Rust fix would be **stricter** than Python, which could:
+
+1. Cause different merge behavior in edge cases
+2. Potentially fix bugs that Python hasn't fixed yet
+3. Break golden test parity until Python is also fixed
 
 ---
 
-## Files Modified
+## Files to Modify
 
 1. `src/license_detection/models.rs`:
-   - Fixed `qcontains()` to handle mixed `qspan_positions` cases
-   - Fixed `qoverlap()` to compute actual position overlap instead of range overlap
-   - Fixed `qdistance_to()` to use saturating_sub for safety
+   - Fixed `qcontains()` to handle mixed `qspan_positions` cases ✓ (already done)
+   - Fixed `qoverlap()` to compute actual position overlap ✓ (already done)
 
 2. `src/license_detection/match_refine.rs`:
-   - Made `filter_contained_matches` pub(crate) for testing
-   - **Added `qoverlap > 0` check in `surround()` merge condition**
-
-3. `src/license_detection/cddl_investigation_test.rs`:
-   - Created comprehensive investigation tests
+   - Add `qoverlap > 0` check in `surround()` merge condition (NOT YET APPLIED)
 
 ---
 
 ## Implementation Status
 
-**The fix documented in "Final Fix" section above has NOT been applied.**
+**The `qcontains()` and `qoverlap()` fixes are applied.**
+
+**The surround merge overlap check is NOT applied.**
 
 Current state of `src/license_detection/match_refine.rs` at lines 251-258:
 ```rust
@@ -132,46 +142,15 @@ if current.surround(&next) {
 
 **MISSING**: The `qoverlap > 0` check before merging surrounded matches.
 
-The `qoverlap > 0` check exists at line 286 but in a DIFFERENT code block (the "overlap merge" case), not in the `surround()` merge blocks.
-
-### Remaining Work
-
-Apply the fix to both `surround()` blocks (lines 251-258 and 259-267):
-
-```rust
-if current.surround(&next) {
-    let qoverlap = current.qoverlap(&next);
-    if qoverlap > 0 {  // ADD THIS CHECK
-        let combined = combine_matches(&current, &next);
-        if combined.qspan().len() == combined.ispan().len() {
-            rule_matches[i] = combined;
-            rule_matches.remove(j);
-            continue;
-        }
-    }
-}
-```
-
-### Test Results (2026-02-25)
-
-Tests still FAILING:
-- `test_cddl_10_detection_basic` - FAILS (CDDL 1.1 incorrectly selected)
-- `test_detect_full_pipeline_matches` - FAILS (CDDL 1.1 incorrectly selected)
-- `test_cddl_11_detection_basic` - PASSES
-
-The problem: CDDL 1.1 matches (174 + 81 = 255 positions via incorrect merge) beat CDDL 1.0 (252 positions) because:
-- CDDL 1.1 after merge: matched_length=255, coverage=86.4%
-- CDDL 1.0: matched_length=252, coverage=96.2%
-- The `filter_overlapping_matches` prefers longer matched_length despite lower coverage
-
 ---
 
-## Resolution
+## Prerequisites
 
-**PENDING** - Fix not yet applied. Once applied, expected:
-- `test_cddl_10_detection_basic` - CDDL 1.0 correctly detected
-- `test_cddl_11_detection_basic` - CDDL 1.1 correctly detected
-- `test_detect_full_pipeline_matches` - Full pipeline validates CDDL 1.0 selection
+Before implementing this improvement:
+
+1. Achieve parity with Python reference on all golden tests
+2. Document that this fix diverges from Python intentionally
+3. Consider upstreaming the fix to Python ScanCode
 
 ---
 
@@ -180,4 +159,11 @@ The problem: CDDL 1.1 matches (174 + 81 = 255 positions via incorrect merge) bea
 1. CDDL 1.0 test file produces `cddl-1.0 OR gpl-2.0` expression
 2. CDDL 1.1 test file continues to produce correct CDDL 1.1 expression
 3. All existing tests pass
-4. Golden tests for CDDL pass
+4. No golden test regressions (or intentional divergence documented)
+
+---
+
+## Related Files
+
+- Investigation test: `src/license_detection/cddl_investigation_test.rs`
+- Plan document (original): `docs/license-detection/PLAN-056-cddl-rule-selection-investigation.md`
