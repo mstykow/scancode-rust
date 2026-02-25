@@ -25,9 +25,11 @@ All 6 tests use legacy `<licenseUrl>` elements (pre-NuGet 4.9):
 ## Test Data
 
 Test files sourced from Python ScanCode reference:
+
 - `reference/scancode-toolkit/tests/packagedcode/data/nuget/`
 
 Each test includes:
+
 - `.nuspec` file (input)
 - `.expected` file (Python ScanCode output)
 
@@ -48,6 +50,7 @@ in the `DatasourceId` enum documents this.
 ## Parser Implementation
 
 **What Parser Extracts** (✅ Complete):
+
 - Package metadata (name, version, description, parties)
 - Dependencies with framework targeting
 - Raw license URLs/text → `extracted_license_statement`
@@ -55,6 +58,7 @@ in the `DatasourceId` enum documents this.
 - Repository and API URLs
 
 **What Parser Does NOT Do** (by design):
+
 - License detection → separate detection engine (see plan doc)
 
 ## NuGet License Format Evolution

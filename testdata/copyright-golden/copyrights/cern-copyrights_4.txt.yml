@@ -1,0 +1,10 @@
+what:
+  - copyrights
+  - holders
+  - authors
+copyrights:
+  - copyright CERN.
+  - copyright of CERN.
+holders:
+  - CERN
+authors: []

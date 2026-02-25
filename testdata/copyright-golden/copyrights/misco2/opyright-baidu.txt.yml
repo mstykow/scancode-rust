@@ -1,0 +1,12 @@
+what:
+  - copyrights
+  - holders
+  - holders_summary
+  - authors
+copyrights: []
+holders:
+  - Baidu Inc.
+holders_summary:
+  - value: Baidu Inc.
+    count: 1
+authors: []

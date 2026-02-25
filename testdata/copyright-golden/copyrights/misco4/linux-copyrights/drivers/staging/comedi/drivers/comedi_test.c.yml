@@ -1,0 +1,14 @@
+what:
+  - copyrights
+  - holders
+  - authors
+copyrights:
+  - Copyright (c) 2000 David A. Schleef <ds@schleef.org>
+  - Copyright (c) 2002 Frank Mori Hess <fmhess@users.sourceforge.net>
+  - Copyright (c) 2002 Joachim Wuttke <Joachim.Wuttke@icn.siemens.de>
+holders:
+  - David A. Schleef
+  - Frank Mori Hess
+  - Joachim Wuttke
+authors:
+  - Joachim Wuttke <Joachim.Wuttke@icn.siemens.de>, Frank Mori Hess <fmhess@users.sourceforge.net>, ds Devices Status

@@ -1,0 +1,11 @@
+what:
+  - copyrights
+  - holders
+  - authors
+copyrights:
+  - (c) 2003 Linux Networx (http://lnxi.com)
+  - Copyright (c) 2007 Akamai Technologies, Inc. Shamelessly
+holders:
+  - Akamai Technologies, Inc. Shamelessly
+  - Linux Networx
+authors: []

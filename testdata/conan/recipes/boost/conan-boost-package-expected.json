@@ -11,10 +11,7 @@
       "description": "Boost provides free peer-reviewed portable C++ source libraries",
       "release_date": null,
       "parties": [],
-      "keywords": [
-        "libraries",
-        "cpp"
-      ],
+      "keywords": ["libraries", "cpp"],
       "homepage_url": "https://www.boost.org",
       "download_url": "https://boostorg.jfrog.io/artifactory/main/release/1.84.0/source/boost_1_84_0.tar.bz2",
       "size": null,
@@ -66,14 +63,8 @@
       "repository_download_url": null,
       "api_data_url": null,
       "package_uid": "pkg:conan/boost@1.84.0?uuid=fixed-uid-done-for-testing-5642512d1758",
-      "datafile_paths": [
-        "conandata.yml",
-        "conanfile.py"
-      ],
-      "datasource_ids": [
-        "conan_conandata_yml",
-        "conan_conanfile_py"
-      ],
+      "datafile_paths": ["conandata.yml", "conanfile.py"],
+      "datasource_ids": ["conan_conandata_yml", "conan_conanfile_py"],
       "purl": "pkg:conan/boost@1.84.0"
     },
     {
@@ -87,10 +78,7 @@
       "description": "Boost provides free peer-reviewed portable C++ source libraries",
       "release_date": null,
       "parties": [],
-      "keywords": [
-        "libraries",
-        "cpp"
-      ],
+      "keywords": ["libraries", "cpp"],
       "homepage_url": "https://www.boost.org",
       "download_url": "https://boostorg.jfrog.io/artifactory/main/release/1.83.0/source/boost_1_83_0.tar.bz2",
       "size": null,
@@ -142,14 +130,8 @@
       "repository_download_url": null,
       "api_data_url": null,
       "package_uid": "pkg:conan/boost@1.83.0?uuid=fixed-uid-done-for-testing-5642512d1758",
-      "datafile_paths": [
-        "conandata.yml",
-        "conanfile.py"
-      ],
-      "datasource_ids": [
-        "conan_conandata_yml",
-        "conan_conanfile_py"
-      ],
+      "datafile_paths": ["conandata.yml", "conanfile.py"],
+      "datasource_ids": ["conan_conandata_yml", "conan_conanfile_py"],
       "purl": "pkg:conan/boost@1.83.0"
     },
     {
@@ -163,10 +145,7 @@
       "description": "Boost provides free peer-reviewed portable C++ source libraries",
       "release_date": null,
       "parties": [],
-      "keywords": [
-        "libraries",
-        "cpp"
-      ],
+      "keywords": ["libraries", "cpp"],
       "homepage_url": "https://www.boost.org",
       "download_url": "https://boostorg.jfrog.io/artifactory/main/release/1.82.0/source/boost_1_82_0.tar.bz2",
       "size": null,
@@ -218,14 +197,8 @@
       "repository_download_url": null,
       "api_data_url": null,
       "package_uid": "pkg:conan/boost@1.82.0?uuid=fixed-uid-done-for-testing-5642512d1758",
-      "datafile_paths": [
-        "conandata.yml",
-        "conanfile.py"
-      ],
-      "datasource_ids": [
-        "conan_conandata_yml",
-        "conan_conanfile_py"
-      ],
+      "datafile_paths": ["conandata.yml", "conanfile.py"],
+      "datasource_ids": ["conan_conandata_yml", "conan_conanfile_py"],
       "purl": "pkg:conan/boost@1.82.0"
     },
     {
@@ -239,10 +212,7 @@
       "description": "Boost provides free peer-reviewed portable C++ source libraries",
       "release_date": null,
       "parties": [],
-      "keywords": [
-        "libraries",
-        "cpp"
-      ],
+      "keywords": ["libraries", "cpp"],
       "homepage_url": "https://www.boost.org",
       "download_url": "https://boostorg.jfrog.io/artifactory/main/release/1.81.0/source/boost_1_81_0.tar.bz2",
       "size": null,
@@ -294,14 +264,8 @@
       "repository_download_url": null,
       "api_data_url": null,
       "package_uid": "pkg:conan/boost@1.81.0?uuid=fixed-uid-done-for-testing-5642512d1758",
-      "datafile_paths": [
-        "conandata.yml",
-        "conanfile.py"
-      ],
-      "datasource_ids": [
-        "conan_conandata_yml",
-        "conan_conanfile_py"
-      ],
+      "datafile_paths": ["conandata.yml", "conanfile.py"],
+      "datasource_ids": ["conan_conandata_yml", "conan_conanfile_py"],
       "purl": "pkg:conan/boost@1.81.0"
     },
     {
@@ -315,10 +279,7 @@
       "description": "Boost provides free peer-reviewed portable C++ source libraries",
       "release_date": null,
       "parties": [],
-      "keywords": [
-        "libraries",
-        "cpp"
-      ],
+      "keywords": ["libraries", "cpp"],
       "homepage_url": "https://www.boost.org",
       "download_url": "https://boostorg.jfrog.io/artifactory/main/release/1.80.0/source/boost_1_80_0.tar.bz2",
       "size": null,
@@ -370,14 +331,8 @@
       "repository_download_url": null,
       "api_data_url": null,
       "package_uid": "pkg:conan/boost@1.80.0?uuid=fixed-uid-done-for-testing-5642512d1758",
-      "datafile_paths": [
-        "conandata.yml",
-        "conanfile.py"
-      ],
-      "datasource_ids": [
-        "conan_conandata_yml",
-        "conan_conanfile_py"
-      ],
+      "datafile_paths": ["conandata.yml", "conanfile.py"],
+      "datasource_ids": ["conan_conandata_yml", "conan_conanfile_py"],
       "purl": "pkg:conan/boost@1.80.0"
     },
     {
@@ -391,10 +346,7 @@
       "description": "Boost provides free peer-reviewed portable C++ source libraries",
       "release_date": null,
       "parties": [],
-      "keywords": [
-        "libraries",
-        "cpp"
-      ],
+      "keywords": ["libraries", "cpp"],
       "homepage_url": "https://www.boost.org",
       "download_url": "https://boostorg.jfrog.io/artifactory/main/release/1.79.0/source/boost_1_79_0.tar.bz2",
       "size": null,
@@ -446,14 +398,8 @@
       "repository_download_url": null,
       "api_data_url": null,
       "package_uid": "pkg:conan/boost@1.79.0?uuid=fixed-uid-done-for-testing-5642512d1758",
-      "datafile_paths": [
-        "conandata.yml",
-        "conanfile.py"
-      ],
-      "datasource_ids": [
-        "conan_conandata_yml",
-        "conan_conanfile_py"
-      ],
+      "datafile_paths": ["conandata.yml", "conanfile.py"],
+      "datasource_ids": ["conan_conandata_yml", "conan_conanfile_py"],
       "purl": "pkg:conan/boost@1.79.0"
     },
     {
@@ -467,10 +413,7 @@
       "description": "Boost provides free peer-reviewed portable C++ source libraries",
       "release_date": null,
       "parties": [],
-      "keywords": [
-        "libraries",
-        "cpp"
-      ],
+      "keywords": ["libraries", "cpp"],
       "homepage_url": "https://www.boost.org",
       "download_url": "https://boostorg.jfrog.io/artifactory/main/release/1.78.0/source/boost_1_78_0.tar.bz2",
       "size": null,
@@ -522,14 +465,8 @@
       "repository_download_url": null,
       "api_data_url": null,
       "package_uid": "pkg:conan/boost@1.78.0?uuid=fixed-uid-done-for-testing-5642512d1758",
-      "datafile_paths": [
-        "conandata.yml",
-        "conanfile.py"
-      ],
-      "datasource_ids": [
-        "conan_conandata_yml",
-        "conan_conanfile_py"
-      ],
+      "datafile_paths": ["conandata.yml", "conanfile.py"],
+      "datasource_ids": ["conan_conandata_yml", "conan_conanfile_py"],
       "purl": "pkg:conan/boost@1.78.0"
     },
     {
@@ -543,10 +480,7 @@
       "description": "Boost provides free peer-reviewed portable C++ source libraries",
       "release_date": null,
       "parties": [],
-      "keywords": [
-        "libraries",
-        "cpp"
-      ],
+      "keywords": ["libraries", "cpp"],
       "homepage_url": "https://www.boost.org",
       "download_url": "https://boostorg.jfrog.io/artifactory/main/release/1.77.0/source/boost_1_77_0.tar.bz2",
       "size": null,
@@ -598,14 +532,8 @@
       "repository_download_url": null,
       "api_data_url": null,
       "package_uid": "pkg:conan/boost@1.77.0?uuid=fixed-uid-done-for-testing-5642512d1758",
-      "datafile_paths": [
-        "conandata.yml",
-        "conanfile.py"
-      ],
-      "datasource_ids": [
-        "conan_conandata_yml",
-        "conan_conanfile_py"
-      ],
+      "datafile_paths": ["conandata.yml", "conanfile.py"],
+      "datasource_ids": ["conan_conandata_yml", "conan_conanfile_py"],
       "purl": "pkg:conan/boost@1.77.0"
     },
     {
@@ -619,10 +547,7 @@
       "description": "Boost provides free peer-reviewed portable C++ source libraries",
       "release_date": null,
       "parties": [],
-      "keywords": [
-        "libraries",
-        "cpp"
-      ],
+      "keywords": ["libraries", "cpp"],
       "homepage_url": "https://www.boost.org",
       "download_url": "https://boostorg.jfrog.io/artifactory/main/release/1.76.0/source/boost_1_76_0.tar.bz2",
       "size": null,
@@ -674,14 +599,8 @@
       "repository_download_url": null,
       "api_data_url": null,
       "package_uid": "pkg:conan/boost@1.76.0?uuid=fixed-uid-done-for-testing-5642512d1758",
-      "datafile_paths": [
-        "conandata.yml",
-        "conanfile.py"
-      ],
-      "datasource_ids": [
-        "conan_conandata_yml",
-        "conan_conanfile_py"
-      ],
+      "datafile_paths": ["conandata.yml", "conanfile.py"],
+      "datasource_ids": ["conan_conandata_yml", "conan_conanfile_py"],
       "purl": "pkg:conan/boost@1.76.0"
     },
     {
@@ -695,10 +614,7 @@
       "description": "Boost provides free peer-reviewed portable C++ source libraries",
       "release_date": null,
       "parties": [],
-      "keywords": [
-        "libraries",
-        "cpp"
-      ],
+      "keywords": ["libraries", "cpp"],
       "homepage_url": "https://www.boost.org",
       "download_url": "https://boostorg.jfrog.io/artifactory/main/release/1.75.0/source/boost_1_75_0.tar.bz2",
       "size": null,
@@ -750,14 +666,8 @@
       "repository_download_url": null,
       "api_data_url": null,
       "package_uid": "pkg:conan/boost@1.75.0?uuid=fixed-uid-done-for-testing-5642512d1758",
-      "datafile_paths": [
-        "conandata.yml",
-        "conanfile.py"
-      ],
-      "datasource_ids": [
-        "conan_conandata_yml",
-        "conan_conanfile_py"
-      ],
+      "datafile_paths": ["conandata.yml", "conanfile.py"],
+      "datasource_ids": ["conan_conandata_yml", "conan_conanfile_py"],
       "purl": "pkg:conan/boost@1.75.0"
     },
     {
@@ -771,10 +681,7 @@
       "description": "Boost provides free peer-reviewed portable C++ source libraries",
       "release_date": null,
       "parties": [],
-      "keywords": [
-        "libraries",
-        "cpp"
-      ],
+      "keywords": ["libraries", "cpp"],
       "homepage_url": "https://www.boost.org",
       "download_url": "https://boostorg.jfrog.io/artifactory/main/release/1.74.0/source/boost_1_74_0.tar.bz2",
       "size": null,
@@ -826,14 +733,8 @@
       "repository_download_url": null,
       "api_data_url": null,
       "package_uid": "pkg:conan/boost@1.74.0?uuid=fixed-uid-done-for-testing-5642512d1758",
-      "datafile_paths": [
-        "conandata.yml",
-        "conanfile.py"
-      ],
-      "datasource_ids": [
-        "conan_conandata_yml",
-        "conan_conanfile_py"
-      ],
+      "datafile_paths": ["conandata.yml", "conanfile.py"],
+      "datasource_ids": ["conan_conandata_yml", "conan_conanfile_py"],
       "purl": "pkg:conan/boost@1.74.0"
     },
     {
@@ -847,10 +748,7 @@
       "description": "Boost provides free peer-reviewed portable C++ source libraries",
       "release_date": null,
       "parties": [],
-      "keywords": [
-        "libraries",
-        "cpp"
-      ],
+      "keywords": ["libraries", "cpp"],
       "homepage_url": "https://www.boost.org",
       "download_url": "https://boostorg.jfrog.io/artifactory/main/release/1.73.0/source/boost_1_73_0.tar.bz2",
       "size": null,
@@ -902,14 +800,8 @@
       "repository_download_url": null,
       "api_data_url": null,
       "package_uid": "pkg:conan/boost@1.73.0?uuid=fixed-uid-done-for-testing-5642512d1758",
-      "datafile_paths": [
-        "conandata.yml",
-        "conanfile.py"
-      ],
-      "datasource_ids": [
-        "conan_conandata_yml",
-        "conan_conanfile_py"
-      ],
+      "datafile_paths": ["conandata.yml", "conanfile.py"],
+      "datasource_ids": ["conan_conandata_yml", "conan_conanfile_py"],
       "purl": "pkg:conan/boost@1.73.0"
     },
     {
@@ -923,10 +815,7 @@
       "description": "Boost provides free peer-reviewed portable C++ source libraries",
       "release_date": null,
       "parties": [],
-      "keywords": [
-        "libraries",
-        "cpp"
-      ],
+      "keywords": ["libraries", "cpp"],
       "homepage_url": "https://www.boost.org",
       "download_url": "https://boostorg.jfrog.io/artifactory/main/release/1.72.0/source/boost_1_72_0.tar.bz2",
       "size": null,
@@ -978,14 +867,8 @@
       "repository_download_url": null,
       "api_data_url": null,
       "package_uid": "pkg:conan/boost@1.72.0?uuid=fixed-uid-done-for-testing-5642512d1758",
-      "datafile_paths": [
-        "conandata.yml",
-        "conanfile.py"
-      ],
-      "datasource_ids": [
-        "conan_conandata_yml",
-        "conan_conanfile_py"
-      ],
+      "datafile_paths": ["conandata.yml", "conanfile.py"],
+      "datasource_ids": ["conan_conandata_yml", "conan_conanfile_py"],
       "purl": "pkg:conan/boost@1.72.0"
     },
     {
@@ -999,10 +882,7 @@
       "description": "Boost provides free peer-reviewed portable C++ source libraries",
       "release_date": null,
       "parties": [],
-      "keywords": [
-        "libraries",
-        "cpp"
-      ],
+      "keywords": ["libraries", "cpp"],
       "homepage_url": "https://www.boost.org",
       "download_url": "https://boostorg.jfrog.io/artifactory/main/release/1.71.0/source/boost_1_71_0.tar.bz2",
       "size": null,
@@ -1054,14 +934,8 @@
       "repository_download_url": null,
       "api_data_url": null,
       "package_uid": "pkg:conan/boost@1.71.0?uuid=fixed-uid-done-for-testing-5642512d1758",
-      "datafile_paths": [
-        "conandata.yml",
-        "conanfile.py"
-      ],
-      "datasource_ids": [
-        "conan_conandata_yml",
-        "conan_conanfile_py"
-      ],
+      "datafile_paths": ["conandata.yml", "conanfile.py"],
+      "datasource_ids": ["conan_conandata_yml", "conan_conanfile_py"],
       "purl": "pkg:conan/boost@1.71.0"
     },
     {
@@ -1075,10 +949,7 @@
       "description": "Boost provides free peer-reviewed portable C++ source libraries",
       "release_date": null,
       "parties": [],
-      "keywords": [
-        "libraries",
-        "cpp"
-      ],
+      "keywords": ["libraries", "cpp"],
       "homepage_url": "https://www.boost.org",
       "download_url": null,
       "size": null,
@@ -1130,12 +1001,8 @@
       "repository_download_url": null,
       "api_data_url": null,
       "package_uid": "pkg:conan/boost?uuid=fixed-uid-done-for-testing-5642512d1758",
-      "datafile_paths": [
-        "conanfile.py"
-      ],
-      "datasource_ids": [
-        "conan_conanfile_py"
-      ],
+      "datafile_paths": ["conanfile.py"],
+      "datasource_ids": ["conan_conanfile_py"],
       "purl": "pkg:conan/boost"
     }
   ],
@@ -1901,10 +1768,7 @@
           "description": "Boost provides free peer-reviewed portable C++ source libraries",
           "release_date": null,
           "parties": [],
-          "keywords": [
-            "libraries",
-            "cpp"
-          ],
+          "keywords": ["libraries", "cpp"],
           "homepage_url": "https://www.boost.org",
           "download_url": null,
           "size": null,
@@ -2039,9 +1903,7 @@
           "purl": "pkg:conan/boost"
         }
       ],
-      "for_packages": [
-        "pkg:conan/boost?uuid=fixed-uid-done-for-testing-5642512d1758"
-      ],
+      "for_packages": ["pkg:conan/boost?uuid=fixed-uid-done-for-testing-5642512d1758"],
       "scan_errors": []
     }
   ]

@@ -1,0 +1,12 @@
+what:
+  - copyrights
+  - holders
+  - authors
+copyrights:
+  - Copyright (c) 2017 Amazon.com, Inc.
+  - Copyright (c) 2017 Amazon.com, Inc. or its affiliates
+holders:
+  - Amazon.com, Inc.
+  - Amazon.com, Inc. or its affiliates
+authors:
+  - David Woodhouse <dwmw2@infradead.org>

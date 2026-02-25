@@ -1,0 +1,20 @@
+what:
+  - copyrights
+  - holders
+  - holders_summary
+  - authors
+copyrights:
+  - Copyright (c) 2004
+  - Copyright (c) 2004 - 2007 Nigel McNie, 2007 - 2008 Benny Baumann
+  - Copyright (c) 2004 Nigel McNie (http://qbnz.com/highlighter/)
+holders:
+  - Nigel McNie
+  - Nigel McNie, Benny Baumann
+authors:
+  - Nigel McNie (nigel@geshi.org)
+  - Nigel McNie, Benny Baumann
+holders_summary:
+  - value: Nigel McNie
+    count: 1
+  - value: Nigel McNie, Benny Baumann
+    count: 1

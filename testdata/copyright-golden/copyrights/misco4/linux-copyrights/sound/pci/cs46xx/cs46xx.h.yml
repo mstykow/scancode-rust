@@ -1,0 +1,10 @@
+what:
+  - copyrights
+  - holders
+  - authors
+copyrights:
+  - (c) by Jaroslav Kysela <perex@perex.cz>
+  - Copyright (c) by Jaroslav Kysela <perex@perex.cz>, Cirrus Logic, Inc.
+holders:
+  - Jaroslav Kysela, Cirrus Logic, Inc.
+authors: []

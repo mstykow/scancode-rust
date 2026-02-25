@@ -3,10 +3,7 @@
   "build": "py312h06a4308_1",
   "build_number": 1,
   "channel": "https://repo.anaconda.com/pkgs/main/linux-64",
-  "constrains": [
-    "pysocks >=1.5.6,!=1.5.7",
-    "chardet >=3.0.2,<6"
-  ],
+  "constrains": ["pysocks >=1.5.6,!=1.5.7", "chardet >=3.0.2,<6"],
   "depends": [
     "certifi >=2017.4.17",
     "charset-normalizer >=2,<4",

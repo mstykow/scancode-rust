@@ -1,0 +1,15 @@
+what:
+  - copyrights
+  - holders
+  - authors
+copyrights:
+  - Copyirght (c) 2017 Linaro Ltd.
+  - Copyright (c) 2006 ARM Ltd.
+  - Copyright (c) 2010 ST-Ericsson SA
+holders:
+  - ARM Ltd.
+  - Linaro Ltd.
+  - ST-Ericsson SA
+authors:
+  - Linus Walleij <linus.walleij@linaro.org>
+  - Peter Pearse <peter.pearse@arm.com>

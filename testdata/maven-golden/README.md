@@ -15,4 +15,5 @@ No golden tests have been created yet for Maven parser. This directory exists fo
 ## Test Data
 
 Future test files should be sourced from Python ScanCode reference:
+
 - `reference/scancode-toolkit/tests/packagedcode/data/maven/`

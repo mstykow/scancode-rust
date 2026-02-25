@@ -1,0 +1,10 @@
+what:
+  - copyrights
+  - holders
+  - authors
+copyrights:
+  - (c) by Jaroslav Kysela <perex@perex.cz>
+  - Copyright (c) by Jaroslav Kysela <perex@perex.cz>, Creative Labs, Inc.
+holders:
+  - Jaroslav Kysela, Creative Labs, Inc.
+authors: []

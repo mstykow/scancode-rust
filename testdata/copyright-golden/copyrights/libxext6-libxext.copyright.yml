@@ -1,0 +1,43 @@
+what:
+  - copyrights
+  - holders
+  - holders_summary
+copyrights:
+  - Copyright (c) 1994, 1995 Hewlett-Packard Company
+  - Copyright (c) 1996 Digital Equipment Corporation, Maynard, Massachusetts
+  - Copyright (c) 1997 by Silicon Graphics Computer Systems, Inc.
+  - Copyright 1986, 1987, 1988 by Hewlett-Packard Corporation
+  - Copyright 1986, 1987, 1988, 1989, 1994, 1998 The Open Group
+  - Copyright 1991,1993 by Digital Equipment Corporation, Maynard, Massachusetts, and Olivetti Research Limited, Cambridge, England
+  - Copyright 1992 Network Computing Devices
+  - Copyright 1999, 2005, 2006 Sun Microsystems, Inc.
+  - Copyright Digital Equipment Corporation, 1996
+holders:
+  - Digital Equipment Corporation
+  - Digital Equipment Corporation, Maynard, Massachusetts
+  - Digital Equipment Corporation, Maynard, Massachusetts, and Olivetti Research Limited, Cambridge, England
+  - Hewlett-Packard Company
+  - Hewlett-Packard Corporation
+  - Network Computing Devices
+  - Silicon Graphics Computer Systems, Inc.
+  - Sun Microsystems, Inc.
+  - The Open Group
+holders_summary:
+  - value: Digital Equipment Corporation
+    count: 1
+  - value: Digital Equipment Corporation, Maynard, Massachusetts
+    count: 1
+  - value: Digital Equipment Corporation, Maynard, Massachusetts, and Olivetti Research Limited, Cambridge, England
+    count: 1
+  - value: Hewlett-Packard
+    count: 1
+  - value: Hewlett-Packard Corporation
+    count: 1
+  - value: Network Computing Devices
+    count: 1
+  - value: Silicon Graphics Computer Systems, Inc.
+    count: 1
+  - value: Sun Microsystems
+    count: 1
+  - value: The Open Group
+    count: 1

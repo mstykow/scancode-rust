@@ -1,0 +1,17 @@
+what:
+  - copyrights
+  - holders
+  - authors
+copyrights:
+  - Copyright (c) 2003 Mark Studebaker
+  - Copyright (c) 2005-2012 Jean Delvare <jdelvare@suse.de>
+  - Copyright (c) 2006 Yuan
+  - Copyright (c) 2006 Yuan Mu (Winbond)
+  - Copyright (c) 2010 Sheng-Yuan Huang (Nuvoton) (PS00)
+holders:
+  - Jean Delvare
+  - Mark Studebaker
+  - Sheng-Yuan Huang (Nuvoton) (PS00)
+  - Yuan
+  - Yuan Mu (Winbond)
+authors: []

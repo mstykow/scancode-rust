@@ -16,9 +16,7 @@
         "email": "ubuntu-devel-discuss@lists.ubuntu.com"
       }
     ],
-    "keywords": [
-      "admin"
-    ],
+    "keywords": ["admin"],
     "homepage_url": "http://alioth.debian.org/projects/adduser/",
     "extra_data": {
       "installed_size": 884

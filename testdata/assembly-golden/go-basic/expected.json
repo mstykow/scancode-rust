@@ -67,14 +67,8 @@
   ],
   "packages": [
     {
-      "datafile_paths": [
-        "go.mod",
-        "go.sum"
-      ],
-      "datasource_ids": [
-        "go_mod",
-        "go_sum"
-      ],
+      "datafile_paths": ["go.mod", "go.sum"],
+      "datasource_ids": ["go_mod", "go_sum"],
       "extra_data": {
         "go_version": "1.21"
       },

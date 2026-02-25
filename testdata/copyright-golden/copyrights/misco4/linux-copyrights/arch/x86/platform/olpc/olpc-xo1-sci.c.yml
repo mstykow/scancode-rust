@@ -1,0 +1,15 @@
+what:
+  - copyrights
+  - holders
+  - authors
+copyrights:
+  - Copyright (c) 2006 Advanced Micro Devices, Inc.
+  - Copyright (c) 2006 Red Hat, Inc.
+  - Copyright (c) 2010 One Laptop
+  - Copyright (c) 2010 One Laptop per Child
+holders:
+  - Advanced Micro Devices, Inc.
+  - One Laptop
+  - One Laptop per Child
+  - Red Hat, Inc.
+authors: []

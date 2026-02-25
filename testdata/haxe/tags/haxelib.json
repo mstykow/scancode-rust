@@ -14,9 +14,7 @@
   ],
   "classPath": "src",
   "description": "Tinkerbell Core",
-  "contributors": [
-    "back2dos"
-  ],
+  "contributors": ["back2dos"],
   "releasenote": "Deprecate Future#fromMany (#78)",
   "version": "1.18.0",
   "url": "http://haxetink.org/tink_core"

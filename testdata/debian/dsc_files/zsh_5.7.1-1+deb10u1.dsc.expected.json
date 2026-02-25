@@ -34,9 +34,7 @@
     "homepage_url": "https://www.zsh.org/",
     "code_view_url": "https://salsa.debian.org/debian/zsh",
     "vcs_url": "https://salsa.debian.org/debian/zsh.git -b debian",
-    "source_packages": [
-      "pkg:deb/debian/zsh"
-    ],
+    "source_packages": ["pkg:deb/debian/zsh"],
     "extra_data": {
       "standards_version": "4.3.0"
     },

@@ -1,0 +1,12 @@
+what:
+  - copyrights
+  - holders
+  - holders_summary
+copyrights:
+  - Copyright Marco d'Itri
+  - Copyright Marco d'Itri <md@Linux.IT>
+holders:
+  - Marco d'Itri
+holders_summary:
+  - value: Marco d'Itri
+    count: 2

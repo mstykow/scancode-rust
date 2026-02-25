@@ -1,9 +1,9 @@
 {
   "name": "selecthxml",
   "license": "BSD",
-  "tags": ["cross","xml","utility","css","macro"],
+  "tags": ["cross", "xml", "utility", "css", "macro"],
   "description": "Allows type-safe CSS-style selection on Xml objects.",
-  "contributors": ["simn","jason"],
+  "contributors": ["simn", "jason"],
   "releasenote": "Update for Haxe 3.2 (Handle null case)",
   "version": "0.5.1",
   "url": "https://github.com/jasononeil/selecthxml",

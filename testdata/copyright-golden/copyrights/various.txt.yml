@@ -1,0 +1,13 @@
+what:
+  - copyrights
+  - holders
+  - holders_summary
+copyrights:
+  - Copyright (c) 2000 - various
+  - Copyright (c) 2000 - various; see CREDITS, ChangeLog, and sources
+holders:
+  - various
+  - various; see CREDITS, ChangeLog, and sources
+holders_summary:
+  - value: various
+    count: 1

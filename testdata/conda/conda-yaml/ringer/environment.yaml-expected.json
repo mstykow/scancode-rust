@@ -36,11 +36,7 @@
     "is_private": true,
     "is_virtual": false,
     "extra_data": {
-      "channels": [
-        "pytorch",
-        "conda-forge",
-        "huggingface"
-      ]
+      "channels": ["pytorch", "conda-forge", "huggingface"]
     },
     "dependencies": [
       {

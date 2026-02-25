@@ -1,0 +1,12 @@
+what:
+  - copyrights
+  - holders
+  - authors
+copyrights:
+  - Copyright (c) 2015 Topic Embedded
+  - Copyright (c) 2015 Topic Embedded Products
+holders:
+  - Topic Embedded
+  - Topic Embedded Products
+authors:
+  - Mike Looijmans <mike.looijmans@topic.nl>

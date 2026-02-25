@@ -1,0 +1,13 @@
+what:
+  - copyrights
+  - holders
+  - authors
+copyrights:
+  - Copyright (c) 2004, 2005, 2006 Red Hat, Inc., Ingo Molnar <mingo@redhat.com>
+  - Copyright (c) 2013 Canonical Ltd. Choice
+  - Copyright (c) 2018 WMWare Inc.
+holders:
+  - Canonical Ltd. Choice
+  - Red Hat, Inc., Ingo Molnar
+  - WMWare Inc.
+authors: []

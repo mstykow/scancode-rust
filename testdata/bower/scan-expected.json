@@ -26,11 +26,7 @@
           "url": "http://johndoe.com"
         }
       ],
-      "keywords": [
-        "motion",
-        "physics",
-        "particles"
-      ],
+      "keywords": ["motion", "physics", "particles"],
       "homepage_url": null,
       "download_url": null,
       "size": null,
@@ -126,12 +122,8 @@
       "repository_download_url": null,
       "api_data_url": null,
       "package_uid": "pkg:bower/John%20Doe?uuid=fixed-uid-done-for-testing-5642512d1758",
-      "datafile_paths": [
-        "scan/bower.json"
-      ],
-      "datasource_ids": [
-        "bower_json"
-      ],
+      "datafile_paths": ["scan/bower.json"],
+      "datasource_ids": ["bower_json"],
       "purl": "pkg:bower/John%20Doe"
     }
   ],
@@ -220,11 +212,7 @@
               "url": "http://johndoe.com"
             }
           ],
-          "keywords": [
-            "motion",
-            "physics",
-            "particles"
-          ],
+          "keywords": ["motion", "physics", "particles"],
           "homepage_url": null,
           "download_url": null,
           "size": null,
@@ -359,9 +347,7 @@
           "purl": "pkg:bower/John%20Doe"
         }
       ],
-      "for_packages": [
-        "pkg:bower/John%20Doe?uuid=fixed-uid-done-for-testing-5642512d1758"
-      ],
+      "for_packages": ["pkg:bower/John%20Doe?uuid=fixed-uid-done-for-testing-5642512d1758"],
       "scan_errors": []
     }
   ]

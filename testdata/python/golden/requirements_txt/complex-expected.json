@@ -36,9 +36,7 @@
     "is_private": false,
     "is_virtual": false,
     "extra_data": {
-      "extra_index_urls": [
-        "http://dist.pinaxproject.com/dev/"
-      ]
+      "extra_index_urls": ["http://dist.pinaxproject.com/dev/"]
     },
     "dependencies": [
       {

@@ -9,7 +9,7 @@ Golden tests compare parser output against expected results from the original Sc
 **Currently Passing:** 3/10 tests (7 tests require license detection engine integration)
 
 - ✅ `test_golden_basic` - Basic package.json parsing
-- ✅ `test_golden_bundled_deps` - Bundled dependencies handling  
+- ✅ `test_golden_bundled_deps` - Bundled dependencies handling
 - ✅ `test_golden_authors_list_strings` - Author array extraction
 - 🔄 7 tests ignored - Require license detection engine (see below)
 

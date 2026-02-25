@@ -1,0 +1,11 @@
+what:
+  - copyrights
+  - holders
+  - authors
+copyrights:
+  - Copyright (c) 2011 One Laptop
+  - Copyright (c) 2011 One Laptop per Child
+holders:
+  - One Laptop
+  - One Laptop per Child
+authors: []

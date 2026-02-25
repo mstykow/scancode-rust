@@ -1,0 +1,14 @@
+what:
+  - copyrights
+  - holders
+  - authors
+copyrights:
+  - (c) 1985
+  - (c) 1985 Waterloo Micro
+  - Copyright Waterloo Microsystems Inc. 1985
+holders:
+  - Waterloo Micro
+  - Waterloo Microsystems Inc.
+authors:
+  - Juergen Seifert <seifert@htwm.de>
+  - Stephen A. Wood <saw@cebaf.gov>

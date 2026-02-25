@@ -5,9 +5,8 @@ description: >
   is split into a new immutable collection class and a corresponding mutable
   builder class.
 homepage: https://github.com/google/built_collection.dart
-
 environment:
-  sdk: '>=2.12.0-0 <3.0.0'
+  sdk: ">=2.12.0-0 <3.0.0"
 
 dev_dependencies:
   pedantic: ^1.4.0

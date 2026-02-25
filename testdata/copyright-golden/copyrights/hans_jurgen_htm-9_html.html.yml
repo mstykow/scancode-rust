@@ -1,0 +1,11 @@
+what:
+  - copyrights
+  - holders
+  - holders_summary
+copyrights:
+  - Copyright (c) 2006 by Hans-Jürgen Koch
+holders:
+  - Hans-Jürgen Koch
+holders_summary:
+  - value: Hans-Jürgen Koch
+    count: 1

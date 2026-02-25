@@ -1,0 +1,12 @@
+what:
+  - copyrights
+  - holders
+  - authors
+copyrights:
+  - (c) by Jaroslav Kysela <perex@perex.cz>
+  - Copyright (c) Lee Revell <rlrevell@joe-job.com>
+  - Copyright (c) by Jaroslav Kysela <perex@perex.cz> Creative Labs, Inc. Routines
+holders:
+  - Jaroslav Kysela Creative Labs, Inc. Routines
+  - Lee Revell
+authors: []

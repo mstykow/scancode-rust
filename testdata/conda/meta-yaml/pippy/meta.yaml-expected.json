@@ -36,12 +36,8 @@
     "is_private": false,
     "is_virtual": false,
     "extra_data": {
-      "host": [
-        "conda-forge::python=3.7"
-      ],
-      "run": [
-        "conda-forge::python=3.7"
-      ]
+      "host": ["conda-forge::python=3.7"],
+      "run": ["conda-forge::python=3.7"]
     },
     "dependencies": [
       {

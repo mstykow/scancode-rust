@@ -1,0 +1,9 @@
+what:
+  - copyrights
+  - holders
+  - authors
+copyrights:
+  - Copyright (c) Jon Schlinkert
+holders:
+  - Jon Schlinkert
+authors: []

@@ -18,9 +18,7 @@
       "datasource_id": "cargo_toml",
       "dependency_uid": "pkg:cargo/tokio?uuid=fixed-uid-done-for-testing-5642512d1758",
       "extra_data": {
-        "features": [
-          "full"
-        ],
+        "features": ["full"],
         "version": "1.0"
       },
       "extracted_requirement": "1.0",
@@ -59,47 +57,19 @@
   ],
   "files_with_packages": [
     {
-      "for_packages": [
-        "pkg:cargo/test-crate@0.1.0?uuid=fixed-uid-done-for-testing-5642512d1758"
-      ],
+      "for_packages": ["pkg:cargo/test-crate@0.1.0?uuid=fixed-uid-done-for-testing-5642512d1758"],
       "path": "Cargo.lock"
     },
     {
-      "for_packages": [
-        "pkg:cargo/test-crate@0.1.0?uuid=fixed-uid-done-for-testing-5642512d1758"
-      ],
+      "for_packages": ["pkg:cargo/test-crate@0.1.0?uuid=fixed-uid-done-for-testing-5642512d1758"],
       "path": "Cargo.toml"
-    },
-    {
-      "for_packages": [
-        "pkg:cargo/test-crate@0.1.0?uuid=fixed-uid-done-for-testing-5642512d1758"
-      ],
-      "path": "LICENSE"
-    },
-    {
-      "for_packages": [
-        "pkg:cargo/test-crate@0.1.0?uuid=fixed-uid-done-for-testing-5642512d1758"
-      ],
-      "path": "README.md"
-    },
-    {
-      "for_packages": [
-        "pkg:cargo/test-crate@0.1.0?uuid=fixed-uid-done-for-testing-5642512d1758"
-      ],
-      "path": "src/lib.rs"
     }
   ],
   "packages": [
     {
       "api_data_url": "https://crates.io/api/v1/crates/test-crate",
-      "datafile_paths": [
-        "Cargo.toml",
-        "Cargo.lock"
-      ],
-      "datasource_ids": [
-        "cargo_toml",
-        "cargo_lock"
-      ],
+      "datafile_paths": ["Cargo.toml", "Cargo.lock"],
+      "datasource_ids": ["cargo_toml", "cargo_lock"],
       "extra_data": {
         "rust_edition": "2021"
       },

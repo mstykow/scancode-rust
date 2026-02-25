@@ -1,0 +1,13 @@
+what:
+  - copyrights
+  - holders
+  - holders_summary
+copyrights:
+  - Copyright (c) 2001 Project
+  - Copyright (c) 2001 Project Mayo. Everyone is permitted to copy a
+holders:
+  - Project
+  - Project Mayo. Everyone is permitted to copy
+holders_summary:
+  - value: Project Mayo
+    count: 1

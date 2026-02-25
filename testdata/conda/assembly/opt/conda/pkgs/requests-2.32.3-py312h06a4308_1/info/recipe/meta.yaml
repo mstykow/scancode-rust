@@ -26,11 +26,11 @@ test:
     - conda
     - pip
 about:
-  description: 'Requests is the only Non-GMO HTTP library for Python, safe for human
+  description: "Requests is the only Non-GMO HTTP library for Python, safe for human
 
     consumption.
 
-    '
+    "
   dev_url: https://github.com/psf/requests
   doc_url: https://requests.readthedocs.io/
   home: https://requests.readthedocs.io/

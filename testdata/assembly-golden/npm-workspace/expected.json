@@ -73,27 +73,19 @@
       "path": "package.json"
     },
     {
-      "for_packages": [
-        "pkg:npm/%40myorg/core@1.0.0?uuid=fixed-uid-done-for-testing-5642512d1758"
-      ],
+      "for_packages": ["pkg:npm/%40myorg/core@1.0.0?uuid=fixed-uid-done-for-testing-5642512d1758"],
       "path": "packages/core/package.json"
     },
     {
-      "for_packages": [
-        "pkg:npm/%40myorg/utils@2.0.0?uuid=fixed-uid-done-for-testing-5642512d1758"
-      ],
+      "for_packages": ["pkg:npm/%40myorg/utils@2.0.0?uuid=fixed-uid-done-for-testing-5642512d1758"],
       "path": "packages/utils/package.json"
     }
   ],
   "packages": [
     {
       "api_data_url": "https://registry.npmjs.org/@myorg%2fcore/1.0.0",
-      "datafile_paths": [
-        "packages/core/package.json"
-      ],
-      "datasource_ids": [
-        "npm_package_json"
-      ],
+      "datafile_paths": ["packages/core/package.json"],
+      "datasource_ids": ["npm_package_json"],
       "description": "Core utilities",
       "download_url": "https://registry.npmjs.org/@myorg/core/-/@myorg/core-1.0.0.tgz",
       "extracted_license_statement": "- MIT\n",
@@ -118,12 +110,8 @@
     },
     {
       "api_data_url": "https://registry.npmjs.org/@myorg%2futils/2.0.0",
-      "datafile_paths": [
-        "packages/utils/package.json"
-      ],
-      "datasource_ids": [
-        "npm_package_json"
-      ],
+      "datafile_paths": ["packages/utils/package.json"],
+      "datasource_ids": ["npm_package_json"],
       "description": "Utility functions",
       "download_url": "https://registry.npmjs.org/@myorg/utils/-/@myorg/utils-2.0.0.tgz",
       "extracted_license_statement": "- MIT\n",

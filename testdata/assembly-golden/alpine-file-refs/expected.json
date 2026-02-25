@@ -36,12 +36,8 @@
   ],
   "packages": [
     {
-      "datafile_paths": [
-        "lib/apk/db/installed"
-      ],
-      "datasource_ids": [
-        "alpine_installed_db"
-      ],
+      "datafile_paths": ["lib/apk/db/installed"],
+      "datasource_ids": ["alpine_installed_db"],
       "description": "the musl c library (libc) implementation",
       "extra_data": {
         "build_timestamp": "1649396308",
@@ -67,19 +63,13 @@
         }
       ],
       "purl": "pkg:alpine/musl@1.2.3-r0?arch=x86_64",
-      "source_packages": [
-        "pkg:alpine/musl"
-      ],
+      "source_packages": ["pkg:alpine/musl"],
       "type": "alpine",
       "version": "1.2.3-r0"
     },
     {
-      "datafile_paths": [
-        "lib/apk/db/installed"
-      ],
-      "datasource_ids": [
-        "alpine_installed_db"
-      ],
+      "datafile_paths": ["lib/apk/db/installed"],
+      "datasource_ids": ["alpine_installed_db"],
       "description": "Size optimized toolbox of many common UNIX utilities",
       "extra_data": {
         "build_timestamp": "1655134784",
@@ -105,9 +95,7 @@
         }
       ],
       "purl": "pkg:alpine/busybox@1.35.0-r17?arch=x86_64",
-      "source_packages": [
-        "pkg:alpine/busybox"
-      ],
+      "source_packages": ["pkg:alpine/busybox"],
       "type": "alpine",
       "version": "1.35.0-r17"
     }

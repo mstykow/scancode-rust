@@ -1,0 +1,12 @@
+what:
+  - copyrights
+  - holders
+  - holders_summary
+copyrights:
+  - Copyright (c) 1995,1996 Danny Gasparovski
+  - Copyright (c), 1995,1996
+holders:
+  - Danny Gasparovski
+holders_summary:
+  - value: Danny Gasparovski
+    count: 2

@@ -1,0 +1,15 @@
+what:
+  - copyrights
+  - holders
+  - authors
+copyrights:
+  - (c) 2000 IBM Deutschland Entwicklung GmbH, IBM Corporation
+  - Copyright (c) 2000-2001 IBM Deutschland Entwicklung GmbH, IBM Corporation Best
+  - Copyright 1998 Free Software Foundation, Inc.
+holders:
+  - Free Software Foundation, Inc.
+  - Free Software Foundation, Inc. GDB free software, covered by the GNU General Public License
+  - IBM Deutschland Entwicklung GmbH, IBM Corporation
+  - IBM Deutschland Entwicklung GmbH, IBM Corporation Best
+authors:
+  - Denis Joseph Barrow (djbarrow@de.ibm.com,barrow_dj@yahoo.com)
