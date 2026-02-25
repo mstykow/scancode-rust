@@ -1,8 +1,10 @@
 # PLAN-044: filter_contained_matches Parity
 
-## Status: READY FOR IMPLEMENTATION
+## Status: IMPLEMENTED ✓
 
 Root cause identified. Previous regression was due to incomplete implementation combined with incorrect span equality logic.
+
+**Result**: Removing `licensing_contains_match()` improved external golden tests by +1 (matching Python behavior where expression-based containment is only used in `filter_overlapping_matches`, not `filter_contained_matches`).
 
 ---
 

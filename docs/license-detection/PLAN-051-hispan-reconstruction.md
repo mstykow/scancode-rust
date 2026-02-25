@@ -1,6 +1,8 @@
 # PLAN-051: Fix Hispan Reconstruction in combine_matches()
 
-## Status: IMPLEMENTED
+## Status: IMPLEMENTED ✓
+
+**Result**: Fixed hispan reconstruction in `combine_matches()`. Added `hispan_positions` field to `LicenseMatch` for non-contiguous hispan tracking. Improved lic1 golden tests by +1.
 
 ## Summary
 

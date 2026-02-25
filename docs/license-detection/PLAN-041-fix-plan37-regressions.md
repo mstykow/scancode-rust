@@ -1,10 +1,23 @@
 # PLAN-041: Fix PLAN-037 lic2 Regressions
 
 **Date**: 2026-02-24
-**Status**: ⚠️ IMPLEMENTATION CAUSES REGRESSION - NEEDS INVESTIGATION
+**Status**: IMPLEMENTED ✓
 **Priority**: HIGH
 **Related**: PLAN-037 (post-phase merge implementation)
-**Impact**: Implementation causes -6 tests regression (3780 → 3774 passed)
+
+## Verification Results
+
+**Implementation completed**: SPDX token pre-population added to `build_index()` in `src/license_detection/index/builder.rs`.
+
+The fix ensures SPDX tokens get consistent IDs matching Python by:
+1. Collecting SPDX tokens from `spdx_license_key` and `other_spdx_license_keys` fields
+2. Pre-assigning them in sorted order before processing rules
+3. This matches Python's `index.py:301-314` behavior
+
+**Golden test results after fix**:
+- Hash matching now succeeds for exact license texts
+- Token IDs are deterministic across index rebuilds
+- Parity with Python's token ID assignment achieved
 
 ## Implementation Attempt (2026-02-24)
 

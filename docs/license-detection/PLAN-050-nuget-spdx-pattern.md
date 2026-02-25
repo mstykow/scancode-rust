@@ -1,6 +1,8 @@
 # PLAN-050: Add NuGet SPDX Pattern Detection
 
-## Status: NOT IMPLEMENTED
+## Status: IMPLEMENTED ✓
+
+**Commit**: Added NuGet SPDX pattern `["licenses", "nuget", "org"]` to all three SPDX prefix checks in `query.rs`.
 
 ## Summary
 

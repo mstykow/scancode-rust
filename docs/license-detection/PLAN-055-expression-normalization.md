@@ -1,6 +1,18 @@
 # PLAN-055: Expression Normalization
 
-## Status: NOT IMPLEMENTED
+## Status: PARTIALLY IMPLEMENTED
+
+### Completed Work
+
+- **`is_from_license` field added** to `LicenseMatch` struct (`src/license_detection/models.rs`)
+- Field is now populated when creating `LicenseMatch` from `Rule`
+- Enables rule priority comparison in filtering functions
+
+### Remaining Work
+
+- **Expression-to-license-key mapping**: When a rule matches license text, the output should be the license key (e.g., `lzma-sdk-2006`), not the decomposed expression from the rule
+- This requires loading `notes` field from LICENSE files and parsing composite mappings
+- Alternatively, implement priority comparison in `filter_contained_matches()` and `filter_overlapping_matches()` to prefer `is_from_license=True` rules
 
 ## Summary
 
