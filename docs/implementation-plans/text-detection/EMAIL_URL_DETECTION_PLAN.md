@@ -70,13 +70,13 @@ Email and URL detection extracts email addresses and URLs from source code files
 
 The Python implementation spans three files:
 
-| File | Lines | Purpose |
-|------|-------|---------|
-| `finder.py` | 597 | Core detection: regex patterns, filter pipelines, URL canonicalization |
-| `finder_data.py` | 252 | Junk classification data: emails, hosts, IPs, URLs, domain suffixes |
-| `plugin_email.py` | 59 | Scanner plugin: `--email`, `--max-email` CLI flags |
-| `plugin_url.py` | 55 | Scanner plugin: `--url`, `--max-url` CLI flags |
-| `api.py` (relevant) | ~60 | `get_emails()`, `get_urls()` — thin wrappers with threshold |
+| File                | Lines | Purpose                                                                |
+| ------------------- | ----- | ---------------------------------------------------------------------- |
+| `finder.py`         | 597   | Core detection: regex patterns, filter pipelines, URL canonicalization |
+| `finder_data.py`    | 252   | Junk classification data: emails, hosts, IPs, URLs, domain suffixes    |
+| `plugin_email.py`   | 59    | Scanner plugin: `--email`, `--max-email` CLI flags                     |
+| `plugin_url.py`     | 55    | Scanner plugin: `--url`, `--max-url` CLI flags                         |
+| `api.py` (relevant) | ~60   | `get_emails()`, `get_urls()` — thin wrappers with threshold            |
 
 Total: ~1,023 lines (much simpler than copyright detection's ~4,675 lines).
 
@@ -164,15 +164,15 @@ r'\b[A-Z0-9._%-]+@[A-Z0-9.-]+\.[A-Z]{2,4}\b'  # case-insensitive
 
 #### Junk Classification Data (`finder_data.py`)
 
-| Dataset | Count | Purpose |
-|---------|-------|---------|
-| `JUNK_EMAILS` | 7 | Exact junk email domains (test.com, example.com, localhost, etc.) |
-| `JUNK_HOSTS_AND_DOMAINS` | 11 | Junk hosts (example.com, localhost, maps.google.com, 1.2.3.4, etc.) |
-| `JUNK_IPS` | 1 | Junk IP addresses (1.2.3.4) |
-| `JUNK_EXACT_DOMAIN_NAMES` | 8 | Exact junk domains for email host filtering (test.com, sample.com, etc.) |
-| `JUNK_URLS` | 73 | Exact junk URLs (W3C schemas, DTDs, XML namespaces, etc.) |
-| `JUNK_URL_PREFIXES` | 57 | URL prefixes to filter (Spring DTDs, Apple certs, Microsoft PKI, etc.) |
-| `JUNK_DOMAIN_SUFFIXES` | 4 | Suffix patterns to filter (.png, .jpg, .gif, .jpeg) |
+| Dataset                   | Count | Purpose                                                                  |
+| ------------------------- | ----- | ------------------------------------------------------------------------ |
+| `JUNK_EMAILS`             | 7     | Exact junk email domains (test.com, example.com, localhost, etc.)        |
+| `JUNK_HOSTS_AND_DOMAINS`  | 11    | Junk hosts (example.com, localhost, maps.google.com, 1.2.3.4, etc.)      |
+| `JUNK_IPS`                | 1     | Junk IP addresses (1.2.3.4)                                              |
+| `JUNK_EXACT_DOMAIN_NAMES` | 8     | Exact junk domains for email host filtering (test.com, sample.com, etc.) |
+| `JUNK_URLS`               | 73    | Exact junk URLs (W3C schemas, DTDs, XML namespaces, etc.)                |
+| `JUNK_URL_PREFIXES`       | 57    | URL prefixes to filter (Spring DTDs, Apple certs, Microsoft PKI, etc.)   |
+| `JUNK_DOMAIN_SUFFIXES`    | 4     | Suffix patterns to filter (.png, .jpg, .gif, .jpeg)                      |
 
 #### Output Format
 
@@ -180,9 +180,7 @@ r'\b[A-Z0-9._%-]+@[A-Z0-9.-]+\.[A-Z]{2,4}\b'  # case-insensitive
 
 ```json
 {
-  "emails": [
-    {"email": "user@example.com", "start_line": 5, "end_line": 5}
-  ]
+  "emails": [{ "email": "user@example.com", "start_line": 5, "end_line": 5 }]
 }
 ```
 
@@ -190,9 +188,7 @@ r'\b[A-Z0-9._%-]+@[A-Z0-9.-]+\.[A-Z]{2,4}\b'  # case-insensitive
 
 ```json
 {
-  "urls": [
-    {"url": "https://example.com", "start_line": 10, "end_line": 10}
-  ]
+  "urls": [{ "url": "https://example.com", "start_line": 10, "end_line": 10 }]
 }
 ```
 

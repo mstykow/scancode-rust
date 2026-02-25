@@ -26,7 +26,7 @@ def _parse(cls, swift_dependency_relation, package_only=False):
         name=swift_dependency_relation.get("name"),  # ONLY NAME
         dependencies=dependencies,
     )
-    
+
     return models.PackageData.from_data(package_data, package_only)
 ```
 

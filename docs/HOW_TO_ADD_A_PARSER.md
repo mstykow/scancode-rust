@@ -279,7 +279,7 @@ mod tests {
     fn test_extract_basic() {
         let path = PathBuf::from("testdata/<ecosystem>/basic.json");
         let data = MyEcosystemParser::extract_packages(&path);
-        
+
         assert_eq!(data.name, Some("my-package".to_string()));
         assert_eq!(data.version, Some("1.0.0".to_string()));
         assert!(!data.dependencies.is_empty());
@@ -289,7 +289,7 @@ mod tests {
     fn test_extract_with_all_fields() {
         let path = PathBuf::from("testdata/<ecosystem>/complete.json");
         let data = MyEcosystemParser::extract_packages(&path);
-        
+
         assert!(data.description.is_some());
         assert!(data.homepage_url.is_some());
         assert!(data.extracted_license_statement.is_some());
@@ -299,7 +299,7 @@ mod tests {
     fn test_extract_malformed_json() {
         let path = PathBuf::from("testdata/<ecosystem>/malformed.json");
         let data = MyEcosystemParser::extract_packages(&path);
-        
+
         // Should not panic, returns default
         assert_eq!(data.package_type, Some("<ecosystem>".to_string()));
     }
@@ -308,17 +308,17 @@ mod tests {
     fn test_dependency_scopes() {
         let path = PathBuf::from("testdata/<ecosystem>/dependencies.json");
         let data = MyEcosystemParser::extract_packages(&path);
-        
+
         let runtime_deps: Vec<_> = data.dependencies
             .iter()
             .filter(|d| d.is_runtime == Some(true))
             .collect();
-        
+
         let dev_deps: Vec<_> = data.dependencies
             .iter()
             .filter(|d| d.scope == Some("dev".to_string()))
             .collect();
-        
+
         assert!(!runtime_deps.is_empty());
         assert!(!dev_deps.is_empty());
     }
@@ -394,7 +394,7 @@ register_package_handlers! {
 
 ```bash
 # Should include "MyEcosystemParser" in output
-cargo run --bin generate-test-expected --list | grep MyEcosystemParser
+cargo run --bin update-parser-golden -- --list | grep MyEcosystemParser
 ```
 
 ## Step 5: Add Golden Tests (Optional but Recommended)
@@ -407,18 +407,20 @@ Use the test generator utility to create expected output files:
 
 ```bash
 # List all available parser types
-cargo run --bin generate-test-expected --list
+cargo run --bin update-parser-golden -- --list
 
 # Generate expected output using parser struct name
-cargo run --bin generate-test-expected MyEcosystemParser \
+cargo run --bin update-parser-golden -- MyEcosystemParser \
   testdata/<ecosystem>/sample.json \
   testdata/<ecosystem>/sample.json.expected.json
 
 # Or use the convenience wrapper script
-./scripts/generate_test_expected.sh MyEcosystemParser \
+./scripts/update_parser_golden.sh MyEcosystemParser \
   testdata/<ecosystem>/sample.json \
   testdata/<ecosystem>/sample.json.expected.json
 ```
+
+For canonical script purpose and full CLI argument reference, see [`scripts/README.md`](../scripts/README.md).
 
 **Auto-Discovery**: The generator automatically discovers ALL parsers registered in `src/parsers/mod.rs` via the `register_package_handlers!` macro. When you add your parser to that list, it becomes immediately available - no manual updates needed!
 
@@ -607,7 +609,7 @@ Create test fixtures in `testdata/assembly-golden/<ecosystem>-basic/`:
 
 **Multi-File Merge**:
 
-- Multiple related files (*.podspec + Podfile + Podfile.lock)
+- Multiple related files (\*.podspec + Podfile + Podfile.lock)
 - Pattern: `["*.podspec", "Podfile", "Podfile.lock"]`
 - Supports glob patterns for variable filenames
 
@@ -659,7 +661,7 @@ If you followed Path B (new ecosystem):
    ```bash
    # Run ecosystem's native tool
    <ecosystem-tool> show <package>
-   
+
    # Compare with our extraction
    cargo run -- testdata/<ecosystem>/ -o output.json
    cat output.json | jq '.packages[0]'
@@ -728,9 +730,11 @@ Our Rust implementation improves on the Python reference by:
 ## References
 
 ### Python Reference Issues
+
 - Bug/TODO description
 
 ### <Ecosystem> Documentation
+
 - [Official Docs](https://...)
 
 ## Status

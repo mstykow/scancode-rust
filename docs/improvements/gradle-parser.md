@@ -59,20 +59,20 @@ pub struct GradleTokenizer {
 impl GradleTokenizer {
     pub fn tokenize(&mut self) -> Result<Vec<Token>> {
         let mut tokens = Vec::new();
-        
+
         while let Some(token) = self.next_token()? {
             tokens.push(token);
         }
-        
+
         Ok(tokens)
     }
-    
+
     fn next_token(&mut self) -> Result<Option<Token>> {
         // Consume whitespace
         while self.current_char.map_or(false, |c| c.is_whitespace()) {
             self.advance();
         }
-        
+
         match self.current_char {
             None => Ok(None),
             Some('{') => {
@@ -112,16 +112,16 @@ impl GradleTokenizer {
 pub fn extract_dependencies(tokens: &[Token]) -> Vec<Dependency> {
     let mut dependencies = Vec::new();
     let mut i = 0;
-    
+
     while i < tokens.len() {
         // Match patterns:
         // 1. implementation 'group:artifact:version'
         // 2. implementation group: 'group', name: 'artifact', version: 'version'
         // 3. compile 'group:artifact:version'
         // etc.
-        
+
         match (&tokens[i], tokens.get(i+1), tokens.get(i+2)) {
-            (Token::Id(dep_type), Some(Token::String(spec)), _) 
+            (Token::Id(dep_type), Some(Token::String(spec)), _)
                 if is_dependency_type(dep_type) => {
                 // Pattern: implementation 'group:artifact:version'
                 if let Some(dep) = parse_dependency_spec(dep_type, spec) {
@@ -141,23 +141,23 @@ pub fn extract_dependencies(tokens: &[Token]) -> Vec<Dependency> {
             _ => i += 1,
         }
     }
-    
+
     dependencies
 }
 
 fn parse_dependency_spec(dep_type: &str, spec: &str) -> Option<Dependency> {
     // Parse "group:artifact:version" notation
     // Example: "org.example:mylib:1.0.0"
-    
+
     let parts: Vec<&str> = spec.split(':').collect();
     if parts.len() < 2 {
         return None;
     }
-    
+
     let group = parts[0].to_string();
     let artifact = parts[1].to_string();
     let version = parts.get(2).map(|v| v.to_string());
-    
+
     Some(Dependency {
         purl: Some(format!("pkg:maven/{}/{}", group, artifact)),
         extracted_requirement: version,
@@ -173,12 +173,12 @@ fn parse_dependency_spec(dep_type: &str, spec: &str) -> Option<Dependency> {
 
 ### 1. **No Code Execution**
 
-| Operation | Python | Rust | Risk |
-|-----------|--------|------|------|
-| Parse build.gradle | Groovy engine | Token lexer | ✅ Safe |
-| Evaluate expressions | Full Groovy DSL | String matching | ✅ Safe |
-| Execute methods | Yes (arbitrary) | No (static parse) | ✅ Safe |
-| Handle malicious code | Vulnerable | Protected | ✅ Safe |
+| Operation             | Python          | Rust              | Risk    |
+| --------------------- | --------------- | ----------------- | ------- |
+| Parse build.gradle    | Groovy engine   | Token lexer       | ✅ Safe |
+| Evaluate expressions  | Full Groovy DSL | String matching   | ✅ Safe |
+| Execute methods       | Yes (arbitrary) | No (static parse) | ✅ Safe |
+| Handle malicious code | Vulnerable      | Protected         | ✅ Safe |
 
 ### 2. **Input Validation**
 
@@ -239,8 +239,16 @@ dependencies {
 ```json
 {
   "dependencies": [
-    {"purl": "pkg:maven/org.example/mylib", "extracted_requirement": "1.0.0", "scope": "implementation"},
-    {"purl": "pkg:maven/junit/junit", "extracted_requirement": "4.12", "scope": "testImplementation"}
+    {
+      "purl": "pkg:maven/org.example/mylib",
+      "extracted_requirement": "1.0.0",
+      "scope": "implementation"
+    },
+    {
+      "purl": "pkg:maven/junit/junit",
+      "extracted_requirement": "4.12",
+      "scope": "testImplementation"
+    }
   ]
 }
 ```
@@ -259,8 +267,16 @@ dependencies {
 ```json
 {
   "dependencies": [
-    {"purl": "pkg:maven/org.example/mylib", "extracted_requirement": "1.0.0", "scope": "implementation"},
-    {"purl": "pkg:maven/junit/junit", "extracted_requirement": "4.12", "scope": "testImplementation"}
+    {
+      "purl": "pkg:maven/org.example/mylib",
+      "extracted_requirement": "1.0.0",
+      "scope": "implementation"
+    },
+    {
+      "purl": "pkg:maven/junit/junit",
+      "extracted_requirement": "4.12",
+      "scope": "testImplementation"
+    }
   ]
 }
 ```
@@ -279,8 +295,16 @@ dependencies {
 ```json
 {
   "dependencies": [
-    {"purl": "pkg:maven/org.example/mylib", "extracted_requirement": "1.0.0", "scope": "implementation"},
-    {"purl": "pkg:maven/junit/junit", "extracted_requirement": "4.12", "scope": "testImplementation"}
+    {
+      "purl": "pkg:maven/org.example/mylib",
+      "extracted_requirement": "1.0.0",
+      "scope": "implementation"
+    },
+    {
+      "purl": "pkg:maven/junit/junit",
+      "extracted_requirement": "4.12",
+      "scope": "testImplementation"
+    }
   ]
 }
 ```
@@ -299,8 +323,8 @@ dependencies {
 ```json
 {
   "dependencies": [
-    {"purl": "pkg:gradle/core", "scope": "implementation"},
-    {"purl": "pkg:gradle/utils", "scope": "implementation"}
+    { "purl": "pkg:gradle/core", "scope": "implementation" },
+    { "purl": "pkg:gradle/utils", "scope": "implementation" }
   ]
 }
 ```
@@ -319,7 +343,11 @@ dependencies {
 ```json
 {
   "dependencies": [
-    {"purl": "pkg:maven/org.example/mylib", "extracted_requirement": "$version", "scope": "implementation"}
+    {
+      "purl": "pkg:maven/org.example/mylib",
+      "extracted_requirement": "$version",
+      "scope": "implementation"
+    }
   ]
 }
 ```
@@ -330,21 +358,21 @@ Note: We preserve `$version` notation without attempting to resolve it (safe by 
 
 ### Python's Risk Assessment
 
-| Aspect | Risk Level | Impact |
-|--------|-----------|--------|
-| Groovy engine execution | 🔴 **CRITICAL** | Arbitrary code execution |
-| No input validation | 🟠 **HIGH** | DoS via complex expressions |
-| Exception handling | 🟠 **HIGH** | Crash instead of graceful failure |
-| Malware detection | ❌ **NONE** | No security scanning |
+| Aspect                  | Risk Level      | Impact                            |
+| ----------------------- | --------------- | --------------------------------- |
+| Groovy engine execution | 🔴 **CRITICAL** | Arbitrary code execution          |
+| No input validation     | 🟠 **HIGH**     | DoS via complex expressions       |
+| Exception handling      | 🟠 **HIGH**     | Crash instead of graceful failure |
+| Malware detection       | ❌ **NONE**     | No security scanning              |
 
 ### Rust's Safety Model
 
-| Aspect | Risk Level | Mitigation |
-|--------|-----------|-----------|
-| Token-based parsing | 🟢 **LOW** | No execution possible |
-| File size limits | 🟢 **LOW** | Prevents memory exhaustion |
-| Recursion depth limits | 🟢 **LOW** | Prevents stack overflow |
-| Safe error handling | 🟢 **LOW** | Explicit error types |
+| Aspect                 | Risk Level | Mitigation                 |
+| ---------------------- | ---------- | -------------------------- |
+| Token-based parsing    | 🟢 **LOW** | No execution possible      |
+| File size limits       | 🟢 **LOW** | Prevents memory exhaustion |
+| Recursion depth limits | 🟢 **LOW** | Prevents stack overflow    |
+| Safe error handling    | 🟢 **LOW** | Explicit error types       |
 
 ## Architectural Decision
 
@@ -407,11 +435,11 @@ By eliminating code execution:
 
 ## Performance Comparison
 
-| Aspect | Python (Groovy) | Rust (Lexer) | Improvement |
-|--------|-----------------|--------------|-------------|
-| Speed | Slow (interpreter) | Fast (native) | 10-100x faster |
-| Memory | High (engine overhead) | Low (streaming) | 5-10x less |
-| Safety | Unsafe (execution) | Safe (parsing) | ✅ Eliminates risk |
+| Aspect | Python (Groovy)        | Rust (Lexer)    | Improvement        |
+| ------ | ---------------------- | --------------- | ------------------ |
+| Speed  | Slow (interpreter)     | Fast (native)   | 10-100x faster     |
+| Memory | High (engine overhead) | Low (streaming) | 5-10x less         |
+| Safety | Unsafe (execution)     | Safe (parsing)  | ✅ Eliminates risk |
 
 ## Testing
 

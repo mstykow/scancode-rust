@@ -77,12 +77,12 @@ These represent major architectural components not yet implemented. Each will be
 
 These implementation plans are **temporary** and complement the **evergreen** documentation in `docs/`:
 
-| Evergreen (Permanent) | Implementation Plans (Temporary) |
-|-----------------------|----------------------------------|
-| `ARCHITECTURE.md` | Component-specific implementation plans |
-| `HOW_TO_ADD_A_PARSER.md` | `PARSER_PLAN.md` |
-| `TESTING_STRATEGY.md` | Test plans within implementation docs |
-| `adr/` | Design decisions made during implementation |
-| `improvements/` | Beyond-parity features documented here |
+| Evergreen (Permanent)    | Implementation Plans (Temporary)            |
+| ------------------------ | ------------------------------------------- |
+| `ARCHITECTURE.md`        | Component-specific implementation plans     |
+| `HOW_TO_ADD_A_PARSER.md` | `PARSER_PLAN.md`                            |
+| `TESTING_STRATEGY.md`    | Test plans within implementation docs       |
+| `adr/`                   | Design decisions made during implementation |
+| `improvements/`          | Beyond-parity features documented here      |
 
 Once a feature is complete, relevant architectural decisions move to ADRs, and the implementation plan is archived.

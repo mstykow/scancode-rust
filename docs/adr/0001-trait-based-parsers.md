@@ -66,26 +66,26 @@ pub struct PackageData {
     pub name: Option<String>,
     pub version: Option<String>,
     pub namespace: Option<String>,
-    
+
     // Metadata
     pub description: Option<String>,
     pub homepage_url: Option<String>,
     pub parties: Vec<Party>,
-    
+
     // Dependencies
     pub dependencies: Vec<Dependency>,
-    
+
     // Licenses (extraction only - detection is separate)
     pub extracted_license_statement: Option<String>,
-    
+
     // Checksums
     pub sha256: Option<String>,
     pub sha1: Option<String>,
-    
+
     // URLs
     pub repository_homepage_url: Option<String>,
     pub repository_download_url: Option<String>,
-    
+
     // Additional data
     pub extra_data: serde_json::Value,
 }
@@ -195,7 +195,7 @@ class DatafileHandler:
     datasource_id = 'npm_package_json'
     path_patterns = ('*/package.json',)
     default_package_type = 'npm'
-    
+
     @classmethod
     def parse(cls, location):
         # Implementation
@@ -203,13 +203,13 @@ class DatafileHandler:
 
 **Key Differences**:
 
-| Aspect | Python | Rust (Our Approach) |
-|--------|--------|---------------------|
-| **Type Safety** | Runtime (duck typing) | Compile-time (traits) |
-| **Dispatch** | Dynamic (class inspection) | Static (monomorphization) |
-| **Performance** | Interpreted + vtables | Zero-cost abstractions |
-| **Extensibility** | Plugin system (runtime) | Traits (compile-time) |
-| **Error Detection** | Runtime errors | Compile-time errors |
+| Aspect              | Python                     | Rust (Our Approach)       |
+| ------------------- | -------------------------- | ------------------------- |
+| **Type Safety**     | Runtime (duck typing)      | Compile-time (traits)     |
+| **Dispatch**        | Dynamic (class inspection) | Static (monomorphization) |
+| **Performance**     | Interpreted + vtables      | Zero-cost abstractions    |
+| **Extensibility**   | Plugin system (runtime)    | Traits (compile-time)     |
+| **Error Detection** | Runtime errors             | Compile-time errors       |
 
 ## Related ADRs
 

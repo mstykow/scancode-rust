@@ -111,27 +111,27 @@ fn is_non_version_dependency(version: &str) -> bool {
 
 ## Supported Non-Version Formats
 
-| Format | Example | PURL Generated | is_pinned |
-|--------|---------|----------------|-----------|
-| Git URL | `git://github.com/user/repo.git` | `pkg:npm/package-name` | `false` |
-| Git+HTTPS | `git+https://github.com/user/repo.git` | `pkg:npm/package-name` | `false` |
-| Git+SSH | `git+ssh://git@github.com:user/repo.git` | `pkg:npm/package-name` | `false` |
-| GitHub shorthand | `github:user/repo` | `pkg:npm/package-name` | `false` |
-| GitHub with branch | `user/repo#main` | `pkg:npm/package-name` | `false` |
-| GitLab shorthand | `gitlab:user/repo` | `pkg:npm/package-name` | `false` |
-| Bitbucket shorthand | `bitbucket:user/repo` | `pkg:npm/package-name` | `false` |
-| HTTP URL | `https://example.com/pkg.tgz` | `pkg:npm/package-name` | `false` |
-| Local file | `file:../local-pkg` | `pkg:npm/package-name` | `false` |
-| Link protocol | `link:../linked-pkg` | `pkg:npm/package-name` | `false` |
+| Format              | Example                                  | PURL Generated         | is_pinned |
+| ------------------- | ---------------------------------------- | ---------------------- | --------- |
+| Git URL             | `git://github.com/user/repo.git`         | `pkg:npm/package-name` | `false`   |
+| Git+HTTPS           | `git+https://github.com/user/repo.git`   | `pkg:npm/package-name` | `false`   |
+| Git+SSH             | `git+ssh://git@github.com:user/repo.git` | `pkg:npm/package-name` | `false`   |
+| GitHub shorthand    | `github:user/repo`                       | `pkg:npm/package-name` | `false`   |
+| GitHub with branch  | `user/repo#main`                         | `pkg:npm/package-name` | `false`   |
+| GitLab shorthand    | `gitlab:user/repo`                       | `pkg:npm/package-name` | `false`   |
+| Bitbucket shorthand | `bitbucket:user/repo`                    | `pkg:npm/package-name` | `false`   |
+| HTTP URL            | `https://example.com/pkg.tgz`            | `pkg:npm/package-name` | `false`   |
+| Local file          | `file:../local-pkg`                      | `pkg:npm/package-name` | `false`   |
+| Link protocol       | `link:../linked-pkg`                     | `pkg:npm/package-name` | `false`   |
 
 ## Comparison with Python
 
-| Aspect | Python | Rust |
-|--------|--------|------|
-| Git URL detection | ❌ None | ✅ Full support |
-| GitHub shorthand | ❌ Treated as version | ✅ Properly detected |
-| Local paths | ❌ Treated as version | ✅ Properly detected |
-| is_pinned for non-version | ❌ Incorrectly `true` | ✅ Correctly `false` |
+| Aspect                    | Python                    | Rust                         |
+| ------------------------- | ------------------------- | ---------------------------- |
+| Git URL detection         | ❌ None                   | ✅ Full support              |
+| GitHub shorthand          | ❌ Treated as version     | ✅ Properly detected         |
+| Local paths               | ❌ Treated as version     | ✅ Properly detected         |
+| is_pinned for non-version | ❌ Incorrectly `true`     | ✅ Correctly `false`         |
 | PURL for non-version deps | ❌ Invalid (includes URL) | ✅ Valid (package name only) |
 
 ## Test Coverage

@@ -14,73 +14,73 @@ CLI parameter parity with Python ScanCode. Rust uses `clap`; Python uses `click`
 
 ### Implemented (5)
 
-| Parameter | Notes |
-|-----------|-------|
-| `<dir_path>` | Positional argument |
+| Parameter           | Notes                  |
+| ------------------- | ---------------------- |
+| `<dir_path>`        | Positional argument    |
 | `-o, --output-file` | Default: "output.json" |
-| `-m, --max-depth` | Default: 50 |
-| `-e, --exclude` | Glob patterns |
-| `--no-assemble` | Rust-specific |
+| `-m, --max-depth`   | Default: 50            |
+| `-e, --exclude`     | Glob patterns          |
+| `--no-assemble`     | Rust-specific          |
 
 ### Core Parameters (pending)
 
-| Parameter | Blocked By |
-|-----------|------------|
-| `-n, --processes` | — (thread pool control) |
-| `--timeout` | — (per-file timeout) |
-| `-q, --quiet` | PROGRESS_TRACKING_PLAN.md |
-| `-v, --verbose` | PROGRESS_TRACKING_PLAN.md |
-| `--strip-root` | — |
-| `--full-root` | — |
+| Parameter         | Blocked By                |
+| ----------------- | ------------------------- |
+| `-n, --processes` | — (thread pool control)   |
+| `--timeout`       | — (per-file timeout)      |
+| `-q, --quiet`     | PROGRESS_TRACKING_PLAN.md |
+| `-v, --verbose`   | PROGRESS_TRACKING_PLAN.md |
+| `--strip-root`    | —                         |
+| `--full-root`     | —                         |
 
 ### Output Format Flags (pending)
 
-| Parameter | Blocked By |
-|-----------|------------|
-| `--yaml` | OUTPUT_FORMATS_PLAN.md |
-| `--csv` | OUTPUT_FORMATS_PLAN.md |
-| `--html` | OUTPUT_FORMATS_PLAN.md |
-| `--spdx-tv` | OUTPUT_FORMATS_PLAN.md |
-| `--spdx-rdf` | OUTPUT_FORMATS_PLAN.md |
+| Parameter     | Blocked By             |
+| ------------- | ---------------------- |
+| `--yaml`      | OUTPUT_FORMATS_PLAN.md |
+| `--csv`       | OUTPUT_FORMATS_PLAN.md |
+| `--html`      | OUTPUT_FORMATS_PLAN.md |
+| `--spdx-tv`   | OUTPUT_FORMATS_PLAN.md |
+| `--spdx-rdf`  | OUTPUT_FORMATS_PLAN.md |
 | `--cyclonedx` | OUTPUT_FORMATS_PLAN.md |
 
 ### Scan Option Flags (pending)
 
-| Parameter | Blocked By |
-|-----------|------------|
-| `--license` | LICENSE_DETECTION_PLAN.md |
-| `--copyright` | COPYRIGHT_DETECTION_PLAN.md |
-| `--email` | EMAIL_URL_DETECTION_PLAN.md |
-| `--url` | EMAIL_URL_DETECTION_PLAN.md |
-| `--license-score` | LICENSE_DETECTION_PLAN.md |
-| `--license-text` | LICENSE_DETECTION_PLAN.md |
-| `--classify` | SUMMARIZATION_PLAN.md |
-| `--summary` | SUMMARIZATION_PLAN.md |
+| Parameter         | Blocked By                  |
+| ----------------- | --------------------------- |
+| `--license`       | LICENSE_DETECTION_PLAN.md   |
+| `--copyright`     | COPYRIGHT_DETECTION_PLAN.md |
+| `--email`         | EMAIL_URL_DETECTION_PLAN.md |
+| `--url`           | EMAIL_URL_DETECTION_PLAN.md |
+| `--license-score` | LICENSE_DETECTION_PLAN.md   |
+| `--license-text`  | LICENSE_DETECTION_PLAN.md   |
+| `--classify`      | SUMMARIZATION_PLAN.md       |
+| `--summary`       | SUMMARIZATION_PLAN.md       |
 
 ### Post-Scan Flags (pending)
 
-| Parameter | Blocked By |
-|-----------|------------|
-| `--consolidate` | CONSOLIDATION_PLAN.md |
-| `--filter-clues` | — |
-| `--is-license-text` | LICENSE_DETECTION_PLAN.md |
+| Parameter                 | Blocked By                |
+| ------------------------- | ------------------------- |
+| `--consolidate`           | CONSOLIDATION_PLAN.md     |
+| `--filter-clues`          | —                         |
+| `--is-license-text`       | LICENSE_DETECTION_PLAN.md |
 | `--license-clarity-score` | LICENSE_DETECTION_PLAN.md |
-| `--summary-key-files` | SUMMARIZATION_PLAN.md |
+| `--summary-key-files`     | SUMMARIZATION_PLAN.md     |
 
 ### Input/Output Control (pending)
 
-| Parameter | Notes |
-|-----------|-------|
-| `--from-json` | Load from previous scan |
-| `--include` | Include patterns |
-| `--mark-source` | Mark source files |
-| `--only-findings` | Filter output |
+| Parameter         | Notes                   |
+| ----------------- | ----------------------- |
+| `--from-json`     | Load from previous scan |
+| `--include`       | Include patterns        |
+| `--mark-source`   | Mark source files       |
+| `--only-findings` | Filter output           |
 
 ### Rust-Specific (planned)
 
-| Parameter | Blocked By |
-|-----------|------------|
-| `--no-cache` | CACHING_PLAN.md |
+| Parameter     | Blocked By      |
+| ------------- | --------------- |
+| `--no-cache`  | CACHING_PLAN.md |
 | `--cache-dir` | CACHING_PLAN.md |
 
 ## Key Design Decisions

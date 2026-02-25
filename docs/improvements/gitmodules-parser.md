@@ -33,7 +33,7 @@ impl PackageParser for GitmodulesParser {
     fn extract_packages(path: &Path) -> Vec<PackageData> {
         let content = read_file_to_string(path)?;
         let submodules = parse_gitmodules(&content);
-        
+
         let dependencies: Vec<Dependency> = submodules
             .into_iter()
             .map(|sub| Dependency {
@@ -110,15 +110,15 @@ impl PackageParser for GitmodulesParser {
 
 ## Features
 
-| Feature | Description |
-|---------|-------------|
-| INI parsing | Handles standard `.gitmodules` INI format |
-| GitHub URLs | Generates `pkg:github/...` PURLs for github.com URLs |
-| GitLab URLs | Generates `pkg:gitlab/...` PURLs for gitlab.com URLs |
-| SSH format | Handles `git@github.com:user/repo.git` URLs |
-| HTTPS format | Handles `https://github.com/user/repo.git` URLs |
-| Comments | Ignores `#` and `;` comment lines |
-| Unknown hosts | Stores URL in extracted_requirement (no PURL) |
+| Feature       | Description                                          |
+| ------------- | ---------------------------------------------------- |
+| INI parsing   | Handles standard `.gitmodules` INI format            |
+| GitHub URLs   | Generates `pkg:github/...` PURLs for github.com URLs |
+| GitLab URLs   | Generates `pkg:gitlab/...` PURLs for gitlab.com URLs |
+| SSH format    | Handles `git@github.com:user/repo.git` URLs          |
+| HTTPS format  | Handles `https://github.com/user/repo.git` URLs      |
+| Comments      | Ignores `#` and `;` comment lines                    |
+| Unknown hosts | Stores URL in extracted_requirement (no PURL)        |
 
 ## URL Parsing
 
@@ -172,12 +172,12 @@ This parser enables:
 
 ## Comparison
 
-| Aspect | Python | Rust |
-|--------|--------|------|
-| `.gitmodules` parsing | ❌ Not supported | ✅ Full support |
-| Submodule dependencies | ❌ Not detected | ✅ Detected as dependencies |
-| GitHub PURL generation | N/A | ✅ Automatic |
-| GitLab PURL generation | N/A | ✅ Automatic |
+| Aspect                 | Python           | Rust                        |
+| ---------------------- | ---------------- | --------------------------- |
+| `.gitmodules` parsing  | ❌ Not supported | ✅ Full support             |
+| Submodule dependencies | ❌ Not detected  | ✅ Detected as dependencies |
+| GitHub PURL generation | N/A              | ✅ Automatic                |
+| GitLab PURL generation | N/A              | ✅ Automatic                |
 
 ## Reference
 

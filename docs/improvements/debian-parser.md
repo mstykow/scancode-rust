@@ -41,7 +41,7 @@ pub fn extract_package_data(path: &Path) -> PackageData {
     // 1. Open .deb as AR archive
     let deb_file = File::open(path)?;
     let mut archive = Archive::new(deb_file);
-    
+
     // 2. Find control.tar.gz (or control.tar.xz)
     let control_tar = archive
         .entries()?
@@ -50,20 +50,20 @@ pub fn extract_package_data(path: &Path) -> PackageData {
                 .identifier()
                 .starts_with(b"control.tar")
         })?;
-    
+
     // 3. Extract control.tar.gz to temp directory
     let temp_dir = TempDir::new()?;
     let decoder = GzDecoder::new(control_tar);
     let mut tar = tar::Archive::new(decoder);
     tar.unpack(temp_dir.path())?;
-    
+
     // 4. Parse control file
     let control_path = temp_dir.path().join("control");
     let content = fs::read_to_string(control_path)?;
-    
+
     // 5. Extract metadata using RFC822 parser
     let fields = parse_rfc822(&content);
-    
+
     PackageData {
         name: fields.get("Package").cloned(),
         version: fields.get("Version").cloned(),
@@ -130,7 +130,7 @@ example.deb (AR archive)
       "is_runtime": true
     }
   ],
-  "sha256": "e3b5c4a...",  // Archive checksum
+  "sha256": "e3b5c4a...", // Archive checksum
   "size": 1234567
 }
 ```
@@ -145,20 +145,20 @@ fn test_debian_deb_introspection() {
     let result = DebianDebParser::extract_package_data(
         Path::new("testdata/debian/apt_2.0.2_amd64.deb")
     );
-    
+
     assert_eq!(result.name, Some("apt".to_string()));
     assert_eq!(result.version, Some("2.0.2".to_string()));
     assert_eq!(result.namespace, Some("debian".to_string()));
-    
+
     // Verify dependencies were extracted
     let deps = result.dependencies;
     assert!(deps.len() > 0, "Should extract dependencies from control file");
-    
+
     // Verify dependency with version constraint
     let libc_dep = deps.iter()
         .find(|d| d.purl.as_ref().unwrap().contains("libc6"))
         .expect("Should find libc6 dependency");
-    
+
     assert!(
         libc_dep.extracted_requirement
             .as_ref()
@@ -295,6 +295,7 @@ Python's `debian_inspector` library:
 - TODO comment suggests this was planned but not implemented
 
 **Comment from Python code** (line 99):
+
 > "TODO: introspect archive"
 
 ### Rust Advantage
@@ -330,7 +331,7 @@ Our Debian parser suite includes **5 parsers** (all complete):
 
 - [Debian Binary Package Format](https://wiki.debian.org/Packaging)
 - [Control File Format](https://www.debian.org/doc/debian-policy/ch-controlfields.html)
-- [AR Archive Format](https://en.wikipedia.org/wiki/Ar_(Unix))
+- [AR Archive Format](<https://en.wikipedia.org/wiki/Ar_(Unix)>)
 
 ### Rust Crates Used
 

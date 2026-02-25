@@ -64,11 +64,11 @@ The Python ScanCode Toolkit solves this using a custom script (`regen_package_do
 
 **Example**:
 
-| Format | Package Type | File Patterns | Status |
-|--------|--------------|---------------|--------|
-| package.json | npm | `**/package.json` | ✅ Complete |
-| Cargo.toml | cargo | `**/Cargo.toml` | ✅ Complete |
-| pom.xml | maven | `**/pom.xml` | ✅ Complete |
+| Format       | Package Type | File Patterns     | Status      |
+| ------------ | ------------ | ----------------- | ----------- |
+| package.json | npm          | `**/package.json` | ✅ Complete |
+| Cargo.toml   | cargo        | `**/Cargo.toml`   | ✅ Complete |
+| pom.xml      | maven        | `**/pom.xml`      | ✅ Complete |
 
 **Implementation** (conceptual):
 
@@ -76,7 +76,7 @@ The Python ScanCode Toolkit solves this using a custom script (`regen_package_do
 // In parser code
 impl PackageParser for NpmParser {
     const PACKAGE_TYPE: &'static str = "npm";
-    
+
     fn is_match(path: &Path) -> bool {
         matches!(
             path.file_name().and_then(|n| n.to_str()),
@@ -106,7 +106,7 @@ impl PackageParser for NpmParser {
 
 **Example**:
 
-```rust
+````rust
 //! Parser for npm package manifests.
 //!
 //! Extracts package metadata, dependencies, and license information from
@@ -146,7 +146,7 @@ impl PackageParser for NpmParser {
 pub fn extract_package_data(path: &Path) -> PackageData {
     // Implementation
 }
-```
+````
 
 **Benefits**:
 
@@ -213,7 +213,7 @@ git add docs/SUPPORTED_FORMATS.md
 fn main() {
     let mut table = MarkdownTable::new();
     table.header(&["Format", "Package Type", "File Patterns", "Status"]);
-    
+
     // Iterate all parsers (using inventory or similar)
     for parser in scancode_rust::parsers::all() {
         table.row(&[
@@ -223,7 +223,7 @@ fn main() {
             parser.status(),
         ]);
     }
-    
+
     println!("{}", table.render());
 }
 ```
@@ -284,6 +284,7 @@ fn main() {
 # Supported Formats
 
 ## npm
+
 - package.json (✅ Complete)
 - package-lock.json (✅ Complete)
 - ...
