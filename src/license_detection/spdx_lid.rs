@@ -295,6 +295,7 @@ pub fn spdx_lid_match(index: &LicenseIndex, query: &Query) -> Vec<LicenseMatch> 
                 is_license_reference: rule.is_license_reference,
                 is_license_tag: rule.is_license_tag,
                 is_license_text: rule.is_license_text,
+                is_from_license: rule.is_from_license,
                 matched_token_positions: None,
                 hilen: 0,
                 rule_start_token: 0,

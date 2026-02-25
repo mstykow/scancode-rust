@@ -286,6 +286,11 @@ pub struct LicenseMatch {
     #[serde(default)]
     pub is_license_text: bool,
 
+    /// True if this match is from a rule created from a license file (not a .RULE file)
+    /// Rules from LICENSE files have relevance=100 and should take priority over decomposed expressions.
+    #[serde(default)]
+    pub is_from_license: bool,
+
     /// Token positions matched by this license (for span subtraction).
     ///
     /// Populated during matching to enable double-match prevention.
@@ -356,6 +361,7 @@ impl Default for LicenseMatch {
             is_license_reference: false,
             is_license_tag: false,
             is_license_text: false,
+            is_from_license: false,
             matched_token_positions: None,
             hilen: 0,
             rule_start_token: 0,
@@ -788,6 +794,7 @@ mod tests {
             is_license_reference: false,
             is_license_tag: false,
             is_license_text: false,
+            is_from_license: false,
             hilen: 50,
             rule_start_token: 0,
             qspan_positions: None,
@@ -1200,6 +1207,7 @@ mod tests {
             is_license_reference: false,
             is_license_tag: false,
             is_license_text: false,
+            is_from_license: false,
             matched_token_positions: None,
             hilen: 0,
             rule_start_token: 0,
@@ -1349,6 +1357,7 @@ mod tests {
             is_license_reference: false,
             is_license_tag: false,
             is_license_text: false,
+            is_from_license: false,
             hilen: 50,
             rule_start_token: 0,
             qspan_positions: None,
