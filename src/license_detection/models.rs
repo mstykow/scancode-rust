@@ -519,7 +519,19 @@ impl LicenseMatch {
         if let (Some(self_positions), Some(other_positions)) =
             (&self.qspan_positions, &other.qspan_positions)
         {
-            return other_positions.iter().all(|p| self_positions.contains(p));
+            let self_set: HashSet<usize> = self_positions.iter().copied().collect();
+            return other_positions.iter().all(|p| self_set.contains(p));
+        }
+
+        if let (Some(self_positions), None) = (&self.qspan_positions, &other.qspan_positions) {
+            let self_set: HashSet<usize> = self_positions.iter().copied().collect();
+            return (other.start_token..other.end_token).all(|p| self_set.contains(&p));
+        }
+
+        if let (None, Some(other_positions)) = (&self.qspan_positions, &other.qspan_positions) {
+            return other_positions
+                .iter()
+                .all(|&p| p >= self.start_token && p < self.end_token);
         }
 
         if self.start_token == 0
@@ -533,6 +545,30 @@ impl LicenseMatch {
     }
 
     pub fn qoverlap(&self, other: &LicenseMatch) -> usize {
+        if let (Some(self_positions), Some(other_positions)) =
+            (&self.qspan_positions, &other.qspan_positions)
+        {
+            let self_set: HashSet<usize> = self_positions.iter().copied().collect();
+            return other_positions
+                .iter()
+                .filter(|p| self_set.contains(p))
+                .count();
+        }
+
+        if let (Some(self_positions), None) = (&self.qspan_positions, &other.qspan_positions) {
+            let self_set: HashSet<usize> = self_positions.iter().copied().collect();
+            return (other.start_token..other.end_token)
+                .filter(|p| self_set.contains(p))
+                .count();
+        }
+
+        if let (None, Some(other_positions)) = (&self.qspan_positions, &other.qspan_positions) {
+            return other_positions
+                .iter()
+                .filter(|&&p| p >= self.start_token && p < self.end_token)
+                .count();
+        }
+
         if self.start_token == 0
             && self.end_token == 0
             && other.start_token == 0
@@ -607,9 +643,9 @@ impl LicenseMatch {
         }
 
         if self_end < other_start {
-            other_start - self_end
+            other_start.saturating_sub(self_end)
         } else {
-            self_start - other_end
+            self_start.saturating_sub(other_end)
         }
     }
 

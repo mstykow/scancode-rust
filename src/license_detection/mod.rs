@@ -4,6 +4,8 @@
 //! and matching it against known license patterns.
 
 pub mod aho_match;
+#[cfg(test)]
+mod cddl_investigation_test;
 mod detection;
 pub mod expression;
 #[cfg(test)]

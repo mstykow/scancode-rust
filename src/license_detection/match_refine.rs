@@ -325,7 +325,9 @@ pub fn merge_overlapping_matches(matches: &[LicenseMatch]) -> Vec<LicenseMatch> 
 /// Tuple of (kept matches, discarded matches)
 ///
 /// Based on Python: `filter_contained_matches()` using qspan containment and expression subsumption
-fn filter_contained_matches(matches: &[LicenseMatch]) -> (Vec<LicenseMatch>, Vec<LicenseMatch>) {
+pub(crate) fn filter_contained_matches(
+    matches: &[LicenseMatch],
+) -> (Vec<LicenseMatch>, Vec<LicenseMatch>) {
     if matches.len() < 2 {
         return (matches.to_vec(), Vec::new());
     }
