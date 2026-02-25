@@ -7,6 +7,8 @@ pub mod aho_match;
 #[cfg(test)]
 mod cddl_investigation_test;
 mod detection;
+#[cfg(test)]
+mod duplicate_merge_investigation_test;
 pub mod expression;
 #[cfg(test)]
 mod glassfish_debug_test;

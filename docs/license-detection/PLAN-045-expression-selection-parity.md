@@ -1,106 +1,109 @@
 # PLAN-045: Expression Selection Parity for Overlapping Matches
 
-**Status: ⚠️ PLAN NEEDS REVISION - DIAGNOSIS IS INCORRECT**
+**Status: ⚠️ NEEDS REVISION - CDDL FIX INCOMPLETE**
 
 ## Executive Summary
 
-**⚠️ CRITICAL: The plan's diagnosis does NOT match actual behavior.**
+**PLAN-056 Fix Status:** The CDDL fix (`qoverlap()`, `qcontains()`, surround merge) was implemented but is **NOT sufficient**.
 
-**Plan's Claim:**
-- CDDL 1.0 and CDDL 1.1 rules both match overlapping text
-- Both matches survive match refinement
-- Detection-level deduplication keeps both detections
+**What PLAN-056 Fixed:**
+- `qoverlap()` now correctly computes position overlap (not just range overlap)
+- `qcontains()` handles mixed `qspan_positions` modes
+- Surround merge in `merge_overlapping_matches()` checks `qoverlap > 0`
 
-**Actual Behavior (verified by running tests):**
+**What Still Fails:**
 - Test file: `cddl-1.0_or_gpl-2.0-glassfish.txt`
-- Expected: `cddl-1.0 OR gpl-2.0` (from YAML)
+- Expected: `cddl-1.0 OR gpl-2.0`
 - Actual: `cddl-1.1 OR gpl-2.0 WITH classpath-exception-2.0`
-- **Only ONE match is detected, NOT two overlapping matches**
 
-**Actual Issue:** The WRONG rule is matching. The CDDL 1.1 rule matches when the CDDL 1.0 rule should match. This is NOT a deduplication issue.
+**Root Cause (VERIFIED 2026-02-25):**
+The bug is in `filter_overlapping_matches()` selection logic. The filter is choosing CDDL 1.1 (lower quality) over CDDL 1.0 (higher quality) due to incorrect overlap ratio comparison.
 
-**Root Cause:** Unknown - needs further investigation. Possibilities:
-1. CDDL 1.0 rule not matching at all (tokenization/matching issue)
-2. CDDL 1.1 rule matching with higher score and filtering out CDDL 1.0
-3. Rule selection logic preferring CDDL 1.1 over CDDL 1.0
+### Key Evidence from `test_detect_all_phases`:
+
+```
+CDDL 1.0: coverage=96.2%, start=18, end=270, matched_length=252, qspan_positions=None
+CDDL 1.1: coverage=59.0%, start=0, end=270, matched_length=174, qspan_positions=Some(174)
+
+overlap: 164 positions
+overlap_ratio_to_next (CDDL 1.0): 0.651 (164/252)
+overlap_ratio_to_current (CDDL 1.1): 0.943 (164/174)
+
+Decision: extra_large_current=true && current_len(174) <= next_len(252)
+-> Keeps CDDL 1.1, removes CDDL 1.0 (WRONG)
+```
+
+**The Problem:** The logic compares overlap ratio against the CURRENT match's length, not considering that the NEXT match has higher coverage and more matched tokens.
 
 ---
 
 ## Investigation Results (VERIFIED 2026-02-25)
 
-### Current Behavior Analysis
+### Both Rules Match, But Wrong One Selected
 
 **Test file:** `testdata/license-golden/datadriven/lic1/cddl-1.0_or_gpl-2.0-glassfish.txt`
 
-**Content differences from CDDL 1.1 version:**
-- Has URL: `https://glassfish.dev.java.net/public/CDDL+GPL.html` (CDDL 1.0)
-- Does NOT have URL: `https://glassfish.dev.java.net/public/CDDL+GPL_1_1.html` (CDDL 1.1)
-- Does NOT have "GPL Classpath Exception" text section
-- Uses "Sun Microsystems" copyright, not "Oracle"
+**Phase 2 & 3 Matching Results:**
+- CDDL 1.0 matches: `coverage=96.2%`, `matched_length=252`, `qspan_positions=None`
+- CDDL 1.1 matches: `coverage=59.0%`, `matched_length=174`, `qspan_positions=Some(174 positions)`
 
-**Expected behavior:**
-- Match `cddl-1.0_or_gpl-2.0-glassfish.RULE` → expression: `cddl-1.0 OR gpl-2.0`
+**Both matches exist before refinement!** The issue is in `filter_overlapping_matches()`.
 
-**Actual behavior:**
-- Matches `cddl-1.1_or_gpl-2.0-classpath_and_apache-2.0-glassfish_1.RULE`
-- Expression: `cddl-1.1 OR gpl-2.0 WITH classpath-exception-2.0`
-- Only ONE match detected
+### Selection Logic Bug
 
-### Verification Commands
+**File:** `src/license_detection/match_refine.rs`
 
-```bash
-# Run glassfish debug test
-cargo test debug_glassfish_detection -- --nocapture
+The filter sorts matches and iterates comparing `current` vs `next`. For CDDL:
 
-# Output shows:
-# Expected: ["cddl-1.0 OR gpl-2.0"]
-# Actual:   ["cddl-1.1 OR gpl-2.0 WITH classpath-exception-2.0"]
-#
-# Detection 1:
-#   expression: Some("cddl-1.1 OR gpl-2.0 WITH classpath-exception-2.0")
-#     match: cddl-1.1 OR gpl-2.0 WITH classpath-exception-2.0 score=86.0 matcher=3-seq lines=2-31
-```
+1. CDDL 1.1 comes first in sort order (lower `start_token=0` vs `start_token=18`)
+2. `qoverlap()` returns 164 positions correctly
+3. `overlap_ratio_to_current = 164/174 = 0.943` (very high)
+4. `overlap_ratio_to_next = 164/252 = 0.651` (lower)
+5. Code checks: `extra_large_current && current_len <= next_len`
+6. This evaluates to `true && 174 <= 252 = true`
+7. CDDL 1.0 is removed, CDDL 1.1 kept
 
-### Plan Diagnosis vs Actual Behavior
-
-| Plan Claim | Actual Behavior | Correct? |
-|------------|-----------------|----------|
-| CDDL 1.0 and CDDL 1.1 both match | Only CDDL 1.1 matches | ❌ NO |
-| Both survive match refinement | Only one match exists | ❌ NO |
-| Detection deduplication keeps both | Only one detection exists | ❌ NO |
-
-**Conclusion:** The plan's diagnosis is incorrect. The issue is NOT about deduplicating overlapping detections.
+**The bug:** The logic keeps the match with higher overlap ratio to itself, ignoring that the other match has better quality metrics (higher coverage, more matched tokens).
 
 ---
 
-## Required Next Steps
+## Required Fix
 
-### Step 1: Investigate Why CDDL 1.0 Rule Doesn't Match
+### Option A: Fix Selection Logic in `filter_overlapping_matches()`
 
-**Hypothesis:** The CDDL 1.0 rule (`cddl-1.0_or_gpl-2.0-glassfish.RULE`) is not matching, or is being filtered out before detection.
+The selection logic should prefer the match with:
+1. Higher `match_coverage` (quality metric)
+2. More `matched_length` (more tokens matched)
+3. NOT just higher overlap ratio to itself
 
-**Investigation needed:**
-1. Check if CDDL 1.0 rule matches at all during matching phase
-2. Check if CDDL 1.0 match is filtered during match refinement
-3. Compare token sets between the two rules and the query file
-
-**Debug approach:**
-```bash
-# Check if CDDL 1.0 rule exists and is loaded
-grep -r "cddl-1.0_or_gpl-2.0-glassfish" reference/scancode-toolkit/src/licensedcode/data/rules/
-
-# Add debug logging to see all matches before refinement
-# Check match_refine.rs for filtering logic
+**Current buggy logic** (simplified):
+```rust
+if extra_large_current && current_len <= next_len {
+    // Keeps current, removes next - WRONG for CDDL case
+}
 ```
 
-### Step 2: Understand Rule Selection
+**Proposed fix:** When overlap ratio is high for both matches, compare quality metrics:
+```rust
+if extra_large_current && current_len <= next_len {
+    // Check if next has better quality before removing
+    let current_quality = current.match_coverage;
+    let next_quality = next.match_coverage;
+    if next_quality > current_quality + 5.0 {  // threshold
+        // Next is better quality, keep next instead
+        result.push(next);
+        continue;
+    }
+}
+```
 
-The CDDL 1.1 rule should NOT match this file because:
-1. File has CDDL 1.0 URL, not CDDL 1.1 URL
-2. File does NOT have Classpath Exception text
-3. File uses Sun Microsystems copyright, not Oracle
+### Option B: Check Python Reference for Exact Logic
 
-This suggests the matching algorithm is not correctly distinguishing between similar rules.
+Python's `filter_overlapping_matches()` may have additional quality checks we're missing. Need to compare:
+
+1. Python's overlap ratio threshold logic
+2. Python's quality comparison between overlapping matches
+3. Python's handling of scattered vs contiguous qspan positions
 
 ---
 
@@ -169,23 +172,33 @@ Python does NOT have this problem because:
 
 ---
 
-## Status: NOT READY FOR IMPLEMENTATION
+## Status: PARTIALLY READY - NEEDS SELECTION LOGIC FIX
 
-**The original implementation plan below is INCORRECT because:**
-1. The diagnosis does not match actual behavior
-2. The fix targets the wrong layer (detection vs matching)
-3. Unit tests in the plan assume the wrong problem
+**What's fixed:**
+- ✅ `qoverlap()` computes actual position overlap
+- ✅ `qcontains()` handles mixed qspan_positions modes
+- ✅ Surround merge checks overlap before combining
 
-**Before implementing any fix, we need to:**
-1. Determine why CDDL 1.0 rule doesn't match (or is filtered)
-2. Understand why CDDL 1.1 rule matches when it shouldn't
-3. Verify the root cause is in matching, refinement, or detection
+**What's broken:**
+- ❌ `filter_overlapping_matches()` selection logic chooses lower-quality match
+
+**Next steps:**
+1. Read Python's `filter_overlapping_matches()` implementation
+2. Identify what quality checks Python uses for overlapping matches
+3. Implement same quality comparison in Rust
 
 ---
 
-## Original Implementation Plan (PROBABLY INCORRECT)
+## Related Plans
 
-*The following was the original plan. It is preserved for reference but should NOT be implemented without further investigation.*
+- **PLAN-056**: CDDL Rule Selection Investigation (partial fix - qoverlap/qcontains)
+- **PLAN-058**: Lic2 Duplicate Merge Regression (caused by PLAN-056 qcontains changes)
+
+---
+
+## Original Implementation Plan (SUPERSEDED BY PLAN-056)
+
+*The following was the original plan. PLAN-056 implemented the qoverlap/qcontains fixes but the selection logic still needs work.*
 
 ### Approach: Add Region-Based Deduplication at Detection Level
 
@@ -523,22 +536,20 @@ cargo test --test license_golden_test
 
 | Question | Answer |
 |----------|--------|
-| **Is the plan ready for implementation?** | ❌ NO |
-| **Why?** | Diagnosis does not match actual behavior |
-| **Actual issue?** | WRONG rule is matching (CDDL 1.1 instead of CDDL 1.0) |
-| **NOT an issue?** | Duplicate overlapping detections |
-| **Next step required?** | Investigate why CDDL 1.0 rule doesn't match |
+| **Is the plan ready for implementation?** | ⚠️ PARTIAL |
+| **What's fixed?** | `qoverlap()`, `qcontains()`, surround merge |
+| **What's still broken?** | `filter_overlapping_matches()` selection logic |
+| **Root cause?** | Overlap ratio comparison ignores quality metrics |
+| **Next step?** | Implement quality comparison for overlapping matches |
 
 ---
 
-## Verification Checklist (UPDATED)
+## Verification Checklist (UPDATED 2026-02-25)
 
-- [ ] **BLOCKED:** Determine why CDDL 1.0 rule doesn't match
-- [ ] **BLOCKED:** Understand why CDDL 1.1 rule matches when it shouldn't
-- [ ] **BLOCKED:** Identify correct root cause before implementing fix
-- [ ] ~~`detections_overlap_significantly()` helper added~~ (WRONG FIX)
-- [ ] ~~`compare_detection_quality()` helper added~~ (WRONG FIX)  
-- [ ] ~~`apply_detection_preferences()` updated~~ (WRONG FIX)
+- [x] `qoverlap()` computes actual position overlap (PLAN-056)
+- [x] `qcontains()` handles mixed qspan_positions (PLAN-056)
+- [x] Surround merge checks qoverlap > 0 (PLAN-056)
+- [ ] **BLOCKED:** `filter_overlapping_matches()` quality comparison
 - [ ] CDDL glassfish golden tests pass
 - [ ] No regressions in other golden tests
 - [ ] Code passes `cargo clippy`
@@ -546,15 +557,18 @@ cargo test --test license_golden_test
 
 | Function | File | Lines | Purpose |
 |----------|------|-------|---------|
+| `filter_overlapping_matches()` | `match_refine.rs` | ~450-650 | **NEEDS FIX** - quality comparison |
 | `filter_contained_matches()` | `match.py` | 1075-1184 | Remove contained matches by qspan equality |
-| `filter_overlapping_matches()` | `match.py` | 1187-1523 | Remove overlapping matches |
 | `get_detections_by_id()` | `detection.py` | ~950 | Group detections by identifier |
 
 ## Appendix: Rust Code References
 
 | Function | File | Lines | Purpose |
 |----------|------|-------|---------|
-| `apply_detection_preferences()` | `detection.rs` | 1146-1184 | **MODIFY** - Add region deduplication |
+| `filter_overlapping_matches()` | `match_refine.rs` | ~450-650 | **NEEDS FIX** - selection logic |
+| `qoverlap()` | `models.rs` | 547-584 | ✅ Fixed - actual position overlap |
+| `qcontains()` | `models.rs` | 518-545 | ✅ Fixed - mixed qspan_positions |
+| `apply_detection_preferences()` | `detection.rs` | 1146-1184 | Detection-level processing |
 | `compute_detection_score()` | `detection.rs` | 634-658 | Detection scoring |
 | `compute_detection_coverage()` | `detection.rs` | 1091-1115 | Detection coverage |
 | `get_matcher_priority()` | `detection.rs` | 1123-1135 | Matcher preference |

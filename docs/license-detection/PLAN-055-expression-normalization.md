@@ -4,15 +4,28 @@
 
 ### Completed Work
 
-- **`is_from_license` field added** to `LicenseMatch` struct (`src/license_detection/models.rs`)
-- Field is now populated when creating `LicenseMatch` from `Rule`
-- Enables rule priority comparison in filtering functions
+- **`is_from_license` field added** to `LicenseMatch` struct (`src/license_detection/models.rs:289-292`)
+- Field is now populated when creating `LicenseMatch` from `Rule` in all matchers:
+  - `hash_match.rs:123`
+  - `aho_match.rs:184`
+  - `seq_match.rs:754, 888`
+  - `spdx_lid.rs:298`
+- License text rules are correctly loaded with `is_from_license=true` and `relevance=100` in `index/builder.rs:104-105`
 
 ### Remaining Work
 
-- **Expression-to-license-key mapping**: When a rule matches license text, the output should be the license key (e.g., `lzma-sdk-2006`), not the decomposed expression from the rule
-- This requires loading `notes` field from LICENSE files and parsing composite mappings
-- Alternatively, implement priority comparison in `filter_contained_matches()` and `filter_overlapping_matches()` to prefer `is_from_license=True` rules
+1. **Add `is_from_license` and `relevance` to filtering sort order**: The sorting in `filter_contained_matches()` and `filter_overlapping_matches()` does NOT currently consider `is_from_license` or `relevance`. Matches are sorted by:
+   - `qstart` (position)
+   - `hilen` (high-value tokens)
+   - `matched_length`
+   - `matcher_order`
+
+   This should be updated to prefer rules with `is_from_license=true` and higher `relevance`.
+
+2. **Implement priority comparison in discard logic**: When deciding which match to discard in overlapping/contained scenarios, prefer the match with:
+   - Higher `relevance` (license text rules have 100)
+   - `is_from_license=true`
+   - `is_license_text=true`
 
 ## Summary
 
@@ -178,11 +191,28 @@ Create mapping from complex expressions to license keys:
 **In `LicenseMatch` struct (`src/license_detection/models.rs`):**
 - `rule_relevance: u8` (line 256) - Copied from matched rule
 - `is_license_text: bool` (line 287) - Copied from matched rule
+- `is_from_license: bool` (line 289-292) - **IMPLEMENTED** - Copied from matched rule
 
-### Missing in LicenseMatch
+### Already Implemented
 
-- `is_from_license: bool` - **NOT present** in LicenseMatch, needs to be added
-  - This is needed to prioritize license text matches in filtering functions
+1. ✅ `LicenseMatch.is_from_license` field added and populated in all matchers
+2. ✅ License text rules loaded with `is_from_license=true` and `relevance=100`
+
+### Still Missing
+
+1. ❌ **Priority comparison in filter functions**: The `filter_contained_matches()` and `filter_overlapping_matches()` functions do NOT consider `is_from_license` or `relevance` in their sorting or discard logic.
+
+2. ❌ **Sort order update**: Current sort order is:
+   ```rust
+   matches.sort_by(|a, b| {
+       a.qstart().cmp(&b.qstart())
+           .then_with(|| b.hilen.cmp(&a.hilen))
+           .then_with(|| b.matched_length.cmp(&a.matched_length))
+           .then_with(|| a.matcher_order().cmp(&b.matcher_order()))
+   });
+   ```
+   
+   Should be updated to include `relevance` and `is_from_license` to prefer license text rules.
 
 ### Python Reference Confirmed
 
@@ -262,10 +292,11 @@ fn test_composite_license_full_text_match() {
 ## Verification Checklist
 
 - [x] Rule struct has `relevance`, `is_from_license`, `is_license_text` fields (ALREADY IMPLEMENTED)
-- [ ] LicenseMatch struct has `is_from_license` field (NEEDS TO BE ADDED)
-- [ ] License text rules load with `relevance=100` and `is_from_license=True`
-- [ ] `filter_contained_matches()` prefers `is_from_license` rules
-- [ ] `filter_overlapping_matches()` prefers higher relevance rules
+- [x] LicenseMatch struct has `is_from_license` field (IMPLEMENTED at models.rs:289-292)
+- [x] License text rules load with `relevance=100` and `is_from_license=True` (index/builder.rs:104-105)
+- [x] `LicenseMatch.is_from_license` is populated from `Rule.is_from_license` in all matchers
+- [ ] `filter_contained_matches()` prefers `is_from_license` rules (NOT IMPLEMENTED)
+- [ ] `filter_overlapping_matches()` prefers higher relevance rules (NOT IMPLEMENTED)
 - [ ] lzma-sdk golden tests pass (return `lzma-sdk-2006` not decomposed expression)
 - [ ] Other composite license tests pass
 - [ ] No regressions in non-composite license tests
@@ -295,15 +326,19 @@ Complex feature requiring significant investigation. The core issue is rule prio
    - ✅ `Rule.relevance: u8` (line 110)
    - ✅ `Rule.is_from_license: bool` (line 107)
    - ✅ `Rule.is_license_text: bool` (line 81)
-   - ⚠️ `LicenseMatch.is_from_license` is **NOT present** - only `LicenseMatch.is_license_text` exists
+   - ✅ `LicenseMatch.is_from_license: bool` (line 289-292) - **IMPLEMENTED**
 
 3. **Python uses relevance=100 for license text rules**: ✅ Confirmed at `models.py:1148` in `build_rule_from_license()`
 
-4. **Implementation approach**: ✅ Priority comparison is correct, but needs `is_from_license` in LicenseMatch
+4. **License text rules loaded correctly**: ✅ `index/builder.rs:104-105` sets `is_from_license=true` and `relevance=100`
 
-5. **Testing strategy**: ✅ Follows TESTING_STRATEGY.md (unit tests + golden tests)
+5. **Field propagation to LicenseMatch**: ✅ All matchers (`hash_match.rs:123`, `aho_match.rs:184`, `seq_match.rs:754,888`, `spdx_lid.rs:298`) populate `is_from_license` from `Rule`
 
-**Action Required**: Add `is_from_license: bool` field to `LicenseMatch` struct and populate it from the matched Rule.
+6. **Priority comparison NOT YET IMPLEMENTED**: ❌ The sorting and discard logic in `filter_contained_matches()` and `filter_overlapping_matches()` does NOT consider `is_from_license` or `relevance`.
+
+**Remaining Action Required**: 
+1. Add `is_from_license` and `relevance` to the sort order in `filter_contained_matches()` and `filter_overlapping_matches()`
+2. Update discard logic to prefer matches with `is_from_license=true` and higher `relevance`
 
 ---
 

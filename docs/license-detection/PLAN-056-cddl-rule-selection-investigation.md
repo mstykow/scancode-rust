@@ -1,6 +1,8 @@
 # PLAN-056: CDDL Rule Selection Investigation
 
-## Status: FIXED
+## Status: INVESTIGATION_COMPLETE - FIX NOT YET APPLIED
+
+**Investigation completed on 2026-02-25. Root cause identified but fix not yet applied to the `surround()` merge blocks.**
 
 ## Problem Statement
 
@@ -112,9 +114,61 @@ This matches the Python FIXME comment at match.py:996: "qsurround is too weak. W
 
 ---
 
+## Implementation Status
+
+**The fix documented in "Final Fix" section above has NOT been applied.**
+
+Current state of `src/license_detection/match_refine.rs` at lines 251-258:
+```rust
+if current.surround(&next) {
+    let combined = combine_matches(&current, &next);
+    if combined.qspan().len() == combined.ispan().len() {
+        rule_matches[i] = combined;
+        rule_matches.remove(j);
+        continue;
+    }
+}
+```
+
+**MISSING**: The `qoverlap > 0` check before merging surrounded matches.
+
+The `qoverlap > 0` check exists at line 286 but in a DIFFERENT code block (the "overlap merge" case), not in the `surround()` merge blocks.
+
+### Remaining Work
+
+Apply the fix to both `surround()` blocks (lines 251-258 and 259-267):
+
+```rust
+if current.surround(&next) {
+    let qoverlap = current.qoverlap(&next);
+    if qoverlap > 0 {  // ADD THIS CHECK
+        let combined = combine_matches(&current, &next);
+        if combined.qspan().len() == combined.ispan().len() {
+            rule_matches[i] = combined;
+            rule_matches.remove(j);
+            continue;
+        }
+    }
+}
+```
+
+### Test Results (2026-02-25)
+
+Tests still FAILING:
+- `test_cddl_10_detection_basic` - FAILS (CDDL 1.1 incorrectly selected)
+- `test_detect_full_pipeline_matches` - FAILS (CDDL 1.1 incorrectly selected)
+- `test_cddl_11_detection_basic` - PASSES
+
+The problem: CDDL 1.1 matches (174 + 81 = 255 positions via incorrect merge) beat CDDL 1.0 (252 positions) because:
+- CDDL 1.1 after merge: matched_length=255, coverage=86.4%
+- CDDL 1.0: matched_length=252, coverage=96.2%
+- The `filter_overlapping_matches` prefers longer matched_length despite lower coverage
+
+---
+
 ## Resolution
 
-All CDDL tests now pass:
+**PENDING** - Fix not yet applied. Once applied, expected:
 - `test_cddl_10_detection_basic` - CDDL 1.0 correctly detected
 - `test_cddl_11_detection_basic` - CDDL 1.1 correctly detected
 - `test_detect_full_pipeline_matches` - Full pipeline validates CDDL 1.0 selection
