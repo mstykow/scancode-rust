@@ -131,10 +131,6 @@ impl PackageParser for CargoParser {
 
         let extra_data = extract_extra_data(&toml_content);
 
-        let has_workspace = toml_content.get("workspace").is_some();
-        let has_package = package.is_some();
-        let is_virtual = has_workspace && !has_package;
-
         vec![PackageData {
             package_type: Some(Self::PACKAGE_TYPE),
             namespace: None,
@@ -170,7 +166,7 @@ impl PackageParser for CargoParser {
             source_packages: Vec::new(),
             file_references: Vec::new(),
             is_private: false,
-            is_virtual,
+            is_virtual: false,
             extra_data,
             dependencies: [dependencies, dev_dependencies, build_dependencies].concat(),
             repository_homepage_url,

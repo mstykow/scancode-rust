@@ -122,6 +122,8 @@ mod tests {
                 license_expression: None,
                 license_detections: vec![],
                 copyrights: vec![],
+                holders: vec![],
+                authors: vec![],
                 urls: vec![],
                 for_packages: vec![],
                 scan_errors: vec![],

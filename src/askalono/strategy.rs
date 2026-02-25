@@ -192,6 +192,11 @@ impl<'a> ScanStrategy<'a> {
         self
     }
 
+    /// Returns `true` if the underlying store has any licenses loaded.
+    pub fn store_has_licenses(&self) -> bool {
+        !self.store.is_empty()
+    }
+
     /// Scan the given text content using this strategy's configured
     /// preferences.
     ///

@@ -22,6 +22,7 @@ def find_markdown_files(root: Path):
     """Find all markdown files excluding submodules, archived, testdata, tests."""
     excludes = {
         ".git",
+        "node_modules",
         "target",
         "archived",
         "testdata",
