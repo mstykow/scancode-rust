@@ -9,6 +9,13 @@ mod cddl_investigation_test;
 mod detection;
 #[cfg(test)]
 mod duplicate_merge_investigation_test;
+#[cfg(test)]
+mod extra_detection_investigation_test;
+#[cfg(test)]
+mod missing_detection_investigation_test;
+#[cfg(test)]
+mod wrong_detection_investigation_test;
+
 pub mod expression;
 #[cfg(test)]
 mod glassfish_debug_test;

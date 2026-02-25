@@ -1114,73 +1114,16 @@ fn compute_detection_coverage(matches: &[LicenseMatch]) -> f32 {
     weighted_coverage.min(100.0)
 }
 
-/// Get matcher priority for detection preference.
-///
-/// Returns a priority score where lower values mean higher preference.
-/// Preference order: SPDX-LID (1) > hash (2) > Aho (3) > seq (4) > unknown (5)
-///
-/// Based on ScanCode matcher strategy ordering.
-fn get_matcher_priority(matcher: &str) -> u8 {
-    if matcher == "1-spdx-id" {
-        1
-    } else if matcher == "1-hash" {
-        2
-    } else if matcher == "2-aho" {
-        3
-    } else if matcher.starts_with("3-seq") {
-        4
-    } else {
-        5
-    }
-}
-
 /// Apply detection preferences based on matcher type.
 ///
-/// When multiple detections have similar scores, prefer:
-/// 1. SPDX-LID matches over hash matches
-/// 2. Hash matches over Aho matches
-/// 3. Aho matches over sequence matches
-/// 4. Sequence matches over unknown matches
+/// Note: Unlike the previous implementation, this function does NOT deduplicate
+/// by license expression. Detections with the same expression but different
+/// locations (different identifiers) should be kept separate.
 ///
-/// Based on ScanCode matcher strategy preferences.
+/// This matches Python's behavior where `get_unique_detections` groups by
+/// `detection.identifier` (expression + content hash), not by expression alone.
 pub fn apply_detection_preferences(detections: Vec<LicenseDetection>) -> Vec<LicenseDetection> {
-    let mut processed: std::collections::HashMap<String, (f32, u8, LicenseDetection)> =
-        std::collections::HashMap::new();
-
-    for detection in detections {
-        let expr = detection
-            .license_expression
-            .clone()
-            .unwrap_or_else(String::new);
-        let score = compute_detection_score(&detection.matches);
-
-        let best_matcher_priority = detection
-            .matches
-            .iter()
-            .map(|m| get_matcher_priority(&m.matcher))
-            .min()
-            .unwrap_or(5);
-
-        let should_keep = processed
-            .get(&expr)
-            .map(|(existing_score, existing_priority, _)| {
-                if (score - existing_score).abs() < 0.01 {
-                    best_matcher_priority < *existing_priority
-                } else {
-                    score > *existing_score
-                }
-            })
-            .unwrap_or(true);
-
-        if should_keep {
-            processed.insert(expr, (score, best_matcher_priority, detection));
-        }
-    }
-
-    processed
-        .into_values()
-        .map(|(_, _, detection)| detection)
-        .collect()
+    detections
 }
 
 /// Main post-processing function for detections.
@@ -3625,109 +3568,58 @@ mod tests {
     }
 
     #[test]
-    fn test_get_matcher_priority() {
-        assert_eq!(get_matcher_priority("1-spdx-id"), 1);
-        assert_eq!(get_matcher_priority("1-hash"), 2);
-        assert_eq!(get_matcher_priority("2-aho"), 3);
-        assert_eq!(get_matcher_priority("3-seq-1"), 4);
-        assert_eq!(get_matcher_priority("3-seq-2"), 4);
-        assert_eq!(get_matcher_priority("5-unknown"), 5);
-    }
-
-    #[test]
-    fn test_apply_detection_preferences_prefers_spdx_over_hash() {
+    fn test_apply_detection_preferences_preserves_all_detections() {
+        // After the fix, apply_detection_preferences should NOT deduplicate.
+        // Detections with the same expression but different identifiers (locations)
+        // should be kept separate.
         let detections = vec![
             LicenseDetection {
-                license_expression: Some("mit".to_string()),
+                license_expression: Some("bsd-new".to_string()),
                 license_expression_spdx: None,
                 matches: vec![create_test_match_with_params(
-                    "mit",
-                    "1-hash",
+                    "bsd-new",
+                    "2-aho",
                     1,
-                    10,
-                    90.0,
+                    1,
+                    100.0,
                     100,
                     100,
                     100.0,
                     100,
-                    "mit.LICENSE",
+                    "edl-1.0_1.RULE",
                 )],
                 detection_log: Vec::new(),
-                identifier: Some("hash".to_string()),
+                identifier: Some("bsd_new-aaa".to_string()),
                 file_region: None,
             },
             LicenseDetection {
-                license_expression: Some("mit".to_string()),
+                license_expression: Some("bsd-new".to_string()),
                 license_expression_spdx: None,
                 matches: vec![create_test_match_with_params(
-                    "mit",
-                    "1-spdx-id",
-                    1,
-                    10,
-                    90.0,
+                    "bsd-new",
+                    "2-aho",
+                    7,
+                    13,
+                    100.0,
                     100,
                     100,
                     100.0,
                     100,
-                    "#42",
+                    "edl-1.0_2.RULE",
                 )],
                 detection_log: Vec::new(),
-                identifier: Some("spdx".to_string()),
+                identifier: Some("bsd_new-bbb".to_string()),
                 file_region: None,
             },
         ];
 
         let result = apply_detection_preferences(detections);
-        assert_eq!(result.len(), 1);
-        assert_eq!(result[0].identifier, Some("spdx".to_string()));
-    }
-
-    #[test]
-    fn test_apply_detection_preferences_score_dominates() {
-        let detections = vec![
-            LicenseDetection {
-                license_expression: Some("mit".to_string()),
-                license_expression_spdx: None,
-                matches: vec![create_test_match_with_params(
-                    "mit",
-                    "1-spdx-id",
-                    1,
-                    10,
-                    85.0,
-                    100,
-                    100,
-                    85.0,
-                    100,
-                    "#42",
-                )],
-                detection_log: Vec::new(),
-                identifier: Some("spdx".to_string()),
-                file_region: None,
-            },
-            LicenseDetection {
-                license_expression: Some("mit".to_string()),
-                license_expression_spdx: None,
-                matches: vec![create_test_match_with_params(
-                    "mit",
-                    "1-hash",
-                    1,
-                    10,
-                    95.0,
-                    100,
-                    100,
-                    100.0,
-                    100,
-                    "mit.LICENSE",
-                )],
-                detection_log: Vec::new(),
-                identifier: Some("hash".to_string()),
-                file_region: None,
-            },
-        ];
-
-        let result = apply_detection_preferences(detections);
-        assert_eq!(result.len(), 1);
-        assert_eq!(result[0].identifier, Some("hash".to_string()));
+        // Both detections should be preserved (different locations = different identifiers)
+        assert_eq!(
+            result.len(),
+            2,
+            "Should preserve both detections with same expression at different locations"
+        );
     }
 
     #[test]
@@ -3749,7 +3641,7 @@ mod tests {
                     "mit.LICENSE",
                 )],
                 detection_log: Vec::new(),
-                identifier: Some("mit".to_string()),
+                identifier: Some("mit-aaa".to_string()),
                 file_region: None,
             },
             LicenseDetection {
@@ -3758,17 +3650,17 @@ mod tests {
                 matches: vec![create_test_match_with_params(
                     "apache-2.0",
                     "1-spdx-id",
-                    1,
-                    10,
+                    20,
+                    30,
                     90.0,
                     100,
                     100,
-                    100.0,
+                    90.0,
                     100,
-                    "#1",
+                    "#42",
                 )],
                 detection_log: Vec::new(),
-                identifier: Some("apache".to_string()),
+                identifier: Some("apache-aaa".to_string()),
                 file_region: None,
             },
         ];

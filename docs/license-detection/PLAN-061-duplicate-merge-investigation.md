@@ -1,6 +1,6 @@
 # PLAN-061: Duplicate Detections Merged Investigation
 
-## Status: NEEDS INVESTIGATION
+## Status: RESOLVED
 
 ## Problem Statement
 
@@ -10,128 +10,108 @@ Multiple license instances in a file are being incorrectly merged into one detec
 
 **File**: `testdata/license-golden/datadriven/lic1/edl-1.0.txt`
 
-| Expected | Actual |
-|----------|--------|
+| Expected | Actual (Before Fix) |
+|----------|---------------------|
 | `["bsd-new", "bsd-new"]` | `["bsd-new"]` |
 
 ---
 
-## Investigation Instructions
+## Root Cause
 
-### Step 1: Create Investigation Test File
+**Location**: `src/license_detection/detection.rs:1146-1184`
 
-Create `src/license_detection/duplicate_parity_investigation_test.rs`:
+**Function**: `apply_detection_preferences()`
 
-```rust
-#[cfg(test)]
-mod tests {
-    use crate::license_detection::LicenseDetectionEngine;
-    use std::path::PathBuf;
-
-    fn get_engine() -> Option<LicenseDetectionEngine> {
-        let data_path = PathBuf::from("reference/scancode-toolkit/src/licensedcode/data");
-        if !data_path.exists() {
-            return None;
-        }
-        LicenseDetectionEngine::new(&data_path).ok()
-    }
-
-    fn read_test_file(name: &str) -> Option<String> {
-        let path = PathBuf::from("testdata/license-golden/datadriven/lic1").join(name);
-        std::fs::read_to_string(&path).ok()
-    }
-
-    #[test]
-    fn test_edl_10_duplicate_parity() {
-        let Some(engine) = get_engine() else { return };
-        let Some(text) = read_test_file("edl-1.0.txt") else { return };
-
-        // TODO: Add step-by-step assertions here
-        // Each assertion should verify intermediate data matches Python
-        
-        let detections = engine.detect(&text).expect("Detection should succeed");
-        
-        // Final assertion - expect 2 separate detections
-        assert_eq!(detections.len(), 2);
-        assert_eq!(
-            detections[0].license_expression,
-            Some("bsd-new".to_string())
-        );
-        assert_eq!(
-            detections[1].license_expression,
-            Some("bsd-new".to_string())
-        );
-    }
-}
-```
-
-### Step 2: Run Python Reference to Get Baseline Data
-
-Use the playground:
-```bash
-cd reference/scancode-playground && venv/bin/python src/scancode/cli.py
-```
-
-Modify the playground to extract and print intermediate data at each step:
-1. Number of matches after each phase
-2. Match positions (start_line, end_line)
-3. Which matches are created for each BSD instance
-4. After merge_overlapping_matches() - are both matches still there?
-5. After filter_contained_matches() - is one removed?
-6. After filter_overlapping_matches() - is one removed?
-7. Detection creation - how many detections created?
-
-### Step 3: Add Step-by-Step Assertions
-
-For each pipeline step, add an assertion verifying Rust matches Python:
+**Bug**: The function was using `license_expression` as a HashMap key to deduplicate detections. This incorrectly merged detections with the same expression but at **different locations**.
 
 ```rust
-// Example: Verify both matches exist after seq_match
-#[test]
-fn test_edl_10_matches_created() {
-    // ...setup...
-    let seq_matches = /* get seq matches */;
-    
-    // From Python: expect 2 matches at different positions
-    assert_eq!(seq_matches.len(), 2, "Should have 2 matches");
-    assert_ne!(seq_matches[0].start_line, seq_matches[1].start_line);
-}
+// BEFORE (buggy):
+let expr = detection.license_expression.clone().unwrap_or_else(String::new);
+// ...
+processed.insert(expr, (score, best_matcher_priority, detection));  // WRONG: dedupes by expression
 ```
 
-### Step 4: Find Divergence Point
+**Why it's wrong**: Detections with the same license expression at different file locations should remain separate. For example, `edl-1.0.txt` has two BSD-New license references:
+- Line 1: Short header "Eclipse Distribution License - v 1.0"
+- Lines 7-13: Full license text
 
-Run each test incrementally. The first failing test identifies where Rust differs from Python.
+Both resolve to `bsd-new` expression but are at completely different locations.
 
-### Step 5: Document Findings
-
-Update this plan with:
-- Exact file and line where divergence occurs
-- What Python does to keep duplicates separate
-- Proposed fix
+**Python behavior**: Python's `get_unique_detections()` groups by `detection.identifier` (expression + content hash), NOT by expression alone. Different locations get different identifiers because the matched text differs.
 
 ---
 
-## Key Questions
+## Investigation Trace
 
-1. Are both BSD instances detected as separate matches initially?
-2. At what point are they merged/removed?
-3. Does Python use position-based deduplication or something else?
-4. Is the merge logic in `merge_overlapping_matches()` or `filter_contained_matches()`?
+### Pipeline Analysis
+
+| Stage | Rust Input | Rust Output | Status |
+|-------|------------|-------------|--------|
+| Raw aho matches | - | 3 matches | ✓ Correct |
+| After merge_overlapping_matches | 3 | 3 | ✓ Correct |
+| After filter_contained_matches | 3 | 2 | ✓ Correct |
+| After filter_overlapping_matches | 2 | 2 | ✓ Correct |
+| After refine_matches | 2 | 2 | ✓ Correct |
+| After group_matches_by_region | 2 matches | 2 groups | ✓ Correct |
+| After remove_duplicate_detections | 2 | 2 | ✓ Correct |
+| After apply_detection_preferences | 2 | **1** | ✗ BUG HERE |
+
+### Computed Identifiers
+
+Both detections had different identifiers:
+- Detection 0: `bsd_new-fe7f8a7d-b17f-b6f2-0394-5be383bf04b3`
+- Detection 1: `bsd_new-ebc66859-1421-b110-ab83-75f066df9fb9`
+
+But `apply_detection_preferences` ignored the identifier and deduplicated by expression alone.
 
 ---
 
-## Key Files to Investigate
+## Fix
+
+Changed `apply_detection_preferences()` to NOT deduplicate by expression:
+
+```rust
+// AFTER (fixed):
+pub fn apply_detection_preferences(detections: Vec<LicenseDetection>) -> Vec<LicenseDetection> {
+    detections  // No deduplication - different locations stay separate
+}
+```
+
+The function's previous deduplication logic was incorrect and not aligned with Python behavior. Python has no equivalent function that deduplicates by expression.
+
+---
+
+## Test Verification
+
+| Test | Before Fix | After Fix |
+|------|------------|-----------|
+| `test_edl_1_0_duplicate_detection` | 1 detection | 2 detections ✓ |
+| `test_apache_2_0_and_apache_2_0` | 1 detection | 2 detections ✓ |
+| `test_aladdin_md5_and_not_rsa_md5` | - | 2 detections ✓ |
+| `test_remove_duplicate_detections_*` | Pass | Pass ✓ |
+
+---
+
+## Key Files
 
 | Rust File | Python File | Purpose |
 |-----------|-------------|---------|
-| `src/license_detection/match_refine.rs` | `licensedcode/match.py` | Merge/filter logic |
-| `src/license_detection/detection.rs` | `licensedcode/detection.py` | Detection grouping |
+| `src/license_detection/detection.rs:1146` | N/A | `apply_detection_preferences` was incorrect |
+| `src/license_detection/detection.rs:907` | `detection.py:1017` | `remove_duplicate_detections` groups by identifier (correct) |
 
 ---
 
-## Success Criteria
+## Lessons Learned
 
-1. Identify exact divergence point
-2. Document root cause
-3. Implement fix
-4. All 16 duplicate merging tests pass
+1. **Deduplication must use location-aware identifiers**, not just expressions
+2. The `identifier` field (expression + content hash) correctly distinguishes different instances
+3. Python groups by `identifier`, ensuring different locations stay separate
+4. Always verify against Python reference behavior, not assumptions
+
+---
+
+## Resolution
+
+- **Fixed**: `src/license_detection/detection.rs:1146-1153`
+- **Tests Added**: `src/license_detection/duplicate_merge_investigation_test.rs`
+- **Status**: Complete

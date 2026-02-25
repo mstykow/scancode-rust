@@ -1,6 +1,6 @@
 # PLAN-062: Extra Detections Investigation
 
-## Status: NEEDS INVESTIGATION
+## Status: ROOT CAUSE IDENTIFIED
 
 ## Problem Statement
 
@@ -10,92 +10,99 @@ Additional unexpected license expressions are detected. Expected N expressions, 
 
 **File**: `testdata/license-golden/datadriven/lic1/gfdl-1.1-en_gnome_1.RULE`
 
-| Expected | Actual |
-|----------|--------|
-| `["gfdl-1.1", "gfdl-1.1-plus"]` | `["gfdl-1.1", "other-copyleft", "other-copyleft", "gfdl-1.1-plus", "gfdl-1.1", "gfdl-1.1", "gfdl-1.1-plus", "gfdl-1.1-plus", "gfdl-1.3-no-invariants-only", ...]` (12 total) |
+| Expected (Python) | Actual (Rust) |
+|-------------------|---------------|
+| `["gfdl-1.1", "gfdl-1.1-plus"]` | `["gfdl-1.1", "gfdl-1.1-plus", "other-copyleft", "gfdl-1.3-no-invariants-only"]` (4 expressions) |
 
 ---
 
-## Investigation Instructions
+## Root Cause Analysis
 
-### Step 1: Create Investigation Test File
+### The Core Issue: Sparse Qspan in Near-Duplicate Matches
 
-Create `src/license_detection/extra_detection_parity_investigation_test.rs`:
+The extra `other-copyleft` detections occur because:
 
-```rust
-#[cfg(test)]
-mod tests {
-    use crate::license_detection::LicenseDetectionEngine;
-    use std::path::PathBuf;
+1. **Rust's near-duplicate sequence matching produces sparse qspan matches**:
+   - GFDL-1.1 near-dupe match spans tokens 1-74 but only has 29 tokens in its qspan
+   - Missing tokens: 5-35 (gap), 41-53 (gap) - these are "unmatched" tokens in the query
 
-    fn get_engine() -> Option<LicenseDetectionEngine> {
-        let data_path = PathBuf::from("reference/scancode-toolkit/src/licensedcode/data");
-        if !data_path.exists() {
-            return None;
-        }
-        LicenseDetectionEngine::new(&data_path).ok()
-    }
+2. **The `other-copyleft` Aho matches land in these gaps**:
+   - `other-copyleft_fsf_address_3.RULE` matches tokens 41-55
+   - `other-copyleft_4.RULE` matches tokens 55-74
+   - These are NOT contained in the GFDL match's qspan (tokens 41-53 are missing)
 
-    fn read_test_file(name: &str) -> Option<String> {
-        let path = PathBuf::from("testdata/license-golden/datadriven/lic1").join(name);
-        std::fs::read_to_string(&path).ok()
-    }
+3. **The `qcontains` check fails**:
+   - `qcontains` checks if all of other's qspan tokens are in self's qspan
+   - GFDL qspan: `[1, 2, 3, 4, 36, 37, 38, 39, 40, 54, ...]` (missing 41-53)
+   - other-copyleft tokens 41-55 are NOT all in GFDL's qspan
+   - Result: `qcontains(other-copyleft at 41-55) = false`
 
-    #[test]
-    fn test_gfdl_11_gnome_parity() {
-        let Some(engine) = get_engine() else { return };
-        let Some(text) = read_test_file("gfdl-1.1-en_gnome_1.RULE") else { return };
+4. **Python's behavior differs**:
+   - Python produces a single `gfdl-1.1` match covering lines 1-608 with 99.03% coverage
+   - The match covers the entire document, including the header lines 1-20
+   - `other-copyleft` matches at lines 11-15 ARE contained within this larger match
 
-        // TODO: Add step-by-step assertions here
-        
-        let detections = engine.detect(&text).expect("Detection should succeed");
-        
-        // Final assertion - expect only 2 detections
-        assert_eq!(detections.len(), 2);
-    }
-}
-```
+### Why Rust's GFDL Match Starts at Line 20
 
-### Step 2: Run Python Reference to Get Baseline Data
+The investigation revealed:
 
-Use the playground:
-```bash
-cd reference/scancode-playground && venv/bin/python src/scancode/cli.py
-```
+1. **Near-duplicate matching produces multiple fragmented GFDL matches**:
+   - `gfdl-1.1`: lines 1-15, tokens 1-74, len=29 (sparse!)
+   - `gfdl-1.1`: lines 20-487, tokens 78-2242, len=2164 (main match)
+   - `gfdl-1.1`: lines 488-550, tokens 2242-2611, len=351
+   - `gfdl-1.1`: lines 557-607, tokens 2649-2909, len=228
 
-Extract intermediate data:
-1. All matches created - which rule identifiers?
-2. Which matches survive filtering?
-3. How are matches grouped into detections?
-4. What prevents extra matches in Python?
+2. **The first match (lines 1-15) has sparse qspan**:
+   - Only 29 matched tokens spread across the 74-token span
+   - Tokens 41-53 (where other-copyleft matches) are NOT in the qspan
 
-### Step 3: Add Step-by-Step Assertions
+3. **`filter_contained_matches` fails to remove `other-copyleft`**:
+   - `other-copyleft` at tokens 41-55 is NOT contained in GFDL's qspan
+   - `other-copyleft` at tokens 55-74 IS contained in GFDL's qspan (token 54+ are present)
 
-```rust
-// Example: Verify match count after refine
-#[test]
-fn test_gfdl_11_refined_matches() {
-    // ...setup...
-    let refined = /* get refined matches */;
-    
-    // From Python: expect exactly 2 matches
-    assert_eq!(refined.len(), 2, "Should have exactly 2 matches after refine");
-}
-```
+### Additional Issue: `gfdl-1.3-no-invariants-only` Matches
 
-### Step 4: Find Divergence Point
-
-The first failing assertion identifies where Rust creates extra matches that Python filters out.
-
-### Step 5: Document Findings
+The `gfdl-1.3-no-invariants-only` matches at lines 596-600 are also unexpected. These come from:
+- Aho-Corasick matching at the end of the document
+- These survive filtering because the main GFDL match ends around line 563
+- The gap at the end allows these smaller matches to survive
 
 ---
 
-## Key Questions
+## Investigation Files
 
-1. Are extra matches created from the start, or created by incorrect merging?
-2. Does Python have additional filtering for GFDL rules?
-3. Are `other-copyleft` and `gfdl-1.3-no-invariants-only` matching incorrectly?
+- `src/license_detection/extra_detection_investigation_test.rs` - Investigation tests
+- Test output shows exact token ranges and qspan contents
+
+---
+
+## Key Questions Answered
+
+1. **Are extra matches created from the start, or created by incorrect merging?**
+   - Created from the start (Aho matches) but survive filtering due to sparse qspan containment
+
+2. **Does Python have additional filtering for GFDL rules?**
+   - No, Python produces a larger, more complete GFDL match that contains the other matches
+
+3. **Are `other-copyleft` and `gfdl-1.3-no-invariants-only` matching incorrectly?**
+   - They match correctly; the issue is they should be contained within the GFDL match
+
+---
+
+## Potential Fixes
+
+### Option 1: Fix Near-Duplicate Matching to Produce Complete Matches
+- Investigate why near-dupe matching produces sparse qspan matches
+- Ensure the main GFDL match covers lines 1-608 like Python does
+- This would make `other-copyleft` be contained in the larger match
+
+### Option 2: Improve Containment Logic for Sparse Matches
+- When a match has sparse qspan, also check containment using start_token/end_token bounds
+- Modify `qcontains` to be more lenient with near-dupe matches
+
+### Option 3: Add Post-Processing to Merge Adjacent Same-Expression Matches
+- Merge all `gfdl-1.1` matches into a single match spanning lines 1-608
+- This would contain the `other-copyleft` matches
 
 ---
 
@@ -105,12 +112,21 @@ The first failing assertion identifies where Rust creates extra matches that Pyt
 |-----------|-------------|---------|
 | `src/license_detection/match_refine.rs` | `licensedcode/match.py` | Filter logic |
 | `src/license_detection/seq_match.rs` | `licensedcode/index.py` | Match creation |
+| `src/license_detection/models.rs` | `licensedcode/match.py` | `qcontains` implementation |
 
 ---
 
 ## Success Criteria
 
-1. Identify where extra matches are created or not filtered
-2. Document root cause
+1. ~~Identify where extra matches are created or not filtered~~ DONE
+2. ~~Document root cause~~ DONE
 3. Implement fix
 4. All 8 extra detection tests pass
+
+---
+
+## Next Steps
+
+1. Compare Python vs Rust near-duplicate matching algorithm
+2. Determine why Python produces complete match (lines 1-608) while Rust produces fragmented matches
+3. Implement fix to ensure GFDL match covers the entire license text

@@ -1,6 +1,6 @@
 # PLAN-060: CDDL Rule Selection Parity Investigation
 
-## Status: NEEDS INVESTIGATION
+## Status: DIVERGENCE IDENTIFIED
 
 ## Problem Statement
 
@@ -10,104 +10,108 @@ CDDL 1.0 test files are incorrectly matching CDDL 1.1 rules. Rust diverges from 
 
 **File**: `testdata/license-golden/datadriven/lic1/cddl-1.0_or_gpl-2.0-glassfish.txt`
 
-| Expected | Actual |
-|----------|--------|
+| Expected (Python) | Actual (Rust) |
+|-------------------|---------------|
 | `["cddl-1.0 OR gpl-2.0"]` | `["cddl-1.1 OR gpl-2.0 WITH classpath-exception-2.0"]` |
 
 ---
 
-## Investigation Instructions
+## Investigation Findings
 
-### Step 1: Create Investigation Test File
+### Divergence Point
 
-Create `src/license_detection/cddl_parity_investigation_test.rs`:
+**File**: `src/license_detection/match_refine.rs`
+**Function**: `filter_overlapping_matches()`
+**Line**: 583-586
+
+### Root Cause Analysis
+
+#### Phase 2: Near-Duplicate Detection
+
+Both Python and Rust create similar candidates during near-duplicate detection:
+- CDDL 1.0 (rid=9698): resemblance=1.000
+- CDDL 1.1 (rid=9757): resemblance=0.800
+
+#### Sequence Matching Creates Fragmented Matches
+
+Rust creates **6 fragmented CDDL 1.1 matches** during sequence matching:
+```
+Match 22: cddl-1.1 ... coverage=3.4%, start=0, end=10
+Match 23: cddl-1.1 ... coverage=20.0%, start=18, end=77
+Match 24: cddl-1.1 ... coverage=11.9%, start=81, end=116
+Match 25: cddl-1.1 ... coverage=1.0%, start=118, end=121
+Match 26: cddl-1.1 ... coverage=7.5%, start=121, end=143
+Match 27: cddl-1.1 ... coverage=42.7%, start=144, end=270
+```
+
+#### Merge Step Creates Competing Match
+
+During `merge_overlapping_matches()` (match_refine.rs:161-304), CDDL 1.1's fragmented matches are merged via the `surround` condition (line 251-266):
 
 ```rust
-#[cfg(test)]
-mod tests {
-    use crate::license_detection::LicenseDetectionEngine;
-    use std::path::PathBuf;
-
-    fn get_engine() -> Option<LicenseDetectionEngine> {
-        let data_path = PathBuf::from("reference/scancode-toolkit/src/licensedcode/data");
-        if !data_path.exists() {
-            return None;
-        }
-        LicenseDetectionEngine::new(&data_path).ok()
-    }
-
-    fn read_test_file(name: &str) -> Option<String> {
-        let path = PathBuf::from("testdata/license-golden/datadriven/lic1").join(name);
-        std::fs::read_to_string(&path).ok()
-    }
-
-    #[test]
-    fn test_cddl_10_glassfish_parity() {
-        let Some(engine) = get_engine() else { return };
-        let Some(text) = read_test_file("cddl-1.0_or_gpl-2.0-glassfish.txt") else { return };
-
-        // TODO: Add step-by-step assertions here
-        // Each assertion should verify intermediate data matches Python
-        
-        let detections = engine.detect(&text).expect("Detection should succeed");
-        
-        // Final assertion
-        assert_eq!(
-            detections.first().and_then(|d| d.license_expression.as_ref()),
-            Some(&"cddl-1.0 OR gpl-2.0".to_string())
-        );
+if current.surround(&next) {
+    let combined = combine_matches(&current, &next);
+    if combined.qspan().len() == combined.ispan().len() {
+        rule_matches[i] = combined;
+        rule_matches.remove(j);
+        continue;
     }
 }
 ```
 
-### Step 2: Run Python Reference to Get Baseline Data
+This creates a merged CDDL 1.1 match:
+- `start=0, end=270, matched_length=255, hilen=52`
 
-Use the playground:
-```bash
-cd reference/scancode-playground && venv/bin/python src/scancode/cli.py
+#### Filter Overlapping Discards CDDL 1.0
+
+At `filter_overlapping_matches()` line 583-586:
+
+```
+CDDL 1.1 (current): qstart=0, end=270, matched_length=255, hilen=52
+CDDL 1.0 (next): qstart=18, end=270, matched_length=252, hilen=51
+
+overlap_ratio_to_next (CDDL 1.0): 0.972 >= 0.90 (extra_large_next=true)
+current_len(255) >= next_len(252): true
+
+Line 583 condition: extra_large_next && current_len >= next_len = true
+Result: CDDL 1.0 is DISCARDED
 ```
 
-Modify the playground to extract and print intermediate data at each step:
-1. Token sequences
-2. Phase 1 (hash) matches
-3. Phase 2 (near-duplicate) matches  
-4. Phase 3 (seq) matches
-5. After merge_overlapping_matches()
-6. After filter_contained_matches()
-7. After filter_overlapping_matches()
-8. After refine_matches()
-9. Final detections
+### Key Intermediate Data
 
-### Step 3: Add Step-by-Step Assertions
+| Step | CDDL 1.0 | CDDL 1.1 |
+|------|----------|----------|
+| Phase 2 matches | 2 matches | 6 fragmented matches |
+| After merge | 2 matches (unchanged) | 1 merged match |
+| After filter_contained | 1 match (start=18) | 1 match (start=0) |
+| After filter_overlapping | **DISCARDED** | **KEPT** |
 
-For each pipeline step, add an assertion to the test that verifies Rust's intermediate data matches Python's:
+### Why Python Gets It Right
 
-```rust
-// Example: After merge_overlapping_matches
-#[test]
-fn test_cddl_10_after_merge() {
-    // ...setup...
-    let matches_after_merge = /* get matches after merge */;
-    
-    // Expected data from Python
-    let expected_match_count = 42;  // From Python run
-    let expected_cddl10_rid = Some(1234);  // From Python run
-    
-    assert_eq!(matches_after_merge.len(), expected_match_count);
-    assert!(matches_after_merge.iter().any(|m| m.rid == expected_cddl10_rid));
-}
-```
+Python also has the same `filter_overlapping_matches` logic, but the critical difference is:
 
-### Step 4: Find Divergence Point
+1. **Python does NOT create the same fragmented CDDL 1.1 matches** - the seq_match algorithm produces different intermediate results
+2. The CDDL 1.0 match has `match_coverage=100.0%` in Python's final result, suggesting it wins before any overlap filtering
 
-Run each test incrementally until the assertion fails. The first failing test is the divergence point.
+---
 
-### Step 5: Document Findings
+## Proposed Fix
 
-Update this plan with:
-- Exact file and line where divergence occurs
-- What Python does differently
-- Proposed fix
+The divergence appears to be in the sequence matching algorithm, not the filtering logic. The issue is that CDDL 1.1's fragmented matches are being created and merged incorrectly.
+
+### Investigation Required
+
+1. **Check Python's seq_match output** - does Python create CDDL 1.1 matches for this file?
+2. **Compare the `surround` merge condition** - the Rust implementation might be too aggressive in merging
+3. **Check ispan alignment** - the condition `combined.qspan().len() == combined.ispan().len()` might be incorrectly satisfied
+
+### Specific Fix Location
+
+**File**: `src/license_detection/match_refine.rs`
+**Function**: `merge_overlapping_matches()`
+**Lines**: 251-266 (surround merge condition)
+
+The `surround` condition is merging matches that shouldn't be merged. The CDDL 1.1 fragmented matches have gaps (positions not matched), but the merge is combining them into a single match that competes with CDDL 1.0.
 
 ---
 
@@ -115,9 +119,9 @@ Update this plan with:
 
 | Rust File | Python File | Purpose |
 |-----------|-------------|---------|
-| `src/license_detection/mod.rs` | `licensedcode/index.py` | Main detection pipeline |
-| `src/license_detection/match_refine.rs` | `licensedcode/match.py` | Match refinement |
-| `src/license_detection/models.rs` | `licensedcode/models.py` | Match data structures |
+| `src/license_detection/match_refine.rs:251-266` | `licensedcode/match.py:998-1010` | Surround merge condition |
+| `src/license_detection/seq_match.rs` | `licensedcode/match_seq.py` | Sequence matching |
+| `src/license_detection/models.rs:512-516` | `licensedcode/match.py:621-630` | `surround()` function |
 
 ---
 
