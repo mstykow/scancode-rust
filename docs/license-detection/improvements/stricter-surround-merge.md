@@ -1,10 +1,10 @@
 # Improvement: Stricter Surround Merge with Overlap Check
 
-## Status: DEFERRED (Blocked by Parity)
+## Status: DEFERRED (This is an IMPROVEMENT, not a parity fix)
 
-**This improvement is deferred until we achieve parity with Python reference.**
+**This improvement is deferred.** It would fix CDDL rule selection by being STRICTER than Python, but the golden tests expect Python's exact behavior.
 
-The fix would improve CDDL rule selection but diverges from Python's behavior, potentially causing golden test regressions.
+**The CDDL parity issue requires finding where Rust diverges from Python - this is a separate investigation.**
 
 ---
 

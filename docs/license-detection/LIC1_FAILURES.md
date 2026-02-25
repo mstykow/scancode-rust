@@ -10,7 +10,7 @@
 
 | Category | Count | Root Cause | Status |
 |----------|-------|------------|--------|
-| CDDL Rule Selection | 8 | Surround merge bug | Blocked by stricter-surround-merge |
+| CDDL Rule Selection | 8 | Rust diverges from Python | Needs investigation |
 | Duplicate Detections Merged | 16 | Matches incorrectly combined | Needs investigation |
 | Extra Detections | 8 | Additional unexpected expressions | Needs investigation |
 | Missing Detections | 12 | Fewer expressions than expected | Needs investigation |
@@ -20,9 +20,9 @@
 
 ## Category 1: CDDL Rule Selection (8 tests)
 
-**Root Cause**: Surround merge not checking overlap before combining. CDDL 1.1 matches incorrectly inflate and beat CDDL 1.0.
+**Root Cause**: Rust diverges from Python in CDDL rule selection. The surround merge improvement documented in `stricter-surround-merge.md` is an IMPROVEMENT over Python, not parity. The actual parity issue has not been identified.
 
-**Status**: Blocked by `improvements/stricter-surround-merge.md` (deferred until Python parity)
+**Status**: Needs investigation to find the divergence point between Rust and Python for CDDL tests
 
 | Test | Expected | Actual | Issue |
 |------|----------|--------|-------|
@@ -125,7 +125,7 @@
 
 ### High-Impact Clusters
 
-1. **CDDL (8 tests)** - Single root cause, blocked on Python parity
+1. **CDDL (8 tests)** - Rust diverges from Python; need to find exact divergence point
 2. **Duplicate Merging (16 tests)** - Likely single root cause in match merging logic
 3. **GFDL Extra Detections (4 tests)** - Pattern: gfdl-1.1 and gfdl-1.3 rules matching too broadly
 
@@ -144,8 +144,9 @@
 ## Recommended Investigation Order
 
 ### Phase 1: High-Impact Single Root Cause
-1. Duplicate merging (16 tests) - likely same fix for all
-2. GFDL extra detections (4 tests) - rule matching issue
+1. CDDL rule selection (8 tests) - find divergence from Python
+2. Duplicate merging (16 tests) - likely same fix for all
+3. GFDL extra detections (4 tests) - rule matching issue
 
 ### Phase 2: Medium-Impact  
 3. godot COPYRIGHT files (2 tests)
