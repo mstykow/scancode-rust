@@ -104,6 +104,12 @@ fn parse_rule_id(rule_identifier: &str) -> Option<usize> {
 }
 
 fn combine_matches(a: &LicenseMatch, b: &LicenseMatch) -> LicenseMatch {
+    assert_eq!(
+        a.rule_identifier, b.rule_identifier,
+        "Cannot combine matches with different rules: {} vs {}",
+        a.rule_identifier, b.rule_identifier
+    );
+
     let mut merged = a.clone();
 
     let mut qspan: HashSet<usize> = a.qspan().into_iter().collect();
@@ -699,17 +705,27 @@ pub fn filter_overlapping_matches(
     (matches, discarded)
 }
 
-fn match_to_span(m: &LicenseMatch) -> Span {
-    Span::from_range(m.start_line..m.end_line + 1)
+fn match_to_qspan(m: &LicenseMatch) -> Span {
+    if let Some(positions) = &m.qspan_positions
+        && !positions.is_empty()
+    {
+        return Span::from_iterator(positions.iter().copied());
+    }
+
+    if m.start_token == 0 && m.end_token == 0 {
+        return Span::from_range(m.start_line..m.end_line + 1);
+    }
+
+    Span::from_range(m.start_token..m.end_token)
 }
 
 pub fn restore_non_overlapping(
-    kept: &[LicenseMatch],
+    matches: &[LicenseMatch],
     discarded: Vec<LicenseMatch>,
 ) -> (Vec<LicenseMatch>, Vec<LicenseMatch>) {
-    let all_matched_qspans = kept
+    let all_matched_qspans = matches
         .iter()
-        .fold(Span::new(), |acc, m| acc.union_span(&match_to_span(m)));
+        .fold(Span::new(), |acc, m| acc.union_span(&match_to_qspan(m)));
 
     let mut to_keep = Vec::new();
     let mut to_discard = Vec::new();
@@ -717,8 +733,8 @@ pub fn restore_non_overlapping(
     let merged_discarded = merge_overlapping_matches(&discarded);
 
     for disc in merged_discarded {
-        let disc_span = match_to_span(&disc);
-        if !disc_span.intersects(&all_matched_qspans) {
+        let disc_qspan = match_to_qspan(&disc);
+        if !disc_qspan.intersects(&all_matched_qspans) {
             to_keep.push(disc);
         } else {
             to_discard.push(disc);

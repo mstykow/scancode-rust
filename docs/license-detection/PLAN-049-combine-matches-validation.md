@@ -1,6 +1,6 @@
 # PLAN-049: Add Validation to combine_matches()
 
-## Status: NOT IMPLEMENTED
+## Status: IMPLEMENTED
 
 ## Summary
 
