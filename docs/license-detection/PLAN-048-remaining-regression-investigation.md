@@ -1,8 +1,18 @@
 # PLAN-048: Remaining -3 Regression Investigation
 
+## Status: SUPERSEDED - Issues extracted to dedicated plans
+
 ## Summary
 
-After PLAN-047 (rid field) and the LGPL false positive fix, there remains a -3 regression in the `external` test category. This document consolidates findings from 9 investigation subagents.
+This investigation identified several issues. All actionable items have been extracted to dedicated plans:
+
+| Issue | New Plan | Priority |
+|-------|----------|----------|
+| `combine_matches` missing validation | PLAN-049 | HIGH |
+| NuGet SPDX pattern | PLAN-050 | MEDIUM |
+| hispan reconstruction | PLAN-051 | MEDIUM |
+| `restore_non_overlapping` lines vs tokens | PLAN-030 (existing) | LOW |
+| Extra licensing_contains check | Documented as intentional extension | NO ACTION |
 
 **Current State:**
 

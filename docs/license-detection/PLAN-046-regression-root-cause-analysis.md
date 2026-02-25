@@ -1,8 +1,17 @@
 # PLAN-046: Regression Root Cause Analysis
 
+## Status: SUPERSEDED - Issues extracted to dedicated plans
+
 ## Summary
 
-After implementing PLAN-044 (`spans_equal()`) and PLAN-045 (`compare_rule_quality()`), we observed 3 net test regressions. This document compiles findings from multiple investigation subagents to identify the root causes.
+This investigation identified root causes of regressions. All actionable issues have been extracted to dedicated plans:
+
+| Issue | New Plan |
+|-------|----------|
+| `combine_matches` missing validation | PLAN-049 |
+| NuGet SPDX pattern | PLAN-050 |
+| hispan reconstruction | PLAN-051 |
+| `restore_non_overlapping` lines vs tokens | PLAN-030 (existing) |
 
 **Key Finding**: The regressions are NOT caused by bugs in PLAN-044/045 implementations. Instead, they expose deeper differences between Rust and Python that interact with the new code.
 
