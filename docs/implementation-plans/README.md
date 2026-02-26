@@ -25,6 +25,25 @@ implementation-plans/
 - **[ASSEMBLY_PLAN.md](package-detection/ASSEMBLY_PLAN.md)** - Package assembly roadmap
   - Status: **COMPLETE** — All phases done (sibling merge, nested merge, workspace assembly, file reference resolution)
 
+### Text Detection (`text-detection/`)
+
+- **[COPYRIGHT_DETECTION_PLAN.md](text-detection/COPYRIGHT_DETECTION_PLAN.md)** - Copyright statement extraction
+  - Status: **COMPLETE** — Implementation landed with scanner integration and golden-test workflow
+
+- **[EMAIL_URL_DETECTION_PLAN.md](text-detection/EMAIL_URL_DETECTION_PLAN.md)** - Email and URL extraction
+  - Status: 🟡 Planning Complete — Ready for implementation
+
+### Infrastructure (`infrastructure/`)
+
+- **[CLI_PLAN.md](infrastructure/CLI_PLAN.md)** - Command-line interface parameter parity
+  - Status: 🟡 5 parameters implemented, 30+ pending
+
+- **[CACHING_PLAN.md](infrastructure/CACHING_PLAN.md)** - Scan result caching and incremental scanning
+  - Status: 🟡 Planning Complete — Ready for implementation
+
+- **[PROGRESS_TRACKING_PLAN.md](infrastructure/PROGRESS_TRACKING_PLAN.md)** - Enhanced progress reporting
+  - Status: 🟡 Planning Complete — Ready for implementation
+
 ## Placeholder Plans (To Be Fleshed Out)
 
 These represent major architectural components not yet implemented. Each will be expanded into a detailed implementation plan when work begins.
@@ -33,12 +52,6 @@ These represent major architectural components not yet implemented. Each will be
 
 - **[LICENSE_DETECTION_PLAN.md](text-detection/LICENSE_DETECTION_PLAN.md)** - License text detection and matching
   - Priority: P0 - Critical, Effort: 6-8 weeks
-
-- **[COPYRIGHT_DETECTION_PLAN.md](text-detection/COPYRIGHT_DETECTION_PLAN.md)** - Copyright statement extraction
-  - Priority: P1 - High, Effort: 3-4 weeks
-
-- **[EMAIL_URL_DETECTION_PLAN.md](text-detection/EMAIL_URL_DETECTION_PLAN.md)** - Email and URL extraction
-  - Priority: P2 - Medium, Effort: 1-2 weeks
 
 ### Post-Processing (`post-processing/`)
 
@@ -58,12 +71,6 @@ These represent major architectural components not yet implemented. Each will be
 
 - **[PLUGIN_SYSTEM_PLAN.md](infrastructure/PLUGIN_SYSTEM_PLAN.md)** - Extensible plugin architecture
   - Priority: P3 - Low, Effort: 3-4 weeks
-
-- **[CACHING_PLAN.md](infrastructure/CACHING_PLAN.md)** - Scan result caching and incremental scanning
-  - Priority: P2 - Medium, Effort: 2-3 weeks
-
-- **[PROGRESS_TRACKING_PLAN.md](infrastructure/PROGRESS_TRACKING_PLAN.md)** - Enhanced progress reporting
-  - Priority: P3 - Low, Effort: 1-2 weeks
 
 ## Document Lifecycle
 

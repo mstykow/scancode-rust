@@ -1,6 +1,7 @@
-# Beyond-Parity Parser Improvements
+# Beyond-Parity Improvements
 
 This directory documents features where scancode-rust **exceeds** the Python ScanCode Toolkit reference implementation.
+It includes parser improvements and text-detection subsystem improvements.
 
 ## Philosophy
 
@@ -31,7 +32,7 @@ Python has unsafe patterns (code execution, DoS vulnerabilities), we use safe al
 
 ## Summary Table
 
-| Parser                                                  | Improvement Type                       | Python Status                                                                                                        | Our Status                                                                             | Impact                                                                        |
+| Area                                                    | Improvement Type                       | Python Status                                                                                                        | Our Status                                                                             | Impact                                                                        |
 | ------------------------------------------------------- | -------------------------------------- | -------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
 | [Alpine](alpine-parser.md)                              | 🐛 Bug Fix + ✨ Feature                | SHA1 always `null` + Provider field TODO                                                                             | SHA1 correctly decoded + Providers extracted                                           | Critical for integrity verification                                           |
 | [RPM](rpm-parser.md)                                    | ✨ New Feature                         | Multiple "add dependencies!!!" TODOs                                                                                 | Full dependency extraction with constraints                                            | Essential for SBOM completeness                                               |
@@ -55,11 +56,11 @@ Python has unsafe patterns (code execution, DoS vulnerabilities), we use safe al
 | [npm Git URLs](npm-git-url-dependencies.md)             | 🐛 Bug Fix                             | Git URLs treated as pinned versions                                                                                  | Correct is_pinned=false for non-version deps                                           | Valid PURLs + correct dependency resolution status                            |
 | [Gitmodules](gitmodules-parser.md)                      | ✨ New Feature                         | No .gitmodules parser                                                                                                | Full submodule dependency extraction                                                   | Complete dependency graphs for projects using submodules                      |
 | [Copyright Detection](copyright-detection.md)           | 🐛 Bug Fix + 🔍 Enhanced + 🛡️ Security | Year range stops at 2039, short-year typo, French/Spanish case bugs, string-based POS tags, global mutable singleton | Year range 2099, all regex bugs fixed, type-safe enum POS tags, thread-safe `LazyLock` | Correct year detection, reliable i18n, compile-time safety, parallel scanning |
-| All Parsers                                             | 🛡️ Security                            | No DoS limits                                                                                                        | File size + iteration limits                                                           | Protection against resource exhaustion                                        |
+| Cross-cutting (All Parsers)                             | 🛡️ Security                            | No DoS limits                                                                                                        | File size + iteration limits                                                           | Protection against resource exhaustion                                        |
 
-## Per-Parser Documentation
+## Per-Improvement Documentation
 
-Each parser with improvements has a dedicated document:
+Each area with improvements has a dedicated document:
 
 - **[alpine-parser.md](alpine-parser.md)** — 🐛 Bug Fix + ✨ Feature: SHA1 decoding fix + Provider field extraction
 - **[rpm-parser.md](rpm-parser.md)** — ✨ New Feature: Dependency extraction with version constraints
@@ -95,7 +96,7 @@ All improvements are:
 
 ## Contributing Improvements
 
-When implementing a parser, if you discover:
+When implementing a parser or detection subsystem, if you discover:
 
 1. **A bug in Python**: Fix it in Rust, document here
 2. **A TODO in Python**: Implement it in Rust, document here
