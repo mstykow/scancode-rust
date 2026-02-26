@@ -62,7 +62,7 @@ pub use match_refine::{
     filter_invalid_contained_unknown_matches, merge_overlapping_matches, refine_matches,
 };
 pub use seq_match::{
-    MAX_NEAR_DUPE_CANDIDATES, compute_candidates_with_msets, seq_match, seq_match_with_candidates,
+    MAX_NEAR_DUPE_CANDIDATES, compute_candidates_with_msets, seq_match_with_candidates,
 };
 pub use spdx_lid::spdx_lid_match;
 pub use unknown_match::unknown_match;
@@ -229,11 +229,20 @@ impl LicenseDetectionEngine {
             }
         }
 
-        // Phase 3: Regular sequence matching
+        // Phase 3: Regular sequence matching on whole_run (with 70 candidates like Python)
+        const MAX_SEQ_CANDIDATES: usize = 70;
         {
             let whole_run = query.whole_query_run();
-            let seq_matches = seq_match(&self.index, &whole_run);
-            seq_all_matches.extend(seq_matches);
+            let candidates = compute_candidates_with_msets(
+                &self.index,
+                &whole_run,
+                false,
+                MAX_SEQ_CANDIDATES,
+            );
+            if !candidates.is_empty() {
+                let matches = seq_match_with_candidates(&self.index, &whole_run, &candidates);
+                seq_all_matches.extend(matches);
+            }
         }
 
         // Phase 4: Query run matching

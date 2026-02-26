@@ -63,9 +63,19 @@ impl Eq for ScoresVector {}
 
 impl Ord for ScoresVector {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.containment
-            .partial_cmp(&other.containment)
-            .unwrap_or(std::cmp::Ordering::Equal)
+        // Python sorts ScoresVector namedtuple with reverse=True:
+        // 1. is_highly_resemblant (True > False)
+        // 2. containment (higher is better)
+        // 3. resemblance (higher is better)
+        // 4. matched_length (higher is better)
+        // Note: rid is used for tie-breaking but not in Python's ScoresVector
+        self.is_highly_resemblant
+            .cmp(&other.is_highly_resemblant)
+            .then_with(|| {
+                self.containment
+                    .partial_cmp(&other.containment)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            })
             .then_with(|| {
                 self.resemblance
                     .partial_cmp(&other.resemblance)
@@ -76,7 +86,6 @@ impl Ord for ScoresVector {
                     .partial_cmp(&other.matched_length)
                     .unwrap_or(std::cmp::Ordering::Equal)
             })
-            .then_with(|| self.is_highly_resemblant.cmp(&other.is_highly_resemblant))
             .then_with(|| self.rid.cmp(&other.rid))
     }
 }
@@ -108,7 +117,13 @@ impl Eq for Candidate {}
 
 impl Ord for Candidate {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.score_vec_full.cmp(&other.score_vec_full)
+        // Python sorts the tuple ((svr, svf), rid, rule, ...) with reverse=True
+        // So it compares (svr, svf) tuple first, which means:
+        // 1. Compare rounded (svr) first
+        // 2. Then compare full (svf) if rounded is equal
+        self.score_vec_rounded
+            .cmp(&other.score_vec_rounded)
+            .then_with(|| self.score_vec_full.cmp(&other.score_vec_full))
     }
 }
 
@@ -331,17 +346,19 @@ pub fn compute_candidates_with_msets(
             continue;
         };
 
+        // Filter using HIGH multisets (Python: high_intersection check)
         let query_high_mset = high_multiset_subset(&query_mset, len_legalese);
         let rule_high_mset = high_multiset_subset(rule_mset, len_legalese);
-
-        let intersection_mset = multisets_intersector(&query_high_mset, &rule_high_mset);
-        if intersection_mset.is_empty() {
+        let high_intersection_mset = multisets_intersector(&query_high_mset, &rule_high_mset);
+        if high_intersection_mset.is_empty() {
             continue;
         }
 
-        let matched_length: usize = intersection_mset.values().sum();
-        let qset_len: usize = query_high_mset.values().sum();
-        let iset_len: usize = rule_high_mset.values().sum();
+        // Compute scores using FULL multisets (Python: matched_length = counter(intersection))
+        let full_intersection_mset = multisets_intersector(&query_mset, rule_mset);
+        let matched_length: usize = full_intersection_mset.values().sum();
+        let qset_len: usize = query_mset.values().sum();
+        let iset_len: usize = rule_mset.values().sum();
 
         if qset_len == 0 || iset_len == 0 {
             continue;

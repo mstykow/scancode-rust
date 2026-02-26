@@ -722,12 +722,12 @@ impl LicenseMatch {
         let (self_qstart, _self_qend) = self.qspan_bounds();
         let (_other_qstart, other_qend) = other.qspan_bounds();
 
-        let q_after = self_qstart > other_qend;
+        let q_after = self_qstart >= other_qend;
 
         let (self_istart, _self_iend) = self.ispan_bounds();
         let (_other_istart, other_iend) = other.ispan_bounds();
 
-        let i_after = self_istart > other_iend;
+        let i_after = self_istart >= other_iend;
 
         q_after && i_after
     }
