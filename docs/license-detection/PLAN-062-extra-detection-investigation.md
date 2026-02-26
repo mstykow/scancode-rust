@@ -1,8 +1,18 @@
 # PLAN-062: Extra Detections Investigation
 
-## Status: ROOT CAUSE IDENTIFIED
+## Status: FIX ATTEMPTED - CAUSED REGRESSION (Reverted)
 
-## Problem Statement
+## Fix Attempt
+
+A fix was attempted to improve containment logic for sparse qspan matches, but it caused major regression:
+- lic1: 252 → 211 passed (-41)
+- lic2: 807 → 738 passed (-69)
+
+The fix was reverted. A different approach is needed.
+
+## Root Cause Analysis
+
+### Problem Statement
 
 Additional unexpected license expressions are detected. Expected N expressions, got N+1 or more.
 
@@ -13,10 +23,6 @@ Additional unexpected license expressions are detected. Expected N expressions, 
 | Expected (Python) | Actual (Rust) |
 |-------------------|---------------|
 | `["gfdl-1.1", "gfdl-1.1-plus"]` | `["gfdl-1.1", "gfdl-1.1-plus", "other-copyleft", "gfdl-1.3-no-invariants-only"]` (4 expressions) |
-
----
-
-## Root Cause Analysis
 
 ### The Core Issue: Sparse Qspan in Near-Duplicate Matches
 

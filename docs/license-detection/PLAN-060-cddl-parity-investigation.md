@@ -1,6 +1,19 @@
 # PLAN-060: CDDL Rule Selection Parity Investigation
 
-## Status: DIVERGENCE IDENTIFIED
+## Status: FIX ATTEMPTED (Partial Improvement)
+
+## Fix Applied
+
+**Commit**: `d8de83f0`
+
+1. Enhanced `surround()` in `models.rs` to check both qspan AND ispan bounds
+2. Added `qoverlap > 0` check in `match_refine.rs` before merging surrounded matches
+
+**Result**: Marginal improvement (lic1: 251→252 passed). The fix doesn't fully resolve the issue because the root cause is deeper - Python's sequence matching doesn't create CDDL 1.1 fragmented matches in the first place.
+
+## Remaining Issue
+
+Rust's `seq_match` creates 6 fragmented CDDL 1.1 matches that get merged and compete with CDDL 1.0. Python produces different intermediate results.
 
 ## Problem Statement
 

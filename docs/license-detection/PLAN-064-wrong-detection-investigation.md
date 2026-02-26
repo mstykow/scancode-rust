@@ -1,6 +1,6 @@
 # PLAN-064: Wrong Detection Investigation
 
-## Status: ROOT CAUSE IDENTIFIED
+## Status: ROOT CAUSE IDENTIFIED (Fix Not Yet Attempted)
 
 ## Problem Statement
 
