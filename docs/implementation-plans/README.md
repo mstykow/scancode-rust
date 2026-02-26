@@ -31,12 +31,12 @@ implementation-plans/
   - Status: **COMPLETE** — Implementation landed with scanner integration and golden-test workflow
 
 - **[EMAIL_URL_DETECTION_PLAN.md](text-detection/EMAIL_URL_DETECTION_PLAN.md)** - Email and URL extraction
-  - Status: 🟡 Planning Complete — Ready for implementation
+  - Status: **COMPLETE** — Implementation landed with scanner/CLI integration and local golden tests
 
 ### Infrastructure (`infrastructure/`)
 
 - **[CLI_PLAN.md](infrastructure/CLI_PLAN.md)** - Command-line interface parameter parity
-  - Status: 🟡 5 parameters implemented, 30+ pending
+  - Status: 🟡 9 parameters implemented, 30+ pending
 
 - **[CACHING_PLAN.md](infrastructure/CACHING_PLAN.md)** - Scan result caching and incremental scanning
   - Status: 🟡 Planning Complete — Ready for implementation
