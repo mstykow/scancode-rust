@@ -387,7 +387,7 @@ mod tests {
                 &index.licenses_by_key.values().cloned().collect::<Vec<_>>(),
             ),
         }
-        .detect(&text)
+        .detect(&text, false)
         .expect("Detection failed");
 
         eprintln!("\nDetections:");

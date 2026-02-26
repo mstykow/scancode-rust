@@ -5,7 +5,6 @@
 
 #[cfg(test)]
 mod tests {
-    use crate::license_detection::LicenseDetectionEngine;
     use crate::license_detection::aho_match::aho_match;
     use crate::license_detection::hash_match::hash_match;
     use crate::license_detection::match_refine::{
@@ -15,11 +14,12 @@ mod tests {
     use crate::license_detection::models::LicenseMatch;
     use crate::license_detection::query::Query;
     use crate::license_detection::seq_match::{
-        MAX_NEAR_DUPE_CANDIDATES, compute_candidates_with_msets, seq_match,
-        seq_match_with_candidates,
+        compute_candidates_with_msets, seq_match, seq_match_with_candidates,
+        MAX_NEAR_DUPE_CANDIDATES,
     };
     use crate::license_detection::spdx_lid::spdx_lid_match;
     use crate::license_detection::unknown_match::unknown_match;
+    use crate::license_detection::LicenseDetectionEngine;
     use once_cell::sync::Lazy;
     use std::path::PathBuf;
     use std::sync::Once;
@@ -66,6 +66,11 @@ mod tests {
         std::fs::read_to_string(&path).ok()
     }
 
+    fn read_unknown_test_file(name: &str) -> Option<String> {
+        let path = PathBuf::from("testdata/license-golden/datadriven/unknown").join(name);
+        std::fs::read_to_string(&path).ok()
+    }
+
     #[test]
     fn test_gfdl_11_gnome_full_detection() {
         let Some(engine) = ensure_engine() else {
@@ -81,7 +86,9 @@ mod tests {
         eprintln!("\n=== FULL DETECTION for gfdl-1.1-en_gnome_1.RULE ===");
         eprintln!("Text length: {} bytes", text.len());
 
-        let detections = engine.detect(&text).expect("Detection should succeed");
+        let detections = engine
+            .detect(&text, false)
+            .expect("Detection should succeed");
 
         eprintln!("\nNumber of detections: {}", detections.len());
         for (i, d) in detections.iter().enumerate() {
@@ -1187,6 +1194,241 @@ mod tests {
                         m.start_line, m.end_line, m.match_coverage, m.rule_identifier
                     );
                 }
+            }
+        }
+    }
+
+    #[test]
+    fn test_plan_080_swrule_detection_ucware() {
+        let Some(engine) = ensure_engine() else {
+            eprintln!("Skipping test: reference directory not found");
+            return;
+        };
+
+        let Some(text) = read_unknown_test_file("ucware-eula.txt") else {
+            eprintln!("Skipping test: test file not found");
+            return;
+        };
+
+        let index = engine.index();
+        let query = Query::new(&text, index).expect("Query creation should succeed");
+
+        eprintln!("\n=== PLAN-080: swrule detection investigation ===");
+
+        // Find swrule.LICENSE in the index
+        let swrule_rid = index
+            .rules_by_rid
+            .iter()
+            .position(|r| r.identifier == "swrule.LICENSE");
+
+        if let Some(rid) = swrule_rid {
+            let rule = &index.rules_by_rid[rid];
+            eprintln!("\nswrule.LICENSE properties:");
+            eprintln!("  tokens length: {}", rule.tokens.len());
+            eprintln!("  length_unique: {}", rule.length_unique);
+            eprintln!("  high_length: {}", rule.high_length);
+            eprintln!("  high_length_unique: {}", rule.high_length_unique);
+            eprintln!("  min_matched_length: {}", rule.min_matched_length);
+            eprintln!(
+                "  min_high_matched_length: {}",
+                rule.min_high_matched_length
+            );
+            eprintln!(
+                "  min_matched_length_unique: {}",
+                rule.min_matched_length_unique
+            );
+            eprintln!(
+                "  min_high_matched_length_unique: {}",
+                rule.min_high_matched_length_unique
+            );
+            eprintln!(
+                "  is_approx_matchable: {}",
+                index.approx_matchable_rids.contains(&rid)
+            );
+
+            // Show legalese tokens in swrule
+            let legalese_tokens: Vec<_> = rule
+                .tokens
+                .iter()
+                .filter(|&&tid| (tid as usize) < index.len_legalese)
+                .collect();
+            eprintln!("  legalese tokens count: {}", legalese_tokens.len());
+        } else {
+            eprintln!("swrule.LICENSE not found in index!");
+        }
+
+        // Check query runs and candidate selection
+        eprintln!("\nQuery properties:");
+        eprintln!("  tokens length: {}", query.tokens.len());
+        eprintln!("  query runs: {}", query.query_runs().len());
+
+        for (i, query_run) in query.query_runs().iter().enumerate() {
+            let candidates = compute_candidates_with_msets(index, query_run, false, 70);
+
+            eprintln!("\nQuery run {}: {} candidates", i, candidates.len());
+
+            // Check if swrule is among candidates
+            let swrule_in_candidates = candidates
+                .iter()
+                .enumerate()
+                .find(|(_, c)| c.rule.identifier == "swrule.LICENSE");
+            if let Some((pos, c)) = swrule_in_candidates {
+                eprintln!("  swrule found at position {}!", pos + 1);
+                eprintln!("    containment: {}", c.score_vec_full.containment);
+                eprintln!("    resemblance: {}", c.score_vec_full.resemblance);
+                eprintln!("    matched_length: {}", c.score_vec_full.matched_length);
+                eprintln!(
+                    "    is_highly_resemblant: {}",
+                    c.score_vec_full.is_highly_resemblant
+                );
+            } else if swrule_rid.is_some() {
+                eprintln!("  swrule NOT in top 70 candidates");
+                eprintln!("  Step 1 position: 329 (containment=0.694)");
+                eprintln!("  Python shows position 66 (containment=0.765)");
+                eprintln!("  --> Difference is in step 2 multiset ranking!");
+
+                // Show candidates around position 65-70 to see what's there
+                eprintln!("\n  Candidates around positions 60-70:");
+                for (pos, c) in candidates.iter().enumerate().skip(59).take(15) {
+                    eprintln!(
+                        "    {}: {} (cont={:.3}, resembl={:.4})",
+                        pos + 1,
+                        c.rule.identifier,
+                        c.score_vec_full.containment,
+                        c.score_vec_full.resemblance
+                    );
+                }
+
+                // Get all step 1 candidates to see if swrule was filtered
+                let all_step1_candidates = {
+                    let query_tokens = query_run.matchable_tokens();
+                    let query_token_ids: Vec<u16> = query_tokens
+                        .iter()
+                        .filter_map(|&tid| if tid >= 0 { Some(tid as u16) } else { None })
+                        .collect();
+
+                    let (query_set, query_mset) =
+                        crate::license_detection::index::token_sets::build_set_and_mset(
+                            &query_token_ids,
+                        );
+                    let len_legalese = index.len_legalese;
+
+                    let mut candidates: Vec<(String, f32, f32, usize)> = Vec::new();
+
+                    for (rid, rule) in index.rules_by_rid.iter().enumerate() {
+                        if !index.approx_matchable_rids.contains(&rid) {
+                            continue;
+                        }
+
+                        let Some(rule_set) = index.sets_by_rid.get(&rid) else {
+                            continue;
+                        };
+
+                        let intersection: std::collections::HashSet<u16> =
+                            query_set.intersection(rule_set).copied().collect();
+                        if intersection.is_empty() {
+                            continue;
+                        }
+
+                        let high_set_intersection =
+                            crate::license_detection::index::token_sets::high_tids_set_subset(
+                                &intersection,
+                                len_legalese,
+                            );
+                        if high_set_intersection.is_empty() {
+                            continue;
+                        }
+
+                        let high_matched_length =
+                            crate::license_detection::index::token_sets::tids_set_counter(
+                                &high_set_intersection,
+                            );
+                        if high_matched_length < rule.min_high_matched_length_unique {
+                            continue;
+                        }
+
+                        let matched_length =
+                            crate::license_detection::index::token_sets::tids_set_counter(
+                                &intersection,
+                            );
+                        if matched_length < rule.min_matched_length_unique {
+                            continue;
+                        }
+
+                        // Compute resemblance
+                        let qset_len = query_set.len();
+                        let iset_len = rule.length_unique;
+                        if qset_len == 0 || iset_len == 0 {
+                            continue;
+                        }
+
+                        let union_len = qset_len + iset_len - matched_length;
+                        let resemblance = matched_length as f32 / union_len as f32;
+                        let containment = matched_length as f32 / iset_len as f32;
+
+                        candidates.push((rule.identifier.clone(), containment, resemblance, rid));
+                    }
+
+                    candidates.sort_by(|a, b| {
+                        b.1.partial_cmp(&a.1)
+                            .unwrap_or(std::cmp::Ordering::Equal)
+                            .then_with(|| {
+                                b.2.partial_cmp(&a.2).unwrap_or(std::cmp::Ordering::Equal)
+                            })
+                    });
+                    candidates
+                };
+
+                // Find swrule's position
+                for (i, (id, cont, resembl, _rid)) in all_step1_candidates.iter().enumerate() {
+                    if id.contains("swrule") {
+                        eprintln!(
+                            "  swrule position in step1: {} (containment={:.3}, resemblance={:.3})",
+                            i, cont, resembl
+                        );
+                        break;
+                    }
+                }
+
+                eprintln!("  Total step1 candidates: {}", all_step1_candidates.len());
+                eprintln!("  Top 10 candidates:");
+                for (i, (id, cont, resembl, _rid)) in
+                    all_step1_candidates.iter().take(10).enumerate()
+                {
+                    eprintln!(
+                        "    {}: {} (cont={:.3}, resembl={:.3})",
+                        i + 1,
+                        id,
+                        cont,
+                        resembl
+                    );
+                }
+            }
+        }
+
+        // Run full detection
+        let detections = engine.detect(&text, false).expect("Detection failed");
+
+        // Check for swrule in detections
+        let has_swrule = detections.iter().any(|d| {
+            d.matches
+                .iter()
+                .any(|m| m.rule_identifier.contains("swrule"))
+        });
+        eprintln!("\nHas swrule detection: {}", has_swrule);
+
+        eprintln!("\nAll matches:");
+        for d in &detections {
+            for m in &d.matches {
+                eprintln!(
+                    "  {} (rule: {}, matcher: {}, score: {:.1}, lines: {}-{})",
+                    m.license_expression,
+                    m.rule_identifier,
+                    m.matcher,
+                    m.score,
+                    m.start_line,
+                    m.end_line
+                );
             }
         }
     }

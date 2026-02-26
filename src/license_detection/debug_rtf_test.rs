@@ -22,7 +22,7 @@ mod debug_tests {
         eprintln!("{}", &rtf_text[..rtf_text.len().min(500)]);
         eprintln!("\n---\n");
 
-        let detections = engine.detect(&rtf_text).expect("Detection failed");
+        let detections = engine.detect(&rtf_text, false).expect("Detection failed");
 
         eprintln!("Detections: {}", detections.len());
         for (i, d) in detections.iter().enumerate() {

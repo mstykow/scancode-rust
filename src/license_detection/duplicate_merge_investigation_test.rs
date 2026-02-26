@@ -62,7 +62,9 @@ mod tests {
             include_str!("../../testdata/license-golden/datadriven/lic2/1908-bzip2/bzip2.106.c");
 
         eprintln!("\n=== FULL DETECTION PIPELINE for bzip2.106.c ===");
-        let detections = engine.detect(content).expect("Detection should succeed");
+        let detections = engine
+            .detect(content, false)
+            .expect("Detection should succeed");
 
         eprintln!("Number of detections: {}", detections.len());
 
@@ -268,7 +270,9 @@ mod tests {
         );
 
         eprintln!("\n=== FULL DETECTION PIPELINE for apache-2.0_and_apache-2.0.txt ===");
-        let detections = engine.detect(content).expect("Detection should succeed");
+        let detections = engine
+            .detect(content, false)
+            .expect("Detection should succeed");
 
         eprintln!("Number of detections: {}", detections.len());
 
@@ -305,7 +309,9 @@ mod tests {
         );
 
         eprintln!("\n=== FULL DETECTION PIPELINE for aladdin-md5_and_not_rsa-md5.txt ===");
-        let detections = engine.detect(content).expect("Detection should succeed");
+        let detections = engine
+            .detect(content, false)
+            .expect("Detection should succeed");
 
         eprintln!("Number of detections: {}", detections.len());
 
@@ -615,7 +621,9 @@ mod tests {
         let content = include_str!("../../testdata/license-golden/datadriven/lic1/edl-1.0.txt");
 
         eprintln!("\n=== FULL DETECTION PIPELINE for edl-1.0.txt ===");
-        let detections = engine.detect(content).expect("Detection should succeed");
+        let detections = engine
+            .detect(content, false)
+            .expect("Detection should succeed");
 
         eprintln!("Number of detections: {}", detections.len());
 

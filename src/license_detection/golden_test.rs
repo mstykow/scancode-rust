@@ -148,7 +148,7 @@ mod golden_tests {
         }
 
         /// Run this test against the detection engine
-        fn run(&self, engine: &LicenseDetectionEngine) -> Result<(), String> {
+        fn run(&self, engine: &LicenseDetectionEngine, unknown_licenses: bool) -> Result<(), String> {
             let text = match self.read_test_file_content()? {
                 Some(t) => t,
                 None => {
@@ -169,7 +169,7 @@ mod golden_tests {
                 }
             };
 
-            let detections = engine.detect(&text).map_err(|e| {
+            let detections = engine.detect(&text, unknown_licenses).map_err(|e| {
                 format!("Detection failed for {}: {:?}", self.test_file.display(), e)
             })?;
 
@@ -238,7 +238,12 @@ mod golden_tests {
 
     /// Run a complete test suite using the shared engine
     fn run_suite(suite_name: &str, dir: &Path) -> SuiteResult {
-        run_suite_range(suite_name, dir, None, None)
+        run_suite_range(suite_name, dir, None, None, false)
+    }
+
+    /// Run a complete test suite with unknown_licenses enabled
+    fn run_suite_unknown(suite_name: &str, dir: &Path) -> SuiteResult {
+        run_suite_range(suite_name, dir, None, None, true)
     }
 
     /// Run a subset of a test suite (for splitting large suites)
@@ -247,6 +252,7 @@ mod golden_tests {
         dir: &Path,
         start: Option<usize>,
         end: Option<usize>,
+        unknown_licenses: bool,
     ) -> SuiteResult {
         let mut result = SuiteResult {
             total: 0,
@@ -293,7 +299,7 @@ mod golden_tests {
                 continue;
             }
 
-            match test.run(engine) {
+            match test.run(engine, unknown_licenses) {
                 Ok(()) => result.passed += 1,
                 Err(e) => {
                     result.failed += 1;
@@ -329,6 +335,7 @@ mod golden_tests {
             &PathBuf::from(format!("{}/lic2", GOLDEN_DIR)),
             Some(0),
             Some(285),
+            false,
         );
         if result.failed > 0 {
             println!("\n{} failures:", result.failed);
@@ -350,6 +357,7 @@ mod golden_tests {
             &PathBuf::from(format!("{}/lic2", GOLDEN_DIR)),
             Some(285),
             Some(570),
+            false,
         );
         if result.failed > 0 {
             println!("\n{} failures:", result.failed);
@@ -371,6 +379,7 @@ mod golden_tests {
             &PathBuf::from(format!("{}/lic2", GOLDEN_DIR)),
             Some(570),
             None,
+            false,
         );
         if result.failed > 0 {
             println!("\n{} failures:", result.failed);
@@ -404,6 +413,7 @@ mod golden_tests {
             &PathBuf::from(format!("{}/lic4", GOLDEN_DIR)),
             Some(0),
             Some(175),
+            false,
         );
         if result.failed > 0 {
             println!("\n{} failures:", result.failed);
@@ -425,6 +435,7 @@ mod golden_tests {
             &PathBuf::from(format!("{}/lic4", GOLDEN_DIR)),
             Some(175),
             None,
+            false,
         );
         if result.failed > 0 {
             println!("\n{} failures:", result.failed);
@@ -446,6 +457,7 @@ mod golden_tests {
             &PathBuf::from(format!("{}/external", GOLDEN_DIR)),
             Some(0),
             Some(285),
+            false,
         );
         if result.failed > 0 {
             println!("\n{} failures:", result.failed);
@@ -467,6 +479,7 @@ mod golden_tests {
             &PathBuf::from(format!("{}/external", GOLDEN_DIR)),
             Some(285),
             Some(570),
+            false,
         );
         if result.failed > 0 {
             println!("\n{} failures:", result.failed);
@@ -488,6 +501,7 @@ mod golden_tests {
             &PathBuf::from(format!("{}/external", GOLDEN_DIR)),
             Some(570),
             Some(855),
+            false,
         );
         if result.failed > 0 {
             println!("\n{} failures:", result.failed);
@@ -509,6 +523,7 @@ mod golden_tests {
             &PathBuf::from(format!("{}/external", GOLDEN_DIR)),
             Some(855),
             Some(1140),
+            false,
         );
         if result.failed > 0 {
             println!("\n{} failures:", result.failed);
@@ -530,6 +545,7 @@ mod golden_tests {
             &PathBuf::from(format!("{}/external", GOLDEN_DIR)),
             Some(1140),
             Some(1425),
+            false,
         );
         if result.failed > 0 {
             println!("\n{} failures:", result.failed);
@@ -551,6 +567,7 @@ mod golden_tests {
             &PathBuf::from(format!("{}/external", GOLDEN_DIR)),
             Some(1425),
             Some(1710),
+            false,
         );
         if result.failed > 0 {
             println!("\n{} failures:", result.failed);
@@ -572,6 +589,7 @@ mod golden_tests {
             &PathBuf::from(format!("{}/external", GOLDEN_DIR)),
             Some(1710),
             Some(1995),
+            false,
         );
         if result.failed > 0 {
             println!("\n{} failures:", result.failed);
@@ -593,6 +611,7 @@ mod golden_tests {
             &PathBuf::from(format!("{}/external", GOLDEN_DIR)),
             Some(1995),
             Some(2280),
+            false,
         );
         if result.failed > 0 {
             println!("\n{} failures:", result.failed);
@@ -614,6 +633,7 @@ mod golden_tests {
             &PathBuf::from(format!("{}/external", GOLDEN_DIR)),
             Some(2280),
             None,
+            false,
         );
         if result.failed > 0 {
             println!("\n{} failures:", result.failed);
@@ -630,7 +650,7 @@ mod golden_tests {
 
     #[test]
     fn test_golden_unknown() {
-        let result = run_suite("unknown", &PathBuf::from(format!("{}/unknown", GOLDEN_DIR)));
+        let result = run_suite_unknown("unknown", &PathBuf::from(format!("{}/unknown", GOLDEN_DIR)));
         if result.failed > 0 {
             println!("\n{} failures:", result.failed);
             for (name, err) in &result.failures {
@@ -638,70 +658,6 @@ mod golden_tests {
             }
         }
         assert_eq!(result.failed, 0, "unknown had {} failures", result.failed);
-    }
-
-    #[test]
-    #[ignore = "Redundant - runs all suites which are tested individually"]
-    fn test_golden_summary() {
-        let Some(_engine) = ensure_engine() else {
-            eprintln!("Skipping summary: engine not available");
-            return;
-        };
-
-        let suites: [(&str, &str, Option<usize>, Option<usize>); 17] = [
-            ("lic1", "lic1", None, None),
-            ("lic2-part1", "lic2", Some(0), Some(285)),
-            ("lic2-part2", "lic2", Some(285), Some(570)),
-            ("lic2-part3", "lic2", Some(570), None),
-            ("lic3", "lic3", None, None),
-            ("lic4-part1", "lic4", Some(0), Some(175)),
-            ("lic4-part2", "lic4", Some(175), None),
-            ("external-part1", "external", Some(0), Some(285)),
-            ("external-part2", "external", Some(285), Some(570)),
-            ("external-part3", "external", Some(570), Some(855)),
-            ("external-part4", "external", Some(855), Some(1140)),
-            ("external-part5", "external", Some(1140), Some(1425)),
-            ("external-part6", "external", Some(1425), Some(1710)),
-            ("external-part7", "external", Some(1710), Some(1995)),
-            ("external-part8", "external", Some(1995), Some(2280)),
-            ("external-part9", "external", Some(2280), None),
-            ("unknown", "unknown", None, None),
-        ];
-
-        let mut total_tests = 0;
-        let mut total_passed = 0;
-        let mut total_failed = 0;
-        let mut total_skipped = 0;
-
-        for (name, subdir, start, end) in suites.iter() {
-            let result = run_suite_range(
-                name,
-                &PathBuf::from(format!("{}/{}", GOLDEN_DIR, subdir)),
-                *start,
-                *end,
-            );
-            total_tests += result.total;
-            total_passed += result.passed;
-            total_failed += result.failed;
-            total_skipped += result.skipped;
-        }
-
-        println!("\n========================================");
-        println!("License Golden Test Summary");
-        println!("========================================");
-        println!("Total tests:  {}", total_tests);
-        println!("Passed:       {}", total_passed);
-        println!("Failed:       {}", total_failed);
-        println!("Skipped:      {}", total_skipped);
-        println!(
-            "Pass rate:    {:.1}%",
-            if total_tests > 0 {
-                (total_passed as f64 / total_tests as f64) * 100.0
-            } else {
-                0.0
-            }
-        );
-        println!("========================================");
     }
 
     #[test]
@@ -713,7 +669,7 @@ mod golden_tests {
 
         let text =
             fs::read_to_string("testdata/license-golden/datadriven/lic1/double_isc.txt").unwrap();
-        let detections = engine.detect(&text).unwrap();
+        let detections = engine.detect(&text, false).unwrap();
 
         let actual: Vec<&str> = detections
             .iter()
@@ -808,7 +764,7 @@ mod golden_tests {
             }
         };
 
-        let detections = engine.detect(&text).unwrap();
+        let detections = engine.detect(&text, false).unwrap();
 
         let actual: Vec<&str> = detections
             .iter()
@@ -840,7 +796,7 @@ mod golden_tests {
         // Test the lgpl bare word detection
         let lgpl_text =
             std::fs::read_to_string("testdata/license-golden/datadriven/lic4/lgpl_21.txt").unwrap();
-        let detections = engine.detect(&lgpl_text).unwrap();
+        let detections = engine.detect(&lgpl_text, false).unwrap();
         let actual: Vec<&str> = detections
             .iter()
             .map(|d| d.license_expression.as_deref().unwrap_or(""))
@@ -861,7 +817,7 @@ mod golden_tests {
 
         let text =
             fs::read_to_string("testdata/license-golden/datadriven/lic1/gpl_12.txt").unwrap();
-        let detections = engine.detect(&text).unwrap();
+        let detections = engine.detect(&text, false).unwrap();
 
         eprintln!("Expected: {:?}", vec!["gpl-1.0-plus", "gpl-2.0-plus"]);
         eprintln!(
@@ -897,7 +853,7 @@ mod golden_tests {
 
         let text =
             fs::read_to_string("testdata/license-golden/datadriven/lic1/crapl-0.1.txt").unwrap();
-        let detections = engine.detect(&text).unwrap();
+        let detections = engine.detect(&text, false).unwrap();
 
         eprintln!("\n========================================");
         eprintln!("DEBUG: crapl-0.1.txt detection");
@@ -1312,7 +1268,7 @@ mod golden_tests {
         }
 
         // Now let's see what the actual engine.detect() returns
-        let engine_detections = engine.detect(&text).unwrap();
+        let engine_detections = engine.detect(&text, false).unwrap();
         eprintln!(
             "\nengine.detect() returned {} detections",
             engine_detections.len()

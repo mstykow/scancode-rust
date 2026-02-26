@@ -32,7 +32,9 @@ mod tests {
         let Some(engine) = get_engine() else { return };
         let Some(text) = read_test_file() else { return };
 
-        let detections = engine.detect(&text).expect("Detection should succeed");
+        let detections = engine
+            .detect(&text, false)
+            .expect("Detection should succeed");
 
         let all_matches: Vec<_> = detections.iter().flat_map(|d| d.matches.iter()).collect();
 

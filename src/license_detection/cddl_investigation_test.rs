@@ -6,12 +6,12 @@
 
 #[cfg(test)]
 mod tests {
-    use crate::license_detection::LicenseDetectionEngine;
     use crate::license_detection::index::token_sets::build_set_and_mset;
     use crate::license_detection::query::Query;
     use crate::license_detection::seq_match::{
-        MAX_NEAR_DUPE_CANDIDATES, compute_candidates_with_msets, seq_match_with_candidates,
+        compute_candidates_with_msets, seq_match_with_candidates, MAX_NEAR_DUPE_CANDIDATES,
     };
+    use crate::license_detection::LicenseDetectionEngine;
     use std::collections::HashSet;
     use std::path::PathBuf;
 
@@ -59,8 +59,8 @@ mod tests {
         use crate::license_detection::match_refine::merge_overlapping_matches;
         use crate::license_detection::query::Query;
         use crate::license_detection::seq_match::{
-            MAX_NEAR_DUPE_CANDIDATES, compute_candidates_with_msets, seq_match,
-            seq_match_with_candidates,
+            compute_candidates_with_msets, seq_match, seq_match_with_candidates,
+            MAX_NEAR_DUPE_CANDIDATES,
         };
 
         let index = engine.index();
@@ -285,7 +285,9 @@ mod tests {
 
         // Now check final detection
         eprintln!("\nFinal detection via engine.detect():");
-        let detections = engine.detect(&text).expect("Detection should succeed");
+        let detections = engine
+            .detect(&text, false)
+            .expect("Detection should succeed");
         for d in &detections {
             eprintln!("  Detection: {:?}", d.license_expression);
         }
@@ -298,7 +300,9 @@ mod tests {
             return;
         };
 
-        let detections = engine.detect(&text).expect("Detection should succeed");
+        let detections = engine
+            .detect(&text, false)
+            .expect("Detection should succeed");
 
         eprintln!("\n========================================");
         eprintln!("CDDL 1.0 Detection Test");
@@ -345,7 +349,9 @@ mod tests {
             return;
         };
 
-        let detections = engine.detect(&text).expect("Detection should succeed");
+        let detections = engine
+            .detect(&text, false)
+            .expect("Detection should succeed");
 
         eprintln!("\n========================================");
         eprintln!("CDDL 1.1 Detection Test");
@@ -1339,7 +1345,9 @@ mod tests {
         }
 
         eprintln!("\n6. FINAL DETECTION (via engine.detect)");
-        let detections = engine.detect(&text).expect("Detection should succeed");
+        let detections = engine
+            .detect(&text, false)
+            .expect("Detection should succeed");
         for (i, d) in detections.iter().enumerate() {
             eprintln!("   Detection {}: {:?}", i + 1, d.license_expression);
             for m in &d.matches {

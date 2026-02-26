@@ -7,7 +7,7 @@ use crate::utils::hash::{calculate_md5, calculate_sha1, calculate_sha256};
 use crate::utils::language::detect_language;
 use crate::utils::text::{is_source, remove_verbatim_escape_sequences, strip_utf8_bom_bytes};
 use anyhow::Error;
-use content_inspector::{ContentType, inspect};
+use content_inspector::{inspect, ContentType};
 use glob::Pattern;
 use indicatif::ProgressBar;
 use log::warn;
@@ -188,7 +188,7 @@ fn extract_license_information(
         return Ok(());
     };
 
-    match engine.detect(&text_content) {
+    match engine.detect(&text_content, false) {
         Ok(detections) => {
             let model_detections: Vec<LicenseDetection> = detections
                 .into_iter()

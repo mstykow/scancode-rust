@@ -10,7 +10,7 @@ fn main() {
 
     println!("Input text:\n{}\n", text);
 
-    let detections = engine.detect(text).expect("Detection failed");
+    let detections = engine.detect(text, false).expect("Detection failed");
 
     println!("Number of detections: {}", detections.len());
 

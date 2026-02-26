@@ -119,17 +119,18 @@ impl LicenseDetectionEngine {
     /// 2. Run matchers in priority order (hash, SPDX-LID, Aho-Corasick)
     /// 3. Phase 2: Near-duplicate detection (ALWAYS runs, even with exact matches)
     /// 4. Phase 3: Query run matching (per-run with high_resemblance=False)
-    /// 5. Unknown matching
+    /// 5. Unknown matching (only if `unknown_licenses` is true)
     /// 6. Refine matches
     /// 7. Group matches by region
     /// 8. Create LicenseDetection objects
     ///
     /// # Arguments
     /// * `text` - The text to analyze
+    /// * `unknown_licenses` - Whether to detect unknown licenses (default: false)
     ///
     /// # Returns
     /// A Result containing a vector of LicenseDetection objects
-    pub fn detect(&self, text: &str) -> Result<Vec<LicenseDetection>> {
+    pub fn detect(&self, text: &str, unknown_licenses: bool) -> Result<Vec<LicenseDetection>> {
         let clean_text = strip_utf8_bom_str(text);
         let mut query = Query::new(clean_text, &self.index)?;
 
@@ -284,12 +285,13 @@ impl LicenseDetectionEngine {
         let (good_matches, weak_matches) = split_weak_matches(&merged_matches);
 
         // Step 3: Unknown detection on uncovered regions - Python: index.py:1093-1114
-        let unknown_matches = unknown_match(&self.index, &query, &good_matches);
-        let filtered_unknown = filter_invalid_contained_unknown_matches(&unknown_matches, &good_matches);
-
-        // Step 4: Combine - Python: index.py:1116-1118
+        // Only run when --unknown-licenses flag is enabled (default: disabled)
         let mut all_matches = good_matches;
-        all_matches.extend(filtered_unknown);
+        if unknown_licenses {
+            let unknown_matches = unknown_match(&self.index, &query, &all_matches);
+            let filtered_unknown = filter_invalid_contained_unknown_matches(&unknown_matches, &all_matches);
+            all_matches.extend(filtered_unknown);
+        }
         all_matches.extend(weak_matches);
 
         // Step 5: Final refine WITH false positive filtering - Python: index.py:1130-1145
@@ -409,7 +411,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE."#;
 
-        let detections = engine.detect(mit_text).expect("Detection should succeed");
+        let detections = engine.detect(mit_text, false).expect("Detection should succeed");
 
         assert!(
             !detections.is_empty(),
@@ -439,14 +441,14 @@ SOFTWARE."#;
             return;
         };
 
-        let detections = engine.detect("").expect("Detection should succeed");
+        let detections = engine.detect("", false).expect("Detection should succeed");
         assert!(
             detections.is_empty() || !detections.is_empty(),
             "Detection completes"
         );
 
         let detections = engine
-            .detect("   \n\n   ")
+            .detect("   \n\n   ", false)
             .expect("Detection should succeed");
         assert!(
             detections.is_empty() || !detections.is_empty(),
@@ -462,7 +464,7 @@ SOFTWARE."#;
         };
 
         let text = "SPDX-License-Identifier: MIT";
-        let detections = engine.detect(text).expect("Detection should succeed");
+        let detections = engine.detect(text, false).expect("Detection should succeed");
 
         assert!(
             !detections.is_empty(),
@@ -478,7 +480,7 @@ SOFTWARE."#;
         };
 
         let text = "Licensed under the MIT License";
-        let detections = engine.detect(text).expect("Detection should succeed");
+        let detections = engine.detect(text, false).expect("Detection should succeed");
 
         assert!(!detections.is_empty(), "Should detect license notice");
     }
@@ -578,7 +580,7 @@ SOFTWARE."#;
         };
 
         let text = "This is just some random text without any license information.";
-        let detections = engine.detect(text).expect("Detection should succeed");
+        let detections = engine.detect(text, false).expect("Detection should succeed");
         assert!(
             !detections.is_empty() || detections.is_empty(),
             "Detection should complete without error"
@@ -593,7 +595,7 @@ SOFTWARE."#;
         };
 
         let text = "This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation.";
-        let detections = engine.detect(text).expect("Detection should succeed");
+        let detections = engine.detect(text, false).expect("Detection should succeed");
 
         assert!(!detections.is_empty(), "Should detect GPL notice");
     }
@@ -606,7 +608,7 @@ SOFTWARE."#;
         };
 
         let text = "Licensed under the Apache License, Version 2.0";
-        let detections = engine.detect(text).expect("Detection should succeed");
+        let detections = engine.detect(text, false).expect("Detection should succeed");
 
         assert!(!detections.is_empty(), "Should detect Apache notice");
     }
@@ -682,7 +684,7 @@ SOFTWARE."#;
         };
 
         let text = "SPDX-License-Identifier: MIT";
-        let detections = engine.detect(text).expect("Detection should succeed");
+        let detections = engine.detect(text, false).expect("Detection should succeed");
 
         assert!(!detections.is_empty(), "Should detect license");
 
@@ -729,7 +731,7 @@ Projects Agency (DARPA)."#;
         let combined_text = format!("{}\n\n{}", isc_text, darpa_text);
 
         let detections = engine
-            .detect(&combined_text)
+            .detect(&combined_text, false)
             .expect("Detection should succeed");
 
         assert!(!detections.is_empty(), "Should detect at least one license");
@@ -800,7 +802,7 @@ Projects Agency (DARPA)."#;
         };
 
         let text = "SPDX-License-Identifier: MIT\nSome code here";
-        let detections = engine.detect(text).expect("Detection should succeed");
+        let detections = engine.detect(text, false).expect("Detection should succeed");
 
         assert!(
             !detections.is_empty(),
@@ -824,7 +826,7 @@ Projects Agency (DARPA)."#;
         };
 
         let text = "SPDX-License-Identifier: MIT OR Apache-2.0";
-        let detections = engine.detect(text).expect("Detection should succeed");
+        let detections = engine.detect(text, false).expect("Detection should succeed");
 
         assert!(
             !detections.is_empty(),
@@ -840,7 +842,7 @@ Projects Agency (DARPA)."#;
         };
 
         let text = "SPDX-License-Identifier: GPL-2.0+";
-        let detections = engine.detect(text).expect("Detection should succeed");
+        let detections = engine.detect(text, false).expect("Detection should succeed");
 
         assert!(
             !detections.is_empty(),
@@ -856,7 +858,7 @@ Projects Agency (DARPA)."#;
         };
 
         let text = "// SPDX-License-Identifier: MIT\n/* some code */";
-        let detections = engine.detect(text).expect("Detection should succeed");
+        let detections = engine.detect(text, false).expect("Detection should succeed");
 
         assert!(
             !detections.is_empty(),
@@ -877,7 +879,7 @@ in the Software without restriction, including without limitation the rights
 to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 copies of the Software."#;
 
-        let detections = engine.detect(mit_text).expect("Detection should succeed");
+        let detections = engine.detect(mit_text, false).expect("Detection should succeed");
 
         assert!(!detections.is_empty(), "Should detect partial MIT license");
     }
@@ -890,7 +892,7 @@ copies of the Software."#;
         };
 
         let text = "Licensed under the MIT License";
-        let detections = engine.detect(text).expect("Detection should succeed");
+        let detections = engine.detect(text, false).expect("Detection should succeed");
 
         assert!(!detections.is_empty(), "Should detect license notice");
     }
@@ -909,7 +911,7 @@ to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 copies of the Software."#;
 
         let detections = engine
-            .detect(partial_mit)
+            .detect(partial_mit, false)
             .expect("Detection should succeed");
 
         assert!(!detections.is_empty(), "Should detect partial MIT license");
@@ -923,7 +925,7 @@ copies of the Software."#;
         };
 
         let text = "This software is proprietary and confidential. All rights reserved.";
-        let detections = engine.detect(text).expect("Detection should succeed");
+        let detections = engine.detect(text, false).expect("Detection should succeed");
 
         assert!(
             !detections.is_empty(),
@@ -954,7 +956,7 @@ copies of the Software."#;
         println!("Text length: {} bytes", text.len());
         println!();
 
-        let detections = engine.detect(&text).expect("Detection failed");
+        let detections = engine.detect(&text, false).expect("Detection failed");
 
         println!("Number of detections: {}", detections.len());
         println!();
@@ -1052,7 +1054,7 @@ copies of the Software."#;
             }
         };
 
-        let detections = engine.detect(&text).expect("Detection should succeed");
+        let detections = engine.detect(&text, false).expect("Detection should succeed");
 
         for detection in &detections {
             for m in &detection.matches {
@@ -1142,7 +1144,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.";
 
         let detections = engine
-            .detect(mit_with_bom)
+            .detect(mit_with_bom, false)
             .expect("Detection should succeed");
 
         assert!(
@@ -1174,7 +1176,7 @@ SOFTWARE.";
         };
 
         let text = "\u{FEFF}SPDX-License-Identifier: MIT";
-        let detections = engine.detect(text).expect("Detection should succeed");
+        let detections = engine.detect(text, false).expect("Detection should succeed");
 
         assert!(
             !detections.is_empty(),
