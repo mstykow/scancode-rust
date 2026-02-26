@@ -60,6 +60,7 @@ pub use aho_match::aho_match;
 pub use hash_match::hash_match;
 pub use match_refine::{
     filter_invalid_contained_unknown_matches, merge_overlapping_matches, refine_matches,
+    refine_matches_without_false_positive_filter, split_weak_matches,
 };
 pub use seq_match::{
     MAX_NEAR_DUPE_CANDIDATES, compute_candidates_with_msets, seq_match_with_candidates,
@@ -275,11 +276,23 @@ impl LicenseDetectionEngine {
         let merged_seq = merge_overlapping_matches(&seq_all_matches);
         all_matches.extend(merged_seq);
 
-        let unknown_matches = unknown_match(&self.index, &query, &all_matches);
-        let filtered_unknown_matches =
-            filter_invalid_contained_unknown_matches(&unknown_matches, &all_matches);
-        all_matches.extend(filtered_unknown_matches);
+        // Step 1: Initial refine WITHOUT false positive filtering
+        // Python: refine_matches with filter_false_positive=False (index.py:1073-1080)
+        let merged_matches = refine_matches_without_false_positive_filter(&self.index, all_matches, &query);
 
+        // Step 2: Split weak from good - Python: index.py:1083
+        let (good_matches, weak_matches) = split_weak_matches(&merged_matches);
+
+        // Step 3: Unknown detection on uncovered regions - Python: index.py:1093-1114
+        let unknown_matches = unknown_match(&self.index, &query, &good_matches);
+        let filtered_unknown = filter_invalid_contained_unknown_matches(&unknown_matches, &good_matches);
+
+        // Step 4: Combine - Python: index.py:1116-1118
+        let mut all_matches = good_matches;
+        all_matches.extend(filtered_unknown);
+        all_matches.extend(weak_matches);
+
+        // Step 5: Final refine WITH false positive filtering - Python: index.py:1130-1145
         let refined = refine_matches(&self.index, all_matches, &query);
 
         let mut sorted = refined;

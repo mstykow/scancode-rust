@@ -60,6 +60,41 @@ pub fn filter_invalid_contained_unknown_matches(
         .collect()
 }
 
+const SMALL_RULE: usize = 15;
+
+/// Split matches into good and weak matches.
+///
+/// Weak matches are:
+/// - Matches to rules with "unknown" in their license expression
+/// - Sequence matches with len() <= SMALL_RULE (15) AND coverage <= 25%
+///
+/// Weak matches are set aside before unknown license matching and reinjected later.
+///
+/// # Arguments
+/// * `matches` - Slice of LicenseMatch to split
+///
+/// # Returns
+/// Tuple of (good_matches, weak_matches)
+///
+/// Based on Python: `split_weak_matches()` (match.py:1740-1765)
+pub fn split_weak_matches(matches: &[LicenseMatch]) -> (Vec<LicenseMatch>, Vec<LicenseMatch>) {
+    let mut good = Vec::new();
+    let mut weak = Vec::new();
+
+    for m in matches {
+        let is_weak = m.has_unknown()
+            || (m.matcher == "3-seq" && m.len() <= SMALL_RULE && m.match_coverage <= 25.0);
+
+        if is_weak {
+            weak.push(m.clone());
+        } else {
+            good.push(m.clone());
+        }
+    }
+
+    (good, weak)
+}
+
 fn filter_too_short_matches(index: &LicenseIndex, matches: &[LicenseMatch]) -> Vec<LicenseMatch> {
     matches
         .iter()
@@ -1486,6 +1521,29 @@ pub fn refine_matches(
     matches: Vec<LicenseMatch>,
     query: &Query,
 ) -> Vec<LicenseMatch> {
+    refine_matches_internal(index, matches, query, true)
+}
+
+/// Initial refinement without false positive filtering.
+///
+/// Used before split_weak_matches and unknown detection.
+/// This matches Python's refine_matches with filter_false_positive=False.
+///
+/// Based on Python: `refine_matches()` at index.py:1073-1080
+pub fn refine_matches_without_false_positive_filter(
+    index: &LicenseIndex,
+    matches: Vec<LicenseMatch>,
+    query: &Query,
+) -> Vec<LicenseMatch> {
+    refine_matches_internal(index, matches, query, false)
+}
+
+fn refine_matches_internal(
+    index: &LicenseIndex,
+    matches: Vec<LicenseMatch>,
+    query: &Query,
+    filter_false_positive: bool,
+) -> Vec<LicenseMatch> {
     if matches.is_empty() {
         return Vec::new();
     }
@@ -1534,11 +1592,15 @@ pub fn refine_matches(
 
     let (non_contained_final, _) = filter_contained_matches(&final_matches);
 
-    let non_fp = filter_false_positive_matches(index, &non_contained_final);
+    let result = if filter_false_positive {
+        let non_fp = filter_false_positive_matches(index, &non_contained_final);
+        let (kept, _discarded) = filter_false_positive_license_lists_matches(non_fp);
+        kept
+    } else {
+        non_contained_final
+    };
 
-    let (kept, _discarded) = filter_false_positive_license_lists_matches(non_fp);
-
-    let merged_final = merge_overlapping_matches(&kept);
+    let merged_final = merge_overlapping_matches(&result);
     let mut final_scored = merged_final;
     update_match_scores(&mut final_scored, query);
 
@@ -3737,5 +3799,115 @@ mod tests {
                 m.license_expression, m.rule_identifier, m.start_line, m.end_line
             );
         }
+    }
+
+    #[test]
+    fn test_split_weak_matches_has_unknown() {
+        let mut m = LicenseMatch {
+            license_expression: "unknown".to_string(),
+            matcher: "1-hash".to_string(),
+            matched_length: 100,
+            match_coverage: 100.0,
+            ..LicenseMatch::default()
+        };
+        m.end_token = 100;
+        m.rule_length = 100;
+
+        let (good, weak) = split_weak_matches(&[m.clone()]);
+        assert!(weak.contains(&m));
+        assert!(!good.contains(&m));
+    }
+
+    #[test]
+    fn test_split_weak_matches_short_seq_low_coverage() {
+        let mut m = LicenseMatch {
+            license_expression: "mit".to_string(),
+            matcher: "3-seq".to_string(),
+            matched_length: 10,
+            match_coverage: 20.0,
+            ..LicenseMatch::default()
+        };
+        m.end_token = 10;
+        m.rule_length = 50;
+
+        let (good, weak) = split_weak_matches(&[m.clone()]);
+        assert!(weak.contains(&m));
+        assert!(!good.contains(&m));
+    }
+
+    #[test]
+    fn test_split_weak_matches_short_seq_high_coverage() {
+        let mut m = LicenseMatch {
+            license_expression: "mit".to_string(),
+            matcher: "3-seq".to_string(),
+            matched_length: 10,
+            match_coverage: 80.0,
+            ..LicenseMatch::default()
+        };
+        m.end_token = 10;
+        m.rule_length = 15;
+
+        let (good, weak) = split_weak_matches(&[m.clone()]);
+        assert!(good.contains(&m));
+        assert!(!weak.contains(&m));
+    }
+
+    #[test]
+    fn test_split_weak_matches_non_seq_short() {
+        let mut m = LicenseMatch {
+            license_expression: "mit".to_string(),
+            matcher: "1-hash".to_string(),
+            matched_length: 10,
+            match_coverage: 20.0,
+            ..LicenseMatch::default()
+        };
+        m.end_token = 10;
+        m.rule_length = 15;
+
+        let (good, weak) = split_weak_matches(&[m.clone()]);
+        assert!(good.contains(&m));
+        assert!(!weak.contains(&m));
+    }
+
+    #[test]
+    fn test_split_weak_matches_mixed() {
+        let mut good_match = LicenseMatch {
+            license_expression: "mit".to_string(),
+            matcher: "1-hash".to_string(),
+            matched_length: 50,
+            match_coverage: 95.0,
+            ..LicenseMatch::default()
+        };
+        good_match.end_token = 50;
+        good_match.rule_length = 50;
+
+        let mut weak_unknown = LicenseMatch {
+            license_expression: "unknown".to_string(),
+            matcher: "5-unknown".to_string(),
+            matched_length: 30,
+            match_coverage: 50.0,
+            ..LicenseMatch::default()
+        };
+        weak_unknown.end_token = 30;
+        weak_unknown.rule_length = 30;
+
+        let mut weak_seq = LicenseMatch {
+            license_expression: "apache-2.0".to_string(),
+            matcher: "3-seq".to_string(),
+            matched_length: 10,
+            match_coverage: 20.0,
+            ..LicenseMatch::default()
+        };
+        weak_seq.end_token = 10;
+        weak_seq.rule_length = 50;
+
+        let matches = vec![good_match.clone(), weak_unknown.clone(), weak_seq.clone()];
+        let (good, weak) = split_weak_matches(&matches);
+
+        assert_eq!(good.len(), 1);
+        assert_eq!(weak.len(), 2);
+        assert!(good.contains(&good_match));
+        assert!(weak.contains(&weak_unknown));
+        assert!(weak.contains(&weak_seq));
     }
 }

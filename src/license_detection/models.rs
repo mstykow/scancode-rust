@@ -741,6 +741,10 @@ impl LicenseMatch {
 
         overlap_end.saturating_sub(overlap_start)
     }
+
+    pub fn has_unknown(&self) -> bool {
+        self.license_expression.contains("unknown")
+    }
 }
 
 #[cfg(test)]
@@ -2019,5 +2023,31 @@ mod tests {
         b.end_token = 20;
         assert_eq!(a.qdistance_to(&b), 10);
         assert_eq!(b.qdistance_to(&a), 10);
+    }
+
+    #[test]
+    fn test_has_unknown_true() {
+        let mut m = create_license_match();
+        m.license_expression = "unknown".to_string();
+        assert!(m.has_unknown());
+
+        m.license_expression = "mit OR unknown".to_string();
+        assert!(m.has_unknown());
+
+        m.license_expression = "unknown-license-ref".to_string();
+        assert!(m.has_unknown());
+    }
+
+    #[test]
+    fn test_has_unknown_false() {
+        let mut m = create_license_match();
+        m.license_expression = "mit".to_string();
+        assert!(!m.has_unknown());
+
+        m.license_expression = "apache-2.0".to_string();
+        assert!(!m.has_unknown());
+
+        m.license_expression = "gpl-2.0-plus".to_string();
+        assert!(!m.has_unknown());
     }
 }
