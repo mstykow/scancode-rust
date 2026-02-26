@@ -1,6 +1,6 @@
 # Email and URL Detection Implementation Plan
 
-> **Status**: 🟡 Planning Complete — Ready for Implementation
+> **Status**: ✅ COMPLETE — Implemented with scanner/CLI integration and local golden tests
 > **Priority**: P2 - Medium Priority
 > **Estimated Effort**: 1-2 weeks
 > **Dependencies**: None (independent of copyright and license detection)
@@ -47,20 +47,16 @@ Email and URL detection extracts email addresses and URLs from source code files
 
 **Implemented:**
 
-- ✅ `OutputURL` struct in `file_info.rs` (url field only — missing `start_line`/`end_line`)
-- ✅ `urls` field in `FileInfo`
+- ✅ Finder module at `src/finder/` (`emails.rs`, `urls.rs`, `host.rs`, `junk_data.rs`)
+- ✅ `OutputEmail` + `emails` field in `FileInfo`
+- ✅ `OutputURL` includes `start_line`/`end_line`
+- ✅ Scanner integration via `process_with_options(...)`
+- ✅ CLI flags: `--email`, `--max-email`, `--url`, `--max-url`
+- ✅ Local golden tests and fixtures in `src/finder/golden_test.rs` and `testdata/plugin_email_url/`
 
-**Missing:**
+**Notes:**
 
-- ❌ `OutputEmail` struct (does not exist yet)
-- ❌ `emails` field in `FileInfo`
-- ❌ `start_line`/`end_line` on `OutputURL`
-- ❌ Email extraction regex and filter pipeline
-- ❌ URL extraction regex and filter pipeline
-- ❌ Junk classification data (domains, hosts, IPs, URL prefixes)
-- ❌ URL canonicalization
-- ❌ IP address validation (IPv4/IPv6, private IP detection)
-- ❌ Scanner integration
+- Rust intentionally keeps several beyond-parity fixes (notably extended TLD length support and IPv6/private IP correctness).
 
 ---
 

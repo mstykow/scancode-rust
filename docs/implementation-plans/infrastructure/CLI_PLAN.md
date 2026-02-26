@@ -1,6 +1,6 @@
 # CLI Implementation Plan
 
-> **Status**: 🟡 5 parameters implemented, 30+ pending
+> **Status**: 🟡 9 parameters implemented, 30+ pending
 > **Priority**: P1 - High (User-facing feature parity)
 > **Dependencies**: Most flags depend on their underlying features (license detection, output formats, etc.)
 
@@ -12,7 +12,7 @@ CLI parameter parity with Python ScanCode. Rust uses `clap`; Python uses `click`
 
 ## Parameter Mapping
 
-### Implemented (5)
+### Implemented (9)
 
 | Parameter           | Notes                  |
 | ------------------- | ---------------------- |
@@ -21,6 +21,10 @@ CLI parameter parity with Python ScanCode. Rust uses `clap`; Python uses `click`
 | `-m, --max-depth`   | Default: 50            |
 | `-e, --exclude`     | Glob patterns          |
 | `--no-assemble`     | Rust-specific          |
+| `--email`           | Enable email detection |
+| `--max-email`       | Threshold (default 50) |
+| `-u, --url`         | Enable URL detection   |
+| `--max-url`         | Threshold (default 50) |
 
 ### Core Parameters (pending)
 
@@ -50,8 +54,8 @@ CLI parameter parity with Python ScanCode. Rust uses `clap`; Python uses `click`
 | ----------------- | --------------------------- |
 | `--license`       | LICENSE_DETECTION_PLAN.md   |
 | `--copyright`     | COPYRIGHT_DETECTION_PLAN.md |
-| `--email`         | EMAIL_URL_DETECTION_PLAN.md |
-| `--url`           | EMAIL_URL_DETECTION_PLAN.md |
+| `--email`         | ✅ IMPLEMENTED              |
+| `--url`           | ✅ IMPLEMENTED              |
 | `--license-score` | LICENSE_DETECTION_PLAN.md   |
 | `--license-text`  | LICENSE_DETECTION_PLAN.md   |
 | `--classify`      | SUMMARIZATION_PLAN.md       |

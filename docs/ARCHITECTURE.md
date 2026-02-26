@@ -612,6 +612,9 @@ The email/URL detection engine is the simplest text detection feature — regex-
 
 Both support configurable thresholds (`--max-email N`, `--max-url N`, default 50).
 
+Golden regression coverage for this module uses local, repo-owned fixtures in
+`testdata/plugin_email_url/` and test execution in `src/finder/golden_test.rs`.
+
 Key design decisions vs Python reference:
 
 - **`url` crate** for URL parsing/canonicalization (replaces `urlpy`)
