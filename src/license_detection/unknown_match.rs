@@ -331,6 +331,8 @@ fn create_unknown_match(
         qspan_positions: None,
         ispan_positions: None,
         hispan_positions: None,
+        candidate_resemblance: 0.0,
+        candidate_containment: 0.0,
     }
     .into()
 }
@@ -522,6 +524,8 @@ mod tests {
             qspan_positions: None,
             ispan_positions: None,
             hispan_positions: None,
+            candidate_resemblance: 0.0,
+            candidate_containment: 0.0,
         }];
 
         let covered = compute_covered_positions(&query, &known_matches);
@@ -603,6 +607,8 @@ mod tests {
             qspan_positions: None,
             ispan_positions: None,
             hispan_positions: None,
+            candidate_resemblance: 0.0,
+            candidate_containment: 0.0,
         }];
 
         let matches = unknown_match(&index, &query, &known_matches);

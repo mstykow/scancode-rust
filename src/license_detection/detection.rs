@@ -1198,6 +1198,8 @@ mod tests {
             qspan_positions: None,
             ispan_positions: None,
             hispan_positions: None,
+            candidate_resemblance: 0.0,
+            candidate_containment: 0.0,
         }
     }
 
@@ -1388,6 +1390,8 @@ mod tests {
             qspan_positions: None,
             ispan_positions: None,
             hispan_positions: None,
+            candidate_resemblance: 0.0,
+            candidate_containment: 0.0,
         }
     }
 
@@ -1556,6 +1560,8 @@ mod tests {
             qspan_positions: None,
             ispan_positions: None,
             hispan_positions: None,
+            candidate_resemblance: 0.0,
+            candidate_containment: 0.0,
         }
     }
 
@@ -4170,6 +4176,8 @@ mod tests {
             qspan_positions: None,
             ispan_positions: None,
             hispan_positions: None,
+            candidate_resemblance: 0.0,
+            candidate_containment: 0.0,
         };
 
         let matches = vec![intro];
@@ -4211,6 +4219,8 @@ mod tests {
             qspan_positions: None,
             ispan_positions: None,
             hispan_positions: None,
+            candidate_resemblance: 0.0,
+            candidate_containment: 0.0,
         };
 
         let low_coverage_match = LicenseMatch {
@@ -4244,6 +4254,8 @@ mod tests {
             qspan_positions: None,
             ispan_positions: None,
             hispan_positions: None,
+            candidate_resemblance: 0.0,
+            candidate_containment: 0.0,
         };
 
         let matches = vec![intro, low_coverage_match];
@@ -4296,6 +4308,8 @@ mod tests {
                     qspan_positions: None,
                     ispan_positions: None,
                     hispan_positions: None,
+            candidate_resemblance: 0.0,
+            candidate_containment: 0.0,
                 }],
                 detection_log: vec![],
                 identifier: None,
@@ -4367,6 +4381,8 @@ mod tests {
             qspan_positions: None,
             ispan_positions: None,
             hispan_positions: None,
+            candidate_resemblance: 0.0,
+            candidate_containment: 0.0,
         };
         assert!(is_unknown_intro(&m));
     }
@@ -4404,6 +4420,8 @@ mod tests {
             qspan_positions: None,
             ispan_positions: None,
             hispan_positions: None,
+            candidate_resemblance: 0.0,
+            candidate_containment: 0.0,
         };
         assert!(is_unknown_intro(&m));
     }
@@ -4441,6 +4459,8 @@ mod tests {
             qspan_positions: None,
             ispan_positions: None,
             hispan_positions: None,
+            candidate_resemblance: 0.0,
+            candidate_containment: 0.0,
         };
         assert!(is_unknown_intro(&m));
     }
@@ -4478,6 +4498,8 @@ mod tests {
             qspan_positions: None,
             ispan_positions: None,
             hispan_positions: None,
+            candidate_resemblance: 0.0,
+            candidate_containment: 0.0,
         };
         assert!(!is_unknown_intro(&m));
     }
@@ -4515,6 +4537,8 @@ mod tests {
             qspan_positions: None,
             ispan_positions: None,
             hispan_positions: None,
+            candidate_resemblance: 0.0,
+            candidate_containment: 0.0,
         };
         assert!(!is_unknown_intro(&m));
     }
@@ -4555,6 +4579,8 @@ mod tests {
             qspan_positions: None,
             ispan_positions: None,
             hispan_positions: None,
+            candidate_resemblance: 0.0,
+            candidate_containment: 0.0,
         }
     }
 

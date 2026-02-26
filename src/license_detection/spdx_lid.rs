@@ -302,6 +302,8 @@ pub fn spdx_lid_match(index: &LicenseIndex, query: &Query) -> Vec<LicenseMatch> 
                 qspan_positions: None,
                 ispan_positions: None,
                 hispan_positions: None,
+                candidate_resemblance: 0.0,
+                candidate_containment: 0.0,
             };
 
             matches.push(license_match);

@@ -188,6 +188,8 @@ pub fn aho_match(index: &LicenseIndex, query_run: &QueryRun) -> Vec<LicenseMatch
             qspan_positions: None,
             ispan_positions: None,
             hispan_positions: None,
+            candidate_resemblance: 0.0,
+            candidate_containment: 0.0,
         };
 
         matches.push(license_match);

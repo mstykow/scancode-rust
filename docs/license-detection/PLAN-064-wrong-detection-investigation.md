@@ -212,3 +212,36 @@ let high_postings: HashMap<u16, Vec<usize>> = index.high_postings_by_rid
 - Why does IBMPL get higher coverage when the text says "Common Public License" (CPL)?
 - Should matches from different rules for the same region be deduplicated by candidate score?
 - Python produces 96.65% CPL coverage - how does it avoid the IBMPL false positive?
+
+---
+
+## Second Root Cause Identified
+
+**In `filter_overlapping_matches`** (match_refine.rs:520-717):
+
+When matches from different licenses overlap, Rust prefers higher `hilen` (high-value token length). Since IBMPL's rule is 2.5x longer, its matches have higher `hilen`, causing CPL to be discarded.
+
+**Evidence**:
+```
+candidate: cpl-1.0 (resemblance=0.996, containment=1.000)  ← Better candidate
+candidate: ibmpl-1.0 (resemblance=0.864, containment=0.993)
+
+Group 1 result:
+  ibmpl-1.0 (coverage=43.1%, lines=4-100)  ← Wins due to hilen
+  cpl-1.0 (coverage=10.7%, lines=13-47)    ← Truncated
+```
+
+**The bug**: Candidate scores (resemblance/containment) are not used when filtering cross-license overlaps.
+
+---
+
+## Proposed Fix (Not Yet Implemented)
+
+**Option 1**: Store candidate scores in `LicenseMatch` and use for cross-license tie-breaking.
+
+**Option 2**: Check for license name in matched text (HTML says "COMMON PUBLIC LICENSE" → CPL).
+
+**Files to change**:
+- `src/license_detection/models.rs`: Add `candidate_resemblance` and `candidate_containment` fields
+- `src/license_detection/seq_match.rs`: Populate these fields when creating matches
+- `src/license_detection/match_refine.rs`: Use these scores in `filter_overlapping_matches`

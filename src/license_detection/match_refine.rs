@@ -249,26 +249,20 @@ pub fn merge_overlapping_matches(matches: &[LicenseMatch]) -> Vec<LicenseMatch> 
                 }
 
                 if current.surround(&next) {
-                    let qoverlap = current.qoverlap(&next);
-                    if qoverlap > 0 {
-                        let combined = combine_matches(&current, &next);
-                        if combined.qspan().len() == combined.ispan().len() {
-                            rule_matches[i] = combined;
-                            rule_matches.remove(j);
-                            continue;
-                        }
+                    let combined = combine_matches(&current, &next);
+                    if combined.qspan().len() == combined.ispan().len() {
+                        rule_matches[i] = combined;
+                        rule_matches.remove(j);
+                        continue;
                     }
                 }
                 if next.surround(&current) {
-                    let qoverlap = current.qoverlap(&next);
-                    if qoverlap > 0 {
-                        let combined = combine_matches(&current, &next);
-                        if combined.qspan().len() == combined.ispan().len() {
-                            rule_matches[j] = combined;
-                            rule_matches.remove(i);
-                            i = i.saturating_sub(1);
-                            break;
-                        }
+                    let combined = combine_matches(&current, &next);
+                    if combined.qspan().len() == combined.ispan().len() {
+                        rule_matches[j] = combined;
+                        rule_matches.remove(i);
+                        i = i.saturating_sub(1);
+                        break;
                     }
                 }
 
@@ -586,23 +580,74 @@ pub fn filter_overlapping_matches(
             let current_hilen = matches[i].hilen();
             let next_hilen = matches[j].hilen();
 
+            let different_licenses =
+                matches[i].license_expression != matches[j].license_expression;
+
+            let current_wins_on_candidate = {
+                let current_resemblance = matches[i].candidate_resemblance;
+                let next_resemblance = matches[j].candidate_resemblance;
+                let current_containment = matches[i].candidate_containment;
+                let next_containment = matches[j].candidate_containment;
+
+                if current_resemblance > next_resemblance {
+                    true
+                } else if current_resemblance < next_resemblance {
+                    false
+                } else if current_containment > next_containment {
+                    true
+                } else if current_containment < next_containment {
+                    false
+                } else {
+                    current_hilen >= next_hilen
+                }
+            };
+
+            let both_have_candidate_scores =
+                matches[i].candidate_resemblance > 0.0 && matches[j].candidate_resemblance > 0.0;
+
             if extra_large_next && current_len_val >= next_len_val {
+                if different_licenses && both_have_candidate_scores
+                    && !current_wins_on_candidate
+                {
+                    discarded.push(matches.remove(i));
+                    i = i.saturating_sub(1);
+                    break;
+                }
                 discarded.push(matches.remove(j));
                 continue;
             }
 
             if extra_large_current && current_len_val <= next_len_val {
+                if different_licenses && both_have_candidate_scores
+                    && current_wins_on_candidate
+                {
+                    discarded.push(matches.remove(j));
+                    continue;
+                }
                 discarded.push(matches.remove(i));
                 i = i.saturating_sub(1);
                 break;
             }
 
             if large_next && current_len_val >= next_len_val && current_hilen >= next_hilen {
+                if different_licenses && both_have_candidate_scores
+                    && !current_wins_on_candidate
+                {
+                    discarded.push(matches.remove(i));
+                    i = i.saturating_sub(1);
+                    break;
+                }
                 discarded.push(matches.remove(j));
                 continue;
             }
 
             if large_current && current_len_val <= next_len_val && current_hilen <= next_hilen {
+                if different_licenses && both_have_candidate_scores
+                    && current_wins_on_candidate
+                {
+                    discarded.push(matches.remove(j));
+                    continue;
+                }
                 discarded.push(matches.remove(i));
                 i = i.saturating_sub(1);
                 break;
@@ -1546,6 +1591,8 @@ mod tests {
             qspan_positions: None,
             ispan_positions: None,
             hispan_positions: None,
+            candidate_resemblance: 0.0,
+            candidate_containment: 0.0,
         }
     }
 
@@ -1587,6 +1634,8 @@ mod tests {
             qspan_positions: None,
             ispan_positions: None,
             hispan_positions: None,
+            candidate_resemblance: 0.0,
+            candidate_containment: 0.0,
         }
     }
 
@@ -2885,6 +2934,8 @@ mod tests {
             qspan_positions: None,
             ispan_positions: None,
             hispan_positions: None,
+            candidate_resemblance: 0.0,
+            candidate_containment: 0.0,
         }
     }
 

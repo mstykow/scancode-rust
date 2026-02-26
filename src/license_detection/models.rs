@@ -333,6 +333,18 @@ pub struct LicenseMatch {
     /// Some(positions) contains exact positions for non-contiguous hispans (after merge).
     #[serde(skip)]
     pub hispan_positions: Option<Vec<usize>>,
+
+    /// Candidate resemblance score from set similarity.
+    /// Used for cross-license tie-breaking when matches overlap.
+    /// Higher resemblance means better candidate quality.
+    #[serde(default)]
+    pub candidate_resemblance: f32,
+
+    /// Candidate containment score from set similarity.
+    /// Used for cross-license tie-breaking when matches overlap.
+    /// Higher containment means more of the rule is matched.
+    #[serde(default)]
+    pub candidate_containment: f32,
 }
 
 impl Default for LicenseMatch {
@@ -368,6 +380,8 @@ impl Default for LicenseMatch {
             qspan_positions: None,
             ispan_positions: None,
             hispan_positions: None,
+            candidate_resemblance: 0.0,
+            candidate_containment: 0.0,
         }
     }
 }
@@ -512,13 +526,7 @@ impl LicenseMatch {
     pub fn surround(&self, other: &LicenseMatch) -> bool {
         let (self_qstart, self_qend) = self.qspan_bounds();
         let (other_qstart, other_qend) = other.qspan_bounds();
-        let qsurrounds = self_qstart <= other_qstart && self_qend >= other_qend;
-
-        let (self_istart, self_iend) = self.ispan_bounds();
-        let (other_istart, other_iend) = other.ispan_bounds();
-        let isurrounds = self_istart <= other_istart && self_iend >= other_iend;
-
-        qsurrounds && isurrounds
+        self_qstart <= other_qstart && self_qend >= other_qend
     }
 
     pub fn qcontains(&self, other: &LicenseMatch) -> bool {
@@ -842,6 +850,8 @@ mod tests {
             qspan_positions: None,
             ispan_positions: None,
             hispan_positions: None,
+            candidate_resemblance: 0.0,
+            candidate_containment: 0.0,
         }
     }
 
@@ -1256,6 +1266,8 @@ mod tests {
             qspan_positions: None,
             ispan_positions: None,
             hispan_positions: None,
+            candidate_resemblance: 0.0,
+            candidate_containment: 0.0,
         };
 
         assert!(match_result.from_file.is_none());
@@ -1405,6 +1417,8 @@ mod tests {
             qspan_positions: None,
             ispan_positions: None,
             hispan_positions: None,
+            candidate_resemblance: 0.0,
+            candidate_containment: 0.0,
         };
 
         assert_eq!(

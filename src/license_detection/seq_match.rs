@@ -711,6 +711,9 @@ pub fn seq_match(index: &LicenseIndex, query_run: &QueryRun) -> Vec<LicenseMatch
                         continue;
                     }
 
+                    let qspan_end = qpos + mlen;
+                    max_qend = max_qend.max(qspan_end);
+
                     if mlen == 1 && query_tokens[qpos] >= len_legalese as u16 {
                         continue;
                     }
@@ -767,11 +770,11 @@ pub fn seq_match(index: &LicenseIndex, query_run: &QueryRun) -> Vec<LicenseMatch
                         qspan_positions: None,
                         ispan_positions: None,
                         hispan_positions: None,
+                        candidate_resemblance: candidate.score_vec_full.resemblance,
+                        candidate_containment: candidate.score_vec_full.containment,
                     };
 
                     matches.push(license_match);
-
-                    max_qend = max_qend.max(qend + 1);
                 }
 
                 qstart = max_qend;
@@ -854,6 +857,9 @@ pub fn seq_match_with_candidates(
                         continue;
                     }
 
+                    let qspan_end = qpos + mlen;
+                    max_qend = max_qend.max(qspan_end);
+
                     if mlen == 1 && query_tokens[qpos] >= len_legalese as u16 {
                         continue;
                     }
@@ -910,11 +916,11 @@ pub fn seq_match_with_candidates(
                         qspan_positions: None,
                         ispan_positions: None,
                         hispan_positions: None,
+                        candidate_resemblance: candidate.score_vec_full.resemblance,
+                        candidate_containment: candidate.score_vec_full.containment,
                     };
 
                     matches.push(license_match);
-
-                    max_qend = max_qend.max(qend + 1);
                 }
 
                 qstart = max_qend;
