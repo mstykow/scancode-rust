@@ -254,6 +254,7 @@ pub mod askalono;
 pub mod assembly;
 pub mod cli;
 pub mod copyright;
+pub mod finder;
 pub mod golden_maintenance;
 pub mod models;
 pub mod parsers;
@@ -265,4 +266,4 @@ pub mod test_utils;
 
 pub use models::{ExtraData, FileInfo, FileType, Header, Output, SystemEnvironment};
 pub use parsers::{NpmParser, PackageParser};
-pub use scanner::{ProcessResult, count, process};
+pub use scanner::{ProcessResult, TextDetectionOptions, count, process, process_with_options};

@@ -1,0 +1,158 @@
+use regex::Regex;
+use std::sync::LazyLock;
+
+use url::Url;
+
+use super::DetectionConfig;
+use super::host::is_good_url_host_domain;
+use super::junk_data::classify_url;
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct UrlDetection {
+    pub url: String,
+    pub start_line: usize,
+    pub end_line: usize,
+}
+
+static URLS_REGEX: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(
+        r#"(?ix)
+        (
+            (?:https?|ftps?|sftp|rsync|ssh|svn|git|hg|https?\+git|https?\+svn|https?\+hg)://[^\s<>\[\]"]+
+            |
+            (?:www|ftp)\.[^\s<>\[\]"]+
+            |
+            git\@[^\s<>\[\]"]+:[^\s<>\[\]"]+\.git
+        )
+        "#,
+    )
+    .expect("valid url regex")
+});
+
+static INVALID_URLS_PATTERN: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"(?i)^(?:https?|ftps?|sftp|rsync|ssh|svn|git|hg|https?\+git|https?\+svn|https?\+hg)://(?:[$%*/_])+$")
+        .expect("valid invalid-url regex")
+});
+
+const EMPTY_URLS: &[&str] = &["https", "http", "ftp", "www"];
+
+fn is_filterable(url: &str) -> bool {
+    !url.starts_with("git@")
+}
+
+fn verbatim_crlf_url_cleaner(url: &str) -> String {
+    if url.ends_with('/') {
+        return url.to_string();
+    }
+
+    url.replace("\\n", "").replace("\\r", "")
+}
+
+fn end_of_url_cleaner(url: &str) -> String {
+    let mut cleaned = if url.ends_with('/') {
+        url.to_string()
+    } else {
+        url.replace("&lt;", "<")
+            .replace("&gt;", ">")
+            .replace("&amp;", "&")
+    };
+
+    for marker in ['\\', '<', '>', '(', ')', '[', ']', '"', '\''] {
+        if let Some((before, _)) = cleaned.split_once(marker) {
+            cleaned = before.to_string();
+        }
+    }
+
+    cleaned
+        .trim_end_matches(|c: char| [',', '.', ':', ';', '!', '?'].contains(&c))
+        .to_string()
+}
+
+fn add_fake_scheme(url: &str) -> String {
+    if is_filterable(url) && !url.contains("://") {
+        format!("http://{url}")
+    } else {
+        url.to_string()
+    }
+}
+
+fn remove_user_password(url: &str) -> Option<String> {
+    if !is_filterable(url) {
+        return Some(url.to_string());
+    }
+
+    let mut parsed = Url::parse(url).ok()?;
+    parsed.set_username("").ok()?;
+    parsed.set_password(None).ok()?;
+    parsed.host_str()?;
+    Some(parsed.to_string())
+}
+
+fn canonical_url(url: &str) -> Option<String> {
+    if !is_filterable(url) {
+        return Some(url.to_string());
+    }
+    Some(Url::parse(url).ok()?.to_string())
+}
+
+pub fn find_urls(text: &str, config: &DetectionConfig) -> Vec<UrlDetection> {
+    let mut detections = Vec::new();
+
+    for (line_index, line) in text.lines().enumerate() {
+        let line_number = line_index + 1;
+
+        for matched in URLS_REGEX.find_iter(line) {
+            let mut candidate = matched.as_str().to_string();
+
+            candidate = verbatim_crlf_url_cleaner(&candidate);
+            candidate = end_of_url_cleaner(&candidate);
+
+            let candidate_lower = candidate.to_ascii_lowercase();
+            if candidate.is_empty() || EMPTY_URLS.contains(&candidate_lower.as_str()) {
+                continue;
+            }
+
+            candidate = add_fake_scheme(&candidate);
+
+            let Some(candidate) = remove_user_password(&candidate) else {
+                continue;
+            };
+            if INVALID_URLS_PATTERN.is_match(&candidate) {
+                continue;
+            }
+
+            let Some(candidate) = canonical_url(&candidate) else {
+                continue;
+            };
+
+            if is_filterable(&candidate) && !is_good_url_host_domain(&candidate) {
+                continue;
+            }
+            if !classify_url(&candidate.to_ascii_lowercase()) {
+                continue;
+            }
+
+            detections.push(UrlDetection {
+                url: candidate,
+                start_line: line_number,
+                end_line: line_number,
+            });
+        }
+    }
+
+    let mut detections = if config.unique {
+        let mut seen = std::collections::HashSet::<String>::new();
+        detections
+            .into_iter()
+            .filter(|d| seen.insert(d.url.clone()))
+            .collect::<Vec<_>>()
+    } else {
+        detections
+    };
+
+    if config.max_urls > 0 && detections.len() > config.max_urls {
+        detections.truncate(config.max_urls);
+    }
+
+    detections
+}

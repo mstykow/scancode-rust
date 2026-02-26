@@ -11,11 +11,13 @@ use rayon::prelude::*;
 
 use crate::askalono::{ScanStrategy, TextData};
 use crate::copyright;
+use crate::finder::{self, DetectionConfig};
 use crate::models::{
     Author, Copyright, FileInfo, FileInfoBuilder, FileType, Holder, LicenseDetection, Match,
+    OutputEmail, OutputURL,
 };
 use crate::parsers::try_parse_file;
-use crate::scanner::ProcessResult;
+use crate::scanner::{ProcessResult, TextDetectionOptions};
 use crate::utils::file::{get_creation_date, is_path_excluded};
 use crate::utils::hash::{calculate_md5, calculate_sha1, calculate_sha256};
 use crate::utils::language::detect_language;
@@ -30,6 +32,24 @@ pub fn process<P: AsRef<Path>>(
     progress_bar: Arc<ProgressBar>,
     exclude_patterns: &[Pattern],
     scan_strategy: &ScanStrategy,
+) -> Result<ProcessResult, Error> {
+    process_with_options(
+        path,
+        max_depth,
+        progress_bar,
+        exclude_patterns,
+        scan_strategy,
+        &TextDetectionOptions::default(),
+    )
+}
+
+pub fn process_with_options<P: AsRef<Path>>(
+    path: P,
+    max_depth: usize,
+    progress_bar: Arc<ProgressBar>,
+    exclude_patterns: &[Pattern],
+    scan_strategy: &ScanStrategy,
+    text_options: &TextDetectionOptions,
 ) -> Result<ProcessResult, Error> {
     let path = path.as_ref();
 
@@ -70,7 +90,7 @@ pub fn process<P: AsRef<Path>>(
         &mut file_entries
             .par_iter()
             .map(|(path, metadata)| {
-                let file_entry = process_file(path, metadata, scan_strategy);
+                let file_entry = process_file(path, metadata, scan_strategy, text_options);
                 progress_bar.inc(1);
                 file_entry
             })
@@ -82,12 +102,13 @@ pub fn process<P: AsRef<Path>>(
         all_files.push(process_directory(&path, &metadata));
 
         if max_depth > 0 {
-            match process(
+            match process_with_options(
                 &path,
                 max_depth - 1,
                 progress_bar.clone(),
                 exclude_patterns,
                 scan_strategy,
+                text_options,
             ) {
                 Ok(mut result) => {
                     all_files.append(&mut result.files);
@@ -104,11 +125,18 @@ pub fn process<P: AsRef<Path>>(
     })
 }
 
-fn process_file(path: &Path, metadata: &fs::Metadata, scan_strategy: &ScanStrategy) -> FileInfo {
+fn process_file(
+    path: &Path,
+    metadata: &fs::Metadata,
+    scan_strategy: &ScanStrategy,
+    text_options: &TextDetectionOptions,
+) -> FileInfo {
     let mut scan_errors: Vec<String> = vec![];
     let mut file_info_builder = FileInfoBuilder::default();
 
-    if let Err(e) = extract_information_from_content(&mut file_info_builder, path, scan_strategy) {
+    if let Err(e) =
+        extract_information_from_content(&mut file_info_builder, path, scan_strategy, text_options)
+    {
         scan_errors.push(e.to_string());
     };
 
@@ -143,6 +171,7 @@ fn extract_information_from_content(
     file_info_builder: &mut FileInfoBuilder,
     path: &Path,
     scan_strategy: &ScanStrategy,
+    text_options: &TextDetectionOptions,
 ) -> Result<(), Error> {
     let buffer = fs::read(path)?;
 
@@ -162,6 +191,7 @@ fn extract_information_from_content(
         let text_content = crate::utils::file::decode_bytes_to_string(&buffer);
 
         extract_copyright_information(file_info_builder, path, &text_content);
+        extract_email_url_information(file_info_builder, &text_content, text_options);
         extract_license_information(file_info_builder, text_content, scan_strategy)
     } else {
         Ok(())
@@ -223,6 +253,46 @@ fn extract_copyright_information(
             })
             .collect::<Vec<Author>>(),
     );
+}
+
+fn extract_email_url_information(
+    file_info_builder: &mut FileInfoBuilder,
+    text_content: &str,
+    text_options: &TextDetectionOptions,
+) {
+    if !text_options.detect_emails && !text_options.detect_urls {
+        return;
+    }
+
+    let config = DetectionConfig {
+        max_emails: text_options.max_emails,
+        max_urls: text_options.max_urls,
+        unique: true,
+    };
+
+    if text_options.detect_emails {
+        let emails = finder::find_emails(text_content, &config)
+            .into_iter()
+            .map(|d| OutputEmail {
+                email: d.email,
+                start_line: d.start_line,
+                end_line: d.end_line,
+            })
+            .collect::<Vec<_>>();
+        file_info_builder.emails(emails);
+    }
+
+    if text_options.detect_urls {
+        let urls = finder::find_urls(text_content, &config)
+            .into_iter()
+            .map(|d| OutputURL {
+                url: d.url,
+                start_line: d.start_line,
+                end_line: d.end_line,
+            })
+            .collect::<Vec<_>>();
+        file_info_builder.urls(urls);
+    }
 }
 
 fn extract_license_information(
@@ -298,6 +368,7 @@ fn process_directory(path: &Path, metadata: &fs::Metadata) -> FileInfo {
         copyrights: Vec::new(),         // TODO: implement
         holders: Vec::new(),            // TODO: implement
         authors: Vec::new(),            // TODO: implement
+        emails: Vec::new(),             // TODO: implement
         license_detections: Vec::new(), // TODO: implement
         urls: Vec::new(),               // TODO: implement
         for_packages: Vec::new(),

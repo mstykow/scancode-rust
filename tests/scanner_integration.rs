@@ -3,7 +3,9 @@ use indicatif::ProgressBar;
 use scancode_rust::askalono::{ScanStrategy, Store};
 use scancode_rust::models::PackageType;
 use scancode_rust::parsers::list_parser_types;
-use scancode_rust::{FileType, process};
+use scancode_rust::{FileType, TextDetectionOptions, process, process_with_options};
+use std::fs;
+use std::path::Path;
 use std::sync::Arc;
 
 /// Helper to create a minimal Store for testing
@@ -286,4 +288,99 @@ fn test_all_parsers_are_registered_and_exported() {
         "Expected at least 40 parsers, found {}. Some parsers may not be registered.",
         parser_types.len()
     );
+}
+
+#[test]
+fn test_scanner_detects_emails_and_urls_when_enabled() {
+    use tempfile::TempDir;
+
+    let temp_dir = TempDir::new().expect("Failed to create temp dir");
+    let test_path = temp_dir.path();
+    let content_path = test_path.join("contacts.txt");
+    fs::write(
+        &content_path,
+        "mail us at support@many.org\nvisit www.acme.dev/docs\n",
+    )
+    .expect("Failed to write test file");
+
+    let progress = Arc::new(ProgressBar::hidden());
+    let patterns: Vec<Pattern> = vec![];
+    let store = create_test_store();
+    let strategy = create_test_strategy(&store);
+    let options = TextDetectionOptions {
+        detect_emails: true,
+        detect_urls: true,
+        max_emails: 50,
+        max_urls: 50,
+    };
+
+    let result = process_with_options(test_path, 10, progress, &patterns, &strategy, &options)
+        .expect("Scan should succeed");
+
+    let file = result
+        .files
+        .iter()
+        .find(|f| f.file_type == FileType::File && f.path.ends_with("contacts.txt"))
+        .expect("Should find contacts file");
+
+    assert_eq!(file.emails.len(), 1);
+    assert_eq!(file.emails[0].email, "support@many.org");
+    assert_eq!(file.emails[0].start_line, 1);
+    assert_eq!(file.emails[0].end_line, 1);
+
+    assert_eq!(file.urls.len(), 1);
+    assert_eq!(file.urls[0].url, "http://www.acme.dev/docs");
+    assert_eq!(file.urls[0].start_line, 2);
+    assert_eq!(file.urls[0].end_line, 2);
+}
+
+#[test]
+fn test_scanner_respects_email_url_thresholds() {
+    use tempfile::TempDir;
+
+    let temp_dir = TempDir::new().expect("Failed to create temp dir");
+    let test_path = temp_dir.path();
+    let content_path = test_path.join("thresholds.txt");
+    fs::write(
+        &content_path,
+        [
+            "a@one.org",
+            "b@two.org",
+            "c@three.org",
+            "http://one.org",
+            "http://two.org",
+            "http://three.org",
+            "",
+        ]
+        .join("\n"),
+    )
+    .expect("Failed to write test file");
+
+    let progress = Arc::new(ProgressBar::hidden());
+    let patterns: Vec<Pattern> = vec![];
+    let store = create_test_store();
+    let strategy = create_test_strategy(&store);
+    let options = TextDetectionOptions {
+        detect_emails: true,
+        detect_urls: true,
+        max_emails: 2,
+        max_urls: 2,
+    };
+
+    let result = process_with_options(test_path, 10, progress, &patterns, &strategy, &options)
+        .expect("Scan should succeed");
+
+    let file = result
+        .files
+        .iter()
+        .find(|f| {
+            f.file_type == FileType::File
+                && Path::new(&f.path)
+                    .file_name()
+                    .is_some_and(|n| n == "thresholds.txt")
+        })
+        .expect("Should find thresholds file");
+
+    assert_eq!(file.emails.len(), 2);
+    assert_eq!(file.urls.len(), 2);
 }

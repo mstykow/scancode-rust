@@ -14,13 +14,14 @@ use std::sync::Arc;
 use crate::askalono::{Store, TextData};
 use crate::cli::Cli;
 use crate::models::{ExtraData, Header, Output, SCANCODE_OUTPUT_FORMAT_VERSION, SystemEnvironment};
-use crate::scanner::{count, process};
+use crate::scanner::{TextDetectionOptions, count, process, process_with_options};
 
 mod askalono;
 mod assembly;
 mod cli;
 #[allow(dead_code, unused_imports)]
 mod copyright;
+mod finder;
 mod models;
 mod parsers;
 mod scanner;
@@ -59,13 +60,31 @@ fn run() -> Result<(), Box<dyn Error>> {
     );
 
     let progress_bar = create_progress_bar(total_files);
-    let mut scan_result = process(
-        &cli.dir_path,
-        cli.max_depth,
-        Arc::clone(&progress_bar),
-        &exclude_patterns,
-        &strategy,
-    )?;
+    let text_options = TextDetectionOptions {
+        detect_emails: cli.email,
+        detect_urls: cli.url,
+        max_emails: cli.max_email,
+        max_urls: cli.max_url,
+    };
+
+    let mut scan_result = if text_options.detect_emails || text_options.detect_urls {
+        process_with_options(
+            &cli.dir_path,
+            cli.max_depth,
+            Arc::clone(&progress_bar),
+            &exclude_patterns,
+            &strategy,
+            &text_options,
+        )?
+    } else {
+        process(
+            &cli.dir_path,
+            cli.max_depth,
+            Arc::clone(&progress_bar),
+            &exclude_patterns,
+            &strategy,
+        )?
+    };
     progress_bar.finish_with_message("Scan complete!");
 
     let assembly_result = if cli.no_assemble {

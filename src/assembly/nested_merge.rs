@@ -275,6 +275,7 @@ mod tests {
                 vec![],
                 vec![],
                 vec![],
+                vec![],
             ),
             FileInfo::new(
                 "MANIFEST.MF".to_string(),
@@ -291,6 +292,7 @@ mod tests {
                 None,
                 vec![],
                 None,
+                vec![],
                 vec![],
                 vec![],
                 vec![],
@@ -332,6 +334,7 @@ mod tests {
                 vec![],
                 vec![],
                 vec![],
+                vec![],
             ),
             FileInfo::new(
                 "copyright".to_string(),
@@ -348,6 +351,7 @@ mod tests {
                 None,
                 vec![],
                 None,
+                vec![],
                 vec![],
                 vec![],
                 vec![],

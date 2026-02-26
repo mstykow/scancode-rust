@@ -124,6 +124,7 @@ mod tests {
                 copyrights: vec![],
                 holders: vec![],
                 authors: vec![],
+                emails: vec![],
                 urls: vec![],
                 for_packages: vec![],
                 scan_errors: vec![],
