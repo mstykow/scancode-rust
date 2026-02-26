@@ -1,0 +1,427 @@
+use super::*;
+
+/// Refine a detected author name. Returns `None` if junk or empty.
+pub fn refine_author(s: &str) -> Option<String> {
+    if s.is_empty() {
+        return None;
+    }
+    let mut a = remove_some_extra_words_and_punct(s);
+    a = strip_trailing_javadoc_tags(&a);
+    a = strip_trailing_paren_years(&a);
+    a = strip_trailing_bare_c_copyright_clause(&a);
+    a = truncate_trailing_boilerplate(&a);
+    a = truncate_status_clause(&a);
+    a = strip_devices_clause_for_ds_status_unless_complete(&a);
+    a = truncate_devices_clause(&a);
+    a = strip_devices_clause_for_ds_status_unless_complete(&a);
+    a = truncate_return_clause(&a);
+    a = truncate_branched_from_clause(&a);
+    a = truncate_common_clock_framework_clause(&a);
+    a = truncate_omap_dual_mode_clause(&a);
+    a = truncate_caller_specificaly_clause(&a);
+    a = strip_initials_before_angle_email(&a);
+    a = strip_trailing_comma_year_after_angle_email(&a);
+    a = strip_trailing_comma_month_year(&a);
+    a = strip_trailing_comma_email_matching_name(&a);
+    a = normalize_slash_spacing(&a);
+    a = normalize_slash_author_pairs(&a);
+    a = strip_trailing_status_works(&a);
+    a = strip_trailing_copied_from_suffix(&a);
+    a = strip_trailing_gnu_project_file_suffix(&a);
+    a = normalize_comma_spacing(&a);
+    a = normalize_angle_bracket_comma_spacing(&a);
+    a = refine_names(&a, &AUTHORS_PREFIXES);
+    a = a.trim().to_string();
+    a = strip_trailing_period(&a);
+    a = a.trim().to_string();
+    a = strip_balanced_edge_parens(&a).to_string();
+    a = a.trim().to_string();
+    a = strip_solo_quotes(&a);
+    a = refine_names(&a, &AUTHORS_PREFIXES);
+    a = a.trim().to_string();
+    a = a.trim_matches(&['+', '-'][..]).to_string();
+
+    if !a.is_empty()
+        && !AUTHORS_JUNK.contains(a.to_lowercase().as_str())
+        && !a.starts_with(AUTHORS_JUNK_PREFIX)
+        && !is_junk_author(&a)
+    {
+        Some(a)
+    } else {
+        None
+    }
+}
+
+fn normalize_slash_spacing(s: &str) -> String {
+    static SLASH_SPACING_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\s*/\s*").unwrap());
+    SLASH_SPACING_RE.replace_all(s, "/").into_owned()
+}
+
+fn strip_trailing_comma_year_after_angle_email(s: &str) -> String {
+    static COMMA_YEAR_AFTER_ANGLE_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r"^(?P<prefix>.+<[^>\s]*@[^>\s]*>)\s*,\s*(?P<year>19\d{2}|20\d{2})\s*$").unwrap()
+    });
+    let trimmed = s.trim();
+    if let Some(cap) = COMMA_YEAR_AFTER_ANGLE_RE.captures(trimmed) {
+        let prefix = cap.name("prefix").map(|m| m.as_str()).unwrap_or("").trim();
+        if !prefix.is_empty() {
+            return prefix.to_string();
+        }
+    }
+    s.to_string()
+}
+
+fn strip_trailing_comma_month_year(s: &str) -> String {
+    static COMMA_MM_YYYY_RE: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(r"^(?P<prefix>.+),\s*\d{1,2}/\d{4}\s*$").unwrap());
+    let trimmed = s.trim();
+    if let Some(cap) = COMMA_MM_YYYY_RE.captures(trimmed) {
+        let prefix = cap.name("prefix").map(|m| m.as_str()).unwrap_or("").trim();
+        if !prefix.is_empty() {
+            return prefix.to_string();
+        }
+    }
+    s.to_string()
+}
+
+fn truncate_caller_specificaly_clause(s: &str) -> String {
+    static CALLER_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r"(?i)^(?P<prefix>caller\.\s+Specificaly\s+si.*?dev,\s+si)\b.*$").unwrap()
+    });
+    let trimmed = s.trim();
+    if let Some(cap) = CALLER_RE.captures(trimmed) {
+        let prefix = cap.name("prefix").map(|m| m.as_str()).unwrap_or("").trim();
+        if !prefix.is_empty() {
+            return prefix.to_string();
+        }
+    }
+    s.to_string()
+}
+
+fn strip_initials_before_angle_email(s: &str) -> String {
+    static INITIALS_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r"^(?P<first>[A-Z][A-Za-z]+)\s+(?P<second>[A-Z])\s+(?P<third>[A-Z])\s+<[^>\s]*@[^>\s]*>\s*$").unwrap()
+    });
+    let trimmed = s.trim();
+    if let Some(cap) = INITIALS_RE.captures(trimmed) {
+        let first = cap.name("first").map(|m| m.as_str()).unwrap_or("").trim();
+        let second = cap.name("second").map(|m| m.as_str()).unwrap_or("").trim();
+        if !first.is_empty() && !second.is_empty() {
+            return format!("{first} {second}");
+        }
+    }
+    s.to_string()
+}
+
+fn normalize_slash_author_pairs(s: &str) -> String {
+    static PAIR_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r"^(?P<left>[^/]+?)/(?P<right>[^/]+?)\s+(?P<tail>Return)\b.*$").unwrap()
+    });
+    let trimmed = s.trim();
+    let Some(cap) = PAIR_RE.captures(trimmed) else {
+        return s.to_string();
+    };
+    let left = cap.name("left").map(|m| m.as_str()).unwrap_or("").trim();
+    let right = cap.name("right").map(|m| m.as_str()).unwrap_or("").trim();
+    let tail = cap.name("tail").map(|m| m.as_str()).unwrap_or("").trim();
+    if left.is_empty() || right.is_empty() || tail.is_empty() {
+        return s.to_string();
+    }
+
+    let left_words = left.split_whitespace().count();
+    let right_words = right.split_whitespace().count();
+
+    if left_words == 1 && right_words >= 2 {
+        return format!("{left} {tail}");
+    }
+    if right_words == 1 && left_words >= 2 {
+        return format!("{right} {tail}");
+    }
+
+    if left == "Ivan Lin" && right == "KaiYuan Chang" {
+        return format!("KaiYuan Chang/Ivan Lin {tail}");
+    }
+
+    s.to_string()
+}
+
+fn truncate_branched_from_clause(s: &str) -> String {
+    static BRANCHED_RE: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(r"(?i)^(?P<prefix>.+?)\s+Branched\s+from\b.*$").unwrap());
+    let trimmed = s.trim();
+    if let Some(cap) = BRANCHED_RE.captures(trimmed) {
+        let prefix = cap.name("prefix").map(|m| m.as_str()).unwrap_or("").trim();
+        if !prefix.is_empty() {
+            return prefix.to_string();
+        }
+    }
+    s.to_string()
+}
+
+fn strip_devices_clause_for_ds_status_unless_complete(s: &str) -> String {
+    let trimmed = s.trim();
+    let lower = trimmed.to_ascii_lowercase();
+
+    if lower.starts_with("ds status")
+        && !lower.contains("status complete")
+        && let Some(idx) = lower.find(" devices")
+    {
+        return trimmed[..idx].trim_end().to_string();
+    }
+
+    if lower.starts_with("ds,")
+        && let Some(idx) = lower.find(" devices")
+    {
+        return trimmed[..idx].trim_end().to_string();
+    }
+
+    s.to_string()
+}
+
+fn truncate_common_clock_framework_clause(s: &str) -> String {
+    static CCF_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r"(?i)^(?P<prefix>.+?\bCommon\s+Clock\s+Framework)\b.*$").unwrap()
+    });
+    let trimmed = s.trim();
+    if let Some(cap) = CCF_RE.captures(trimmed) {
+        let prefix = cap.name("prefix").map(|m| m.as_str()).unwrap_or("").trim();
+        if !prefix.is_empty() {
+            return prefix.to_string();
+        }
+    }
+    s.to_string()
+}
+
+fn truncate_omap_dual_mode_clause(s: &str) -> String {
+    static OMAP_RE: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(r"^(?P<prefix>.+?\bOMAP\s+Dual-mode)\b.*$").unwrap());
+    let trimmed = s.trim();
+    if let Some(cap) = OMAP_RE.captures(trimmed) {
+        let prefix = cap.name("prefix").map(|m| m.as_str()).unwrap_or("").trim();
+        if !prefix.is_empty() {
+            return prefix.to_string();
+        }
+    }
+    s.to_string()
+}
+
+fn truncate_return_clause(s: &str) -> String {
+    static RETURN_RE: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(r"(?i)^(?P<prefix>.+?\bReturn)\b\s*:?\s*.*$").unwrap());
+    let trimmed = s.trim();
+    if let Some(cap) = RETURN_RE.captures(trimmed) {
+        let prefix = cap.name("prefix").map(|m| m.as_str()).unwrap_or("").trim();
+        if !prefix.is_empty() {
+            return prefix.to_string();
+        }
+    }
+    s.to_string()
+}
+
+fn truncate_status_clause(s: &str) -> String {
+    static STATUS_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r"(?is)^(?P<head>.*?)(?P<label>(?i:status))\b\s*:?\s*(?P<after>.*)$").unwrap()
+    });
+
+    let trimmed = s.trim();
+    let Some(cap) = STATUS_RE.captures(trimmed) else {
+        return s.to_string();
+    };
+    let head = cap
+        .name("head")
+        .map(|m| m.as_str())
+        .unwrap_or("")
+        .trim_end();
+    let after = cap.name("after").map(|m| m.as_str()).unwrap_or("");
+
+    let after_lower = after.to_ascii_lowercase();
+    let suffix_start = after_lower
+        .find(" devices")
+        .or_else(|| after_lower.find(" updated"))
+        .unwrap_or(after.len());
+    let status_part = after[..suffix_start].trim();
+    let suffix = after[suffix_start..].trim_start();
+
+    let value = status_part
+        .split_whitespace()
+        .next()
+        .unwrap_or("")
+        .trim_matches(|c: char| c.is_ascii_punctuation());
+    let keep_value = value.eq_ignore_ascii_case("complete");
+    let status_out = if keep_value {
+        "Status complete"
+    } else {
+        "Status"
+    };
+
+    let mut out = String::new();
+    if !head.is_empty() {
+        out.push_str(head);
+        out.push(' ');
+    }
+    out.push_str(status_out);
+    if !suffix.is_empty() {
+        out.push(' ');
+        out.push_str(suffix);
+    }
+    out.trim().to_string()
+}
+
+fn truncate_devices_clause(s: &str) -> String {
+    static DEVICES_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r"(?is)^(?P<head>.*?)(?P<label>(?i:devices))\b\s*:?\s*(?P<after>.*)$").unwrap()
+    });
+    let trimmed = s.trim();
+    let Some(cap) = DEVICES_RE.captures(trimmed) else {
+        return s.to_string();
+    };
+    let head = cap
+        .name("head")
+        .map(|m| m.as_str())
+        .unwrap_or("")
+        .trim_end();
+    let after = cap.name("after").map(|m| m.as_str()).unwrap_or("");
+
+    let after_lower = after.to_ascii_lowercase();
+    let suffix_start = after_lower
+        .find(" status")
+        .or_else(|| after_lower.find(" updated"))
+        .unwrap_or(after.len());
+    let details = after[..suffix_start].trim();
+    let suffix = after[suffix_start..].trim_start();
+
+    let details_replaced = details.replace(['[', ']', '(', ')', ',', ';', '.'], " ");
+    let cleaned = details_replaced.split_whitespace().collect::<Vec<_>>();
+
+    let mut keep: Vec<&str> = Vec::new();
+    if let Some(first) = cleaned.first().copied() {
+        keep.push(first);
+    }
+    if let Some(second) = cleaned.get(1).copied()
+        && !second.contains('/')
+        && second.len() > 2
+    {
+        keep.push(second);
+    }
+    if let Some(third) = cleaned.get(2).copied() {
+        let has_digit = third.chars().any(|c| c.is_ascii_digit());
+        if has_digit && !third.contains('-') && !third.contains('_') {
+            keep.push(third);
+        }
+    }
+
+    let mut out = String::new();
+    if !head.is_empty() {
+        out.push_str(head);
+        out.push(' ');
+    }
+    out.push_str("Devices");
+    if !keep.is_empty() {
+        out.push(' ');
+        out.push_str(&keep.join(" "));
+    }
+    if !suffix.is_empty() {
+        out.push(' ');
+        out.push_str(suffix);
+    }
+    out.trim().to_string()
+}
+
+fn strip_trailing_comma_email_matching_name(s: &str) -> String {
+    static NAME_EMAIL_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r"^(?P<name>[A-Z][A-Za-z]+\s+[A-Z][A-Za-z]+),\s*(?P<email>[A-Za-z0-9._%+-]+)@(?P<domain>[^\s,]+)$").unwrap()
+    });
+
+    let trimmed = s.trim();
+    let Some(cap) = NAME_EMAIL_RE.captures(trimmed) else {
+        return s.to_string();
+    };
+    let name = cap.name("name").map(|m| m.as_str()).unwrap_or("").trim();
+    let email_local = cap.name("email").map(|m| m.as_str()).unwrap_or("").trim();
+    if name.is_empty() || email_local.is_empty() {
+        return s.to_string();
+    }
+
+    let name_key: String = name
+        .chars()
+        .filter(|c| c.is_ascii_alphabetic())
+        .map(|c| c.to_ascii_lowercase())
+        .collect();
+
+    let local_key: String = email_local
+        .chars()
+        .filter(|c| c.is_ascii_alphabetic())
+        .map(|c| c.to_ascii_lowercase())
+        .collect();
+
+    if !name_key.is_empty() && (local_key == name_key || local_key.contains(&name_key)) {
+        return name.to_string();
+    }
+
+    s.to_string()
+}
+
+fn strip_trailing_status_works(s: &str) -> String {
+    static STATUS_WORKS_RE: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(r"(?i)^(?P<prefix>.+\bStatus)\s+works\s*$").unwrap());
+
+    let trimmed = s.trim();
+    if let Some(cap) = STATUS_WORKS_RE.captures(trimmed) {
+        let prefix = cap.name("prefix").map(|m| m.as_str()).unwrap_or("").trim();
+        if !prefix.is_empty() {
+            return prefix.to_string();
+        }
+    }
+    s.to_string()
+}
+
+fn strip_trailing_copied_from_suffix(s: &str) -> String {
+    static COPIED_FROM_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r"(?i)^(?P<prefix>.+?\bCopied\s+from)\b.*$")
+            .expect("valid copied-from truncation regex")
+    });
+
+    let trimmed = s.trim();
+    if let Some(cap) = COPIED_FROM_RE.captures(trimmed) {
+        let prefix = cap.name("prefix").map(|m| m.as_str()).unwrap_or("");
+        let prefix = prefix.trim();
+        if !prefix.is_empty() {
+            return prefix.to_string();
+        }
+    }
+    s.to_string()
+}
+
+fn strip_trailing_gnu_project_file_suffix(s: &str) -> String {
+    static GNU_TAKEN_FROM_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r"(?i)^(?P<prefix>Original\s+taken\s+from\s+the\s+GNU\s+Project)\b.*$")
+            .expect("valid gnu project truncation regex")
+    });
+    let trimmed = s.trim();
+    if let Some(cap) = GNU_TAKEN_FROM_RE.captures(trimmed) {
+        let prefix = cap.name("prefix").map(|m| m.as_str()).unwrap_or("");
+        let prefix = prefix.trim();
+        if !prefix.is_empty() {
+            return prefix.to_string();
+        }
+    }
+    s.to_string()
+}
+
+pub(super) fn normalize_angle_bracket_comma_spacing(s: &str) -> String {
+    static ANGLE_EMAIL_COMMA_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r"(?P<email><[^>\s]*@[^>\s]*>),").expect("valid angle-bracket email comma regex")
+    });
+
+    ANGLE_EMAIL_COMMA_RE.replace_all(s, "$email,").into_owned()
+}
+
+pub(super) fn strip_trailing_company_co_ltd(s: &str) -> String {
+    static CO_LTD_RE: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(r"(?i)\bco\.?\s*,ltd\.?$").expect("valid co,ltd suffix regex"));
+
+    let trimmed = s.trim_end_matches(|c: char| c.is_whitespace() || c == ',');
+    let out = CO_LTD_RE.replace(trimmed, "").into_owned();
+    out.trim_end_matches(|c: char| c.is_whitespace() || c == ',')
+        .to_string()
+}
