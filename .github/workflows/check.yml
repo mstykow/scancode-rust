@@ -117,13 +117,11 @@ jobs:
       - name: Check formatting (Prettier)
         run: npm run format:check
 
-      - name: Set up Python
-        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
-        with:
-          python-version: "3.11"
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.93.1
 
       - name: Validate URLs
-        run: python3 scripts/validate_urls.py
+        run: cargo run --quiet --bin validate-urls -- --root .
         continue-on-error: true
 
       - name: Lint Markdown

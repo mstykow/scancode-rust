@@ -120,6 +120,10 @@ path = "bin/update_parser_golden.rs"
 name = "update-copyright-golden"
 path = "bin/update_copyright_golden.rs"
 
+[[bin]]
+name = "validate-urls"
+path = "bin/validate_urls.rs"
+
 [features]
 default = ["spdx"]
 golden-tests = []

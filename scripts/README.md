@@ -102,11 +102,11 @@ Useful examples:
 ./scripts/update_copyright_golden.sh copyrights --filter essential_smoke --write
 ```
 
-## URL Validation Script
+## URL Validation Tool
 
 ### Purpose
 
-`validate_urls.py` systematically validates all URLs in production documentation and Rust docstrings to catch broken links before they reach users.
+`validate-urls` systematically validates all URLs in production documentation and Rust docstrings to catch broken links before they reach users.
 
 ### What It Validates
 
@@ -129,7 +129,7 @@ Useful examples:
 
 ```bash
 # Manual run
-python3 scripts/validate_urls.py
+cargo run --quiet --bin validate-urls -- --root .
 
 # Exit codes:
 #   0 = All URLs valid
@@ -159,11 +159,11 @@ Example output:
 
 ### CI/CD Integration
 
-**Configured in** `.github/workflows/docs-quality.yml`:
+**Configured in** `.github/workflows/check.yml`:
 
 ```yaml
 - name: Validate Documentation URLs
-  run: python3 scripts/validate_urls.py
+  run: cargo run --quiet --bin validate-urls -- --root .
   continue-on-error: true # Informational only - doesn't block PRs
 ```
 
@@ -192,7 +192,7 @@ If the check reports broken URLs:
 
 ### Maintenance
 
-**No regular maintenance needed** - The script automatically:
+**No regular maintenance needed** - The tool automatically:
 
 - Skips template URLs (containing `{`, `<`, `...`)
 - Handles relative URLs and fragments
@@ -200,17 +200,3 @@ If the check reports broken URLs:
 - Times out after 10 seconds per URL
 
 ---
-
-## URL Extraction Script
-
-### Purpose
-
-`extract_urls.sh` is a helper script for extracting all URLs from documentation (used during development/debugging).
-
-### Usage
-
-```bash
-./scripts/extract_urls.sh > all_urls.txt
-```
-
-**Note**: This script is for manual inspection only, not used in CI/CD.
