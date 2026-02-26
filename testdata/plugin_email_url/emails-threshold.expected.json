@@ -1,0 +1,27 @@
+{
+  "files": [
+    {
+      "path": "3w-xxxx.c",
+      "type": "file",
+      "emails": [
+        {
+          "email": "linux@3ware.com",
+          "start_line": 1,
+          "end_line": 1
+        },
+        {
+          "email": "acme@conectiva.com.br",
+          "start_line": 3,
+          "end_line": 3
+        }
+      ],
+      "scan_errors": []
+    },
+    {
+      "path": "IMarkerActionFilter.java",
+      "type": "file",
+      "emails": [],
+      "scan_errors": []
+    }
+  ]
+}
