@@ -249,20 +249,26 @@ pub fn merge_overlapping_matches(matches: &[LicenseMatch]) -> Vec<LicenseMatch> 
                 }
 
                 if current.surround(&next) {
-                    let combined = combine_matches(&current, &next);
-                    if combined.qspan().len() == combined.ispan().len() {
-                        rule_matches[i] = combined;
-                        rule_matches.remove(j);
-                        continue;
+                    let qoverlap = current.qoverlap(&next);
+                    if qoverlap > 0 {
+                        let combined = combine_matches(&current, &next);
+                        if combined.qspan().len() == combined.ispan().len() {
+                            rule_matches[i] = combined;
+                            rule_matches.remove(j);
+                            continue;
+                        }
                     }
                 }
                 if next.surround(&current) {
-                    let combined = combine_matches(&current, &next);
-                    if combined.qspan().len() == combined.ispan().len() {
-                        rule_matches[j] = combined;
-                        rule_matches.remove(i);
-                        i = i.saturating_sub(1);
-                        break;
+                    let qoverlap = current.qoverlap(&next);
+                    if qoverlap > 0 {
+                        let combined = combine_matches(&current, &next);
+                        if combined.qspan().len() == combined.ispan().len() {
+                            rule_matches[j] = combined;
+                            rule_matches.remove(i);
+                            i = i.saturating_sub(1);
+                            break;
+                        }
                     }
                 }
 

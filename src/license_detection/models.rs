@@ -510,9 +510,15 @@ impl LicenseMatch {
     }
 
     pub fn surround(&self, other: &LicenseMatch) -> bool {
-        let (self_start, self_end) = self.qspan_bounds();
-        let (other_start, other_end) = other.qspan_bounds();
-        self_start <= other_start && self_end >= other_end
+        let (self_qstart, self_qend) = self.qspan_bounds();
+        let (other_qstart, other_qend) = other.qspan_bounds();
+        let qsurrounds = self_qstart <= other_qstart && self_qend >= other_qend;
+
+        let (self_istart, self_iend) = self.ispan_bounds();
+        let (other_istart, other_iend) = other.ispan_bounds();
+        let isurrounds = self_istart <= other_istart && self_iend >= other_iend;
+
+        qsurrounds && isurrounds
     }
 
     pub fn qcontains(&self, other: &LicenseMatch) -> bool {
