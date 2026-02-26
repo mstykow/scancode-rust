@@ -10,10 +10,12 @@
 mod candidates;
 mod credits;
 mod detector;
+mod detector_input_normalization;
 pub mod golden_utils;
 mod grammar;
 mod hints;
 mod lexer;
+mod line_tracking;
 mod parser;
 mod patterns;
 mod prepare;
