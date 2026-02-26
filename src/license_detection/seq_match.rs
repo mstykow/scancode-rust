@@ -663,7 +663,8 @@ pub fn seq_match(index: &LicenseIndex, query_run: &QueryRun) -> Vec<LicenseMatch
     for candidate in candidates {
         let rid = candidate.rid;
         let rule_tokens = index.tids_by_rid.get(rid);
-        let high_postings: HashMap<u16, Vec<usize>> = index.high_postings_by_rid
+        let high_postings: HashMap<u16, Vec<usize>> = index
+            .high_postings_by_rid
             .get(&rid)
             .map(|hp| {
                 hp.iter()
@@ -805,7 +806,8 @@ pub fn seq_match_with_candidates(
     for candidate in candidates {
         let rid = candidate.rid;
         let rule_tokens = index.tids_by_rid.get(rid);
-        let high_postings: HashMap<u16, Vec<usize>> = index.high_postings_by_rid
+        let high_postings: HashMap<u16, Vec<usize>> = index
+            .high_postings_by_rid
             .get(&rid)
             .map(|hp| {
                 hp.iter()

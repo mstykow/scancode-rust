@@ -238,6 +238,16 @@ mod golden_tests {
 
     /// Run a complete test suite using the shared engine
     fn run_suite(suite_name: &str, dir: &Path) -> SuiteResult {
+        run_suite_range(suite_name, dir, None, None)
+    }
+
+    /// Run a subset of a test suite (for splitting large suites)
+    fn run_suite_range(
+        suite_name: &str,
+        dir: &Path,
+        start: Option<usize>,
+        end: Option<usize>,
+    ) -> SuiteResult {
         let mut result = SuiteResult {
             total: 0,
             passed: 0,
@@ -251,10 +261,31 @@ mod golden_tests {
             return result;
         };
 
-        let tests = discover_tests(dir);
+        let mut tests = discover_tests(dir);
+        let total_tests = tests.len();
+
+        let start_idx = start.unwrap_or(0);
+        let end_idx = end.unwrap_or(total_tests).min(total_tests);
+
+        if start_idx >= total_tests {
+            return result;
+        }
+
+        tests = tests.split_off(start_idx);
+        if end_idx < total_tests {
+            tests.truncate(end_idx - start_idx);
+        }
+
         result.total = tests.len();
 
-        println!("\n{}: Running {} tests...", suite_name, tests.len());
+        println!(
+            "\n{}: Running {} tests ({}-{} of {})...",
+            suite_name,
+            tests.len(),
+            start_idx,
+            end_idx,
+            total_tests
+        );
 
         for test in &tests {
             if test.yaml.expected_failure {
@@ -292,15 +323,66 @@ mod golden_tests {
     }
 
     #[test]
-    fn test_golden_lic2() {
-        let result = run_suite("lic2", &PathBuf::from(format!("{}/lic2", GOLDEN_DIR)));
+    fn test_golden_lic2_part1() {
+        let result = run_suite_range(
+            "lic2-part1",
+            &PathBuf::from(format!("{}/lic2", GOLDEN_DIR)),
+            Some(0),
+            Some(285),
+        );
         if result.failed > 0 {
             println!("\n{} failures:", result.failed);
             for (name, err) in &result.failures {
                 println!("  - {}: {}", name, err.lines().next().unwrap_or(err));
             }
         }
-        assert_eq!(result.failed, 0, "lic2 had {} failures", result.failed);
+        assert_eq!(
+            result.failed, 0,
+            "lic2-part1 had {} failures",
+            result.failed
+        );
+    }
+
+    #[test]
+    fn test_golden_lic2_part2() {
+        let result = run_suite_range(
+            "lic2-part2",
+            &PathBuf::from(format!("{}/lic2", GOLDEN_DIR)),
+            Some(285),
+            Some(570),
+        );
+        if result.failed > 0 {
+            println!("\n{} failures:", result.failed);
+            for (name, err) in &result.failures {
+                println!("  - {}: {}", name, err.lines().next().unwrap_or(err));
+            }
+        }
+        assert_eq!(
+            result.failed, 0,
+            "lic2-part2 had {} failures",
+            result.failed
+        );
+    }
+
+    #[test]
+    fn test_golden_lic2_part3() {
+        let result = run_suite_range(
+            "lic2-part3",
+            &PathBuf::from(format!("{}/lic2", GOLDEN_DIR)),
+            Some(570),
+            None,
+        );
+        if result.failed > 0 {
+            println!("\n{} failures:", result.failed);
+            for (name, err) in &result.failures {
+                println!("  - {}: {}", name, err.lines().next().unwrap_or(err));
+            }
+        }
+        assert_eq!(
+            result.failed, 0,
+            "lic2-part3 had {} failures",
+            result.failed
+        );
     }
 
     #[test]
@@ -316,22 +398,12 @@ mod golden_tests {
     }
 
     #[test]
-    fn test_golden_lic4() {
-        let result = run_suite("lic4", &PathBuf::from(format!("{}/lic4", GOLDEN_DIR)));
-        if result.failed > 0 {
-            println!("\n{} failures:", result.failed);
-            for (name, err) in &result.failures {
-                println!("  - {}: {}", name, err.lines().next().unwrap_or(err));
-            }
-        }
-        assert_eq!(result.failed, 0, "lic4 had {} failures", result.failed);
-    }
-
-    #[test]
-    fn test_golden_external() {
-        let result = run_suite(
-            "external",
-            &PathBuf::from(format!("{}/external", GOLDEN_DIR)),
+    fn test_golden_lic4_part1() {
+        let result = run_suite_range(
+            "lic4-part1",
+            &PathBuf::from(format!("{}/lic4", GOLDEN_DIR)),
+            Some(0),
+            Some(175),
         );
         if result.failed > 0 {
             println!("\n{} failures:", result.failed);
@@ -339,7 +411,221 @@ mod golden_tests {
                 println!("  - {}: {}", name, err.lines().next().unwrap_or(err));
             }
         }
-        assert_eq!(result.failed, 0, "external had {} failures", result.failed);
+        assert_eq!(
+            result.failed, 0,
+            "lic4-part1 had {} failures",
+            result.failed
+        );
+    }
+
+    #[test]
+    fn test_golden_lic4_part2() {
+        let result = run_suite_range(
+            "lic4-part2",
+            &PathBuf::from(format!("{}/lic4", GOLDEN_DIR)),
+            Some(175),
+            None,
+        );
+        if result.failed > 0 {
+            println!("\n{} failures:", result.failed);
+            for (name, err) in &result.failures {
+                println!("  - {}: {}", name, err.lines().next().unwrap_or(err));
+            }
+        }
+        assert_eq!(
+            result.failed, 0,
+            "lic4-part2 had {} failures",
+            result.failed
+        );
+    }
+
+    #[test]
+    fn test_golden_external_part1() {
+        let result = run_suite_range(
+            "external-part1",
+            &PathBuf::from(format!("{}/external", GOLDEN_DIR)),
+            Some(0),
+            Some(285),
+        );
+        if result.failed > 0 {
+            println!("\n{} failures:", result.failed);
+            for (name, err) in &result.failures {
+                println!("  - {}: {}", name, err.lines().next().unwrap_or(err));
+            }
+        }
+        assert_eq!(
+            result.failed, 0,
+            "external-part1 had {} failures",
+            result.failed
+        );
+    }
+
+    #[test]
+    fn test_golden_external_part2() {
+        let result = run_suite_range(
+            "external-part2",
+            &PathBuf::from(format!("{}/external", GOLDEN_DIR)),
+            Some(285),
+            Some(570),
+        );
+        if result.failed > 0 {
+            println!("\n{} failures:", result.failed);
+            for (name, err) in &result.failures {
+                println!("  - {}: {}", name, err.lines().next().unwrap_or(err));
+            }
+        }
+        assert_eq!(
+            result.failed, 0,
+            "external-part2 had {} failures",
+            result.failed
+        );
+    }
+
+    #[test]
+    fn test_golden_external_part3() {
+        let result = run_suite_range(
+            "external-part3",
+            &PathBuf::from(format!("{}/external", GOLDEN_DIR)),
+            Some(570),
+            Some(855),
+        );
+        if result.failed > 0 {
+            println!("\n{} failures:", result.failed);
+            for (name, err) in &result.failures {
+                println!("  - {}: {}", name, err.lines().next().unwrap_or(err));
+            }
+        }
+        assert_eq!(
+            result.failed, 0,
+            "external-part3 had {} failures",
+            result.failed
+        );
+    }
+
+    #[test]
+    fn test_golden_external_part4() {
+        let result = run_suite_range(
+            "external-part4",
+            &PathBuf::from(format!("{}/external", GOLDEN_DIR)),
+            Some(855),
+            Some(1140),
+        );
+        if result.failed > 0 {
+            println!("\n{} failures:", result.failed);
+            for (name, err) in &result.failures {
+                println!("  - {}: {}", name, err.lines().next().unwrap_or(err));
+            }
+        }
+        assert_eq!(
+            result.failed, 0,
+            "external-part4 had {} failures",
+            result.failed
+        );
+    }
+
+    #[test]
+    fn test_golden_external_part5() {
+        let result = run_suite_range(
+            "external-part5",
+            &PathBuf::from(format!("{}/external", GOLDEN_DIR)),
+            Some(1140),
+            Some(1425),
+        );
+        if result.failed > 0 {
+            println!("\n{} failures:", result.failed);
+            for (name, err) in &result.failures {
+                println!("  - {}: {}", name, err.lines().next().unwrap_or(err));
+            }
+        }
+        assert_eq!(
+            result.failed, 0,
+            "external-part5 had {} failures",
+            result.failed
+        );
+    }
+
+    #[test]
+    fn test_golden_external_part6() {
+        let result = run_suite_range(
+            "external-part6",
+            &PathBuf::from(format!("{}/external", GOLDEN_DIR)),
+            Some(1425),
+            Some(1710),
+        );
+        if result.failed > 0 {
+            println!("\n{} failures:", result.failed);
+            for (name, err) in &result.failures {
+                println!("  - {}: {}", name, err.lines().next().unwrap_or(err));
+            }
+        }
+        assert_eq!(
+            result.failed, 0,
+            "external-part6 had {} failures",
+            result.failed
+        );
+    }
+
+    #[test]
+    fn test_golden_external_part7() {
+        let result = run_suite_range(
+            "external-part7",
+            &PathBuf::from(format!("{}/external", GOLDEN_DIR)),
+            Some(1710),
+            Some(1995),
+        );
+        if result.failed > 0 {
+            println!("\n{} failures:", result.failed);
+            for (name, err) in &result.failures {
+                println!("  - {}: {}", name, err.lines().next().unwrap_or(err));
+            }
+        }
+        assert_eq!(
+            result.failed, 0,
+            "external-part7 had {} failures",
+            result.failed
+        );
+    }
+
+    #[test]
+    fn test_golden_external_part8() {
+        let result = run_suite_range(
+            "external-part8",
+            &PathBuf::from(format!("{}/external", GOLDEN_DIR)),
+            Some(1995),
+            Some(2280),
+        );
+        if result.failed > 0 {
+            println!("\n{} failures:", result.failed);
+            for (name, err) in &result.failures {
+                println!("  - {}: {}", name, err.lines().next().unwrap_or(err));
+            }
+        }
+        assert_eq!(
+            result.failed, 0,
+            "external-part8 had {} failures",
+            result.failed
+        );
+    }
+
+    #[test]
+    fn test_golden_external_part9() {
+        let result = run_suite_range(
+            "external-part9",
+            &PathBuf::from(format!("{}/external", GOLDEN_DIR)),
+            Some(2280),
+            None,
+        );
+        if result.failed > 0 {
+            println!("\n{} failures:", result.failed);
+            for (name, err) in &result.failures {
+                println!("  - {}: {}", name, err.lines().next().unwrap_or(err));
+            }
+        }
+        assert_eq!(
+            result.failed, 0,
+            "external-part9 had {} failures",
+            result.failed
+        );
     }
 
     #[test]
@@ -362,13 +648,24 @@ mod golden_tests {
             return;
         };
 
-        let suites = [
-            ("lic1", "lic1"),
-            ("lic2", "lic2"),
-            ("lic3", "lic3"),
-            ("lic4", "lic4"),
-            ("external", "external"),
-            ("unknown", "unknown"),
+        let suites: [(&str, &str, Option<usize>, Option<usize>); 17] = [
+            ("lic1", "lic1", None, None),
+            ("lic2-part1", "lic2", Some(0), Some(285)),
+            ("lic2-part2", "lic2", Some(285), Some(570)),
+            ("lic2-part3", "lic2", Some(570), None),
+            ("lic3", "lic3", None, None),
+            ("lic4-part1", "lic4", Some(0), Some(175)),
+            ("lic4-part2", "lic4", Some(175), None),
+            ("external-part1", "external", Some(0), Some(285)),
+            ("external-part2", "external", Some(285), Some(570)),
+            ("external-part3", "external", Some(570), Some(855)),
+            ("external-part4", "external", Some(855), Some(1140)),
+            ("external-part5", "external", Some(1140), Some(1425)),
+            ("external-part6", "external", Some(1425), Some(1710)),
+            ("external-part7", "external", Some(1710), Some(1995)),
+            ("external-part8", "external", Some(1995), Some(2280)),
+            ("external-part9", "external", Some(2280), None),
+            ("unknown", "unknown", None, None),
         ];
 
         let mut total_tests = 0;
@@ -376,8 +673,13 @@ mod golden_tests {
         let mut total_failed = 0;
         let mut total_skipped = 0;
 
-        for (name, subdir) in suites.iter() {
-            let result = run_suite(name, &PathBuf::from(format!("{}/{}", GOLDEN_DIR, subdir)));
+        for (name, subdir, start, end) in suites.iter() {
+            let result = run_suite_range(
+                name,
+                &PathBuf::from(format!("{}/{}", GOLDEN_DIR, subdir)),
+                *start,
+                *end,
+            );
             total_tests += result.total;
             total_passed += result.passed;
             total_failed += result.failed;
