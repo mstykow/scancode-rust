@@ -1,9 +1,9 @@
 {
   "headers": [
     {
-      "start_timestamp": "2026-02-26T14:35:30.938164124+00:00",
-      "end_timestamp": "2026-02-26T14:36:32.412544666+00:00",
-      "duration": 61.474380542,
+      "start_timestamp": "2026-02-26T21:16:06.805431230+00:00",
+      "end_timestamp": "2026-02-26T21:16:18.941259411+00:00",
+      "duration": 12.135828181,
       "extra_data": {
         "files_count": 1,
         "directories_count": 1,
@@ -23,83 +23,230 @@
   "dependencies": [],
   "files": [
     {
-      "name": "ucware-eula.txt",
-      "base_name": "ucware-eula",
+      "name": "kde_licenses_test.txt",
+      "base_name": "kde_licenses_test",
       "extension": ".txt",
-      "path": "/tmp/ucware-test/ucware-eula.txt",
+      "path": "/tmp/kde_test/kde_licenses_test.txt",
       "type": "file",
       "mime_type": "text/plain",
-      "size": 2610,
-      "date": "2026-02-26T13:12:44+00:00",
-      "sha1": "164d1ff666cb3daee82933ea83aac27a4055ab20",
-      "md5": "68dd429b99672fcc640f6a39619c4021",
-      "sha256": "c250830c033efd6b61980d5e7594ea15cdfc32b51483498c6c9a79962bedd510",
+      "size": 8536,
+      "date": "2026-02-26T21:15:50+00:00",
+      "sha1": "98fef9342cc32217ee86d319af530281e9dfd77e",
+      "md5": "ebe88f9a87b505018f52575aaff16d24",
+      "sha256": "ba0be5ceb9777c873d6bce2d6dddd26f0607f6a9bd57a6e6987eea83acd41cc3",
       "programming_language": "Text",
       "package_data": [],
-      "detected_license_expression_spdx": "(LicenseRef-scancode-unknown-license-reference AND swrule AND LicenseRef-scancode-warranty-disclaimer)",
+      "detected_license_expression_spdx": "(GPL-2.0-only OR GPL-3.0-only OR LicenseRef-scancode-kde-accepted-gpl) AND GPL-2.0-or-later AND (GPL-3.0-only AND GPL-3.0-or-later AND LGPL-2.1-or-later AND BSD-2-Clause AND BSD-3-Clause AND X11 AND MIT) AND (LGPL-2.1-only OR LGPL-3.0-only OR LicenseRef-scancode-kde-accepted-lgpl)",
       "license_detections": [
         {
-          "license_expression": "unknown-license-reference AND swrule AND warranty-disclaimer",
-          "license_expression_spdx": "LicenseRef-scancode-unknown-license-reference AND swrule AND LicenseRef-scancode-warranty-disclaimer",
+          "license_expression": "gpl-2.0 OR gpl-3.0 OR kde-accepted-gpl",
+          "license_expression_spdx": "GPL-2.0-only OR GPL-3.0-only OR LicenseRef-scancode-kde-accepted-gpl",
           "matches": [
             {
-              "license_expression": "unknown-license-reference",
-              "license_expression_spdx": "unknown-license-reference",
-              "start_line": 1,
-              "end_line": 1,
+              "license_expression": "gpl-2.0 OR gpl-3.0 OR kde-accepted-gpl",
+              "license_expression_spdx": "gpl-2.0 OR gpl-3.0 OR kde-accepted-gpl",
+              "start_line": 3,
+              "end_line": 17,
+              "matcher": "2-aho",
+              "score": 100.0,
+              "matched_length": 139,
+              "match_coverage": 100.0,
+              "rule_relevance": 100,
+              "rule_identifier": "gpl-2.0_or_gpl-3.0-plus_1.RULE",
+              "rule_url": ""
+            }
+          ],
+          "identifier": "gpl_2_0_OR_gpl_3_0_OR_kde_accepted_gpl-ff5b0b22-0080-41fb-5d17-86f0e580210f"
+        },
+        {
+          "license_expression": "lgpl-2.1 OR lgpl-3.0 OR kde-accepted-lgpl",
+          "license_expression_spdx": "LGPL-2.1-only OR LGPL-3.0-only OR LicenseRef-scancode-kde-accepted-lgpl",
+          "matches": [
+            {
+              "license_expression": "lgpl-2.1 OR lgpl-3.0 OR kde-accepted-lgpl",
+              "license_expression_spdx": "lgpl-2.1 OR lgpl-3.0 OR kde-accepted-lgpl",
+              "start_line": 22,
+              "end_line": 36,
+              "matcher": "2-aho",
+              "score": 100.0,
+              "matched_length": 143,
+              "match_coverage": 100.0,
+              "rule_relevance": 100,
+              "rule_identifier": "lgpl-2.1_or_lgpl-3.0_2.RULE",
+              "rule_url": ""
+            }
+          ],
+          "identifier": "lgpl_2_1_OR_lgpl_3_0_OR_kde_accepted_lgpl-40b81945-7270-c6ee-39b9-36391e2b8749"
+        },
+        {
+          "license_expression": "gpl-2.0-plus",
+          "license_expression_spdx": "GPL-2.0-or-later",
+          "matches": [
+            {
+              "license_expression": "gpl-2.0-plus",
+              "license_expression_spdx": "gpl-2.0-plus",
+              "start_line": 41,
+              "end_line": 52,
+              "matcher": "2-aho",
+              "score": 100.0,
+              "matched_length": 102,
+              "match_coverage": 100.0,
+              "rule_relevance": 100,
+              "rule_identifier": "gpl-2.0-plus_119.RULE",
+              "rule_url": ""
+            }
+          ],
+          "identifier": "gpl_2_0_plus-9b44ef18-69db-1b2d-f6ce-dd439fc51603"
+        },
+        {
+          "license_expression": "gpl-3.0 AND gpl-3.0-plus AND lgpl-2.1-plus AND bsd-simplified AND bsd-new AND x11-xconsortium AND mit",
+          "license_expression_spdx": "GPL-3.0-only AND GPL-3.0-or-later AND LGPL-2.1-or-later AND BSD-2-Clause AND BSD-3-Clause AND X11 AND MIT",
+          "matches": [
+            {
+              "license_expression": "gpl-3.0",
+              "license_expression_spdx": "gpl-3.0",
+              "start_line": 57,
+              "end_line": 71,
+              "matcher": "2-aho",
+              "score": 100.0,
+              "matched_length": 133,
+              "match_coverage": 100.0,
+              "rule_relevance": 100,
+              "rule_identifier": "gpl-3.0-plus_88.RULE",
+              "rule_url": ""
+            },
+            {
+              "license_expression": "gpl-3.0-plus",
+              "license_expression_spdx": "gpl-3.0-plus",
+              "start_line": 71,
+              "end_line": 73,
               "matcher": "2-aho",
               "score": 100.0,
               "matched_length": 3,
               "match_coverage": 100.0,
               "rule_relevance": 100,
-              "rule_identifier": "license-intro_21.RULE",
-              "rule_url": "",
-              "matched_text": "SOFTWARE LICENSE AGREEMENT"
+              "rule_identifier": "gpl-3.0-plus_92.RULE",
+              "rule_url": ""
             },
             {
-              "license_expression": "unknown-license-reference",
-              "license_expression_spdx": "unknown-license-reference",
-              "start_line": 3,
-              "end_line": 3,
+              "license_expression": "gpl-3.0-plus",
+              "license_expression_spdx": "gpl-3.0-plus",
+              "start_line": 75,
+              "end_line": 75,
               "matcher": "2-aho",
-              "score": 90.0,
-              "matched_length": 2,
+              "score": 100.0,
+              "matched_length": 3,
               "match_coverage": 100.0,
-              "rule_relevance": 90,
-              "rule_identifier": "license-intro_22.RULE",
-              "rule_url": "",
-              "matched_text": "This user license agreement (the \"AGREEMENT\") is an agreement between you (individual or single entity) and UCWare Group (UCWARE.COM), for the UCWare Group software (the \"SOFTWARE\") that is accompanying this AGREEMENT."
-            },
-            {
-              "license_expression": "swrule",
-              "license_expression_spdx": "swrule",
-              "start_line": 31,
-              "end_line": 31,
-              "matcher": "3-seq",
-              "score": 11.0,
-              "matched_length": 5,
-              "match_coverage": 10.638298034667969,
               "rule_relevance": 100,
-              "rule_identifier": "swrule.LICENSE",
-              "rule_url": "",
-              "matched_text": "9. THE SOFTWARE IS DISTRIBUTED \"AS IS\". NO WARRANTY OF ANY KIND IS EXPRESSED OR IMPLIED. YOU USE AT YOUR OWN RISK. NEITHER THE AUTHOR NOR THE AGENTS OF THE AUTHOR WILL BE LIABLE FOR DATA LOSS, DAMAGES, LOSS OF PROFITS OR ANY OTHER KIND OF LOSS WHILE USING OR MISUSING THIS SOFTWARE."
+              "rule_identifier": "gpl-3.0-plus_46.RULE",
+              "rule_url": ""
             },
             {
-              "license_expression": "warranty-disclaimer",
-              "license_expression_spdx": "warranty-disclaimer",
-              "start_line": 31,
-              "end_line": 31,
+              "license_expression": "gpl-3.0-plus",
+              "license_expression_spdx": "gpl-3.0-plus",
+              "start_line": 79,
+              "end_line": 90,
               "matcher": "2-aho",
-              "score": 90.0,
-              "matched_length": 2,
+              "score": 100.0,
+              "matched_length": 102,
               "match_coverage": 100.0,
-              "rule_relevance": 90,
-              "rule_identifier": "warranty-disclaimer_24.RULE",
-              "rule_url": "",
-              "matched_text": "9. THE SOFTWARE IS DISTRIBUTED \"AS IS\". NO WARRANTY OF ANY KIND IS EXPRESSED OR IMPLIED. YOU USE AT YOUR OWN RISK. NEITHER THE AUTHOR NOR THE AGENTS OF THE AUTHOR WILL BE LIABLE FOR DATA LOSS, DAMAGES, LOSS OF PROFITS OR ANY OTHER KIND OF LOSS WHILE USING OR MISUSING THIS SOFTWARE."
+              "rule_relevance": 100,
+              "rule_identifier": "gpl-3.0-plus_29.RULE",
+              "rule_url": ""
+            },
+            {
+              "license_expression": "lgpl-2.1-plus",
+              "license_expression_spdx": "lgpl-2.1-plus",
+              "start_line": 92,
+              "end_line": 109,
+              "matcher": "3-seq",
+              "score": 94.0,
+              "matched_length": 112,
+              "match_coverage": 100.0,
+              "rule_relevance": 100,
+              "rule_identifier": "lgpl-2.1-plus_114.RULE",
+              "rule_url": ""
+            },
+            {
+              "license_expression": "bsd-simplified",
+              "license_expression_spdx": "bsd-simplified",
+              "start_line": 111,
+              "end_line": 113,
+              "matcher": "2-aho",
+              "score": 100.0,
+              "matched_length": 4,
+              "match_coverage": 100.0,
+              "rule_relevance": 100,
+              "rule_identifier": "bsd-simplified_89.RULE",
+              "rule_url": ""
+            },
+            {
+              "license_expression": "bsd-simplified AND bsd-new",
+              "license_expression_spdx": "bsd-simplified AND bsd-new",
+              "start_line": 117,
+              "end_line": 140,
+              "matcher": "2-aho",
+              "score": 100.0,
+              "matched_length": 227,
+              "match_coverage": 100.0,
+              "rule_relevance": 100,
+              "rule_identifier": "bsd-simplified_and_bsd-new_2.RULE",
+              "rule_url": ""
+            },
+            {
+              "license_expression": "x11-xconsortium",
+              "license_expression_spdx": "x11-xconsortium",
+              "start_line": 141,
+              "end_line": 143,
+              "matcher": "2-aho",
+              "score": 100.0,
+              "matched_length": 3,
+              "match_coverage": 100.0,
+              "rule_relevance": 100,
+              "rule_identifier": "x11-xconsortium_33.RULE",
+              "rule_url": ""
+            },
+            {
+              "license_expression": "x11-xconsortium",
+              "license_expression_spdx": "x11-xconsortium",
+              "start_line": 147,
+              "end_line": 166,
+              "matcher": "2-aho",
+              "score": 100.0,
+              "matched_length": 198,
+              "match_coverage": 100.0,
+              "rule_relevance": 100,
+              "rule_identifier": "x11-xconsortium_10.RULE",
+              "rule_url": ""
+            },
+            {
+              "license_expression": "mit",
+              "license_expression_spdx": "mit",
+              "start_line": 168,
+              "end_line": 170,
+              "matcher": "2-aho",
+              "score": 100.0,
+              "matched_length": 3,
+              "match_coverage": 100.0,
+              "rule_relevance": 100,
+              "rule_identifier": "mit_144.RULE",
+              "rule_url": ""
+            },
+            {
+              "license_expression": "mit",
+              "license_expression_spdx": "mit",
+              "start_line": 174,
+              "end_line": 191,
+              "matcher": "2-aho",
+              "score": 100.0,
+              "matched_length": 161,
+              "match_coverage": 100.0,
+              "rule_relevance": 100,
+              "rule_identifier": "mit.LICENSE",
+              "rule_url": ""
             }
           ],
-          "identifier": "unknown_license_reference_AND_swrule_AND_warranty_disclaimer-35d83cc7-5356-faad-a9b7-ba0d66b91ed4"
+          "identifier": "gpl_3_0_AND_gpl_3_0_plus_AND_lgpl_2_1_plus_AND_bsd_simplified_AND_bsd_new_AND_x11_xconsortium_AND_mit-e9f4c235-6e5b-9e4c-fe66-9d8b74bdb18e"
         }
       ],
       "copyrights": [],

@@ -1149,8 +1149,7 @@ pub fn post_process_detections(
     min_score: f32,
 ) -> Vec<LicenseDetection> {
     let filtered = filter_detections_by_score(detections, min_score);
-    let deduplicated = remove_duplicate_detections(filtered);
-    let preferred = apply_detection_preferences(deduplicated);
+    let preferred = apply_detection_preferences(filtered);
     let ranked = rank_detections(preferred);
     sort_detections_by_line(ranked)
 }
@@ -3269,55 +3268,6 @@ mod tests {
 
         let result = remove_duplicate_detections(detections);
         assert_eq!(result.len(), 2);
-    }
-
-    #[test]
-    fn test_remove_duplicate_detections_same_identifier_removed() {
-        let identifier = "mit-abc123".to_string();
-        let detections = vec![
-            LicenseDetection {
-                license_expression: Some("mit".to_string()),
-                license_expression_spdx: None,
-                matches: vec![create_test_match_with_params(
-                    "mit",
-                    "1-hash",
-                    1,
-                    10,
-                    95.0,
-                    100,
-                    100,
-                    100.0,
-                    100,
-                    "mit.LICENSE",
-                )],
-                detection_log: Vec::new(),
-                identifier: Some(identifier.clone()),
-                file_region: None,
-            },
-            LicenseDetection {
-                license_expression: Some("mit".to_string()),
-                license_expression_spdx: None,
-                matches: vec![create_test_match_with_params(
-                    "mit",
-                    "2-aho",
-                    1,
-                    10,
-                    85.0,
-                    100,
-                    100,
-                    85.0,
-                    100,
-                    "mit.LICENSE",
-                )],
-                detection_log: Vec::new(),
-                identifier: Some(identifier.clone()),
-                file_region: None,
-            },
-        ];
-
-        let result = remove_duplicate_detections(detections);
-        assert_eq!(result.len(), 1, "Same identifier should dedupe");
-        assert_eq!(result[0].identifier, Some(identifier));
     }
 
     #[test]

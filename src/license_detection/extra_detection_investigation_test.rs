@@ -1432,4 +1432,53 @@ mod tests {
             }
         }
     }
+
+    #[test]
+    fn test_plan_083_gpl_lgpl_complex() {
+        let Some(engine) = ensure_engine() else {
+            eprintln!("Skipping test: reference directory not found");
+            return;
+        };
+
+        let path = PathBuf::from("testdata/license-golden/datadriven/lic4/gpl-2.0-plus_and_gpl-2.0-plus_and_gpl-3.0-plus_and_lgpl-2.1-plus_and_other.txt");
+        let Some(text) = std::fs::read_to_string(&path).ok() else {
+            eprintln!("Skipping test: test file not found");
+            return;
+        };
+
+        eprintln!("\n=== PLAN-083 Investigation ===");
+
+        let detections = engine
+            .detect(&text, false)
+            .expect("Detection should succeed");
+
+        let mut all_matches: Vec<_> = detections
+            .iter()
+            .flat_map(|d| {
+                d.matches
+                    .iter()
+                    .map(|m| (d.license_expression.as_deref().unwrap_or(""), m))
+            })
+            .collect();
+
+        all_matches.sort_by_key(|(_, m)| m.start_line);
+
+        eprintln!("\nRust matches ({} total):", all_matches.len());
+        for (_, m) in &all_matches {
+            eprintln!(
+                "  lines={}-{}: {} (rule={}, rid={})",
+                m.start_line, m.end_line, m.license_expression, m.rule_identifier, m.rid
+            );
+        }
+
+        eprintln!("\nPython expected (8 matches):");
+        eprintln!("  lines=5-9: gpl-3.0-plus");
+        eprintln!("  lines=13-17: lgpl-2.1-plus");
+        eprintln!("  lines=22-26: lgpl-2.1-plus");
+        eprintln!("  lines=33-37: lgpl-2.1-plus AND free-unknown");
+        eprintln!("  lines=39-53: mit-modern");
+        eprintln!("  lines=57-61: gpl-2.0-plus");
+        eprintln!("  lines=65-69: gpl-2.0-plus");
+        eprintln!("  lines=71-74: lgpl-2.1 AND gpl-2.0 AND gpl-3.0");
+    }
 }
