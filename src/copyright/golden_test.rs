@@ -36,6 +36,14 @@ mod tests {
         extra: Vec<String>,
     }
 
+    struct GoldenTestCase {
+        yaml_path: PathBuf,
+        expected: ExpectedOutput,
+        check_copyrights: bool,
+        check_holders: bool,
+        check_authors: bool,
+    }
+
     impl FieldDiff {
         fn is_match(&self) -> bool {
             self.missing.is_empty() && self.extra.is_empty()
@@ -61,15 +69,16 @@ mod tests {
         }
     }
 
-    fn compare_field(field: &str, expected: &[String], actual: &[String]) -> FieldDiff {
+    fn compare_field_iter<'a, I>(field: &str, expected: &[String], actual: I) -> FieldDiff
+    where
+        I: IntoIterator<Item = &'a str>,
+    {
         let expected_set: BTreeSet<String> = expected
             .iter()
             .map(|s| canonicalize_golden_value(s.as_str()))
             .collect();
-        let actual_set: BTreeSet<String> = actual
-            .iter()
-            .map(|s| canonicalize_golden_value(s.as_str()))
-            .collect();
+        let actual_set: BTreeSet<String> =
+            actual.into_iter().map(canonicalize_golden_value).collect();
 
         let missing: Vec<String> = expected_set
             .difference(&actual_set)
@@ -85,6 +94,10 @@ mod tests {
             missing,
             extra,
         }
+    }
+
+    fn compare_field(field: &str, expected: &[String], actual: &[String]) -> FieldDiff {
+        compare_field_iter(field, expected, actual.iter().map(String::as_str))
     }
 
     /// Discover all YAML test files in a directory (recursively).
@@ -138,7 +151,7 @@ mod tests {
         }
 
         // Pre-filter to testable files and count skipped
-        let mut test_cases: Vec<(&PathBuf, ExpectedOutput)> = Vec::new();
+        let mut test_cases: Vec<GoldenTestCase> = Vec::new();
         let mut skipped = 0usize;
         let mut setup_failures: Vec<(String, String)> = Vec::new();
 
@@ -177,17 +190,24 @@ mod tests {
                 }
             };
 
-            let what_fields: Vec<String> = expected.what.clone().unwrap_or_default();
-            let has_check = what_fields.iter().any(|w| w == "copyrights")
-                || what_fields.iter().any(|w| w == "holders")
-                || what_fields.iter().any(|w| w == "authors");
+            let what_fields = expected.what.as_deref().unwrap_or(&[]);
+            let check_copyrights = what_fields.iter().any(|w| w == "copyrights");
+            let check_holders = what_fields.iter().any(|w| w == "holders");
+            let check_authors = what_fields.iter().any(|w| w == "authors");
+            let has_check = check_copyrights || check_holders || check_authors;
 
             if !has_check {
                 skipped += 1;
                 continue;
             }
 
-            test_cases.push((yaml_path, expected));
+            test_cases.push(GoldenTestCase {
+                yaml_path: yaml_path.clone(),
+                expected,
+                check_copyrights,
+                check_holders,
+                check_authors,
+            });
         }
 
         let setup_failure_count = setup_failures.len();
@@ -196,7 +216,9 @@ mod tests {
         let failures: Mutex<Vec<(String, String)>> = Mutex::new(setup_failures);
 
         // Run detection in parallel across all test cases
-        test_cases.par_iter().for_each(|(yaml_path, expected)| {
+        test_cases.par_iter().for_each(|case| {
+            let yaml_path = &case.yaml_path;
+            let expected = &case.expected;
             let input_path = input_path_from_yaml(yaml_path);
             let relative_path = yaml_path
                 .strip_prefix(&dir)
@@ -204,10 +226,9 @@ mod tests {
                 .to_string_lossy()
                 .to_string();
 
-            let what_fields: Vec<String> = expected.what.clone().unwrap_or_default();
-            let check_copyrights = what_fields.iter().any(|w| w == "copyrights");
-            let check_holders = what_fields.iter().any(|w| w == "holders");
-            let check_authors = what_fields.iter().any(|w| w == "authors");
+            let check_copyrights = case.check_copyrights;
+            let check_holders = case.check_holders;
+            let check_authors = case.check_authors;
 
             let content = match read_input_content(&input_path) {
                 Ok(content) => content,
@@ -223,18 +244,16 @@ mod tests {
             // Run detection
             let (copyrights, holders, authors) = detect_copyrights(&content);
 
-            // Extract string values
-            let actual_copyrights: Vec<String> =
-                copyrights.iter().map(|c| c.copyright.clone()).collect();
-            let actual_holders: Vec<String> = holders.iter().map(|h| h.holder.clone()).collect();
-            let actual_authors: Vec<String> = authors.iter().map(|a| a.author.clone()).collect();
-
             // Compare requested fields
             let mut field_diffs: Vec<FieldDiff> = Vec::new();
 
             if check_copyrights {
                 let expected_copyrights = expected.copyrights.as_deref().unwrap_or(&[]);
-                let diff = compare_field("copyrights", expected_copyrights, &actual_copyrights);
+                let diff = compare_field_iter(
+                    "copyrights",
+                    expected_copyrights,
+                    copyrights.iter().map(|c| c.copyright.as_str()),
+                );
                 if !diff.is_match() {
                     field_diffs.push(diff);
                 }
@@ -242,7 +261,11 @@ mod tests {
 
             if check_holders {
                 let expected_holders = expected.holders.as_deref().unwrap_or(&[]);
-                let diff = compare_field("holders", expected_holders, &actual_holders);
+                let diff = compare_field_iter(
+                    "holders",
+                    expected_holders,
+                    holders.iter().map(|h| h.holder.as_str()),
+                );
                 if !diff.is_match() {
                     field_diffs.push(diff);
                 }
@@ -250,7 +273,11 @@ mod tests {
 
             if check_authors {
                 let expected_authors = expected.authors.as_deref().unwrap_or(&[]);
-                let diff = compare_field("authors", expected_authors, &actual_authors);
+                let diff = compare_field_iter(
+                    "authors",
+                    expected_authors,
+                    authors.iter().map(|a| a.author.as_str()),
+                );
                 if !diff.is_match() {
                     field_diffs.push(diff);
                 }

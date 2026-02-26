@@ -269,10 +269,12 @@ pub fn prepare_text_line(line: &str) -> String {
     s = normalize_replacement_chars(&s);
 
     // ── Man page junk removal ──
-    s = s
-        .replace("\\\\ co", " ")
-        .replace("\\ co", " ")
-        .replace("(co ", " ");
+    if s.contains("\\\\ co") || s.contains("\\ co") || s.contains("(co ") {
+        s = s
+            .replace("\\\\ co", " ")
+            .replace("\\ co", " ")
+            .replace("(co ", " ");
+    }
 
     // Remove printf format codes like ` %s ` or ` #d `
     s = PRINTF_FORMAT_RE.replace_all(&s, " ").into_owned();
@@ -403,18 +405,22 @@ pub fn prepare_text_line(line: &str) -> String {
     s = CONSECUTIVE_QUOTES_RE.replace_all(&s, "'").into_owned();
 
     // ── Escape handling ──
-    s = s
-        .replace("\\t", " ")
-        .replace("\\n", " ")
-        .replace("\\r", " ")
-        .replace("\\0", " ")
-        .replace('\\', " ")
-        .replace("('", " ")
-        .replace("')", " ")
-        .replace("],", " ");
+    if s.contains('\\') || s.contains("('") || s.contains("')") || s.contains("],") {
+        s = s
+            .replace("\\t", " ")
+            .replace("\\n", " ")
+            .replace("\\r", " ")
+            .replace("\\0", " ")
+            .replace('\\', " ")
+            .replace("('", " ")
+            .replace("')", " ")
+            .replace("],", " ");
+    }
 
     // ── Debian markup removal ──
-    s = s.replace("</s>", "").replace("<s>", "").replace("<s/>", "");
+    if s.contains("<s") || s.contains("</s>") {
+        s = s.replace("</s>", "").replace("<s>", "").replace("<s/>", "");
+    }
 
     s = ANGLE_BRACKET_SINGLE_YEAR_RE
         .replace_all(&s, "${year}")

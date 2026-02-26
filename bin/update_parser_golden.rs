@@ -1,10 +1,10 @@
 use std::fs;
 use std::path::PathBuf;
-use std::process::Command;
 
 use anyhow::{Context, Result};
 use clap::Parser;
 
+use scancode_rust::golden_maintenance::run_prettier;
 use scancode_rust::parsers;
 
 #[derive(Parser, Debug)]
@@ -33,36 +33,6 @@ struct Args {
         help = "Path to write expected JSON output"
     )]
     output_file: Option<PathBuf>,
-}
-
-fn run_prettier(paths: &[PathBuf]) -> Result<()> {
-    if paths.is_empty() {
-        return Ok(());
-    }
-
-    const CHUNK_SIZE: usize = 100;
-    for chunk in paths.chunks(CHUNK_SIZE) {
-        let mut cmd = Command::new("npm");
-        cmd.args(["exec", "--", "prettier", "--write"]);
-        for path in chunk {
-            cmd.arg(path);
-        }
-
-        let output = cmd
-            .output()
-            .context("failed to run `npm exec -- prettier --write`")?;
-
-        if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            anyhow::bail!(
-                "prettier formatting failed (status: {}): {}",
-                output.status,
-                stderr.trim()
-            );
-        }
-    }
-
-    Ok(())
 }
 
 fn main() -> Result<()> {

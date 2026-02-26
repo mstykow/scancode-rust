@@ -3955,20 +3955,22 @@ fn strip_trailing_incomplete_as_represented_by(s: &str) -> String {
 
 /// Strip leading words that match any of the given prefixes (case-insensitive).
 pub fn strip_prefixes(s: &str, prefixes: &HashSet<&str>) -> String {
-    let mut words: Vec<&str> = s.split_whitespace().collect();
-    while !words.is_empty() && prefixes.contains(words[0].to_lowercase().as_str()) {
-        words.remove(0);
+    let words: Vec<&str> = s.split_whitespace().collect();
+    let mut start = 0usize;
+    while start < words.len() && prefixes.contains(words[start].to_lowercase().as_str()) {
+        start += 1;
     }
-    words.join(" ")
+    words[start..].join(" ")
 }
 
 /// Strip trailing words that match any of the given suffixes (case-insensitive).
 pub fn strip_suffixes(s: &str, suffixes: &HashSet<&str>) -> String {
-    let mut words: Vec<&str> = s.split_whitespace().collect();
-    while !words.is_empty() && suffixes.contains(words.last().unwrap().to_lowercase().as_str()) {
-        words.pop();
+    let words: Vec<&str> = s.split_whitespace().collect();
+    let mut end = words.len();
+    while end > 0 && suffixes.contains(words[end - 1].to_lowercase().as_str()) {
+        end -= 1;
     }
-    words.join(" ")
+    words[..end].join(" ")
 }
 
 /// Strip trailing period, preserving it for acronyms and company suffixes.

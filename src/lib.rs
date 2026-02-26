@@ -254,6 +254,7 @@ pub mod askalono;
 pub mod assembly;
 pub mod cli;
 pub mod copyright;
+pub mod golden_maintenance;
 pub mod models;
 pub mod parsers;
 pub mod scanner;

@@ -54,12 +54,32 @@ impl<'a> PreparedLineCache<'a> {
     }
 }
 
-fn line_number_at_offset(content: &str, byte_offset: usize) -> usize {
-    let offset = byte_offset.min(content.len());
-    1 + content.as_bytes()[..offset]
-        .iter()
-        .filter(|&&b| b == b'\n')
-        .count()
+struct LineNumberIndex {
+    newline_offsets: Vec<usize>,
+    content_len: usize,
+}
+
+impl LineNumberIndex {
+    fn new(content: &str) -> Self {
+        let newline_offsets = content
+            .as_bytes()
+            .iter()
+            .enumerate()
+            .filter_map(|(idx, b)| (*b == b'\n').then_some(idx))
+            .collect();
+
+        Self {
+            newline_offsets,
+            content_len: content.len(),
+        }
+    }
+
+    fn line_number_at_offset(&self, byte_offset: usize) -> usize {
+        let offset = byte_offset.min(self.content_len);
+        1 + self
+            .newline_offsets
+            .partition_point(|&line_break| line_break < offset)
+    }
 }
 
 const NON_COPYRIGHT_LABELS: &[TreeLabel] = &[];
@@ -167,6 +187,7 @@ pub fn detect_copyrights_from_text(
     let expanded = maybe_expand_copyrighted_by_href_urls(normalized.as_ref());
     let did_expand_href = matches!(expanded, Cow::Owned(_));
     let content = expanded.as_ref();
+    let line_number_index = LineNumberIndex::new(content);
 
     let allow_not_copyrighted_prefix = NOT_COPYRIGHTED_RE.find_iter(content).count() == 1;
 
@@ -328,112 +349,15 @@ pub fn detect_copyrights_from_text(
         copyrights.extend(to_add);
     }
 
-    extract_midline_c_year_holder_with_leading_acronym_from_raw_lines(
-        &raw_lines,
-        &mut copyrights,
-        &mut holders,
-    );
-
-    extend_copyrights_with_authors_blocks(&raw_lines, &mut copyrights, &mut holders);
-
-    extend_year_only_copyrights_with_trailing_text(&raw_lines, &mut copyrights, &mut holders);
-
-    merge_year_only_copyrights_with_following_author_colon_lines(
-        &mut prepared_cache,
-        &mut copyrights,
-        &mut holders,
-    );
-    extract_licensed_material_of_company_bare_c_year_lines(
-        &mut prepared_cache,
-        &mut copyrights,
-        &mut holders,
-    );
-
-    drop_shadowed_and_or_holders(&mut holders);
-    drop_shadowed_prefix_holders(&mut holders);
-    drop_shadowed_acronym_extended_holders(&mut holders);
-    drop_shadowed_prefix_copyrights(&mut copyrights);
-
-    drop_shadowed_c_sign_variants(&mut copyrights);
-    drop_shadowed_year_prefixed_holders(&mut holders);
-
-    merge_multiline_person_year_copyright_continuations(
-        &raw_lines,
-        &mut prepared_cache,
-        &mut copyrights,
-        &mut holders,
-    );
-
-    extract_mso_document_properties_copyrights(content, &mut copyrights, &mut holders);
-    expand_portions_copyright_variants(&mut copyrights);
-    expand_year_only_copyrights_with_by_name_prefix(
-        &mut prepared_cache,
-        &mut copyrights,
-        &mut holders,
-    );
-    expand_year_only_copyrights_with_read_the_suffix(
-        &mut prepared_cache,
-        &mut copyrights,
-        &mut holders,
-    );
-    merge_multiline_obfuscated_name_year_copyright_pairs(
-        &raw_lines,
-        &mut prepared_cache,
-        &mut copyrights,
-        &mut holders,
-    );
-    add_modify_suffix_holders(&raw_lines, &mut prepared_cache, &mut holders);
-    drop_shadowed_prefix_bare_c_copyrights_same_span(&mut copyrights);
-
-    apply_javadoc_company_metadata(content, &mut copyrights, &mut holders);
-    apply_european_community_copyright(content, &mut copyrights, &mut holders);
-    extract_html_entity_year_range_copyrights(content, &mut copyrights);
-    extract_copr_lines(&groups, &mut copyrights, &mut holders);
-    extract_standalone_c_holder_year_lines(&groups, &mut copyrights, &mut holders);
-    extract_c_years_then_holder_lines(&groups, &mut copyrights, &mut holders);
-    extract_copyright_c_years_holder_lines(&groups, &mut copyrights, &mut holders);
-    extract_c_holder_without_year_lines(content, &groups, &mut copyrights, &mut holders);
-    extract_three_digit_copyright_year_lines(content, &mut copyrights, &mut holders);
-    extract_copyrighted_by_lines(content, &mut copyrights, &mut holders);
-    extract_c_word_year_lines(content, &mut copyrights, &mut holders);
-    extract_are_c_year_holder_lines(content, &mut copyrights, &mut holders);
-    extract_bare_c_by_holder_lines(content, &mut copyrights, &mut holders);
-    extract_trailing_bare_c_year_range_suffixes(&groups, &mut copyrights);
-    extract_common_year_only_lines(&groups, &mut copyrights);
-    extract_embedded_bare_c_year_suffixes(&groups, &mut copyrights);
-    extract_repeated_embedded_bare_c_year_suffixes(&groups, &mut copyrights);
-    extract_lowercase_username_angle_email_copyrights(&groups, &mut copyrights, &mut holders);
-    extract_lowercase_username_paren_email_copyrights(&groups, &mut copyrights, &mut holders);
-    extract_copyright_c_year_comma_name_angle_email_lines(&groups, &mut copyrights, &mut holders);
-    extract_c_year_range_by_name_comma_email_lines(&groups, &mut copyrights, &mut holders);
-    extract_copyright_years_by_name_then_paren_email_next_line(
+    run_phase_primary_extractions(
         content,
+        &raw_lines,
+        &groups,
+        &line_number_index,
+        &mut prepared_cache,
         &mut copyrights,
         &mut holders,
     );
-    extract_copyright_years_by_name_paren_email_lines(&groups, &mut copyrights, &mut holders);
-    extract_copyright_year_name_with_of_lines(&groups, &mut copyrights, &mut holders);
-    extract_line_ending_copyright_then_by_holder(content, &mut copyrights, &mut holders);
-    extract_changelog_timestamp_copyrights_from_content(content, &mut copyrights, &mut holders);
-    drop_url_extended_prefix_duplicates(&mut copyrights);
-
-    drop_obfuscated_email_year_only_copyrights(content, &mut copyrights, &mut holders);
-    extract_glide_3dfx_copyright_notice(content, &mut copyrights);
-    extract_spdx_filecopyrighttext_c_without_year(content, &mut copyrights, &mut holders);
-    extract_html_meta_name_copyright_content(content, &mut copyrights, &mut holders);
-    extract_html_anchor_copyright_url(content, &mut copyrights, &mut holders);
-    extract_angle_bracket_year_name_copyrights(&groups, &mut copyrights, &mut holders);
-    extract_html_icon_class_copyrights(content, &mut copyrights, &mut holders);
-    extract_added_the_copyright_year_for_lines(content, &mut copyrights, &mut holders);
-    extract_copyright_by_without_year_lines(&groups, &mut copyrights, &mut holders);
-    extract_copyright_notice_paren_year_lines(&groups, &mut copyrights, &mut holders);
-    extract_copyright_year_c_holder_mid_sentence_lines(&groups, &mut copyrights, &mut holders);
-    extract_javadoc_author_copyright_lines(&groups, &mut copyrights, &mut holders);
-    extract_xml_copyright_tag_c_lines(content, &mut copyrights, &mut holders);
-    extract_copyright_its_authors_lines(&groups, &mut copyrights, &mut holders);
-    extract_copyright_year_c_name_angle_email_lines(&groups, &mut copyrights, &mut holders);
-    extract_us_government_year_placeholder_copyrights(&groups, &mut copyrights, &mut holders);
-    extract_holder_is_name_paren_email_lines(content, &mut copyrights, &mut holders);
 
     extract_question_mark_year_copyrights(content, &mut copyrights, &mut holders);
 
@@ -599,6 +523,102 @@ pub fn detect_copyrights_from_text(
     authors.retain(|a| a.start_line > 0 && a.end_line > 0);
 
     (copyrights, holders, authors)
+}
+
+fn run_phase_primary_extractions(
+    content: &str,
+    raw_lines: &[&str],
+    groups: &[Vec<(usize, String)>],
+    line_number_index: &LineNumberIndex,
+    prepared_cache: &mut PreparedLineCache<'_>,
+    copyrights: &mut Vec<CopyrightDetection>,
+    holders: &mut Vec<HolderDetection>,
+) {
+    extract_midline_c_year_holder_with_leading_acronym_from_raw_lines(
+        raw_lines, copyrights, holders,
+    );
+    extend_copyrights_with_authors_blocks(raw_lines, copyrights, holders);
+    extend_year_only_copyrights_with_trailing_text(raw_lines, copyrights, holders);
+
+    merge_year_only_copyrights_with_following_author_colon_lines(
+        prepared_cache,
+        copyrights,
+        holders,
+    );
+    extract_licensed_material_of_company_bare_c_year_lines(prepared_cache, copyrights, holders);
+
+    drop_shadowed_and_or_holders(holders);
+    drop_shadowed_prefix_holders(holders);
+    drop_shadowed_acronym_extended_holders(holders);
+    drop_shadowed_prefix_copyrights(copyrights);
+    drop_shadowed_c_sign_variants(copyrights);
+    drop_shadowed_year_prefixed_holders(holders);
+
+    merge_multiline_person_year_copyright_continuations(
+        raw_lines,
+        prepared_cache,
+        copyrights,
+        holders,
+    );
+
+    extract_mso_document_properties_copyrights(content, copyrights, holders);
+    expand_portions_copyright_variants(copyrights);
+    expand_year_only_copyrights_with_by_name_prefix(prepared_cache, copyrights, holders);
+    expand_year_only_copyrights_with_read_the_suffix(prepared_cache, copyrights, holders);
+    merge_multiline_obfuscated_name_year_copyright_pairs(
+        raw_lines,
+        prepared_cache,
+        copyrights,
+        holders,
+    );
+    add_modify_suffix_holders(raw_lines, prepared_cache, holders);
+    drop_shadowed_prefix_bare_c_copyrights_same_span(copyrights);
+
+    apply_javadoc_company_metadata(content, line_number_index, copyrights, holders);
+    apply_european_community_copyright(content, line_number_index, copyrights, holders);
+    extract_html_entity_year_range_copyrights(content, line_number_index, copyrights);
+    extract_copr_lines(groups, copyrights, holders);
+    extract_standalone_c_holder_year_lines(groups, copyrights, holders);
+    extract_c_years_then_holder_lines(groups, copyrights, holders);
+    extract_copyright_c_years_holder_lines(groups, copyrights, holders);
+    extract_c_holder_without_year_lines(content, groups, copyrights, holders);
+    extract_three_digit_copyright_year_lines(content, copyrights, holders);
+    extract_copyrighted_by_lines(content, copyrights, holders);
+    extract_c_word_year_lines(content, copyrights, holders);
+    extract_are_c_year_holder_lines(content, copyrights, holders);
+    extract_bare_c_by_holder_lines(content, copyrights, holders);
+    extract_trailing_bare_c_year_range_suffixes(groups, copyrights);
+    extract_common_year_only_lines(groups, copyrights);
+    extract_embedded_bare_c_year_suffixes(groups, copyrights);
+    extract_repeated_embedded_bare_c_year_suffixes(groups, copyrights);
+    extract_lowercase_username_angle_email_copyrights(groups, copyrights, holders);
+    extract_lowercase_username_paren_email_copyrights(groups, copyrights, holders);
+    extract_copyright_c_year_comma_name_angle_email_lines(groups, copyrights, holders);
+    extract_c_year_range_by_name_comma_email_lines(groups, copyrights, holders);
+    extract_copyright_years_by_name_then_paren_email_next_line(content, copyrights, holders);
+    extract_copyright_years_by_name_paren_email_lines(groups, copyrights, holders);
+    extract_copyright_year_name_with_of_lines(groups, copyrights, holders);
+    extract_line_ending_copyright_then_by_holder(content, copyrights, holders);
+    extract_changelog_timestamp_copyrights_from_content(content, copyrights, holders);
+    drop_url_extended_prefix_duplicates(copyrights);
+
+    drop_obfuscated_email_year_only_copyrights(content, copyrights, holders);
+    extract_glide_3dfx_copyright_notice(content, copyrights);
+    extract_spdx_filecopyrighttext_c_without_year(content, copyrights, holders);
+    extract_html_meta_name_copyright_content(content, copyrights, holders);
+    extract_html_anchor_copyright_url(content, line_number_index, copyrights, holders);
+    extract_angle_bracket_year_name_copyrights(groups, copyrights, holders);
+    extract_html_icon_class_copyrights(content, line_number_index, copyrights, holders);
+    extract_added_the_copyright_year_for_lines(content, copyrights, holders);
+    extract_copyright_by_without_year_lines(groups, copyrights, holders);
+    extract_copyright_notice_paren_year_lines(groups, copyrights, holders);
+    extract_copyright_year_c_holder_mid_sentence_lines(groups, copyrights, holders);
+    extract_javadoc_author_copyright_lines(groups, copyrights, holders);
+    extract_xml_copyright_tag_c_lines(content, line_number_index, copyrights, holders);
+    extract_copyright_its_authors_lines(groups, copyrights, holders);
+    extract_copyright_year_c_name_angle_email_lines(groups, copyrights, holders);
+    extract_us_government_year_placeholder_copyrights(groups, copyrights, holders);
+    extract_holder_is_name_paren_email_lines(content, copyrights, holders);
 }
 
 fn refine_final_copyrights(copyrights: &mut Vec<CopyrightDetection>) {
@@ -8704,6 +8724,7 @@ fn extract_copr_lines(
 
 fn apply_european_community_copyright(
     content: &str,
+    line_number_index: &LineNumberIndex,
     copyrights: &mut Vec<CopyrightDetection>,
     holders: &mut Vec<HolderDetection>,
 ) {
@@ -8724,7 +8745,7 @@ fn apply_european_community_copyright(
 
     let holder = "the European Community";
     let desired_copyright = format!("(c) {holder} {year}");
-    let ln = line_number_at_offset(content, m.start());
+    let ln = line_number_index.line_number_at_offset(m.start());
 
     if !copyrights.iter().any(|c| c.copyright == desired_copyright) {
         copyrights.push(CopyrightDetection {
@@ -8745,6 +8766,7 @@ fn apply_european_community_copyright(
 
 fn apply_javadoc_company_metadata(
     content: &str,
+    line_number_index: &LineNumberIndex,
     copyrights: &mut Vec<CopyrightDetection>,
     holders: &mut Vec<HolderDetection>,
 ) {
@@ -8770,7 +8792,7 @@ fn apply_javadoc_company_metadata(
 
     let ln = copy_cap
         .get(0)
-        .map(|m| line_number_at_offset(content, m.start()))
+        .map(|m| line_number_index.line_number_at_offset(m.start()))
         .unwrap_or(1);
 
     let append_company_value = company_val.split_whitespace().count() >= 2;
@@ -8808,6 +8830,7 @@ fn apply_javadoc_company_metadata(
 
 fn extract_html_entity_year_range_copyrights(
     content: &str,
+    line_number_index: &LineNumberIndex,
     copyrights: &mut Vec<CopyrightDetection>,
 ) {
     static COPY_ENTITY_RANGE_RE: LazyLock<Regex> = LazyLock::new(|| {
@@ -8840,7 +8863,7 @@ fn extract_html_entity_year_range_copyrights(
         let Some(m) = cap.get(0) else {
             continue;
         };
-        let ln = line_number_at_offset(content, m.start());
+        let ln = line_number_index.line_number_at_offset(m.start());
         if !is_terminator(&content[m.end()..]) {
             continue;
         }
@@ -8867,7 +8890,7 @@ fn extract_html_entity_year_range_copyrights(
         let Some(m) = cap.get(0) else {
             continue;
         };
-        let ln = line_number_at_offset(content, m.start());
+        let ln = line_number_index.line_number_at_offset(m.start());
         if !is_terminator(&content[m.end()..]) {
             continue;
         }
@@ -8894,7 +8917,7 @@ fn extract_html_entity_year_range_copyrights(
         let Some(m) = cap.get(0) else {
             continue;
         };
-        let ln = line_number_at_offset(content, m.start());
+        let ln = line_number_index.line_number_at_offset(m.start());
         let range = cap.get(1).map(|m| m.as_str()).unwrap_or("").trim();
         if range.is_empty() {
             continue;
@@ -9609,6 +9632,7 @@ fn extract_javadoc_author_copyright_lines(
 
 fn extract_xml_copyright_tag_c_lines(
     content: &str,
+    line_number_index: &LineNumberIndex,
     copyrights: &mut Vec<CopyrightDetection>,
     holders: &mut Vec<HolderDetection>,
 ) {
@@ -9631,7 +9655,7 @@ fn extract_xml_copyright_tag_c_lines(
     for cap in BLOCK_RE.captures_iter(content) {
         let ln = cap
             .get(0)
-            .map(|m| line_number_at_offset(content, m.start()))
+            .map(|m| line_number_index.line_number_at_offset(m.start()))
             .unwrap_or(1);
         let inner = cap.name("body").map(|m| m.as_str()).unwrap_or("");
         if inner.is_empty() {
@@ -10038,6 +10062,7 @@ fn extract_initials_holders_from_copyrights(
 
 fn extract_html_anchor_copyright_url(
     content: &str,
+    line_number_index: &LineNumberIndex,
     copyrights: &mut Vec<CopyrightDetection>,
     holders: &mut Vec<HolderDetection>,
 ) {
@@ -10059,7 +10084,7 @@ fn extract_html_anchor_copyright_url(
     for cap in A_HREF_COPYRIGHT_RE.captures_iter(content) {
         let ln = cap
             .get(0)
-            .map(|m| line_number_at_offset(content, m.start()))
+            .map(|m| line_number_index.line_number_at_offset(m.start()))
             .unwrap_or(1);
         let url = cap.name("url").map(|m| m.as_str()).unwrap_or("").trim();
         if url.is_empty() {
@@ -10158,6 +10183,7 @@ fn extract_angle_bracket_year_name_copyrights(
 
 fn extract_html_icon_class_copyrights(
     content: &str,
+    line_number_index: &LineNumberIndex,
     copyrights: &mut Vec<CopyrightDetection>,
     holders: &mut Vec<HolderDetection>,
 ) {
@@ -10192,7 +10218,7 @@ fn extract_html_icon_class_copyrights(
     for cap in FA_AUTHORS_RE.captures_iter(content) {
         let ln = cap
             .get(0)
-            .map(|m| line_number_at_offset(content, m.start()))
+            .map(|m| line_number_index.line_number_at_offset(m.start()))
             .unwrap_or(1);
         let year = cap.name("year").map(|m| m.as_str()).unwrap_or("").trim();
         if year.is_empty() {
@@ -10223,7 +10249,7 @@ fn extract_html_icon_class_copyrights(
     for cap in GLYPHICON_DALEGROUP_RE.captures_iter(content) {
         let ln = cap
             .get(0)
-            .map(|m| line_number_at_offset(content, m.start()))
+            .map(|m| line_number_index.line_number_at_offset(m.start()))
             .unwrap_or(1);
         let url = cap.name("url").map(|m| m.as_str()).unwrap_or("").trim();
         if url.is_empty() {
@@ -10258,7 +10284,7 @@ fn extract_html_icon_class_copyrights(
     for cap in GLYPHICON_RUBIX_RE.captures_iter(content) {
         let ln = cap
             .get(0)
-            .map(|m| line_number_at_offset(content, m.start()))
+            .map(|m| line_number_index.line_number_at_offset(m.start()))
             .unwrap_or(1);
         let years = cap.name("years").map(|m| m.as_str()).unwrap_or("").trim();
         if years.is_empty() {
