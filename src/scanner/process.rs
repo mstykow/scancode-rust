@@ -20,8 +20,10 @@ use crate::utils::file::{get_creation_date, is_path_excluded};
 use crate::utils::hash::{calculate_md5, calculate_sha1, calculate_sha256};
 use crate::utils::language::detect_language;
 
-// License detection threshold - scores above this value are considered a match
-
+/// Scan a directory tree and produce [`ProcessResult`] entries.
+///
+/// This traverses files/directories up to `max_depth`, applies exclusion
+/// patterns, extracts metadata, and performs license/copyright parsing.
 pub fn process<P: AsRef<Path>>(
     path: P,
     max_depth: usize,

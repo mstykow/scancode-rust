@@ -8,6 +8,7 @@ use crate::utils::spdx::combine_license_expressions;
 
 #[derive(Debug, Builder, Serialize)]
 #[builder(build_fn(skip))]
+/// File-level scan result containing metadata and detected findings.
 pub struct FileInfo {
     pub name: String,
     pub base_name: String,
@@ -50,6 +51,7 @@ pub struct FileInfo {
 }
 
 impl FileInfoBuilder {
+    /// Build a [`FileInfo`] from the current builder state.
     pub fn build(&self) -> Result<FileInfo, String> {
         Ok(FileInfo::new(
             self.name.clone().ok_or("Missing field: name")?,
@@ -79,6 +81,7 @@ impl FileInfoBuilder {
 
 impl FileInfo {
     #[allow(clippy::too_many_arguments)]
+    /// Construct a [`FileInfo`] from fully resolved scanner fields.
     pub fn new(
         name: String,
         base_name: String,
