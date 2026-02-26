@@ -1,7 +1,6 @@
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 use anyhow::{Context, Result};
 use clap::{Parser, ValueEnum};
@@ -9,6 +8,7 @@ use serde::Deserialize;
 use serde_yaml::Value;
 
 use scancode_rust::copyright::golden_utils::{canonicalize_golden_value, read_input_content};
+use scancode_rust::golden_maintenance::{find_files_with_extension, run_prettier};
 
 const EXPECTED_FAILURES_KEY: &str = "expected_failures";
 
@@ -183,63 +183,9 @@ fn update_yaml_to_actual(ours_yaml: &Path, content: &str, write: bool) -> Result
     Ok(true)
 }
 
-fn find_yaml_files(dir: &Path) -> Result<Vec<PathBuf>> {
-    let mut yamls = Vec::new();
-    if !dir.is_dir() {
-        return Ok(yamls);
-    }
-
-    fn recurse(dir: &Path, out: &mut Vec<PathBuf>) -> Result<()> {
-        for entry in fs::read_dir(dir)? {
-            let entry = entry?;
-            let path = entry.path();
-            if path.is_dir() {
-                recurse(&path, out)?;
-            } else if path.extension().is_some_and(|ext| ext == "yml") {
-                out.push(path);
-            }
-        }
-        Ok(())
-    }
-
-    recurse(dir, &mut yamls)?;
-    yamls.sort();
-    Ok(yamls)
-}
-
 fn load_expected(path: &Path) -> Result<ExpectedOutput> {
     let yaml = fs::read_to_string(path).with_context(|| format!("read YAML: {path:?}"))?;
     serde_yaml::from_str(&yaml).with_context(|| format!("parse YAML: {path:?}"))
-}
-
-fn run_prettier(paths: &[PathBuf]) -> Result<()> {
-    if paths.is_empty() {
-        return Ok(());
-    }
-
-    const CHUNK_SIZE: usize = 100;
-    for chunk in paths.chunks(CHUNK_SIZE) {
-        let mut cmd = Command::new("npm");
-        cmd.args(["exec", "--", "prettier", "--write"]);
-        for path in chunk {
-            cmd.arg(path);
-        }
-
-        let output = cmd
-            .output()
-            .context("failed to run `npm exec -- prettier --write`")?;
-
-        if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            anyhow::bail!(
-                "prettier formatting failed (status: {}): {}",
-                output.status,
-                stderr.trim()
-            );
-        }
-    }
-
-    Ok(())
 }
 
 fn main() -> Result<()> {
@@ -257,7 +203,7 @@ fn main() -> Result<()> {
         .join("reference/scancode-toolkit/tests/cluecode/data")
         .join(suite);
 
-    let yamls = find_yaml_files(&ours_root)?;
+    let yamls = find_files_with_extension(&ours_root, "yml")?;
     if yamls.is_empty() {
         anyhow::bail!("no YAML files found under {ours_root:?}");
     }
