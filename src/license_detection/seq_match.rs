@@ -663,9 +663,17 @@ pub fn seq_match(index: &LicenseIndex, query_run: &QueryRun) -> Vec<LicenseMatch
     for candidate in candidates {
         let rid = candidate.rid;
         let rule_tokens = index.tids_by_rid.get(rid);
-        let high_postings = index.high_postings_by_rid.get(&rid);
+        let high_postings: HashMap<u16, Vec<usize>> = index.high_postings_by_rid
+            .get(&rid)
+            .map(|hp| {
+                hp.iter()
+                    .filter(|(tid, _)| candidate.high_set_intersection.contains(tid))
+                    .map(|(&tid, postings)| (tid, postings.clone()))
+                    .collect()
+            })
+            .unwrap_or_default();
 
-        if let (Some(rule_tokens), Some(high_postings)) = (rule_tokens, high_postings) {
+        if let Some(rule_tokens) = rule_tokens {
             let query_tokens = query_run.tokens();
             let len_legalese = index.len_legalese;
 
@@ -686,7 +694,7 @@ pub fn seq_match(index: &LicenseIndex, query_run: &QueryRun) -> Vec<LicenseMatch
                     rule_tokens,
                     qstart,
                     qfinish + 1,
-                    high_postings,
+                    &high_postings,
                     len_legalese,
                     &matchables,
                 );
@@ -797,9 +805,17 @@ pub fn seq_match_with_candidates(
     for candidate in candidates {
         let rid = candidate.rid;
         let rule_tokens = index.tids_by_rid.get(rid);
-        let high_postings = index.high_postings_by_rid.get(&rid);
+        let high_postings: HashMap<u16, Vec<usize>> = index.high_postings_by_rid
+            .get(&rid)
+            .map(|hp| {
+                hp.iter()
+                    .filter(|(tid, _)| candidate.high_set_intersection.contains(tid))
+                    .map(|(&tid, postings)| (tid, postings.clone()))
+                    .collect()
+            })
+            .unwrap_or_default();
 
-        if let (Some(rule_tokens), Some(high_postings)) = (rule_tokens, high_postings) {
+        if let Some(rule_tokens) = rule_tokens {
             let query_tokens = query_run.tokens();
             let len_legalese = index.len_legalese;
 
@@ -820,7 +836,7 @@ pub fn seq_match_with_candidates(
                     rule_tokens,
                     qstart,
                     qfinish + 1,
-                    high_postings,
+                    &high_postings,
                     len_legalese,
                     &matchables,
                 );

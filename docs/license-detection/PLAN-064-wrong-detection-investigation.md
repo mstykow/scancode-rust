@@ -1,6 +1,6 @@
 # PLAN-064: Wrong Detection Investigation
 
-## Status: ROOT CAUSE IDENTIFIED (Fix Not Yet Attempted)
+## Status: PARTIAL FIX APPLIED - Further Investigation Needed
 
 ## Problem Statement
 
@@ -138,3 +138,77 @@ cargo test test_cpl_10_html_full_pipeline_debug --lib -- --nocapture
 2. ~~Document root cause~~ ✓ (Sequence matching creates fragmented matches)
 3. Implement fix in sequence matching or match merging
 4. All 6 wrong detection tests pass
+
+---
+
+## Specific Fix
+
+### Root Cause
+
+**Missing `high_postings` filtering** in `seq_match_with_candidates()` and `seq_match()`.
+
+**Python filters** (index.py:850-854):
+```python
+high_postings = self.high_postings_by_rid[rid]
+high_postings = {
+    tid: postings for tid, postings in high_postings.items()
+        if tid in high_intersection}  # Filter to intersection tokens only
+```
+
+**Rust bug** (seq_match.rs lines 666 and 800):
+```rust
+let high_postings = index.high_postings_by_rid.get(&rid);  // NO FILTERING!
+```
+
+### Fix Location
+
+**File**: `src/license_detection/seq_match.rs`
+
+**Lines to change**:
+- Line ~666 in `seq_match()`
+- Line ~800 in `seq_match_with_candidates()`
+
+### Fix Code
+
+```rust
+// Filter high_postings to only include tokens in high_set_intersection
+let high_postings: HashMap<u16, Vec<usize>> = index.high_postings_by_rid
+    .get(&rid)
+    .map(|hp| {
+        hp.iter()
+            .filter(|(tid, _)| candidate.high_set_intersection.contains(tid))
+            .map(|(&tid, postings)| (tid, postings.clone()))
+            .collect()
+    })
+    .unwrap_or_default();
+```
+
+### Why This Fixes It
+
+1. `high_set_intersection` contains only high-value tokens present in **both** query and rule
+2. Filtering restricts sequence matching anchors to these tokens
+3. This produces fewer, larger matches instead of many tiny matches
+4. The CPL-1.0 match will then cover lines 4-119 instead of 607 tiny matches
+
+---
+
+## Fix Applied (Commit TBD)
+
+**Result**: Partial improvement.
+
+| Metric | Before Fix | After Fix |
+|--------|------------|-----------|
+| CPL-1.0 matches | 607 tiny matches | 6 refined matches |
+| CPL-1.0 coverage | Fragmented | Still fragmented (10.7% + 11.3%) |
+| IBMPL-1.0 coverage | N/A | 43.1% (incorrectly higher than CPL) |
+| Golden tests | 3593 passed | 3593 passed (unchanged) |
+
+**Remaining Issue**: The CPL-1.0 license is still being detected incorrectly because:
+1. IBMPL-1.0 gets higher coverage (43.1%) than CPL-1.0 (10.7%) 
+2. These are very similar licenses and sequence matching prefers IBMPL
+3. The matches aren't being properly merged or cross-rule deduplicated
+
+**Further investigation needed**:
+- Why does IBMPL get higher coverage when the text says "Common Public License" (CPL)?
+- Should matches from different rules for the same region be deduplicated by candidate score?
+- Python produces 96.65% CPL coverage - how does it avoid the IBMPL false positive?
