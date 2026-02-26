@@ -1,6 +1,17 @@
 # PLAN-086: here-proprietary_4.RULE Investigation
 
-## Status: IMPLEMENTATION PLAN READY
+## Status: FIX CAUSED REGRESSION - NEEDS REVISION
+
+**Attempt**: Modifying `filter_contained_matches()` to check `license_expression` before deduplicating same-qspan matches.
+
+**Before fix**: 4115 passed, 248 failed
+**After fix**: 4113 passed, 250 failed (net -2 passed, +2 failed)
+
+**Issue**: The fix correctly handles `here-proprietary_4.RULE` but breaks other tests where same-position matches with different expressions should still interact with containment logic.
+
+**Root cause**: The fix skips the `qcontains` check entirely when `same_qspan` is true, which prevents legitimate containment filtering for other cases.
+
+**Next approach**: Need to investigate why the duplicate matches are created in the first place (SPDX-LID + Aho both matching same text) and fix at the source, rather than in the filtering stage.
 
 ## Problem Statement
 

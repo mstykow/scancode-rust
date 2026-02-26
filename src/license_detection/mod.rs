@@ -200,82 +200,90 @@ impl LicenseDetectionEngine {
             all_matches.extend(merged_aho);
         }
 
+        // Check if we should skip sequence matching (Python: index.py:1041-1046)
+        // After aho matching, if no matchable regions remain, skip phases 2-4
+        // Python: if not whole_query_run.is_matchable(include_low=False, qspans=already_matched_qspans)
+        let whole_run = query.whole_query_run();
+        let skip_seq_matching = !whole_run.is_matchable(false, &matched_qspans);
+
         // Phases 2-4: Sequence matching (near_dupe + seq + query_runs)
         // Collect all sequence matches, merge ONCE after all phases
         // Corresponds to Python's single `approx` matcher (index.py:724-812)
+        // SKIP if aho matches covered all matchable regions (PLAN-081)
         let mut seq_all_matches = Vec::new();
+        if !skip_seq_matching {
+            // Phase 2: Near-duplicate detection
+            {
+                let whole_run = query.whole_query_run();
+                let near_dupe_candidates = compute_candidates_with_msets(
+                    &self.index,
+                    &whole_run,
+                    true,
+                    MAX_NEAR_DUPE_CANDIDATES,
+                );
 
-        // Phase 2: Near-duplicate detection
-        {
-            let whole_run = query.whole_query_run();
-            let near_dupe_candidates = compute_candidates_with_msets(
-                &self.index,
-                &whole_run,
-                true,
-                MAX_NEAR_DUPE_CANDIDATES,
-            );
+                if !near_dupe_candidates.is_empty() {
+                    let near_dupe_matches =
+                        seq_match_with_candidates(&self.index, &whole_run, &near_dupe_candidates);
 
-            if !near_dupe_candidates.is_empty() {
-                let near_dupe_matches =
-                    seq_match_with_candidates(&self.index, &whole_run, &near_dupe_candidates);
-
-                for m in &near_dupe_matches {
-                    if m.end_token > m.start_token {
-                        let span = query::PositionSpan::new(m.start_token, m.end_token - 1);
-                        query.subtract(&span);
-                        matched_qspans.push(span);
+                    for m in &near_dupe_matches {
+                        if m.end_token > m.start_token {
+                            let span = query::PositionSpan::new(m.start_token, m.end_token - 1);
+                            query.subtract(&span);
+                            matched_qspans.push(span);
+                        }
                     }
-                }
 
-                seq_all_matches.extend(near_dupe_matches);
+                    seq_all_matches.extend(near_dupe_matches);
+                }
             }
-        }
 
-        // Phase 3: Regular sequence matching on whole_run (with 70 candidates like Python)
-        const MAX_SEQ_CANDIDATES: usize = 70;
-        {
-            let whole_run = query.whole_query_run();
-            let candidates = compute_candidates_with_msets(
-                &self.index,
-                &whole_run,
-                false,
-                MAX_SEQ_CANDIDATES,
-            );
-            if !candidates.is_empty() {
-                let matches = seq_match_with_candidates(&self.index, &whole_run, &candidates);
-                seq_all_matches.extend(matches);
-            }
-        }
-
-        // Phase 4: Query run matching
-        const MAX_QUERY_RUN_CANDIDATES: usize = 70;
-        {
-            let whole_run = query.whole_query_run();
-            for query_run in query.query_runs().iter() {
-                if query_run.start == whole_run.start && query_run.end == whole_run.end {
-                    continue;
-                }
-
-                if !query_run.is_matchable(false, &matched_qspans) {
-                    continue;
-                }
-
+            // Phase 3: Regular sequence matching on whole_run (with 70 candidates like Python)
+            const MAX_SEQ_CANDIDATES: usize = 70;
+            {
+                let whole_run = query.whole_query_run();
                 let candidates = compute_candidates_with_msets(
                     &self.index,
-                    query_run,
+                    &whole_run,
                     false,
-                    MAX_QUERY_RUN_CANDIDATES,
+                    MAX_SEQ_CANDIDATES,
                 );
                 if !candidates.is_empty() {
-                    let matches = seq_match_with_candidates(&self.index, query_run, &candidates);
+                    let matches = seq_match_with_candidates(&self.index, &whole_run, &candidates);
                     seq_all_matches.extend(matches);
                 }
             }
-        }
 
-        // Merge all sequence matches ONCE (like Python's approx matcher)
-        let merged_seq = merge_overlapping_matches(&seq_all_matches);
-        all_matches.extend(merged_seq);
+            // Phase 4: Query run matching
+            const MAX_QUERY_RUN_CANDIDATES: usize = 70;
+            {
+                let whole_run = query.whole_query_run();
+                for query_run in query.query_runs().iter() {
+                    if query_run.start == whole_run.start && query_run.end == whole_run.end {
+                        continue;
+                    }
+
+                    if !query_run.is_matchable(false, &matched_qspans) {
+                        continue;
+                    }
+
+                    let candidates = compute_candidates_with_msets(
+                        &self.index,
+                        query_run,
+                        false,
+                        MAX_QUERY_RUN_CANDIDATES,
+                    );
+                    if !candidates.is_empty() {
+                        let matches = seq_match_with_candidates(&self.index, query_run, &candidates);
+                        seq_all_matches.extend(matches);
+                    }
+                }
+            }
+
+            // Merge all sequence matches ONCE (like Python's approx matcher)
+            let merged_seq = merge_overlapping_matches(&seq_all_matches);
+            all_matches.extend(merged_seq);
+        }
 
         // Step 1: Initial refine WITHOUT false positive filtering
         // Python: refine_matches with filter_false_positive=False (index.py:1073-1080)
