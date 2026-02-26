@@ -4,6 +4,7 @@ use serde::Serialize;
 pub const SCANCODE_OUTPUT_FORMAT_VERSION: &str = "4.0.0";
 
 #[derive(Serialize, Debug)]
+/// Top-level ScanCode-compatible JSON payload.
 pub struct Output {
     pub headers: Vec<Header>,
     pub packages: Vec<Package>,
@@ -14,6 +15,7 @@ pub struct Output {
 }
 
 #[derive(Serialize, Debug)]
+/// Scan execution metadata stored in `output.headers`.
 pub struct Header {
     pub start_timestamp: String,
     pub end_timestamp: String,
@@ -24,6 +26,7 @@ pub struct Header {
 }
 
 #[derive(Serialize, Debug)]
+/// Additional counters and environment details for a scan run.
 pub struct ExtraData {
     pub files_count: usize,
     pub directories_count: usize,
@@ -32,6 +35,7 @@ pub struct ExtraData {
 }
 
 #[derive(Serialize, Debug)]
+/// Host environment information captured during scan execution.
 pub struct SystemEnvironment {
     pub operating_system: Option<String>,
     pub cpu_architecture: String,
@@ -40,6 +44,7 @@ pub struct SystemEnvironment {
 }
 
 #[derive(Serialize, Debug)]
+/// Reference entry for a detected license.
 pub struct LicenseReference {
     pub name: String,
     pub short_name: String,
@@ -48,6 +53,7 @@ pub struct LicenseReference {
 }
 
 #[derive(Serialize, Debug)]
+/// Reference metadata for a license detection rule.
 pub struct LicenseRuleReference {
     pub identifier: String,
     pub license_expression: String,

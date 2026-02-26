@@ -3,6 +3,10 @@ use glob::Pattern;
 use std::fs;
 use std::path::Path;
 
+/// Count files, directories, and excluded paths under `path`.
+///
+/// Returns `(files_count, directories_count, excluded_count)` while honoring
+/// exclusion patterns and recursion depth.
 pub fn count<P: AsRef<Path>>(
     path: P,
     max_depth: usize,
