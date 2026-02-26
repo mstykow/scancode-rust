@@ -21,4 +21,20 @@ pub struct Cli {
     /// Disable package assembly (merging related manifest/lockfiles into packages)
     #[arg(long)]
     pub no_assemble: bool,
+
+    /// Scan input for email addresses
+    #[arg(long)]
+    pub email: bool,
+
+    /// Report only up to INT emails found in a file. Use 0 for no limit.
+    #[arg(long, default_value_t = 50, requires = "email")]
+    pub max_email: usize,
+
+    /// Scan input for URLs
+    #[arg(short = 'u', long)]
+    pub url: bool,
+
+    /// Report only up to INT URLs found in a file. Use 0 for no limit.
+    #[arg(long, default_value_t = 50, requires = "url")]
+    pub max_url: usize,
 }

@@ -43,6 +43,9 @@ pub struct FileInfo {
     #[builder(default)]
     pub authors: Vec<Author>,
     #[builder(default)]
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub emails: Vec<OutputEmail>,
+    #[builder(default)]
     pub urls: Vec<OutputURL>,
     #[builder(default)]
     pub for_packages: Vec<String>,
@@ -72,6 +75,7 @@ impl FileInfoBuilder {
             self.copyrights.clone().unwrap_or_default(),
             self.holders.clone().unwrap_or_default(),
             self.authors.clone().unwrap_or_default(),
+            self.emails.clone().unwrap_or_default(),
             self.urls.clone().unwrap_or_default(),
             self.for_packages.clone().unwrap_or_default(),
             self.scan_errors.clone().unwrap_or_default(),
@@ -101,6 +105,7 @@ impl FileInfo {
         copyrights: Vec<Copyright>,
         holders: Vec<Holder>,
         authors: Vec<Author>,
+        emails: Vec<OutputEmail>,
         urls: Vec<OutputURL>,
         for_packages: Vec<String>,
         scan_errors: Vec<String>,
@@ -147,6 +152,7 @@ impl FileInfo {
             copyrights,
             holders,
             authors,
+            emails,
             urls,
             for_packages,
             scan_errors,
@@ -750,8 +756,17 @@ pub fn build_package_uid(purl: &str) -> String {
 }
 
 #[derive(Serialize, Debug, Clone)]
+pub struct OutputEmail {
+    pub email: String,
+    pub start_line: usize,
+    pub end_line: usize,
+}
+
+#[derive(Serialize, Debug, Clone)]
 pub struct OutputURL {
     pub url: String,
+    pub start_line: usize,
+    pub end_line: usize,
 }
 
 #[derive(Debug, Clone, PartialEq)]
