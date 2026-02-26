@@ -273,7 +273,7 @@ pub fn spdx_lid_match(index: &LicenseIndex, query: &Query) -> Vec<LicenseMatch> 
 
             let license_match = LicenseMatch {
                 license_expression: rule.license_expression.clone(),
-                license_expression_spdx: resolved_expression.clone(),
+                license_expression_spdx: spdx_expression.clone(),
                 from_file: None,
                 start_line,
                 end_line,

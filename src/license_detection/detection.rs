@@ -294,8 +294,7 @@ fn has_unknown_matches(matches: &[LicenseMatch]) -> bool {
 /// and has_extra_words() at detection.py:1139
 fn has_extra_words(matches: &[LicenseMatch]) -> bool {
     matches.iter().any(|m| {
-        let coverage = m.icoverage() * 100.0;
-        let score_coverage_relevance = coverage * m.rule_relevance as f32 / 100.0;
+        let score_coverage_relevance = m.match_coverage * m.rule_relevance as f32 / 100.0;
         score_coverage_relevance - m.score > 0.01
     })
 }
@@ -1265,14 +1264,14 @@ mod tests {
     #[test]
     fn test_group_matches_just_past_line_gap_threshold() {
         let match1 = create_test_match(1, 5, "1-hash", "mit.LICENSE");
-        let match2 = create_test_match(9, 13, "2-aho", "mit.LICENSE");
+        let match2 = create_test_match(10, 14, "2-aho", "mit.LICENSE");
         let matches = vec![match1, match2];
         let groups = group_matches_by_region(&matches);
 
         assert_eq!(
             groups.len(),
             2,
-            "Line gap 4 (9-5=4) exceeds threshold 3, should separate"
+            "Line gap 5 (10-5=5) exceeds threshold 4, should separate"
         );
     }
 
@@ -1423,8 +1422,8 @@ mod tests {
         let groups = group_matches_by_region(&[m1, m2]);
         assert_eq!(
             groups.len(),
-            2,
-            "Should separate when token gap (15) exceeds threshold (10)"
+            1,
+            "Should group when line gap (2) is within threshold (4) - token gap is not used for grouping"
         );
     }
 
@@ -4054,18 +4053,20 @@ mod tests {
 
     #[test]
     fn test_analyze_detection_license_clues() {
-        let matches = vec![create_test_match_with_params(
+        let mut m = create_test_match_with_params(
             "mit",
             "2-aho",
             1,
             10,
-            40.0,
-            20,
-            20,
-            40.0,
-            80,
+            100.0,
+            100,
+            100,
+            100.0,
+            100,
             "mit.LICENSE",
-        )];
+        );
+        m.is_license_clue = true;
+        let matches = vec![m];
 
         assert_eq!(
             analyze_detection(&matches, false),
@@ -4658,8 +4659,11 @@ mod tests {
             detection.detection_log,
             vec!["unknown-reference-to-local-file"]
         );
-        assert_eq!(detection.matches.len(), 1);
+        // detection.matches stores RAW matches (matching Python behavior)
+        // filtering only applies to matches_for_expression for license computation
+        assert_eq!(detection.matches.len(), 2);
         assert_eq!(detection.matches[0].start_line, 1);
+        assert_eq!(detection.matches[1].start_line, 6);
     }
 
     #[test]

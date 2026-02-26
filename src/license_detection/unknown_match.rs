@@ -546,9 +546,13 @@ mod tests {
 
     #[test]
     fn test_create_unknown_match_valid() {
+        use crate::license_detection::test_utils::create_mock_query_with_tokens;
+
         let index = LicenseIndex::with_legalese_count(10);
-        let text = "This is a license text that should be long enough for unknown detection";
-        let query = Query::new(text, &index).expect("Failed to create query");
+
+        // Create tokens with IDs 0-9 (legalese tokens) so hispan count >= 5
+        let tokens: Vec<u16> = (0..30).collect();
+        let query = create_mock_query_with_tokens(&tokens, &index);
 
         let match_result = create_unknown_match(&index, &query, 0, 30, 5);
 
