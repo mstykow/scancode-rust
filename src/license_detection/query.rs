@@ -398,7 +398,11 @@ impl<'a> Query<'a> {
                         let is_spdx_third = third_three == ["spdx", "license", "identifier"]
                             || third_three == ["spdx", "licence", "identifier"]
                             || third_three == ["licenses", "nuget", "org"];
-                        if is_spdx_third { Some(2) } else { None }
+                        if is_spdx_third {
+                            Some(2)
+                        } else {
+                            None
+                        }
                     } else {
                         None
                     }
@@ -413,7 +417,7 @@ impl<'a> Query<'a> {
                 let spdx_start_known_pos = line_first_known_pos + offset;
                 if spdx_start_known_pos <= line_last_known_pos {
                     let spdx_start = spdx_start_known_pos as usize;
-                    let spdx_end = line_last_known_pos as usize;
+                    let spdx_end = (line_last_known_pos + 1) as usize;
                     spdx_lines.push((line_trimmed.to_string(), spdx_start, spdx_end));
                 }
             }
