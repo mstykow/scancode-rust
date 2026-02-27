@@ -191,9 +191,23 @@ impl LicenseDetectionEngine {
             let whole_run = query.whole_query_run();
             let aho_matches = aho_match(&self.index, &whole_run);
             let merged_aho = merge_overlapping_matches(&aho_matches);
-            let (filtered_aho, _discarded_aho) =
+            let (non_contained_aho, discarded_contained) =
                 match_refine::filter_contained_matches(&merged_aho);
-            for m in &filtered_aho {
+            let (filtered_aho, discarded_overlapping) =
+                match_refine::filter_overlapping_matches(non_contained_aho, &self.index);
+
+            // Restore matches that were discarded but don't overlap with kept matches
+            // This matches Python's behavior in refine_matches (match.py:2794-2800)
+            let (restored_contained, _) =
+                match_refine::restore_non_overlapping(&filtered_aho, discarded_contained);
+            let (restored_overlapping, _) =
+                match_refine::restore_non_overlapping(&filtered_aho, discarded_overlapping);
+
+            let mut final_aho = filtered_aho;
+            final_aho.extend(restored_contained);
+            final_aho.extend(restored_overlapping);
+
+            for m in &final_aho {
                 if m.match_coverage >= 99.99 && m.end_token > m.start_token {
                     matched_qspans.push(query::PositionSpan::new(m.start_token, m.end_token - 1));
                 }
@@ -203,7 +217,7 @@ impl LicenseDetectionEngine {
                     query.subtract(&span);
                 }
             }
-            all_matches.extend(filtered_aho);
+            all_matches.extend(final_aho);
         }
 
         // Check if we should skip sequence matching (Python: index.py:1041-1046)
