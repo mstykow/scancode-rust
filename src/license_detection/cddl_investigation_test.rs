@@ -6,12 +6,12 @@
 
 #[cfg(test)]
 mod tests {
+    use crate::license_detection::LicenseDetectionEngine;
     use crate::license_detection::index::token_sets::build_set_and_mset;
     use crate::license_detection::query::Query;
     use crate::license_detection::seq_match::{
-        compute_candidates_with_msets, seq_match_with_candidates, MAX_NEAR_DUPE_CANDIDATES,
+        MAX_NEAR_DUPE_CANDIDATES, compute_candidates_with_msets, seq_match_with_candidates,
     };
-    use crate::license_detection::LicenseDetectionEngine;
     use std::collections::HashSet;
     use std::path::PathBuf;
 
@@ -59,8 +59,8 @@ mod tests {
         use crate::license_detection::match_refine::merge_overlapping_matches;
         use crate::license_detection::query::Query;
         use crate::license_detection::seq_match::{
-            compute_candidates_with_msets, seq_match, seq_match_with_candidates,
-            MAX_NEAR_DUPE_CANDIDATES,
+            MAX_NEAR_DUPE_CANDIDATES, compute_candidates_with_msets, seq_match,
+            seq_match_with_candidates,
         };
 
         let index = engine.index();

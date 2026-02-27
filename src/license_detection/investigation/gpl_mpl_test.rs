@@ -657,4 +657,165 @@ mod tests {
             eprintln!("LINES_THRESHOLD = 4 (matches within 4 lines are grouped)");
         }
     }
+
+    #[test]
+    fn test_gpl_mpl_failing_phase1_filtering_matches_python() {
+        let Some(_engine) = get_engine() else { return };
+        let Some(text) = read_test_file() else { return };
+
+        use crate::license_detection::aho_match::aho_match;
+        use crate::license_detection::index::build_index;
+        use crate::license_detection::match_refine::{
+            filter_contained_matches, filter_overlapping_matches, merge_overlapping_matches,
+        };
+        use crate::license_detection::query::{PositionSpan, Query};
+        use crate::license_detection::rules::{
+            load_licenses_from_directory, load_rules_from_directory,
+        };
+        use crate::utils::text::strip_utf8_bom_str;
+
+        let rules_path = PathBuf::from("reference/scancode-toolkit/src/licensedcode/data/rules");
+        let licenses_path =
+            PathBuf::from("reference/scancode-toolkit/src/licensedcode/data/licenses");
+
+        let rules = load_rules_from_directory(&rules_path, false).unwrap();
+        let licenses = load_licenses_from_directory(&licenses_path, false).unwrap();
+        let index = build_index(rules, licenses);
+
+        let clean_text = strip_utf8_bom_str(&text);
+        let query = Query::new(clean_text, &index).expect("Query creation failed");
+        let whole_run = query.whole_query_run();
+
+        let aho_matches = aho_match(&index, &whole_run);
+        let merged_aho = merge_overlapping_matches(&aho_matches);
+
+        eprintln!("=== PHASE 1 FILTERING ===");
+        eprintln!("aho_matches: {}", aho_matches.len());
+        eprintln!("merged_aho: {}", merged_aho.len());
+
+        let (non_contained, discarded_contained) = filter_contained_matches(&merged_aho);
+        eprintln!(
+            "after filter_contained: {} kept, {} discarded",
+            non_contained.len(),
+            discarded_contained.len()
+        );
+
+        for m in &non_contained {
+            eprintln!(
+                "  KEPT: {} tokens {}-{}",
+                m.license_expression, m.start_token, m.end_token
+            );
+        }
+
+        let (filtered, discarded_overlapping) =
+            filter_overlapping_matches(non_contained.clone(), &index);
+        eprintln!(
+            "after filter_overlapping: {} kept, {} discarded",
+            filtered.len(),
+            discarded_overlapping.len()
+        );
+
+        for m in &filtered {
+            eprintln!(
+                "  FINAL: {} tokens {}-{}",
+                m.license_expression, m.start_token, m.end_token
+            );
+        }
+
+        let mut matched_qspans: Vec<PositionSpan> = Vec::new();
+        for m in &filtered {
+            if m.match_coverage >= 99.99 && m.end_token > m.start_token {
+                matched_qspans.push(PositionSpan::new(m.start_token, m.end_token - 1));
+            }
+        }
+
+        let whole_run = query.whole_query_run();
+        let is_matchable = whole_run.is_matchable(false, &matched_qspans);
+
+        eprintln!("\n=== IS_MATCHABLE CHECK ===");
+        eprintln!("matched_qspans: {}", matched_qspans.len());
+        eprintln!("is_matchable: {}", is_matchable);
+
+        assert_eq!(
+            filtered.len(),
+            3,
+            "Phase 1 aho filtering should produce 3 matches (like Python), not 4"
+        );
+
+        assert!(
+            is_matchable,
+            "After proper filtering, is_matchable should be True (position 0 should remain uncovered)"
+        );
+    }
+
+    #[test]
+    fn test_gpl_mpl_main_pipeline_skip_seq_matching_bug() {
+        // This test demonstrates the bug: the main pipeline currently skips seq matching
+        // because it only calls filter_contained_matches (not filter_overlapping_matches)
+        // after aho matching, leaving 4 matches that cover all high_matchable positions.
+        //
+        // EXPECTED: is_matchable should be True (position 0 uncovered)
+        // ACTUAL: is_matchable is False (all positions covered by 4 matches)
+        //
+        // This test will FAIL until the fix is applied.
+
+        let Some(_engine) = get_engine() else { return };
+        let Some(text) = read_test_file() else { return };
+
+        use crate::license_detection::aho_match::aho_match;
+        use crate::license_detection::index::build_index;
+        use crate::license_detection::match_refine::{
+            filter_contained_matches, merge_overlapping_matches,
+        };
+        use crate::license_detection::query::{PositionSpan, Query};
+        use crate::license_detection::rules::{
+            load_licenses_from_directory, load_rules_from_directory,
+        };
+        use crate::utils::text::strip_utf8_bom_str;
+
+        let rules_path = PathBuf::from("reference/scancode-toolkit/src/licensedcode/data/rules");
+        let licenses_path =
+            PathBuf::from("reference/scancode-toolkit/src/licensedcode/data/licenses");
+
+        let rules = load_rules_from_directory(&rules_path, false).unwrap();
+        let licenses = load_licenses_from_directory(&licenses_path, false).unwrap();
+        let index = build_index(rules, licenses);
+
+        let clean_text = strip_utf8_bom_str(&text);
+        let query = Query::new(clean_text, &index).expect("Query creation failed");
+        let whole_run = query.whole_query_run();
+
+        let aho_matches = aho_match(&index, &whole_run);
+        let merged_aho = merge_overlapping_matches(&aho_matches);
+
+        // This is what the main pipeline CURRENTLY does (buggy behavior)
+        let (filtered_aho, _) = filter_contained_matches(&merged_aho);
+
+        eprintln!("=== CURRENT MAIN PIPELINE BEHAVIOR (BUGGY) ===");
+        eprintln!("filtered_aho count: {}", filtered_aho.len());
+
+        let mut matched_qspans: Vec<PositionSpan> = Vec::new();
+        for m in &filtered_aho {
+            eprintln!(
+                "  {} tokens {}-{}",
+                m.license_expression, m.start_token, m.end_token
+            );
+            if m.match_coverage >= 99.99 && m.end_token > m.start_token {
+                matched_qspans.push(PositionSpan::new(m.start_token, m.end_token - 1));
+            }
+        }
+
+        let whole_run = query.whole_query_run();
+        let is_matchable = whole_run.is_matchable(false, &matched_qspans);
+
+        eprintln!("\nis_matchable (current buggy behavior): {}", is_matchable);
+
+        // This assertion should FAIL until the fix is applied
+        assert!(
+            is_matchable,
+            "BUG: is_matchable should be True but is False because main pipeline only calls \
+             filter_contained_matches without filter_overlapping_matches. \
+             Fix: Add filter_overlapping_matches after filter_contained_matches in mod.rs:193-198"
+        );
+    }
 }

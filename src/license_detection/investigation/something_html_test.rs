@@ -823,4 +823,266 @@ mod tests {
             sun_sissl_matches.len()
         );
     }
+
+    #[test]
+    fn test_plan_007_qspan_containment_debug() {
+        let Some(engine) = ensure_engine() else {
+            eprintln!("Skipping test: reference directory not found");
+            return;
+        };
+
+        let Some(text) = read_test_file() else {
+            eprintln!("Skipping test: test file not found");
+            return;
+        };
+
+        let index = engine.index();
+        let query = Query::new(&text, index).expect("Query creation should succeed");
+        let whole_run = query.whole_query_run();
+
+        // Get all matches and merge
+        let aho_matches = aho_match(index, &whole_run);
+        let merged_aho = merge_overlapping_matches(&aho_matches);
+
+        // Also get seq matches
+        let seq_candidates = compute_candidates_with_msets(index, &whole_run, false, 70);
+        let seq_matches = if !seq_candidates.is_empty() {
+            seq_match_with_candidates(index, &whole_run, &seq_candidates)
+        } else {
+            Vec::new()
+        };
+        let merged_seq = merge_overlapping_matches(&seq_matches);
+
+        // Combine all matches
+        let mut all_matches = Vec::new();
+        all_matches.extend(merged_aho.clone());
+        all_matches.extend(merged_seq.clone());
+
+        // Find the BIG match (lines 195-494, tokens 806-3180) - this is sun-sissl-1.1_3.RULE
+        let big_match: Vec<_> = all_matches
+            .iter()
+            .filter(|m| {
+                m.rule_identifier == "sun-sissl-1.1_3.RULE"
+                    && m.start_line == 195
+                    && m.license_expression == "sun-sissl-1.1"
+            })
+            .collect();
+
+        // Find the problematic match at line 205 (tokens 815-823) - this is sun-sissl-1.1_4.RULE
+        let line_205_match: Vec<_> = all_matches
+            .iter()
+            .filter(|m| {
+                m.rule_identifier == "sun-sissl-1.1_4.RULE"
+                    && m.start_line == 205
+                    && m.license_expression == "sun-sissl-1.1"
+            })
+            .collect();
+
+        // Find the sun-sissl-1.1.RULE match at lines 195-207
+        let rule_match_195_207: Vec<_> = all_matches
+            .iter()
+            .filter(|m| {
+                m.rule_identifier == "sun-sissl-1.1.RULE"
+                    && m.start_line == 195
+                    && m.end_line == 207
+                    && m.license_expression == "sun-sissl-1.1"
+            })
+            .collect();
+
+        eprintln!("\n=== QSPAN CONTAINMENT DEBUG (CORRECT MATCHES) ===");
+
+        if let Some(big) = big_match.first() {
+            eprintln!("\nBIG match (lines 195-494, should contain line 205 match):");
+            eprintln!(
+                "  lines {}-{}, tokens {}-{}",
+                big.start_line, big.end_line, big.start_token, big.end_token
+            );
+            eprintln!("  matched_length: {}", big.matched_length);
+            eprintln!("  hilen: {}", big.hilen);
+            eprintln!("  rule: {}", big.rule_identifier);
+            if let Some(positions) = &big.qspan_positions {
+                eprintln!("  qspan_positions count: {}", positions.len());
+                let min_pos = positions.iter().min().copied().unwrap_or(0);
+                let max_pos = positions.iter().max().copied().unwrap_or(0);
+                eprintln!("  qspan_positions range: {}..={}", min_pos, max_pos);
+                // Check if positions 815-822 are in the qspan
+                let in_qspan: Vec<_> = (815..823).map(|p| positions.contains(&p)).collect();
+                eprintln!("  positions 815-822 in qspan: {:?}", in_qspan);
+                eprintln!(
+                    "  ALL positions 815-822 in qspan: {}",
+                    in_qspan.iter().all(|&x| x)
+                );
+            } else {
+                eprintln!("  qspan_positions: None");
+            }
+        } else {
+            eprintln!("\nBIG match NOT FOUND!");
+        }
+
+        if let Some(m195_207) = rule_match_195_207.first() {
+            eprintln!(
+                "\nsun-sissl-1.1.RULE match (lines 195-207, tokens 806-834, might contain line 205):"
+            );
+            eprintln!(
+                "  lines {}-{}, tokens {}-{}",
+                m195_207.start_line, m195_207.end_line, m195_207.start_token, m195_207.end_token
+            );
+            eprintln!("  matched_length: {}", m195_207.matched_length);
+            eprintln!("  rule: {}", m195_207.rule_identifier);
+            if let Some(positions) = &m195_207.qspan_positions {
+                eprintln!("  qspan_positions count: {}", positions.len());
+            } else {
+                eprintln!("  qspan_positions: None (uses range)");
+            }
+            if let Some(m205) = line_205_match.first() {
+                eprintln!("  m195_207.qcontains(m205): {}", m195_207.qcontains(m205));
+            }
+        } else {
+            eprintln!("\nsun-sissl-1.1.RULE match at lines 195-207 NOT FOUND!");
+        }
+
+        if let Some(m205) = line_205_match.first() {
+            eprintln!("\nLine 205 match (should be contained in BIG match):");
+            eprintln!(
+                "  lines {}-{}, tokens {}-{}",
+                m205.start_line, m205.end_line, m205.start_token, m205.end_token
+            );
+            eprintln!("  matched_length: {}", m205.matched_length);
+            eprintln!("  hilen: {}", m205.hilen);
+            eprintln!("  rule: {}", m205.rule_identifier);
+            if let Some(positions) = &m205.qspan_positions {
+                eprintln!("  qspan_positions count: {}", positions.len());
+                eprintln!("  qspan_positions: {:?}", positions);
+            } else {
+                eprintln!("  qspan_positions: None (will use start_token..end_token range)");
+            }
+        } else {
+            eprintln!("\nLine 205 match NOT FOUND!");
+        }
+
+        // Test containment
+        if let (Some(big), Some(m205)) = (big_match.first(), line_205_match.first()) {
+            eprintln!("\n=== CONTAINMENT TEST ===");
+            eprintln!("big.qcontains(m205): {}", big.qcontains(m205));
+            eprintln!(
+                "Simple range check: {} <= {} && {} >= {} = {}",
+                big.start_token,
+                m205.start_token,
+                big.end_token,
+                m205.end_token,
+                big.start_token <= m205.start_token && big.end_token >= m205.end_token
+            );
+
+            eprintln!("\nBUG EXPLANATION:");
+            eprintln!("  The BIG match has qspan_positions with GAPS (not all positions 806-3179)");
+            eprintln!("  The line 205 match has qspan_positions: None");
+            eprintln!(
+                "  qcontains checks if ALL positions in (815..823) are in big's qspan_positions"
+            );
+            eprintln!("  Since big's qspan has gaps at positions 815-822, qcontains returns false");
+            eprintln!(
+                "  BUT Python uses a different approach - it checks qspan containment, not range"
+            );
+        }
+    }
+
+    #[test]
+    fn test_plan_007_filter_contained_matches_same_license() {
+        use crate::license_detection::match_refine::filter_contained_matches;
+
+        let Some(engine) = ensure_engine() else {
+            eprintln!("Skipping test: reference directory not found");
+            return;
+        };
+
+        let Some(text) = read_test_file() else {
+            eprintln!("Skipping test: test file not found");
+            return;
+        };
+
+        let index = engine.index();
+        let query = Query::new(&text, index).expect("Query creation should succeed");
+        let whole_run = query.whole_query_run();
+
+        let aho_matches = aho_match(index, &whole_run);
+        let merged_aho = merge_overlapping_matches(&aho_matches);
+
+        let seq_candidates = compute_candidates_with_msets(index, &whole_run, false, 70);
+        let seq_matches = if !seq_candidates.is_empty() {
+            seq_match_with_candidates(index, &whole_run, &seq_candidates)
+        } else {
+            Vec::new()
+        };
+        let merged_seq = merge_overlapping_matches(&seq_matches);
+
+        let mut all_matches = Vec::new();
+        all_matches.extend(merged_aho.clone());
+        all_matches.extend(merged_seq.clone());
+
+        let merged = merge_overlapping_matches(&all_matches);
+
+        eprintln!("\n=== TEST: filter_contained_matches should remove line 205 match ===");
+
+        let line_205_matches_before: Vec<_> = merged
+            .iter()
+            .filter(|m| {
+                m.start_line == 205
+                    && m.rule_identifier == "sun-sissl-1.1_4.RULE"
+                    && m.license_expression == "sun-sissl-1.1"
+            })
+            .collect();
+        eprintln!(
+            "Line 205 matches BEFORE filter_contained: {}",
+            line_205_matches_before.len()
+        );
+
+        let big_matches: Vec<_> = merged
+            .iter()
+            .filter(|m| {
+                m.start_line == 195 && m.end_line > 400 && m.license_expression == "sun-sissl-1.1"
+            })
+            .collect();
+        eprintln!("BIG matches (lines 195-400+): {}", big_matches.len());
+
+        if let (Some(line_205), Some(big)) = (line_205_matches_before.first(), big_matches.first())
+        {
+            eprintln!(
+                "\nRange containment check: {} <= {} && {} >= {} = {}",
+                big.start_token,
+                line_205.start_token,
+                big.end_token,
+                line_205.end_token,
+                big.start_token <= line_205.start_token && big.end_token >= line_205.end_token
+            );
+            eprintln!(
+                "Both have same license_expression: {}",
+                big.license_expression == line_205.license_expression
+            );
+        }
+
+        let (kept, discarded) = filter_contained_matches(&merged);
+
+        let line_205_matches_after: Vec<_> = kept
+            .iter()
+            .filter(|m| {
+                m.start_line == 205
+                    && m.rule_identifier == "sun-sissl-1.1_4.RULE"
+                    && m.license_expression == "sun-sissl-1.1"
+            })
+            .collect();
+        eprintln!(
+            "\nLine 205 matches AFTER filter_contained: {}",
+            line_205_matches_after.len()
+        );
+
+        // This test will FAIL until the fix is implemented
+        // The line 205 match should be filtered because:
+        // 1. It's contained within the BIG match (range-wise)
+        // 2. Both have the same license_expression (sun-sissl-1.1)
+        assert_eq!(
+            line_205_matches_after.len(),
+            0,
+            "BUG: Line 205 match should be filtered by filter_contained_matches because it's contained within the BIG match (same license, range-contained)"
+        );
+    }
 }

@@ -284,7 +284,7 @@ pub fn parse_rule_file(path: &Path) -> Result<Rule> {
     let is_false_positive = fm.is_false_positive.unwrap_or(false);
 
     let license_expression = match fm.license_expression {
-        Some(expr) => expr,
+        Some(expr) => normalize_trivial_outer_parens(&expr),
         None if is_false_positive => "unknown".to_string(),
         None => {
             return Err(anyhow!(
@@ -580,6 +580,36 @@ fn validate_rules(rules: &[Rule]) {
             "Found {} duplicate rule text(s) during rule validation",
             duplicate_count
         );
+    }
+}
+
+fn has_trivial_outer_parens(s: &str) -> bool {
+    let trimmed = s.trim();
+    if !trimmed.starts_with('(') || !trimmed.ends_with(')') {
+        return false;
+    }
+    let mut depth = 0;
+    let chars: Vec<char> = trimmed.chars().collect();
+    for (i, c) in chars.iter().enumerate() {
+        if *c == '(' {
+            depth += 1;
+        } else if *c == ')' {
+            depth -= 1;
+            if depth == 0 && i < chars.len() - 1 {
+                return false;
+            }
+        }
+    }
+    depth == 0
+}
+
+fn normalize_trivial_outer_parens(expr: &str) -> String {
+    let trimmed = expr.trim();
+    if has_trivial_outer_parens(trimmed) {
+        let inner = &trimmed[1..trimmed.len() - 1];
+        normalize_trivial_outer_parens(inner)
+    } else {
+        expr.to_string()
     }
 }
 

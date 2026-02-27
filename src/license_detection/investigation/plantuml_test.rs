@@ -197,4 +197,159 @@ mod tests {
             "FAIL: combine_expressions should normalize away unnecessary outer parentheses from input"
         );
     }
+
+    #[test]
+    fn test_sencha_expression_current_behavior() {
+        use crate::license_detection::expression::{expression_to_string, parse_expression};
+
+        let input = "(gpl-3.0 WITH sencha-app-floss-exception OR gpl-3.0 WITH sencha-dev-floss-exception OR sencha-commercial) AND (public-domain AND mit AND mit)";
+        let expr = parse_expression(input).expect("Parse should succeed");
+        let output = expression_to_string(&expr);
+
+        eprintln!("Sencha input: {:?}", input);
+        eprintln!("Sencha output: {:?}", output);
+
+        assert_eq!(
+            output,
+            "(gpl-3.0 WITH sencha-app-floss-exception OR gpl-3.0 WITH sencha-dev-floss-exception OR sencha-commercial) AND public-domain AND mit AND mit",
+            "FAIL: Current behavior loses stylistic parens on right side"
+        );
+    }
+
+    #[test]
+    fn test_plantuml_expression_removes_trivial_outer_parens() {
+        use crate::license_detection::expression::{expression_to_string, parse_expression};
+
+        let input_with_parens = "(mit OR apache-2.0 OR epl-2.0 OR lgpl-3.0-plus OR gpl-3.0-plus)";
+        let input_without_parens = "mit OR apache-2.0 OR epl-2.0 OR lgpl-3.0-plus OR gpl-3.0-plus";
+
+        let expr = parse_expression(input_with_parens).expect("Parse should succeed");
+        let output = expression_to_string(&expr);
+
+        eprintln!("PlantUML input: {:?}", input_with_parens);
+        eprintln!("PlantUML output: {:?}", output);
+
+        assert_eq!(
+            output, input_without_parens,
+            "FAIL: PlantUML expression should have trivial outer parens removed"
+        );
+    }
+
+    #[test]
+    fn test_normalization_heuristic_trivial_outer_only_first() {
+        use crate::license_detection::expression::{expression_to_string, parse_expression};
+
+        let cases = vec![
+            ("(mit)", "mit"),
+            ("(mit OR apache-2.0)", "mit OR apache-2.0"),
+            ("((mit OR apache-2.0))", "mit OR apache-2.0"),
+            ("(mit AND apache-2.0)", "mit AND apache-2.0"),
+            ("(gpl-3.0 WITH exception)", "gpl-3.0 WITH exception"),
+        ];
+
+        for (input, expected) in cases {
+            let expr =
+                parse_expression(input).expect(&format!("Parse should succeed for: {}", input));
+            let output = expression_to_string(&expr);
+            assert_eq!(
+                output, expected,
+                "Trivial outer parens should be removed for: {}",
+                input
+            );
+        }
+    }
+
+    #[test]
+    fn test_semantically_required_grouping_preserved() {
+        use crate::license_detection::expression::{expression_to_string, parse_expression};
+
+        let cases = vec![
+            (
+                "(mit OR apache-2.0) AND gpl-3.0",
+                "(mit OR apache-2.0) AND gpl-3.0",
+            ),
+            (
+                "mit AND (apache-2.0 OR gpl-3.0)",
+                "mit AND (apache-2.0 OR gpl-3.0)",
+            ),
+            (
+                "(mit AND apache-2.0) OR gpl-3.0",
+                "(mit AND apache-2.0) OR gpl-3.0",
+            ),
+            ("(a OR b) AND (c OR d)", "(a OR b) AND (c OR d)"),
+        ];
+
+        for (input, expected) in cases {
+            let expr =
+                parse_expression(input).expect(&format!("Parse should succeed for: {}", input));
+            let output = expression_to_string(&expr);
+            assert_eq!(
+                output, expected,
+                "Semantic grouping parens should be preserved for: {}",
+                input
+            );
+        }
+    }
+
+    #[test]
+    fn test_stylistic_parens_lost_by_parser() {
+        use crate::license_detection::expression::{expression_to_string, parse_expression};
+
+        let cases = vec![
+            (
+                "(gpl-3.0 WITH exception) OR mit",
+                "gpl-3.0 WITH exception OR mit",
+            ),
+            (
+                "(public-domain AND mit AND mit)",
+                "public-domain AND mit AND mit",
+            ),
+        ];
+
+        for (input, expected) in cases {
+            let expr =
+                parse_expression(input).expect(&format!("Parse should succeed for: {}", input));
+            let output = expression_to_string(&expr);
+            assert_eq!(
+                output, expected,
+                "Stylistic parens are lost (current behavior): {}",
+                input
+            );
+        }
+    }
+
+    #[test]
+    fn test_is_trivial_outer_parens_heuristic() {
+        fn has_trivial_outer_parens(s: &str) -> bool {
+            let trimmed = s.trim();
+            if !trimmed.starts_with('(') || !trimmed.ends_with(')') {
+                return false;
+            }
+            let mut depth = 0;
+            let chars: Vec<char> = trimmed.chars().collect();
+            for (i, c) in chars.iter().enumerate() {
+                if *c == '(' {
+                    depth += 1;
+                } else if *c == ')' {
+                    depth -= 1;
+                    if depth == 0 && i < chars.len() - 1 {
+                        return false;
+                    }
+                }
+            }
+            depth == 0
+        }
+
+        assert!(has_trivial_outer_parens("(mit)"));
+        assert!(has_trivial_outer_parens("(mit OR apache-2.0)"));
+        assert!(has_trivial_outer_parens("((mit OR apache-2.0))"));
+        assert!(has_trivial_outer_parens("(mit AND apache-2.0)"));
+        assert!(has_trivial_outer_parens("(gpl-3.0 WITH exception)"));
+        assert!(has_trivial_outer_parens("(mit OR apache-2.0 OR epl-2.0)"));
+
+        assert!(!has_trivial_outer_parens("(mit OR apache-2.0) AND gpl-3.0"));
+        assert!(!has_trivial_outer_parens("mit AND (apache-2.0 OR gpl-3.0)"));
+        assert!(!has_trivial_outer_parens("(a OR b) AND (c OR d)"));
+        assert!(!has_trivial_outer_parens("mit OR apache-2.0"));
+    }
 }

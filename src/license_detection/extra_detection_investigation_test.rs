@@ -5,6 +5,7 @@
 
 #[cfg(test)]
 mod tests {
+    use crate::license_detection::LicenseDetectionEngine;
     use crate::license_detection::aho_match::aho_match;
     use crate::license_detection::hash_match::hash_match;
     use crate::license_detection::match_refine::{
@@ -15,12 +16,11 @@ mod tests {
     use crate::license_detection::models::LicenseMatch;
     use crate::license_detection::query::Query;
     use crate::license_detection::seq_match::{
-        compute_candidates_with_msets, seq_match, seq_match_with_candidates,
-        MAX_NEAR_DUPE_CANDIDATES,
+        MAX_NEAR_DUPE_CANDIDATES, compute_candidates_with_msets, seq_match,
+        seq_match_with_candidates,
     };
     use crate::license_detection::spdx_lid::spdx_lid_match;
     use crate::license_detection::unknown_match::unknown_match;
-    use crate::license_detection::LicenseDetectionEngine;
     use once_cell::sync::Lazy;
     use std::path::PathBuf;
     use std::sync::Once;
@@ -1441,7 +1441,9 @@ mod tests {
             return;
         };
 
-        let path = PathBuf::from("testdata/license-golden/datadriven/lic4/gpl-2.0-plus_and_gpl-2.0-plus_and_gpl-3.0-plus_and_lgpl-2.1-plus_and_other.txt");
+        let path = PathBuf::from(
+            "testdata/license-golden/datadriven/lic4/gpl-2.0-plus_and_gpl-2.0-plus_and_gpl-3.0-plus_and_lgpl-2.1-plus_and_other.txt",
+        );
         let Some(text) = std::fs::read_to_string(&path).ok() else {
             eprintln!("Skipping test: test file not found");
             return;
@@ -1490,7 +1492,9 @@ mod tests {
             return;
         };
 
-        let path = PathBuf::from("testdata/license-golden/datadriven/lic4/gpl-2.0-plus_and_gpl-2.0-plus_and_gpl-3.0-plus_and_lgpl-2.1-plus_and_other.txt");
+        let path = PathBuf::from(
+            "testdata/license-golden/datadriven/lic4/gpl-2.0-plus_and_gpl-2.0-plus_and_gpl-3.0-plus_and_lgpl-2.1-plus_and_other.txt",
+        );
         let Some(text) = std::fs::read_to_string(&path).ok() else {
             eprintln!("Skipping test: test file not found");
             return;
@@ -1628,7 +1632,9 @@ mod tests {
             return;
         };
 
-        let path = PathBuf::from("testdata/license-golden/datadriven/lic4/gpl-2.0-plus_and_gpl-2.0-plus_and_gpl-3.0-plus_and_lgpl-2.1-plus_and_other.txt");
+        let path = PathBuf::from(
+            "testdata/license-golden/datadriven/lic4/gpl-2.0-plus_and_gpl-2.0-plus_and_gpl-3.0-plus_and_lgpl-2.1-plus_and_other.txt",
+        );
         let Some(text) = std::fs::read_to_string(&path).ok() else {
             eprintln!("Skipping test: test file not found");
             return;
@@ -1756,7 +1762,7 @@ mod tests {
         };
         use crate::license_detection::query::Query;
         use crate::license_detection::seq_match::{
-            compute_candidates_with_msets, seq_match_with_candidates, MAX_NEAR_DUPE_CANDIDATES,
+            MAX_NEAR_DUPE_CANDIDATES, compute_candidates_with_msets, seq_match_with_candidates,
         };
         use crate::license_detection::spdx_lid::spdx_lid_match;
 
@@ -2066,7 +2072,9 @@ mod tests {
             return;
         };
 
-        let path = PathBuf::from("testdata/license-golden/datadriven/lic4/gpl-2.0-plus_and_gpl-2.0-plus_and_gpl-3.0-plus_and_lgpl-2.1-plus_and_other.txt");
+        let path = PathBuf::from(
+            "testdata/license-golden/datadriven/lic4/gpl-2.0-plus_and_gpl-2.0-plus_and_gpl-3.0-plus_and_lgpl-2.1-plus_and_other.txt",
+        );
         let Some(text) = std::fs::read_to_string(&path).ok() else {
             eprintln!("Skipping test: test file not found");
             return;
@@ -2126,7 +2134,9 @@ mod tests {
             return;
         };
 
-        let path = PathBuf::from("testdata/license-golden/datadriven/lic4/gpl-2.0-plus_and_gpl-2.0-plus_and_gpl-3.0-plus_and_lgpl-2.1-plus_and_other.txt");
+        let path = PathBuf::from(
+            "testdata/license-golden/datadriven/lic4/gpl-2.0-plus_and_gpl-2.0-plus_and_gpl-3.0-plus_and_lgpl-2.1-plus_and_other.txt",
+        );
         let Some(text) = std::fs::read_to_string(&path).ok() else {
             eprintln!("Skipping test: test file not found");
             return;
@@ -2199,7 +2209,9 @@ mod tests {
             return;
         };
 
-        let path = PathBuf::from("testdata/license-golden/datadriven/lic4/gpl-2.0-plus_and_gpl-2.0-plus_and_gpl-3.0-plus_and_lgpl-2.1-plus_and_other.txt");
+        let path = PathBuf::from(
+            "testdata/license-golden/datadriven/lic4/gpl-2.0-plus_and_gpl-2.0-plus_and_gpl-3.0-plus_and_lgpl-2.1-plus_and_other.txt",
+        );
         let Some(text) = std::fs::read_to_string(&path).ok() else {
             eprintln!("Skipping test: test file not found");
             return;
@@ -2254,7 +2266,9 @@ mod tests {
             return;
         };
 
-        let path = PathBuf::from("testdata/license-golden/datadriven/lic4/gpl-2.0-plus_and_gpl-2.0-plus_and_gpl-3.0-plus_and_lgpl-2.1-plus_and_other.txt");
+        let path = PathBuf::from(
+            "testdata/license-golden/datadriven/lic4/gpl-2.0-plus_and_gpl-2.0-plus_and_gpl-3.0-plus_and_lgpl-2.1-plus_and_other.txt",
+        );
         let Some(text) = std::fs::read_to_string(&path).ok() else {
             eprintln!("Skipping test: test file not found");
             return;
@@ -2347,7 +2361,9 @@ mod tests {
             return;
         };
 
-        let path = PathBuf::from("testdata/license-golden/datadriven/lic4/gpl-2.0-plus_and_gpl-2.0-plus_and_gpl-3.0-plus_and_lgpl-2.1-plus_and_other.txt");
+        let path = PathBuf::from(
+            "testdata/license-golden/datadriven/lic4/gpl-2.0-plus_and_gpl-2.0-plus_and_gpl-3.0-plus_and_lgpl-2.1-plus_and_other.txt",
+        );
         let Some(text) = std::fs::read_to_string(&path).ok() else {
             eprintln!("Skipping test: test file not found");
             return;
@@ -2433,7 +2449,9 @@ mod tests {
             return;
         };
 
-        let path = PathBuf::from("testdata/license-golden/datadriven/lic4/gpl-2.0-plus_and_gpl-2.0-plus_and_gpl-3.0-plus_and_lgpl-2.1-plus_and_other.txt");
+        let path = PathBuf::from(
+            "testdata/license-golden/datadriven/lic4/gpl-2.0-plus_and_gpl-2.0-plus_and_gpl-3.0-plus_and_lgpl-2.1-plus_and_other.txt",
+        );
         let Some(text) = std::fs::read_to_string(&path).ok() else {
             eprintln!("Skipping test: test file not found");
             return;

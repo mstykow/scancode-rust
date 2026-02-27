@@ -63,8 +63,8 @@ mod tests {
         };
         use crate::license_detection::query::Query;
         use crate::license_detection::seq_match::{
-            compute_candidates_with_msets, seq_match, seq_match_with_candidates,
-            MAX_NEAR_DUPE_CANDIDATES,
+            MAX_NEAR_DUPE_CANDIDATES, compute_candidates_with_msets, seq_match,
+            seq_match_with_candidates,
         };
         use crate::license_detection::spdx_lid::spdx_lid_match;
         use crate::license_detection::unknown_match::unknown_match;
@@ -370,7 +370,9 @@ mod tests {
     #[test]
     fn test_plan_085_gpl_lgpl_mpl_trace() {
         let Some(engine) = get_engine() else { return };
-        let path = PathBuf::from("testdata/license-golden/datadriven/lic4/gpl-2.0-plus_and_lgpl-2.1-plus_and_mpl-1.1.txt");
+        let path = PathBuf::from(
+            "testdata/license-golden/datadriven/lic4/gpl-2.0-plus_and_lgpl-2.1-plus_and_mpl-1.1.txt",
+        );
         let text = match std::fs::read_to_string(&path) {
             Ok(t) => t,
             Err(_) => return,
@@ -534,7 +536,9 @@ mod tests {
     #[test]
     fn test_plan_085_full_detection() {
         let Some(engine) = get_engine() else { return };
-        let path = PathBuf::from("testdata/license-golden/datadriven/lic4/gpl-2.0-plus_and_lgpl-2.1-plus_and_mpl-1.1.txt");
+        let path = PathBuf::from(
+            "testdata/license-golden/datadriven/lic4/gpl-2.0-plus_and_lgpl-2.1-plus_and_mpl-1.1.txt",
+        );
         let text = match std::fs::read_to_string(&path) {
             Ok(t) => t,
             Err(_) => return,

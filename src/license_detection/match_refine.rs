@@ -615,8 +615,7 @@ pub fn filter_overlapping_matches(
             let current_hilen = matches[i].hilen();
             let next_hilen = matches[j].hilen();
 
-            let different_licenses =
-                matches[i].license_expression != matches[j].license_expression;
+            let different_licenses = matches[i].license_expression != matches[j].license_expression;
 
             let current_wins_on_candidate = {
                 let current_resemblance = matches[i].candidate_resemblance;
@@ -641,9 +640,7 @@ pub fn filter_overlapping_matches(
                 matches[i].candidate_resemblance > 0.0 && matches[j].candidate_resemblance > 0.0;
 
             if extra_large_next && current_len_val >= next_len_val {
-                if different_licenses && both_have_candidate_scores
-                    && !current_wins_on_candidate
-                {
+                if different_licenses && both_have_candidate_scores && !current_wins_on_candidate {
                     discarded.push(matches.remove(i));
                     i = i.saturating_sub(1);
                     break;
@@ -653,9 +650,7 @@ pub fn filter_overlapping_matches(
             }
 
             if extra_large_current && current_len_val <= next_len_val {
-                if different_licenses && both_have_candidate_scores
-                    && current_wins_on_candidate
-                {
+                if different_licenses && both_have_candidate_scores && current_wins_on_candidate {
                     discarded.push(matches.remove(j));
                     continue;
                 }
@@ -665,9 +660,7 @@ pub fn filter_overlapping_matches(
             }
 
             if large_next && current_len_val >= next_len_val && current_hilen >= next_hilen {
-                if different_licenses && both_have_candidate_scores
-                    && !current_wins_on_candidate
-                {
+                if different_licenses && both_have_candidate_scores && !current_wins_on_candidate {
                     discarded.push(matches.remove(i));
                     i = i.saturating_sub(1);
                     break;
@@ -677,9 +670,7 @@ pub fn filter_overlapping_matches(
             }
 
             if large_current && current_len_val <= next_len_val && current_hilen <= next_hilen {
-                if different_licenses && both_have_candidate_scores
-                    && current_wins_on_candidate
-                {
+                if different_licenses && both_have_candidate_scores && current_wins_on_candidate {
                     discarded.push(matches.remove(j));
                     continue;
                 }
