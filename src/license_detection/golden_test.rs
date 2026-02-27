@@ -26,7 +26,7 @@
 #[cfg(test)]
 mod golden_tests {
     use crate::license_detection::LicenseDetectionEngine;
-    use content_inspector::{ContentType, inspect};
+    use crate::utils::file_text::extract_text_from_file;
     use once_cell::sync::Lazy;
     use serde::Deserialize;
     use std::fs;
@@ -106,49 +106,20 @@ mod golden_tests {
             })
         }
 
-        /// Read file content, handling non-UTF-8 and binary files gracefully.
-        /// Returns None for files that should be skipped (true binaries).
+        /// Read file content using production text extraction.
+        /// Returns None for files that should be skipped.
         fn read_test_file_content(&self) -> Result<Option<String>, String> {
-            let bytes = fs::read(&self.test_file).map_err(|e| {
-                format!(
-                    "Failed to read test file {}: {}",
-                    self.test_file.display(),
-                    e
-                )
-            })?;
-
-            let content_type = inspect(&bytes);
-
-            if matches!(
-                content_type,
-                ContentType::BINARY
-                    | ContentType::UTF_16LE
-                    | ContentType::UTF_16BE
-                    | ContentType::UTF_32LE
-                    | ContentType::UTF_32BE
-            ) {
-                let ext = self
-                    .test_file
-                    .extension()
-                    .and_then(|e| e.to_str())
-                    .unwrap_or("");
-
-                if matches!(
-                    ext,
-                    "jar" | "zip" | "gz" | "tar" | "gif" | "png" | "jpg" | "jpeg" | "class" | "pdf"
-                ) {
-                    return Ok(None);
-                }
-            }
-
-            match String::from_utf8(bytes.clone()) {
-                Ok(s) => Ok(Some(s)),
-                Err(_) => Ok(Some(String::from_utf8_lossy(&bytes).into_owned())),
-            }
+            extract_text_from_file(&self.test_file)
+                .map(|opt| opt.map(|ft| ft.text))
+                .map_err(|e| format!("Failed to read {}: {}", self.test_file.display(), e))
         }
 
         /// Run this test against the detection engine
-        fn run(&self, engine: &LicenseDetectionEngine, unknown_licenses: bool) -> Result<(), String> {
+        fn run(
+            &self,
+            engine: &LicenseDetectionEngine,
+            unknown_licenses: bool,
+        ) -> Result<(), String> {
             let text = match self.read_test_file_content()? {
                 Some(t) => t,
                 None => {
@@ -650,7 +621,8 @@ mod golden_tests {
 
     #[test]
     fn test_golden_unknown() {
-        let result = run_suite_unknown("unknown", &PathBuf::from(format!("{}/unknown", GOLDEN_DIR)));
+        let result =
+            run_suite_unknown("unknown", &PathBuf::from(format!("{}/unknown", GOLDEN_DIR)));
         if result.failed > 0 {
             println!("\n{} failures:", result.failed);
             for (name, err) in &result.failures {

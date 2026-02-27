@@ -3,11 +3,11 @@ use crate::models::{FileInfo, FileInfoBuilder, FileType, LicenseDetection, Match
 use crate::parsers::try_parse_file;
 use crate::scanner::ProcessResult;
 use crate::utils::file::{get_creation_date, is_path_excluded};
+use crate::utils::file_text::extract_text_for_detection;
 use crate::utils::hash::{calculate_md5, calculate_sha1, calculate_sha256};
 use crate::utils::language::detect_language;
-use crate::utils::text::{is_source, remove_verbatim_escape_sequences, strip_utf8_bom_bytes};
+use crate::utils::text::{is_source, remove_verbatim_escape_sequences};
 use anyhow::Error;
-use content_inspector::{inspect, ContentType};
 use glob::Pattern;
 use indicatif::ProgressBar;
 use log::warn;
@@ -158,23 +158,19 @@ fn extract_information_from_content(
     if let Some(package_data) = try_parse_file(path) {
         file_info_builder.package_data(package_data);
         Ok(())
-    } else {
-        let content_type = inspect(&buffer);
-        if content_type == ContentType::UTF_8 || content_type == ContentType::UTF_8_BOM {
-            let clean_buffer = strip_utf8_bom_bytes(&buffer);
-            let mut text_content = String::from_utf8_lossy(clean_buffer).into_owned();
-            if is_source(path) {
-                text_content = remove_verbatim_escape_sequences(&text_content);
-            }
-            extract_license_information(
-                file_info_builder,
-                text_content,
-                license_engine,
-                include_text,
-            )
-        } else {
-            Ok(())
+    } else if let Some(file_text) = extract_text_for_detection(&buffer, path) {
+        let mut text_content = file_text.text;
+        if is_source(path) {
+            text_content = remove_verbatim_escape_sequences(&text_content);
         }
+        extract_license_information(
+            file_info_builder,
+            text_content,
+            license_engine,
+            include_text,
+        )
+    } else {
+        Ok(())
     }
 }
 
