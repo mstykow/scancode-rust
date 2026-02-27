@@ -760,19 +760,28 @@ pub fn populate_detection_from_group(detection: &mut LicenseDetection, group: &D
         return;
     }
 
+    let log_category = analyze_detection(&group.matches, false);
+
+    let matches_for_expression = if log_category == DETECTION_LOG_UNKNOWN_INTRO_FOLLOWED_BY_MATCH {
+        filter_license_intros(&group.matches)
+    } else if log_category == DETECTION_LOG_UNKNOWN_REFERENCE_TO_LOCAL_FILE {
+        filter_license_intros_and_references(&group.matches)
+    } else {
+        group.matches.clone()
+    };
+
     detection.matches = group.matches.clone();
 
     let _score = compute_detection_score(&detection.matches);
 
-    if let Ok(expr) = determine_license_expression(&detection.matches) {
+    if let Ok(expr) = determine_license_expression(&matches_for_expression) {
         detection.license_expression = Some(expr.clone());
 
-        if let Ok(spdx_expr) = determine_spdx_expression(&detection.matches) {
+        if let Ok(spdx_expr) = determine_spdx_expression(&matches_for_expression) {
             detection.license_expression_spdx = Some(spdx_expr);
         }
     }
 
-    let log_category = analyze_detection(&detection.matches, false);
     detection.detection_log.push(log_category.to_string());
 
     detection.identifier = None;
