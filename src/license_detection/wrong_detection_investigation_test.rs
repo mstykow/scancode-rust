@@ -358,4 +358,207 @@ mod tests {
         //
         // This causes Rust to NOT merge matches that Python would merge.
     }
+
+    /// Investigation test for PLAN-085: gpl-2.0-plus_and_lgpl-2.1-plus_and_mpl-1.1.txt
+    ///
+    /// Python produces 2 detections:
+    /// 1. Rule 1: lines 2-13
+    /// 2. Rule 6: lines 25-37
+    ///
+    /// Rust produces 1 detection:
+    /// 1. Rule 18: lines 2-37 (broader rule that covers both sections)
+    #[test]
+    fn test_plan_085_gpl_lgpl_mpl_trace() {
+        let Some(engine) = get_engine() else { return };
+        let path = PathBuf::from("testdata/license-golden/datadriven/lic4/gpl-2.0-plus_and_lgpl-2.1-plus_and_mpl-1.1.txt");
+        let text = match std::fs::read_to_string(&path) {
+            Ok(t) => t,
+            Err(_) => return,
+        };
+
+        use crate::license_detection::aho_match::aho_match;
+        use crate::license_detection::match_refine::{
+            filter_contained_matches, filter_overlapping_matches, merge_overlapping_matches,
+            refine_matches,
+        };
+        use crate::license_detection::query::Query;
+
+        println!("\n========================================");
+        println!("PLAN-085: gpl-2.0-plus_and_lgpl-2.1-plus_and_mpl-1.1.txt");
+        println!("========================================");
+
+        let query = Query::new(&text, engine.index()).expect("Query creation should succeed");
+        let whole_run = query.whole_query_run();
+
+        // Phase 1: Aho-Corasick matching
+        let aho_matches = aho_match(engine.index(), &whole_run);
+        println!("\n--- Phase 1: Aho matches: {} ---", aho_matches.len());
+
+        // Filter for MPL/GPL/LGPL expression
+        let mpl_matches: Vec<_> = aho_matches
+            .iter()
+            .filter(|m| {
+                m.rule_identifier
+                    .contains("mpl-1.1_or_gpl-2.0-plus_or_lgpl-2.1-plus")
+            })
+            .collect();
+        println!("MPL/GPL/LGPL matches: {}", mpl_matches.len());
+        for m in &mpl_matches {
+            println!(
+                "  Rule: {}, lines: {}-{}, tokens: {}-{}, len: {}",
+                m.rule_identifier,
+                m.start_line,
+                m.end_line,
+                m.start_token,
+                m.end_token,
+                m.matched_length
+            );
+        }
+
+        // Step 2: After merge_overlapping_matches
+        println!("\n--- Step 2: After merge_overlapping_matches ---");
+        let merged = merge_overlapping_matches(&aho_matches);
+        let merged_mpl: Vec<_> = merged
+            .iter()
+            .filter(|m| {
+                m.rule_identifier
+                    .contains("mpl-1.1_or_gpl-2.0-plus_or_lgpl-2.1-plus")
+            })
+            .collect();
+        println!("MPL/GPL/LGPL matches: {}", merged_mpl.len());
+        for m in &merged_mpl {
+            println!(
+                "  Rule: {}, lines: {}-{}, tokens: {}-{}, len: {}",
+                m.rule_identifier,
+                m.start_line,
+                m.end_line,
+                m.start_token,
+                m.end_token,
+                m.matched_length
+            );
+        }
+
+        // Step 3: After filter_contained_matches
+        println!("\n--- Step 3: After filter_contained_matches ---");
+        let (kept, discarded) = filter_contained_matches(&merged);
+        let kept_mpl: Vec<_> = kept
+            .iter()
+            .filter(|m| {
+                m.rule_identifier
+                    .contains("mpl-1.1_or_gpl-2.0-plus_or_lgpl-2.1-plus")
+            })
+            .collect();
+        let disc_mpl: Vec<_> = discarded
+            .iter()
+            .filter(|m| {
+                m.rule_identifier
+                    .contains("mpl-1.1_or_gpl-2.0-plus_or_lgpl-2.1-plus")
+            })
+            .collect();
+        println!("Kept MPL/GPL/LGPL matches: {}", kept_mpl.len());
+        for m in &kept_mpl {
+            println!(
+                "  Rule: {}, lines: {}-{}, tokens: {}-{}, len: {}",
+                m.rule_identifier,
+                m.start_line,
+                m.end_line,
+                m.start_token,
+                m.end_token,
+                m.matched_length
+            );
+        }
+        println!("Discarded MPL/GPL/LGPL matches: {}", disc_mpl.len());
+        for m in &disc_mpl {
+            println!(
+                "  Rule: {}, lines: {}-{}, tokens: {}-{}, len: {}",
+                m.rule_identifier,
+                m.start_line,
+                m.end_line,
+                m.start_token,
+                m.end_token,
+                m.matched_length
+            );
+        }
+
+        // Step 4: After filter_overlapping_matches
+        println!("\n--- Step 4: After filter_overlapping_matches ---");
+        let (kept2, discarded2) = filter_overlapping_matches(kept, engine.index());
+        let kept2_mpl: Vec<_> = kept2
+            .iter()
+            .filter(|m| {
+                m.rule_identifier
+                    .contains("mpl-1.1_or_gpl-2.0-plus_or_lgpl-2.1-plus")
+            })
+            .collect();
+        println!("Kept MPL/GPL/LGPL matches: {}", kept2_mpl.len());
+        for m in &kept2_mpl {
+            println!(
+                "  Rule: {}, lines: {}-{}, tokens: {}-{}, len: {}",
+                m.rule_identifier,
+                m.start_line,
+                m.end_line,
+                m.start_token,
+                m.end_token,
+                m.matched_length
+            );
+        }
+
+        // Step 5: Final refinement
+        println!("\n--- Step 5: After full refine_matches ---");
+        let refined = refine_matches(engine.index(), aho_matches.clone(), &query);
+        let refined_mpl: Vec<_> = refined
+            .iter()
+            .filter(|m| {
+                m.rule_identifier
+                    .contains("mpl-1.1_or_gpl-2.0-plus_or_lgpl-2.1-plus")
+            })
+            .collect();
+        println!("Final MPL/GPL/LGPL matches: {}", refined_mpl.len());
+        for m in &refined_mpl {
+            println!(
+                "  Rule: {}, lines: {}-{}, tokens: {}-{}, len: {}",
+                m.rule_identifier,
+                m.start_line,
+                m.end_line,
+                m.start_token,
+                m.end_token,
+                m.matched_length
+            );
+        }
+
+        // Expected: 2 matches (rules 1 and 6 at different locations)
+        // Actual: 1 match (rule 18 covering everything)
+    }
+
+    /// Check if seq matches override the correct aho matches
+    #[test]
+    fn test_plan_085_full_detection() {
+        let Some(engine) = get_engine() else { return };
+        let path = PathBuf::from("testdata/license-golden/datadriven/lic4/gpl-2.0-plus_and_lgpl-2.1-plus_and_mpl-1.1.txt");
+        let text = match std::fs::read_to_string(&path) {
+            Ok(t) => t,
+            Err(_) => return,
+        };
+
+        use crate::license_detection::LicenseDetectionEngine;
+
+        println!("\n========================================");
+        println!("PLAN-085: Full Detection");
+        println!("========================================");
+
+        let detections = engine
+            .detect(&text, false)
+            .expect("Detection should succeed");
+        println!("Total detections: {}", detections.len());
+
+        for d in &detections {
+            println!("\nDetection: {:?}", d.license_expression);
+            for m in &d.matches {
+                println!(
+                    "  Match: {} lines {}-{}, matcher={}, rule={}",
+                    m.license_expression, m.start_line, m.end_line, m.matcher, m.rule_identifier
+                );
+            }
+        }
+    }
 }

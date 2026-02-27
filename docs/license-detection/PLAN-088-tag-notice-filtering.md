@@ -1,6 +1,22 @@
 # PLAN-088: Tag Matches Filtered When Contained by Notice Matches
 
-## Status: INVESTIGATION COMPLETE - FIX REQUIRED
+## Status: ROOT CAUSE IS MATCH GENERATION, NOT FILTERING
+
+**Previous fix was WRONG**: The proposed fix (preserve different expressions in containment filtering) would break Python parity.
+
+**Validation findings**:
+- Python's `filter_contained_matches` does NOT check license expression
+- Python's test `test_filter_contained_matches...if_licenses_are_different` shows matches ARE filtered when they have different licenses
+- The real issue is that Rust and Python match DIFFERENT rules
+
+**Root cause**:
+- Python matches: `lgpl-2.1` (tag) + `lgpl-2.1` (tag) + `lgpl-2.1-plus` (notice) = 3 matches
+- Rust matches: `lgpl-2.1-plus_114.RULE` (combined tag+notice) = 1 match
+
+**Next investigation needed**:
+- Why does Rust's sequence matcher prefer the combined rule?
+- Check candidate scoring for tag rules vs combined rules
+- May need to adjust seq matching to prefer narrower rules
 
 ## Problem Statement
 
@@ -10,139 +26,141 @@
 |-------------------|---------------|
 | 15 matches | 14 matches |
 
-**Critical difference at lines 92-109**:
+**Critical difference at lines 88-109**:
 
 ```
-92:  LGPL 2.1
-93:  
-94:  LGPL-2.1
-95:  
-96:  Copyright <year>  <name of author> <e-mail>
-...  (LGPL notice text)
-109: License along with this library.  If not, see <http://www.gnu.org/licenses/>.
+Line 88: (empty)
+Line 89: You should have received a copy of the GNU General Public License
+Line 90: along with this program.  If not, see <http://www.gnu.org/licenses/>.
+Line 91: (empty)
+Line 92: LGPL 2.1
+Line 93: (empty)
+Line 94: LGPL-2.1
+Line 95: (empty)
+Line 96-109: LGPL notice text
 ```
 
 ### Expected Behavior (Python)
 
-Python produces **3 separate matches**:
-1. `lgpl-2.1` at line 92 - tag match ("LGPL 2.1")
-2. `lgpl-2.1` at line 94 - tag match ("LGPL-2.1")
-3. `lgpl-2.1-plus` at lines 96-109 - notice match
+Python produces **3 separate matches** for this region:
+1. `lgpl-2.1` at lines 90-92, rule=lgpl-2.1_72.RULE (matches URL in line 90)
+2. `lgpl-2.1` at line 94, rule=lgpl-2.1_85.RULE (matches "lgpl 2.1")
+3. `lgpl-2.1-plus` at lines 98-109, rule=lgpl-2.1-plus_36.RULE (matches notice text)
 
 ### Actual Behavior (Rust)
 
-Rust produces **1 match**:
-- `lgpl-2.1-plus` at lines 92-109 - covers everything
-
-The tag matches for `lgpl-2.1` are being filtered as "contained" by the larger `lgpl-2.1-plus` match.
+Rust produces **1 match** for this region:
+- `lgpl-2.1-plus` at lines 92-109, rule=lgpl-2.1-plus_114.RULE (matches tags + notice combined)
 
 ## Root Cause Analysis
 
-### Key Rules Involved
+### Key Discovery: Different Rules Being Matched
 
-1. **`lgpl-2.1-plus_114.RULE`** - Notice rule
-   - Expression: `lgpl-2.1-plus`
-   - `is_license_notice: yes`
-   - `minimum_coverage: 50`
-   - Text includes BOTH the tags ("LGPL 2.1", "LGPL-2.1") AND the notice text
+The root cause is **NOT** filter_contained_matches behavior. The root cause is that **Rust and Python are matching different rules**:
 
-2. **Tag rules for `lgpl-2.1`** (e.g., `lgpl-2.1_115.RULE`, etc.)
-   - Expression: `lgpl-2.1`
-   - `is_license_tag: yes`
-   - Match short identifiers like "License: LGPL 2.1"
+| System | Rule Used | Text Coverage |
+|--------|-----------|---------------|
+| Python | `lgpl-2.1-plus_36.RULE` | Notice text only (lines 98-109) |
+| Rust | `lgpl-2.1-plus_114.RULE` | Tags + Notice text (lines 92-109) |
 
-### Why This Happens
+### Rule File Comparison
 
-The `lgpl-2.1-plus_114.RULE` has `minimum_coverage: 50`, meaning it only needs to match 50% of its rule text. The rule text includes the tag lines at the beginning, so:
+**lgpl-2.1-plus_36.RULE** (Python uses this):
+```yaml
+license_expression: lgpl-2.1-plus
+is_license_notice: yes
+---
+This library is free software; you can redistribute it and/or modify
+it under the terms of the {{GNU Lesser General Public License as published
+by the Free Software Foundation; either version 2.1 of the License, or
+(at your option) any later version}}.
+...
+```
 
-1. **Sequence matching** finds a match for `lgpl-2.1-plus` starting at line 92
-2. The match spans lines 92-109 (including both tags AND notice)
-3. **Aho matching** also finds separate tag matches at lines 92 and 94
-4. **`filter_contained_matches()`** discards the tag matches because they are spatially contained within the larger `lgpl-2.1-plus` match
+**lgpl-2.1-plus_114.RULE** (Rust uses this):
+```yaml
+license_expression: lgpl-2.1-plus
+is_license_notice: yes
+minimum_coverage: 50
+---
+LGPL 2.1
 
-### Python's Different Behavior
+LGPL-2.1
 
-Python also has the same filtering logic, but Python produces 3 matches. The key insight from test `test_filter_contained_matches_matches_does_filter_matches_with_contained_spans_if_licenses_are_different`:
+This library is free software; you can redistribute it and/or
+modify it under the terms of the {{GNU Lesser General Public
+...
+```
 
+### Why Python Doesn't Match lgpl-2.1-plus_114.RULE
+
+The `lgpl-2.1-plus_114.RULE` has `minimum_coverage: 50`, meaning it only needs 50% match coverage. However:
+
+1. Python's sequence matcher may score this rule lower than the separate tag matches + notice match
+2. Python may prefer the combination of:
+   - Tag match (`lgpl-2.1_85.RULE` matches "lgpl 2.1")
+   - URL reference match (`lgpl-2.1_72.RULE` matches URL)
+   - Notice match (`lgpl-2.1-plus_36.RULE` matches notice)
+3. After `filter_contained_matches()`, Python keeps these separate matches because they have different license expressions
+
+### Why Rust Prefers lgpl-2.1-plus_114.RULE
+
+Rust's sequence matcher is finding `lgpl-2.1-plus_114.RULE` as a better match because:
+1. It matches both the tags AND the notice in one rule
+2. The `minimum_coverage: 50` allows partial matching
+3. Rust's scoring may favor this comprehensive rule over separate smaller matches
+
+### Python's filter_contained_matches Test Analysis
+
+From `test_filter_contained_matches_matches_does_filter_matches_with_contained_spans_if_licenses_are_different`:
 ```python
-def test_filter_contained_matches_matches_does_filter_matches_with_contained_spans_if_licenses_are_different(self):
-    r1 = create_rule_from_text_and_expression(license_expression='apache-2.0')
-    m1 = LicenseMatch(rule=r1, qspan=Span(0, 2), ispan=Span(0, 2))
-
-    r2 = create_rule_from_text_and_expression(license_expression='apache-2.0')
-    m2 = LicenseMatch(rule=r2, qspan=Span(1, 6), ispan=Span(1, 6))
-
-    r3 = create_rule_from_text_and_expression(license_expression='apache-1.1')  # DIFFERENT LICENSE
-    m3 = LicenseMatch(rule=r3, qspan=Span(0, 2), ispan=Span(0, 2))
-
-    matches, discarded = filter_contained_matches([m1, m2, m3])
-    assert matches == [m1, m2]  # m3 is kept because license differs from m1
+# m1: apache-2.0, Span(0, 2)
+# m2: apache-2.0, Span(1, 6)  
+# m3: apache-1.1, Span(0, 2) - DIFFERENT LICENSE
+assert matches == [m1, m2]  # m3 IS kept because different license
 ```
 
-**Key insight**: When a contained match has a **different license expression** than the containing match, Python keeps both.
+**Key insight**: The test name is misleading. Python DOES keep matches with different license expressions even when spatially contained!
 
-In our case:
-- Tag matches: `lgpl-2.1` (different expression)
-- Notice match: `lgpl-2.1-plus` (different expression)
-- Therefore, both should be kept!
-
-### The Bug in Rust
-
-The Rust `filter_contained_matches()` implementation at `src/license_detection/match_refine.rs:362-419`:
-
-```rust
-if current.qcontains(&next) {
-    discarded.push(matches.remove(j));
-    continue;
-}
-```
-
-This unconditionally discards contained matches without checking if the license expressions differ.
+However, in our case, Python doesn't even generate the lgpl-2.1-plus_114.RULE match, so containment filtering isn't the issue.
 
 ## Implementation Plan
 
-### Phase 1: Verify the Hypothesis
+### Phase 1: Verify Rust Match Generation
 
-**Task 1.1**: Add debug output to confirm Rust is generating tag matches
-
-Create a test to verify that tag matches ARE being generated initially but are being filtered:
+**Task 1.1**: Create test to see what matches Rust generates before filtering
 
 ```rust
-// In src/license_detection/missing_detection_investigation_test.rs or new file
 #[test]
-fn test_lgpl_tag_matches_generated_before_filtering() {
-    // Run detection with detailed logging
-    // Verify that lgpl-2.1 tag matches appear BEFORE filter_contained_matches
-    // Verify that they are DISCARDED by filter_contained_matches
+fn test_kde_licenses_lgpl_region_matches() {
+    // Run detection pipeline step-by-step
+    // Print ALL matches before filter_contained_matches
+    // Check if lgpl-2.1 tag matches are generated
+    // Check if lgpl-2.1-plus_114.RULE match is generated
 }
 ```
 
-**Files to modify**:
-- `src/license_detection/match_refine.rs` - Add temporary debug logging
+**Task 1.2**: Determine if the issue is:
+- Rust not generating the tag matches at all, OR
+- Rust generating lgpl-2.1-plus_114.RULE which swallows everything, OR
+- filter_contained_matches filtering the tag matches
 
-**Task 1.2**: Compare Python and Rust filtering side-by-side
+### Phase 2: Two Possible Fixes
 
-Run both implementations with trace logging enabled and compare the filtering decisions.
+#### Option A: Fix in filter_contained_matches (if tag matches are being filtered)
 
-### Phase 2: Implement the Fix
-
-**Task 2.1**: Modify `filter_contained_matches()` to preserve matches with different expressions
-
-Location: `src/license_detection/match_refine.rs:362-419`
-
-The fix: When a match is contained by another, check if their license expressions differ. If they differ, KEEP both matches.
+If Rust IS generating tag matches but they're being filtered, modify `filter_contained_matches()` at lines 403-411:
 
 ```rust
-// Current code (line 403-405):
+// Current code:
 if current.qcontains(&next) {
     discarded.push(matches.remove(j));
     continue;
 }
 
-// Fixed code:
+// Fixed code - preserve matches with different license expressions:
 if current.qcontains(&next) {
-    // Preserve matches with different license expressions
-    if !current.license_expression.eq_ignore_ascii_case(&next.license_expression) {
+    if current.license_expression != next.license_expression {
         j += 1;
         continue;  // Keep both matches
     }
@@ -151,119 +169,37 @@ if current.qcontains(&next) {
 }
 ```
 
-Apply the same logic to the reverse case (lines 407-411):
+**Note**: This fix matches Python's behavior as shown in the test case.
 
-```rust
-if next.qcontains(&current) {
-    // Preserve matches with different license expressions
-    if !current.license_expression.eq_ignore_ascii_case(&next.license_expression) {
-        j += 1;
-        continue;  // Keep both matches
-    }
-    discarded.push(matches.remove(i));
-    i = i.saturating_sub(1);
-    break;
-}
-```
+#### Option B: Fix in sequence matching (if wrong rule is being matched)
 
-**Task 2.2**: Add unit tests for the new behavior
+If Rust is preferring `lgpl-2.1-plus_114.RULE` over separate tag + notice matches:
 
-Add tests to `src/license_detection/match_refine.rs` in the `#[cfg(test)]` module:
+1. **Investigate scoring**: Check if Rust's seq matcher scores should prefer separate matches
+2. **Rule prioritization**: Consider if `minimum_coverage: 50` rules should be deprioritized
+3. **Match combination**: Consider if multiple smaller matches should be preferred over one comprehensive match
 
-```rust
-#[test]
-fn test_filter_contained_preserves_different_license_expressions() {
-    // Contained match with different expression should be kept
-    let mut m1 = create_test_match_with_tokens("rule1", 0, 10, 10);
-    m1.license_expression = "lgpl-2.1-plus".to_string();
-    
-    let mut m2 = create_test_match_with_tokens("rule2", 2, 4, 2);
-    m2.license_expression = "lgpl-2.1".to_string();  // Different expression
-    
-    let (kept, discarded) = filter_contained_matches(&[m1.clone(), m2.clone()]);
-    
-    assert_eq!(kept.len(), 2, "Both matches should be kept with different expressions");
-    assert!(discarded.is_empty());
-}
+### Phase 3: Verification
 
-#[test]
-fn test_filter_contained_filters_same_license_expressions() {
-    // Contained match with same expression should be filtered
-    let m1 = create_test_match_with_tokens("rule1", 0, 10, 10);
-    let m2 = create_test_match_with_tokens("rule2", 2, 4, 2);
-    // Both have default "mit" expression
-    
-    let (kept, discarded) = filter_contained_matches(&[m1, m2]);
-    
-    assert_eq!(kept.len(), 1, "Only larger match should be kept with same expression");
-    assert_eq!(discarded.len(), 1);
-}
-```
-
-### Phase 3: Verify the Fix
-
-**Task 3.1**: Run the golden test
-
+**Task 3.1**: Run golden test
 ```bash
-cargo test license_detection_golden --lib -- --test-threads=1 2>&1 | grep -A5 "kde_licenses"
+cargo test kde_licenses --lib -- --nocapture
 ```
 
 **Task 3.2**: Run all license detection tests
-
 ```bash
 cargo test --lib license_detection
 ```
 
-**Task 3.3**: Run the full test suite
+### Phase 4: Edge Cases
 
-```bash
-cargo test
-```
+**Task 4.1**: Check expression subsumption
 
-### Phase 4: Consider Edge Cases
+The expressions `lgpl-2.1` and `lgpl-2.1-plus` are related:
+- `lgpl-2.1-plus` includes `lgpl-2.1` as a possibility (version 2.1 or later)
+- Should matches with subsumed expressions still be preserved?
 
-**Task 4.1**: Check for expression subsumption
-
-Python may also consider whether one expression "subsumes" another (e.g., `lgpl-2.1-plus` vs `lgpl-2.1`). The `lgpl-2.1-plus` expression technically includes `lgpl-2.1` as a possibility.
-
-**Investigation needed**: Check Python's `is_equivalent` or `subsumes` logic:
-
-```bash
-grep -r "subsumes\|is_equivalent" reference/scancode-toolkit/src/licensedcode/
-```
-
-If subsumption is considered, the fix may need to be more nuanced:
-
-```rust
-// Possible enhancement: consider expression relationships
-fn expressions_are_related(expr1: &str, expr2: &str) -> bool {
-    // lgpl-2.1-plus subsumes lgpl-2.1
-    // apache-2.0 is unrelated to mit
-    // etc.
-}
-```
-
-**Task 4.2**: Check for tag vs notice distinction
-
-Should `is_license_tag` matches ALWAYS be preserved even when contained? This would be a simpler fix but may have unintended consequences.
-
-From Python code at `match.py:1957-1960`:
-```python
-# Matches to license tag are special and can be scattered on a few
-# extra lines.
-if rule.is_license_tag:
-    matched_len += 2
-```
-
-This shows Python gives special treatment to tag matches in some contexts.
-
-**Task 4.3**: Test with other similar cases
-
-Search for other test files that might have similar tag+notice patterns:
-
-```bash
-grep -r "LGPL.*2.1" testdata/license-golden/datadriven/ | head -20
-```
+Python test shows it preserves `apache-2.0` and `apache-1.1` (different licenses), so it should also preserve `lgpl-2.1` and `lgpl-2.1-plus` (different expressions).
 
 ## Files to Modify
 
@@ -281,17 +217,17 @@ grep -r "LGPL.*2.1" testdata/license-golden/datadriven/ | head -20
 
 ## Risk Assessment
 
-**Low Risk**: The fix is localized to `filter_contained_matches()` and adds a simple condition check. The behavior matches Python's documented test cases.
+**Low Risk**: The fix in `filter_contained_matches()` is a simple condition check. Python's test explicitly shows this behavior is expected.
 
 **Potential Impact**: Other golden tests may see additional matches now that contained matches with different expressions are preserved. This is expected and correct behavior.
 
 ## Timeline
 
 - Phase 1 (Verification): 1 hour
-- Phase 2 (Implementation): 2 hours
+- Phase 2 (Implementation): 2 hours  
 - Phase 3 (Testing): 1 hour
-- Phase 4 (Edge Cases): 2 hours
-- **Total**: ~6 hours
+- Phase 4 (Edge Cases): 1 hour
+- **Total**: ~5 hours
 
 ## References
 
@@ -299,3 +235,13 @@ grep -r "LGPL.*2.1" testdata/license-golden/datadriven/ | head -20
 - Python code: `reference/scancode-toolkit/src/licensedcode/match.py:1075-1184`
 - Rust code: `src/license_detection/match_refine.rs:362-419`
 - Related: PLAN-088-kde-licenses-test.md (initial analysis)
+
+## Appendix: Python Reference Output
+
+```
+lgpl-2.1: lines=90-92, rule=lgpl-2.1_72.RULE
+lgpl-2.1: lines=94-94, rule=lgpl-2.1_85.RULE
+lgpl-2.1-plus: lines=98-109, rule=lgpl-2.1-plus_36.RULE
+```
+
+Note: Python matches `lgpl-2.1_72.RULE` which matches a URL in the file (line 90 has `http://www.gnu.org/licenses/lgpl-2.1`), not the text "LGPL 2.1" on line 92.

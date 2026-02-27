@@ -1,6 +1,6 @@
 # PLAN-085: gpl-2.0-plus_and_lgpl-2.1-plus_and_mpl-1.1.txt Investigation
 
-## Status: IMPLEMENTATION PLAN
+## Status: RESOLVED
 
 ## Problem Statement
 
@@ -8,9 +8,9 @@
 
 | Expected (Python) | Actual (Rust) |
 |-------------------|---------------|
-| `["mpl-1.1 OR gpl-2.0-plus OR lgpl-2.1-plus", "mpl-1.1 OR gpl-2.0-plus OR lgpl-2.1-plus"]` (2) | `["mpl-1.1 OR gpl-2.0-plus OR lgpl-2.1-plus"]` (1) |
+| `["mpl-1.1 OR gpl-2.0-plus OR lgpl-2.1-plus", "mpl-1.1 OR gpl-2.0-plus OR lgpl-2.1-plus"]` (2) | `["mpl-1.1 OR gpl-2.0-plus OR lgpl-2.1-plus", "mpl-1.1 OR gpl-2.0-plus OR lgpl-2.1-plus"]` (2) |
 
-**Issue**: Missing one detection with same expression.
+**Issue**: ~~Missing one detection with same expression~~ **RESOLVED** - Rust now produces correct output.
 
 ## Root Cause Analysis
 
@@ -33,13 +33,47 @@ Python produces **2 separate detections** with different rules:
 
 ### Rust Behavior
 
-Rust produces **1 detection**:
+~~Rust produces **1 detection**:~~
+
+**UPDATE (2026-02-27): Rust now produces **2 detections** (CORRECT):**
 
 | Detection | Lines | Rule | Matcher | Score | Coverage |
 |-----------|-------|------|---------|-------|----------|
-| 1 | 2-37 | `mpl-1.1_or_gpl-2.0-plus_or_lgpl-2.1-plus_18.RULE` | 3-seq | 92.0 | 91.8% |
+| 1 | 2-13 | `mpl-1.1_or_gpl-2.0-plus_or_lgpl-2.1-plus_1.RULE` | 2-aho | 100.0 | 100.0% |
+| 2 | 25-37 | `mpl-1.1_or_gpl-2.0-plus_or_lgpl-2.1-plus_6.RULE` | 2-aho | 100.0 | 100.0% |
 
-### Key Differences
+### Investigation Findings (2026-02-27)
+
+The investigation traced the match filtering pipeline step by step:
+
+1. **Aho Matches**: Rust produces 4 MPL/GPL/LGPL matches:
+   - Rule 1: lines 2-13 (len=90) ✓
+   - Rule 6: lines 25-37 (len=154) ✓
+   - Rule 10: lines 3-3 (len=10) - contained in rule 1
+   - Rule 15: lines 25-35 (len=151) - contained in rule 6
+
+2. **After merge_overlapping_matches**: 4 matches (no merging needed - different rules)
+
+3. **After filter_contained_matches**: 2 matches kept
+   - Rule 1 (lines 2-13) ✓
+   - Rule 6 (lines 25-37) ✓
+   - Rule 10 and Rule 15 were correctly discarded as contained matches
+
+4. **After filter_overlapping_matches**: 2 matches (no overlap between different locations)
+
+5. **Final Result**: 2 detections with correct rules and locations
+
+### Conclusion
+
+**The issue is RESOLVED.** Rust now correctly produces 2 detections matching Python's output.
+
+The original issue was likely fixed by earlier improvements to the match refinement pipeline. The investigation test `test_plan_085_gpl_lgpl_mpl_trace` and `test_plan_085_full_detection` in `src/license_detection/wrong_detection_investigation_test.rs` confirm the correct behavior.
+
+---
+
+## Historical Analysis (Preserved for Reference)
+
+### Key Differences (Original Problem Description)
 
 1. **Matcher Type**: Python uses `2-aho` (Aho-Corasick exact match), Rust uses `3-seq` (sequence match)
 2. **Rule Selection**: Python matches narrower rules (1 and 6), Rust matches broader rule (18)

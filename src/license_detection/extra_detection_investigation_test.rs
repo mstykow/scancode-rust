@@ -10,6 +10,7 @@ mod tests {
     use crate::license_detection::match_refine::{
         filter_contained_matches, filter_false_positive_license_lists_matches,
         filter_overlapping_matches, merge_overlapping_matches, refine_matches,
+        refine_matches_without_false_positive_filter, split_weak_matches,
     };
     use crate::license_detection::models::LicenseMatch;
     use crate::license_detection::query::Query;
@@ -1480,5 +1481,1079 @@ mod tests {
         eprintln!("  lines=57-61: gpl-2.0-plus");
         eprintln!("  lines=65-69: gpl-2.0-plus");
         eprintln!("  lines=71-74: lgpl-2.1 AND gpl-2.0 AND gpl-3.0");
+    }
+
+    #[test]
+    fn test_plan_083_debug_aho_matching() {
+        let Some(engine) = ensure_engine() else {
+            eprintln!("Skipping test: reference directory not found");
+            return;
+        };
+
+        let path = PathBuf::from("testdata/license-golden/datadriven/lic4/gpl-2.0-plus_and_gpl-2.0-plus_and_gpl-3.0-plus_and_lgpl-2.1-plus_and_other.txt");
+        let Some(text) = std::fs::read_to_string(&path).ok() else {
+            eprintln!("Skipping test: test file not found");
+            return;
+        };
+
+        eprintln!("\n=== PLAN-083 Aho Debug ===");
+
+        let query = Query::new(&text, &engine.index).expect("Query should be created");
+
+        eprintln!("\nQuery token count: {}", query.tokens.len());
+        eprintln!("\n=== Lines 13-17 (expected match location) ===");
+        eprintln!(
+            "Text at lines 13-17:\n{}",
+            text.lines().skip(12).take(5).collect::<Vec<_>>().join("\n")
+        );
+
+        let target_rule = "lgpl-2.1-plus_24.RULE";
+        let rid_24 = engine
+            .index
+            .rules_by_rid
+            .iter()
+            .position(|r| r.identifier == target_rule)
+            .expect("Rule should exist");
+        let rule_tokens_24 = &engine.index.tids_by_rid[rid_24];
+
+        eprintln!("\n=== Rule {} ===", target_rule);
+        eprintln!("Token count: {}", rule_tokens_24.len());
+        eprintln!("First 10 token IDs: {:?}", &rule_tokens_24[..10]);
+
+        eprintln!("\n=== Query tokens around line 13 (positions 70-85) ===");
+        for i in 70..85.min(query.tokens.len()) {
+            let line = query.line_by_pos.get(i).copied().unwrap_or(0);
+            let tid = query.tokens[i];
+            eprintln!("  [{}] tid={} line={}", i, tid, line);
+        }
+
+        eprintln!("\n=== Query tokens around line 22 (positions 130-145) ===");
+        for i in 130..145.min(query.tokens.len()) {
+            let line = query.line_by_pos.get(i).copied().unwrap_or(0);
+            let tid = query.tokens[i];
+            eprintln!("  [{}] tid={} line={}", i, tid, line);
+        }
+
+        let encoded_query: Vec<u8> = query.tokens.iter().flat_map(|t| t.to_le_bytes()).collect();
+
+        eprintln!(
+            "\n=== All Aho matches for {} (RID {}) ===",
+            target_rule, rid_24
+        );
+        let mut found_24 = false;
+        for m in engine
+            .index
+            .rules_automaton
+            .find_overlapping_iter(&encoded_query)
+        {
+            let rid = engine.index.pattern_id_to_rid[m.pattern().as_usize()];
+            if rid == rid_24 {
+                found_24 = true;
+                let tok_start = m.start() / 2;
+                let tok_end = m.end() / 2;
+                let start_line = query.line_by_pos.get(tok_start).copied().unwrap_or(0);
+                let end_line = query
+                    .line_by_pos
+                    .get(tok_end.saturating_sub(1))
+                    .copied()
+                    .unwrap_or(0);
+                eprintln!(
+                    "  tokens={}-{} lines={}-{}",
+                    tok_start, tok_end, start_line, end_line
+                );
+            }
+        }
+        if !found_24 {
+            eprintln!("  NO MATCHES FOUND!");
+        }
+
+        eprintln!("\n=== All Aho matches in byte range 140-250 (token 70-125, around line 13) ===");
+        for m in engine
+            .index
+            .rules_automaton
+            .find_overlapping_iter(&encoded_query)
+        {
+            let byte_start = m.start();
+            if byte_start >= 140 && byte_start <= 250 {
+                let tok_start = byte_start / 2;
+                let tok_end = m.end() / 2;
+                let rid = engine.index.pattern_id_to_rid[m.pattern().as_usize()];
+                let rule = &engine.index.rules_by_rid[rid];
+                let start_line = query.line_by_pos.get(tok_start).copied().unwrap_or(0);
+                let end_line = query
+                    .line_by_pos
+                    .get(tok_end.saturating_sub(1))
+                    .copied()
+                    .unwrap_or(0);
+                eprintln!(
+                    "  bytes={}-{} tokens={}-{} lines={}-{} rule={} len={}",
+                    byte_start,
+                    m.end(),
+                    tok_start,
+                    tok_end,
+                    start_line,
+                    end_line,
+                    rule.identifier,
+                    engine.index.tids_by_rid[rid].len()
+                );
+            }
+        }
+
+        eprintln!("\n=== Compare rule tokens vs query tokens at position 72 ===");
+        let mut match_pos = 0;
+        for (i, &rule_tid) in rule_tokens_24.iter().enumerate() {
+            let pos = 72 + i;
+            if pos < query.tokens.len() {
+                let query_tid = query.tokens[pos];
+                if rule_tid == query_tid {
+                    match_pos += 1;
+                } else {
+                    eprintln!(
+                        "  MISMATCH at [{}]: rule_tid={} != query_tid={}",
+                        i, rule_tid, query_tid
+                    );
+                }
+            } else {
+                eprintln!("  Out of bounds at position {}", pos);
+                break;
+            }
+        }
+        eprintln!("Matched {} of {} tokens", match_pos, rule_tokens_24.len());
+    }
+
+    #[test]
+    fn test_plan_083_trace_pipeline() {
+        let Some(engine) = ensure_engine() else {
+            eprintln!("Skipping test: reference directory not found");
+            return;
+        };
+
+        let path = PathBuf::from("testdata/license-golden/datadriven/lic4/gpl-2.0-plus_and_gpl-2.0-plus_and_gpl-3.0-plus_and_lgpl-2.1-plus_and_other.txt");
+        let Some(text) = std::fs::read_to_string(&path).ok() else {
+            eprintln!("Skipping test: test file not found");
+            return;
+        };
+
+        eprintln!("\n=== PLAN-083 Pipeline Trace ===");
+
+        let index = &engine.index;
+        let query = Query::new(&text, index).expect("Query should be created");
+        let query_run = query.whole_query_run();
+
+        eprintln!("\n--- Step 1: Aho Match ---");
+        let aho_matches = aho_match(index, &query_run);
+        eprintln!("Total Aho matches: {}", aho_matches.len());
+
+        let target_rule = "lgpl-2.1-plus_24.RULE";
+        eprintln!("\nMatches for {}:", target_rule);
+        for m in &aho_matches {
+            if m.rule_identifier == target_rule {
+                eprintln!(
+                    "  lines={}-{} tokens={}-{} score={:.2}",
+                    m.start_line, m.end_line, m.start_token, m.end_token, m.score
+                );
+            }
+        }
+
+        eprintln!("\nAll Aho matches at lines 13-17:");
+        for m in &aho_matches {
+            if m.start_line >= 13 && m.start_line <= 17 {
+                eprintln!(
+                    "  lines={}-{} rule={} tokens={}-{} score={:.2}",
+                    m.start_line,
+                    m.end_line,
+                    m.rule_identifier,
+                    m.start_token,
+                    m.end_token,
+                    m.score
+                );
+            }
+        }
+
+        eprintln!("\n--- Step 2: After merge_overlapping_matches ---");
+        let merged = merge_overlapping_matches(&aho_matches);
+        eprintln!("Merged matches: {}", merged.len());
+        for m in &merged {
+            if m.start_line >= 13 && m.start_line <= 17 {
+                eprintln!(
+                    "  lines={}-{} rule={}",
+                    m.start_line, m.end_line, m.rule_identifier
+                );
+            }
+        }
+
+        eprintln!("\n--- Step 3: After filter_contained_matches ---");
+        let (kept, discarded) = filter_contained_matches(&merged);
+        eprintln!("Kept matches: {}", kept.len());
+        eprintln!("Discarded matches: {}", discarded.len());
+        for m in &kept {
+            if m.start_line >= 13 && m.start_line <= 26 {
+                eprintln!(
+                    "  lines={}-{} rule={}",
+                    m.start_line, m.end_line, m.rule_identifier
+                );
+            }
+        }
+
+        eprintln!("\n--- Matchables check for tokens 72-120 ---");
+        let matchables = query_run.matchables(true);
+        let mut non_matchable_count = 0;
+        for pos in 72..120 {
+            if !matchables.contains(&pos) {
+                non_matchable_count += 1;
+                let tid = query.tokens[pos];
+                eprintln!("  Position {} is NOT matchable (tid={})", pos, tid);
+            }
+        }
+        eprintln!("Non-matchable positions in range: {}", non_matchable_count);
+    }
+
+    #[test]
+    fn test_plan_087_ijg_containment() {
+        let Some(engine) = ensure_engine() else {
+            eprintln!("Skipping test: reference directory not found");
+            return;
+        };
+
+        let path = PathBuf::from("testdata/license-golden/datadriven/lic4/ijg.txt");
+        let Some(text) = std::fs::read_to_string(&path).ok() else {
+            eprintln!("Skipping test: test file not found");
+            return;
+        };
+
+        eprintln!("\n=== PLAN-087 ijg.txt Investigation ===");
+        eprintln!("Text length: {} bytes", text.len());
+
+        // Run the full detection
+        let detections = engine
+            .detect(&text, false)
+            .expect("Detection should succeed");
+
+        eprintln!("\n=== Full Detection Results ===");
+        eprintln!("Number of detections: {}", detections.len());
+        for (i, d) in detections.iter().enumerate() {
+            eprintln!("Detection[{}]: {:?}", i, d.license_expression);
+            for m in &d.matches {
+                eprintln!(
+                    "  Match: {} (rid={}, lines={}-{}, start_token={}, end_token={}, qspan={:?})",
+                    m.license_expression,
+                    m.rid,
+                    m.start_line,
+                    m.end_line,
+                    m.start_token,
+                    m.end_token,
+                    m.qspan_positions.as_ref().map(|p| (p.first(), p.last()))
+                );
+            }
+        }
+
+        // Now trace through the pipeline manually
+        use crate::license_detection::aho_match::aho_match;
+        use crate::license_detection::hash_match::hash_match;
+        use crate::license_detection::match_refine::{
+            filter_contained_matches, merge_overlapping_matches, refine_matches,
+            refine_matches_without_false_positive_filter,
+        };
+        use crate::license_detection::query::Query;
+        use crate::license_detection::seq_match::{
+            compute_candidates_with_msets, seq_match_with_candidates, MAX_NEAR_DUPE_CANDIDATES,
+        };
+        use crate::license_detection::spdx_lid::spdx_lid_match;
+
+        let index = &engine.index;
+        let query = Query::new(&text, index).expect("Query should be created");
+        let query_run = query.whole_query_run();
+
+        eprintln!("\n=== Step 1: Hash Match ===");
+        let hash_matches = hash_match(index, &query_run);
+        eprintln!("Hash matches: {}", hash_matches.len());
+
+        eprintln!("\n=== Step 2: SPDX-LID Match ===");
+        let spdx_matches = spdx_lid_match(index, &query);
+        eprintln!("SPDX-LID matches: {}", spdx_matches.len());
+        for m in &spdx_matches {
+            eprintln!(
+                "  {} (rid={}, lines={}-{}, tokens={}-{}, matcher={}, coverage={:.1}%)",
+                m.license_expression,
+                m.rid,
+                m.start_line,
+                m.end_line,
+                m.start_token,
+                m.end_token,
+                m.matcher,
+                m.match_coverage
+            );
+        }
+
+        eprintln!("\n=== Step 3: Aho Match ===");
+        let aho_matches = aho_match(index, &query_run);
+        eprintln!("Total Aho matches: {}", aho_matches.len());
+        for m in &aho_matches {
+            eprintln!(
+                "  {} (rid={}, lines={}-{}, tokens={}-{}, matcher={}, coverage={:.1}%, qspan={:?})",
+                m.license_expression,
+                m.rid,
+                m.start_line,
+                m.end_line,
+                m.start_token,
+                m.end_token,
+                m.matcher,
+                m.match_coverage,
+                m.qspan_positions.as_ref().map(|p| p.len())
+            );
+        }
+
+        eprintln!("\n=== Step 3: Merge Aho Matches ===");
+        let merged_aho = merge_overlapping_matches(&aho_matches);
+        eprintln!("Merged Aho matches: {}", merged_aho.len());
+        for m in &merged_aho {
+            eprintln!(
+                "  {} (rid={}, lines={}-{}, tokens={}-{}, coverage={:.1}%, qspan={:?})",
+                m.license_expression,
+                m.rid,
+                m.start_line,
+                m.end_line,
+                m.start_token,
+                m.end_token,
+                m.match_coverage,
+                m.qspan_positions
+                    .as_ref()
+                    .map(|p| (p.len(), p.first(), p.last()))
+            );
+        }
+
+        eprintln!("\n=== Step 4: Merge SPDX-LID matches ===");
+        let merged_spdx = merge_overlapping_matches(&spdx_matches);
+        eprintln!("Merged SPDX-LID matches: {}", merged_spdx.len());
+        for m in &merged_spdx {
+            eprintln!(
+                "  {} (rid={}, lines={}-{}, tokens={}-{}, coverage={:.1}%)",
+                m.license_expression,
+                m.rid,
+                m.start_line,
+                m.end_line,
+                m.start_token,
+                m.end_token,
+                m.match_coverage
+            );
+        }
+
+        eprintln!("\n=== Step 5: Near-dupe candidates ===");
+        let near_dupe_candidates =
+            compute_candidates_with_msets(index, &query_run, true, MAX_NEAR_DUPE_CANDIDATES);
+        eprintln!("Near-dupe candidates: {}", near_dupe_candidates.len());
+        for c in &near_dupe_candidates {
+            let rule = &index.rules_by_rid[c.rid];
+            eprintln!(
+                "  {} (rid={}, resemblance={:.3})",
+                rule.identifier, c.rid, c.score_vec_full.resemblance
+            );
+        }
+
+        eprintln!("\n=== Step 5: Seq Match with Near-dupe Candidates ===");
+        let near_dupe_matches = seq_match_with_candidates(index, &query_run, &near_dupe_candidates);
+        eprintln!("Near-dupe matches: {}", near_dupe_matches.len());
+        for m in &near_dupe_matches {
+            eprintln!(
+                "  {} (rid={}, lines={}-{}, tokens={}-{}, coverage={:.1}%, qspan={:?})",
+                m.license_expression,
+                m.rid,
+                m.start_line,
+                m.end_line,
+                m.start_token,
+                m.end_token,
+                m.match_coverage,
+                m.qspan_positions
+                    .as_ref()
+                    .map(|p| (p.len(), p.first(), p.last()))
+            );
+        }
+
+        eprintln!("\n=== Step 6: Merge All Matches ===");
+        let mut all_matches = merged_spdx.clone();
+        all_matches.extend(merged_aho.clone());
+        all_matches.extend(near_dupe_matches.clone());
+        let merged_all = merge_overlapping_matches(&all_matches);
+        eprintln!("Total merged matches: {}", merged_all.len());
+        for m in &merged_all {
+            eprintln!(
+                "  {} (rid={}, lines={}-{}, tokens={}-{}, coverage={:.1}%, qspan={:?})",
+                m.license_expression,
+                m.rid,
+                m.start_line,
+                m.end_line,
+                m.start_token,
+                m.end_token,
+                m.match_coverage,
+                m.qspan_positions
+                    .as_ref()
+                    .map(|p| (p.len(), p.first(), p.last()))
+            );
+        }
+
+        eprintln!("\n=== Step 7: Refine without FP filter ===");
+        let refined =
+            refine_matches_without_false_positive_filter(index, all_matches.clone(), &query);
+        eprintln!("Refined matches: {}", refined.len());
+        for m in &refined {
+            eprintln!(
+                "  {} (rid={}, lines={}-{}, tokens={}-{}, coverage={:.1}%, qspan={:?})",
+                m.license_expression,
+                m.rid,
+                m.start_line,
+                m.end_line,
+                m.start_token,
+                m.end_token,
+                m.match_coverage,
+                m.qspan_positions
+                    .as_ref()
+                    .map(|p| (p.len(), p.first(), p.last()))
+            );
+        }
+
+        eprintln!("\n=== Step 8: Filter Contained Matches ===");
+        let (kept, discarded) = filter_contained_matches(&refined);
+        eprintln!("Kept: {}", kept.len());
+        for m in &kept {
+            eprintln!(
+                "  {} (rid={}, lines={}-{}, tokens={}-{}, coverage={:.1}%, qspan={:?})",
+                m.license_expression,
+                m.rid,
+                m.start_line,
+                m.end_line,
+                m.start_token,
+                m.end_token,
+                m.match_coverage,
+                m.qspan_positions
+                    .as_ref()
+                    .map(|p| (p.len(), p.first(), p.last()))
+            );
+        }
+        eprintln!("Discarded: {}", discarded.len());
+        for m in &discarded {
+            eprintln!(
+                "  {} (rid={}, lines={}-{}, tokens={}-{}, coverage={:.1}%, qspan={:?})",
+                m.license_expression,
+                m.rid,
+                m.start_line,
+                m.end_line,
+                m.start_token,
+                m.end_token,
+                m.match_coverage,
+                m.qspan_positions
+                    .as_ref()
+                    .map(|p| (p.len(), p.first(), p.last()))
+            );
+        }
+
+        // Check if warranty-disclaimer is contained by ijg
+        let ijg_match = merged_all.iter().find(|m| m.license_expression == "ijg");
+        let warranty_match = refined
+            .iter()
+            .find(|m| m.license_expression == "warranty-disclaimer");
+
+        if let (Some(ijg), Some(warranty)) = (&ijg_match, &warranty_match) {
+            eprintln!("\n=== Containment Check: ijg vs warranty-disclaimer ===");
+            eprintln!(
+                "ijg: tokens={}-{}, qspan={:?}",
+                ijg.start_token,
+                ijg.end_token,
+                ijg.qspan_positions.as_ref().map(|p| (p.first(), p.last()))
+            );
+            eprintln!(
+                "warranty: tokens={}-{}, qspan={:?}",
+                warranty.start_token,
+                warranty.end_token,
+                warranty
+                    .qspan_positions
+                    .as_ref()
+                    .map(|p| (p.first(), p.last()))
+            );
+            eprintln!("ijg.qcontains(warranty): {}", ijg.qcontains(warranty));
+            eprintln!("warranty.qcontains(ijg): {}", warranty.qcontains(ijg));
+        }
+
+        // Now trace through split_weak_matches and second refine
+        use crate::license_detection::match_refine::split_weak_matches;
+
+        eprintln!("\n=== Step 9: Split Weak Matches ===");
+        let (good_matches, weak_matches) = split_weak_matches(&refined);
+        eprintln!("Good matches: {}", good_matches.len());
+        for m in &good_matches {
+            eprintln!(
+                "  {} (rid={}, matcher={}, lines={}-{}, tokens={}-{}, coverage={:.1}%)",
+                m.license_expression,
+                m.rid,
+                m.matcher,
+                m.start_line,
+                m.end_line,
+                m.start_token,
+                m.end_token,
+                m.match_coverage
+            );
+        }
+        eprintln!("Weak matches: {}", weak_matches.len());
+        for m in &weak_matches {
+            eprintln!(
+                "  {} (rid={}, matcher={}, lines={}-{}, tokens={}-{}, coverage={:.1}%)",
+                m.license_expression,
+                m.rid,
+                m.matcher,
+                m.start_line,
+                m.end_line,
+                m.start_token,
+                m.end_token,
+                m.match_coverage
+            );
+        }
+
+        eprintln!("\n=== Step 10: Combine good + weak ===");
+        let mut combined = good_matches.clone();
+        combined.extend(weak_matches.clone());
+        eprintln!("Combined matches: {}", combined.len());
+
+        eprintln!("\n=== Step 11: Final refine WITH FP filter ===");
+        let final_refined = refine_matches(index, combined.clone(), &query);
+        eprintln!("Final refined matches: {}", final_refined.len());
+        for m in &final_refined {
+            eprintln!(
+                "  {} (rid={}, matcher={}, lines={}-{}, tokens={}-{}, coverage={:.1}%, qspan={:?})",
+                m.license_expression,
+                m.rid,
+                m.matcher,
+                m.start_line,
+                m.end_line,
+                m.start_token,
+                m.end_token,
+                m.match_coverage,
+                m.qspan_positions
+                    .as_ref()
+                    .map(|p| (p.len(), p.first(), p.last()))
+            );
+        }
+
+        eprintln!("\n=== Step 12: Group matches by region ===");
+        use crate::license_detection::detection::group_matches_by_region;
+        let groups = group_matches_by_region(&final_refined);
+        eprintln!("Number of groups: {}", groups.len());
+        for (i, g) in groups.iter().enumerate() {
+            eprintln!(
+                "Group[{}]: lines={}-{}, matches={}",
+                i,
+                g.start_line,
+                g.end_line,
+                g.matches.len()
+            );
+            for m in &g.matches {
+                eprintln!(
+                    "  {} (rid={}, matcher={}, lines={}-{}, tokens={}-{})",
+                    m.license_expression,
+                    m.rid,
+                    m.matcher,
+                    m.start_line,
+                    m.end_line,
+                    m.start_token,
+                    m.end_token
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_plan_083_full_pipeline() {
+        let Some(engine) = ensure_engine() else {
+            eprintln!("Skipping test: reference directory not found");
+            return;
+        };
+
+        let path = PathBuf::from("testdata/license-golden/datadriven/lic4/gpl-2.0-plus_and_gpl-2.0-plus_and_gpl-3.0-plus_and_lgpl-2.1-plus_and_other.txt");
+        let Some(text) = std::fs::read_to_string(&path).ok() else {
+            eprintln!("Skipping test: test file not found");
+            return;
+        };
+
+        eprintln!("\n=== PLAN-083 Full Pipeline ===");
+
+        let detections = engine
+            .detect(&text, false)
+            .expect("Detection should succeed");
+
+        let mut all_matches: Vec<_> = detections
+            .iter()
+            .flat_map(|d| {
+                d.matches
+                    .iter()
+                    .map(|m| (d.license_expression.as_deref().unwrap_or(""), m))
+            })
+            .collect();
+
+        all_matches.sort_by_key(|(_, m)| m.start_line);
+
+        eprintln!("\nFinal matches ({} total):", all_matches.len());
+        for (_, m) in &all_matches {
+            eprintln!(
+                "  lines={}-{}: {} (rule={})",
+                m.start_line, m.end_line, m.license_expression, m.rule_identifier
+            );
+        }
+
+        let target_rule = "lgpl-2.1-plus_24.RULE";
+        eprintln!("\nMatches for {}:", target_rule);
+        let found: Vec<_> = all_matches
+            .iter()
+            .filter(|(_, m)| m.rule_identifier == target_rule)
+            .collect();
+        for (_, m) in &found {
+            eprintln!("  lines={}-{}", m.start_line, m.end_line);
+        }
+        eprintln!("Found {} matches for {}", found.len(), target_rule);
+
+        eprintln!("\nMatches at lines 13-17:");
+        for (_, m) in &all_matches {
+            if m.start_line >= 13 && m.end_line <= 17 {
+                eprintln!(
+                    "  lines={}-{}: rule={} matcher={}",
+                    m.start_line, m.end_line, m.rule_identifier, m.matcher
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_plan_083_refine_trace() {
+        let Some(engine) = ensure_engine() else {
+            eprintln!("Skipping test: reference directory not found");
+            return;
+        };
+
+        let path = PathBuf::from("testdata/license-golden/datadriven/lic4/gpl-2.0-plus_and_gpl-2.0-plus_and_gpl-3.0-plus_and_lgpl-2.1-plus_and_other.txt");
+        let Some(text) = std::fs::read_to_string(&path).ok() else {
+            eprintln!("Skipping test: test file not found");
+            return;
+        };
+
+        eprintln!("\n=== PLAN-083 Refine Trace ===");
+
+        let index = &engine.index;
+        let query = Query::new(&text, index).expect("Query should be created");
+        let query_run = query.whole_query_run();
+
+        let target_rule = "lgpl-2.1-plus_24.RULE";
+
+        let aho_matches = aho_match(index, &query_run);
+        eprintln!("Aho matches: {}", aho_matches.len());
+
+        let merged_aho = merge_overlapping_matches(&aho_matches);
+        eprintln!("After merge: {}", merged_aho.len());
+
+        let (kept, discarded) = filter_contained_matches(&merged_aho);
+        eprintln!(
+            "After filter_contained: kept={} discarded={}",
+            kept.len(),
+            discarded.len()
+        );
+
+        eprintln!("\nKept matches containing {}:", target_rule);
+        for m in &kept {
+            if m.rule_identifier.contains("lgpl-2.1-plus_24") {
+                eprintln!(
+                    "  lines={}-{} tokens={}-{}",
+                    m.start_line, m.end_line, m.start_token, m.end_token
+                );
+            }
+        }
+
+        let (non_overlapping_kept, overlapping_discarded) =
+            filter_overlapping_matches(kept.clone(), index);
+        eprintln!(
+            "\nAfter filter_overlapping: kept={} discarded={}",
+            non_overlapping_kept.len(),
+            overlapping_discarded.len()
+        );
+
+        eprintln!("\nNon-overlapping kept matches containing lgpl-2.1-plus:");
+        for m in &non_overlapping_kept {
+            if m.rule_identifier.contains("lgpl-2.1-plus") {
+                eprintln!(
+                    "  lines={}-{} rule={}",
+                    m.start_line, m.end_line, m.rule_identifier
+                );
+            }
+        }
+
+        eprintln!("\nOverlapping discarded matches containing lgpl-2.1-plus:");
+        for m in &overlapping_discarded {
+            if m.rule_identifier.contains("lgpl-2.1-plus") {
+                eprintln!(
+                    "  lines={}-{} rule={}",
+                    m.start_line, m.end_line, m.rule_identifier
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_plan_083_refine_without_fp() {
+        let Some(engine) = ensure_engine() else {
+            eprintln!("Skipping test: reference directory not found");
+            return;
+        };
+
+        let path = PathBuf::from("testdata/license-golden/datadriven/lic4/gpl-2.0-plus_and_gpl-2.0-plus_and_gpl-3.0-plus_and_lgpl-2.1-plus_and_other.txt");
+        let Some(text) = std::fs::read_to_string(&path).ok() else {
+            eprintln!("Skipping test: test file not found");
+            return;
+        };
+
+        eprintln!("\n=== PLAN-083 Refine Without FP ===");
+
+        let index = &engine.index;
+        let query = Query::new(&text, index).expect("Query should be created");
+        let query_run = query.whole_query_run();
+
+        let target_rule = "lgpl-2.1-plus_24.RULE";
+
+        let aho_matches = aho_match(index, &query_run);
+        eprintln!("Aho matches: {}", aho_matches.len());
+
+        let merged_aho = merge_overlapping_matches(&aho_matches);
+        eprintln!("After merge: {}", merged_aho.len());
+
+        let refined =
+            refine_matches_without_false_positive_filter(index, merged_aho.clone(), &query);
+        eprintln!("After refine_matches_without_fp: {}", refined.len());
+
+        eprintln!("\nRefined matches containing lgpl-2.1-plus_24:");
+        for m in &refined {
+            if m.rule_identifier == target_rule {
+                eprintln!(
+                    "  lines={}-{} tokens={}-{}",
+                    m.start_line, m.end_line, m.start_token, m.end_token
+                );
+            }
+        }
+
+        let refined_fp = refine_matches(index, refined.clone(), &query);
+        eprintln!("\nAfter refine_matches WITH fp: {}", refined_fp.len());
+
+        eprintln!("\nFinal refined matches containing lgpl-2.1-plus_24:");
+        for m in &refined_fp {
+            if m.rule_identifier == target_rule {
+                eprintln!(
+                    "  lines={}-{} tokens={}-{}",
+                    m.start_line, m.end_line, m.start_token, m.end_token
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_plan_083_detect_steps() {
+        let Some(engine) = ensure_engine() else {
+            eprintln!("Skipping test: reference directory not found");
+            return;
+        };
+
+        let path = PathBuf::from("testdata/license-golden/datadriven/lic4/gpl-2.0-plus_and_gpl-2.0-plus_and_gpl-3.0-plus_and_lgpl-2.1-plus_and_other.txt");
+        let Some(text) = std::fs::read_to_string(&path).ok() else {
+            eprintln!("Skipping test: test file not found");
+            return;
+        };
+
+        eprintln!("\n=== PLAN-083 Detect Steps ===");
+
+        let index = &engine.index;
+        let query = Query::new(&text, index).expect("Query should be created");
+
+        let target_rule = "lgpl-2.1-plus_24.RULE";
+
+        let whole_run = query.whole_query_run();
+
+        let spdx_matches = spdx_lid_match(index, &query);
+        eprintln!("SPDX matches: {}", spdx_matches.len());
+        let merged_spdx = merge_overlapping_matches(&spdx_matches);
+        eprintln!("Merged SPDX: {}", merged_spdx.len());
+
+        let aho_matches = aho_match(index, &whole_run);
+        eprintln!("\nAho matches: {}", aho_matches.len());
+        let merged_aho = merge_overlapping_matches(&aho_matches);
+        eprintln!("Merged Aho: {}", merged_aho.len());
+
+        eprintln!("\nAho matches containing lgpl-2.1-plus_24:");
+        for m in &merged_aho {
+            if m.rule_identifier == target_rule {
+                eprintln!(
+                    "  lines={}-{} tokens={}-{}",
+                    m.start_line, m.end_line, m.start_token, m.end_token
+                );
+            }
+        }
+
+        let mut all_matches = Vec::new();
+        all_matches.extend(merged_spdx.clone());
+        all_matches.extend(merged_aho.clone());
+        eprintln!("\nAll matches before refine: {}", all_matches.len());
+
+        let refined =
+            refine_matches_without_false_positive_filter(index, all_matches.clone(), &query);
+        eprintln!("After refine_without_fp: {}", refined.len());
+
+        eprintln!("\nRefined matches containing lgpl-2.1-plus_24:");
+        for m in &refined {
+            if m.rule_identifier == target_rule {
+                eprintln!(
+                    "  lines={}-{} tokens={}-{}",
+                    m.start_line, m.end_line, m.start_token, m.end_token
+                );
+            }
+        }
+
+        let (good_matches, weak_matches) = split_weak_matches(&refined);
+        eprintln!("\nGood matches: {}", good_matches.len());
+        eprintln!("Weak matches: {}", weak_matches.len());
+
+        eprintln!("\nGood matches containing lgpl-2.1-plus_24:");
+        for m in &good_matches {
+            if m.rule_identifier == target_rule {
+                eprintln!(
+                    "  lines={}-{} tokens={}-{}",
+                    m.start_line, m.end_line, m.start_token, m.end_token
+                );
+            }
+        }
+
+        let mut final_matches = good_matches.clone();
+        final_matches.extend(weak_matches.clone());
+        eprintln!("\nFinal matches after adding weak: {}", final_matches.len());
+
+        let refined_final = refine_matches(index, final_matches.clone(), &query);
+        eprintln!("After final refine: {}", refined_final.len());
+
+        eprintln!("\nFinal refined matches containing lgpl-2.1-plus_24:");
+        for m in &refined_final {
+            if m.rule_identifier == target_rule {
+                eprintln!(
+                    "  lines={}-{} tokens={}-{}",
+                    m.start_line, m.end_line, m.start_token, m.end_token
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_plan_083_with_seq_matching() {
+        let Some(engine) = ensure_engine() else {
+            eprintln!("Skipping test: reference directory not found");
+            return;
+        };
+
+        let path = PathBuf::from("testdata/license-golden/datadriven/lic4/gpl-2.0-plus_and_gpl-2.0-plus_and_gpl-3.0-plus_and_lgpl-2.1-plus_and_other.txt");
+        let Some(text) = std::fs::read_to_string(&path).ok() else {
+            eprintln!("Skipping test: test file not found");
+            return;
+        };
+
+        eprintln!("\n=== PLAN-083 With Seq Matching ===");
+
+        let index = &engine.index;
+        let query = Query::new(&text, index).expect("Query should be created");
+
+        let target_rule = "lgpl-2.1-plus_24.RULE";
+        let extra_rule = "lgpl-2.1-plus_419.RULE";
+
+        let whole_run = query.whole_query_run();
+
+        let aho_matches = aho_match(index, &whole_run);
+        eprintln!("Aho matches: {}", aho_matches.len());
+        let merged_aho = merge_overlapping_matches(&aho_matches);
+        eprintln!("Merged Aho: {}", merged_aho.len());
+
+        let mut all_matches = merged_aho.clone();
+
+        let candidates = compute_candidates_with_msets(index, &whole_run, false, 70);
+        eprintln!("\nSeq candidates: {}", candidates.len());
+
+        let seq_matches = seq_match_with_candidates(index, &whole_run, &candidates);
+        eprintln!("Seq matches: {}", seq_matches.len());
+        let merged_seq = merge_overlapping_matches(&seq_matches);
+        eprintln!("Merged Seq: {}", merged_seq.len());
+
+        eprintln!("\nSeq matches containing lgpl-2.1-plus:");
+        for m in &merged_seq {
+            if m.rule_identifier.contains("lgpl-2.1-plus") {
+                eprintln!(
+                    "  lines={}-{} rule={} tokens={}-{}",
+                    m.start_line, m.end_line, m.rule_identifier, m.start_token, m.end_token
+                );
+            }
+        }
+
+        all_matches.extend(merged_seq);
+        eprintln!("\nAll matches before refine: {}", all_matches.len());
+
+        let refined =
+            refine_matches_without_false_positive_filter(index, all_matches.clone(), &query);
+        eprintln!("After refine_without_fp: {}", refined.len());
+
+        eprintln!("\nRefined matches containing lgpl-2.1-plus:");
+        for m in &refined {
+            if m.rule_identifier.contains("lgpl-2.1-plus") {
+                eprintln!(
+                    "  lines={}-{} rule={} tokens={}-{}",
+                    m.start_line, m.end_line, m.rule_identifier, m.start_token, m.end_token
+                );
+            }
+        }
+
+        let (good_matches, weak_matches) = split_weak_matches(&refined);
+        eprintln!("\nGood matches: {}", good_matches.len());
+        eprintln!("Weak matches: {}", weak_matches.len());
+
+        let mut final_matches = good_matches.clone();
+        final_matches.extend(weak_matches.clone());
+
+        let refined_final = refine_matches(index, final_matches.clone(), &query);
+        eprintln!("After final refine: {}", refined_final.len());
+
+        eprintln!("\nFinal matches containing lgpl-2.1-plus:");
+        for m in &refined_final {
+            if m.rule_identifier.contains("lgpl-2.1-plus") {
+                eprintln!(
+                    "  lines={}-{} rule={} tokens={}-{}",
+                    m.start_line, m.end_line, m.rule_identifier, m.start_token, m.end_token
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_plan_083_containment_analysis() {
+        let Some(engine) = ensure_engine() else {
+            eprintln!("Skipping test: reference directory not found");
+            return;
+        };
+
+        let path = PathBuf::from("testdata/license-golden/datadriven/lic4/gpl-2.0-plus_and_gpl-2.0-plus_and_gpl-3.0-plus_and_lgpl-2.1-plus_and_other.txt");
+        let Some(text) = std::fs::read_to_string(&path).ok() else {
+            eprintln!("Skipping test: test file not found");
+            return;
+        };
+
+        eprintln!("\n=== PLAN-083 Containment Analysis ===");
+
+        let index = &engine.index;
+        let query = Query::new(&text, index).expect("Query should be created");
+        let whole_run = query.whole_query_run();
+
+        let aho_matches = aho_match(index, &whole_run);
+        let merged_aho = merge_overlapping_matches(&aho_matches);
+
+        let m24 = merged_aho
+            .iter()
+            .find(|m| m.rule_identifier == "lgpl-2.1-plus_24.RULE" && m.start_line == 13);
+        let m108 = merged_aho
+            .iter()
+            .find(|m| m.rule_identifier == "lgpl-2.1-plus_108.RULE");
+
+        eprintln!("\nAho match lgpl-2.1-plus_24.RULE at lines 13-17:");
+        if let Some(m) = m24 {
+            eprintln!("  start_token={} end_token={}", m.start_token, m.end_token);
+        }
+
+        eprintln!("\nAho match lgpl-2.1-plus_108.RULE:");
+        if let Some(m) = m108 {
+            eprintln!(
+                "  start_token={} end_token={} lines={}-{}",
+                m.start_token, m.end_token, m.start_line, m.end_line
+            );
+        }
+
+        let candidates = compute_candidates_with_msets(index, &whole_run, false, 70);
+        let seq_matches = seq_match_with_candidates(index, &whole_run, &candidates);
+        let merged_seq = merge_overlapping_matches(&seq_matches);
+
+        let m419_from_seq = merged_seq
+            .iter()
+            .find(|m| m.rule_identifier == "lgpl-2.1-plus_419.RULE" && m.start_line == 14);
+
+        eprintln!("\nSeq match lgpl-2.1-plus_419.RULE at lines 14-25:");
+        if let Some(m) = m419_from_seq {
+            eprintln!("  start_token={} end_token={}", m.start_token, m.end_token);
+            eprintln!("  match_coverage={}", m.match_coverage);
+        }
+
+        eprintln!("\n=== Containment check ===");
+        if let (Some(m24), Some(m419)) = (m24, m419_from_seq) {
+            eprintln!(
+                "\nlgpl-2.1-plus_24.RULE (tokens {}-{}) vs lgpl-2.1-plus_419.RULE (tokens {}-{}):",
+                m24.start_token, m24.end_token, m419.start_token, m419.end_token
+            );
+
+            eprintln!("  m24.qcontains(m419): {}", m24.qcontains(m419));
+            eprintln!("  m419.qcontains(m24): {}", m419.qcontains(m24));
+        }
+
+        if let (Some(m24), Some(m108)) = (m24, m108) {
+            eprintln!(
+                "\nlgpl-2.1-plus_24.RULE (tokens {}-{}) vs lgpl-2.1-plus_108.RULE (tokens {}-{}):",
+                m24.start_token, m24.end_token, m108.start_token, m108.end_token
+            );
+
+            eprintln!("  m24.qcontains(m108): {}", m24.qcontains(m108));
+            eprintln!("  m108.qcontains(m24): {}", m108.qcontains(m24));
+        }
+
+        let mut all_matches = merged_aho.clone();
+        all_matches.extend(merged_seq.clone());
+
+        let merged = merge_overlapping_matches(&all_matches);
+        let (kept, discarded) = filter_contained_matches(&merged);
+
+        eprintln!("\n=== After filter_contained ===");
+        eprintln!("Kept: {} Discarded: {}", kept.len(), discarded.len());
+
+        eprintln!("\nDiscarded matches at lines 13-26:");
+        for m in &discarded {
+            if m.start_line >= 13 && m.end_line <= 26 {
+                eprintln!(
+                    "  lines={}-{} rule={} tokens={}-{}",
+                    m.start_line, m.end_line, m.rule_identifier, m.start_token, m.end_token
+                );
+            }
+        }
+
+        eprintln!("\nKept matches at lines 13-26:");
+        for m in &kept {
+            if m.start_line >= 13 && m.end_line <= 26 {
+                eprintln!(
+                    "  lines={}-{} rule={} tokens={}-{}",
+                    m.start_line, m.end_line, m.rule_identifier, m.start_token, m.end_token
+                );
+            }
+        }
+
+        eprintln!("\n=== After filter_overlapping ===");
+        let (kept2, discarded2) = filter_overlapping_matches(kept.clone(), index);
+        eprintln!("Kept: {} Discarded: {}", kept2.len(), discarded2.len());
+
+        eprintln!("\nDiscarded overlapping matches at lines 13-26:");
+        for m in &discarded2 {
+            if m.start_line >= 13 && m.end_line <= 26 {
+                eprintln!(
+                    "  lines={}-{} rule={} tokens={}-{}",
+                    m.start_line, m.end_line, m.rule_identifier, m.start_token, m.end_token
+                );
+            }
+        }
+
+        eprintln!("\nKept non-overlapping matches at lines 13-26:");
+        for m in &kept2 {
+            if m.start_line >= 13 && m.end_line <= 26 {
+                eprintln!(
+                    "  lines={}-{} rule={} tokens={}-{}",
+                    m.start_line, m.end_line, m.rule_identifier, m.start_token, m.end_token
+                );
+            }
+        }
     }
 }

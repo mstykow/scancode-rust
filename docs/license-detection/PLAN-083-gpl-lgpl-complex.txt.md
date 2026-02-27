@@ -1,6 +1,19 @@
 # PLAN-083: gpl-2.0-plus_and_gpl-3.0-plus_and_lgpl-2.1-plus_and_other.txt Investigation
 
-## Status: ROOT CAUSE IDENTIFIED
+## Status: NEEDS DEEPER INVESTIGATION
+
+**Previous hypothesis was WRONG**: The proposed fix (prefer Aho matches by coverage) would break Python parity.
+
+**Validation findings**:
+- Python's `filter_overlapping_matches` does NOT consider coverage or matcher type
+- Python only uses: qspan.start, hilen, matched_length, matcher_order
+- Rust correctly implements Python's overlap filtering logic
+- The issue is WHY Python doesn't generate `_419.RULE` as a seq match
+
+**Next investigation needed**:
+1. Compare candidate selection between Python and Rust for this query
+2. Check if `_419.RULE` is in the top 70 candidates for both
+3. Investigate sequence alignment results
 
 ## Problem Statement
 
@@ -32,7 +45,7 @@ lines=71-74: lgpl-2.1 AND gpl-2.0 AND gpl-3.0 (rule=lgpl-2.1_and_gpl-2.0_and_gpl
 ```
 lines=5-9: gpl-3.0-plus (rule=gpl-3.0-plus_9.RULE)
 lines=13-13: lgpl-2.1-plus (rule=lgpl-2.1-plus_108.RULE)  <-- EXTRA, CONTAINED BY MISSING MATCH
-lines=14-25: lgpl-2.1-plus (rule=lgpl-2.1-plus_419.RULE)  <-- SHOULD NOT EXIST
+lines=14-25: lgpl-2.1-plus (rule=lgpl-2.1-plus_419.RULE)  <-- SHOULD NOT EXIST (seq match)
 lines=22-26: lgpl-2.1-plus (rule=lgpl-2.1-plus_24.RULE)   <-- CORRECT
 lines=33-37: lgpl-2.1-plus AND free-unknown (rule=lgpl-2.1-plus_and_free-unknown_1.RULE)
 lines=39-53: mit-modern (rule=mit-modern_3.RULE)
@@ -41,66 +54,103 @@ lines=65-69: gpl-2.0-plus (rule=gpl-2.0-plus_71.RULE)
 lines=71-74: lgpl-2.1 AND gpl-2.0 AND gpl-3.0 (rule=lgpl-2.1_and_gpl-2.0_and_gpl-3.0.RULE)
 ```
 
-## Root Cause
+## Root Cause (Updated)
 
-**Rust's Aho-Corasick matcher is NOT finding `lgpl-2.1-plus_24.RULE` at lines 13-17 (qspan 72-119), while Python does.**
+**`filter_overlapping_matches` is incorrectly discarding the Aho-Corasick exact match (`lgpl-2.1-plus_24.RULE`) in favor of a sequence match (`lgpl-2.1-plus_419.RULE`) with lower coverage.**
 
 ### Detailed Analysis
 
-1. **Python Aho finds** `lgpl-2.1-plus_24.RULE` at:
-   - qspan 72-119 → lines 13-17 (query run 1)
-   - qspan 135-182 → lines 22-26 (query run 2)
+1. **Aho-Corasick DOES find `lgpl-2.1-plus_24.RULE` at lines 13-17**:
+   - Tokens 72-120, 48 matched tokens, 100% coverage
+   - Matcher: `2-aho`
 
-2. **Rust Aho finds**:
-   - `lgpl-2.1-plus_108.RULE` at lines 13-13 (qspan 72-75) - a tiny 3-token match
-   - `lgpl-2.1-plus_419.RULE` at lines 14-25 (a DIFFERENT rule)
-   - `lgpl-2.1-plus_24.RULE` at lines 22-26 - CORRECT
+2. **Sequence matching produces `lgpl-2.1-plus_419.RULE` at lines 14-25**:
+   - Tokens 78-162, 84 matched tokens, 70% coverage
+   - Matcher: `3-seq`
 
-3. **Python containment filtering** correctly filters out `lgpl-2.1-plus_108.RULE` because it's contained within `lgpl-2.1-plus_24.RULE`.
+3. **Both matches overlap** (tokens 78-120 overlap region)
 
-4. **Rust containment filtering** cannot filter `lgpl-2.1-plus_108.RULE` because the containing match (`lgpl-2.1-plus_24.RULE` at lines 13-17) was never found.
+4. **`filter_contained_matches` keeps both** (neither is fully contained in the other)
 
-### Rule Details
+5. **`filter_overlapping_matches` discards the Aho match** because:
+   - The seq match is longer (84 tokens vs 48 tokens)
+   - The overlap ratio logic prefers longer matches
+   - BUT this is WRONG because the Aho match has 100% coverage vs 70% for the seq match
 
-- `lgpl-2.1-plus_24.RULE`: 48 tokens, starts with `[2432, 2403, 4401, 4373, 6614, ...]`
-- `lgpl-2.1-plus_419.RULE`: 70 tokens, starts with `[6614, 6615, 5332, 5120, 6225, ...]`
-- `lgpl-2.1-plus_108.RULE`: 3 tokens, matches "License: LGPL-2.1+"
+### The Problem in `filter_overlapping_matches`
 
-### Why Rust doesn't find lgpl-2.1-plus_24 at lines 13-17
+The function at `src/license_detection/match_refine.rs:549-797` sorts matches by:
+1. `qstart` (ascending)
+2. `hilen` (descending - high-value tokens)
+3. `matched_length` (descending)
+4. `matcher_order` (ascending - hash=1, aho=2, seq=3)
 
-**Hypothesis**: The pattern `lgpl-2.1-plus_24.RULE` (48 tokens starting with `[2432, 2403, 4401, 4373, 6614, ...]`) is not being matched by the Aho-Corasick automaton.
+When comparing overlapping matches, the logic considers:
+- `current_len >= next_len` (longer match wins)
+- `current_hilen >= next_hilen` (more high-value tokens wins)
 
-Possible causes:
-1. **Pattern not in automaton**: The pattern might be missing from `rules_automaton_patterns`
-2. **Pattern ID mismatch**: The `pattern_id_to_rid` mapping might be wrong
-3. **Tokenization difference**: The query tokens might not match the rule tokens
+**The issue**: When comparing `lgpl-2.1-plus_24.RULE` (aho, 48 tokens) with `lgpl-2.1-plus_419.RULE` (seq, 84 tokens):
+- The seq match is longer, so it wins
+- But the aho match has 100% coverage vs 70% for seq
+
+**The fix should prioritize exact matches (aho) with 100% coverage over sequence matches with partial coverage.**
+
+### Code Location
+
+The issue is in `filter_overlapping_matches` at lines 643-665:
+
+```rust
+if extra_large_next && current_len_val >= next_len_val {
+    // Discard next if current is longer or equal
+    discarded.push(matches.remove(j));
+    continue;
+}
+
+if extra_large_current && current_len_val <= next_len_val {
+    // Discard current if next is longer or equal
+    discarded.push(matches.remove(i));
+    i = i.saturating_sub(1);
+    break;
+}
+```
+
+This logic doesn't consider match coverage. An aho match with 100% coverage should win over a seq match with 70% coverage even if the seq match is longer.
 
 ## Files to Fix
 
-1. `src/license_detection/aho_match.rs` - Aho-Corasick matching
-2. `src/license_detection/index/builder.rs` - Automaton building
+1. `src/license_detection/match_refine.rs` - `filter_overlapping_matches` function
 
-## Next Steps
+## Recommended Fix
 
-See **[PLAN-083-investigation-steps.md](./PLAN-083-investigation-steps.md)** for detailed investigation plan.
+Add a check for match coverage when comparing overlapping matches:
 
-### Quick Investigation Summary
+1. If one match is an exact match (aho, 100% coverage) and the other is a sequence match (partial coverage), prefer the exact match
+2. Consider adding a check for `match_coverage == 100.0` or `matcher == "2-aho"` as a tiebreaker
 
-1. **Phase 1**: Verify pattern is in automaton (it is - same pattern works at lines 22-26)
-2. **Phase 2**: Compare tokenization at lines 13-17 vs 22-26
-3. **Phase 3**: Debug Aho-Corasick matching at specific byte positions
-4. **Phase 4**: Compare with Python implementation
-5. **Phase 5**: Identify and fix the root cause
+Example fix approach:
 
-### Key Insight
+```rust
+// Prefer exact matches (aho with 100% coverage) over sequence matches
+let current_is_exact = matches[i].matcher == "2-aho" && matches[i].match_coverage >= 99.9;
+let next_is_exact = matches[j].matcher == "2-aho" && matches[j].match_coverage >= 99.9;
 
-The pattern IS in the automaton because Rust finds `lgpl-2.1-plus_24.RULE` at lines 22-26. The issue is specific to the match at lines 13-17. This suggests either:
-- Tokenization difference at that location
-- Matchables check rejection
-- Aho-Corasick configuration issue with overlapping matches
+if current_is_exact && !next_is_exact && next_len_val > current_len_val {
+    // Keep the exact match even if the seq match is longer
+    discarded.push(matches.remove(j));
+    continue;
+}
+```
 
 ## Test Command
 
 ```bash
 cargo test --lib test_plan_083 -- --nocapture
 ```
+
+## Verification
+
+After the fix:
+1. `lgpl-2.1-plus_24.RULE` at lines 13-17 should be kept (aho match with 100% coverage)
+2. `lgpl-2.1-plus_108.RULE` at lines 13-13 should be filtered as contained by `_24`
+3. `lgpl-2.1-plus_419.RULE` at lines 14-25 should NOT appear
+4. Total match count should be 8 (matching Python)
