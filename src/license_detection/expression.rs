@@ -689,13 +689,14 @@ fn tokenize(expr: &str) -> Result<Vec<Token>, ParseError> {
                 pos += 1;
             }
             _ => {
-                if c.is_alphanumeric() || c == '-' || c == '.' || c == '_' {
+                if c.is_alphanumeric() || c == '-' || c == '.' || c == '_' || c == '+' {
                     let start = pos;
                     while pos < chars.len()
                         && (chars[pos].is_alphanumeric()
                             || chars[pos] == '-'
                             || chars[pos] == '.'
-                            || chars[pos] == '_')
+                            || chars[pos] == '_'
+                            || chars[pos] == '+')
                     {
                         pos += 1;
                     }
@@ -1403,7 +1404,6 @@ mod tests {
         assert_eq!(expr, LicenseExpression::License("gpl-2.0-plus".to_string()));
     }
     #[test]
-    #[ignore]
     fn test_parse_gpl_plus_license() {
         let expr = parse_expression("GPL-2.0+").unwrap();
         assert_eq!(expr, LicenseExpression::License("gpl-2.0+".to_string()));
