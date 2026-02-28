@@ -17,3 +17,21 @@ mod plantuml_test;
 
 #[cfg(test)]
 mod something_html_test;
+
+#[cfg(test)]
+mod unknown_readme_test;
+
+#[cfg(test)]
+mod unknown_cigna_test;
+
+#[cfg(test)]
+mod unknown_citrix_test;
+
+#[cfg(test)]
+mod unknown_qt_commercial_test;
+
+#[cfg(test)]
+mod unknown_scea_test;
+
+#[cfg(test)]
+mod unknown_ucware_test;

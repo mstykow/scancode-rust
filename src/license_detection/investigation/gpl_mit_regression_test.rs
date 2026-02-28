@@ -476,8 +476,10 @@ mod tests {
                     "  extra_large_next={}, large_next={}, medium_next={}, small_next={}",
                     extra_large_next, large_next, medium_next, small_next
                 );
-                eprintln!("  extra_large_current={}, large_current={}, medium_current={}, small_current={}",
-                    extra_large_current, large_current, medium_current, small_current);
+                eprintln!(
+                    "  extra_large_current={}, large_current={}, medium_current={}, small_current={}",
+                    extra_large_current, large_current, medium_current, small_current
+                );
                 eprintln!("  different_licenses={}", different_licenses);
 
                 // Check which branch would trigger
@@ -495,12 +497,18 @@ mod tests {
                     && current_len >= next_len
                     && matches[i].hilen >= matches[j].hilen
                 {
-                    eprintln!("  -> Would DISCARD [{}] (large_next && current_len >= next_len && hilen_check)", j);
+                    eprintln!(
+                        "  -> Would DISCARD [{}] (large_next && current_len >= next_len && hilen_check)",
+                        j
+                    );
                 } else if large_current
                     && current_len <= next_len
                     && matches[i].hilen <= matches[j].hilen
                 {
-                    eprintln!("  -> Would DISCARD [{}] (large_current && current_len <= next_len && hilen_check)", i);
+                    eprintln!(
+                        "  -> Would DISCARD [{}] (large_current && current_len <= next_len && hilen_check)",
+                        i
+                    );
                 } else {
                     eprintln!("  -> No action (checking next overlap conditions...)");
                 }

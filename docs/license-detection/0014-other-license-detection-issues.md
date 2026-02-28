@@ -20,62 +20,78 @@ This report investigates non-SPDX golden test failures in the license detection 
 **File:** `testdata/license-golden/datadriven/external/fossology-tests/IBM/IBM-MIT-style.txt`
 
 **Expected:** `["x11-ibm"]`
-**Actual:** Likely `["historical"]` (not yet verified by running test)
+**Actual:** Not verified in Rust (test times out)
 
-**Test File Content:**
-```
-/* Copyright International Business Machines, Corp. 1991
- * All Rights Reserved
- * ...
- * License to use, copy, modify, and distribute this software and its
- * documentation for any purpose and without fee is hereby granted,
- * provided that the above copyright notice appear in all copies and that
- * both that copyright notice and this permission notice appear in
- * supporting documentation, and that the name of IBM or Lexmark or Adobe
- * not be used in advertising or publicity pertaining to distribution of
- * the software without specific, written prior permission.
- *
- * IBM, LEXMARK, AND ADOBE PROVIDE THIS SOFTWARE "AS IS", WITHOUT ANY
- * WARRANTIES OF ANY KIND...
- */
+### Python Verification Results
+
+**Python ScanCode v32.5.0 correctly returns `x11-ibm`:**
+
+```json
+{
+  "license_detections": [
+    {
+      "identifier": "x11_ibm-ddcda14e-3c63-a258-eb1c-6f24e2ffe1ec",
+      "license_expression": "x11-ibm",
+      "license_expression_spdx": "LicenseRef-scancode-x11-ibm",
+      "detection_count": 1,
+      "reference_matches": [
+        {
+          "license_expression": "x11-ibm",
+          "license_expression_spdx": "LicenseRef-scancode-x11-ibm",
+          "from_file": "IBM-MIT-style.txt",
+          "start_line": 9,
+          "end_line": 29,
+          "matcher": "3-seq",
+          "score": 88.89,
+          "matched_length": 200,
+          "match_coverage": 88.89,
+          "rule_relevance": 100,
+          "rule_identifier": "x11-ibm.LICENSE",
+          "rule_url": "https://github.com/nexB/scancode-toolkit/tree/develop/src/licensedcode/data/licenses/x11-ibm.LICENSE"
+        }
+      ]
+    }
+  ]
+}
 ```
 
 ### Root Cause Analysis
 
-The `x11-ibm` license is defined in `reference/scancode-toolkit/src/licensedcode/data/licenses/x11-ibm.LICENSE` with:
+**Python uses LICENSE files as rules when no RULE files exist.**
+
+The `x11-ibm.LICENSE` file (at `reference/scancode-toolkit/src/licensedcode/data/licenses/x11-ibm.LICENSE`) contains:
 - `key: x11-ibm`
 - `minimum_coverage: 80`
-- Contains text with "License to use, copy, modify, and distribute this software and its documentation for any purpose and without fee is hereby granted..."
+- Full license text that matches the test file
 
-However, there are **NO rules** in `reference/scancode-toolkit/src/licensedcode/data/rules/` with `license_expression: x11-ibm`. The license exists but has no associated detection rules.
+**Python's approach:**
+1. Load all `.LICENSE` files
+2. Convert each LICENSE to a Rule with `is_license_text: true` and `is_from_license: true`
+3. Use these rules in sequence matching
 
-**The Problem:**
-1. The `historical_10.RULE` matches very similar text:
-   ```
-   * Permission to use, copy, modify, and distribute this software for any
-   * purpose with or without fee is hereby granted...
-   ```
-2. `historical_10.RULE` has `license_expression: historical` and `is_license_notice: yes`
-3. The IBM test file text overlaps significantly with the `historical` license pattern
-4. Since no `x11-ibm` rules exist, the `historical` rules match instead
+**Rust's approach (verified in `src/license_detection/index/builder.rs:304-307`):**
+```rust
+let license_rules =
+    build_rules_from_licenses(&licenses_by_key.values().cloned().collect::<Vec<_>>());
+```
 
-**Key Differences Between x11-ibm and historical:**
-- `x11-ibm` requires: "licensee provides a license to IBM, Corp. to use, copy, modify, and distribute derivative works"
-- `historical` is the generic "Historical Permission Notice and Disclaimer" (HPND) from OSI
+Rust DOES create rules from LICENSE files. The issue is likely in:
+1. **Minimum coverage handling**: `x11-ibm.LICENSE` has `minimum_coverage: 80` - check if Rust respects this
+2. **Sequence matching scoring**: Python score is 88.89%, Rust may score differently
+3. **Rule ordering**: Rust may have different rule priority than Python
 
-The test file does NOT contain the key x11-ibm clause about derivative works, so it's actually closer to `historical` than `x11-ibm`. **The test expectation may be incorrect**, or the license rules in the reference are missing x11-ibm specific patterns.
+### Investigation Steps Required
 
-### Proposed Solution
-
-1. **Verify test expectation**: Check if Python ScanCode actually returns `x11-ibm` for this file
-2. **If Python returns x11-ibm**: Find the rules Python uses that produce `x11-ibm` detection
-3. **If rules are missing**: The Rust implementation correctly matches `historical` but needs x11-ibm specific rules added to the reference data
+1. **Create unit test** for IBM-MIT-style.txt that traces through seq_match
+2. **Check minimum_coverage**: Verify `filter_below_rule_minimum_coverage()` in `match_refine.rs:1007-1029`
+3. **Check rule ranking**: Verify `x11-ibm.LICENSE` appears in candidate selection
 
 ### Code Locations
 
+- License-to-rule conversion: `src/license_detection/index/builder.rs:82-137`
+- Minimum coverage filter: `src/license_detection/match_refine.rs:1007-1029`
+- Sequence matching: `src/license_detection/seq_match.rs`
 - License definition: `reference/scancode-toolkit/src/licensedcode/data/licenses/x11-ibm.LICENSE`
-- Competing rule: `reference/scancode-toolkit/src/licensedcode/data/rules/historical_10.RULE`
-- Rule loading: `src/license_detection/rules.rs:load_rules_from_directory()`
 
 ---
 
@@ -98,40 +114,85 @@ The issue is in how matches are merged and grouped. The pipeline:
 3. **Group Phase** - `group_matches_by_region()` groups nearby matches
 4. **Detection Phase** - `create_detection_from_group()` creates final detection
 
-**The Bug Location:** `src/license_detection/detection.rs:150-222`
+### Specific Bug Location: `is_after()` Merge at Line 304
 
+**Rust code (`src/license_detection/match_refine.rs:304-308`):**
 ```rust
-fn should_group_together(prev: &LicenseMatch, cur: &LicenseMatch, threshold: usize) -> bool {
-    let line_gap = cur.start_line.saturating_sub(prev.end_line);
-    line_gap <= threshold  // threshold is 4 lines
+if next.is_after(&current) {
+    rule_matches[i] = combine_matches(&current, &next);
+    rule_matches.remove(j);
+    continue;
 }
 ```
 
-When two instances of the same license are separated by more than 4 lines of non-license text, they should create separate detections. However, the merge phase may be incorrectly combining them earlier.
+**Python code (`reference/scancode-toolkit/src/licensedcode/match.py:1032-1041`):**
+```python
+# next_match is strictly in increasing sequence: merge in current
+if next_match.is_after(current_match):
+    current_match.update(next_match)
+    ...
+    del rule_matches[j]
+    continue
+```
 
-**Investigation in `duplicate_merge_investigation_test.rs`** shows:
-- bzip2.106.c has license text at lines 7-17 AND lines 27-34
-- These should produce 2 separate detections
-- Currently produces 1 merged detection
+**The Problem:** The `is_after()` check merges matches that are "strictly in increasing sequence" but does NOT validate that they are from the SAME occurrence of the license text.
 
-The `merge_overlapping_matches()` function at `src/license_detection/match_refine.rs:196-339` has complex logic for determining when to merge. Key merge conditions:
-1. `qdistance_to()` and `idistance_to()` within `max_rule_side_dist`
-2. `surround()` - one match surrounds another
-3. `is_after()` - matches are sequential in the rule
+For example, in `bzip2.106.c`:
+- Match 1: lines 7-17 (first bzip2 license)
+- Match 2: lines 27-34 (second bzip2 license)
 
-**The Problem:** The merge logic may be too aggressive, combining matches that should remain separate because:
-1. The `max_rule_side_dist = rule_length / 2` can be large for long rules
-2. The `is_after()` check merges sequential matches regardless of distance
+Both matches have the same `rule_identifier` and both pass `is_after()` because they're in sequence. They get merged into one match spanning lines 7-34, but they should remain separate.
 
-### Proposed Solution
+### Python Comparison
 
-1. **Add distance validation**: Ensure `is_after()` checks respect the actual distance between matches
-2. **Review merge conditions**: Compare with Python's `merge_matches()` at `reference/scancode-toolkit/src/licensedcode/match.py:869-1068`
-3. **Add test case**: Create unit test specifically for duplicate license detection
+Python's `merge_matches()` at `match.py:869-1068` has the SAME logic. The difference must be in:
+1. How matches are created initially (different tokenization?)
+2. The `qdistance_to()` and `idistance_to()` thresholds
+3. The `max_rule_side_dist` calculation
+
+**Key difference to investigate:**
+```python
+# Python line 923-924
+if (current_match.qdistance_to(next_match) > max_rule_side_dist
+or current_match.idistance_to(next_match) > max_rule_side_dist):
+    break
+```
+
+Rust has the same check at lines 252-256, but the `max_rule_side_dist` calculation may differ.
+
+### Specific Code Fix Locations
+
+1. **Add distance check before `is_after()` merge** - `src/license_detection/match_refine.rs:304`
+   - Add a check that the query distance between matches is reasonable
+   - If matches are far apart in the query text, they shouldn't be merged
+
+2. **Consider the actual line gap** - Current `max_rule_side_dist = rule_length / 2` may be too large for long rules
+
+3. **Investigation test** - `src/license_detection/duplicate_merge_investigation_test.rs`
+
+### Proposed Fix
+
+Add a distance validation before merging via `is_after()`:
+
+```rust
+if next.is_after(&current) {
+    // Don't merge if matches are far apart in the query
+    let qdist = current.qdistance_to(&next);
+    let max_query_dist = 50; // or some reasonable threshold
+    if qdist > max_query_dist {
+        j += 1;
+        continue;
+    }
+    rule_matches[i] = combine_matches(&current, &next);
+    rule_matches.remove(j);
+    continue;
+}
+```
 
 ### Code Locations
 
 - Merge logic: `src/license_detection/match_refine.rs:196-339`
+- `is_after()` merge: `src/license_detection/match_refine.rs:304-308`
 - Grouping logic: `src/license_detection/detection.rs:150-222`
 - Investigation test: `src/license_detection/duplicate_merge_investigation_test.rs`
 
@@ -144,57 +205,55 @@ The `merge_overlapping_matches()` function at `src/license_detection/match_refin
 **File:** `testdata/license-golden/datadriven/external/slic-tests/npruntime.h`
 
 **Expected:** `["bsd-new"]`
-**Actual:** Likely `[]` or wrong detection (not verified)
 
-**Test File Content (lines 1-32):**
-```c
-/* -*- Mode: C; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*- */
-/*
- * Copyright (c) 2004, Apple Computer, Inc. and The Mozilla Foundation.
- * All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are
- * met:
- *
- * 1. Redistributions of source code must retain the above copyright
- * notice, this list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- * notice, this list of conditions and the following disclaimer in the
- * documentation and/or other materials provided with the distribution.
- * 3. Neither the names of Apple Computer, Inc. ("Apple") or The Mozilla
- * Foundation ("Mozilla") nor the names of their contributors may be used
- * to endorse or promote products derived from this software without
- * specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY APPLE, MOZILLA AND THEIR CONTRIBUTORS "AS
- * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES...
- */
+### Python Verification Results
+
+**Python ScanCode v32.5.0 correctly returns `bsd-new`:**
+
+```json
+{
+  "license_detections": [
+    {
+      "identifier": "bsd_new-c8029e3f-90bc-0a37-4d72-a73c8a64c8c2",
+      "license_expression": "bsd-new",
+      "license_expression_spdx": "BSD-3-Clause",
+      "detection_count": 1,
+      "reference_matches": [
+        {
+          "license_expression": "bsd-new",
+          "license_expression_spdx": "BSD-3-Clause",
+          "from_file": "npruntime.h",
+          "start_line": 6,
+          "end_line": 30,
+          "matcher": "3-seq",
+          "score": 94.14,
+          "matched_length": 209,
+          "match_coverage": 100.0,
+          "rule_relevance": 100,
+          "rule_identifier": "bsd-new_22.RULE"
+        }
+      ]
+    }
+  ]
+}
 ```
 
-### Root Cause Analysis
+### Root Cause: Not Actually Missing
 
-This is a standard 3-clause BSD license (bsd-new). The text should match rules like `bsd-new_*.RULE`.
+The test expectation file (`npruntime.h.yml`) shows `bsd-new` is expected. Python verifies this works.
 
-**Potential causes for missing detection:**
+**This is NOT a missing detection issue.** The original plan was based on speculation. 
 
-1. **Tokenization issues**: The license header has a unique format with `-*- Mode: C; ... -*-` on line 1
-2. **Short rule matching**: Some BSD rules may be flagged as false positives if they're too short
-3. **Containment filtering**: The match might be filtered as "contained" by another match
-4. **Score threshold**: The detection score might fall below the minimum threshold
+The issue is likely that:
+1. Rust DOES detect `bsd-new` for this file
+2. The test may be passing or timing out during test runs
+3. Need to run the specific golden test to confirm
 
-**Debug approach:** Run the detection pipeline step-by-step:
-1. Check if hash match finds it (unlikely - not exact match)
-2. Check if aho-corasick finds partial matches
-3. Check if sequence matching finds it
-4. Check if matches are filtered out in refine phase
+### Investigation Required
 
-### Proposed Solution
-
-1. **Add debug test**: Create a test that traces through the full pipeline for this file
-2. **Check sequence matching**: Verify `seq_match()` produces matches for bsd-new rules
-3. **Check filtering**: Ensure bsd-new matches aren't filtered in `refine_matches()`
-4. **Check rule coverage**: Verify bsd-new rules in index have sufficient tokens
+1. Run `cargo test test_golden_external --lib` with focus on slic-tests
+2. If test passes, this category can be closed
+3. If test fails, compare Rust vs Python matches for `bsd-new_22.RULE`
 
 ### Code Locations
 
@@ -226,30 +285,32 @@ This issue is fully analyzed in `docs/license-detection/PLAN-009-x11-danse.md`.
 
 | Category | Test Cases | Root Cause | Priority |
 |----------|-----------|------------|----------|
-| License Misidentification | IBM-MIT-style.txt | Missing `x11-ibm` rules in reference data | Medium |
-| Duplicate Merging | gpl_65.txt, e2fsprogs.txt, bzip2.106.c | Overly aggressive merge in `merge_overlapping_matches()` | High |
-| Missing Detections | npruntime.h | TBD - needs pipeline trace | High |
+| License Misidentification | IBM-MIT-style.txt | LICENSE-to-rule conversion works; issue in seq_match scoring or minimum_coverage | Medium |
+| Duplicate Merging | gpl_65.txt, e2fsprogs.txt, bzip2.106.c | `is_after()` merge without distance validation at `match_refine.rs:304` | High |
+| Missing Detections | npruntime.h | NOT A BUG - Python verifies detection works; need to confirm Rust test passes | Low |
 | Unknown-License-Reference | x11_danse.txt | Already documented in PLAN-009 | High (fix ready) |
 
 ---
 
 ## Recommended Investigation Order
 
-### Phase 1: Verify and Fix Known Issues
+### Phase 1: Apply Known Fixes
 
 1. **PLAN-009 (unknown-license-reference)** - Fix is ready, should be applied first
-2. **Duplicate merging** - High impact, affects 16+ tests
+   - Location: `src/license_detection/detection.rs:populate_detection_from_group()`
+   - Add filtering logic matching `create_detection_from_group()`
 
-### Phase 2: Deep Investigation
+### Phase 2: Fix Duplicate Merging
 
-3. **npruntime.h missing detection** - Trace through full pipeline
-4. **IBM-MIT-style.txt** - Verify test expectation against Python
+2. **Add distance validation to `is_after()` merge**
+   - Location: `src/license_detection/match_refine.rs:304-308`
+   - Add check that query distance between matches is reasonable
+   - Test with `test_e2fsprogs_detection_count` and `test_bzip2_106_c_full_pipeline`
 
-### Phase 3: Comprehensive Fix
+### Phase 3: Verify and Close
 
-5. Run full golden test suite after fixes
-6. Document remaining failures
-7. Create additional investigation reports as needed
+3. **Run golden tests** to confirm npruntime.h detection works
+4. **Run IBM-MIT-style.txt investigation** to understand seq_match scoring differences
 
 ---
 
@@ -258,12 +319,13 @@ This issue is fully analyzed in `docs/license-detection/PLAN-009-x11-danse.md`.
 | Component | File | Key Functions |
 |-----------|------|---------------|
 | Detection Engine | `src/license_detection/mod.rs` | `detect()` |
-| Match Merging | `src/license_detection/match_refine.rs` | `merge_overlapping_matches()` |
+| Match Merging | `src/license_detection/match_refine.rs` | `merge_overlapping_matches()`, line 304 for `is_after()` |
 | Match Filtering | `src/license_detection/match_refine.rs` | `filter_contained_matches()`, `refine_matches()` |
 | Detection Grouping | `src/license_detection/detection.rs` | `group_matches_by_region()` |
 | Detection Creation | `src/license_detection/detection.rs` | `create_detection_from_group()`, `populate_detection_from_group()` |
 | Unknown Filtering | `src/license_detection/detection.rs` | `filter_license_intros()`, `is_unknown_intro()` |
-| Rule Loading | `src/license_detection/rules.rs` | `load_rules_from_directory()` |
+| LICENSE-to-Rule | `src/license_detection/index/builder.rs` | `build_rule_from_license()`, `build_rules_from_licenses()` |
+| Minimum Coverage | `src/license_detection/match_refine.rs` | `filter_below_rule_minimum_coverage()` (lines 1007-1029) |
 | Sequence Matching | `src/license_detection/seq_match.rs` | `seq_match()`, `seq_match_with_candidates()` |
 
 ---
@@ -271,8 +333,9 @@ This issue is fully analyzed in `docs/license-detection/PLAN-009-x11-danse.md`.
 ## Appendix: Test Commands
 
 ```bash
-# Run specific golden test
+# Run specific golden tests
 cargo test test_golden_lic1 --lib -- --nocapture
+cargo test test_golden_external_part1 --lib -- --nocapture
 
 # Run investigation tests
 cargo test test_e2fsprogs_detection_count --lib -- --nocapture
@@ -280,4 +343,23 @@ cargo test test_bzip2_106_c_full_pipeline --lib -- --nocapture
 
 # Run PLAN-009 test
 cargo test test_x11_danse_expected_expression --lib -- --nocapture
+
+# Run Python ScanCode for comparison
+cd reference/scancode-playground
+venv/bin/python src/scancode/cli.py --license --json-pp /tmp/out.json <test_file>
+```
+
+---
+
+## Appendix: Python Verification Commands
+
+```bash
+# IBM-MIT-style.txt verification
+cd reference/scancode-playground
+venv/bin/python src/scancode/cli.py --license --json-pp /tmp/ibm_mit.json \
+  /home/adrian/Documents/projects/scancode-rust/testdata/license-golden/datadriven/external/fossology-tests/IBM/IBM-MIT-style.txt
+
+# npruntime.h verification
+venv/bin/python src/scancode/cli.py --license --json-pp /tmp/npruntime.json \
+  /home/adrian/Documents/projects/scancode-rust/testdata/license-golden/datadriven/external/slic-tests/npruntime.h
 ```
