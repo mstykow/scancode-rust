@@ -31,6 +31,62 @@ pub const MATCH_SEQ_ORDER: u8 = 3;
 /// Default threshold for high resemblance (0.8 = 80% similarity).
 pub const HIGH_RESEMBLANCE_THRESHOLD: f32 = 0.8;
 
+/// Key for grouping duplicate candidates.
+///
+/// Candidates with the same DupeGroupKey are considered duplicates,
+/// and only the best one is kept.
+///
+/// Corresponds to Python: `filter_dupes.group_key()` in match_set.py (line 467-476)
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+struct DupeGroupKey {
+    license_expression: String,
+    is_highly_resemblant: bool,
+    containment: i32,
+    resemblance: i32,
+    matched_length: i32,
+    rule_length: usize,
+}
+
+/// Filter duplicate candidates, keeping only the best from each group.
+///
+/// Candidates are grouped by (license_expression, is_highly_resemblant, containment,
+/// resemblance, matched_length, rule_length). Within each group, candidates are
+/// ranked by (score_vec_full, rule.identifier) and only the best is kept.
+///
+/// This matches Python's filter_dupes behavior where matched_length uses 1-decimal
+/// precision (e.g., 6.9 and 6.7 are different, but 7 and 7 would be same).
+///
+/// Corresponds to Python: `filter_dupes()` in match_set.py (line 461-498)
+fn filter_dupes(candidates: Vec<Candidate>) -> Vec<Candidate> {
+    let mut groups: HashMap<DupeGroupKey, Vec<Candidate>> = HashMap::new();
+
+    for candidate in candidates {
+        let key = DupeGroupKey {
+            license_expression: candidate.rule.license_expression.clone(),
+            is_highly_resemblant: candidate.score_vec_rounded.is_highly_resemblant,
+            containment: (candidate.score_vec_rounded.containment * 10.0).round() as i32,
+            resemblance: (candidate.score_vec_rounded.resemblance * 10.0).round() as i32,
+            matched_length: ((candidate.score_vec_full.matched_length / 20.0) * 10.0).round() as i32,
+            rule_length: candidate.rule.tokens.len(),
+        };
+        groups.entry(key).or_default().push(candidate);
+    }
+
+    let mut result: Vec<Candidate> = Vec::new();
+    for mut group in groups.into_values() {
+        group.sort_by(|a, b| {
+            b.score_vec_full
+                .cmp(&a.score_vec_full)
+                .then_with(|| b.rule.identifier.cmp(&a.rule.identifier))
+        });
+        if let Some(best) = group.into_iter().next() {
+            result.push(best);
+        }
+    }
+
+    result
+}
+
 /// Default number of top near-duplicate candidates to consider.
 pub const MAX_NEAR_DUPE_CANDIDATES: usize = 50;
 
@@ -399,6 +455,8 @@ pub fn compute_candidates_with_msets(
             high_set_intersection,
         });
     }
+
+    sortable_candidates = filter_dupes(sortable_candidates);
 
     sortable_candidates.sort_by(|a, b| b.cmp(a));
     sortable_candidates.truncate(top_n);
@@ -1948,6 +2006,212 @@ mod tests {
         assert_eq!(
             blocks[0].2, 3,
             "Match should stop at position 3 because positions 3,4 are not in matchables"
+        );
+    }
+
+    #[test]
+    fn test_filter_dupes_matched_length_precision() {
+        let rule1 = Rule {
+            identifier: "x11-dec1.RULE".to_string(),
+            license_expression: "x11-dec1".to_string(),
+            text: String::new(),
+            tokens: vec![0; 138],
+            is_license_text: true,
+            is_license_notice: false,
+            is_license_reference: false,
+            is_license_tag: false,
+            is_license_intro: false,
+            is_license_clue: false,
+            is_false_positive: false,
+            is_required_phrase: false,
+            is_from_license: false,
+            relevance: 100,
+            minimum_coverage: None,
+            is_continuous: true,
+            referenced_filenames: None,
+            ignorable_urls: None,
+            ignorable_emails: None,
+            ignorable_copyrights: None,
+            ignorable_holders: None,
+            ignorable_authors: None,
+            language: None,
+            notes: None,
+            length_unique: 0,
+            high_length_unique: 0,
+            high_length: 0,
+            min_matched_length: 0,
+            min_high_matched_length: 0,
+            min_matched_length_unique: 0,
+            min_high_matched_length_unique: 0,
+            is_small: false,
+            is_tiny: false,
+            starts_with_license: false,
+            ends_with_license: false,
+            is_deprecated: false,
+            spdx_license_key: None,
+            other_spdx_license_keys: vec![],
+            required_phrase_spans: vec![],
+            stopwords_by_pos: std::collections::HashMap::new(),
+        };
+
+        let rule2 = Rule {
+            identifier: "cmu-uc.RULE".to_string(),
+            license_expression: "cmu-uc".to_string(),
+            text: String::new(),
+            tokens: vec![0; 133],
+            ..rule1.clone()
+        };
+
+        let candidate1 = Candidate {
+            score_vec_rounded: ScoresVector {
+                is_highly_resemblant: false,
+                containment: 0.5,
+                resemblance: 0.25,
+                matched_length: 7.0,
+                rid: 1,
+            },
+            score_vec_full: ScoresVector {
+                is_highly_resemblant: false,
+                containment: 0.5,
+                resemblance: 0.25,
+                matched_length: 138.0,
+                rid: 1,
+            },
+            rid: 1,
+            rule: rule1,
+            high_set_intersection: HashSet::new(),
+        };
+
+        let candidate2 = Candidate {
+            score_vec_rounded: ScoresVector {
+                is_highly_resemblant: false,
+                containment: 0.5,
+                resemblance: 0.25,
+                matched_length: 7.0,
+                rid: 2,
+            },
+            score_vec_full: ScoresVector {
+                is_highly_resemblant: false,
+                containment: 0.5,
+                resemblance: 0.25,
+                matched_length: 133.0,
+                rid: 2,
+            },
+            rid: 2,
+            rule: rule2,
+            high_set_intersection: HashSet::new(),
+        };
+
+        let candidates = vec![candidate1, candidate2];
+        let filtered = filter_dupes(candidates);
+
+        assert_eq!(
+            filtered.len(),
+            2,
+            "Should keep both candidates when matched_length differs at 1-decimal precision: 138/20=6.9 vs 133/20=6.7"
+        );
+    }
+
+    #[test]
+    fn test_filter_dupes_same_group() {
+        let rule1 = Rule {
+            identifier: "mit.RULE".to_string(),
+            license_expression: "mit".to_string(),
+            text: String::new(),
+            tokens: vec![0; 100],
+            is_license_text: true,
+            is_license_notice: false,
+            is_license_reference: false,
+            is_license_tag: false,
+            is_license_intro: false,
+            is_license_clue: false,
+            is_false_positive: false,
+            is_required_phrase: false,
+            is_from_license: false,
+            relevance: 100,
+            minimum_coverage: None,
+            is_continuous: true,
+            referenced_filenames: None,
+            ignorable_urls: None,
+            ignorable_emails: None,
+            ignorable_copyrights: None,
+            ignorable_holders: None,
+            ignorable_authors: None,
+            language: None,
+            notes: None,
+            length_unique: 0,
+            high_length_unique: 0,
+            high_length: 0,
+            min_matched_length: 0,
+            min_high_matched_length: 0,
+            min_matched_length_unique: 0,
+            min_high_matched_length_unique: 0,
+            is_small: false,
+            is_tiny: false,
+            starts_with_license: false,
+            ends_with_license: false,
+            is_deprecated: false,
+            spdx_license_key: None,
+            other_spdx_license_keys: vec![],
+            required_phrase_spans: vec![],
+            stopwords_by_pos: std::collections::HashMap::new(),
+        };
+
+        let rule2 = Rule {
+            identifier: "mit_2.RULE".to_string(),
+            license_expression: "mit".to_string(),
+            text: String::new(),
+            tokens: vec![0; 100],
+            ..rule1.clone()
+        };
+
+        let candidate1 = Candidate {
+            score_vec_rounded: ScoresVector {
+                is_highly_resemblant: false,
+                containment: 0.5,
+                resemblance: 0.25,
+                matched_length: 5.0,
+                rid: 1,
+            },
+            score_vec_full: ScoresVector {
+                is_highly_resemblant: false,
+                containment: 0.5,
+                resemblance: 0.25,
+                matched_length: 100.0,
+                rid: 1,
+            },
+            rid: 1,
+            rule: rule1,
+            high_set_intersection: HashSet::new(),
+        };
+
+        let candidate2 = Candidate {
+            score_vec_rounded: ScoresVector {
+                is_highly_resemblant: false,
+                containment: 0.5,
+                resemblance: 0.25,
+                matched_length: 5.0,
+                rid: 2,
+            },
+            score_vec_full: ScoresVector {
+                is_highly_resemblant: false,
+                containment: 0.5,
+                resemblance: 0.25,
+                matched_length: 100.0,
+                rid: 2,
+            },
+            rid: 2,
+            rule: rule2,
+            high_set_intersection: HashSet::new(),
+        };
+
+        let candidates = vec![candidate1, candidate2];
+        let filtered = filter_dupes(candidates);
+
+        assert_eq!(
+            filtered.len(),
+            1,
+            "Should keep only one candidate when all group keys match"
         );
     }
 }
