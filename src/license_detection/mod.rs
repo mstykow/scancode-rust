@@ -1,7 +1,87 @@
 //! License Detection Engine
-//!
-//! This module provides license detection capabilities by analyzing text content
-//! and matching it against known license patterns.
+#[cfg(test)]
+mod test_mit_debug {
+    #[test]
+    fn test_mit_t10() {
+        use std::path::PathBuf;
+        use crate::license_detection::index::build_index;
+        use crate::license_detection::query::Query;
+        use crate::license_detection::aho_match::aho_match;
+        use crate::license_detection::match_refine::{merge_overlapping_matches, filter_contained_matches, filter_overlapping_matches, restore_non_overlapping};
+        use crate::license_detection::rules::{load_rules_from_directory, load_licenses_from_directory};
+        use crate::license_detection::models::LicenseMatch;
+        use crate::license_detection::detection::{group_matches_by_region, create_detection_from_group};
+        
+        let rules_path = PathBuf::from("reference/scancode-toolkit/src/licensedcode/data/rules");
+        let licenses_path = PathBuf::from("reference/scancode-toolkit/src/licensedcode/data/licenses");
+        let rules = load_rules_from_directory(&rules_path, false).unwrap();
+        let licenses = load_licenses_from_directory(&licenses_path, false).unwrap();
+        let index = build_index(rules, licenses);
+        
+        let text = std::fs::read_to_string("testdata/license-golden/datadriven/external/glc/MIT.t10").unwrap();
+        let query = Query::new(&text, &index).unwrap();
+        let whole_run = query.whole_query_run();
+        
+        // Phase 1c: Aho-Corasick matching
+        let aho_matches = aho_match(&index, &whole_run);
+        eprintln!("Raw AHO matches: {}", aho_matches.len());
+        for m in &aho_matches {
+            eprintln!("  {} at tokens {}-{}, lines {}-{}, coverage={:.2}%, is_text={}, is_ref={}", 
+                m.license_expression, m.start_token, m.end_token, m.start_line, m.end_line, m.match_coverage,
+                m.is_license_text, m.is_license_reference);
+        }
+        
+        let merged_aho = merge_overlapping_matches(&aho_matches);
+        eprintln!("\nAfter merge: {}", merged_aho.len());
+        for m in &merged_aho {
+            eprintln!("  {} at tokens {}-{}, lines {}-{}", m.license_expression, m.start_token, m.end_token, m.start_line, m.end_line);
+        }
+        
+        let (non_contained_aho, discarded_contained) = filter_contained_matches(&merged_aho);
+        eprintln!("\nAfter filter_contained: kept {} discarded {}", non_contained_aho.len(), discarded_contained.len());
+        for m in &non_contained_aho {
+            eprintln!("  KEPT: {} at lines {}-{}", m.license_expression, m.start_line, m.end_line);
+        }
+        for m in &discarded_contained {
+            eprintln!("  DISCARDED: {} at lines {}-{}", m.license_expression, m.start_line, m.end_line);
+        }
+        
+        let (filtered_aho, discarded_overlapping) = filter_overlapping_matches(non_contained_aho.clone(), &index);
+        eprintln!("\nAfter filter_overlapping: kept {} discarded {}", filtered_aho.len(), discarded_overlapping.len());
+        for m in &filtered_aho {
+            eprintln!("  KEPT: {} at lines {}-{}", m.license_expression, m.start_line, m.end_line);
+        }
+        
+        // Restore
+        let (restored_contained, _) = restore_non_overlapping(&filtered_aho, discarded_contained);
+        let (restored_overlapping, _) = restore_non_overlapping(&filtered_aho, discarded_overlapping);
+        
+        let mut final_aho = filtered_aho.clone();
+        final_aho.extend(restored_contained);
+        final_aho.extend(restored_overlapping);
+        
+        eprintln!("\nAfter restore: {}", final_aho.len());
+        for m in &final_aho {
+            eprintln!("  {} at lines {}-{}", m.license_expression, m.start_line, m.end_line);
+        }
+        
+        // Group
+        let groups = group_matches_by_region(&final_aho);
+        eprintln!("\nGroups: {}", groups.len());
+        for (i, g) in groups.iter().enumerate() {
+            eprintln!("  Group {}:", i);
+            for m in &g.matches {
+                eprintln!("    {} at lines {}-{}", m.license_expression, m.start_line, m.end_line);
+            }
+        }
+        
+        // Detection
+        for (i, g) in groups.iter().enumerate() {
+            let detection = create_detection_from_group(g);
+            eprintln!("  Detection {}: expr={:?}", i, detection.license_expression);
+        }
+    }
+}
 
 pub mod aho_match;
 #[cfg(test)]

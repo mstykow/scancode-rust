@@ -301,9 +301,10 @@ mod tests {
             load_licenses_from_directory, load_rules_from_directory,
         };
         use crate::license_detection::seq_match::{
-            compute_candidates_with_msets, MAX_NEAR_DUPE_CANDIDATES,
+            compute_candidates_with_msets, seq_match_with_candidates, MAX_NEAR_DUPE_CANDIDATES,
         };
         use crate::utils::text::strip_utf8_bom_str;
+        use std::path::PathBuf;
 
         let rules_path = PathBuf::from("reference/scancode-toolkit/src/licensedcode/data/rules");
         let licenses_path =
@@ -357,6 +358,38 @@ mod tests {
                 c.rule.identifier, c.rule.license_expression,
                 c.score_vec_rounded.is_highly_resemblant, c.score_vec_rounded.containment, c.score_vec_rounded.resemblance, c.score_vec_rounded.matched_length,
                 c.score_vec_full.is_highly_resemblant, c.score_vec_full.containment, c.score_vec_full.resemblance, c.score_vec_full.matched_length);
+        }
+
+        // Now run seq_match_with_candidates to see what matches are produced
+        eprintln!("\n=== Running seq_match_with_candidates ===");
+        let matches = seq_match_with_candidates(&index, &whole_run, &near_dupe_candidates);
+        eprintln!("Matches produced: {}", matches.len());
+
+        // Check for x11-dec1 and cmu-uc in matches
+        let x11_matches: Vec<_> = matches
+            .iter()
+            .filter(|m| m.license_expression.contains("x11-dec1"))
+            .collect();
+        eprintln!("\n=== x11-dec1 matches ===");
+        eprintln!("Count: {}", x11_matches.len());
+        for m in &x11_matches {
+            eprintln!(
+                "{} - score={:.2}, lines={}-{}, matched_len={}",
+                m.rule_identifier, m.match_coverage, m.start_line, m.end_line, m.matched_length
+            );
+        }
+
+        let cmu_matches: Vec<_> = matches
+            .iter()
+            .filter(|m| m.license_expression.contains("cmu-uc"))
+            .collect();
+        eprintln!("\n=== cmu-uc matches ===");
+        eprintln!("Count: {}", cmu_matches.len());
+        for m in &cmu_matches {
+            eprintln!(
+                "{} - score={:.2}, lines={}-{}, matched_len={}",
+                m.rule_identifier, m.match_coverage, m.start_line, m.end_line, m.matched_length
+            );
         }
     }
 

@@ -38,3 +38,6 @@ mod unknown_ucware_test;
 
 #[cfg(test)]
 mod rule_118_test;
+
+#[cfg(test)]
+mod ar_er_debug_test;

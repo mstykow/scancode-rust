@@ -740,10 +740,12 @@ pub fn classify_detection(detection: &LicenseDetection, min_score: f32) -> bool 
 
     let score = compute_detection_score(&detection.matches);
     let meets_score_threshold = score >= min_score - 0.01;
-    let not_low_quality = !is_low_quality_matches(&detection.matches);
     let not_false_positive = !is_false_positive(&detection.matches);
 
-    meets_score_threshold && not_low_quality && not_false_positive
+    // Python does NOT filter out low-quality matches - it returns them with
+    // "low-quality-matches" in detection_log but still includes them.
+    // See: detection.py get_detected_license_expression() lines 1565-1571
+    meets_score_threshold && not_false_positive
 }
 
 /// Populate LicenseDetection from a DetectionGroup.

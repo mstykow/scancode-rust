@@ -386,6 +386,7 @@ pub(crate) fn filter_contained_matches(
             let next = matches[j].clone();
 
             if next.end_token > current.end_token {
+                j += 1;
                 break;
             }
 
@@ -416,6 +417,66 @@ pub(crate) fn filter_contained_matches(
     }
 
     (matches, discarded)
+}
+
+/// Filter license reference matches when a license text match exists for the same expression
+/// AND the reference is contained within the text match's region.
+///
+/// This handles cases where a short license reference appears within or directly overlapping
+/// with the full license text. The reference is redundant in such cases.
+///
+/// A reference is discarded ONLY when:
+/// - It has the same license_expression as a license text match
+/// - It is shorter than the license text match
+/// - It is CONTAINED within the text match's qregion (token span)
+///
+/// References at DIFFERENT locations are kept (e.g., MIT.t10 where "The MIT License" 
+/// header at line 1 is separate from the license text at lines 5-20).
+fn filter_license_references_with_text_match(
+    matches: &[LicenseMatch],
+) -> Vec<LicenseMatch> {
+    if matches.len() < 2 {
+        return matches.to_vec();
+    }
+
+    let mut to_discard = std::collections::HashSet::new();
+
+    for i in 0..matches.len() {
+        for j in 0..matches.len() {
+            if i == j {
+                continue;
+            }
+
+            let current = &matches[i];
+            let other = &matches[j];
+
+            if current.license_expression != other.license_expression {
+                continue;
+            }
+
+            let current_is_ref = current.is_license_reference && !current.is_license_text;
+            let other_is_text = other.is_license_text && !other.is_license_reference;
+
+            if current_is_ref && other_is_text && current.matched_length < other.matched_length {
+                // Only discard if the reference is contained within the text match's region
+                // This preserves references at different locations (like MIT.t10)
+                if other.qcontains(current) {
+                    to_discard.insert(i);
+                }
+            }
+        }
+    }
+
+    if to_discard.is_empty() {
+        return matches.to_vec();
+    }
+
+    matches
+        .iter()
+        .enumerate()
+        .filter(|(i, _)| !to_discard.contains(i))
+        .map(|(_, m)| m.clone())
+        .collect()
 }
 
 /// Filter matches to false positive rules.
@@ -1592,7 +1653,10 @@ fn refine_matches_internal(
     };
 
     let merged_final = merge_overlapping_matches(&result);
-    let mut final_scored = merged_final;
+    
+    let filtered_refs = filter_license_references_with_text_match(&merged_final);
+    
+    let mut final_scored = filtered_refs;
     update_match_scores(&mut final_scored, query);
 
     final_scored

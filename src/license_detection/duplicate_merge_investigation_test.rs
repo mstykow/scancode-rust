@@ -52,42 +52,42 @@ mod tests {
     }
 
     #[test]
-    fn test_bzip2_106_c_full_pipeline() {
+    fn test_ncsa_t1_detection_debug() {
         let Some(engine) = ensure_engine() else {
             eprintln!("Skipping test: reference directory not found");
             return;
         };
 
-        let content =
-            include_str!("../../testdata/license-golden/datadriven/lic2/1908-bzip2/bzip2.106.c");
+        let content = include_str!("../../testdata/license-golden/datadriven/external/glc/NCSA.t1");
 
-        eprintln!("\n=== FULL DETECTION PIPELINE for bzip2.106.c ===");
+        eprintln!("\n=== FULL DETECTION PIPELINE for NCSA.t1 ===");
         let detections = engine
             .detect(content, false)
             .expect("Detection should succeed");
 
         eprintln!("Number of detections: {}", detections.len());
-
-        let mut all_matches: Vec<_> = detections.iter().flat_map(|d| d.matches.iter()).collect();
-        all_matches.sort_by_key(|m| m.start_line);
-
-        for (i, m) in all_matches.iter().enumerate() {
-            print_match_details(m, &format!("Match[{}]", i));
+        for (i, d) in detections.iter().enumerate() {
+            eprintln!("Detection {}: expr={:?}", i, d.license_expression);
+            for (j, m) in d.matches.iter().enumerate() {
+                eprintln!(
+                    "  Match[{}]: rule={} expr={} lines={}-{} tokens={}-{} is_license_text={} is_license_ref={}",
+                    j, m.rule_identifier, m.license_expression, m.start_line, m.end_line,
+                    m.start_token, m.end_token, m.is_license_text, m.is_license_reference
+                );
+            }
         }
 
-        let expressions: Vec<&str> = all_matches
+        let expressions: Vec<&str> = detections
             .iter()
+            .flat_map(|d| d.matches.iter())
             .map(|m| m.license_expression.as_str())
             .collect();
-        eprintln!("Final expressions: {:?}", expressions);
-
-        // Document current behavior (1 match instead of expected 2)
-        eprintln!("\nEXPECTED: 2 matches (Python produces matches at lines 7-17 and 27-34)");
-        eprintln!("ACTUAL: {} matches", all_matches.len());
+        eprintln!("Final expressions (as compared in test): {:?}", expressions);
+        eprintln!("Expected: [\"uoi-ncsa\", \"uoi-ncsa\"]");
     }
 
     #[test]
-    fn test_bzip2_106_c_aho_matches_directly() {
+    fn test_bzip2_106_c_full_pipeline() {
         use crate::license_detection::aho_match::aho_match;
         use crate::license_detection::query::Query;
 
@@ -799,15 +799,144 @@ mod tests {
         eprintln!("Discarded: {}", discarded_overlapping.len());
         for (i, m) in discarded_overlapping.iter().enumerate() {
             eprintln!(
-                "  [D{}] expr={} lines={}-{} tokens={}-{}",
-                i, m.license_expression, m.start_line, m.end_line, m.start_token, m.end_token
+                "  [D{}] expr={} lines={}-{} tokens={}-{} is_license_text={} is_license_ref={}",
+                i,
+                m.license_expression,
+                m.start_line,
+                m.end_line,
+                m.start_token,
+                m.end_token,
+                m.is_license_text,
+                m.is_license_reference
+            );
+        }
+    }
+
+    #[test]
+    fn test_ncsa_txt_merge_matches_debug() {
+        use crate::license_detection::aho_match::aho_match;
+        use crate::license_detection::match_refine::merge_overlapping_matches;
+        use crate::license_detection::query::Query;
+
+        let Some(engine) = ensure_engine() else {
+            eprintln!("Skipping test: reference directory not found");
+            return;
+        };
+
+        let content = include_str!(
+            "../../testdata/license-golden/datadriven/external/fossology-tests/NCSA/NCSA.txt"
+        );
+        let index = engine.index();
+
+        let query = Query::new(content, index).expect("Query creation should succeed");
+        let whole_run = query.whole_query_run();
+
+        let aho_matches = aho_match(index, &whole_run);
+
+        eprintln!("\n=== merge_matches DEBUG for NCSA.txt ===");
+        eprintln!("Before merge: {} matches", aho_matches.len());
+        for (i, m) in aho_matches.iter().enumerate() {
+            eprintln!(
+                "  [{}] expr={} rule={} lines={}-{} tokens={}-{} same_licensing check",
+                i,
+                m.license_expression,
+                m.rule_identifier,
+                m.start_line,
+                m.end_line,
+                m.start_token,
+                m.end_token
             );
         }
 
-        // Final count
-        eprintln!("\n=== FINAL ANALYSIS ===");
-        eprintln!("Expected: 2 matches (lines 1-1 and 7-13)");
-        eprintln!("Got: {} matches after refinement", non_overlapping.len());
+        let merged = merge_overlapping_matches(&aho_matches);
+        eprintln!("\nAfter merge: {} matches", merged.len());
+        for (i, m) in merged.iter().enumerate() {
+            eprintln!(
+                "  [{}] expr={} rule={} lines={}-{} tokens={}-{}",
+                i,
+                m.license_expression,
+                m.rule_identifier,
+                m.start_line,
+                m.end_line,
+                m.start_token,
+                m.end_token
+            );
+        }
+    }
+
+    #[test]
+    fn test_mit_t10_detection_debug() {
+        let Some(engine) = ensure_engine() else {
+            eprintln!("Skipping test: reference directory not found");
+            return;
+        };
+
+        let content = include_str!("../../testdata/license-golden/datadriven/external/glc/MIT.t10");
+
+        eprintln!("\n=== FULL DETECTION PIPELINE for MIT.t10 ===");
+        let detections = engine
+            .detect(content, false)
+            .expect("Detection should succeed");
+
+        eprintln!("Number of detections: {}", detections.len());
+        for (i, d) in detections.iter().enumerate() {
+            eprintln!("Detection {}: expr={:?}", i, d.license_expression);
+            for (j, m) in d.matches.iter().enumerate() {
+                eprintln!(
+                    "  Match[{}]: rule={} expr={} lines={}-{} tokens={}-{} is_license_text={} is_license_ref={}",
+                    j, m.rule_identifier, m.license_expression, m.start_line, m.end_line,
+                    m.start_token, m.end_token, m.is_license_text, m.is_license_reference
+                );
+            }
+        }
+
+        let expressions: Vec<&str> = detections
+            .iter()
+            .flat_map(|d| d.matches.iter())
+            .map(|m| m.license_expression.as_str())
+            .collect();
+        eprintln!("Final expressions (as compared in test): {:?}", expressions);
+        eprintln!("Expected: [\"mit\", \"mit\"]");
+    }
+
+    #[test]
+    fn test_mit_t10_step_by_step() {
+        use crate::license_detection::aho_match::aho_match;
+        use crate::license_detection::match_refine::refine_matches;
+        use crate::license_detection::query::Query;
+
+        let Some(engine) = ensure_engine() else {
+            eprintln!("Skipping test: reference directory not found");
+            return;
+        };
+
+        let content = include_str!("../../testdata/license-golden/datadriven/external/glc/MIT.t10");
+        let index = engine.index();
+
+        let query = Query::new(content, index).expect("Query creation should succeed");
+        let whole_run = query.whole_query_run();
+
+        let aho_matches = aho_match(index, &whole_run);
+
+        eprintln!("\n=== STEP BY STEP for MIT.t10 ===");
+        eprintln!("Raw aho matches: {}", aho_matches.len());
+        for (i, m) in aho_matches.iter().enumerate() {
+            eprintln!(
+                "  [{}] expr={} rule={} lines={}-{} tokens={}-{} is_license_text={} is_license_ref={}",
+                i, m.license_expression, m.rule_identifier, m.start_line, m.end_line,
+                m.start_token, m.end_token, m.is_license_text, m.is_license_reference
+            );
+        }
+
+        let refined = refine_matches(index, aho_matches, &query);
+        eprintln!("\nRefined matches: {}", refined.len());
+        for (i, m) in refined.iter().enumerate() {
+            eprintln!(
+                "  [{}] expr={} rule={} lines={}-{} tokens={}-{} is_license_text={} is_license_ref={}",
+                i, m.license_expression, m.rule_identifier, m.start_line, m.end_line,
+                m.start_token, m.end_token, m.is_license_text, m.is_license_reference
+            );
+        }
     }
 
     #[test]
@@ -1025,6 +1154,165 @@ mod tests {
             eprintln!(
                 "  Detection {}: identifier={:?} expr={:?}",
                 i, d.identifier, d.license_expression
+            );
+        }
+    }
+
+    #[test]
+    fn test_ncsa_txt_detection_debug() {
+        let Some(engine) = ensure_engine() else {
+            eprintln!("Skipping test: reference directory not found");
+            return;
+        };
+
+        let content = include_str!(
+            "../../testdata/license-golden/datadriven/external/fossology-tests/NCSA/NCSA.txt"
+        );
+
+        eprintln!("\n=== FULL DETECTION PIPELINE for NCSA.txt ===");
+        let detections = engine
+            .detect(content, false)
+            .expect("Detection should succeed");
+
+        eprintln!("Number of detections: {}", detections.len());
+        for (i, d) in detections.iter().enumerate() {
+            eprintln!("Detection {}: expr={:?}", i, d.license_expression);
+            for (j, m) in d.matches.iter().enumerate() {
+                eprintln!(
+                    "  Match[{}]: rule={} expr={} lines={}-{} tokens={}-{} is_license_text={} is_license_ref={}",
+                    j, m.rule_identifier, m.license_expression, m.start_line, m.end_line,
+                    m.start_token, m.end_token, m.is_license_text, m.is_license_reference
+                );
+            }
+        }
+
+        let expressions: Vec<&str> = detections
+            .iter()
+            .flat_map(|d| d.matches.iter())
+            .map(|m| m.license_expression.as_str())
+            .collect();
+        eprintln!("Final expressions (as compared in test): {:?}", expressions);
+        eprintln!("Expected: [\"uoi-ncsa\"]");
+    }
+
+    #[test]
+    fn test_ncsa_txt_refine_step_by_step() {
+        use crate::license_detection::aho_match::aho_match;
+        use crate::license_detection::match_refine::{
+            filter_contained_matches, filter_overlapping_matches, merge_overlapping_matches,
+        };
+        use crate::license_detection::query::Query;
+
+        let Some(engine) = ensure_engine() else {
+            eprintln!("Skipping test: reference directory not found");
+            return;
+        };
+
+        let content = include_str!(
+            "../../testdata/license-golden/datadriven/external/fossology-tests/NCSA/NCSA.txt"
+        );
+        let index = engine.index();
+
+        let query = Query::new(content, index).expect("Query creation should succeed");
+        let whole_run = query.whole_query_run();
+
+        let aho_matches = aho_match(index, &whole_run);
+
+        eprintln!("\n=== STEP BY STEP REFINEMENT for NCSA.txt ===");
+
+        eprintln!("\n--- STEP 0: Raw aho matches ---");
+        eprintln!("Count: {}", aho_matches.len());
+        for (i, m) in aho_matches.iter().enumerate() {
+            eprintln!(
+                "  [{}] expr={} lines={}-{} tokens={}-{} is_license_text={} is_license_ref={}",
+                i,
+                m.license_expression,
+                m.start_line,
+                m.end_line,
+                m.start_token,
+                m.end_token,
+                m.is_license_text,
+                m.is_license_reference
+            );
+        }
+
+        let merged = merge_overlapping_matches(&aho_matches);
+        eprintln!("\n--- STEP 1: After merge_overlapping_matches ---");
+        eprintln!("Count: {}", merged.len());
+        for (i, m) in merged.iter().enumerate() {
+            eprintln!(
+                "  [{}] expr={} lines={}-{} tokens={}-{} is_license_text={} is_license_ref={}",
+                i,
+                m.license_expression,
+                m.start_line,
+                m.end_line,
+                m.start_token,
+                m.end_token,
+                m.is_license_text,
+                m.is_license_reference
+            );
+        }
+
+        let (non_contained, discarded_contained) = filter_contained_matches(&merged);
+        eprintln!("\n--- STEP 2: After filter_contained_matches ---");
+        eprintln!("Kept: {}", non_contained.len());
+        for (i, m) in non_contained.iter().enumerate() {
+            eprintln!(
+                "  [{}] expr={} lines={}-{} tokens={}-{} is_license_text={} is_license_ref={}",
+                i,
+                m.license_expression,
+                m.start_line,
+                m.end_line,
+                m.start_token,
+                m.end_token,
+                m.is_license_text,
+                m.is_license_reference
+            );
+        }
+        eprintln!("Discarded: {}", discarded_contained.len());
+        for (i, m) in discarded_contained.iter().enumerate() {
+            eprintln!(
+                "  [D{}] expr={} lines={}-{} tokens={}-{} is_license_text={} is_license_ref={}",
+                i,
+                m.license_expression,
+                m.start_line,
+                m.end_line,
+                m.start_token,
+                m.end_token,
+                m.is_license_text,
+                m.is_license_reference
+            );
+        }
+
+        let (non_overlapping, discarded_overlapping) =
+            filter_overlapping_matches(non_contained.clone(), index);
+        eprintln!("\n--- STEP 3: After filter_overlapping_matches ---");
+        eprintln!("Kept: {}", non_overlapping.len());
+        for (i, m) in non_overlapping.iter().enumerate() {
+            eprintln!(
+                "  [{}] expr={} lines={}-{} tokens={}-{} is_license_text={} is_license_ref={}",
+                i,
+                m.license_expression,
+                m.start_line,
+                m.end_line,
+                m.start_token,
+                m.end_token,
+                m.is_license_text,
+                m.is_license_reference
+            );
+        }
+        eprintln!("Discarded: {}", discarded_overlapping.len());
+        for (i, m) in discarded_overlapping.iter().enumerate() {
+            eprintln!(
+                "  [D{}] expr={} lines={}-{} tokens={}-{} is_license_text={} is_license_ref={}",
+                i,
+                m.license_expression,
+                m.start_line,
+                m.end_line,
+                m.start_token,
+                m.end_token,
+                m.is_license_text,
+                m.is_license_reference
             );
         }
     }
