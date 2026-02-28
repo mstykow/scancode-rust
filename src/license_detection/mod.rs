@@ -39,6 +39,8 @@ pub mod spdx_mapping;
 mod test_utils;
 #[cfg(test)]
 mod token_id_equivalence_test;
+#[cfg(test)]
+mod filter_dupes_debug_test;
 mod tokenize;
 pub mod unknown_match;
 

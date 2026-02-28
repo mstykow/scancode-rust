@@ -13,15 +13,18 @@
 - **Missing one `unknown` match at the end**
 - Python has 5 matches, Rust has 4 matches
 
-## Python Reference Output
+## Python Reference Output (Confirmed 2026-02-28)
+
+Run with: `scancode --license --unknown-licenses <file>`
 
 ```
-Total matches: 5
-0: scea-1.0 | lines 1-1 | rule=scea-1.0_4.RULE | matcher=2-aho
-1: unknown-license-reference | lines 1-1 | rule=unknown-license-reference_332.RULE | matcher=2-aho
-2: scea-1.0 | lines 7-7 | rule=scea-1.0_4.RULE | matcher=2-aho
-3: unknown | lines 7-22 | rule=license-detection-unknown-* | matcher=6-unknown
-4: unknown | lines 22-31 | rule=license-detection-unknown-* | matcher=6-unknown
+Detection 1: scea-1.0
+  Match: scea-1.0 | lines 1-1 | rule=scea-1.0_4.RULE | matcher=2-aho
+
+Detection 2: scea-1.0 AND unknown
+  Match: scea-1.0 | lines 7-7 | rule=scea-1.0_4.RULE | matcher=2-aho
+  Match: unknown | lines 7-22 | matcher=6-unknown
+  Match: unknown | lines 22-31 | matcher=6-unknown
 ```
 
 Key observation: Python creates **TWO separate unknown matches**:
@@ -30,7 +33,7 @@ Key observation: Python creates **TWO separate unknown matches**:
 
 These are **adjacent** (line 22 is both end of match 3 and start of match 4).
 
-## Rust Debug Output
+## Rust Debug Output (Confirmed 2026-02-28)
 
 ```
 === RUST DETECTIONS ===
@@ -118,83 +121,67 @@ This means Python correctly excludes ONLY the matched positions, while Rust excl
 
 ## Proposed Fix
 
-### Option 1: Track qspan positions in LicenseMatch (Comprehensive)
+The `LicenseMatch` struct already has `qspan_positions: Option<Vec<usize>>` field (line 323 in models.rs).
 
-Add `qspan_positions: Vec<usize>` to `LicenseMatch` to track exactly which token positions were matched. Use this for computing covered positions in unknown detection.
+### Implementation Steps
 
-**Pros:**
-- Accurate parity with Python
-- Enables future features (highlighting, etc.)
+1. **Populate `qspan_positions` for aho matches**:
+   - In `aho_match.rs`, set `qspan_positions` to the exact token positions matched
+   - Currently it's set to `None` for all aho matches
 
-**Cons:**
-- Requires changes to all matchers
-- More memory per match
+2. **Use `qspan_positions` in `compute_covered_positions()`**:
+   - In `unknown_match.rs:161-174`, check if `qspan_positions` is Some
+   - If Some, use those positions instead of `start_token..end_token`
+   - This matches Python's behavior of using only matched positions
 
-### Option 2: Re-compute qspan from matched_token_positions (If available)
+### Code Change in `unknown_match.rs`
 
-If `matched_token_positions` is already populated for matches, use it to compute coverage.
+```rust
+fn compute_covered_positions(
+    _query: &Query,
+    known_matches: &[LicenseMatch],
+) -> std::collections::HashSet<usize> {
+    let mut covered = std::collections::HashSet::new();
 
-### Option 3: Debug Python to identify the actual gap-causing match
+    for m in known_matches {
+        if let Some(positions) = &m.qspan_positions {
+            // Use exact matched positions (Python's qspan behavior)
+            for pos in positions {
+                covered.insert(*pos);
+            }
+        } else {
+            // Fallback to full range for matches without qspan_positions
+            for pos in m.start_token..m.end_token {
+                covered.insert(pos);
+            }
+        }
+    }
 
-Run Python with tracing to identify which match's qspan creates the gap between lines 7-22 and 22-31. Then ensure Rust has equivalent behavior.
-
-**Recommended approach:** Option 3 first to confirm hypothesis, then implement Option 1 or 2.
-
----
-
-## Specific Investigation Needed
-
-1. **Run Python with TRACE enabled** to see:
-   - What matches exist before `split_weak_matches`
-   - What `good_qspan` looks like
-   - What `unmatched_qspan.subspans()` returns
-   - Which match's qspan causes the split
-
-2. **Compare Rust's intermediate state** to Python:
-   - What matches does Rust have after initial matching?
-   - What positions are marked as covered?
-
-3. **Check for hidden matches** in Python that might create the gap:
-   - Run with `TRACE=true` in Python
-   - Look for matches that are filtered during `refine_matches`
-
----
-
-## Debugging Commands
-
-### Python Debug
-```bash
-cd reference/scancode-toolkit
-python -c "
-import os
-os.environ['LICENSEDCODE_TRACE'] = 'true'
-from licensedcode.index import LicenseIndex
-from licensedcode.query import Query
-
-idx = LicenseIndex()
-text = open('../../testdata/license-golden/datadriven/unknown/scea.txt').read()
-qry = Query(idx, text, location='test')
-matches = idx.match(qry)
-"
+    covered
+}
 ```
 
-### Rust Debug
-Add debug output to `unknown_match()` to print:
-- Covered positions
-- Unmatched regions
-- Ngram match positions
+---
+
+## Investigation Notes
+
+**Root Cause Confirmed (2026-02-28):**
+
+The Python output shows the gap is created by a known match at line 22 (the `license-intro_59.RULE` which matches "Contributions"). This creates a gap in the unknown regions that causes Python to split into two matches.
+
+However, the deeper issue is that Python's unknown detection uses `qspan` (exact matched token positions) while Rust uses `start_token..end_token` (full range). The fix is to populate and use `qspan_positions`.
 
 ---
 
 ## Estimated Effort
 
-**Total: 4-8 hours** (depending on investigation findings)
+**Total: 2-4 hours**
 
 | Task | Time |
 |------|------|
-| Debug Python to identify gap-causing match | 2-3 hours |
-| Implement fix based on findings | 2-4 hours |
-| Update tests | 1 hour |
+| Populate qspan_positions in aho_match.rs | 1-2 hours |
+| Update compute_covered_positions() in unknown_match.rs | 30 min |
+| Add tests and verify | 1 hour |
 
 ---
 

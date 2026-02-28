@@ -1,6 +1,8 @@
 # 0014: Non-SPDX License Detection Issues Investigation
 
-## Status: Investigation Complete
+## Status: Investigation Ongoing
+
+**Latest Update:** Category 3 (npruntime.h) root cause confirmed as missing `filter_dupes()` in candidate selection. Fix implemented but causes regressions requiring deeper pipeline analysis.
 
 ## Executive Summary
 
@@ -198,7 +200,7 @@ if next.is_after(&current) {
 
 ---
 
-## Category 3: Missing Detections
+## Category 3: Missing Detections (npruntime.h)
 
 ### Test Case: `npruntime.h`
 
@@ -238,28 +240,87 @@ if next.is_after(&current) {
 }
 ```
 
-### Root Cause: Not Actually Missing
+### Root Cause Confirmed: Missing `filter_dupes()` in Candidate Selection
 
-The test expectation file (`npruntime.h.yml`) shows `bsd-new` is expected. Python verifies this works.
+**The issue is candidate crowding in the sequence matcher.**
 
-**This is NOT a missing detection issue.** The original plan was based on speculation. 
+During `seq_match_with_candidates()`, the algorithm selects the top 70 candidates for detailed matching. The `filter_dupes()` function in Python removes duplicate rule candidates that would otherwise crowd out better matches.
 
-The issue is likely that:
-1. Rust DOES detect `bsd-new` for this file
-2. The test may be passing or timing out during test runs
-3. Need to run the specific golden test to confirm
+**Rust was missing `filter_dupes()` in candidate selection.**
 
-### Investigation Required
+Without deduplication:
+- 60 of 70 candidate slots were filled with `bsd-new` variations (different rules matching the same license)
+- The correct rule `bsd-new_22.RULE` was crowded out and never evaluated
+- Result: `bsd-new` not detected
 
-1. Run `cargo test test_golden_external --lib` with focus on slic-tests
-2. If test passes, this category can be closed
-3. If test fails, compare Rust vs Python matches for `bsd-new_22.RULE`
+### filter_dupes Investigation Results
+
+**Implementation was added and matched Python:**
+- Same grouping keys (by license expression)
+- Same best candidate selection logic (highest score wins)
+- Correctly reduces duplicate candidates before detailed matching
+
+**Test Results:**
+- Fixed 14 tests (including npruntime.h)
+- Introduced 15 new failures
+- **Net: -1 regression**
+
+### Regression Analysis
+
+The fix is technically correct but causes unexpected behavioral changes:
+
+**Example Regression: `MIT.t21`**
+- Before fix: `proprietary-license`
+- After fix: `mit`
+- This appears to be an **improvement** (MIT is more accurate than proprietary)
+
+**Example Regression: Extra Detections**
+- Some tests now detect additional licenses like `lgpl-2.1-plus`
+- Deduplication changes which candidate "wins" when multiple rules have similar scores
+- The winning candidate may trigger different downstream match refinement
+
+### Key Insight: Complex Pipeline Interactions
+
+The `filter_dupes` fix interacts with other parts of the pipeline in unexpected ways:
+
+1. **Candidate Selection**: Removing duplicates changes which rules are evaluated
+2. **Match Refinement**: Different rules may produce different match regions
+3. **Detection Creation**: Different matches may group differently into detections
+
+**The issue may not be in `filter_dupes` itself** but in:
+- How rules are prioritized after deduplication
+- The match refinement pipeline after candidate selection
+- How detections are created from the refined matches
+
+### Next Steps
+
+1. **Analyze regression cases individually**:
+   - For each failing test, compare Python vs Rust output
+   - Determine if Rust's new behavior is actually correct
+   - Document cases where Rust behavior differs from Python
+
+2. **Investigate candidate prioritization**:
+   - After `filter_dupes`, how are remaining candidates ordered?
+   - Does Python have additional sorting we're missing?
+
+3. **Check match refinement differences**:
+   - Does the winning candidate trigger different refinement behavior?
+   - Are there downstream effects in `refine_matches()`?
+
+4. **Consider incremental approach**:
+   - Fix npruntime.h specifically without changing other behavior
+   - May need to understand why Python's dedup doesn't cause regressions
 
 ### Code Locations
 
-- Sequence matching: `src/license_detection/seq_match.rs`
+- filter_dupes implementation: `src/license_detection/seq_match.rs`
+- Candidate selection: `src/license_detection/seq_match.rs:seq_match_with_candidates()`
 - Match refinement: `src/license_detection/match_refine.rs:refine_matches()`
 - Detection filtering: `src/license_detection/detection.rs:post_process_detections()`
+
+### Status: Investigation Ongoing
+
+Root cause confirmed, but fix causes regressions that need deeper analysis.
 
 ---
 
@@ -287,7 +348,7 @@ This issue is fully analyzed in `docs/license-detection/PLAN-009-x11-danse.md`.
 |----------|-----------|------------|----------|
 | License Misidentification | IBM-MIT-style.txt | LICENSE-to-rule conversion works; issue in seq_match scoring or minimum_coverage | Medium |
 | Duplicate Merging | gpl_65.txt, e2fsprogs.txt, bzip2.106.c | `is_after()` merge without distance validation at `match_refine.rs:304` | High |
-| Missing Detections | npruntime.h | NOT A BUG - Python verifies detection works; need to confirm Rust test passes | Low |
+| Missing Detections (npruntime.h) | npruntime.h | Missing `filter_dupes()` causes candidate crowding; fix causes regressions needing deeper analysis | High |
 | Unknown-License-Reference | x11_danse.txt | Already documented in PLAN-009 | High (fix ready) |
 
 ---
@@ -307,10 +368,25 @@ This issue is fully analyzed in `docs/license-detection/PLAN-009-x11-danse.md`.
    - Add check that query distance between matches is reasonable
    - Test with `test_e2fsprogs_detection_count` and `test_bzip2_106_c_full_pipeline`
 
-### Phase 3: Verify and Close
+### Phase 3: Resolve filter_dupes Regressions
 
-3. **Run golden tests** to confirm npruntime.h detection works
-4. **Run IBM-MIT-style.txt investigation** to understand seq_match scoring differences
+3. **Analyze npruntime.h / filter_dupes regression cases**
+   - For each failing test after filter_dupes fix, compare Python vs Rust output
+   - Determine if Rust's new behavior is actually correct or a regression
+   - Key tests to analyze: `MIT.t21`, tests with extra `lgpl-2.1-plus` detections
+   
+4. **Investigate candidate prioritization after deduplication**
+   - After `filter_dupes`, how are remaining candidates ordered?
+   - Does Python have additional sorting we're missing?
+   
+5. **Check match refinement pipeline interactions**
+   - Does the winning candidate trigger different refinement behavior?
+   - Are there downstream effects we haven't accounted for?
+
+### Phase 4: Verify and Close
+
+6. **Run golden tests** to confirm npruntime.h detection works after regressions resolved
+7. **Run IBM-MIT-style.txt investigation** to understand seq_match scoring differences
 
 ---
 
