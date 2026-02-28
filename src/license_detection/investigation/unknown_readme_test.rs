@@ -387,4 +387,87 @@ mod tests {
             }
         }
     }
+
+    #[test]
+    fn test_plan_012_unknown_automaton_debug() {
+        let Some(engine) = get_engine() else { return };
+        let Some(text) = read_test_file() else { return };
+
+        use crate::license_detection::aho_match::aho_match;
+        use crate::license_detection::query::Query;
+        use crate::utils::text::strip_utf8_bom_str;
+
+        let clean_text = strip_utf8_bom_str(&text);
+        let query = Query::new(clean_text, engine.index()).expect("Query creation failed");
+
+        eprintln!("\n=== UNKNOWN AUTOMATON DEBUG ===");
+        eprintln!("Query tokens: {}", query.tokens.len());
+        eprintln!("len_legalese: {}", engine.index().len_legalese);
+
+        // Count ngram matches in entire document
+        let tokens = &query.tokens;
+        let region_bytes: Vec<u8> = tokens.iter().flat_map(|tid| tid.to_le_bytes()).collect();
+
+        let mut match_count = 0;
+        for _ in engine.index().unknown_automaton.find_iter(&region_bytes) {
+            match_count += 1;
+        }
+        eprintln!("Total ngram matches in document: {}", match_count);
+
+        // Check hispan
+        let hispan: usize = (0..tokens.len())
+            .filter(|&pos| (tokens[pos] as usize) < engine.index().len_legalese)
+            .count();
+        eprintln!("Hispan (high-value legalese tokens): {}", hispan);
+
+        // Check thresholds
+        let region_length = tokens.len();
+        eprintln!("Region length: {}", region_length);
+        eprintln!("Passes length check (>= 24): {}", region_length >= 24);
+        eprintln!("Passes hispan check (>= 5): {}", hispan >= 5);
+
+        // Check with weak matches covered
+        let whole_run = query.whole_query_run();
+        let aho_matches = aho_match(engine.index(), &whole_run);
+
+        let unknown_ref_matches: Vec<_> = aho_matches
+            .iter()
+            .filter(|m| m.license_expression == "unknown-license-reference")
+            .collect();
+
+        eprintln!("\n=== UNKNOWN-LICENSE-REFERENCE MATCHES ===");
+        for m in &unknown_ref_matches {
+            eprintln!(
+                "  {} at tokens {}-{}",
+                m.license_expression, m.start_token, m.end_token
+            );
+        }
+
+        // Compute covered positions from weak matches
+        let mut covered: std::collections::HashSet<usize> = std::collections::HashSet::new();
+        for m in &unknown_ref_matches {
+            for pos in m.start_token..m.end_token {
+                covered.insert(pos);
+            }
+        }
+        eprintln!(
+            "Covered positions from weak matches: {} tokens",
+            covered.len()
+        );
+
+        // Find unmatched regions
+        let mut unmatched_count = 0;
+        let mut region_start = None;
+        for pos in 0..tokens.len() {
+            if !covered.contains(&pos) {
+                if region_start.is_none() {
+                    region_start = Some(pos);
+                    unmatched_count += 1;
+                }
+            } else if region_start.is_some() {
+                region_start = None;
+            }
+        }
+        eprintln!("Unmatched regions count: {}", unmatched_count);
+    }
 }

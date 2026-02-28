@@ -35,3 +35,6 @@ mod unknown_scea_test;
 
 #[cfg(test)]
 mod unknown_ucware_test;
+
+#[cfg(test)]
+mod rule_118_test;

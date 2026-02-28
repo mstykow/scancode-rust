@@ -1,6 +1,6 @@
 # PLAN-016: unknown/scea.txt
 
-## Status: VALIDATED - FIX APPROACH CONFIRMED
+## Status: INVESTIGATION COMPLETE - AWAITING FIX
 
 ## Test File
 `testdata/license-golden/datadriven/unknown/scea.txt`
@@ -28,7 +28,7 @@ Key observation: Python creates **TWO separate unknown matches**:
 - `unknown` at lines 7-22
 - `unknown` at lines 22-31
 
-These are **adjacent** (line 22 is both end of match 4 and start of match 5).
+These are **adjacent** (line 22 is both end of match 3 and start of match 4).
 
 ## Rust Debug Output
 
@@ -69,180 +69,142 @@ Rust creates **ONE unknown match** spanning lines 7-31.
 
 ---
 
-## Validation Results
+## Refined Root Cause Analysis
 
-### 1. Python Implementation Analysis
+### Key Discovery
 
-**File:** `reference/scancode-toolkit/src/licensedcode/match_unknown.py`
+The splitting into multiple unknown matches happens in Python's `index.py:1095`:
 
-**Key code path (lines 143-152):**
-```python
-matched_ngrams = get_matched_ngrams(tokens=query_run.tokens, qbegin=query_run.start, ...)
-qspans = (Span(qstart, qend) for qstart, qend in matched_ngrams)
-qspan = Span().union(*qspans)
-```
-
-**Critical insight:** Python's `match_unknowns()` creates a `qspan` that represents **only the positions where ngrams matched**. The `union()` operation merges overlapping/adjacent ngram positions into contiguous spans.
-
-**File:** `reference/scancode-toolkit/src/licensedcode/index.py` (lines 1091-1109)
 ```python
 unmatched_qspan = original_qspan.difference(good_qspan)
 for unspan in unmatched_qspan.subspans():
     unquery_run = query.QueryRun(query=qry, start=unspan.start, end=unspan.end)
-    unknown_match = match_unknown.match_unknowns(idx=self, query_run=unquery_run, ...)
+    unknown_match = match_unknown.match_unknowns(...)
 ```
 
-The splitting into multiple unknown matches occurs because:
-1. `unmatched_qspan` represents positions NOT covered by known matches
-2. `subspans()` returns contiguous regions from this potentially sparse span
-3. Each subspan gets its own call to `match_unknowns()`
+**Critical:** `subspans()` splits based on gaps in the unmatched positions. These gaps are caused by known matches' `qspan` (matched token positions only, not the full region).
 
-**Span behavior (spans.py:454-474):**
-```python
-def subspans(self):
-    """Return a list of Spans creating one new Span for each set of contiguous integer items."""
-    return Span.from_ints(self)
-```
+### Why Two Unknown Matches in Python?
 
-Uses `itertools.groupby` to split at gaps in integer positions.
+For Python to create two unknown matches at lines 7-22 and 22-31, there must be a gap in `unmatched_qspan` caused by a known match's qspan covering some positions between them.
 
-### 2. Rust Implementation Analysis
+**Hypothesis:** There's likely a match (possibly filtered during `refine_matches`) whose `qspan` creates this gap. This could be:
+1. An aho match for a rule that matches part of line 22
+2. A seq match that was found but later filtered out
+3. Some match that exists in Python's intermediate state but not in final output
 
-**File:** `src/license_detection/unknown_match.rs`
-
-**Current behavior (lines 127-145):**
-```rust
-for region in unmatched_regions {
-    let start = region.0;
-    let end = region.1;
-    let ngram_matches = match_ngrams_in_region(&query.tokens, start, end, automaton);
-    if ngram_matches < MIN_NGRAM_MATCHES { continue; }
-    if let Some(match_result) = create_unknown_match(index, query, start, end, ngram_matches) {
-        unknown_matches.push(match_result);
-    }
-}
-```
-
-**Problem:** Rust counts total ngram matches but doesn't track **where** those matches occurred. It creates one match for the entire region regardless of ngram distribution.
-
-**File:** `src/license_detection/spans.rs`
-- Existing `Span` struct supports `from_iterator()` which creates contiguous ranges
-- Has `union_span()` and other utilities
-- **Missing:** `subspans()` equivalent to return individual contiguous ranges
-
-### 3. Root Cause Confirmed
-
-The proposed fix in the plan is correct. The divergence is:
+### Rust vs Python Difference
 
 | Aspect | Python | Rust |
 |--------|--------|------|
-| Tracks ngram positions | Yes (individual qstart/qend) | No (only count) |
-| Splits on ngram gaps | Yes (via `union()` then match text extraction) | No |
-| Creates multiple matches | Yes, one per contiguous ngram region | No, one per uncovered region |
+| Coverage computation | Uses `qspan` (matched positions only) | Uses `start_token..end_token` (full region) |
+| Splitting mechanism | `subspans()` on sparse position set | Finds contiguous uncovered regions |
+| Gap detection | Automatic via Span's difference/subspans | Manual region finding |
 
-### 4. Complexity Assessment
+### The Critical Bug
 
-**Effort: Medium**
+Rust's `compute_covered_positions()` uses `start_token..end_token` which is the **qregion** (full span from start to end), NOT the **qspan** (matched positions only).
 
-**Required changes:**
+In Python:
+```python
+good_qspans = (mtch.qspan for mtch in good_matches)  # qspan, not qregion!
+good_qspan = Span().union(*good_qspans)
+unmatched_qspan = original_qspan.difference(good_qspan)
+```
 
-1. **Modify `match_ngrams_in_region()`** to return positions instead of just count:
-   ```rust
-   fn find_ngram_matches(tokens: &[u16], start: usize, end: usize, automaton: &AhoCorasick) 
-       -> Vec<(usize, usize)>  // Returns (qstart, qend) tuples
-   ```
-
-2. **Add `subspans()` method to `Span`** (or implement inline):
-   ```rust
-   fn subspans(&self) -> Vec<Range<usize>> {
-       // Group contiguous positions, similar to Span.from_ints()
-   }
-   ```
-
-3. **Update `unknown_match()` to group matches into contiguous spans**:
-   ```rust
-   let ngram_positions: Vec<(usize, usize)> = find_ngram_matches(...);
-   let qspan = Span::from_positions(&ngram_positions);  // Union of all positions
-   for subspan in qspan.subspans() {
-       // Create unknown match for each contiguous region
-   }
-   ```
-
-**Existing utilities:**
-- `Span::from_iterator()` already creates contiguous ranges from positions
-- Tests exist for span operations
-- No new external dependencies needed
+This means Python correctly excludes ONLY the matched positions, while Rust excludes the entire region from start_token to end_token.
 
 ---
 
-## Specific Code Changes Needed
+## Proposed Fix
 
-### Change 1: Return ngram positions instead of count
+### Option 1: Track qspan positions in LicenseMatch (Comprehensive)
 
-**File:** `src/license_detection/unknown_match.rs`
+Add `qspan_positions: Vec<usize>` to `LicenseMatch` to track exactly which token positions were matched. Use this for computing covered positions in unknown detection.
 
-Replace `match_ngrams_in_region()` with `find_ngram_matches()`:
-```rust
-fn find_ngram_matches(
-    tokens: &[u16],
-    start: usize,
-    end: usize,
-    automaton: &AhoCorasick,
-) -> Vec<(usize, usize)> {
-    // Return list of (qstart, qend) for each matched ngram
-    // Similar to Python's get_matched_ngrams()
-}
+**Pros:**
+- Accurate parity with Python
+- Enables future features (highlighting, etc.)
+
+**Cons:**
+- Requires changes to all matchers
+- More memory per match
+
+### Option 2: Re-compute qspan from matched_token_positions (If available)
+
+If `matched_token_positions` is already populated for matches, use it to compute coverage.
+
+### Option 3: Debug Python to identify the actual gap-causing match
+
+Run Python with tracing to identify which match's qspan creates the gap between lines 7-22 and 22-31. Then ensure Rust has equivalent behavior.
+
+**Recommended approach:** Option 3 first to confirm hypothesis, then implement Option 1 or 2.
+
+---
+
+## Specific Investigation Needed
+
+1. **Run Python with TRACE enabled** to see:
+   - What matches exist before `split_weak_matches`
+   - What `good_qspan` looks like
+   - What `unmatched_qspan.subspans()` returns
+   - Which match's qspan causes the split
+
+2. **Compare Rust's intermediate state** to Python:
+   - What matches does Rust have after initial matching?
+   - What positions are marked as covered?
+
+3. **Check for hidden matches** in Python that might create the gap:
+   - Run with `TRACE=true` in Python
+   - Look for matches that are filtered during `refine_matches`
+
+---
+
+## Debugging Commands
+
+### Python Debug
+```bash
+cd reference/scancode-toolkit
+python -c "
+import os
+os.environ['LICENSEDCODE_TRACE'] = 'true'
+from licensedcode.index import LicenseIndex
+from licensedcode.query import Query
+
+idx = LicenseIndex()
+text = open('../../testdata/license-golden/datadriven/unknown/scea.txt').read()
+qry = Query(idx, text, location='test')
+matches = idx.match(qry)
+"
 ```
 
-### Change 2: Add helper to group contiguous positions
-
-**File:** `src/license_detection/unknown_match.rs` or `src/license_detection/spans.rs`
-
-```rust
-fn group_contiguous_spans(positions: &[(usize, usize)], ngram_length: usize) -> Vec<(usize, usize)> {
-    // Sort by start position
-    // Group overlapping/adjacent spans (within ngram_length of each other)
-    // Return list of merged (start, end) tuples
-}
-```
-
-### Change 3: Update `unknown_match()` main function
-
-**File:** `src/license_detection/unknown_match.rs` (lines 127-145)
-
-```rust
-for region in unmatched_regions {
-    let ngram_matches = find_ngram_matches(&query.tokens, region.0, region.1, automaton);
-    
-    // Group into contiguous spans
-    let contiguous_spans = group_contiguous_spans(&ngram_matches, UNKNOWN_NGRAM_LENGTH);
-    
-    for span in contiguous_spans {
-        // Apply thresholds to each contiguous span
-        // Create unknown match if valid
-    }
-}
-```
+### Rust Debug
+Add debug output to `unknown_match()` to print:
+- Covered positions
+- Unmatched regions
+- Ngram match positions
 
 ---
 
 ## Estimated Effort
 
-**Total: 2-4 hours**
+**Total: 4-8 hours** (depending on investigation findings)
 
 | Task | Time |
 |------|------|
-| Modify `match_ngrams_in_region()` to return positions | 30 min |
-| Implement `group_contiguous_spans()` helper | 1 hour |
-| Update `unknown_match()` to use new logic | 1 hour |
-| Update/add tests | 1-1.5 hours |
+| Debug Python to identify gap-causing match | 2-3 hours |
+| Implement fix based on findings | 2-4 hours |
+| Update tests | 1 hour |
 
 ---
 
 ## Risk Analysis
-- **Low risk**: This only affects unknown license detection
-- **Functional impact**: Users may see more granular unknown matches (improved accuracy)
+- **Medium risk**: Fix depends on understanding the exact Python behavior
+- **Functional impact**: Users will see more accurate unknown match boundaries
 - **Priority**: Medium - affects feature parity with Python
 
-## Investigation Test File
-Created at `src/license_detection/investigation/unknown_scea_test.rs`
+## Related Files
+- `src/license_detection/unknown_match.rs` - Unknown match detection
+- `src/license_detection/match_refine.rs` - `split_weak_matches()`
+- `reference/scancode-toolkit/src/licensedcode/index.py` - Python reference
+- `reference/scancode-toolkit/src/licensedcode/spans.py` - Python Span implementation

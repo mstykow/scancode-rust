@@ -1,6 +1,6 @@
 # PLAN-013: unknown/cigna-go-you-mobile-app-eula.txt
 
-## Status: VALIDATION COMPLETE - ROOT CAUSE INCORRECT
+## Status: ROOT CAUSE IDENTIFIED - CANDIDATE SELECTION ISSUE
 
 ## Test File
 `testdata/license-golden/datadriven/unknown/cigna-go-you-mobile-app-eula.txt`
@@ -14,119 +14,95 @@
 - Position 4: Expected `proprietary-license`, Actual `warranty-disclaimer`
 - Extra `warranty-disclaimer`, missing `proprietary-license`
 
-## Validation Results
+## Root Cause Analysis
 
-### 1. Rule File Verification
-**File exists:** `reference/scancode-toolkit/src/licensedcode/data/rules/unknown-license-reference_298.RULE`
+### 1. The Rule IS Loaded and IS Approx-Matchable
 
-**Rule attributes:**
-```yaml
-license_expression: unknown-license-reference
-is_license_notice: yes
-relevance: 100
-referenced_filenames:
-    - Copyright
+**Rule: `unknown-license-reference_118.RULE`**
+- License expression: `unknown-license-reference`
+- Text: "By downloading, copying, installing or using the software you agree to this license. If you do not agree to this license, do not download, install, copy or use the software."
+- Token count: 30 (not small, not tiny)
+- `is_license_reference: true` but `is_small: false`, so it IS approx-matchable
+- **Confirmed in `approx_matchable_rids`**
+
+### 2. The Rule PASSES All Threshold Checks
+
+Step 1 of candidate selection checks:
+- ✅ Intersection size: 18 tokens (min_matched_length_unique: 4) - PASS
+- ✅ High token intersection: 4 tokens (min_high_matched_length_unique: 3) - PASS
+
+### 3. The Rule FAILS to Make Top Candidates Due to Low Resemblance
+
+**The Problem: Candidate ranking truncates at `top_n * 10 = 100` candidates**
+
+Rule 118's scores:
+- `resemblance`: 0.035857 (0.036)
+- `amplified_resemblance`: 0.001286 (0.001) 
+- `containment`: 0.90
+
+Competing rules (from debug output):
+- `warranty-disclaimer_103.RULE`: resemblance=0.022, matched_length=248
+- `warranty-disclaimer_104.RULE`: resemblance=0.009, matched_length=157
+- `license-intro_40.RULE`: resemblance=0.000, matched_length=10
+
+**The sorting is by:**
+1. `is_highly_resemblant` (false for all these)
+2. `containment` (0.90 for rule 118 vs 1.0 for others)
+3. `resemblance` (0.001 for rule 118 vs higher for others)
+4. `matched_length` (18 for rule 118 vs higher for others)
+
+Rule 118 ranks very low due to its low resemblance and is truncated by the `top_n * 10` limit.
+
+### 4. Why Python Detects This
+
+Python uses `top=50` by default in `compute_candidates()`, which means `top * 10 = 500` candidates pass through step 1. 
+
+Rust uses `MAX_NEAR_DUPE_CANDIDATES = 10` for regular candidates, meaning only 100 candidates pass through.
+
+**This is the critical difference!** Rule 118's low resemblance ranks it outside the top 100 in Rust but inside the top 500 in Python.
+
+## Proposed Fix
+
+### Option A: Increase Candidate Limit (Recommended)
+
+Change `MAX_NEAR_DUPE_CANDIDATES` to match Python's default:
+
+```rust
+// In src/license_detection/seq_match.rs
+pub const MAX_NEAR_DUPE_CANDIDATES: usize = 50;  // Match Python's default
 ```
 
-**Rule text:**
-```
-This SOFTWARE is licensed under the LICENSE provided in the
-../Copyright file. By downloading, installing, copying, or otherwise
-using the SOFTWARE, you agree to be bound by the terms of that
-LICENSE.
-```
+This would keep `50 * 10 = 500` candidates, matching Python's behavior.
 
-### 2. Rule Loading Verification
-**Result: RULE IS LOADED INTO INDEX**
+### Option B: Adjust Sorting Weights
 
-Test output confirms:
-```
-Found rule: unknown-license-reference_298.RULE
-  license_expression: unknown-license-reference
-  text: This SOFTWARE is licensed under the LICENSE provided in the
-../Copyright file. By downloading, installing, copying, or otherwise
-using the SOFTWARE, you agree to be bound by the terms of that
-LICENSE.
-  tokens: [6764, 6375, 5482, 2457, 6767, ...]  (32 tokens)
-  is_small: false
-  is_tiny: false
-  is_license_reference: false  (NOTE: is_license_notice=true from frontmatter)
-```
+Weight `matched_length` higher relative to `resemblance` so rules with good token overlap but low resemblance (like rule 118) rank higher.
 
-### 3. Rule Counts Comparison
-- Python rules: 36,475 total
-- Python `unknown-license-reference_*` rules: 452 total
-- Rust loads rules from same directory and builds index correctly
+### Option C: Special Handling for License Reference Rules
 
-### 4. Why Rule is NOT Being Matched
+Rules with `is_license_reference: true` that have high containment (>0.8) could be given priority in candidate selection.
 
-**The proposed root cause was INCORRECT.** The rule IS loaded. The issue is:
+## Implementation Plan
 
-1. **AHO Matching Requires Exact Token Sequence**
-   - The rule text: "This SOFTWARE is licensed under the LICENSE provided in the ../Copyright file. By downloading, installing, copying, or otherwise using the SOFTWARE..."
-   - The input text: "By accessing, downloading, copying or otherwise using the Application, You acknowledge that You have read this Agreement..."
-   - These do NOT share an exact token sequence match for AHO detection
+1. **Change `MAX_NEAR_DUPE_CANDIDATES` from 10 to 50** in `src/license_detection/seq_match.rs`
+2. **Verify** by running `test_plan_013_rust_detection`
+3. **Check for regressions** by running the full golden test suite
 
-2. **Sequence Matching - Rule Not in Top Candidates**
-   - Regular candidates: 10 rules (warranty-disclaimer variants dominate)
-   - The `unknown-license-reference_298.RULE` does not score high enough to be a candidate
-   - This is because the overlap between rule text and input text is minimal
+## Risk Analysis
 
-3. **Actual Text Overlap is Small**
-   - Rule: "By downloading, installing, copying, or otherwise using the SOFTWARE, you agree to be bound by the terms"
-   - Input: "By accessing, downloading, copying or otherwise using the Application, You acknowledge that You have read this Agreement, understand it, and agree to be bound by its terms"
-   - Shared: "by", "downloading", "copying", "or", "otherwise", "using", "you", "agree", "to", "be", "bound", "by"
-   - Missing: "installing" (rule), "accessing" (input), different structure
+- **Low Risk**: Increasing candidate limit only affects ranking, not correctness
+- **Performance Impact**: Slight increase in memory/time for processing more candidates
+- **Benefit**: Better parity with Python's detection behavior
 
-## Updated Root Cause Analysis
+## Investigation Files Created
 
-**The issue is NOT a missing rule. The rule IS loaded but doesn't match due to:**
-
-1. **Text similarity is insufficient for sequence matching** - The candidate scoring doesn't rank this rule high enough
-
-2. **No AHO match** - The input text doesn't contain the exact token sequence from the rule
-
-3. **Python may use different detection** - Need to verify HOW Python detects `unknown-license-reference` in this file
-
-## Proposed Fix (Updated)
-
-1. **Run Python detection on the same file** to see:
-   - Which rule identifier is matched for `unknown-license-reference`
-   - What matcher is used (aho, hash, seq, etc.)
-   - What the actual matched text is
-
-2. **If Python uses a DIFFERENT rule**:
-   - Find the correct rule that should match
-   - Investigate why that rule isn't matching in Rust
-
-3. **If Python uses the SAME rule**:
-   - Investigate Python's candidate scoring
-   - May need to adjust Rust's scoring algorithm
-
-## Specific Code Changes Needed
-
-1. **Add Python comparison test** to `unknown_cigna_test.rs`:
-   - Run Python detection on the same file
-   - Compare matched rule identifiers
-
-2. **Check candidate scoring** in `src/license_detection/seq_match.rs`:
-   - Verify if `unknown-license-reference_298.RULE` should be a candidate
-   - Check containment/resemblance calculations
-
-## Investigation Test File
-Created at `src/license_detection/investigation/unknown_cigna_test.rs`
+- `src/license_detection/investigation/rule_118_test.rs` - Detailed candidate selection analysis
 
 ## Success Criteria
 - [x] Investigation test file created
 - [x] Python reference output documented
 - [x] Rust debug output added for all pipeline stages
-- [x] Exact divergence location identified
-- [x] Root cause documented
-- [x] **VALIDATION: Rule IS loaded (proposed fix was incorrect)**
-- [ ] Run Python detection to find correct matching rule
+- [x] Exact divergence location identified: Candidate truncation at step 1
+- [x] Root cause documented: Candidate limit too low
 - [ ] Fix proposed and implemented
-
-## Risk Analysis
-- **Medium Risk**: Detection algorithm differences rather than missing data
-- **Impact**: May require scoring algorithm adjustments
-- **Complexity**: Need to understand Python's detection behavior for this specific case
+- [ ] Golden test passes

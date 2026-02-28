@@ -1,94 +1,118 @@
 # PLAN-017: unknown/ucware-eula.txt
 
-## Status: VALIDATION COMPLETE - ROOT CAUSE IDENTIFIED
+## Status: ROOT CAUSE REFINED - PIPELINE FLOW ISSUE
 
 ## Test File
 `testdata/license-golden/datadriven/unknown/ucware-eula.txt`
 
 ## Issue
 **Expected:** `["unknown-license-reference", "unknown-license-reference", "unknown", "warranty-disclaimer", "unknown", "swrule"]`
+**Actual (from investigation test):** `["unknown-license-reference", "unknown-license-reference", "swrule", "warranty-disclaimer"]`
 **Actual (from main detection):** `["unknown", "warranty-disclaimer", "unknown"]`
-**Actual (from investigation test with 70 candidates):** `["unknown-license-reference", "unknown-license-reference", "swrule", "warranty-disclaimer"]`
 
-## Validation Results
+## Refined Root Cause Analysis
 
-### Python Implementation Analysis (match_unknown.py)
+### Issue 1: Test Does Not Follow Python Pipeline
 
-Python's `match_unknowns()` function works as follows:
+The investigation test (`test_plan_017_rust_detection`) does NOT follow Python's pipeline:
 
-1. **Line 143-152**: It calls `get_matched_ngrams()` which finds all ngram matches from the automaton
-2. **Line 151-152**: It builds a union of all matched ngram positions into a `qspan`
-3. **Line 220**: Threshold check: `len(qspan) < 24 OR len(hispan) < 5` → skip
-
-**Key insight**: Python matches ngrams against the **full query tokens**, not just the uncovered region. The `QueryRun` is used to define the region boundaries, but `get_matched_ngrams()` searches the entire `tokens` sequence.
-
-### Rust Implementation Analysis (unknown_match.rs)
-
-Rust's `unknown_match()` function:
-
-1. **Lines 184-212**: Correctly finds uncovered regions
-2. **Line 136**: Calls `match_ngrams_in_region()` - **THIS IS THE BUG**
-3. **Lines 224-248**: `match_ngrams_in_region()` extracts a substring of tokens from the uncovered region and searches ONLY that substring
-
-**The Bug**: Rust only searches for ngrams **entirely within** the uncovered region, while Python searches the **full query** and then filters by region.
-
-### Debug Test Output
-
-From `test_debug_unknown_match_internals`:
-
-```
-Region 6: tokens 49-83 (length=34), legalese=9, ngram_matches=0
-  -> FAIL: ngram_matches 0 < MIN_NGRAM_MATCHES (3)
-```
-
-- **Full query has 25 ngram matches** but **Region 6 has 0 ngram matches**!
-- This is because ngrams that span across known matches are not being found
-- Python would find these ngrams because it searches the full text
-
-### Why Python Finds More Ngrams
-
-In Python's `get_matched_ngrams()`:
+**Python Pipeline (index.py:1082-1116):**
 ```python
-qtokens = tuple(tokens)  # Uses FULL query tokens
+# Step 1: Initial refine WITHOUT false positive filtering (line 1074-1080)
+matches, _discarded = match.refine_matches(..., filter_false_positive=False, ...)
+
+# Step 2: Split weak from good (line 1083)
+good_matches, weak_matches = match.split_weak_matches(matches)
+
+# Step 3: Compute uncovered regions from GOOD matches only (line 1087-1091)
+original_qspan = Span(0, len(qry.tokens) - 1)
+good_qspan = Span().union(*(mtch.qspan for mtch in good_matches))
+unmatched_qspan = original_qspan.difference(good_qspan)
+
+# Step 4: Run unknown detection on each unmatched subspan (line 1095-1109)
+for unspan in unmatched_qspan.subspans():
+    unknown_match = match_unknown.match_unknowns(...)
+
+# Step 5: Filter contained unknowns, extend matches, reinject weak (line 1111-1118)
+```
+
+**Investigation Test Pipeline:**
+```rust
+// NO initial refine
+// NO split_weak_matches
+all_matches.extend(hash_match(...));
+all_matches.extend(aho_match(...));
+all_matches.extend(seq_match(...));
+all_matches.extend(unknown_match(&query, &all_matches)); // Uses ALL matches, not good_matches
+let refined = refine_matches(...);  // Called AFTER unknown_match
+```
+
+### Issue 2: `split_weak_matches` Removes Unknown-License-Reference Matches
+
+Python's `split_weak_matches()` (match.py:1740-1765) removes matches where:
+- `match.rule.has_unknown` is true (i.e., `"unknown" in license_expression`)
+- OR match is a small/low-coverage seq match
+
+**All `unknown-license-reference` matches are considered "weak"** and are set aside before unknown detection. This is critical because:
+
+1. If `unknown-license-reference` matches stay in `good_matches`, they COVER those regions
+2. Unknown detection only runs on UNCOVERED regions
+3. With `unknown-license-reference` as "weak", those regions become uncovered
+4. Unknown detection then finds `unknown` matches in those regions
+
+### Issue 3: Ngram Search Scope (Previously Documented)
+
+Python's `get_matched_ngrams()` searches the FULL query tokens:
+```python
+qtokens = tuple(tokens)  # FULL query tokens, not region substring
 for qend, _ in automaton.iter(qtokens):
-    qend = qbegin + qend  # Adjusts for region start offset
+    qend = qbegin + qend  # Adjusts positions with region offset
     qstart = qend - offset
     yield qstart, qend
 ```
 
-The key difference:
-- Python: Searches full `qtokens`, then adjusts positions with `qbegin` offset
-- Rust: Searches only `region_tokens = &tokens[start..end]`
+Rust's `match_ngrams_in_region()` searches only the region substring:
+```rust
+let region_tokens = &tokens[start..end];  // Only region tokens
+```
 
-An ngram that starts at position 47 and ends at 53 would:
-- Python: Be found (automaton iterates over full text)
-- Rust: NOT be found (it crosses region boundary at 49)
+This causes Rust to miss ngrams that cross region boundaries.
 
-## Root Cause (REFINED)
+## Expected Fix
 
-**The ngram matching algorithm is fundamentally different:**
+### Fix 1: Update Test to Follow Python Pipeline
 
-| Aspect | Python | Rust |
-|--------|--------|------|
-| Search scope | Full query tokens | Only uncovered region tokens |
-| Cross-boundary ngrams | Found (positions adjusted) | Not found (out of scope) |
-| Result | 25 matches in full query | 0 matches in uncovered regions |
+```rust
+fn test_plan_017_rust_detection() {
+    // ... gather matches ...
+    
+    // Step 1: Initial refine without FP filtering
+    let merged = refine_matches_without_false_positive_filter(&index, all_matches, &query);
+    
+    // Step 2: Split weak from good
+    let (good_matches, weak_matches) = split_weak_matches(&merged);
+    
+    // Step 3: Unknown detection on uncovered regions
+    let unknown_matches = unknown_match(&index, &query, &good_matches);
+    let filtered_unknown = filter_invalid_contained_unknown_matches(&unknown_matches, &good_matches);
+    
+    // Step 4: Combine
+    let mut all_matches = good_matches;
+    all_matches.extend(filtered_unknown);
+    all_matches.extend(weak_matches);
+    
+    // Step 5: Final refine with FP filtering
+    let refined = refine_matches(&index, all_matches, &query);
+}
+```
 
-**The `UNKNOWN_NGRAM_LENGTH * 4` threshold (24 tokens)** ensures only regions with enough potential for multiple ngram matches qualify. But since Rust searches only the substring, it finds 0 ngram matches even in large regions.
-
-## Proposed Fix
-
-**Option A: Match Python's approach (Recommended)**
-
-1. Modify `match_ngrams_in_region()` to search the full query tokens
-2. Filter matches to only those that fall within the uncovered region
-3. Adjust match positions by the region's start offset
+### Fix 2: Update `match_ngrams_in_region()` to Search Full Query
 
 ```rust
 fn match_ngrams_in_region(
     tokens: &[u16],      // Full query tokens
-    region_start: usize, // Start of uncovered region
-    region_end: usize,   // End of uncovered region
+    region_start: usize,
+    region_end: usize,
     automaton: &AhoCorasick,
 ) -> usize {
     let query_bytes: Vec<u8> = tokens.iter()
@@ -99,10 +123,10 @@ fn match_ngrams_in_region(
     let mut match_count = 0;
     
     for m in automaton.find_iter(&query_bytes) {
-        let qend = m.end() / 2;  // Convert byte position to token position
+        let qend = m.end() / 2;
         let qstart = qend.saturating_sub(offset);
         
-        // Only count matches that fall within the uncovered region
+        // Only count matches within the region
         if qstart >= region_start && qend <= region_end {
             match_count += 1;
         }
@@ -112,20 +136,30 @@ fn match_ngrams_in_region(
 }
 ```
 
-**Option B: Adjust threshold values**
+### Fix 3: Python Returns SPANS, Not Just Count
 
-Lower `MIN_NGRAM_MATCHES` to 0 and rely on other thresholds. This is not recommended as it reduces the quality of unknown detection.
+Python's `get_matched_ngrams()` returns the matched positions:
+```python
+yield qstart, qend
+```
+
+These are then used to build a `qspan`:
+```python
+qspans = (Span(qstart, qend) for qstart, qend in matched_ngrams)
+qspan = Span().union(*qspans)
+```
+
+Rust currently only returns a COUNT. It should return the matched positions to build the span properly.
 
 ## Success Criteria
 - [x] Python implementation analyzed
 - [x] Rust implementation analyzed  
-- [x] Root cause identified: ngram search scope mismatch
-- [x] Specific code change documented
-- [ ] Fix implemented
+- [x] Root cause refined: pipeline flow + ngram search scope
+- [x] Specific code changes documented
+- [ ] Fix 1 implemented (test follows Python pipeline)
+- [ ] Fix 2 implemented (ngram search scope)
+- [ ] Fix 3 implemented (return positions, not count)
 - [ ] Tests pass
 
 ## Risk Analysis
-**Medium risk** - The fix changes core ngram matching logic. Must ensure:
-1. Other test files still pass
-2. No false positives introduced
-3. Performance remains acceptable
+**Low risk** - The test fix is straightforward. The ngram scope fix aligns with Python behavior and the previous attempt showed it enables detection.
