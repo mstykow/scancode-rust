@@ -1,6 +1,6 @@
 # PLAN-013: unknown/cigna-go-you-mobile-app-eula.txt
 
-## Status: ROOT CAUSE IDENTIFIED - CANDIDATE SELECTION ISSUE
+## Status: ✅ PARTIALLY FIXED
 
 ## Test File
 `testdata/license-golden/datadriven/unknown/cigna-go-you-mobile-app-eula.txt`
