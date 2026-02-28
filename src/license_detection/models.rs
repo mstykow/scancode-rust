@@ -743,7 +743,7 @@ impl LicenseMatch {
     }
 
     pub fn has_unknown(&self) -> bool {
-        self.license_expression == "unknown"
+        self.license_expression.contains("unknown")
     }
 }
 
@@ -2030,6 +2030,12 @@ mod tests {
         let mut m = create_license_match();
         m.license_expression = "unknown".to_string();
         assert!(m.has_unknown());
+
+        m.license_expression = "mit OR unknown".to_string();
+        assert!(m.has_unknown());
+
+        m.license_expression = "unknown-license-ref".to_string();
+        assert!(m.has_unknown());
     }
 
     #[test]
@@ -2042,15 +2048,6 @@ mod tests {
         assert!(!m.has_unknown());
 
         m.license_expression = "gpl-2.0-plus".to_string();
-        assert!(!m.has_unknown());
-
-        m.license_expression = "free-unknown".to_string();
-        assert!(!m.has_unknown());
-
-        m.license_expression = "unknown-license-reference".to_string();
-        assert!(!m.has_unknown());
-
-        m.license_expression = "mit OR unknown".to_string();
         assert!(!m.has_unknown());
     }
 }

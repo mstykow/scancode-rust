@@ -2,15 +2,12 @@
 //!
 //! ## Issue
 //! **Expected:** `["unknown", "gpl-1.0-plus", "free-unknown", "warranty-disclaimer", "free-unknown", "free-unknown", "unknown-license-reference", "commercial-license", "unknown"]`
+//! **Actual:** `["unknown", "gpl-1.0-plus", "unknown", "warranty-disclaimer", "unknown", "commercial-license", "unknown"]`
 //!
-//! ## Fix Applied
-//! Changed `has_unknown()` from `.contains("unknown")` to `== "unknown"`.
-//! This prevents `free-unknown` and `unknown-license-reference` from being
-//! incorrectly classified as weak matches.
-//!
-//! ## Remaining Issues
-//! After the fix, `free-unknown` matches are preserved correctly, but there
-//! are additional detection pipeline differences that need investigation.
+//! ## Differences
+//! - `free-unknown` matches are becoming `unknown`
+//! - Missing one `free-unknown` and one `unknown-license-reference`
+//! - Different ordering/shifted matches
 
 #[cfg(test)]
 mod tests {
@@ -65,18 +62,21 @@ mod tests {
 
         eprintln!("\nAll license expressions: {:?}", all_expressions);
 
-        assert!(
-            all_expressions.iter().any(|e| *e == "free-unknown"),
-            "free-unknown should be preserved (not replaced by unknown) after has_unknown fix"
-        );
+        let expected = vec![
+            "unknown",
+            "gpl-1.0-plus",
+            "free-unknown",
+            "warranty-disclaimer",
+            "free-unknown",
+            "free-unknown",
+            "unknown-license-reference",
+            "commercial-license",
+            "unknown",
+        ];
 
-        let free_unknown_count = all_expressions
-            .iter()
-            .filter(|e| **e == "free-unknown")
-            .count();
         assert_eq!(
-            free_unknown_count, 3,
-            "Should have 3 free-unknown matches (not being replaced by unknown)"
+            all_expressions, expected,
+            "Expected license expressions mismatch"
         );
     }
 
