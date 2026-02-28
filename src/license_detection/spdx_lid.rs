@@ -15,6 +15,9 @@
 
 use regex::Regex;
 
+use crate::license_detection::expression::{
+    LicenseExpression, expression_to_string, parse_expression,
+};
 use crate::license_detection::index::LicenseIndex;
 use crate::license_detection::models::LicenseMatch;
 use crate::license_detection::query::Query;
@@ -259,10 +262,9 @@ pub fn spdx_lid_match(index: &LicenseIndex, query: &Query) -> Vec<LicenseMatch> 
             lowered.clone()
         };
 
-        if let Some(rid) = find_matching_rule_for_expression(index, &resolved_expression) {
-            let rule = &index.rules_by_rid[rid];
-
-            let score = rule.relevance as f32 / 100.0;
+        if let Some(license_expression) =
+            find_matching_rule_for_expression(index, &resolved_expression)
+        {
             let matched_length = spdx_expression.len();
             let match_coverage = 100.0;
 
@@ -271,8 +273,39 @@ pub fn spdx_lid_match(index: &LicenseIndex, query: &Query) -> Vec<LicenseMatch> 
 
             let matched_text = query.matched_text(start_line, end_line);
 
+            let (rid, rule_relevance, rule_identifier, rule_length, referenced_filenames) = index
+                .rid_by_spdx_key
+                .get(&license_expression)
+                .map(|&rid| {
+                    let rule = &index.rules_by_rid[rid];
+                    (
+                        rid,
+                        rule.relevance,
+                        rule.identifier.clone(),
+                        rule.tokens.len(),
+                        rule.referenced_filenames.clone(),
+                    )
+                })
+                .unwrap_or_else(|| {
+                    let unknown_rid = index.unknown_spdx_rid.unwrap_or(0);
+                    if unknown_rid < index.rules_by_rid.len() {
+                        let rule = &index.rules_by_rid[unknown_rid];
+                        (
+                            unknown_rid,
+                            rule.relevance,
+                            rule.identifier.clone(),
+                            rule.tokens.len(),
+                            rule.referenced_filenames.clone(),
+                        )
+                    } else {
+                        (0, 100_u8, String::new(), 0_usize, None)
+                    }
+                });
+
+            let score = rule_relevance as f32 / 100.0;
+
             let license_match = LicenseMatch {
-                license_expression: rule.license_expression.clone(),
+                license_expression,
                 license_expression_spdx: spdx_expression.clone(),
                 from_file: None,
                 start_line,
@@ -282,20 +315,20 @@ pub fn spdx_lid_match(index: &LicenseIndex, query: &Query) -> Vec<LicenseMatch> 
                 matcher: MATCH_SPDX_ID.to_string(),
                 score,
                 matched_length,
-                rule_length: rule.tokens.len(),
+                rule_length,
                 match_coverage,
-                rule_relevance: rule.relevance,
+                rule_relevance,
                 rid,
-                rule_identifier: rule.identifier.clone(),
+                rule_identifier,
                 rule_url: String::new(),
                 matched_text: Some(matched_text),
-                referenced_filenames: rule.referenced_filenames.clone(),
-                is_license_intro: rule.is_license_intro,
-                is_license_clue: rule.is_license_clue,
-                is_license_reference: rule.is_license_reference,
-                is_license_tag: rule.is_license_tag,
-                is_license_text: rule.is_license_text,
-                is_from_license: rule.is_from_license,
+                referenced_filenames,
+                is_license_intro: false,
+                is_license_clue: false,
+                is_license_reference: false,
+                is_license_tag: true,
+                is_license_text: false,
+                is_from_license: false,
                 matched_token_positions: None,
                 hilen: 0,
                 rule_start_token: 0,
@@ -313,36 +346,111 @@ pub fn spdx_lid_match(index: &LicenseIndex, query: &Query) -> Vec<LicenseMatch> 
     matches
 }
 
-fn find_matching_rule_for_expression(index: &LicenseIndex, expression: &str) -> Option<usize> {
+fn find_matching_rule_for_expression(index: &LicenseIndex, expression: &str) -> Option<String> {
     if let Some(&rid) = index.rid_by_spdx_key.get(expression) {
-        return Some(rid);
+        let rule = &index.rules_by_rid[rid];
+        return Some(rule.license_expression.clone());
     }
 
-    for (rid, rule) in index.rules_by_rid.iter().enumerate() {
+    for rule in &index.rules_by_rid {
         let normalized = normalize_spdx_key(&rule.license_expression);
         if normalized == expression {
-            return Some(rid);
+            return Some(rule.license_expression.clone());
+        }
+    }
+
+    if let Ok(parsed) = parse_expression(expression)
+        && let Some(converted) = convert_spdx_expression_to_scancode(&parsed, index)
+    {
+        let result = expression_to_string(&converted);
+        if !result.is_empty() {
+            return Some(result);
         }
     }
 
     let license_keys = split_license_expression(expression);
     if license_keys.is_empty() {
-        return index.unknown_spdx_rid;
+        return index
+            .unknown_spdx_rid
+            .map(|rid| index.rules_by_rid[rid].license_expression.clone());
     }
 
     let first_key = &license_keys[0];
     if let Some(&rid) = index.rid_by_spdx_key.get(first_key) {
-        return Some(rid);
+        return Some(index.rules_by_rid[rid].license_expression.clone());
     }
 
-    for (rid, rule) in index.rules_by_rid.iter().enumerate() {
+    for rule in &index.rules_by_rid {
         let normalized = normalize_spdx_key(&rule.license_expression);
         if normalized == *first_key {
-            return Some(rid);
+            return Some(rule.license_expression.clone());
         }
     }
 
-    index.unknown_spdx_rid
+    index
+        .unknown_spdx_rid
+        .map(|rid| index.rules_by_rid[rid].license_expression.clone())
+}
+
+fn convert_spdx_expression_to_scancode(
+    expr: &LicenseExpression,
+    index: &LicenseIndex,
+) -> Option<LicenseExpression> {
+    match expr {
+        LicenseExpression::License(key) => {
+            let lookup_key = key.to_lowercase();
+            if let Some(&rid) = index.rid_by_spdx_key.get(&lookup_key) {
+                Some(LicenseExpression::License(
+                    index.rules_by_rid[rid].license_expression.clone(),
+                ))
+            } else {
+                None
+            }
+        }
+        LicenseExpression::LicenseRef(key) => {
+            let lookup_key = key.to_lowercase();
+            if let Some(&rid) = index.rid_by_spdx_key.get(&lookup_key) {
+                Some(LicenseExpression::License(
+                    index.rules_by_rid[rid].license_expression.clone(),
+                ))
+            } else {
+                None
+            }
+        }
+        LicenseExpression::And { left, right } => {
+            let left_converted = convert_spdx_expression_to_scancode(left, index);
+            let right_converted = convert_spdx_expression_to_scancode(right, index);
+            match (left_converted, right_converted) {
+                (Some(l), Some(r)) => Some(LicenseExpression::And {
+                    left: Box::new(l),
+                    right: Box::new(r),
+                }),
+                _ => None,
+            }
+        }
+        LicenseExpression::Or { left, right } => {
+            let left_converted = convert_spdx_expression_to_scancode(left, index);
+            let right_converted = convert_spdx_expression_to_scancode(right, index);
+            match (left_converted, right_converted) {
+                (Some(l), Some(r)) => Some(LicenseExpression::Or {
+                    left: Box::new(l),
+                    right: Box::new(r),
+                }),
+                _ => None,
+            }
+        }
+        LicenseExpression::With { left, right } => {
+            let left_converted = convert_spdx_expression_to_scancode(left, index);
+            let right_converted = convert_spdx_expression_to_scancode(right, index);
+            match (left_converted, right_converted) {
+                (Some(l), Some(r)) => Some(LicenseExpression::With {
+                    left: Box::new(l),
+                    right: Box::new(r),
+                }),
+                _ => None,
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -928,14 +1036,16 @@ mod tests {
             "Should have unknown-spdx rule loaded"
         );
 
-        let unknown_rid = find_matching_rule_for_expression(&index, "nonexistent-license-xyz");
+        let unknown_expr = find_matching_rule_for_expression(&index, "nonexistent-license-xyz");
         assert!(
-            unknown_rid.is_some(),
-            "Unknown SPDX identifier should return unknown-spdx rule"
+            unknown_expr.is_some(),
+            "Unknown SPDX identifier should return some expression"
         );
-        assert_eq!(
-            unknown_rid, index.unknown_spdx_rid,
-            "Unknown SPDX identifier should map to unknown-spdx rule"
+        let expr = unknown_expr.unwrap();
+        assert!(
+            expr.contains("unknown-spdx"),
+            "Unknown SPDX identifier should map to unknown-spdx expression, got: {}",
+            expr
         );
     }
 
@@ -1006,5 +1116,100 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn test_spdx_expression_with_or_operator() {
+        let path =
+            std::path::Path::new("reference/scancode-toolkit/src/licensedcode/data/licenses");
+        if !path.exists() {
+            eprintln!("Skipping test: reference directory not found");
+            return;
+        }
+
+        let licenses = crate::license_detection::rules::load_licenses_from_directory(path, false)
+            .expect("Failed to load licenses");
+        let rules = crate::license_detection::rules::load_rules_from_directory(
+            std::path::Path::new("reference/scancode-toolkit/src/licensedcode/data/rules"),
+            false,
+        )
+        .expect("Failed to load rules");
+
+        let index = crate::license_detection::index::build_index(rules, licenses);
+
+        let expression = "mit OR apache-2.0";
+        let result = find_matching_rule_for_expression(&index, expression);
+        assert!(result.is_some(), "Should parse OR expression");
+        let expr = result.unwrap();
+        assert!(
+            expr.contains("mit") && expr.contains("apache-2.0") && expr.contains(" OR "),
+            "OR expression should preserve structure, got: {}",
+            expr
+        );
+    }
+
+    #[test]
+    fn test_spdx_expression_with_with_operator() {
+        let path =
+            std::path::Path::new("reference/scancode-toolkit/src/licensedcode/data/licenses");
+        if !path.exists() {
+            eprintln!("Skipping test: reference directory not found");
+            return;
+        }
+
+        let licenses = crate::license_detection::rules::load_licenses_from_directory(path, false)
+            .expect("Failed to load licenses");
+        let rules = crate::license_detection::rules::load_rules_from_directory(
+            std::path::Path::new("reference/scancode-toolkit/src/licensedcode/data/rules"),
+            false,
+        )
+        .expect("Failed to load rules");
+
+        let index = crate::license_detection::index::build_index(rules, licenses);
+
+        let expression = "gpl-2.0-only with classpath-exception-2.0";
+        let result = find_matching_rule_for_expression(&index, expression);
+        assert!(result.is_some(), "Should parse WITH expression");
+        let expr = result.unwrap();
+        assert!(
+            expr.contains("gpl-2.0")
+                && expr.contains("classpath-exception-2.0")
+                && expr.contains(" WITH "),
+            "WITH expression should preserve structure, got: {}",
+            expr
+        );
+    }
+
+    #[test]
+    fn test_spdx_expression_complex_or() {
+        let path =
+            std::path::Path::new("reference/scancode-toolkit/src/licensedcode/data/licenses");
+        if !path.exists() {
+            eprintln!("Skipping test: reference directory not found");
+            return;
+        }
+
+        let licenses = crate::license_detection::rules::load_licenses_from_directory(path, false)
+            .expect("Failed to load licenses");
+        let rules = crate::license_detection::rules::load_rules_from_directory(
+            std::path::Path::new("reference/scancode-toolkit/src/licensedcode/data/rules"),
+            false,
+        )
+        .expect("Failed to load rules");
+
+        let index = crate::license_detection::index::build_index(rules, licenses);
+
+        let expression = "epl-2.0 or apache-2.0 or gpl-2.0-only with classpath-exception-2.0";
+        let result = find_matching_rule_for_expression(&index, expression);
+        assert!(result.is_some(), "Should parse complex expression");
+        let expr = result.unwrap();
+        assert!(
+            expr.contains("epl-2.0")
+                && expr.contains("apache-2.0")
+                && expr.contains("gpl-2.0")
+                && expr.contains("classpath-exception-2.0"),
+            "Complex expression should preserve all license keys, got: {}",
+            expr
+        );
     }
 }
