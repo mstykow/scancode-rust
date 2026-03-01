@@ -63,6 +63,13 @@
       "minimumReleaseAge": "7 days"
     },
     {
+      "description": "Only update engines field for major Node.js versions",
+      "matchDepTypes": ["engines"],
+      "matchPackageNames": ["node"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "enabled": false
+    },
+    {
       "description": "Automerge non-major updates after release age",
       "matchUpdateTypes": ["minor", "patch"],
       "automerge": true
