@@ -66,7 +66,7 @@ fn filter_dupes(candidates: Vec<Candidate>) -> Vec<Candidate> {
             is_highly_resemblant: candidate.score_vec_rounded.is_highly_resemblant,
             containment: (candidate.score_vec_rounded.containment * 10.0).round() as i32,
             resemblance: (candidate.score_vec_rounded.resemblance * 10.0).round() as i32,
-            matched_length: ((candidate.score_vec_full.matched_length / 20.0) * 10.0).round() as i32,
+            matched_length: (candidate.score_vec_rounded.matched_length * 10.0).round() as i32,
             rule_length: candidate.rule.tokens.len(),
         };
         groups.entry(key).or_default().push(candidate);
@@ -273,7 +273,7 @@ fn compute_set_similarity(
         is_highly_resemblant: (resemblance * 10.0).round() / 10.0 >= HIGH_RESEMBLANCE_THRESHOLD,
         containment: (containment * 10.0).round() / 10.0,
         resemblance: (amplified_resemblance * 10.0).round() / 10.0,
-        matched_length: (matched_length as f32 / 20.0).round(),
+        matched_length: ((matched_length as f32 / 20.0) * 10.0).round() / 10.0,
         rid: 0,
     };
 
@@ -369,7 +369,7 @@ pub fn compute_candidates_with_msets(
             is_highly_resemblant: (resemblance * 10.0).round() / 10.0 >= HIGH_RESEMBLANCE_THRESHOLD,
             containment: (containment * 10.0).round() / 10.0,
             resemblance: (amplified_resemblance * 10.0).round() / 10.0,
-            matched_length: (matched_length as f32 / 20.0).round(),
+            matched_length: ((matched_length as f32 / 20.0) * 10.0).round() / 10.0,
             rid,
         };
 
@@ -429,7 +429,7 @@ pub fn compute_candidates_with_msets(
             is_highly_resemblant: (resemblance * 10.0).round() / 10.0 >= HIGH_RESEMBLANCE_THRESHOLD,
             containment: (containment * 10.0).round() / 10.0,
             resemblance: (amplified_resemblance * 10.0).round() / 10.0,
-            matched_length: (matched_length as f32 / 20.0).round(),
+            matched_length: ((matched_length as f32 / 20.0) * 10.0).round() / 10.0,
             rid,
         };
 
