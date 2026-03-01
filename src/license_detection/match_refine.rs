@@ -1590,6 +1590,81 @@ pub fn refine_matches_without_false_positive_filter(
     refine_matches_internal(index, matches, query, false)
 }
 
+/// Refine Aho-Corasick matches.
+///
+/// This matches Python's `get_exact_matches()` which calls `refine_matches()` with `merge=False`.
+/// Unlike full refinement, this:
+/// - Skips initial merge (merge=False)
+/// - Applies required phrase filtering
+/// - Applies all quality filters
+/// - Applies containment and overlap filtering with restore
+/// - Skips final merge (merge=False)
+///
+/// Based on Python: `get_exact_matches()` at index.py:691-696
+pub fn refine_aho_matches(
+    index: &LicenseIndex,
+    matches: Vec<LicenseMatch>,
+    query: &Query,
+) -> Vec<LicenseMatch> {
+    if matches.is_empty() {
+        return Vec::new();
+    }
+
+    // Python: skip merge_matches when merge=False
+    // But apply all the quality filters
+
+    // Filter matches missing required phrases
+    let (with_required_phrases, missing_phrases) =
+        filter_matches_missing_required_phrases(index, &matches, query);
+
+    let non_spurious = filter_spurious_matches(&with_required_phrases, query);
+
+    let above_min_cov = filter_below_rule_minimum_coverage(index, &non_spurious);
+
+    let non_single_spurious = filter_matches_to_spurious_single_token(&above_min_cov, query, 5);
+
+    let non_short = filter_too_short_matches(index, &non_single_spurious);
+
+    let non_scattered = filter_short_matches_scattered_on_too_many_lines(index, &non_short);
+
+    let non_gibberish =
+        filter_invalid_matches_to_single_word_gibberish(index, &non_scattered, query);
+
+    // Python: skip merge_matches again when merge=False
+
+    let (non_contained, discarded_contained) = filter_contained_matches(&non_gibberish);
+
+    let (kept, discarded_overlapping) = filter_overlapping_matches(non_contained, index);
+
+    let mut matches_after_first_restore = kept.clone();
+
+    if !discarded_contained.is_empty() {
+        let (restored_contained, _) = restore_non_overlapping(&kept, discarded_contained);
+        matches_after_first_restore.extend(restored_contained);
+    }
+
+    let mut final_matches = matches_after_first_restore.clone();
+
+    if !discarded_overlapping.is_empty() {
+        let (restored_overlapping, _) =
+            restore_non_overlapping(&matches_after_first_restore, discarded_overlapping);
+        final_matches.extend(restored_overlapping);
+    }
+
+    let (non_contained_final, _) = filter_contained_matches(&final_matches);
+
+    // Skip false positive filtering (already done in aho phase)
+    // Skip min_score filtering (not needed for aho matches)
+    // Skip final merge (merge=False)
+
+    let filtered_refs = filter_license_references_with_text_match(&non_contained_final);
+
+    let mut final_scored = filtered_refs;
+    update_match_scores(&mut final_scored, query);
+
+    final_scored
+}
+
 fn refine_matches_internal(
     index: &LicenseIndex,
     matches: Vec<LicenseMatch>,

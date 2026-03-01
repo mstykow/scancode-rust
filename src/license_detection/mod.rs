@@ -272,24 +272,23 @@ impl LicenseDetectionEngine {
         {
             let whole_run = query.whole_query_run();
             let aho_matches = aho_match(&self.index, &whole_run);
-            let merged_aho = merge_overlapping_matches(&aho_matches);
-            let (non_contained_aho, discarded_contained) =
-                match_refine::filter_contained_matches(&merged_aho);
-            let (filtered_aho, discarded_overlapping) =
-                match_refine::filter_overlapping_matches(non_contained_aho, &self.index);
+            
+            #[cfg(debug_assertions)]
+            let aho_count = aho_matches.len();
+            
+            // Python's get_exact_matches() calls refine_matches with merge=False
+            // This applies quality filters including required phrase filtering
+            let refined_aho = match_refine::refine_aho_matches(&self.index, aho_matches, &query);
+            
+            #[cfg(debug_assertions)]
+            eprintln!("DEBUG: aho_matches before refine: {}, after refine: {}", 
+                aho_count, refined_aho.len());
+            #[cfg(debug_assertions)]
+            for m in refined_aho.iter().take(5) {
+                eprintln!("  DEBUG AHO: {} rule={}", m.license_expression, m.rule_identifier);
+            }
 
-            // Restore matches that were discarded but don't overlap with kept matches
-            // This matches Python's behavior in refine_matches (match.py:2794-2800)
-            let (restored_contained, _) =
-                match_refine::restore_non_overlapping(&filtered_aho, discarded_contained);
-            let (restored_overlapping, _) =
-                match_refine::restore_non_overlapping(&filtered_aho, discarded_overlapping);
-
-            let mut final_aho = filtered_aho;
-            final_aho.extend(restored_contained);
-            final_aho.extend(restored_overlapping);
-
-            for m in &final_aho {
+            for m in &refined_aho {
                 if m.match_coverage >= 99.99 && m.end_token > m.start_token {
                     matched_qspans.push(query::PositionSpan::new(m.start_token, m.end_token - 1));
                 }
@@ -299,7 +298,7 @@ impl LicenseDetectionEngine {
                     query.subtract(&span);
                 }
             }
-            all_matches.extend(final_aho);
+            all_matches.extend(refined_aho);
         }
 
         // Check if we should skip sequence matching (Python: index.py:1041-1046)
