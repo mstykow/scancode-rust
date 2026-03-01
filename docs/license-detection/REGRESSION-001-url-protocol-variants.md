@@ -126,6 +126,38 @@ The issue may not be in the URL variant logic itself, but in how matches are ded
 3. Verify match deduplication handles variant matches correctly
 4. Consider implementing Option A as the most conservative fix
 
+## Validation Update
+
+**Date:** 2026-03-01
+
+### Issue Status
+
+| Test | File | Status | Details |
+|------|------|--------|---------|
+| Test 1 | `gpl-2.0_82.RULE` | **REGRESSION EXISTS** | Missing one `gpl-2.0` match |
+| Test 2 | `gpl-2.0_and_lppl-1.3c_and_public-domain.label` | **NEEDS CLARIFICATION** | Different expression structure from expected |
+| Test 3 | `gpl_and_gpl_and_gpl_and_lgpl-2.0_and_other.txt` | **REGRESSION EXISTS** | Wrong last detection (detects `unknown-license-reference` and `lgpl-3.0` instead of `gpl-1.0-plus`) |
+
+### Python Comparison
+
+**Critical Finding:** Python ScanCode does NOT create URL protocol variants. This is a Rust-specific optimization that does not exist in the original Python implementation.
+
+- The `BSL-1.0_or_MIT.txt` fix works in Rust, but the approach fundamentally differs from Python's behavior
+- Python handles dual-license matching without needing URL protocol variant generation
+- The Rust optimization introduces regressions that Python does not have
+
+### Recommended Action
+
+1. **Consider removing the URL variant feature entirely** - Since Python doesn't use this approach and it introduces regressions, the feature may not be worth the complexity.
+
+2. **Find an alternative approach for `BSL-1.0_or_MIT.txt`** - Any fix must match Python's behavior rather than implementing Rust-specific optimizations that diverge from the reference implementation.
+
+3. **Root cause remains:** The core issue is token set expansion adding `http` to rules, which causes incorrect matching in files that contain `http` tokens unrelated to the ignorable URL being matched.
+
+### Conclusion
+
+The URL protocol variant feature should be reconsidered. The regressions it introduces outweigh the benefit of fixing a single test case. A solution that maintains parity with Python's behavior is required.
+
 ## Related Documents
 
 - Original implementation: `docs/license-detection/0019-phase3-expression-combination-plan.md`
