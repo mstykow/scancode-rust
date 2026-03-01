@@ -45,7 +45,7 @@ fn run() -> Result<(), Box<dyn Error>> {
     let start_time = Utc::now();
 
     let exclude_patterns = compile_exclude_patterns(&cli.exclude);
-    println!("Exclusion patterns: {:?}", cli.exclude);
+    eprintln!("Exclusion patterns: {:?}", cli.exclude);
 
     let store = load_license_database()?;
     let strategy = ScanStrategy::new(&store)
@@ -54,7 +54,7 @@ fn run() -> Result<(), Box<dyn Error>> {
 
     let (total_files, total_dirs, excluded_count) =
         count(&cli.dir_path, cli.max_depth, &exclude_patterns)?;
-    println!(
+    eprintln!(
         "Found {} files in {} directories ({} items excluded)",
         total_files, total_dirs, excluded_count
     );
@@ -104,14 +104,17 @@ fn run() -> Result<(), Box<dyn Error>> {
         total_dirs,
         assembly_result,
     );
-    let output_config = OutputWriteConfig {
-        format: cli.format,
-        custom_template: cli.custom_template.clone(),
-        scanned_path: Some(cli.dir_path.clone()),
-    };
-    write_output_file(&cli.output_file, &output, &output_config)?;
+    for target in cli.output_targets() {
+        let output_config = OutputWriteConfig {
+            format: target.format,
+            custom_template: target.custom_template.clone(),
+            scanned_path: Some(cli.dir_path.clone()),
+        };
 
-    println!("{:?} output written to {}", cli.format, cli.output_file);
+        write_output_file(&target.file, &output, &output_config)?;
+        eprintln!("{:?} output written to {}", target.format, target.file);
+    }
+
     Ok(())
 }
 
@@ -126,7 +129,7 @@ fn compile_exclude_patterns(patterns: &[String]) -> Vec<Pattern> {
 const LICENSES_DIR: Dir = include_dir!("resources/licenses/json/details");
 
 fn load_license_database() -> Result<Store, Box<dyn Error>> {
-    println!("Loading SPDX data, this may take a while...");
+    eprintln!("Loading SPDX data, this may take a while...");
     let mut store = Store::new();
 
     for file in LICENSES_DIR.files() {
