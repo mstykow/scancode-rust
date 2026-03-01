@@ -221,12 +221,15 @@ fn should_group_together(prev: &LicenseMatch, cur: &LicenseMatch, threshold: usi
     line_gap <= threshold
 }
 
-/// Sort matches by start line for grouping.
+/// Sort matches by start token position (qstart in Python).
+///
+/// Python sorts matches by `qstart` (token start position) at match.py:350-354.
+/// This ensures matches appear in file order, not alphabetical order.
 pub fn sort_matches_by_line(matches: &mut [LicenseMatch]) {
     matches.sort_by(|a, b| {
-        a.start_line
-            .cmp(&b.start_line)
-            .then_with(|| a.end_line.cmp(&b.end_line))
+        a.start_token
+            .cmp(&b.start_token)
+            .then_with(|| a.end_token.cmp(&b.end_token))
     });
 }
 
