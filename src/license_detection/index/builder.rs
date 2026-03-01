@@ -10,16 +10,16 @@ use aho_corasick::AhoCorasickBuilder;
 use std::collections::{HashMap, HashSet};
 
 use crate::license_detection::hash_match::compute_hash;
-use crate::license_detection::index::LicenseIndex;
 use crate::license_detection::index::dictionary::TokenDictionary;
 use crate::license_detection::index::token_sets::{
     build_set_and_mset, high_multiset_subset, high_tids_set_subset, multiset_counter,
     tids_set_counter,
 };
+use crate::license_detection::index::LicenseIndex;
 use crate::license_detection::models::{License, Rule};
 use crate::license_detection::rules::legalese;
 use crate::license_detection::rules::thresholds::{
-    SMALL_RULE, TINY_RULE, compute_thresholds_occurrences, compute_thresholds_unique,
+    compute_thresholds_occurrences, compute_thresholds_unique, SMALL_RULE, TINY_RULE,
 };
 use crate::license_detection::tokenize::{
     parse_required_phrase_spans, tokenize, tokenize_with_stopwords,
@@ -77,6 +77,38 @@ fn prepare_rule_text(text: &str) -> String {
         .map(|line| line.trim())
         .collect::<Vec<_>>()
         .join("\n")
+}
+
+#[cfg(test)]
+fn generate_url_variants(text: &str, ignorable_urls: &Option<Vec<String>>) -> Vec<String> {
+    let Some(urls) = ignorable_urls else {
+        return vec![];
+    };
+    if urls.is_empty() {
+        return vec![];
+    }
+
+    let mut variants = Vec::new();
+    let current = text.to_string();
+
+    for url in urls {
+        let url_lower = url.to_lowercase();
+        if url_lower.starts_with("https://") {
+            let http_url = format!("http://{}", &url[8..]);
+            if current.contains(url) {
+                let variant = current.replace(url, &http_url);
+                variants.push(variant);
+            }
+        } else if url_lower.starts_with("http://") {
+            let https_url = format!("https://{}", &url[7..]);
+            if current.contains(url) {
+                let variant = current.replace(url, &https_url);
+                variants.push(variant);
+            }
+        }
+    }
+
+    variants
 }
 
 fn build_rule_from_license(license: &License) -> Option<Rule> {
@@ -354,6 +386,46 @@ pub fn build_index(rules: Vec<Rule>, licenses: Vec<License>) -> LicenseIndex {
         }
 
         rid_by_hash.insert(rule_hash, rid);
+
+        // Generate alternate hashes for ignorable URL variants (http vs https)
+        // This allows rules with ignorable URLs to match files with different URL protocols
+        if let Some(ref ignorable_urls) = rule.ignorable_urls {
+            if !ignorable_urls.is_empty() {
+                for url in ignorable_urls {
+                    let url_lower = url.to_lowercase();
+                    // If rule has https:// URL, create a variant with http://
+                    if url_lower.starts_with("https://") {
+                        let http_url = format!("http://{}", &url[8..]);
+                        if rule.text.contains(url) {
+                            let variant_text = rule.text.replace(url, &http_url);
+                            let (variant_tokens, _) = tokenize_with_stopwords(&variant_text);
+                            let mut variant_token_ids: Vec<u16> =
+                                Vec::with_capacity(variant_tokens.len());
+                            for vts in &variant_tokens {
+                                let vtid = dictionary.get_or_assign(vts);
+                                variant_token_ids.push(vtid);
+                            }
+                            let variant_hash = compute_hash(&variant_token_ids);
+
+                            // Only add variant if this hash doesn't already exist
+                            // (prevents duplicate patterns when another rule already has the http:// variant)
+                            if !rid_by_hash.contains_key(&variant_hash) {
+                                rid_by_hash.insert(variant_hash, rid);
+
+                                // Also add variant pattern to Aho-Corasick automaton
+                                // This allows matching files with different URL protocols
+                                if !variant_token_ids.is_empty() {
+                                    rules_automaton_patterns
+                                        .push(tokens_to_bytes(&variant_token_ids));
+                                    pattern_id_to_rid.push(rid);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         regular_rids.insert(rid);
 
         let is_approx_matchable = {
@@ -387,6 +459,26 @@ pub fn build_index(rules: Vec<Rule>, licenses: Vec<License>) -> LicenseIndex {
         }
 
         let (tids_set, mset) = build_set_and_mset(&rule_token_ids);
+
+        // For rules with ignorable URLs containing https://, also add http:// token to set
+        // This allows matching files that use http:// instead of https://
+        let mut tids_set = tids_set;
+        if let Some(ref ignorable_urls) = rule.ignorable_urls {
+            for url in ignorable_urls {
+                if url.to_lowercase().starts_with("https://") {
+                    // If rule has https:// in ignorable URL, add http token to set
+                    if let (Some(https_tid), Some(http_tid)) =
+                        (dictionary.get("https"), dictionary.get("http"))
+                    {
+                        if tids_set.contains(&https_tid) {
+                            tids_set.insert(http_tid);
+                        }
+                    }
+                    break;
+                }
+            }
+        }
+
         sets_by_rid.insert(rid, tids_set.clone());
         msets_by_rid.insert(rid, mset.clone());
 
@@ -1204,5 +1296,290 @@ SOFTWARE."#;
             !index.approx_matchable_rids.contains(&rid),
             "Required phrase should not be approx_matchable"
         );
+    }
+
+    #[test]
+    fn test_generate_url_variants_https_to_http() {
+        let text = "See https://www.boost.org/LICENSE_1_0.txt for details";
+        let ignorable_urls = Some(vec!["https://www.boost.org/LICENSE_1_0.txt".to_string()]);
+
+        let variants = generate_url_variants(text, &ignorable_urls);
+        assert_eq!(variants.len(), 1);
+        assert!(variants[0].contains("http://www.boost.org/LICENSE_1_0.txt"));
+        assert!(!variants[0].contains("https://"));
+    }
+
+    #[test]
+    fn test_generate_url_variants_http_to_https() {
+        let text = "See http://www.boost.org/LICENSE_1_0.txt for details";
+        let ignorable_urls = Some(vec!["http://www.boost.org/LICENSE_1_0.txt".to_string()]);
+
+        let variants = generate_url_variants(text, &ignorable_urls);
+        assert_eq!(variants.len(), 1);
+        assert!(variants[0].contains("https://www.boost.org/LICENSE_1_0.txt"));
+        assert!(!variants[0].contains("http://"));
+    }
+
+    #[test]
+    fn test_generate_url_variants_none() {
+        let text = "Some text without URLs";
+        let variants = generate_url_variants(text, &None);
+        assert!(variants.is_empty());
+    }
+
+    #[test]
+    fn test_generate_url_variants_empty() {
+        let text = "Some text";
+        let variants = generate_url_variants(text, &Some(vec![]));
+        assert!(variants.is_empty());
+    }
+
+    #[test]
+    fn test_build_index_mit_or_boost_rule_variants() {
+        use std::path::Path;
+
+        let rules_path = Path::new("reference/scancode-toolkit/src/licensedcode/data/rules");
+        let licenses_path = Path::new("reference/scancode-toolkit/src/licensedcode/data/licenses");
+
+        if !rules_path.exists() || !licenses_path.exists() {
+            eprintln!("Skipping test: reference directories not found");
+            return;
+        }
+
+        let rules = crate::license_detection::rules::load_rules_from_directory(rules_path, false);
+        let licenses =
+            crate::license_detection::rules::load_licenses_from_directory(licenses_path, false);
+
+        let rules = match rules {
+            Ok(r) => r,
+            Err(e) => {
+                eprintln!("Skipping test: failed to load rules: {}", e);
+                return;
+            }
+        };
+
+        let licenses = match licenses {
+            Ok(l) => l,
+            Err(e) => {
+                eprintln!("Skipping test: failed to load licenses: {}", e);
+                return;
+            }
+        };
+
+        let index = build_index(rules, licenses);
+
+        // Find the mit_or_boost-1.0_1.RULE
+        let target_rid = index
+            .rules_by_rid
+            .iter()
+            .position(|r| r.identifier == "mit_or_boost-1.0_1.RULE");
+
+        if let Some(rid) = target_rid {
+            let rule = &index.rules_by_rid[rid];
+            eprintln!("Found rule: {}", rule.identifier);
+            eprintln!("License expression: {}", rule.license_expression);
+            eprintln!("Ignorable URLs: {:?}", rule.ignorable_urls);
+
+            // The rule text should have https://
+            let has_https = rule.text.contains("https://");
+            eprintln!("Rule text has https://: {}", has_https);
+
+            // Count how many hashes point to this rule
+            let hash_count = index.rid_by_hash.values().filter(|&&r| r == rid).count();
+            eprintln!("Number of hashes for this rule: {}", hash_count);
+
+            // Should have at least 2 hashes (original + http variant)
+            assert!(
+                hash_count >= 2,
+                "Rule should have hash for both https and http variants"
+            );
+        } else {
+            eprintln!("Rule mit_or_boost-1.0_1.RULE not found");
+        }
+    }
+
+    #[test]
+    fn test_sequence_matching_bsl_file() {
+        use crate::license_detection::index::token_sets::{build_set_and_mset, tids_set_counter};
+        use crate::license_detection::query::Query;
+        use crate::license_detection::seq_match::{
+            seq_match_with_candidates, HIGH_RESEMBLANCE_THRESHOLD,
+        };
+        use std::path::Path;
+
+        let test_file = Path::new("testdata/license-golden/datadriven/external/fossology-tests/Dual-license/BSL-1.0_or_MIT.txt");
+        if !test_file.exists() {
+            eprintln!("Skipping test: test file not found");
+            return;
+        }
+
+        let rules_path = Path::new("reference/scancode-toolkit/src/licensedcode/data/rules");
+        let licenses_path = Path::new("reference/scancode-toolkit/src/licensedcode/data/licenses");
+
+        if !rules_path.exists() || !licenses_path.exists() {
+            eprintln!("Skipping test: reference directories not found");
+            return;
+        }
+
+        let rules =
+            crate::license_detection::rules::load_rules_from_directory(rules_path, false).unwrap();
+        let licenses =
+            crate::license_detection::rules::load_licenses_from_directory(licenses_path, false)
+                .unwrap();
+        let index = build_index(rules, licenses);
+
+        let text = std::fs::read_to_string(test_file).unwrap();
+        let query = Query::new(&text, &index).expect("Query creation failed");
+
+        eprintln!("Query token count: {}", query.tokens.len());
+
+        // Build query set and mset
+        let (query_set, query_mset) = build_set_and_mset(&query.tokens);
+        let query_unique_count = tids_set_counter(&query_set);
+        eprintln!("Query unique tokens: {}", query_unique_count);
+
+        // Find the mit_or_boost rule and compare
+        let target_rid = index
+            .rules_by_rid
+            .iter()
+            .position(|r| r.identifier == "mit_or_boost-1.0_1.RULE");
+        if let Some(rid) = target_rid {
+            let rule = &index.rules_by_rid[rid];
+            let rule_tokens = &index.tids_by_rid[rid];
+            eprintln!("\nRule token count: {}", rule_tokens.len());
+
+            // Use the indexed set from the index
+            let indexed_set = index
+                .sets_by_rid
+                .get(&rid)
+                .expect("Should have indexed set");
+            let rule_unique_count = tids_set_counter(indexed_set);
+            eprintln!(
+                "Rule unique tokens (from indexed set): {}",
+                rule_unique_count
+            );
+
+            // Compute intersection with indexed set
+            let intersection: std::collections::HashSet<_> =
+                query_set.intersection(indexed_set).collect();
+            eprintln!("Intersection unique tokens: {}", intersection.len());
+
+            let union_len = query_set.union(indexed_set).count();
+            let resemblance = intersection.len() as f32 / union_len as f32;
+            eprintln!("Set resemblance: {:.3}", resemblance);
+            eprintln!(
+                "High resemblance threshold: {:.3}",
+                HIGH_RESEMBLANCE_THRESHOLD
+            );
+
+            // Check for http/https tokens
+            let http_tid = index.dictionary.get("http");
+            let https_tid = index.dictionary.get("https");
+            eprintln!("\nhttp token id: {:?}", http_tid);
+            eprintln!("https token id: {:?}", https_tid);
+            eprintln!(
+                "Query has http: {:?}",
+                http_tid.map(|t| query_set.contains(&t))
+            );
+            eprintln!(
+                "Indexed set has http: {:?}",
+                http_tid.map(|t| indexed_set.contains(&t))
+            );
+            eprintln!(
+                "Indexed set has https: {:?}",
+                https_tid.map(|t| indexed_set.contains(&t))
+            );
+
+            // Check if rule is approx_matchable
+            eprintln!(
+                "\nRule is approx_matchable: {}",
+                index.approx_matchable_rids.contains(&rid)
+            );
+
+            // Check the threshold values
+            eprintln!("\nRule thresholds:");
+            eprintln!(
+                "  min_matched_length_unique: {}",
+                rule.min_matched_length_unique
+            );
+            eprintln!(
+                "  min_high_matched_length_unique: {}",
+                rule.min_high_matched_length_unique
+            );
+            eprintln!("  min_matched_length: {}", rule.min_matched_length);
+            eprintln!(
+                "  min_high_matched_length: {}",
+                rule.min_high_matched_length
+            );
+
+            // Check if query meets thresholds
+            let high_intersection: std::collections::HashSet<u16> = indexed_set
+                .iter()
+                .filter(|&&t| (t as usize) < index.len_legalese)
+                .copied()
+                .collect();
+            let query_high: std::collections::HashSet<u16> = query_set
+                .iter()
+                .filter(|&&t| (t as usize) < index.len_legalese)
+                .copied()
+                .collect();
+            let high_intersection_count = high_intersection.intersection(&query_high).count();
+            eprintln!(
+                "\nHigh token intersection count: {}",
+                high_intersection_count
+            );
+        }
+    }
+
+    #[test]
+    fn test_full_detection_bsl_file() {
+        use crate::license_detection::LicenseDetectionEngine;
+        use std::path::Path;
+
+        let test_file = Path::new("testdata/license-golden/datadriven/external/fossology-tests/Dual-license/BSL-1.0_or_MIT.txt");
+        if !test_file.exists() {
+            eprintln!("Skipping test: test file not found");
+            return;
+        }
+
+        let rules_path = Path::new("reference/scancode-toolkit/src/licensedcode/data");
+        if !rules_path.exists() {
+            eprintln!("Skipping test: reference directory not found");
+            return;
+        }
+
+        let engine = LicenseDetectionEngine::new(rules_path).expect("Engine creation failed");
+        let text = std::fs::read_to_string(test_file).unwrap();
+
+        let detections = engine.detect(&text, false).expect("Detection failed");
+
+        eprintln!("\nDetection results:");
+        for d in &detections {
+            eprintln!(
+                "  - {}",
+                d.license_expression.as_deref().unwrap_or("unknown")
+            );
+            for m in &d.matches {
+                eprintln!(
+                    "      {} (matcher: {}, coverage: {:.1}%, score: {:.2}, tokens: {}-{})",
+                    m.license_expression,
+                    m.matcher,
+                    m.match_coverage,
+                    m.score,
+                    m.start_token,
+                    m.end_token
+                );
+            }
+        }
+
+        // Check if mit_or_boost rule exists in index
+        let index = engine.index();
+        let mit_or_boost_rid = index
+            .rules_by_rid
+            .iter()
+            .position(|r| r.identifier == "mit_or_boost-1.0_1.RULE");
+        if let Some(rid) = mit_or_boost_rid {
+            eprintln!("\nmit_or_boost-1.0_1.RULE found at rid {}", rid);
+        }
     }
 }
