@@ -162,3 +162,22 @@ The URL protocol variant feature should be reconsidered. The regressions it intr
 
 - Original implementation: `docs/license-detection/0019-phase3-expression-combination-plan.md`
 - Code location: `src/license_detection/index/builder.rs:390-480`
+
+---
+
+## Resolution
+
+**Date:** 2026-03-01
+**Action:** Removed the URL protocol variants feature entirely
+
+The Rust-specific URL protocol variants feature has been removed because:
+1. Python doesn't have this feature - it was a Rust-specific optimization
+2. It caused 3 test regressions due to overly broad token set expansion
+3. The fix for BSL-1.0_or_MIT.txt should be achieved through a different approach
+
+**Result:**
+- All 3 regressions fixed
+- Test count improved: 133 → 130 failures
+- BSL-1.0_or_MIT.txt still detects both `mit` and `boost-1.0` licenses (via different matching)
+
+**Status:** ✅ RESOLVED - Feature removed, regressions fixed
