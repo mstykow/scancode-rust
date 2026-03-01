@@ -93,10 +93,8 @@ scancode-rust implements a multi-phase processing pipeline based on Python ScanC
 │  Phase 5: Output                                                │
 │  ┌────────────────────────────────────────────────────────┐    │
 │  │ • JSON output (ScanCode-compatible)                     │    │
-│  │ • SPDX (RDF, JSON, YAML, tag-value)                     │    │
-│  │ • CycloneDX (JSON, XML)                                 │    │
-│  │ • CSV, YAML, HTML                                       │    │
-│  │ • Custom templates                                      │    │
+│  │ • SPDX, CycloneDX, CSV, YAML, HTML, JSONL              │    │
+│  │ • HTML app and custom templates                         │    │
 │  └────────────────────────────────────────────────────────┘    │
 │                                                                  │
 └─────────────────────────────────────────────────────────────────┘
@@ -110,22 +108,18 @@ scancode-rust implements a multi-phase processing pipeline based on Python ScanC
 - **Package Assembly**: Sibling and nested merge strategies for combining related manifests
 - **Text Detection**: License detection (n-gram matching), copyright detection (4-stage pipeline), email/URL extraction
 - **Post-Processing**: Summarization, tallies, classification
-- **Output**: JSON (ScanCode-compatible), SPDX, CycloneDX, CSV, YAML, HTML
+- **Output**: JSON, SPDX (TV/RDF), CycloneDX (JSON/XML), CSV, YAML, JSON Lines, HTML, HTML app, custom templates
 - **Testing Infrastructure**: Unit tests, doctests, golden tests, integration tests
 - **Infrastructure**: Plugin system, caching, enhanced progress tracking
 
 ### Implementation Status
 
-For current implementation status, priorities, and effort estimates, see:
+Implementation details in this document are intentionally architecture-focused.
+For current capabilities and behavior, use:
 
-- **[implementation-plans/README.md](implementation-plans/README.md)** - Overview of all implementation plans
-- **[implementation-plans/package-detection/](implementation-plans/package-detection/)** - Package parsing and assembly
-- **[implementation-plans/text-detection/](implementation-plans/text-detection/)** - License, copyright, email/URL detection
-- **[implementation-plans/post-processing/](implementation-plans/post-processing/)** - Summarization and tallies
-- **[implementation-plans/output/](implementation-plans/output/)** - Output format support
-- **[implementation-plans/infrastructure/](implementation-plans/infrastructure/)** - Plugin system, caching, progress tracking
-
-Each plan includes detailed status, priorities (P0-P3), effort estimates, and implementation phases.
+- **[README.md](../README.md)** for user-facing features and usage
+- **[SUPPORTED_FORMATS.md](SUPPORTED_FORMATS.md)** for currently supported formats and ecosystems
+- **[TESTING_STRATEGY.md](TESTING_STRATEGY.md)** for verification and regression approach
 
 ### Plugin Architecture
 
@@ -137,7 +131,7 @@ Python ScanCode uses a plugin-based architecture with 5 plugin types:
 4. **OutputFilter Plugins**: License policy filtering, custom filters
 5. **Output Plugins**: Format-specific output (SPDX, CycloneDX, etc.)
 
-The Rust implementation will adopt a similar architecture using Rust traits and dynamic dispatch, with compile-time plugin registration for zero runtime overhead.
+The Rust implementation currently uses static, compile-time wiring (trait-based parsers and explicit pipeline stages).
 
 ## Architecture Components
 
@@ -304,9 +298,9 @@ pub struct PackageData {
 │                   │                                        │
 │  4. Output        v                                        │
 │  ┌─────────────────────────────────────┐                  │
-│  │ JSON serialization                  │                  │
-│  │ ─ ScanCode Toolkit compatible       │                  │
-│  │ ─ SBOM-ready structure              │                  │
+│  │ Output format dispatch              │                  │
+│  │ ─ JSON / YAML / CSV / JSONL         │                  │
+│  │ ─ SPDX / CycloneDX / HTML / template│                  │
 │  └─────────────────────────────────────┘                  │
 │                                                            │
 │  Detection Engines (Integrated)                           │
@@ -536,7 +530,7 @@ opt-level = 3             # Maximum optimization
 
 ## Extended Architecture
 
-The following sections describe major architectural components in detail. See [implementation-plans/](implementation-plans/) for implementation status and roadmap.
+The following sections describe major architectural components in detail.
 
 ### Text Detection Engines
 
@@ -547,7 +541,7 @@ The following sections describe major architectural components in detail. See [i
 - Confidence scoring and multi-license handling
 - Integration with existing SPDX license data
 
-**Copyright Detection** (see [COPYRIGHT_DETECTION_PLAN.md](implementation-plans/text-detection/COPYRIGHT_DETECTION_PLAN.md)):
+**Copyright Detection**:
 
 The copyright detection engine extracts copyright statements, holder names, and author information from source files using a four-stage pipeline:
 
@@ -583,7 +577,7 @@ Behavioral compatibility model:
 
 - **Default expectation**: Follow Python ScanCode behavior closely for copyright, holder, and author extraction.
 - **Intentional Rust differences**: Preserve Unicode names, apply correctness bug fixes from the Python reference, and keep detection thread-safe for parallel scans.
-- **Known parity gaps**: Some edge-case files still differ from Python output; these are tracked in the implementation plan and treated as targeted follow-up work.
+- **Known parity gaps**: Some edge-case files still differ from Python output; these are treated as targeted follow-up work with regression tests.
 - **Fixture ownership**: Copyright golden fixtures in this repository are Rust-owned expectations; Python fixtures are a reference input, not the source of truth for local expected outputs.
 
 Migration expectation:
@@ -593,7 +587,7 @@ Migration expectation:
 
 Module location: `src/copyright/`
 
-**Email/URL Detection** (see [EMAIL_URL_DETECTION_PLAN.md](implementation-plans/text-detection/EMAIL_URL_DETECTION_PLAN.md)):
+**Email/URL Detection**:
 
 The email/URL detection engine is the simplest text detection feature — regex-based extraction with an ordered filter pipeline to remove junk results.
 
@@ -644,9 +638,16 @@ Module location: `src/finder/`
 
 ### Output Format Support
 
+**Implementation and parity tracking:**
+
+- Multi-format output layer is implemented in `src/output/mod.rs`
+- CLI selects output format via `--format` and dispatches through `write_output_file`
+- Format compatibility is verified through fixture-backed tests and documented
+  in `docs/TESTING_STRATEGY.md`
+
 **SBOM Formats**:
 
-- SPDX: RDF, JSON, YAML, tag-value
+- SPDX: Tag-value and RDF/XML
 - CycloneDX: JSON, XML
 - Compatibility with SBOM tooling ecosystem
 
@@ -654,7 +655,7 @@ Module location: `src/finder/`
 
 - CSV (tabular data export)
 - YAML (human-readable)
-- HTML (interactive reports)
+- HTML report + HTML app
 - Custom templates (user-defined formats)
 
 #### Infrastructure Enhancements
@@ -666,13 +667,13 @@ Module location: `src/finder/`
 - Custom output formats
 - Third-party integrations
 
-**Caching** (see [CACHING_PLAN.md](implementation-plans/infrastructure/CACHING_PLAN.md)):
+**Caching**:
 
 Two-layer caching system for scan performance optimization:
 
-1. **License Index Cache**: Persists the compiled askalono `Store` (MessagePack + zstd) to avoid rebuilding from SPDX text on each run. Existing `Store::from_cache()`/`to_cache()` infrastructure handles serialization. Version-stamped with tool version + SPDX data version. Expected speedup: 200-300ms → 20-50ms startup.
+1. **License Index Cache**: Persists the compiled askalono `Store` (MessagePack + zstd) to avoid rebuilding from SPDX text on each run. Existing `Store::from_cache()`/`to_cache()` infrastructure handles serialization. Version-stamped with tool version + SPDX data version. This is designed to reduce startup overhead by reusing compiled store data.
 
-2. **Scan Result Cache** (beyond-parity — Python has none): Content-addressed per-file cache keyed by SHA256 hash (already computed in `process_file()`). Cached data: package_data, license_detections, copyrights, programming_language. Path-dependent fields reconstructed at load time. Sharded directory layout (`ab/ab3f...postcard`) for filesystem scalability. Expected speedup: 10-50x on repeated scans.
+2. **Scan Result Cache** (beyond-parity — Python has none): Content-addressed per-file cache keyed by SHA256 hash (already computed in `process_file()`). Cached data: package_data, license_detections, copyrights, programming_language. Path-dependent fields reconstructed at load time. Sharded directory layout (`ab/ab3f...postcard`) for filesystem scalability. This is intended to significantly improve repeated-scan performance.
 
 3. **Incremental Scanning** (beyond-parity — Python has none): Scan manifest tracks `{path: (mtime, size, sha256)}` per directory. On re-scan, only files with changed mtime/size are re-hashed and re-scanned. Enables CI/CD integration (scan only changed files per commit).
 
@@ -680,7 +681,7 @@ Cache location: XDG-compliant (`~/.cache/scancode-rust/`), overridable via `SCAN
 
 Module location: `src/cache/`
 
-**Progress Tracking** (see [PROGRESS_TRACKING_PLAN.md](implementation-plans/infrastructure/PROGRESS_TRACKING_PLAN.md)):
+**Progress Tracking**:
 
 Centralized `ScanProgress` struct managing multi-phase progress bars via `indicatif::MultiProgress`:
 
@@ -689,9 +690,9 @@ Centralized `ScanProgress` struct managing multi-phase progress bars via `indica
 3. **Assembly phase**: Progress bar for package assembly (sibling merge, workspace merge, etc.).
 4. **Scan summary**: Files/sec, bytes/sec, error count, per-phase timings, initial/final counts.
 
-Three verbosity modes: `--quiet` (hidden draw target, suppresses all stderr), default (progress bars + summary), `--verbose` (file-by-file listing + extended summary). Mutually exclusive via `clap` conflicts.
+Verbosity modes are part of ongoing CLI ergonomics work and are implemented in the command-line and progress modules.
 
-Logging integration via `indicatif-log-bridge`: parser `warn!()` messages route above the progress bar without corrupting display. All progress goes to stderr; stdout reserved for structured output.
+Logging integration via `indicatif-log-bridge`: parser `warn!()` messages route above the progress bar without corrupting display. Runtime logging and output-writing behavior are implemented in `src/progress.rs`, `src/scanner.rs`, and output writers.
 
 Module location: `src/progress.rs`
 
@@ -755,4 +756,3 @@ The `setup.sh` script:
 - [ADRs](adr/) - Architectural decision records
 - [Improvements](improvements/) - Beyond-parity features
 - [SUPPORTED_FORMATS.md](SUPPORTED_FORMATS.md) - Complete format list (auto-generated)
-- [Implementation Plans](implementation-plans/) - Feature implementation status and roadmap

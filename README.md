@@ -10,7 +10,7 @@ A high-performance code scanning tool written in Rust that detects licenses, cop
 - File metadata
 - System information
 
-More ScanCode features coming soon!
+For design details and implementation guidance, see the documentation in `docs/`.
 
 ## Features
 
@@ -60,17 +60,23 @@ The compiled binary will be available at `target/release/scancode-rust`.
 ## Usage
 
 ```sh
-scancode-rust [OPTIONS] <DIR_PATH> --output-file <OUTPUT_FILE>
+scancode-rust [OPTIONS] <DIR_PATH> [-o <OUTPUT_FILE>]
 ```
 
 ### Options
 
 ```sh
 Options:
-  -o, --output-file <OUTPUT_FILE>    Output JSON file path
+  -o <OUTPUT_FILE>                    Output file path [default: output.json]
+      --format <FORMAT>               Output format [default: json]
+      --custom-template <PATH>        Required when --format custom-template
   -d, --max-depth <MAX_DEPTH>        Maximum directory depth to scan [default: 50]
   -e, --exclude <EXCLUDE>...         Glob patterns to exclude from scanning
       --no-assemble                  Disable package assembly (merging related manifest/lockfiles)
+      --email                        Scan input for email addresses
+      --max-email <INT>              Max emails per file [default: 50; requires --email]
+  -u, --url                          Scan input for URLs
+      --max-url <INT>                Max URLs per file [default: 50; requires --url]
   -h, --help                         Print help
   -V, --version                      Print version
 ```
@@ -87,11 +93,22 @@ scancode-rust ~/projects/my-codebase -o scan-results.json --exclude "*.git*" "ta
 
 ## Output Format
 
-The tool produces JSON output compatible with ScanCode Toolkit, including:
+Implemented output formats:
 
-- Scan headers with timestamp information
-- File-level data with license and metadata information
-- System environment details
+- JSON (ScanCode-compatible baseline)
+- YAML
+- CSV
+- JSON Lines
+- SPDX (Tag-Value, RDF/XML)
+- CycloneDX (JSON, XML)
+- HTML report
+- HTML app
+- Custom template rendering
+
+Output architecture and compatibility approach are documented in:
+
+- `docs/ARCHITECTURE.md`
+- `docs/TESTING_STRATEGY.md`
 
 ## Documentation
 
@@ -203,9 +220,9 @@ Use the `release.sh` script:
 
 Available release types:
 
-- `patch`: Increments the patch version (0.0.4 → 0.0.5)
-- `minor`: Increments the minor version (0.0.4 → 0.1.0)
-- `major`: Increments the major version (0.0.4 → 1.0.0)
+- `patch`: Increments `X.Y.Z` to `X.Y.(Z+1)`
+- `minor`: Increments `X.Y.Z` to `X.(Y+1).0`
+- `major`: Increments `X.Y.Z` to `(X+1).0.0`
 
 **What happens automatically:**
 
