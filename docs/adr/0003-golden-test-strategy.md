@@ -131,7 +131,7 @@ testdata/
    - Validates against proven reference implementation
 
 5. **Continuous Validation**
-   - Pre-commit hooks run tests
+   - Pre-commit hooks run fast local quality gates (format/lint/docs checks)
    - CI validates on every push
    - Automated regression detection
 

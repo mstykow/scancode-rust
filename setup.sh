@@ -42,4 +42,14 @@ else
 fi
 
 echo ""
-echo "Submodule setup complete. Run 'cargo build --release' to embed it into the binary."
+echo "Installing pre-commit hooks..."
+if command -v pre-commit >/dev/null 2>&1; then
+    pre-commit install
+    echo "✅ Pre-commit hooks installed"
+else
+    echo "⚠️  pre-commit is not installed. Install it, then run:"
+    echo "   pre-commit install"
+fi
+
+echo ""
+echo "Setup complete. Run 'cargo build --release' to embed license data into the binary."

@@ -143,7 +143,8 @@ To contribute to `scancode-rust`, follow these steps to set up the repository fo
    ```
 
 3. **Initialize the License Submodule**  
-   Use the following script to initialize the submodule and configure sparse checkout:
+   Use the following script to initialize the submodule and configure sparse checkout.  
+   If `pre-commit` is installed, this script also installs Git pre-commit hooks automatically:
 
    ```sh
    ./setup.sh
@@ -163,8 +164,9 @@ To contribute to `scancode-rust`, follow these steps to set up the repository fo
    cargo test
    ```
 
-6. **Set Up Pre-commit Hooks**  
-   This repository uses [pre-commit](https://pre-commit.com/) to run checks before each commit:
+6. **Install Pre-commit (if needed)**  
+   This repository uses [pre-commit](https://pre-commit.com/) to run checks before each commit.  
+   If you install `pre-commit` after running `./setup.sh`, run `pre-commit install` once:
 
    ```sh
    # Using pip
@@ -175,6 +177,13 @@ To contribute to `scancode-rust`, follow these steps to set up the repository fo
 
    # Install the hooks
    pre-commit install
+   ```
+
+   Common documentation quality commands:
+
+   ```sh
+   npm run check:docs  # markdownlint + prettier check
+   npm run fix:docs    # markdownlint auto-fix + prettier write
    ```
 
 7. **Start Developing**  

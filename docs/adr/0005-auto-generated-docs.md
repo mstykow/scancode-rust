@@ -195,13 +195,11 @@ docs/
 #!/bin/bash
 # .git/hooks/pre-commit
 
-# Format code
-cargo fmt --all
+# Hook behavior is configured in .pre-commit-config.yaml.
+# The docs regeneration hook runs this command when parser files change:
+cargo run --quiet --bin generate-supported-formats
 
-# Generate documentation
-cargo run --bin gen_parser_docs > docs/SUPPORTED_FORMATS.md
-
-# Stage generated docs
+# Then it stages the generated file:
 git add docs/SUPPORTED_FORMATS.md
 ```
 
@@ -261,7 +259,7 @@ fn main() {
 
 1. **Build Complexity**
    - Requires documentation generation tooling
-   - Pre-commit hook adds setup step
+   - Pre-commit tooling adds setup dependency
    - **Acceptable**: One-time setup, huge long-term benefit
 
 2. **Partial Automation**
