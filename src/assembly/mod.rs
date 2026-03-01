@@ -271,6 +271,8 @@ mod tests {
             urls: vec![],
             for_packages: vec![],
             scan_errors: vec![],
+            is_source: None,
+            source_count: None,
         }
     }
 
@@ -688,6 +690,8 @@ mod tests {
             urls: vec![],
             for_packages: vec![],
             scan_errors: vec![],
+            is_source: None,
+            source_count: None,
         }];
 
         let result = assemble(&mut files);

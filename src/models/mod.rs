@@ -13,4 +13,7 @@ pub use package_type::PackageType;
 
 #[cfg(test)]
 pub use file_info::build_package_uid;
-pub use output::{ExtraData, Header, Output, SCANCODE_OUTPUT_FORMAT_VERSION, SystemEnvironment};
+pub use output::{
+    ExtraData, Header, LicenseReference, LicenseRuleReference, Output,
+    SCANCODE_OUTPUT_FORMAT_VERSION, SystemEnvironment,
+};

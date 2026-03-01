@@ -105,13 +105,46 @@ pub struct Cli {
     #[arg(short, long, default_value = "50")]
     pub max_depth: usize,
 
+    #[arg(short = 'n', long, default_value_t = default_processes())]
+    pub processes: i32,
+
+    #[arg(long, default_value_t = 120.0)]
+    pub timeout: f64,
+
+    #[arg(short, long, conflicts_with = "verbose")]
+    pub quiet: bool,
+
+    #[arg(short, long, conflicts_with = "quiet")]
+    pub verbose: bool,
+
+    #[arg(long, conflicts_with = "full_root")]
+    pub strip_root: bool,
+
+    #[arg(long, conflicts_with = "strip_root")]
+    pub full_root: bool,
+
     /// Exclude patterns (glob patterns like "*.tmp" or "node_modules")
     #[arg(short, long, value_delimiter = ',')]
     pub exclude: Vec<String>,
 
+    #[arg(long, value_delimiter = ',')]
+    pub include: Vec<String>,
+
+    #[arg(long)]
+    pub from_json: bool,
+
     /// Disable package assembly (merging related manifest/lockfiles into packages)
     #[arg(long)]
     pub no_assemble: bool,
+
+    #[arg(long)]
+    pub filter_clues: bool,
+
+    #[arg(long)]
+    pub only_findings: bool,
+
+    #[arg(long)]
+    pub mark_source: bool,
 
     /// Scan input for email addresses
     #[arg(long)]
@@ -128,6 +161,11 @@ pub struct Cli {
     /// Report only up to INT URLs found in a file. Use 0 for no limit.
     #[arg(long, default_value_t = 50, requires = "url")]
     pub max_url: usize,
+}
+
+fn default_processes() -> i32 {
+    let cpus = std::thread::available_parallelism().map_or(1, |n| n.get());
+    if cpus > 1 { (cpus - 1) as i32 } else { 1 }
 }
 
 #[derive(Debug, Clone)]
@@ -278,5 +316,84 @@ mod tests {
         let missing_output =
             Cli::try_parse_from(["scancode-rust", "--custom-template", "tpl.tera", "samples"]);
         assert!(missing_output.is_err());
+    }
+
+    #[test]
+    fn test_parses_processes_and_timeout_options() {
+        let parsed = Cli::try_parse_from([
+            "scancode-rust",
+            "--json-pp",
+            "scan.json",
+            "-n",
+            "4",
+            "--timeout",
+            "30",
+            "samples",
+        ])
+        .expect("cli parse should succeed");
+
+        assert_eq!(parsed.processes, 4);
+        assert_eq!(parsed.timeout, 30.0);
+    }
+
+    #[test]
+    fn test_strip_root_conflicts_with_full_root() {
+        let parsed = Cli::try_parse_from([
+            "scancode-rust",
+            "--json-pp",
+            "scan.json",
+            "--strip-root",
+            "--full-root",
+            "samples",
+        ]);
+        assert!(parsed.is_err());
+    }
+
+    #[test]
+    fn test_parses_include_and_only_findings_and_filter_clues() {
+        let parsed = Cli::try_parse_from([
+            "scancode-rust",
+            "--json-pp",
+            "scan.json",
+            "--include",
+            "src/**,Cargo.toml",
+            "--only-findings",
+            "--filter-clues",
+            "samples",
+        ])
+        .expect("cli parse should succeed");
+
+        assert_eq!(parsed.include, vec!["src/**", "Cargo.toml"]);
+        assert!(parsed.only_findings);
+        assert!(parsed.filter_clues);
+    }
+
+    #[test]
+    fn test_quiet_conflicts_with_verbose() {
+        let parsed = Cli::try_parse_from([
+            "scancode-rust",
+            "--json-pp",
+            "scan.json",
+            "--quiet",
+            "--verbose",
+            "samples",
+        ]);
+        assert!(parsed.is_err());
+    }
+
+    #[test]
+    fn test_parses_from_json_and_mark_source() {
+        let parsed = Cli::try_parse_from([
+            "scancode-rust",
+            "--json-pp",
+            "scan.json",
+            "--from-json",
+            "--mark-source",
+            "sample-scan.json",
+        ])
+        .expect("cli parse should succeed");
+
+        assert!(parsed.from_json);
+        assert!(parsed.mark_source);
     }
 }

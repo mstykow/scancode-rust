@@ -128,6 +128,8 @@ mod tests {
                 urls: vec![],
                 for_packages: vec![],
                 scan_errors: vec![],
+                is_source: None,
+                source_count: None,
             };
 
             file_infos.push(file_info);

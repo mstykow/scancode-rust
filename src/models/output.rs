@@ -1,9 +1,9 @@
 use super::{FileInfo, Package, TopLevelDependency};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 pub const SCANCODE_OUTPUT_FORMAT_VERSION: &str = "4.0.0";
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 /// Top-level ScanCode-compatible JSON payload.
 pub struct Output {
     pub headers: Vec<Header>,
@@ -14,7 +14,7 @@ pub struct Output {
     pub license_rule_references: Vec<LicenseRuleReference>,
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 /// Scan execution metadata stored in `output.headers`.
 pub struct Header {
     pub start_timestamp: String,
@@ -25,7 +25,7 @@ pub struct Header {
     pub output_format_version: String,
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 /// Additional counters and environment details for a scan run.
 pub struct ExtraData {
     pub files_count: usize,
@@ -34,7 +34,7 @@ pub struct ExtraData {
     pub system_environment: SystemEnvironment,
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 /// Host environment information captured during scan execution.
 pub struct SystemEnvironment {
     pub operating_system: Option<String>,
@@ -43,7 +43,7 @@ pub struct SystemEnvironment {
     pub rust_version: String,
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 /// Reference entry for a detected license.
 pub struct LicenseReference {
     pub name: String,
@@ -52,7 +52,7 @@ pub struct LicenseReference {
     pub text: String,
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 /// Reference metadata for a license detection rule.
 pub struct LicenseRuleReference {
     pub identifier: String,

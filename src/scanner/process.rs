@@ -1,6 +1,7 @@
 use std::fs;
 use std::path::Path;
 use std::sync::Arc;
+use std::time::Instant;
 
 use anyhow::Error;
 use content_inspector::{ContentType, inspect};
@@ -92,6 +93,9 @@ pub fn process_with_options<P: AsRef<Path>>(
             .map(|(path, metadata)| {
                 let file_entry = process_file(path, metadata, scan_strategy, text_options);
                 progress_bar.inc(1);
+                if progress_bar.is_hidden() && text_options.verbose_paths {
+                    progress_bar.println(path.to_string_lossy());
+                }
                 file_entry
             })
             .collect(),
@@ -134,11 +138,20 @@ fn process_file(
     let mut scan_errors: Vec<String> = vec![];
     let mut file_info_builder = FileInfoBuilder::default();
 
+    let started = Instant::now();
+
     if let Err(e) =
         extract_information_from_content(&mut file_info_builder, path, scan_strategy, text_options)
     {
         scan_errors.push(e.to_string());
     };
+
+    if is_timeout_exceeded(started, text_options.timeout_seconds) {
+        scan_errors.push(format!(
+            "Processing interrupted due to timeout after {:.2} seconds",
+            text_options.timeout_seconds
+        ));
+    }
 
     file_info_builder
         .name(path.file_name().unwrap().to_string_lossy().to_string())
@@ -173,7 +186,15 @@ fn extract_information_from_content(
     scan_strategy: &ScanStrategy,
     text_options: &TextDetectionOptions,
 ) -> Result<(), Error> {
+    let started = Instant::now();
     let buffer = fs::read(path)?;
+
+    if is_timeout_exceeded(started, text_options.timeout_seconds) {
+        return Err(Error::msg(format!(
+            "Timeout while reading file content (> {:.2}s)",
+            text_options.timeout_seconds
+        )));
+    }
 
     file_info_builder
         .sha1(Some(calculate_sha1(&buffer)))
@@ -187,15 +208,36 @@ fn extract_information_from_content(
         file_info_builder.package_data(package_data);
     }
 
+    if is_timeout_exceeded(started, text_options.timeout_seconds) {
+        return Err(Error::msg(format!(
+            "Timeout while extracting package/text metadata (> {:.2}s)",
+            text_options.timeout_seconds
+        )));
+    }
+
     if inspect(&buffer) == ContentType::UTF_8 {
         let text_content = crate::utils::file::decode_bytes_to_string(&buffer);
 
         extract_copyright_information(file_info_builder, path, &text_content);
         extract_email_url_information(file_info_builder, &text_content, text_options);
+
+        if is_timeout_exceeded(started, text_options.timeout_seconds) {
+            return Err(Error::msg(format!(
+                "Timeout before license scan (> {:.2}s)",
+                text_options.timeout_seconds
+            )));
+        }
+
         extract_license_information(file_info_builder, text_content, scan_strategy)
     } else {
         Ok(())
     }
+}
+
+fn is_timeout_exceeded(started: Instant, timeout_seconds: f64) -> bool {
+    timeout_seconds.is_finite()
+        && timeout_seconds > 0.0
+        && started.elapsed().as_secs_f64() > timeout_seconds
 }
 
 fn extract_copyright_information(
@@ -373,5 +415,7 @@ fn process_directory(path: &Path, metadata: &fs::Metadata) -> FileInfo {
         urls: Vec::new(),               // TODO: implement
         for_packages: Vec::new(),
         scan_errors: Vec::new(),
+        is_source: None,
+        source_count: None,
     }
 }

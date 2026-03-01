@@ -299,6 +299,8 @@ mod tests {
                 urls: vec![],
                 for_packages: vec![],
                 scan_errors: vec![],
+                is_source: None,
+                source_count: None,
             },
             FileInfo {
                 name: "libc.so".to_string(),
@@ -323,6 +325,8 @@ mod tests {
                 urls: vec![],
                 for_packages: vec![],
                 scan_errors: vec![],
+                is_source: None,
+                source_count: None,
             },
             FileInfo {
                 name: "ldconfig".to_string(),
@@ -347,6 +351,8 @@ mod tests {
                 urls: vec![],
                 for_packages: vec![],
                 scan_errors: vec![],
+                is_source: None,
+                source_count: None,
             },
         ];
 
@@ -461,6 +467,8 @@ mod tests {
             urls: vec![],
             for_packages: vec![],
             scan_errors: vec![],
+            is_source: None,
+            source_count: None,
         }];
 
         let mut packages = vec![Package {
@@ -556,6 +564,8 @@ mod tests {
                 urls: vec![],
                 for_packages: vec![],
                 scan_errors: vec![],
+                is_source: None,
+                source_count: None,
             },
             FileInfo {
                 name: "os-release".to_string(),
@@ -585,6 +595,8 @@ mod tests {
                 urls: vec![],
                 for_packages: vec![],
                 scan_errors: vec![],
+                is_source: None,
+                source_count: None,
             },
         ];
 
@@ -696,6 +708,8 @@ mod tests {
                 urls: vec![],
                 for_packages: vec![],
                 scan_errors: vec![],
+                is_source: None,
+                source_count: None,
             },
             FileInfo {
                 name: "test.so".to_string(),
@@ -720,6 +734,8 @@ mod tests {
                 urls: vec![],
                 for_packages: vec![],
                 scan_errors: vec![],
+                is_source: None,
+                source_count: None,
             },
         ];
 

@@ -312,6 +312,8 @@ fn test_scanner_detects_emails_and_urls_when_enabled() {
         detect_urls: true,
         max_emails: 50,
         max_urls: 50,
+        timeout_seconds: 120.0,
+        verbose_paths: false,
     };
 
     let result = process_with_options(test_path, 10, progress, &patterns, &strategy, &options)
@@ -365,6 +367,8 @@ fn test_scanner_respects_email_url_thresholds() {
         detect_urls: true,
         max_emails: 2,
         max_urls: 2,
+        timeout_seconds: 120.0,
+        verbose_paths: false,
     };
 
     let result = process_with_options(test_path, 10, progress, &patterns, &strategy, &options)
