@@ -1,5 +1,7 @@
 use clap::Parser;
 
+use crate::output::OutputFormat;
+
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 pub struct Cli {
@@ -9,6 +11,12 @@ pub struct Cli {
     /// Output file path
     #[arg(default_value = "output.json", short)]
     pub output_file: String,
+
+    #[arg(long, value_enum, default_value_t = OutputFormat::Json)]
+    pub format: OutputFormat,
+
+    #[arg(long, required_if_eq("format", "custom-template"))]
+    pub custom_template: Option<String>,
 
     /// Maximum recursion depth (0 means no recursion)
     #[arg(short, long, default_value = "50")]
