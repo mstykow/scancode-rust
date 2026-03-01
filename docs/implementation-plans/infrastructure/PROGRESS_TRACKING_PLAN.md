@@ -615,7 +615,7 @@ Python only shows the error count in the final summary.
 1. **Quiet mode**: Run scan with `--quiet`, verify stderr is empty
 2. **Default mode**: Run scan, verify progress bar appeared on stderr (check for `\r` / ANSI escape sequences)
 3. **Verbose mode**: Run scan with `--verbose`, verify file paths appear on stderr
-4. **Piped output**: Run `scancode-rust dir -o out.json 2>/dev/null`, verify JSON is valid (no progress corruption)
+4. **Piped output**: Run `scancode-rust --json out.json dir 2>/dev/null`, verify JSON is valid (no progress corruption)
 5. **Error display**: Scan directory with malformed files, verify errors appear on stderr
 
 ### Manual Verification

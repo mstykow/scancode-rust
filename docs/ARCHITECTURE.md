@@ -641,7 +641,8 @@ Module location: `src/finder/`
 **Implementation and parity tracking:**
 
 - Multi-format output layer is implemented in `src/output/mod.rs`
-- CLI selects output format via `--format` and dispatches through `write_output_file`
+- CLI follows ScanCode-style output flags (for example `--json-pp FILE`,
+  `--spdx-tv FILE`) and dispatches through `write_output_file`
 - Format compatibility is verified through fixture-backed tests and documented
   in `docs/TESTING_STRATEGY.md`
 

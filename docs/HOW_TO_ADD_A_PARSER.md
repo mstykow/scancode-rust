@@ -639,7 +639,7 @@ scancode -p testdata/<ecosystem>/basic.json --json reference_output.json
 Compare outputs:
 
 ```bash
-cargo run -- testdata/<ecosystem>/ -o rust_output.json
+cargo run -- --json-pp rust_output.json testdata/<ecosystem>/
 # Compare fields manually or use diff tool
 ```
 
@@ -663,7 +663,7 @@ If you followed Path B (new ecosystem):
    <ecosystem-tool> show <package>
 
    # Compare with our extraction
-   cargo run -- testdata/<ecosystem>/ -o output.json
+   cargo run -- --json-pp output.json testdata/<ecosystem>/
    cat output.json | jq '.packages[0]'
    ```
 

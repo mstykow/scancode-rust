@@ -261,7 +261,7 @@ proptest! {
 **Approach**: Run full scancode-rust CLI, compare JSON output.
 
 ```bash
-cargo run -- testdata/npm/ -o actual.json
+cargo run -- --json-pp actual.json testdata/npm/
 diff actual.json expected.json
 ```
 
