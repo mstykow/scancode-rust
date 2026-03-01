@@ -72,7 +72,7 @@ cargo clippy                  # Lint and catch mistakes
 cargo clippy --fix            # Auto-fix clippy suggestions
 
 # Run Tool
-cargo run -- <dir> -o output.json --exclude "*.git*" "target/*"
+cargo run -- --json-pp output.json <dir> --exclude "*.git*" "target/*"
 ```
 
 ## Running Single Tests

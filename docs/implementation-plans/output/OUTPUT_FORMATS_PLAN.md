@@ -67,7 +67,8 @@ This plan is based on:
 
 ### Implemented
 
-- Output format selector in CLI (`--format`)
+- ScanCode-style output flags in CLI (for example `--json FILE`,
+  `--json-pp FILE`, `--spdx-tv FILE`)
 - Output writer abstraction (`OutputWriter`, `OutputFormat`, dispatch)
 - Main output path dispatches through `write_output_file` in
   [`src/output/mod.rs`](../../../src/output/mod.rs)
@@ -104,18 +105,17 @@ This plan is based on:
 
 ## Library Strategy (Current)
 
-Current implementation uses serde/csv/tera plus in-module mapping/rendering in
-[`src/output/mod.rs`](../../../src/output/mod.rs).
+Current implementation uses serde/csv/tera with a modular output layer in
+[`src/output/`](../../../src/output/).
 
 Adopting dedicated SPDX/CycloneDX model crates remains optional future work,
 gated by clear parity, validation, or maintainability wins.
 
 ## Implementation Status by Format
 
-- Implemented in [`src/output/mod.rs`](../../../src/output/mod.rs): JSON, YAML,
-  CSV, JSON Lines, SPDX
-  Tag-Value, SPDX RDF/XML, CycloneDX JSON, CycloneDX XML, HTML report,
-  HTML app, custom template.
+- Implemented in [`src/output/`](../../../src/output/): JSON/JSON-PP, YAML,
+  CSV, JSON Lines, SPDX Tag-Value, SPDX RDF/XML, CycloneDX JSON,
+  CycloneDX XML, HTML report, HTML app, and custom template output.
 - Output dispatch and writer abstraction are implemented and wired through CLI
   format selection.
 - Parity scope and acceptance tracking are maintained in
@@ -157,7 +157,5 @@ scheduled, and should follow user-impact priorities from
 - SPDX and CycloneDX remain highest-value user outputs.
 - The current Rust codebase is already structured around a canonical `Output` model, which makes multi-format writers straightforward to layer in.
 - No blocker from license-detection-engine work is required to start this plan.
-- [`src/output/mod.rs`](../../../src/output/mod.rs) is currently monolithic. A
-  low-risk maintenance split
-  into per-format internal submodules is recommended when scheduling a
-  behavior-preserving refactor pass.
+- Output implementation is split into per-format internal modules under
+  [`src/output/`](../../../src/output/) with `mod.rs` as dispatch façade.

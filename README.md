@@ -4,7 +4,7 @@ A high-performance code scanning tool written in Rust that detects licenses, cop
 
 ## Overview
 
-`scancode-rust` is designed to be a faster alternative to the Python-based [ScanCode Toolkit](https://github.com/nexB/scancode-toolkit), aiming to produce compatible output formats while delivering significantly improved performance. This tool currently scans codebases to identify:
+`scancode-rust` is designed to be a faster alternative to the Python-based [ScanCode Toolkit](https://github.com/nexB/scancode-toolkit), with a focus on drop-in replacement compatibility while delivering significantly improved performance. This tool currently scans codebases to identify:
 
 - License information
 - File metadata
@@ -60,16 +60,25 @@ The compiled binary will be available at `target/release/scancode-rust`.
 ## Usage
 
 ```sh
-scancode-rust [OPTIONS] <DIR_PATH> [-o <OUTPUT_FILE>]
+scancode-rust [OPTIONS] <DIR_PATH>
 ```
 
 ### Options
 
 ```sh
 Options:
-  -o <OUTPUT_FILE>                    Output file path [default: output.json]
-      --format <FORMAT>               Output format [default: json]
-      --custom-template <PATH>        Required when --format custom-template
+      --json <FILE>                   Write compact JSON to FILE
+      --json-pp <FILE>                Write pretty JSON to FILE
+      --json-lines <FILE>             Write JSON Lines to FILE
+      --yaml <FILE>                   Write YAML to FILE
+      --csv <FILE>                    Write CSV to FILE
+      --html <FILE>                   Write HTML report to FILE
+      --spdx-tv <FILE>                Write SPDX Tag/Value to FILE
+      --spdx-rdf <FILE>               Write SPDX RDF/XML to FILE
+      --cyclonedx <FILE>              Write CycloneDX JSON to FILE
+      --cyclonedx-xml <FILE>          Write CycloneDX XML to FILE
+      --custom-output <FILE>          Write custom templated output to FILE
+      --custom-template <FILE>        Template path (requires --custom-output)
   -d, --max-depth <MAX_DEPTH>        Maximum directory depth to scan [default: 50]
   -e, --exclude <EXCLUDE>...         Glob patterns to exclude from scanning
       --no-assemble                  Disable package assembly (merging related manifest/lockfiles)
@@ -84,8 +93,12 @@ Options:
 ### Example
 
 ```sh
-scancode-rust ~/projects/my-codebase -o scan-results.json --exclude "*.git*" "target/*" "node_modules/*"
+scancode-rust --json-pp scan-results.json ~/projects/my-codebase --exclude "*.git*" "target/*" "node_modules/*"
 ```
+
+Use `-` as FILE to write an output stream to stdout (for example: `--json-pp -`).
+Multiple output flags can be used in a single run, matching ScanCode CLI
+behavior.
 
 ## Performance
 
