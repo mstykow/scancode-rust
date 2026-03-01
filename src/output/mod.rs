@@ -1,4 +1,3 @@
-use clap::ValueEnum;
 use std::fs::File;
 use std::io::{self, Write};
 
@@ -16,30 +15,20 @@ mod template;
 pub(crate) const EMPTY_SHA1: &str = "da39a3ee5e6b4b0d3255bfef95601890afd80709";
 pub(crate) const SCANCODE_NOTICE: &str = "Generated with ScanCode and provided on an \"AS IS\" BASIS, WITHOUT WARRANTIES\nOR CONDITIONS OF ANY KIND, either express or implied. No content created from\nScanCode should be considered or used as legal advice. Consult an Attorney\nfor any legal advice.\nScanCode is a free software code scanning tool from nexB Inc. and others.\nVisit https://github.com/nexB/scancode-toolkit/ for support and download.\nSPDX License List: 3.27";
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum OutputFormat {
     #[default]
-    #[value(name = "json")]
     Json,
-    #[value(name = "yaml")]
+    JsonPretty,
     Yaml,
-    #[value(name = "csv")]
     Csv,
-    #[value(name = "json-lines", alias = "jsonl")]
     JsonLines,
-    #[value(name = "html")]
     Html,
-    #[value(name = "html-app")]
     HtmlApp,
-    #[value(name = "custom-template")]
     CustomTemplate,
-    #[value(name = "spdx-tv")]
     SpdxTv,
-    #[value(name = "spdx-rdf")]
     SpdxRdf,
-    #[value(name = "cyclonedx", alias = "cyclonedx-json")]
     CycloneDxJson,
-    #[value(name = "cyclonedx-xml")]
     CycloneDxXml,
 }
 
@@ -76,6 +65,10 @@ impl OutputWriter for FormatWriter {
     ) -> io::Result<()> {
         match self.format {
             OutputFormat::Json => {
+                serde_json::to_writer(&mut *writer, output).map_err(shared::io_other)?;
+                writer.write_all(b"\n")
+            }
+            OutputFormat::JsonPretty => {
                 serde_json::to_writer_pretty(&mut *writer, output).map_err(shared::io_other)?;
                 writer.write_all(b"\n")
             }
@@ -101,6 +94,19 @@ pub fn write_output_file(
     output: &Output,
     config: &OutputWriteConfig,
 ) -> io::Result<()> {
+    if output_file == "-" {
+        if config.format == OutputFormat::HtmlApp {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "html-app output cannot be written to stdout",
+            ));
+        }
+
+        let stdout = io::stdout();
+        let mut handle = stdout.lock();
+        return writer_for_format(config.format).write(output, &mut handle, config);
+    }
+
     if config.format == OutputFormat::HtmlApp {
         return html_app::write_html_app(output_file, output, config);
     }

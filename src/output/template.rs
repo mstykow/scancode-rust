@@ -16,7 +16,7 @@ pub(crate) fn write_custom_template(
     let template_path = config.custom_template.as_ref().ok_or_else(|| {
         io::Error::new(
             io::ErrorKind::InvalidInput,
-            "--custom-template path is required for custom-template format",
+            "--custom-template path is required for custom template output",
         )
     })?;
 
