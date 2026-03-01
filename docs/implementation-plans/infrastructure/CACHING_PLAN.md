@@ -1,6 +1,6 @@
 # Caching & Incremental Scanning Implementation Plan
 
-> **Status**: 🟡 Planning Complete — Ready for Implementation
+> **Status**: 🟡 Planning Complete — Semantics Validated, Implementation Pending
 > **Priority**: P2 - Medium Priority (Performance Feature)
 > **Estimated Effort**: 2-3 weeks
 > **Dependencies**: License detection (for license index caching benefits)
@@ -24,9 +24,11 @@ Persistent caching of scan results and compiled data structures to speed up repe
 1. **Index Caching**: Persistent cache of the compiled license index (expensive to build from source text)
 2. **Scan Result Caching**: Per-file cache of scan results keyed by content hash (the major performance win)
 
-### Critical Finding: Python Has No Scan Result Caching
+### Critical Findings from Python Reference
 
-**Python ScanCode does NOT cache per-file scan results.** It only caches the license index and package pattern index (compiled data structures). There is no mechanism to skip re-scanning unchanged files. This means **scan result caching and incremental scanning are entirely beyond-parity features** — Rust will be the first ScanCode implementation to support them.
+1. **Python ScanCode does NOT cache per-file scan results.** It only caches the license index and package pattern index (compiled data structures). There is no mechanism to skip re-scanning unchanged files. This means **scan result caching and incremental scanning are beyond-parity features**.
+2. **`--no-cache` is not a current parity flag upstream** (it was removed). Current scan-time cache/memory behavior is primarily controlled by `--max-in-memory`.
+3. **`--from-json` is not incremental scan mode** upstream; it loads previous scan JSON for downstream processing.
 
 ### Scope
 
@@ -37,7 +39,8 @@ Persistent caching of scan results and compiled data structures to speed up repe
 - **Incremental Scanning**: Only scan files that changed since last scan (mtime + content hash check)
 - **Cache Invalidation**: Version-stamped caches with tool version + data version embedded in cache metadata
 - **Multi-Process Safety**: File locking for cache writes (parallel scans on same codebase)
-- **Cache Management CLI**: `--no-cache`, `--cache-dir`, `--cache-clear` flags
+- **Cache Management CLI**: `--cache-dir`, `--cache-clear`, and parity-aligned memory/cache control (`--max-in-memory` equivalent)
+- **Optional Rust Convenience Flag**: `--no-cache` (if implemented, must be explicitly documented as Rust-specific and scoped to persistent cache read/write only)
 - **Configurable Cache Location**: XDG cache directory by default, overridable via environment variable and CLI flag
 
 **Out of Scope:**
@@ -62,8 +65,18 @@ Persistent caching of scan results and compiled data structures to speed up repe
 - ❌ Incremental scanning logic
 - ❌ Cache invalidation
 - ❌ Multi-process file locking
-- ❌ CLI flags for cache control
-- ❌ XDG cache directory support
+- ❌ Unified cache manager and CLI wiring (`src/cache/`)
+- ❌ Unified XDG cache location support across all cache users
+
+### CLI Flag Positioning (Validated)
+
+| Flag                              | Decision               | Notes                                                                                                |
+| --------------------------------- | ---------------------- | ---------------------------------------------------------------------------------------------------- |
+| `--cache-dir`                     | Keep                   | Useful and safe once unified cache manager exists; aligns with env-var-based cache location control. |
+| `--cache-clear`                   | Keep                   | Good operational safety valve once cache ownership is centralized.                                   |
+| `--max-in-memory` (or equivalent) | Keep for parity        | Upstream uses this as current scan-time memory/disk-spill control.                                   |
+| `--no-cache`                      | Optional Rust-specific | Not parity-required. If added, scope to persistent cache read/write only.                            |
+| `--incremental`                   | Defer                  | Beyond parity; requires robust invalidation and deterministic behavior guarantees.                   |
 
 ---
 
@@ -418,7 +431,8 @@ src/
 1. `config.rs`: `CacheConfig` struct, XDG directory resolution, env var support
 2. `metadata.rs`: `CacheMetadata`, version stamping, JSON serialization
 3. `mod.rs`: `CacheManager::new()`, directory creation, metadata load/save
-4. CLI integration: Add `--no-cache`, `--cache-dir <PATH>`, `--cache-clear` to `cli.rs`
+4. CLI integration: Add `--cache-dir <PATH>`, `--cache-clear`, and `--max-in-memory` parity-equivalent behavior.
+5. Optional: add Rust-specific `--no-cache` with strict semantics (persistent cache read/write disable only).
 
 **Dependencies**: `dirs` crate (XDG directory), `serde_json` (metadata file)
 
@@ -485,9 +499,9 @@ src/
 2. Incremental mode: On subsequent scan, compare file metadata against manifest
 3. Fast-path: If mtime + size unchanged, assume file unchanged (skip SHA256 computation)
 4. Slow-path: If mtime/size changed, compute SHA256 and check scan result cache
-5. CLI flag: `--incremental` to enable incremental mode
+5. CLI flag: `--incremental` to enable incremental mode (deferred until invalidation model is complete)
 
-**Scan manifest location**: `<scan-output-dir>/.scancode-rust-cache/manifest.json`
+**Scan manifest location**: unified cache root (not output-directory coupled), e.g. `<cache-root>/incremental/<input-fingerprint>/manifest.json`
 
 **Integration**: Add incremental check in file discovery phase (`scanner/count.rs` or `scanner/process.rs`).
 
@@ -589,7 +603,9 @@ src/
 - [ ] Cache invalidates correctly on tool version change
 - [ ] Corrupt cache entries are detected and rebuilt (never crash)
 - [ ] Multi-process scans don't corrupt cache (file locking)
-- [ ] `--no-cache`, `--cache-dir`, `--cache-clear` CLI flags work
+- [ ] `--cache-dir` and `--cache-clear` CLI flags work with unified cache manager
+- [ ] `--max-in-memory` parity-equivalent behavior is implemented and documented
+- [ ] If implemented, `--no-cache` is clearly documented as Rust-specific and scoped to persistent cache read/write only
 - [ ] `SCANCODE_RUST_CACHE` environment variable overrides cache location
 - [ ] Cross-project cache sharing works (same file content → same cache entry)
 - [ ] Cache directory follows XDG standard (Linux: `~/.cache/`, macOS: `~/Library/Caches/`)

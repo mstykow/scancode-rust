@@ -1,6 +1,6 @@
 # CLI Implementation Plan
 
-> **Status**: 🟡 Drop-in output flag surface implemented; broader CLI parity remains
+> **Status**: 🟡 Drop-in output flag surface implemented; broader CLI parity remains (cache flag strategy recalibrated)
 > **Priority**: P1 - High (user-facing drop-in replacement parity)
 > **Dependencies**: Some flags depend on underlying features (license detection, post-scan processing, caching)
 
@@ -50,6 +50,7 @@ This plan tracks progress toward a **drop-in replacement CLI surface**.
 | `-v, --verbose`   | PROGRESS_TRACKING_PLAN.md |
 | `--strip-root`    | —                         |
 | `--full-root`     | —                         |
+| `--max-in-memory` | CACHING_PLAN.md           |
 
 ### Scan Option Flags (pending)
 
@@ -81,12 +82,14 @@ This plan tracks progress toward a **drop-in replacement CLI surface**.
 | `--mark-source`   | Mark source files       |
 | `--only-findings` | Filter output           |
 
-### Rust-Specific (planned)
+### Cache Control (planned)
 
-| Parameter     | Blocked By      |
-| ------------- | --------------- |
-| `--no-cache`  | CACHING_PLAN.md |
-| `--cache-dir` | CACHING_PLAN.md |
+| Parameter       | Positioning / Blocked By                                   |
+| --------------- | ---------------------------------------------------------- |
+| `--cache-dir`   | CACHING_PLAN.md (safe once cache manager exists)           |
+| `--cache-clear` | CACHING_PLAN.md (safe once cache ownership is centralized) |
+| `--no-cache`    | Optional Rust-specific convenience; not parity-required    |
+| `--incremental` | CACHING_PLAN.md (beyond parity; defer until robust model)  |
 
 ## Key Design Decisions
 
@@ -104,6 +107,7 @@ This plan tracks progress toward a **drop-in replacement CLI surface**.
 - No plugin runtime architecture (compile-time wiring instead)
 - Thread pool via rayon instead of multiprocessing
 - JSON output structure matches Python (`SCANCODE_OUTPUT_FORMAT_VERSION`)
+- `--no-cache` is not a parity requirement (upstream removed it); if retained, it is Rust-specific
 
 ## References
 

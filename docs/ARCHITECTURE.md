@@ -670,17 +670,22 @@ Module location: `src/finder/`
 
 **Caching**:
 
-Two-layer caching system for scan performance optimization:
+Caching is currently split between implemented primitives and planned unification:
 
-1. **License Index Cache**: Persists the compiled askalono `Store` (MessagePack + zstd) to avoid rebuilding from SPDX text on each run. Existing `Store::from_cache()`/`to_cache()` infrastructure handles serialization. Version-stamped with tool version + SPDX data version. This is designed to reduce startup overhead by reusing compiled store data.
+**Current implementation:**
 
-2. **Scan Result Cache** (beyond-parity — Python has none): Content-addressed per-file cache keyed by SHA256 hash (already computed in `process_file()`). Cached data: package_data, license_detections, copyrights, programming_language. Path-dependent fields reconstructed at load time. Sharded directory layout (`ab/ab3f...postcard`) for filesystem scalability. This is intended to significantly improve repeated-scan performance.
+1. **Askalono cache primitives**: `Store::from_cache()` / `Store::to_cache()` exist (MessagePack + zstd + version header), but are not yet wired as the default runtime loading path.
+2. **Parser-local Swift cache**: `Package.swift` dump output is cached on disk under an XDG/HOME-derived cache path in the Swift parser.
 
-3. **Incremental Scanning** (beyond-parity — Python has none): Scan manifest tracks `{path: (mtime, size, sha256)}` per directory. On re-scan, only files with changed mtime/size are re-hashed and re-scanned. Enables CI/CD integration (scan only changed files per commit).
+**Planned unified caching architecture:**
 
-Cache location: XDG-compliant (`~/.cache/scancode-rust/`), overridable via `SCANCODE_RUST_CACHE` env var or `--cache-dir` CLI flag. Multi-process safety via `fd-lock` file locking. Atomic writes (temp + rename) prevent corruption on crash.
+1. **License Index Cache**: Persist compiled askalono `Store` with tool/data version stamping.
+2. **Scan Result Cache** (beyond parity — Python has none): Content-addressed per-file cache keyed by SHA256.
+3. **Incremental Scanning** (beyond parity — Python has none): manifest-guided re-scan of changed files only.
 
-Module location: `src/cache/`
+When unified cache management lands, cache location will be XDG-compliant (`~/.cache/scancode-rust/`) with environment/CLI overrides, multi-process safety via file locking, and atomic writes.
+
+Planned module location for unified cache management: `src/cache/`.
 
 **Progress Tracking**:
 
