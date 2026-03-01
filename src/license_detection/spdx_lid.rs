@@ -346,6 +346,15 @@ pub fn spdx_lid_match(index: &LicenseIndex, query: &Query) -> Vec<LicenseMatch> 
     matches
 }
 
+fn is_bare_license_list(expression: &str) -> bool {
+    let lowered = expression.to_lowercase();
+    !lowered.contains(" and ")
+        && !lowered.contains(" or ")
+        && !lowered.contains(" with ")
+        && !expression.contains('(')
+        && !expression.contains(')')
+}
+
 fn find_matching_rule_for_expression(index: &LicenseIndex, expression: &str) -> Option<String> {
     if let Some(&rid) = index.rid_by_spdx_key.get(expression) {
         let rule = &index.rules_by_rid[rid];
@@ -365,6 +374,21 @@ fn find_matching_rule_for_expression(index: &LicenseIndex, expression: &str) -> 
         let result = expression_to_string(&converted);
         if !result.is_empty() {
             return Some(result);
+        }
+    }
+
+    if is_bare_license_list(expression) {
+        let license_keys = split_license_expression(expression);
+        if license_keys.len() > 1 {
+            let or_expression = license_keys.join(" OR ");
+            if let Ok(parsed) = parse_expression(&or_expression)
+                && let Some(converted) = convert_spdx_expression_to_scancode(&parsed, index)
+            {
+                let result = expression_to_string(&converted);
+                if !result.is_empty() {
+                    return Some(result);
+                }
+            }
         }
     }
 
@@ -1211,5 +1235,56 @@ mod tests {
             "Complex expression should preserve all license keys, got: {}",
             expr
         );
+    }
+
+    #[test]
+    fn test_uboot_bare_list_as_or() {
+        let path =
+            std::path::Path::new("reference/scancode-toolkit/src/licensedcode/data/licenses");
+        if !path.exists() {
+            eprintln!("Skipping test: reference directory not found");
+            return;
+        }
+
+        let licenses = crate::license_detection::rules::load_licenses_from_directory(path, false)
+            .expect("Failed to load licenses");
+        let rules = crate::license_detection::rules::load_rules_from_directory(
+            std::path::Path::new("reference/scancode-toolkit/src/licensedcode/data/rules"),
+            false,
+        )
+        .expect("Failed to load rules");
+
+        let index = crate::license_detection::index::build_index(rules, licenses);
+
+        let expression = "GPL-2.0+ BSD-2-Clause";
+        let result = find_matching_rule_for_expression(&index, expression);
+        assert!(result.is_some(), "Should parse U-Boot bare list as OR");
+        let expr = result.unwrap();
+        assert!(
+            expr.contains(" OR "),
+            "U-Boot bare list should be treated as OR, got: {}",
+            expr
+        );
+        assert!(
+            expr.contains("gpl-2.0-plus") || expr.contains("gpl-2.0+"),
+            "Should contain GPL-2.0+, got: {}",
+            expr
+        );
+        assert!(
+            expr.contains("bsd") || expr.contains("bsd-simplified"),
+            "Should contain BSD, got: {}",
+            expr
+        );
+    }
+
+    #[test]
+    fn test_is_bare_license_list() {
+        assert!(is_bare_license_list("GPL-2.0+ BSD-2-Clause MIT"));
+        assert!(is_bare_license_list("mit apache-2.0"));
+        assert!(!is_bare_license_list("MIT OR Apache-2.0"));
+        assert!(!is_bare_license_list("MIT AND Apache-2.0"));
+        assert!(!is_bare_license_list("GPL-2.0 WITH Classpath-exception-2.0"));
+        assert!(!is_bare_license_list("(MIT OR Apache-2.0)"));
+        assert!(is_bare_license_list("GPL-2.0+"));
     }
 }
