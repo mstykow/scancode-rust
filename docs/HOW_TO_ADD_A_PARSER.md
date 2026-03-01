@@ -776,10 +776,10 @@ cargo doc --open  # Generate and view API docs
 ### Pre-commit Hook
 
 ```bash
-pre-commit install   # One-time setup
-git add .
-git commit          # Hooks run automatically
+pre-commit run --all-files
 ```
+
+For hook installation and contributor setup, see [`README.md`](../README.md).
 
 ## Common Pitfalls & Solutions
 

@@ -127,4 +127,4 @@ jobs:
         continue-on-error: true
 
       - name: Lint Markdown
-        run: npx --yes markdownlint-cli2
+        run: npm run lint:md

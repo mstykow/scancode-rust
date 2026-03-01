@@ -276,6 +276,9 @@ mod tests {
 
 - `cargo fmt --all` - Format code and stage changes
 - `cargo clippy --all-targets --all-features -- -D warnings` - Lint with warnings as errors
+- `cargo run --quiet --bin generate-supported-formats` - Regenerate `docs/SUPPORTED_FORMATS.md` when parser files change
+- `npm run lint:md:fix` - Lint and auto-fix Markdown
+- `npm run format` - Format YAML, JSON, and Markdown with Prettier
 
 **GitHub Actions** (runs on push to main and PRs):
 

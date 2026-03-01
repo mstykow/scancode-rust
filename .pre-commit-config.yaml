@@ -25,7 +25,7 @@ repos:
 
       - id: markdown-lint
         name: Lint markdown files with auto-fix
-        entry: bash -c 'npx --yes markdownlint-cli2 --fix "**/*.md" && git add -u :/*.md'
+        entry: bash -c 'npm install --quiet && npm run lint:md:fix && git add -u :/*.md'
         language: system
         types: [markdown]
         pass_filenames: false

@@ -394,7 +394,7 @@ cargo test --lib --features golden-tests golden # Run only golden tests
 
 Tests run automatically on:
 
-- Every commit (via pre-commit hooks: `cargo fmt`, `cargo clippy`)
+- Every commit (via pre-commit hooks: formatting, linting, and docs/file-quality checks)
 - Every push to main
 - Every pull request
 
