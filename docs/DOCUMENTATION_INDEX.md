@@ -25,11 +25,6 @@ This index helps you find the right documentation for your needs.
 
 ## For Maintainers
 
-### Implementation Plans (Temporary)
-
-- **[implementation-plans/](implementation-plans/)** - Active and placeholder implementation plans
-  - See [implementation-plans/README.md](implementation-plans/README.md) for current status
-
 ### Document Organization
 
 ```text
@@ -42,15 +37,7 @@ docs/
 │
 ├── adr/                               # Evergreen: Design decisions
 │
-├── improvements/                      # Evergreen: Beyond-parity features
-│
-└── implementation-plans/              # Temporary: Porting progress
-    ├── README.md                      # Plan index and status
-    ├── package-detection/             # Parser and assembly plans
-    ├── text-detection/                # License, copyright, email/URL plans
-    ├── post-processing/               # Summarization, consolidation plans
-    ├── output/                        # Output format plans
-    └── infrastructure/                # CLI, caching, plugins, progress plans
+└── improvements/                      # Evergreen: Beyond-parity features
 ```
 
 ## Quick Links by Task
@@ -75,11 +62,11 @@ docs/
 **...see where Rust exceeds Python**
 → [improvements/](improvements/)
 
-**...track implementation progress**
-→ [implementation-plans/](implementation-plans/)
+**...track implementation quality and behavior**
+→ [TESTING_STRATEGY.md](TESTING_STRATEGY.md)
 
 **...implement a specific feature**
-→ [implementation-plans/](implementation-plans/) (find the relevant plan)
+→ [ARCHITECTURE.md](ARCHITECTURE.md) and [HOW_TO_ADD_A_PARSER.md](HOW_TO_ADD_A_PARSER.md)
 
 ## Document Lifecycle
 
@@ -92,25 +79,17 @@ docs/
 - **adr/** - Immutable once written (new ADRs added as needed)
 - **improvements/** - Documents added as beyond-parity features are implemented
 
-### Temporary Documents (Implementation Plans)
-
-- **implementation-plans/** - Active during porting, archived when complete
-- Lifecycle: Placeholder → Planning → Active → Complete → Archived
-- Once a feature is complete, relevant decisions move to ADRs
-
 ## Contributing
 
 When adding documentation:
 
 1. **Evergreen docs** go in `docs/` root or subdirectories (`adr/`, `improvements/`)
-2. **Implementation plans** go in `docs/implementation-plans/`
-3. **ADRs** are immutable - create new ADRs instead of editing old ones
-4. **Beyond-parity features** get documented in `improvements/` with examples
-5. **Auto-generated docs** (like `SUPPORTED_FORMATS.md`) should not be edited manually
+2. **ADRs** are immutable - create new ADRs instead of editing old ones
+3. **Beyond-parity features** get documented in `improvements/` with examples
+4. **Auto-generated docs** (like `SUPPORTED_FORMATS.md`) should not be edited manually
 
 ## Maintenance
 
 - **SUPPORTED_FORMATS.md**: Regenerate with `cargo run --bin generate-supported-formats`
-- **Implementation plans**: Update status as work progresses
 - **ADRs**: Add new ADRs for significant design decisions
 - **Improvements**: Document beyond-parity features as they're implemented

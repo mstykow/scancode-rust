@@ -622,7 +622,7 @@ Create test fixtures in `testdata/assembly-golden/<ecosystem>-basic/`:
 ### Related Documentation
 
 - [Assembly Golden Tests README](../testdata/assembly-golden/README.md) - Test structure and UUID normalization
-- [Assembly Plan](implementation-plans/package-detection/ASSEMBLY_PLAN.md) - Assembly architecture
+- [Architecture](ARCHITECTURE.md#package-assembly-system) - Assembly architecture and design principles
 - [Assembler Configurations](../src/assembly/assemblers.rs) - All registered assemblers
 
 ## Step 7: Validate Implementation

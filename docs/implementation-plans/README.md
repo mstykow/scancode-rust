@@ -20,7 +20,7 @@ implementation-plans/
 ### Package Detection (`package-detection/`)
 
 - **[PARSER_PLAN.md](package-detection/PARSER_PLAN.md)** - Individual file format parser implementations
-  - Status: ~98% complete — only complex binary formats remain (low priority)
+  - Status: Near completion; remaining work is tracked in [PARSER_PLAN.md](package-detection/PARSER_PLAN.md)
 
 - **[ASSEMBLY_PLAN.md](package-detection/ASSEMBLY_PLAN.md)** - Package assembly roadmap
   - Status: **COMPLETE** — All phases done (sibling merge, nested merge, workspace assembly, file reference resolution)
@@ -36,13 +36,21 @@ implementation-plans/
 ### Infrastructure (`infrastructure/`)
 
 - **[CLI_PLAN.md](infrastructure/CLI_PLAN.md)** - Command-line interface parameter parity
-  - Status: 🟡 9 parameters implemented, 30+ pending
+  - Status: 🟡 Active — implemented and pending CLI parity items are tracked in [CLI_PLAN.md](infrastructure/CLI_PLAN.md)
 
 - **[CACHING_PLAN.md](infrastructure/CACHING_PLAN.md)** - Scan result caching and incremental scanning
   - Status: 🟡 Planning Complete — Ready for implementation
 
 - **[PROGRESS_TRACKING_PLAN.md](infrastructure/PROGRESS_TRACKING_PLAN.md)** - Enhanced progress reporting
   - Status: 🟡 Planning Complete — Ready for implementation
+
+### Output Formats (`output/`)
+
+- **[OUTPUT_FORMATS_PLAN.md](output/OUTPUT_FORMATS_PLAN.md)** - SPDX, CycloneDX, CSV, YAML, HTML output
+  - Status: 🟢 Fixture-backed parity hardening complete across SPDX/CycloneDX/HTML/CSV/JSONL/YAML
+
+- **[PARITY_SCORECARD.md](output/PARITY_SCORECARD.md)** - Format-by-format parity contract and fixture coverage
+  - Status: 🟢 Maintained as the canonical output parity contract and verification checklist
 
 ## Placeholder Plans (To Be Fleshed Out)
 
@@ -62,11 +70,6 @@ These represent major architectural components not yet implemented. Each will be
   - Priority: P2 - Medium, Effort: 2-3 weeks
   - Dependencies: License detection, copyright detection, package assembly
 
-### Output Formats (`output/`)
-
-- **[OUTPUT_FORMATS_PLAN.md](output/OUTPUT_FORMATS_PLAN.md)** - SPDX, CycloneDX, CSV, YAML, HTML output
-  - Priority: P1 - High, Effort: 4-6 weeks
-
 ### Infrastructure (`infrastructure/`)
 
 - **[PLUGIN_SYSTEM_PLAN.md](infrastructure/PLUGIN_SYSTEM_PLAN.md)** - Extensible plugin architecture
@@ -78,11 +81,19 @@ These represent major architectural components not yet implemented. Each will be
 2. **Planning** - Detailed analysis, design decisions, implementation phases
 3. **Active** - Work in progress, updated with status
 4. **Complete** - Feature implemented, document archived
-5. **Archived** - Moved to `docs/archived/` for historical reference
+5. **Archived** - Moved to [`docs/archived/`](../archived/) for historical reference
+
+### Documentation Style for Plan Status
+
+- Prefer stable wording (for example: "tracked in the plan document") over point-in-time snapshots.
+- Avoid embedding volatile counts, one-off verification snapshots, or temporary pass/fail badges.
+- Keep detailed status updates in the linked plan documents and CI/PR logs.
+- When referencing internal files or documents, prefer explicit relative Markdown links over plain path text.
 
 ## Relationship to Evergreen Docs
 
-These implementation plans are **temporary** and complement the **evergreen** documentation in `docs/`:
+These implementation plans are **temporary** and complement the **evergreen**
+documentation in [`docs/`](../):
 
 | Evergreen (Permanent)    | Implementation Plans (Temporary)            |
 | ------------------------ | ------------------------------------------- |
