@@ -63,8 +63,8 @@ mod tests {
         };
         use crate::license_detection::query::Query;
         use crate::license_detection::seq_match::{
-            MAX_NEAR_DUPE_CANDIDATES, compute_candidates_with_msets, seq_match,
-            seq_match_with_candidates,
+            compute_candidates_with_msets, seq_match, seq_match_with_candidates,
+            MAX_NEAR_DUPE_CANDIDATES,
         };
         use crate::license_detection::spdx_lid::spdx_lid_match;
         use crate::license_detection::unknown_match::unknown_match;
@@ -543,8 +543,6 @@ mod tests {
             Ok(t) => t,
             Err(_) => return,
         };
-
-        use crate::license_detection::LicenseDetectionEngine;
 
         println!("\n========================================");
         println!("PLAN-085: Full Detection");

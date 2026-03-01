@@ -242,13 +242,10 @@ mod tests {
         let Some(text) = read_test_file() else { return };
 
         use crate::license_detection::aho_match::aho_match;
-        use crate::license_detection::detection::{
-            create_detection_from_group, group_matches_by_region, sort_matches_by_line,
-        };
+        use crate::license_detection::detection::{group_matches_by_region, sort_matches_by_line};
         use crate::license_detection::hash_match::hash_match;
         use crate::license_detection::index::build_index;
         use crate::license_detection::match_refine::{
-            filter_contained_matches, filter_overlapping_matches, merge_overlapping_matches,
             refine_matches, refine_matches_without_false_positive_filter, split_weak_matches,
         };
         use crate::license_detection::query::Query;

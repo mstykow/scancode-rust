@@ -160,9 +160,18 @@ fn extract_information_from_content(
         Ok(())
     } else if let Some(file_text) = extract_text_for_detection(&buffer, path) {
         let mut text_content = file_text.text;
-        if is_source(path) {
+
+        // Handle source map files specially
+        if crate::utils::sourcemap::is_sourcemap(path) {
+            if let Some(sourcemap_content) =
+                crate::utils::sourcemap::extract_sourcemap_content(&text_content)
+            {
+                text_content = sourcemap_content;
+            }
+        } else if is_source(path) {
             text_content = remove_verbatim_escape_sequences(&text_content);
         }
+
         extract_license_information(
             file_info_builder,
             text_content,

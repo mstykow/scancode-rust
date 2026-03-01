@@ -32,8 +32,7 @@ mod tests {
         use crate::license_detection::index::build_index;
         use crate::license_detection::match_refine::{
             filter_contained_matches, filter_overlapping_matches, merge_overlapping_matches,
-            refine_matches, refine_matches_without_false_positive_filter, restore_non_overlapping,
-            split_weak_matches,
+            refine_matches, refine_matches_without_false_positive_filter, split_weak_matches,
         };
         use crate::license_detection::query::Query;
         use crate::license_detection::rules::{

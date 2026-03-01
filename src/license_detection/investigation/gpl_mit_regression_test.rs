@@ -81,7 +81,7 @@ mod tests {
         let Some(text) = read_test_file() else { return };
 
         use crate::license_detection::aho_match::aho_match;
-        use crate::license_detection::hash_match::hash_match;
+
         use crate::license_detection::index::build_index;
         use crate::license_detection::match_refine::{
             filter_contained_matches, filter_overlapping_matches, merge_overlapping_matches,
@@ -90,7 +90,7 @@ mod tests {
         use crate::license_detection::rules::{
             load_licenses_from_directory, load_rules_from_directory,
         };
-        use crate::license_detection::spdx_lid::spdx_lid_match;
+
         use crate::utils::text::strip_utf8_bom_str;
 
         let rules_path = PathBuf::from("reference/scancode-toolkit/src/licensedcode/data/rules");

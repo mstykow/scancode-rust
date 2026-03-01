@@ -5,7 +5,7 @@
 //!
 //! Based on Python's `textcode/analysis.py:numbered_text_lines()` and `as_unicode()`.
 
-use content_inspector::{ContentType, inspect};
+use content_inspector::{inspect, ContentType};
 use std::io;
 use std::path::Path;
 

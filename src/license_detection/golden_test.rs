@@ -109,9 +109,25 @@ mod golden_tests {
         /// Read file content using production text extraction.
         /// Returns None for files that should be skipped.
         fn read_test_file_content(&self) -> Result<Option<String>, String> {
-            extract_text_from_file(&self.test_file)
+            let text = extract_text_from_file(&self.test_file)
                 .map(|opt| opt.map(|ft| ft.text))
-                .map_err(|e| format!("Failed to read {}: {}", self.test_file.display(), e))
+                .map_err(|e| format!("Failed to read {}: {}", self.test_file.display(), e))?;
+            
+            // Handle source map files specially - extract content from JSON
+            let text = match text {
+                Some(t) => t,
+                None => return Ok(None),
+            };
+            
+            if crate::utils::sourcemap::is_sourcemap(&self.test_file) {
+                if let Some(sourcemap_content) = crate::utils::sourcemap::extract_sourcemap_content(&text) {
+                    Ok(Some(sourcemap_content))
+                } else {
+                    Ok(Some(text))
+                }
+            } else {
+                Ok(Some(text))
+            }
         }
 
         /// Run this test against the detection engine

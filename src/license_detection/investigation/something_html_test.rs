@@ -21,7 +21,6 @@ mod tests {
         compute_candidates_with_msets, seq_match_with_candidates, MAX_NEAR_DUPE_CANDIDATES,
     };
     use crate::license_detection::spdx_lid::spdx_lid_match;
-    use crate::license_detection::unknown_match::unknown_match;
     use crate::license_detection::LicenseDetectionEngine;
     use once_cell::sync::Lazy;
     use std::path::PathBuf;

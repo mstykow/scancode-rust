@@ -9,7 +9,7 @@ mod test_mit_debug {
         use crate::license_detection::aho_match::aho_match;
         use crate::license_detection::match_refine::{merge_overlapping_matches, filter_contained_matches, filter_overlapping_matches, restore_non_overlapping};
         use crate::license_detection::rules::{load_rules_from_directory, load_licenses_from_directory};
-        use crate::license_detection::models::LicenseMatch;
+
         use crate::license_detection::detection::{group_matches_by_region, create_detection_from_group};
         
         let rules_path = PathBuf::from("reference/scancode-toolkit/src/licensedcode/data/rules");
