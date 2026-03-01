@@ -257,6 +257,7 @@ pub mod copyright;
 pub mod finder;
 pub mod golden_maintenance;
 pub mod models;
+pub mod output;
 pub mod parsers;
 pub mod scanner;
 pub mod utils;
@@ -265,5 +266,8 @@ pub mod utils;
 pub mod test_utils;
 
 pub use models::{ExtraData, FileInfo, FileType, Header, Output, SystemEnvironment};
+pub use output::{
+    OutputFormat, OutputWriteConfig, OutputWriter, write_output_file, writer_for_format,
+};
 pub use parsers::{NpmParser, PackageParser};
 pub use scanner::{ProcessResult, TextDetectionOptions, count, process, process_with_options};

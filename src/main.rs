@@ -4,16 +4,15 @@ use clap::Parser;
 use glob::Pattern;
 use include_dir::{Dir, include_dir};
 use indicatif::{ProgressBar, ProgressStyle};
-use serde_json::{Value, from_str, to_string_pretty};
+use serde_json::{Value, from_str};
 use std::env;
 use std::error::Error;
-use std::fs::File;
-use std::io::Write;
 use std::sync::Arc;
 
 use crate::askalono::{Store, TextData};
 use crate::cli::Cli;
 use crate::models::{ExtraData, Header, Output, SCANCODE_OUTPUT_FORMAT_VERSION, SystemEnvironment};
+use crate::output::{OutputWriteConfig, write_output_file};
 use crate::scanner::{TextDetectionOptions, count, process, process_with_options};
 
 mod askalono;
@@ -23,6 +22,7 @@ mod cli;
 mod copyright;
 mod finder;
 mod models;
+mod output;
 mod parsers;
 mod scanner;
 mod utils;
@@ -104,9 +104,14 @@ fn run() -> Result<(), Box<dyn Error>> {
         total_dirs,
         assembly_result,
     );
-    write_output(&cli.output_file, &output)?;
+    let output_config = OutputWriteConfig {
+        format: cli.format,
+        custom_template: cli.custom_template.clone(),
+        scanned_path: Some(cli.dir_path.clone()),
+    };
+    write_output_file(&cli.output_file, &output, &output_config)?;
 
-    println!("JSON output written to {}", cli.output_file);
+    println!("{:?} output written to {}", cli.format, cli.output_file);
     Ok(())
 }
 
@@ -217,14 +222,4 @@ fn create_output(
         license_references: Vec::new(),      // TODO: implement
         license_rule_references: Vec::new(), // TODO: implement
     }
-}
-
-fn write_output(output_file: &str, output: &Output) -> std::io::Result<()> {
-    let json_output = match to_string_pretty(output) {
-        Ok(json) => json,
-        Err(err) => return Err(std::io::Error::other(err)),
-    };
-    let mut file = File::create(output_file)?;
-    file.write_all(json_output.as_bytes())?;
-    Ok(())
 }
