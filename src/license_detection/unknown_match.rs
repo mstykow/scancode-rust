@@ -1,54 +1,4 @@
 //! Unknown license detection using ngram matching.
-//!
-//! This module implements detection of license-like text that doesn't match
-//! any known rule. It uses an ngram-based approach to identify regions with
-//! sufficient license-like content.
-//!
-//! # Signature Difference from Other Matchers
-//!
-//! Unlike other matchers (`hash_match`, `aho_match`, `seq_match`) which take
-//! `&QueryRun` as their query parameter, `unknown_match` takes `&Query` directly
-//! and requires a `known_matches` parameter.
-//!
-//! ## Why This Design?
-//!
-//! The unknown matcher has a fundamentally different purpose: it finds regions
-//! of text that are **NOT** covered by previously detected licenses. This requires
-//! knowledge of what has already been matched.
-//!
-//! Other matchers operate independently:
-//! - `hash_match`: Looks for exact hash matches of the entire text
-//! - `aho_match`: Finds all occurrences of rule patterns
-//! - `seq_match`: Finds approximate matches using set similarity
-//!
-//! The unknown matcher operates on **gaps**:
-//! - First computes which positions are already covered by known matches
-//! - Then searches only the uncovered regions for license-like content
-//! - This prevents re-detecting known licenses as "unknown"
-//!
-//! ## Python Parity
-//!
-//! The Python reference (`match_unknowns()` in `match_unknown.py`) has a similar
-//! conceptual design but different signature:
-//!
-//! ```python
-//! def match_unknowns(idx, query_run, automaton, unknown_ngram_length=6, **kwargs):
-//!     matched_ngrams = get_matched_ngrams(...)
-//!     qspans = (Span(qstart, qend) for qstart, qend in matched_ngrams)
-//!     qspan = Span().union(*qspans)
-//! ```
-//!
-//! The Python version receives `query_run` but operates on the automaton matches
-//! within that run. The Rust version explicitly receives `known_matches` because:
-//!
-//! 1. The Rust detection pipeline calls matchers in sequence and accumulates results
-//! 2. By the time unknown_match is called, we already have the complete list of
-//!    matches from hash, SPDX-LID, aho, and seq matchers
-//! 3. Passing `known_matches` directly is more explicit and avoids recomputing
-//!    coverage information
-//!
-//! This design choice maintains functional parity with Python while being more
-//! idiomatic for Rust's explicit data flow patterns.
 
 use aho_corasick::AhoCorasick;
 
@@ -56,55 +6,17 @@ use crate::license_detection::index::LicenseIndex;
 use crate::license_detection::models::LicenseMatch;
 use crate::license_detection::query::Query;
 
-/// Matcher name for unknown license detection.
-///
-/// Corresponds to Python: `MATCH_UNKNOWN = '6-unknown'` (line 46)
 pub const MATCH_UNKNOWN: &str = "5-undetected";
 
-/// Matcher order for unknown license detection.
-///
-/// Corresponds to Python: `MATCH_UNKNOWN_ORDER = 6` (line 47)
 #[allow(dead_code)]
 pub const MATCH_UNKNOWN_ORDER: u8 = 5;
 
-/// Length of ngrams for unknown detection.
-///
-/// Corresponds to Python: `UNKNOWN_NGRAM_LENGTH = 6` (line 49)
 const UNKNOWN_NGRAM_LENGTH: usize = 6;
 
-/// Minimum number of ngram matches required for a region.
 const MIN_NGRAM_MATCHES: usize = 3;
 
-/// Minimum region length in tokens.
 const MIN_REGION_LENGTH: usize = 5;
 
-/// Perform unknown license matching on a query.
-///
-/// This function identifies regions of the query that are not covered by known
-/// matches and attempts to license-like content in those regions using an
-/// ngram-based approach.
-///
-/// # Arguments
-/// * `index` - The license index containing the unknown_automaton
-/// * `query` - The query object containing tokenized text
-/// * `known_matches` - Previously found matches that cover recognized license text
-///
-/// # Returns
-/// A vector of LicenseMatch objects representing unknown license detections
-///
-/// # Simplified Implementation Notes
-///
-/// This is a simplified version for Phase 4.5 that:
-/// - Assumes unknown_automaton is pre-built (will build in future phase)
-/// - Uses simple region gap detection for unmatched areas
-/// - Creates matches based on ngram count threshold
-///
-/// The full Python implementation includes:
-/// - Ngram building from approx-matchable rules via add_ngrams()
-/// - Filtering of ngrams via is_good_tokens_ngram()
-/// - More sophisticated region grouping
-///
-/// Corresponds to Python: `match_unknowns()` (lines 132-239)
 pub fn unknown_match(
     index: &LicenseIndex,
     query: &Query,
@@ -133,13 +45,46 @@ pub fn unknown_match(
             continue;
         }
 
-        let ngram_matches = match_ngrams_in_region(&query.tokens, start, end, automaton);
+        let matched_ngrams = get_matched_ngrams(&query.tokens, start, end, automaton);
 
-        if ngram_matches < MIN_NGRAM_MATCHES {
+        if matched_ngrams.len() < MIN_NGRAM_MATCHES {
             continue;
         }
 
-        if let Some(match_result) = create_unknown_match(index, query, start, end, ngram_matches) {
+        let qspan = compute_qspan_union(&matched_ngrams);
+
+        if qspan.is_empty() {
+            continue;
+        }
+
+        let qspan_length: usize = qspan.iter().map(|(s, e)| e - s).sum();
+
+        // DEBUG
+        #[cfg(debug_assertions)]
+        {
+            eprintln!("\n=== UNKNOWN MATCH DEBUG ===");
+            eprintln!("Region: {}-{} ({} tokens)", start, end, region_length);
+            eprintln!("matched_ngrams: {} matches", matched_ngrams.len());
+            eprintln!("qspan: {:?}", qspan);
+            eprintln!("qspan_length: {} (threshold: {})", qspan_length, UNKNOWN_NGRAM_LENGTH * 4);
+        }
+
+        if qspan_length < UNKNOWN_NGRAM_LENGTH * 4 {
+            continue;
+        }
+
+        let hispan = compute_hispan_from_qspan(&query.tokens, &qspan, index.len_legalese);
+
+        #[cfg(debug_assertions)]
+        {
+            eprintln!("hispan: {} (threshold: 5)", hispan);
+        }
+
+        if hispan < 5 {
+            continue;
+        }
+
+        if let Some(match_result) = create_unknown_match_from_qspan(query, &qspan, hispan) {
             unknown_matches.push(match_result);
         }
     }
@@ -147,17 +92,6 @@ pub fn unknown_match(
     unknown_matches
 }
 
-/// Compute the set of query positions covered by known matches.
-///
-/// Uses token positions (start_token, end_token) for precise coverage,
-/// matching Python's qspan-based approach.
-///
-/// # Arguments
-/// * `_query` - The query object (unused, kept for API compatibility)
-/// * `known_matches` - Previously found matches
-///
-/// # Returns
-/// A HashSet of token positions that are covered by known matches
 fn compute_covered_positions(
     _query: &Query,
     known_matches: &[LicenseMatch],
@@ -173,14 +107,6 @@ fn compute_covered_positions(
     covered
 }
 
-/// Find regions of the query that are not covered by known matches.
-///
-/// # Arguments
-/// * `query_len` - Total length of the query in tokens
-/// * `covered_positions` - Set of positions covered by known matches
-///
-/// # Returns
-/// A vector of (start, end) tuples representing unmatched regions
 fn find_unmatched_regions(
     query_len: usize,
     covered_positions: &std::collections::HashSet<usize>,
@@ -211,24 +137,14 @@ fn find_unmatched_regions(
     regions
 }
 
-/// Count ngram matches in a specific region using the unknown automaton.
-///
-/// # Arguments
-/// * `tokens` - The query tokens
-/// * `start` - Start position of the region
-/// * `end` - End position of the region (exclusive)
-/// * `automaton` - The unknown ngram automaton
-///
-/// # Returns
-/// The number of ngram matches found in the region
-fn match_ngrams_in_region(
+fn get_matched_ngrams(
     tokens: &[u16],
     start: usize,
     end: usize,
     automaton: &AhoCorasick,
-) -> usize {
+) -> Vec<(usize, usize)> {
     if start >= end || end > tokens.len() {
-        return 0;
+        return Vec::new();
     }
 
     let region_tokens = &tokens[start..end];
@@ -238,53 +154,73 @@ fn match_ngrams_in_region(
         .flat_map(|tid| tid.to_le_bytes())
         .collect();
 
-    let mut match_count = 0;
+    let offset = UNKNOWN_NGRAM_LENGTH;
+    let mut matches = Vec::new();
 
-    for _ in automaton.find_iter(&region_bytes) {
-        match_count += 1;
+    for m in automaton.find_iter(&region_bytes) {
+        let local_qend = m.end() / 2;
+        let qend = start + local_qend;
+        let qstart = qend.saturating_sub(offset);
+        matches.push((qstart, qend));
     }
 
-    match_count
+    matches
 }
 
-/// Create a LicenseMatch for an unknown license region.
-///
-/// # Arguments
-/// * `index` - The license index
-/// * `query` - The query object
-/// * `start` - Start position of the region
-/// * `end` - End position of the region (exclusive)
-/// * `ngram_count` - Number of ngram matches in the region
-///
-/// # Returns
-/// Option containing the LicenseMatch, or None if the region doesn't meet thresholds
-fn create_unknown_match(
-    index: &LicenseIndex,
-    query: &Query,
-    start: usize,
-    end: usize,
-    ngram_count: usize,
-) -> Option<LicenseMatch> {
-    let region_length = end.saturating_sub(start);
-
-    if region_length < UNKNOWN_NGRAM_LENGTH * 4 {
-        return None;
+fn compute_qspan_union(positions: &[(usize, usize)]) -> Vec<(usize, usize)> {
+    if positions.is_empty() {
+        return Vec::new();
     }
 
-    // Compute hispan: count high-value legalese tokens.
-    // Python: `len(hispan) < 5` check at match_unknown.py:220
-    let hispan = (start..end)
+    let mut sorted: Vec<_> = positions.to_vec();
+    sorted.sort_by_key(|p| p.0);
+
+    let mut merged: Vec<(usize, usize)> = Vec::new();
+    let mut current = sorted[0];
+
+    for (start, end) in sorted.into_iter().skip(1) {
+        if start <= current.1 {
+            current.1 = current.1.max(end);
+        } else {
+            merged.push(current);
+            current = (start, end);
+        }
+    }
+    merged.push(current);
+
+    merged
+}
+
+fn compute_hispan_from_qspan(
+    tokens: &[u16],
+    qspan: &[(usize, usize)],
+    len_legalese: usize,
+) -> usize {
+    qspan.iter()
+        .flat_map(|(start, end)| *start..*end)
         .filter(|&pos| {
-            query
-                .tokens
-                .get(pos)
-                .is_some_and(|&tid| (tid as usize) < index.len_legalese)
+            tokens.get(pos).is_some_and(|&tid| (tid as usize) < len_legalese)
         })
-        .count();
+        .count()
+}
 
-    if hispan < 5 {
+fn create_unknown_match_from_qspan(
+    query: &Query,
+    qspan: &[(usize, usize)],
+    hispan: usize,
+) -> Option<LicenseMatch> {
+    if qspan.is_empty() {
         return None;
     }
+
+    let qspan_positions: Vec<usize> = qspan.iter()
+        .flat_map(|(start, end)| *start..*end)
+        .collect();
+
+    let match_len = qspan_positions.len();
+
+    let start = qspan.first()?.0;
+    let end = qspan.last()?.1;
 
     let start_line = query.line_by_pos.get(start).copied().unwrap_or(1);
     let end_line = query
@@ -293,12 +229,11 @@ fn create_unknown_match(
         .copied()
         .unwrap_or(start_line);
 
-    let matched_length = region_length;
-    let match_coverage = 100.0;
-
-    let score = calculate_score(ngram_count, region_length);
-
     let matched_text = query.matched_text(start_line, end_line);
+
+    let ngram_count = qspan.len();
+
+    let score = calculate_score(ngram_count, match_len);
 
     LicenseMatch {
         rid: 0,
@@ -311,9 +246,9 @@ fn create_unknown_match(
         end_token: end,
         matcher: MATCH_UNKNOWN.to_string(),
         score,
-        matched_length,
-        rule_length: region_length,
-        match_coverage,
+        matched_length: match_len,
+        rule_length: match_len,
+        match_coverage: 100.0,
         rule_relevance: 50,
         rule_identifier: "unknown".to_string(),
         rule_url: String::new(),
@@ -328,7 +263,7 @@ fn create_unknown_match(
         matched_token_positions: None,
         hilen: hispan,
         rule_start_token: 0,
-        qspan_positions: None,
+        qspan_positions: Some(qspan_positions),
         ispan_positions: None,
         hispan_positions: None,
         candidate_resemblance: 0.0,
@@ -337,20 +272,12 @@ fn create_unknown_match(
     .into()
 }
 
-/// Calculate match score based on ngram count and region length.
-///
-/// # Arguments
-/// * `ngram_count` - Number of ngram matches found
-/// * `region_length` - Length of the region in tokens
-///
-/// # Returns
-/// A score between 0.0 and 1.0
-fn calculate_score(ngram_count: usize, region_length: usize) -> f32 {
-    if region_length == 0 {
+fn calculate_score(ngram_count: usize, match_len: usize) -> f32 {
+    if match_len == 0 {
         return 0.0;
     }
 
-    let density = ngram_count as f32 / region_length as f32;
+    let density = ngram_count as f32 / match_len as f32;
 
     density.min(1.0)
 }
@@ -427,24 +354,73 @@ mod tests {
     }
 
     #[test]
-    fn test_match_ngrams_in_region() {
+    fn test_compute_qspan_union_empty() {
+        let positions: Vec<(usize, usize)> = Vec::new();
+        let merged = compute_qspan_union(&positions);
+        assert!(merged.is_empty());
+    }
+
+    #[test]
+    fn test_compute_qspan_union_single() {
+        let positions = vec![(5, 11)];
+        let merged = compute_qspan_union(&positions);
+        assert_eq!(merged, vec![(5, 11)]);
+    }
+
+    #[test]
+    fn test_compute_qspan_union_overlapping() {
+        let positions = vec![(5, 11), (8, 14), (20, 26)];
+        let merged = compute_qspan_union(&positions);
+        assert_eq!(merged, vec![(5, 14), (20, 26)]);
+    }
+
+    #[test]
+    fn test_compute_qspan_union_adjacent() {
+        let positions = vec![(5, 11), (11, 17)];
+        let merged = compute_qspan_union(&positions);
+        assert_eq!(merged, vec![(5, 17)]);
+    }
+
+    #[test]
+    fn test_compute_qspan_union_unsorted() {
+        let positions = vec![(20, 26), (5, 11), (8, 14)];
+        let merged = compute_qspan_union(&positions);
+        assert_eq!(merged, vec![(5, 14), (20, 26)]);
+    }
+
+    #[test]
+    fn test_compute_hispan_from_qspan() {
+        let tokens: Vec<u16> = (0..30).collect();
+        let qspan = vec![(0, 10), (20, 25)];
+        let hispan = compute_hispan_from_qspan(&tokens, &qspan, 15);
+        assert_eq!(hispan, 10);
+    }
+
+    #[test]
+    fn test_get_matched_ngrams_empty_automaton() {
         let tokens = vec![1u16, 2, 3, 4, 5, 6, 7, 8];
         let automaton =
             AhoCorasick::new(std::iter::empty::<&[u8]>()).expect("Failed to create automaton");
 
-        let count = match_ngrams_in_region(&tokens, 0, 8, &automaton);
+        let matches = get_matched_ngrams(&tokens, 0, 8, &automaton);
 
-        assert_eq!(count, 0);
+        assert!(matches.is_empty());
     }
 
     #[test]
-    fn test_create_unknown_match_too_short() {
-        let index = LicenseIndex::with_legalese_count(10);
-        let query = Query::new("short text", &index).expect("Failed to create query");
+    fn test_get_matched_ngrams_with_matches() {
+        let tokens: Vec<u16> = (0..30).collect();
+        let ngram: Vec<u8> = vec![0, 0, 1, 0, 2, 0, 3, 0, 4, 0, 5, 0];
+        let automaton = AhoCorasick::new(std::iter::once(ngram.as_slice()))
+            .expect("Failed to create automaton");
 
-        let match_result = create_unknown_match(&index, &query, 0, 5, 10);
+        let matches = get_matched_ngrams(&tokens, 0, 30, &automaton);
 
-        assert!(match_result.is_none());
+        assert!(!matches.is_empty(), "Should find ngram matches");
+
+        for (qstart, qend) in &matches {
+            assert_eq!(*qend - *qstart, UNKNOWN_NGRAM_LENGTH);
+        }
     }
 
     #[test]
@@ -537,28 +513,18 @@ mod tests {
     }
 
     #[test]
-    fn test_match_ngrams_in_region_with_matches() {
-        let tokens: Vec<u16> = (0..30).collect();
-        let ngram: Vec<u8> = vec![0, 0, 1, 0, 2, 0, 3, 0, 4, 0, 5, 0];
-        let automaton = AhoCorasick::new(std::iter::once(ngram.as_slice()))
-            .expect("Failed to create automaton");
-
-        let count = match_ngrams_in_region(&tokens, 0, 30, &automaton);
-
-        assert!(count > 0, "Should find ngram matches");
-    }
-
-    #[test]
-    fn test_create_unknown_match_valid() {
+    fn test_create_unknown_match_from_qspan_valid() {
         use crate::license_detection::test_utils::create_mock_query_with_tokens;
 
         let index = LicenseIndex::with_legalese_count(10);
 
-        // Create tokens with IDs 0-9 (legalese tokens) so hispan count >= 5
         let tokens: Vec<u16> = (0..30).collect();
         let query = create_mock_query_with_tokens(&tokens, &index);
 
-        let match_result = create_unknown_match(&index, &query, 0, 30, 5);
+        let qspan = vec![(0, 30)];
+        let hispan = 30;
+
+        let match_result = create_unknown_match_from_qspan(&query, &qspan, hispan);
 
         assert!(
             match_result.is_some(),
@@ -568,6 +534,7 @@ mod tests {
         let m = match_result.unwrap();
         assert_eq!(m.license_expression, "unknown");
         assert_eq!(m.matcher, MATCH_UNKNOWN);
+        assert!(m.qspan_positions.is_some());
     }
 
     #[test]
@@ -635,15 +602,15 @@ mod tests {
     }
 
     #[test]
-    fn test_match_ngrams_in_region_out_of_bounds() {
+    fn test_get_matched_ngrams_out_of_bounds() {
         let tokens = vec![1u16, 2, 3];
         let automaton =
             AhoCorasick::new(std::iter::empty::<&[u8]>()).expect("Failed to create automaton");
 
-        let count = match_ngrams_in_region(&tokens, 5, 10, &automaton);
-        assert_eq!(count, 0, "Out of bounds should return 0");
+        let matches = get_matched_ngrams(&tokens, 5, 10, &automaton);
+        assert!(matches.is_empty(), "Out of bounds should return empty");
 
-        let count = match_ngrams_in_region(&tokens, 2, 1, &automaton);
-        assert_eq!(count, 0, "Invalid range should return 0");
+        let matches = get_matched_ngrams(&tokens, 2, 1, &automaton);
+        assert!(matches.is_empty(), "Invalid range should return empty");
     }
 }

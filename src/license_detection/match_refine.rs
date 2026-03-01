@@ -411,31 +411,6 @@ pub(crate) fn filter_contained_matches(
                 break;
             }
 
-            // Expression-based containment: filter when one expression contains another
-            // and the containing match is larger/better, with some overlap
-            let current_len = current.matched_length;
-            let next_len = next.matched_length;
-            let current_hilen = current.hilen();
-            let next_hilen = next.hilen();
-
-            // Only apply expression containment when there's overlap
-            let overlap = current.qoverlap(&next);
-            if overlap > 0 {
-                if current_len >= next_len && current_hilen >= next_hilen {
-                    if licensing_contains_match(&current, &next) {
-                        discarded.push(matches.remove(j));
-                        continue;
-                    }
-                }
-                if next_len >= current_len && next_hilen >= current_hilen {
-                    if licensing_contains_match(&next, &current) {
-                        discarded.push(matches.remove(i));
-                        i = i.saturating_sub(1);
-                        break;
-                    }
-                }
-            }
-
             j += 1;
         }
         i += 1;
@@ -482,22 +457,6 @@ fn filter_license_references_with_text_match(
 
                 if current_is_ref && other_is_text && current.matched_length < other.matched_length {
                     if other.qcontains(current) {
-                        to_discard.insert(i);
-                    }
-                }
-                continue;
-            }
-
-            // Case 2: Expression containment - filter shorter match when expression is contained
-            // and the shorter match is within the larger match's region
-            let overlap = current.qoverlap(other);
-            if overlap > 0 {
-                let current_len = current.matched_length;
-                let other_len = other.matched_length;
-
-                // Check if other's expression contains current's expression
-                if other_len >= current_len && other.hilen() >= current.hilen() {
-                    if licensing_contains_match(other, current) && other.qcontains(current) {
                         to_discard.insert(i);
                     }
                 }

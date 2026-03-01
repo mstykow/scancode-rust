@@ -41,3 +41,6 @@ mod rule_118_test;
 
 #[cfg(test)]
 mod ar_er_debug_test;
+
+#[cfg(test)]
+mod or_expression_pipeline_test;
