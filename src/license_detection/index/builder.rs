@@ -387,45 +387,6 @@ pub fn build_index(rules: Vec<Rule>, licenses: Vec<License>) -> LicenseIndex {
 
         rid_by_hash.insert(rule_hash, rid);
 
-        // Generate alternate hashes for ignorable URL variants (http vs https)
-        // This allows rules with ignorable URLs to match files with different URL protocols
-        if let Some(ref ignorable_urls) = rule.ignorable_urls {
-            if !ignorable_urls.is_empty() {
-                for url in ignorable_urls {
-                    let url_lower = url.to_lowercase();
-                    // If rule has https:// URL, create a variant with http://
-                    if url_lower.starts_with("https://") {
-                        let http_url = format!("http://{}", &url[8..]);
-                        if rule.text.contains(url) {
-                            let variant_text = rule.text.replace(url, &http_url);
-                            let (variant_tokens, _) = tokenize_with_stopwords(&variant_text);
-                            let mut variant_token_ids: Vec<u16> =
-                                Vec::with_capacity(variant_tokens.len());
-                            for vts in &variant_tokens {
-                                let vtid = dictionary.get_or_assign(vts);
-                                variant_token_ids.push(vtid);
-                            }
-                            let variant_hash = compute_hash(&variant_token_ids);
-
-                            // Only add variant if this hash doesn't already exist
-                            // (prevents duplicate patterns when another rule already has the http:// variant)
-                            if !rid_by_hash.contains_key(&variant_hash) {
-                                rid_by_hash.insert(variant_hash, rid);
-
-                                // Also add variant pattern to Aho-Corasick automaton
-                                // This allows matching files with different URL protocols
-                                if !variant_token_ids.is_empty() {
-                                    rules_automaton_patterns
-                                        .push(tokens_to_bytes(&variant_token_ids));
-                                    pattern_id_to_rid.push(rid);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
         regular_rids.insert(rid);
 
         let is_approx_matchable = {
@@ -459,25 +420,6 @@ pub fn build_index(rules: Vec<Rule>, licenses: Vec<License>) -> LicenseIndex {
         }
 
         let (tids_set, mset) = build_set_and_mset(&rule_token_ids);
-
-        // For rules with ignorable URLs containing https://, also add http:// token to set
-        // This allows matching files that use http:// instead of https://
-        let mut tids_set = tids_set;
-        if let Some(ref ignorable_urls) = rule.ignorable_urls {
-            for url in ignorable_urls {
-                if url.to_lowercase().starts_with("https://") {
-                    // If rule has https:// in ignorable URL, add http token to set
-                    if let (Some(https_tid), Some(http_tid)) =
-                        (dictionary.get("https"), dictionary.get("http"))
-                    {
-                        if tids_set.contains(&https_tid) {
-                            tids_set.insert(http_tid);
-                        }
-                    }
-                    break;
-                }
-            }
-        }
 
         sets_by_rid.insert(rid, tids_set.clone());
         msets_by_rid.insert(rid, mset.clone());
