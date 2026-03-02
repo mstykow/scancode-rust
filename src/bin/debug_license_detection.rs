@@ -138,10 +138,13 @@ fn run_debug_pipeline(file_path: &str) -> Result<()> {
     }
     
     // Combine all matches
+    // Python merges each matcher's results before adding to matches (index.py:1040)
     let mut all_matches = Vec::new();
     all_matches.extend(spdx_matches.clone());
     all_matches.extend(aho_matches.clone());
-    all_matches.extend(seq_matches.clone());
+    // Merge sequence matches ONCE (like Python's approx matcher and Rust's engine.detect)
+    let merged_seq = merge_overlapping_matches(&seq_matches);
+    all_matches.extend(merged_seq);
     
     // Stage 6: Merging
     print_section("STAGE 6: MATCH MERGING");
