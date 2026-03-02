@@ -212,6 +212,12 @@ pub fn extract_package_data(path: &Path) -> PackageData {
 }
 ```
 
+### Dead Code
+
+- **Never use `#[allow(dead_code)]`** except when explicitly requested by the user
+- **Dead functions indicate a problem**: Either they became unused by accident (find where they should be used) or they are unnecessary (remove them)
+- **All code should serve a purpose**: Unused code is technical debt and should be cleaned up
+
 ## Adding a New Package Parser
 
 1. **Create parser file**: `src/parsers/<ecosystem>.rs`
