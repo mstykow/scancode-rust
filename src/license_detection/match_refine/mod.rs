@@ -1,0 +1,792 @@
+//! Match refinement - merge, filter, and finalize license matches.
+//!
+//! This module implements the final phase of license matching where raw matches
+//! from all strategies are combined, refined, and finalized.
+//!
+//! Based on the Python ScanCode Toolkit implementation at:
+//! reference/scancode-toolkit/src/licensedcode/match.py
+
+mod false_positive;
+mod filter;
+mod merge;
+
+use crate::license_detection::index::LicenseIndex;
+use crate::license_detection::models::LicenseMatch;
+use crate::license_detection::query::Query;
+
+// Internal use only
+use filter::{
+    filter_below_rule_minimum_coverage, filter_false_positive_matches,
+    filter_invalid_matches_to_single_word_gibberish,
+    filter_matches_missing_required_phrases, filter_matches_to_spurious_single_token,
+    filter_short_matches_scattered_on_too_many_lines, filter_spurious_matches,
+    filter_too_short_matches,
+};
+use merge::{filter_license_references_with_text_match, update_match_scores};
+
+// Re-export for crate-internal use (debug_pipeline feature)
+pub use filter::{
+    filter_contained_matches, filter_overlapping_matches, restore_non_overlapping,
+};
+pub use merge::merge_overlapping_matches;
+
+// Public API re-exports for investigation tests
+pub use false_positive::filter_false_positive_license_lists_matches;
+
+const SMALL_RULE: usize = 15;
+
+/// Filter unknown matches contained within good matches' qregion.
+///
+/// Unknown license matches that are fully contained within the qregion
+/// (token span from start_token to end_token) of a known good match
+/// should be discarded as they are redundant.
+///
+/// # Arguments
+/// * `unknown_matches` - Slice of unknown license matches to filter
+/// * `good_matches` - Slice of known good matches to check containment against
+///
+/// # Returns
+/// Vector of unknown LicenseMatch with contained matches removed
+///
+/// Based on Python: `filter_invalid_contained_unknown_matches()` (match.py:1904-1926)
+pub fn filter_invalid_contained_unknown_matches(
+    unknown_matches: &[LicenseMatch],
+    good_matches: &[LicenseMatch],
+) -> Vec<LicenseMatch> {
+    unknown_matches
+        .iter()
+        .filter(|unknown| {
+            let unknown_start = unknown.start_token;
+            let unknown_end = unknown.end_token;
+
+            let is_contained = good_matches
+                .iter()
+                .any(|good| good.start_token <= unknown_start && good.end_token >= unknown_end);
+
+            !is_contained
+        })
+        .cloned()
+        .collect()
+}
+
+/// Split matches into good and weak matches.
+///
+/// Weak matches are:
+/// - Matches to rules with "unknown" in their license expression
+/// - Sequence matches with len() <= SMALL_RULE (15) AND coverage <= 25%
+///
+/// Weak matches are set aside before unknown license matching and reinjected later.
+///
+/// # Arguments
+/// * `matches` - Slice of LicenseMatch to split
+///
+/// # Returns
+/// Tuple of (good_matches, weak_matches)
+///
+/// Based on Python: `split_weak_matches()` (match.py:1740-1765)
+pub fn split_weak_matches(matches: &[LicenseMatch]) -> (Vec<LicenseMatch>, Vec<LicenseMatch>) {
+    let mut good = Vec::new();
+    let mut weak = Vec::new();
+
+    for m in matches {
+        let is_weak = m.has_unknown()
+            || (m.matcher == "3-seq" && m.len() <= SMALL_RULE && m.match_coverage <= 25.0);
+
+        if is_weak {
+            weak.push(m.clone());
+        } else {
+            good.push(m.clone());
+        }
+    }
+
+    (good, weak)
+}
+
+/// Main refinement function - applies all refinement operations to match results.
+///
+/// This is the main entry point for Phase 4.6 match refinement. It applies
+/// filters in the same order as Python's refine_matches():
+///
+/// 1. Filter matches missing required phrases
+/// 2. Filter spurious matches (low density)
+/// 3. Filter below rule minimum coverage
+/// 4. Filter spurious single-token matches
+/// 5. Filter too short matches
+/// 6. Filter scattered short matches
+/// 7. Filter invalid single-word gibberish (binary files)
+/// 8. Merge overlapping/adjacent matches
+/// 9. Filter contained matches
+/// 10. Filter overlapping matches
+/// 11. Restore non-overlapping discarded matches
+/// 12. Filter false positive matches
+/// 13. Filter false positive license list matches
+/// 14. Update match scores
+///
+/// The operations are applied in sequence to produce final refined matches.
+///
+/// # Arguments
+/// * `index` - LicenseIndex containing false_positive_rids and rules_by_rid
+/// * `matches` - Vector of raw LicenseMatch from all strategies
+/// * `query` - Query object for spurious/gibberish filtering
+///
+/// # Returns
+/// Vector of refined LicenseMatch ready for detection assembly
+///
+/// Based on Python: `refine_matches()` (lines 2691-2833)
+pub fn refine_matches(
+    index: &LicenseIndex,
+    matches: Vec<LicenseMatch>,
+    query: &Query,
+) -> Vec<LicenseMatch> {
+    refine_matches_internal(index, matches, query, true)
+}
+
+/// Initial refinement without false positive filtering.
+///
+/// Used before split_weak_matches and unknown detection.
+/// This matches Python's refine_matches with filter_false_positive=False.
+///
+/// Based on Python: `refine_matches()` at index.py:1073-1080
+pub fn refine_matches_without_false_positive_filter(
+    index: &LicenseIndex,
+    matches: Vec<LicenseMatch>,
+    query: &Query,
+) -> Vec<LicenseMatch> {
+    refine_matches_internal(index, matches, query, false)
+}
+
+/// Refine Aho-Corasick matches.
+///
+/// This matches Python's `get_exact_matches()` which calls `refine_matches()` with `merge=False`.
+/// Unlike full refinement, this:
+/// - Skips initial merge (merge=False)
+/// - Applies required phrase filtering
+/// - Applies all quality filters
+/// - Applies containment and overlap filtering with restore
+/// - Skips final merge (merge=False)
+///
+/// Based on Python: `get_exact_matches()` at index.py:691-696
+pub fn refine_aho_matches(
+    index: &LicenseIndex,
+    matches: Vec<LicenseMatch>,
+    query: &Query,
+) -> Vec<LicenseMatch> {
+    if matches.is_empty() {
+        return Vec::new();
+    }
+
+    let (with_required_phrases, _missing_phrases) =
+        filter_matches_missing_required_phrases(index, &matches, query);
+
+    let non_spurious = filter_spurious_matches(&with_required_phrases, query);
+
+    let above_min_cov = filter_below_rule_minimum_coverage(index, &non_spurious);
+
+    let non_single_spurious = filter_matches_to_spurious_single_token(&above_min_cov, query, 5);
+
+    let non_short = filter_too_short_matches(index, &non_single_spurious);
+
+    let non_scattered = filter_short_matches_scattered_on_too_many_lines(index, &non_short);
+
+    let non_gibberish =
+        filter_invalid_matches_to_single_word_gibberish(index, &non_scattered, query);
+
+    let (non_contained, discarded_contained) = filter_contained_matches(&non_gibberish);
+
+    let (kept, discarded_overlapping) = filter_overlapping_matches(non_contained, index);
+
+    let mut matches_after_first_restore = kept.clone();
+
+    if !discarded_contained.is_empty() {
+        let (restored_contained, _) = restore_non_overlapping(&kept, discarded_contained);
+        matches_after_first_restore.extend(restored_contained);
+    }
+
+    let mut final_matches = matches_after_first_restore.clone();
+
+    if !discarded_overlapping.is_empty() {
+        let (restored_overlapping, _) =
+            restore_non_overlapping(&matches_after_first_restore, discarded_overlapping);
+        final_matches.extend(restored_overlapping);
+    }
+
+    let (non_contained_final, _) = filter_contained_matches(&final_matches);
+
+    let filtered_refs = filter_license_references_with_text_match(&non_contained_final);
+
+    let mut final_scored = filtered_refs;
+    update_match_scores(&mut final_scored, query);
+
+    final_scored
+}
+
+fn refine_matches_internal(
+    index: &LicenseIndex,
+    matches: Vec<LicenseMatch>,
+    query: &Query,
+    filter_false_positive: bool,
+) -> Vec<LicenseMatch> {
+    if matches.is_empty() {
+        return Vec::new();
+    }
+
+    let merged = merge_overlapping_matches(&matches);
+
+    let (with_required_phrases, _missing_phrases) =
+        filter_matches_missing_required_phrases(index, &merged, query);
+
+    let non_spurious = filter_spurious_matches(&with_required_phrases, query);
+
+    let above_min_cov = filter_below_rule_minimum_coverage(index, &non_spurious);
+
+    let non_single_spurious = filter_matches_to_spurious_single_token(&above_min_cov, query, 5);
+
+    let non_short = filter_too_short_matches(index, &non_single_spurious);
+
+    let non_scattered = filter_short_matches_scattered_on_too_many_lines(index, &non_short);
+
+    let non_gibberish =
+        filter_invalid_matches_to_single_word_gibberish(index, &non_scattered, query);
+
+    let merged_again = merge_overlapping_matches(&non_gibberish);
+
+    let (non_contained, discarded_contained) = filter_contained_matches(&merged_again);
+
+    let (kept, discarded_overlapping) = filter_overlapping_matches(non_contained, index);
+
+    let mut matches_after_first_restore = kept.clone();
+
+    if !discarded_contained.is_empty() {
+        let (restored_contained, _) = restore_non_overlapping(&kept, discarded_contained);
+        matches_after_first_restore.extend(restored_contained);
+    }
+
+    let mut final_matches = matches_after_first_restore.clone();
+
+    if !discarded_overlapping.is_empty() {
+        let (restored_overlapping, _) =
+            restore_non_overlapping(&matches_after_first_restore, discarded_overlapping);
+        final_matches.extend(restored_overlapping);
+    }
+
+    let (non_contained_final, _) = filter_contained_matches(&final_matches);
+
+    let result = if filter_false_positive {
+        let non_fp = filter_false_positive_matches(index, &non_contained_final);
+        let (kept, _discarded) = filter_false_positive_license_lists_matches(non_fp);
+        kept
+    } else {
+        non_contained_final
+    };
+
+    let merged_final = merge_overlapping_matches(&result);
+
+    let filtered_refs = filter_license_references_with_text_match(&merged_final);
+
+    let mut final_scored = filtered_refs;
+    update_match_scores(&mut final_scored, query);
+
+    final_scored
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn parse_rule_id(rule_identifier: &str) -> Option<usize> {
+        let trimmed = rule_identifier.trim();
+        if let Some(stripped) = trimmed.strip_prefix('#') {
+            stripped.parse().ok()
+        } else {
+            trimmed.parse().ok()
+        }
+    }
+
+    fn create_test_match(
+        rule_identifier: &str,
+        start_line: usize,
+        end_line: usize,
+        score: f32,
+        coverage: f32,
+        relevance: u8,
+    ) -> LicenseMatch {
+        let matched_len = end_line - start_line + 1;
+        let rule_len = matched_len;
+        let rid = parse_rule_id(rule_identifier).unwrap_or(0);
+        LicenseMatch {
+            rid,
+            license_expression: "mit".to_string(),
+            license_expression_spdx: "MIT".to_string(),
+            from_file: None,
+            start_line,
+            end_line,
+            start_token: start_line,
+            end_token: end_line + 1,
+            matcher: "2-aho".to_string(),
+            score,
+            matched_length: matched_len,
+            rule_length: rule_len,
+            matched_token_positions: None,
+            match_coverage: coverage,
+            rule_relevance: relevance,
+            rule_identifier: rule_identifier.to_string(),
+            rule_url: "https://example.com".to_string(),
+            matched_text: None,
+            referenced_filenames: None,
+            is_license_intro: false,
+            is_license_clue: false,
+            is_license_reference: false,
+            is_license_tag: false,
+            is_license_text: false,
+            is_from_license: false,
+            hilen: 50,
+            rule_start_token: 0,
+            qspan_positions: None,
+            ispan_positions: None,
+            hispan_positions: None,
+            candidate_resemblance: 0.0,
+            candidate_containment: 0.0,
+        }
+    }
+
+    #[test]
+    fn test_refine_matches_full_pipeline() {
+        let mut index = LicenseIndex::with_legalese_count(10);
+        let _ = index.false_positive_rids.insert(99);
+
+        let mut m1 = create_test_match("#1", 1, 10, 0.5, 100.0, 100);
+        m1.rule_length = 100;
+        m1.rule_start_token = 0;
+        let mut m2 = create_test_match("#1", 5, 15, 0.5, 100.0, 100);
+        m2.rule_length = 100;
+        m2.rule_start_token = 4;
+        let m3 = create_test_match("#2", 20, 25, 0.5, 100.0, 80);
+        let m4 = create_test_match("#99", 30, 35, 0.5, 100.0, 100);
+
+        let matches = vec![m1, m2, m3, m4];
+
+        let query = Query::new("test text", &index).unwrap();
+        let refined = refine_matches(&index, matches, &query);
+
+        assert_eq!(refined.len(), 2);
+
+        let rule1_match = refined.iter().find(|m| m.rule_identifier == "#1").unwrap();
+        assert_eq!(rule1_match.start_line, 1);
+        assert_eq!(rule1_match.end_line, 15);
+
+        let rule2_match = refined.iter().find(|m| m.rule_identifier == "#2").unwrap();
+        assert_eq!(rule2_match.score, 80.0);
+    }
+
+    #[test]
+    fn test_refine_matches_empty() {
+        let index = LicenseIndex::with_legalese_count(10);
+        let matches: Vec<LicenseMatch> = vec![];
+        let query = Query::new("", &index).unwrap();
+
+        let refined = refine_matches(&index, matches, &query);
+
+        assert_eq!(refined.len(), 0);
+    }
+
+    #[test]
+    fn test_refine_matches_single() {
+        let index = LicenseIndex::with_legalese_count(10);
+        let matches = vec![create_test_match("#1", 1, 10, 0.5, 100.0, 100)];
+        let query = Query::new("test text", &index).unwrap();
+
+        let refined = refine_matches(&index, matches, &query);
+
+        assert_eq!(refined.len(), 1);
+        assert_eq!(refined[0].score, 100.0);
+    }
+
+    #[test]
+    fn test_refine_matches_no_merging_needed() {
+        let index = LicenseIndex::with_legalese_count(10);
+
+        let matches = vec![
+            create_test_match("#1", 1, 10, 0.9, 90.0, 100),
+            create_test_match("#2", 20, 30, 0.85, 85.0, 100),
+        ];
+
+        let query = Query::new("test text", &index).unwrap();
+
+        let refined = refine_matches(&index, matches, &query);
+
+        assert_eq!(refined.len(), 2);
+    }
+
+    #[test]
+    fn test_refine_matches_pipeline_preserves_non_overlapping_different_rules() {
+        let index = LicenseIndex::with_legalese_count(10);
+
+        let matches = vec![
+            create_test_match("#1", 1, 10, 0.9, 90.0, 100),
+            create_test_match("#2", 20, 30, 0.85, 85.0, 100),
+            create_test_match("#3", 40, 50, 0.8, 80.0, 100),
+        ];
+
+        let query = Query::new("test text", &index).unwrap();
+        let refined = refine_matches(&index, matches, &query);
+
+        assert_eq!(refined.len(), 3);
+    }
+
+    #[test]
+    fn test_refine_matches_complex_scenario() {
+        let mut index = LicenseIndex::with_legalese_count(10);
+        let _ = index.false_positive_rids.insert(999);
+
+        let mut m1 = create_test_match("#1", 1, 10, 0.7, 100.0, 100);
+        m1.matched_length = 100;
+        m1.rule_length = 100;
+        m1.rule_start_token = 0;
+        let mut m2 = create_test_match("#1", 8, 15, 0.8, 100.0, 100);
+        m2.matched_length = 100;
+        m2.rule_length = 100;
+        m2.rule_start_token = 7;
+        let mut m3 = create_test_match("#2", 20, 50, 0.9, 100.0, 100);
+        m3.matched_length = 300;
+        m3.rule_length = 300;
+        m3.rule_start_token = 0;
+        let mut m4 = create_test_match("#2", 25, 45, 0.85, 100.0, 100);
+        m4.matched_length = 150;
+        m4.rule_length = 300;
+        m4.rule_start_token = 5;
+
+        let matches = vec![m1, m2, m3, m4];
+
+        let query = Query::new("test text", &index).unwrap();
+        let refined = refine_matches(&index, matches, &query);
+
+        assert!(
+            refined.len() >= 2,
+            "Should have at least 2 matches after refinement"
+        );
+    }
+
+    #[test]
+    fn test_split_weak_matches_has_unknown() {
+        let mut m = LicenseMatch {
+            license_expression: "unknown".to_string(),
+            matcher: "1-hash".to_string(),
+            matched_length: 100,
+            match_coverage: 100.0,
+            ..LicenseMatch::default()
+        };
+        m.end_token = 100;
+        m.rule_length = 100;
+
+        let (good, weak) = split_weak_matches(&[m.clone()]);
+        assert!(weak.contains(&m));
+        assert!(!good.contains(&m));
+    }
+
+    #[test]
+    fn test_split_weak_matches_short_seq_low_coverage() {
+        let mut m = LicenseMatch {
+            license_expression: "mit".to_string(),
+            matcher: "3-seq".to_string(),
+            matched_length: 10,
+            match_coverage: 20.0,
+            ..LicenseMatch::default()
+        };
+        m.end_token = 10;
+        m.rule_length = 50;
+
+        let (good, weak) = split_weak_matches(&[m.clone()]);
+        assert!(weak.contains(&m));
+        assert!(!good.contains(&m));
+    }
+
+    #[test]
+    fn test_split_weak_matches_short_seq_high_coverage() {
+        let mut m = LicenseMatch {
+            license_expression: "mit".to_string(),
+            matcher: "3-seq".to_string(),
+            matched_length: 10,
+            match_coverage: 80.0,
+            ..LicenseMatch::default()
+        };
+        m.end_token = 10;
+        m.rule_length = 15;
+
+        let (good, weak) = split_weak_matches(&[m.clone()]);
+        assert!(good.contains(&m));
+        assert!(!weak.contains(&m));
+    }
+
+    #[test]
+    fn test_split_weak_matches_non_seq_short() {
+        let mut m = LicenseMatch {
+            license_expression: "mit".to_string(),
+            matcher: "1-hash".to_string(),
+            matched_length: 10,
+            match_coverage: 20.0,
+            ..LicenseMatch::default()
+        };
+        m.end_token = 10;
+        m.rule_length = 15;
+
+        let (good, weak) = split_weak_matches(&[m.clone()]);
+        assert!(good.contains(&m));
+        assert!(!weak.contains(&m));
+    }
+
+    #[test]
+    fn test_split_weak_matches_mixed() {
+        let mut good_match = LicenseMatch {
+            license_expression: "mit".to_string(),
+            matcher: "1-hash".to_string(),
+            matched_length: 50,
+            match_coverage: 95.0,
+            ..LicenseMatch::default()
+        };
+        good_match.end_token = 50;
+        good_match.rule_length = 50;
+
+        let mut weak_unknown = LicenseMatch {
+            license_expression: "unknown".to_string(),
+            matcher: "5-unknown".to_string(),
+            matched_length: 30,
+            match_coverage: 50.0,
+            ..LicenseMatch::default()
+        };
+        weak_unknown.end_token = 30;
+        weak_unknown.rule_length = 30;
+
+        let mut weak_seq = LicenseMatch {
+            license_expression: "apache-2.0".to_string(),
+            matcher: "3-seq".to_string(),
+            matched_length: 10,
+            match_coverage: 20.0,
+            ..LicenseMatch::default()
+        };
+        weak_seq.end_token = 10;
+        weak_seq.rule_length = 50;
+
+        let matches = vec![good_match.clone(), weak_unknown.clone(), weak_seq.clone()];
+        let (good, weak) = split_weak_matches(&matches);
+
+        assert_eq!(good.len(), 1);
+        assert_eq!(weak.len(), 2);
+        assert!(good.contains(&good_match));
+        assert!(weak.contains(&weak_unknown));
+        assert!(weak.contains(&weak_seq));
+    }
+
+    #[test]
+    fn debug_gpl_2_0_9_required_phrases_filter() {
+        use crate::license_detection::aho_match;
+        use crate::license_detection::index::build_index;
+        use crate::license_detection::rules::{
+            load_licenses_from_directory, load_rules_from_directory,
+        };
+
+        let rules_path =
+            std::path::Path::new("reference/scancode-toolkit/src/licensedcode/data/rules");
+        let licenses_path =
+            std::path::Path::new("reference/scancode-toolkit/src/licensedcode/data/licenses");
+        let rules = load_rules_from_directory(rules_path, false).expect("Failed to load rules");
+        let licenses =
+            load_licenses_from_directory(licenses_path, false).expect("Failed to load licenses");
+        let index = build_index(rules, licenses);
+
+        let text = std::fs::read_to_string("testdata/license-golden/datadriven/lic1/gpl-2.0_9.txt")
+            .unwrap();
+
+        println!("\n=== ORIGINAL TEXT lines 45-46 ===");
+        for (i, line) in text.lines().enumerate() {
+            if (44..=46).contains(&i) {
+                println!("{}: {:?}", i + 1, line);
+            }
+        }
+
+        let query = Query::new(&text, &index).unwrap();
+        let run = query.whole_query_run();
+
+        let rule_20733 = index.rules_by_rid.get(20733);
+        if let Some(rule) = rule_20733 {
+            println!("\n=== RULE #20733 (gpl_66.RULE) ===");
+            println!("license_expression: {}", rule.license_expression);
+            println!("text: {:?}", rule.text);
+            println!("required_phrase_spans: {:?}", rule.required_phrase_spans);
+            println!("is_license_notice: {}", rule.is_license_notice);
+            println!("\n=== RULE #20733 STOPWORDS ===");
+            for (&pos, &count) in &rule.stopwords_by_pos {
+                println!("  pos {}: {} stopwords after", pos, count);
+            }
+        }
+
+        let matches = aho_match::aho_match(&index, &run);
+
+        println!("\n=== ALL MATCHES ({}) ===", matches.len());
+        for m in &matches {
+            let rule = index.rules_by_rid.get(
+                m.rule_identifier
+                    .as_str()
+                    .trim_start_matches('#')
+                    .parse::<usize>()
+                    .unwrap_or(0),
+            );
+            println!(
+                "  {} (rid={}): lines {}-{}, start_token={}, end_token={}, len={}",
+                m.license_expression,
+                m.rule_identifier,
+                m.start_line,
+                m.end_line,
+                m.start_token,
+                m.end_token,
+                m.matched_length
+            );
+            if let Some(r) = rule {
+                println!("    required_phrase_spans: {:?}", r.required_phrase_spans);
+            }
+        }
+
+        let gpl_1_0_plus_match = matches.iter().find(|m| m.rule_identifier == "#20733");
+        if let Some(m) = gpl_1_0_plus_match {
+            println!("\n=== GPL-1.0-PLUS MATCH #20733 DETAILS ===");
+            println!("start_token={}, end_token={}", m.start_token, m.end_token);
+            println!(
+                "matched_length={}, rule_start_token={}",
+                m.matched_length, m.rule_start_token
+            );
+
+            let ispan = m.ispan();
+            println!("ispan: {:?}", ispan);
+
+            let qspan = m.qspan();
+            println!("qspan: {:?}", qspan);
+
+            let rule = index.rules_by_rid.get(20733);
+            if let Some(r) = rule {
+                println!(
+                    "\nChecking required_phrase_spans: {:?}",
+                    r.required_phrase_spans
+                );
+                for rp_span in &r.required_phrase_spans {
+                    let in_ispan = rp_span.clone().into_iter().all(|pos| ispan.contains(&pos));
+                    println!("  span {:?} in ispan? {}", rp_span, in_ispan);
+
+                    let qkey_positions: Vec<_> = qspan
+                        .iter()
+                        .zip(ispan.iter())
+                        .filter(|(_, ipos)| rp_span.contains(*ipos))
+                        .map(|(qpos, _)| *qpos)
+                        .collect();
+                    println!("    qkey_positions for this span: {:?}", qkey_positions);
+
+                    if !qkey_positions.is_empty() {
+                        let is_continuous = qkey_positions.windows(2).all(|w| w[1] == w[0] + 1);
+                        println!("    is continuous in qspan? {}", is_continuous);
+                    }
+                }
+            }
+        }
+
+        let gpl_2_0_match = matches.iter().find(|m| m.rule_identifier == "#17911");
+        if let Some(m) = gpl_2_0_match {
+            println!("\n=== GPL-2.0 MATCH #17911 DETAILS ===");
+            println!("start_token={}, end_token={}", m.start_token, m.end_token);
+            println!(
+                "matched_length={}, rule_start_token={}",
+                m.matched_length, m.rule_start_token
+            );
+
+            let ispan = m.ispan();
+            println!("ispan length: {}", ispan.len());
+            println!(
+                "ispan first 30: {:?}",
+                ispan.iter().take(30).collect::<Vec<_>>()
+            );
+            println!(
+                "ispan last 10: {:?}",
+                ispan.iter().rev().take(10).collect::<Vec<_>>()
+            );
+
+            let rule = index.rules_by_rid.get(17911);
+            if let Some(r) = rule {
+                println!(
+                    "\nChecking required_phrase_spans: {:?}",
+                    r.required_phrase_spans
+                );
+                for rp_span in &r.required_phrase_spans {
+                    let in_ispan = rp_span.clone().into_iter().all(|pos| ispan.contains(&pos));
+                    println!("  span {:?} in ispan? {}", rp_span, in_ispan);
+
+                    let missing: Vec<_> =
+                        rp_span.clone().filter(|pos| !ispan.contains(pos)).collect();
+                    if !missing.is_empty() {
+                        println!("    MISSING positions: {:?}", missing);
+                    }
+                }
+            }
+        }
+
+        let refined = refine_matches(&index, matches.clone(), &query);
+        println!("\n=== FINAL REFINED ({}) ===", refined.len());
+        for m in &refined {
+            println!(
+                "  {} (rid={}): lines {}-{}",
+                m.license_expression, m.rule_identifier, m.start_line, m.end_line
+            );
+        }
+    }
+
+    #[test]
+    fn debug_gpl_token_positions_real() {
+        use crate::license_detection::aho_match;
+        use crate::license_detection::index::build_index;
+        use crate::license_detection::rules::{
+            load_licenses_from_directory, load_rules_from_directory,
+        };
+
+        let rules_path =
+            std::path::Path::new("reference/scancode-toolkit/src/licensedcode/data/rules");
+        let licenses_path =
+            std::path::Path::new("reference/scancode-toolkit/src/licensedcode/data/licenses");
+        let rules = load_rules_from_directory(rules_path, false).expect("Failed to load rules");
+        let licenses =
+            load_licenses_from_directory(licenses_path, false).expect("Failed to load licenses");
+        let index = build_index(rules, licenses);
+
+        let text =
+            std::fs::read_to_string("testdata/license-golden/datadriven/lic1/gpl-2.0-plus_1.txt")
+                .unwrap();
+        let query = Query::new(&text, &index).unwrap();
+        let run = query.whole_query_run();
+
+        let matches = aho_match::aho_match(&index, &run);
+
+        let gpl_matches: Vec<_> = matches
+            .iter()
+            .filter(|m| m.license_expression.to_lowercase().contains("gpl"))
+            .collect();
+
+        println!("\nGPL matches with token positions:");
+        for m in &gpl_matches {
+            println!(
+                "  {} start_token={}, end_token={}, lines {}-{}, len={}",
+                m.license_expression,
+                m.start_token,
+                m.end_token,
+                m.start_line,
+                m.end_line,
+                m.matched_length
+            );
+        }
+
+        if gpl_matches.len() >= 2 {
+            let m1 = &gpl_matches[0];
+            let m2 = &gpl_matches[1];
+
+            let same_start = m1.start_token == m2.start_token;
+            println!("\nSame start_token? {}", same_start);
+
+            println!("m1.qcontains(m2): {}", m1.qcontains(m2));
+            println!("m2.qcontains(m1): {}", m2.qcontains(m1));
+        }
+    }
+}
