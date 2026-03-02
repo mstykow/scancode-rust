@@ -57,9 +57,12 @@ scancode-rust uses a **behavior-focused, multi-layered testing approach** that p
 ///
 /// ```rust
 /// use scancode_rust::scanner::process;
+/// use scancode_rust::progress::{ProgressMode, ScanProgress};
 /// use std::path::PathBuf;
+/// use std::sync::Arc;
 ///
-/// let result = process(&PathBuf::from(".""), 50, progress, &patterns, &strategy)?;
+/// let progress = Arc::new(ScanProgress::new(ProgressMode::Quiet));
+/// let result = process(&PathBuf::from("."), 50, progress, &patterns, &strategy)?;
 /// println!("Found {} files", result.files.len());
 /// ```
 pub fn process(...) -> Result<ScanResult> {
