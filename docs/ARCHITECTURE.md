@@ -323,7 +323,7 @@ files.par_iter()
     .map(|(path, metadata)| {
         // Each file processed in parallel
         let file_entry = process_file(path, metadata, scan_strategy);
-        progress_bar.inc(1);
+        progress.file_completed(path, metadata.len(), &file_entry.scan_errors);
         file_entry
     })
     .collect()
@@ -691,16 +691,17 @@ Unified runtime wiring is still pending: scanner/main integration, CLI cache fla
 
 **Progress Tracking**:
 
-Centralized `ScanProgress` struct managing multi-phase progress bars via `indicatif::MultiProgress`:
+Centralized `ScanProgress` struct manages mode-aware progress output via `indicatif::MultiProgress`:
 
-1. **Discovery phase**: Spinner while counting files. Records initial file/dir/size counts.
-2. **Scan phase**: Main progress bar with ETA, elapsed time, and file count. Integrates with rayon parallel processing via `Arc<ProgressBar>`. Rate-limited to 20 Hz (indicatif default).
-3. **Assembly phase**: Progress bar for package assembly (sibling merge, workspace merge, etc.).
-4. **Scan summary**: Files/sec, bytes/sec, error count, per-phase timings, initial/final counts.
+1. **Discovery phase**: Spinner/message while counting files, recording initial file/dir/size counts.
+2. **SPDX load phase**: Startup message and timing capture around license DB load.
+3. **Scan phase**: Main progress bar (default mode, TTY only) with ETA, elapsed time, and `{per_sec}` throughput; verbose mode emits file-by-file paths.
+4. **Assembly and output phases**: Phase messages/spinners with timing capture.
+5. **Scan summary**: Files/sec, bytes/sec, error count, initial/final counts (including sizes), package assembly counts, and per-phase timings.
 
-Verbosity modes are part of ongoing CLI ergonomics work and are implemented in the command-line and progress modules.
+Verbosity behavior is implemented in `src/progress.rs` and wired through `src/main.rs`: quiet suppresses stderr output, default shows progress/summary, verbose shows per-file stderr output with detailed per-file errors.
 
-Logging integration via `indicatif-log-bridge`: parser `warn!()` messages route above the progress bar without corrupting display. Runtime logging and output-writing behavior are implemented in `src/progress.rs`, `src/scanner.rs`, and output writers.
+Logging integration uses `indicatif-log-bridge` so parser `warn!()` messages print above active progress output without corruption. Runtime wiring lives in `src/progress.rs`, with scan updates in `src/scanner/process.rs`.
 
 Module location: `src/progress.rs`
 
