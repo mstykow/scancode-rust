@@ -13,8 +13,8 @@ use std::path::PathBuf;
 
 use anyhow::Result;
 use scancode_rust::license_detection::{
-    aho_match, compute_candidates_with_msets, group_matches_by_region, hash_match,
-    create_detection_from_group, merge_overlapping_matches, post_process_detections,
+    aho_match, compute_candidates_with_msets, create_detection_from_group, group_matches_by_region, hash_match,
+    merge_overlapping_matches, post_process_detections, refine_aho_matches, sort_matches_by_line,
     refine_matches, refine_matches_without_false_positive_filter, seq_match_with_candidates,
     spdx_lid_match, split_weak_matches, LicenseDetectionEngine, MAX_NEAR_DUPE_CANDIDATES,
 };
@@ -64,7 +64,11 @@ fn run_debug_pipeline(file_path: &str) -> Result<()> {
     let rules_path = PathBuf::from("reference/scancode-toolkit/src/licensedcode/data");
     let engine = LicenseDetectionEngine::new(&rules_path)?;
     
-    let text = std::fs::read_to_string(&path)?;
+    // Use the same text extraction as the golden tests
+    let bytes = std::fs::read(&path)?;
+    let text = scancode_rust::utils::file_text::extract_text_for_detection(&bytes, &path)
+        .map(|ft| ft.text)
+        .unwrap_or_else(|| String::from_utf8_lossy(&bytes).into_owned());
     let index = engine.index();
     
     print_section(&format!("LICENSE DETECTION DEBUG: {}", file_path));
@@ -103,8 +107,10 @@ fn run_debug_pipeline(file_path: &str) -> Result<()> {
     
     // Stage 4: Aho-Corasick matching
     print_section("STAGE 4: EXACT MATCHING (Aho-Corasick)");
-    let aho_matches = aho_match(index, &whole_run);
-    println!("EXACT MATCHES: {}", aho_matches.len());
+    let raw_aho_matches = aho_match(index, &whole_run);
+    // Python's get_exact_matches() calls refine_matches with merge=False (index.py:691-696)
+    let aho_matches = refine_aho_matches(index, raw_aho_matches.clone(), &query);
+    println!("EXACT MATCHES: {} (raw: {})", aho_matches.len(), raw_aho_matches.len());
     for m in aho_matches.iter().take(10) {
         println!("{}", format_match(m));
     }
@@ -180,15 +186,16 @@ fn run_debug_pipeline(file_path: &str) -> Result<()> {
     }
     
     let refined = refine_matches_without_false_positive_filter(index, all_matches, &query);
-    let (good_matches, weak_matches) = split_weak_matches(&refined);
     
-    println!("\nAfter full refinement:");
-    println!("  Good matches: {}", good_matches.len());
-    println!("  Weak matches: {}", weak_matches.len());
+    // Note: We do NOT call split_weak_matches() here because that's only done
+    // when unknown_licenses=True. The default behavior (matching Python with
+    // unknown_licenses=False) is to pass all matches directly to refine_matches.
+    // See Python: index.py:1079-1118
     
     // Stage 8: Detection assembly
     print_section("STAGE 8: DETECTION ASSEMBLY");
-    let final_refined = refine_matches(index, good_matches, &query);
+    let mut final_refined = refine_matches(index, refined, &query);
+    sort_matches_by_line(&mut final_refined);
     let groups = group_matches_by_region(&final_refined);
     println!("Groups: {}", groups.len());
     

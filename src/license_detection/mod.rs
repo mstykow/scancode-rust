@@ -39,15 +39,14 @@ use crate::utils::text::strip_utf8_bom_str;
 
 use crate::license_detection::detection::{
     populate_detection_from_group_with_spdx,
-    sort_matches_by_line,
 };
 
-pub use detection::{LicenseDetection, group_matches_by_region, create_detection_from_group, post_process_detections};
+pub use detection::{LicenseDetection, group_matches_by_region, create_detection_from_group, post_process_detections, sort_matches_by_line};
 
 pub use aho_match::aho_match;
 pub use hash_match::hash_match;
 pub use match_refine::{
-    filter_invalid_contained_unknown_matches, merge_overlapping_matches, refine_matches,
+    filter_invalid_contained_unknown_matches, merge_overlapping_matches, refine_aho_matches, refine_matches,
     refine_matches_without_false_positive_filter, split_weak_matches,
 };
 pub use seq_match::{MAX_NEAR_DUPE_CANDIDATES, compute_candidates_with_msets, seq_match_with_candidates};
