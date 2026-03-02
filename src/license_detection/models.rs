@@ -439,6 +439,10 @@ impl LicenseMatch {
         }
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
     #[allow(dead_code)]
     fn qregion_len(&self) -> usize {
         if let Some(positions) = &self.qspan_positions {

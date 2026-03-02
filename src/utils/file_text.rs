@@ -132,9 +132,7 @@ fn decode_utf16be(bytes: &[u8]) -> String {
 
 /// Decode UTF-32 bytes to String.
 fn decode_utf32(bytes: &[u8], content_type: ContentType) -> String {
-    let data = if bytes.starts_with(&[0xFF, 0xFE, 0x00, 0x00]) {
-        &bytes[4..]
-    } else if bytes.starts_with(&[0x00, 0x00, 0xFE, 0xFF]) {
+    let data = if bytes.starts_with(&[0xFF, 0xFE, 0x00, 0x00]) || bytes.starts_with(&[0x00, 0x00, 0xFE, 0xFF]) {
         &bytes[4..]
     } else {
         bytes

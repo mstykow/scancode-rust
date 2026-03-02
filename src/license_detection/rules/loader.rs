@@ -13,14 +13,6 @@ use std::path::Path;
 static FM_BOUNDARY: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?m)^-{3,}\s*$").expect("Invalid frontmatter regex"));
 
-fn unescape_html_entities(text: &str) -> String {
-    text.replace("&quot;", "\"")
-        .replace("&apos;", "'")
-        .replace("&lt;", "<")
-        .replace("&gt;", ">")
-        .replace("&amp;", "&")
-        .replace("&nbsp;", " ")
-}
 
 fn deserialize_yes_no_bool<'de, D>(deserializer: D) -> Result<Option<bool>, D::Error>
 where

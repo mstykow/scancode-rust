@@ -84,19 +84,9 @@ mod test_mit_debug {
 }
 
 pub mod aho_match;
-#[cfg(test)]
-mod cddl_investigation_test;
 mod detection;
 #[cfg(test)]
-mod duplicate_merge_investigation_test;
-#[cfg(test)]
-mod extra_detection_investigation_test;
-#[cfg(test)]
 mod investigation;
-#[cfg(test)]
-mod missing_detection_investigation_test;
-#[cfg(test)]
-mod wrong_detection_investigation_test;
 #[cfg(test)]
 mod x11_danse_test;
 

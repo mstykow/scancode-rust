@@ -454,10 +454,8 @@ fn filter_license_references_with_text_match(
                 let current_is_ref = current.is_license_reference && !current.is_license_text;
                 let other_is_text = other.is_license_text && !other.is_license_reference;
 
-                if current_is_ref && other_is_text && current.matched_length < other.matched_length {
-                    if other.qcontains(current) {
-                        to_discard.insert(i);
-                    }
+                if current_is_ref && other_is_text && current.matched_length < other.matched_length && other.qcontains(current) {
+                    to_discard.insert(i);
                 }
             }
         }
