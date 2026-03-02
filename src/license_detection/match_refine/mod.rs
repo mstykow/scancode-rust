@@ -7,7 +7,8 @@
 //! reference/scancode-toolkit/src/licensedcode/match.py
 
 mod false_positive;
-mod filter;
+mod filter_low_quality;
+mod handle_overlaps;
 mod merge;
 
 use crate::license_detection::index::LicenseIndex;
@@ -15,7 +16,7 @@ use crate::license_detection::models::LicenseMatch;
 use crate::license_detection::query::Query;
 
 // Internal use only
-use filter::{
+use filter_low_quality::{
     filter_below_rule_minimum_coverage, filter_false_positive_matches,
     filter_invalid_matches_to_single_word_gibberish,
     filter_matches_missing_required_phrases, filter_matches_to_spurious_single_token,
@@ -25,7 +26,7 @@ use filter::{
 use merge::{filter_license_references_with_text_match, update_match_scores};
 
 // Re-export for crate-internal use (debug_pipeline feature)
-pub use filter::{
+pub use handle_overlaps::{
     filter_contained_matches, filter_overlapping_matches, restore_non_overlapping,
 };
 pub use merge::merge_overlapping_matches;
