@@ -464,69 +464,6 @@ pub fn compute_candidates_with_msets(
     sortable_candidates
 }
 
-/// Select top-N candidate rules for sequence matching.
-///
-/// Uses set similarity to rank candidates and returns the top-N.
-///
-/// Corresponds to Python: `compute_candidates()` in match_set.py (line 244)
-///
-/// # Arguments
-///
-/// * `index` - License index containing rule token sets
-/// * `query_run` - Query run to match
-/// * `top_n` - Number of top candidates to return
-///
-/// # Returns
-///
-/// Vector of top-N candidates sorted by similarity score
-#[allow(dead_code)]
-fn select_candidates(index: &LicenseIndex, query_run: &QueryRun, top_n: usize) -> Vec<Candidate> {
-    let mut candidates = Vec::new();
-
-    let query_tokens = query_run.matchable_tokens();
-    if query_tokens.is_empty() {
-        return candidates;
-    }
-
-    let query_token_ids: Vec<u16> = query_tokens
-        .iter()
-        .filter_map(|&tid| if tid >= 0 { Some(tid as u16) } else { None })
-        .collect();
-
-    if query_token_ids.is_empty() {
-        return candidates;
-    }
-
-    let (query_set, query_mset) = build_set_and_mset(&query_token_ids);
-
-    let len_legalese = index.len_legalese;
-
-    for (rid, rule) in index.rules_by_rid.iter().enumerate() {
-        let rule_set = index.sets_by_rid.get(&rid);
-        let rule_mset = index.msets_by_rid.get(&rid);
-
-        if let (Some(rule_set), Some(rule_mset)) = (rule_set, rule_mset)
-            && let Some((score_vec_rounded, score_vec_full)) =
-                compute_set_similarity(&query_set, &query_mset, rule_set, rule_mset, len_legalese)
-        {
-            let intersection: HashSet<u16> = query_set.intersection(rule_set).copied().collect();
-            let high_set_intersection = high_tids_set_subset(&intersection, len_legalese);
-
-            candidates.push(Candidate {
-                score_vec_rounded,
-                score_vec_full,
-                rid,
-                rule: rule.clone(),
-                high_set_intersection,
-            });
-        }
-    }
-
-    candidates.sort_by(|a, b| b.cmp(a));
-    candidates.truncate(top_n);
-    candidates
-}
-
 /// Find the longest matching block between query and rule token sequences.
 ///
 /// Uses dynamic programming to find the longest contiguous matching subsequence.
@@ -712,152 +649,6 @@ fn match_blocks(
     }
 
     non_adjacent
-}
-
-/// Main sequence matching function.
-///
-/// Performs approximate sequence matching using set similarity for candidate
-/// selection followed by sequence alignment.
-///
-/// Corresponds to Python: `match_sequence()` in match_seq.py (line 48)
-///
-/// # Arguments
-///
-/// * `index` - License index
-/// * `query_run` - Query run to match
-///
-/// # Returns
-///
-/// Vector of LicenseMatch results
-#[allow(dead_code)]
-pub fn seq_match(index: &LicenseIndex, query_run: &QueryRun) -> Vec<LicenseMatch> {
-    let mut matches = Vec::new();
-
-    let candidates = select_candidates(index, query_run, 50);
-
-    for candidate in candidates {
-        let rid = candidate.rid;
-        let rule_tokens = index.tids_by_rid.get(rid);
-        let high_postings: HashMap<u16, Vec<usize>> = index
-            .high_postings_by_rid
-            .get(&rid)
-            .map(|hp| {
-                hp.iter()
-                    .filter(|(tid, _)| candidate.high_set_intersection.contains(tid))
-                    .map(|(&tid, postings)| (tid, postings.clone()))
-                    .collect()
-            })
-            .unwrap_or_default();
-
-        if let Some(rule_tokens) = rule_tokens {
-            let query_tokens = query_run.tokens();
-            let len_legalese = index.len_legalese;
-
-            let qbegin = 0usize;
-            let qfinish = query_tokens.len().saturating_sub(1);
-
-            let matchables: HashSet<usize> = query_run
-                .matchables(true)
-                .into_iter()
-                .map(|pos| pos - query_run.start)
-                .collect();
-
-            let mut qstart = qbegin;
-
-            while qstart <= qfinish {
-                let blocks = match_blocks(
-                    query_tokens,
-                    rule_tokens,
-                    qstart,
-                    qfinish + 1,
-                    &high_postings,
-                    len_legalese,
-                    &matchables,
-                );
-
-                if blocks.is_empty() {
-                    break;
-                }
-
-                let mut max_qend = qstart;
-
-                for (qpos, ipos, mlen) in blocks {
-                    if mlen < 1 {
-                        continue;
-                    }
-
-                    let qspan_end = qpos + mlen;
-                    max_qend = max_qend.max(qspan_end);
-
-                    if mlen == 1 && query_tokens[qpos] >= len_legalese as u16 {
-                        continue;
-                    }
-
-                    let rule_length = rule_tokens.len();
-                    if rule_length == 0 {
-                        continue;
-                    }
-
-                    let hispan_count = (ipos..ipos + mlen)
-                        .filter(|&p| rule_tokens.get(p).is_some_and(|t| *t < len_legalese as u16))
-                        .count();
-
-                    let match_coverage = (mlen as f32 / rule_length as f32) * 100.0;
-
-                    let qend = qpos + mlen - 1;
-                    let abs_qpos = qpos + query_run.start;
-                    let abs_qend = qend + query_run.start;
-                    let start_line = query_run.line_for_pos(abs_qpos).unwrap_or(1);
-                    let end_line = query_run.line_for_pos(abs_qend).unwrap_or(start_line);
-
-                    let score = (match_coverage * candidate.rule.relevance as f32) / 100.0;
-
-                    let matched_text = query_run.matched_text(start_line, end_line);
-
-                    let license_match = LicenseMatch {
-                        license_expression: candidate.rule.license_expression.clone(),
-                        license_expression_spdx: candidate.rule.license_expression.clone(),
-                        from_file: None,
-                        start_line,
-                        end_line,
-                        start_token: abs_qpos,
-                        end_token: abs_qend + 1,
-                        matcher: MATCH_SEQ.to_string(),
-                        score,
-                        matched_length: mlen,
-                        rule_length,
-                        match_coverage,
-                        rule_relevance: candidate.rule.relevance,
-                        rid,
-                        rule_identifier: candidate.rule.identifier.clone(),
-                        rule_url: String::new(),
-                        matched_text: Some(matched_text),
-                        referenced_filenames: candidate.rule.referenced_filenames.clone(),
-                        is_license_intro: candidate.rule.is_license_intro,
-                        is_license_clue: candidate.rule.is_license_clue,
-                        is_license_reference: candidate.rule.is_license_reference,
-                        is_license_tag: candidate.rule.is_license_tag,
-                        is_license_text: candidate.rule.is_license_text,
-                        is_from_license: candidate.rule.is_from_license,
-                        matched_token_positions: None,
-                        hilen: hispan_count,
-                        rule_start_token: ipos,
-                        qspan_positions: None,
-                        ispan_positions: None,
-                        hispan_positions: None,
-                        candidate_resemblance: candidate.score_vec_full.resemblance,
-                        candidate_containment: candidate.score_vec_full.containment,
-                    };
-
-                    matches.push(license_match);
-                }
-
-                qstart = max_qend;
-            }
-        }
-    }
-
-    matches
 }
 
 /// Sequence matching against pre-selected candidates.
@@ -1069,13 +860,13 @@ mod tests {
             ignorable_authors: None,
             language: None,
             notes: None,
-            length_unique: 0,
-            high_length_unique: 0,
-            high_length: 0,
-            min_matched_length: 0,
-            min_high_matched_length: 0,
-            min_matched_length_unique: 0,
-            min_high_matched_length_unique: 0,
+            length_unique: tokens.len(),
+            high_length_unique: tokens.iter().filter(|&&t| (t as usize) < index.len_legalese).count(),
+            high_length: tokens.len(),
+            min_matched_length: 1,
+            min_high_matched_length: 1,
+            min_matched_length_unique: 1,
+            min_high_matched_length_unique: 1,
             is_small: false,
             is_tiny: false,
             starts_with_license: false,
@@ -1182,22 +973,6 @@ mod tests {
         let result = compute_set_similarity(&set1, &mset1, &set2, &mset2, 5);
 
         assert!(result.is_none());
-    }
-
-    #[test]
-    fn test_select_candidates() {
-        let mut index = create_seq_match_test_index();
-
-        add_test_rule(&mut index, "license copyright granted", "test-license-1");
-        add_test_rule(&mut index, "permission redistribute", "test-license-2");
-
-        let text = "license copyright granted here";
-        let query = Query::new(text, &index).unwrap();
-        let query_run = query.whole_query_run();
-
-        let candidates = select_candidates(&index, &query_run, 10);
-
-        assert!(!candidates.is_empty());
     }
 
     #[test]
@@ -1601,7 +1376,8 @@ mod tests {
         let query = Query::new(text, &index).unwrap();
         let query_run = query.whole_query_run();
 
-        let matches = seq_match(&index, &query_run);
+        let candidates = compute_candidates_with_msets(&index, &query_run, false, 50);
+        let matches = seq_match_with_candidates(&index, &query_run, &candidates);
 
         assert!(!matches.is_empty());
         assert_eq!(matches[0].matcher, MATCH_SEQ);
@@ -1621,7 +1397,8 @@ mod tests {
         let query = Query::new(text, &index).unwrap();
         let query_run = query.whole_query_run();
 
-        let matches = seq_match(&index, &query_run);
+        let candidates = compute_candidates_with_msets(&index, &query_run, false, 50);
+        let matches = seq_match_with_candidates(&index, &query_run, &candidates);
 
         assert!(
             !matches.is_empty(),
@@ -1640,7 +1417,8 @@ mod tests {
         let query = Query::new(text, &index).unwrap();
         let query_run = query.whole_query_run();
 
-        let matches = seq_match(&index, &query_run);
+        let candidates = compute_candidates_with_msets(&index, &query_run, false, 50);
+        let matches = seq_match_with_candidates(&index, &query_run, &candidates);
 
         assert!(matches.is_empty());
     }
@@ -1681,22 +1459,6 @@ mod tests {
     }
 
     #[test]
-    fn test_select_candidates_empty_tokens() {
-        let index = create_seq_match_test_index();
-
-        let text = "";
-        let query = Query::new(text, &index).unwrap();
-        let query_run = query.whole_query_run();
-
-        let candidates = select_candidates(&index, &query_run, 10);
-
-        assert!(
-            candidates.is_empty(),
-            "Should return empty candidates for empty query"
-        );
-    }
-
-    #[test]
     fn test_seq_match_with_no_legalese_intersection() {
         let mut index = create_test_index(&[("word1", 10), ("word2", 11), ("word3", 12)], 5);
 
@@ -1706,7 +1468,8 @@ mod tests {
         let query = Query::new(text, &index).unwrap();
         let query_run = query.whole_query_run();
 
-        let matches = seq_match(&index, &query_run);
+        let candidates = compute_candidates_with_msets(&index, &query_run, false, 50);
+        let matches = seq_match_with_candidates(&index, &query_run, &candidates);
 
         assert!(
             matches.is_empty(),
@@ -1854,7 +1617,8 @@ mod tests {
         let query = Query::new(text, &index).unwrap();
         let query_run = query.whole_query_run();
 
-        let matches = seq_match(&index, &query_run);
+        let candidates = compute_candidates_with_msets(&index, &query_run, false, 50);
+        let matches = seq_match_with_candidates(&index, &query_run, &candidates);
 
         assert!(
             matches.len() >= 2,
@@ -1894,7 +1658,8 @@ mod tests {
         let query = Query::new(text, &index).unwrap();
         let query_run = query.whole_query_run();
 
-        let matches = seq_match(&index, &query_run);
+        let candidates = compute_candidates_with_msets(&index, &query_run, false, 50);
+        let matches = seq_match_with_candidates(&index, &query_run, &candidates);
 
         assert!(!matches.is_empty(), "Should find matches");
 
@@ -1932,7 +1697,8 @@ mod tests {
         let query = Query::new(text, &index).unwrap();
         let query_run = query.whole_query_run();
 
-        let matches = seq_match(&index, &query_run);
+        let candidates = compute_candidates_with_msets(&index, &query_run, false, 50);
+        let matches = seq_match_with_candidates(&index, &query_run, &candidates);
 
         assert!(!matches.is_empty(), "Should find partial matches");
 

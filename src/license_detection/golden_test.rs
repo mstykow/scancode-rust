@@ -1228,7 +1228,8 @@ mod golden_tests {
         }
 
         // Phase 3: Regular sequence matching
-        let seq_matches = crate::license_detection::seq_match::seq_match(index, &whole_run);
+        let seq_candidates = crate::license_detection::seq_match::compute_candidates_with_msets(index, &whole_run, false, 50);
+        let seq_matches = crate::license_detection::seq_match::seq_match_with_candidates(index, &whole_run, &seq_candidates);
         eprintln!("\nSeq matches: {}", seq_matches.len());
         for m in &seq_matches {
             eprintln!(
