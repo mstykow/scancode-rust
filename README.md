@@ -60,7 +60,7 @@ The compiled binary will be available at `target/release/scancode-rust`.
 ## Usage
 
 ```sh
-scancode-rust [OPTIONS] <DIR_PATH>
+scancode-rust [OPTIONS] <DIR_PATH>...
 ```
 
 ### Options
@@ -79,10 +79,22 @@ Options:
       --cyclonedx-xml <FILE>          Write CycloneDX XML to FILE
       --custom-output <FILE>          Write custom templated output to FILE
       --custom-template <FILE>        Template path (requires --custom-output)
-  -d, --max-depth <MAX_DEPTH>        Maximum directory depth to scan [default: 50]
-  -e, --exclude <EXCLUDE>...         Glob patterns to exclude from scanning
+  -m, --max-depth <MAX_DEPTH>        Maximum recursion depth (0 means no depth limit) [default: 0]
+  -n, --processes <PROCESSES>        Number of worker processes [default: CPUs-1]
+      --timeout <TIMEOUT>            Per-file timeout in seconds [default: 120]
+  -q, --quiet                        Suppress summary and progress output
+  -v, --verbose                      Print file-by-file progress output
+      --strip-root                   Strip the root segment from reported paths
+      --full-root                    Report full absolute paths
+      --exclude <EXCLUDE>            Glob patterns to exclude from scanning (alias: --ignore)
+      --include <INCLUDE>            Glob patterns to include in output
+      --from-json                    Load from previous JSON scan file (input is positional JSON path)
       --no-assemble                  Disable package assembly (merging related manifest/lockfiles)
-      --email                        Scan input for email addresses
+      --filter-clues                 Remove redundant clue-level findings
+      --only-findings                Keep only files/directories with findings
+      --mark-source                  Mark source-heavy files/directories
+  -c, --copyright                    Enable copyright/holder/author detection
+  -e, --email                        Scan input for email addresses
       --max-email <INT>              Max emails per file [default: 50; requires --email]
   -u, --url                          Scan input for URLs
       --max-url <INT>                Max URLs per file [default: 50; requires --url]
@@ -93,12 +105,13 @@ Options:
 ### Example
 
 ```sh
-scancode-rust --json-pp scan-results.json ~/projects/my-codebase --exclude "*.git*" "target/*" "node_modules/*"
+scancode-rust --json-pp scan-results.json ~/projects/my-codebase --ignore "*.git*" --ignore "target/*" --ignore "node_modules/*"
 ```
 
 Use `-` as FILE to write an output stream to stdout (for example: `--json-pp -`).
 Multiple output flags can be used in a single run, matching ScanCode CLI
 behavior.
+When using `--from-json`, you can pass multiple JSON inputs; directory scan mode currently supports one input path.
 
 ## Performance
 

@@ -1,6 +1,6 @@
 # CLI Implementation Plan
 
-> **Status**: 🟡 Drop-in output flag surface implemented; broader CLI parity remains (cache flag strategy recalibrated)
+> **Status**: 🟡 Core non-cache CLI parity implemented; remaining gaps are feature-blocked options
 > **Priority**: P1 - High (user-facing drop-in replacement parity)
 > **Dependencies**: Some flags depend on underlying features (license detection, post-scan processing, caching)
 
@@ -17,70 +17,74 @@ This plan tracks progress toward a **drop-in replacement CLI surface**.
 
 ### Implemented (drop-in-oriented core)
 
-| Parameter                  | Notes                                          |
-| -------------------------- | ---------------------------------------------- |
-| `<dir_path>`               | Positional argument                            |
-| `--json <FILE>`            | Compact JSON output                            |
-| `--json-pp <FILE>`         | Pretty JSON output                             |
-| `--json-lines <FILE>`      | JSON Lines output                              |
-| `--yaml <FILE>`            | YAML output                                    |
-| `--csv <FILE>`             | CSV output (deprecated upstream but supported) |
-| `--html <FILE>`            | HTML report output                             |
-| `--spdx-tv <FILE>`         | SPDX Tag/Value output                          |
-| `--spdx-rdf <FILE>`        | SPDX RDF/XML output                            |
-| `--cyclonedx <FILE>`       | CycloneDX JSON output                          |
-| `--cyclonedx-xml <FILE>`   | CycloneDX XML output                           |
-| `--custom-output <FILE>`   | Custom template output file                    |
-| `--custom-template <FILE>` | Required with `--custom-output`                |
-| `-m, --max-depth`          | Default: 50                                    |
-| `-e, --exclude`            | Glob patterns                                  |
-| `--no-assemble`            | Rust-specific                                  |
-| `--email`                  | Enable email detection                         |
-| `--max-email`              | Threshold (default 50, requires `--email`)     |
-| `-u, --url`                | Enable URL detection                           |
-| `--max-url`                | Threshold (default 50, requires `--url`)       |
+| Parameter                  | Notes                                                                                                             |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `<dir_path>`               | Positional argument                                                                                               |
+| `--json <FILE>`            | Compact JSON output                                                                                               |
+| `--json-pp <FILE>`         | Pretty JSON output                                                                                                |
+| `--json-lines <FILE>`      | JSON Lines output                                                                                                 |
+| `--yaml <FILE>`            | YAML output                                                                                                       |
+| `--csv <FILE>`             | CSV output (deprecated upstream but supported)                                                                    |
+| `--html <FILE>`            | HTML report output                                                                                                |
+| `--spdx-tv <FILE>`         | SPDX Tag/Value output                                                                                             |
+| `--spdx-rdf <FILE>`        | SPDX RDF/XML output                                                                                               |
+| `--cyclonedx <FILE>`       | CycloneDX JSON output                                                                                             |
+| `--cyclonedx-xml <FILE>`   | CycloneDX XML output                                                                                              |
+| `--custom-output <FILE>`   | Custom template output file                                                                                       |
+| `--custom-template <FILE>` | Required with `--custom-output`                                                                                   |
+| `-m, --max-depth`          | Default: 0 (no depth limit)                                                                                       |
+| `-n, --processes`          | Compatible with `0` and `-1` values                                                                               |
+| `--timeout`                | Per-file timeout option                                                                                           |
+| `-q, --quiet`              | Quiet mode                                                                                                        |
+| `-v, --verbose`            | Verbose path mode                                                                                                 |
+| `--strip-root`             | Relative path normalization                                                                                       |
+| `--full-root`              | Absolute path reporting                                                                                           |
+| `--exclude` / `--ignore`   | Glob patterns (`--ignore` for ScanCode parity)                                                                    |
+| `--from-json`              | Load previous JSON scan(s) from positional input (`<dir_path>...`); incompatible with `--copyright/--email/--url` |
+| `--include`                | Include path patterns                                                                                             |
+| `--mark-source`            | Mark source-heavy files/directories                                                                               |
+| `--only-findings`          | Filter output to files with findings                                                                              |
+| `--filter-clues`           | Filter redundant clues                                                                                            |
+| `-c, --copyright`          | Copyright/holder/author detection toggle                                                                          |
+| `-e, --email`              | Enable email detection                                                                                            |
+| `-u, --url`                | Enable URL detection                                                                                              |
+| `--no-assemble`            | Rust-specific                                                                                                     |
+| `--max-email`              | Threshold (default 50, requires `--email`)                                                                        |
+| `--max-url`                | Threshold (default 50, requires `--url`)                                                                          |
 
 ### Core Parameters (pending)
 
-| Parameter         | Blocked By                |
-| ----------------- | ------------------------- |
-| `-n, --processes` | — (thread pool control)   |
-| `--timeout`       | — (per-file timeout)      |
-| `-q, --quiet`     | PROGRESS_TRACKING_PLAN.md |
-| `-v, --verbose`   | PROGRESS_TRACKING_PLAN.md |
-| `--strip-root`    | —                         |
-| `--full-root`     | —                         |
-| `--max-in-memory` | CACHING_PLAN.md           |
+| Parameter         | Blocked By      |
+| ----------------- | --------------- |
+| `--max-in-memory` | CACHING_PLAN.md |
 
 ### Scan Option Flags (pending)
 
-| Parameter         | Blocked By                  |
-| ----------------- | --------------------------- |
-| `--license`       | LICENSE_DETECTION_PLAN.md   |
-| `--copyright`     | COPYRIGHT_DETECTION_PLAN.md |
-| `--license-score` | LICENSE_DETECTION_PLAN.md   |
-| `--license-text`  | LICENSE_DETECTION_PLAN.md   |
-| `--classify`      | SUMMARIZATION_PLAN.md       |
-| `--summary`       | SUMMARIZATION_PLAN.md       |
+| Parameter         | Blocked By                |
+| ----------------- | ------------------------- |
+| `--license`       | LICENSE_DETECTION_PLAN.md |
+| `--license-score` | LICENSE_DETECTION_PLAN.md |
+| `--license-text`  | LICENSE_DETECTION_PLAN.md |
+| `--classify`      | SUMMARIZATION_PLAN.md     |
+| `--summary`       | SUMMARIZATION_PLAN.md     |
 
 ### Post-Scan Flags (pending)
 
 | Parameter                 | Blocked By                |
 | ------------------------- | ------------------------- |
 | `--consolidate`           | CONSOLIDATION_PLAN.md     |
-| `--filter-clues`          | —                         |
 | `--is-license-text`       | LICENSE_DETECTION_PLAN.md |
 | `--license-clarity-score` | LICENSE_DETECTION_PLAN.md |
 | `--summary-key-files`     | SUMMARIZATION_PLAN.md     |
 
-### Input/Output Control (pending)
+### Input/Output Control (implemented)
 
-| Parameter         | Notes                   |
-| ----------------- | ----------------------- |
-| `--from-json`     | Load from previous scan |
-| `--include`       | Include patterns        |
-| `--mark-source`   | Mark source files       |
-| `--only-findings` | Filter output           |
+| Parameter         | Notes                                                                        |
+| ----------------- | ---------------------------------------------------------------------------- |
+| `--from-json`     | Load from previous scan JSON input(s); disallows `--copyright/--email/--url` |
+| `--include`       | Include patterns                                                             |
+| `--mark-source`   | Mark source files                                                            |
+| `--only-findings` | Filter output                                                                |
 
 ### Cache Control (planned)
 
