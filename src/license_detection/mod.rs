@@ -301,22 +301,29 @@ impl LicenseDetectionEngine {
         let merged_matches =
             refine_matches_without_false_positive_filter(&self.index, all_matches, &query);
 
-        // Step 2: Split weak from good - Python: index.py:1083
-        let (good_matches, weak_matches) = split_weak_matches(&merged_matches);
+        // Step 2: Unknown detection and weak match handling
+        // Python: index.py:1079-1118 - only runs when unknown_licenses=True
+        let refined_matches = if unknown_licenses {
+            // Split weak from good - Python: index.py:1083
+            let (good_matches, weak_matches) = split_weak_matches(&merged_matches);
 
-        // Step 3: Unknown detection on uncovered regions - Python: index.py:1093-1114
-        // Only run when --unknown-licenses flag is enabled (default: disabled)
-        let mut all_matches = good_matches;
-        if unknown_licenses {
-            let unknown_matches = unknown_match(&self.index, &query, &all_matches);
+            // Unknown detection on uncovered regions - Python: index.py:1093-1114
+            let unknown_matches = unknown_match(&self.index, &query, &good_matches);
             let filtered_unknown =
-                filter_invalid_contained_unknown_matches(&unknown_matches, &all_matches);
+                filter_invalid_contained_unknown_matches(&unknown_matches, &good_matches);
+
+            let mut all_matches = good_matches;
             all_matches.extend(filtered_unknown);
-        }
-        all_matches.extend(weak_matches);
+            // reinject weak matches and let refine matches keep the bests
+            // Python: index.py:1117-1118
+            all_matches.extend(weak_matches);
+            all_matches
+        } else {
+            merged_matches
+        };
 
         // Step 5: Final refine WITH false positive filtering - Python: index.py:1130-1145
-        let refined = refine_matches(&self.index, all_matches, &query);
+        let refined = refine_matches(&self.index, refined_matches, &query);
 
         let mut sorted = refined;
         sort_matches_by_line(&mut sorted);
