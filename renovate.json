@@ -116,6 +116,14 @@
       "matchPackageNames": ["rusqlite"],
       "allowedVersions": "0.37.x",
       "enabled": true
+    },
+    {
+      "description": "Group Node.js updates together (.nvmrc, Dockerfiles) - LTS only",
+      "matchDatasources": ["node-version", "docker"],
+      "matchPackageNames": ["node"],
+      "allowedVersions": "/^\\d*[02468]\\../",
+      "groupName": "Node.js",
+      "groupSlug": "node"
     }
   ]
 }
