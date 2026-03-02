@@ -139,10 +139,10 @@ extracted_license_statement = "MIT"
    - Must process detection stage separately
    - Acceptable: more accurate results worth the wait
 
-3. **Detection Engine Not Yet Built**
-   - Current parsers only extract (detection TODO)
-   - Some golden tests blocked on detection engine
-   - Acceptable: prioritizing parser coverage first
+3. **Transition Period During Engine Migration**
+   - `main` may still reflect legacy implementation details while `feat-add-license-parsing` introduces `LicenseDetectionEngine`
+   - Some plan/docs references can lag until migration lands fully on default branch
+   - Acceptable: the extraction-vs-detection boundary remains stable across both implementations
 
 ## Alternatives Considered
 

@@ -81,7 +81,7 @@ To run a specific test, use its full path from `cargo test -- --list`:
 
 ```bash
 cargo test parsers::npm_test::tests::test_extract_from_testdata
-cargo test askalono::strategy::tests::single_optimize
+cargo test parsers::npm_test::tests::test_is_match
 cargo test test_is_match       # Runs all tests with "test_is_match" in name
 ```
 
