@@ -1,6 +1,6 @@
 # License Detection Implementation Plan
 
-> **Status**: 🔴 Placeholder - Not Started
+> **Status**: 🔄 Transitioning — placeholder assumptions are being superseded by the runtime-rule-loading license engine direction (`feat-add-license-parsing`)
 > **Priority**: P0 - Critical Core Feature
 > **Estimated Effort**: 6-8 weeks
 > **Dependencies**: None (foundational feature)
@@ -8,6 +8,8 @@
 ## Overview
 
 License detection is the core feature of ScanCode - identifying license text in source files and generating SPDX license expressions. This involves text matching, rule-based detection, and license expression composition.
+
+> **Transition note**: This placeholder plan predates the new `LicenseDetectionEngine` architecture in `feat-add-license-parsing`. Treat askalono-era assumptions as non-authoritative and align new work with runtime ScanCode rule loading + `LicenseIndex` pipeline design.
 
 ## Scope
 
@@ -66,7 +68,7 @@ License detection is the core feature of ScanCode - identifying license text in 
 
 ### Design Questions
 
-1. **Matching Algorithm**: Use Python's approach (token-based fingerprinting) or explore Rust-native alternatives (e.g., Aho-Corasick, suffix arrays)?
+1. **Matching Algorithm**: Align with the new engine pipeline (hash, SPDX-LID, Aho-Corasick, sequence, unknown detection) and preserve ScanCode-compatible behavior.
 2. **Rule Storage**: Embed rules at compile time or load at runtime?
 3. **Caching Strategy**: In-memory cache, disk cache, or both?
 4. **Parallelization**: Per-file parallel detection or batch processing?
@@ -106,6 +108,6 @@ This section will be expanded when work begins. Preliminary phases:
 ## Notes
 
 - This is the most complex feature to port from Python
-- Consider using existing Rust crates (e.g., `askalono` for inspiration, though it's Apache-2.0 focused)
+- Use the `feat-add-license-parsing` `license_detection` architecture as baseline; avoid introducing new askalono-era assumptions.
 - License detection is independent of package detection - can be implemented in parallel
 - Golden tests will be critical for validating parity with Python

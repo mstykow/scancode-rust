@@ -58,8 +58,8 @@ These represent major architectural components not yet implemented. Each will be
 
 ### Text Detection (`text-detection/`)
 
-- **[LICENSE_DETECTION_PLAN.md](text-detection/LICENSE_DETECTION_PLAN.md)** - License text detection and matching
-  - Priority: P0 - Critical, Effort: 6-8 weeks
+- **[LICENSE_DETECTION_PLAN.md](text-detection/LICENSE_DETECTION_PLAN.md)** - License text detection and matching (transition placeholder)
+  - Priority: P0 - Critical; active engine direction is the runtime ScanCode rule-loading architecture tracked in `feat-add-license-parsing`
 
 ### Post-Processing (`post-processing/`)
 
