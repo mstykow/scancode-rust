@@ -48,11 +48,7 @@ fn run() -> Result<()> {
     let cli = Cli::parse();
     let start_time = Utc::now();
 
-    if cli.from_json && (cli.email || cli.url) {
-        return Err(anyhow!(
-            "When using --from-json, file scan options like --email/--url are not allowed"
-        ));
-    }
+    validate_scan_option_compatibility(&cli)?;
 
     let exclude_patterns = compile_exclude_patterns(&cli.exclude);
     let include_patterns = compile_include_patterns(&cli.include);
@@ -68,8 +64,24 @@ fn run() -> Result<()> {
         preloaded_license_references,
         preloaded_license_rule_references,
     ) = if cli.from_json {
-        let mut loaded = load_scan_from_json(&cli.dir_path)?;
-        loaded.excluded_count = 0;
+        let mut merged: Option<JsonScanInput> = None;
+        for input_path in &cli.dir_path {
+            let mut loaded = load_scan_from_json(input_path)?;
+            if let Some(acc) = &mut merged {
+                acc.files.append(&mut loaded.files);
+                acc.packages.append(&mut loaded.packages);
+                acc.dependencies.append(&mut loaded.dependencies);
+                acc.license_references
+                    .append(&mut loaded.license_references);
+                acc.license_rule_references
+                    .append(&mut loaded.license_rule_references);
+                acc.excluded_count += loaded.excluded_count;
+            } else {
+                merged = Some(loaded);
+            }
+        }
+
+        let loaded = merged.ok_or_else(|| anyhow!("No input paths provided"))?;
         let directories_count = loaded
             .files
             .iter()
@@ -89,13 +101,18 @@ fn run() -> Result<()> {
             loaded.license_rule_references,
         )
     } else {
+        let scan_path = cli
+            .dir_path
+            .first()
+            .ok_or_else(|| anyhow!("No directory input path provided"))?;
+
         let store = load_license_database(cli.quiet)?;
         let strategy = ScanStrategy::new(&store)
             .optimize(true)
             .confidence_threshold(LICENSE_DETECTION_THRESHOLD);
 
         let (total_files, total_dirs, excluded_count) =
-            count(&cli.dir_path, cli.max_depth, &exclude_patterns)?;
+            count(scan_path, cli.max_depth, &exclude_patterns)?;
 
         if !cli.quiet {
             eprintln!(
@@ -106,6 +123,7 @@ fn run() -> Result<()> {
 
         let progress_bar = create_progress_bar(total_files, cli.quiet || cli.verbose);
         let text_options = TextDetectionOptions {
+            detect_copyrights: cli.copyright,
             detect_emails: cli.email,
             detect_urls: cli.url,
             max_emails: cli.max_email,
@@ -113,27 +131,33 @@ fn run() -> Result<()> {
             timeout_seconds: cli.timeout,
             verbose_paths: cli.verbose && !cli.quiet,
         };
+        let default_text_options = TextDetectionOptions::default();
 
         let thread_count = resolve_thread_count(cli.processes);
-        let mut result = if text_options.detect_emails || text_options.detect_urls {
+        let mut result = if !text_options.detect_emails
+            && !text_options.detect_urls
+            && text_options.detect_copyrights == default_text_options.detect_copyrights
+            && text_options.timeout_seconds == default_text_options.timeout_seconds
+            && !text_options.verbose_paths
+        {
+            run_with_thread_pool(thread_count, || {
+                process(
+                    scan_path,
+                    cli.max_depth,
+                    Arc::clone(&progress_bar),
+                    &exclude_patterns,
+                    &strategy,
+                )
+            })?
+        } else {
             run_with_thread_pool(thread_count, || {
                 process_with_options(
-                    &cli.dir_path,
+                    scan_path,
                     cli.max_depth,
                     Arc::clone(&progress_bar),
                     &exclude_patterns,
                     &strategy,
                     &text_options,
-                )
-            })?
-        } else {
-            run_with_thread_pool(thread_count, || {
-                process(
-                    &cli.dir_path,
-                    cli.max_depth,
-                    Arc::clone(&progress_bar),
-                    &exclude_patterns,
-                    &strategy,
                 )
             })?
         };
@@ -170,9 +194,13 @@ fn run() -> Result<()> {
     }
 
     if cli.strip_root || cli.full_root {
+        let root_path = cli
+            .dir_path
+            .first()
+            .ok_or_else(|| anyhow!("No input path available for path normalization"))?;
         normalize_paths(
             &mut scan_result.files,
-            &cli.dir_path,
+            root_path,
             cli.strip_root,
             cli.full_root,
         );
@@ -209,13 +237,33 @@ fn run() -> Result<()> {
         let output_config = OutputWriteConfig {
             format: target.format,
             custom_template: target.custom_template.clone(),
-            scanned_path: Some(cli.dir_path.clone()),
+            scanned_path: if cli.dir_path.len() == 1 {
+                cli.dir_path.first().cloned()
+            } else {
+                None
+            },
         };
 
         write_output_file(&target.file, &output, &output_config)?;
         if !cli.quiet {
             eprintln!("{:?} output written to {}", target.format, target.file);
         }
+    }
+
+    Ok(())
+}
+
+fn validate_scan_option_compatibility(cli: &Cli) -> Result<()> {
+    if cli.from_json && (cli.copyright || cli.email || cli.url) {
+        return Err(anyhow!(
+            "When using --from-json, file scan options like --copyright/--email/--url are not allowed"
+        ));
+    }
+
+    if !cli.from_json && cli.dir_path.len() != 1 {
+        return Err(anyhow!(
+            "Directory scan mode currently supports exactly one input path"
+        ));
     }
 
     Ok(())
@@ -236,11 +284,18 @@ fn compile_include_patterns(patterns: &[String]) -> Vec<Pattern> {
 }
 
 fn resolve_thread_count(processes: i32) -> usize {
-    if processes <= 0 {
-        1
-    } else {
+    if processes > 0 {
         processes as usize
+    } else if processes == 0 {
+        default_parallel_threads()
+    } else {
+        1
     }
+}
+
+fn default_parallel_threads() -> usize {
+    let cpus = std::thread::available_parallelism().map_or(1, |n| n.get());
+    if cpus > 1 { cpus - 1 } else { 1 }
 }
 
 fn run_with_thread_pool<T, F>(threads: usize, f: F) -> Result<T>
@@ -248,12 +303,8 @@ where
     F: FnOnce() -> Result<T> + Send,
     T: Send,
 {
-    if threads <= 1 {
-        return f();
-    }
-
     let pool = rayon::ThreadPoolBuilder::new()
-        .num_threads(threads)
+        .num_threads(threads.max(1))
         .build()?;
     pool.install(f)
 }

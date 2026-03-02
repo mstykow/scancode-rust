@@ -1,5 +1,6 @@
 use super::*;
 use crate::models::{Author, Copyright, FileInfo, FileType, Holder, OutputEmail, OutputURL};
+use clap::Parser;
 use serde_json::json;
 use std::fs;
 
@@ -244,4 +245,73 @@ fn mark_source_sets_directory_flags_at_threshold() {
         .expect("src directory exists");
     assert_eq!(src_after.is_source, Some(true));
     assert_eq!(src_after.source_count, Some(3));
+}
+
+#[test]
+fn resolve_thread_count_supports_reference_compat_values() {
+    assert_eq!(resolve_thread_count(-1), 1);
+    assert_eq!(resolve_thread_count(0), default_parallel_threads());
+    assert_eq!(resolve_thread_count(4), 4);
+}
+
+#[test]
+fn validate_scan_option_compatibility_rejects_scan_flags_with_from_json() {
+    let cli = crate::cli::Cli::try_parse_from([
+        "scancode-rust",
+        "--json-pp",
+        "scan.json",
+        "--from-json",
+        "--copyright",
+        "sample-scan.json",
+    ])
+    .expect("cli parse should succeed");
+
+    let result = validate_scan_option_compatibility(&cli);
+    assert!(result.is_err());
+}
+
+#[test]
+fn validate_scan_option_compatibility_allows_scan_flags_without_from_json() {
+    let cli = crate::cli::Cli::try_parse_from([
+        "scancode-rust",
+        "--json-pp",
+        "scan.json",
+        "--copyright",
+        "sample-dir",
+    ])
+    .expect("cli parse should succeed");
+
+    let result = validate_scan_option_compatibility(&cli);
+    assert!(result.is_ok());
+}
+
+#[test]
+fn validate_scan_option_compatibility_allows_multiple_inputs_with_from_json() {
+    let cli = crate::cli::Cli::try_parse_from([
+        "scancode-rust",
+        "--json-pp",
+        "scan.json",
+        "--from-json",
+        "scan-a.json",
+        "scan-b.json",
+    ])
+    .expect("cli parse should succeed");
+
+    let result = validate_scan_option_compatibility(&cli);
+    assert!(result.is_ok());
+}
+
+#[test]
+fn validate_scan_option_compatibility_rejects_multiple_paths_without_from_json() {
+    let cli = crate::cli::Cli::try_parse_from([
+        "scancode-rust",
+        "--json-pp",
+        "scan.json",
+        "dir-a",
+        "dir-b",
+    ])
+    .expect("cli parse should succeed");
+
+    let result = validate_scan_option_compatibility(&cli);
+    assert!(result.is_err());
 }

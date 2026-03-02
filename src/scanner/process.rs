@@ -52,8 +52,33 @@ pub fn process_with_options<P: AsRef<Path>>(
     scan_strategy: &ScanStrategy,
     text_options: &TextDetectionOptions,
 ) -> Result<ProcessResult, Error> {
-    let path = path.as_ref();
+    let depth_limit = depth_limit_from_cli(max_depth);
+    process_with_options_internal(
+        path.as_ref(),
+        depth_limit,
+        progress_bar,
+        exclude_patterns,
+        scan_strategy,
+        text_options,
+    )
+}
 
+fn depth_limit_from_cli(max_depth: usize) -> Option<usize> {
+    if max_depth == 0 {
+        None
+    } else {
+        Some(max_depth)
+    }
+}
+
+fn process_with_options_internal(
+    path: &Path,
+    depth_limit: Option<usize>,
+    progress_bar: Arc<ProgressBar>,
+    exclude_patterns: &[Pattern],
+    scan_strategy: &ScanStrategy,
+    text_options: &TextDetectionOptions,
+) -> Result<ProcessResult, Error> {
     if is_path_excluded(path, exclude_patterns) {
         return Ok(ProcessResult {
             files: Vec::new(),
@@ -105,10 +130,16 @@ pub fn process_with_options<P: AsRef<Path>>(
     for (path, metadata) in dir_entries {
         all_files.push(process_directory(&path, &metadata));
 
-        if max_depth > 0 {
-            match process_with_options(
+        let should_recurse = match depth_limit {
+            None => true,
+            Some(remaining_depth) => remaining_depth > 0,
+        };
+
+        if should_recurse {
+            let next_depth_limit = depth_limit.map(|remaining_depth| remaining_depth - 1);
+            match process_with_options_internal(
                 &path,
-                max_depth - 1,
+                next_depth_limit,
                 progress_bar.clone(),
                 exclude_patterns,
                 scan_strategy,
@@ -218,7 +249,9 @@ fn extract_information_from_content(
     if inspect(&buffer) == ContentType::UTF_8 {
         let text_content = crate::utils::file::decode_bytes_to_string(&buffer);
 
-        extract_copyright_information(file_info_builder, path, &text_content);
+        if text_options.detect_copyrights {
+            extract_copyright_information(file_info_builder, path, &text_content);
+        }
         extract_email_url_information(file_info_builder, &text_content, text_options);
 
         if is_timeout_exceeded(started, text_options.timeout_seconds) {

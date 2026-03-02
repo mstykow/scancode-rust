@@ -29,7 +29,8 @@ use crate::output::OutputFormat;
 )]
 pub struct Cli {
     /// Directory path to scan
-    pub dir_path: String,
+    #[arg(required = true)]
+    pub dir_path: Vec<String>,
 
     /// Write scan output as compact JSON to FILE
     #[arg(long = "json", value_name = "FILE", allow_hyphen_values = true)]
@@ -101,11 +102,11 @@ pub struct Cli {
     )]
     pub custom_template: Option<String>,
 
-    /// Maximum recursion depth (0 means no recursion)
-    #[arg(short, long, default_value = "50")]
+    /// Maximum recursion depth (0 means no depth limit)
+    #[arg(short, long, default_value = "0")]
     pub max_depth: usize,
 
-    #[arg(short = 'n', long, default_value_t = default_processes())]
+    #[arg(short = 'n', long, default_value_t = default_processes(), allow_hyphen_values = true)]
     pub processes: i32,
 
     #[arg(long, default_value_t = 120.0)]
@@ -123,8 +124,8 @@ pub struct Cli {
     #[arg(long, conflicts_with = "strip_root")]
     pub full_root: bool,
 
-    /// Exclude patterns (glob patterns like "*.tmp" or "node_modules")
-    #[arg(short, long, value_delimiter = ',')]
+    /// Exclude patterns (ScanCode-compatible alias: --ignore)
+    #[arg(long = "exclude", visible_alias = "ignore", value_delimiter = ',')]
     pub exclude: Vec<String>,
 
     #[arg(long, value_delimiter = ',')]
@@ -146,8 +147,11 @@ pub struct Cli {
     #[arg(long)]
     pub mark_source: bool,
 
+    #[arg(short = 'c', long)]
+    pub copyright: bool,
+
     /// Scan input for email addresses
-    #[arg(long)]
+    #[arg(short = 'e', long)]
     pub email: bool,
 
     /// Report only up to INT emails found in a file. Use 0 for no limit.
@@ -369,6 +373,21 @@ mod tests {
     }
 
     #[test]
+    fn test_parses_ignore_alias_for_exclude_patterns() {
+        let parsed = Cli::try_parse_from([
+            "scancode-rust",
+            "--json-pp",
+            "scan.json",
+            "--ignore",
+            "*.git*,target/*",
+            "samples",
+        ])
+        .expect("cli parse should accept --ignore alias");
+
+        assert_eq!(parsed.exclude, vec!["*.git*", "target/*"]);
+    }
+
+    #[test]
     fn test_quiet_conflicts_with_verbose() {
         let parsed = Cli::try_parse_from([
             "scancode-rust",
@@ -394,6 +413,72 @@ mod tests {
         .expect("cli parse should succeed");
 
         assert!(parsed.from_json);
+        assert_eq!(parsed.dir_path, vec!["sample-scan.json"]);
         assert!(parsed.mark_source);
+    }
+
+    #[test]
+    fn test_parses_copyright_flag() {
+        let parsed = Cli::try_parse_from([
+            "scancode-rust",
+            "--json-pp",
+            "scan.json",
+            "--copyright",
+            "samples",
+        ])
+        .expect("cli parse should succeed");
+
+        assert!(parsed.copyright);
+    }
+
+    #[test]
+    fn test_parses_short_scan_flags() {
+        let parsed = Cli::try_parse_from([
+            "scancode-rust",
+            "--json-pp",
+            "scan.json",
+            "-c",
+            "-e",
+            "-u",
+            "samples",
+        ])
+        .expect("cli parse should support short scan flags");
+
+        assert!(parsed.copyright);
+        assert!(parsed.email);
+        assert!(parsed.url);
+    }
+
+    #[test]
+    fn test_parses_processes_compat_values_zero_and_minus_one() {
+        let zero = Cli::try_parse_from([
+            "scancode-rust",
+            "--json-pp",
+            "scan.json",
+            "-n",
+            "0",
+            "samples",
+        ])
+        .expect("cli parse should accept processes=0");
+        assert_eq!(zero.processes, 0);
+
+        let parsed = Cli::try_parse_from([
+            "scancode-rust",
+            "--json-pp",
+            "scan.json",
+            "-n",
+            "-1",
+            "samples",
+        ])
+        .expect("cli parse should accept processes=-1");
+        assert_eq!(parsed.processes, -1);
+    }
+
+    #[test]
+    fn test_max_depth_default_matches_reference_behavior() {
+        let parsed = Cli::try_parse_from(["scancode-rust", "--json-pp", "scan.json", "samples"])
+            .expect("cli parse should succeed");
+
+        assert_eq!(parsed.max_depth, 0);
     }
 }

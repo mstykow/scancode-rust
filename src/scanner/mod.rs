@@ -16,6 +16,7 @@ pub struct ProcessResult {
 
 #[derive(Debug, Clone)]
 pub struct TextDetectionOptions {
+    pub detect_copyrights: bool,
     pub detect_emails: bool,
     pub detect_urls: bool,
     pub max_emails: usize,
@@ -27,6 +28,7 @@ pub struct TextDetectionOptions {
 impl Default for TextDetectionOptions {
     fn default() -> Self {
         Self {
+            detect_copyrights: true,
             detect_emails: false,
             detect_urls: false,
             max_emails: 50,
@@ -39,3 +41,14 @@ impl Default for TextDetectionOptions {
 
 pub use self::count::count;
 pub use self::process::{process, process_with_options};
+
+#[cfg(test)]
+mod tests {
+    use super::TextDetectionOptions;
+
+    #[test]
+    fn default_options_keep_copyright_detection_enabled() {
+        let options = TextDetectionOptions::default();
+        assert!(options.detect_copyrights);
+    }
+}
