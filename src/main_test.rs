@@ -315,3 +315,41 @@ fn validate_scan_option_compatibility_rejects_multiple_paths_without_from_json()
     let result = validate_scan_option_compatibility(&cli);
     assert!(result.is_err());
 }
+
+#[test]
+fn progress_mode_from_cli_maps_quiet_verbose_default() {
+    let default_cli =
+        crate::cli::Cli::try_parse_from(["scancode-rust", "--json-pp", "scan.json", "sample-dir"])
+            .expect("cli parse should succeed");
+    assert_eq!(
+        progress_mode_from_cli(&default_cli),
+        crate::progress::ProgressMode::Default
+    );
+
+    let quiet_cli = crate::cli::Cli::try_parse_from([
+        "scancode-rust",
+        "--json-pp",
+        "scan.json",
+        "--quiet",
+        "sample-dir",
+    ])
+    .expect("cli parse should succeed");
+    assert_eq!(
+        progress_mode_from_cli(&quiet_cli),
+        crate::progress::ProgressMode::Quiet
+    );
+
+    let cli = crate::cli::Cli::try_parse_from([
+        "scancode-rust",
+        "--json-pp",
+        "scan.json",
+        "--verbose",
+        "sample-dir",
+    ])
+    .expect("cli parse should succeed");
+
+    assert_eq!(
+        progress_mode_from_cli(&cli),
+        crate::progress::ProgressMode::Verbose
+    );
+}

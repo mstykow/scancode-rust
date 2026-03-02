@@ -6,7 +6,6 @@ use std::time::Instant;
 use anyhow::Error;
 use content_inspector::{ContentType, inspect};
 use glob::Pattern;
-use indicatif::ProgressBar;
 use mime_guess::from_path;
 use rayon::prelude::*;
 
@@ -18,6 +17,7 @@ use crate::models::{
     OutputEmail, OutputURL,
 };
 use crate::parsers::try_parse_file;
+use crate::progress::ScanProgress;
 use crate::scanner::{ProcessResult, TextDetectionOptions};
 use crate::utils::file::{get_creation_date, is_path_excluded};
 use crate::utils::hash::{calculate_md5, calculate_sha1, calculate_sha256};
@@ -30,14 +30,14 @@ use crate::utils::language::detect_language;
 pub fn process<P: AsRef<Path>>(
     path: P,
     max_depth: usize,
-    progress_bar: Arc<ProgressBar>,
+    progress: Arc<ScanProgress>,
     exclude_patterns: &[Pattern],
     scan_strategy: &ScanStrategy,
 ) -> Result<ProcessResult, Error> {
     process_with_options(
         path,
         max_depth,
-        progress_bar,
+        progress,
         exclude_patterns,
         scan_strategy,
         &TextDetectionOptions::default(),
@@ -47,7 +47,7 @@ pub fn process<P: AsRef<Path>>(
 pub fn process_with_options<P: AsRef<Path>>(
     path: P,
     max_depth: usize,
-    progress_bar: Arc<ProgressBar>,
+    progress: Arc<ScanProgress>,
     exclude_patterns: &[Pattern],
     scan_strategy: &ScanStrategy,
     text_options: &TextDetectionOptions,
@@ -56,7 +56,7 @@ pub fn process_with_options<P: AsRef<Path>>(
     process_with_options_internal(
         path.as_ref(),
         depth_limit,
-        progress_bar,
+        progress,
         exclude_patterns,
         scan_strategy,
         text_options,
@@ -74,7 +74,7 @@ fn depth_limit_from_cli(max_depth: usize) -> Option<usize> {
 fn process_with_options_internal(
     path: &Path,
     depth_limit: Option<usize>,
-    progress_bar: Arc<ProgressBar>,
+    progress: Arc<ScanProgress>,
     exclude_patterns: &[Pattern],
     scan_strategy: &ScanStrategy,
     text_options: &TextDetectionOptions,
@@ -117,10 +117,7 @@ fn process_with_options_internal(
             .par_iter()
             .map(|(path, metadata)| {
                 let file_entry = process_file(path, metadata, scan_strategy, text_options);
-                progress_bar.inc(1);
-                if progress_bar.is_hidden() && text_options.verbose_paths {
-                    progress_bar.println(path.to_string_lossy());
-                }
+                progress.file_completed(path, metadata.len(), &file_entry.scan_errors);
                 file_entry
             })
             .collect(),
@@ -140,7 +137,7 @@ fn process_with_options_internal(
             match process_with_options_internal(
                 &path,
                 next_depth_limit,
-                progress_bar.clone(),
+                progress.clone(),
                 exclude_patterns,
                 scan_strategy,
                 text_options,
@@ -149,7 +146,7 @@ fn process_with_options_internal(
                     all_files.append(&mut result.files);
                     total_excluded += result.excluded_count;
                 }
-                Err(e) => eprintln!("Error processing directory {}: {}", path.display(), e),
+                Err(e) => progress.record_runtime_error(&path, &e.to_string()),
             }
         }
     }
