@@ -111,18 +111,6 @@ pub(super) fn is_correct_detection(matches: &[LicenseMatch]) -> bool {
     all_valid_matchers && all_perfect_coverage
 }
 
-/// Check if matches are correct detection (perfect matches).
-///
-/// A detection is correct if:
-/// - All matchers are "1-hash", "1-spdx-id", or "2-aho" (exact matchers)
-/// - All match coverages are 100%
-///
-/// Based on Python: is_correct_detection() at detection.py:1078
-#[allow(non_snake_case)]
-pub fn is_correctDetection(matches: &[LicenseMatch]) -> bool {
-    is_correct_detection(matches)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -385,15 +373,6 @@ mod tests {
     fn test_is_correct_detection_empty() {
         let matches: Vec<LicenseMatch> = vec![];
         assert!(!is_correct_detection(&matches));
-    }
-
-    #[test]
-    #[allow(non_snake_case)]
-    fn test_is_correctDetection_snake_case() {
-        let mut m = create_test_match(1, 5, "1-hash", "mit.LICENSE");
-        m.match_coverage = 100.0;
-        let matches = vec![m];
-        assert!(is_correctDetection(&matches));
     }
 
     #[test]

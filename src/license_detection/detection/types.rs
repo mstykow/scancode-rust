@@ -1,7 +1,6 @@
 //! Core detection data structures.
 
 use crate::license_detection::models::LicenseMatch;
-use serde::{Deserialize, Serialize};
 
 pub struct DetectionGroup {
     /// The matches in this group

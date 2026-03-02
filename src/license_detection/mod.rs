@@ -50,9 +50,7 @@ pub use match_refine::{
     filter_invalid_contained_unknown_matches, merge_overlapping_matches, refine_matches,
     refine_matches_without_false_positive_filter, split_weak_matches,
 };
-pub use seq_match::{HIGH_RESEMBLANCE_THRESHOLD,
-    MAX_NEAR_DUPE_CANDIDATES, compute_candidates_with_msets, seq_match_with_candidates,
-};
+pub use seq_match::{MAX_NEAR_DUPE_CANDIDATES, compute_candidates_with_msets, seq_match_with_candidates};
 pub use spdx_lid::spdx_lid_match;
 pub use unknown_match::unknown_match;
 

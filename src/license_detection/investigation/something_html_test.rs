@@ -1059,7 +1059,7 @@ mod tests {
             );
         }
 
-        let (kept, discarded) = filter_contained_matches(&merged);
+        let (kept, _discarded) = filter_contained_matches(&merged);
 
         let line_205_matches_after: Vec<_> = kept
             .iter()

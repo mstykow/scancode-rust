@@ -103,14 +103,7 @@ mod tests {
         let Some(text) = read_test_file() else { return };
 
         use crate::license_detection::aho_match::aho_match;
-        use crate::license_detection::detection::{
-            create_detection_from_group, group_matches_by_region,
-        };
         use crate::license_detection::index::build_index;
-        use crate::license_detection::match_refine::{
-            merge_overlapping_matches, refine_matches, refine_matches_without_false_positive_filter,
-            split_weak_matches,
-        };
         use crate::license_detection::query::Query;
         use crate::license_detection::rules::{
             load_licenses_from_directory, load_rules_from_directory,

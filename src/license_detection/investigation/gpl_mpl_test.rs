@@ -208,7 +208,7 @@ mod tests {
         let index = build_index(rules, licenses);
 
         let clean_text = strip_utf8_bom_str(&text);
-        let mut query = Query::new(clean_text, &index).expect("Query creation failed");
+        let query = Query::new(clean_text, &index).expect("Query creation failed");
 
         let whole_run = query.whole_query_run();
 
@@ -440,7 +440,7 @@ mod tests {
         let index = build_index(rules, licenses);
 
         let clean_text = strip_utf8_bom_str(&text);
-        let mut query = Query::new(clean_text, &index).expect("Query creation failed");
+        let query = Query::new(clean_text, &index).expect("Query creation failed");
 
         let whole_run = query.whole_query_run();
 
@@ -587,7 +587,6 @@ mod tests {
 
     #[test]
     fn test_gpl_mpl_match_grouping_analysis() {
-        let Some(engine) = get_engine() else { return };
         let Some(text) = read_test_file() else { return };
 
         use crate::license_detection::aho_match::aho_match;

@@ -10,12 +10,9 @@ mod types;
 
 
 pub use types::{DetectionGroup, FileRegion, LicenseDetection};
-pub use grouping::{group_matches_by_region, sort_matches_by_line, is_correctDetection};
+pub use grouping::{group_matches_by_region, sort_matches_by_line};
 
-use crate::license_detection::expression::{CombineRelation, combine_expressions};
-use crate::license_detection::models::LicenseMatch;
 use crate::license_detection::spdx_mapping::SpdxMapping;
-use crate::license_detection::tokenize::tokenize_without_stopwords;
 
 use identifier::{
     compute_detection_coverage,

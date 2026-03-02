@@ -13,12 +13,7 @@ mod parse;
 mod simplify;
 
 pub use parse::parse_expression;
-pub use simplify::{
-    combine_expressions, expression_to_string, licensing_contains, simplify_expression,
-    validate_expression,
-};
-
-use std::collections::HashSet;
+pub use simplify::{expression_to_string, licensing_contains};
 
 /// Error type for license expression parsing.
 #[allow(dead_code)]
@@ -178,6 +173,8 @@ pub enum CombineRelation {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashSet;
+    pub use simplify::validate_expression;
 
     #[test]
     fn test_and_helper_empty() {

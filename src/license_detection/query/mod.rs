@@ -553,12 +553,12 @@ impl<'a> Query<'a> {
         self.tokens.is_empty()
     }
 
+
     /// Get the number of known tokens.
     #[inline]
     pub fn len(&self) -> usize {
         self.tokens.len()
     }
-
     /// Get a query run covering the entire query.
     ///
     /// Corresponds to Python: `whole_query_run()` method (lines 306-317)

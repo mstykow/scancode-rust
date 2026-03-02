@@ -7,8 +7,9 @@
 //! Usage: `cargo build --features debug-pipeline`
 
 use crate::license_detection::index::LicenseIndex;
-use crate::license_detection::match_refine::{
-    filter_below_rule_minimum_coverage, filter_contained_matches, filter_false_positive_matches,
+use crate::license_detection::match_refine::filter_contained_matches;
+use crate::license_detection::match_refine::filter_low_quality::{
+    filter_below_rule_minimum_coverage, filter_false_positive_matches,
     filter_invalid_matches_to_single_word_gibberish, filter_matches_missing_required_phrases,
     filter_matches_to_spurious_single_token, filter_short_matches_scattered_on_too_many_lines,
     filter_spurious_matches, filter_too_short_matches,

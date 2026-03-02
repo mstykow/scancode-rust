@@ -836,9 +836,7 @@ SOFTWARE."#;
     fn test_sequence_matching_bsl_file() {
         use crate::license_detection::index::token_sets::{build_set_and_mset, tids_set_counter};
         use crate::license_detection::query::Query;
-        use crate::license_detection::seq_match::{
-            seq_match_with_candidates, HIGH_RESEMBLANCE_THRESHOLD,
-        };
+        use crate::license_detection::seq_match::HIGH_RESEMBLANCE_THRESHOLD;
         use std::path::Path;
 
         let test_file = Path::new("testdata/license-golden/datadriven/external/fossology-tests/Dual-license/BSL-1.0_or_MIT.txt");
@@ -868,7 +866,7 @@ SOFTWARE."#;
         eprintln!("Query token count: {}", query.tokens.len());
 
         // Build query set and mset
-        let (query_set, query_mset) = build_set_and_mset(&query.tokens);
+        let (query_set, _query_mset) = build_set_and_mset(&query.tokens);
         let query_unique_count = tids_set_counter(&query_set);
         eprintln!("Query unique tokens: {}", query_unique_count);
 

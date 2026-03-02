@@ -19,7 +19,7 @@
 mod candidates;
 mod matching;
 
-pub use candidates::{Candidate, ScoresVector, compute_candidates_with_msets};
+pub use candidates::{Candidate, compute_candidates_with_msets};
 pub use matching::seq_match_with_candidates;
 
 pub const MATCH_SEQ: &str = "3-seq";
@@ -40,7 +40,7 @@ mod tests {
     use crate::license_detection::models::Rule;
     use crate::license_detection::query::Query;
     use crate::license_detection::test_utils::create_test_index;
-    use std::collections::{HashMap, HashSet};
+    use std::collections::HashMap;
 
     pub(super) fn create_seq_match_test_index() -> LicenseIndex {
         create_test_index(

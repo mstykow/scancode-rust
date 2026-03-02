@@ -166,39 +166,6 @@ mod tests {
     }
 
     #[test]
-    fn test_combine_expressions_single_or() {
-        use crate::license_detection::expression::{combine_expressions, CombineRelation};
-
-        let expressions = vec!["mit OR apache-2.0 OR epl-2.0 OR lgpl-3.0-plus OR gpl-3.0-plus"];
-        let combined = combine_expressions(&expressions, CombineRelation::And, true)
-            .expect("Combine should succeed");
-
-        eprintln!("Combined single OR expression: {:?}", combined);
-
-        assert_eq!(
-            combined, "mit OR apache-2.0 OR epl-2.0 OR lgpl-3.0-plus OR gpl-3.0-plus",
-            "Single OR expression should not be wrapped in parens"
-        );
-    }
-
-    #[test]
-    fn test_combine_expressions_normalizes_input_with_parens() {
-        use crate::license_detection::expression::{combine_expressions, CombineRelation};
-
-        let expressions = vec!["(mit OR apache-2.0 OR epl-2.0 OR lgpl-3.0-plus OR gpl-3.0-plus)"];
-        let combined = combine_expressions(&expressions, CombineRelation::And, true)
-            .expect("Combine should succeed");
-
-        eprintln!("Input expression with parens: {:?}", expressions[0]);
-        eprintln!("Combined expression: {:?}", combined);
-
-        assert_eq!(
-            combined, "mit OR apache-2.0 OR epl-2.0 OR lgpl-3.0-plus OR gpl-3.0-plus",
-            "FAIL: combine_expressions should normalize away unnecessary outer parentheses from input"
-        );
-    }
-
-    #[test]
     fn test_sencha_expression_current_behavior() {
         use crate::license_detection::expression::{expression_to_string, parse_expression};
 

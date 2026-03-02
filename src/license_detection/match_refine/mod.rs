@@ -7,7 +7,7 @@
 //! reference/scancode-toolkit/src/licensedcode/match.py
 
 mod false_positive;
-mod filter_low_quality;
+pub(crate) mod filter_low_quality;
 mod handle_overlaps;
 mod merge;
 
