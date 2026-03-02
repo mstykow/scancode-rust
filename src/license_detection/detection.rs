@@ -1177,6 +1177,21 @@ pub fn post_process_detections(
     min_score: f32,
 ) -> Vec<LicenseDetection> {
     let filtered = filter_detections_by_score(detections, min_score);
+    // NOTE: We do NOT call remove_duplicate_detections here.
+    //
+    // Python's get_unique_detections() groups detections by identifier and creates
+    // UniqueDetection objects with aggregated file_regions, but it does NOT remove
+    // detections. The Python test infrastructure uses idx.match() which returns
+    // raw matches without any deduplication.
+    //
+    // Calling remove_duplicate_detections would incorrectly merge detections that
+    // have the same license expression at different locations (e.g., two bsd-new
+    // licenses in different parts of a file). The identifier is computed from
+    // license_expression + rule_identifier + score + matched_text_tokens, which
+    // would be identical for same-license texts at different locations.
+    //
+    // TODO: Implement UniqueDetection with file_regions aggregation for output
+    // formatting when we add full ScanCode output compatibility.
     let preferred = apply_detection_preferences(filtered);
     let ranked = rank_detections(preferred);
     sort_detections_by_line(ranked)
