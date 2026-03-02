@@ -22,7 +22,6 @@ pub struct TextDetectionOptions {
     pub max_emails: usize,
     pub max_urls: usize,
     pub timeout_seconds: f64,
-    pub verbose_paths: bool,
 }
 
 impl Default for TextDetectionOptions {
@@ -34,12 +33,11 @@ impl Default for TextDetectionOptions {
             max_emails: 50,
             max_urls: 50,
             timeout_seconds: 120.0,
-            verbose_paths: false,
         }
     }
 }
 
-pub use self::count::count;
+pub use self::count::count_with_size;
 pub use self::process::{process, process_with_options};
 
 #[cfg(test)]

@@ -1,8 +1,8 @@
 use glob::Pattern;
-use indicatif::ProgressBar;
 use scancode_rust::askalono::{ScanStrategy, Store};
 use scancode_rust::models::PackageType;
 use scancode_rust::parsers::list_parser_types;
+use scancode_rust::progress::{ProgressMode, ScanProgress};
 use scancode_rust::{FileType, TextDetectionOptions, process, process_with_options};
 use std::fs;
 use std::path::Path;
@@ -21,10 +21,14 @@ fn create_test_strategy(store: &Store) -> ScanStrategy<'_> {
         .confidence_threshold(0.9)
 }
 
+fn hidden_progress() -> Arc<ScanProgress> {
+    Arc::new(ScanProgress::new(ProgressMode::Quiet))
+}
+
 #[test]
 fn test_scanner_discovers_all_registered_parsers() {
     let test_dir = "testdata/integration/multi-parser";
-    let progress = Arc::new(ProgressBar::hidden());
+    let progress = hidden_progress();
     let patterns: Vec<Pattern> = vec![];
     let store = create_test_store();
     let strategy = create_test_strategy(&store);
@@ -65,7 +69,7 @@ fn test_scanner_discovers_all_registered_parsers() {
 #[test]
 fn test_full_output_format_structure() {
     let test_dir = "testdata/integration/multi-parser";
-    let progress = Arc::new(ProgressBar::hidden());
+    let progress = hidden_progress();
     let patterns: Vec<Pattern> = vec![];
     let store = create_test_store();
     let strategy = create_test_strategy(&store);
@@ -127,7 +131,7 @@ fn test_scanner_handles_empty_directory() {
     let temp_dir = TempDir::new().expect("Failed to create temp dir");
     let test_path = temp_dir.path();
 
-    let progress = Arc::new(ProgressBar::hidden());
+    let progress = hidden_progress();
     let patterns: Vec<Pattern> = vec![];
     let store = create_test_store();
     let strategy = create_test_strategy(&store);
@@ -155,7 +159,7 @@ fn test_scanner_handles_parse_errors_gracefully() {
     let malformed_json = test_path.join("package.json");
     fs::write(&malformed_json, "{ this is not valid json }").expect("Failed to write test file");
 
-    let progress = Arc::new(ProgressBar::hidden());
+    let progress = hidden_progress();
     let patterns: Vec<Pattern> = vec![];
     let store = create_test_store();
     let strategy = create_test_strategy(&store);
@@ -182,7 +186,7 @@ fn test_scanner_handles_parse_errors_gracefully() {
 #[test]
 fn test_exclusion_patterns_filter_correctly() {
     let test_dir = "testdata/integration/multi-parser";
-    let progress = Arc::new(ProgressBar::hidden());
+    let progress = hidden_progress();
 
     let patterns: Vec<Pattern> = vec![Pattern::new("*.toml").expect("Invalid pattern")];
     let store = create_test_store();
@@ -231,7 +235,7 @@ fn test_max_depth_limits_traversal() {
     fs::write(&deep_file, r#"{"name": "deep", "version": "1.0.0"}"#)
         .expect("Failed to write test file");
 
-    let progress = Arc::new(ProgressBar::hidden());
+    let progress = hidden_progress();
     let patterns: Vec<Pattern> = vec![];
     let store = create_test_store();
     let strategy = create_test_strategy(&store);
@@ -244,7 +248,7 @@ fn test_max_depth_limits_traversal() {
     let has_deep_json = result.files.iter().any(|f| f.name == "package.json");
     assert!(!has_deep_json, "Should not find package.json at depth > 1");
 
-    let unlimited_progress = Arc::new(ProgressBar::hidden());
+    let unlimited_progress = hidden_progress();
     let unlimited_result = process(test_path, 0, unlimited_progress, &patterns, &strategy)
         .expect("Scan with unlimited depth should succeed");
     let has_deep_json_unlimited = unlimited_result
@@ -315,7 +319,7 @@ fn test_scanner_detects_emails_and_urls_when_enabled() {
     )
     .expect("Failed to write test file");
 
-    let progress = Arc::new(ProgressBar::hidden());
+    let progress = hidden_progress();
     let patterns: Vec<Pattern> = vec![];
     let store = create_test_store();
     let strategy = create_test_strategy(&store);
@@ -326,7 +330,6 @@ fn test_scanner_detects_emails_and_urls_when_enabled() {
         max_emails: 50,
         max_urls: 50,
         timeout_seconds: 120.0,
-        verbose_paths: false,
     };
 
     let result = process_with_options(test_path, 10, progress, &patterns, &strategy, &options)
@@ -371,7 +374,7 @@ fn test_scanner_respects_email_url_thresholds() {
     )
     .expect("Failed to write test file");
 
-    let progress = Arc::new(ProgressBar::hidden());
+    let progress = hidden_progress();
     let patterns: Vec<Pattern> = vec![];
     let store = create_test_store();
     let strategy = create_test_strategy(&store);
@@ -382,7 +385,6 @@ fn test_scanner_respects_email_url_thresholds() {
         max_emails: 2,
         max_urls: 2,
         timeout_seconds: 120.0,
-        verbose_paths: false,
     };
 
     let result = process_with_options(test_path, 10, progress, &patterns, &strategy, &options)

@@ -12,15 +12,15 @@
 //! ```rust,no_run
 //! use scancode_rust::scanner::process;
 //! use scancode_rust::askalono::{Store, ScanStrategy};
+//! use scancode_rust::progress::{ProgressMode, ScanProgress};
 //! use std::path::PathBuf;
 //! use std::sync::Arc;
-//! use indicatif::ProgressBar;
 //! use glob::Pattern;
 //!
 //! # fn main() -> anyhow::Result<()> {
 //! // Scan a directory
 //! let path = PathBuf::from("/path/to/codebase");
-//! let progress = Arc::new(ProgressBar::hidden());
+//! let progress = Arc::new(ScanProgress::new(ProgressMode::Quiet));
 //! let patterns: Vec<Pattern> = vec![
 //!     Pattern::new("*.git*")?,
 //!     Pattern::new("node_modules/*")?,
@@ -158,13 +158,13 @@
 //! ```rust,no_run
 //! use scancode_rust::scanner::process;
 //! use scancode_rust::askalono::{Store, ScanStrategy};
+//! use scancode_rust::progress::{ProgressMode, ScanProgress};
 //! use std::path::PathBuf;
 //! use std::sync::Arc;
-//! use indicatif::ProgressBar;
 //! use glob::Pattern;
 //!
 //! # fn main() -> anyhow::Result<()> {
-//! let progress = Arc::new(ProgressBar::hidden());
+//! let progress = Arc::new(ScanProgress::new(ProgressMode::Quiet));
 //! let patterns: Vec<Pattern> = vec![];
 //! let store = Store::new();
 //! let strategy = ScanStrategy::new(&store);
@@ -179,13 +179,13 @@
 //! ```rust,no_run
 //! use scancode_rust::scanner::process;
 //! use scancode_rust::askalono::{Store, ScanStrategy};
+//! use scancode_rust::progress::{ProgressMode, ScanProgress};
 //! use std::path::PathBuf;
 //! use std::sync::Arc;
-//! use indicatif::ProgressBar;
 //! use glob::Pattern;
 //!
 //! # fn main() -> anyhow::Result<()> {
-//! let progress = Arc::new(ProgressBar::hidden());
+//! let progress = Arc::new(ScanProgress::new(ProgressMode::Quiet));
 //! let patterns: Vec<Pattern> = vec![
 //!     Pattern::new("*.git*")?,
 //!     Pattern::new("node_modules/*")?,
@@ -204,13 +204,13 @@
 //! ```rust,no_run
 //! use scancode_rust::scanner::process;
 //! use scancode_rust::askalono::{Store, ScanStrategy};
+//! use scancode_rust::progress::{ProgressMode, ScanProgress};
 //! use std::path::PathBuf;
 //! use std::sync::Arc;
-//! use indicatif::ProgressBar;
 //! use glob::Pattern;
 //!
 //! # fn main() -> anyhow::Result<()> {
-//! let progress = Arc::new(ProgressBar::hidden());
+//! let progress = Arc::new(ScanProgress::new(ProgressMode::Quiet));
 //! let patterns: Vec<Pattern> = vec![];
 //! let store = Store::new();
 //! let strategy = ScanStrategy::new(&store);
@@ -260,6 +260,7 @@ pub mod golden_maintenance;
 pub mod models;
 pub mod output;
 pub mod parsers;
+pub mod progress;
 pub mod scanner;
 pub mod utils;
 
@@ -271,4 +272,7 @@ pub use output::{
     OutputFormat, OutputWriteConfig, OutputWriter, write_output_file, writer_for_format,
 };
 pub use parsers::{NpmParser, PackageParser};
-pub use scanner::{ProcessResult, TextDetectionOptions, count, process, process_with_options};
+pub use progress::{ProgressMode, ScanProgress};
+pub use scanner::{
+    ProcessResult, TextDetectionOptions, count_with_size, process, process_with_options,
+};
