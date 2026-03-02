@@ -4,7 +4,6 @@ use chrono::Utc;
 use clap::Parser;
 use glob::Pattern;
 use include_dir::{Dir, include_dir};
-use indicatif::{ProgressBar, ProgressStyle};
 use serde::Deserialize;
 use serde_json::{Value, from_str};
 use std::collections::{HashMap, HashSet};
@@ -17,7 +16,8 @@ use crate::askalono::{Store, TextData};
 use crate::cli::Cli;
 use crate::models::{ExtraData, Header, Output, SCANCODE_OUTPUT_FORMAT_VERSION, SystemEnvironment};
 use crate::output::{OutputWriteConfig, write_output_file};
-use crate::scanner::{TextDetectionOptions, count, process, process_with_options};
+use crate::progress::{ProgressMode, ScanProgress};
+use crate::scanner::{TextDetectionOptions, count_with_size, process, process_with_options};
 
 mod askalono;
 mod assembly;
@@ -28,6 +28,7 @@ mod finder;
 mod models;
 mod output;
 mod parsers;
+mod progress;
 mod scanner;
 mod utils;
 
@@ -47,15 +48,17 @@ fn main() -> std::io::Result<()> {
 fn run() -> Result<()> {
     let cli = Cli::parse();
     let start_time = Utc::now();
+    let progress = Arc::new(ScanProgress::new(progress_mode_from_cli(&cli)));
+    progress.set_processes(resolve_thread_count(cli.processes));
+    progress.set_scan_names(configured_scan_names(&cli));
+    progress.init_logging_bridge();
 
     validate_scan_option_compatibility(&cli)?;
 
     let exclude_patterns = compile_exclude_patterns(&cli.exclude);
     let include_patterns = compile_include_patterns(&cli.include);
 
-    if !cli.quiet {
-        eprintln!("Exclusion patterns: {:?}", cli.exclude);
-    }
+    progress.start_discovery();
 
     let (
         mut scan_result,
@@ -87,6 +90,23 @@ fn run() -> Result<()> {
             .iter()
             .filter(|f| f.file_type == crate::models::FileType::Directory)
             .count();
+        let files_count = loaded
+            .files
+            .iter()
+            .filter(|f| f.file_type == crate::models::FileType::File)
+            .count();
+        let size_count = loaded
+            .files
+            .iter()
+            .filter(|f| f.file_type == crate::models::FileType::File)
+            .map(|f| f.size)
+            .sum();
+        progress.finish_discovery(
+            files_count,
+            directories_count,
+            size_count,
+            loaded.excluded_count,
+        );
         (
             scanner::ProcessResult {
                 files: loaded.files,
@@ -106,22 +126,23 @@ fn run() -> Result<()> {
             .first()
             .ok_or_else(|| anyhow!("No directory input path provided"))?;
 
-        let store = load_license_database(cli.quiet)?;
+        let (total_files, total_dirs, excluded_count, total_size) =
+            count_with_size(scan_path, cli.max_depth, &exclude_patterns)?;
+        progress.finish_discovery(total_files, total_dirs, total_size, excluded_count);
+        if !cli.quiet {
+            progress.output_written(&format!(
+                "Found {} files in {} directories ({} items excluded)",
+                total_files, total_dirs, excluded_count
+            ));
+        }
+
+        progress.start_spdx_load();
+        let store = load_license_database()?;
+        progress.finish_spdx_load();
         let strategy = ScanStrategy::new(&store)
             .optimize(true)
             .confidence_threshold(LICENSE_DETECTION_THRESHOLD);
 
-        let (total_files, total_dirs, excluded_count) =
-            count(scan_path, cli.max_depth, &exclude_patterns)?;
-
-        if !cli.quiet {
-            eprintln!(
-                "Found {} files in {} directories ({} items excluded)",
-                total_files, total_dirs, excluded_count
-            );
-        }
-
-        let progress_bar = create_progress_bar(total_files, cli.quiet || cli.verbose);
         let text_options = TextDetectionOptions {
             detect_copyrights: cli.copyright,
             detect_emails: cli.email,
@@ -129,22 +150,21 @@ fn run() -> Result<()> {
             max_emails: cli.max_email,
             max_urls: cli.max_url,
             timeout_seconds: cli.timeout,
-            verbose_paths: cli.verbose && !cli.quiet,
         };
         let default_text_options = TextDetectionOptions::default();
 
         let thread_count = resolve_thread_count(cli.processes);
+        progress.start_scan(total_files);
         let mut result = if !text_options.detect_emails
             && !text_options.detect_urls
             && text_options.detect_copyrights == default_text_options.detect_copyrights
             && text_options.timeout_seconds == default_text_options.timeout_seconds
-            && !text_options.verbose_paths
         {
             run_with_thread_pool(thread_count, || {
                 process(
                     scan_path,
                     cli.max_depth,
-                    Arc::clone(&progress_bar),
+                    Arc::clone(&progress),
                     &exclude_patterns,
                     &strategy,
                 )
@@ -154,7 +174,7 @@ fn run() -> Result<()> {
                 process_with_options(
                     scan_path,
                     cli.max_depth,
-                    Arc::clone(&progress_bar),
+                    Arc::clone(&progress),
                     &exclude_patterns,
                     &strategy,
                     &text_options,
@@ -163,11 +183,7 @@ fn run() -> Result<()> {
         };
 
         result.excluded_count = excluded_count;
-        if !progress_bar.is_hidden() {
-            progress_bar.finish_with_message("Scan complete!");
-        } else {
-            progress_bar.finish_and_clear();
-        }
+        progress.finish_scan();
 
         (
             result,
@@ -210,6 +226,11 @@ fn run() -> Result<()> {
         apply_mark_source(&mut scan_result.files);
     }
 
+    let manifests_seen = scan_result
+        .files
+        .iter()
+        .map(|file| file.package_data.len())
+        .sum();
     let assembly_result = if cli.no_assemble {
         assembly::AssemblyResult {
             packages: Vec::new(),
@@ -218,12 +239,18 @@ fn run() -> Result<()> {
     } else if cli.from_json
         && (!preloaded_assembly.packages.is_empty() || !preloaded_assembly.dependencies.is_empty())
     {
+        progress.start_assembly();
+        progress.finish_assembly(preloaded_assembly.packages.len(), manifests_seen);
         preloaded_assembly
     } else {
-        assembly::assemble(&mut scan_result.files)
+        progress.start_assembly();
+        let assembled = assembly::assemble(&mut scan_result.files);
+        progress.finish_assembly(assembled.packages.len(), manifests_seen);
+        assembled
     };
 
     let end_time = Utc::now();
+
     let output = create_output(
         start_time,
         end_time,
@@ -233,6 +260,8 @@ fn run() -> Result<()> {
         preloaded_license_references,
         preloaded_license_rule_references,
     );
+
+    progress.start_output();
     for target in cli.output_targets() {
         let output_config = OutputWriteConfig {
             format: target.format,
@@ -245,10 +274,15 @@ fn run() -> Result<()> {
         };
 
         write_output_file(&target.file, &output, &output_config)?;
-        if !cli.quiet {
-            eprintln!("{:?} output written to {}", target.format, target.file);
-        }
+        progress.output_written(&format!(
+            "{:?} output written to {}",
+            target.format, target.file
+        ));
     }
+    progress.finish_output();
+
+    progress.record_final_counts(&output.files);
+    progress.display_summary(&start_time.to_rfc3339(), &Utc::now().to_rfc3339());
 
     Ok(())
 }
@@ -296,6 +330,30 @@ fn resolve_thread_count(processes: i32) -> usize {
 fn default_parallel_threads() -> usize {
     let cpus = std::thread::available_parallelism().map_or(1, |n| n.get());
     if cpus > 1 { cpus - 1 } else { 1 }
+}
+
+fn progress_mode_from_cli(cli: &Cli) -> ProgressMode {
+    if cli.quiet {
+        ProgressMode::Quiet
+    } else if cli.verbose {
+        ProgressMode::Verbose
+    } else {
+        ProgressMode::Default
+    }
+}
+
+fn configured_scan_names(cli: &Cli) -> String {
+    let mut names = vec!["licenses", "packages"];
+    if cli.copyright {
+        names.push("copyrights");
+    }
+    if cli.email {
+        names.push("emails");
+    }
+    if cli.url {
+        names.push("urls");
+    }
+    names.join(", ")
 }
 
 fn run_with_thread_pool<T, F>(threads: usize, f: F) -> Result<T>
@@ -575,13 +633,9 @@ fn apply_mark_source(files: &mut [crate::models::FileInfo]) {
     }
 }
 
-// Embed the license files into the binary
 const LICENSES_DIR: Dir = include_dir!("resources/licenses/json/details");
 
-fn load_license_database(quiet: bool) -> Result<Store> {
-    if !quiet {
-        eprintln!("Loading SPDX data, this may take a while...");
-    }
+fn load_license_database() -> Result<Store> {
     let mut store = Store::new();
 
     for file in LICENSES_DIR.files() {
@@ -606,21 +660,6 @@ fn load_license_database(quiet: bool) -> Result<Store> {
     }
 
     Ok(store)
-}
-
-fn create_progress_bar(total_files: usize, hidden: bool) -> Arc<ProgressBar> {
-    let progress_bar = if hidden {
-        ProgressBar::hidden()
-    } else {
-        ProgressBar::new(total_files as u64)
-    };
-    progress_bar.set_style(
-        ProgressStyle::default_bar()
-            .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} files processed ({eta})")
-            .expect("Failed to create progress bar style")
-            .progress_chars("#>-"),
-    );
-    Arc::new(progress_bar)
 }
 
 fn create_output(
