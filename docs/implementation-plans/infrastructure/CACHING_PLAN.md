@@ -34,7 +34,7 @@ Persistent caching of scan results and compiled data structures to speed up repe
 
 **In Scope:**
 
-- **License Index Caching**: Persistent cache of compiled askalono `Store` (currently rebuilt from embedded SPDX text on each run, taking 200-300ms)
+- **License Index Caching**: Persistent cache of compiled `LicenseIndex` artifacts produced by the runtime rule-loading license engine
 - **Scan Result Caching**: Cache `FileInfo` results per file keyed by SHA256 content hash
 - **Incremental Scanning**: Only scan files that changed since last scan (mtime + content hash check)
 - **Cache Invalidation**: Version-stamped caches with tool version + data version embedded in cache metadata
@@ -46,21 +46,21 @@ Persistent caching of scan results and compiled data structures to speed up repe
 **Out of Scope:**
 
 - Distributed caching (Redis, shared network cache)
-- Cache compression beyond what's inherited from askalono (zstd)
+- Cache compression tuning beyond the initial engine snapshot format
 - Cache size limits / eviction policies (deferred — disk is cheap)
 
 ### Current State in Rust
 
 **Implemented:**
 
-- ✅ SPDX license data embedded at compile time via `include_dir!()` macro
-- ✅ Askalono `Store` with existing `from_cache()`/`to_cache()` methods (MessagePack + zstd, version header)
+- ✅ New engine direction validated in `feat-add-license-parsing`: runtime ScanCode rule loading + `LicenseDetectionEngine`/`LicenseIndex`
+- ✅ Rule-driven detection pipeline architecture documented and integrated on story branch
 - ✅ SHA256 hash computation per file in `process_file()` (already available as cache key)
 - ✅ `FileInfo` struct with all scannable fields (package_data, license_detections, copyrights, etc.)
 
 **Missing:**
 
-- ❌ Persistent license index cache (Store is rebuilt from text each run)
+- ❌ Persistent license index snapshot cache for the new `LicenseIndex` artifacts
 - ❌ Scan result cache infrastructure
 - ❌ Incremental scanning logic
 - ❌ Cache invalidation
@@ -217,7 +217,7 @@ Python's invalidation is **minimal**:
 
 1. **Content-addressed scan result cache** — the major beyond-parity win
 2. **Version-stamped index caches** — embed tool version + data version in cache metadata
-3. **Leverage existing askalono cache infrastructure** — already uses MessagePack + zstd
+3. **Engine-owned index snapshot caching** — cache contract belongs to `LicenseDetectionEngine`/`LicenseIndex`, not legacy askalono internals
 4. **XDG-compliant cache location** — platform-native defaults, overridable
 5. **Thread-safe by design** — no global mutable state, file locking for multi-process
 6. **Safe serialization** — `postcard` or `rmp-serde`, never pickle-equivalent
@@ -232,7 +232,7 @@ Python's invalidation is **minimal**:
 │  ┌─────────────────────┐     ┌──────────────────────────────────────┐  │
 │  │ License Index Cache  │     │ Scan Result Cache                    │  │
 │  │                      │     │                                      │  │
-│  │ • askalono Store     │     │ • Per-file FileInfo results          │  │
+│  │ • LicenseIndex snapshot│   │ • Per-file FileInfo results          │  │
 │  │ • MsgPack + zstd     │     │ • Keyed by SHA256 content hash      │  │
 │  │ • Version-stamped    │     │ • Version-stamped metadata           │  │
 │  │ • Built once, loaded │     │ • Written during scan, read on       │  │
@@ -259,7 +259,7 @@ Python's invalidation is **minimal**:
 ~/.cache/scancode-rust/                    # XDG cache dir (or SCANCODE_RUST_CACHE env var)
 ├── metadata.json                          # Cache version, tool version, timestamps
 ├── license-index/
-│   ├── store.bin.zstd                     # Cached askalono Store (MsgPack + zstd)
+│   ├── index.snapshot.bin                 # Cached engine index snapshot (engine-owned format)
 │   └── store.lock                         # Lock file for index rebuild
 ├── scans/
 │   ├── ab/
@@ -331,18 +331,15 @@ pub struct CacheManager {
 
 ### Key Design Decisions
 
-#### 1. Serialization: `rmp-serde` (MessagePack) for Scan Results
+#### 1. Serialization: Engine-owned snapshot format for License Index cache
 
-**Decision**: Use `rmp-serde` (MessagePack) rather than `postcard` or `bincode`.
+**Decision**: Use a versioned engine-owned snapshot envelope (`cache metadata header` + `opaque index payload`).
 
 **Rationale**:
 
-- Askalono already uses `rmp-serde` for its Store cache — one less dependency
-- MessagePack is well-specified and portable (unlike pickle)
-- Schema evolution is easier with MessagePack (tolerates extra fields)
-- `bincode` is unmaintained as of 2025
-- `postcard` is slightly faster but less mature for schema evolution
-- Performance difference is negligible for our use case (I/O-bound, not serialization-bound)
+- Cache format remains internal to the engine and can evolve without leaking implementation details into CLI/infrastructure plans
+- Snapshot metadata can enforce deterministic invalidation (`cache_schema_version`, `engine_version`, `rules_fingerprint`, `build_options_fingerprint`)
+- Avoids coupling infrastructure planning to a removed askalono-specific payload contract
 
 #### 2. Cache Location: XDG via `dirs` Crate
 
@@ -392,7 +389,7 @@ pub struct CacheManager {
 **Cached** (content-dependent, expensive to compute):
 
 - Package data (parser results)
-- License detections (askalono matching)
+- License detections from the new `license_detection` engine
 - Copyright detections
 - Programming language
 
@@ -411,7 +408,7 @@ src/
 ├── cache/
 │   ├── mod.rs              # Public API: CacheManager
 │   ├── config.rs           # CacheConfig, CLI flag integration
-│   ├── index_cache.rs      # License index (askalono Store) caching
+│   ├── index_cache.rs      # License index snapshot caching (`LicenseIndex` artifacts)
 │   ├── scan_cache.rs       # Per-file scan result caching
 │   ├── metadata.rs         # CacheMetadata, version management
 │   └── locking.rs          # File locking wrappers
@@ -440,18 +437,18 @@ src/
 
 ### Phase 2: License Index Caching (2-3 days)
 
-**Goal**: Cache the compiled askalono `Store` on disk to eliminate 200-300ms startup cost.
+**Goal**: Cache compiled `LicenseIndex` snapshots on disk to avoid rebuilding from rules on every run.
 
 **Deliverables:**
 
-1. `index_cache.rs`: `load_or_build_license_store()` — check cache → load or build → save
-2. Leverage existing `Store::from_cache()`/`Store::to_cache()` methods
-3. Version-stamp cache with tool version + SPDX data version
+1. `index_cache.rs`: `load_or_build_license_index()` — check cache → validate → load or rebuild → save
+2. Define cache envelope with metadata: `cache_schema_version`, `engine_version`, `rules_fingerprint`, `build_options_fingerprint`, `created_at`
+3. Version-stamp/invalidate using engine + rules fingerprints (not mtime-only)
 4. Invalidation: rebuild if version mismatch or cache corrupt/missing
 
-**Integration**: Replace the `create_store_from_texts()` call in `main.rs` with `load_or_build_license_store()`.
+**Integration**: Wire scanner/main startup to `LicenseDetectionEngine` cache-aware initialization (`load index snapshot or rebuild from rules`).
 
-**Expected speedup**: 200-300ms → 20-50ms (10x faster startup).
+**Expected speedup**: Reduce warm-start index initialization by reusing validated snapshots (cold start still rebuilds from rules).
 
 **Testing**: Cache hit/miss, version mismatch invalidation, corrupt cache recovery.
 
@@ -466,7 +463,7 @@ src/
 3. Write path: After `process_file()` completes, cache the result keyed by SHA256
 4. Atomic writes: temp file + rename pattern
 
-**Dependencies**: `rmp-serde` (already present), `fd-lock` (new)
+**Dependencies**: serialization crate(s) selected by engine implementation, `fd-lock` (new)
 
 **Integration**: Add cache write call at end of `process_file()` in `scanner/process.rs`.
 
@@ -545,7 +542,7 @@ src/
 ### 4. Safe Serialization (Security Fix)
 
 **Python**: Uses `pickle` — vulnerable to arbitrary code execution on malicious cache files.
-**Rust**: Uses `rmp-serde` (MessagePack) — data-only format, no code execution possible.
+**Rust**: Uses a data-only engine snapshot format (no code execution semantics).
 
 ### 5. Thread-Safe Cache Access (Bug Fix)
 
@@ -617,13 +614,13 @@ src/
 
 ## Dependency Summary
 
-| Crate       | Version | Purpose                                                        | Status      |
-| ----------- | ------- | -------------------------------------------------------------- | ----------- |
-| `rmp-serde` | 1.3     | MessagePack serialization (already in Cargo.toml for askalono) | ✅ Existing |
-| `zstd`      | 0.13    | Compression for license index cache (already in Cargo.toml)    | ✅ Existing |
-| `sha2`      | 0.10    | SHA256 hashing (already used for file hashing)                 | ✅ Existing |
-| `dirs`      | 5.0     | XDG cache directory resolution                                 | 🆕 New      |
-| `fd-lock`   | 4.0     | File locking for multi-process safety                          | 🆕 New      |
+| Crate       | Version | Purpose                                                               | Status      |
+| ----------- | ------- | --------------------------------------------------------------------- | ----------- |
+| `rmp-serde` | TBD     | Optional candidate for snapshot serialization (engine-owned decision) | ⚖️ Evaluate |
+| `zstd`      | TBD     | Optional compression for index snapshots                              | ⚖️ Evaluate |
+| `sha2`      | 0.10    | SHA256 hashing (already used for file hashing)                        | ✅ Existing |
+| `dirs`      | 5.0     | XDG cache directory resolution                                        | 🆕 New      |
+| `fd-lock`   | 4.0     | File locking for multi-process safety                                 | 🆕 New      |
 
 Only 2 new dependencies needed — both small, well-maintained, and widely used.
 
@@ -632,7 +629,7 @@ Only 2 new dependencies needed — both small, well-maintained, and widely used.
 ## Related Documents
 
 - **Architecture**: [`docs/ARCHITECTURE.md`](../../ARCHITECTURE.md) — Scanner pipeline, caching section
-- **License Detection**: [`LICENSE_DETECTION_PLAN.md`](../text-detection/LICENSE_DETECTION_PLAN.md) — License index is primary cache beneficiary
+- **License Detection**: Transition from placeholder plan to the new runtime-rule-loading `LicenseDetectionEngine` architecture (see `feat-add-license-parsing` branch docs)
 - **Testing Strategy**: [`docs/TESTING_STRATEGY.md`](../../TESTING_STRATEGY.md) — Testing approach
 - **Python Reference**: `reference/scancode-toolkit/src/licensedcode/cache.py` — License cache implementation
 - **Python Reference**: `reference/scancode-toolkit/src/packagedcode/cache.py` — Package pattern cache
@@ -650,21 +647,23 @@ Only 2 new dependencies needed — both small, well-maintained, and widely used.
 | `scancode/lockfile.py`    | 34    | File locking wrapper: FileLock class around fasteners.InterProcessLock with timeout                                                |
 | `licensedcode/reindex.py` | 79    | CLI command: `scancode-reindex-licenses` with `--all-languages`, `--only-builtin` flags                                            |
 
-## Appendix: Existing Askalono Cache Format
+## Appendix: Planned License Index Snapshot Cache Envelope
 
-The askalono `Store` already has cache support (`src/askalono/store/cache.rs`):
+The new license engine should own index snapshot persistence with explicit metadata:
 
 ```text
-┌──────────────┬──────────────────────────────────┐
-│ Header (11B) │ zstd-compressed MessagePack body  │
-│ "askalono-04"│                                    │
-└──────────────┴──────────────────────────────────┘
+┌──────────────────────┬──────────────────────────────────────────────┐
+│ metadata header      │ engine payload (opaque, versioned by engine)│
+│ cache_schema_version │ LicenseIndex-derived snapshot bytes          │
+│ engine_version       │                                              │
+│ rules_fingerprint    │                                              │
+│ build_options_fp     │                                              │
+└──────────────────────┴──────────────────────────────────────────────┘
 ```
 
-- **Header**: 11-byte version string (`b"askalono-04"`) for cache compatibility check
-- **Body**: MessagePack-serialized `Store` struct, compressed with zstd (level 21)
-- **Uncompressed size**: ~3.7 MiB
-- **Compressed size**: ~1-2 MiB
-- **Load time**: 20-50ms (vs 200-300ms from text)
+Invalidation should be deterministic and metadata-driven:
 
-This infrastructure will be reused directly for the license index cache layer.
+1. `rules_fingerprint` mismatch → rebuild
+2. `cache_schema_version` mismatch → rebuild
+3. `engine_version` mismatch → rebuild
+4. `build_options_fingerprint` mismatch → rebuild

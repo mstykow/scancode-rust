@@ -670,16 +670,16 @@ Module location: `src/finder/`
 
 **Caching**:
 
-Caching is currently split between implemented primitives and planned unification:
+Caching is currently split between transition-state behavior on `main` and the target runtime-rule-loading license engine architecture.
 
-**Current implementation:**
+**Transition state (`main` at time of writing):**
 
-1. **Askalono cache primitives**: `Store::from_cache()` / `Store::to_cache()` exist (MessagePack + zstd + version header), but are not yet wired as the default runtime loading path.
-2. **Parser-local Swift cache**: `Package.swift` dump output is cached on disk under an XDG/HOME-derived cache path in the Swift parser.
+1. Legacy askalono-based startup still exists.
+2. Parser-local Swift cache persists `Package.swift` dump output under an XDG/HOME-derived cache path.
 
-**Planned unified caching architecture:**
+**Target unified caching architecture (aligned with `feat-add-license-parsing`):**
 
-1. **License Index Cache**: Persist compiled askalono `Store` with tool/data version stamping.
+1. **License Index Cache**: Persist versioned `LicenseIndex` snapshots generated from ScanCode rules loaded at runtime.
 2. **Scan Result Cache** (beyond parity — Python has none): Content-addressed per-file cache keyed by SHA256.
 3. **Incremental Scanning** (beyond parity — Python has none): manifest-guided re-scan of changed files only.
 
@@ -716,25 +716,27 @@ Ongoing quality improvements:
 
 ### How License Detection Works
 
-This tool uses the [SPDX License List Data](https://github.com/spdx/license-list-data) for license detection. The license data is:
+The project is transitioning to a ScanCode-compatible runtime rule-loading model for license detection.
 
-1. **Stored in a Git submodule** at `resources/licenses/` (sparse checkout of `json/details/` only)
-2. **Embedded at compile time** using Rust's `include_dir!` macro (see `src/main.rs`)
-3. **Built into the binary** - no runtime dependencies on external files
+Target model:
+
+1. **Source of truth**: ScanCode `.LICENSE` and `.RULE` datasets from the `reference/scancode-toolkit` submodule.
+2. **Load mode**: Rules are loaded at runtime by `LicenseDetectionEngine` and compiled into `LicenseIndex` structures.
+3. **Performance path**: Rebuild on cold start; load from validated index snapshot cache on warm start.
 
 This means:
 
-- **For users**: The binary is self-contained and portable
-- **For developers**: The submodule must be initialized before building
-- **Package size**: Only the needed JSON files are included in the published crate
+- **For users**: license detection correctness aligns with ScanCode rule data and can be updated by refreshing rule datasets.
+- **For developers**: rule data availability and fingerprinting are first-class runtime concerns.
+- **For packaging**: cache snapshots are rebuildable artifacts; rules remain the canonical source.
 
 ### Updating the License Data
 
-**For Releases:** The `release.sh` script automatically updates the license data to the latest version before publishing. No manual action needed.
+**For Releases:** Keep the rule dataset in sync with upstream ScanCode data before release, and ensure snapshot cache invalidation fingerprints update with dataset/version changes.
 
 **For Development:**
 
-To initialize or update to the latest SPDX license definitions:
+To initialize or update the latest ScanCode license/rule definitions in the reference submodule:
 
 ```sh
 ./setup.sh                  # Initialize/update license data to latest
