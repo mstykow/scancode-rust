@@ -1,6 +1,6 @@
 # Progress Tracking & Reporting Implementation Plan
 
-> **Status**: 🟢 Implemented (2026-03-02) — Wired in runtime, validated with tests and quality gates
+> **Status**: 🟢 Implemented — Wired in runtime, validated with tests and quality gates
 > **Priority**: P3 - Low Priority (UX Feature)
 > **Estimated Effort**: Completed
 > **Dependencies**: None (integrates with existing scanner pipeline)
@@ -48,12 +48,12 @@ Enhanced progress reporting during scans: multi-phase progress bars, ETA, throug
 
 ### Source Files
 
-| File                                                   | Lines | Role                                       |
-| ------------------------------------------------------ | ----- | ------------------------------------------ |
-| `reference/scancode-toolkit/src/scancode/cli.py`       | 1670+ | Main CLI with all progress orchestration   |
-| `commoncode.cliutils` (external)                       | N/A   | `progressmanager`, `path_progress_message` |
-| `reference/scancode-toolkit/src/scancode/interrupt.py` | ~100  | Per-file timeout handling                  |
-| `reference/scancode-toolkit/src/scancode/pool.py`      | ~50   | Multiprocessing pool management            |
+| File                                                   | Role                                       |
+| ------------------------------------------------------ | ------------------------------------------ |
+| `reference/scancode-toolkit/src/scancode/cli.py`       | Main CLI with all progress orchestration   |
+| `commoncode.cliutils` (external)                       | `progressmanager`, `path_progress_message` |
+| `reference/scancode-toolkit/src/scancode/interrupt.py` | Per-file timeout handling                  |
+| `reference/scancode-toolkit/src/scancode/pool.py`      | Multiprocessing pool management            |
 
 ### Python Architecture: 7 Scanning Phases
 
@@ -104,13 +104,13 @@ Scan Speed:     42.5 files/sec. 1.23 MB/sec.
 Initial counts: 1500 resource(s): 1200 file(s) and 300 directorie(s) for 45.2 MB
 Final counts:   1450 resource(s): 1150 file(s) and 300 directorie(s) for 44.8 MB
 Timings:
-  scan_start: 2024-01-15T10:30:00
-  scan_end:   2024-01-15T10:30:35
-  setup: 0.50s
-  scan: 28.24s
-  post-scan: 2.10s
-  output: 0.15s
-  total: 35.12s
+  scan_start: <timestamp>
+  scan_end:   <timestamp>
+  setup: <seconds>
+  scan: <seconds>
+  post-scan: <seconds>
+  output: <seconds>
+  total: <seconds>
 ```
 
 ### Error Collection
@@ -184,11 +184,11 @@ The progress/reporting path is now implemented around a centralized manager:
 ### Dependencies
 
 ```toml
-indicatif = "0.18.4"
-indicatif-log-bridge = "0.2.3"
-log = "0.4.29"
-env_logger = "0.11.9"
-chrono = "0.4.44"
+indicatif
+indicatif-log-bridge
+log
+env_logger
+chrono
 ```
 
 ---
@@ -233,7 +233,7 @@ pub verbose: bool,
 
 **Rationale**: Parser code already uses `log::warn!()` for errors. Without the bridge, these messages can interfere with progress rendering. `indicatif-log-bridge` integrates a logger with `MultiProgress` and uses suspended draws during log writes for clean output.
 
-**New dependency**: `indicatif-log-bridge = "0.2"`
+**New dependency**: `indicatif-log-bridge`
 
 #### D5: Centralized `ScanProgress` Struct — Not a Trait
 
@@ -377,22 +377,22 @@ The scan summary follows Python's key structure while remaining aligned with Rus
 
 ```text
 Scanning done.
-Summary:        licenses, packages with 4 process(es)
-Errors count:   2
-Scan Speed:     42.50 files/sec. 1.23 MB/sec.
-Initial counts: 1500 resource(s): 1200 file(s) and 300 directorie(s) for 45.2 MB
-Final counts:   1450 resource(s): 1150 file(s) and 300 directorie(s) for 44.8 MB
-Excluded count: 50
-Packages:       35 assembled from 78 manifests
+Summary:        <enabled scans> with <process count> process(es)
+Errors count:   <error count>
+Scan Speed:     <files/sec> files/sec. <bytes/sec>/sec.
+Initial counts: <resource count> resource(s): <file count> file(s) and <dir count> directorie(s) for <size>
+Final counts:   <resource count> resource(s): <file count> file(s) and <dir count> directorie(s) for <size>
+Excluded count: <excluded count>
+Packages:       <assembled count> assembled from <manifest count> manifests
 Timings:
-  scan_start: 2025-02-11T19:06:14+01:00
-  scan_end:   2025-02-11T19:06:49+01:00
-  discovery:  0.12s
-  spdx_load:  0.28s
-  scan:       28.24s
-  assembly:   2.10s
-  output:     0.15s
-  total:      30.89s
+  scan_start: <timestamp>
+  scan_end:   <timestamp>
+  discovery:  <seconds>
+  spdx_load:  <seconds>
+  scan:       <seconds>
+  assembly:   <seconds>
+  output:     <seconds>
+  total:      <seconds>
 ```
 
 ### Human-Readable Size Formatting
@@ -456,11 +456,11 @@ Rust's progress bar template can include `{per_sec}` to show real-time files/sec
 
 ### B3: Automatic Terminal Detection (Python Relies on Click)
 
-indicatif draw targets hide progress rendering when the output stream is not an attended terminal. Newer releases also explicitly account for `NO_COLOR`/`TERM=dumb`; keep this behavior tied to the actual pinned version.
+indicatif draw targets hide progress rendering when the output stream is not an attended terminal. Color behavior should remain aligned with the currently used indicatif behavior in this repository.
 
 ### B4: Rate-Limited Updates (Python Updates Every File)
 
-indicatif redraws are rate-limited by default, preventing terminal I/O from becoming a bottleneck on fast scans. Note: default `ProgressBar` target refresh is 20 Hz, while `MultiProgress` default refresh is 15 Hz.
+indicatif redraws are rate-limited by default, preventing terminal I/O from becoming a bottleneck on fast scans.
 
 ### B5: Log Messages Above Progress Bar
 
@@ -513,15 +513,15 @@ Python only shows the error count in the final summary.
 
 ## Dependency Summary
 
-| Crate                        | Status          | Purpose                                     |
-| ---------------------------- | --------------- | ------------------------------------------- |
-| `indicatif` 0.18.4           | Already present | Progress bars, multi-bar, rayon integration |
-| `clap` 4.5.60                | Already present | CLI argument parsing                        |
-| `log` 0.4.29                 | Already present | Logging facade                              |
-| `rayon` 1.11.0               | Already present | Parallel processing                         |
-| `chrono` 0.4.44              | Already present | Timestamps for summary                      |
-| `env_logger` 0.11.9          | In dependencies | Logger implementation for `RUST_LOG`        |
-| `indicatif-log-bridge` 0.2.3 | In dependencies | Route log messages above progress bars      |
+| Crate                  | Status          | Purpose                                     |
+| ---------------------- | --------------- | ------------------------------------------- |
+| `indicatif`            | Already present | Progress bars, multi-bar, rayon integration |
+| `clap`                 | Already present | CLI argument parsing                        |
+| `log`                  | Already present | Logging facade                              |
+| `rayon`                | Already present | Parallel processing                         |
+| `chrono`               | Already present | Timestamps for summary                      |
+| `env_logger`           | In dependencies | Logger implementation for `RUST_LOG`        |
+| `indicatif-log-bridge` | In dependencies | Route log messages above progress bars      |
 
 **Change summary**: Added `indicatif-log-bridge`; moved `env_logger` to regular dependencies.
 
@@ -531,4 +531,4 @@ Python only shows the error count in the final summary.
 
 - **Architecture**: [`docs/ARCHITECTURE.md`](../../ARCHITECTURE.md) — Scanner pipeline section
 - **Caching Plan**: [`CACHING_PLAN.md`](CACHING_PLAN.md) — Cache loading will need progress reporting
-- **Python Reference**: `reference/scancode-toolkit/src/scancode/cli.py` — Lines 256-268 (flags), 1178-1376 (scanner progress), 1476-1608 (summary display)
+- **Python Reference**: `reference/scancode-toolkit/src/scancode/cli.py` — see flags, scanner progress, and summary display sections
