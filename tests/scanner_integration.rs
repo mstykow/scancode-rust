@@ -243,6 +243,18 @@ fn test_max_depth_limits_traversal() {
     // Should not find the deep package.json
     let has_deep_json = result.files.iter().any(|f| f.name == "package.json");
     assert!(!has_deep_json, "Should not find package.json at depth > 1");
+
+    let unlimited_progress = Arc::new(ProgressBar::hidden());
+    let unlimited_result = process(test_path, 0, unlimited_progress, &patterns, &strategy)
+        .expect("Scan with unlimited depth should succeed");
+    let has_deep_json_unlimited = unlimited_result
+        .files
+        .iter()
+        .any(|f| f.name == "package.json");
+    assert!(
+        has_deep_json_unlimited,
+        "max_depth=0 should scan recursively without depth limit"
+    );
 }
 
 /// Regression test: Verify that all parsers in register_package_handlers! macro are actually
@@ -308,6 +320,7 @@ fn test_scanner_detects_emails_and_urls_when_enabled() {
     let store = create_test_store();
     let strategy = create_test_strategy(&store);
     let options = TextDetectionOptions {
+        detect_copyrights: true,
         detect_emails: true,
         detect_urls: true,
         max_emails: 50,
@@ -363,6 +376,7 @@ fn test_scanner_respects_email_url_thresholds() {
     let store = create_test_store();
     let strategy = create_test_strategy(&store);
     let options = TextDetectionOptions {
+        detect_copyrights: true,
         detect_emails: true,
         detect_urls: true,
         max_emails: 2,

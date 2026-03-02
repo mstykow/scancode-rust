@@ -12,8 +12,23 @@ pub fn count<P: AsRef<Path>>(
     max_depth: usize,
     exclude_patterns: &[Pattern],
 ) -> std::io::Result<(usize, usize, usize)> {
-    let path = path.as_ref();
+    let depth_limit = depth_limit_from_cli(max_depth);
+    count_internal(path.as_ref(), depth_limit, exclude_patterns)
+}
 
+fn depth_limit_from_cli(max_depth: usize) -> Option<usize> {
+    if max_depth == 0 {
+        None
+    } else {
+        Some(max_depth)
+    }
+}
+
+fn count_internal(
+    path: &Path,
+    depth_limit: Option<usize>,
+    exclude_patterns: &[Pattern],
+) -> std::io::Result<(usize, usize, usize)> {
     if is_path_excluded(path, exclude_patterns) {
         return Ok((0, 0, 1));
     }
@@ -38,10 +53,15 @@ pub fn count<P: AsRef<Path>>(
         } else if metadata.is_dir() {
             dirs_count += 1;
 
-            // Recursively process subdirectories if not at max depth
-            if max_depth > 0 {
+            let should_recurse = match depth_limit {
+                None => true,
+                Some(remaining_depth) => remaining_depth > 0,
+            };
+
+            if should_recurse {
+                let next_depth_limit = depth_limit.map(|remaining_depth| remaining_depth - 1);
                 let (sub_files, sub_dirs, sub_excluded) =
-                    count(&entry_path, max_depth - 1, exclude_patterns)?;
+                    count_internal(&entry_path, next_depth_limit, exclude_patterns)?;
 
                 files_count += sub_files;
                 dirs_count += sub_dirs - 1; // Avoid double-counting this directory
