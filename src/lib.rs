@@ -252,6 +252,7 @@
 
 pub mod askalono;
 pub mod assembly;
+pub mod cache;
 pub mod cli;
 pub mod copyright;
 pub mod finder;
