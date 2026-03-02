@@ -34,13 +34,14 @@ fn print_section(title: &str) {
     println!("{}", "=".repeat(80));
 }
 
+#[cfg(feature = "debug-pipeline")]
 fn print_subsection(title: &str) {
     println!("\n{}", "-".repeat(80));
     println!(" {}", title);
     println!("{}", "-".repeat(80));
 }
 
-fn format_match(m: &scancode_rust::license_detection::LicenseMatch) -> String {
+fn format_match(m: &scancode_rust::license_detection::models::LicenseMatch) -> String {
     format!(
         "  Rule: {} (license: {})\n  Score: {:.1}%, Coverage: {:.1}%\n  Lines: {}-{}, Tokens: {}-{}",
         m.rule_identifier,

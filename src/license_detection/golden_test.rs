@@ -26,7 +26,7 @@
 #[cfg(test)]
 mod golden_tests {
     use crate::license_detection::LicenseDetectionEngine;
-    use crate::utils::file_text::extract_text_from_file;
+    use crate::utils::file_text::extract_text_for_detection;
     use once_cell::sync::Lazy;
     use serde::Deserialize;
     use std::fs;
@@ -109,7 +109,8 @@ mod golden_tests {
         /// Read file content using production text extraction.
         /// Returns None for files that should be skipped.
         fn read_test_file_content(&self) -> Result<Option<String>, String> {
-            let text = extract_text_from_file(&self.test_file)
+            let text = fs::read(&self.test_file)
+                .map(|buffer| extract_text_for_detection(&buffer, &self.test_file))
                 .map(|opt| opt.map(|ft| ft.text))
                 .map_err(|e| format!("Failed to read {}: {}", self.test_file.display(), e))?;
             

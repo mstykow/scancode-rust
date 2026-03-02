@@ -6,7 +6,6 @@
 //! Based on Python's `textcode/analysis.py:numbered_text_lines()` and `as_unicode()`.
 
 use content_inspector::{inspect, ContentType};
-use std::io;
 use std::path::Path;
 
 /// Result of extracting text from a file for license detection.
@@ -33,16 +32,6 @@ pub enum TextSource {
     BinaryStrings,
     /// Fallback decoding (LATIN-1 or lossy)
     FallbackDecoding,
-}
-
-/// Read a file and extract text for license detection.
-///
-/// Returns `Ok(Some(FileText))` if text could be extracted.
-/// Returns `Ok(None)` if the file type should be skipped entirely.
-/// Returns `Err` if the file could not be read.
-pub fn extract_text_from_file(path: &Path) -> io::Result<Option<FileText>> {
-    let bytes = std::fs::read(path)?;
-    Ok(extract_text_for_detection(&bytes, path))
 }
 
 /// Extract text from file bytes for license detection.

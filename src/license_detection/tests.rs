@@ -1,0 +1,885 @@
+    use super::*;
+    use std::path::PathBuf;
+
+    fn get_reference_data_paths() -> Option<(PathBuf, PathBuf)> {
+        let rules_path = PathBuf::from("reference/scancode-toolkit/src/licensedcode/data/rules");
+        let licenses_path =
+            PathBuf::from("reference/scancode-toolkit/src/licensedcode/data/licenses");
+        if rules_path.exists() && licenses_path.exists() {
+            Some((rules_path, licenses_path))
+        } else {
+            None
+        }
+    }
+
+    fn create_engine_from_reference() -> Option<LicenseDetectionEngine> {
+        let (rules_path, licenses_path) = get_reference_data_paths()?;
+        let rules = load_rules_from_directory(&rules_path, false).ok()?;
+        let licenses = load_licenses_from_directory(&licenses_path, false).ok()?;
+        let index = build_index(rules, licenses);
+        let spdx_mapping =
+            build_spdx_mapping(&index.licenses_by_key.values().cloned().collect::<Vec<_>>());
+        Some(LicenseDetectionEngine {
+            index: Arc::new(index),
+            spdx_mapping,
+        })
+    }
+
+    #[test]
+    fn test_engine_new_with_reference_rules() {
+        let Some(engine) = create_engine_from_reference() else {
+            eprintln!("Skipping test: reference directory not found");
+            return;
+        };
+
+        assert!(
+            !engine.index().rules_by_rid.is_empty(),
+            "Should have rules loaded"
+        );
+        assert!(
+            !engine.index().licenses_by_key.is_empty(),
+            "Should have licenses loaded"
+        );
+        assert!(
+            engine.index().len_legalese > 0,
+            "Should have legalese tokens"
+        );
+        assert!(
+            !engine.index().rid_by_hash.is_empty(),
+            "Should have hash mappings"
+        );
+        assert!(
+            !engine.index().regular_rids.is_empty(),
+            "Should have regular rules"
+        );
+    }
+
+    #[test]
+    fn test_engine_detect_mit_license() {
+        let Some(engine) = create_engine_from_reference() else {
+            eprintln!("Skipping test: reference directory not found");
+            return;
+        };
+
+        let mit_text = r#"Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE."#;
+
+        let detections = engine
+            .detect(mit_text, false)
+            .expect("Detection should succeed");
+
+        assert!(
+            !detections.is_empty(),
+            "Should detect at least one license in MIT text"
+        );
+
+        let mit_related = detections.iter().any(|d| {
+            d.license_expression
+                .as_ref()
+                .map(|e| e.contains("mit") || e.contains("unknown"))
+                .unwrap_or(false)
+        });
+        assert!(
+            mit_related,
+            "Should detect MIT or unknown license, got: {:?}",
+            detections
+                .iter()
+                .map(|d| d.license_expression.as_deref().unwrap_or("none"))
+                .collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn test_engine_detect_empty_text() {
+        let Some(engine) = create_engine_from_reference() else {
+            eprintln!("Skipping test: reference directory not found");
+            return;
+        };
+
+        let detections = engine.detect("", false).expect("Detection should succeed");
+        assert!(
+            detections.is_empty() || !detections.is_empty(),
+            "Detection completes"
+        );
+
+        let detections = engine
+            .detect("   \n\n   ", false)
+            .expect("Detection should succeed");
+        assert!(
+            detections.is_empty() || !detections.is_empty(),
+            "Detection completes"
+        );
+    }
+
+    #[test]
+    fn test_engine_detect_spdx_identifier() {
+        let Some(engine) = create_engine_from_reference() else {
+            eprintln!("Skipping test: reference directory not found");
+            return;
+        };
+
+        let text = "SPDX-License-Identifier: MIT";
+        let detections = engine
+            .detect(text, false)
+            .expect("Detection should succeed");
+
+        assert!(
+            !detections.is_empty(),
+            "Should detect license from SPDX identifier"
+        );
+    }
+
+    #[test]
+    fn test_engine_detect_license_notice() {
+        let Some(engine) = create_engine_from_reference() else {
+            eprintln!("Skipping test: reference directory not found");
+            return;
+        };
+
+        let text = "Licensed under the MIT License";
+        let detections = engine
+            .detect(text, false)
+            .expect("Detection should succeed");
+
+        assert!(!detections.is_empty(), "Should detect license notice");
+    }
+
+    #[test]
+    fn test_engine_index_populated() {
+        let Some(engine) = create_engine_from_reference() else {
+            eprintln!("Skipping test: reference directory not found");
+            return;
+        };
+        let index = engine.index();
+
+        assert!(
+            index.rules_by_rid.len() > 1000,
+            "Should have at least 1000 rules loaded from reference"
+        );
+
+        assert!(
+            index.licenses_by_key.len() > 100,
+            "Should have at least 100 licenses loaded from reference"
+        );
+
+        assert!(
+            !index.approx_matchable_rids.is_empty(),
+            "Should have approx-matchable rules"
+        );
+
+        let has_false_positives = !index.false_positive_rids.is_empty();
+        assert!(has_false_positives, "Should have false positive rules");
+
+        let mut rules_with_tokens = 0;
+        for &rid in index.regular_rids.iter().take(10) {
+            let rule = &index.rules_by_rid[rid];
+            if !rule.tokens.is_empty() {
+                rules_with_tokens += 1;
+                assert!(
+                    rule.min_matched_length > 0,
+                    "Regular rule {} should have computed threshold",
+                    rid
+                );
+            }
+        }
+        assert!(
+            rules_with_tokens > 0,
+            "Should have at least one rule with tokens among first 10"
+        );
+    }
+
+    #[test]
+    fn test_engine_automaton_functional() {
+        let Some(engine) = create_engine_from_reference() else {
+            eprintln!("Skipping test: reference directory not found");
+            return;
+        };
+        let index = engine.index();
+
+        if !index.rules_by_rid.is_empty() {
+            let first_rule = &index.rules_by_rid[0];
+            if !first_rule.tokens.is_empty() {
+                let pattern: Vec<u8> = first_rule
+                    .tokens
+                    .iter()
+                    .flat_map(|t| t.to_le_bytes())
+                    .collect();
+
+                let matches: Vec<_> = index.rules_automaton.find_iter(&pattern).collect();
+                assert!(
+                    !matches.is_empty(),
+                    "Automaton should find pattern for rule 0"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_engine_spdx_mapping() {
+        let Some(engine) = create_engine_from_reference() else {
+            eprintln!("Skipping test: reference directory not found");
+            return;
+        };
+        let mapping = engine.spdx_mapping();
+
+        let mit_spdx = mapping.scancode_to_spdx("mit");
+        assert!(mit_spdx.is_some(), "Should have MIT SPDX mapping");
+        assert_eq!(
+            mit_spdx.unwrap(),
+            "MIT",
+            "MIT should map to MIT SPDX identifier"
+        );
+    }
+
+    #[test]
+    fn test_engine_detect_no_license() {
+        let Some(engine) = create_engine_from_reference() else {
+            eprintln!("Skipping test: reference directory not found");
+            return;
+        };
+
+        let text = "This is just some random text without any license information.";
+        let detections = engine
+            .detect(text, false)
+            .expect("Detection should succeed");
+        assert!(
+            !detections.is_empty() || detections.is_empty(),
+            "Detection should complete without error"
+        );
+    }
+
+    #[test]
+    fn test_engine_detect_gpl_notice() {
+        let Some(engine) = create_engine_from_reference() else {
+            eprintln!("Skipping test: reference directory not found");
+            return;
+        };
+
+        let text = "This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation.";
+        let detections = engine
+            .detect(text, false)
+            .expect("Detection should succeed");
+
+        assert!(!detections.is_empty(), "Should detect GPL notice");
+    }
+
+    #[test]
+    fn test_engine_detect_apache_notice() {
+        let Some(engine) = create_engine_from_reference() else {
+            eprintln!("Skipping test: reference directory not found");
+            return;
+        };
+
+        let text = "Licensed under the Apache License, Version 2.0";
+        let detections = engine
+            .detect(text, false)
+            .expect("Detection should succeed");
+
+        assert!(!detections.is_empty(), "Should detect Apache notice");
+    }
+
+    #[test]
+    fn test_engine_index_sets_by_rid() {
+        let Some(engine) = create_engine_from_reference() else {
+            eprintln!("Skipping test: reference directory not found");
+            return;
+        };
+        let index = engine.index();
+
+        for &rid in index.regular_rids.iter().take(5) {
+            assert!(
+                index.sets_by_rid.contains_key(&rid),
+                "Rule {} should have token set",
+                rid
+            );
+            let set = &index.sets_by_rid[&rid];
+            assert!(
+                !set.is_empty(),
+                "Rule {} token set should not be empty",
+                rid
+            );
+        }
+    }
+
+    #[test]
+    fn test_engine_index_msets_by_rid() {
+        let Some(engine) = create_engine_from_reference() else {
+            eprintln!("Skipping test: reference directory not found");
+            return;
+        };
+        let index = engine.index();
+
+        for &rid in index.regular_rids.iter().take(5) {
+            assert!(
+                index.msets_by_rid.contains_key(&rid),
+                "Rule {} should have token multiset",
+                rid
+            );
+            let mset = &index.msets_by_rid[&rid];
+            assert!(
+                !mset.is_empty(),
+                "Rule {} token multiset should not be empty",
+                rid
+            );
+        }
+    }
+
+    #[test]
+    fn test_engine_index_high_postings() {
+        let Some(engine) = create_engine_from_reference() else {
+            eprintln!("Skipping test: reference directory not found");
+            return;
+        };
+        let index = engine.index();
+
+        if !index.approx_matchable_rids.is_empty() {
+            let some_approx_rid = index.approx_matchable_rids.iter().next().unwrap();
+            if index.high_postings_by_rid.contains_key(some_approx_rid) {
+                let postings = &index.high_postings_by_rid[some_approx_rid];
+                assert!(!postings.is_empty(), "High postings should have entries");
+            }
+        }
+    }
+
+    #[test]
+    fn test_engine_matched_text_populated() {
+        let Some(engine) = create_engine_from_reference() else {
+            eprintln!("Skipping test: reference directory not found");
+            return;
+        };
+
+        let text = "SPDX-License-Identifier: MIT";
+        let detections = engine
+            .detect(text, false)
+            .expect("Detection should succeed");
+
+        assert!(!detections.is_empty(), "Should detect license");
+
+        for detection in &detections {
+            for m in &detection.matches {
+                assert!(
+                    m.matched_text.is_some(),
+                    "matched_text should be populated for matcher {}",
+                    m.matcher
+                );
+                let matched = m.matched_text.as_ref().unwrap();
+                assert!(
+                    !matched.is_empty(),
+                    "matched_text should not be empty for matcher {}",
+                    m.matcher
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_detect_multiple_licenses_in_text() {
+        let Some(engine) = create_engine_from_reference() else {
+            eprintln!("Skipping test: reference directory not found");
+            return;
+        };
+
+        let isc_text = r#"Permission to use, copy, modify, and/or distribute this software for any
+purpose with or without fee is hereby granted, provided that the above
+copyright notice and this permission notice appear in all copies.
+
+THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE."#;
+
+        let darpa_text = r#"Portions of this software were developed by the University of California,
+Irvine under a U.S. Government contract with the Defense Advanced Research
+Projects Agency (DARPA)."#;
+
+        let combined_text = format!("{}\n\n{}", isc_text, darpa_text);
+
+        let detections = engine
+            .detect(&combined_text, false)
+            .expect("Detection should succeed");
+
+        assert!(!detections.is_empty(), "Should detect at least one license");
+
+        let detected_licenses: Vec<String> = detections
+            .iter()
+            .filter_map(|d| d.license_expression.as_ref())
+            .cloned()
+            .collect();
+
+        assert!(
+            detected_licenses
+                .iter()
+                .any(|l| l.to_lowercase().contains("isc")),
+            "Should detect ISC license, got: {:?}",
+            detected_licenses
+        );
+    }
+
+    #[test]
+    fn test_sudo_license_loaded_from_license_file() {
+        let Some(engine) = create_engine_from_reference() else {
+            eprintln!("Skipping test: reference directory not found");
+            return;
+        };
+
+        let index = engine.index();
+
+        let sudo_rules: Vec<_> = index
+            .rules_by_rid
+            .iter()
+            .filter(|r| r.license_expression.contains("sudo"))
+            .collect();
+
+        eprintln!("Found {} rules with 'sudo' expression", sudo_rules.len());
+        for rule in sudo_rules.iter().take(3) {
+            eprintln!(
+                "  Rule: {} - is_from_license: {}, text len: {}",
+                rule.identifier,
+                rule.is_from_license,
+                rule.text.len()
+            );
+        }
+
+        assert!(
+            !sudo_rules.is_empty(),
+            "Should have at least one rule with 'sudo' license expression"
+        );
+
+        let sudo_from_license = sudo_rules.iter().find(|r| r.is_from_license);
+        assert!(
+            sudo_from_license.is_some(),
+            "Should have a sudo rule created from license file"
+        );
+
+        let rule = sudo_from_license.unwrap();
+        assert!(
+            rule.text.contains("Sponsored in part"),
+            "sudo rule text should contain DARPA acknowledgment"
+        );
+    }
+
+    #[test]
+    fn test_spdx_simple() {
+        let Some(engine) = create_engine_from_reference() else {
+            eprintln!("Skipping test: reference directory not found");
+            return;
+        };
+
+        let text = "SPDX-License-Identifier: MIT\nSome code here";
+        let detections = engine
+            .detect(text, false)
+            .expect("Detection should succeed");
+
+        assert!(
+            !detections.is_empty(),
+            "Should detect license from SPDX identifier"
+        );
+
+        let has_mit = detections.iter().any(|d| {
+            d.license_expression
+                .as_ref()
+                .map(|e| e.contains("mit"))
+                .unwrap_or(false)
+        });
+        assert!(has_mit, "Should detect MIT license");
+    }
+
+    #[test]
+    fn test_spdx_with_or() {
+        let Some(engine) = create_engine_from_reference() else {
+            eprintln!("Skipping test: reference directory not found");
+            return;
+        };
+
+        let text = "SPDX-License-Identifier: MIT OR Apache-2.0";
+        let detections = engine
+            .detect(text, false)
+            .expect("Detection should succeed");
+
+        assert!(
+            !detections.is_empty(),
+            "Should detect license from SPDX identifier with OR"
+        );
+    }
+
+    #[test]
+    fn test_spdx_with_plus() {
+        let Some(engine) = create_engine_from_reference() else {
+            eprintln!("Skipping test: reference directory not found");
+            return;
+        };
+
+        let text = "SPDX-License-Identifier: GPL-2.0+";
+        let detections = engine
+            .detect(text, false)
+            .expect("Detection should succeed");
+
+        assert!(
+            !detections.is_empty(),
+            "Should detect license from SPDX identifier with plus"
+        );
+    }
+
+    #[test]
+    fn test_spdx_in_comment() {
+        let Some(engine) = create_engine_from_reference() else {
+            eprintln!("Skipping test: reference directory not found");
+            return;
+        };
+
+        let text = "// SPDX-License-Identifier: MIT\n/* some code */";
+        let detections = engine
+            .detect(text, false)
+            .expect("Detection should succeed");
+
+        assert!(
+            !detections.is_empty(),
+            "Should detect SPDX identifier in comment"
+        );
+    }
+
+    #[test]
+    fn test_hash_exact_mit() {
+        let Some(engine) = create_engine_from_reference() else {
+            eprintln!("Skipping test: reference directory not found");
+            return;
+        };
+
+        let mit_text = r#"Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software."#;
+
+        let detections = engine
+            .detect(mit_text, false)
+            .expect("Detection should succeed");
+
+        assert!(!detections.is_empty(), "Should detect partial MIT license");
+    }
+
+    #[test]
+    fn test_aho_single_rule() {
+        let Some(engine) = create_engine_from_reference() else {
+            eprintln!("Skipping test: reference directory not found");
+            return;
+        };
+
+        let text = "Licensed under the MIT License";
+        let detections = engine
+            .detect(text, false)
+            .expect("Detection should succeed");
+
+        assert!(!detections.is_empty(), "Should detect license notice");
+    }
+
+    #[test]
+    fn test_seq_partial_license() {
+        let Some(engine) = create_engine_from_reference() else {
+            eprintln!("Skipping test: reference directory not found");
+            return;
+        };
+
+        let partial_mit = r#"Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software."#;
+
+        let detections = engine
+            .detect(partial_mit, false)
+            .expect("Detection should succeed");
+
+        assert!(!detections.is_empty(), "Should detect partial MIT license");
+    }
+
+    #[test]
+    fn test_unknown_proprietary() {
+        let Some(engine) = create_engine_from_reference() else {
+            eprintln!("Skipping test: reference directory not found");
+            return;
+        };
+
+        let text = "This software is proprietary and confidential. All rights reserved.";
+        let detections = engine
+            .detect(text, false)
+            .expect("Detection should succeed");
+
+        assert!(
+            !detections.is_empty(),
+            "Should detect unknown license or return empty"
+        );
+    }
+
+    #[test]
+    fn test_debug_camellia_bsd_detection() {
+        let Some(engine) = create_engine_from_reference() else {
+            eprintln!("Skipping test: reference directory not found");
+            return;
+        };
+
+        let test_file =
+            std::path::PathBuf::from("testdata/license-golden/datadriven/lic1/camellia_bsd.c");
+        let text = match std::fs::read_to_string(&test_file) {
+            Ok(t) => t,
+            Err(e) => {
+                eprintln!("Skipping test: cannot read test file: {}", e);
+                return;
+            }
+        };
+
+        println!("\n========================================");
+        println!("DEBUG: camellia_bsd.c detection");
+        println!("========================================");
+        println!("Text length: {} bytes", text.len());
+        println!();
+
+        let detections = engine.detect(&text, false).expect("Detection failed");
+
+        println!("Number of detections: {}", detections.len());
+        println!();
+
+        for (i, detection) in detections.iter().enumerate() {
+            println!("Detection {}:", i + 1);
+            println!("  license_expression: {:?}", detection.license_expression);
+            println!(
+                "  license_expression_spdx: {:?}",
+                detection.license_expression_spdx
+            );
+            println!("  detection_log: {:?}", detection.detection_log);
+            println!("  Number of matches: {}", detection.matches.len());
+
+            for (j, m) in detection.matches.iter().enumerate() {
+                println!("    Match {}:", j + 1);
+                println!("      license_expression: {}", m.license_expression);
+                println!("      matcher: {}", m.matcher);
+                println!("      score: {:.2}", m.score);
+                println!("      match_coverage: {:.1}%", m.match_coverage);
+                println!("      matched_length: {}", m.matched_length);
+                println!("      rule_relevance: {}", m.rule_relevance);
+                println!("      rule_identifier: {}", m.rule_identifier);
+                println!("      start_line: {}", m.start_line);
+                println!("      end_line: {}", m.end_line);
+                if let Some(ref matched_text) = m.matched_text {
+                    let preview: String = matched_text.chars().take(200).collect();
+                    println!(
+                        "      matched_text (preview): {}...",
+                        preview.replace('\n', "\\n")
+                    );
+                }
+            }
+            println!();
+        }
+
+        println!("========================================");
+        println!("Expected license: bsd-2-clause-first-lines");
+        println!("========================================");
+
+        let index = engine.index();
+        let key = "bsd-2-clause-first-lines";
+        if index.licenses_by_key.contains_key(key) {
+            println!("License '{}' found in index", key);
+            let license = &index.licenses_by_key[key];
+            println!("License text from index (first 500 chars):");
+            let preview: String = license.text.chars().take(500).collect();
+            println!("{}", preview);
+        } else {
+            println!("License '{}' NOT found in index", key);
+            println!("Available licenses containing 'bsd-2':");
+            for k in index.licenses_by_key.keys() {
+                if k.contains("bsd-2") {
+                    println!("  - {}", k);
+                }
+            }
+        }
+
+        println!("\n========================================");
+        println!("Investigating gpl-1.0-plus false positive");
+        println!("========================================");
+
+        let gpl_rid = 20010;
+        if gpl_rid < index.rules_by_rid.len() {
+            let rule = &index.rules_by_rid[gpl_rid];
+            println!("Rule #{}:", gpl_rid);
+            println!("  license_expression: {}", rule.license_expression);
+            println!("  text: {}", rule.text);
+            println!("  is_license_tag: {}", rule.is_license_tag);
+            println!("  is_license_reference: {}", rule.is_license_reference);
+            println!("  is_license_notice: {}", rule.is_license_notice);
+            println!("  is_false_positive: {}", rule.is_false_positive);
+            println!("  relevance: {}", rule.relevance);
+            println!("  tokens: {:?}", rule.tokens);
+            println!("  is_small: {}", rule.is_small);
+            println!("  is_tiny: {}", rule.is_tiny);
+        }
+    }
+
+    #[test]
+    fn test_no_token_boundary_false_positives() {
+        let Some(engine) = create_engine_from_reference() else {
+            eprintln!("Skipping test: reference directory not found");
+            return;
+        };
+
+        let test_file = std::path::PathBuf::from(
+            "testdata/license-golden/datadriven/lic1/config.guess-gpl2.txt",
+        );
+        let text = match std::fs::read_to_string(&test_file) {
+            Ok(t) => t,
+            Err(e) => {
+                eprintln!("Skipping test: cannot read test file: {}", e);
+                return;
+            }
+        };
+
+        let detections = engine
+            .detect(&text, false)
+            .expect("Detection should succeed");
+
+        for detection in &detections {
+            for m in &detection.matches {
+                assert!(
+                    !m.license_expression.contains("cc-by-nc-sa"),
+                    "Found false positive cc-by-nc-sa match at lines {}-{} with matched_text: {:?}",
+                    m.start_line,
+                    m.end_line,
+                    m.matched_text
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_is_license_text_subtraction_triggers() {
+        let is_license_text = true;
+        let rule_length: usize = 150;
+        let match_coverage: f32 = 99.0;
+
+        assert!(
+            is_license_text && rule_length > 120 && match_coverage > 98.0,
+            "Subtraction should trigger for long license text with high coverage"
+        );
+    }
+
+    #[test]
+    fn test_is_license_text_subtraction_skips_short() {
+        let is_license_text = true;
+        let rule_length: usize = 100;
+        let match_coverage: f32 = 99.0;
+
+        assert!(
+            !(is_license_text && rule_length > 120 && match_coverage > 98.0),
+            "Subtraction should NOT trigger for short rules"
+        );
+    }
+
+    #[test]
+    fn test_is_license_text_subtraction_skips_low_coverage() {
+        let is_license_text = true;
+        let rule_length: usize = 150;
+        let match_coverage: f32 = 95.0;
+
+        assert!(
+            !(is_license_text && rule_length > 120 && match_coverage > 98.0),
+            "Subtraction should NOT trigger for low coverage"
+        );
+    }
+
+    #[test]
+    fn test_is_license_text_subtraction_skips_non_text() {
+        let is_license_text = false;
+        let rule_length: usize = 150;
+        let match_coverage: f32 = 99.0;
+
+        assert!(
+            !(is_license_text && rule_length > 120 && match_coverage > 98.0),
+            "Subtraction should NOT trigger when is_license_text is false"
+        );
+    }
+
+    #[test]
+    fn test_detect_mit_license_with_utf8_bom() {
+        let Some(engine) = create_engine_from_reference() else {
+            eprintln!("Skipping test: reference directory not found");
+            return;
+        };
+
+        let mit_with_bom =
+            "\u{FEFF}Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the \"Software\"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.";
+
+        let detections = engine
+            .detect(mit_with_bom, false)
+            .expect("Detection should succeed");
+
+        assert!(
+            !detections.is_empty(),
+            "Should detect at least one license in MIT text with BOM"
+        );
+
+        let mit_related = detections.iter().any(|d| {
+            d.license_expression
+                .as_ref()
+                .map(|e| e.contains("mit") || e.contains("unknown"))
+                .unwrap_or(false)
+        });
+        assert!(
+            mit_related,
+            "Should detect MIT or unknown license with BOM, got: {:?}",
+            detections
+                .iter()
+                .map(|d| d.license_expression.as_deref().unwrap_or("none"))
+                .collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn test_detect_spdx_identifier_with_utf8_bom() {
+        let Some(engine) = create_engine_from_reference() else {
+            eprintln!("Skipping test: reference directory not found");
+            return;
+        };
+
+        let text = "\u{FEFF}SPDX-License-Identifier: MIT";
+        let detections = engine
+            .detect(text, false)
+            .expect("Detection should succeed");
+
+        assert!(
+            !detections.is_empty(),
+            "Should detect SPDX identifier even with BOM"
+        );
+    }

@@ -15,8 +15,7 @@ const REQUIRED_PHRASE_CLOSE: &str = "}}";
 ///
 /// This is the Rust equivalent of the Python STOPWORDS frozenset from
 /// reference/scancode-toolkit/src/licensedcode/stopwords.py
-#[allow(dead_code)]
-static STOPWORDS: Lazy<HashSet<&'static str>> = Lazy::new(|| {
+pub(crate) static STOPWORDS: Lazy<HashSet<&'static str>> = Lazy::new(|| {
     let mut set = HashSet::new();
 
     // common XML character references as &quot;

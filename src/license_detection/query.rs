@@ -1,7 +1,7 @@
 //! Query processing - tokenized input for license matching.
 
 use crate::license_detection::index::LicenseIndex;
-use crate::license_detection::tokenize::tokenize_without_stopwords;
+use crate::license_detection::tokenize::{tokenize_without_stopwords, STOPWORDS};
 use std::collections::{HashMap, HashSet};
 
 /// A span representing a range of token positions.
@@ -21,13 +21,11 @@ pub struct PositionSpan {
 
 impl PositionSpan {
     /// Create a new span from start and end positions (inclusive).
-    #[allow(dead_code)]
     pub fn new(start: usize, end: usize) -> Self {
         Self { start, end }
     }
 
     /// Check if this span contains a position.
-    #[allow(dead_code)]
     pub fn contains(&self, pos: usize) -> bool {
         pos >= self.start && pos <= self.end
     }
@@ -40,7 +38,6 @@ impl PositionSpan {
     /// Subtract another span from this span.
     ///
     /// Returns positions in self that are not in other.
-    #[allow(dead_code)]
     pub fn difference(&self, other: &PositionSpan) -> HashSet<usize> {
         self.positions()
             .difference(&other.positions())
@@ -49,114 +46,6 @@ impl PositionSpan {
     }
 }
 
-/// Stopwords that are filtered out during tokenization.
-///
-/// These are common words like HTML tags, XML entities, comment markers, etc.
-/// that are not useful for license matching.
-///
-/// Based on Python: reference/scancode-toolkit/src/licensedcode/stopwords.py
-#[allow(dead_code)]
-const STOPWORDS: &[&str] = &[
-    // XML character references
-    "amp",
-    "apos",
-    "gt",
-    "lt",
-    "nbsp",
-    "quot",
-    // HTML tags
-    "a",
-    "abbr",
-    "alt",
-    "blockquote",
-    "body",
-    "br",
-    "class",
-    "div",
-    "em",
-    "h1",
-    "h2",
-    "h3",
-    "h4",
-    "h5",
-    "hr",
-    "href",
-    "img",
-    "li",
-    "ol",
-    "p",
-    "pre",
-    "rel",
-    "script",
-    "span",
-    "src",
-    "td",
-    "th",
-    "tr",
-    "ul",
-    // Comment line markers
-    "rem",
-    "dnl",
-    // DocBook tags
-    "para",
-    "ulink",
-    // HTML punctuation/entities
-    "bdquo",
-    "bull",
-    "bullet",
-    "colon",
-    "comma",
-    "emdash",
-    "emsp",
-    "ensp",
-    "ge",
-    "hairsp",
-    "ldquo",
-    "ldquor",
-    "le",
-    "lpar",
-    "lsaquo",
-    "lsquo",
-    "lsquor",
-    "mdash",
-    "ndash",
-    "numsp",
-    "period",
-    "puncsp",
-    "raquo",
-    "rdquo",
-    "rdquor",
-    "rpar",
-    "rsaquo",
-    "rsquo",
-    "rsquor",
-    "sbquo",
-    "semi",
-    "thinsp",
-    "tilde",
-    // XML char entities
-    "x3c",
-    "x3e",
-    // CSS
-    "lists",
-    "side",
-    "nav",
-    "height",
-    "auto",
-    "border",
-    "padding",
-    "width",
-    // Perl PODs
-    "head1",
-    "head2",
-    "head3",
-    // C literals
-    "printf",
-    // Shell
-    "echo",
-];
-
-/// A query represents tokenized input text to be matched against license rules.
 ///
 /// Query holds:
 /// - Known token IDs (tokens existing in the index dictionary)
@@ -169,7 +58,6 @@ const STOPWORDS: &[&str] = &[
 /// Based on Python Query class at:
 /// reference/scancode-toolkit/src/licensedcode/query.py (lines 155-295)
 #[derive(Debug)]
-#[allow(dead_code)]
 pub struct Query<'a> {
     /// The original input text.
     ///
@@ -256,7 +144,6 @@ pub struct Query<'a> {
     pub index: &'a LicenseIndex,
 }
 
-#[allow(dead_code)]
 impl<'a> Query<'a> {
     /// Create a new query from text string and license index.
     ///
@@ -311,7 +198,7 @@ impl<'a> Query<'a> {
         let is_binary = Self::detect_binary(text)?;
         let has_long_lines = Self::detect_long_lines(text);
 
-        let stopwords_set: HashSet<&str> = STOPWORDS.iter().copied().collect();
+        let stopwords_set = &*STOPWORDS;
 
         let mut tokens = Vec::new();
         let mut line_by_pos = Vec::new();
@@ -841,7 +728,6 @@ pub struct QueryRun<'a> {
     pub end: Option<usize>,
 }
 
-#[allow(dead_code)]
 impl<'a> QueryRun<'a> {
     /// Create a new query run from a query with start and end positions.
     ///
