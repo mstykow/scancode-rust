@@ -109,3 +109,7 @@ path = "src/bin/generate_supported_formats.rs"
 [[bin]]
 name = "generate-test-expected"
 path = "bin/generate_test_expected.rs"
+
+[features]
+default = []
+debug-pipeline = []

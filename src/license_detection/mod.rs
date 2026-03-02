@@ -108,8 +108,8 @@ mod golden_test;
 pub mod hash_match;
 pub mod index;
 mod match_refine;
-mod models;
-mod query;
+pub mod models;
+pub mod query;
 pub mod rules;
 pub mod seq_match;
 pub mod spans;
@@ -124,6 +124,9 @@ mod filter_dupes_debug_test;
 mod tokenize;
 pub mod unknown_match;
 
+#[cfg(feature = "debug-pipeline")]
+mod debug_pipeline;
+
 use std::path::Path;
 use std::sync::Arc;
 
@@ -136,11 +139,12 @@ use crate::license_detection::spdx_mapping::{SpdxMapping, build_spdx_mapping};
 use crate::utils::text::strip_utf8_bom_str;
 
 use crate::license_detection::detection::{
-    create_detection_from_group, group_matches_by_region, populate_detection_from_group_with_spdx,
-    post_process_detections, sort_matches_by_line,
+    populate_detection_from_group_with_spdx,
+    sort_matches_by_line,
 };
 
-pub use detection::LicenseDetection;
+pub use detection::{LicenseDetection, group_matches_by_region, create_detection_from_group, post_process_detections};
+pub use models::LicenseMatch;
 
 pub use aho_match::aho_match;
 pub use hash_match::hash_match;
@@ -153,6 +157,15 @@ pub use seq_match::{
 };
 pub use spdx_lid::spdx_lid_match;
 pub use unknown_match::unknown_match;
+
+#[cfg(feature = "debug-pipeline")]
+pub use debug_pipeline::{
+    filter_below_rule_minimum_coverage_debug_only, filter_contained_matches_debug_only,
+    filter_false_positive_matches_debug_only, filter_invalid_matches_to_single_word_gibberish_debug_only,
+    filter_matches_missing_required_phrases_debug_only, filter_matches_to_spurious_single_token_debug_only,
+    filter_short_matches_scattered_on_too_many_lines_debug_only, filter_spurious_matches_debug_only,
+    filter_too_short_matches_debug_only,
+};
 
 /// License detection engine that orchestrates the detection pipeline.
 ///

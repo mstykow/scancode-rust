@@ -95,7 +95,7 @@ pub fn split_weak_matches(matches: &[LicenseMatch]) -> (Vec<LicenseMatch>, Vec<L
     (good, weak)
 }
 
-fn filter_too_short_matches(index: &LicenseIndex, matches: &[LicenseMatch]) -> Vec<LicenseMatch> {
+pub(crate) fn filter_too_short_matches(index: &LicenseIndex, matches: &[LicenseMatch]) -> Vec<LicenseMatch> {
     matches
         .iter()
         .filter(|m| {
@@ -386,7 +386,6 @@ pub(crate) fn filter_contained_matches(
             let next = matches[j].clone();
 
             if next.end_token > current.end_token {
-                j += 1;
                 break;
             }
 
@@ -488,7 +487,7 @@ fn filter_license_references_with_text_match(
 /// Vector of LicenseMatch with false positive matches removed
 ///
 /// Based on Python: `filter_false_positive_matches()` (lines 1950-1970)
-fn filter_false_positive_matches(
+pub(crate) fn filter_false_positive_matches(
     index: &LicenseIndex,
     matches: &[LicenseMatch],
 ) -> Vec<LicenseMatch> {
@@ -561,7 +560,7 @@ fn is_false_positive(m: &LicenseMatch, index: &LicenseIndex) -> bool {
 /// sequence and unknown matcher types - exact matches are always kept.
 ///
 /// Based on Python: `filter_spurious_matches()` (match.py:1768-1836)
-fn filter_spurious_matches(matches: &[LicenseMatch], query: &Query) -> Vec<LicenseMatch> {
+pub(crate) fn filter_spurious_matches(matches: &[LicenseMatch], query: &Query) -> Vec<LicenseMatch> {
     matches
         .iter()
         .filter(|m| {
@@ -1062,7 +1061,7 @@ pub fn filter_false_positive_license_lists_matches(
 /// Vector of LicenseMatch with below-minimum-coverage matches removed
 ///
 /// Based on Python: `filter_below_rule_minimum_coverage()` (lines 1551-1587)
-fn filter_below_rule_minimum_coverage(
+pub(crate) fn filter_below_rule_minimum_coverage(
     index: &LicenseIndex,
     matches: &[LicenseMatch],
 ) -> Vec<LicenseMatch> {
@@ -1103,7 +1102,7 @@ fn filter_below_rule_minimum_coverage(
 /// Vector of LicenseMatch with scattered matches removed
 ///
 /// Based on Python: `filter_short_matches_scattered_on_too_many_lines()` (lines 1931-1972)
-fn filter_short_matches_scattered_on_too_many_lines(
+pub(crate) fn filter_short_matches_scattered_on_too_many_lines(
     index: &LicenseIndex,
     matches: &[LicenseMatch],
 ) -> Vec<LicenseMatch> {
@@ -1156,7 +1155,7 @@ fn filter_short_matches_scattered_on_too_many_lines(
 /// Tuple of (kept matches, discarded matches)
 ///
 /// Based on Python: `filter_matches_missing_required_phrases()` (match.py:2154-2328)
-fn filter_matches_missing_required_phrases(
+pub(crate) fn filter_matches_missing_required_phrases(
     index: &LicenseIndex,
     matches: &[LicenseMatch],
     query: &Query,
@@ -1363,7 +1362,7 @@ fn filter_matches_missing_required_phrases(
 /// Vector of LicenseMatch with spurious single-token matches removed
 ///
 /// Based on Python: `filter_matches_to_spurious_single_token()` (lines 1622-1700)
-fn filter_matches_to_spurious_single_token(
+pub(crate) fn filter_matches_to_spurious_single_token(
     matches: &[LicenseMatch],
     query: &Query,
     unknown_count: usize,
@@ -1504,7 +1503,7 @@ fn is_valid_short_match(matched_text: &str, rule_text: &str, max_diff: usize) ->
 /// Vector of LicenseMatch with gibberish matches removed
 ///
 /// Based on Python: `filter_invalid_matches_to_single_word_gibberish()` (lines 1839-1901)
-fn filter_invalid_matches_to_single_word_gibberish(
+pub(crate) fn filter_invalid_matches_to_single_word_gibberish(
     index: &LicenseIndex,
     matches: &[LicenseMatch],
     query: &Query,
@@ -1611,7 +1610,7 @@ pub fn refine_aho_matches(
     // But apply all the quality filters
 
     // Filter matches missing required phrases
-    let (with_required_phrases, missing_phrases) =
+    let (with_required_phrases, _missing_phrases) =
         filter_matches_missing_required_phrases(index, &matches, query);
 
     let non_spurious = filter_spurious_matches(&with_required_phrases, query);

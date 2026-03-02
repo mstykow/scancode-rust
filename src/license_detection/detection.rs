@@ -789,7 +789,14 @@ pub fn populate_detection_from_group(detection: &mut LicenseDetection, group: &D
 
     detection.detection_log.push(log_category.to_string());
 
-    detection.identifier = None;
+    // Compute identifier like Python: detection.identifier = detection.identifier_with_expression
+    if let Some(ref expr) = detection.license_expression {
+        let id_safe_expression = python_safe_name(expr);
+        let content_uuid = compute_content_identifier(&detection.matches);
+        detection.identifier = Some(format!("{}-{}", id_safe_expression, content_uuid));
+    } else {
+        detection.identifier = None;
+    }
 
     if group.start_line > 0 {
         detection.file_region = Some(FileRegion {
@@ -881,7 +888,14 @@ pub fn create_detection_from_group(group: &DetectionGroup) -> LicenseDetection {
 
     detection.detection_log.push(log_category.to_string());
 
-    detection.identifier = None;
+    // Compute identifier like Python: detection.identifier = detection.identifier_with_expression
+    if let Some(ref expr) = detection.license_expression {
+        let id_safe_expression = python_safe_name(expr);
+        let content_uuid = compute_content_identifier(&detection.matches);
+        detection.identifier = Some(format!("{}-{}", id_safe_expression, content_uuid));
+    } else {
+        detection.identifier = None;
+    }
 
     if group.start_line > 0 {
         detection.file_region = Some(FileRegion {

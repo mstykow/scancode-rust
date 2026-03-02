@@ -10,7 +10,7 @@ This guide provides essential information for AI coding agents working on the `s
 - **How-To Guides**: [`docs/HOW_TO_ADD_A_PARSER.md`](docs/HOW_TO_ADD_A_PARSER.md) - Step-by-step guide for adding new parsers
 - **Architectural Decision Records**: [`docs/adr/`](docs/adr/) - Why key decisions were made (5 ADRs)
 - **Beyond-Parity Features**: [`docs/improvements/`](docs/improvements/) - Where Rust exceeds Python (7 parsers documented)
-- **License Detection Debugging**: [`docs/DEBUG-LICENSE-DETECTION.md`](docs/DEBUG-LICENSE-DETECTION.md) - Debug the Python license detection pipeline
+- **License Detection Debugging**: [`docs/DEBUG-LICENSE-DETECTION.md`](docs/DEBUG-LICENSE-DETECTION.md) - Debug Python and Rust license detection pipelines
 - **Supported Formats**: [`docs/SUPPORTED_FORMATS.md`](docs/SUPPORTED_FORMATS.md) - Auto-generated list of all supported package formats
 - **API Reference**: Run `cargo doc --open` - Complete API documentation
 - **This File**: Quick start, code style, common pitfalls
