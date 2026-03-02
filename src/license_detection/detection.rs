@@ -930,6 +930,10 @@ pub fn filter_detections_by_score(
 /// location. Detections with the same expression but different identifiers
 /// represent the same license at DIFFERENT locations and should be kept separate.
 ///
+/// NOTE: This function is currently unused. It will be renamed to `get_unique_detections`
+/// and reimplemented to return `UniqueDetection` with aggregated `file_regions`.
+/// See: docs/license-detection/PLAN-019-unique-detection.md
+///
 /// Based on Python get_detections_by_id behavior in detection.py.
 pub fn remove_duplicate_detections(detections: Vec<LicenseDetection>) -> Vec<LicenseDetection> {
     let mut detections_by_id: std::collections::HashMap<String, LicenseDetection> =
@@ -1098,6 +1102,11 @@ fn python_token_tuple_repr(tokens: &[String]) -> String {
     result
 }
 
+/// Compute a unique identifier for a detection.
+///
+/// NOTE: This function is currently unused. It will be used by `get_unique_detections`
+/// when implementing UniqueDetection aggregation.
+/// See: docs/license-detection/PLAN-019-unique-detection.md
 pub fn compute_detection_identifier(detection: &LicenseDetection) -> String {
     let expression = detection
         .license_expression
