@@ -1,6 +1,6 @@
 # Caching & Incremental Scanning Implementation Plan
 
-> **Status**: 🟡 Planning Complete — Semantics Validated, Implementation Pending
+> **Status**: 🟡 Groundwork In Progress — `src/cache` primitives landed, runtime integration pending
 > **Priority**: P2 - Medium Priority (Performance Feature)
 > **Estimated Effort**: 2-3 weeks
 > **Dependencies**: License detection (for license index caching benefits)
@@ -57,15 +57,19 @@ Persistent caching of scan results and compiled data structures to speed up repe
 - ✅ Rule-driven detection pipeline architecture documented and integrated on story branch
 - ✅ SHA256 hash computation per file in `process_file()` (already available as cache key)
 - ✅ `FileInfo` struct with all scannable fields (package_data, license_detections, copyrights, etc.)
+- ✅ `src/cache/config.rs`: foundational cache directory helpers (`.scancode-cache`, index/scan-results dirs)
+- ✅ `src/cache/metadata.rs`: snapshot metadata + deterministic invalidation key compatibility checks
+- ✅ `src/cache/paths.rs`: SHA256 validation and deterministic sharded scan cache pathing (`.msgpack.zst`)
+- ✅ `src/cache/io.rs`: versioned snapshot envelope read/write with zstd + MessagePack and atomic temp-file rename
 
 **Missing:**
 
 - ❌ Persistent license index snapshot cache for the new `LicenseIndex` artifacts
-- ❌ Scan result cache infrastructure
+- ❌ Scan result cache integration in scanner read/write pipeline
 - ❌ Incremental scanning logic
-- ❌ Cache invalidation
+- ❌ End-to-end invalidation wiring in runtime startup/scanner flow
 - ❌ Multi-process file locking
-- ❌ Unified cache manager and CLI wiring (`src/cache/`)
+- ❌ Unified cache manager orchestration and CLI wiring
 - ❌ Unified XDG cache location support across all cache users
 
 ### CLI Flag Positioning (Validated)
@@ -220,7 +224,7 @@ Python's invalidation is **minimal**:
 3. **Engine-owned index snapshot caching** — cache contract belongs to `LicenseDetectionEngine`/`LicenseIndex`, not legacy askalono internals
 4. **XDG-compliant cache location** — platform-native defaults, overridable
 5. **Thread-safe by design** — no global mutable state, file locking for multi-process
-6. **Safe serialization** — `postcard` or `rmp-serde`, never pickle-equivalent
+6. **Safe serialization** — `rmp-serde` + `zstd`, never pickle-equivalent
 
 ### High-Level Architecture
 
@@ -256,22 +260,24 @@ Python's invalidation is **minimal**:
 ### Cache Directory Layout
 
 ```text
-~/.cache/scancode-rust/                    # XDG cache dir (or SCANCODE_RUST_CACHE env var)
-├── metadata.json                          # Cache version, tool version, timestamps
+<scan-root>/.scancode-cache/               # Current groundwork default (XDG/env/CLI override planned)
+├── metadata.json                          # Planned cache-manager metadata file
 ├── license-index/
-│   ├── index.snapshot.bin                 # Cached engine index snapshot (engine-owned format)
+│   ├── snapshot.bin.zst                   # Cached engine index snapshot envelope (msgpack + zstd)
 │   └── store.lock                         # Lock file for index rebuild
-├── scans/
+├── scan-results/
 │   ├── ab/
-│   │   ├── ab3f...a1c2.postcard           # Cached FileInfo for file with that SHA256
-│   │   └── ab91...f3d0.postcard           # (sharded by first 2 hex chars)
+│   │   ├── cd/
+│   │   │   └── abcd...a1c2.msgpack.zst    # Two-level shard (first 4 hex chars)
+│   │   └── ef/
+│   │       └── abef...f3d0.msgpack.zst
 │   ├── cd/
-│   │   └── cd12...8e9f.postcard
+│   │   └── 12/cd12...8e9f.msgpack.zst
 │   └── ...
 └── scans.lock                             # Lock file for scan cache writes
 ```
 
-**Sharding rationale**: With 100K+ cached files, flat directories become slow on some filesystems. Two-character hex prefix = 256 subdirectories, each holding ~400 files for a 100K-file codebase.
+**Sharding rationale**: With 100K+ cached files, flat directories become slow on some filesystems. Current groundwork uses two-level sharding from the first 4 SHA256 hex chars (`aa/bb`) for stable distribution.
 
 ### Core Data Types
 
@@ -380,8 +386,10 @@ pub struct CacheManager {
 
 **Rationale**:
 
-- `rename()` is atomic on POSIX — no corrupt cache files on crash
-- Write to `<hash>.postcard.tmp` → rename to `<hash>.postcard`
+- Use same-directory temp-file + rename to avoid exposing partially-written cache entries
+- Rename/replace semantics vary across platforms/filesystems; treat this as atomic-best-effort portability, not identical OS behavior
+- Durable crash safety requires explicit file sync before rename (and parent-directory sync when needed on Unix-like systems)
+- Write to temporary file in the target directory, then rename to `*.msgpack.zst`/`snapshot.bin.zst`
 - If process crashes mid-write, temp file is orphaned (harmless)
 
 #### 6. What to Cache vs. What to Reconstruct
@@ -406,14 +414,14 @@ pub struct CacheManager {
 ```text
 src/
 ├── cache/
-│   ├── mod.rs              # Public API: CacheManager
-│   ├── config.rs           # CacheConfig, CLI flag integration
-│   ├── index_cache.rs      # License index snapshot caching (`LicenseIndex` artifacts)
-│   ├── scan_cache.rs       # Per-file scan result caching
-│   ├── metadata.rs         # CacheMetadata, version management
-│   └── locking.rs          # File locking wrappers
-├── cache_test.rs           # Unit tests
+│   ├── mod.rs              # Public cache API exports
+│   ├── config.rs           # CacheConfig and directory helpers
+│   ├── metadata.rs         # Snapshot metadata + invalidation keys
+│   ├── paths.rs            # SHA256 validation + sharded cache paths
+│   └── io.rs               # Snapshot envelope read/write + atomic persistence
 ```
+
+Planned follow-up modules (not yet implemented): `index_cache.rs`, `scan_cache.rs`, `locking.rs`.
 
 ---
 
@@ -554,6 +562,8 @@ src/
 **Python**: `except Exception: print(...)` silently swallows cache load errors.
 **Rust**: `Result<T, E>` with proper error propagation, `log::warn!` for non-fatal cache errors.
 
+Cache load/decode/validation failures should degrade to cache miss + rebuild, not fatal scan termination.
+
 ### 7. Faster Lock Timeout (Performance)
 
 **Python**: 6-minute lock timeout for license index (because building is slow in Python).
@@ -563,7 +573,7 @@ src/
 
 ## Testing Strategy
 
-### Unit Tests (`cache_test.rs`)
+### Unit Tests (`src/cache/*`)
 
 1. **Cache directory**: XDG resolution, env var override, CLI flag override
 2. **Metadata**: Version stamping, JSON read/write, version mismatch detection
@@ -614,15 +624,15 @@ src/
 
 ## Dependency Summary
 
-| Crate       | Version | Purpose                                                               | Status      |
-| ----------- | ------- | --------------------------------------------------------------------- | ----------- |
-| `rmp-serde` | TBD     | Optional candidate for snapshot serialization (engine-owned decision) | ⚖️ Evaluate |
-| `zstd`      | TBD     | Optional compression for index snapshots                              | ⚖️ Evaluate |
-| `sha2`      | 0.10    | SHA256 hashing (already used for file hashing)                        | ✅ Existing |
-| `dirs`      | 5.0     | XDG cache directory resolution                                        | 🆕 New      |
-| `fd-lock`   | 4.0     | File locking for multi-process safety                                 | 🆕 New      |
+| Crate       | Version | Purpose                                           | Status      |
+| ----------- | ------- | ------------------------------------------------- | ----------- |
+| `rmp-serde` | 1.3.1   | Snapshot envelope serialization (MessagePack)     | ✅ Existing |
+| `zstd`      | 0.13.3  | Snapshot compression for persisted cache payloads | ✅ Existing |
+| `sha2`      | 0.10    | SHA256 hashing (already used for file hashing)    | ✅ Existing |
+| `dirs`      | 5.0     | XDG cache directory resolution                    | 📝 Planned  |
+| `fd-lock`   | 4.0     | File locking for multi-process safety             | 📝 Planned  |
 
-Only 2 new dependencies needed — both small, well-maintained, and widely used.
+Remaining dependency additions are focused on XDG and lock coordination (`dirs`, `fd-lock`) once integration phases begin.
 
 ---
 

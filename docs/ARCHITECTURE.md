@@ -683,9 +683,9 @@ Caching is currently split between transition-state behavior on `main` and the t
 2. **Scan Result Cache** (beyond parity — Python has none): Content-addressed per-file cache keyed by SHA256.
 3. **Incremental Scanning** (beyond parity — Python has none): manifest-guided re-scan of changed files only.
 
-When unified cache management lands, cache location will be XDG-compliant (`~/.cache/scancode-rust/`) with environment/CLI overrides, multi-process safety via file locking, and atomic writes.
+Current groundwork on this branch now lives in `src/cache/` (`config`, `metadata`, `paths`, `io`) with snapshot envelope read/write, compatibility checks, and atomic temp-file + rename persistence.
 
-Planned module location for unified cache management: `src/cache/`.
+Unified runtime wiring is still pending: scanner/main integration, CLI cache flags, and lock-managed multi-process coordination. XDG/env override behavior remains a planned follow-up once cache ownership is centralized.
 
 **Progress Tracking**:
 
@@ -716,15 +716,20 @@ Ongoing quality improvements:
 
 ### How License Detection Works
 
-The project is transitioning to a ScanCode-compatible runtime rule-loading model for license detection.
+The project is in a transition period between legacy askalono startup on `main` and the target ScanCode-compatible runtime rule-loading model in `feat-add-license-parsing`.
 
-Target model:
+**Current mainline behavior (`main`):**
+
+1. License detection startup still initializes askalono from embedded SPDX JSON details.
+2. `setup.sh` updates the SPDX data submodule used by current embedded-license workflows.
+
+**Target model (post-merge of `feat-add-license-parsing`):**
 
 1. **Source of truth**: ScanCode `.LICENSE` and `.RULE` datasets from the `reference/scancode-toolkit` submodule.
 2. **Load mode**: Rules are loaded at runtime by `LicenseDetectionEngine` and compiled into `LicenseIndex` structures.
 3. **Performance path**: Rebuild on cold start; load from validated index snapshot cache on warm start.
 
-This means:
+Target-model implications:
 
 - **For users**: license detection correctness aligns with ScanCode rule data and can be updated by refreshing rule datasets.
 - **For developers**: rule data availability and fingerprinting are first-class runtime concerns.
@@ -732,11 +737,11 @@ This means:
 
 ### Updating the License Data
 
-**For Releases:** Keep the rule dataset in sync with upstream ScanCode data before release, and ensure snapshot cache invalidation fingerprints update with dataset/version changes.
+**For Releases:** Keep the active rule/license dataset in sync with upstream data for the currently shipped engine path, and ensure snapshot cache invalidation fingerprints update with dataset/version changes.
 
 **For Development:**
 
-To initialize or update the latest ScanCode license/rule definitions in the reference submodule:
+To initialize or update the latest reference license/rule definitions in the submodule:
 
 ```sh
 ./setup.sh                  # Initialize/update license data to latest
@@ -750,12 +755,13 @@ git add resources/licenses
 git commit -m "chore: update SPDX license data"
 ```
 
-The `setup.sh` script:
+The `setup.sh` script currently:
 
 - Initializes the submodule with shallow clone (`--depth=1`)
 - Configures sparse checkout to only include `json/details/` (saves ~90% disk space)
 - Updates to the latest upstream version
-- The build process then embeds these files directly into the compiled binary
+
+Longer-term (target runtime-rule-loading model), rule data remains the canonical source and index snapshots are rebuildable cache artifacts.
 
 ## Related Documentation
 
