@@ -3950,10 +3950,6 @@ fn extend_dash_obfuscated_email_suffixes(
         .expect("valid dash obfuscated email regex")
     });
 
-    if copyrights.len() > 50 {
-        return;
-    }
-
     for (ln, _) in group {
         if !copyrights.iter().any(|c| c.start_line == *ln) {
             continue;
