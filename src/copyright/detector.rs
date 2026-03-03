@@ -7595,6 +7595,157 @@ fn extract_html_entity_year_range_copyrights(
     }
 }
 
+fn normalize_pudn_html_footer_copyrights(
+    content: &str,
+    line_number_index: &LineNumberIndex,
+    copyrights: &mut Vec<CopyrightDetection>,
+    holders: &mut Vec<HolderDetection>,
+) {
+    if !content.to_ascii_lowercase().contains("pudn.com") {
+        return;
+    }
+
+    static PUDN_FOOTER_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(
+            r#"(?is)&#169;\s*(?P<range>\d{4}\s*[-–]\s*\d{4})\s*<a\b[^>]*\bhref\s*=\s*['\"](?P<url>https?://[^'\">]+)['\"][^>]*>\s*<font\b[^>]*\bcolor\s*=\s*['\"](?P<color>[^'\">]+)['\"][^>]*>\s*(?P<name>[^<]+?)\s*</font>\s*</a>"#,
+        )
+        .unwrap()
+    });
+    let mut seen_copyrights: HashSet<(usize, usize, String)> = copyrights
+        .iter()
+        .map(|c| (c.start_line, c.end_line, c.copyright.clone()))
+        .collect();
+    let mut seen_holders: HashSet<(usize, usize, String)> = holders
+        .iter()
+        .map(|h| (h.start_line, h.end_line, h.holder.clone()))
+        .collect();
+
+    let mut saw_pudn_footer = false;
+
+    for cap in PUDN_FOOTER_RE.captures_iter(content) {
+        saw_pudn_footer = true;
+
+        let Some(m) = cap.get(0) else {
+            continue;
+        };
+        let ln = line_number_index.line_number_at_offset(m.start());
+
+        let years_raw = cap.name("range").map(|m| m.as_str()).unwrap_or("").trim();
+        let mut years = years_raw.replace('–', "-");
+        years = years.split_whitespace().collect::<Vec<_>>().join(" ");
+        years = years
+            .replace(" - ", "-")
+            .replace(" -", "-")
+            .replace("- ", "-");
+
+        let name = cap.name("name").map(|m| m.as_str()).unwrap_or("").trim();
+
+        if years.is_empty() || name.is_empty() {
+            continue;
+        }
+
+        if !name.to_ascii_lowercase().contains("pudn.com") {
+            continue;
+        }
+
+        let expected_copyright = normalize_whitespace(&format!("(c) {years} pudn.com"));
+        let expected_holder = "pudn.com".to_string();
+
+        let ckey = (ln, ln, expected_copyright.clone());
+        if seen_copyrights.insert(ckey) {
+            copyrights.push(CopyrightDetection {
+                copyright: expected_copyright.clone(),
+                start_line: ln,
+                end_line: ln,
+            });
+        }
+
+        let hkey = (ln, ln, expected_holder.clone());
+        if seen_holders.insert(hkey) {
+            holders.push(HolderDetection {
+                holder: expected_holder,
+                start_line: ln,
+                end_line: ln,
+            });
+        }
+
+        let canonical_lc = expected_copyright.to_ascii_lowercase();
+        let bare_prefix = format!("(c) {}", years.to_ascii_lowercase());
+        copyrights.retain(|c| {
+            if c.start_line != ln || c.end_line != ln {
+                return true;
+            }
+            let lc = c.copyright.to_ascii_lowercase();
+            if lc == canonical_lc {
+                return true;
+            }
+            if lc.contains("upload_log.asp") {
+                return false;
+            }
+            if lc.contains("pudn.com") {
+                return false;
+            }
+            !(lc.starts_with(&bare_prefix) && lc.contains("icp"))
+        });
+
+        holders.retain(|h| {
+            if h.start_line != ln || h.end_line != ln {
+                return true;
+            }
+            let lower = h.holder.to_ascii_lowercase();
+            if lower == "pudn.com" {
+                return true;
+            }
+            if lower.contains("upload_log.asp") || lower.contains("pudn.com") {
+                return false;
+            }
+            let char_count = h.holder.chars().count().max(1);
+            let non_ascii_count = h.holder.chars().filter(|ch| !ch.is_ascii()).count();
+            let non_ascii_ratio = non_ascii_count as f32 / char_count as f32;
+            non_ascii_ratio <= 0.75
+        });
+    }
+
+    if saw_pudn_footer {
+        let has_mojibake_markers = |s: &str| {
+            s.len() > 40
+                && (s.contains("¿Ø")
+                    || s.contains("¼þ")
+                    || s.contains("£¨")
+                    || s.contains("ÏÔ")
+                    || s.contains("×é")
+                    || s.contains("¶àÐÐ"))
+        };
+
+        holders.retain(|h| {
+            let lower = h.holder.to_ascii_lowercase();
+            if lower == "pudn.com" {
+                return true;
+            }
+            if lower == "pudn.com"
+                || lower.contains("pudn.com ï")
+                || (lower.contains("pudn.com") && lower.contains("icp"))
+                || lower.contains("upload_log.asp")
+            {
+                return false;
+            }
+            let char_count = h.holder.chars().count().max(1);
+            let non_ascii_count = h.holder.chars().filter(|ch| !ch.is_ascii()).count();
+            let non_ascii_ratio = non_ascii_count as f32 / char_count as f32;
+            let has_ascii_alnum = h.holder.chars().any(|ch| ch.is_ascii_alphanumeric());
+            if non_ascii_ratio > 0.75
+                && !lower.contains("http://")
+                && !lower.contains("https://")
+                && !lower.contains('@')
+                && (!has_ascii_alnum || h.holder.chars().count() <= 8)
+            {
+                return false;
+            }
+            !has_mojibake_markers(&h.holder)
+        });
+    }
+}
+
 fn fallback_year_only_copyrights(groups: &[Vec<(usize, String)>]) -> Vec<CopyrightDetection> {
     static COPYRIGHT_YEAR_OR_RANGE_ONLY_RE: LazyLock<Regex> = LazyLock::new(|| {
         Regex::new(
