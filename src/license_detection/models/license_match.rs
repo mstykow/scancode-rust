@@ -543,6 +543,32 @@ impl LicenseMatch {
     }
 
     pub fn ispan_overlap(&self, other: &LicenseMatch) -> usize {
+        if let (Some(self_positions), Some(other_positions)) =
+            (&self.ispan_positions, &other.ispan_positions)
+        {
+            let self_set: HashSet<usize> = self_positions.iter().copied().collect();
+            return other_positions
+                .iter()
+                .filter(|p| self_set.contains(p))
+                .count();
+        }
+
+        if let (Some(self_positions), None) = (&self.ispan_positions, &other.ispan_positions) {
+            let self_set: HashSet<usize> = self_positions.iter().copied().collect();
+            return (other.rule_start_token..other.rule_start_token + other.matched_length)
+                .filter(|p| self_set.contains(p))
+                .count();
+        }
+
+        if let (None, Some(other_positions)) = (&self.ispan_positions, &other.ispan_positions) {
+            return other_positions
+                .iter()
+                .filter(|&&p| {
+                    p >= self.rule_start_token && p < self.rule_start_token + self.matched_length
+                })
+                .count();
+        }
+
         let (self_start, self_end) = self.ispan_bounds();
         let (other_start, other_end) = other.ispan_bounds();
 
