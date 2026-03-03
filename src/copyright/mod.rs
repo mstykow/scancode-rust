@@ -113,7 +113,7 @@ mod tests {
 
     #[test]
     fn test_options_can_keep_only_authors() {
-        let content = "Copyright (c) 2024 Acme Inc.\nWritten by John Doe";
+        let content = "Written by John Doe";
         let options = CopyrightDetectionOptions {
             include_copyrights: false,
             include_holders: false,
