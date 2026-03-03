@@ -970,6 +970,90 @@ fn test_extract_html_meta_name_copyright_content() {
 }
 
 #[test]
+fn test_extract_pudn_footer_canonicalizes_to_domain_only() {
+    let content = "&#169; 2004-2009 <a href=\"http://www.pudn.com/\"><font color=\"red\">pudn.com</font></a> ÏæICP±¸07000446";
+    let (copyrights, holders, _authors) = detect_copyrights_from_text(content);
+
+    assert!(
+        copyrights
+            .iter()
+            .any(|c| c.copyright == "(c) 2004-2009 pudn.com"),
+        "copyrights: {copyrights:?}"
+    );
+    assert!(
+        holders.iter().any(|h| h.holder == "pudn.com"),
+        "holders: {holders:?}"
+    );
+    assert!(!holders.iter().any(|h| h.holder.contains("upload_log.asp")));
+}
+
+#[test]
+fn test_extract_pudn_upload_log_link_does_not_create_copyright() {
+    let content = r#"&nbsp;&nbsp;�� �� ��: <a href="http://s.pudn.com/upload_log.asp?e=234428" target="_blank">ɭ��</a>"#;
+    let (copyrights, _holders, _authors) = detect_copyrights_from_text(content);
+
+    assert!(
+        !copyrights
+            .iter()
+            .any(|c| c.copyright.contains("upload_log.asp")),
+        "copyrights: {copyrights:?}"
+    );
+}
+
+#[test]
+fn test_identical_pudn_html_fixtures_produce_identical_canonical_output() {
+    let url_path =
+        PathBuf::from("testdata/copyright-golden/copyrights/url_in_html-detail_9_html.html");
+    let incorrect_path =
+        PathBuf::from("testdata/copyright-golden/copyrights/html_incorrect-detail_9_html.html");
+
+    let url_bytes = fs::read(&url_path).expect("url_in_html fixture must be readable");
+    let incorrect_bytes =
+        fs::read(&incorrect_path).expect("html_incorrect fixture must be readable");
+
+    assert_eq!(
+        url_bytes, incorrect_bytes,
+        "fixtures must be byte-identical"
+    );
+
+    let url_content = crate::copyright::golden_utils::read_input_content(&url_path)
+        .expect("url_in_html fixture content must load");
+    let incorrect_content = crate::copyright::golden_utils::read_input_content(&incorrect_path)
+        .expect("html_incorrect fixture content must load");
+
+    let (c1, h1, a1) = detect_copyrights_from_text(&url_content);
+    let (c2, h2, a2) = detect_copyrights_from_text(&incorrect_content);
+
+    let mut c1v: Vec<String> = c1.into_iter().map(|d| d.copyright).collect();
+    let mut h1v: Vec<String> = h1.into_iter().map(|d| d.holder).collect();
+    let mut a1v: Vec<String> = a1.into_iter().map(|d| d.author).collect();
+    let mut c2v: Vec<String> = c2.into_iter().map(|d| d.copyright).collect();
+    let mut h2v: Vec<String> = h2.into_iter().map(|d| d.holder).collect();
+    let mut a2v: Vec<String> = a2.into_iter().map(|d| d.author).collect();
+
+    c1v.sort();
+    h1v.sort();
+    a1v.sort();
+    c2v.sort();
+    h2v.sort();
+    a2v.sort();
+    c1v.dedup();
+    h1v.dedup();
+    a1v.dedup();
+    c2v.dedup();
+    h2v.dedup();
+    a2v.dedup();
+
+    assert_eq!(c1v, c2v, "copyright outputs differ for identical content");
+    assert_eq!(h1v, h2v, "holder outputs differ for identical content");
+    assert_eq!(a1v, a2v, "author outputs differ for identical content");
+
+    assert_eq!(c1v, vec!["(c) 2004-2009 pudn.com".to_string()]);
+    assert_eq!(h1v, vec!["pudn.com".to_string()]);
+    assert!(a1v.is_empty());
+}
+
+#[test]
 fn test_detect_postscript_percent_copyright_prefix() {
     let content = "%%Copyright: -----------------------------------------------------------\n\
 %%Copyright: Copyright 1990-2009 Adobe Systems Incorporated.\n\

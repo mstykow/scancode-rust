@@ -87,6 +87,7 @@ pub(super) fn run_phase_primary_extractions(
     super::extract_spdx_filecopyrighttext_c_without_year(content, copyrights, holders);
     super::extract_html_meta_name_copyright_content(content, copyrights, holders);
     super::extract_html_anchor_copyright_url(content, line_number_index, copyrights, holders);
+    super::normalize_pudn_html_footer_copyrights(content, line_number_index, copyrights, holders);
     super::extract_angle_bracket_year_name_copyrights(groups, copyrights, holders);
     super::extract_html_icon_class_copyrights(content, line_number_index, copyrights, holders);
     super::extract_added_the_copyright_year_for_lines(content, copyrights, holders);
