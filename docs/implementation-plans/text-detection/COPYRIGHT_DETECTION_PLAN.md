@@ -61,6 +61,13 @@ Copyright detection extracts copyright statements, holder names, author informat
 - ✅ Thread-safe design via `LazyLock`
 - ✅ Performance optimizations (long-line skip, encoded-data detection)
 - ✅ Golden test infrastructure with Rust-owned fixtures
+- ✅ API-level include filters (`include_copyrights`, `include_holders`, `include_authors`)
+- ✅ Optional per-file detection runtime deadline (`Duration`-based)
+- ✅ Improved Office/HTML demarkup for `<o:...>` tags (strips noisy Office tags)
+- ✅ First-pass ICS false `(c)` junk filtering expansion (ternary/bitwise/cast-like code patterns)
+- ✅ Multi-line span boundary fixes for `copyrighted by ...` + trailing `Copyright (c)` merges
+- ✅ Multi-line HTML anchor span tracking (match start/end line mapping)
+- ✅ Parenthesized obfuscated-email continuation merge for multi-line copyright notices
 
 ---
 
@@ -336,15 +343,15 @@ Long copyright statements spanning many lines with inline URLs and multiple hold
 
 **Example**: `partial_detection.txt` — multi-line file with Debian markup, inline emails, and multi-holder copyrights. Python detects duplicate `(c)` variants; our refiner deduplicates more aggressively.
 
-**Classification**: Parity gap (not intentional).
+**Classification**: Parity gap (not intentional), partially reduced.
 
 **User impact**: May produce slightly different statement boundaries or deduplicated output in long multi-line notices.
 
-**Difficulty**: Medium. Requires tuning span collection boundaries and suffix stripping.
+**Difficulty**: Medium. Requires additional span/suffix tuning beyond recently landed boundary fixes.
 
 ### Category 2: ICS False `(c)` Code Patterns
 
-ICS source files containing `(c)` in C code contexts (type casts, ternary operators) can be falsely detected as copyright symbols. Junk-pattern filtering catches most cases but some remain.
+ICS source files containing `(c)` in C code contexts (type casts, ternary operators) can be falsely detected as copyright symbols. Junk-pattern filtering catches most cases; a first expanded batch for cast/ternary/bitwise forms is now implemented, but additional tails remain.
 
 **Example**: `iptables-extensions/libxt_LED.c` — `(c)` appears in bitwise/ternary code expressions.
 
@@ -352,11 +359,11 @@ ICS source files containing `(c)` in C code contexts (type casts, ternary operat
 
 **User impact**: In some code-heavy files, extra copyright-like detections may appear and require tighter filtering.
 
-**Difficulty**: Low-medium. More junk patterns in `refiner.rs`.
+**Difficulty**: Low-medium. Continue adding targeted junk patterns and structural code-context filters in `refiner.rs`.
 
 ### Category 3: HTML/Markup-Heavy Files
 
-Files with heavy HTML markup (credits pages, documentation) where tag stripping produces slightly different whitespace or token boundaries than Python.
+Files with heavy HTML markup (credits pages, documentation) where tag stripping produces slightly different whitespace or token boundaries than Python. Multi-line anchor span tracking and selected Office/markup cleanup fixes are implemented, but broader demarkup parity remains.
 
 **Example**: `bzip2/manual.html`, `sonivox-docs/JET_*.html` — complex HTML with copyright notices embedded in markup.
 
@@ -364,7 +371,7 @@ Files with heavy HTML markup (credits pages, documentation) where tag stripping 
 
 **User impact**: Extracted text may differ in spacing or token boundaries for markup-heavy sources.
 
-**Difficulty**: Medium. May require deeper demarkup preprocessing.
+**Difficulty**: Medium. May require deeper demarkup preprocessing and additional HTML-specific postprocess guards.
 
 ### Category 4: Edge-Case Copyright Phrasings
 
@@ -450,18 +457,18 @@ The known gaps above can be reduced in priority order:
 
 1. **ICS false `(c)` patterns** (largest category) — Add junk patterns in `refiner.rs`. Low effort, high impact.
 2. **HTML-heavy files** — Improve demarkup preprocessing. Medium effort.
-3. **Multi-line URL copyrights** — Tune span collection boundaries. Medium effort.
+3. **Multi-line URL copyrights** — Tune span collection boundaries. Medium effort. _(Partially completed: multiline clause merge span updates + multiline anchor span mapping landed.)_
 4. **Edge-case phrasings** — Grammar/parser additions. Medium-high effort.
 5. **Author/holder gaps** (smallest category) — Specific PosTag fixes. Low effort.
 
 ### Priority 2: Performance Optimizations
 
 - **RegexSet pre-filter**: The sequential regex pattern set per token could potentially use a pre-filter to reduce matching overhead while preserving first-match-wins semantics.
-- **Per-file deadline/timeout**: Python supports a `deadline` parameter for aborting long-running detection. We have `max_iterations = 50` in the parser but no wall-clock timeout. Add `std::time::Instant`-based deadline check.
+- ✅ **Per-file deadline/timeout**: Implemented wall-clock runtime limit plumbing (`max_runtime`) and parser-aware deadline checks.
 
 ### Priority 3: Feature Enhancements
 
-- **`include_*` filtering parameters**: Python's API supports `include_copyrights`, `include_holders`, `include_authors` flags. We always detect everything. Adding these would be trivial — filter after detection.
+- ✅ **`include_*` filtering parameters**: Implemented via `CopyrightDetectionOptions` and `detect_copyrights_with_options()`.
 - **Full `demarkup` preprocessing**: Python calls `strip_known_markup_from_text` which handles HTML, RST, roff, and other markup formats more aggressively. Our `prepare_text_line` does basic normalization but doesn't strip full document markup. Would improve detection on heavily marked-up files.
 - **Grammar top-level rules**: The grammar's COPYRIGHT/AUTHOR top-level rules don't always fire, so detection relies on span-based extraction as fallback. Investigating why these rules don't match could improve structural accuracy.
 

@@ -13,6 +13,9 @@ The copyright detection engine in scancode-rust is a **complete rewrite** of Pyt
 7. **🔍 Enhanced**: Thread-safe design (no global mutable singleton)
 8. **🔍 Enhanced**: Deduplicated 3 duplicate patterns from Python reference
 9. **🛡️ Security**: No code execution, no global mutable state
+10. **✨ Enhanced**: API-level include filters (`include_copyrights`, `include_holders`, `include_authors`)
+11. **⚡ Performance**: Optional wall-clock deadline for copyright detection and parser iterations
+12. **✨ Enhanced**: Better Office/HTML demarkup for noisy `<o:...>` markup tags
 
 ## Improvement 1: Extended Year Range (Bug Fix)
 
@@ -197,4 +200,6 @@ Key safeguards:
 - ✅ Thread-safe for parallel file processing
 - ✅ All library tests passing, golden tests stable in CI
 - ⚡ Performance optimizations for minified code and encoded data
+- ✅ Optional detection runtime deadline support (`max_runtime`) wired into parser-aware detection flow
+- ✅ Public include-filter API via `CopyrightDetectionOptions`
 - 🟢 CI remains stable with tracked parity-gap follow-up work
