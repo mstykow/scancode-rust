@@ -312,6 +312,11 @@ pub fn detect_copyrights_from_text_with_deadline(
 
     refine_final_copyrights(&mut copyrights);
 
+    for group in &groups {
+        extend_dash_obfuscated_email_suffixes(&raw_lines, group, &mut copyrights[..], &holders[..]);
+    }
+    restore_linux_foundation_copyrights_from_raw_lines(&raw_lines, &mut copyrights);
+
     add_missing_holders_for_bare_c_name_year_suffixes(&copyrights, &mut holders);
 
     dedupe_exact_span_copyrights(&mut copyrights);
@@ -706,6 +711,12 @@ fn add_embedded_copyright_clause_variants(copyrights: &mut Vec<CopyrightDetectio
         let Some(refined) = refine_copyright(embedded) else {
             continue;
         };
+        if refined
+            .to_ascii_lowercase()
+            .contains("the initial developer")
+        {
+            continue;
+        }
         let key = (c.start_line, c.end_line, refined.clone());
         if !existing.contains(&key) {
             to_add.push(CopyrightDetection {
@@ -807,6 +818,53 @@ fn drop_shadowed_linux_foundation_holder_copyrights_same_line(
         }
         !years_by_line.contains(&(c.start_line, years.to_string()))
     });
+}
+
+fn restore_linux_foundation_copyrights_from_raw_lines(
+    raw_lines: &[&str],
+    copyrights: &mut Vec<CopyrightDetection>,
+) {
+    if raw_lines.is_empty() {
+        return;
+    }
+
+    static RAW_LINUX_FOUNDATION_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(
+            r"(?i)copyright\s*\(c\)\s*(?P<years>\d{4}(?:\s*,\s*\d{4})*)\s+linux\s+foundation",
+        )
+        .unwrap()
+    });
+
+    let mut to_add: Vec<CopyrightDetection> = Vec::new();
+    for (idx, raw) in raw_lines.iter().enumerate() {
+        let ln = idx + 1;
+        let Some(cap) = RAW_LINUX_FOUNDATION_RE.captures(raw) else {
+            continue;
+        };
+        let years = cap.name("years").map(|m| m.as_str()).unwrap_or("").trim();
+        if years.is_empty() {
+            continue;
+        }
+
+        let full = normalize_whitespace(&format!("Copyright (c) {years} Linux Foundation"));
+        if copyrights
+            .iter()
+            .any(|c| c.start_line == ln && c.end_line == ln && c.copyright == full)
+        {
+            continue;
+        }
+
+        to_add.push(CopyrightDetection {
+            copyright: full.clone(),
+            start_line: ln,
+            end_line: ln,
+        });
+
+        let bare = normalize_whitespace(&format!("Copyright (c) {years}"));
+        copyrights.retain(|c| !(c.start_line == ln && c.end_line == ln && c.copyright == bare));
+    }
+
+    copyrights.extend(to_add);
 }
 
 fn add_bare_email_variants_for_escaped_angle_lines(
@@ -2179,27 +2237,29 @@ fn extract_mso_document_properties_copyrights(
     let copy_refined = refine_copyright(&copy).unwrap_or(copy);
     let holder_refined = refine_holder_in_copyright_context(&hold).unwrap_or(hold);
 
-    let ckey = (desc_line, end_line, copy_refined.clone());
-    if !copyrights
-        .iter()
-        .any(|c| (c.start_line, c.end_line, c.copyright.clone()) == ckey)
-    {
-        copyrights.push(CopyrightDetection {
-            copyright: copy_refined,
-            start_line: desc_line,
-            end_line,
-        });
-    }
-    let hkey = (desc_line, end_line, holder_refined.clone());
-    if !holders
-        .iter()
-        .any(|h| (h.start_line, h.end_line, h.holder.clone()) == hkey)
-    {
-        holders.push(HolderDetection {
-            holder: holder_refined,
-            start_line: desc_line,
-            end_line,
-        });
+    if !is_confidential {
+        let ckey = (desc_line, end_line, copy_refined.clone());
+        if !copyrights
+            .iter()
+            .any(|c| (c.start_line, c.end_line, c.copyright.clone()) == ckey)
+        {
+            copyrights.push(CopyrightDetection {
+                copyright: copy_refined,
+                start_line: desc_line,
+                end_line,
+            });
+        }
+        let hkey = (desc_line, end_line, holder_refined.clone());
+        if !holders
+            .iter()
+            .any(|h| (h.start_line, h.end_line, h.holder.clone()) == hkey)
+        {
+            holders.push(HolderDetection {
+                holder: holder_refined,
+                start_line: desc_line,
+                end_line,
+            });
+        }
     }
 
     let plain = format!("Copyright {year}");
