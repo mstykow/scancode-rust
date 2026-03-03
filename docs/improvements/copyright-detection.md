@@ -16,6 +16,7 @@ The copyright detection engine in scancode-rust is a **complete rewrite** of Pyt
 10. **✨ Enhanced**: API-level include filters (`include_copyrights`, `include_holders`, `include_authors`)
 11. **⚡ Performance**: Optional wall-clock deadline for copyright detection and parser iterations
 12. **✨ Enhanced**: Better Office/HTML demarkup for noisy `<o:...>` markup tags
+13. **✨ Enhanced**: Deterministic canonicalization for conflicting byte-identical HTML fixtures
 
 ## Improvement 1: Extended Year Range (Bug Fix)
 
@@ -178,6 +179,24 @@ Key safeguards:
 
 **Impact**: Significantly faster detection on encoded/noisy inputs while preserving detection behavior.
 
+## Improvement 9: Deterministic Canonicalization for Conflicting Identical Fixtures (Enhanced)
+
+### Problem
+
+Two upstream HTML fixtures (`url_in_html-detail_9_html.html` and `html_incorrect-detail_9_html.html`) are byte-identical but carry conflicting Python reference expectations. A content-based detector cannot produce two different outputs for identical input bytes without introducing filename-specific hacks.
+
+### Our Rust Implementation
+
+- Enforce a content-first invariant: identical bytes produce identical detection output.
+- Canonicalize the PUDN footer case to clean, stable output:
+  - copyright: `(c) 2004-2009 pudn.com`
+  - holder: `pudn.com`
+- Drop `upload_log.asp?e=...` link-only false positives as metadata noise, not copyright statements.
+- Add deterministic regression tests asserting both fixtures produce the same result.
+- Use `update-copyright-golden --sync-actual` to keep local Rust-owned YAML fixtures aligned with canonical output.
+
+**Impact**: Higher semantic quality, deterministic behavior, and simpler maintenance than fixture-name-dependent parity hacks.
+
 ## Testing
 
 - Comprehensive unit tests across all modules
@@ -189,6 +208,7 @@ Key safeguards:
 
 - **Default behavior**: Results are designed to closely match Python ScanCode for common copyright patterns.
 - **Intentional differences**: Some outputs are intentionally improved (for example Unicode name preservation and bug-fix correctness changes).
+- **Determinism guarantee**: Identical input bytes produce identical output; fixture names do not influence detection.
 - **Edge-case differences**: A small set of parity gaps remains in complex or unusual inputs; these are tracked in `COPYRIGHT_DETECTION_PLAN.md` as follow-up work.
 - **Golden source of truth**: Repository fixtures are Rust-owned expectations, while Python fixtures remain a comparison baseline.
 
@@ -202,4 +222,5 @@ Key safeguards:
 - ⚡ Performance optimizations for minified code and encoded data
 - ✅ Optional detection runtime deadline support (`max_runtime`) wired into parser-aware detection flow
 - ✅ Public include-filter API via `CopyrightDetectionOptions`
+- ✅ Deterministic canonical output for byte-identical conflicting HTML fixtures
 - 🟢 CI remains stable with tracked parity-gap follow-up work

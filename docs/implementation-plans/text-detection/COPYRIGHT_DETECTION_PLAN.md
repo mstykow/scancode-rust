@@ -369,6 +369,8 @@ Files with heavy HTML markup (credits pages, documentation) where tag stripping 
 
 **Classification**: Parity gap.
 
+**Intentional divergence (resolved conflict class)**: `url_in_html-detail_9_html.html` and `html_incorrect-detail_9_html.html` are byte-identical inputs with conflicting Python reference expectations. Rust now enforces content-deterministic output for identical bytes and uses a canonical, cleaner extraction (`(c) 2004-2009 pudn.com`, holder `pudn.com`) instead of fixture-name-dependent behavior.
+
 **User impact**: Extracted text may differ in spacing or token boundaries for markup-heavy sources.
 
 **Difficulty**: Medium. May require deeper demarkup preprocessing and additional HTML-specific postprocess guards.
