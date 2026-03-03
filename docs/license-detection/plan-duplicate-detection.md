@@ -1,10 +1,41 @@
 # Implementation Plan: Missing Duplicate Detections
 
-**Status:** Verified - Needs Refinement  
+## Status: IN_PROGRESS (Root Cause Identified - Implementation Needed)
+
+### Key Finding (2026-03-03)
+
+**The real issue is `filter_contained_matches()` over-filtering non-overlapping matches.**
+
+After investigating several other potential causes (detection grouping, expression combination, etc.), the actual root cause has been identified:
+
+**Location:** `src/license_detection/match_refine/handle_overlaps.rs:40-96`
+
+**Problem:** The `filter_contained_matches()` function incorrectly marks matches at non-overlapping locations as "contained" and removes them.
+
+**Evidence:**
+- Files like `gpl-2.0_or_bsd-new_intel_kernel.c` expect 4 detections but Rust produces 1
+- Python's `filter_contained_matches()` has a break condition that stops when `next.qend > current.qend`
+- Rust's break condition may be using wrong field or incorrectly checking containment
+- The `qcontains()` method may also have edge cases with token position handling
+
+**What was tried:**
+1. ~~Detection grouping~~ - Not the issue; Python doesn't group in the same way
+2. ~~Expression combination~~ - Fixed but didn't help detection counts
+3. ~~`is_candidate_false_positive`~~ - Fixed but didn't help extra detections
+
+**What still needs to be done:**
+1. Fix the break condition in `filter_contained_matches()` to match Python exactly
+2. Verify `qcontains()` handles all edge cases correctly
+3. Consider if the test comparison needs adjustment (Python returns matches, Rust returns detections)
+
+**Recommendation:** Focus implementation effort on `filter_contained_matches()` break condition and `qcontains()` edge cases.
+
+---
+
 **Created:** 2026-03-03  
 **Priority:** High  
 **Category:** License Detection Correctness  
-**Verified:** 2026-03-03 - Code locations confirmed, root cause analysis validated
+**Verified:** 2026-03-03 - Root cause identified: contained match filtering is over-aggressive
 
 ## Executive Summary
 

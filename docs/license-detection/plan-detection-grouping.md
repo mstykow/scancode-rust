@@ -1,5 +1,26 @@
 # Plan: Fix Detection Grouping Issues
 
+## Status: IMPLEMENTED (Partial - Does Not Solve Detection Count Issues)
+
+### Implementation Attempt (2026-03-03)
+
+**What was done:**
+- Modified `determine_license_expression()` to use `combine_expressions()` instead of naive string join
+- Modified `determine_spdx_expression()` similarly
+- Added proper imports for `combine_expressions` and `CombineRelation`
+
+**Result:** The fix was implemented correctly but **did not reduce the golden test failure count**.
+
+**Why it didn't help:**
+- The detection count issue is NOT caused by expression combination
+- Investigation revealed the real problem is in **contained match filtering** (`filter_contained_matches`)
+- Matches at non-overlapping locations are being incorrectly marked as "contained" and removed
+- See `plan-duplicate-detection.md` for the actual root cause
+
+**Recommendation:** This plan should be considered complete (the fix is correct), but the detection count issues require a different fix.
+
+---
+
 ## Verification Status: PASS (Updated)
 
 This plan has been verified against the actual codebase and Python reference.

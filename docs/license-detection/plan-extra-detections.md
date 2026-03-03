@@ -1,6 +1,28 @@
 # Plan: Fix Extra/Spurious License Detections
 
-**Status:** Needs Revision  
+## Status: IMPLEMENTED (Partial - Does Not Solve Extra Detection Issues)
+
+### Implementation Attempt (2026-03-03)
+
+**What was done:**
+- Fixed `is_candidate_false_positive` in `src/license_detection/match_refine/false_positive.rs:21`
+- Changed `m.matched_length` to `m.len()` to correctly use qspan token count
+
+**Result:** The fix was implemented correctly but **did not reduce the golden test failure count**.
+
+**Why it didn't help:**
+- The extra detection issue appears to have multiple root causes
+- The `is_candidate_false_positive` fix only affects license list false positive detection
+- Many cases (like `Artistic-2.0.t1` detecting `warranty-disclaimer`) are NOT filtered by this mechanism
+- Further investigation needed:
+  1. Are unwanted matches surviving overlap filtering?
+  2. Are they separate non-overlapping matches that shouldn't exist?
+  3. Is expression containment not being checked correctly?
+
+**Recommendation:** The fix is correct and should remain, but additional investigation is needed to find the other root causes.
+
+---
+
 **Created:** 2026-03-03  
 **Updated:** 2026-03-03  
 **Related:** `0022-phase6-extra-detections-plan.md`

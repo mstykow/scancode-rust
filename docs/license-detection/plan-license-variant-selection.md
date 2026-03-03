@@ -1,5 +1,28 @@
 # Plan: Fix Wrong License Variant Detection
 
+## Status: IMPLEMENTED (Partial - Does Not Solve Variant Selection Issues)
+
+### Implementation Attempt (2026-03-03)
+
+**What was done:**
+- Removed `rid` tie-breaker from `ScoresVector::cmp` in `src/license_detection/seq_match/candidates.rs`
+- Candidates with identical scores now compare as equal (matching Python behavior)
+
+**Result:** The fix was implemented correctly but **did not reduce the golden test failure count**.
+
+**Why it didn't help:**
+- The rid tie-breaker was only affecting candidate ordering when all other scores were equal
+- In practice, most variant selection issues are caused by different score values, not tie-breaking
+- The candidate score comparison logic in `handle_overlaps.rs` (beyond-parity feature) may still be causing issues
+- May need to investigate:
+  1. Are candidate scores being populated correctly for sequence matches?
+  2. Are problematic cases using Aho-Corasick matching (which has no candidate scores)?
+  3. Is the `different_licenses && both_have_candidate_scores` logic causing incorrect decisions?
+
+**Recommendation:** The fix is correct and should remain (matches Python behavior), but variant selection issues require deeper investigation.
+
+---
+
 ## Verification Status: NEEDS_IMPROVEMENT
 
 ### Summary of Verification

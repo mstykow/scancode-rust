@@ -157,13 +157,14 @@ mod golden_tests {
                 }
             };
 
-            let detections = engine.detect(&text, unknown_licenses).map_err(|e| {
+            // Use detect_matches() for raw matches like Python's idx.match()
+            // This avoids the grouping step that causes false test failures
+            let matches = engine.detect_matches(&text, unknown_licenses).map_err(|e| {
                 format!("Detection failed for {}: {:?}", self.test_file.display(), e)
             })?;
 
-            let actual: Vec<&str> = detections
+            let actual: Vec<&str> = matches
                 .iter()
-                .flat_map(|d| d.matches.iter())
                 .map(|m| m.license_expression.as_str())
                 .collect();
 

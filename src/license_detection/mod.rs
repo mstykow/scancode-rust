@@ -42,6 +42,7 @@ use crate::license_detection::detection::{
 };
 
 pub use detection::{LicenseDetection, group_matches_by_region, create_detection_from_group, post_process_detections, sort_matches_by_line};
+pub use models::LicenseMatch;
 
 pub use aho_match::aho_match;
 pub use hash_match::hash_match;
@@ -336,6 +337,175 @@ impl LicenseDetectionEngine {
         let detections = post_process_detections(detections, 0.0);
 
         Ok(detections)
+    }
+
+    /// Detect licenses and return raw matches (like Python's idx.match()).
+    ///
+    /// This method returns matches after refinement, WITHOUT grouping into detections.
+    /// Use this for testing and comparison with Python's idx.match() output.
+    /// For production use, prefer detect() which returns grouped detections.
+    ///
+    /// # Arguments
+    /// * `text` - The text to analyze
+    /// * `unknown_licenses` - Whether to detect unknown licenses (default: false)
+    ///
+    /// # Returns
+    /// A Result containing a vector of LicenseMatch objects (ungrouped)
+    pub fn detect_matches(&self, text: &str, unknown_licenses: bool) -> Result<Vec<LicenseMatch>> {
+        let clean_text = strip_utf8_bom_str(text);
+        let mut query = Query::new(clean_text, &self.index)?;
+
+        let mut all_matches = Vec::new();
+        let mut matched_qspans: Vec<query::PositionSpan> = Vec::new();
+
+        // Phase 1a: Hash matching
+        {
+            let whole_run = query.whole_query_run();
+            let hash_matches = hash_match(&self.index, &whole_run);
+
+            if !hash_matches.is_empty() {
+                let mut matches = hash_matches;
+                sort_matches_by_line(&mut matches);
+                return Ok(matches);
+            }
+        }
+
+        // Phase 1b: SPDX-LID matching
+        {
+            let spdx_matches = spdx_lid_match(&self.index, &query);
+            let merged_spdx = merge_overlapping_matches(&spdx_matches);
+            for m in &merged_spdx {
+                if m.match_coverage >= 99.99 && m.end_token > m.start_token {
+                    matched_qspans.push(query::PositionSpan::new(m.start_token, m.end_token - 1));
+                }
+                if m.is_license_text && m.rule_length > 120 && m.match_coverage > 98.0 {
+                    let span =
+                        query::PositionSpan::new(m.start_token, m.end_token.saturating_sub(1));
+                    query.subtract(&span);
+                }
+            }
+            all_matches.extend(merged_spdx);
+        }
+
+        // Phase 1c: Aho-Corasick matching
+        {
+            let whole_run = query.whole_query_run();
+            let aho_matches = aho_match(&self.index, &whole_run);
+            let refined_aho = match_refine::refine_aho_matches(&self.index, aho_matches, &query);
+
+            for m in &refined_aho {
+                if m.match_coverage >= 99.99 && m.end_token > m.start_token {
+                    matched_qspans.push(query::PositionSpan::new(m.start_token, m.end_token - 1));
+                }
+            }
+            all_matches.extend(refined_aho);
+        }
+
+        let whole_run = query.whole_query_run();
+        let skip_seq_matching = !whole_run.is_matchable(false, &matched_qspans);
+
+        let mut seq_all_matches = Vec::new();
+        if !skip_seq_matching {
+            // Phase 2: Near-duplicate detection
+            {
+                let whole_run = query.whole_query_run();
+                let near_dupe_candidates = compute_candidates_with_msets(
+                    &self.index,
+                    &whole_run,
+                    true,
+                    MAX_NEAR_DUPE_CANDIDATES,
+                );
+
+                if !near_dupe_candidates.is_empty() {
+                    let near_dupe_matches =
+                        seq_match_with_candidates(&self.index, &whole_run, &near_dupe_candidates);
+
+                    for m in &near_dupe_matches {
+                        if m.end_token > m.start_token {
+                            let span = query::PositionSpan::new(m.start_token, m.end_token - 1);
+                            query.subtract(&span);
+                            matched_qspans.push(span);
+                        }
+                    }
+
+                    seq_all_matches.extend(near_dupe_matches);
+                }
+            }
+
+            // Phase 3: Regular sequence matching
+            const MAX_SEQ_CANDIDATES: usize = 70;
+            {
+                let whole_run = query.whole_query_run();
+                let candidates = compute_candidates_with_msets(
+                    &self.index,
+                    &whole_run,
+                    false,
+                    MAX_SEQ_CANDIDATES,
+                );
+                if !candidates.is_empty() {
+                    let matches = seq_match_with_candidates(&self.index, &whole_run, &candidates);
+                    seq_all_matches.extend(matches);
+                }
+            }
+
+            // Phase 4: Query run matching
+            const MAX_QUERY_RUN_CANDIDATES: usize = 70;
+            {
+                let whole_run = query.whole_query_run();
+                for query_run in query.query_runs().iter() {
+                    if query_run.start == whole_run.start && query_run.end == whole_run.end {
+                        continue;
+                    }
+
+                    if !query_run.is_matchable(false, &matched_qspans) {
+                        continue;
+                    }
+
+                    let candidates = compute_candidates_with_msets(
+                        &self.index,
+                        query_run,
+                        false,
+                        MAX_QUERY_RUN_CANDIDATES,
+                    );
+                    if !candidates.is_empty() {
+                        let matches =
+                            seq_match_with_candidates(&self.index, query_run, &candidates);
+                        seq_all_matches.extend(matches);
+                    }
+                }
+            }
+
+            let merged_seq = merge_overlapping_matches(&seq_all_matches);
+            all_matches.extend(merged_seq);
+        }
+
+        // Step 1: Initial refine WITHOUT false positive filtering
+        let merged_matches =
+            refine_matches_without_false_positive_filter(&self.index, all_matches, &query);
+
+        // Step 2: Unknown detection and weak match handling
+        let refined_matches = if unknown_licenses {
+            let (good_matches, weak_matches) = split_weak_matches(&merged_matches);
+            let unknown_matches = unknown_match(&self.index, &query, &good_matches);
+            let filtered_unknown =
+                filter_invalid_contained_unknown_matches(&unknown_matches, &good_matches);
+
+            let mut all_matches = good_matches;
+            all_matches.extend(filtered_unknown);
+            all_matches.extend(weak_matches);
+            all_matches
+        } else {
+            merged_matches
+        };
+
+        // Step 3: Final refine WITH false positive filtering - Python: index.py:1130-1145
+        let refined = refine_matches(&self.index, refined_matches, &query);
+
+        let mut sorted = refined;
+        sort_matches_by_line(&mut sorted);
+
+        // Return raw matches (NOT grouped) - this is Python's idx.match() behavior
+        Ok(sorted)
     }
 
     /// Get a reference to the license index.

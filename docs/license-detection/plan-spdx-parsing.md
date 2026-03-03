@@ -1,6 +1,35 @@
 # SPDX Expression Parsing Issues - Detailed Implementation Plan
 
-**Status:** Investigation Complete  
+## Status: IMPLEMENTED
+
+### Implementation Completed (2026-03-03)
+
+**What was implemented:**
+
+1. **Recovery tokenizer** - Added `tokenize_for_recovery()` and `classify_recovery_token()` to extract license keys and keywords from malformed expressions
+
+2. **Recovery parsing** - Implemented `reparse_invalid_expression()` that:
+   - Separates keywords (AND/OR/WITH) from license keys
+   - Uses OR for bare lists (U-Boot style: `GPL-2.0+ BSD-2-Clause`)
+   - Uses AND + `unknown-spdx` for expressions with keywords that didn't parse
+   - Properly handles unknown SPDX identifiers
+
+3. **Expression conversion** - Added `convert_recovered_expression_to_scancode()` that substitutes unknown keys with `unknown-spdx` instead of failing
+
+4. **Updated main function** - Modified `find_matching_rule_for_expression()` to call recovery parsing when normal parsing fails
+
+5. **License key validation** - Added `is_likely_license_key()` to filter out non-license text (e.g., "The author added...")
+
+**Test results:**
+- U-Boot style bare lists now produce OR expressions
+- Malformed parentheses are handled gracefully
+- Unknown SPDX identifiers map to `unknown-spdx`
+- Text after SPDX identifiers is properly ignored
+
+**Note:** While this fix is implemented correctly, it may not significantly reduce the golden test failure count if the tests are checking other aspects of the detection pipeline.
+
+---
+
 **Created:** 2026-03-03  
 **Priority:** High  
 **Estimated Tests Fixed:** ~50 SPDX-related failures
