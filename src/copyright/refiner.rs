@@ -818,6 +818,7 @@ static COPYRIGHTS_JUNK_PATTERNS: LazyLock<Vec<Regex>> = LazyLock::new(|| {
         r"(?i)^\(c\) &&",
         r"(?i)^\(c\) \|\|",
         r"(?i)^\(c\) [\w]+\?",
+        r"(?i)^\(c\)\s+[A-Za-z_][A-Za-z0-9_]*\s*\?\s*[A-Za-z0-9_()><=+\-*/&|]+\s*:\s*[A-Za-z0-9_()><=+\-*/&|]+\s*$",
         r"(?i)^\(c\) [\w]+\.[\w]+\.",
         r"(?i)^\(c\) [\w]+\([\w,]+\)",
         // (c) followed by short gibberish (1-3 mixed-case chars) from binary data
@@ -863,6 +864,8 @@ static COPYRIGHTS_JUNK_PATTERNS: LazyLock<Vec<Regex>> = LazyLock::new(|| {
         r"(?i)^\(c\) \(s\)",
         r"(?i)^\(c\) \d+ \(\(", // "(c) 16 ((d) 24)"
         r"(?i)^\(c\) \d+ &",    // "(c) 6 (trail&0x3f)"
+        r"(?i)^\(c\)\s+[A-Za-z_][A-Za-z0-9_]*\s*(?:&|\||\^|>>|<<)\s*(?:0x[0-9A-Fa-f]+|\d+)\b",
+        r"(?i)^\(c\)\s+[A-Za-z_][A-Za-z0-9_]*\s*(?:\|=|&=|\^=|>>=|<<=)\s*(?:0x[0-9A-Fa-f]+|\d+)\b",
         r"(?i)^\(c\) strict\b",
         r"(?i)^\(c\) width\b",
         r"(?i)^\(c\) arg\b",
@@ -1072,6 +1075,7 @@ static COPYRIGHTS_JUNK_PATTERNS: LazyLock<Vec<Regex>> = LazyLock::new(|| {
         r"(?i)^\(c\) \(c&",
         r"(?i)^\(c\) \(cp\)",
         r"(?i)^\(c\) \( cp\)",
+        r"(?i)^\(c\)\s*\(\s*(?:const\s+)?(?:signed\s+|unsigned\s+)?(?:char|short|int|long|float|double|void|size_t|ssize_t|uintptr_t|intptr_t|u?int(?:8|16|32|64)_t)\s*(?:\*+\s*)?\)\s*[A-Za-z_(]",
         r"(?i)^\(c\) \(l\)",
         r"(?i)^\(c\) \(out\.\b",
         r"(?i)^\(c\) \(run\)",

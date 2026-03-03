@@ -79,6 +79,12 @@ static ANGLE_EMAIL_RE: LazyLock<Regex> =
 static MSO_O_TEMPLATE_TOKEN_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"(?i)\bo:template\b").unwrap());
 
+static MSO_TEMPLATE_ELEMENT_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(?is)<o:template>.*?</o:template>").unwrap());
+
+static MSO_LASTAUTHOR_ELEMENT_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(?is)<o:lastauthor>.*?</o:lastauthor>").unwrap());
+
 /// Regex to strip HTML attribute tokens that leak into copyright text.
 /// Python's `SKIP_ATTRIBUTES` skips tokens starting with `href=`, `class=`, etc.
 static HTML_ATTR_RE: LazyLock<Regex> = LazyLock::new(|| {
@@ -138,14 +144,6 @@ static ESCAPED_ANGLE_EMAIL_RE: LazyLock<Regex> =
 fn replace_tags_preserving_copyright(text: &str, re: &Regex) -> String {
     re.replace_all(text, |caps: &regex::Captures| {
         let m = caps.get(0).unwrap().as_str();
-        let inner = m
-            .trim_start_matches('<')
-            .trim_end_matches('>')
-            .trim_start_matches('/')
-            .trim();
-        if inner.to_ascii_lowercase().starts_with("o:") {
-            return m.to_string();
-        }
         if should_keep_angle_bracket_content(m) {
             m.trim_start_matches('<')
                 .trim_end_matches('>')
@@ -171,7 +169,7 @@ fn should_keep_angle_bracket_content(m: &str) -> bool {
 
     let inner_lower = inner.to_ascii_lowercase();
     if inner_lower.starts_with("o:") {
-        return true;
+        return false;
     }
     let inner_simple = inner_lower
         .trim()
@@ -438,6 +436,13 @@ pub fn prepare_text_line(line: &str) -> String {
 
     if s.contains("<o:p>") || s.contains("</o:p>") {
         s = s.replace("<o:p>", " ").replace("</o:p>", " ");
+    }
+
+    if s.to_ascii_lowercase().contains("<o:template>") {
+        s = MSO_TEMPLATE_ELEMENT_RE.replace_all(&s, " ").into_owned();
+    }
+    if s.to_ascii_lowercase().contains("<o:lastauthor>") {
+        s = MSO_LASTAUTHOR_ELEMENT_RE.replace_all(&s, " ").into_owned();
     }
 
     if s.to_ascii_lowercase().contains("o:template") {
@@ -1215,5 +1220,31 @@ mod tests {
             !result.contains("<div>"),
             "div tag should be stripped: {result}"
         );
+    }
+
+    #[test]
+    fn test_strip_o_lastauthor_markup_tag() {
+        let result = prepare_text_line("Copyright 2024 Foo <o:LastAuthor>bar</o:LastAuthor>");
+        assert!(!result.to_ascii_lowercase().contains("o:lastauthor"));
+        assert!(result.contains("Copyright 2024 Foo"));
+    }
+
+    #[test]
+    fn test_strip_o_lastauthor_element_content() {
+        let result = prepare_text_line("<o:LastAuthor>Jennifer Hruska</o:LastAuthor>");
+        assert!(!result.to_ascii_lowercase().contains("jennifer"));
+        assert!(!result.to_ascii_lowercase().contains("hruska"));
+    }
+
+    #[test]
+    fn test_strip_o_template_token() {
+        let result = prepare_text_line("Copyright 2024 Foo <o:template>");
+        assert!(!result.to_ascii_lowercase().contains("o:template"));
+    }
+
+    #[test]
+    fn test_strip_o_template_element_content() {
+        let result = prepare_text_line("<o:Template>techdoc.dot</o:Template>");
+        assert!(!result.to_ascii_lowercase().contains("techdoc.dot"));
     }
 }

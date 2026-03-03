@@ -4,6 +4,8 @@
 //! a parse tree by replacing matched token/node spans with tree nodes.
 //! Uses a single-pass approach matching Python's pygmars `loop=1` behavior.
 
+use std::time::Instant;
+
 use super::grammar::{GRAMMAR_RULES, GrammarRule, TagMatcher};
 use super::types::{ParseNode, Token};
 
@@ -30,6 +32,10 @@ fn last_line(node: &ParseNode) -> Option<usize> {
 /// Returns the final sequence of `ParseNode` (mix of leaf tokens and
 /// tree nodes).
 pub fn parse(tokens: Vec<Token>) -> Vec<ParseNode> {
+    parse_with_deadline(tokens, None)
+}
+
+pub fn parse_with_deadline(tokens: Vec<Token>, deadline: Option<Instant>) -> Vec<ParseNode> {
     if tokens.is_empty() {
         return Vec::new();
     }
@@ -40,6 +46,10 @@ pub fn parse(tokens: Vec<Token>) -> Vec<ParseNode> {
     // Safety bound to prevent infinite loops.
     let max_iterations = 50;
     for _ in 0..max_iterations {
+        if deadline.is_some_and(|d| Instant::now() >= d) {
+            break;
+        }
+
         let mut changed = false;
 
         for rule in GRAMMAR_RULES.iter() {
@@ -246,6 +256,19 @@ mod tests {
         let result = parse(tokens);
         // Two NN tokens — no grammar rule matches NN NN, so both preserved.
         assert_eq!(result.len(), 2);
+    }
+
+    #[test]
+    fn test_parse_with_expired_deadline_returns_without_reducing() {
+        let tokens = vec![
+            make_token("2020", PosTag::Yr, 1),
+            make_token("-", PosTag::Dash, 1),
+            make_token("2024", PosTag::Yr, 1),
+        ];
+
+        let result = parse_with_deadline(tokens, Some(Instant::now()));
+        assert_eq!(result.len(), 3);
+        assert!(result.iter().all(|n| n.tag().is_some()));
     }
 
     #[test]

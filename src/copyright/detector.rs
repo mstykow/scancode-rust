@@ -14,6 +14,7 @@ use std::sync::LazyLock;
 
 use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
+use std::time::{Duration, Instant};
 
 use regex::Regex;
 
@@ -23,7 +24,7 @@ use super::detector_input_normalization::{
 };
 use super::lexer::get_tokens;
 use super::line_tracking::{LineNumberIndex, PreparedLineCache};
-use super::parser::parse;
+use super::parser::{parse, parse_with_deadline};
 use super::refiner::{
     is_junk_copyright, refine_author, refine_copyright, refine_holder,
     refine_holder_in_copyright_context,
@@ -87,9 +88,21 @@ pub fn detect_copyrights_from_text(
     Vec<HolderDetection>,
     Vec<AuthorDetection>,
 ) {
+    detect_copyrights_from_text_with_deadline(content, None)
+}
+
+pub fn detect_copyrights_from_text_with_deadline(
+    content: &str,
+    max_runtime: Option<Duration>,
+) -> (
+    Vec<CopyrightDetection>,
+    Vec<HolderDetection>,
+    Vec<AuthorDetection>,
+) {
     let mut copyrights = Vec::new();
     let mut holders = Vec::new();
     let mut authors = Vec::new();
+    let deadline = max_runtime.and_then(|d| Instant::now().checked_add(d));
 
     if content.is_empty() {
         return (copyrights, holders, authors);
@@ -119,6 +132,10 @@ pub fn detect_copyrights_from_text(
     let groups = collect_candidate_lines(numbered_lines);
 
     for group in &groups {
+        if deadline_exceeded(deadline) {
+            break;
+        }
+
         if group.is_empty() {
             continue;
         }
@@ -128,7 +145,11 @@ pub fn detect_copyrights_from_text(
             continue;
         }
 
-        let tree = parse(tokens);
+        let tree = if deadline.is_some() {
+            parse_with_deadline(tokens, deadline)
+        } else {
+            parse(tokens)
+        };
 
         let has_top_level_nodes = tree.iter().any(|n| {
             matches!(
@@ -261,6 +282,14 @@ pub fn detect_copyrights_from_text(
         copyrights.extend(to_add);
     }
 
+    if deadline_exceeded(deadline) {
+        refine_final_copyrights(&mut copyrights);
+        dedupe_exact_span_copyrights(&mut copyrights);
+        dedupe_exact_span_holders(&mut holders);
+        dedupe_exact_span_authors(&mut authors);
+        return (copyrights, holders, authors);
+    }
+
     primary_phase::run_phase_primary_extractions(
         content,
         &raw_lines,
@@ -313,6 +342,10 @@ fn refine_final_copyrights(copyrights: &mut Vec<CopyrightDetection>) {
         });
     }
     *copyrights = refined;
+}
+
+fn deadline_exceeded(deadline: Option<Instant>) -> bool {
+    deadline.is_some_and(|d| Instant::now() >= d)
 }
 
 fn add_missing_holders_for_bare_c_name_year_suffixes(
@@ -2174,6 +2207,12 @@ fn extract_mso_document_properties_copyrights(
         !(c.start_line == desc_line && c.end_line == desc_line && c.copyright == plain)
     });
 
+    let shadow_non_confidential = normalize_whitespace(&format!("{last_author} Copyright {year}"));
+    copyrights.retain(|c| {
+        !normalize_whitespace(&c.copyright).eq_ignore_ascii_case(&shadow_non_confidential)
+    });
+    holders.retain(|h| !normalize_whitespace(&h.holder).eq_ignore_ascii_case(&last_author));
+
     if is_confidential {
         let short_c = format!("Copyright {year} Confidential");
         let short_h = "Confidential".to_string();
@@ -2459,6 +2498,57 @@ fn merge_multiline_obfuscated_name_year_copyright_pairs(
                 });
             }
         }
+    }
+}
+
+fn extend_copyrights_with_next_line_parenthesized_obfuscated_email(
+    raw_lines: &[&str],
+    copyrights: &mut [CopyrightDetection],
+) {
+    if copyrights.is_empty() {
+        return;
+    }
+
+    static PAREN_OBF_EMAIL_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(
+            r"(?ix)^(?:\(\s*)?[a-z0-9][a-z0-9._-]{0,63}\s+(?:at|\[\s*at\s*\])\s+[a-z0-9][a-z0-9._-]{0,63}(?:(?:\s+(?:dot|\[\s*dot\s*\])\s+[a-z]{2,12})+|(?:\.[a-z0-9][a-z0-9-]{0,62})+)(?:\s*\))?$",
+        )
+        .unwrap()
+    });
+    static BASE_COPY_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r"(?i)^copyright\s*\(c\)\s*(?:19\d{2}|20\d{2})(?:\s*[-–]\s*(?:19\d{2}|20\d{2}|\d{2}))?\s+.+$")
+            .unwrap()
+    });
+
+    for c in copyrights.iter_mut() {
+        if c.start_line != c.end_line {
+            continue;
+        }
+
+        let current = c.copyright.trim();
+        if !BASE_COPY_RE.is_match(current) {
+            continue;
+        }
+        if current.contains("@") || current.contains(" AT ") || current.contains(" at ") {
+            continue;
+        }
+
+        let Some(next_raw) = raw_lines.get(c.end_line) else {
+            continue;
+        };
+        let prepared_next = crate::copyright::prepare::prepare_text_line(next_raw);
+        let next_trim = prepared_next.trim();
+        if !PAREN_OBF_EMAIL_RE.is_match(next_trim) {
+            continue;
+        }
+
+        let merged = format!("{current} {next_trim}");
+        let Some(refined) = refine_copyright(&merged) else {
+            continue;
+        };
+
+        c.copyright = refined;
+        c.end_line += 1;
     }
 }
 
@@ -3977,7 +4067,9 @@ fn merge_multiline_copyrighted_by_with_trailing_copyright_clause(
         .unwrap()
     });
 
+    let line_number_index = LineNumberIndex::new(content);
     let mut unique_clauses: HashSet<String> = HashSet::new();
+    let mut clause_max_line: HashMap<String, usize> = HashMap::new();
     for cap in TRAILING_COPY_C_YEAR_RE.captures_iter(content) {
         let years = cap.name("years").map(|m| m.as_str()).unwrap_or("").trim();
         if years.is_empty() {
@@ -3985,7 +4077,15 @@ fn merge_multiline_copyrighted_by_with_trailing_copyright_clause(
         }
         let candidate = format!("Copyright (c) {years}");
         if let Some(refined) = refine_copyright(&candidate) {
-            unique_clauses.insert(refined);
+            let ln = cap
+                .get(0)
+                .map(|m| line_number_index.line_number_at_offset(m.start()))
+                .unwrap_or(1);
+            unique_clauses.insert(refined.clone());
+            clause_max_line
+                .entry(refined)
+                .and_modify(|e| *e = (*e).max(ln))
+                .or_insert(ln);
         }
     }
     if unique_clauses.len() != 1 {
@@ -3995,6 +4095,7 @@ fn merge_multiline_copyrighted_by_with_trailing_copyright_clause(
     if suffix.is_empty() {
         return;
     }
+    let suffix_line = clause_max_line.get(&suffix).copied().unwrap_or(1);
 
     for det in copyrights.iter_mut() {
         let det_lower = det.copyright.to_ascii_lowercase();
@@ -4015,6 +4116,7 @@ fn merge_multiline_copyrighted_by_with_trailing_copyright_clause(
         } else {
             det.copyright = merged;
         }
+        det.end_line = det.end_line.max(suffix_line);
     }
 }
 
@@ -8473,10 +8575,14 @@ fn extract_html_anchor_copyright_url(
     let mut seen_holders: HashSet<String> = holders.iter().map(|h| h.holder.clone()).collect();
 
     for cap in A_HREF_COPYRIGHT_RE.captures_iter(content) {
-        let ln = cap
+        let start_line = cap
             .get(0)
             .map(|m| line_number_index.line_number_at_offset(m.start()))
             .unwrap_or(1);
+        let end_line = cap
+            .get(0)
+            .map(|m| line_number_index.line_number_at_offset(m.end()))
+            .unwrap_or(start_line);
         let url = cap.name("url").map(|m| m.as_str()).unwrap_or("").trim();
         if url.is_empty() {
             continue;
@@ -8490,8 +8596,8 @@ fn extract_html_anchor_copyright_url(
         if seen_copyrights.insert(cr.clone()) {
             copyrights.push(CopyrightDetection {
                 copyright: cr,
-                start_line: ln,
-                end_line: ln,
+                start_line,
+                end_line,
             });
         }
 
@@ -8499,8 +8605,8 @@ fn extract_html_anchor_copyright_url(
         if seen_holders.insert(holder.clone()) {
             holders.push(HolderDetection {
                 holder,
-                start_line: ln,
-                end_line: ln,
+                start_line,
+                end_line,
             });
         }
     }

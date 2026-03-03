@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::Path;
 use std::sync::Arc;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use anyhow::Error;
 use content_inspector::{ContentType, inspect};
@@ -10,7 +10,7 @@ use mime_guess::from_path;
 use rayon::prelude::*;
 
 use crate::askalono::{ScanStrategy, TextData};
-use crate::copyright;
+use crate::copyright::{self, CopyrightDetectionOptions};
 use crate::finder::{self, DetectionConfig};
 use crate::models::{
     Author, Copyright, FileInfo, FileInfoBuilder, FileType, Holder, LicenseDetection, Match,
@@ -247,7 +247,12 @@ fn extract_information_from_content(
         let text_content = crate::utils::file::decode_bytes_to_string(&buffer);
 
         if text_options.detect_copyrights {
-            extract_copyright_information(file_info_builder, path, &text_content);
+            extract_copyright_information(
+                file_info_builder,
+                path,
+                &text_content,
+                text_options.timeout_seconds,
+            );
         }
         extract_email_url_information(file_info_builder, &text_content, text_options);
 
@@ -274,6 +279,7 @@ fn extract_copyright_information(
     file_info_builder: &mut FileInfoBuilder,
     path: &Path,
     text_content: &str,
+    timeout_seconds: f64,
 ) {
     // CREDITS files get special handling (Linux kernel style).
     if copyright::is_credits_file(path) {
@@ -293,7 +299,17 @@ fn extract_copyright_information(
         }
     }
 
-    let (copyrights, holders, authors) = copyright::detect_copyrights(text_content);
+    let copyright_options = CopyrightDetectionOptions {
+        max_runtime: if timeout_seconds.is_finite() && timeout_seconds > 0.0 {
+            Some(Duration::from_secs_f64(timeout_seconds))
+        } else {
+            None
+        },
+        ..CopyrightDetectionOptions::default()
+    };
+
+    let (copyrights, holders, authors) =
+        copyright::detect_copyrights_with_options(text_content, &copyright_options);
 
     file_info_builder.copyrights(
         copyrights

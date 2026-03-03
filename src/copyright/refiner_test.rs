@@ -336,6 +336,14 @@ fn test_is_junk_copyright_math_c_variable() {
 }
 
 #[test]
+fn test_is_junk_copyright_c_cast_ternary_and_bitwise_patterns() {
+    assert!(is_junk_copyright("(c) (const unsigned char*)ptr"));
+    assert!(is_junk_copyright("(c) c ? foo : bar"));
+    assert!(is_junk_copyright("(c) c & 0x3f"));
+    assert!(is_junk_copyright("(c) flags |= 0x80"));
+}
+
+#[test]
 fn test_is_junk_copyright_year_only() {
     assert!(!is_junk_copyright("Copyright (c) 2003"));
     assert!(!is_junk_copyright("Copyright (C) 1995"));

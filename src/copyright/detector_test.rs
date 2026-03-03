@@ -2080,6 +2080,33 @@ fn test_fixture_sample_py_motorola_holder_has_dash_variant_only() {
 }
 
 #[test]
+fn test_mso_document_properties_non_confidential_uses_template_lastauthor_variant() {
+    let content = "<o:Description>Copyright 2009</o:Description>\n<o:Template>techdoc.dot</o:Template>\n<o:LastAuthor>Jennifer Hruska</o:LastAuthor>";
+    let (copyrights, holders, _authors) = detect_copyrights_from_text(content);
+
+    assert!(
+        copyrights
+            .iter()
+            .any(|c| c.copyright == "Copyright 2009 techdoc.dot o:LastAuthor Jennifer Hruska"),
+        "copyrights: {:?}",
+        copyrights
+    );
+    assert!(
+        holders
+            .iter()
+            .any(|h| h.holder == "techdoc.dot o:LastAuthor Jennifer Hruska"),
+        "holders: {:?}",
+        holders
+    );
+    assert!(
+        !copyrights
+            .iter()
+            .any(|c| c.copyright == "Jennifer Hruska Copyright 2009")
+    );
+    assert!(!holders.iter().any(|h| h.holder == "Jennifer Hruska"));
+}
+
+#[test]
 fn test_detect_copyright_holder_suffix_authors() {
     let (c, h, a) = detect_copyrights_from_text("Copyright 2015 The Error Prone Authors.");
     assert!(
@@ -2097,6 +2124,31 @@ fn test_detect_copyright_holder_suffix_authors() {
         a.is_empty(),
         "Should not treat trailing 'Authors' token as an author: {:?}",
         a
+    );
+}
+
+#[test]
+fn test_detect_filters_code_like_c_marker_lines() {
+    let text = "(c) (const unsigned char*)ptr\n(c) c ? foo : bar\n(c) c & 0x3f\n(c) flags |= 0x80";
+    let (copyrights, holders, authors) = detect_copyrights_from_text(text);
+    assert!(copyrights.is_empty(), "copyrights: {copyrights:?}");
+    assert!(holders.is_empty(), "holders: {holders:?}");
+    assert!(authors.is_empty(), "authors: {authors:?}");
+}
+
+#[test]
+fn test_complex_html_preserves_parenthesized_obfuscated_email_continuation() {
+    let content =
+        fs::read_to_string("testdata/copyright-golden/copyrights/misco4/linux9/complex-html.txt")
+            .unwrap();
+
+    let (copyrights, _holders, _authors) = detect_copyrights_from_text(&content);
+    assert!(
+        copyrights
+            .iter()
+            .any(|c| c.copyright == "Copyright (c) 2001 Karl Garrison (karl AT indy.rr.com)"),
+        "copyrights: {:?}",
+        copyrights
     );
 }
 
@@ -2907,6 +2959,30 @@ fn test_multiline_copyrighted_by_href_links_merges_trailing_copyright_clause() {
         "Expected merged copyrighted-by href copyright, got: {:?}",
         c
     );
+    let merged = c.iter().find(|cr| cr.copyright == expected).unwrap();
+    assert!(
+        merged.end_line > merged.start_line,
+        "Expected merged span to extend across lines, got: {:?}",
+        merged
+    );
+}
+
+#[test]
+fn test_html_anchor_copyright_url_multiline_span_preserved() {
+    let input = "<a href=\"https://example.com/path\">\ncopyright\n</a>";
+    let (c, h, _a) = detect_copyrights_from_text(input);
+
+    let cd = c
+        .iter()
+        .find(|cr| cr.copyright == "copyright https://example.com/path")
+        .unwrap();
+    assert_eq!((cd.start_line, cd.end_line), (1, 3), "copyrights: {c:?}");
+
+    let hd = h
+        .iter()
+        .find(|hr| hr.holder == "https://example.com/path")
+        .unwrap();
+    assert_eq!((hd.start_line, hd.end_line), (1, 3), "holders: {h:?}");
 }
 
 #[test]
