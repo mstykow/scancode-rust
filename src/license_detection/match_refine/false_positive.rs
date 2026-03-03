@@ -18,7 +18,7 @@ pub(super) fn is_candidate_false_positive(m: &LicenseMatch) -> bool {
 
     let is_not_spdx_id = m.matcher != "1-spdx-id";
     let is_exact_match = (m.match_coverage - 100.0).abs() < f32::EPSILON;
-    let is_short = m.matched_length <= MAX_CANDIDATE_LENGTH;
+    let is_short = m.len() <= MAX_CANDIDATE_LENGTH;
 
     is_tag_or_ref && is_not_spdx_id && is_exact_match && is_short
 }
@@ -203,10 +203,7 @@ mod tests {
         rule_length: usize,
         license_expression: &str,
     ) -> LicenseMatch {
-        let rid = rule_identifier
-            .trim_start_matches('#')
-            .parse()
-            .unwrap_or(0);
+        let rid = rule_identifier.trim_start_matches('#').parse().unwrap_or(0);
         LicenseMatch {
             rid,
             license_expression: license_expression.to_string(),
@@ -235,7 +232,7 @@ mod tests {
             matched_token_positions: None,
             hilen: matched_length / 2,
             rule_start_token: 0,
-            qspan_positions: None,
+            qspan_positions: Some((0..matched_length).collect()),
             ispan_positions: None,
             hispan_positions: None,
             candidate_resemblance: 0.0,

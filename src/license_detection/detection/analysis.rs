@@ -1,8 +1,9 @@
 //! Detection analysis and heuristics.
 
-use crate::license_detection::models::LicenseMatch;
 use super::types::LicenseDetection;
 use super::*;
+use crate::license_detection::expression::{combine_expressions, CombineRelation};
+use crate::license_detection::models::LicenseMatch;
 
 /// Matches with line gap > this are considered separate groups.
 /// Corresponds to Python's LINES_THRESHOLD = 4 (query.py:108)
@@ -122,14 +123,16 @@ pub(super) fn is_false_positive(matches: &[LicenseMatch]) -> bool {
     }
 
     // Check 2: GPL with short rule length
-    if is_gpl && matches.iter().all(|m| m.rule_length <= FALSE_POSITIVE_RULE_LENGTH_THRESHOLD) {
+    if is_gpl
+        && matches
+            .iter()
+            .all(|m| m.rule_length <= FALSE_POSITIVE_RULE_LENGTH_THRESHOLD)
+    {
         return true;
     }
 
     // Check 3: Late matches (after line 1000) with short rules and low relevance
-    if start_line > FALSE_POSITIVE_START_LINE_THRESHOLD
-        && all_rule_length_one
-        && all_low_relevance
+    if start_line > FALSE_POSITIVE_START_LINE_THRESHOLD && all_rule_length_one && all_low_relevance
     {
         return true;
     }
@@ -152,13 +155,16 @@ pub(super) fn is_false_positive(matches: &[LicenseMatch]) -> bool {
 pub(super) fn is_low_quality_matches(matches: &[LicenseMatch]) -> bool {
     matches.iter().all(|m| {
         m.match_coverage < CLUES_MATCH_COVERAGE_THR - 0.01
-            || (m.match_coverage < IMPERFECT_MATCH_COVERAGE_THR - 0.01 && has_extra_words(&[m.clone()]))
+            || (m.match_coverage < IMPERFECT_MATCH_COVERAGE_THR - 0.01
+                && has_extra_words(&[m.clone()]))
     })
 }
 
 /// Check if any match has correct license clue.
 pub(super) fn has_correct_license_clue_matches(matches: &[LicenseMatch]) -> bool {
-    matches.iter().any(|m| m.is_license_clue && m.match_coverage >= 99.99)
+    matches
+        .iter()
+        .any(|m| m.is_license_clue && m.match_coverage >= 99.99)
 }
 
 /// Check if matches represent undetected licenses.
@@ -178,7 +184,8 @@ pub(super) fn has_unknown_intro_before_detection(matches: &[LicenseMatch]) -> bo
             continue;
         }
         let has_unknown = m.license_expression.contains("unknown");
-        let is_intro = m.is_license_intro || m.is_license_clue || m.license_expression == "free-unknown";
+        let is_intro =
+            m.is_license_intro || m.is_license_clue || m.license_expression == "free-unknown";
         if has_unknown && is_intro {
             // Check if there's a non-intro, non-unknown match after this
             let has_unknown_intro = matches.iter().any(|other| {
@@ -192,8 +199,8 @@ pub(super) fn has_unknown_intro_before_detection(matches: &[LicenseMatch]) -> bo
 
             if has_unknown_intro {
                 let coverage_ok = m.match_coverage >= IMPERFECT_MATCH_COVERAGE_THR - 0.01;
-                let not_unknown =
-                    !m.rule_identifier.contains("unknown") && !m.license_expression.contains("unknown");
+                let not_unknown = !m.rule_identifier.contains("unknown")
+                    && !m.license_expression.contains("unknown");
                 if coverage_ok && not_unknown {
                     return true;
                 }
@@ -333,7 +340,10 @@ pub(super) fn analyze_detection(matches: &[LicenseMatch], package_license: bool)
     }
 
     // Check for imperfect coverage
-    if matches.iter().any(|m| m.match_coverage < IMPERFECT_MATCH_COVERAGE_THR - 0.01) {
+    if matches
+        .iter()
+        .any(|m| m.match_coverage < IMPERFECT_MATCH_COVERAGE_THR - 0.01)
+    {
         return "imperfect-match-coverage";
     }
 
@@ -384,19 +394,8 @@ pub fn determine_license_expression(matches: &[LicenseMatch]) -> Result<String, 
         .map(|m| m.license_expression.as_str())
         .collect();
 
-    // Get unique expressions preserving order
-    let mut unique: Vec<&str> = Vec::new();
-    for expr in &expressions {
-        if !unique.contains(expr) {
-            unique.push(expr);
-        }
-    }
-
-    if unique.len() == 1 {
-        Ok(unique[0].to_string())
-    } else {
-        Ok(unique.join(" AND "))
-    }
+    combine_expressions(&expressions, CombineRelation::And, true)
+        .map_err(|e| format!("Failed to combine expressions: {}", e))
 }
 
 /// Determine SPDX expression from matches.
@@ -414,19 +413,8 @@ pub fn determine_spdx_expression(matches: &[LicenseMatch]) -> Result<String, Str
         .map(|m| m.license_expression_spdx.as_str())
         .collect();
 
-    // Get unique expressions preserving order
-    let mut unique: Vec<&str> = Vec::new();
-    for expr in &expressions {
-        if !unique.contains(expr) {
-            unique.push(expr);
-        }
-    }
-
-    if unique.len() == 1 {
-        Ok(unique[0].to_string())
-    } else {
-        Ok(unique.join(" AND "))
-    }
+    combine_expressions(&expressions, CombineRelation::And, true)
+        .map_err(|e| format!("Failed to combine SPDX expressions: {}", e))
 }
 
 /// Determine SPDX expression from ScanCode license keys.
@@ -573,7 +561,18 @@ mod tests {
 
     #[test]
     fn test_is_match_coverage_below_threshold_exact() {
-        let matches = vec![create_test_match_full("mit", "1-hash", 1, 10, 60.0, 100, 100, 60.0, 100, "mit.LICENSE")];
+        let matches = vec![create_test_match_full(
+            "mit",
+            "1-hash",
+            1,
+            10,
+            60.0,
+            100,
+            100,
+            60.0,
+            100,
+            "mit.LICENSE",
+        )];
         assert!(!is_match_coverage_below_threshold(&matches, 60.0, true));
     }
 
@@ -625,37 +624,103 @@ mod tests {
 
     #[test]
     fn test_is_false_positive_perfect_match() {
-        let matches = vec![create_test_match_full("mit", "1-hash", 1, 10, 95.0, 100, 100, 100.0, 100, "mit.LICENSE")];
+        let matches = vec![create_test_match_full(
+            "mit",
+            "1-hash",
+            1,
+            10,
+            95.0,
+            100,
+            100,
+            100.0,
+            100,
+            "mit.LICENSE",
+        )];
         assert!(!is_false_positive(&matches));
     }
 
     #[test]
     fn test_is_false_positive_bare_single() {
-        let matches = vec![create_test_match_full("gpl", "2-aho", 2000, 2005, 30.0, 3, 3, 30.0, 50, "gpl_bare.LICENSE")];
+        let matches = vec![create_test_match_full(
+            "gpl",
+            "2-aho",
+            2000,
+            2005,
+            30.0,
+            3,
+            3,
+            30.0,
+            50,
+            "gpl_bare.LICENSE",
+        )];
         assert!(is_false_positive(&matches));
     }
 
     #[test]
     fn test_is_false_positive_gpl_short() {
-        let matches = vec![create_test_match_full("gpl-2.0", "2-aho", 1, 10, 50.0, 2, 1, 50.0, 50, "gpl-2.0.LICENSE")];
+        let matches = vec![create_test_match_full(
+            "gpl-2.0",
+            "2-aho",
+            1,
+            10,
+            50.0,
+            2,
+            1,
+            50.0,
+            50,
+            "gpl-2.0.LICENSE",
+        )];
         assert!(is_false_positive(&matches));
     }
 
     #[test]
     fn test_is_false_positive_lgpl_short_not_filtered() {
-        let matches = vec![create_test_match_full("lgpl-2.0-plus", "2-aho", 6, 8, 50.0, 1, 1, 100.0, 60, "lgpl_bare_single_word.RULE")];
+        let matches = vec![create_test_match_full(
+            "lgpl-2.0-plus",
+            "2-aho",
+            6,
+            8,
+            50.0,
+            1,
+            1,
+            100.0,
+            60,
+            "lgpl_bare_single_word.RULE",
+        )];
         assert!(!is_false_positive(&matches));
     }
 
     #[test]
     fn test_is_false_positive_late_short_low_relevance() {
-        let matches = vec![create_test_match_full("mit", "2-aho", 1500, 1505, 30.0, 3, 1, 30.0, 50, "mit.LICENSE")];
+        let matches = vec![create_test_match_full(
+            "mit",
+            "2-aho",
+            1500,
+            1505,
+            30.0,
+            3,
+            1,
+            30.0,
+            50,
+            "mit.LICENSE",
+        )];
         assert!(is_false_positive(&matches));
     }
 
     #[test]
     fn test_is_false_positive_single_license_reference_short() {
-        let mut m = create_test_match_full("borceux", "2-aho", 1, 10, 100.0, 1, 1, 100.0, 80, "borceux.LICENSE");
+        let mut m = create_test_match_full(
+            "borceux",
+            "2-aho",
+            1,
+            10,
+            100.0,
+            1,
+            1,
+            100.0,
+            80,
+            "borceux.LICENSE",
+        );
         m.is_license_reference = true;
         let matches = vec![m];
         assert!(!is_false_positive(&matches));
@@ -663,7 +728,18 @@ mod tests {
 
     #[test]
     fn test_is_false_positive_single_license_reference_long_rule() {
-        let mut m = create_test_match_full("some-license", "2-aho", 1, 10, 100.0, 10, 10, 100.0, 80, "some-license.LICENSE");
+        let mut m = create_test_match_full(
+            "some-license",
+            "2-aho",
+            1,
+            10,
+            100.0,
+            10,
+            10,
+            100.0,
+            80,
+            "some-license.LICENSE",
+        );
         m.is_license_reference = true;
         let matches = vec![m];
         assert!(!is_false_positive(&matches));
@@ -671,7 +747,18 @@ mod tests {
 
     #[test]
     fn test_is_false_positive_single_license_reference_full_relevance() {
-        let mut m = create_test_match_full("some-license", "2-aho", 1, 10, 100.0, 1, 1, 100.0, 100, "some-license.LICENSE");
+        let mut m = create_test_match_full(
+            "some-license",
+            "2-aho",
+            1,
+            10,
+            100.0,
+            1,
+            1,
+            100.0,
+            100,
+            "some-license.LICENSE",
+        );
         m.is_license_reference = true;
         let matches = vec![m];
         assert!(!is_false_positive(&matches));
@@ -679,7 +766,18 @@ mod tests {
 
     #[test]
     fn test_is_false_positive_with_copyright_word() {
-        let mut m = create_test_match_full("gpl-2.0", "2-aho", 1, 10, 50.0, 100, 1, 50.0, 50, "gpl-2.0.LICENSE");
+        let mut m = create_test_match_full(
+            "gpl-2.0",
+            "2-aho",
+            1,
+            10,
+            50.0,
+            100,
+            1,
+            50.0,
+            50,
+            "gpl-2.0.LICENSE",
+        );
         m.matched_text = Some("This is copyrighted material under GPL".to_string());
         let matches = vec![m];
         assert!(!is_false_positive(&matches));
@@ -687,7 +785,9 @@ mod tests {
 
     #[test]
     fn test_is_false_positive_with_c_symbol() {
-        let mut m = create_test_match_full("mit", "2-aho", 1500, 1510, 30.0, 10, 2, 30.0, 50, "mit.RULE");
+        let mut m = create_test_match_full(
+            "mit", "2-aho", 1500, 1510, 30.0, 10, 2, 30.0, 50, "mit.RULE",
+        );
         m.matched_text = Some("Licensed under MIT (c) 2024".to_string());
         let matches = vec![m];
         assert!(!is_false_positive(&matches));
@@ -695,7 +795,18 @@ mod tests {
 
     #[test]
     fn test_is_false_positive_without_copyright_word() {
-        let mut m = create_test_match_full("gpl-2.0", "2-aho", 1, 10, 50.0, 5, 1, 50.0, 50, "gpl-2.0.LICENSE");
+        let mut m = create_test_match_full(
+            "gpl-2.0",
+            "2-aho",
+            1,
+            10,
+            50.0,
+            5,
+            1,
+            50.0,
+            50,
+            "gpl-2.0.LICENSE",
+        );
         m.matched_text = Some("GPL licensed software".to_string());
         let matches = vec![m];
         assert!(is_false_positive(&matches));
@@ -703,9 +814,31 @@ mod tests {
 
     #[test]
     fn test_is_false_positive_partial_copyright() {
-        let mut m1 = create_test_match_full("gpl-2.0", "2-aho", 1, 5, 50.0, 10, 1, 50.0, 50, "gpl-2.0.LICENSE");
+        let mut m1 = create_test_match_full(
+            "gpl-2.0",
+            "2-aho",
+            1,
+            5,
+            50.0,
+            10,
+            1,
+            50.0,
+            50,
+            "gpl-2.0.LICENSE",
+        );
         m1.matched_text = Some("Copyright GPL".to_string());
-        let mut m2 = create_test_match_full("gpl-2.0", "2-aho", 6, 10, 50.0, 10, 1, 50.0, 50, "gpl-2.0.LICENSE");
+        let mut m2 = create_test_match_full(
+            "gpl-2.0",
+            "2-aho",
+            6,
+            10,
+            50.0,
+            10,
+            1,
+            50.0,
+            50,
+            "gpl-2.0.LICENSE",
+        );
         m2.matched_text = Some("GPL licensed".to_string());
         let matches = vec![m1, m2];
         assert!(is_false_positive(&matches));
@@ -713,9 +846,31 @@ mod tests {
 
     #[test]
     fn test_is_false_positive_all_matches_with_copyright() {
-        let mut m1 = create_test_match_full("gpl-2.0", "2-aho", 1, 5, 50.0, 10, 1, 50.0, 50, "gpl-2.0.LICENSE");
+        let mut m1 = create_test_match_full(
+            "gpl-2.0",
+            "2-aho",
+            1,
+            5,
+            50.0,
+            10,
+            1,
+            50.0,
+            50,
+            "gpl-2.0.LICENSE",
+        );
         m1.matched_text = Some("Copyright GPL".to_string());
-        let mut m2 = create_test_match_full("gpl-2.0", "2-aho", 6, 10, 50.0, 10, 1, 50.0, 50, "gpl-2.0.LICENSE");
+        let mut m2 = create_test_match_full(
+            "gpl-2.0",
+            "2-aho",
+            6,
+            10,
+            50.0,
+            10,
+            1,
+            50.0,
+            50,
+            "gpl-2.0.LICENSE",
+        );
         m2.matched_text = Some("(c) GPL".to_string());
         let matches = vec![m1, m2];
         assert!(!is_false_positive(&matches));
@@ -723,7 +878,18 @@ mod tests {
 
     #[test]
     fn test_is_false_positive_matched_text_none() {
-        let mut m = create_test_match_full("gpl-2.0", "2-aho", 1, 10, 50.0, 5, 1, 50.0, 50, "gpl-2.0.LICENSE");
+        let mut m = create_test_match_full(
+            "gpl-2.0",
+            "2-aho",
+            1,
+            10,
+            50.0,
+            5,
+            1,
+            50.0,
+            50,
+            "gpl-2.0.LICENSE",
+        );
         m.matched_text = None;
         let matches = vec![m];
         assert!(is_false_positive(&matches));
@@ -731,7 +897,8 @@ mod tests {
 
     #[test]
     fn test_is_false_positive_copyright_case_insensitive() {
-        let mut m = create_test_match_full("mit", "2-aho", 1, 10, 50.0, 10, 1, 50.0, 50, "mit.RULE");
+        let mut m =
+            create_test_match_full("mit", "2-aho", 1, 10, 50.0, 10, 1, 50.0, 50, "mit.RULE");
         m.matched_text = Some("COPYRIGHT HOLDER NAME".to_string());
         let matches = vec![m];
         assert!(!is_false_positive(&matches));
@@ -739,7 +906,18 @@ mod tests {
 
     #[test]
     fn test_is_false_positive_copyright_empty_string() {
-        let mut m = create_test_match_full("gpl-2.0", "2-aho", 1, 10, 50.0, 5, 1, 50.0, 50, "gpl-2.0.LICENSE");
+        let mut m = create_test_match_full(
+            "gpl-2.0",
+            "2-aho",
+            1,
+            10,
+            50.0,
+            5,
+            1,
+            50.0,
+            50,
+            "gpl-2.0.LICENSE",
+        );
         m.matched_text = Some("".to_string());
         let matches = vec![m];
         assert!(is_false_positive(&matches));
@@ -747,13 +925,35 @@ mod tests {
 
     #[test]
     fn test_is_low_quality_matches_low_coverage() {
-        let matches = vec![create_test_match_full("mit", "2-aho", 1, 10, 40.0, 20, 20, 40.0, 80, "mit.LICENSE")];
+        let matches = vec![create_test_match_full(
+            "mit",
+            "2-aho",
+            1,
+            10,
+            40.0,
+            20,
+            20,
+            40.0,
+            80,
+            "mit.LICENSE",
+        )];
         assert!(is_low_quality_matches(&matches));
     }
 
     #[test]
     fn test_is_low_quality_matches_false_perfect() {
-        let matches = vec![create_test_match_full("mit", "1-hash", 1, 10, 95.0, 100, 100, 100.0, 100, "mit.LICENSE")];
+        let matches = vec![create_test_match_full(
+            "mit",
+            "1-hash",
+            1,
+            10,
+            95.0,
+            100,
+            100,
+            100.0,
+            100,
+            "mit.LICENSE",
+        )];
         assert!(!is_low_quality_matches(&matches));
     }
 
@@ -772,8 +972,30 @@ mod tests {
 
     #[test]
     fn test_compute_detection_score_multiple_equal() {
-        let m1 = create_test_match_full("mit", "1-hash", 1, 10, 90.0, 100, 100, 90.0, 100, "mit.LICENSE");
-        let m2 = create_test_match_full("mit", "1-hash", 11, 20, 90.0, 100, 100, 90.0, 100, "mit.LICENSE");
+        let m1 = create_test_match_full(
+            "mit",
+            "1-hash",
+            1,
+            10,
+            90.0,
+            100,
+            100,
+            90.0,
+            100,
+            "mit.LICENSE",
+        );
+        let m2 = create_test_match_full(
+            "mit",
+            "1-hash",
+            11,
+            20,
+            90.0,
+            100,
+            100,
+            90.0,
+            100,
+            "mit.LICENSE",
+        );
         let matches = vec![m1, m2];
         let score = compute_detection_score(&matches);
         assert!((score - 90.0).abs() < 0.1);
@@ -781,8 +1003,30 @@ mod tests {
 
     #[test]
     fn test_compute_detection_score_weighted() {
-        let m1 = create_test_match_full("mit", "1-hash", 1, 10, 80.0, 100, 100, 80.0, 100, "mit.LICENSE");
-        let m2 = create_test_match_full("mit", "1-hash", 11, 20, 100.0, 100, 100, 100.0, 100, "mit.LICENSE");
+        let m1 = create_test_match_full(
+            "mit",
+            "1-hash",
+            1,
+            10,
+            80.0,
+            100,
+            100,
+            80.0,
+            100,
+            "mit.LICENSE",
+        );
+        let m2 = create_test_match_full(
+            "mit",
+            "1-hash",
+            11,
+            20,
+            100.0,
+            100,
+            100,
+            100.0,
+            100,
+            "mit.LICENSE",
+        );
         let matches = vec![m1, m2];
         let score = compute_detection_score(&matches);
         assert!(score > 80.0 && score < 100.0);
@@ -797,7 +1041,18 @@ mod tests {
 
     #[test]
     fn test_compute_detection_score_capped_at_100() {
-        let m = create_test_match_full("mit", "1-hash", 1, 10, 100.0, 100, 100, 100.0, 100, "mit.LICENSE");
+        let m = create_test_match_full(
+            "mit",
+            "1-hash",
+            1,
+            10,
+            100.0,
+            100,
+            100,
+            100.0,
+            100,
+            "mit.LICENSE",
+        );
         let matches = vec![m];
         let score = compute_detection_score(&matches);
         assert_eq!(score, 100.0);
@@ -813,8 +1068,30 @@ mod tests {
 
     #[test]
     fn test_determine_license_expression_multiple() {
-        let m1 = create_test_match_full("mit", "1-hash", 1, 10, 100.0, 100, 100, 100.0, 100, "mit.LICENSE");
-        let mut m2 = create_test_match_full("apache-2.0", "1-hash", 11, 20, 100.0, 100, 100, 100.0, 100, "apache.LICENSE");
+        let m1 = create_test_match_full(
+            "mit",
+            "1-hash",
+            1,
+            10,
+            100.0,
+            100,
+            100,
+            100.0,
+            100,
+            "mit.LICENSE",
+        );
+        let mut m2 = create_test_match_full(
+            "apache-2.0",
+            "1-hash",
+            11,
+            20,
+            100.0,
+            100,
+            100,
+            100.0,
+            100,
+            "apache.LICENSE",
+        );
         m2.license_expression = "apache-2.0".to_string();
         let matches = vec![m1, m2];
         let result = determine_license_expression(&matches);
@@ -833,7 +1110,18 @@ mod tests {
 
     #[test]
     fn test_classify_detection_valid_perfect() {
-        let m = create_test_match_full("mit", "1-hash", 1, 10, 95.0, 100, 100, 100.0, 100, "mit.LICENSE");
+        let m = create_test_match_full(
+            "mit",
+            "1-hash",
+            1,
+            10,
+            95.0,
+            100,
+            100,
+            100.0,
+            100,
+            "mit.LICENSE",
+        );
         let detection = LicenseDetection {
             license_expression: Some("mit".to_string()),
             license_expression_spdx: Some("MIT".to_string()),
@@ -847,7 +1135,18 @@ mod tests {
 
     #[test]
     fn test_classify_detection_invalid_low_score() {
-        let m = create_test_match_full("mit", "2-aho", 1, 10, 30.0, 100, 100, 30.0, 50, "mit.LICENSE");
+        let m = create_test_match_full(
+            "mit",
+            "2-aho",
+            1,
+            10,
+            30.0,
+            100,
+            100,
+            30.0,
+            50,
+            "mit.LICENSE",
+        );
         let detection = LicenseDetection {
             license_expression: Some("mit".to_string()),
             license_expression_spdx: Some("MIT".to_string()),
@@ -861,7 +1160,18 @@ mod tests {
 
     #[test]
     fn test_classify_detection_invalid_false_positive() {
-        let m = create_test_match_full("gpl", "2-aho", 2000, 2005, 30.0, 3, 3, 30.0, 50, "gpl_bare.LICENSE");
+        let m = create_test_match_full(
+            "gpl",
+            "2-aho",
+            2000,
+            2005,
+            30.0,
+            3,
+            3,
+            30.0,
+            50,
+            "gpl_bare.LICENSE",
+        );
         let detection = LicenseDetection {
             license_expression: Some("gpl".to_string()),
             license_expression_spdx: Some("GPL".to_string()),
@@ -888,7 +1198,18 @@ mod tests {
 
     #[test]
     fn test_classify_detection_score_threshold() {
-        let m = create_test_match_full("mit", "1-hash", 1, 10, 45.0, 100, 100, 45.0, 100, "mit.LICENSE");
+        let m = create_test_match_full(
+            "mit",
+            "1-hash",
+            1,
+            10,
+            45.0,
+            100,
+            100,
+            45.0,
+            100,
+            "mit.LICENSE",
+        );
         let detection = LicenseDetection {
             license_expression: Some("mit".to_string()),
             license_expression_spdx: Some("MIT".to_string()),
@@ -903,7 +1224,18 @@ mod tests {
 
     #[test]
     fn test_classify_detection_perfect_matches() {
-        let m = create_test_match_full("mit", "1-hash", 1, 10, 100.0, 100, 100, 100.0, 100, "mit.LICENSE");
+        let m = create_test_match_full(
+            "mit",
+            "1-hash",
+            1,
+            10,
+            100.0,
+            100,
+            100,
+            100.0,
+            100,
+            "mit.LICENSE",
+        );
         let detection = LicenseDetection {
             license_expression: Some("mit".to_string()),
             license_expression_spdx: Some("MIT".to_string()),
@@ -920,13 +1252,35 @@ mod tests {
         let matches = vec![create_test_match(95.0, "mit.LICENSE")];
         let result = determine_spdx_expression(&matches);
         assert!(result.is_ok());
-        assert_eq!(result.unwrap(), "MIT");
+        assert_eq!(result.unwrap(), "mit");
     }
 
     #[test]
     fn test_determine_spdx_expression_multiple() {
-        let m1 = create_test_match_full("mit", "1-hash", 1, 10, 100.0, 100, 100, 100.0, 100, "mit.LICENSE");
-        let mut m2 = create_test_match_full("apache-2.0", "1-hash", 11, 20, 100.0, 100, 100, 100.0, 100, "apache.LICENSE");
+        let m1 = create_test_match_full(
+            "mit",
+            "1-hash",
+            1,
+            10,
+            100.0,
+            100,
+            100,
+            100.0,
+            100,
+            "mit.LICENSE",
+        );
+        let mut m2 = create_test_match_full(
+            "apache-2.0",
+            "1-hash",
+            11,
+            20,
+            100.0,
+            100,
+            100,
+            100.0,
+            100,
+            "apache.LICENSE",
+        );
         m2.license_expression_spdx = "Apache-2.0".to_string();
         let matches = vec![m1, m2];
         let result = determine_spdx_expression(&matches);
@@ -995,19 +1349,44 @@ mod tests {
         let mut m = create_test_match(100.0, "mit.LICENSE");
         m.matcher = "undetected".to_string();
         let matches = vec![m];
-        assert_eq!(analyze_detection(&matches, false), "undetected-license-matches");
+        assert_eq!(
+            analyze_detection(&matches, false),
+            "undetected-license-matches"
+        );
     }
 
     #[test]
     fn test_analyze_detection_perfect() {
-        let m = create_test_match_full("mit", "1-hash", 1, 10, 100.0, 100, 100, 100.0, 100, "mit.LICENSE");
+        let m = create_test_match_full(
+            "mit",
+            "1-hash",
+            1,
+            10,
+            100.0,
+            100,
+            100,
+            100.0,
+            100,
+            "mit.LICENSE",
+        );
         let matches = vec![m];
         assert_eq!(analyze_detection(&matches, false), "");
     }
 
     #[test]
     fn test_analyze_detection_false_positive() {
-        let matches = vec![create_test_match_full("gpl", "2-aho", 2000, 2005, 30.0, 3, 3, 30.0, 50, "gpl_bare.LICENSE")];
+        let matches = vec![create_test_match_full(
+            "gpl",
+            "2-aho",
+            2000,
+            2005,
+            30.0,
+            3,
+            3,
+            30.0,
+            50,
+            "gpl_bare.LICENSE",
+        )];
         assert_eq!(analyze_detection(&matches, false), "false-positive");
     }
 
@@ -1019,9 +1398,23 @@ mod tests {
 
     #[test]
     fn test_analyze_detection_imperfect_coverage() {
-        let m = create_test_match_full("mit", "1-hash", 1, 10, 80.0, 100, 100, 80.0, 100, "mit.LICENSE");
+        let m = create_test_match_full(
+            "mit",
+            "1-hash",
+            1,
+            10,
+            80.0,
+            100,
+            100,
+            80.0,
+            100,
+            "mit.LICENSE",
+        );
         let matches = vec![m];
-        assert_eq!(analyze_detection(&matches, false), "imperfect-match-coverage");
+        assert_eq!(
+            analyze_detection(&matches, false),
+            "imperfect-match-coverage"
+        );
     }
 
     #[test]

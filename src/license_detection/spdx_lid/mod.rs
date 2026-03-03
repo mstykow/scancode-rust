@@ -22,6 +22,20 @@ use crate::license_detection::index::LicenseIndex;
 use crate::license_detection::models::LicenseMatch;
 use crate::license_detection::query::Query;
 
+#[derive(Debug, Clone, PartialEq)]
+enum RecoveryToken {
+    LicenseKey(String),
+    Keyword(SpdxKeyword),
+    Ignored,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+enum SpdxKeyword {
+    And,
+    Or,
+    With,
+}
+
 /// Matcher identifier for SPDX-License-Identifier based matching.
 ///
 /// Corresponds to Python: `MATCH_SPDX_ID = '1-spdx-id'` (line 61)
@@ -355,6 +369,184 @@ pub(crate) fn is_bare_license_list(expression: &str) -> bool {
         && !expression.contains(')')
 }
 
+fn tokenize_for_recovery(text: &str) -> Vec<RecoveryToken> {
+    let mut tokens = Vec::new();
+    let mut current = String::new();
+
+    for c in text.to_lowercase().chars() {
+        match c {
+            ' ' | '\t' | '(' | ')' | '\n' | '\r' => {
+                if !current.is_empty() {
+                    let token = classify_recovery_token(&current);
+                    if !matches!(token, RecoveryToken::Ignored) {
+                        tokens.push(token);
+                    }
+                    current.clear();
+                }
+            }
+            _ => current.push(c),
+        }
+    }
+
+    if !current.is_empty() {
+        let token = classify_recovery_token(&current);
+        if !matches!(token, RecoveryToken::Ignored) {
+            tokens.push(token);
+        }
+    }
+
+    tokens
+}
+
+fn classify_recovery_token(text: &str) -> RecoveryToken {
+    match text {
+        "and" => RecoveryToken::Keyword(SpdxKeyword::And),
+        "or" => RecoveryToken::Keyword(SpdxKeyword::Or),
+        "with" => RecoveryToken::Keyword(SpdxKeyword::With),
+        _ => {
+            if is_likely_license_key(text) {
+                RecoveryToken::LicenseKey(text.to_string())
+            } else {
+                RecoveryToken::Ignored
+            }
+        }
+    }
+}
+
+fn is_likely_license_key(text: &str) -> bool {
+    if text.len() < 2 {
+        return false;
+    }
+
+    let has_valid_chars = text
+        .chars()
+        .all(|c| c.is_alphanumeric() || c == '-' || c == '.' || c == '+' || c == '_');
+
+    let looks_like_license = text.chars().any(|c| c.is_ascii_digit())
+        || text.starts_with("gpl")
+        || text.starts_with("lgpl")
+        || text.starts_with("bsd")
+        || text.starts_with("mit")
+        || text.starts_with("apache")
+        || text.starts_with("mpl")
+        || text.starts_with("epl")
+        || text.starts_with("isc")
+        || text.starts_with("unlicense")
+        || text.starts_with("cddl")
+        || text.starts_with("ecl")
+        || text.starts_with("ogc")
+        || text.starts_with("ogl")
+        || text.starts_with("gfdl")
+        || text.starts_with("bsl")
+        || text.starts_with("postgresql")
+        || text.starts_with("ntp")
+        || text.starts_with("licenseref")
+        || text.ends_with('+')
+        || text.contains('-');
+
+    has_valid_chars && looks_like_license
+}
+
+fn is_spdx_exception(text: &str) -> bool {
+    let lowered = text.to_lowercase();
+    if lowered.ends_with("-exception")
+        || lowered.contains("-exception-")
+        || lowered.ends_with("exception")
+    {
+        return true;
+    }
+    matches!(
+        lowered.as_str(),
+        "linux-syscall-note"
+            | "gpl-cc-1.0"
+            | "llgpl"
+            | "shl-2.0"
+            | "shl-2.1"
+    )
+}
+
+fn reparse_invalid_expression(text: &str) -> Option<LicenseExpression> {
+    let tokens = tokenize_for_recovery(text);
+
+    let mut has_keywords = false;
+    let mut license_keys: Vec<String> = Vec::new();
+
+    for token in &tokens {
+        match token {
+            RecoveryToken::Keyword(_) => has_keywords = true,
+            RecoveryToken::LicenseKey(key) => license_keys.push(key.clone()),
+            RecoveryToken::Ignored => {}
+        }
+    }
+
+    if license_keys.is_empty() {
+        return Some(LicenseExpression::License("unknown-spdx".to_string()));
+    }
+
+    let all_exceptions = license_keys.iter().all(|key| is_spdx_exception(key));
+    if all_exceptions {
+        return Some(LicenseExpression::License("unknown-spdx".to_string()));
+    }
+
+    let expressions: Vec<LicenseExpression> = license_keys
+        .into_iter()
+        .map(LicenseExpression::License)
+        .collect();
+
+    let mut result = if has_keywords {
+        LicenseExpression::and(expressions)
+            .unwrap_or(LicenseExpression::License("unknown-spdx".to_string()))
+    } else {
+        LicenseExpression::or(expressions)
+            .unwrap_or(LicenseExpression::License("unknown-spdx".to_string()))
+    };
+
+    if has_keywords {
+        result = LicenseExpression::And {
+            left: Box::new(result),
+            right: Box::new(LicenseExpression::License("unknown-spdx".to_string())),
+        };
+    }
+
+    Some(result)
+}
+
+fn convert_recovered_expression_to_scancode(
+    expr: &LicenseExpression,
+    index: &LicenseIndex,
+) -> LicenseExpression {
+    match expr {
+        LicenseExpression::License(key) => {
+            let lookup_key = key.to_lowercase();
+            if let Some(&rid) = index.rid_by_spdx_key.get(&lookup_key) {
+                LicenseExpression::License(index.rules_by_rid[rid].license_expression.clone())
+            } else {
+                LicenseExpression::License("unknown-spdx".to_string())
+            }
+        }
+        LicenseExpression::LicenseRef(key) => {
+            let lookup_key = key.to_lowercase();
+            if let Some(&rid) = index.rid_by_spdx_key.get(&lookup_key) {
+                LicenseExpression::License(index.rules_by_rid[rid].license_expression.clone())
+            } else {
+                LicenseExpression::License("unknown-spdx".to_string())
+            }
+        }
+        LicenseExpression::And { left, right } => LicenseExpression::And {
+            left: Box::new(convert_recovered_expression_to_scancode(left, index)),
+            right: Box::new(convert_recovered_expression_to_scancode(right, index)),
+        },
+        LicenseExpression::Or { left, right } => LicenseExpression::Or {
+            left: Box::new(convert_recovered_expression_to_scancode(left, index)),
+            right: Box::new(convert_recovered_expression_to_scancode(right, index)),
+        },
+        LicenseExpression::With { left, right } => LicenseExpression::With {
+            left: Box::new(convert_recovered_expression_to_scancode(left, index)),
+            right: Box::new(convert_recovered_expression_to_scancode(right, index)),
+        },
+    }
+}
+
 pub(crate) fn find_matching_rule_for_expression(index: &LicenseIndex, expression: &str) -> Option<String> {
     if let Some(&rid) = index.rid_by_spdx_key.get(expression) {
         let rule = &index.rules_by_rid[rid];
@@ -392,22 +584,11 @@ pub(crate) fn find_matching_rule_for_expression(index: &LicenseIndex, expression
         }
     }
 
-    let license_keys = split_license_expression(expression);
-    if license_keys.is_empty() {
-        return index
-            .unknown_spdx_rid
-            .map(|rid| index.rules_by_rid[rid].license_expression.clone());
-    }
-
-    let first_key = &license_keys[0];
-    if let Some(&rid) = index.rid_by_spdx_key.get(first_key) {
-        return Some(index.rules_by_rid[rid].license_expression.clone());
-    }
-
-    for rule in &index.rules_by_rid {
-        let normalized = normalize_spdx_key(&rule.license_expression);
-        if normalized == *first_key {
-            return Some(rule.license_expression.clone());
+    if let Some(recovered) = reparse_invalid_expression(expression) {
+        let converted = convert_recovered_expression_to_scancode(&recovered, index);
+        let result = expression_to_string(&converted);
+        if !result.is_empty() {
+            return Some(result);
         }
     }
 

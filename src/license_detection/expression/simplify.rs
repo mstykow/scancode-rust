@@ -499,9 +499,10 @@ mod tests {
 
     #[test]
     fn test_simplify_complex_duplicates() {
-        let expr =
-            super::super::parse::parse_expression("gpl-2.0-plus AND gpl-2.0-plus AND lgpl-2.0-plus")
-                .unwrap();
+        let expr = super::super::parse::parse_expression(
+            "gpl-2.0-plus AND gpl-2.0-plus AND lgpl-2.0-plus",
+        )
+        .unwrap();
         let simplified = simplify_expression(&expr);
         assert_eq!(
             expression_to_string(&simplified),
@@ -511,7 +512,8 @@ mod tests {
 
     #[test]
     fn test_simplify_three_duplicates() {
-        let expr = super::super::parse::parse_expression("fsf-free AND fsf-free AND fsf-free").unwrap();
+        let expr =
+            super::super::parse::parse_expression("fsf-free AND fsf-free AND fsf-free").unwrap();
         let simplified = simplify_expression(&expr);
         assert_eq!(expression_to_string(&simplified), "fsf-free");
     }

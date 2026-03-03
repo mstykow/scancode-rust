@@ -1,9 +1,9 @@
 //! Candidate selection using set and multiset similarity.
 
-use crate::license_detection::index::LicenseIndex;
 use crate::license_detection::index::token_sets::{
     build_set_and_mset, high_multiset_subset, high_tids_set_subset, tids_set_counter,
 };
+use crate::license_detection::index::LicenseIndex;
 use crate::license_detection::models::Rule;
 use crate::license_detection::query::QueryRun;
 use std::collections::{HashMap, HashSet};
@@ -44,7 +44,7 @@ impl Ord for ScoresVector {
         // 2. containment (higher is better)
         // 3. resemblance (higher is better)
         // 4. matched_length (higher is better)
-        // Note: rid is used for tie-breaking but not in Python's ScoresVector
+        // Note: Python does NOT use rid for tie-breaking in ScoresVector
         self.is_highly_resemblant
             .cmp(&other.is_highly_resemblant)
             .then_with(|| {
@@ -62,7 +62,6 @@ impl Ord for ScoresVector {
                     .partial_cmp(&other.matched_length)
                     .unwrap_or(std::cmp::Ordering::Equal)
             })
-            .then_with(|| self.rid.cmp(&other.rid))
     }
 }
 
