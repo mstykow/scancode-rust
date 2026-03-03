@@ -104,9 +104,9 @@ fn test_dash_obfuscated_email_is_kept_in_copyright() {
 
     let (copyrights, holders, _authors) = detect_copyrights_from_text(input);
     assert!(
-        copyrights
-            .iter()
-            .any(|c| { c.copyright == "Copyright (c) 2005, 2006 Nick Galbreath" }),
+        copyrights.iter().any(|c| {
+            c.copyright == "Copyright (c) 2005, 2006 Nick Galbreath - nickg at modp dot com"
+        }),
         "copyrights: {:?}",
         copyrights.iter().map(|c| &c.copyright).collect::<Vec<_>>()
     );
