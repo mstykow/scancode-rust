@@ -122,12 +122,8 @@ pub(super) fn is_false_positive(matches: &[LicenseMatch]) -> bool {
         return true;
     }
 
-    // Check 2: GPL with short rule length
-    if is_gpl
-        && matches
-            .iter()
-            .all(|m| m.rule_length <= FALSE_POSITIVE_RULE_LENGTH_THRESHOLD)
-    {
+    // Check 2: GPL with rule_length == 1 (matching Python's all_match_rule_length_one)
+    if is_gpl && all_rule_length_one {
         return true;
     }
 
