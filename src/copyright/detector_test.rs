@@ -2107,6 +2107,39 @@ fn test_mso_document_properties_non_confidential_uses_template_lastauthor_varian
 }
 
 #[test]
+fn test_mso_document_properties_confidential_does_not_emit_template_lastauthor_variant() {
+    let content = "<o:Description>Copyright 2009 Confidential Information</o:Description>\n<o:Template>techdoc.dot</o:Template>\n<o:LastAuthor>Jennifer Hruska</o:LastAuthor>";
+    let (copyrights, holders, _authors) = detect_copyrights_from_text(content);
+
+    assert!(
+        copyrights
+            .iter()
+            .any(|c| c.copyright == "Copyright 2009 Confidential"),
+        "copyrights: {:?}",
+        copyrights
+    );
+    assert!(
+        holders.iter().any(|h| h.holder == "Confidential"),
+        "holders: {:?}",
+        holders
+    );
+    assert!(
+        !copyrights.iter().any(|c| c
+            .copyright
+            .contains("techdoc.dot o:LastAuthor Jennifer Hruska")),
+        "copyrights: {:?}",
+        copyrights
+    );
+    assert!(
+        !holders.iter().any(|h| h
+            .holder
+            .contains("techdoc.dot o:LastAuthor Jennifer Hruska")),
+        "holders: {:?}",
+        holders
+    );
+}
+
+#[test]
 fn test_detect_copyright_holder_suffix_authors() {
     let (c, h, a) = detect_copyrights_from_text("Copyright 2015 The Error Prone Authors.");
     assert!(
@@ -2707,6 +2740,24 @@ fn test_drop_shadowed_c_sign_variants_unit() {
     ];
     expected.sort();
     assert_eq!(got, expected, "After dropping variants, got: {c:?}");
+}
+
+#[test]
+fn test_linux_foundation_line_prefers_holder_variant_over_bare_years() {
+    let content = "* Copyright (c) 2007, 2010 Linux Foundation";
+    let (c, _h, _a) = detect_copyrights_from_text(content);
+    assert!(
+        c.iter()
+            .any(|cr| cr.copyright == "Copyright (c) 2007, 2010 Linux Foundation"),
+        "copyrights: {:?}",
+        c
+    );
+    assert!(
+        !c.iter()
+            .any(|cr| cr.copyright == "Copyright (c) 2007, 2010"),
+        "copyrights: {:?}",
+        c
+    );
 }
 
 #[test]
