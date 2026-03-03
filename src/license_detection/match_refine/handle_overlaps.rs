@@ -78,21 +78,13 @@ pub fn filter_contained_matches(
             }
 
             if current.qcontains(&next) {
-                let current_is_fuzzy = current.qspan_positions.is_some();
-                let next_is_exact = next.qspan_positions.is_none();
-                if !(current_is_fuzzy && next_is_exact) {
-                    discarded.push(matches.remove(j));
-                    continue;
-                }
+                discarded.push(matches.remove(j));
+                continue;
             }
             if next.qcontains(&current) {
-                let next_is_fuzzy = next.qspan_positions.is_some();
-                let current_is_exact = current.qspan_positions.is_none();
-                if !(next_is_fuzzy && current_is_exact) {
-                    discarded.push(matches.remove(i));
-                    i = i.saturating_sub(1);
-                    break;
-                }
+                discarded.push(matches.remove(i));
+                i = i.saturating_sub(1);
+                break;
             }
 
             j += 1;
