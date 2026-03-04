@@ -245,6 +245,9 @@ pub fn seq_match_with_candidates(
             let mut qstart = qbegin;
 
             while qstart <= qfinish {
+                if !query_run.is_matchable(false, &[]) {
+                    break;
+                }
                 let blocks = match_blocks(
                     query_tokens,
                     rule_tokens,
