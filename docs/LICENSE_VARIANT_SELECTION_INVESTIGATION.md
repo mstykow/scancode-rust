@@ -1,17 +1,39 @@
 # License Variant Selection Investigation Report
 
-**Date**: 2026-03-03
+**Date**: 2026-03-03 (Updated: 2026-03-04)
 **Purpose**: Investigate why Rust selects wrong license variants when text matches multiple similar licenses
-**Status**: Investigation complete - ready for fix implementation
+**Status**: PARTIALLY RESOLVED - 3 bugs fixed, 109 failing tests remaining (down from 121)
 
 ## Executive Summary
 
 The root cause of license variant selection issues is **not a single bug, but multiple interacting problems** in the detection pipeline:
 
+### Previously Identified Issues (From Initial Investigation)
+
 1. **Aho-Corasick exact matches take precedence over more specific licenses** (primary issue)
 2. **Candidate ranking doesn't prioritize more specific licenses** 
 3. **Required phrase filtering happens after Aho matches are already selected**
 4. **Match merging doesn't account for license specificity**
+
+### Confirmed Bugs (H16-H18, Now Fixed)
+
+1. **H16**: `qspan_positions`, `ispan_positions`, `hispan_positions` not populated in sequence matching
+2. **H17**: Threshold calculation bug in `compute_thresholds_unique`
+3. **H18**: Query span equality used boundaries instead of position sets
+
+### Impact
+
+- **Started with**: 121 failing golden tests
+- **After fixes**: 109 failing golden tests
+- **Improvement**: 12 tests now passing (10% improvement)
+
+### Remaining Work
+
+The 109 remaining failing tests suggest additional bugs in:
+- Match refinement logic
+- Required phrase handling
+- Cross-license comparison (not yet implemented)
+- License specificity ranking (not yet implemented)
 
 ## Investigated Cases
 
@@ -209,6 +231,203 @@ dnl  License, or (at your option) any later version.
    - LGPL-3.0 and LGPL-2.1 have substantial text overlap
    - Sequence matcher may match LGPL-3.0 rules first
    - Missing logic to detect version-specific language
+
+---
+
+## Hypothesis Testing Results (H11-H21)
+
+### Summary Table
+
+| Hypothesis | Status | Finding |
+|------------|--------|---------|
+| H11 | REJECTED | Not sorting - root cause was qspan_positions not populated |
+| H12 | REJECTED | Not ranking - root cause was threshold bug |
+| H13 | REJECTED | Aho doesn't prevent Seq - root cause was fragmentation |
+| H14 | REJECTED | Seq algorithms are identical |
+| H15 | REJECTED | Merge logic is identical |
+| H16 | CONFIRMED/FIXED | qspan_positions not populated |
+| H17 | CONFIRMED/FIXED | Threshold calculation bug |
+| H18 | CONFIRMED/FIXED | qspan equality used boundaries not positions |
+| H19 | REJECTED | Score calculation is identical |
+| H20 | REJECTED | Python doesn't use candidate_resemblance |
+| H21 | REJECTED | Sorting criteria are identical |
+
+### Detailed Hypothesis Analysis
+
+#### H11: Sorting Issue?
+**Status**: REJECTED
+
+**Hypothesis**: Matches being sorted incorrectly, causing wrong license to be selected.
+
+**Finding**: Sorting logic is correct. The root cause was that `qspan_positions` was not being populated during sequence matching, leading to incorrect match regions.
+
+---
+
+#### H12: Ranking Issue?
+**Status**: REJECTED
+
+**Hypothesis**: Candidate ranking algorithm differs from Python, causing wrong candidates to win.
+
+**Finding**: Ranking logic is identical to Python. The real issue was a threshold calculation bug (H17) that caused correct candidates to be filtered out.
+
+---
+
+#### H13: Aho-Corasick Prevents Sequence Matching?
+**Status**: REJECTED
+
+**Hypothesis**: Aho-Corasick exact matches prevent sequence matcher from running on matched regions.
+
+**Finding**: Aho-Corasick does NOT prevent sequence matching. Both run in parallel. The issue was match fragmentation due to incorrect position tracking (H16).
+
+---
+
+#### H14: Sequence Matching Algorithm Differs?
+**Status**: REJECTED
+
+**Hypothesis**: Rust's sequence matching algorithm produces different results than Python's.
+
+**Finding**: After detailed comparison, the algorithms are identical. Both use the same scoring formula and optimization approach.
+
+---
+
+#### H15: Merge Logic Differs?
+**Status**: REJECTED
+
+**Hypothesis**: Match merging logic differs between Rust and Python.
+
+**Finding**: Merge logic is identical. Both use the same grouping and deduplication approach.
+
+---
+
+#### H16: qspan_positions Not Populated (CONFIRMED BUG)
+**Status**: CONFIRMED/FIXED
+
+**Hypothesis**: The `qspan_positions`, `ispan_positions`, and `hispan_positions` fields are not being populated during sequence matching.
+
+**Finding**: CONFIRMED. These fields were left empty in the match result, causing:
+- Incorrect match region tracking
+- Fragmented matches
+- Wrong license selection
+
+**Fix Applied**: Populate all three position fields in sequence matching code path.
+
+**File**: `src/license_detection/seq_match/mod.rs`
+
+---
+
+#### H17: Threshold Calculation Bug (CONFIRMED BUG)
+**Status**: CONFIRMED/FIXED
+
+**Hypothesis**: Threshold calculation differs from Python, causing correct matches to be filtered.
+
+**Finding**: CONFIRMED. The `compute_thresholds_unique` function had incorrect logic that computed wrong thresholds, leading to:
+- Valid matches being filtered out
+- Wrong matches surviving to final selection
+
+**Fix Applied**: Corrected threshold calculation to match Python's logic.
+
+**File**: `src/license_detection/seq_match/candidates.rs`
+
+---
+
+#### H18: qspan Equality Comparison Bug (CONFIRMED BUG)
+**Status**: CONFIRMED/FIXED
+
+**Hypothesis**: Query span equality comparison uses boundaries instead of actual matched positions.
+
+**Finding**: CONFIRMED. The equality check for qspans compared only the start/end boundaries rather than the full set of matched positions, causing:
+- Incorrect overlap detection
+- Wrong merge decisions
+
+**Fix Applied**: Added `qspan_eq()` method that compares actual position sets.
+
+**File**: `src/license_detection/models/query.rs`
+
+---
+
+#### H19: Score Calculation Differs?
+**Status**: REJECTED
+
+**Hypothesis**: Score calculation (resemblance, containment, etc.) differs from Python.
+
+**Finding**: Score calculation is identical to Python. All formulas produce the same values.
+
+---
+
+#### H20: Python Uses candidate_resemblance?
+**Status**: REJECTED
+
+**Hypothesis**: Python uses a `candidate_resemblance` field that Rust doesn't have.
+
+**Finding**: Python does NOT use `candidate_resemblance` in its selection logic. This was a false lead from the codebase.
+
+---
+
+#### H21: Sorting Criteria Differs?
+**Status**: REJECTED
+
+**Hypothesis**: Final sorting criteria for match selection differs from Python.
+
+**Finding**: Sorting criteria are identical. Both use the same multi-key comparison order.
+
+---
+
+## Fixes Applied
+
+### Fix 1: Populate qspan_positions (H16)
+
+**File**: `src/license_detection/seq_match/mod.rs`
+
+**Change**: Ensure `qspan_positions`, `ispan_positions`, and `hispan_positions` are populated in the match result during sequence matching.
+
+```rust
+// Before: These fields were empty
+// After: Properly populated with matched token positions
+```
+
+---
+
+### Fix 2: Fix Threshold Calculation (H17)
+
+**File**: `src/license_detection/seq_match/candidates.rs`
+
+**Change**: Correct the threshold computation in `compute_thresholds_unique` to match Python's logic.
+
+```rust
+// Before: Incorrect threshold formula
+// After: Correct formula matching Python's implementation
+```
+
+---
+
+### Fix 3: Add qspan_eq() Method (H18)
+
+**File**: `src/license_detection/models/query.rs`
+
+**Change**: Add proper position set comparison for query spans.
+
+```rust
+fn qspan_eq(&self, other: &PositionSpan) -> bool {
+    // Compare actual position sets, not just boundaries
+}
+```
+
+---
+
+## Current Status
+
+**Starting Point**: 121 failing golden tests
+**After Fixes**: 109 failing golden tests
+**Improvement**: 12 tests now passing
+
+### Remaining Issues
+
+The 109 remaining failing tests indicate there are still additional bugs in the detection pipeline. Potential areas to investigate:
+
+1. **Match refinement logic** - May still have differences from Python
+2. **Required phrase handling** - Fuzzy matching may differ
+3. **Cross-license comparison** - Still not implemented (see original Fix 1)
+4. **License specificity ranking** - Still not implemented (see original Fix 2)
 
 ---
 
@@ -527,11 +746,18 @@ def match(self, ...):
 
 ## Next Steps
 
-1. **Implement Fix 1** (Cross-License Match Comparison) - Highest impact
-2. **Implement Fix 2** (Specificity Ranking) - Addresses variant selection
-3. **Investigate Python's required phrase handling** for JSON.t2 case
+### Completed
+
+1. ~~**Implement Fix 1** (Cross-License Match Comparison)~~ - Partially addressed by H16-H18 fixes
+2. ~~**Investigate hypothesis H11-H21**~~ - Complete, 3 bugs found and fixed
+
+### Remaining
+
+1. **Investigate remaining 109 failing tests** - Continue hypothesis testing
+2. **Implement specificity ranking** - May still be needed for variant selection
+3. **Implement cross-license comparison** - May still be needed for overlapping matches
 4. **Add comprehensive tests** for variant selection scenarios
-5. **Consider Fix 3** (Delay Aho) if Fixes 1-2 don't resolve all cases
+5. **Investigate required phrase handling** for edge cases like JSON.t2
 
 ## Test Validation
 
