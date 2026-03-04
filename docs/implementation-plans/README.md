@@ -23,15 +23,15 @@ implementation-plans/
   - Status: Near completion; remaining work is tracked in [PARSER_PLAN.md](package-detection/PARSER_PLAN.md)
 
 - **[ASSEMBLY_PLAN.md](package-detection/ASSEMBLY_PLAN.md)** - Package assembly roadmap
-  - Status: **COMPLETE** — All phases done (sibling merge, nested merge, workspace assembly, file reference resolution)
+  - Status: 🟢 Complete — All phases done (sibling merge, nested merge, workspace assembly, file reference resolution)
 
 ### Text Detection (`text-detection/`)
 
 - **[COPYRIGHT_DETECTION_PLAN.md](text-detection/COPYRIGHT_DETECTION_PLAN.md)** - Copyright statement extraction
-  - Status: **COMPLETE** — Implementation landed with scanner integration and golden-test workflow
+  - Status: 🟢 Complete — Implementation landed with scanner integration and golden-test workflow
 
 - **[EMAIL_URL_DETECTION_PLAN.md](text-detection/EMAIL_URL_DETECTION_PLAN.md)** - Email and URL extraction
-  - Status: **COMPLETE** — Implementation landed with scanner/CLI integration and local golden tests
+  - Status: 🟢 Complete — Implementation landed with scanner/CLI integration and local golden tests
 
 ### Infrastructure (`infrastructure/`)
 
@@ -39,7 +39,7 @@ implementation-plans/
   - Status: 🟡 Active — implemented and pending CLI parity items are tracked in [CLI_PLAN.md](infrastructure/CLI_PLAN.md)
 
 - **[CACHING_PLAN.md](infrastructure/CACHING_PLAN.md)** - Scan result caching and incremental scanning
-  - Status: 🟡 Planning Complete — Ready for implementation
+  - Status: 🟡 Active — cache CLI/runtime integration is tracked in [CACHING_PLAN.md](infrastructure/CACHING_PLAN.md)
 
 - **[PROGRESS_TRACKING_PLAN.md](infrastructure/PROGRESS_TRACKING_PLAN.md)** - Enhanced progress reporting
   - Status: 🟢 Implemented — progress manager, mode handling, summary/reporting, and integration tests are tracked in the plan document
