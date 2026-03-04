@@ -311,7 +311,7 @@ Rust ecosystem provides excellent archive handling:
 
 ## Related Parsers
 
-Our Debian parser suite includes **5 parsers** (all complete):
+Our Debian parser suite includes multiple parsers (all complete):
 
 1. **DebianControlParser** - Control files (manifests)
 2. **DebianDebParser** - .deb archives (THIS IMPROVEMENT)
@@ -319,7 +319,7 @@ Our Debian parser suite includes **5 parsers** (all complete):
 4. **DebianDscParser** - Source package metadata
 5. **DebianInstalledParser** - dpkg status database
 
-**This improvement completes the .deb archive parser (parser #2).**
+**This improvement completes the `.deb` archive parser in that suite.**
 
 ## References
 

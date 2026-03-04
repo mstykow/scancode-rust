@@ -231,8 +231,8 @@ for line in content.lines() {
 
 ### Golden Tests
 
-- **12/13 passing** (92% pass rate)
-- **1 intentionally ignored**: Provider field test (beyond parity, documented architectural difference)
+- Golden test coverage is maintained in the parser suite and CI.
+- For current pass/ignore status, rely on test runs rather than static counts in this document.
 
 ### Test Data
 

@@ -20,7 +20,7 @@ implementation-plans/
 ### Package Detection (`package-detection/`)
 
 - **[PARSER_PLAN.md](package-detection/PARSER_PLAN.md)** - Individual file format parser implementations
-  - Status: Near completion; remaining work is tracked in [PARSER_PLAN.md](package-detection/PARSER_PLAN.md)
+  - Status: 🟢 Complete — planned production parser/recognizer coverage is implemented; deferred and future-scope items are documented in [PARSER_PLAN.md](package-detection/PARSER_PLAN.md)
 
 - **[ASSEMBLY_PLAN.md](package-detection/ASSEMBLY_PLAN.md)** - Package assembly roadmap
   - Status: 🟢 Complete — All phases done (sibling merge, nested merge, workspace assembly, file reference resolution)

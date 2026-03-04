@@ -1,52 +1,53 @@
 # Parser Parity Plan
 
-> **Updated**: February 11, 2026
-> **Status**: 🟢 **COMPLETE** — 86 parsers + 23 recognizers covering 31 ecosystems. Only Windows binary formats remain (low priority, deferred).
+> **Updated**: March 4, 2026
+> **Status**: 🟢 **COMPLETE** — Planned production parser/recognizer coverage is implemented. Deferred and future-scope items are documented below.
 
 ## Current State
 
-86 Rust parsers + 23 file-type recognizers covering 31 ecosystems. All phases complete except 3 low-priority Windows binary parsers (deferred).
+Production parser coverage is complete for this plan's scope. Deferred/future-scope items are currently limited to low-priority Windows binary deep parsing.
 
 ---
 
 ## Implemented Ecosystems
 
-All production handlers covered. Some consolidate multiple Python handlers into fewer Rust parsers (by design).
+All production handlers in plan scope are covered. Some ecosystems consolidate multiple Python handlers into fewer Rust parsers by design.
 
-| Ecosystem           | Python Handlers | Rust Parsers | Notes                                                                                          |
-| ------------------- | --------------- | ------------ | ---------------------------------------------------------------------------------------------- |
-| AboutCode           | 1               | 1            | `AboutFileParser`                                                                              |
-| Alpine              | 4               | 2            | .apk archive + installed DB. APKBUILD not implemented (Python is stub only).                   |
-| Autotools           | 1               | 1            | `AutotoolsConfigureParser`                                                                     |
-| Bazel               | 1               | 1            | `BazelBuildParser`                                                                             |
-| Bower               | 1               | 1            | `BowerJsonParser`                                                                              |
-| Buck                | 2               | 2            | `BuckBuildParser`, `BuckMetadataBzlParser`                                                     |
-| Cargo/Rust          | 2               | 2            | `CargoParser`, `CargoLockParser` + workspace assembly                                          |
-| Chef                | 3               | 2            | metadata.rb, metadata.json. Cookbook .tgz not implemented (archive).                           |
-| CocoaPods           | 4               | 4            | Podfile, Podfile.lock, .podspec, .podspec.json                                                 |
-| Conan               | 2               | 4            | ⭐ Beyond parity: added `conanfile.txt`, `conan.lock`, `conandata.yml`                         |
-| Conda               | 3               | 3            | conda-meta JSON, environment.yaml, meta.yaml                                                   |
-| CPAN                | 2               | 5            | ⭐ Beyond parity: META.json, META.yml, MANIFEST, dist.ini, Makefile.PL (Python has stubs only) |
-| CRAN/R              | 1               | 1            | `CranParser`                                                                                   |
-| Dart/Pub            | 2               | 2            | pubspec.yaml, pubspec.lock                                                                     |
-| Debian              | 11              | 12           | Includes ⭐ .deb introspection, copyright, distroless, md5sums variants                        |
-| FreeBSD             | 1               | 1            | `FreebsdCompactManifestParser`                                                                 |
-| Go                  | 3               | 3            | go.mod, go.sum, Godeps.json                                                                    |
-| Gradle              | 1               | 2            | ⭐ Beyond parity: added `GradleLockfileParser`                                                 |
-| Haxe                | 1               | 1            | `HaxeParser`                                                                                   |
-| Linux Distro        | 1               | 1            | `OsReleaseParser` ⭐ fixes name logic bug + extracts URLs                                      |
-| Maven/Java          | 3               | 3            | pom.xml, MANIFEST.MF, ⭐ OSGi metadata + SCM/CI/issue management                               |
-| npm/yarn/pnpm       | 8               | 5            | Consolidates v1/v2 yarn, shrinkwrap variants + workspace assembly                              |
-| NuGet               | 3               | 4            | ⭐ Beyond parity: added `PackagesConfigParser`                                                 |
-| OCaml/opam          | 1               | 1            | `OpamParser`                                                                                   |
-| PHP/Composer        | 2               | 2            | `ComposerJsonParser`, `ComposerLockParser` ⭐ extra provenance fields                          |
-| Python/PyPI         | ~13             | 6            | Consolidates many handlers, includes pip-inspect                                               |
-| README              | 1               | 1            | `ReadmeParser`                                                                                 |
-| RPM                 | 4               | 7            | ⭐ Specfile, DB (3 variants), license files, Mariner, archive                                  |
-| Ruby                | 7               | 5            | Gemspec, Gemfile, lockfile, .gem archive, extracted metadata                                   |
-| Swift               | 3               | 3            | Package.resolved, Package.swift.json, ⭐ full dependency graph                                 |
-| Windows Update      | 1               | 1            | `MicrosoftUpdateManifestParser`                                                                |
-| misc.py recognizers | 23              | 23           | All recognizers implemented, including magic byte detection                                    |
+| Ecosystem           | Coverage       | Notes                                                                                          |
+| ------------------- | -------------- | ---------------------------------------------------------------------------------------------- |
+| AboutCode           | ✅ Implemented | `AboutFileParser`                                                                              |
+| Alpine              | ✅ Implemented | .apk archive + installed DB. APKBUILD not implemented (Python is stub only).                   |
+| Autotools           | ✅ Implemented | `AutotoolsConfigureParser`                                                                     |
+| Bazel               | ✅ Implemented | `BazelBuildParser`                                                                             |
+| Bower               | ✅ Implemented | `BowerJsonParser`                                                                              |
+| Buck                | ✅ Implemented | `BuckBuildParser`, `BuckMetadataBzlParser`                                                     |
+| Cargo/Rust          | ✅ Implemented | `CargoParser`, `CargoLockParser` + workspace assembly                                          |
+| Chef                | ✅ Implemented | metadata.rb, metadata.json. Cookbook .tgz not implemented (archive).                           |
+| CocoaPods           | ✅ Implemented | Podfile, Podfile.lock, .podspec, .podspec.json                                                 |
+| Conan               | ✅ Implemented | ⭐ Beyond parity: added `conanfile.txt`, `conan.lock`, `conandata.yml`                         |
+| Conda               | ✅ Implemented | conda-meta JSON, environment.yaml, meta.yaml                                                   |
+| CPAN                | ✅ Implemented | ⭐ Beyond parity: META.json, META.yml, MANIFEST, dist.ini, Makefile.PL (Python has stubs only) |
+| CRAN/R              | ✅ Implemented | `CranParser`                                                                                   |
+| Dart/Pub            | ✅ Implemented | pubspec.yaml, pubspec.lock                                                                     |
+| Debian              | ✅ Implemented | Includes ⭐ .deb introspection, copyright, distroless, md5sums variants                        |
+| FreeBSD             | ✅ Implemented | `FreebsdCompactManifestParser`                                                                 |
+| Git submodules      | ✅ Implemented | `GitmodulesParser`                                                                             |
+| Go                  | ✅ Implemented | go.mod, go.sum, Godeps.json                                                                    |
+| Gradle              | ✅ Implemented | ⭐ Beyond parity: added `GradleLockfileParser`                                                 |
+| Haxe                | ✅ Implemented | `HaxeParser`                                                                                   |
+| Linux Distro        | ✅ Implemented | `OsReleaseParser` ⭐ fixes name logic bug + extracts URLs                                      |
+| Maven/Java          | ✅ Implemented | pom.xml, MANIFEST.MF, ⭐ OSGi metadata + SCM/CI/issue management                               |
+| npm/yarn/pnpm       | ✅ Implemented | Consolidates v1/v2 yarn, shrinkwrap variants + workspace assembly                              |
+| NuGet               | ✅ Implemented | ⭐ Beyond parity: added `PackagesConfigParser`                                                 |
+| OCaml/opam          | ✅ Implemented | `OpamParser`                                                                                   |
+| PHP/Composer        | ✅ Implemented | `ComposerJsonParser`, `ComposerLockParser` ⭐ extra provenance fields                          |
+| Python/PyPI         | ✅ Implemented | Consolidates many handlers, includes pip-inspect                                               |
+| README              | ✅ Implemented | `ReadmeParser`                                                                                 |
+| RPM                 | ✅ Implemented | ⭐ Specfile, DB (3 variants), license files, Mariner, archive                                  |
+| Ruby                | ✅ Implemented | Gemspec, Gemfile, lockfile, .gem archive, extracted metadata                                   |
+| Swift               | ✅ Implemented | Package.resolved, Package.swift.json, ⭐ full dependency graph                                 |
+| Windows Update      | ✅ Implemented | `MicrosoftUpdateManifestParser`                                                                |
+| misc.py recognizers | ✅ Implemented | All recognizers implemented, including magic byte detection                                    |
 
 ---
 
@@ -58,7 +59,7 @@ These require specialized crates and have low ROI. Even Python doesn't fully par
 | -------------------------- | ------------------- | --------------------------------------- | -------- |
 | `MsiInstallerHandler`      | `*.msi`             | OLE Compound Document binary format     | Low      |
 | `WindowsExecutableHandler` | `*.exe`, `*.dll`    | PE binary format, VERSION_INFO resource | Low      |
-| Win Registry handlers (3)  | Registry hive files | Binary registry format                  | Low      |
+| Win Registry handlers      | Registry hive files | Binary registry format                  | Low      |
 
 ### Out of Scope
 
