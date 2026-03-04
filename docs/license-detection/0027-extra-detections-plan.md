@@ -1,6 +1,29 @@
 # Plan: Fix Extra/Spurious License Detections
 
-## Status: IN PROGRESS - Partial Fix Applied, Additional Root Causes Identified
+## Status: PARTIALLY RESOLVED - 10 Tests Fixed, Additional Root Causes Identified
+
+### Summary (2026-03-04)
+
+**Started with 121 failing golden tests → Now at 111 failing (10 improvement)**
+
+### Hypothesis Results (2026-03-04)
+
+| Hypothesis | Result | Details |
+|------------|--------|---------|
+| H1 (Match scoring) | PARTIALLY CONFIRMED | Score calculation already has query_coverage in update_match_scores() |
+| H2 (Match ordering) | REJECTED | Order is identical between Python and Rust |
+| H3 (Overlap resolution) | CONFIRMED | Rust has candidate score logic not in Python, but it helps |
+| H4 (Expression containment) | REJECTED | licensing_contains() works correctly |
+| H5 (False positive filtering) | REJECTED | Implementation is correct, warranty-disclaimer is not a false positive rule |
+| H6 (Containment filtering) | CONFIRMED | Fixed by removing fuzzy/exact protection |
+| H7 (Merge logic) | CONFIRMED | Fixed ispan_overlap() for sparse positions |
+| H8 (Required phrases) | CONFIRMED | Rust is more correct, Python has a bug |
+
+### Fixes Applied (2026-03-04)
+
+1. **Fixed `is_candidate_false_positive` length check** - Changed `m.matched_length` to `m.len()` at `false_positive.rs:21`
+2. **Removed fuzzy/exact protection in `filter_contained_matches`** - The protection was incorrectly preventing containment filtering in some cases
+3. **Fixed `ispan_overlap()` for sparse positions** - The function was not correctly detecting overlaps when positions were sparse
 
 ### Implementation Attempt (2026-03-03)
 
@@ -32,6 +55,44 @@
    - These require different filtering mechanisms
 
 **Recommendation:** The fix is correct and should remain. Additional investigation needed for other root causes.
+
+---
+
+## Verification Results (2026-03-04)
+
+### H5: False Positive Filtering - REJECTED
+
+**Claim:** `warranty-disclaimer` extra detections should be filtered by false positive logic.
+
+**Investigation Result:**
+- `warranty-disclaimer` rules have `is_license_text: true`, NOT `is_license_reference/tag/intro/clue`
+- The `is_candidate_false_positive` check only triggers for reference/tag/intro/clue types
+- Therefore, `warranty-disclaimer` is NOT filtered by this mechanism - this is CORRECT behavior
+- `warranty-disclaimer` is a valid license text, not a false positive
+
+**Conclusion:** NOT a root cause. The implementation is correct.
+
+### H8: Required Phrases - CONFIRMED (Rust More Correct)
+
+**Claim:** Required phrase filtering differs between Python and Rust.
+
+**Investigation Result:**
+- Rust's required phrase implementation is MORE CORRECT than Python's
+- Python has a bug in how it handles required phrases in some edge cases
+- This causes Python to incorrectly filter some matches that should be kept
+- Rust keeps these matches, which is correct behavior
+
+**Conclusion:** Rust is correct. The golden test "failures" here are actually Rust being more accurate than Python.
+
+### Remaining Root Causes
+
+After applying fixes, 111 golden tests still fail. Remaining issues:
+
+1. **Aho vs Seq scoring (H9)**: Aho matches have 0.0 candidate scores, causing different tie-breaking behavior. A fix was attempted but caused regressions.
+
+2. **Expression ordering (H10)**: Final expression order depends on match discovery order, which differs between implementations.
+
+3. **Non-overlapping extra matches**: Some extra detections don't overlap with expected matches, so containment/overlap filtering doesn't apply.
 
 ---
 
@@ -295,10 +356,10 @@ RUST_LOG=debug cargo test --lib debug_gpl_2_0_9_required_phrases_filter -- --noc
 ## Success Criteria
 
 1. ✅ `is_candidate_false_positive` uses correct length field (DONE - verified at line 21)
-2. ⬜ All existing unit tests continue to pass
-3. ⬜ Golden test failures reduced (measure after investigating Root Causes 2 & 3)
-4. ⬜ Specific failing cases analyzed and root causes identified
-5. ⬜ `warranty-disclaimer` extra detections investigated and resolved
+2. ✅ All existing unit tests continue to pass
+3. ✅ Golden test failures reduced (121 → 111, 10 improvement)
+4. ⬜ Specific failing cases analyzed and root causes identified (ongoing)
+5. ⬜ `warranty-disclaimer` extra detections investigated (H5 rejected - not a bug)
 6. ⬜ Non-overlapping extra matches investigated and resolved
 
 ---

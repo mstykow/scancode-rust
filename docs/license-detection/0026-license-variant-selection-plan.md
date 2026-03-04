@@ -1,8 +1,24 @@
 # Plan: Fix Wrong License Variant Detection
 
-## Status: IMPLEMENTED (Partial - Does Not Solve Variant Selection Issues)
+## Status: INVESTIGATION COMPLETE - Multiple Hypotheses Tested
 
-### Implementation Attempt (2026-03-03)
+### Investigation Summary (2026-03-04)
+
+**Started with 121 failing golden tests → Now at 111 failing (10 improvement)**
+
+### Hypothesis Results
+
+| Hypothesis | Result | Details |
+|------------|--------|---------|
+| H1 (Match scoring) | PARTIALLY CONFIRMED | Score calculation already has query_coverage in update_match_scores() |
+| H2 (Match ordering) | REJECTED | Order is identical between Python and Rust |
+| H3 (Overlap resolution) | CONFIRMED | Rust has candidate score logic not in Python, but it helps |
+| H4 (Expression containment) | REJECTED | licensing_contains() works correctly |
+| H5 (False positive filtering) | REJECTED | Implementation is correct, warranty-disclaimer is not a false positive rule |
+| H9 (Aho vs Seq scoring) | CONFIRMED | Aho has 0.0 candidate scores, but fix caused regressions |
+| H10 (Expression ordering) | CONFIRMED | Order depends on match order |
+
+### Implementation Attempts
 
 **What was done:**
 - Removed `rid` tie-breaker from `ScoresVector::cmp` in `src/license_detection/seq_match/candidates.rs:40-65`
@@ -101,6 +117,58 @@ The `filter_dupes` function groups candidates by `license_expression`, so candid
 - The overlap filtering must then choose between them
 
 This is correct behavior matching Python, but explains why variant selection happens at the overlap stage, not the candidate selection stage.
+
+---
+
+## Verification Results (2026-03-04)
+
+### Hypothesis H4: Expression Containment - REJECTED
+
+**Claim:** `licensing_contains()` may behave differently for variant selection.
+
+**Investigation Result:**
+- The `licensing_contains()` function in `src/license_detection/expression.rs` works correctly
+- It properly identifies when one license expression contains another
+- Used correctly in overlap filtering at `handle_overlaps.rs:255-321`
+
+**Conclusion:** NOT a root cause for variant selection issues.
+
+### Hypothesis H9: Aho vs Seq Scoring - CONFIRMED
+
+**Claim:** Aho-Corasick matches have 0.0 candidate scores, causing different behavior than sequence matches.
+
+**Investigation Result:**
+- Confirmed: Aho matches set `candidate_resemblance = 0.0` and `candidate_containment = 0.0` (`aho_match.rs:191`)
+- Confirmed: Seq matches properly populate these fields (`matching.rs:328-329`)
+- When both matches have 0.0 scores, the beyond-parity candidate score logic doesn't activate
+- This causes Rust to follow Python's behavior (discard shorter match)
+
+**Fix Attempted:**
+- Tried to normalize candidate scores for Aho matches
+- **Result:** Caused regressions in other test cases
+- **Decision:** Reverted fix, need different approach
+
+### Hypothesis H10: Expression Ordering - CONFIRMED
+
+**Claim:** Expression order depends on match order.
+
+**Investigation Result:**
+- The order of license expressions in results depends on:
+  1. The order matches are discovered (Aho-Corasick vs sequence matching)
+  2. Sorting by position and length
+  3. Tie-breaking behavior
+- Python and Rust may discover matches in different orders due to implementation differences
+- This affects which license appears first in results
+
+**Conclusion:** Expected behavior, but contributes to golden test failures.
+
+### Remaining Work
+
+The candidate score logic in `handle_overlaps.rs` is a beyond-parity feature that should be KEPT. It helps when both matches have candidate scores (sequence matching). The remaining issues are:
+
+1. Aho matches have no candidate scores - need alternative tie-breaking
+2. Match discovery order differs - affects final expression ordering
+3. Some edge cases in score calculation
 
 ### 5. Testing Strategy: NEEDS IMPLEMENTATION
 

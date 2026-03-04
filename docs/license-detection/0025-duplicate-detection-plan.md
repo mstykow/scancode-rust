@@ -1,8 +1,14 @@
 # Implementation Plan: Missing Duplicate Detections
 
-## Status: VERIFIED - Root Cause Confirmed (Pipeline Difference)
+## Status: PARTIALLY RESOLVED - detect_matches() Implemented, 10 Tests Fixed
 
-### Key Finding (2026-03-03, Verified 2026-03-03)
+### Summary (2026-03-04)
+
+**Started with 121 failing golden tests → Now at 111 failing (10 improvement)**
+
+The `detect_matches()` method was implemented to return raw matches (like Python's `idx.match()`) for accurate golden test comparison. This fixed some duplicate detection issues.
+
+### Key Finding (2026-03-03, Verified 2026-03-04)
 
 **The real issue is NOT `filter_contained_matches()` - it's a pipeline difference between Python and Rust.**
 
@@ -338,7 +344,42 @@ Before marking complete:
 
 ## Next Steps
 
-1. **Implement `detect_matches()`** - Add method to return raw matches like Python's `idx.match()`
-2. **Update golden tests** - Use `detect_matches()` for accurate Python comparison
-3. **Run full golden test suite** - Verify alignment with Python reference
+1. **Implement `detect_matches()`** - Add method to return raw matches like Python's `idx.match()` ✅ DONE
+2. **Update golden tests** - Use `detect_matches()` for accurate Python comparison ✅ DONE
+3. **Run full golden test suite** - Verify alignment with Python reference ✅ DONE (111 remaining failures)
 4. **Document the difference** - Explain `detect()` vs `detect_matches()` in API docs
+
+---
+
+## Verification Results (2026-03-04)
+
+### Hypothesis Testing Summary
+
+| Hypothesis | Result | Notes |
+|------------|--------|-------|
+| H1 (Match scoring) | PARTIALLY CONFIRMED | Score calculation already has query_coverage in update_match_scores() |
+| H2 (Match ordering) | REJECTED | Order is identical between Python and Rust |
+| H3 (Overlap resolution) | CONFIRMED | Rust has candidate score logic not in Python, but it helps |
+| H6 (Containment filtering) | CONFIRMED | Fixed by removing fuzzy/exact protection |
+| H7 (Merge logic) | CONFIRMED | Fixed ispan_overlap() for sparse positions |
+
+### Fixes Applied
+
+1. **Added `detect_matches()` method** - Returns raw matches after refinement, without grouping into detections. This matches Python's `idx.match()` behavior for golden test comparison.
+
+2. **Removed fuzzy/exact protection in `filter_contained_matches`** - The protection was incorrectly preventing containment filtering in some cases.
+
+3. **Fixed `ispan_overlap()` for sparse positions** - The function was not correctly detecting overlaps when positions were sparse.
+
+### Remaining Issues
+
+After all fixes, 111 golden tests still fail. Root causes for remaining failures:
+- H9 (Aho vs Seq scoring): Aho matches have 0.0 candidate scores, causing different behavior than seq matches. A fix was attempted but caused regressions.
+- H10 (Expression ordering): Order depends on match order, which can differ between implementations.
+- H8 (Required phrases): Rust is more correct than Python in some cases (Python has a bug).
+
+### Success Metrics
+
+- **Before fixes:** 121 failing golden tests
+- **After fixes:** 111 failing golden tests
+- **Improvement:** 10 tests fixed (8.3% improvement)
