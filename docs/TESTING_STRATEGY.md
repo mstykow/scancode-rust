@@ -181,6 +181,8 @@ fn test_golden_debian_control() {
 - Exclusion patterns work correctly
 - Max depth limits are respected
 - Empty directories handled gracefully
+- Scan-result cache entry persistence (first scan writes cache, repeat scan reuses stable findings)
+- Cache-control CLI wiring behavior (`--cache-dir`, `--cache-clear`) via startup/runtime tests
 
 **Why This Matters**: Unit tests verify components work; integration tests verify they work together correctly.
 

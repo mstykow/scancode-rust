@@ -685,9 +685,15 @@ Caching is currently split between transition-state behavior on `main` and the t
 2. **Scan Result Cache** (beyond parity — Python has none): Content-addressed per-file cache keyed by SHA256.
 3. **Incremental Scanning** (beyond parity — Python has none): manifest-guided re-scan of changed files only.
 
-Current groundwork on this branch now lives in `src/cache/` (`config`, `metadata`, `paths`, `io`) with snapshot envelope read/write, compatibility checks, and atomic temp-file + rename persistence.
+Current caching modules on `main` live in `src/cache/` (`config`, `metadata`, `paths`, `io`, `scan_cache`) with snapshot envelope read/write, compatibility checks, sharded scan-result paths, and atomic temp-file + rename persistence.
 
-Unified runtime wiring is still pending: scanner/main integration, CLI cache flags, and lock-managed multi-process coordination. XDG/env override behavior remains a planned follow-up once cache ownership is centralized.
+Runtime wiring is now active for scan-result caching in scanner/main:
+
+1. scanner read-before-scan and write-after-scan integration in `src/scanner/process.rs`
+2. startup cache bootstrap and clear wiring in `src/main.rs`
+3. cache CLI controls `--cache-dir` and `--cache-clear`, plus `SCANCODE_RUST_CACHE` override
+
+Remaining follow-up work is focused on index snapshot integration for the new license engine, lock-managed multi-process coordination, incremental scanning, and unified XDG-default cache ownership.
 
 **Progress Tracking**:
 

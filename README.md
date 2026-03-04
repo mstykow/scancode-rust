@@ -89,6 +89,9 @@ Options:
       --exclude <EXCLUDE>            Glob patterns to exclude from scanning (alias: --ignore)
       --include <INCLUDE>            Glob patterns to include in output
       --from-json                    Load from previous JSON scan file (input is positional JSON path)
+      --cache-dir <PATH>             Override cache directory for persisted scan cache data
+      --cache-clear                  Remove persisted cache data before directory scan starts
+      --max-in-memory <INT>          Max findings kept in memory before spill behavior (parity surface; behavior roadmap in caching plan)
       --no-assemble                  Disable package assembly (merging related manifest/lockfiles)
       --filter-clues                 Remove redundant clue-level findings
       --only-findings                Keep only files/directories with findings
@@ -112,6 +115,7 @@ Use `-` as FILE to write an output stream to stdout (for example: `--json-pp -`)
 Multiple output flags can be used in a single run, matching ScanCode CLI
 behavior.
 When using `--from-json`, you can pass multiple JSON inputs; directory scan mode currently supports one input path.
+Cache location can also be controlled with the `SCANCODE_RUST_CACHE` environment variable.
 
 ## Performance
 

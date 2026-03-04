@@ -65,6 +65,9 @@ docs/
 **...track implementation quality and behavior**
 → [TESTING_STRATEGY.md](TESTING_STRATEGY.md)
 
+**...configure cache behavior and controls**
+→ [README.md](../README.md) and [implementation-plans/infrastructure/CACHING_PLAN.md](implementation-plans/infrastructure/CACHING_PLAN.md)
+
 **...implement a specific feature**
 → [ARCHITECTURE.md](ARCHITECTURE.md) and [HOW_TO_ADD_A_PARSER.md](HOW_TO_ADD_A_PARSER.md)
 
