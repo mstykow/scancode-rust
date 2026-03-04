@@ -97,7 +97,8 @@ pub fn compute_thresholds_unique(
     } else if length < 20 {
         (high_length_unique, high_length_unique)
     } else {
-        let high_u = (high_length_unique / 2).max(high_length_unique);
+        let half = high_length_unique / 2;
+        let high_u = if half > 0 { half } else { high_length_unique };
         (MIN_MATCH_LENGTH, high_u.min(MIN_MATCH_HIGH_LENGTH))
     }
 }

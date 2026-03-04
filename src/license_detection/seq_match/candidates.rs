@@ -96,9 +96,22 @@ impl Ord for Candidate {
         // So it compares (svr, svf) tuple first, which means:
         // 1. Compare rounded (svr) first
         // 2. Then compare full (svf) if rounded is equal
+        //
+        // TIEBREAKERS (when scores are equal):
+        // When two candidates have similar scores, prefer the more specific license.
+        // This fixes cases like:
+        // - cc-by-nc-4.0 vs cc-by-4.0 (NC variant has additional restriction)
+        // - bsd-simplified vs bsd-new (2-clause vs 3-clause)
+        // - php-3.01 vs php-3.0 (minor version update)
+        //
+        // Specificity criteria (in order):
+        // 1. Longer rule text = more specific (more tokens to match)
+        // 2. Higher relevance = more specific rule
         self.score_vec_rounded
             .cmp(&other.score_vec_rounded)
             .then_with(|| self.score_vec_full.cmp(&other.score_vec_full))
+            .then_with(|| self.rule.tokens.len().cmp(&other.rule.tokens.len()))
+            .then_with(|| self.rule.relevance.cmp(&other.rule.relevance))
     }
 }
 
@@ -148,6 +161,8 @@ pub(super) fn filter_dupes(candidates: Vec<Candidate>) -> Vec<Candidate> {
         group.sort_by(|a, b| {
             b.score_vec_full
                 .cmp(&a.score_vec_full)
+                .then_with(|| b.rule.tokens.len().cmp(&a.rule.tokens.len()))
+                .then_with(|| b.rule.relevance.cmp(&a.rule.relevance))
                 .then_with(|| b.rule.identifier.cmp(&a.rule.identifier))
         });
         if let Some(best) = group.into_iter().next() {

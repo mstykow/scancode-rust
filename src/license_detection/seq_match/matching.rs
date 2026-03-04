@@ -278,11 +278,12 @@ pub fn seq_match_with_candidates(
                         continue;
                     }
 
-                    let hispan_count = (ipos..ipos + mlen)
+                    let qspan_positions: Vec<usize> = (qpos..qpos + mlen).collect();
+                    let ispan_positions: Vec<usize> = (ipos..ipos + mlen).collect();
+                    let hispan_positions: Vec<usize> = (ipos..ipos + mlen)
                         .filter(|&p| rule_tokens.get(p).is_some_and(|t| *t < len_legalese as u16))
-                        .count();
-
-                    let match_coverage = (mlen as f32 / rule_length as f32) * 100.0;
+                        .collect();
+                    let hispan_count = hispan_positions.len();
 
                     let qend = qpos + mlen - 1;
                     let abs_qpos = qpos + query_run.start;
@@ -290,7 +291,10 @@ pub fn seq_match_with_candidates(
                     let start_line = query_run.line_for_pos(abs_qpos).unwrap_or(1);
                     let end_line = query_run.line_for_pos(abs_qend).unwrap_or(start_line);
 
-                    let score = (match_coverage * candidate.rule.relevance as f32) / 100.0;
+                    let rule_coverage = mlen as f32 / rule_length as f32;
+                    let match_coverage = rule_coverage * 100.0;
+
+                    let score = match_coverage * candidate.rule.relevance as f32 / 100.0;
 
                     let matched_text = query_run.matched_text(start_line, end_line);
 
@@ -322,9 +326,9 @@ pub fn seq_match_with_candidates(
                         matched_token_positions: None,
                         hilen: hispan_count,
                         rule_start_token: ipos,
-                        qspan_positions: None,
-                        ispan_positions: None,
-                        hispan_positions: None,
+                        qspan_positions: Some(qspan_positions),
+                        ispan_positions: Some(ispan_positions),
+                        hispan_positions: Some(hispan_positions),
                         candidate_resemblance: candidate.score_vec_full.resemblance,
                         candidate_containment: candidate.score_vec_full.containment,
                     };
