@@ -3434,3 +3434,17 @@ fn test_disclaimer_tail_with_inc_as_does_not_create_holder() {
         "Unexpected disclaimer-derived holders: {holders:?}"
     );
 }
+
+#[test]
+fn test_issue_4736_camelcase_provider_not_author_false_positive() {
+    let input = "A meter implementation is created by a MeterProvider in this system.\nA trace implementation is created by a TracerProvider in this system.";
+    let (_copyrights, _holders, authors) = detect_copyrights_from_text(input);
+
+    let author_values: Vec<&str> = authors.iter().map(|a| a.author.as_str()).collect();
+    assert!(
+        author_values
+            .iter()
+            .all(|a| *a != "MeterProvider in" && *a != "TracerProvider in"),
+        "Unexpected provider false-positive authors: {author_values:?}"
+    );
+}

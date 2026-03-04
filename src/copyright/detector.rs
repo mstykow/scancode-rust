@@ -4796,6 +4796,60 @@ fn extract_following_authors_holders(content: &str, holders: &mut Vec<HolderDete
     }
 }
 
+fn drop_created_by_camelcase_identifier_authors(content: &str, authors: &mut Vec<AuthorDetection>) {
+    if content.is_empty() || authors.is_empty() {
+        return;
+    }
+
+    static CREATED_BY_CAMELCASE_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r"(?i)\bcreated\s+by\s+a\s+(?P<name>[A-Z][a-z0-9]+(?:[A-Z][a-z0-9]+)+)\b")
+            .expect("valid created-by CamelCase regex")
+    });
+
+    let lines: Vec<&str> = content.lines().collect();
+    let mut by_line: HashMap<usize, HashSet<String>> = HashMap::new();
+    for (idx, raw_line) in lines.iter().enumerate() {
+        let prepared = crate::copyright::prepare::prepare_text_line(raw_line);
+        for cap in CREATED_BY_CAMELCASE_RE.captures_iter(&prepared) {
+            let name = cap.name("name").map(|m| m.as_str()).unwrap_or("").trim();
+            if name.is_empty() {
+                continue;
+            }
+            by_line
+                .entry(idx + 1)
+                .or_default()
+                .insert(name.to_ascii_lowercase());
+        }
+    }
+
+    if by_line.is_empty() {
+        return;
+    }
+
+    authors.retain(|author| {
+        if author.start_line != author.end_line {
+            return true;
+        }
+        let Some(names) = by_line.get(&author.start_line) else {
+            return true;
+        };
+
+        let value = author.author.trim().to_ascii_lowercase();
+        for name in names {
+            if value == *name
+                || value == format!("{name} in")
+                || value == format!("{name} for")
+                || value == format!("{name} to")
+                || value == format!("{name} from")
+                || value == format!("{name} by")
+            {
+                return false;
+            }
+        }
+        true
+    });
+}
+
 fn merge_implemented_by_lines(
     content: &str,
     copyrights: &mut Vec<CopyrightDetection>,
@@ -11584,6 +11638,9 @@ fn try_extract_orphaned_by_author(
                     PosTag::Nnp | PosTag::Nn | PosTag::Email | PosTag::Url
                 ) =>
             {
+                if is_author_tail_preposition(token) {
+                    break;
+                }
                 author_tokens.push(token);
                 consumed = j - idx;
                 j += 1;
@@ -11649,6 +11706,9 @@ fn try_extract_date_by_author(tree: &[ParseNode], idx: usize) -> Option<(AuthorD
                     PosTag::Nnp | PosTag::Nn | PosTag::Email | PosTag::Url
                 ) =>
             {
+                if is_author_tail_preposition(token) {
+                    break;
+                }
                 author_tokens.push(token);
                 consumed = j - idx;
                 j += 1;
@@ -11663,6 +11723,14 @@ fn try_extract_date_by_author(tree: &[ParseNode], idx: usize) -> Option<(AuthorD
 
     let det = build_author_from_tokens(&author_tokens)?;
     Some((det, consumed))
+}
+
+fn is_author_tail_preposition(token: &Token) -> bool {
+    token.tag == PosTag::Nn
+        && matches!(
+            token.value.to_ascii_lowercase().as_str(),
+            "in" | "for" | "to" | "from" | "by"
+        )
 }
 
 fn try_extract_by_name_email_author(

@@ -50,6 +50,7 @@ pub(super) fn run_phase_postprocess(
         content, authors,
     );
     super::author_heuristics::drop_authors_embedded_in_copyrights(copyrights, authors);
+    super::drop_created_by_camelcase_identifier_authors(content, authors);
     super::author_heuristics::drop_shadowed_prefix_authors(authors);
     super::author_heuristics::drop_comedi_ds_status_devices_authors(content, copyrights, authors);
 
