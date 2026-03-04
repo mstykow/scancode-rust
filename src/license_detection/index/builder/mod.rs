@@ -10,16 +10,16 @@ use aho_corasick::AhoCorasickBuilder;
 use std::collections::{HashMap, HashSet};
 
 use crate::license_detection::hash_match::compute_hash;
+use crate::license_detection::index::LicenseIndex;
 use crate::license_detection::index::dictionary::TokenDictionary;
 use crate::license_detection::index::token_sets::{
     build_set_and_mset, high_multiset_subset, high_tids_set_subset, multiset_counter,
     tids_set_counter,
 };
-use crate::license_detection::index::LicenseIndex;
 use crate::license_detection::models::{License, Rule};
 use crate::license_detection::rules::legalese;
 use crate::license_detection::rules::thresholds::{
-    compute_thresholds_occurrences, compute_thresholds_unique, SMALL_RULE, TINY_RULE,
+    SMALL_RULE, TINY_RULE, compute_thresholds_occurrences, compute_thresholds_unique,
 };
 use crate::license_detection::tokenize::{
     parse_required_phrase_spans, tokenize, tokenize_with_stopwords,
@@ -226,7 +226,11 @@ const MARKERS: &[&str] = &[
     "www",
 ];
 
-pub fn is_good_tokens_ngram(tokens_ngram: &[String], tids_ngram: &[u16], len_legalese: usize) -> bool {
+pub fn is_good_tokens_ngram(
+    tokens_ngram: &[String],
+    tids_ngram: &[u16],
+    len_legalese: usize,
+) -> bool {
     const MIN_GOOD: usize = 3;
 
     let digit_count = tokens_ngram
@@ -507,7 +511,6 @@ pub fn build_index(rules: Vec<Rule>, licenses: Vec<License>) -> LicenseIndex {
         unknown_spdx_rid,
     }
 }
-
 
 #[cfg(test)]
 mod tests;

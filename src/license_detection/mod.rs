@@ -37,29 +37,34 @@ use crate::license_detection::rules::{load_licenses_from_directory, load_rules_f
 use crate::license_detection::spdx_mapping::{SpdxMapping, build_spdx_mapping};
 use crate::utils::text::strip_utf8_bom_str;
 
-use crate::license_detection::detection::{
-    populate_detection_from_group_with_spdx,
-};
+use crate::license_detection::detection::populate_detection_from_group_with_spdx;
 
-pub use detection::{LicenseDetection, group_matches_by_region, create_detection_from_group, post_process_detections, sort_matches_by_line};
+pub use detection::{
+    LicenseDetection, create_detection_from_group, group_matches_by_region,
+    post_process_detections, sort_matches_by_line,
+};
 pub use models::LicenseMatch;
 
 pub use aho_match::aho_match;
 pub use hash_match::hash_match;
 pub use match_refine::{
-    filter_invalid_contained_unknown_matches, merge_overlapping_matches, refine_aho_matches, refine_matches,
-    refine_matches_without_false_positive_filter, split_weak_matches,
+    filter_invalid_contained_unknown_matches, merge_overlapping_matches, refine_aho_matches,
+    refine_matches, refine_matches_without_false_positive_filter, split_weak_matches,
 };
-pub use seq_match::{MAX_NEAR_DUPE_CANDIDATES, compute_candidates_with_msets, seq_match_with_candidates};
+pub use seq_match::{
+    MAX_NEAR_DUPE_CANDIDATES, compute_candidates_with_msets, seq_match_with_candidates,
+};
 pub use spdx_lid::spdx_lid_match;
 pub use unknown_match::unknown_match;
 
 #[cfg(feature = "debug-pipeline")]
 pub use debug_pipeline::{
     filter_below_rule_minimum_coverage_debug_only, filter_contained_matches_debug_only,
-    filter_false_positive_matches_debug_only, filter_invalid_matches_to_single_word_gibberish_debug_only,
-    filter_matches_missing_required_phrases_debug_only, filter_matches_to_spurious_single_token_debug_only,
-    filter_overlapping_matches_debug_only, filter_short_matches_scattered_on_too_many_lines_debug_only,
+    filter_false_positive_matches_debug_only,
+    filter_invalid_matches_to_single_word_gibberish_debug_only,
+    filter_matches_missing_required_phrases_debug_only,
+    filter_matches_to_spurious_single_token_debug_only, filter_overlapping_matches_debug_only,
+    filter_short_matches_scattered_on_too_many_lines_debug_only,
     filter_spurious_matches_debug_only, filter_too_short_matches_debug_only,
 };
 
@@ -165,7 +170,9 @@ impl LicenseDetectionEngine {
             let spdx_matches = spdx_lid_match(&self.index, &query);
             let merged_spdx = merge_overlapping_matches(&spdx_matches);
             for m in &merged_spdx {
-                if (m.match_coverage * 100.0).round() / 100.0 == 100.0 && m.end_token > m.start_token {
+                if (m.match_coverage * 100.0).round() / 100.0 == 100.0
+                    && m.end_token > m.start_token
+                {
                     matched_qspans.push(query::PositionSpan::new(m.start_token, m.end_token - 1));
                 }
                 if m.is_license_text && m.rule_length > 120 && m.match_coverage > 98.0 {
@@ -181,24 +188,32 @@ impl LicenseDetectionEngine {
         {
             let whole_run = query.whole_query_run();
             let aho_matches = aho_match(&self.index, &whole_run);
-            
+
             #[cfg(debug_assertions)]
             let aho_count = aho_matches.len();
-            
+
             // Python's get_exact_matches() calls refine_matches with merge=False
             // This applies quality filters including required phrase filtering
             let refined_aho = match_refine::refine_aho_matches(&self.index, aho_matches, &query);
-            
+
             #[cfg(debug_assertions)]
-            eprintln!("DEBUG: aho_matches before refine: {}, after refine: {}", 
-                aho_count, refined_aho.len());
+            eprintln!(
+                "DEBUG: aho_matches before refine: {}, after refine: {}",
+                aho_count,
+                refined_aho.len()
+            );
             #[cfg(debug_assertions)]
             for m in refined_aho.iter().take(5) {
-                eprintln!("  DEBUG AHO: {} rule={}", m.license_expression, m.rule_identifier);
+                eprintln!(
+                    "  DEBUG AHO: {} rule={}",
+                    m.license_expression, m.rule_identifier
+                );
             }
 
             for m in &refined_aho {
-                if (m.match_coverage * 100.0).round() / 100.0 == 100.0 && m.end_token > m.start_token {
+                if (m.match_coverage * 100.0).round() / 100.0 == 100.0
+                    && m.end_token > m.start_token
+                {
                     matched_qspans.push(query::PositionSpan::new(m.start_token, m.end_token - 1));
                 }
             }
@@ -377,7 +392,9 @@ impl LicenseDetectionEngine {
             let spdx_matches = spdx_lid_match(&self.index, &query);
             let merged_spdx = merge_overlapping_matches(&spdx_matches);
             for m in &merged_spdx {
-                if (m.match_coverage * 100.0).round() / 100.0 == 100.0 && m.end_token > m.start_token {
+                if (m.match_coverage * 100.0).round() / 100.0 == 100.0
+                    && m.end_token > m.start_token
+                {
                     matched_qspans.push(query::PositionSpan::new(m.start_token, m.end_token - 1));
                 }
                 if m.is_license_text && m.rule_length > 120 && m.match_coverage > 98.0 {
@@ -396,7 +413,9 @@ impl LicenseDetectionEngine {
             let refined_aho = match_refine::refine_aho_matches(&self.index, aho_matches, &query);
 
             for m in &refined_aho {
-                if (m.match_coverage * 100.0).round() / 100.0 == 100.0 && m.end_token > m.start_token {
+                if (m.match_coverage * 100.0).round() / 100.0 == 100.0
+                    && m.end_token > m.start_token
+                {
                     matched_qspans.push(query::PositionSpan::new(m.start_token, m.end_token - 1));
                 }
             }

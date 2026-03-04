@@ -265,7 +265,7 @@ fn compute_match_score(m: &LicenseMatch, query: &Query) -> f32 {
 /// - It is shorter than the license text match
 /// - It is CONTAINED within the text match's qregion (token span)
 ///
-/// References at DIFFERENT locations are kept (e.g., MIT.t10 where "The MIT License" 
+/// References at DIFFERENT locations are kept (e.g., MIT.t10 where "The MIT License"
 /// header at line 1 is separate from the license text at lines 5-20).
 pub(super) fn filter_license_references_with_text_match(
     matches: &[LicenseMatch],
@@ -289,7 +289,11 @@ pub(super) fn filter_license_references_with_text_match(
                 let current_is_ref = current.is_license_reference && !current.is_license_text;
                 let other_is_text = other.is_license_text && !other.is_license_reference;
 
-                if current_is_ref && other_is_text && current.matched_length < other.matched_length && other.qcontains(current) {
+                if current_is_ref
+                    && other_is_text
+                    && current.matched_length < other.matched_length
+                    && other.qcontains(current)
+                {
                     to_discard.insert(i);
                 }
             }

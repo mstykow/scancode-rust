@@ -18,10 +18,9 @@ use crate::license_detection::query::Query;
 // Internal use only
 use filter_low_quality::{
     filter_below_rule_minimum_coverage, filter_false_positive_matches,
-    filter_invalid_matches_to_single_word_gibberish,
-    filter_matches_missing_required_phrases, filter_matches_to_spurious_single_token,
-    filter_short_matches_scattered_on_too_many_lines, filter_spurious_matches,
-    filter_too_short_matches,
+    filter_invalid_matches_to_single_word_gibberish, filter_matches_missing_required_phrases,
+    filter_matches_to_spurious_single_token, filter_short_matches_scattered_on_too_many_lines,
+    filter_spurious_matches, filter_too_short_matches,
 };
 use merge::{filter_license_references_with_text_match, update_match_scores};
 

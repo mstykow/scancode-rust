@@ -13,11 +13,11 @@ use std::path::PathBuf;
 
 use anyhow::Result;
 use scancode_rust::license_detection::{
-    aho_match, compute_candidates_with_msets, create_detection_from_group, group_matches_by_region,
-    hash_match, merge_overlapping_matches, post_process_detections, refine_aho_matches,
-    refine_matches, refine_matches_without_false_positive_filter, seq_match_with_candidates,
-    sort_matches_by_line, spdx_lid_match, split_weak_matches, LicenseDetectionEngine,
-    MAX_NEAR_DUPE_CANDIDATES,
+    LicenseDetectionEngine, MAX_NEAR_DUPE_CANDIDATES, aho_match, compute_candidates_with_msets,
+    create_detection_from_group, group_matches_by_region, hash_match, merge_overlapping_matches,
+    post_process_detections, refine_aho_matches, refine_matches,
+    refine_matches_without_false_positive_filter, seq_match_with_candidates, sort_matches_by_line,
+    spdx_lid_match, split_weak_matches,
 };
 
 #[cfg(feature = "debug-pipeline")]
@@ -232,8 +232,15 @@ fn run_debug_pipeline(file_path: &str) -> Result<()> {
         for (idx, m) in sorted_input.iter().take(10).enumerate() {
             println!(
                 "    [{}] {} (license: {}, qstart={}, end_token={}, hilen={}, matched_len={}, matcher_order={}, coverage={:.4}, qspan_positions={})",
-                idx, m.rule_identifier, m.license_expression, m.qstart(), m.end_token,
-                m.hilen(), m.matched_length, m.matcher_order(), m.match_coverage,
+                idx,
+                m.rule_identifier,
+                m.license_expression,
+                m.qstart(),
+                m.end_token,
+                m.hilen(),
+                m.matched_length,
+                m.matcher_order(),
+                m.match_coverage,
                 m.qspan_positions.as_ref().map(|p| p.len()).unwrap_or(0)
             );
         }
@@ -313,16 +320,32 @@ fn run_debug_pipeline(file_path: &str) -> Result<()> {
         for m in &after_contained {
             println!(
                 "    - {} (license: {}, lines {}-{}, qstart={}, qend={}, start_token={}, end_token={}, hilen={}, coverage={:.4})",
-                m.rule_identifier, m.license_expression, m.start_line, m.end_line,
-                m.qstart(), m.end_token, m.start_token, m.end_token, m.hilen(), m.match_coverage
+                m.rule_identifier,
+                m.license_expression,
+                m.start_line,
+                m.end_line,
+                m.qstart(),
+                m.end_token,
+                m.start_token,
+                m.end_token,
+                m.hilen(),
+                m.match_coverage
             );
         }
         println!("  First 5 discarded matches:");
         for m in discarded_contained.iter().take(5) {
             println!(
                 "    - {} (license: {}, lines {}-{}, qstart={}, qend={}, start_token={}, end_token={}, hilen={}, coverage={:.4})",
-                m.rule_identifier, m.license_expression, m.start_line, m.end_line,
-                m.qstart(), m.end_token, m.start_token, m.end_token, m.hilen(), m.match_coverage
+                m.rule_identifier,
+                m.license_expression,
+                m.start_line,
+                m.end_line,
+                m.qstart(),
+                m.end_token,
+                m.start_token,
+                m.end_token,
+                m.hilen(),
+                m.match_coverage
             );
         }
 
@@ -337,8 +360,13 @@ fn run_debug_pipeline(file_path: &str) -> Result<()> {
         for m in &after_fp {
             println!(
                 "    - {} (license: {}, lines {}-{}, cand_resemblance={:.4}, cand_containment={:.4}, rule_len={})",
-                m.rule_identifier, m.license_expression, m.start_line, m.end_line,
-                m.candidate_resemblance, m.candidate_containment, m.rule_length
+                m.rule_identifier,
+                m.license_expression,
+                m.start_line,
+                m.end_line,
+                m.candidate_resemblance,
+                m.candidate_containment,
+                m.rule_length
             );
         }
     }
@@ -397,10 +425,14 @@ fn main() {
     if args.len() < 2 {
         eprintln!("Debug License Detection Pipeline");
         eprintln!();
-        eprintln!("Usage: cargo run --features debug-pipeline --bin debug_license_detection -- <file_path>");
+        eprintln!(
+            "Usage: cargo run --features debug-pipeline --bin debug_license_detection -- <file_path>"
+        );
         eprintln!();
         eprintln!("Example:");
-        eprintln!("  cargo run --features debug-pipeline --bin debug_license_detection -- testdata/mit.txt");
+        eprintln!(
+            "  cargo run --features debug-pipeline --bin debug_license_detection -- testdata/mit.txt"
+        );
         std::process::exit(1);
     }
 

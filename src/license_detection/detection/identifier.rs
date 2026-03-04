@@ -1,7 +1,7 @@
 //! Detection identifier computation.
 
-use crate::license_detection::models::LicenseMatch;
 use super::types::LicenseDetection;
+use crate::license_detection::models::LicenseMatch;
 use crate::license_detection::tokenize::tokenize_without_stopwords;
 
 pub(super) fn python_safe_name(s: &str) -> String {
@@ -159,9 +159,7 @@ pub(super) fn compute_detection_coverage(matches: &[LicenseMatch]) -> f32 {
     weighted_coverage.min(100.0)
 }
 
-
 #[cfg(test)]
-
 #[cfg(test)]
 mod tests {
     use super::*;

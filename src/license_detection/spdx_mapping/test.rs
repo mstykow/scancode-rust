@@ -2,8 +2,8 @@
 
 #[cfg(test)]
 mod tests {
-    use crate::license_detection::spdx_mapping::*;
     use crate::license_detection::models::License;
+    use crate::license_detection::spdx_mapping::*;
 
     fn create_test_licenses() -> Vec<License> {
         vec![

@@ -35,8 +35,8 @@ pub const MAX_NEAR_DUPE_CANDIDATES: usize = 10;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::license_detection::index::token_sets::build_set_and_mset;
     use crate::license_detection::index::LicenseIndex;
+    use crate::license_detection::index::token_sets::build_set_and_mset;
     use crate::license_detection::models::Rule;
     use crate::license_detection::query::Query;
     use crate::license_detection::test_utils::create_test_index;
@@ -100,7 +100,10 @@ mod tests {
             language: None,
             notes: None,
             length_unique: tokens.len(),
-            high_length_unique: tokens.iter().filter(|&&t| (t as usize) < index.len_legalese).count(),
+            high_length_unique: tokens
+                .iter()
+                .filter(|&&t| (t as usize) < index.len_legalese)
+                .count(),
             high_length: tokens.len(),
             min_matched_length: 1,
             min_high_matched_length: 1,

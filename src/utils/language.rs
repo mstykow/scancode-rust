@@ -1,4 +1,4 @@
-use content_inspector::{inspect, ContentType};
+use content_inspector::{ContentType, inspect};
 use std::path::Path;
 
 fn is_utf8_text(content_type: ContentType) -> bool {

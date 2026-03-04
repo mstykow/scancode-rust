@@ -8,19 +8,19 @@ pub mod grouping;
 pub mod identifier;
 mod types;
 
-
-pub use types::{DetectionGroup, FileRegion, LicenseDetection};
 pub use grouping::{group_matches_by_region, sort_matches_by_line};
+pub use types::{DetectionGroup, FileRegion, LicenseDetection};
 
 use crate::license_detection::spdx_mapping::SpdxMapping;
 
-use identifier::{
-    compute_detection_coverage,
-    compute_detection_identifier, python_safe_name, compute_content_identifier};
 use analysis::{
-    determine_spdx_expression_from_scancode, classify_detection,
-    analyze_detection, filter_license_intros, filter_license_intros_and_references,
-    compute_detection_score, determine_license_expression, determine_spdx_expression,
+    analyze_detection, classify_detection, compute_detection_score, determine_license_expression,
+    determine_spdx_expression, determine_spdx_expression_from_scancode, filter_license_intros,
+    filter_license_intros_and_references,
+};
+use identifier::{
+    compute_content_identifier, compute_detection_coverage, compute_detection_identifier,
+    python_safe_name,
 };
 
 /// Matches with line gap > this are considered separate groups.
@@ -77,7 +77,6 @@ pub const DETECTION_LOG_UNKNOWN_INTRO_FOLLOWED_BY_MATCH: &str = "unknown-intro-f
 pub const DETECTION_LOG_UNKNOWN_REFERENCE_TO_LOCAL_FILE: &str = "unknown-reference-to-local-file";
 
 /// A group of license matches that are nearby each other in the file.
-
 
 /// Populate LicenseDetection from a DetectionGroup.
 ///
@@ -371,16 +370,19 @@ pub fn post_process_detections(
     sort_detections_by_line(ranked)
 }
 
-
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::license_detection::models::License;
     use crate::license_detection::models::LicenseMatch;
     use crate::license_detection::spdx_mapping::build_spdx_mapping;
-    use crate::license_detection::models::License;
 
-    fn create_test_match(start_line: usize, end_line: usize, matcher: &str, rule_identifier: &str) -> LicenseMatch {
+    fn create_test_match(
+        start_line: usize,
+        end_line: usize,
+        matcher: &str,
+        rule_identifier: &str,
+    ) -> LicenseMatch {
         LicenseMatch {
             rid: 0,
             license_expression: "mit".to_string(),
@@ -478,7 +480,10 @@ mod tests {
         populate_detection_from_group(&mut detection, &group);
         assert_eq!(detection.matches.len(), 1);
         assert!(detection.license_expression.is_some());
-        assert!(detection.detection_log.contains(&"".to_string()) || detection.detection_log.is_empty(), "Perfect detection has empty log");
+        assert!(
+            detection.detection_log.contains(&"".to_string()) || detection.detection_log.is_empty(),
+            "Perfect detection has empty log"
+        );
     }
 
     #[test]
@@ -514,7 +519,11 @@ mod tests {
             file_region: None,
         };
         populate_detection_from_group(&mut detection, &group);
-        assert!(detection.detection_log.contains(&"false-positive".to_string()));
+        assert!(
+            detection
+                .detection_log
+                .contains(&"false-positive".to_string())
+        );
     }
 
     #[test]
@@ -665,7 +674,11 @@ mod tests {
             file_region: None,
         };
         let result = remove_duplicate_detections(vec![d1, d2]);
-        assert_eq!(result.len(), 2, "Different identifiers should not be deduplicated");
+        assert_eq!(
+            result.len(),
+            2,
+            "Different identifiers should not be deduplicated"
+        );
     }
 
     #[test]
@@ -729,7 +742,11 @@ mod tests {
         d1.identifier = Some(compute_detection_identifier(&d1));
         d2.identifier = Some(compute_detection_identifier(&d2));
         let ranked = rank_detections(vec![d2, d1]);
-        assert_eq!(ranked[0].license_expression, Some("mit".to_string()), "Higher coverage should rank first");
+        assert_eq!(
+            ranked[0].license_expression,
+            Some("mit".to_string()),
+            "Higher coverage should rank first"
+        );
     }
 
     #[test]
@@ -784,7 +801,10 @@ mod tests {
         };
         let id1 = compute_detection_identifier(&d1);
         let id2 = compute_detection_identifier(&d2);
-        assert_ne!(id1, id2, "Different content should produce different identifiers");
+        assert_ne!(
+            id1, id2,
+            "Different content should produce different identifiers"
+        );
     }
 
     #[test]
@@ -806,7 +826,11 @@ mod tests {
             file_region: None,
         };
         let result = apply_detection_preferences(vec![d1, d2]);
-        assert_eq!(result.len(), 2, "Detections with same expression but different identifiers should be kept separate");
+        assert_eq!(
+            result.len(),
+            2,
+            "Detections with same expression but different identifiers should be kept separate"
+        );
     }
 
     #[test]
@@ -886,7 +910,11 @@ mod tests {
             matches: vec![create_perfect_match(20, 30)],
             detection_log: vec![],
             identifier: Some("mit-1".to_string()),
-            file_region: Some(FileRegion { path: "test.txt".to_string(), start_line: 20, end_line: 30 }),
+            file_region: Some(FileRegion {
+                path: "test.txt".to_string(),
+                start_line: 20,
+                end_line: 30,
+            }),
         };
         let d2 = LicenseDetection {
             license_expression: Some("apache-2.0".to_string()),
@@ -894,7 +922,11 @@ mod tests {
             matches: vec![create_perfect_match(1, 10)],
             detection_log: vec![],
             identifier: Some("apache-1".to_string()),
-            file_region: Some(FileRegion { path: "test.txt".to_string(), start_line: 1, end_line: 10 }),
+            file_region: Some(FileRegion {
+                path: "test.txt".to_string(),
+                start_line: 1,
+                end_line: 10,
+            }),
         };
         let sorted = sort_detections_by_line(vec![d1, d2]);
         assert_eq!(sorted[0].file_region.as_ref().unwrap().start_line, 1);
@@ -911,8 +943,14 @@ mod tests {
     fn test_detection_log_constants_match_python() {
         assert_eq!(DETECTION_LOG_PERFECT_DETECTION, "perfect-detection");
         assert_eq!(DETECTION_LOG_LOW_QUALITY_MATCHES, "low-quality-matches");
-        assert_eq!(DETECTION_LOG_UNKNOWN_INTRO_FOLLOWED_BY_MATCH, "unknown-intro-followed-by-match");
-        assert_eq!(DETECTION_LOG_UNKNOWN_REFERENCE_TO_LOCAL_FILE, "unknown-reference-to-local-file");
+        assert_eq!(
+            DETECTION_LOG_UNKNOWN_INTRO_FOLLOWED_BY_MATCH,
+            "unknown-intro-followed-by-match"
+        );
+        assert_eq!(
+            DETECTION_LOG_UNKNOWN_REFERENCE_TO_LOCAL_FILE,
+            "unknown-reference-to-local-file"
+        );
     }
 
     #[test]

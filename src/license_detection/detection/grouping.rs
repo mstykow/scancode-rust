@@ -1,8 +1,8 @@
 //! Match grouping functions.
 
-use crate::license_detection::models::LicenseMatch;
-use super::types::DetectionGroup;
 use super::LINES_THRESHOLD;
+use super::types::DetectionGroup;
+use crate::license_detection::models::LicenseMatch;
 
 pub fn group_matches_by_region(matches: &[LicenseMatch]) -> Vec<DetectionGroup> {
     group_matches_by_region_with_threshold(matches, LINES_THRESHOLD)
@@ -73,7 +73,11 @@ pub(super) fn group_matches_by_region_with_threshold(
 /// ```
 ///
 /// This means: GROUP if start_line <= prev_end_line + 4 (equivalent to line_gap <= 4)
-pub(super) fn should_group_together(prev: &LicenseMatch, cur: &LicenseMatch, threshold: usize) -> bool {
+pub(super) fn should_group_together(
+    prev: &LicenseMatch,
+    cur: &LicenseMatch,
+    threshold: usize,
+) -> bool {
     let line_gap = cur.start_line.saturating_sub(prev.end_line);
     line_gap <= threshold
 }
@@ -116,7 +120,12 @@ mod tests {
     use super::*;
     use crate::license_detection::models::LicenseMatch;
 
-    fn create_test_match(start_line: usize, end_line: usize, matcher: &str, rule_identifier: &str) -> LicenseMatch {
+    fn create_test_match(
+        start_line: usize,
+        end_line: usize,
+        matcher: &str,
+        rule_identifier: &str,
+    ) -> LicenseMatch {
         LicenseMatch {
             rid: 0,
             license_expression: "mit".to_string(),
@@ -153,7 +162,12 @@ mod tests {
         }
     }
 
-    fn create_test_match_with_tokens(start_line: usize, end_line: usize, start_token: usize, end_token: usize) -> LicenseMatch {
+    fn create_test_match_with_tokens(
+        start_line: usize,
+        end_line: usize,
+        start_token: usize,
+        end_token: usize,
+    ) -> LicenseMatch {
         LicenseMatch {
             rid: 0,
             license_expression: "mit".to_string(),
@@ -274,7 +288,11 @@ mod tests {
         let m1 = create_test_match_with_tokens(1, 10, 0, 50);
         let m2 = create_test_match_with_tokens(12, 20, 55, 100);
         let groups = group_matches_by_region(&[m1, m2]);
-        assert_eq!(groups.len(), 1, "Should group when line gap within threshold");
+        assert_eq!(
+            groups.len(),
+            1,
+            "Should group when line gap within threshold"
+        );
     }
 
     #[test]
@@ -282,7 +300,11 @@ mod tests {
         let m1 = create_test_match_with_tokens(1, 10, 0, 50);
         let m2 = create_test_match_with_tokens(15, 25, 55, 100);
         let groups = group_matches_by_region(&[m1, m2]);
-        assert_eq!(groups.len(), 2, "Should separate when line gap exceeds threshold");
+        assert_eq!(
+            groups.len(),
+            2,
+            "Should separate when line gap exceeds threshold"
+        );
     }
 
     #[test]
@@ -290,7 +312,11 @@ mod tests {
         let m1 = create_test_match_with_tokens(1, 10, 0, 50);
         let m2 = create_test_match_with_tokens(13, 20, 55, 100);
         let groups = group_matches_by_region(&[m1, m2]);
-        assert_eq!(groups.len(), 1, "Should group at exact line gap within threshold");
+        assert_eq!(
+            groups.len(),
+            1,
+            "Should group at exact line gap within threshold"
+        );
     }
 
     #[test]
@@ -298,7 +324,8 @@ mod tests {
         let m1 = create_test_match(1, 5, "1-hash", "mit.LICENSE");
         let m2 = create_test_match(5, 10, "1-hash", "mit.LICENSE");
         let m3 = create_test_match(12, 15, "1-hash", "apache.LICENSE");
-        let groups = group_matches_by_region_with_threshold(&[m1.clone(), m2.clone(), m3.clone()], 0);
+        let groups =
+            group_matches_by_region_with_threshold(&[m1.clone(), m2.clone(), m3.clone()], 0);
         assert_eq!(groups.len(), 2, "Threshold 0 should only group gap=0");
     }
 
@@ -307,14 +334,19 @@ mod tests {
         let m1 = create_test_match(1, 5, "1-hash", "mit.LICENSE");
         let m2 = create_test_match(50, 55, "1-hash", "mit.LICENSE");
         let groups = group_matches_by_region_with_threshold(&[m1, m2], 100);
-        assert_eq!(groups.len(), 1, "Large threshold should group distant matches");
+        assert_eq!(
+            groups.len(),
+            1,
+            "Large threshold should group distant matches"
+        );
     }
 
     #[test]
     fn test_group_matches_threshold_exactly_at_boundary() {
         let m1 = create_test_match(1, 5, "1-hash", "mit.LICENSE");
         let m2_at_boundary = create_test_match(10, 15, "1-hash", "mit.LICENSE");
-        let groups = group_matches_by_region_with_threshold(&[m1.clone(), m2_at_boundary.clone()], 4);
+        let groups =
+            group_matches_by_region_with_threshold(&[m1.clone(), m2_at_boundary.clone()], 4);
         assert_eq!(groups.len(), 2, "Threshold 4: should not group");
         let groups = group_matches_by_region_with_threshold(&[m1, m2_at_boundary], 5);
         assert_eq!(groups.len(), 1, "Threshold 5: should group");
@@ -380,7 +412,11 @@ mod tests {
         let m1 = create_test_match_with_tokens(1, 10, 0, 50);
         let m2 = create_test_match_with_tokens(12, 20, 65, 100);
         let groups = group_matches_by_region(&[m1, m2]);
-        assert_eq!(groups.len(), 1, "Should group when line gap (2) is within threshold - token gap is not used");
+        assert_eq!(
+            groups.len(),
+            1,
+            "Should group when line gap (2) is within threshold - token gap is not used"
+        );
     }
 
     #[test]
@@ -396,6 +432,10 @@ mod tests {
         let m1 = create_test_match_with_tokens(1, 10, 0, 50);
         let m2 = create_test_match_with_tokens(15, 25, 65, 100);
         let groups = group_matches_by_region(&[m1, m2]);
-        assert_eq!(groups.len(), 2, "Should separate when line gap (5) exceeds threshold (4)");
+        assert_eq!(
+            groups.len(),
+            2,
+            "Should separate when line gap (5) exceeds threshold (4)"
+        );
     }
 }

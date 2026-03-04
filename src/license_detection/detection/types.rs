@@ -70,7 +70,6 @@ pub struct FileRegion {
     pub end_line: usize,
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;

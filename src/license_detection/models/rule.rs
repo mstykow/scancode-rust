@@ -145,4 +145,3 @@ impl Ord for Rule {
         self.identifier.cmp(&other.identifier)
     }
 }
-

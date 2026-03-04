@@ -239,7 +239,11 @@ pub(crate) fn split_license_expression(license_expression: &str) -> Vec<String> 
 }
 
 #[cfg(test)]
-pub(crate) fn extract_matched_text_from_lines(text: &str, start_line: usize, end_line: usize) -> String {
+pub(crate) fn extract_matched_text_from_lines(
+    text: &str,
+    start_line: usize,
+    end_line: usize,
+) -> String {
     if start_line == 0 || end_line == 0 || start_line > end_line {
         return String::new();
     }
@@ -457,11 +461,7 @@ fn is_spdx_exception(text: &str) -> bool {
     }
     matches!(
         lowered.as_str(),
-        "linux-syscall-note"
-            | "gpl-cc-1.0"
-            | "llgpl"
-            | "shl-2.0"
-            | "shl-2.1"
+        "linux-syscall-note" | "gpl-cc-1.0" | "llgpl" | "shl-2.0" | "shl-2.1"
     )
 }
 
@@ -547,7 +547,10 @@ fn convert_recovered_expression_to_scancode(
     }
 }
 
-pub(crate) fn find_matching_rule_for_expression(index: &LicenseIndex, expression: &str) -> Option<String> {
+pub(crate) fn find_matching_rule_for_expression(
+    index: &LicenseIndex,
+    expression: &str,
+) -> Option<String> {
     if let Some(&rid) = index.rid_by_spdx_key.get(expression) {
         let rule = &index.rules_by_rid[rid];
         return Some(rule.license_expression.clone());
@@ -657,7 +660,6 @@ fn convert_spdx_expression_to_scancode(
         }
     }
 }
-
 
 #[cfg(test)]
 mod test;

@@ -1,7 +1,10 @@
 #[cfg(test)]
 mod tests {
-    use crate::license_detection::index::builder::{build_index, compute_is_approx_matchable, generate_url_variants, is_good_tokens_ngram, ngrams, tokens_to_bytes};
     use crate::license_detection::index::LicenseIndex;
+    use crate::license_detection::index::builder::{
+        build_index, compute_is_approx_matchable, generate_url_variants, is_good_tokens_ngram,
+        ngrams, tokens_to_bytes,
+    };
     use crate::license_detection::models::{License, Rule};
 
     fn find_rid_by_identifier(index: &LicenseIndex, identifier: &str) -> Option<usize> {
@@ -839,7 +842,9 @@ SOFTWARE."#;
         use crate::license_detection::seq_match::HIGH_RESEMBLANCE_THRESHOLD;
         use std::path::Path;
 
-        let test_file = Path::new("testdata/license-golden/datadriven/external/fossology-tests/Dual-license/BSL-1.0_or_MIT.txt");
+        let test_file = Path::new(
+            "testdata/license-golden/datadriven/external/fossology-tests/Dual-license/BSL-1.0_or_MIT.txt",
+        );
         if !test_file.exists() {
             eprintln!("Skipping test: test file not found");
             return;
@@ -968,7 +973,9 @@ SOFTWARE."#;
         use crate::license_detection::LicenseDetectionEngine;
         use std::path::Path;
 
-        let test_file = Path::new("testdata/license-golden/datadriven/external/fossology-tests/Dual-license/BSL-1.0_or_MIT.txt");
+        let test_file = Path::new(
+            "testdata/license-golden/datadriven/external/fossology-tests/Dual-license/BSL-1.0_or_MIT.txt",
+        );
         if !test_file.exists() {
             eprintln!("Skipping test: test file not found");
             return;

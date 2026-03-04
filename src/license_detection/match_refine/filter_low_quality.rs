@@ -16,7 +16,10 @@ use crate::license_detection::query::Query;
 /// sequence and unknown matcher types - exact matches are always kept.
 ///
 /// Based on Python: `filter_spurious_matches()` (match.py:1768-1836)
-pub(crate) fn filter_spurious_matches(matches: &[LicenseMatch], query: &Query) -> Vec<LicenseMatch> {
+pub(crate) fn filter_spurious_matches(
+    matches: &[LicenseMatch],
+    query: &Query,
+) -> Vec<LicenseMatch> {
     matches
         .iter()
         .filter(|m| {
@@ -510,7 +513,10 @@ pub(crate) fn filter_invalid_matches_to_single_word_gibberish(
         .collect()
 }
 
-pub(crate) fn filter_too_short_matches(index: &LicenseIndex, matches: &[LicenseMatch]) -> Vec<LicenseMatch> {
+pub(crate) fn filter_too_short_matches(
+    index: &LicenseIndex,
+    matches: &[LicenseMatch],
+) -> Vec<LicenseMatch> {
     matches
         .iter()
         .filter(|m| {

@@ -171,7 +171,10 @@ mod tests {
 
         eprintln!("\nPipeline Stage Analysis:");
         eprintln!("  Phase 1 (Aho):  {} OR matches found", aho_or_count);
-        eprintln!("  Phase 2 (Seq):  {} OR matches found", seq_or_matches.len());
+        eprintln!(
+            "  Phase 2 (Seq):  {} OR matches found",
+            seq_or_matches.len()
+        );
 
         eprintln!("\nKEY FINDING: The OR expression 'mit OR boost-1.0' IS found in seq matching!");
         eprintln!("The bug is that it gets filtered out during refinement because");
@@ -273,7 +276,10 @@ mod tests {
                 .iter()
                 .any(|d| d.license_expression.as_deref() == Some("mit OR boost-1.0")),
             "Expected detection with 'mit OR boost-1.0' but got: {:?}",
-            detections.iter().map(|d| &d.license_expression).collect::<Vec<_>>()
+            detections
+                .iter()
+                .map(|d| &d.license_expression)
+                .collect::<Vec<_>>()
         );
     }
 }

@@ -1,13 +1,12 @@
 #[cfg(test)]
 mod tests {
-    use crate::license_detection::models::{License, LicenseMatch, Rule};
     use crate::license_detection::index::LicenseIndex;
+    use crate::license_detection::models::{License, LicenseMatch, Rule};
     use std::collections::HashMap;
 
     fn create_test_index() -> LicenseIndex {
         LicenseIndex::with_legalese_count(10)
     }
-
 
     fn create_license() -> License {
         License {
@@ -1299,6 +1298,5 @@ mod tests {
 
         m.license_expression = "apache-2.0".to_string();
         assert!(!m.has_unknown());
-
-}
+    }
 }

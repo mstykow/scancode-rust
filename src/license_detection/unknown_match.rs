@@ -66,7 +66,11 @@ pub fn unknown_match(
             eprintln!("Region: {}-{} ({} tokens)", start, end, region_length);
             eprintln!("matched_ngrams: {} matches", matched_ngrams.len());
             eprintln!("qspan: {:?}", qspan);
-            eprintln!("qspan_length: {} (threshold: {})", qspan_length, UNKNOWN_NGRAM_LENGTH * 4);
+            eprintln!(
+                "qspan_length: {} (threshold: {})",
+                qspan_length,
+                UNKNOWN_NGRAM_LENGTH * 4
+            );
         }
 
         if qspan_length < UNKNOWN_NGRAM_LENGTH * 4 {
@@ -196,10 +200,13 @@ fn compute_hispan_from_qspan(
     qspan: &[(usize, usize)],
     len_legalese: usize,
 ) -> usize {
-    qspan.iter()
+    qspan
+        .iter()
         .flat_map(|(start, end)| *start..*end)
         .filter(|&pos| {
-            tokens.get(pos).is_some_and(|&tid| (tid as usize) < len_legalese)
+            tokens
+                .get(pos)
+                .is_some_and(|&tid| (tid as usize) < len_legalese)
         })
         .count()
 }
@@ -213,9 +220,7 @@ fn create_unknown_match_from_qspan(
         return None;
     }
 
-    let qspan_positions: Vec<usize> = qspan.iter()
-        .flat_map(|(start, end)| *start..*end)
-        .collect();
+    let qspan_positions: Vec<usize> = qspan.iter().flat_map(|(start, end)| *start..*end).collect();
 
     let match_len = qspan_positions.len();
 

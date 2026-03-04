@@ -13,7 +13,6 @@ use std::path::Path;
 static FM_BOUNDARY: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?m)^-{3,}\s*$").expect("Invalid frontmatter regex"));
 
-
 fn deserialize_yes_no_bool<'de, D>(deserializer: D) -> Result<Option<bool>, D::Error>
 where
     D: Deserializer<'de>,

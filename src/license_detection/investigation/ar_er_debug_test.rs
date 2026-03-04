@@ -53,8 +53,16 @@ mod tests {
         for (i, m) in matches.iter().enumerate() {
             eprintln!(
                 "{}: {} (rule: {}, start_token: {}, end_token: {}, lines: {}-{}, coverage: {:.1}%, len: {}, hilen: {})",
-                i, m.license_expression, m.rule_identifier, m.start_token, m.end_token,
-                m.start_line, m.end_line, m.match_coverage, m.matched_length, m.hilen
+                i,
+                m.license_expression,
+                m.rule_identifier,
+                m.start_token,
+                m.end_token,
+                m.start_line,
+                m.end_line,
+                m.match_coverage,
+                m.matched_length,
+                m.hilen
             );
         }
 
@@ -64,8 +72,16 @@ mod tests {
         for (i, m) in merged.iter().enumerate() {
             eprintln!(
                 "{}: {} (rule: {}, start_token: {}, end_token: {}, lines: {}-{}, coverage: {:.1}%, len: {}, hilen: {})",
-                i, m.license_expression, m.rule_identifier, m.start_token, m.end_token,
-                m.start_line, m.end_line, m.match_coverage, m.matched_length, m.hilen
+                i,
+                m.license_expression,
+                m.rule_identifier,
+                m.start_token,
+                m.end_token,
+                m.start_line,
+                m.end_line,
+                m.match_coverage,
+                m.matched_length,
+                m.hilen
             );
         }
 
