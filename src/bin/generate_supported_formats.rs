@@ -17,7 +17,9 @@ fn main() {
         let docs_path = Path::new("docs/SUPPORTED_FORMATS.md");
         match fs::read_to_string(docs_path) {
             Ok(existing) => {
-                if existing.trim() == output.trim() {
+                if normalize_markdown_for_compare(&existing)
+                    == normalize_markdown_for_compare(&output)
+                {
                     println!("✓ docs/SUPPORTED_FORMATS.md is up to date");
                     std::process::exit(0);
                 } else {
@@ -48,6 +50,13 @@ fn generate_markdown() -> String {
         a.package_type
             .cmp(b.package_type)
             .then(a.description.cmp(b.description))
+            .then(a.file_patterns.join(", ").cmp(&b.file_patterns.join(", ")))
+            .then(a.primary_language.cmp(b.primary_language))
+            .then(
+                a.documentation_url
+                    .unwrap_or("")
+                    .cmp(b.documentation_url.unwrap_or("")),
+            )
     });
 
     let mut output = String::new();
@@ -81,4 +90,24 @@ fn generate_markdown() -> String {
     }
 
     output
+}
+
+fn normalize_markdown_for_compare(input: &str) -> String {
+    input
+        .lines()
+        .map(|line| {
+            let trimmed = line.trim();
+            if trimmed.starts_with('|') && trimmed.ends_with('|') {
+                let cells: Vec<String> = trimmed
+                    .trim_matches('|')
+                    .split('|')
+                    .map(|cell| cell.trim().to_string())
+                    .collect();
+                format!("| {} |", cells.join(" | "))
+            } else {
+                trimmed.to_string()
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
 }
