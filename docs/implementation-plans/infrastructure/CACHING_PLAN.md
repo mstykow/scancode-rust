@@ -1,6 +1,6 @@
 # Caching & Incremental Scanning Implementation Plan
 
-> **Status**: 🟡 Groundwork In Progress — `src/cache` primitives landed, runtime integration pending
+> **Status**: 🟡 Active — cache CLI + scanner read/write integration landed; incremental + lock orchestration pending
 > **Priority**: P2 - Medium Priority (Performance Feature)
 > **Estimated Effort**: 2-3 weeks
 > **Dependencies**: License detection (for license index caching benefits)
@@ -61,16 +61,18 @@ Persistent caching of scan results and compiled data structures to speed up repe
 - ✅ `src/cache/metadata.rs`: snapshot metadata + deterministic invalidation key compatibility checks
 - ✅ `src/cache/paths.rs`: SHA256 validation and deterministic sharded scan cache pathing (`.msgpack.zst`)
 - ✅ `src/cache/io.rs`: versioned snapshot envelope read/write with zstd + MessagePack and atomic temp-file rename
+- ✅ `src/cache/scan_cache.rs`: scan-result cache payload model + read/write helpers with metadata-key invalidation
+- ✅ `src/scanner/process.rs`: cache read-before-scan and write-after-scan integration
+- ✅ `src/main.rs`: cache bootstrap wiring with `SCANCODE_RUST_CACHE` + CLI overrides
+- ✅ CLI flags parsed and wired: `--cache-dir`, `--cache-clear`, `--max-in-memory` (placeholder semantics documented)
 
 **Missing:**
 
 - ❌ Persistent license index snapshot cache for the new `LicenseIndex` artifacts
-- ❌ Scan result cache integration in scanner read/write pipeline
 - ❌ Incremental scanning logic
-- ❌ End-to-end invalidation wiring in runtime startup/scanner flow
 - ❌ Multi-process file locking
-- ❌ Unified cache manager orchestration and CLI wiring
-- ❌ Unified XDG cache location support across all cache users
+- ❌ Cache hit/miss statistics integration in progress/summary output
+- ❌ Unified XDG cache location support across all cache users (current default remains scan-root local)
 
 ### CLI Flag Positioning (Validated)
 
@@ -418,10 +420,11 @@ src/
 │   ├── config.rs           # CacheConfig and directory helpers
 │   ├── metadata.rs         # Snapshot metadata + invalidation keys
 │   ├── paths.rs            # SHA256 validation + sharded cache paths
-│   └── io.rs               # Snapshot envelope read/write + atomic persistence
+│   ├── io.rs               # Snapshot envelope read/write + atomic persistence
+│   └── scan_cache.rs       # Scanner-facing read/write helpers for cached findings
 ```
 
-Planned follow-up modules (not yet implemented): `index_cache.rs`, `scan_cache.rs`, `locking.rs`.
+Planned follow-up modules (not yet implemented): `index_cache.rs`, `locking.rs`.
 
 ---
 
@@ -604,19 +607,19 @@ Cache load/decode/validation failures should degrade to cache miss + rebuild, no
 ## Success Criteria
 
 - [ ] License index loads from cache (5-10x faster startup)
-- [ ] Scan results cached per file by SHA256 content hash
-- [ ] Repeated scans of unchanged files skip scanning (10-20x speedup)
+- [x] Scan results cached per file by SHA256 content hash
+- [x] Repeated scans of unchanged files skip scanning (cache read-before-scan path)
 - [ ] Incremental scans only process changed files
 - [ ] Cache invalidates correctly on tool version change
-- [ ] Corrupt cache entries are detected and rebuilt (never crash)
+- [x] Corrupt cache entries are detected and rebuilt (degrade to cache miss)
 - [ ] Multi-process scans don't corrupt cache (file locking)
-- [ ] `--cache-dir` and `--cache-clear` CLI flags work with unified cache manager
-- [ ] `--max-in-memory` parity-equivalent behavior is implemented and documented
+- [x] `--cache-dir` and `--cache-clear` CLI flags are wired in runtime startup
+- [ ] `--max-in-memory` parity-equivalent behavior is fully implemented (currently CLI placeholder wiring)
 - [ ] If implemented, `--no-cache` is clearly documented as Rust-specific and scoped to persistent cache read/write only
-- [ ] `SCANCODE_RUST_CACHE` environment variable overrides cache location
+- [x] `SCANCODE_RUST_CACHE` environment variable overrides cache location
 - [ ] Cross-project cache sharing works (same file content → same cache entry)
 - [ ] Cache directory follows XDG standard (Linux: `~/.cache/`, macOS: `~/Library/Caches/`)
-- [ ] Atomic writes prevent corrupt cache files on crash
+- [x] Atomic writes prevent corrupt cache files on crash
 - [ ] `cargo clippy` clean, `cargo fmt` clean
 - [ ] Comprehensive test coverage
 

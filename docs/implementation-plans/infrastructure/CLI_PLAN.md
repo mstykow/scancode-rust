@@ -1,6 +1,6 @@
 # CLI Implementation Plan
 
-> **Status**: 🟡 Core non-cache CLI parity implemented; remaining gaps are feature-blocked options
+> **Status**: 🟡 Core CLI parity implemented; cache controls are now wired, with remaining feature-blocked flags still pending
 > **Priority**: P1 - High (user-facing drop-in replacement parity)
 > **Dependencies**: Some flags depend on underlying features (license detection, post-scan processing, caching)
 
@@ -52,11 +52,11 @@ This plan tracks progress toward a **drop-in replacement CLI surface**.
 | `--max-email`              | Threshold (default 50, requires `--email`)                                                                        |
 | `--max-url`                | Threshold (default 50, requires `--url`)                                                                          |
 
-### Core Parameters (pending)
+### Core Parameters (partial)
 
-| Parameter         | Blocked By      |
-| ----------------- | --------------- |
-| `--max-in-memory` | CACHING_PLAN.md |
+| Parameter         | Status                                                                   |
+| ----------------- | ------------------------------------------------------------------------ |
+| `--max-in-memory` | Parsed and exposed; full parity memory/disk-spill behavior still pending |
 
 ### Scan Option Flags (pending)
 
@@ -86,14 +86,15 @@ This plan tracks progress toward a **drop-in replacement CLI surface**.
 | `--mark-source`   | Mark source files                                                            |
 | `--only-findings` | Filter output                                                                |
 
-### Cache Control (planned)
+### Cache Control (partial)
 
-| Parameter       | Positioning / Blocked By                                   |
-| --------------- | ---------------------------------------------------------- |
-| `--cache-dir`   | CACHING_PLAN.md (safe once cache manager exists)           |
-| `--cache-clear` | CACHING_PLAN.md (safe once cache ownership is centralized) |
-| `--no-cache`    | Optional Rust-specific convenience; not parity-required    |
-| `--incremental` | CACHING_PLAN.md (beyond parity; defer until robust model)  |
+| Parameter         | Positioning / Status                                                                            |
+| ----------------- | ----------------------------------------------------------------------------------------------- |
+| `--cache-dir`     | Implemented and wired in runtime startup cache bootstrap                                        |
+| `--cache-clear`   | Implemented and wired to clear persisted cache before directory scan starts                     |
+| `--max-in-memory` | Implemented as CLI surface; parity-equivalent spill behavior remains pending in caching roadmap |
+| `--no-cache`      | Optional Rust-specific convenience; not parity-required                                         |
+| `--incremental`   | CACHING_PLAN.md (beyond parity; defer until robust model)                                       |
 
 ## Key Design Decisions
 
