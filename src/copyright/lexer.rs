@@ -99,7 +99,72 @@ pub fn get_tokens(numbered_lines: &[(usize, String)]) -> Vec<Token> {
         }
     }
 
+    retag_camel_case_junk_before_company_suffix_in_copyright_context(&mut tokens);
+
     tokens
+}
+
+fn retag_camel_case_junk_before_company_suffix_in_copyright_context(tokens: &mut [Token]) {
+    if tokens.len() < 2 {
+        return;
+    }
+
+    for i in 0..tokens.len().saturating_sub(1) {
+        if tokens[i].tag != PosTag::Junk {
+            continue;
+        }
+        if tokens[i + 1].tag != PosTag::Comp {
+            continue;
+        }
+        if tokens[i].start_line != tokens[i + 1].start_line {
+            continue;
+        }
+        if !is_camel_case_identifier_candidate(&tokens[i].value) {
+            continue;
+        }
+
+        let mut has_copy_prefix = false;
+        let mut j = i;
+        while j > 0 {
+            j -= 1;
+            if tokens[j].start_line != tokens[i].start_line || tokens[j].tag == PosTag::EmptyLine {
+                break;
+            }
+            if tokens[j].tag == PosTag::Copy {
+                has_copy_prefix = true;
+                break;
+            }
+        }
+
+        if has_copy_prefix {
+            tokens[i].tag = PosTag::Nnp;
+        }
+    }
+}
+
+fn is_camel_case_identifier_candidate(value: &str) -> bool {
+    let mut chars = value.chars();
+    let Some(first) = chars.next() else {
+        return false;
+    };
+    if !first.is_ascii_uppercase() {
+        return false;
+    }
+
+    let mut has_lower = false;
+    let mut has_inner_upper = false;
+    for c in chars {
+        if !c.is_ascii_alphanumeric() {
+            return false;
+        }
+        if c.is_ascii_lowercase() {
+            has_lower = true;
+        } else if c.is_ascii_uppercase() {
+            has_inner_upper = true;
+        }
+    }
+
+    has_lower && has_inner_upper
 }
 
 #[cfg(test)]
@@ -236,6 +301,54 @@ mod tests {
             tokens.len() >= 3,
             "Expected at least 3 tokens, got {}",
             tokens.len()
+        );
+    }
+
+    #[test]
+    fn test_retag_camelcase_junk_before_company_suffix_in_copyright_context() {
+        let lines = vec![(1, "Copyright (C) OpenSharedMap Inc.".to_string())];
+        let tokens = get_tokens(&lines);
+        let osm = tokens
+            .iter()
+            .find(|t| t.value == "OpenSharedMap")
+            .expect("OpenSharedMap token should exist");
+        assert_eq!(
+            osm.tag,
+            PosTag::Nnp,
+            "Expected OpenSharedMap to be retagged as Nnp in copyright context"
+        );
+    }
+
+    #[test]
+    fn test_does_not_retag_camelcase_junk_outside_copyright_context() {
+        let lines = vec![(1, "Use OpenSharedMap Inc. APIs".to_string())];
+        let tokens = get_tokens(&lines);
+        let osm = tokens
+            .iter()
+            .find(|t| t.value == "OpenSharedMap")
+            .expect("OpenSharedMap token should exist");
+        assert_eq!(
+            osm.tag,
+            PosTag::Junk,
+            "OpenSharedMap should remain Junk outside copyright context"
+        );
+    }
+
+    #[test]
+    fn test_does_not_retag_all_caps_token_before_company_suffix() {
+        let lines = vec![(
+            1,
+            "Copyright Owner Inc. AS IS AND ANY EXPRESS OR IMPLIED WARRANTIES".to_string(),
+        )];
+        let tokens = get_tokens(&lines);
+        let as_token = tokens
+            .iter()
+            .find(|t| t.value == "AS")
+            .expect("AS token should exist");
+        assert_ne!(
+            as_token.tag,
+            PosTag::Nnp,
+            "All-caps AS token should not be retagged as a name"
         );
     }
 }
