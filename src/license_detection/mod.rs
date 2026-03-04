@@ -59,8 +59,8 @@ pub use debug_pipeline::{
     filter_below_rule_minimum_coverage_debug_only, filter_contained_matches_debug_only,
     filter_false_positive_matches_debug_only, filter_invalid_matches_to_single_word_gibberish_debug_only,
     filter_matches_missing_required_phrases_debug_only, filter_matches_to_spurious_single_token_debug_only,
-    filter_short_matches_scattered_on_too_many_lines_debug_only, filter_spurious_matches_debug_only,
-    filter_too_short_matches_debug_only,
+    filter_overlapping_matches_debug_only, filter_short_matches_scattered_on_too_many_lines_debug_only,
+    filter_spurious_matches_debug_only, filter_too_short_matches_debug_only,
 };
 
 /// License detection engine that orchestrates the detection pipeline.
@@ -165,7 +165,7 @@ impl LicenseDetectionEngine {
             let spdx_matches = spdx_lid_match(&self.index, &query);
             let merged_spdx = merge_overlapping_matches(&spdx_matches);
             for m in &merged_spdx {
-                if m.match_coverage >= 99.99 && m.end_token > m.start_token {
+                if (m.match_coverage * 100.0).round() / 100.0 == 100.0 && m.end_token > m.start_token {
                     matched_qspans.push(query::PositionSpan::new(m.start_token, m.end_token - 1));
                 }
                 if m.is_license_text && m.rule_length > 120 && m.match_coverage > 98.0 {
@@ -198,7 +198,7 @@ impl LicenseDetectionEngine {
             }
 
             for m in &refined_aho {
-                if m.match_coverage >= 99.99 && m.end_token > m.start_token {
+                if (m.match_coverage * 100.0).round() / 100.0 == 100.0 && m.end_token > m.start_token {
                     matched_qspans.push(query::PositionSpan::new(m.start_token, m.end_token - 1));
                 }
             }
@@ -375,7 +375,7 @@ impl LicenseDetectionEngine {
             let spdx_matches = spdx_lid_match(&self.index, &query);
             let merged_spdx = merge_overlapping_matches(&spdx_matches);
             for m in &merged_spdx {
-                if m.match_coverage >= 99.99 && m.end_token > m.start_token {
+                if (m.match_coverage * 100.0).round() / 100.0 == 100.0 && m.end_token > m.start_token {
                     matched_qspans.push(query::PositionSpan::new(m.start_token, m.end_token - 1));
                 }
                 if m.is_license_text && m.rule_length > 120 && m.match_coverage > 98.0 {
@@ -394,7 +394,7 @@ impl LicenseDetectionEngine {
             let refined_aho = match_refine::refine_aho_matches(&self.index, aho_matches, &query);
 
             for m in &refined_aho {
-                if m.match_coverage >= 99.99 && m.end_token > m.start_token {
+                if (m.match_coverage * 100.0).round() / 100.0 == 100.0 && m.end_token > m.start_token {
                     matched_qspans.push(query::PositionSpan::new(m.start_token, m.end_token - 1));
                 }
             }
