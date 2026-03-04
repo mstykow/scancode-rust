@@ -2,8 +2,8 @@
 
 #[cfg(test)]
 mod test {
-    use crate::license_detection::query::{Query, QueryRun, PositionSpan};
     use crate::license_detection::index::LicenseIndex;
+    use crate::license_detection::query::{PositionSpan, Query, QueryRun};
     use crate::license_detection::test_utils::create_test_index;
 
     fn create_query_test_index() -> LicenseIndex {

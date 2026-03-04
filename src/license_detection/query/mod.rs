@@ -285,7 +285,11 @@ impl<'a> Query<'a> {
                         let is_spdx_third = third_three == ["spdx", "license", "identifier"]
                             || third_three == ["spdx", "licence", "identifier"]
                             || third_three == ["licenses", "nuget", "org"];
-                        if is_spdx_third { Some(2) } else { None }
+                        if is_spdx_third {
+                            Some(2)
+                        } else {
+                            None
+                        }
                     } else {
                         None
                     }
@@ -553,7 +557,6 @@ impl<'a> Query<'a> {
         self.tokens.is_empty()
     }
 
-
     /// Get the number of known tokens.
     #[inline]
     pub fn len(&self) -> usize {
@@ -746,6 +749,11 @@ impl<'a> QueryRun<'a> {
         self.query.index
     }
 
+    /// Get the underlying query reference.
+    pub fn query(&self) -> &Query<'a> {
+        self.query
+    }
+
     /// Get the start line number of this query run.
     ///
     /// Corresponds to Python: `start_line` property (lines 771-773)
@@ -920,8 +928,6 @@ impl<'a> QueryRun<'a> {
         self.query.matched_text(start_line, end_line)
     }
 }
-
-
 
 #[cfg(test)]
 mod test;

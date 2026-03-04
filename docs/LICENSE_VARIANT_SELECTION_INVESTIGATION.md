@@ -2,7 +2,7 @@
 
 **Date**: 2026-03-03 (Updated: 2026-03-04)
 **Purpose**: Investigate why Rust selects wrong license variants when text matches multiple similar licenses
-**Status**: PARTIALLY RESOLVED - 3 bugs fixed, 109 failing tests remaining (down from 121)
+**Status**: ONGOING - 104 failing tests remaining (down from 121)
 
 ## Executive Summary
 
@@ -24,16 +24,40 @@ The root cause of license variant selection issues is **not a single bug, but mu
 ### Impact
 
 - **Started with**: 121 failing golden tests
-- **After fixes**: 109 failing golden tests
-- **Improvement**: 12 tests now passing (10% improvement)
+- **After fixes**: 104 failing golden tests
+- **Improvement**: 17 tests now passing (14% improvement)
+
+### New Hypotheses Investigated (2026-03-04)
+
+| Hypothesis | Status | Finding |
+|------------|--------|---------|
+| **H34** | REJECTED | Duplicate deduplication - bug in hash match early return, but hash match behavior matches Python |
+| **H39** | REJECTED | Detection grouping merges matches - NOT the issue, grouping works correctly |
+| **H44** | REJECTED | Missing `filter_overlapping_matches` - EXISTS in Rust at `handle_overlaps.rs:121` |
+| **H46** | PARTIAL | Expression deduplication removes duplicate licenses - Reverted, not the main issue |
+| H35-H38, H40-H43, H45, H47-H48 | PENDING | Various match filtering, candidate selection, variant selection issues |
+
+### Key Finding: unicode.txt Investigation
+
+Python's `idx.match()` returns 3 matches:
+```
+[0] unicode-tou_7.RULE - unicode-tou (lines 1-29)
+[1] unicode_40.RULE - unicode (lines 31-37)
+[2] unicode_42.RULE - unicode (lines 39-47)
+```
+
+Rust's debug pipeline shows "Final refined matches: 3" but test still fails.
+
+**Next**: Need to investigate why Rust's `detect_matches()` returns different results than the debug pipeline shows.
 
 ### Remaining Work
 
-The 109 remaining failing tests suggest additional bugs in:
-- Match refinement logic
-- Required phrase handling
-- Cross-license comparison (not yet implemented)
-- License specificity ranking (not yet implemented)
+The 104 remaining failing tests suggest additional bugs in:
+- Match refinement after false positive filtering
+- Detection assembly vs raw match count
+- Expression normalization
+- Variant selection (specificity ranking)
+- Cross-license comparison
 
 ## Investigated Cases
 
