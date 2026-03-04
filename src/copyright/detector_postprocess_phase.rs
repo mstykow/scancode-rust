@@ -28,6 +28,7 @@ pub(super) fn run_phase_postprocess(
     super::fix_sundry_contributors_truncation(content, copyrights, holders);
     super::restore_bare_holder_angle_emails(copyrights, holders);
     super::drop_trailing_software_line_from_holders(content, holders);
+    super::drop_url_embedded_c_symbol_false_positive_holders(content, holders);
 
     super::author_heuristics::merge_metadata_author_and_email_lines(content, authors);
     super::author_heuristics::extract_debian_maintainer_authors(content, authors);
