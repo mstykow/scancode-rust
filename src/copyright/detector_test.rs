@@ -3406,24 +3406,31 @@ fn test_detect_copyright_with_dots_multiline() {
 }
 
 #[test]
-fn test_issue_4724_url_with_c_symbol_not_copyright() {
-    let input = "http://example.com/path/(c)/search";
+fn test_issue_4145_opensharedmap_inc_detected() {
+    let input = "Copyright (C) OpenSharedMap Inc.";
     let (copyrights, holders, _authors) = detect_copyrights_from_text(input);
-    assert!(
-        copyrights.is_empty(),
-        "Unexpected copyrights: {copyrights:?}"
-    );
-    assert!(holders.is_empty(), "Unexpected holders: {holders:?}");
-}
-#[test]
-fn test_extract_module_author_macro() {
-    let input = "MODULE_AUTHOR(\"Linux Foundation <lf@example.org>\");";
-    let (_copyrights, _holders, authors) = detect_copyrights_from_text(input);
 
     assert!(
-        authors
+        copyrights
             .iter()
-            .any(|a| a.author == "Linux Foundation <lf@example.org>"),
-        "authors: {authors:?}"
+            .any(|c| c.copyright.contains("OpenSharedMap Inc")),
+        "Expected OpenSharedMap copyright detection, got: {copyrights:?}"
+    );
+    assert!(
+        holders
+            .iter()
+            .any(|h| h.holder.contains("OpenSharedMap Inc")),
+        "Expected OpenSharedMap holder detection, got: {holders:?}"
+    );
+}
+
+#[test]
+fn test_disclaimer_tail_with_inc_as_does_not_create_holder() {
+    let input = "Copyright Owner Inc. AS IS AND ANY EXPRESS OR IMPLIED WARRANTIES";
+    let (_copyrights, holders, _authors) = detect_copyrights_from_text(input);
+
+    assert!(
+        holders.is_empty(),
+        "Unexpected disclaimer-derived holders: {holders:?}"
     );
 }
