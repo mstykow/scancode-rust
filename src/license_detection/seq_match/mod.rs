@@ -30,7 +30,7 @@ pub const MATCH_SEQ_ORDER: u8 = 3;
 pub const HIGH_RESEMBLANCE_THRESHOLD: f32 = 0.8;
 
 /// Default number of top near-duplicate candidates to consider.
-pub const MAX_NEAR_DUPE_CANDIDATES: usize = 50;
+pub const MAX_NEAR_DUPE_CANDIDATES: usize = 10;
 
 #[cfg(test)]
 mod tests {
