@@ -15,14 +15,18 @@ pub fn compare_package_data_parser_only(
     let expected_content = fs::read_to_string(expected_path)
         .map_err(|e| format!("Failed to read expected file: {}", e))?;
 
-    let expected_array: Vec<Value> = serde_json::from_str(&expected_content)
+    let expected_value: Value = serde_json::from_str(&expected_content)
         .map_err(|e| format!("Failed to parse expected JSON: {}", e))?;
 
-    if expected_array.is_empty() {
-        return Err("Expected file contains empty array".to_string());
-    }
+    let expected_json = if let Some(expected_array) = expected_value.as_array() {
+        if expected_array.is_empty() {
+            return Err("Expected file contains empty array".to_string());
+        }
+        &expected_array[0]
+    } else {
+        &expected_value
+    };
 
-    let expected_json = &expected_array[0];
     let actual_json = serde_json::to_value(actual)
         .map_err(|e| format!("Failed to serialize actual PackageData: {}", e))?;
 
