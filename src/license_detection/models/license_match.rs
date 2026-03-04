@@ -449,6 +449,41 @@ impl LicenseMatch {
         }
     }
 
+    pub fn qspan_eq(&self, other: &LicenseMatch) -> bool {
+        match (&self.qspan_positions, &other.qspan_positions) {
+            (Some(self_positions), Some(other_positions)) => {
+                self_positions.len() == other_positions.len()
+                    && self_positions.iter().collect::<HashSet<_>>()
+                        == other_positions.iter().collect::<HashSet<_>>()
+            }
+            (Some(self_positions), None) => {
+                let range_len = other.end_token.saturating_sub(other.start_token);
+                self_positions.len() == range_len
+                    && self_positions
+                        .iter()
+                        .all(|&p| p >= other.start_token && p < other.end_token)
+            }
+            (None, Some(other_positions)) => {
+                let range_len = self.end_token.saturating_sub(self.start_token);
+                other_positions.len() == range_len
+                    && other_positions
+                        .iter()
+                        .all(|&p| p >= self.start_token && p < self.end_token)
+            }
+            (None, None) => {
+                if self.start_token == 0
+                    && self.end_token == 0
+                    && other.start_token == 0
+                    && other.end_token == 0
+                {
+                    self.start_line == other.start_line && self.end_line == other.end_line
+                } else {
+                    self.start_token == other.start_token && self.end_token == other.end_token
+                }
+            }
+        }
+    }
+
     #[allow(dead_code)]
     pub fn has_gaps(&self) -> bool {
         self.qspan_positions.is_some() || self.ispan_positions.is_some()

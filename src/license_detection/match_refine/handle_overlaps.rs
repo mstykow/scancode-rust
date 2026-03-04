@@ -66,7 +66,7 @@ pub fn filter_contained_matches(
                 break;
             }
 
-            if current.qstart() == next.qstart() && current.end_token == next.end_token {
+            if current.qspan_eq(&next) {
                 if current.match_coverage >= next.match_coverage {
                     discarded.push(matches.remove(j));
                     continue;
