@@ -2,11 +2,7 @@ mod config;
 mod io;
 mod metadata;
 mod paths;
+mod scan_cache;
 
 pub use config::CacheConfig;
-pub use io::{
-    CacheIoError, CacheMissReason, SnapshotReadStatus, load_snapshot_payload,
-    read_snapshot_payload, write_snapshot_payload,
-};
-pub use metadata::{CacheInvalidationKey, CacheSnapshotMetadata};
-pub use paths::{scan_result_cache_path, validate_sha256_hex};
+pub use scan_cache::{CachedScanFindings, read_cached_findings, write_cached_findings};
