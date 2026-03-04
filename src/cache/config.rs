@@ -16,6 +16,38 @@ impl CacheConfig {
         Self::new(scan_root.join(".scancode-cache"))
     }
 
+    pub fn resolve_root_dir(
+        scan_root: &Path,
+        cli_cache_dir: Option<&Path>,
+        env_cache_dir: Option<&Path>,
+    ) -> PathBuf {
+        if let Some(path) = cli_cache_dir {
+            return path.to_path_buf();
+        }
+
+        if let Some(path) = env_cache_dir {
+            return path.to_path_buf();
+        }
+
+        scan_root.join(".scancode-cache")
+    }
+
+    pub fn from_overrides(
+        scan_root: &Path,
+        cli_cache_dir: Option<&Path>,
+        env_cache_dir: Option<&Path>,
+    ) -> Self {
+        if cli_cache_dir.is_none() && env_cache_dir.is_none() {
+            return Self::from_scan_root(scan_root);
+        }
+
+        Self::new(Self::resolve_root_dir(
+            scan_root,
+            cli_cache_dir,
+            env_cache_dir,
+        ))
+    }
+
     pub fn root_dir(&self) -> &Path {
         &self.root_dir
     }
@@ -31,6 +63,13 @@ impl CacheConfig {
     pub fn ensure_dirs(&self) -> io::Result<()> {
         fs::create_dir_all(self.index_dir())?;
         fs::create_dir_all(self.scan_results_dir())?;
+        Ok(())
+    }
+
+    pub fn clear(&self) -> io::Result<()> {
+        if self.root_dir().exists() {
+            fs::remove_dir_all(&self.root_dir)?;
+        }
         Ok(())
     }
 }
@@ -60,5 +99,39 @@ mod tests {
         assert!(config.root_dir().exists());
         assert!(config.index_dir().exists());
         assert!(config.scan_results_dir().exists());
+    }
+
+    #[test]
+    fn test_resolve_root_dir_prefers_cli_then_env_then_default() {
+        let scan_root = Path::new("/scan-root");
+        let cli_dir = Path::new("/cli-cache");
+        let env_dir = Path::new("/env-cache");
+
+        assert_eq!(
+            CacheConfig::resolve_root_dir(scan_root, Some(cli_dir), Some(env_dir)),
+            cli_dir
+        );
+        assert_eq!(
+            CacheConfig::resolve_root_dir(scan_root, None, Some(env_dir)),
+            env_dir
+        );
+        assert_eq!(
+            CacheConfig::resolve_root_dir(scan_root, None, None),
+            PathBuf::from("/scan-root/.scancode-cache")
+        );
+    }
+
+    #[test]
+    fn test_clear_removes_cache_root_directory() {
+        let temp_dir = TempDir::new().expect("Failed to create temp dir");
+        let config = CacheConfig::new(temp_dir.path().join("cache-root"));
+
+        config
+            .ensure_dirs()
+            .expect("Failed to create cache directories");
+        assert!(config.root_dir().exists());
+
+        config.clear().expect("Failed to clear cache directory");
+        assert!(!config.root_dir().exists());
     }
 }

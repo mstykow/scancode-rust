@@ -6,10 +6,12 @@ use std::time::{Duration, Instant};
 use anyhow::Error;
 use content_inspector::{ContentType, inspect};
 use glob::Pattern;
+use log::warn;
 use mime_guess::from_path;
 use rayon::prelude::*;
 
 use crate::askalono::{ScanStrategy, TextData};
+use crate::cache::{CachedScanFindings, read_cached_findings, write_cached_findings};
 use crate::copyright::{self, CopyrightDetectionOptions};
 use crate::finder::{self, DetectionConfig};
 use crate::models::{
@@ -181,7 +183,7 @@ fn process_file(
         ));
     }
 
-    file_info_builder
+    let mut file_info = file_info_builder
         .name(path.file_name().unwrap().to_string_lossy().to_string())
         .base_name(
             path.file_stem()
@@ -205,7 +207,25 @@ fn process_file(
         .date(get_creation_date(metadata))
         .scan_errors(scan_errors)
         .build()
-        .expect("FileInformationBuild not completely initialized")
+        .expect("FileInformationBuild not completely initialized");
+
+    if let (Some(scan_results_dir), Some(sha256)) = (
+        text_options.scan_cache_dir.as_deref(),
+        file_info.sha256.as_deref(),
+    ) && file_info.scan_errors.is_empty()
+    {
+        let findings = CachedScanFindings::from_file_info(&file_info);
+        let options_fingerprint = scan_cache_fingerprint(text_options);
+        if let Err(err) =
+            write_cached_findings(scan_results_dir, sha256, &options_fingerprint, &findings)
+        {
+            file_info
+                .scan_errors
+                .push(format!("Failed to write scan cache entry: {err}"));
+        }
+    }
+
+    file_info
 }
 
 fn extract_information_from_content(
@@ -224,11 +244,36 @@ fn extract_information_from_content(
         )));
     }
 
+    let sha256 = calculate_sha256(&buffer);
+
     file_info_builder
         .sha1(Some(calculate_sha1(&buffer)))
         .md5(Some(calculate_md5(&buffer)))
-        .sha256(Some(calculate_sha256(&buffer)))
+        .sha256(Some(sha256.clone()))
         .programming_language(Some(detect_language(path, &buffer)));
+
+    if let Some(scan_results_dir) = text_options.scan_cache_dir.as_deref() {
+        let options_fingerprint = scan_cache_fingerprint(text_options);
+        match read_cached_findings(scan_results_dir, &sha256, &options_fingerprint) {
+            Ok(Some(findings)) => {
+                file_info_builder
+                    .package_data(findings.package_data)
+                    .license_expression(findings.license_expression)
+                    .license_detections(findings.license_detections)
+                    .copyrights(findings.copyrights)
+                    .holders(findings.holders)
+                    .authors(findings.authors)
+                    .emails(findings.emails)
+                    .urls(findings.urls)
+                    .programming_language(findings.programming_language);
+                return Ok(());
+            }
+            Ok(None) => {}
+            Err(err) => {
+                warn!("Failed to read scan cache for {:?}: {}", path, err);
+            }
+        }
+    }
 
     // Package parsing and text-based detection (copyright, license) are independent.
     // Python ScanCode runs all enabled plugins on every file, so we do the same.
@@ -273,6 +318,18 @@ fn is_timeout_exceeded(started: Instant, timeout_seconds: f64) -> bool {
     timeout_seconds.is_finite()
         && timeout_seconds > 0.0
         && started.elapsed().as_secs_f64() > timeout_seconds
+}
+
+fn scan_cache_fingerprint(text_options: &TextDetectionOptions) -> String {
+    format!(
+        "copyrights={};emails={};urls={};max_emails={};max_urls={};timeout={:.6}",
+        text_options.detect_copyrights,
+        text_options.detect_emails,
+        text_options.detect_urls,
+        text_options.max_emails,
+        text_options.max_urls,
+        text_options.timeout_seconds,
+    )
 }
 
 fn extract_copyright_information(

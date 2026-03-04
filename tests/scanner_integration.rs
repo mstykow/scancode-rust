@@ -3,6 +3,7 @@ use scancode_rust::askalono::{ScanStrategy, Store};
 use scancode_rust::models::PackageType;
 use scancode_rust::parsers::list_parser_types;
 use scancode_rust::progress::{ProgressMode, ScanProgress};
+use scancode_rust::utils::hash::calculate_sha256;
 use scancode_rust::{FileType, TextDetectionOptions, process, process_with_options};
 use std::fs;
 use std::path::Path;
@@ -330,6 +331,7 @@ fn test_scanner_detects_emails_and_urls_when_enabled() {
         max_emails: 50,
         max_urls: 50,
         timeout_seconds: 120.0,
+        scan_cache_dir: None,
     };
 
     let result = process_with_options(test_path, 10, progress, &patterns, &strategy, &options)
@@ -385,6 +387,7 @@ fn test_scanner_respects_email_url_thresholds() {
         max_emails: 2,
         max_urls: 2,
         timeout_seconds: 120.0,
+        scan_cache_dir: None,
     };
 
     let result = process_with_options(test_path, 10, progress, &patterns, &strategy, &options)
@@ -403,4 +406,70 @@ fn test_scanner_respects_email_url_thresholds() {
 
     assert_eq!(file.emails.len(), 2);
     assert_eq!(file.urls.len(), 2);
+}
+
+#[test]
+fn test_scanner_persists_scan_result_cache_entries() {
+    use tempfile::TempDir;
+
+    let temp_dir = TempDir::new().expect("Failed to create temp dir");
+    let test_path = temp_dir.path();
+    let cache_dir = test_path.join("scan-cache");
+    let content_path = test_path.join("contacts.txt");
+    fs::write(
+        &content_path,
+        "copyright 2024 Acme Corp\nmail us at support@many.org\nvisit www.acme.dev/docs\n",
+    )
+    .expect("Failed to write test file");
+
+    let progress = hidden_progress();
+    let patterns: Vec<Pattern> = vec![];
+    let store = create_test_store();
+    let strategy = create_test_strategy(&store);
+    let options = TextDetectionOptions {
+        detect_copyrights: true,
+        detect_emails: true,
+        detect_urls: true,
+        max_emails: 50,
+        max_urls: 50,
+        timeout_seconds: 120.0,
+        scan_cache_dir: Some(cache_dir.clone()),
+    };
+
+    let first = process_with_options(
+        test_path,
+        10,
+        Arc::clone(&progress),
+        &patterns,
+        &strategy,
+        &options,
+    )
+    .expect("First scan should succeed");
+
+    let first_file = first
+        .files
+        .iter()
+        .find(|f| f.file_type == FileType::File && f.path.ends_with("contacts.txt"))
+        .expect("Should find contacts file");
+    assert_eq!(first_file.emails.len(), 1);
+    assert_eq!(first_file.urls.len(), 1);
+
+    let content = fs::read(&content_path).expect("Failed to read contacts file");
+    let sha256 = calculate_sha256(&content);
+    let cache_path = cache_dir
+        .join(&sha256[0..2])
+        .join(&sha256[2..4])
+        .join(format!("{sha256}.msgpack.zst"));
+    assert!(cache_path.exists(), "Expected scan cache entry to exist");
+
+    let second = process_with_options(test_path, 10, progress, &patterns, &strategy, &options)
+        .expect("Second scan should succeed");
+    let second_file = second
+        .files
+        .iter()
+        .find(|f| f.file_type == FileType::File && f.path.ends_with("contacts.txt"))
+        .expect("Should find contacts file on second scan");
+
+    assert_eq!(second_file.emails.len(), 1);
+    assert_eq!(second_file.urls.len(), 1);
 }
