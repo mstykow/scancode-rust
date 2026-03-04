@@ -366,6 +366,34 @@ pub fn prepare_text_line(line: &str) -> String {
         // Named entities
         .replace("&quot;", "\"")
         .replace("&#34;", "\"")
+        .replace("&auml;", "ä")
+        .replace("&auml", "ä")
+        .replace("&Auml;", "Ä")
+        .replace("&Auml", "Ä")
+        .replace("&ouml;", "ö")
+        .replace("&ouml", "ö")
+        .replace("&Ouml;", "Ö")
+        .replace("&Ouml", "Ö")
+        .replace("&uuml;", "ü")
+        .replace("&uuml", "ü")
+        .replace("&Uuml;", "Ü")
+        .replace("&Uuml", "Ü")
+        .replace("&szlig;", "ß")
+        .replace("&szlig", "ß")
+        .replace("&#196;", "Ä")
+        .replace("&#214;", "Ö")
+        .replace("&#220;", "Ü")
+        .replace("&#228;", "ä")
+        .replace("&#246;", "ö")
+        .replace("&#252;", "ü")
+        .replace("&#223;", "ß")
+        .replace("&#xC4;", "Ä")
+        .replace("&#xD6;", "Ö")
+        .replace("&#xDC;", "Ü")
+        .replace("&#xE4;", "ä")
+        .replace("&#xF6;", "ö")
+        .replace("&#xFC;", "ü")
+        .replace("&#xDF;", "ß")
         .replace("&amp;", "&")
         .replace("&#38;", "&")
         .replace("&gt;", ">")
@@ -1247,4 +1275,26 @@ mod tests {
         let result = prepare_text_line("<o:Template>techdoc.dot</o:Template>");
         assert!(!result.to_ascii_lowercase().contains("techdoc.dot"));
     }
+}
+
+#[test]
+fn test_html_entity_uuml() {
+    let result = prepare_text_line("@author Ceki G&uuml;lc&uuml;");
+    assert_eq!(result, "@author Ceki Gülcü");
+}
+
+#[test]
+fn test_html_entity_all_german_umlauts_and_szlig_named() {
+    let result = prepare_text_line(
+        "@author &Auml;gnes &Ouml;zil &Uuml;ber M&auml;x Gr&ouml;&szlig;e &auml &ouml &uuml &szlig",
+    );
+    assert_eq!(result, "@author Ägnes Özil Über Mäx Größe ä ö ü ß");
+}
+
+#[test]
+fn test_html_entity_all_german_umlauts_and_szlig_numeric() {
+    let result = prepare_text_line(
+        "@author &#xC4; &#xD6; &#xDC; &#xE4; &#xF6; &#xFC; &#xDF; &#196; &#214; &#220; &#228; &#246; &#252; &#223;",
+    );
+    assert_eq!(result, "@author Ä Ö Ü ä ö ü ß Ä Ö Ü ä ö ü ß");
 }

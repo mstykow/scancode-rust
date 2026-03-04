@@ -1,0 +1,3 @@
+/*
+ * @author &Auml;gnes &Ouml;zil &Uuml;ber M&auml;x Gr&ouml;&szlig;e
+ */
