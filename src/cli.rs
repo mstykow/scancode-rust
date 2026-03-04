@@ -131,6 +131,15 @@ pub struct Cli {
     #[arg(long, value_delimiter = ',')]
     pub include: Vec<String>,
 
+    #[arg(long = "cache-dir", value_name = "PATH")]
+    pub cache_dir: Option<String>,
+
+    #[arg(long = "cache-clear")]
+    pub cache_clear: bool,
+
+    #[arg(long = "max-in-memory", value_name = "INT")]
+    pub max_in_memory: Option<usize>,
+
     #[arg(long)]
     pub from_json: bool,
 
@@ -472,6 +481,26 @@ mod tests {
         ])
         .expect("cli parse should accept processes=-1");
         assert_eq!(parsed.processes, -1);
+    }
+
+    #[test]
+    fn test_parses_cache_flags() {
+        let parsed = Cli::try_parse_from([
+            "scancode-rust",
+            "--json-pp",
+            "scan.json",
+            "--cache-dir",
+            "/tmp/sc-cache",
+            "--cache-clear",
+            "--max-in-memory",
+            "5000",
+            "samples",
+        ])
+        .expect("cli parse should accept cache flags");
+
+        assert_eq!(parsed.cache_dir.as_deref(), Some("/tmp/sc-cache"));
+        assert!(parsed.cache_clear);
+        assert_eq!(parsed.max_in_memory, Some(5000));
     }
 
     #[test]

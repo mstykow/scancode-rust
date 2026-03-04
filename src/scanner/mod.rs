@@ -1,6 +1,8 @@
 mod count;
 mod process;
 
+use std::path::PathBuf;
+
 use crate::models::FileInfo;
 
 /// Aggregated result of scanning a directory tree.
@@ -22,6 +24,7 @@ pub struct TextDetectionOptions {
     pub max_emails: usize,
     pub max_urls: usize,
     pub timeout_seconds: f64,
+    pub scan_cache_dir: Option<PathBuf>,
 }
 
 impl Default for TextDetectionOptions {
@@ -33,6 +36,7 @@ impl Default for TextDetectionOptions {
             max_emails: 50,
             max_urls: 50,
             timeout_seconds: 120.0,
+            scan_cache_dir: None,
         }
     }
 }

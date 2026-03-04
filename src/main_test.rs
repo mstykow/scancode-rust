@@ -353,3 +353,52 @@ fn progress_mode_from_cli_maps_quiet_verbose_default() {
         crate::progress::ProgressMode::Verbose
     );
 }
+
+#[test]
+fn prepare_cache_for_scan_defaults_to_scan_root_cache_directory() {
+    let temp_dir = tempfile::TempDir::new().expect("create temp dir");
+    let scan_root = temp_dir.path().join("scan");
+    fs::create_dir_all(&scan_root).expect("create scan root");
+
+    let cli =
+        crate::cli::Cli::try_parse_from(["scancode-rust", "--json-pp", "scan.json", "sample-dir"])
+            .expect("cli parse should succeed");
+
+    let config = prepare_cache_for_scan(scan_root.to_str().expect("utf-8 path"), &cli)
+        .expect("cache preparation should succeed");
+
+    assert_eq!(config.root_dir(), scan_root.join(".scancode-cache"));
+    assert!(config.index_dir().exists());
+    assert!(config.scan_results_dir().exists());
+}
+
+#[test]
+fn prepare_cache_for_scan_respects_cache_dir_and_cache_clear() {
+    let temp_dir = tempfile::TempDir::new().expect("create temp dir");
+    let scan_root = temp_dir.path().join("scan");
+    fs::create_dir_all(&scan_root).expect("create scan root");
+
+    let explicit_cache_dir = temp_dir.path().join("explicit-cache");
+    fs::create_dir_all(explicit_cache_dir.join("index")).expect("create stale cache dir");
+    let stale_file = explicit_cache_dir.join("index").join("stale.txt");
+    fs::write(&stale_file, "old").expect("write stale file");
+
+    let cli = crate::cli::Cli::try_parse_from([
+        "scancode-rust",
+        "--json-pp",
+        "scan.json",
+        "--cache-dir",
+        explicit_cache_dir.to_str().expect("utf-8 path"),
+        "--cache-clear",
+        "sample-dir",
+    ])
+    .expect("cli parse should succeed");
+
+    let config = prepare_cache_for_scan(scan_root.to_str().expect("utf-8 path"), &cli)
+        .expect("cache preparation should succeed");
+
+    assert_eq!(config.root_dir(), explicit_cache_dir);
+    assert!(!stale_file.exists());
+    assert!(config.index_dir().exists());
+    assert!(config.scan_results_dir().exists());
+}

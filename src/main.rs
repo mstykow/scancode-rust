@@ -13,6 +13,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use crate::askalono::{Store, TextData};
+use crate::cache::CacheConfig;
 use crate::cli::Cli;
 use crate::models::{ExtraData, Header, Output, SCANCODE_OUTPUT_FORMAT_VERSION, SystemEnvironment};
 use crate::output::{OutputWriteConfig, write_output_file};
@@ -21,6 +22,7 @@ use crate::scanner::{TextDetectionOptions, count_with_size, process, process_wit
 
 mod askalono;
 mod assembly;
+mod cache;
 mod cli;
 #[allow(dead_code, unused_imports)]
 mod copyright;
@@ -126,6 +128,8 @@ fn run() -> Result<()> {
             .first()
             .ok_or_else(|| anyhow!("No directory input path provided"))?;
 
+        let cache_config = prepare_cache_for_scan(scan_path, &cli)?;
+
         let (total_files, total_dirs, excluded_count, total_size) =
             count_with_size(scan_path, cli.max_depth, &exclude_patterns)?;
         progress.finish_discovery(total_files, total_dirs, total_size, excluded_count);
@@ -150,6 +154,7 @@ fn run() -> Result<()> {
             max_emails: cli.max_email,
             max_urls: cli.max_url,
             timeout_seconds: cli.timeout,
+            scan_cache_dir: Some(cache_config.scan_results_dir()),
         };
         let default_text_options = TextDetectionOptions::default();
 
@@ -301,6 +306,22 @@ fn validate_scan_option_compatibility(cli: &Cli) -> Result<()> {
     }
 
     Ok(())
+}
+
+fn prepare_cache_for_scan(scan_path: &str, cli: &Cli) -> Result<CacheConfig> {
+    let env_cache_dir = env::var_os("SCANCODE_RUST_CACHE").map(PathBuf::from);
+    let config = CacheConfig::from_overrides(
+        Path::new(scan_path),
+        cli.cache_dir.as_deref().map(Path::new),
+        env_cache_dir.as_deref(),
+    );
+
+    if cli.cache_clear {
+        config.clear()?;
+    }
+
+    config.ensure_dirs()?;
+    Ok(config)
 }
 
 fn compile_exclude_patterns(patterns: &[String]) -> Vec<Pattern> {
