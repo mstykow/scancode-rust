@@ -39,16 +39,29 @@ The root cause of license variant selection issues is **not a single bug, but mu
 
 ### Key Finding: unicode.txt Investigation
 
-Python's `idx.match()` returns 3 matches:
+Python's `idx.match(location=...)` returns 3 matches:
 ```
-[0] unicode-tou_7.RULE - unicode-tou (lines 1-29)
-[1] unicode_40.RULE - unicode (lines 31-37)
-[2] unicode_42.RULE - unicode (lines 39-47)
+[0] unicode-tou_7.RULE - unicode-tou (lines 1-29, qspan=0-982)
+[1] unicode_40.RULE - unicode (lines 31-37, qspan=985-1118)
+[2] unicode_42.RULE - unicode (lines 39-47, qspan=1127-1467)
 ```
 
-Rust's debug pipeline shows "Final refined matches: 3" but test still fails.
+Rust's debug pipeline shows "Final refined matches: 3" but test still fails with 2 expressions.
 
-**Next**: Need to investigate why Rust's `detect_matches()` returns different results than the debug pipeline shows.
+### Line Threshold Difference (Fixed)
+
+Python's `build_query()` uses different `line_threshold`:
+- `location` (text file): 15
+- `location` (binary file): 50
+- `query_string`: 4 (default LINES_THRESHOLD)
+
+Rust was using 4 for all cases. Fixed to use 15 by default.
+
+### Remaining Mystery
+
+Despite fixing line_threshold, the golden test still fails. Need to investigate:
+1. Why Rust's `detect_matches()` returns 2 expressions when debug shows 3 matches
+2. Whether there's a filter or merge happening after refinement
 
 ### Remaining Work
 

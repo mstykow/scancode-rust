@@ -526,6 +526,15 @@ impl LicenseDetectionEngine {
 
         let mut sorted = refined;
         sort_matches_by_line(&mut sorted);
+        
+        // DEBUG: Print match count
+        #[cfg(feature = "debug-pipeline")]
+        {
+            eprintln!("DEBUG detect_matches(): returning {} matches", sorted.len());
+            for m in &sorted {
+                eprintln!("  - {} ({})", m.rule_identifier, m.license_expression);
+            }
+        }
 
         // Return raw matches (NOT grouped) - this is Python's idx.match() behavior
         Ok(sorted)

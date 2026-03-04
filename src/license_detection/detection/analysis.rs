@@ -2,7 +2,7 @@
 
 use super::types::LicenseDetection;
 use super::*;
-use crate::license_detection::expression::{CombineRelation, combine_expressions};
+use crate::license_detection::expression::{combine_expressions, CombineRelation};
 use crate::license_detection::models::LicenseMatch;
 
 /// Matches with line gap > this are considered separate groups.
@@ -390,7 +390,7 @@ pub fn determine_license_expression(matches: &[LicenseMatch]) -> Result<String, 
         .map(|m| m.license_expression.as_str())
         .collect();
 
-    combine_expressions(&expressions, CombineRelation::And, true)
+    combine_expressions(&expressions, CombineRelation::And, false)
         .map_err(|e| format!("Failed to combine expressions: {}", e))
 }
 
@@ -409,7 +409,7 @@ pub fn determine_spdx_expression(matches: &[LicenseMatch]) -> Result<String, Str
         .map(|m| m.license_expression_spdx.as_str())
         .collect();
 
-    combine_expressions(&expressions, CombineRelation::And, true)
+    combine_expressions(&expressions, CombineRelation::And, false)
         .map_err(|e| format!("Failed to combine SPDX expressions: {}", e))
 }
 

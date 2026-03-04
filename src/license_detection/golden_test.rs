@@ -159,9 +159,14 @@ mod golden_tests {
 
             // Use detect_matches() for raw matches like Python's idx.match()
             // This avoids the grouping step that causes false test failures
-            let matches = engine.detect_matches(&text, unknown_licenses).map_err(|e| {
-                format!("Detection failed for {}: {:?}", self.test_file.display(), e)
-            })?;
+            #[cfg(feature = "debug-pipeline")]
+            eprintln!("DEBUG TEST: {}", self.name);
+            
+            let matches = engine
+                .detect_matches(&text, unknown_licenses)
+                .map_err(|e| {
+                    format!("Detection failed for {}: {:?}", self.test_file.display(), e)
+                })?;
 
             let actual: Vec<&str> = matches
                 .iter()
