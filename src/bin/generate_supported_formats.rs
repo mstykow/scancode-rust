@@ -103,6 +103,15 @@ fn normalize_markdown_for_compare(input: &str) -> String {
                     .split('|')
                     .map(|cell| cell.trim().to_string())
                     .collect();
+
+                let is_separator_row = cells
+                    .iter()
+                    .all(|cell| !cell.is_empty() && cell.chars().all(|c| c == '-' || c == ':'));
+
+                if is_separator_row {
+                    return format!("| {} |", vec!["---"; cells.len()].join(" | "));
+                }
+
                 format!("| {} |", cells.join(" | "))
             } else {
                 trimmed.to_string()
