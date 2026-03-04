@@ -57,11 +57,28 @@ Python's `build_query()` uses different `line_threshold`:
 
 Rust was using 4 for all cases. Fixed to use 15 by default.
 
-### Remaining Mystery
+### Root Cause Analysis (2026-03-04)
 
-Despite fixing line_threshold, the golden test still fails. Need to investigate:
-1. Why Rust's `detect_matches()` returns 2 expressions when debug shows 3 matches
-2. Whether there's a filter or merge happening after refinement
+**Key Debug Output**:
+```
+skip_seq_matching = false (matched_qspans.len = 3)
+matched_qspan[0]: 0-982
+matched_qspan[1]: 985-1118
+matched_qspan[2]: 1127-1467
+all_matches before refine = 305
+merged_matches after refine = 2
+```
+
+**Observations**:
+1. `is_matchable()` returns `true` (there's position 983 in the gap)
+2. Sequence matching runs and produces ~302 extra matches
+3. After refinement, only 2 matches remain
+
+**Python behavior**: 
+- `is_matchable()` also returns `True` (position 983 is matchable)
+- But Python returns 3 matches
+
+**Hypothesis**: Rust's `filter_contained_matches` or `filter_overlapping_matches` is incorrectly filtering one of the unicode matches due to interference from the extra 302 sequence matches.
 
 ### Remaining Work
 
