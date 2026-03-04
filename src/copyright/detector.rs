@@ -4701,6 +4701,33 @@ fn drop_trailing_software_line_from_holders(content: &str, holders: &mut [Holder
     }
 }
 
+fn drop_url_embedded_c_symbol_false_positive_holders(
+    content: &str,
+    holders: &mut Vec<HolderDetection>,
+) {
+    static URL_EMBEDDED_C_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r"(?i)https?://\S*\(c\)\S*").expect("valid URL embedded (c) regex")
+    });
+
+    let lines: Vec<&str> = content.lines().collect();
+    holders.retain(|holder| {
+        let Some(raw_line) = lines.get(holder.start_line.saturating_sub(1)) else {
+            return true;
+        };
+        if !URL_EMBEDDED_C_RE.is_match(raw_line) {
+            return true;
+        }
+
+        let value = holder.holder.trim();
+        let is_single_token = !value.chars().any(char::is_whitespace);
+        let is_lower_pathish = value
+            .chars()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-' || c == '_');
+
+        !(is_single_token && is_lower_pathish)
+    });
+}
+
 fn extract_following_authors_holders(content: &str, holders: &mut Vec<HolderDetection>) {
     if content.is_empty() {
         return;

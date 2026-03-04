@@ -3404,3 +3404,14 @@ fn test_detect_copyright_with_dots_multiline() {
         h
     );
 }
+
+#[test]
+fn test_issue_4724_url_with_c_symbol_not_copyright() {
+    let input = "http://example.com/path/(c)/search";
+    let (copyrights, holders, _authors) = detect_copyrights_from_text(input);
+    assert!(
+        copyrights.is_empty(),
+        "Unexpected copyrights: {copyrights:?}"
+    );
+    assert!(holders.is_empty(), "Unexpected holders: {holders:?}");
+}
