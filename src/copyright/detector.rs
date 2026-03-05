@@ -4728,6 +4728,64 @@ fn drop_url_embedded_c_symbol_false_positive_holders(
     });
 }
 
+fn extract_c_symbol_holder_then_years_lines(
+    content: &str,
+    copyrights: &mut Vec<CopyrightDetection>,
+    holders: &mut Vec<HolderDetection>,
+) {
+    if content.is_empty() {
+        return;
+    }
+
+    static C_HOLDER_YEARS_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(
+            r"(?i)^\(c\)\s+(?P<holder>.+?)\s+(?P<years>(?:19|20)\d{2}(?:\s*,\s*(?:19|20)\d{2}){1,})\b(?:\s+all\s+rights\s+reserved\.?\s*)?$",
+        )
+        .expect("valid (c) holder years regex")
+    });
+
+    let mut seen_copyrights: HashSet<String> =
+        copyrights.iter().map(|c| c.copyright.clone()).collect();
+    let mut seen_holders: HashSet<String> = holders.iter().map(|h| h.holder.clone()).collect();
+
+    for (idx, raw_line) in content.lines().enumerate() {
+        if !raw_line.contains("[C]") && !raw_line.contains("[c]") {
+            continue;
+        }
+        let ln = idx + 1;
+        let prepared = crate::copyright::prepare::prepare_text_line(raw_line);
+        let line = prepared.trim();
+        let Some(cap) = C_HOLDER_YEARS_RE.captures(line) else {
+            continue;
+        };
+
+        let holder_raw = cap.name("holder").map(|m| m.as_str()).unwrap_or("").trim();
+        let years = cap.name("years").map(|m| m.as_str()).unwrap_or("").trim();
+        if holder_raw.is_empty() || years.is_empty() {
+            continue;
+        }
+
+        let holder = refine_holder_in_copyright_context(holder_raw)
+            .unwrap_or_else(|| holder_raw.to_string());
+        let copyright_text = format!("Copyright (c) {holder} {years}");
+
+        if seen_copyrights.insert(copyright_text.clone()) {
+            copyrights.push(CopyrightDetection {
+                copyright: copyright_text,
+                start_line: ln,
+                end_line: ln,
+            });
+        }
+        if seen_holders.insert(holder.clone()) {
+            holders.push(HolderDetection {
+                holder,
+                start_line: ln,
+                end_line: ln,
+            });
+        }
+    }
+}
+
 fn extract_following_authors_holders(content: &str, holders: &mut Vec<HolderDetection>) {
     if content.is_empty() {
         return;
