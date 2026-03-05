@@ -1101,6 +1101,104 @@ fn add_confidential_short_variants_late(
     }
 }
 
+fn split_multiline_holder_lists_from_copyright_email_sequences(
+    copyrights: &[CopyrightDetection],
+    holders: &mut Vec<HolderDetection>,
+) {
+    if copyrights.is_empty() || holders.is_empty() {
+        return;
+    }
+
+    static NAME_EMAIL_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r"(?P<name>[^<>\n]+?)\s*<[^>\s]+@[^>\s]+>").expect("valid name-email regex")
+    });
+    static LEADING_COPY_YEAR_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(
+            r"(?i)^\s*(?:copyright\s*)?\(c\)\s*(?:\d{2,4}(?:\s*-\s*\d{2,4})?(?:\s*,\s*\d{2,4})*)\s+",
+        )
+        .expect("valid leading copyright-year regex")
+    });
+
+    let mut to_add: Vec<HolderDetection> = Vec::new();
+    let mut to_remove: HashSet<(usize, usize, String)> = HashSet::new();
+
+    for c in copyrights {
+        if c.end_line <= c.start_line {
+            continue;
+        }
+
+        let c_trimmed = c.copyright.trim();
+        let c_lower = c_trimmed.to_ascii_lowercase();
+        if !(c_lower.starts_with("(c)") || c_lower.starts_with("copyright (c)")) {
+            continue;
+        }
+        if c_trimmed.contains(',') {
+            continue;
+        }
+
+        if !c.copyright.contains('@') || !c.copyright.contains('<') || !c.copyright.contains('>') {
+            continue;
+        }
+
+        let mut split_names: Vec<String> = NAME_EMAIL_RE
+            .captures_iter(&c.copyright)
+            .filter_map(|cap| {
+                cap.name("name")
+                    .map(|m| normalize_whitespace(m.as_str().trim()))
+            })
+            .map(|name| LEADING_COPY_YEAR_RE.replace(&name, "").trim().to_string())
+            .filter_map(|name| refine_holder(&name))
+            .collect();
+
+        if split_names.len() < 2 {
+            continue;
+        }
+
+        split_names.dedup();
+        if split_names.len() != 2 {
+            continue;
+        }
+        let joined = normalize_whitespace(&split_names.join(" "));
+
+        let mut has_joined_holder = false;
+        for h in holders.iter() {
+            if h.start_line == c.start_line
+                && h.end_line == c.end_line
+                && normalize_whitespace(&h.holder) == joined
+            {
+                has_joined_holder = true;
+                to_remove.insert((h.start_line, h.end_line, h.holder.clone()));
+            }
+        }
+
+        if !has_joined_holder {
+            continue;
+        }
+
+        for name in split_names {
+            let key = (c.start_line, c.end_line, name.clone());
+            if !holders
+                .iter()
+                .any(|h| (h.start_line, h.end_line, h.holder.clone()) == key)
+            {
+                to_add.push(HolderDetection {
+                    holder: name,
+                    start_line: c.start_line,
+                    end_line: c.end_line,
+                });
+            }
+        }
+    }
+
+    if !to_remove.is_empty() {
+        holders.retain(|h| !to_remove.contains(&(h.start_line, h.end_line, h.holder.clone())));
+    }
+    if !to_add.is_empty() {
+        holders.extend(to_add);
+        dedupe_exact_span_holders(holders);
+    }
+}
+
 fn add_karlsruhe_university_short_variants(
     copyrights: &mut Vec<CopyrightDetection>,
     holders: &mut Vec<HolderDetection>,

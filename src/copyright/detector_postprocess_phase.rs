@@ -161,5 +161,6 @@ pub(super) fn run_phase_postprocess(
     super::add_missing_holder_from_single_copyright(copyrights, holders);
 
     super::drop_shadowed_acronym_location_suffix_copyrights_same_span(copyrights);
+    super::split_multiline_holder_lists_from_copyright_email_sequences(copyrights, holders);
     super::drop_copyright_like_holders(holders);
 }
