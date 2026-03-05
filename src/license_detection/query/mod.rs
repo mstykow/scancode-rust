@@ -334,10 +334,11 @@ impl<'a> Query<'a> {
         // in Phase 4 (mod.rs:286) handles this. query.subtract() is called after
         // near-dupe matches (mod.rs:252) to update high/low_matchables.
         //
-        // TODO: Temporarily disabled - causes 26 regressions (96 → 122 failures)
-        // due to candidate selection issue in early query runs. The splitting logic
-        // works correctly, but candidates from earlier runs aren't properly filtered
-        // when checking against later runs' matched_qspans. Re-enable once fixed.
+        // TODO: QueryRun causes 37 regressions due to issues with multi-license
+        // detection in files with large junk sections. The candidate selection
+        // fix (preferring higher coverage) is correct and has been kept.
+        // QueryRun needs further investigation before re-enabling.
+        //
         // let query_runs = Self::compute_query_runs(
         //     &tokens,
         //     &tokens_by_line,

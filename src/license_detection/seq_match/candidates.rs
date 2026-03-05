@@ -97,21 +97,17 @@ impl Ord for Candidate {
         // 1. Compare rounded (svr) first
         // 2. Then compare full (svf) if rounded is equal
         //
-        // TIEBREAKERS (when scores are equal):
-        // When two candidates have similar scores, prefer the more specific license.
-        // This fixes cases like:
-        // - cc-by-nc-4.0 vs cc-by-4.0 (NC variant has additional restriction)
-        // - bsd-simplified vs bsd-new (2-clause vs 3-clause)
-        // - php-3.01 vs php-3.0 (minor version update)
+        // Python's filter_dupes uses rank_key = (sv_full, rule.identifier) with reverse=True
+        // This means: higher sv_full wins, then HIGHER identifier alphabetically wins
+        // Example: "cc-by-sa-1.0" > "cc-by-nc-sa-1.0" alphabetically, so SA wins tiebreaker
         //
-        // Specificity criteria (in order):
-        // 1. Longer rule text = more specific (more tokens to match)
-        // 2. Higher relevance = more specific rule
+        // CRITICAL: Python does NOT use rule length or relevance as tiebreakers.
+        // Adding extra tiebreakers causes bugs like preferring cc-by-nc-sa over cc-by-sa
+        // because NC-SA has shorter rule text.
         self.score_vec_rounded
             .cmp(&other.score_vec_rounded)
             .then_with(|| self.score_vec_full.cmp(&other.score_vec_full))
-            .then_with(|| self.rule.tokens.len().cmp(&other.rule.tokens.len()))
-            .then_with(|| self.rule.relevance.cmp(&other.rule.relevance))
+            .then_with(|| self.rule.identifier.cmp(&other.rule.identifier))
     }
 }
 
@@ -158,11 +154,11 @@ pub(super) fn filter_dupes(candidates: Vec<Candidate>) -> Vec<Candidate> {
 
     let mut result: Vec<Candidate> = Vec::new();
     for mut group in groups.into_values() {
+        // Python: duplicates = sorted(duplicates, reverse=True, key=lambda x: (sv_full, rule.identifier))
+        // Higher sv_full wins, then HIGHER identifier alphabetically (reverse=True)
         group.sort_by(|a, b| {
             b.score_vec_full
                 .cmp(&a.score_vec_full)
-                .then_with(|| b.rule.tokens.len().cmp(&a.rule.tokens.len()))
-                .then_with(|| b.rule.relevance.cmp(&a.rule.relevance))
                 .then_with(|| b.rule.identifier.cmp(&a.rule.identifier))
         });
         if let Some(best) = group.into_iter().next() {
@@ -383,26 +379,6 @@ pub fn compute_candidates_with_msets(
     }
 
     step1_candidates.sort_by(|a, b| b.1.cmp(&a.1));
-
-    // DEBUG: Log top candidates from step 1
-    eprintln!(
-        "\n=== STEP 1 CANDIDATES (set-based, top 20 of {}) ===",
-        step1_candidates.len()
-    );
-    for (i, (svr, svf, rid, rule, _)) in step1_candidates.iter().take(20).enumerate() {
-        eprintln!("{:2}. {} (rid={})", i + 1, rule.license_expression, rid);
-        eprintln!(
-            "    resemblance: {:.4}, containment: {:.4}, matched_len: {:.0}",
-            svf.resemblance, svf.containment, svf.matched_length
-        );
-    }
-
-    // Find cc-by-sa-1.0 in the list
-    for (i, (_, _, _, rule, _)) in step1_candidates.iter().enumerate() {
-        if rule.license_expression == "cc-by-sa-1.0" {
-            eprintln!("\nFound cc-by-sa-1.0 at position {} in Step 1", i + 1);
-        }
-    }
 
     step1_candidates.truncate(top_n * 10);
 
@@ -931,6 +907,156 @@ mod tests {
             filtered.len(),
             1,
             "Should keep only one candidate when all group keys match"
+        );
+    }
+
+    #[test]
+    fn test_alphabetical_tiebreaker_cc_by_sa_vs_nc_sa() {
+        let rule_sa = Rule {
+            identifier: "cc-by-sa-1.0.RULE".to_string(),
+            license_expression: "cc-by-sa-1.0".to_string(),
+            text: String::new(),
+            tokens: vec![0; 1960],
+            is_license_text: true,
+            is_license_notice: false,
+            is_license_reference: false,
+            is_license_tag: false,
+            is_license_intro: false,
+            is_license_clue: false,
+            is_false_positive: false,
+            is_required_phrase: false,
+            is_from_license: false,
+            relevance: 100,
+            minimum_coverage: None,
+            is_continuous: true,
+            referenced_filenames: None,
+            ignorable_urls: None,
+            ignorable_emails: None,
+            ignorable_copyrights: None,
+            ignorable_holders: None,
+            ignorable_authors: None,
+            language: None,
+            notes: None,
+            length_unique: 0,
+            high_length_unique: 0,
+            high_length: 0,
+            min_matched_length: 0,
+            min_high_matched_length: 0,
+            min_matched_length_unique: 0,
+            min_high_matched_length_unique: 0,
+            is_small: false,
+            is_tiny: false,
+            starts_with_license: false,
+            ends_with_license: false,
+            is_deprecated: false,
+            spdx_license_key: None,
+            other_spdx_license_keys: vec![],
+            required_phrase_spans: vec![],
+            stopwords_by_pos: std::collections::HashMap::new(),
+        };
+
+        let rule_nc_sa = Rule {
+            identifier: "cc-by-nc-sa-1.0.RULE".to_string(),
+            license_expression: "cc-by-nc-sa-1.0".to_string(),
+            text: String::new(),
+            tokens: vec![0; 1829],
+            is_license_text: true,
+            is_license_notice: false,
+            is_license_reference: false,
+            is_license_tag: false,
+            is_license_intro: false,
+            is_license_clue: false,
+            is_false_positive: false,
+            is_required_phrase: false,
+            is_from_license: false,
+            relevance: 100,
+            minimum_coverage: None,
+            is_continuous: true,
+            referenced_filenames: None,
+            ignorable_urls: None,
+            ignorable_emails: None,
+            ignorable_copyrights: None,
+            ignorable_holders: None,
+            ignorable_authors: None,
+            language: None,
+            notes: None,
+            length_unique: 0,
+            high_length_unique: 0,
+            high_length: 0,
+            min_matched_length: 0,
+            min_high_matched_length: 0,
+            min_matched_length_unique: 0,
+            min_high_matched_length_unique: 0,
+            is_small: false,
+            is_tiny: false,
+            starts_with_license: false,
+            ends_with_license: false,
+            is_deprecated: false,
+            spdx_license_key: None,
+            other_spdx_license_keys: vec![],
+            required_phrase_spans: vec![],
+            stopwords_by_pos: std::collections::HashMap::new(),
+        };
+
+        let candidate_sa = Candidate {
+            score_vec_rounded: ScoresVector {
+                is_highly_resemblant: true,
+                containment: 0.9,
+                resemblance: 0.8,
+                matched_length: 100.0,
+                rid: 1,
+            },
+            score_vec_full: ScoresVector {
+                is_highly_resemblant: true,
+                containment: 0.9,
+                resemblance: 0.8,
+                matched_length: 100.0,
+                rid: 1,
+            },
+            rid: 1,
+            rule: rule_sa,
+            high_set_intersection: HashSet::new(),
+        };
+
+        let candidate_nc_sa = Candidate {
+            score_vec_rounded: ScoresVector {
+                is_highly_resemblant: true,
+                containment: 0.9,
+                resemblance: 0.8,
+                matched_length: 100.0,
+                rid: 2,
+            },
+            score_vec_full: ScoresVector {
+                is_highly_resemblant: true,
+                containment: 0.9,
+                resemblance: 0.8,
+                matched_length: 100.0,
+                rid: 2,
+            },
+            rid: 2,
+            rule: rule_nc_sa,
+            high_set_intersection: HashSet::new(),
+        };
+
+        assert!(
+            candidate_sa > candidate_nc_sa,
+            "cc-by-sa-1.0 should rank higher than cc-by-nc-sa-1.0 due to alphabetical tiebreaker (with reverse=True, 's' > 'n' after 'cc-by-')"
+        );
+
+        let candidates = vec![candidate_nc_sa.clone(), candidate_sa.clone()];
+        let filtered = filter_dupes(candidates);
+
+        assert_eq!(
+            filtered.len(),
+            2,
+            "Different license expressions should create different groups"
+        );
+
+        let mut sorted = vec![candidate_nc_sa, candidate_sa];
+        sorted.sort_by(|a, b| b.cmp(a));
+        assert_eq!(
+            sorted[0].rule.license_expression, "cc-by-sa-1.0",
+            "cc-by-sa-1.0 should be ranked first (alphabetically higher with reverse sort)"
         );
     }
 }
