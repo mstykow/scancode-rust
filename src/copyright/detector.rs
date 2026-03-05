@@ -943,6 +943,110 @@ fn drop_comma_holders_shadowed_by_space_version_same_span(holders: &mut Vec<Hold
     });
 }
 
+fn normalize_company_suffix_period_holder_variants(holders: &mut Vec<HolderDetection>) {
+    if holders.len() < 2 {
+        return;
+    }
+
+    use std::collections::{HashMap, HashSet};
+
+    fn company_suffix_period_key(holder: &str) -> Option<String> {
+        let trimmed = holder.trim();
+        if trimmed.is_empty() {
+            return None;
+        }
+
+        let no_dot = trimmed.strip_suffix('.').unwrap_or(trimmed);
+        let token = no_dot
+            .split_whitespace()
+            .last()
+            .map(|t| t.trim_matches(|c: char| matches!(c, ',' | ';' | ':' | ')' | '(')))
+            .unwrap_or("");
+
+        if !matches!(
+            token.to_ascii_lowercase().as_str(),
+            "inc" | "corp" | "ltd" | "llc" | "co" | "llp"
+        ) {
+            return None;
+        }
+
+        Some(no_dot.to_ascii_lowercase())
+    }
+
+    fn has_trailing_period(holder: &str) -> bool {
+        holder.trim_end().ends_with('.')
+    }
+
+    #[derive(Clone)]
+    struct Occurrence {
+        key: String,
+        holder: String,
+        start_line: usize,
+        end_line: usize,
+        dotted: bool,
+    }
+
+    let occurrences: Vec<Occurrence> = holders
+        .iter()
+        .filter_map(|h| {
+            let key = company_suffix_period_key(&h.holder)?;
+            Some(Occurrence {
+                key,
+                holder: h.holder.clone(),
+                start_line: h.start_line,
+                end_line: h.end_line,
+                dotted: has_trailing_period(&h.holder),
+            })
+        })
+        .collect();
+
+    let mut canonical_by_key: HashMap<String, String> = HashMap::new();
+    let mut affected_spans_by_key: HashMap<String, HashSet<(usize, usize)>> = HashMap::new();
+
+    for i in 0..occurrences.len() {
+        for j in (i + 1)..occurrences.len() {
+            let a = &occurrences[i];
+            let b = &occurrences[j];
+            if a.key != b.key || a.dotted == b.dotted {
+                continue;
+            }
+            if a.start_line.abs_diff(b.start_line) > 1 || a.end_line.abs_diff(b.end_line) > 1 {
+                continue;
+            }
+
+            let canonical = if a.dotted { &a.holder } else { &b.holder };
+            canonical_by_key
+                .entry(a.key.clone())
+                .or_insert_with(|| canonical.clone());
+            affected_spans_by_key
+                .entry(a.key.clone())
+                .or_default()
+                .insert((a.start_line, a.end_line));
+            affected_spans_by_key
+                .entry(a.key.clone())
+                .or_default()
+                .insert((b.start_line, b.end_line));
+        }
+    }
+
+    for h in holders.iter_mut() {
+        let Some(key) = company_suffix_period_key(&h.holder) else {
+            continue;
+        };
+        let Some(canonical) = canonical_by_key.get(&key) else {
+            continue;
+        };
+        let Some(spans) = affected_spans_by_key.get(&key) else {
+            continue;
+        };
+        if spans.contains(&(h.start_line, h.end_line)) {
+            h.holder = canonical.clone();
+        }
+    }
+
+    dedupe_exact_span_holders(holders);
+}
+
 fn add_confidential_short_variants_late(
     copyrights: &mut Vec<CopyrightDetection>,
     holders: &mut Vec<HolderDetection>,

@@ -133,6 +133,7 @@ pub(super) fn run_phase_postprocess(
     super::drop_shadowed_linux_foundation_holder_copyrights_same_line(copyrights);
     super::add_bare_email_variants_for_escaped_angle_lines(raw_lines, copyrights);
     super::drop_comma_holders_shadowed_by_space_version_same_span(holders);
+    super::normalize_company_suffix_period_holder_variants(holders);
     super::add_confidential_short_variants_late(copyrights, holders);
     super::add_karlsruhe_university_short_variants(copyrights, holders);
     super::add_intel_and_sun_non_portions_variants(raw_lines, prepared_cache, copyrights);
