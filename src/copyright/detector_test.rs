@@ -3448,3 +3448,22 @@ fn test_issue_4736_camelcase_provider_not_author_false_positive() {
         "Unexpected provider false-positive authors: {author_values:?}"
     );
 }
+
+#[test]
+fn test_issue_3892_platformdirs_lowercase_holder_detected() {
+    let input = "Copyright (c) 2010-202x The platformdirs developers";
+    let (copyrights, holders, _authors) = detect_copyrights_from_text(input);
+
+    assert!(
+        copyrights.iter().any(|c| c
+            .copyright
+            .contains("2010-202x The platformdirs developers")),
+        "Expected platformdirs copyright, got: {copyrights:?}"
+    );
+    assert!(
+        holders
+            .iter()
+            .any(|h| h.holder == "The platformdirs developers"),
+        "Expected platformdirs holder, got: {holders:?}"
+    );
+}

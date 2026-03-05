@@ -53,7 +53,7 @@ pub(super) static COMPILED_PATTERNS: LazyLock<CompiledPatterns> = LazyLock::new(
 fn build_pattern_list() -> Vec<(String, PosTag)> {
     // Year sub-patterns (reused by multiple patterns)
     // Bug fix: Python uses 20[0-3][0-9] (2000-2039), we extend to 20[0-9][0-9] (2000-2099)
-    let year = r"(19[6-9][0-9]|20[0-9][0-9])";
+    let year = r"(19[6-9][0-9]|20[0-9][0-9]|20[0-9][xX])";
 
     // Bug fix: Python has [0-][0-9] which is a typo — should be [0-2][0-9]
     let year_short = r"([6-9][0-9]|[0-2][0-9])";
