@@ -79,6 +79,8 @@ pub struct LicenseDetectionEngine {
     spdx_mapping: SpdxMapping,
 }
 
+const MAX_DETECTION_SIZE: usize = 100 * 1024; // 100KB
+
 impl LicenseDetectionEngine {
     /// Create a new license detection engine from a directory of license rules.
     ///
@@ -132,7 +134,20 @@ impl LicenseDetectionEngine {
     /// A Result containing a vector of LicenseDetection objects
     pub fn detect(&self, text: &str, unknown_licenses: bool) -> Result<Vec<LicenseDetection>> {
         let clean_text = strip_utf8_bom_str(text);
-        let mut query = Query::new(clean_text, &self.index)?;
+
+        // Truncate content if too large - licenses rarely appear after 100KB
+        let content = if clean_text.len() > MAX_DETECTION_SIZE {
+            log::warn!(
+                "Content size {} exceeds limit {}, truncating for detection",
+                clean_text.len(),
+                MAX_DETECTION_SIZE
+            );
+            &clean_text[..MAX_DETECTION_SIZE]
+        } else {
+            clean_text
+        };
+
+        let mut query = Query::new(content, &self.index)?;
 
         let mut all_matches = Vec::new();
         let mut matched_qspans: Vec<query::PositionSpan> = Vec::new();
@@ -393,7 +408,20 @@ impl LicenseDetectionEngine {
     /// A Result containing a vector of LicenseMatch objects (ungrouped)
     pub fn detect_matches(&self, text: &str, unknown_licenses: bool) -> Result<Vec<LicenseMatch>> {
         let clean_text = strip_utf8_bom_str(text);
-        let mut query = Query::new(clean_text, &self.index)?;
+
+        // Truncate content if too large - licenses rarely appear after 100KB
+        let content = if clean_text.len() > MAX_DETECTION_SIZE {
+            log::warn!(
+                "Content size {} exceeds limit {}, truncating for detection",
+                clean_text.len(),
+                MAX_DETECTION_SIZE
+            );
+            &clean_text[..MAX_DETECTION_SIZE]
+        } else {
+            clean_text
+        };
+
+        let mut query = Query::new(content, &self.index)?;
 
         let mut all_matches = Vec::new();
         let mut matched_qspans: Vec<query::PositionSpan> = Vec::new();
