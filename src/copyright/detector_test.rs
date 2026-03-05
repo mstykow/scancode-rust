@@ -3467,3 +3467,21 @@ fn test_issue_3892_platformdirs_lowercase_holder_detected() {
         "Expected platformdirs holder, got: {holders:?}"
     );
 }
+#[test]
+fn test_issue_3659_square_c_sign_detected() {
+    let input = "[C] The Regents of the University of Michigan and Merit Network, Inc. 1992, 1993, 1994, 1995 All Rights Reserved";
+    let (copyrights, holders, _authors) = detect_copyrights_from_text(input);
+
+    assert!(
+        copyrights.iter().any(|c| c
+            .copyright
+            .contains("Regents of the University of Michigan")),
+        "Expected Regents copyright detection, got: {copyrights:?}"
+    );
+    assert!(
+        holders
+            .iter()
+            .any(|h| h.holder.contains("Regents of the University of Michigan")),
+        "Expected Regents holder detection, got: {holders:?}"
+    );
+}
