@@ -5060,6 +5060,94 @@ fn recover_template_literal_year_range_copyrights(
     }
 }
 
+fn drop_url_embedded_suffix_variants_same_span(
+    copyrights: &mut Vec<CopyrightDetection>,
+    holders: &mut Vec<HolderDetection>,
+) {
+    if !copyrights.is_empty() {
+        let mut drop: HashSet<(usize, usize, String)> = HashSet::new();
+
+        for longer in copyrights.iter() {
+            let longer_lower = longer.copyright.to_ascii_lowercase();
+            if !(longer_lower.contains("http://") || longer_lower.contains("https://")) {
+                continue;
+            }
+
+            for shorter in copyrights.iter() {
+                if longer.start_line != shorter.start_line || longer.end_line != shorter.end_line {
+                    continue;
+                }
+                if longer.copyright == shorter.copyright {
+                    continue;
+                }
+
+                let short = shorter.copyright.trim();
+                if !longer.copyright.starts_with(short) {
+                    continue;
+                }
+
+                let tail = longer.copyright[short.len()..]
+                    .trim_start()
+                    .to_ascii_lowercase();
+                if tail.starts_with("see url")
+                    || tail.starts_with("url ")
+                    || tail.starts_with("http")
+                {
+                    drop.insert((longer.start_line, longer.end_line, longer.copyright.clone()));
+                    break;
+                }
+            }
+        }
+
+        if !drop.is_empty() {
+            copyrights.retain(|c| !drop.contains(&(c.start_line, c.end_line, c.copyright.clone())));
+        }
+    }
+
+    if !holders.is_empty() {
+        let mut drop: HashSet<(usize, usize, String)> = HashSet::new();
+
+        for longer in holders.iter() {
+            let longer_lower = longer.holder.to_ascii_lowercase();
+            if !(longer_lower.contains(" see url")
+                || longer_lower.contains(" http://")
+                || longer_lower.contains(" https://"))
+            {
+                continue;
+            }
+
+            for shorter in holders.iter() {
+                if longer.start_line != shorter.start_line || longer.end_line != shorter.end_line {
+                    continue;
+                }
+                if longer.holder == shorter.holder {
+                    continue;
+                }
+
+                let short = shorter.holder.trim();
+                if !longer.holder.starts_with(short) {
+                    continue;
+                }
+
+                let tail = longer.holder[short.len()..]
+                    .trim_start()
+                    .to_ascii_lowercase();
+                if tail.starts_with("see url")
+                    || tail.starts_with("url ")
+                    || tail.starts_with("http")
+                {
+                    drop.insert((longer.start_line, longer.end_line, longer.holder.clone()));
+                    break;
+                }
+            }
+        }
+
+        if !drop.is_empty() {
+            holders.retain(|h| !drop.contains(&(h.start_line, h.end_line, h.holder.clone())));
+        }
+    }
+}
+
 fn extract_following_authors_holders(content: &str, holders: &mut Vec<HolderDetection>) {
     if content.is_empty() {
         return;
