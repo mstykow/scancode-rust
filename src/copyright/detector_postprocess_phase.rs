@@ -69,6 +69,7 @@ pub(super) fn run_phase_postprocess(
         copyrights,
     );
     super::extend_copyrights_with_next_line_parenthesized_obfuscated_email(raw_lines, copyrights);
+    super::extend_copyrights_with_following_all_rights_reserved_line(raw_lines, copyrights);
 
     super::drop_symbol_year_only_copyrights(content, copyrights);
 
