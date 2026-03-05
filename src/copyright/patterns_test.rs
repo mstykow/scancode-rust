@@ -177,6 +177,7 @@ fn test_year_patterns() {
     assert_eq!(p.match_token("2024"), PosTag::Yr);
     assert_eq!(p.match_token("1999"), PosTag::Yr);
     assert_eq!(p.match_token("1960"), PosTag::Yr);
+    assert_eq!(p.match_token("202x"), PosTag::Yr);
     // Bug fix: beyond Python's 2039 limit
     assert_eq!(p.match_token("2040"), PosTag::Yr);
     assert_eq!(p.match_token("2099"), PosTag::Yr);
@@ -186,6 +187,7 @@ fn test_year_patterns() {
 fn test_year_ranges() {
     let p = &*COMPILED_PATTERNS;
     assert_eq!(p.match_token("2020-2024"), PosTag::Yr);
+    assert_eq!(p.match_token("2010-202x"), PosTag::Yr);
     assert_eq!(p.match_token("1999,2000"), PosTag::Yr);
     assert_eq!(p.match_token("2020-present"), PosTag::Yr);
 }
