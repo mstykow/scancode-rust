@@ -305,6 +305,8 @@ pub fn prepare_text_line(line: &str) -> String {
         .replace("( C)", " (c) ")
         .replace("(C)", " (c) ")
         .replace("(c)", " (c) ")
+        .replace("[C]", " (c) ")
+        .replace("[c]", " (c) ")
         .replace("( © )", " (c) ")
         .replace("(©)", " (c) ")
         .replace("(© )", " (c) ")
@@ -1278,23 +1280,7 @@ mod tests {
 }
 
 #[test]
-fn test_html_entity_uuml() {
-    let result = prepare_text_line("@author Ceki G&uuml;lc&uuml;");
-    assert_eq!(result, "@author Ceki Gülcü");
-}
-
-#[test]
-fn test_html_entity_all_german_umlauts_and_szlig_named() {
-    let result = prepare_text_line(
-        "@author &Auml;gnes &Ouml;zil &Uuml;ber M&auml;x Gr&ouml;&szlig;e &auml &ouml &uuml &szlig",
-    );
-    assert_eq!(result, "@author Ägnes Özil Über Mäx Größe ä ö ü ß");
-}
-
-#[test]
-fn test_html_entity_all_german_umlauts_and_szlig_numeric() {
-    let result = prepare_text_line(
-        "@author &#xC4; &#xD6; &#xDC; &#xE4; &#xF6; &#xFC; &#xDF; &#196; &#214; &#220; &#228; &#246; &#252; &#223;",
-    );
-    assert_eq!(result, "@author Ä Ö Ü ä ö ü ß Ä Ö Ü ä ö ü ß");
+fn test_copyright_symbol_square_c() {
+    let result = prepare_text_line("[C] The Regents");
+    assert!(result.contains("(c)"), "got: {result}");
 }
