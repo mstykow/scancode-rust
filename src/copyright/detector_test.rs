@@ -3530,3 +3530,25 @@ fn test_normalize_company_suffix_period_holder_variants() {
         "holders: {holders:?}"
     );
 }
+
+#[test]
+fn test_split_multiline_holder_list_with_emails() {
+    let input = "(c) 1999                Terrehon Bowden <terrehon@pacbell.net>\n                        Bodo Bauer <bb@ricochet.net>\n";
+
+    let (_copyrights, holders, _authors) = detect_copyrights_from_text(input);
+
+    assert!(
+        holders.iter().any(|h| h.holder == "Terrehon Bowden"),
+        "holders: {holders:?}"
+    );
+    assert!(
+        holders.iter().any(|h| h.holder == "Bodo Bauer"),
+        "holders: {holders:?}"
+    );
+    assert!(
+        !holders
+            .iter()
+            .any(|h| h.holder == "Terrehon Bowden Bodo Bauer"),
+        "holders: {holders:?}"
+    );
+}
