@@ -1,0 +1,11 @@
+what:
+  - holders
+  - holders_summary
+holders:
+  - Terrehon Bowden
+  - Bodo Bauer
+holders_summary:
+  - value: Bodo Bauer
+    count: 1
+  - value: Terrehon Bowden
+    count: 1
