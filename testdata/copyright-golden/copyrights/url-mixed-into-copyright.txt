@@ -1,0 +1,1 @@
+/* Copyright (c) 2020 Example Corp. See url("https://dummy-url-for-test.com") */
