@@ -8,7 +8,7 @@ use std::collections::HashSet;
 use crate::license_detection::models::LicenseMatch;
 use crate::license_detection::query::Query;
 
-const MAX_DIST: usize = 100;
+const MAX_DIST: usize = 50;
 
 fn combine_matches(a: &LicenseMatch, b: &LicenseMatch) -> LicenseMatch {
     assert_eq!(
