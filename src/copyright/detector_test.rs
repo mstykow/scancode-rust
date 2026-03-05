@@ -3415,3 +3415,15 @@ fn test_issue_4724_url_with_c_symbol_not_copyright() {
     );
     assert!(holders.is_empty(), "Unexpected holders: {holders:?}");
 }
+#[test]
+fn test_extract_module_author_macro() {
+    let input = "MODULE_AUTHOR(\"Linux Foundation <lf@example.org>\");";
+    let (_copyrights, _holders, authors) = detect_copyrights_from_text(input);
+
+    assert!(
+        authors
+            .iter()
+            .any(|a| a.author == "Linux Foundation <lf@example.org>"),
+        "authors: {authors:?}"
+    );
+}
