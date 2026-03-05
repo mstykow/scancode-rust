@@ -3519,3 +3519,14 @@ fn test_issue_4755_markdown_transition_line_not_author() {
         "authors: {authors:?}"
     );
 }
+#[test]
+fn test_normalize_company_suffix_period_holder_variants() {
+    let input = "Copyright (c) 2020 Foo, Inc\nCopyright (c) 2021 Foo, Inc.";
+    let (_copyrights, holders, _authors) = detect_copyrights_from_text(input);
+
+    assert_eq!(holders.len(), 2, "holders: {holders:?}");
+    assert!(
+        holders.iter().all(|h| h.holder == "Foo, Inc."),
+        "holders: {holders:?}"
+    );
+}
