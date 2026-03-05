@@ -4978,90 +4978,84 @@ fn drop_url_embedded_c_symbol_false_positive_holders(
     });
 }
 
-fn drop_url_embedded_suffix_variants_same_span(
+fn recover_template_literal_year_range_copyrights(
+    content: &str,
     copyrights: &mut Vec<CopyrightDetection>,
     holders: &mut Vec<HolderDetection>,
 ) {
-    if !copyrights.is_empty() {
-        let mut drop: HashSet<(usize, usize, String)> = HashSet::new();
-
-        for longer in copyrights.iter() {
-            let longer_lower = longer.copyright.to_ascii_lowercase();
-            if !(longer_lower.contains("http://") || longer_lower.contains("https://")) {
-                continue;
-            }
-
-            for shorter in copyrights.iter() {
-                if longer.start_line != shorter.start_line || longer.end_line != shorter.end_line {
-                    continue;
-                }
-                if longer.copyright == shorter.copyright {
-                    continue;
-                }
-
-                let short = shorter.copyright.trim();
-                if !longer.copyright.starts_with(short) {
-                    continue;
-                }
-
-                let tail = longer.copyright[short.len()..]
-                    .trim_start()
-                    .to_ascii_lowercase();
-                if tail.starts_with("see url")
-                    || tail.starts_with("url ")
-                    || tail.starts_with("http")
-                {
-                    drop.insert((longer.start_line, longer.end_line, longer.copyright.clone()));
-                    break;
-                }
-            }
-        }
-
-        if !drop.is_empty() {
-            copyrights.retain(|c| !drop.contains(&(c.start_line, c.end_line, c.copyright.clone())));
-        }
+    if content.is_empty() {
+        return;
     }
 
-    if !holders.is_empty() {
-        let mut drop: HashSet<(usize, usize, String)> = HashSet::new();
+    static TEMPLATE_COPY_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(
+            r#"(?ix)
+            \bcopyright\s+
+            (?P<start>(?:19|20)\d{2})
+            \s*[\-–]\s*
+            (?P<templ>\$\{[^}\r\n]+\})
+            \s+
+            (?P<holder>[^`"'<>\{\}\r\n]+?)
+            (?:\s*[`"']\s*)?$
+        "#,
+        )
+        .expect("valid template literal copyright regex")
+    });
 
-        for longer in holders.iter() {
-            let longer_lower = longer.holder.to_ascii_lowercase();
-            if !(longer_lower.contains(" see url")
-                || longer_lower.contains(" http://")
-                || longer_lower.contains(" https://"))
-            {
-                continue;
-            }
+    let mut seen_copyrights: HashSet<String> =
+        copyrights.iter().map(|c| c.copyright.clone()).collect();
+    let mut seen_holders: HashSet<String> = holders.iter().map(|h| h.holder.clone()).collect();
 
-            for shorter in holders.iter() {
-                if longer.start_line != shorter.start_line || longer.end_line != shorter.end_line {
-                    continue;
-                }
-                if longer.holder == shorter.holder {
-                    continue;
-                }
-
-                let short = shorter.holder.trim();
-                if !longer.holder.starts_with(short) {
-                    continue;
-                }
-
-                let tail = longer.holder[short.len()..]
-                    .trim_start()
-                    .to_ascii_lowercase();
-                if tail.starts_with("see url")
-                    || tail.starts_with("url ")
-                    || tail.starts_with("http")
-                {
-                    drop.insert((longer.start_line, longer.end_line, longer.holder.clone()));
-                    break;
-                }
-            }
+    for (idx, raw_line) in content.lines().enumerate() {
+        if !(raw_line.contains("Copyright") || raw_line.contains("copyright")) {
+            continue;
+        }
+        if !raw_line.contains("${") {
+            continue;
         }
 
-        if !drop.is_empty() {
-            holders.retain(|h| !drop.contains(&(h.start_line, h.end_line, h.holder.clone())));
+        let Some(cap) = TEMPLATE_COPY_RE.captures(raw_line.trim()) else {
+            continue;
+        };
+
+        let ln = idx + 1;
+        let start = cap.name("start").map(|m| m.as_str()).unwrap_or("").trim();
+        let templ = cap.name("templ").map(|m| m.as_str()).unwrap_or("").trim();
+        let holder_raw = cap.name("holder").map(|m| m.as_str()).unwrap_or("").trim();
+        if start.is_empty() || templ.is_empty() || holder_raw.is_empty() {
+            continue;
+        }
+        let templ_lower = templ.to_ascii_lowercase();
+        if !(templ_lower.contains("new date") && templ_lower.contains("getutcfullyear")) {
+            continue;
+        }
+
+        let Some(holder) = refine_holder_in_copyright_context(holder_raw) else {
+            continue;
+        };
+
+        let copyright_text = format!("Copyright {start}-{templ} {holder}");
+        if seen_copyrights.insert(copyright_text.clone()) {
+            copyrights.push(CopyrightDetection {
+                copyright: copyright_text,
+                start_line: ln,
+                end_line: ln,
+            });
+        }
+
+        let truncated = format!("Copyright {start}-$");
+        copyrights.retain(|c| {
+            !(c.start_line == ln
+                && c.end_line == ln
+                && c.copyright.eq_ignore_ascii_case(&truncated))
+        });
+
+        if seen_holders.insert(holder.clone()) {
+            holders.push(HolderDetection {
+                holder,
+                start_line: ln,
+                end_line: ln,
+            });
         }
     }
 }
