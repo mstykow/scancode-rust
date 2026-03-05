@@ -1359,3 +1359,68 @@ pub(super) fn drop_written_by_authors_preceded_by_copyright(
     }
     authors.retain(|a| !to_drop.contains(&a.author));
 }
+
+pub(super) fn extract_dense_name_email_author_lists(
+    content: &str,
+    authors: &mut Vec<AuthorDetection>,
+) {
+    if content.is_empty() {
+        return;
+    }
+
+    let lower = content.to_ascii_lowercase();
+    if lower.contains("copyright") || lower.contains("(c)") {
+        return;
+    }
+
+    static NAME_EMAIL_LINE_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r"^(?P<name>[^<\n]{2,120})\s*<(?P<email>[^>\s]+@[^>\s]+)>\s*$").unwrap()
+    });
+
+    let mut non_empty_lines: Vec<(usize, String)> = Vec::new();
+    for (idx, raw) in content.lines().enumerate() {
+        let prepared = crate::copyright::prepare::prepare_text_line(raw);
+        let line = prepared.trim();
+        if line.is_empty() {
+            continue;
+        }
+        non_empty_lines.push((idx + 1, line.to_string()));
+    }
+    if non_empty_lines.len() < 2 {
+        return;
+    }
+
+    let mut matched: Vec<(usize, String)> = Vec::new();
+    for (ln, line) in &non_empty_lines {
+        let Some(cap) = NAME_EMAIL_LINE_RE.captures(line) else {
+            continue;
+        };
+        let name = cap.name("name").map(|m| m.as_str()).unwrap_or("").trim();
+        let email = cap.name("email").map(|m| m.as_str()).unwrap_or("").trim();
+        if name.is_empty() || email.is_empty() {
+            continue;
+        }
+        matched.push((*ln, format!("{name} <{email}>")));
+    }
+
+    if matched.len() < 2 {
+        return;
+    }
+    if matched.len() * 2 < non_empty_lines.len() {
+        return;
+    }
+
+    let mut seen: HashSet<String> = authors.iter().map(|a| a.author.clone()).collect();
+    for (ln, candidate) in matched {
+        let Some(author) = refine_author(&candidate) else {
+            continue;
+        };
+        if seen.insert(author.clone()) {
+            authors.push(AuthorDetection {
+                author,
+                start_line: ln,
+                end_line: ln,
+            });
+        }
+    }
+}
