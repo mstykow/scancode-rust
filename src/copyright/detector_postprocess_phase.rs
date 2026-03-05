@@ -43,6 +43,7 @@ pub(super) fn run_phase_postprocess(
     super::author_heuristics::extract_with_additional_hacking_by_authors(content, authors);
     super::author_heuristics::extract_developed_and_created_by_authors(content, authors);
     super::author_heuristics::extract_author_colon_blocks(content, authors);
+    super::author_heuristics::extract_module_author_macros(content, copyrights, holders, authors);
     super::author_heuristics::extract_code_written_by_author_blocks(content, authors);
     super::author_heuristics::extract_converted_to_by_authors(content, authors);
     super::author_heuristics::extract_various_bugfixes_and_enhancements_by_authors(

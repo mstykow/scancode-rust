@@ -5,7 +5,7 @@ use regex::Regex;
 
 use super::normalize_whitespace;
 use crate::copyright::refiner::refine_author;
-use crate::copyright::types::{AuthorDetection, CopyrightDetection};
+use crate::copyright::types::{AuthorDetection, CopyrightDetection, HolderDetection};
 
 pub(super) fn extract_multiline_written_by_author_blocks(
     content: &str,
@@ -159,6 +159,51 @@ pub(super) fn extract_multiline_written_by_author_blocks(
         }
 
         i = j;
+    }
+}
+
+pub(super) fn extract_module_author_macros(
+    content: &str,
+    copyrights: &[CopyrightDetection],
+    holders: &[HolderDetection],
+    authors: &mut Vec<AuthorDetection>,
+) {
+    if content.is_empty() {
+        return;
+    }
+    if !copyrights.is_empty() || !holders.is_empty() || !authors.is_empty() {
+        return;
+    }
+
+    static MODULE_AUTHOR_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r#"(?i)MODULE_AUTHOR\s*\(\s*\"(?P<who>[^\"]+)\"\s*\)"#).unwrap()
+    });
+
+    let mut seen: HashSet<String> = authors.iter().map(|a| a.author.clone()).collect();
+    for (idx, raw) in content.lines().enumerate() {
+        let ln = idx + 1;
+        let line = raw.trim();
+        if line.is_empty() || !line.contains("MODULE_AUTHOR") {
+            continue;
+        }
+
+        for cap in MODULE_AUTHOR_RE.captures_iter(line) {
+            let who = cap.name("who").map(|m| m.as_str()).unwrap_or("").trim();
+            if who.is_empty() {
+                continue;
+            }
+            let who = who.replace(r#"\""#, "\"");
+            let Some(author) = refine_author(&who) else {
+                continue;
+            };
+            if seen.insert(author.clone()) {
+                authors.push(AuthorDetection {
+                    author,
+                    start_line: ln,
+                    end_line: ln,
+                });
+            }
+        }
     }
 }
 
