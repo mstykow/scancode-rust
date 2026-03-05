@@ -8,12 +8,15 @@ copyrights:
   - Copyright 2002 OProfile authors
 holders:
   - Ganesh Venkitachalam
-  - Hewlett Packard Co Stephane Eranian David Mosberger-Tang
+  - Hewlett Packard Co Stephane Eranian
+  - David Mosberger-Tang
   - OProfile authors
 holders_summary:
   - value: Ganesh Venkitachalam
     count: 1
-  - value: Hewlett Packard Co Stephane Eranian David Mosberger-Tang
+  - value: Hewlett Packard Co Stephane Eranian
+    count: 1
+  - value: David Mosberger-Tang
     count: 1
   - value: OProfile authors
     count: 1
