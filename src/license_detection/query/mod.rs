@@ -725,7 +725,7 @@ impl<'a> Query<'a> {
 ///
 /// Based on Python QueryRun class at:
 /// reference/scancode-toolkit/src/licensedcode/query.py (lines 720-914)
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct QueryRun<'a> {
     query: &'a Query<'a>,
     pub start: usize,
