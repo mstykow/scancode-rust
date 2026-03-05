@@ -1,9 +1,9 @@
 //! Candidate selection using set and multiset similarity.
 
-use crate::license_detection::index::LicenseIndex;
 use crate::license_detection::index::token_sets::{
     build_set_and_mset, high_multiset_subset, high_tids_set_subset, tids_set_counter,
 };
+use crate::license_detection::index::LicenseIndex;
 use crate::license_detection::models::Rule;
 use crate::license_detection::query::QueryRun;
 use std::collections::{HashMap, HashSet};
@@ -383,6 +383,27 @@ pub fn compute_candidates_with_msets(
     }
 
     step1_candidates.sort_by(|a, b| b.1.cmp(&a.1));
+
+    // DEBUG: Log top candidates from step 1
+    eprintln!(
+        "\n=== STEP 1 CANDIDATES (set-based, top 20 of {}) ===",
+        step1_candidates.len()
+    );
+    for (i, (svr, svf, rid, rule, _)) in step1_candidates.iter().take(20).enumerate() {
+        eprintln!("{:2}. {} (rid={})", i + 1, rule.license_expression, rid);
+        eprintln!(
+            "    resemblance: {:.4}, containment: {:.4}, matched_len: {:.0}",
+            svf.resemblance, svf.containment, svf.matched_length
+        );
+    }
+
+    // Find cc-by-sa-1.0 in the list
+    for (i, (_, _, _, rule, _)) in step1_candidates.iter().enumerate() {
+        if rule.license_expression == "cc-by-sa-1.0" {
+            eprintln!("\nFound cc-by-sa-1.0 at position {} in Step 1", i + 1);
+        }
+    }
+
     step1_candidates.truncate(top_n * 10);
 
     let mut sortable_candidates: Vec<Candidate> = Vec::new();

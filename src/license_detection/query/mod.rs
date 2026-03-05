@@ -333,13 +333,19 @@ impl<'a> Query<'a> {
         // Double-matching prevention: is_matchable() with matched_qspans exclusion
         // in Phase 4 (mod.rs:286) handles this. query.subtract() is called after
         // near-dupe matches (mod.rs:252) to update high/low_matchables.
-        let query_runs = Self::compute_query_runs(
-            &tokens,
-            &tokens_by_line,
-            _line_threshold,
-            len_legalese,
-            &index.digit_only_tids,
-        );
+        //
+        // TODO: Temporarily disabled - causes 26 regressions (96 → 122 failures)
+        // due to candidate selection issue in early query runs. The splitting logic
+        // works correctly, but candidates from earlier runs aren't properly filtered
+        // when checking against later runs' matched_qspans. Re-enable once fixed.
+        // let query_runs = Self::compute_query_runs(
+        //     &tokens,
+        //     &tokens_by_line,
+        //     _line_threshold,
+        //     len_legalese,
+        //     &index.digit_only_tids,
+        // );
+        let query_runs = Vec::new();
 
         Ok(Query {
             text: text.to_string(),
