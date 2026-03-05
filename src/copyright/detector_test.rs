@@ -3607,7 +3607,7 @@ fn test_drop_url_embedded_suffix_copyright_and_holder_variants() {
 }
 
 #[test]
-fn test_issue_2512_extract_authors_from_dense_name_email_list() {
+fn test_extract_authors_from_dense_name_email_list() {
     let input = "John Doe <john@example.com>\nJane Smith <jane@example.com>\n";
     let (_copyrights, _holders, authors) = detect_copyrights_from_text(input);
 
