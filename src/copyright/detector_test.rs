@@ -3552,3 +3552,26 @@ fn test_split_multiline_holder_list_with_emails() {
         "holders: {holders:?}"
     );
 }
+
+#[test]
+fn test_issue_3741_extend_copyright_with_following_all_rights_reserved_line() {
+    let input = "Copyright 2010-2015 Mike Bostock\nAll rights reserved.";
+    let (copyrights, holders, _authors) = detect_copyrights_from_text(input);
+
+    assert!(
+        copyrights
+            .iter()
+            .any(|c| c.copyright == "Copyright 2010-2015 Mike Bostock"),
+        "copyrights: {copyrights:?}"
+    );
+    assert!(
+        copyrights
+            .iter()
+            .any(|c| c.start_line == 1 && c.end_line == 2),
+        "copyrights: {copyrights:?}"
+    );
+    assert!(
+        holders.iter().any(|h| h.holder == "Mike Bostock"),
+        "holders: {holders:?}"
+    );
+}
