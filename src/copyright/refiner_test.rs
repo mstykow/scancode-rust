@@ -1213,3 +1213,13 @@ fn test_refine_copyright_strips_trailing_digit_then_period() {
         Some("(c) 1985 Waterloo Micro".to_string())
     );
 }
+
+#[test]
+fn test_refine_author_drops_d3_transition_markdown_link_fragment() {
+    assert_eq!(
+        refine_author(
+            "transition .transition https://github.com/d3/d3-transition/blob/master/README.md"
+        ),
+        None
+    );
+}

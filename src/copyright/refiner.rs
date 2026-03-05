@@ -225,6 +225,7 @@ static AUTHORS_JUNK_PATTERNS: LazyLock<Vec<Regex>> = LazyLock::new(|| {
         r"(?i)^who\s+hopes\b",
         r"(?i)^so preceded by\b",
         r"(?i)^bounce, so we\b",
+        r"(?i)^transition\s+\.transition\s+https?://github\.com/d3/d3-transition/blob/master/README\.md(?:#\w+)?$",
     ];
     patterns.iter().filter_map(|p| Regex::new(p).ok()).collect()
 });

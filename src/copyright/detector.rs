@@ -4728,7 +4728,7 @@ fn drop_url_embedded_c_symbol_false_positive_holders(
     });
 }
 
-fn extract_c_symbol_holder_then_years_lines(
+fn recover_template_literal_year_range_copyrights(
     content: &str,
     copyrights: &mut Vec<CopyrightDetection>,
     holders: &mut Vec<HolderDetection>,
@@ -4737,11 +4737,19 @@ fn extract_c_symbol_holder_then_years_lines(
         return;
     }
 
-    static C_HOLDER_YEARS_RE: LazyLock<Regex> = LazyLock::new(|| {
+    static TEMPLATE_COPY_RE: LazyLock<Regex> = LazyLock::new(|| {
         Regex::new(
-            r"(?i)^\(c\)\s+(?P<holder>.+?)\s+(?P<years>(?:19|20)\d{2}(?:\s*,\s*(?:19|20)\d{2}){1,})\b(?:\s+all\s+rights\s+reserved\.?\s*)?$",
+            r#"(?ix)
+            \bcopyright\s+
+            (?P<start>(?:19|20)\d{2})
+            \s*[\-–]\s*
+            (?P<templ>\$\{[^}\r\n]+\})
+            \s+
+            (?P<holder>[^`"'<>\{\}\r\n]+?)
+            (?:\s*[`"']\s*)?$
+        "#,
         )
-        .expect("valid (c) holder years regex")
+        .expect("valid template literal copyright regex")
     });
 
     let mut seen_copyrights: HashSet<String> =
@@ -4749,26 +4757,34 @@ fn extract_c_symbol_holder_then_years_lines(
     let mut seen_holders: HashSet<String> = holders.iter().map(|h| h.holder.clone()).collect();
 
     for (idx, raw_line) in content.lines().enumerate() {
-        if !raw_line.contains("[C]") && !raw_line.contains("[c]") {
+        if !(raw_line.contains("Copyright") || raw_line.contains("copyright")) {
             continue;
         }
-        let ln = idx + 1;
-        let prepared = crate::copyright::prepare::prepare_text_line(raw_line);
-        let line = prepared.trim();
-        let Some(cap) = C_HOLDER_YEARS_RE.captures(line) else {
+        if !raw_line.contains("${") {
+            continue;
+        }
+
+        let Some(cap) = TEMPLATE_COPY_RE.captures(raw_line.trim()) else {
             continue;
         };
 
+        let ln = idx + 1;
+        let start = cap.name("start").map(|m| m.as_str()).unwrap_or("").trim();
+        let templ = cap.name("templ").map(|m| m.as_str()).unwrap_or("").trim();
         let holder_raw = cap.name("holder").map(|m| m.as_str()).unwrap_or("").trim();
-        let years = cap.name("years").map(|m| m.as_str()).unwrap_or("").trim();
-        if holder_raw.is_empty() || years.is_empty() {
+        if start.is_empty() || templ.is_empty() || holder_raw.is_empty() {
+            continue;
+        }
+        let templ_lower = templ.to_ascii_lowercase();
+        if !(templ_lower.contains("new date") && templ_lower.contains("getutcfullyear")) {
             continue;
         }
 
-        let holder = refine_holder_in_copyright_context(holder_raw)
-            .unwrap_or_else(|| holder_raw.to_string());
-        let copyright_text = format!("Copyright (c) {holder} {years}");
+        let Some(holder) = refine_holder_in_copyright_context(holder_raw) else {
+            continue;
+        };
 
+        let copyright_text = format!("Copyright {start}-{templ} {holder}");
         if seen_copyrights.insert(copyright_text.clone()) {
             copyrights.push(CopyrightDetection {
                 copyright: copyright_text,
@@ -4776,6 +4792,14 @@ fn extract_c_symbol_holder_then_years_lines(
                 end_line: ln,
             });
         }
+
+        let truncated = format!("Copyright {start}-$");
+        copyrights.retain(|c| {
+            !(c.start_line == ln
+                && c.end_line == ln
+                && c.copyright.eq_ignore_ascii_case(&truncated))
+        });
+
         if seen_holders.insert(holder.clone()) {
             holders.push(HolderDetection {
                 holder,
@@ -6653,7 +6677,7 @@ fn extract_standalone_c_holder_year_lines(
 ) {
     static STANDALONE_C_HOLDER_YEAR_RE: LazyLock<Regex> = LazyLock::new(|| {
         Regex::new(
-            r"^\(c\)\s+(?P<holder>[A-Z0-9][A-Za-z0-9 ,&'\-\.]*)\s+(?P<year>19[6-9]\d|20\d{2})\s*$",
+            r"^\(c\)\s+(?P<holder>[A-Z0-9][A-Za-z0-9 ,&'\-\.]*?)\s+(?P<years>(?:19\d{2}|20\d{2})(?:\s*,\s*(?:19\d{2}|20\d{2}))*)\s*(?:[Aa]ll\s+[Rr]ights\s+[Rr]eserved)?\s*$",
         )
         .unwrap()
     });
@@ -6674,15 +6698,16 @@ fn extract_standalone_c_holder_year_lines(
         for idx in 0..group.len() {
             let (ln, line) = &group[idx];
             let trimmed = line.trim();
-            let (holder_raw, yearish) =
+            let (holder_raw, yearish, has_separator_comma) =
                 if let Some(cap) = STANDALONE_C_HOLDER_YEAR_RE.captures(trimmed) {
                     (
                         cap.name("holder").map(|m| m.as_str()).unwrap_or("").trim(),
-                        cap.name("year")
+                        cap.name("years")
                             .map(|m| m.as_str())
                             .unwrap_or("")
                             .trim()
                             .to_string(),
+                        false,
                     )
                 } else if let Some(cap) = STANDALONE_C_HOLDER_YEAR_LIST_RE.captures(trimmed) {
                     (
@@ -6692,6 +6717,7 @@ fn extract_standalone_c_holder_year_lines(
                             .unwrap_or("")
                             .trim()
                             .to_string(),
+                        true,
                     )
                 } else {
                     continue;
@@ -6719,10 +6745,21 @@ fn extract_standalone_c_holder_year_lines(
                 }
             }
 
+            let use_copyright_prefix = trimmed.to_ascii_lowercase().contains("all rights reserved");
             let cr_raw = if let Some(email) = &email_suffix {
-                format!("(c) {holder_raw} {yearish} - {email}")
-            } else if trimmed.contains(',') {
-                format!("(c) {holder_raw}, {yearish}")
+                if use_copyright_prefix {
+                    format!("Copyright (c) {holder_raw} {yearish} - {email}")
+                } else {
+                    format!("(c) {holder_raw} {yearish} - {email}")
+                }
+            } else if has_separator_comma {
+                if use_copyright_prefix {
+                    format!("Copyright (c) {holder_raw}, {yearish}")
+                } else {
+                    format!("(c) {holder_raw}, {yearish}")
+                }
+            } else if use_copyright_prefix {
+                format!("Copyright (c) {holder_raw} {yearish}")
             } else {
                 format!("(c) {holder_raw} {yearish}")
             };
