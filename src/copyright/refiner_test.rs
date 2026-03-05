@@ -852,6 +852,11 @@ fn test_refine_holder_junk_symbol_conversion_table() {
 }
 
 #[test]
+fn test_refine_holder_drops_mojibake_unicode_table_runs() {
+    assert_eq!(refine_holder("ÃÃÃÃÃÃÃÃÃÃÃÃ"), None);
+}
+
+#[test]
 fn test_refine_holder_junk_legal_disclaimer_fragments() {
     assert_eq!(
         refine_holder("NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES"),

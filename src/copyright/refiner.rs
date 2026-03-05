@@ -1953,6 +1953,7 @@ static HOLDERS_JUNK_PATTERNS: LazyLock<Vec<Regex>> = LazyLock::new(|| {
         r"(?i)^\(scale\s+\d+\)$",
         r"(?i)^scale\s+\d+$",
         r"(?i)^i,\s*div\s+while$",
+        r"^(?:[\u{0080}-\u{00FF}]+\s*){6,}$",
     ];
     patterns.iter().filter_map(|p| Regex::new(p).ok()).collect()
 });
