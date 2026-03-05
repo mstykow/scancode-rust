@@ -1,0 +1,1 @@
+copyright: `Copyright 2010–${new Date().getUTCFullYear()} Mike Bostock`

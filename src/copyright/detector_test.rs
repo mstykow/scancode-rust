@@ -3485,3 +3485,37 @@ fn test_issue_3659_square_c_sign_detected() {
         "Expected Regents holder detection, got: {holders:?}"
     );
 }
+
+#[test]
+fn test_issue_4755_template_literal_copyright_holder_detected() {
+    let input = "copyright: `Copyright 2010–${new Date().getUTCFullYear()} Mike Bostock`";
+    let (copyrights, holders, _authors) = detect_copyrights_from_text(input);
+
+    assert!(
+        copyrights
+            .iter()
+            .any(|c| c.copyright == "Copyright 2010-${new Date .getUTCFullYear } Mike Bostock"),
+        "copyrights: {copyrights:?}"
+    );
+    assert!(
+        holders.iter().any(|h| h.holder == "Mike Bostock"),
+        "holders: {holders:?}"
+    );
+    assert!(
+        !copyrights.iter().any(|c| c.copyright == "Copyright 2010-$"),
+        "copyrights: {copyrights:?}"
+    );
+}
+
+#[test]
+fn test_issue_4755_markdown_transition_line_not_author() {
+    let input = "The meaning of [*transition*.delay](https://github.com/d3/d3-transition/blob/master/README.md#transition_delay) has changed for chained transitions created by [*transition*.transition](https://github.com/d3/d3-transition/blob/master/README.md#transition_transition).";
+    let (_copyrights, _holders, authors) = detect_copyrights_from_text(input);
+
+    assert!(
+        !authors.iter().any(|a| a.author.contains(
+            "transition .transition https://github.com/d3/d3-transition/blob/master/README.md"
+        )),
+        "authors: {authors:?}"
+    );
+}
