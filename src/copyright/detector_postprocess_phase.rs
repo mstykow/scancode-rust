@@ -49,6 +49,7 @@ pub(super) fn run_phase_postprocess(
     super::author_heuristics::extract_various_bugfixes_and_enhancements_by_authors(
         content, authors,
     );
+    super::author_heuristics::extract_dense_name_email_author_lists(content, authors);
     super::author_heuristics::drop_authors_embedded_in_copyrights(copyrights, authors);
     super::drop_created_by_camelcase_identifier_authors(content, authors);
     super::author_heuristics::drop_shadowed_prefix_authors(authors);
