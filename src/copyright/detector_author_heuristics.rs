@@ -1400,6 +1400,14 @@ pub(super) fn extract_dense_name_email_author_lists(
         if name.is_empty() || email.is_empty() {
             continue;
         }
+        let name_lower = name.to_ascii_lowercase();
+        if name.contains(':')
+            || name_lower.contains("author")
+            || name_lower.contains("maintainer")
+            || name_lower.contains("copyright")
+        {
+            continue;
+        }
         matched.push((*ln, format!("{name} <{email}>")));
     }
 
