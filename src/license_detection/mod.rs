@@ -270,6 +270,16 @@ impl LicenseDetectionEngine {
                 );
                 if !candidates.is_empty() {
                     let matches = seq_match_with_candidates(&self.index, &whole_run, &candidates);
+
+                    // Add to matched_qspans to prevent double-matching in Phase 4
+                    for m in &matches {
+                        if m.end_token > m.start_token {
+                            let span = query::PositionSpan::new(m.start_token, m.end_token - 1);
+                            query.subtract(&span);           // Update matchables
+                            matched_qspans.push(span);        // Track matched regions
+                        }
+                    }
+
                     seq_all_matches.extend(matches);
                 }
             }
@@ -278,6 +288,7 @@ impl LicenseDetectionEngine {
             const MAX_QUERY_RUN_CANDIDATES: usize = 70;
             {
                 let whole_run = query.whole_query_run();
+                let mut phase4_spans: Vec<query::PositionSpan> = Vec::new();
                 for query_run in query.query_runs().iter() {
                     if query_run.start == whole_run.start && query_run.end == whole_run.end {
                         continue;
@@ -296,9 +307,23 @@ impl LicenseDetectionEngine {
                     if !candidates.is_empty() {
                         let matches =
                             seq_match_with_candidates(&self.index, query_run, &candidates);
+
+                        // Collect spans to add to matched_qspans (apply after loop due to borrow)
+                        for m in &matches {
+                            if m.end_token > m.start_token {
+                                let span = query::PositionSpan::new(m.start_token, m.end_token - 1);
+                                phase4_spans.push(span);
+                            }
+                        }
+
                         seq_all_matches.extend(matches);
                     }
                 }
+                // Apply spans after the loop completes
+                for span in &phase4_spans {
+                    query.subtract(span);
+                }
+                matched_qspans.extend(phase4_spans);
             }
 
             // Merge all sequence matches ONCE (like Python's approx matcher)
@@ -463,6 +488,16 @@ impl LicenseDetectionEngine {
                 );
                 if !candidates.is_empty() {
                     let matches = seq_match_with_candidates(&self.index, &whole_run, &candidates);
+
+                    // Add to matched_qspans to prevent double-matching in Phase 4
+                    for m in &matches {
+                        if m.end_token > m.start_token {
+                            let span = query::PositionSpan::new(m.start_token, m.end_token - 1);
+                            query.subtract(&span);           // Update matchables
+                            matched_qspans.push(span);        // Track matched regions
+                        }
+                    }
+
                     seq_all_matches.extend(matches);
                 }
             }
@@ -471,6 +506,7 @@ impl LicenseDetectionEngine {
             const MAX_QUERY_RUN_CANDIDATES: usize = 70;
             {
                 let whole_run = query.whole_query_run();
+                let mut phase4_spans: Vec<query::PositionSpan> = Vec::new();
                 for query_run in query.query_runs().iter() {
                     if query_run.start == whole_run.start && query_run.end == whole_run.end {
                         continue;
@@ -489,9 +525,23 @@ impl LicenseDetectionEngine {
                     if !candidates.is_empty() {
                         let matches =
                             seq_match_with_candidates(&self.index, query_run, &candidates);
+
+                        // Collect spans to add to matched_qspans (apply after loop due to borrow)
+                        for m in &matches {
+                            if m.end_token > m.start_token {
+                                let span = query::PositionSpan::new(m.start_token, m.end_token - 1);
+                                phase4_spans.push(span);
+                            }
+                        }
+
                         seq_all_matches.extend(matches);
                     }
                 }
+                // Apply spans after the loop completes
+                for span in &phase4_spans {
+                    query.subtract(span);
+                }
+                matched_qspans.extend(phase4_spans);
             }
 
             let merged_seq = merge_overlapping_matches(&seq_all_matches);

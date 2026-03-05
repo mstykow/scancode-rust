@@ -158,7 +158,7 @@ impl<'a> Query<'a> {
     /// A Result containing the Query or an error if binary detection fails
     ///
     /// Corresponds to Python: `Query.__init__()` (lines 196-295)
-    const TEXT_LINE_THRESHOLD: usize = 15;
+    const TEXT_LINE_THRESHOLD: usize = 4;
 
     pub fn new(text: &str, index: &'a LicenseIndex) -> Result<Self, anyhow::Error> {
         Self::with_options(text, index, Self::TEXT_LINE_THRESHOLD)
@@ -329,18 +329,17 @@ impl<'a> Query<'a> {
             .map(|(pos, _tid)| pos)
             .collect();
 
-        // TODO: Query run splitting is currently disabled because it causes
-        // double-matching. The is_matchable() check with matched_qspans helps
-        // but doesn't fully prevent the issue. Further investigation needed.
-        // See: reference/scancode-toolkit/src/licensedcode/index.py:1056
-        // let query_runs = Self::compute_query_runs(
-        //     &tokens,
-        //     &tokens_by_line,
-        //     _line_threshold,
-        //     len_legalese,
-        //     &index.digit_only_tids,
-        // );
-        let query_runs: Vec<(usize, Option<usize>)> = Vec::new();
+        // Compute query runs by splitting on 4+ consecutive junk lines.
+        // Double-matching prevention: is_matchable() with matched_qspans exclusion
+        // in Phase 4 (mod.rs:286) handles this. query.subtract() is called after
+        // near-dupe matches (mod.rs:252) to update high/low_matchables.
+        let query_runs = Self::compute_query_runs(
+            &tokens,
+            &tokens_by_line,
+            _line_threshold,
+            len_legalese,
+            &index.digit_only_tids,
+        );
 
         Ok(Query {
             text: text.to_string(),

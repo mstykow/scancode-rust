@@ -8,13 +8,16 @@ This report condenses findings from a comprehensive audit comparing the Python S
 
 ## Critical Differences (High Impact on Results)
 
-### 1. QueryRun Splitting Disabled in Rust
+### 1. QueryRun Splitting (FIXED)
 **File**: `QUERY_TOKENIZATION.md`
 
 - **Python**: Actively splits text into QueryRuns when encountering 4+ empty/junk lines (`LINES_THRESHOLD=4`)
-- **Rust**: QueryRun splitting is **disabled** 
-- **Impact**: Different matching behavior for files with multiple license sections separated by blank lines
-- **Location**: Python `query.py:583-652`, Rust `query/mod.rs`
+- **Rust**: QueryRun splitting is now **enabled** (was previously disabled)
+- **Implementation**: 
+  - `compute_query_runs()` at `query/mod.rs:372-431`
+  - Double-matching prevention via `is_matchable()` with `matched_qspans` exclusion in Phase 4
+  - `query.subtract()` called after near-dupe matches to update `high_matchables`/`low_matchables`
+- **Location**: Python `query.py:568-652`, Rust `query/mod.rs:336-342`
 
 ### 2. Required Phrase Handling Not Implemented
 **File**: `RULE_ENGINE.md`
