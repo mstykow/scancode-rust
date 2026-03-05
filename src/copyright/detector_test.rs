@@ -3406,7 +3406,7 @@ fn test_detect_copyright_with_dots_multiline() {
 }
 
 #[test]
-fn test_issue_4145_opensharedmap_inc_detected() {
+fn test_opensharedmap_inc_holder_detected() {
     let input = "Copyright (C) OpenSharedMap Inc.";
     let (copyrights, holders, _authors) = detect_copyrights_from_text(input);
 
@@ -3436,7 +3436,7 @@ fn test_disclaimer_tail_with_inc_as_does_not_create_holder() {
 }
 
 #[test]
-fn test_issue_4736_camelcase_provider_not_author_false_positive() {
+fn test_camelcase_provider_not_author_false_positive() {
     let input = "A meter implementation is created by a MeterProvider in this system.\nA trace implementation is created by a TracerProvider in this system.";
     let (_copyrights, _holders, authors) = detect_copyrights_from_text(input);
 
@@ -3450,7 +3450,7 @@ fn test_issue_4736_camelcase_provider_not_author_false_positive() {
 }
 
 #[test]
-fn test_issue_3892_platformdirs_lowercase_holder_detected() {
+fn test_platformdirs_lowercase_holder_detected() {
     let input = "Copyright (c) 2010-202x The platformdirs developers";
     let (copyrights, holders, _authors) = detect_copyrights_from_text(input);
 
@@ -3468,7 +3468,7 @@ fn test_issue_3892_platformdirs_lowercase_holder_detected() {
     );
 }
 #[test]
-fn test_issue_3659_square_c_sign_detected() {
+fn test_square_c_sign_detected() {
     let input = "[C] The Regents of the University of Michigan and Merit Network, Inc. 1992, 1993, 1994, 1995 All Rights Reserved";
     let (copyrights, holders, _authors) = detect_copyrights_from_text(input);
 
@@ -3487,7 +3487,7 @@ fn test_issue_3659_square_c_sign_detected() {
 }
 
 #[test]
-fn test_issue_4755_template_literal_copyright_holder_detected() {
+fn test_template_literal_copyright_holder_detected() {
     let input = "copyright: `Copyright 2010–${new Date().getUTCFullYear()} Mike Bostock`";
     let (copyrights, holders, _authors) = detect_copyrights_from_text(input);
 
@@ -3508,7 +3508,7 @@ fn test_issue_4755_template_literal_copyright_holder_detected() {
 }
 
 #[test]
-fn test_issue_4755_markdown_transition_line_not_author() {
+fn test_markdown_transition_line_not_author() {
     let input = "The meaning of [*transition*.delay](https://github.com/d3/d3-transition/blob/master/README.md#transition_delay) has changed for chained transitions created by [*transition*.transition](https://github.com/d3/d3-transition/blob/master/README.md#transition_transition).";
     let (_copyrights, _holders, authors) = detect_copyrights_from_text(input);
 
@@ -3554,7 +3554,7 @@ fn test_split_multiline_holder_list_with_emails() {
 }
 
 #[test]
-fn test_issue_3741_extend_copyright_with_following_all_rights_reserved_line() {
+fn test_extend_copyright_with_following_all_rights_reserved_line() {
     let input = "Copyright 2010-2015 Mike Bostock\nAll rights reserved.";
     let (copyrights, holders, _authors) = detect_copyrights_from_text(input);
 
@@ -3572,6 +3572,36 @@ fn test_issue_3741_extend_copyright_with_following_all_rights_reserved_line() {
     );
     assert!(
         holders.iter().any(|h| h.holder == "Mike Bostock"),
+        "holders: {holders:?}"
+    );
+}
+
+#[test]
+fn test_drop_url_embedded_suffix_copyright_and_holder_variants() {
+    let input =
+        "/* Copyright (c) 2020 Example Corp. See url(\"https://dummy-url-for-test.com\") */";
+    let (copyrights, holders, _authors) = detect_copyrights_from_text(input);
+
+    assert!(
+        copyrights
+            .iter()
+            .any(|c| c.copyright == "Copyright (c) 2020 Example Corp."),
+        "copyrights: {copyrights:?}"
+    );
+    assert!(
+        !copyrights
+            .iter()
+            .any(|c| c.copyright.contains("See url") || c.copyright.contains("https://")),
+        "copyrights: {copyrights:?}"
+    );
+    assert!(
+        holders.iter().any(|h| h.holder == "Example Corp."),
+        "holders: {holders:?}"
+    );
+    assert!(
+        !holders
+            .iter()
+            .any(|h| h.holder.contains("See url") || h.holder.contains("http")),
         "holders: {holders:?}"
     );
 }
