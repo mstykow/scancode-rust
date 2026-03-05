@@ -36,7 +36,7 @@ fn main() {
         let near_dupe_candidates = compute_candidates_with_msets(index, &whole_run, true, MAX_NEAR_DUPE_CANDIDATES);
         
         if !near_dupe_candidates.is_empty() {
-            let near_dupe_matches = seq_match_with_candidates(index, &whole_run, &near_dupe_candidates);
+            let near_dupe_matches = seq_match_with_candidates(index, &whole_run, &near_dupe_candidates, &[]);
             
             println!("=== BEFORE merge_overlapping_matches ===");
             println!("Total sequence matches: {}", near_dupe_matches.len());

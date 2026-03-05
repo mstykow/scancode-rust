@@ -41,11 +41,11 @@ fn main() {
     println!("\n=== SEQUENCE MATCHES (sample) ===");
     let near_dupe_candidates =
         compute_candidates_with_msets(index, &whole_run, true, MAX_NEAR_DUPE_CANDIDATES);
-    let near_dupe_matches = seq_match_with_candidates(index, &whole_run, &near_dupe_candidates);
+    let near_dupe_matches = seq_match_with_candidates(index, &whole_run, &near_dupe_candidates, &[]);
 
     const MAX_SEQ_CANDIDATES: usize = 70;
     let candidates = compute_candidates_with_msets(index, &whole_run, false, MAX_SEQ_CANDIDATES);
-    let seq_matches = seq_match_with_candidates(index, &whole_run, &candidates);
+    let seq_matches = seq_match_with_candidates(index, &whole_run, &candidates, &[]);
 
     let mut all_seq = Vec::new();
     all_seq.extend(near_dupe_matches);

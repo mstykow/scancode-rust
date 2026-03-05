@@ -75,13 +75,13 @@ fn main() {
         // Phase 2: Near-duplicate detection
         let near_dupe_candidates =
             compute_candidates_with_msets(index, &whole_run, true, MAX_NEAR_DUPE_CANDIDATES);
-        let near_dupe_matches = seq_match_with_candidates(index, &whole_run, &near_dupe_candidates);
+        let near_dupe_matches = seq_match_with_candidates(index, &whole_run, &near_dupe_candidates, &[]);
 
         // Phase 3: Regular sequence matching
         const MAX_SEQ_CANDIDATES: usize = 70;
         let candidates =
             compute_candidates_with_msets(index, &whole_run, false, MAX_SEQ_CANDIDATES);
-        let seq_matches = seq_match_with_candidates(index, &whole_run, &candidates);
+        let seq_matches = seq_match_with_candidates(index, &whole_run, &candidates, &[]);
 
         let mut seq_all = Vec::new();
         seq_all.extend(near_dupe_matches);

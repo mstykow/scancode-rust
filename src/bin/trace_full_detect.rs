@@ -41,7 +41,7 @@ fn main() {
         let near_dupe_candidates = compute_candidates_with_msets(index, &whole_run, true, MAX_NEAR_DUPE_CANDIDATES);
         
         if !near_dupe_candidates.is_empty() {
-            let near_dupe_matches = seq_match_with_candidates(index, &whole_run, &near_dupe_candidates);
+            let near_dupe_matches = seq_match_with_candidates(index, &whole_run, &near_dupe_candidates, &[]);
             
             for m in &near_dupe_matches {
                 if m.end_token > m.start_token {
@@ -59,7 +59,7 @@ fn main() {
         let whole_run = query.whole_query_run();
         let candidates = compute_candidates_with_msets(index, &whole_run, false, 70);
         if !candidates.is_empty() {
-            let matches = seq_match_with_candidates(index, &whole_run, &candidates);
+            let matches = seq_match_with_candidates(index, &whole_run, &candidates, &[]);
             seq_all_matches.extend(matches);
         }
 
@@ -74,7 +74,7 @@ fn main() {
             }
             let candidates = compute_candidates_with_msets(index, query_run, false, 70);
             if !candidates.is_empty() {
-                let matches = seq_match_with_candidates(index, query_run, &candidates);
+                let matches = seq_match_with_candidates(index, query_run, &candidates, &[]);
                 seq_all_matches.extend(matches);
             }
         }

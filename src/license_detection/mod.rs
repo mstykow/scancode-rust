@@ -249,9 +249,7 @@ impl LicenseDetectionEngine {
                     for m in &near_dupe_matches {
                         if m.end_token > m.start_token {
                             let span = query::PositionSpan::new(m.start_token, m.end_token - 1);
-                            if m.is_license_text && m.rule_length > 120 && m.match_coverage > 98.0 {
-                                query.subtract(&span);
-                            }
+                            query.subtract(&span);
                             matched_qspans.push(span);
                         }
                     }
@@ -444,9 +442,7 @@ impl LicenseDetectionEngine {
                     for m in &near_dupe_matches {
                         if m.end_token > m.start_token {
                             let span = query::PositionSpan::new(m.start_token, m.end_token - 1);
-                            if m.is_license_text && m.rule_length > 120 && m.match_coverage > 98.0 {
-                                query.subtract(&span);
-                            }
+                            query.subtract(&span);
                             matched_qspans.push(span);
                         }
                     }

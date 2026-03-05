@@ -55,7 +55,7 @@ fn main() {
 
         if !near_dupe_candidates.is_empty() {
             let near_dupe_matches =
-                seq_match_with_candidates(index, &whole_run, &near_dupe_candidates);
+                seq_match_with_candidates(index, &whole_run, &near_dupe_candidates, &[]);
             println!("Near-dupe matches: {}", near_dupe_matches.len());
 
             let merged_seq = merge_overlapping_matches(&near_dupe_matches);

@@ -38,7 +38,7 @@ fn main() {
         let near_dupe_candidates = compute_candidates_with_msets(index, &whole_run, true, MAX_NEAR_DUPE_CANDIDATES);
         
         if !near_dupe_candidates.is_empty() {
-            let near_dupe_matches = seq_match_with_candidates(index, &whole_run, &near_dupe_candidates);
+            let near_dupe_matches = seq_match_with_candidates(index, &whole_run, &near_dupe_candidates, &[]);
             println!("Phase 2 (near-dupe) matches: {}", near_dupe_matches.len());
             seq_all_matches.extend(near_dupe_matches);
         }
@@ -49,7 +49,7 @@ fn main() {
         let candidates = compute_candidates_with_msets(index, &whole_run, false, MAX_SEQ_CANDIDATES);
         
         if !candidates.is_empty() {
-            let matches = seq_match_with_candidates(index, &whole_run, &candidates);
+            let matches = seq_match_with_candidates(index, &whole_run, &candidates, &[]);
             println!("Phase 3 (regular) matches: {}", matches.len());
             
             // Find unicode_3 matches in phase 3
@@ -76,7 +76,7 @@ fn main() {
             }
             let candidates = compute_candidates_with_msets(index, query_run, false, MAX_QUERY_RUN_CANDIDATES);
             if !candidates.is_empty() {
-                let matches = seq_match_with_candidates(index, query_run, &candidates);
+                let matches = seq_match_with_candidates(index, query_run, &candidates, &[]);
                 println!("Phase 4 (query run) matches: {}", matches.len());
                 seq_all_matches.extend(matches);
             }

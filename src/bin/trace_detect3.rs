@@ -40,7 +40,7 @@ fn main() {
         println!("\n=== PHASE 2: NEAR-DUPE CANDIDATES ({}) ===", near_dupe_candidates.len());
         
         if !near_dupe_candidates.is_empty() {
-            let near_dupe_matches = seq_match_with_candidates(index, &whole_run, &near_dupe_candidates);
+            let near_dupe_matches = seq_match_with_candidates(index, &whole_run, &near_dupe_candidates, &[]);
             println!("Near-dupe matches: {}", near_dupe_matches.len());
             
             for m in &near_dupe_matches {
@@ -59,7 +59,7 @@ fn main() {
         println!("\n=== PHASE 3: REGULAR SEQ CANDIDATES ({}) ===", candidates.len());
         
         if !candidates.is_empty() {
-            let matches = seq_match_with_candidates(index, &whole_run, &candidates);
+            let matches = seq_match_with_candidates(index, &whole_run, &candidates, &[]);
             println!("Phase 3 matches: {}", matches.len());
             for m in matches.iter().take(5) {
                 println!("  {} (license: {}, qstart={}, end_token={})", 
@@ -80,7 +80,7 @@ fn main() {
             }
             let candidates = compute_candidates_with_msets(index, query_run, false, MAX_QUERY_RUN_CANDIDATES);
             if !candidates.is_empty() {
-                let matches = seq_match_with_candidates(index, query_run, &candidates);
+                let matches = seq_match_with_candidates(index, query_run, &candidates, &[]);
                 println!("\n=== PHASE 4: QUERY RUN MATCHES ({}) ===", matches.len());
                 seq_all_matches.extend(matches);
             }

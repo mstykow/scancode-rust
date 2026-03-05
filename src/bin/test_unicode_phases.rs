@@ -89,7 +89,7 @@ fn main() {
             let candidates =
                 compute_candidates_with_msets(index, query_run, false, MAX_QUERY_RUN_CANDIDATES);
             if !candidates.is_empty() {
-                let matches = seq_match_with_candidates(index, query_run, &candidates);
+                let matches = seq_match_with_candidates(index, query_run, &candidates, &[]);
                 query_run_matches.extend(matches);
             }
         }

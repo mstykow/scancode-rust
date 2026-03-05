@@ -49,7 +49,7 @@ fn main() {
         let candidates = compute_candidates_with_msets(index, &whole_run, true, MAX_NEAR_DUPE_CANDIDATES);
         println!("\n=== SEQUENCE CANDIDATES ({}) ===", candidates.len());
         if !candidates.is_empty() {
-            let seq_matches = seq_match_with_candidates(index, &whole_run, &candidates);
+            let seq_matches = seq_match_with_candidates(index, &whole_run, &candidates, &[]);
             let merged_seq = merge_overlapping_matches(&seq_matches);
             println!("=== MERGED SEQUENCE MATCHES ({}) ===", merged_seq.len());
             for m in merged_seq.iter().take(5) {
