@@ -2814,6 +2814,54 @@ fn extend_copyrights_with_next_line_parenthesized_obfuscated_email(
     }
 }
 
+fn extend_copyrights_with_following_all_rights_reserved_line(
+    raw_lines: &[&str],
+    copyrights: &mut [CopyrightDetection],
+) {
+    if copyrights.is_empty() || raw_lines.is_empty() {
+        return;
+    }
+
+    static ALL_RIGHTS_RE: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(r"(?i)^all\s+rights\s+reserved\.?$").unwrap());
+    static BASE_COPY_RE: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(r"(?i)^\s*(?:copyright\b|\(c\))").unwrap());
+
+    for c in copyrights.iter_mut() {
+        if c.start_line != c.end_line {
+            continue;
+        }
+
+        let trimmed = c.copyright.trim();
+        if !BASE_COPY_RE.is_match(trimmed) {
+            continue;
+        }
+
+        let lower = trimmed.to_ascii_lowercase();
+        if lower.contains("all rights reserved") {
+            continue;
+        }
+
+        let Some(next_raw) = raw_lines.get(c.end_line) else {
+            continue;
+        };
+        let next_trim = next_raw.trim().trim_start_matches('*').trim_start();
+        if !ALL_RIGHTS_RE.is_match(next_trim) {
+            continue;
+        }
+
+        let merged = format!("{trimmed} {next_trim}");
+        let refined = refine_copyright(&merged).unwrap_or_else(|| normalize_whitespace(&merged));
+        let merged_normalized = normalize_whitespace(&merged);
+        c.copyright = if refined.to_ascii_lowercase().contains("all rights reserved") {
+            refined
+        } else {
+            merged_normalized
+        };
+        c.end_line += 1;
+    }
+}
+
 fn add_modify_suffix_holders(
     raw_lines: &[&str],
     prepared_cache: &mut PreparedLineCache<'_>,
