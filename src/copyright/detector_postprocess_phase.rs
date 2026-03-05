@@ -159,6 +159,7 @@ pub(super) fn run_phase_postprocess(
     super::add_first_angle_email_only_variants(copyrights);
     super::drop_shadowed_angle_email_prefix_copyrights_same_span(copyrights);
     super::drop_shadowed_quote_before_email_variants_same_span(copyrights);
+    super::drop_url_embedded_suffix_variants_same_span(copyrights, holders);
     super::add_missing_holder_from_single_copyright(copyrights, holders);
 
     super::drop_shadowed_acronym_location_suffix_copyrights_same_span(copyrights);
