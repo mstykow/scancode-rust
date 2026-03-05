@@ -1,0 +1,9 @@
+what:
+  - holders
+  - holders_summary
+holders:
+  - Foo, Inc.
+  - Foo, Inc.
+holders_summary:
+  - value: Foo, Inc.
+    count: 2
