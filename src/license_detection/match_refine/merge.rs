@@ -127,7 +127,12 @@ pub fn merge_overlapping_matches(matches: &[LicenseMatch]) -> Vec<LicenseMatch> 
                     break;
                 }
 
-                if current.qspan() == next.qspan() && current.ispan() == next.ispan() {
+                let current_qspan: HashSet<usize> = current.qspan().into_iter().collect();
+                let next_qspan: HashSet<usize> = next.qspan().into_iter().collect();
+                let current_ispan: HashSet<usize> = current.ispan().into_iter().collect();
+                let next_ispan: HashSet<usize> = next.ispan().into_iter().collect();
+
+                if current_qspan == next_qspan && current_ispan == next_ispan {
                     rule_matches.remove(j);
                     continue;
                 }

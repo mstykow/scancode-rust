@@ -8,7 +8,7 @@ mod tests {
         load_licenses_from_directory, load_rules_from_directory,
     };
     use crate::license_detection::seq_match::{
-        MAX_NEAR_DUPE_CANDIDATES, compute_candidates_with_msets,
+        compute_candidates_with_msets, MAX_NEAR_DUPE_CANDIDATES,
     };
     use std::path::PathBuf;
 

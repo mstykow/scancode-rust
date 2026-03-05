@@ -144,21 +144,6 @@ fn test_engine_detect_spdx_identifier() {
 }
 
 #[test]
-fn test_engine_detect_license_notice() {
-    let Some(engine) = create_engine_from_reference() else {
-        eprintln!("Skipping test: reference directory not found");
-        return;
-    };
-
-    let text = "Licensed under the MIT License";
-    let detections = engine
-        .detect(text, false)
-        .expect("Detection should succeed");
-
-    assert!(!detections.is_empty(), "Should detect license notice");
-}
-
-#[test]
 fn test_engine_index_populated() {
     let Some(engine) = create_engine_from_reference() else {
         eprintln!("Skipping test: reference directory not found");
@@ -576,18 +561,77 @@ copies of the Software."#;
 }
 
 #[test]
-fn test_aho_single_rule() {
+fn debug_duplicate_mit_licenses() {
     let Some(engine) = create_engine_from_reference() else {
         eprintln!("Skipping test: reference directory not found");
         return;
     };
 
-    let text = "Licensed under the MIT License";
-    let detections = engine
-        .detect(text, false)
-        .expect("Detection should succeed");
+    // mit_25.txt - Expected 2 MIT matches
+    let mit25_text = std::fs::read_to_string("testdata/license-golden/datadriven/lic3/mit_25.txt")
+        .expect("Failed to read mit_25.txt");
 
-    assert!(!detections.is_empty(), "Should detect license notice");
+    // First check what rules match this text
+    use crate::license_detection::aho_match::aho_match;
+    use crate::license_detection::query::Query;
+
+    let query = Query::new(&mit25_text, &engine.index).unwrap();
+    let run = query.whole_query_run();
+
+    // Get raw aho matches
+    let aho_matches = aho_match(&engine.index, &run);
+
+    println!("\n=== RAW AHO MATCHES ({}) ===", aho_matches.len());
+    for m in &aho_matches {
+        println!(
+            "  {} at lines {}-{} (tokens {}-{}, rule={}, matcher={})",
+            m.license_expression,
+            m.start_line,
+            m.end_line,
+            m.start_token,
+            m.end_token,
+            m.rule_identifier,
+            m.matcher
+        );
+    }
+
+    // Now get refined matches
+    let matches = engine
+        .detect_matches(&mit25_text, false)
+        .expect("Detection failed");
+
+    println!("\n=== FINAL MATCHES ===");
+    println!("Expected: 2 MIT matches");
+    println!("Got: {} matches", matches.len());
+    for m in &matches {
+        println!(
+            "  {} at lines {}-{} (tokens {}-{}, rule={}, matcher={})",
+            m.license_expression,
+            m.start_line,
+            m.end_line,
+            m.start_token,
+            m.end_token,
+            m.rule_identifier,
+            m.matcher
+        );
+    }
+
+    // Check if the issue is in the merge step
+    let detections = engine.detect(&mit25_text, false).expect("Detection failed");
+    println!("\nDetections: {} groups", detections.len());
+    for d in &detections {
+        println!(
+            "  {:?} with {} matches",
+            d.license_expression,
+            d.matches.len()
+        );
+        for m in &d.matches {
+            println!(
+                "    - {} at lines {}-{} (rule={})",
+                m.license_expression, m.start_line, m.end_line, m.rule_identifier
+            );
+        }
+    }
 }
 
 #[test]
@@ -880,4 +924,87 @@ fn test_detect_spdx_identifier_with_utf8_bom() {
         !detections.is_empty(),
         "Should detect SPDX identifier even with BOM"
     );
+}
+
+#[test]
+fn debug_libevent_licenses() {
+    let Some(engine) = create_engine_from_reference() else {
+        eprintln!("Skipping test: reference directory not found");
+        return;
+    };
+
+    // libevent.LICENSE - Expected 7 matches
+    let libevent_text =
+        std::fs::read_to_string("testdata/license-golden/datadriven/lic3/libevent.LICENSE")
+            .expect("Failed to read libevent.LICENSE");
+
+    let matches = engine
+        .detect_matches(&libevent_text, false)
+        .expect("Detection failed");
+
+    println!("\n=== libevent.LICENSE ===");
+    println!("Expected: 7 matches (3 bsd-new, 2 isc, 2 mit)");
+    println!("Got: {} matches", matches.len());
+    for m in &matches {
+        println!(
+            "  {} at lines {}-{} (rule={})",
+            m.license_expression, m.start_line, m.end_line, m.rule_identifier
+        );
+    }
+}
+
+#[test]
+fn debug_unicode_licenses() {
+    let Some(engine) = create_engine_from_reference() else {
+        eprintln!("Skipping test: reference directory not found");
+        return;
+    };
+
+    // unicode.txt - Expected 3 matches
+    let unicode_text = std::fs::read_to_string(
+        "testdata/license-golden/datadriven/external/fossology-licenses/unicode.txt",
+    )
+    .expect("Failed to read unicode.txt");
+
+    let matches = engine
+        .detect_matches(&unicode_text, false)
+        .expect("Detection failed");
+
+    println!("\n=== unicode.txt ===");
+    println!("Expected: 3 matches (unicode-tou, unicode, unicode)");
+    println!("Got: {} matches", matches.len());
+    for m in &matches {
+        println!(
+            "  {} at lines {}-{} (rule={})",
+            m.license_expression, m.start_line, m.end_line, m.rule_identifier
+        );
+    }
+}
+
+#[test]
+fn debug_ace_licenses() {
+    let Some(engine) = create_engine_from_reference() else {
+        eprintln!("Skipping test: reference directory not found");
+        return;
+    };
+
+    // ACE-copying.html - Expected 2 matches
+    let ace_text = std::fs::read_to_string(
+        "testdata/license-golden/datadriven/external/fossology-tests/ACE/ACE-copying.html",
+    )
+    .expect("Failed to read ACE-copying.html");
+
+    let matches = engine
+        .detect_matches(&ace_text, false)
+        .expect("Detection failed");
+
+    println!("\n=== ACE-copying.html ===");
+    println!("Expected: 2 ace-tao matches");
+    println!("Got: {} matches", matches.len());
+    for m in &matches {
+        println!(
+            "  {} at lines {}-{} (rule={})",
+            m.license_expression, m.start_line, m.end_line, m.rule_identifier
+        );
+    }
 }

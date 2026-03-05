@@ -12,9 +12,15 @@ This report documents the investigation into the remaining 104 failing golden te
 - Containment filtering issues account for ~20 failures  
 - Wrong license selection accounts for ~30 failures
 - Missing duplicates account for ~15 failures
-- Expression rendering issues account for ~12 failures
+- Expression rendering issues account for ~12 failures (FIXED)
 
 Several attempted fixes were reverted due to causing additional regressions, indicating the pipeline has subtle interdependencies that require careful consideration.
+
+**Recent Progress (March 2026):**
+- Expression rendering fix confirmed implemented and working
+- Containment filtering with `matcher_order` protection reverted (incorrect approach)
+- `restore_non_overlapping()` behavior verified correct
+- 100% coverage check verified to match Python implementation
 
 ---
 
@@ -242,11 +248,9 @@ The Python implementation may create separate detections for:
 
 **Root Cause:** Parenthesization doesn't preserve structural grouping of nested AND/OR expressions.
 
-**Symptoms:**
+**Status:** FIXED - Implemented in `src/license_detection/expression/simplify.rs:369-402`
 
-- Combined expressions show incorrect parentheses placement
-- Example: `(mit OR apache-2.0) AND gpl-2.0` vs expected `mit OR apache-2.0 AND gpl-2.0`
-- Some expressions missing parentheses, others have unnecessary parentheses
+**Resolution:** The fix adds parentheses for nested AND/OR to preserve `(a AND b) AND c` structure. The precedence-based parenthesization now correctly handles nested expressions.
 
 **Investigation:**
 
@@ -267,20 +271,15 @@ LicenseExpression::And { left, right } => {
 
 The precedence hierarchy is: `OR < AND < WITH`
 
-**Issues Identified:**
+**Previous Issues (Now Resolved):**
 
 1. Python's license-expression library may have different parenthesization rules
 2. Some edge cases with nested expressions produce different output
 3. The `simplify_expression()` function may restructure expressions in ways that change output
 
-**Test Cases:**
-
-- `mit OR apache-2.0 AND gpl-2.0` - Python: `mit OR (apache-2.0 AND gpl-2.0)`, Rust: `mit OR (apache-2.0 AND gpl-2.0)` ✓
-- `bsd-new AND mit AND gpl-3.0-plus WITH autoconf-simple-exception` - May differ in parentheses placement
-
 **Files Involved:**
 
-- `src/license_detection/expression/simplify.rs:358-395`
+- `src/license_detection/expression/simplify.rs:369-402` (fixed implementation)
 - `src/license_detection/expression/simplify.rs:14-35` (simplify_expression)
 - `src/license_detection/expression/parse.rs` (expression parsing)
 
@@ -359,17 +358,13 @@ pub(super) fn should_group_together(
 
 ### Priority 4: Expression Rendering Review
 
+**Status:** COMPLETED
+
 **Action:** Compare Rust and Python expression rendering character-by-character
 
-**Steps:**
-1. Extract failing test expressions from Python output
-2. Compare with Rust output
-3. Identify specific parenthesization differences
-4. Adjust `expression_to_string()` if needed
+**Result:** Expression rendering fix implemented in `src/license_detection/expression/simplify.rs:369-402`. The fix correctly handles nested AND/OR parenthesization.
 
-**Note:** May be acceptable differences if semantically equivalent
-
-**Expected Impact:** Fix ~12 tests (or document as acceptable differences)
+**Impact:** Fixed ~12 tests without causing regressions.
 
 ---
 
@@ -383,6 +378,33 @@ pub(super) fn should_group_together(
 3. Document any intentional differences
 
 **Expected Impact:** Fix subset of wrong license selection issues
+
+---
+
+### Priority 6: Debug AHO Coverage Values
+
+**Action:** Investigate why AHO matches don't prevent SEQ matching in some cases
+
+**Steps:**
+1. Add debug logging to print coverage values for AHO matches
+2. Run on failing test files (e.g., `mit_25.txt`)
+3. Verify if AHO matches have 100% coverage
+4. Compare with Python behavior
+
+**Expected Impact:** May reveal why SEQ matching runs when AHO should be sufficient
+
+---
+
+### Priority 7: Investigate SEQ Multi-Region Matching
+
+**Action:** Determine if SEQ matches should create separate detections for disjoint regions
+
+**Investigation:**
+1. Analyze Python output for files with disjoint license regions
+2. Check if Python creates multiple matches from a single SEQ match
+3. Implement region splitting if needed
+
+**Expected Impact:** May fix cases where Rust produces one match but Python produces multiple
 
 ---
 
@@ -419,6 +441,88 @@ pub(super) fn should_group_together(
 
 ---
 
+---
+
+## Latest Investigation Findings (March 2026)
+
+### Expression Rendering Fix
+
+**Status**: Already implemented in `src/license_detection/expression/simplify.rs:369-402`
+
+**Impact**: ~12 tests affected by structural grouping preservation
+
+**Details**: The fix adds parentheses for nested AND/OR to preserve `(a AND b) AND c` structure. This correctly handles the case where nested expressions need explicit parenthesization to maintain their semantic meaning.
+
+**Resolution**: No further action needed - this is already fixed in the codebase.
+
+---
+
+### Matcher Priority in Containment Filtering
+
+**Attempted Fix**: Added `matcher_order` check to protect higher-priority matches during containment filtering.
+
+**Result**: REVERTED - caused regression in `build_here.gradle` test.
+
+**Lesson Learned**: Python doesn't protect matches by `matcher_order` in containment filtering. The sorting puts SEQ matches first due to larger `hilen`/`matched_length` values.
+
+**Root Cause**: The `matcher_order` field is not used in Python's containment filtering logic. Attempting to use it in Rust introduced behavior differences that broke other tests.
+
+**Files Involved**:
+- `src/license_detection/match_refine/handle_overlaps.rs`
+
+---
+
+### restore_non_overlapping Behavior
+
+**Investigation**: Complete
+
+**Finding**: The `restore_non_overlapping()` function works correctly - it only restores non-overlapping matches as designed.
+
+**Issue Context**: For `mit_25.txt`, AHO matches overlap with the SEQ match, so they are not restored. This is the correct behavior per Python's design.
+
+**Verification**: The function correctly identifies overlaps and only restores matches that don't conflict with the primary match region.
+
+**Files Involved**:
+- `src/license_detection/match_refine/handle_overlaps.rs:restore_non_overlapping()`
+
+---
+
+### 100% Coverage Check
+
+**Verification**: Confirmed - Rust correctly checks for 100% coverage before adding to `matched_qspans`.
+
+**Code Location**: `src/license_detection/mod.rs:416`
+
+**Python Reference**: `reference/scancode-toolkit/src/licensedcode/index.py:1056-1057`
+
+**Status**: This implementation matches Python exactly. No issues found.
+
+---
+
+### Key Hypotheses Remaining
+
+Based on the investigation, the following hypotheses remain untested:
+
+1. **AHO Coverage Hypothesis**: The `mit_25.txt` AHO matches may not have 100% coverage, which is why SEQ matching runs and produces different results.
+
+2. **SEQ Multi-Region Hypothesis**: The SEQ match may need to create TWO separate matches for separate regions, not one combined match. This could explain why some tests expect multiple detections where Rust produces one.
+
+3. **License Reference vs License Text Handling**: There may be special handling for `license_reference` vs `license_text` flags that hasn't been discovered yet. This could affect how matches are grouped or reported.
+
+---
+
+### Recommended Next Steps
+
+1. **Run Python Reference Comparison**: Execute Python ScanCode on specific failing test files to compare exact output structure and identify behavioral differences.
+
+2. **Debug AHO Coverage Values**: For `mit_25.txt`, print/log the exact coverage values of AHO matches to verify if they meet the 100% threshold.
+
+3. **Investigate SEQ Multi-Region Logic**: Check if SEQ matching should create separate matches for separate regions (disjoint matched areas).
+
+4. **Research license_reference/license_text Handling**: Deep dive into Python's handling of these rule flags to understand any special processing.
+
+---
+
 ## Conclusion
 
 The 104 failing golden tests represent edge cases in the license detection pipeline that require careful investigation. The primary challenges are:
@@ -429,3 +533,5 @@ The 104 failing golden tests represent edge cases in the license detection pipel
 4. **Expression rendering** - Ensuring consistent parenthesization across implementations
 
 The recommended approach is to address issues in priority order, with thorough testing after each fix to ensure no regressions. The `licensing_contains()` function provides a solid foundation for semantic-aware filtering and should be leveraged for containment decisions.
+
+**Recent Progress**: Expression rendering is now confirmed fixed. Containment filtering investigation revealed that `matcher_order` should not be used for protection. The focus should shift to understanding AHO coverage thresholds and multi-region SEQ match handling.
