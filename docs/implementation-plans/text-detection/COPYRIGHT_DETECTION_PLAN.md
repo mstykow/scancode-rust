@@ -1,6 +1,6 @@
 # Copyright Detection Implementation Plan
 
-> **Status**: ✅ Implementation Complete
+> **Status**: 🟡 Implemented with an open scanner text-extraction parity gap
 > **Priority**: P1 - High Priority Core Feature
 > **Actual Effort**: Completed
 > **Dependencies**: None (independent of license detection)
@@ -46,7 +46,7 @@ Copyright detection extracts copyright statements, holder names, author informat
 
 ### Current State
 
-**All features implemented:**
+**Implemented core detector and golden harness:**
 
 - ✅ Copyright pattern matching engine
 - ✅ Grammar parser
@@ -54,7 +54,7 @@ Copyright detection extracts copyright statements, holder names, author informat
 - ✅ Year and year-range parsing (1960-2099)
 - ✅ Multi-line statement handling
 - ✅ Author detection
-- ✅ Scanner integration (runs on all files including package manifests)
+- ⚠️ Scanner integration currently runs text detection only on buffers classified as UTF-8; Python text-extraction parity for non-UTF text, PDFs with text, and binary strings remains open
 - ✅ Unicode name preservation (no transliteration — names like "François Müller" kept intact)
 - ✅ Linux CREDITS file parsing
 - ✅ Junk/false-positive filtering
@@ -318,6 +318,16 @@ Documented in detail in [`docs/improvements/copyright-detection.md`](../../impro
 
 Golden test suites (copyrights, holders, authors, ICS) validate output against the Python reference while preserving intentional Rust improvements. Here, **ICS** refers to the Android Ice Cream Sandwich (Android 4.0) fixture corpus used by the upstream ScanCode copyright tests. Fixtures in this repository are treated as Rust-owned expectations, and update tooling is designed to keep them stable and deterministic.
 
+### Important Scope Note About Golden Coverage
+
+Current Rust golden coverage primarily validates the **detector over normalized text content**, not the full scanner ingestion path.
+
+- `src/copyright/golden_test.rs` loads fixture bytes through `src/copyright/golden_utils.rs::read_input_content()` and then calls `detect_copyrights(&content)` directly.
+- This means golden tests can exercise decoded non-UTF-like content and printable strings extracted from `.dll` / `.exe` fixtures even when the live scanner runtime would currently skip those files.
+- Rust currently ports the upstream `copyrights`, `holders`, `authors`, and `ics` fixture families into local copyright golden tests, but does **not** yet provide equivalent scanner-level parity coverage for upstream `credits`, `years`, `generated`, and `copyright_fossology` families.
+
+As a result, passing copyright golden tests is strong evidence that the detector logic works on normalized text input, but it is **not sufficient evidence** that scanner-level ingestion parity with Python ScanCode is complete.
+
 ### Behavioral Contract vs Python Reference
 
 This implementation follows a simple compatibility contract:
@@ -334,6 +344,26 @@ Run golden tests with: `cargo test --features golden-tests copyright::golden_tes
 ---
 
 ## Known Gaps and Follow-up Work
+
+### Open Runtime Parity Gap: Non-UTF Text, PDFs, and Binary String Extraction
+
+The Rust detector itself is implemented, but the **live scanner text-extraction path is still narrower than the Python reference**.
+
+- **Python reference behavior**: `textcode.analysis.numbered_text_lines()` uses `typecode.get_type(location)` and is not UTF-8-only. It:
+  - decodes non-UTF text lines through `as_unicode()` (UTF-8 → Latin-1 → normalization/chardet fallback),
+  - routes PDFs with extractable text through `unicode_text_lines_from_pdf()`, and
+  - supports weird-encoding fixtures such as `tests/textcode/data/analysis/weird_encoding/easyconf-0.9.0.pom`, and
+  - falls back to `unicode_text_lines_from_binary()` / `strings.strings_from_file()` for binaries that `typecode` reports as containing text.
+- **Current Rust runtime behavior**: `src/scanner/process.rs` only runs copyright/email/url/license text detection when `inspect(&buffer) == ContentType::UTF_8`.
+- **Test-harness mismatch**: the Rust copyright golden harness uses `src/copyright/golden_utils.rs::read_input_content()`, which can decode bytes with a Latin-1-style fallback and extract printable strings from `.dll` / `.exe`. This means the golden harness currently exercises some inputs that the production scanner still skips.
+- **Not part of this gap**: image/media metadata extraction. The Python reference `tests/textcode/test_analysis.py` explicitly asserts that files in `media_without_text/` yield no numbered text lines, so lack of image metadata scanning is not a parity shortfall.
+- **Separate intentional divergence**: `src/scanner/process.rs` currently short-circuits PEM certificate files before clue extraction. This differs from the Python reference, which includes certificate fixtures that produce clue detections, but it was added intentionally to resolve Rust issue `#222` rather than being an unnoticed parity miss from the original implementation plan.
+
+**Classification**: Open parity gap.
+
+**User impact**: The Rust CLI/runtime scanner can miss detections that Python ScanCode would surface from decodable non-UTF text, PDFs with extractable text, or binary string extraction, even though detector/golden fixtures exist for some of those classes of inputs.
+
+**Status**: Follow-up required.
 
 The original parity-gap buckets below are now considered **closed for this plan**.
 
