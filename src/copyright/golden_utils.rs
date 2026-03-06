@@ -2,7 +2,7 @@ use std::fs;
 use std::io;
 use std::path::Path;
 
-use crate::utils::file::{decode_bytes_to_string, extract_printable_strings};
+use crate::utils::file::extract_text_for_detection;
 
 pub fn canonicalize_golden_value(s: &str) -> String {
     let s = s
@@ -24,15 +24,6 @@ pub fn read_input_content(input_path: &Path) -> io::Result<String> {
         return Ok(String::new());
     }
 
-    let decoded = decode_bytes_to_string(&bytes);
-    if !decoded.is_empty() {
-        return Ok(decoded);
-    }
-
-    let allow_binary_strings = matches!(ext.as_deref(), Some("dll") | Some("exe"));
-    if allow_binary_strings {
-        return Ok(extract_printable_strings(&bytes));
-    }
-
-    Ok(String::new())
+    let (text, _) = extract_text_for_detection(input_path, &bytes);
+    Ok(text)
 }

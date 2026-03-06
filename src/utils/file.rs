@@ -1,7 +1,17 @@
+use std::fs;
+use std::panic::{AssertUnwindSafe, catch_unwind};
+use std::path::Path;
+
 use chrono::{TimeZone, Utc};
 use glob::Pattern;
-use std::fs;
-use std::path::Path;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ExtractedTextKind {
+    None,
+    Decoded,
+    Pdf,
+    BinaryStrings,
+}
 
 /// Get the creation date of a file or directory as an RFC3339 string.
 pub fn get_creation_date(metadata: &fs::Metadata) -> Option<String> {
@@ -61,6 +71,62 @@ pub fn decode_bytes_to_string(bytes: &[u8]) -> String {
             }
             bytes.iter().map(|&b| b as char).collect()
         }
+    }
+}
+
+pub fn extract_text_for_detection(path: &Path, bytes: &[u8]) -> (String, ExtractedTextKind) {
+    let ext = path
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|s| s.to_ascii_lowercase());
+
+    if matches!(ext.as_deref(), Some("pdf")) {
+        let text = extract_pdf_text(bytes);
+        return if text.is_empty() {
+            (String::new(), ExtractedTextKind::None)
+        } else {
+            (text, ExtractedTextKind::Pdf)
+        };
+    }
+
+    let decoded = decode_bytes_to_string(bytes);
+    if !decoded.is_empty() {
+        return (decoded, ExtractedTextKind::Decoded);
+    }
+
+    if matches!(ext.as_deref(), Some("dll") | Some("exe")) {
+        let text = extract_printable_strings(bytes);
+        return if text.is_empty() {
+            (String::new(), ExtractedTextKind::None)
+        } else {
+            (text, ExtractedTextKind::BinaryStrings)
+        };
+    }
+
+    (String::new(), ExtractedTextKind::None)
+}
+
+fn extract_pdf_text(bytes: &[u8]) -> String {
+    if bytes.len() < 5 || &bytes[..5] != b"%PDF-" {
+        return String::new();
+    }
+
+    let extracted = catch_unwind(AssertUnwindSafe(|| {
+        pdf_extract::extract_text_from_mem_by_pages(bytes)
+    }));
+    match extracted {
+        Ok(Ok(pages)) => {
+            let Some(text) = pages.into_iter().next() else {
+                return String::new();
+            };
+            let normalized = text.replace(['\r', '\u{0c}'], "\n");
+            if normalized.trim().is_empty() {
+                String::new()
+            } else {
+                normalized
+            }
+        }
+        Ok(Err(_)) | Err(_) => String::new(),
     }
 }
 
