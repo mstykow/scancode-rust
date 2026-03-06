@@ -534,6 +534,15 @@ fn test_refine_copyright_strips_trailing_paren_email_after_c_by() {
 }
 
 #[test]
+fn test_refine_copyright_strips_trailing_division_of_company_suffix() {
+    let input = "Copyright (c) 2006, Industrial Light & Magic, a division of Lucasfilm Entertainment Company Ltd.";
+    assert_eq!(
+        refine_copyright(input),
+        Some("Copyright (c) 2006, Industrial Light & Magic".to_string())
+    );
+}
+
+#[test]
 fn test_refine_copyright_strips_independent_jpeg_group_software_tail() {
     let result = refine_copyright(
         "(c) 1991-1992, Thomas G. Lane, Part of the Independent JPEG Group's software.",
@@ -1036,6 +1045,15 @@ fn test_refine_holder_strips_prefix() {
 fn test_refine_holder_strips_trailing_period() {
     let result = refine_holder("IBM Corporation.");
     assert_eq!(result, Some("IBM Corporation".to_string()));
+}
+
+#[test]
+fn test_refine_holder_strips_trailing_division_of_company_suffix() {
+    let input = "Industrial Light & Magic, a division of Lucas Digital Ltd. LLC";
+    assert_eq!(
+        refine_holder(input),
+        Some("Industrial Light & Magic".to_string())
+    );
 }
 
 #[test]

@@ -2022,6 +2022,7 @@ pub fn refine_copyright(s: &str) -> Option<String> {
     c = strip_trailing_obfuscated_email_in_angle_brackets_after_copyright(&c);
     c = strip_trailing_linux_ag_location_in_copyright(&c);
     c = strip_trailing_by_person_clause_after_company(&c);
+    c = strip_trailing_division_of_company_suffix(&c);
     c = strip_trailing_linux_foundation_suffix(&c);
     c = strip_trailing_paren_at_without_domain(&c);
     c = strip_trailing_inc_after_today_year_placeholder(&c);
@@ -3044,6 +3045,7 @@ fn refine_holder_impl(s: &str, in_copyright_context: bool) -> Option<String> {
         h = remove_comma_between_person_and_company_suffix(&h);
     }
     h = strip_trailing_by_person_clause_after_company(&h);
+    h = strip_trailing_division_of_company_suffix(&h);
     h = strip_leading_ecos_title(&h);
     h = strip_trailing_et_al(&h);
     h = strip_trailing_authors_clause(&h);
@@ -3132,6 +3134,23 @@ fn strip_trailing_but_suffix(s: &str) -> String {
     cap.name("prefix")
         .map(|m| m.as_str().trim_end().to_string())
         .unwrap_or_else(|| s.to_string())
+}
+
+fn strip_trailing_division_of_company_suffix(s: &str) -> String {
+    static DIVISION_OF_RE: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(r"(?i)^(?P<prefix>.+?),\s*a\s+division\s+of\s+.+$").unwrap());
+
+    let trimmed = s.trim();
+    let Some(cap) = DIVISION_OF_RE.captures(trimmed) else {
+        return s.to_string();
+    };
+
+    let prefix = cap.name("prefix").map(|m| m.as_str()).unwrap_or("").trim();
+    if prefix.is_empty() || !prefix_has_holder_words(prefix) {
+        return s.to_string();
+    }
+
+    prefix.trim_end_matches(&[',', ' '][..]).trim().to_string()
 }
 
 fn strip_trailing_linux_ag_location(s: &str) -> String {
