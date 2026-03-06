@@ -934,6 +934,14 @@ fn test_refine_copyright_strips_trailing_authors_clause() {
 }
 
 #[test]
+fn test_refine_copyright_strips_trailing_document_authors_clause() {
+    let result = refine_copyright(
+        "Copyright (c) 2011 Joyent, Inc. and the persons identified as document authors.",
+    );
+    assert_eq!(result, Some("Copyright (c) 2011 Joyent, Inc.".to_string()));
+}
+
+#[test]
 fn test_refine_copyright_keeps_authors_clause_when_multiple_names() {
     let result = refine_copyright(
         "Copyright (c) 2006-2008 One Laptop Per Child Authors Zephaniah E. Hull Andres Salomon <dilinger@debian.org>",
@@ -955,6 +963,12 @@ fn test_refine_copyright_keeps_authors_when_part_of_product_name() {
         result,
         Some("Copyright (c) 2019 The Bootstrap Authors https://getbootstrap.com".to_string())
     );
+}
+
+#[test]
+fn test_refine_holder_strips_trailing_document_authors_clause() {
+    let result = refine_holder("Joyent, Inc. and the persons identified as document authors.");
+    assert_eq!(result, Some("Joyent, Inc.".to_string()));
 }
 
 #[test]

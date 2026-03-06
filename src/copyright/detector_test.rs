@@ -1959,6 +1959,25 @@ fn test_detect_contributors_et_al() {
 }
 
 #[test]
+fn test_detect_joyent_document_authors_keeps_company_prefix() {
+    let input = "Copyright (c) 2011 Joyent, Inc. and the persons identified as document authors.";
+    let (c, h, a) = detect_copyrights_from_text(input);
+
+    assert!(
+        c.iter()
+            .any(|cr| cr.copyright == "Copyright (c) 2011 Joyent, Inc."),
+        "Missing Joyent copyright, got: {:?}",
+        c.iter().map(|cr| &cr.copyright).collect::<Vec<_>>()
+    );
+    assert!(
+        h.iter().any(|ho| ho.holder == "Joyent, Inc."),
+        "Missing Joyent holder, got: {:?}",
+        h.iter().map(|ho| &ho.holder).collect::<Vec<_>>()
+    );
+    assert!(a.is_empty(), "Unexpected authors detected: {:?}", a);
+}
+
+#[test]
 fn test_detect_not_copyrighted_statement() {
     let input = "Not copyrighted 1992 by Mark Adler";
     let (c, h, _a) = detect_copyrights_from_text(input);
