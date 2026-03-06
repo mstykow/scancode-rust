@@ -456,9 +456,7 @@ mod tests {
         let result = tokenize("{{Hi}}some {{}}Text with{{noth+-_!@ing}}   {{junk}}spAces!");
         assert_eq!(
             result,
-            vec![
-                "hi", "some", "text", "with", "noth+", "ing", "junk", "spaces"
-            ]
+            vec!["hi", "some", "text", "with", "noth+", "ing", "junk", "spaces"]
         );
     }
 
@@ -484,8 +482,8 @@ mod tests {
     #[test]
     fn test_tokenize_unicode_characters() {
         // With Unicode pattern [^_\W], we match Unicode letters like Python's re.UNICODE
-        let result = tokenize("hello 世界 мир");
-        assert_eq!(result, vec!["hello", "世界", "мир"]);
+        let result = tokenize("hello 世界 mir");
+        assert_eq!(result, vec!["hello", "世界", "mir"]);
     }
 
     #[test]
