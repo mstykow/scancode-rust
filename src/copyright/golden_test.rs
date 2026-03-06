@@ -351,6 +351,11 @@ mod tests {
     }
 
     #[test]
+    fn test_golden_bare_inline_holders() {
+        run_golden_test("testdata/copyright-golden/bare-inline-holders");
+    }
+
+    #[test]
     fn test_fixture_transfig_with_parts() {
         let yaml_path = PathBuf::from(
             "testdata/copyright-golden/copyrights/transfig_with_parts-transfig.copyright.yml",
