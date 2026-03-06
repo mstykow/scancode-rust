@@ -409,13 +409,12 @@ fn extract_email_url_information(
         return;
     }
 
-    let config = DetectionConfig {
-        max_emails: text_options.max_emails,
-        max_urls: text_options.max_urls,
-        unique: true,
-    };
-
     if text_options.detect_emails {
+        let config = DetectionConfig {
+            max_emails: text_options.max_emails,
+            max_urls: text_options.max_urls,
+            unique: false,
+        };
         let emails = finder::find_emails(text_content, &config)
             .into_iter()
             .map(|d| OutputEmail {
@@ -428,6 +427,11 @@ fn extract_email_url_information(
     }
 
     if text_options.detect_urls {
+        let config = DetectionConfig {
+            max_emails: text_options.max_emails,
+            max_urls: text_options.max_urls,
+            unique: true,
+        };
         let urls = finder::find_urls(text_content, &config)
             .into_iter()
             .map(|d| OutputURL {
@@ -486,7 +490,6 @@ fn extract_license_information(
 
     Ok(())
 }
-
 fn process_directory(path: &Path, metadata: &fs::Metadata) -> FileInfo {
     let name = path
         .file_name()
