@@ -402,6 +402,64 @@ fn test_scanner_detects_copyrights_in_latin1_text() {
 }
 
 #[test]
+fn test_scanner_ignores_xml_namespace_garbage_in_copyright_detection() {
+    use tempfile::TempDir;
+
+    let temp_dir = TempDir::new().expect("Failed to create temp dir");
+    let test_path = temp_dir.path();
+    let fixture =
+        Path::new("testdata/copyright-golden/copyrights/view_layout2_xml-view_layout_xml.xml");
+    let content_path = test_path.join("view_layout.xml");
+    fs::copy(fixture, &content_path).expect("Failed to copy XML fixture");
+
+    let progress = hidden_progress();
+    let patterns: Vec<Pattern> = vec![];
+    let store = create_test_store();
+    let strategy = create_test_strategy(&store);
+    let options = TextDetectionOptions {
+        detect_copyrights: true,
+        detect_emails: false,
+        detect_urls: false,
+        max_emails: 50,
+        max_urls: 50,
+        timeout_seconds: 120.0,
+        scan_cache_dir: None,
+    };
+
+    let result = process_with_options(test_path, 10, progress, &patterns, &strategy, &options)
+        .expect("Scan should succeed");
+
+    let file = result
+        .files
+        .iter()
+        .find(|f| f.file_type == FileType::File && f.path.ends_with("view_layout.xml"))
+        .expect("Should find XML fixture file");
+
+    assert_eq!(
+        file.copyrights.len(),
+        1,
+        "copyrights: {:?}",
+        file.copyrights
+    );
+    assert_eq!(file.holders.len(), 1, "holders: {:?}", file.holders);
+    assert_eq!(
+        file.copyrights[0].copyright,
+        "Copyright (c) 2008 Esmertec AG."
+    );
+    assert_eq!(file.holders[0].holder, "Esmertec AG.");
+    assert!(
+        file.holders.iter().all(|h| {
+            let lower = h.holder.to_ascii_lowercase();
+            !lower.contains("xmlns")
+                && !lower.contains("android:")
+                && !lower.contains("linearlayout")
+        }),
+        "Unexpected XML garbage holders: {:?}",
+        file.holders
+    );
+}
+
+#[test]
 fn test_scanner_respects_email_url_thresholds() {
     use tempfile::TempDir;
 
