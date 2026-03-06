@@ -1,6 +1,6 @@
 # Email and URL Detection Implementation Plan
 
-> **Status**: ✅ COMPLETE — Implemented with scanner/CLI integration and local golden tests
+> **Status**: 🟡 Implemented with an open scanner text-extraction parity gap
 > **Priority**: P2 - Medium Priority
 > **Estimated Effort**: 1-2 weeks
 > **Dependencies**: None (independent of copyright and license detection)
@@ -57,6 +57,7 @@ Email and URL detection extracts email addresses and URLs from source code files
 **Notes:**
 
 - Rust intentionally keeps several beyond-parity fixes (notably extended TLD length support and IPv6/private IP correctness).
+- ⚠️ The live Rust scanner currently invokes finder detection only on buffers classified as UTF-8 in `src/scanner/process.rs`, while the Python reference finder reads through `textcode.analysis.numbered_text_lines()` and therefore covers decodable non-UTF text, PDFs with text, and some binary-string extraction paths. This is an open parity gap for runtime scanning. PEM certificate skipping is a separate intentional divergence in the scanner, not the hidden parity gap discussed here.
 
 ---
 
