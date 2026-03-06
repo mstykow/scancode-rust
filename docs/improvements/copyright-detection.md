@@ -215,7 +215,7 @@ Two upstream HTML fixtures (`url_in_html-detail_9_html.html` and `html_incorrect
 ## Status
 
 - ✅ All Python bug fixes implemented and tested
-- ✅ Full pipeline integrated into scanner (runs on all files including package manifests)
+- ⚠️ Pipeline integrated into the scanner for UTF-8 text inputs and package manifests; runtime parity with Python remains open for non-UTF text, PDFs with text, and binary-string extraction. PEM certificate skipping is a separate intentional divergence.
 - ✨ Unicode name preservation in output (Python outputs ASCII-only via `toascii`)
 - ✅ Thread-safe for parallel file processing
 - ✅ All library tests passing, golden tests stable in CI
