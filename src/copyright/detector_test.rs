@@ -2430,6 +2430,24 @@ fn test_detect_copyright_unicode_holder() {
 }
 
 #[test]
+fn test_detect_all_rights_reserved_by_unicode_holder() {
+    let text = "Copyright (C) All rights Reserved by 株式会社　朝日住宅社";
+    let (c, h, _a) = detect_copyrights_from_text(text);
+
+    assert!(
+        c.iter()
+            .any(|cr| cr.copyright == "Copyright (c) by 株式会社 朝日住宅社"),
+        "Should detect reserved-by copyright with Unicode holder: {:?}",
+        c
+    );
+    assert!(
+        h.iter().any(|hd| hd.holder == "株式会社 朝日住宅社"),
+        "Should detect Unicode holder from reserved-by line: {:?}",
+        h
+    );
+}
+
+#[test]
 fn test_detect_copyright_and_author_same_text() {
     // Adjacent lines are grouped into one candidate, so the author
     // span gets absorbed into the copyright group. Separating them
