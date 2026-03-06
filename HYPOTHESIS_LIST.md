@@ -27,28 +27,52 @@
 - **Impact**: ~15 tests
 - **Status**: PYTHON PARITY ACHIEVED (Python has same issue)
 
-### H5: Extra Matches Being Created
+### H5: Extra Matches Being Created - **INVESTIGATED**
 - **Impact**: ~15 tests (Rust produces more matches than expected)
-- **Examples**: 
-  - options.c: expected 2, got 5 matches
-  - BSD-3-Clause_AND_CC0-1.0.txt: expected 2, got 3 matches
-- **Status**: PENDING
+- **Status**: ROOT CAUSES IDENTIFIED
+
+#### H5-A: options.c - Missing rule gpl-2.0-plus_412.RULE
+- **Root cause**: Rule 412 has `minimum_coverage: 70` and `ignorable_urls`
+- **Python matches**: Lines 679-681 with rule gpl-2.0-plus_412.RULE (minimum_coverage 70)
+- **Rust matches**: 3 separate small rules (gpl-2.0-plus_225, gpl-2.0-plus_780, gpl-1.0-plus_155)
+- **Issue**: Rust's sequence matcher doesn't find rule 412 as a candidate, falls back to smaller rules
+- **Fix needed**: Improve sequence matching to handle ignorable_urls
+
+#### H5-B: BSD-3-Clause_AND_CC0-1.0.txt - Sequence matching misses rule
+- **Root cause**: Rust uses Aho-Corasick for exact matches, missing approximate match Python finds
+- **Python**: Uses bsd-new_303.RULE via sequence matching (3-seq)
+- **Rust**: Uses 2 separate Aho matches (bsd-new_302, bsd-new_304)
+- **Fix needed**: Improve sequence candidate selection
+
+#### H5-C: warranty-disclaimer over-matching
+- **Root cause**: Multiple small warranty-disclaimer rules match where larger rules should
+- **Fix needed**: Better overlap filtering or minimum_coverage enforcement
 
 ### H6: Unknown License Detection Differences
 - **Impact**: ~5 tests
-- **Examples**: 
-  - README.md: expected "unknown-license-reference" x3, got "unknown-license-reference" x2 + "unknown"
 - **Status**: PENDING
 
 ### H7: Match Ordering Differences
 - **Impact**: ~5 tests
-- **Example**: README.html: expected ["bsd-new", "bsd-simplified"], got ["bsd-simplified", "bsd-new"]
 - **Status**: PENDING
 
 ### H8: Binary File Detection
-- **Impact**: ~2 tests (adj.dat)
-- **Root cause**: Binary files should extract text or return empty detections
+- **Impact**: ~2 tests
 - **Status**: PENDING
+
+## Summary of Extra Matches Root Causes
+
+1. **Sequence matching misses rules that Python finds**:
+   - Rust falls back to smaller Aho-Corasick matches
+   - Results in more matches instead of one combined match
+
+2. **ignorable_urls not properly handled**:
+   - Rules with ignorable_urls should match with/without URL punctuation
+   - Rust doesn't generate URL variants for matching
+
+3. **minimum_coverage filtering in sequence matching**:
+   - Rules with higher minimum_coverage may be filtered out incorrectly
+   - Need to verify candidate selection respects minimum_coverage
 
 ## Investigation Protocol
 1. Pick top 3 hypotheses

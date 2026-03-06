@@ -128,6 +128,8 @@ mod golden_tests {
                 } else {
                     Ok(Some(text))
                 }
+            } else if crate::utils::text::is_source(&self.test_file) {
+                Ok(Some(crate::utils::text::remove_verbatim_escape_sequences(&text)))
             } else {
                 Ok(Some(text))
             }

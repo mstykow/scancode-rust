@@ -119,6 +119,12 @@ mod tests {
     }
 
     #[test]
+    fn test_is_source_c() {
+        assert!(is_source(&PathBuf::from("options.c")));
+        assert!(is_source(&PathBuf::from("OPTIONS.C")));
+    }
+
+    #[test]
     fn test_is_source_not_source() {
         assert!(!is_source(&PathBuf::from("README.md")));
         assert!(!is_source(&PathBuf::from("data.json")));
@@ -163,5 +169,21 @@ mod tests {
         let input = "a\\nb\\nc\\n";
         let output = remove_verbatim_escape_sequences(input);
         assert_eq!(output, "a b c ");
+    }
+
+    #[test]
+    fn test_remove_verbatim_escape_sequences_options_c_sample() {
+        let input = "Try `progname --help' for more information.\\n";
+        let output = remove_verbatim_escape_sequences(input);
+        assert_eq!(output, "Try `progname --help' for more information. ");
+    }
+
+    #[test]
+    fn test_is_source_options_c() {
+        let path = PathBuf::from("testdata/license-golden/datadriven/lic2/regression/options.c");
+        assert!(
+            is_source(&path),
+            "options.c should be recognized as source file"
+        );
     }
 }

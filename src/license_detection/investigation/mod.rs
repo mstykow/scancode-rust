@@ -47,3 +47,6 @@ mod or_expression_pipeline_test;
 
 #[cfg(test)]
 mod duplicate_license_test;
+
+#[cfg(test)]
+mod gpl_412_test;

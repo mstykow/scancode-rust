@@ -2,7 +2,7 @@
 
 use super::types::LicenseDetection;
 use super::*;
-use crate::license_detection::expression::{CombineRelation, combine_expressions};
+use crate::license_detection::expression::{combine_expressions, CombineRelation};
 use crate::license_detection::models::LicenseMatch;
 
 /// Matches with line gap > this are considered separate groups.
