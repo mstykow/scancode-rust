@@ -1612,4 +1612,14 @@ mod tests {
     fn test_golden_ics() {
         run_golden_test("testdata/copyright-golden/ics");
     }
+
+    #[test]
+    fn test_golden_non_detection_boilerplate() {
+        run_golden_test("testdata/copyright-golden/non-detection-boilerplate");
+    }
+
+    #[test]
+    fn test_golden_all_rights_reserved() {
+        run_golden_test("testdata/copyright-golden/all-rights-reserved");
+    }
 }
