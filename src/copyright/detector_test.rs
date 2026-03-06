@@ -2413,6 +2413,53 @@ fn test_detect_copyright_holder_suffix_authors_and_contributors() {
 }
 
 #[test]
+fn test_detect_copyright_holder_suffix_the_respective_contributors() {
+    let text = "Copyright (c) 2014, 2015, the respective contributors";
+    let prepared = super::super::prepare::prepare_text_line(text);
+    let tokens = get_tokens(&[(1, prepared)]);
+    let tree = parse(tokens);
+    let (copyright_idx, copyright_node) = tree
+        .iter()
+        .enumerate()
+        .find(|(_i, n)| {
+            matches!(
+                n.label(),
+                Some(TreeLabel::Copyright) | Some(TreeLabel::Copyright2)
+            )
+        })
+        .expect("Should parse a COPYRIGHT node");
+    let start = copyright_idx + 1;
+    assert!(
+        should_start_absorbing(copyright_node, &tree, start),
+        "Should start absorbing respective-contributors suffix; tree={:?}",
+        tree
+    );
+    let (trailing, _skip) = collect_trailing_orphan_tokens(copyright_node, &tree, start);
+    assert!(
+        trailing
+            .iter()
+            .any(|t| t.value.eq_ignore_ascii_case("contributors")),
+        "Trailing tokens should include 'contributors', got: {:?}",
+        trailing
+    );
+
+    let (c, h, a) = detect_copyrights_from_text(text);
+
+    assert!(
+        c.iter().any(|cr| cr.copyright == text),
+        "Should keep the full respective-contributors suffix in copyright: {:?}",
+        c
+    );
+    assert!(
+        h.iter()
+            .any(|hd| hd.holder == "the respective contributors"),
+        "Should detect 'the respective contributors' as holder: {:?}",
+        h
+    );
+    assert!(a.is_empty(), "Unexpected authors detected: {:?}", a);
+}
+
+#[test]
 fn test_detect_copyright_unicode_holder() {
     let (c, h, _a) = detect_copyrights_from_text("Copyright 2024 François Müller");
     assert!(!c.is_empty(), "Should detect copyright, got: {:?}", c);
