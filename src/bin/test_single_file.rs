@@ -42,18 +42,27 @@ fn main() {
 
     // Run detection
     let start = Instant::now();
+
+    // Use aho-only detection to debug
     let matches = engine
         .detect_matches(&text, false)
         .expect("Detection failed");
+
     let elapsed = start.elapsed();
 
     println!("Detection time: {:?}", elapsed);
     println!("Matches found: {}\n", matches.len());
 
-    for m in &matches {
+    for (i, m) in matches.iter().enumerate() {
         println!(
-            "  - {} (lines {}-{}, score {:.2})",
-            m.license_expression, m.start_line, m.end_line, m.score
+            "  {}. {} (rid={}, lines {}-{}, score {:.2}, matcher={})",
+            i,
+            m.license_expression,
+            m.rule_identifier,
+            m.start_line,
+            m.end_line,
+            m.score,
+            m.matcher
         );
     }
 }
