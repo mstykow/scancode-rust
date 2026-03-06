@@ -4,7 +4,6 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use anyhow::Error;
-use content_inspector::{ContentType, inspect};
 use glob::Pattern;
 use log::warn;
 use mime_guess::from_path;
@@ -21,7 +20,7 @@ use crate::models::{
 use crate::parsers::try_parse_file;
 use crate::progress::ScanProgress;
 use crate::scanner::{ProcessResult, TextDetectionOptions};
-use crate::utils::file::{get_creation_date, is_path_excluded};
+use crate::utils::file::{decode_bytes_to_string, get_creation_date, is_path_excluded};
 use crate::utils::hash::{calculate_md5, calculate_sha1, calculate_sha256};
 use crate::utils::language::detect_language;
 
@@ -300,30 +299,29 @@ fn extract_information_from_content(
         )));
     }
 
-    if inspect(&buffer) == ContentType::UTF_8 {
-        let text_content = crate::utils::file::decode_bytes_to_string(&buffer);
-
-        if text_options.detect_copyrights {
-            extract_copyright_information(
-                file_info_builder,
-                path,
-                &text_content,
-                text_options.timeout_seconds,
-            );
-        }
-        extract_email_url_information(file_info_builder, &text_content, text_options);
-
-        if is_timeout_exceeded(started, text_options.timeout_seconds) {
-            return Err(Error::msg(format!(
-                "Timeout before license scan (> {:.2}s)",
-                text_options.timeout_seconds
-            )));
-        }
-
-        extract_license_information(file_info_builder, text_content, scan_strategy)
-    } else {
-        Ok(())
+    let text_content = decode_bytes_to_string(&buffer);
+    if text_content.is_empty() {
+        return Ok(());
     }
+
+    if text_options.detect_copyrights {
+        extract_copyright_information(
+            file_info_builder,
+            path,
+            &text_content,
+            text_options.timeout_seconds,
+        );
+    }
+    extract_email_url_information(file_info_builder, &text_content, text_options);
+
+    if is_timeout_exceeded(started, text_options.timeout_seconds) {
+        return Err(Error::msg(format!(
+            "Timeout before license scan (> {:.2}s)",
+            text_options.timeout_seconds
+        )));
+    }
+
+    extract_license_information(file_info_builder, text_content, scan_strategy)
 }
 
 fn is_timeout_exceeded(started: Instant, timeout_seconds: f64) -> bool {
