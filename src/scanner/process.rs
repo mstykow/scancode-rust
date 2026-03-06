@@ -23,7 +23,7 @@ use crate::parsers::try_parse_file;
 use crate::progress::ScanProgress;
 use crate::scanner::{ProcessResult, TextDetectionOptions};
 use crate::utils::file::{
-    decode_bytes_to_string, extract_printable_strings, get_creation_date, is_path_excluded,
+    ExtractedTextKind, extract_text_for_detection, get_creation_date, is_path_excluded,
 };
 use crate::utils::hash::{calculate_md5, calculate_sha1, calculate_sha256};
 use crate::utils::language::detect_language;
@@ -303,19 +303,16 @@ fn extract_information_from_content(
         )));
     }
 
-    let mut text_content = decode_bytes_to_string(&buffer);
-    let mut from_binary_strings = false;
-    if text_content.is_empty() {
-        let ext = path
-            .extension()
-            .and_then(|e| e.to_str())
-            .map(|s| s.to_ascii_lowercase());
-        let allow_binary_strings = matches!(ext.as_deref(), Some("dll") | Some("exe"));
-        if allow_binary_strings {
-            text_content = extract_printable_strings(&buffer);
-            from_binary_strings = !text_content.is_empty();
-        }
+    let (text_content, text_kind) = extract_text_for_detection(path, &buffer);
+    let from_binary_strings = matches!(text_kind, ExtractedTextKind::BinaryStrings);
+
+    if is_timeout_exceeded(started, text_options.timeout_seconds) {
+        return Err(Error::msg(format!(
+            "Timeout while extracting text content (> {:.2}s)",
+            text_options.timeout_seconds
+        )));
     }
+
     if text_content.is_empty() {
         return Ok(());
     }
