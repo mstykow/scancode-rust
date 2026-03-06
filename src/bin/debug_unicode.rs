@@ -1,7 +1,7 @@
 //! Debug unicode.txt AHO match coverage
 
 use scancode_rust::license_detection::query::{PositionSpan, Query};
-use scancode_rust::license_detection::{aho_match, refine_aho_matches, LicenseDetectionEngine};
+use scancode_rust::license_detection::{LicenseDetectionEngine, aho_match, refine_aho_matches};
 use std::path::PathBuf;
 
 fn main() {

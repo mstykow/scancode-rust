@@ -789,5 +789,4 @@ mod tests {
             println!("m2.qcontains(m1): {}", m2.qcontains(m1));
         }
     }
-
 }

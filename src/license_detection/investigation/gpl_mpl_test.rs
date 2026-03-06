@@ -194,7 +194,7 @@ mod tests {
             load_licenses_from_directory, load_rules_from_directory,
         };
         use crate::license_detection::seq_match::{
-            compute_candidates_with_msets, seq_match_with_candidates, MAX_NEAR_DUPE_CANDIDATES,
+            MAX_NEAR_DUPE_CANDIDATES, compute_candidates_with_msets, seq_match_with_candidates,
         };
         use crate::license_detection::spdx_lid::spdx_lid_match;
         use crate::utils::text::strip_utf8_bom_str;
@@ -521,7 +521,7 @@ mod tests {
             load_licenses_from_directory, load_rules_from_directory,
         };
         use crate::license_detection::seq_match::{
-            compute_candidates_with_msets, MAX_NEAR_DUPE_CANDIDATES,
+            MAX_NEAR_DUPE_CANDIDATES, compute_candidates_with_msets,
         };
         use crate::utils::text::strip_utf8_bom_str;
 

@@ -6,7 +6,8 @@ use scancode_rust::license_detection::{
 use std::path::PathBuf;
 
 fn main() {
-    let path = PathBuf::from("testdata/license-golden/datadriven/external/fossology-licenses/unicode.txt");
+    let path =
+        PathBuf::from("testdata/license-golden/datadriven/external/fossology-licenses/unicode.txt");
     let bytes = std::fs::read(&path).unwrap();
     let text = String::from_utf8_lossy(&bytes).into_owned();
 
@@ -23,7 +24,10 @@ fn main() {
     let mut matched_qspans = Vec::new();
     for m in &refined_aho {
         if (m.match_coverage * 100.0).round() / 100.0 == 100.0 && m.end_token > m.start_token {
-            matched_qspans.push(scancode_rust::license_detection::query::PositionSpan::new(m.start_token, m.end_token - 1));
+            matched_qspans.push(scancode_rust::license_detection::query::PositionSpan::new(
+                m.start_token,
+                m.end_token - 1,
+            ));
         }
     }
 
@@ -32,9 +36,11 @@ fn main() {
     let mut seq_all_matches = Vec::new();
     if !skip_seq_matching {
         let whole_run = query.whole_query_run();
-        let near_dupe_candidates = compute_candidates_with_msets(index, &whole_run, true, MAX_NEAR_DUPE_CANDIDATES);
+        let near_dupe_candidates =
+            compute_candidates_with_msets(index, &whole_run, true, MAX_NEAR_DUPE_CANDIDATES);
         if !near_dupe_candidates.is_empty() {
-            let near_dupe_matches = seq_match_with_candidates(index, &whole_run, &near_dupe_candidates, &[]);
+            let near_dupe_matches =
+                seq_match_with_candidates(index, &whole_run, &near_dupe_candidates, &[]);
             seq_all_matches.extend(near_dupe_matches);
         }
         let whole_run = query.whole_query_run();
@@ -69,8 +75,14 @@ fn main() {
     println!("=== ALL unicode_42 MATCHES ===");
     for (i, m) in all_matches.iter().enumerate() {
         if m.rule_identifier == "unicode_42.RULE" {
-            println!("[{}] qstart={}, end_token={}, matcher={}, hilen={}", 
-                i, m.qstart(), m.end_token, m.matcher, m.hilen);
+            println!(
+                "[{}] qstart={}, end_token={}, matcher={}, hilen={}",
+                i,
+                m.qstart(),
+                m.end_token,
+                m.matcher,
+                m.hilen
+            );
         }
     }
 
@@ -83,20 +95,40 @@ fn main() {
             .then_with(|| b.matched_length.cmp(&a.matched_length))
             .then_with(|| a.matcher_order().cmp(&b.matcher_order()))
     });
-    
+
     println!("\n=== MATCHES AT POSITIONS 220-230 ===");
     for (i, m) in sorted.iter().enumerate() {
         if i >= 220 && i <= 230 {
-            println!("[{}] {} (qstart={}, end_token={}, hilen={}, matcher_order={})", 
-                i, m.rule_identifier, m.qstart(), m.end_token, m.hilen, m.matcher_order());
+            println!(
+                "[{}] {} (qstart={}, end_token={}, hilen={}, matcher_order={})",
+                i,
+                m.rule_identifier,
+                m.qstart(),
+                m.end_token,
+                m.hilen,
+                m.matcher_order()
+            );
         }
     }
-    
+
     // Check if unicode_42 (seq, position 225) might be contained by unicode_3
-    let u3 = sorted.iter().find(|m| m.rule_identifier == "unicode_3.RULE" && m.start_token == 985).unwrap();
-    let u42_seq = sorted.iter().find(|m| m.rule_identifier == "unicode_42.RULE" && m.matcher == "3-seq").unwrap();
-    
+    let u3 = sorted
+        .iter()
+        .find(|m| m.rule_identifier == "unicode_3.RULE" && m.start_token == 985)
+        .unwrap();
+    let u42_seq = sorted
+        .iter()
+        .find(|m| m.rule_identifier == "unicode_42.RULE" && m.matcher == "3-seq")
+        .unwrap();
+
     println!("\n=== unicode_42 (seq) CHECK ===");
-    println!("unicode_42 (seq): qstart={}, end_token={}", u42_seq.qstart(), u42_seq.end_token);
-    println!("unicode_3.qcontains(unicode_42_seq): {}", u3.qcontains(u42_seq));
+    println!(
+        "unicode_42 (seq): qstart={}, end_token={}",
+        u42_seq.qstart(),
+        u42_seq.end_token
+    );
+    println!(
+        "unicode_3.qcontains(unicode_42_seq): {}",
+        u3.qcontains(u42_seq)
+    );
 }

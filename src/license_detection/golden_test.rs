@@ -113,15 +113,17 @@ mod golden_tests {
                 .map(|buffer| extract_text_for_detection(&buffer, &self.test_file))
                 .map(|opt| opt.map(|ft| ft.text))
                 .map_err(|e| format!("Failed to read {}: {}", self.test_file.display(), e))?;
-            
+
             // Handle source map files specially - extract content from JSON
             let text = match text {
                 Some(t) => t,
                 None => return Ok(None),
             };
-            
+
             if crate::utils::sourcemap::is_sourcemap(&self.test_file) {
-                if let Some(sourcemap_content) = crate::utils::sourcemap::extract_sourcemap_content(&text) {
+                if let Some(sourcemap_content) =
+                    crate::utils::sourcemap::extract_sourcemap_content(&text)
+                {
                     Ok(Some(sourcemap_content))
                 } else {
                     Ok(Some(text))
@@ -161,7 +163,7 @@ mod golden_tests {
             // This avoids the grouping step that causes false test failures
             #[cfg(feature = "debug-pipeline")]
             eprintln!("DEBUG TEST: {}", self.name);
-            
+
             let matches = engine
                 .detect_matches(&text, unknown_licenses)
                 .map_err(|e| {
@@ -654,5 +656,4 @@ mod golden_tests {
         }
         assert_eq!(result.failed, 0, "unknown had {} failures", result.failed);
     }
-
 }

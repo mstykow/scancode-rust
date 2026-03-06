@@ -1,9 +1,9 @@
+use scancode_rust::license_detection::models::LicenseMatch;
 use scancode_rust::license_detection::query::Query;
 use scancode_rust::license_detection::{
     LicenseDetectionEngine, MAX_NEAR_DUPE_CANDIDATES, aho_match, compute_candidates_with_msets,
     merge_overlapping_matches, refine_aho_matches, seq_match_with_candidates,
 };
-use scancode_rust::license_detection::models::LicenseMatch;
 use std::path::PathBuf;
 
 fn my_filter_contained_matches(matches: &[LicenseMatch]) -> (Vec<LicenseMatch>, Vec<LicenseMatch>) {
@@ -24,7 +24,7 @@ fn my_filter_contained_matches(matches: &[LicenseMatch]) -> (Vec<LicenseMatch>, 
 
     println!("=== SIMULATING filter_contained_matches ===");
     println!("Initial matches: {}", matches.len());
-    
+
     // Find key match positions
     for (i, m) in matches.iter().enumerate() {
         if m.rule_identifier == "unicode_3.RULE" && m.start_token == 985 {
@@ -51,9 +51,15 @@ fn my_filter_contained_matches(matches: &[LicenseMatch]) -> (Vec<LicenseMatch>, 
 
             if current.qspan_eq(&next) {
                 println!("\n[AT i={}, j={}] qspan_eq MATCH:", i, j);
-                println!("  current: {} (coverage={})", current.rule_identifier, current.match_coverage);
-                println!("  next: {} (coverage={})", next.rule_identifier, next.match_coverage);
-                
+                println!(
+                    "  current: {} (coverage={})",
+                    current.rule_identifier, current.match_coverage
+                );
+                println!(
+                    "  next: {} (coverage={})",
+                    next.rule_identifier, next.match_coverage
+                );
+
                 if current.match_coverage >= next.match_coverage {
                     println!("  -> DISCARD next (lower or equal coverage)");
                     discarded.push(matches.remove(j));
@@ -68,7 +74,10 @@ fn my_filter_contained_matches(matches: &[LicenseMatch]) -> (Vec<LicenseMatch>, 
 
             if current.qcontains(&next) {
                 println!("\n[AT i={}, j={}] qcontains MATCH:", i, j);
-                println!("  current: {} qcontains next: {}", current.rule_identifier, next.rule_identifier);
+                println!(
+                    "  current: {} qcontains next: {}",
+                    current.rule_identifier, next.rule_identifier
+                );
                 println!("  -> DISCARD next");
                 discarded.push(matches.remove(j));
                 continue;
@@ -88,7 +97,8 @@ fn my_filter_contained_matches(matches: &[LicenseMatch]) -> (Vec<LicenseMatch>, 
 }
 
 fn main() {
-    let path = PathBuf::from("testdata/license-golden/datadriven/external/fossology-licenses/unicode.txt");
+    let path =
+        PathBuf::from("testdata/license-golden/datadriven/external/fossology-licenses/unicode.txt");
     let bytes = std::fs::read(&path).unwrap();
     let text = String::from_utf8_lossy(&bytes).into_owned();
 
@@ -105,7 +115,10 @@ fn main() {
     let mut matched_qspans = Vec::new();
     for m in &refined_aho {
         if (m.match_coverage * 100.0).round() / 100.0 == 100.0 && m.end_token > m.start_token {
-            matched_qspans.push(scancode_rust::license_detection::query::PositionSpan::new(m.start_token, m.end_token - 1));
+            matched_qspans.push(scancode_rust::license_detection::query::PositionSpan::new(
+                m.start_token,
+                m.end_token - 1,
+            ));
         }
     }
 
@@ -114,9 +127,11 @@ fn main() {
     let mut seq_all_matches = Vec::new();
     if !skip_seq_matching {
         let whole_run = query.whole_query_run();
-        let near_dupe_candidates = compute_candidates_with_msets(index, &whole_run, true, MAX_NEAR_DUPE_CANDIDATES);
+        let near_dupe_candidates =
+            compute_candidates_with_msets(index, &whole_run, true, MAX_NEAR_DUPE_CANDIDATES);
         if !near_dupe_candidates.is_empty() {
-            let near_dupe_matches = seq_match_with_candidates(index, &whole_run, &near_dupe_candidates, &[]);
+            let near_dupe_matches =
+                seq_match_with_candidates(index, &whole_run, &near_dupe_candidates, &[]);
             seq_all_matches.extend(near_dupe_matches);
         }
         let whole_run = query.whole_query_run();
@@ -148,14 +163,19 @@ fn main() {
     all_matches.extend(seq_all_matches.clone());
 
     let (kept, discarded) = my_filter_contained_matches(&all_matches);
-    
+
     println!("\n=== RESULT ===");
     println!("Kept: {}", kept.len());
     println!("Discarded: {}", discarded.len());
-    
+
     println!("\nKept matches:");
     for m in &kept {
-        println!("  {} (license: {}, qstart={}, end_token={})", 
-            m.rule_identifier, m.license_expression, m.qstart(), m.end_token);
+        println!(
+            "  {} (license: {}, qstart={}, end_token={})",
+            m.rule_identifier,
+            m.license_expression,
+            m.qstart(),
+            m.end_token
+        );
     }
 }

@@ -290,8 +290,8 @@ impl LicenseDetectionEngine {
                     for m in &matches {
                         if m.end_token > m.start_token {
                             let span = query::PositionSpan::new(m.start_token, m.end_token - 1);
-                            query.subtract(&span);           // Update matchables
-                            matched_qspans.push(span);        // Track matched regions
+                            query.subtract(&span); // Update matchables
+                            matched_qspans.push(span); // Track matched regions
                         }
                     }
 
@@ -521,8 +521,8 @@ impl LicenseDetectionEngine {
                     for m in &matches {
                         if m.end_token > m.start_token {
                             let span = query::PositionSpan::new(m.start_token, m.end_token - 1);
-                            query.subtract(&span);           // Update matchables
-                            matched_qspans.push(span);        // Track matched regions
+                            query.subtract(&span); // Update matchables
+                            matched_qspans.push(span); // Track matched regions
                         }
                     }
 
@@ -600,7 +600,7 @@ impl LicenseDetectionEngine {
 
         let mut sorted = refined;
         sort_matches_by_line(&mut sorted);
-        
+
         // DEBUG: Print match count
         #[cfg(feature = "debug-pipeline")]
         {

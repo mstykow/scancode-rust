@@ -1,8 +1,8 @@
 use scancode_rust::license_detection::query::Query;
 use scancode_rust::license_detection::{
-    aho_match, compute_candidates_with_msets, merge_overlapping_matches, refine_aho_matches,
-    refine_matches, refine_matches_without_false_positive_filter, seq_match_with_candidates,
-    sort_matches_by_line, LicenseDetectionEngine, MAX_NEAR_DUPE_CANDIDATES,
+    LicenseDetectionEngine, MAX_NEAR_DUPE_CANDIDATES, aho_match, compute_candidates_with_msets,
+    merge_overlapping_matches, refine_aho_matches, refine_matches,
+    refine_matches_without_false_positive_filter, seq_match_with_candidates, sort_matches_by_line,
 };
 use std::path::PathBuf;
 

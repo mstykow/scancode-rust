@@ -6,7 +6,8 @@ use scancode_rust::license_detection::{
 use std::path::PathBuf;
 
 fn main() {
-    let path = PathBuf::from("testdata/license-golden/datadriven/external/fossology-licenses/unicode.txt");
+    let path =
+        PathBuf::from("testdata/license-golden/datadriven/external/fossology-licenses/unicode.txt");
     let bytes = std::fs::read(&path).unwrap();
     let text = String::from_utf8_lossy(&bytes).into_owned();
 
@@ -24,7 +25,10 @@ fn main() {
     let mut matched_qspans = Vec::new();
     for m in &refined_aho {
         if (m.match_coverage * 100.0).round() / 100.0 == 100.0 && m.end_token > m.start_token {
-            matched_qspans.push(scancode_rust::license_detection::query::PositionSpan::new(m.start_token, m.end_token - 1));
+            matched_qspans.push(scancode_rust::license_detection::query::PositionSpan::new(
+                m.start_token,
+                m.end_token - 1,
+            ));
         }
     }
 
@@ -34,9 +38,11 @@ fn main() {
     if !skip_seq_matching {
         // All phases
         let whole_run = query.whole_query_run();
-        let near_dupe_candidates = compute_candidates_with_msets(index, &whole_run, true, MAX_NEAR_DUPE_CANDIDATES);
+        let near_dupe_candidates =
+            compute_candidates_with_msets(index, &whole_run, true, MAX_NEAR_DUPE_CANDIDATES);
         if !near_dupe_candidates.is_empty() {
-            let near_dupe_matches = seq_match_with_candidates(index, &whole_run, &near_dupe_candidates, &[]);
+            let near_dupe_matches =
+                seq_match_with_candidates(index, &whole_run, &near_dupe_candidates, &[]);
             seq_all_matches.extend(near_dupe_matches);
         }
         let whole_run = query.whole_query_run();
@@ -80,34 +86,52 @@ fn main() {
     // Find the key matches in sorted order
     println!("=== KEY MATCHES IN SORTED ORDER ===");
     for (i, m) in sorted.iter().enumerate() {
-        if (m.rule_identifier == "unicode_3.RULE" && m.start_token == 985) ||
-           m.rule_identifier == "unicode_40.RULE" ||
-           (m.rule_identifier == "unicode_42.RULE" && m.matcher == "2-aho") {
-            println!("[{}] {} (qstart={}, end_token={}, hilen={}, len={}, matcher_order={})", 
-                i, m.rule_identifier, m.qstart(), m.end_token, m.hilen, m.matched_length, m.matcher_order());
+        if (m.rule_identifier == "unicode_3.RULE" && m.start_token == 985)
+            || m.rule_identifier == "unicode_40.RULE"
+            || (m.rule_identifier == "unicode_42.RULE" && m.matcher == "2-aho")
+        {
+            println!(
+                "[{}] {} (qstart={}, end_token={}, hilen={}, len={}, matcher_order={})",
+                i,
+                m.rule_identifier,
+                m.qstart(),
+                m.end_token,
+                m.hilen,
+                m.matched_length,
+                m.matcher_order()
+            );
         }
     }
 
     // Now check what happens in filter_contained_matches
     println!("\n=== SIMULATING filter_contained_matches ===");
-    
+
     // Find positions
-    let unicode_3_pos = sorted.iter().position(|m| m.rule_identifier == "unicode_3.RULE" && m.start_token == 985).unwrap();
-    let unicode_40_pos = sorted.iter().position(|m| m.rule_identifier == "unicode_40.RULE").unwrap();
-    let unicode_42_pos = sorted.iter().position(|m| m.rule_identifier == "unicode_42.RULE" && m.matcher == "2-aho").unwrap();
-    
+    let unicode_3_pos = sorted
+        .iter()
+        .position(|m| m.rule_identifier == "unicode_3.RULE" && m.start_token == 985)
+        .unwrap();
+    let unicode_40_pos = sorted
+        .iter()
+        .position(|m| m.rule_identifier == "unicode_40.RULE")
+        .unwrap();
+    let unicode_42_pos = sorted
+        .iter()
+        .position(|m| m.rule_identifier == "unicode_42.RULE" && m.matcher == "2-aho")
+        .unwrap();
+
     println!("unicode_3 at position {}", unicode_3_pos);
     println!("unicode_40 at position {}", unicode_40_pos);
     println!("unicode_42 at position {}", unicode_42_pos);
-    
+
     // Check containment
     let u3 = &sorted[unicode_3_pos];
     let u40 = &sorted[unicode_40_pos];
     let u42 = &sorted[unicode_42_pos];
-    
+
     println!("\nu3.qcontains(u40) = {}", u3.qcontains(u40));
     println!("u3.qcontains(u42) = {}", u3.qcontains(u42));
-    
+
     // The issue: u3 comes BEFORE u40 (position 194 vs 195), so when processing u3 at i=194:
     // j=195 (u40), u3.qcontains(u40) = true, so u40 is DISCARDED
     // j=196 (next match), but u42 has qstart=1127 which is > u3.end_token=1468? No, 1127 < 1468
@@ -116,6 +140,6 @@ fn main() {
     // u42.end_token = 1468, u3.end_token = 1468, so 1468 > 1468 = false, so we continue
     // Then u3.qcontains(u42) = false, so u42 is NOT discarded
     // j++, continue...
-    
+
     // But u42 is NOT being returned either! Let me check what's happening...
 }

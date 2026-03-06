@@ -8,6 +8,7 @@
 
 #[cfg(test)]
 mod tests {
+    use crate::license_detection::LicenseDetectionEngine;
     use crate::license_detection::aho_match::aho_match;
     use crate::license_detection::hash_match::hash_match;
     use crate::license_detection::match_refine::{
@@ -18,10 +19,9 @@ mod tests {
     use crate::license_detection::models::LicenseMatch;
     use crate::license_detection::query::Query;
     use crate::license_detection::seq_match::{
-        compute_candidates_with_msets, seq_match_with_candidates, MAX_NEAR_DUPE_CANDIDATES,
+        MAX_NEAR_DUPE_CANDIDATES, compute_candidates_with_msets, seq_match_with_candidates,
     };
     use crate::license_detection::spdx_lid::spdx_lid_match;
-    use crate::license_detection::LicenseDetectionEngine;
     use once_cell::sync::Lazy;
     use std::path::PathBuf;
     use std::sync::Once;
