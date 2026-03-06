@@ -126,4 +126,53 @@ mod tests {
             ]
         );
     }
+
+    #[test]
+    fn scanner_skips_pem_certificate_text_detection() {
+        let options = TextDetectionOptions {
+            detect_copyrights: true,
+            detect_emails: true,
+            detect_urls: true,
+            max_emails: 50,
+            max_urls: 50,
+            timeout_seconds: 120.0,
+            scan_cache_dir: None,
+        };
+        let pem_fixture = concat!(
+            "-----BEGIN CERTIFICATE-----\n",
+            "MIID8TCCAtmgAwIBAgIQQT1yx/RrH4FDffHSKFTfmjANBgkqhkiG9w0BAQUFADCB\n",
+            "ijELMAkGA1UEBhMCQ0gxEDAOBgNVBAoTB1dJU2VLZXkxGzAZBgNVBAsTEkNvcHly\n",
+            "-----END CERTIFICATE-----\n",
+            "Certificate:\n",
+            "    Data:\n",
+            "        Signature Algorithm: sha1WithRSAEncryption\n",
+            "        Issuer: C=CH, O=WISeKey, OU=Copyright (c) 2005, OU=OISTE Foundation Endorsed\n",
+            "        Subject: C=CH, O=WISeKey, OU=Copyright (c) 2005, OU=OISTE Foundation Endorsed\n",
+            "        Contact: cert-owner@example.com\n",
+        );
+        let scanned = scan_single_file("cert.pem", pem_fixture, &options);
+
+        assert!(
+            scanned.copyrights.is_empty(),
+            "copyrights: {:#?}",
+            scanned.copyrights
+        );
+        assert!(
+            scanned.holders.is_empty(),
+            "holders: {:#?}",
+            scanned.holders
+        );
+        assert!(
+            scanned.authors.is_empty(),
+            "authors: {:#?}",
+            scanned.authors
+        );
+        assert!(scanned.emails.is_empty(), "emails: {:#?}", scanned.emails);
+        assert!(scanned.urls.is_empty(), "urls: {:#?}", scanned.urls);
+        assert!(
+            scanned.license_detections.is_empty(),
+            "licenses: {:#?}",
+            scanned.license_detections
+        );
+    }
 }
