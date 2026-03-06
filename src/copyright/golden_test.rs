@@ -346,6 +346,11 @@ mod tests {
     }
 
     #[test]
+    fn test_golden_portions_held_by_others() {
+        run_golden_test("testdata/copyright-golden/portions-held-by-others");
+    }
+
+    #[test]
     fn test_fixture_transfig_with_parts() {
         let yaml_path = PathBuf::from(
             "testdata/copyright-golden/copyrights/transfig_with_parts-transfig.copyright.yml",
