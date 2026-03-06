@@ -26,6 +26,61 @@ fn hidden_progress() -> Arc<ScanProgress> {
     Arc::new(ScanProgress::new(ProgressMode::Quiet))
 }
 
+fn build_text_pdf(lines: &[&str]) -> Vec<u8> {
+    fn escape_pdf_text(text: &str) -> String {
+        text.replace('\\', "\\\\")
+            .replace('(', "\\(")
+            .replace(')', "\\)")
+    }
+
+    let mut content = String::from("BT\n/F1 12 Tf\n72 720 Td\n");
+    for (index, line) in lines.iter().enumerate() {
+        if index > 0 {
+            content.push_str("0 -16 Td\n");
+        }
+        content.push_str(&format!("({}) Tj\n", escape_pdf_text(line)));
+    }
+    content.push_str("ET\n");
+
+    let objects = [
+        "1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n".to_string(),
+        "2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n".to_string(),
+        "3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>\nendobj\n".to_string(),
+        format!(
+            "4 0 obj\n<< /Length {} >>\nstream\n{}endstream\nendobj\n",
+            content.len(),
+            content
+        ),
+        "5 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n"
+            .to_string(),
+    ];
+
+    let mut pdf = b"%PDF-1.4\n".to_vec();
+    let mut offsets = vec![0usize];
+    for object in objects {
+        offsets.push(pdf.len());
+        pdf.extend_from_slice(object.as_bytes());
+    }
+
+    let xref_offset = pdf.len();
+    pdf.extend_from_slice(format!("xref\n0 {}\n", offsets.len()).as_bytes());
+    pdf.extend_from_slice(b"0000000000 65535 f \n");
+    for offset in offsets.iter().skip(1) {
+        pdf.extend_from_slice(format!("{:010} 00000 n \n", offset).as_bytes());
+    }
+
+    pdf.extend_from_slice(
+        format!(
+            "trailer\n<< /Size {} /Root 1 0 R >>\nstartxref\n{}\n%%EOF\n",
+            offsets.len(),
+            xref_offset
+        )
+        .as_bytes(),
+    );
+
+    pdf
+}
+
 #[test]
 fn test_scanner_discovers_all_registered_parsers() {
     let test_dir = "testdata/integration/multi-parser";
@@ -399,6 +454,115 @@ fn test_scanner_detects_copyrights_in_latin1_text() {
     assert_eq!(file.holders[0].holder, "François Müller");
     assert_eq!(file.holders[0].start_line, 1);
     assert_eq!(file.holders[0].end_line, 1);
+}
+
+#[test]
+fn test_scanner_detects_copyrights_in_pdf_text() {
+    use tempfile::TempDir;
+
+    let temp_dir = TempDir::new().expect("Failed to create temp dir");
+    let test_path = temp_dir.path();
+    let content_path = test_path.join("notice.pdf");
+    let pdf = build_text_pdf(&["Copyright 2024 Example Corp.", "All rights reserved."]);
+    fs::write(&content_path, pdf).expect("Failed to write PDF fixture");
+
+    let progress = hidden_progress();
+    let patterns: Vec<Pattern> = vec![];
+    let store = create_test_store();
+    let strategy = create_test_strategy(&store);
+    let options = TextDetectionOptions {
+        detect_copyrights: true,
+        detect_emails: false,
+        detect_urls: false,
+        max_emails: 50,
+        max_urls: 50,
+        timeout_seconds: 120.0,
+        scan_cache_dir: None,
+    };
+
+    let result = process_with_options(test_path, 10, progress, &patterns, &strategy, &options)
+        .expect("Scan should succeed");
+
+    let file = result
+        .files
+        .iter()
+        .find(|f| f.file_type == FileType::File && f.path.ends_with("notice.pdf"))
+        .expect("Should find PDF file");
+
+    assert!(
+        file.copyrights
+            .iter()
+            .any(|c| c.copyright == "Copyright 2024 Example Corp."),
+        "copyrights: {:?}",
+        file.copyrights
+    );
+    assert!(
+        file.holders.iter().any(|h| h.holder == "Example Corp."),
+        "holders: {:?}",
+        file.holders
+    );
+}
+
+#[test]
+fn test_scanner_detects_emails_and_urls_in_pdf_text() {
+    use tempfile::TempDir;
+
+    let temp_dir = TempDir::new().expect("Failed to create temp dir");
+    let test_path = temp_dir.path();
+    let content_path = test_path.join("contacts.pdf");
+    let pdf = build_text_pdf(&["Reach us at legal@acme.org", "https://acme.org/support"]);
+    let (extracted_text, _) =
+        scancode_rust::utils::file::extract_text_for_detection(&content_path, &pdf);
+    fs::write(&content_path, pdf).expect("Failed to write PDF fixture");
+
+    assert!(
+        extracted_text.contains("legal@acme.org"),
+        "extracted_text: {:?}",
+        extracted_text
+    );
+    assert!(
+        extracted_text.contains("https://acme.org/support"),
+        "extracted_text: {:?}",
+        extracted_text
+    );
+
+    let progress = hidden_progress();
+    let patterns: Vec<Pattern> = vec![];
+    let store = create_test_store();
+    let strategy = create_test_strategy(&store);
+    let options = TextDetectionOptions {
+        detect_copyrights: false,
+        detect_emails: true,
+        detect_urls: true,
+        max_emails: 50,
+        max_urls: 50,
+        timeout_seconds: 120.0,
+        scan_cache_dir: None,
+    };
+
+    let result = process_with_options(test_path, 10, progress, &patterns, &strategy, &options)
+        .expect("Scan should succeed");
+
+    let file = result
+        .files
+        .iter()
+        .find(|f| f.file_type == FileType::File && f.path.ends_with("contacts.pdf"))
+        .expect("Should find PDF file");
+
+    assert!(
+        file.emails
+            .iter()
+            .any(|email| email.email == "legal@acme.org"),
+        "emails: {:?}",
+        file.emails
+    );
+    assert!(
+        file.urls
+            .iter()
+            .any(|url| url.url == "https://acme.org/support"),
+        "urls: {:?}",
+        file.urls
+    );
 }
 
 #[test]
