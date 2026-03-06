@@ -356,6 +356,11 @@ mod tests {
     }
 
     #[test]
+    fn test_golden_assembly_year_only_copyrights() {
+        run_golden_test("testdata/copyright-golden/assembly-year-only-copyrights");
+    }
+
+    #[test]
     fn test_fixture_transfig_with_parts() {
         let yaml_path = PathBuf::from(
             "testdata/copyright-golden/copyrights/transfig_with_parts-transfig.copyright.yml",
