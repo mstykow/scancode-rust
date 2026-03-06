@@ -460,6 +460,95 @@ fn test_scanner_ignores_xml_namespace_garbage_in_copyright_detection() {
 }
 
 #[test]
+fn test_scanner_detects_copyrights_in_windows_dll_strings() {
+    use tempfile::TempDir;
+
+    let temp_dir = TempDir::new().expect("Failed to create temp dir");
+    let test_path = temp_dir.path();
+    let fixture = Path::new("testdata/copyright-golden/copyrights/windows.dll");
+    let content_path = test_path.join("windows.dll");
+    fs::copy(fixture, &content_path).expect("Failed to copy DLL fixture");
+
+    let progress = hidden_progress();
+    let patterns: Vec<Pattern> = vec![];
+    let store = create_test_store();
+    let strategy = create_test_strategy(&store);
+    let options = TextDetectionOptions {
+        detect_copyrights: true,
+        detect_emails: false,
+        detect_urls: false,
+        max_emails: 50,
+        max_urls: 50,
+        timeout_seconds: 120.0,
+        scan_cache_dir: None,
+    };
+
+    let result = process_with_options(test_path, 10, progress, &patterns, &strategy, &options)
+        .expect("Scan should succeed");
+
+    let file = result
+        .files
+        .iter()
+        .find(|f| f.file_type == FileType::File && f.path.ends_with("windows.dll"))
+        .expect("Should find DLL fixture file");
+
+    assert!(
+        file.copyrights
+            .iter()
+            .any(|c| c.copyright == "Copyright nexB and others (c) 2012"),
+        "copyrights: {:?}",
+        file.copyrights
+    );
+    assert!(
+        file.holders.iter().any(|h| h.holder == "nexB and others"),
+        "holders: {:?}",
+        file.holders
+    );
+}
+
+#[test]
+fn test_scanner_avoids_false_positive_copyrights_in_executable_strings() {
+    use tempfile::TempDir;
+
+    let temp_dir = TempDir::new().expect("Failed to create temp dir");
+    let test_path = temp_dir.path();
+    let fixture = Path::new("testdata/misc/test_nsis.exe");
+    let content_path = test_path.join("test_nsis.exe");
+    fs::copy(fixture, &content_path).expect("Failed to copy executable fixture");
+
+    let progress = hidden_progress();
+    let patterns: Vec<Pattern> = vec![];
+    let store = create_test_store();
+    let strategy = create_test_strategy(&store);
+    let options = TextDetectionOptions {
+        detect_copyrights: true,
+        detect_emails: false,
+        detect_urls: false,
+        max_emails: 50,
+        max_urls: 50,
+        timeout_seconds: 120.0,
+        scan_cache_dir: None,
+    };
+
+    let result = process_with_options(test_path, 10, progress, &patterns, &strategy, &options)
+        .expect("Scan should succeed");
+
+    let file = result
+        .files
+        .iter()
+        .find(|f| f.file_type == FileType::File && f.path.ends_with("test_nsis.exe"))
+        .expect("Should find executable fixture file");
+
+    assert!(
+        file.copyrights.is_empty(),
+        "copyrights: {:?}",
+        file.copyrights
+    );
+    assert!(file.holders.is_empty(), "holders: {:?}", file.holders);
+    assert!(file.authors.is_empty(), "authors: {:?}", file.authors);
+}
+
+#[test]
 fn test_scanner_respects_email_url_thresholds() {
     use tempfile::TempDir;
 
