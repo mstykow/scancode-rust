@@ -25,6 +25,14 @@ use crate::utils::file::{get_creation_date, is_path_excluded};
 use crate::utils::hash::{calculate_md5, calculate_sha1, calculate_sha256};
 use crate::utils::language::detect_language;
 
+const PEM_CERTIFICATE_HEADERS: &[(&str, &str)] = &[
+    ("-----BEGIN CERTIFICATE-----", "-----END CERTIFICATE-----"),
+    (
+        "-----BEGIN TRUSTED CERTIFICATE-----",
+        "-----END TRUSTED CERTIFICATE-----",
+    ),
+];
+
 /// Scan a directory tree and produce [`ProcessResult`] entries.
 ///
 /// This traverses files/directories up to `max_depth`, applies exclusion
@@ -251,6 +259,10 @@ fn extract_information_from_content(
         .md5(Some(calculate_md5(&buffer)))
         .sha256(Some(sha256.clone()))
         .programming_language(Some(detect_language(path, &buffer)));
+
+    if should_skip_text_detection(path, &buffer) {
+        return Ok(());
+    }
 
     if let Some(scan_results_dir) = text_options.scan_cache_dir.as_deref() {
         let options_fingerprint = scan_cache_fingerprint(text_options);
@@ -490,6 +502,27 @@ fn extract_license_information(
 
     Ok(())
 }
+
+fn should_skip_text_detection(path: &Path, buffer: &[u8]) -> bool {
+    is_pem_certificate_file(path, buffer)
+}
+
+fn is_pem_certificate_file(_path: &Path, buffer: &[u8]) -> bool {
+    let prefix_len = buffer.len().min(8192);
+    let prefix = String::from_utf8_lossy(&buffer[..prefix_len]);
+    let trimmed_lines: Vec<&str> = prefix
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .take(64)
+        .collect();
+
+    PEM_CERTIFICATE_HEADERS.iter().any(|(begin, end)| {
+        trimmed_lines.iter().any(|line| line == begin)
+            && trimmed_lines.iter().any(|line| line == end)
+    })
+}
+
 fn process_directory(path: &Path, metadata: &fs::Metadata) -> FileInfo {
     let name = path
         .file_name()
