@@ -189,63 +189,30 @@ pub fn filter_overlapping_matches(
 
             let different_licenses = matches[i].license_expression != matches[j].license_expression;
 
-            let current_wins_on_candidate = {
-                let current_resemblance = matches[i].candidate_resemblance;
-                let next_resemblance = matches[j].candidate_resemblance;
-                let current_containment = matches[i].candidate_containment;
-                let next_containment = matches[j].candidate_containment;
-
-                if current_resemblance > next_resemblance {
-                    true
-                } else if current_resemblance < next_resemblance {
-                    false
-                } else if current_containment > next_containment {
-                    true
-                } else if current_containment < next_containment {
-                    false
-                } else {
-                    current_hilen >= next_hilen
-                }
-            };
-
-            let both_have_candidate_scores =
-                matches[i].candidate_resemblance > 0.0 && matches[j].candidate_resemblance > 0.0;
+            // Note: We do NOT use candidate_resemblance for tie-breaking here.
+            // candidate_resemblance is a GLOBAL measure based on multiset intersection
+            // over the entire query and rule, not the actual matched region.
+            // Using it for LOCAL overlap decisions produces wrong results.
+            // See: CC-BY-SA-2.0 vs CC-BY-NC-SA-2.0 where NC-SA has higher
+            // candidate_resemblance but lower actual coverage.
 
             if extra_large_next && current_len_val >= next_len_val {
-                if different_licenses && both_have_candidate_scores && !current_wins_on_candidate {
-                    discarded.push(matches.remove(i));
-                    i = i.saturating_sub(1);
-                    break;
-                }
                 discarded.push(matches.remove(j));
                 continue;
             }
 
             if extra_large_current && current_len_val <= next_len_val {
-                if different_licenses && both_have_candidate_scores && current_wins_on_candidate {
-                    discarded.push(matches.remove(j));
-                    continue;
-                }
                 discarded.push(matches.remove(i));
                 i = i.saturating_sub(1);
                 break;
             }
 
             if large_next && current_len_val >= next_len_val && current_hilen >= next_hilen {
-                if different_licenses && both_have_candidate_scores && !current_wins_on_candidate {
-                    discarded.push(matches.remove(i));
-                    i = i.saturating_sub(1);
-                    break;
-                }
                 discarded.push(matches.remove(j));
                 continue;
             }
 
             if large_current && current_len_val <= next_len_val && current_hilen <= next_hilen {
-                if different_licenses && both_have_candidate_scores && current_wins_on_candidate {
-                    discarded.push(matches.remove(j));
-                    continue;
-                }
                 discarded.push(matches.remove(i));
                 i = i.saturating_sub(1);
                 break;

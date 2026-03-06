@@ -1,36 +1,53 @@
-# Hypothesis List for 90 Failing Golden Tests
+# Hypothesis List for 82 Failing Golden Tests
+
+## Progress
+- Started: 96 failing tests
+- After MAX_DIST fix: 90 failing tests  
+- After minimum_containment fix: 82 failing tests (**14 tests fixed, 14.6% improvement**)
 
 ## Active Hypotheses
 
 ### H1: QueryRun Splitting Disabled
 - **Impact**: ~25 tests (missing detections)
 - **Root cause**: QueryRun splitting is disabled, files with 4+ blank lines between licenses don't get separate matches
-- **Investigation**: Compare Python vs Rust on files with multiple license sections
 - **Status**: PENDING
 
 ### H2: Multi-Occurrence Deduplication
 - **Impact**: ~25 tests (missing detections of same license at different locations)
 - **Root cause IDENTIFIED**: Containment filtering removes 100% Aho matches when covered by larger seq match
-- **Example**: flex-readme.txt has 3 Aho matches, but 1 seq match covers them all
-- **Python behavior**: Produces 3 separate detections (TBD how)
+- **Example**: dojo.js expected 4 matches, got 3
 - **Status**: INVESTIGATED - Need to understand Python's detection grouping
 
-### H3: Required Phrase Validation Missing
-- **Impact**: ~20 tests (CC-BY-SA detected as CC-BY-NC-SA)
-- **Root cause IDENTIFIED**: NOT required phrases - candidate tie-breaking issue
-- **Actual issue**: Sequence matcher gives same scores to SA and NC-SA rules
-- **Status**: INVESTIGATED - Need better candidate ranking
+### H3: CC-BY-SA vs CC-BY-NC-SA - **FIXED**
+- **Root cause**: NC-SA got higher candidate_resemblance than SA despite matching less text
+- **Fix**: Added minimum_containment check to candidate selection
+- **Result**: CC-BY-SA tests now pass
 
-### H4: German Text Character Normalization
+### H4: German Text ß Character
 - **Impact**: ~15 tests
-- **Root cause IDENTIFIED**: German "ß" not normalized to "ss" in tokenization
-- **Example**: "gemäß" doesn't match "gemass" in GPL rules
-- **Fix READY**: Add German character normalization in tokenize.rs
-- **Status**: READY TO IMPLEMENT
+- **Status**: PYTHON PARITY ACHIEVED (Python has same issue)
 
-### H6: Binary File Detection
-- **Impact**: ~2 tests
-- **Root cause**: Binary files should return empty detections
+### H5: Extra Matches Being Created
+- **Impact**: ~15 tests (Rust produces more matches than expected)
+- **Examples**: 
+  - options.c: expected 2, got 5 matches
+  - BSD-3-Clause_AND_CC0-1.0.txt: expected 2, got 3 matches
+- **Status**: PENDING
+
+### H6: Unknown License Detection Differences
+- **Impact**: ~5 tests
+- **Examples**: 
+  - README.md: expected "unknown-license-reference" x3, got "unknown-license-reference" x2 + "unknown"
+- **Status**: PENDING
+
+### H7: Match Ordering Differences
+- **Impact**: ~5 tests
+- **Example**: README.html: expected ["bsd-new", "bsd-simplified"], got ["bsd-simplified", "bsd-new"]
+- **Status**: PENDING
+
+### H8: Binary File Detection
+- **Impact**: ~2 tests (adj.dat)
+- **Root cause**: Binary files should extract text or return empty detections
 - **Status**: PENDING
 
 ## Investigation Protocol

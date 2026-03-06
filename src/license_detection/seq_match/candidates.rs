@@ -1,9 +1,9 @@
 //! Candidate selection using set and multiset similarity.
 
-use crate::license_detection::index::LicenseIndex;
 use crate::license_detection::index::token_sets::{
     build_set_and_mset, high_multiset_subset, high_tids_set_subset, tids_set_counter,
 };
+use crate::license_detection::index::LicenseIndex;
 use crate::license_detection::models::Rule;
 use crate::license_detection::query::QueryRun;
 use std::collections::{HashMap, HashSet};
@@ -351,6 +351,15 @@ pub fn compute_candidates_with_msets(
         let containment = matched_length as f32 / iset_len as f32;
         let amplified_resemblance = resemblance.powi(2);
 
+        // Check minimum_containment (Python: match_set.py:429-433)
+        // Rules with minimum_coverage require a minimum containment ratio
+        let minimum_containment = rule.minimum_coverage.map(|mc| mc as f32 / 100.0);
+        if let Some(min_cont) = minimum_containment {
+            if containment < min_cont {
+                continue;
+            }
+        }
+
         let svr = ScoresVector {
             is_highly_resemblant: (resemblance * 10.0).round() / 10.0 >= HIGH_RESEMBLANCE_THRESHOLD,
             containment: (containment * 10.0).round() / 10.0,
@@ -411,6 +420,15 @@ pub fn compute_candidates_with_msets(
         let resemblance = matched_length as f32 / union_len as f32;
         let containment = matched_length as f32 / iset_len as f32;
         let amplified_resemblance = resemblance.powi(2);
+
+        // Check minimum_containment (Python: match_set.py:429-433)
+        // Rules with minimum_coverage require a minimum containment ratio
+        let minimum_containment = rule.minimum_coverage.map(|mc| mc as f32 / 100.0);
+        if let Some(min_cont) = minimum_containment {
+            if containment < min_cont {
+                continue;
+            }
+        }
 
         let score_vec_rounded = ScoresVector {
             is_highly_resemblant: (resemblance * 10.0).round() / 10.0 >= HIGH_RESEMBLANCE_THRESHOLD,

@@ -13,11 +13,11 @@ use std::path::PathBuf;
 
 use anyhow::Result;
 use scancode_rust::license_detection::{
-    LicenseDetectionEngine, MAX_NEAR_DUPE_CANDIDATES, aho_match, compute_candidates_with_msets,
-    create_detection_from_group, group_matches_by_region, hash_match, merge_overlapping_matches,
-    post_process_detections, refine_aho_matches, refine_matches,
-    refine_matches_without_false_positive_filter, seq_match_with_candidates, sort_matches_by_line,
-    spdx_lid_match, split_weak_matches,
+    aho_match, compute_candidates_with_msets, create_detection_from_group, group_matches_by_region,
+    hash_match, merge_overlapping_matches, post_process_detections, refine_aho_matches,
+    refine_matches, refine_matches_without_false_positive_filter, seq_match_with_candidates,
+    sort_matches_by_line, spdx_lid_match, split_weak_matches, LicenseDetectionEngine,
+    MAX_NEAR_DUPE_CANDIDATES,
 };
 
 #[cfg(feature = "debug-pipeline")]
@@ -138,13 +138,36 @@ fn run_debug_pipeline(file_path: &str) -> Result<()> {
     print_section("STAGE 5a: CANDIDATE SELECTION");
     let candidates =
         compute_candidates_with_msets(index, &whole_run, true, MAX_NEAR_DUPE_CANDIDATES);
+
+    // Get query multiset length for context
+    let query_tokens = whole_run.matchable_tokens();
+    let query_token_ids: Vec<u16> = query_tokens
+        .iter()
+        .filter_map(|&tid| if tid >= 0 { Some(tid as u16) } else { None })
+        .collect();
+    let (_, query_mset) =
+        scancode_rust::license_detection::index::token_sets::build_set_and_mset(&query_token_ids);
+    let qset_len: usize = query_mset.values().sum();
+    println!("Query multiset length (qset_len): {}", qset_len);
+
     println!("NEAR-DUPE CANDIDATES: {}", candidates.len());
     for (i, c) in candidates.iter().take(10).enumerate() {
+        let rule_len = if c.score_vec_full.containment > 0.0 {
+            (c.score_vec_full.matched_length / c.score_vec_full.containment) as usize
+        } else {
+            0
+        };
+        let union_len = (c.score_vec_full.matched_length as usize + rule_len
+            - c.score_vec_full.matched_length as usize);
         println!(
-            "  {}. {} (score: {:.4})",
+            "  {}. {} (resemblance: {:.4}, containment: {:.4}, matched_len: {:.0}, rule_len: {}, union_len: {})",
             i + 1,
             c.rule.identifier,
-            c.score_vec_rounded.resemblance
+            c.score_vec_full.resemblance,
+            c.score_vec_full.containment,
+            c.score_vec_full.matched_length,
+            rule_len,
+            union_len
         );
     }
 
@@ -155,9 +178,28 @@ fn run_debug_pipeline(file_path: &str) -> Result<()> {
         Vec::new()
     };
     println!("SEQUENCE MATCHES: {}", seq_matches.len());
-    for m in seq_matches.iter().take(10) {
-        println!("{}", format_match(m));
+
+    // Find CC-BY-SA and CC-BY-NC-SA matches specifically
+    let sa_matches: Vec<_> = seq_matches
+        .iter()
+        .filter(|m| {
+            m.rule_identifier.contains("cc-by-sa-2.0")
+                || m.rule_identifier.contains("cc-by-nc-sa-2.0")
+        })
+        .collect();
+
+    for m in sa_matches.iter().take(30) {
+        println!(
+            "{} matched_len={} coverage={:.1}%",
+            format_match(m),
+            m.matched_length,
+            m.match_coverage
+        );
     }
+    println!(
+        "\\n(Showing only cc-by-sa and cc-by-nc-sa matches, {} total)",
+        sa_matches.len()
+    );
 
     // Combine all matches
     // Python merges each matcher's results before adding to matches (index.py:1040)
@@ -173,6 +215,24 @@ fn run_debug_pipeline(file_path: &str) -> Result<()> {
     println!("Input matches: {}", all_matches.len());
     let merged = merge_overlapping_matches(&all_matches);
     println!("After merge: {}", merged.len());
+
+    // Show SA and NC-SA matches after merge
+    let sa_merged: Vec<_> = merged
+        .iter()
+        .filter(|m| {
+            m.rule_identifier.contains("cc-by-sa-2.0")
+                || m.rule_identifier.contains("cc-by-nc-sa-2.0")
+        })
+        .collect();
+    println!(
+        "\\nCC-BY-SA and CC-BY-NC-SA matches after merge ({} total):",
+        sa_merged.len()
+    );
+    for m in sa_merged.iter() {
+        println!("  {} lines {}-{} len={} hilen={} coverage={:.1}% match_coverage={:.1}% resemblance={:.4}",
+            m.rule_identifier, m.start_line, m.end_line,
+            m.matched_length, m.hilen, m.match_coverage, m.match_coverage, m.candidate_resemblance);
+    }
 
     // Stage 7: Refinement (with debug detail if feature enabled)
     print_section("STAGE 7: MATCH REFINEMENT");
