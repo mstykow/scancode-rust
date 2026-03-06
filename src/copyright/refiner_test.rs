@@ -672,6 +672,11 @@ fn test_refine_copyright_strips_trailing_et_al() {
 }
 
 #[test]
+fn test_refine_copyright_drops_bare_copyrighted_software_phrase() {
+    assert_eq!(refine_copyright("copyrighted software"), None);
+}
+
+#[test]
 fn test_is_junk_copyright_template_placeholders() {
     let refined = refine_copyright("Copyright 2014-$ date.year pkg.author").unwrap();
     assert!(is_junk_copyright(&refined));
@@ -807,6 +812,11 @@ fn test_refine_holder_empty() {
 #[test]
 fn test_refine_holder_junk() {
     assert_eq!(refine_holder("the"), None);
+}
+
+#[test]
+fn test_refine_holder_drops_bare_software_token() {
+    assert_eq!(refine_holder("software"), None);
 }
 
 #[test]

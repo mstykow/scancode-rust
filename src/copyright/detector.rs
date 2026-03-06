@@ -7687,6 +7687,68 @@ fn extract_bare_c_by_holder_lines(
     }
 }
 
+fn extract_all_rights_reserved_by_holder_lines(
+    content: &str,
+    copyrights: &mut Vec<CopyrightDetection>,
+    holders: &mut Vec<HolderDetection>,
+) {
+    if content.is_empty() {
+        return;
+    }
+
+    static RESERVED_BY_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r"(?i)copyright\s*\(c\)\s*all\s+rights\s+reserved\s+by\s+(?P<holder>[^\n]+)$")
+            .unwrap()
+    });
+
+    let mut seen_cr: HashSet<(usize, String)> = copyrights
+        .iter()
+        .map(|c| (c.start_line, c.copyright.clone()))
+        .collect();
+    let mut seen_h: HashSet<(usize, String)> = holders
+        .iter()
+        .map(|h| (h.start_line, h.holder.clone()))
+        .collect();
+
+    for (idx, raw) in content.lines().enumerate() {
+        let ln = idx + 1;
+        let prepared = crate::copyright::prepare::prepare_text_line(raw);
+        let line = prepared.trim();
+        if line.is_empty() {
+            continue;
+        }
+        let Some(cap) = RESERVED_BY_RE.captures(line) else {
+            continue;
+        };
+        let holder_raw = cap.name("holder").map(|m| m.as_str()).unwrap_or("").trim();
+        if holder_raw.is_empty() {
+            continue;
+        }
+
+        let raw = format!("Copyright (c) by {holder_raw}");
+        let Some(refined) = refine_copyright(&raw) else {
+            continue;
+        };
+        if seen_cr.insert((ln, refined.clone())) {
+            copyrights.push(CopyrightDetection {
+                copyright: refined,
+                start_line: ln,
+                end_line: ln,
+            });
+        }
+
+        if let Some(h) = refine_holder_in_copyright_context(holder_raw)
+            && seen_h.insert((ln, h.clone()))
+        {
+            holders.push(HolderDetection {
+                holder: h,
+                start_line: ln,
+                end_line: ln,
+            });
+        }
+    }
+}
+
 fn extract_holder_is_name_paren_email_lines(
     content: &str,
     copyrights: &mut Vec<CopyrightDetection>,

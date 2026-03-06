@@ -67,6 +67,7 @@ pub(super) fn run_phase_primary_extractions(
     super::extract_c_word_year_lines(content, copyrights, holders);
     super::extract_are_c_year_holder_lines(content, copyrights, holders);
     super::extract_bare_c_by_holder_lines(content, copyrights, holders);
+    super::extract_all_rights_reserved_by_holder_lines(content, copyrights, holders);
     super::extract_trailing_bare_c_year_range_suffixes(groups, copyrights);
     super::extract_common_year_only_lines(groups, copyrights);
     super::extract_embedded_bare_c_year_suffixes(groups, copyrights);

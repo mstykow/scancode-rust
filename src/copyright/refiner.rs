@@ -1125,6 +1125,7 @@ static COPYRIGHTS_JUNK_PATTERNS: LazyLock<Vec<Regex>> = LazyLock::new(|| {
         r"(?i)^copyright year to\b",
         r"(?i)^copyrighted - provided\b",
         r"(?i)^copyrighted by the following\b",
+        r"(?i)^copyrighted software$",
         r"(?i)^copyrighted work\b",
         r"(?i)^copyrights apply\b",
         r"(?i)^copyrights to use\b",
@@ -1335,6 +1336,7 @@ static HOLDERS_JUNK_PATTERNS: LazyLock<Vec<Regex>> = LazyLock::new(|| {
         r"(?i)\bnotifies\b",
         r"(?i)\bthe above\b",
         r"(?i)\bthe software,?$",
+        r"(?i)^software$",
         r"(?i)\bsuspend your rights\b",
         r"(?i)\bderivative works\b",
         r"(?i)\bpublicly display\b",
@@ -2080,7 +2082,10 @@ pub fn refine_copyright(s: &str) -> Option<String> {
     {
         return None;
     }
-    if is_junk_copyright_of_header(&result) || is_junk_copyrighted_works_header(&result) {
+    if is_junk_copyright_of_header(&result)
+        || is_junk_copyrighted_works_header(&result)
+        || is_junk_copyrighted_software_phrase(&result)
+    {
         return None;
     }
     if result.is_empty() {
@@ -2920,6 +2925,10 @@ fn is_junk_copyrighted_works_header(s: &str) -> bool {
     }
 
     !rest.chars().any(|c| c.is_ascii_uppercase())
+}
+
+fn is_junk_copyrighted_software_phrase(s: &str) -> bool {
+    s.trim().eq_ignore_ascii_case("copyrighted software")
 }
 
 fn strip_trailing_company_name_placeholder(s: &str) -> String {
