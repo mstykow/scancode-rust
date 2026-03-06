@@ -2003,6 +2003,7 @@ pub fn refine_copyright(s: &str) -> Option<String> {
     c = strip_trailing_short_surname_paren_list_in_copyright(&c);
     c = strip_trailing_et_al(&c);
     c = strip_trailing_authors_clause(&c);
+    c = strip_trailing_document_authors_clause(&c);
     c = strip_trailing_amp_authors(&c);
     c = strip_trailing_x509_dn_fields(&c);
     c = strip_some_punct(&c);
@@ -2545,6 +2546,30 @@ fn strip_trailing_authors_clause(s: &str) -> String {
         .to_string()
 }
 
+fn strip_trailing_document_authors_clause(s: &str) -> String {
+    static DOCUMENT_AUTHORS_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(
+            r"(?i)^(?P<prefix>.+?)\s+and\s+the\s+persons\s+identified\s+as\s+document\s+authors\.?$",
+        )
+        .unwrap()
+    });
+
+    let trimmed = s.trim();
+    let Some(cap) = DOCUMENT_AUTHORS_RE.captures(trimmed) else {
+        return s.to_string();
+    };
+
+    let prefix = cap.name("prefix").map(|m| m.as_str()).unwrap_or("").trim();
+    if prefix.is_empty() || !prefix_has_holder_words(prefix) {
+        return s.to_string();
+    }
+
+    prefix
+        .trim_end_matches(&[',', ';', ':', ' '][..])
+        .trim()
+        .to_string()
+}
+
 fn strip_trailing_et_al(s: &str) -> String {
     static ET_AL_RE: LazyLock<Regex> =
         LazyLock::new(|| Regex::new(r"(?i)^(?P<prefix>.+?)\s*,?\s*et\s+al\.?\s*$").unwrap());
@@ -3049,6 +3074,7 @@ fn refine_holder_impl(s: &str, in_copyright_context: bool) -> Option<String> {
     h = strip_leading_ecos_title(&h);
     h = strip_trailing_et_al(&h);
     h = strip_trailing_authors_clause(&h);
+    h = strip_trailing_document_authors_clause(&h);
     h = strip_trailing_amp_authors(&h);
     h = strip_trailing_x509_dn_fields_from_holder(&h);
     h = strip_leading_js_project_version(&h);
