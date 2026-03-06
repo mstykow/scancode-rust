@@ -341,6 +341,11 @@ mod tests {
     }
 
     #[test]
+    fn test_golden_collective_authors_and_contributors() {
+        run_golden_test("testdata/copyright-golden/collective-authors-and-contributors");
+    }
+
+    #[test]
     fn test_fixture_transfig_with_parts() {
         let yaml_path = PathBuf::from(
             "testdata/copyright-golden/copyrights/transfig_with_parts-transfig.copyright.yml",
