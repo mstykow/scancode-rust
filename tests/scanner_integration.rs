@@ -355,6 +355,53 @@ fn test_scanner_detects_emails_and_urls_when_enabled() {
 }
 
 #[test]
+fn test_scanner_detects_copyrights_in_latin1_text() {
+    use tempfile::TempDir;
+
+    let temp_dir = TempDir::new().expect("Failed to create temp dir");
+    let test_path = temp_dir.path();
+    let content_path = test_path.join("latin1_notice.txt");
+    let content = b"Copyright 2024 Fran\xe7ois M\xfcller\n";
+    fs::write(&content_path, content).expect("Failed to write Latin-1 test file");
+
+    let progress = hidden_progress();
+    let patterns: Vec<Pattern> = vec![];
+    let store = create_test_store();
+    let strategy = create_test_strategy(&store);
+    let options = TextDetectionOptions {
+        detect_copyrights: true,
+        detect_emails: false,
+        detect_urls: false,
+        max_emails: 50,
+        max_urls: 50,
+        timeout_seconds: 120.0,
+        scan_cache_dir: None,
+    };
+
+    let result = process_with_options(test_path, 10, progress, &patterns, &strategy, &options)
+        .expect("Scan should succeed");
+
+    let file = result
+        .files
+        .iter()
+        .find(|f| f.file_type == FileType::File && f.path.ends_with("latin1_notice.txt"))
+        .expect("Should find Latin-1 notice file");
+
+    assert_eq!(file.copyrights.len(), 1);
+    assert_eq!(
+        file.copyrights[0].copyright,
+        "Copyright 2024 François Müller"
+    );
+    assert_eq!(file.copyrights[0].start_line, 1);
+    assert_eq!(file.copyrights[0].end_line, 1);
+
+    assert_eq!(file.holders.len(), 1);
+    assert_eq!(file.holders[0].holder, "François Müller");
+    assert_eq!(file.holders[0].start_line, 1);
+    assert_eq!(file.holders[0].end_line, 1);
+}
+
+#[test]
 fn test_scanner_respects_email_url_thresholds() {
     use tempfile::TempDir;
 
