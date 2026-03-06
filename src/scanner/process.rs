@@ -352,7 +352,7 @@ fn extract_copyright_information(
 ) {
     // CREDITS files get special handling (Linux kernel style).
     if copyright::is_credits_file(path) {
-        let author_detections = copyright::detect_credits_authors(&path.to_string_lossy());
+        let author_detections = copyright::detect_credits_authors(text_content);
         if !author_detections.is_empty() {
             file_info_builder.authors(
                 author_detections

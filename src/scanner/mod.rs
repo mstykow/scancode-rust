@@ -175,4 +175,40 @@ mod tests {
             scanned.license_detections
         );
     }
+
+    #[test]
+    fn scanner_detects_structured_credits_authors() {
+        let options = TextDetectionOptions {
+            detect_copyrights: true,
+            detect_emails: false,
+            detect_urls: false,
+            max_emails: 50,
+            max_urls: 50,
+            timeout_seconds: 120.0,
+            scan_cache_dir: None,
+        };
+        let credits_fixture = concat!(
+            "N: Jack Lloyd\n",
+            "E: lloyd@randombit.net\n",
+            "W: http://www.randombit.net/\n",
+        );
+        let scanned = scan_single_file("CREDITS", credits_fixture, &options);
+
+        let authors: Vec<(&str, usize, usize)> = scanned
+            .authors
+            .iter()
+            .map(|author| (author.author.as_str(), author.start_line, author.end_line))
+            .collect();
+
+        assert_eq!(
+            authors,
+            vec![(
+                "Jack Lloyd lloyd@randombit.net http://www.randombit.net/",
+                1,
+                3,
+            )]
+        );
+        assert!(scanned.copyrights.is_empty());
+        assert!(scanned.holders.is_empty());
+    }
 }
