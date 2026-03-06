@@ -11316,6 +11316,47 @@ fn is_name_continuation(node: &ParseNode) -> bool {
     }
 }
 
+fn is_same_line_holder_suffix_prefix(tree: &[ParseNode], idx: usize, line: usize) -> bool {
+    let Some(node) = tree.get(idx) else {
+        return false;
+    };
+    let leaves = collect_all_leaves(node);
+    let Some(first_token) = leaves.first() else {
+        return false;
+    };
+    if first_token.start_line != line {
+        return false;
+    }
+
+    let is_name_like_prefix = matches!(
+        first_token.tag,
+        PosTag::Nnp
+            | PosTag::Nn
+            | PosTag::Caps
+            | PosTag::Comp
+            | PosTag::MixedCap
+            | PosTag::Uni
+            | PosTag::Pn
+            | PosTag::Ou
+            | PosTag::Of
+            | PosTag::Van
+    );
+    if !is_name_like_prefix {
+        return false;
+    }
+
+    let end = std::cmp::min(idx + 6, tree.len());
+    tree[idx..end].iter().any(|node| {
+        collect_all_leaves(node).iter().any(|token| {
+            token.start_line == line
+                && matches!(
+                    token.tag,
+                    PosTag::Auths | PosTag::AuthDot | PosTag::Contributors | PosTag::Commit
+                )
+        })
+    })
+}
+
 fn is_orphan_copy_name_match(node: &ParseNode) -> bool {
     match node.label() {
         Some(TreeLabel::NameYear) | Some(TreeLabel::NameEmail) | Some(TreeLabel::Company) => true,
@@ -11568,7 +11609,11 @@ fn should_start_absorbing(copyright_node: &ParseNode, tree: &[ParseNode], start:
                 || matches!(n.label(), Some(TreeLabel::YrRange) | Some(TreeLabel::YrAnd))
                 || collect_all_leaves(n).iter().any(|t| t.tag == PosTag::Maint)
         });
-        if has_expected_continuation {
+        let has_holder_suffix_prefix =
+            tree[start + 1..end].iter().enumerate().any(|(offset, _)| {
+                is_same_line_holder_suffix_prefix(tree, start + 1 + offset, token.start_line)
+            });
+        if has_expected_continuation || has_holder_suffix_prefix {
             return true;
         }
     }
@@ -11818,6 +11863,8 @@ fn collect_trailing_orphan_tokens<'a>(
         }
 
         let allowed_suffix = is_allowed_holder_suffix_boundary_on_same_line(copyright_node, node);
+        let allowed_suffix_prefix =
+            last_line.is_some_and(|line| is_same_line_holder_suffix_prefix(tree, j, line));
 
         let allow_junk_file = match node {
             ParseNode::Leaf(token)
@@ -11830,11 +11877,16 @@ fn collect_trailing_orphan_tokens<'a>(
             _ => false,
         };
 
-        if is_orphan_boundary(node) && !allowed_suffix && !allow_junk_file {
+        if is_orphan_boundary(node) && !allowed_suffix && !allowed_suffix_prefix && !allow_junk_file
+        {
             break;
         }
 
-        if !is_orphan_continuation(node) && !allowed_suffix && !allow_junk_file {
+        if !is_orphan_continuation(node)
+            && !allowed_suffix
+            && !allowed_suffix_prefix
+            && !allow_junk_file
+        {
             break;
         }
 
