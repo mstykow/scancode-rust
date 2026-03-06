@@ -28,10 +28,10 @@ implementation-plans/
 ### Text Detection (`text-detection/`)
 
 - **[COPYRIGHT_DETECTION_PLAN.md](text-detection/COPYRIGHT_DETECTION_PLAN.md)** - Copyright statement extraction
-  - Status: 🟡 Implemented — scanner text-extraction parity gaps for non-UTF, PDF, and binary inputs are tracked in the plan
+  - Status: 🟡 Implemented — remaining scanner parity gaps for PDF and binary-string inputs are tracked in the plan
 
 - **[EMAIL_URL_DETECTION_PLAN.md](text-detection/EMAIL_URL_DETECTION_PLAN.md)** - Email and URL extraction
-  - Status: 🟡 Implemented — scanner text-extraction parity gaps for non-UTF, PDF, and binary inputs are tracked in the plan
+  - Status: 🟡 Implemented — remaining scanner parity gaps for PDF and binary-string inputs are tracked in the plan
 
 ### Infrastructure (`infrastructure/`)
 
