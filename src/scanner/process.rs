@@ -11,7 +11,9 @@ use rayon::prelude::*;
 
 use crate::askalono::{ScanStrategy, TextData};
 use crate::cache::{CachedScanFindings, read_cached_findings, write_cached_findings};
-use crate::copyright::{self, CopyrightDetectionOptions};
+use crate::copyright::{
+    self, AuthorDetection, CopyrightDetection, CopyrightDetectionOptions, HolderDetection,
+};
 use crate::finder::{self, DetectionConfig};
 use crate::models::{
     Author, Copyright, FileInfo, FileInfoBuilder, FileType, Holder, LicenseDetection, Match,
@@ -20,7 +22,9 @@ use crate::models::{
 use crate::parsers::try_parse_file;
 use crate::progress::ScanProgress;
 use crate::scanner::{ProcessResult, TextDetectionOptions};
-use crate::utils::file::{decode_bytes_to_string, get_creation_date, is_path_excluded};
+use crate::utils::file::{
+    decode_bytes_to_string, extract_printable_strings, get_creation_date, is_path_excluded,
+};
 use crate::utils::hash::{calculate_md5, calculate_sha1, calculate_sha256};
 use crate::utils::language::detect_language;
 
@@ -299,7 +303,19 @@ fn extract_information_from_content(
         )));
     }
 
-    let text_content = decode_bytes_to_string(&buffer);
+    let mut text_content = decode_bytes_to_string(&buffer);
+    let mut from_binary_strings = false;
+    if text_content.is_empty() {
+        let ext = path
+            .extension()
+            .and_then(|e| e.to_str())
+            .map(|s| s.to_ascii_lowercase());
+        let allow_binary_strings = matches!(ext.as_deref(), Some("dll") | Some("exe"));
+        if allow_binary_strings {
+            text_content = extract_printable_strings(&buffer);
+            from_binary_strings = !text_content.is_empty();
+        }
+    }
     if text_content.is_empty() {
         return Ok(());
     }
@@ -310,6 +326,7 @@ fn extract_information_from_content(
             path,
             &text_content,
             text_options.timeout_seconds,
+            from_binary_strings,
         );
     }
     extract_email_url_information(file_info_builder, &text_content, text_options);
@@ -347,6 +364,7 @@ fn extract_copyright_information(
     path: &Path,
     text_content: &str,
     timeout_seconds: f64,
+    from_binary_strings: bool,
 ) {
     // CREDITS files get special handling (Linux kernel style).
     if copyright::is_credits_file(path) {
@@ -377,6 +395,11 @@ fn extract_copyright_information(
 
     let (copyrights, holders, authors) =
         copyright::detect_copyrights_with_options(text_content, &copyright_options);
+    let (copyrights, holders, authors) = if from_binary_strings {
+        prune_binary_string_detections(copyrights, holders, authors)
+    } else {
+        (copyrights, holders, authors)
+    };
 
     file_info_builder.copyrights(
         copyrights
@@ -408,6 +431,103 @@ fn extract_copyright_information(
             })
             .collect::<Vec<Author>>(),
     );
+}
+
+fn prune_binary_string_detections(
+    copyrights: Vec<CopyrightDetection>,
+    holders: Vec<HolderDetection>,
+    _authors: Vec<AuthorDetection>,
+) -> (
+    Vec<CopyrightDetection>,
+    Vec<HolderDetection>,
+    Vec<AuthorDetection>,
+) {
+    let kept_copyrights: Vec<CopyrightDetection> = copyrights
+        .into_iter()
+        .filter(|c| is_binary_string_copyright_candidate(&c.copyright))
+        .collect();
+
+    let kept_holders: Vec<HolderDetection> = holders
+        .into_iter()
+        .filter(|holder| {
+            kept_copyrights.iter().any(|copyright| {
+                ranges_overlap(
+                    holder.start_line,
+                    holder.end_line,
+                    copyright.start_line,
+                    copyright.end_line,
+                )
+            })
+        })
+        .collect();
+
+    (kept_copyrights, kept_holders, Vec::new())
+}
+
+fn ranges_overlap(a_start: usize, a_end: usize, b_start: usize, b_end: usize) -> bool {
+    a_start <= b_end && b_start <= a_end
+}
+
+fn is_binary_string_copyright_candidate(text: &str) -> bool {
+    if has_explicit_copyright_marker(text) || contains_year(text) {
+        return true;
+    }
+
+    let lower = text.to_ascii_lowercase();
+    let Some(tail) = lower.strip_prefix("copyright") else {
+        return true;
+    };
+    let tail = tail.trim();
+    let alpha_tokens: Vec<&str> = tail
+        .split_whitespace()
+        .filter(|token| token.chars().any(|c| c.is_alphabetic()))
+        .collect();
+
+    if alpha_tokens.len() <= 1 {
+        return true;
+    }
+
+    if tail.contains(',') || tail.contains(" and ") || tail.contains('&') {
+        return true;
+    }
+
+    alpha_tokens
+        .iter()
+        .any(|token| is_company_like_suffix(token.trim_matches(|c: char| !c.is_alphanumeric())))
+}
+
+fn has_explicit_copyright_marker(text: &str) -> bool {
+    let lower = text.to_ascii_lowercase();
+    lower.contains("(c)") || lower.contains('©') || lower.contains("copr")
+}
+
+fn contains_year(text: &str) -> bool {
+    let bytes = text.as_bytes();
+    bytes.windows(4).any(|window| {
+        window.iter().all(|b| b.is_ascii_digit())
+            && matches!(window[0], b'1' | b'2')
+            && matches!(window[1], b'9' | b'0')
+    })
+}
+
+fn is_company_like_suffix(token: &str) -> bool {
+    matches!(
+        token.to_ascii_lowercase().as_str(),
+        "inc"
+            | "corp"
+            | "corporation"
+            | "co"
+            | "company"
+            | "ltd"
+            | "llc"
+            | "gmbh"
+            | "foundation"
+            | "project"
+            | "systems"
+            | "software"
+            | "technologies"
+            | "technology"
+    )
 }
 
 fn extract_email_url_information(

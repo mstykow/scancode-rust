@@ -63,3 +63,65 @@ pub fn decode_bytes_to_string(bytes: &[u8]) -> String {
         }
     }
 }
+
+pub fn extract_printable_strings(bytes: &[u8]) -> String {
+    const MIN_LEN: usize = 4;
+    const MAX_OUTPUT_BYTES: usize = 2_000_000;
+
+    fn is_printable_ascii(b: u8) -> bool {
+        matches!(b, 0x20..=0x7E)
+    }
+
+    let mut out = String::new();
+    let mut run: Vec<u8> = Vec::new();
+
+    let flush_run = |out: &mut String, run: &mut Vec<u8>| {
+        if run.len() >= MIN_LEN {
+            if !out.is_empty() {
+                out.push('\n');
+            }
+            out.push_str(&String::from_utf8_lossy(run));
+        }
+        run.clear();
+    };
+
+    for &b in bytes {
+        if is_printable_ascii(b) {
+            run.push(b);
+        } else {
+            flush_run(&mut out, &mut run);
+            if out.len() >= MAX_OUTPUT_BYTES {
+                return out;
+            }
+        }
+    }
+    flush_run(&mut out, &mut run);
+    if out.len() >= MAX_OUTPUT_BYTES {
+        return out;
+    }
+
+    for start in 0..=1 {
+        run.clear();
+        let mut i = start;
+        while i + 1 < bytes.len() {
+            let b0 = bytes[i];
+            let b1 = bytes[i + 1];
+            let (ch, zero) = if start == 0 { (b0, b1) } else { (b1, b0) };
+            if is_printable_ascii(ch) && zero == 0 {
+                run.push(ch);
+            } else {
+                flush_run(&mut out, &mut run);
+                if out.len() >= MAX_OUTPUT_BYTES {
+                    return out;
+                }
+            }
+            i += 2;
+        }
+        flush_run(&mut out, &mut run);
+        if out.len() >= MAX_OUTPUT_BYTES {
+            return out;
+        }
+    }
+
+    out
+}
