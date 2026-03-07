@@ -1,9 +1,10 @@
-# Hypothesis List for 82 Failing Golden Tests
+# Hypothesis List for 74 Failing Golden Tests
 
 ## Progress
 - Started: 96 failing tests
 - After MAX_DIST fix: 90 failing tests  
-- After minimum_containment fix: 82 failing tests (**14 tests fixed, 14.6% improvement**)
+- After minimum_containment fix: 82 failing tests (14 tests fixed)
+- After escape sequence preprocessing fix: 74 failing tests (**22 tests fixed, 22.9% improvement**)
 
 ## Active Hypotheses
 
@@ -31,12 +32,10 @@
 - **Impact**: ~15 tests (Rust produces more matches than expected)
 - **Status**: ROOT CAUSES IDENTIFIED
 
-#### H5-A: options.c - Missing rule gpl-2.0-plus_412.RULE
-- **Root cause**: Rule 412 has `minimum_coverage: 70` and `ignorable_urls`
-- **Python matches**: Lines 679-681 with rule gpl-2.0-plus_412.RULE (minimum_coverage 70)
-- **Rust matches**: 3 separate small rules (gpl-2.0-plus_225, gpl-2.0-plus_780, gpl-1.0-plus_155)
-- **Issue**: Rust's sequence matcher doesn't find rule 412 as a candidate, falls back to smaller rules
-- **Fix needed**: Improve sequence matching to handle ignorable_urls
+#### H5-A: options.c - **FIXED**
+- **Root cause**: Golden tests weren't applying escape sequence preprocessing for source files
+- **Fix**: Added source file preprocessing in `golden_test.rs:131-134`
+- **Result**: Rule gpl-2.0-plus_412.RULE now matches correctly
 
 #### H5-B: BSD-3-Clause_AND_CC0-1.0.txt - Sequence matching misses rule
 - **Root cause**: Rust uses Aho-Corasick for exact matches, missing approximate match Python finds
@@ -56,7 +55,12 @@
 - **Impact**: ~5 tests
 - **Status**: PENDING
 
-### H8: Binary File Detection
+### H9: Sequence Matching Candidate Selection - **INVESTIGATING**
+- **Impact**: Unknown number of tests
+- **Root cause IDENTIFIED**: `high_set_intersection` check filters out rules that Python finds
+- **Example**: `aladdin-md5_and_not_rsa-md5.txt` - Python finds `aladdin-md5.RULE` via seq match, Rust doesn't
+- **Location**: `src/license_detection/seq_match/candidates.rs:325-328`
+- **Fix needed**: Adjust candidate selection thresholds to match Python
 - **Impact**: ~2 tests
 - **Status**: PENDING
 

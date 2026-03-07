@@ -157,6 +157,12 @@ pub fn aho_match(index: &LicenseIndex, query_run: &QueryRun) -> Vec<LicenseMatch
 
         let matched_text = query_run.matched_text(start_line, end_line);
 
+        let qspan_positions: Vec<usize> = (qstart..qend).collect();
+        let ispan_positions: Vec<usize> = (0..matched_length).collect();
+        let hispan_positions: Vec<usize> = (0..matched_length)
+            .filter(|&p| rule_tids[p] < index.len_legalese as u16)
+            .collect();
+
         let license_match = LicenseMatch {
             license_expression: rule.license_expression.clone(),
             license_expression_spdx: rule.license_expression.clone(),
@@ -185,9 +191,9 @@ pub fn aho_match(index: &LicenseIndex, query_run: &QueryRun) -> Vec<LicenseMatch
             matched_token_positions: None,
             hilen: hispan_count,
             rule_start_token: 0,
-            qspan_positions: None,
-            ispan_positions: None,
-            hispan_positions: None,
+            qspan_positions: Some(qspan_positions),
+            ispan_positions: Some(ispan_positions),
+            hispan_positions: Some(hispan_positions),
             candidate_resemblance: 0.0,
             candidate_containment: 0.0,
         };

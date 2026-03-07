@@ -50,3 +50,6 @@ mod duplicate_license_test;
 
 #[cfg(test)]
 mod gpl_412_test;
+
+#[cfg(test)]
+mod aladdin_md5_test;

@@ -82,7 +82,12 @@ pub fn hash_match(index: &LicenseIndex, query_run: &QueryRun) -> Vec<LicenseMatc
         let rule_length = rule.tokens.len();
         let _ispan = Span::from_range(0..rule_length);
 
-        let hispan = (0..rule_length).filter(|&p| itokens[p] < index.len_legalese as u16);
+        let end = query_run.end.unwrap_or(query_run.start);
+        let qspan_positions: Vec<usize> = (query_run.start..=end).collect();
+        let ispan_positions: Vec<usize> = (0..rule_length).collect();
+        let hispan_positions: Vec<usize> = (0..rule_length)
+            .filter(|&p| itokens[p] < index.len_legalese as u16)
+            .collect();
 
         let matched_length = query_run.tokens().len();
         let match_coverage = 100.0;
@@ -122,11 +127,11 @@ pub fn hash_match(index: &LicenseIndex, query_run: &QueryRun) -> Vec<LicenseMatc
             is_license_text: rule.is_license_text,
             is_from_license: rule.is_from_license,
             matched_token_positions: None,
-            hilen: hispan.count(),
+            hilen: hispan_positions.len(),
             rule_start_token: 0,
-            qspan_positions: None,
-            ispan_positions: None,
-            hispan_positions: None,
+            qspan_positions: Some(qspan_positions),
+            ispan_positions: Some(ispan_positions),
+            hispan_positions: Some(hispan_positions),
             candidate_resemblance: 0.0,
             candidate_containment: 0.0,
         };
