@@ -133,10 +133,14 @@ fn find_workspace_roots(files: &[FileInfo]) -> Vec<WorkspaceRoot> {
                 && let Some(parent) = path.parent()
             {
                 let root_dir = parent.to_path_buf();
+                let root_package_json_idx = find_root_package_json_index(files, &root_dir);
 
                 // Either create new or update existing entry
                 if let Some(existing) = seen_roots.get_mut(&root_dir) {
                     existing.pnpm_workspace_yaml_idx = Some(idx);
+                    if existing.root_package_json_idx.is_none() {
+                        existing.root_package_json_idx = root_package_json_idx;
+                    }
                     if existing.patterns.is_empty() {
                         existing.patterns = workspaces;
                     }
@@ -145,7 +149,7 @@ fn find_workspace_roots(files: &[FileInfo]) -> Vec<WorkspaceRoot> {
                         root_dir.clone(),
                         WorkspaceRoot {
                             root_dir,
-                            root_package_json_idx: None,
+                            root_package_json_idx,
                             pnpm_workspace_yaml_idx: Some(idx),
                             patterns: workspaces,
                         },
@@ -156,7 +160,16 @@ fn find_workspace_roots(files: &[FileInfo]) -> Vec<WorkspaceRoot> {
     }
 
     roots.extend(seen_roots.into_values());
+    roots.sort_by(|left, right| left.root_dir.cmp(&right.root_dir));
     roots
+}
+
+fn find_root_package_json_index(files: &[FileInfo], root_dir: &Path) -> Option<usize> {
+    files.iter().position(|file| {
+        let path = Path::new(&file.path);
+        path.parent() == Some(root_dir)
+            && path.file_name().and_then(|name| name.to_str()) == Some("package.json")
+    })
 }
 
 /// Extract workspace patterns from PackageData extra_data
@@ -164,19 +177,27 @@ fn extract_workspaces(pkg_data: &PackageData) -> Option<Vec<String>> {
     let extra_data = pkg_data.extra_data.as_ref()?;
     let workspaces_value = extra_data.get("workspaces")?;
 
-    if let Some(arr) = workspaces_value.as_array() {
-        let patterns: Vec<String> = arr
+    extract_workspace_patterns(workspaces_value)
+}
+
+fn extract_workspace_patterns(value: &serde_json::Value) -> Option<Vec<String>> {
+    let patterns = match value {
+        serde_json::Value::String(pattern) => vec![pattern.clone()],
+        serde_json::Value::Array(patterns) => patterns
             .iter()
-            .filter_map(|v| v.as_str())
-            .map(|s| s.to_string())
-            .collect();
-        if patterns.is_empty() {
-            None
-        } else {
-            Some(patterns)
-        }
-    } else {
+            .filter_map(|pattern| pattern.as_str().map(str::to_string))
+            .collect(),
+        serde_json::Value::Object(object) => object
+            .get("packages")
+            .and_then(extract_workspace_patterns)
+            .unwrap_or_default(),
+        _ => Vec::new(),
+    };
+
+    if patterns.is_empty() {
         None
+    } else {
+        Some(patterns)
     }
 }
 
@@ -254,19 +275,17 @@ fn process_workspace(
         .collect();
 
     // Step 5: Handle root dependencies (hoist to workspace level)
-    if let Some(idx) = workspace_root.root_package_json_idx {
-        let for_uid = if is_pnpm_with_root_package {
-            root_package_uid.clone()
-        } else {
-            None
-        };
+    if let Some(idx) = workspace_root.root_package_json_idx
+        && !is_pnpm_with_root_package
+    {
+        remove_root_level_dependencies(dependencies, &workspace_root.root_dir);
         hoist_root_dependencies(
             files,
             idx,
             &workspace_root.root_dir,
             dependencies,
             &member_versions,
-            for_uid.as_deref(),
+            None,
         );
     }
 
@@ -361,6 +380,7 @@ fn discover_members(files: &[FileInfo], workspace_root: &WorkspaceRoot) -> Vec<u
         }
     }
 
+    member_indices.sort_by(|left, right| files[*left].path.cmp(&files[*right].path));
     member_indices
 }
 
@@ -456,6 +476,22 @@ fn remove_root_package(
     if let Some(uid) = &removed_uid {
         dependencies.retain(|dep| dep.for_package_uid.as_ref() != Some(uid));
     }
+}
+
+fn remove_root_level_dependencies(dependencies: &mut Vec<TopLevelDependency>, root_dir: &Path) {
+    dependencies.retain(|dependency| {
+        let path = Path::new(&dependency.datafile_path);
+        let is_root_level = path.parent() == Some(root_dir);
+        let is_workspace_root_datasource = matches!(
+            dependency.datasource_id,
+            DatasourceId::NpmPackageJson
+                | DatasourceId::NpmPackageLockJson
+                | DatasourceId::YarnLock
+                | DatasourceId::PnpmLockYaml
+        );
+
+        !(is_root_level && is_workspace_root_datasource)
+    });
 }
 
 /// Create Package instances for each workspace member
@@ -845,6 +881,38 @@ mod tests {
         assert_eq!(workspaces.len(), 2);
         assert_eq!(workspaces[0], "packages/*");
         assert_eq!(workspaces[1], "apps/*");
+    }
+
+    #[test]
+    fn test_extract_workspaces_string() {
+        let pkg_data = PackageData {
+            package_type: Some(PackageType::Npm),
+            datasource_id: Some(DatasourceId::NpmPackageJson),
+            extra_data: Some(std::collections::HashMap::from([(
+                "workspaces".to_string(),
+                serde_json::Value::String("packages/*".to_string()),
+            )])),
+            ..Default::default()
+        };
+
+        let workspaces = extract_workspaces(&pkg_data).unwrap();
+        assert_eq!(workspaces, vec!["packages/*"]);
+    }
+
+    #[test]
+    fn test_extract_workspaces_object_packages() {
+        let pkg_data = PackageData {
+            package_type: Some(PackageType::Npm),
+            datasource_id: Some(DatasourceId::NpmPackageJson),
+            extra_data: Some(std::collections::HashMap::from([(
+                "workspaces".to_string(),
+                serde_json::json!({ "packages": ["packages/*", "apps/*"] }),
+            )])),
+            ..Default::default()
+        };
+
+        let workspaces = extract_workspaces(&pkg_data).unwrap();
+        assert_eq!(workspaces, vec!["packages/*", "apps/*"]);
     }
 
     #[test]
