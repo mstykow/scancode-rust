@@ -11,7 +11,9 @@ use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
 
-use crate::models::{DatasourceId, FileInfo, Package, PackageData, TopLevelDependency};
+use crate::models::{
+    DatasourceId, FileInfo, Package, PackageData, PackageType, TopLevelDependency,
+};
 
 pub use assemblers::ASSEMBLERS;
 
@@ -96,13 +98,15 @@ pub fn assemble(files: &mut [FileInfo]) -> AssemblyResult {
                     if let Some((pkg, deps, affected_indices)) =
                         sibling_merge::assemble_siblings(config, files, file_indices)
                     {
-                        let package_uid = pkg.package_uid.clone();
-                        for idx in &affected_indices {
-                            if !files[*idx].for_packages.contains(&package_uid) {
-                                files[*idx].for_packages.push(package_uid.clone());
+                        if let Some(pkg) = pkg {
+                            let package_uid = pkg.package_uid.clone();
+                            for idx in &affected_indices {
+                                if !files[*idx].for_packages.contains(&package_uid) {
+                                    files[*idx].for_packages.push(package_uid.clone());
+                                }
                             }
+                            packages.push(pkg);
                         }
-                        packages.push(pkg);
                         dependencies.extend(deps);
                     }
                 }
@@ -154,7 +158,8 @@ pub fn assemble(files: &mut [FileInfo]) -> AssemblyResult {
         }
     }
 
-    // Post-processing: resolve file references from package database entries
+    assign_npm_package_resources(files, &packages);
+
     file_ref_resolve::resolve_file_references(files, &mut packages, &mut dependencies);
 
     // Post-processing: workspace assembly for npm/pnpm monorepos
@@ -162,6 +167,26 @@ pub fn assemble(files: &mut [FileInfo]) -> AssemblyResult {
 
     // Post-processing: workspace assembly for Cargo workspaces
     cargo_workspace_merge::assemble_cargo_workspaces(files, &mut packages, &mut dependencies);
+
+    for package in &mut packages {
+        package.datafile_paths.sort();
+        package.datafile_paths.dedup();
+        package.datasource_ids.sort_by_key(|left| left.to_string());
+        package.datasource_ids.dedup();
+    }
+
+    for file in files.iter_mut() {
+        file.for_packages.sort();
+        file.for_packages.dedup();
+    }
+
+    packages.sort_by(|left, right| left.package_uid.cmp(&right.package_uid));
+    dependencies.sort_by(|left, right| {
+        left.dependency_uid
+            .cmp(&right.dependency_uid)
+            .then_with(|| left.datafile_path.cmp(&right.datafile_path))
+            .then_with(|| left.for_package_uid.cmp(&right.for_package_uid))
+    });
 
     AssemblyResult {
         packages,
@@ -211,6 +236,45 @@ fn assemble_one_per_package_data(
     }
 
     results
+}
+
+fn assign_npm_package_resources(files: &mut [FileInfo], packages: &[Package]) {
+    let mut package_roots: Vec<(PathBuf, String)> = packages
+        .iter()
+        .filter(|package| package.package_type == Some(PackageType::Npm))
+        .filter_map(|package| {
+            package
+                .datafile_paths
+                .first()
+                .and_then(|path| Path::new(path).parent())
+                .map(|root| (root.to_path_buf(), package.package_uid.clone()))
+        })
+        .collect();
+
+    package_roots.sort_by(|(left_root, _), (right_root, _)| {
+        right_root
+            .components()
+            .count()
+            .cmp(&left_root.components().count())
+    });
+
+    for file in files.iter_mut() {
+        let path = Path::new(&file.path);
+        if let Some((_, package_uid)) = package_roots
+            .iter()
+            .find(|(root, _)| path.starts_with(root) && !is_first_level_node_modules(path, root))
+        {
+            file.for_packages.clear();
+            file.for_packages.push(package_uid.clone());
+        }
+    }
+}
+
+fn is_first_level_node_modules(path: &Path, root: &Path) -> bool {
+    path.strip_prefix(root)
+        .ok()
+        .and_then(|relative| relative.components().next())
+        .is_some_and(|component| component.as_os_str() == "node_modules")
 }
 
 /// Group file indices by their parent directory path.
@@ -379,6 +443,61 @@ mod tests {
     }
 
     #[test]
+    fn test_assemble_npm_package_json_skips_mismatched_lockfile() {
+        let mut files = vec![
+            create_test_file_info(
+                "project/package.json",
+                DatasourceId::NpmPackageJson,
+                Some("pkg:npm/my-app@1.0.0"),
+                Some("my-app"),
+                Some("1.0.0"),
+                vec![],
+            ),
+            create_test_file_info(
+                "project/package-lock.json",
+                DatasourceId::NpmPackageLockJson,
+                Some("pkg:npm/other-app@2.0.0"),
+                Some("other-app"),
+                Some("2.0.0"),
+                vec![Dependency {
+                    purl: Some("pkg:npm/left-pad@1.3.0".to_string()),
+                    extracted_requirement: Some("1.3.0".to_string()),
+                    scope: Some("dependencies".to_string()),
+                    is_runtime: Some(true),
+                    is_optional: Some(false),
+                    is_pinned: Some(true),
+                    is_direct: Some(false),
+                    resolved_package: None,
+                    extra_data: None,
+                }],
+            ),
+        ];
+
+        let result = assemble(&mut files);
+
+        assert_eq!(
+            result.packages.len(),
+            1,
+            "Expected only the manifest package"
+        );
+        let package = &result.packages[0];
+        assert_eq!(package.name, Some("my-app".to_string()));
+        assert_eq!(
+            package.datafile_paths,
+            vec!["project/package.json".to_string()]
+        );
+        assert!(
+            result.dependencies.is_empty(),
+            "Mismatched lockfile deps should not merge"
+        );
+        assert_eq!(files[0].for_packages.len(), 1);
+        assert!(
+            files[1].for_packages.is_empty(),
+            "Mismatched lockfile should remain unassigned"
+        );
+    }
+
+    #[test]
     fn test_assemble_cargo_toml_with_lock() {
         let mut files = vec![
             create_test_file_info(
@@ -523,6 +642,48 @@ mod tests {
             0,
             "Expected no packages when PackageData has no purl"
         );
+    }
+
+    #[test]
+    fn test_assemble_npm_lockfile_does_not_create_package_when_manifest_has_no_purl() {
+        let dep = Dependency {
+            purl: Some("pkg:npm/express@4.18.0".to_string()),
+            extracted_requirement: Some("4.18.0".to_string()),
+            scope: Some("dependencies".to_string()),
+            is_runtime: Some(true),
+            is_optional: Some(false),
+            is_pinned: Some(true),
+            is_direct: Some(true),
+            resolved_package: None,
+            extra_data: None,
+        };
+
+        let mut files = vec![
+            create_test_file_info(
+                "project/package.json",
+                DatasourceId::NpmPackageJson,
+                None,
+                None,
+                None,
+                vec![],
+            ),
+            create_test_file_info(
+                "project/package-lock.json",
+                DatasourceId::NpmPackageLockJson,
+                Some("pkg:npm/lock-only@1.0.0"),
+                Some("lock-only"),
+                Some("1.0.0"),
+                vec![dep],
+            ),
+        ];
+
+        let result = assemble(&mut files);
+
+        assert!(result.packages.is_empty());
+        assert_eq!(result.dependencies.len(), 1);
+        assert_eq!(result.dependencies[0].for_package_uid, None);
+        assert!(files[0].for_packages.is_empty());
+        assert!(files[1].for_packages.is_empty());
     }
 
     #[test]
