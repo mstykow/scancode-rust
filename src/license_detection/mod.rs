@@ -79,7 +79,7 @@ pub struct LicenseDetectionEngine {
     spdx_mapping: SpdxMapping,
 }
 
-const MAX_DETECTION_SIZE: usize = 100 * 1024; // 100KB
+const MAX_DETECTION_SIZE: usize = 1024 * 1024; // 1MB
 
 impl LicenseDetectionEngine {
     /// Create a new license detection engine from a directory of license rules.
@@ -135,7 +135,6 @@ impl LicenseDetectionEngine {
     pub fn detect(&self, text: &str, unknown_licenses: bool) -> Result<Vec<LicenseDetection>> {
         let clean_text = strip_utf8_bom_str(text);
 
-        // Truncate content if too large - licenses rarely appear after 100KB
         let content = if clean_text.len() > MAX_DETECTION_SIZE {
             log::warn!(
                 "Content size {} exceeds limit {}, truncating for detection",
@@ -405,7 +404,6 @@ impl LicenseDetectionEngine {
     pub fn detect_matches(&self, text: &str, unknown_licenses: bool) -> Result<Vec<LicenseMatch>> {
         let clean_text = strip_utf8_bom_str(text);
 
-        // Truncate content if too large - licenses rarely appear after 100KB
         let content = if clean_text.len() > MAX_DETECTION_SIZE {
             log::warn!(
                 "Content size {} exceeds limit {}, truncating for detection",
