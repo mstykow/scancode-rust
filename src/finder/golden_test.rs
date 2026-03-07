@@ -8,6 +8,7 @@ mod tests {
     use crate::finder::emails::EmailDetection;
     use crate::finder::urls::UrlDetection;
     use crate::finder::{DetectionConfig, find_emails, find_urls};
+    use crate::utils::file::extract_text_for_detection;
 
     #[derive(Debug, Deserialize)]
     struct ExpectedReport {
@@ -47,8 +48,10 @@ mod tests {
 
     fn read_input(relative_path: &str) -> String {
         let path = PathBuf::from("testdata/plugin_email_url/files").join(relative_path);
-        fs::read_to_string(&path)
-            .unwrap_or_else(|e| panic!("failed to read input fixture {:?}: {}", path, e))
+        let bytes = fs::read(&path)
+            .unwrap_or_else(|e| panic!("failed to read input fixture {:?}: {}", path, e));
+        let (content, _) = extract_text_for_detection(&path, &bytes);
+        content
     }
 
     fn to_expected_emails(detections: Vec<EmailDetection>) -> Vec<ExpectedEmail> {
@@ -124,6 +127,11 @@ mod tests {
     }
 
     #[test]
+    fn test_emails_image_metadata_golden() {
+        assert_emails_fixture("emails-image-metadata.expected.json", 50);
+    }
+
+    #[test]
     fn test_urls_golden() {
         assert_urls_fixture("urls.expected.json", 50);
     }
@@ -131,5 +139,10 @@ mod tests {
     #[test]
     fn test_urls_threshold_golden() {
         assert_urls_fixture("urls-threshold.expected.json", 2);
+    }
+
+    #[test]
+    fn test_urls_image_metadata_golden() {
+        assert_urls_fixture("urls-image-metadata.expected.json", 50);
     }
 }
