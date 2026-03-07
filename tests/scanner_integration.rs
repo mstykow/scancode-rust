@@ -3,6 +3,7 @@ use scancode_rust::askalono::{ScanStrategy, Store};
 use scancode_rust::models::PackageType;
 use scancode_rust::parsers::list_parser_types;
 use scancode_rust::progress::{ProgressMode, ScanProgress};
+use scancode_rust::utils::file::{ExtractedTextKind, extract_text_for_detection};
 use scancode_rust::utils::hash::calculate_sha256;
 use scancode_rust::{FileType, TextDetectionOptions, process, process_with_options};
 use std::fs;
@@ -79,6 +80,115 @@ fn build_text_pdf(lines: &[&str]) -> Vec<u8> {
     );
 
     pdf
+}
+
+fn build_exif_block(field_tag: exif::Tag, value: &str) -> Vec<u8> {
+    use exif::experimental::Writer;
+    use exif::{Field, In, Value};
+    use std::io::Cursor;
+
+    let field = Field {
+        tag: field_tag,
+        ifd_num: In::PRIMARY,
+        value: Value::Ascii(vec![value.as_bytes().to_vec()]),
+    };
+
+    let mut writer = Writer::new();
+    writer.push_field(&field);
+
+    let mut cursor = Cursor::new(Vec::new());
+    writer
+        .write(&mut cursor, false)
+        .expect("Failed to encode EXIF metadata");
+    cursor.into_inner()
+}
+
+fn build_png_with_metadata(exif: Option<Vec<u8>>, xmp: Option<&str>) -> Vec<u8> {
+    use image::codecs::png::PngEncoder;
+    use image::{ExtendedColorType, ImageEncoder};
+
+    let mut png = Vec::new();
+    {
+        let mut encoder = PngEncoder::new(&mut png);
+        if let Some(exif) = exif {
+            encoder
+                .set_exif_metadata(exif)
+                .expect("PNG encoder should support EXIF metadata");
+        }
+        encoder
+            .write_image(&[255, 255, 255], 1, 1, ExtendedColorType::Rgb8)
+            .expect("Failed to encode PNG");
+    }
+
+    if let Some(xmp) = xmp {
+        png = insert_png_chunk(&png, *b"iTXt", build_png_xmp_chunk_data(xmp.as_bytes()));
+    }
+
+    png
+}
+
+fn build_png_xmp_chunk_data(xmp: &[u8]) -> Vec<u8> {
+    let mut data = b"XML:com.adobe.xmp\0\0\0\0\0".to_vec();
+    data.extend_from_slice(xmp);
+    data
+}
+
+fn insert_png_chunk(png: &[u8], chunk_type: [u8; 4], data: Vec<u8>) -> Vec<u8> {
+    const PNG_SIGNATURE_LEN: usize = 8;
+
+    assert!(
+        png.len() >= PNG_SIGNATURE_LEN,
+        "PNG should contain signature"
+    );
+    let mut insert_at = png.len();
+    let mut offset = PNG_SIGNATURE_LEN;
+
+    while offset + 12 <= png.len() {
+        let length = u32::from_be_bytes([
+            png[offset],
+            png[offset + 1],
+            png[offset + 2],
+            png[offset + 3],
+        ]) as usize;
+        let chunk_end = offset + 12 + length;
+        assert!(chunk_end <= png.len(), "PNG chunk should be in bounds");
+
+        if &png[offset + 4..offset + 8] == b"IEND" {
+            insert_at = offset;
+            break;
+        }
+
+        offset = chunk_end;
+    }
+
+    let mut out = Vec::with_capacity(png.len() + data.len() + 12);
+    out.extend_from_slice(&png[..insert_at]);
+    append_png_chunk(&mut out, chunk_type, &data);
+    out.extend_from_slice(&png[insert_at..]);
+    out
+}
+
+fn append_png_chunk(out: &mut Vec<u8>, chunk_type: [u8; 4], data: &[u8]) {
+    out.extend_from_slice(&(data.len() as u32).to_be_bytes());
+    out.extend_from_slice(&chunk_type);
+    out.extend_from_slice(data);
+
+    let mut crc_input = Vec::with_capacity(chunk_type.len() + data.len());
+    crc_input.extend_from_slice(&chunk_type);
+    crc_input.extend_from_slice(data);
+    out.extend_from_slice(&png_crc32(&crc_input).to_be_bytes());
+}
+
+fn png_crc32(bytes: &[u8]) -> u32 {
+    let mut crc = 0xffff_ffffu32;
+    for &byte in bytes {
+        crc ^= u32::from(byte);
+        for _ in 0..8 {
+            let mask = (crc & 1).wrapping_neg() & 0xedb8_8320;
+            crc = (crc >> 1) ^ mask;
+        }
+    }
+    !crc
 }
 
 #[test]
@@ -560,6 +670,142 @@ fn test_scanner_detects_emails_and_urls_in_pdf_text() {
         file.urls
             .iter()
             .any(|url| url.url == "https://acme.org/support"),
+        "urls: {:?}",
+        file.urls
+    );
+}
+
+#[test]
+fn test_scanner_detects_copyrights_in_exif_metadata() {
+    use tempfile::TempDir;
+
+    let temp_dir = TempDir::new().expect("Failed to create temp dir");
+    let test_path = temp_dir.path();
+    let content_path = test_path.join("photo.png");
+    let png = build_png_with_metadata(
+        Some(build_exif_block(
+            exif::Tag::Copyright,
+            "Copyright 2026 Example Corp.",
+        )),
+        None,
+    );
+    let (extracted_text, kind) = extract_text_for_detection(&content_path, &png);
+    fs::write(&content_path, png).expect("Failed to write PNG fixture");
+
+    assert_eq!(kind, ExtractedTextKind::ImageMetadata);
+    assert!(
+        extracted_text.contains("Copyright 2026 Example Corp."),
+        "extracted_text: {:?}",
+        extracted_text
+    );
+
+    let progress = hidden_progress();
+    let patterns: Vec<Pattern> = vec![];
+    let store = create_test_store();
+    let strategy = create_test_strategy(&store);
+    let options = TextDetectionOptions {
+        detect_copyrights: true,
+        detect_emails: false,
+        detect_urls: false,
+        max_emails: 50,
+        max_urls: 50,
+        timeout_seconds: 120.0,
+        scan_cache_dir: None,
+    };
+
+    let result = process_with_options(test_path, 10, progress, &patterns, &strategy, &options)
+        .expect("Scan should succeed");
+
+    let file = result
+        .files
+        .iter()
+        .find(|f| f.file_type == FileType::File && f.path.ends_with("photo.png"))
+        .expect("Should find PNG file");
+
+    assert!(
+        file.copyrights
+            .iter()
+            .any(|c| c.copyright == "Copyright 2026 Example Corp"),
+        "copyrights: {:?}",
+        file.copyrights
+    );
+    assert!(
+        file.holders.iter().any(|h| h.holder == "Example Corp"),
+        "holders: {:?}",
+        file.holders
+    );
+}
+
+#[test]
+fn test_scanner_detects_emails_and_urls_in_xmp_metadata() {
+    use tempfile::TempDir;
+
+    let temp_dir = TempDir::new().expect("Failed to create temp dir");
+    let test_path = temp_dir.path();
+    let content_path = test_path.join("contacts.png");
+    let xmp = r#"<?xpacket begin="﻿" id="W5M0MpCehiHzreSzNTczkc9d"?>
+<x:xmpmeta xmlns:x="adobe:ns:meta/">
+  <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+    <rdf:Description xmlns:dc="http://purl.org/dc/elements/1.1/">
+      <dc:description>
+        <rdf:Alt>
+          <rdf:li xml:lang="x-default">Reach us at legal@acme.org and https://acme.org/legal</rdf:li>
+        </rdf:Alt>
+      </dc:description>
+    </rdf:Description>
+  </rdf:RDF>
+</x:xmpmeta>
+<?xpacket end="w"?>"#;
+    let png = build_png_with_metadata(None, Some(xmp));
+    let (extracted_text, kind) = extract_text_for_detection(&content_path, &png);
+    fs::write(&content_path, png).expect("Failed to write PNG fixture");
+
+    assert_eq!(kind, ExtractedTextKind::ImageMetadata);
+    assert!(
+        extracted_text.contains("legal@acme.org"),
+        "extracted_text: {:?}",
+        extracted_text
+    );
+    assert!(
+        extracted_text.contains("https://acme.org/legal"),
+        "extracted_text: {:?}",
+        extracted_text
+    );
+
+    let progress = hidden_progress();
+    let patterns: Vec<Pattern> = vec![];
+    let store = create_test_store();
+    let strategy = create_test_strategy(&store);
+    let options = TextDetectionOptions {
+        detect_copyrights: false,
+        detect_emails: true,
+        detect_urls: true,
+        max_emails: 50,
+        max_urls: 50,
+        timeout_seconds: 120.0,
+        scan_cache_dir: None,
+    };
+
+    let result = process_with_options(test_path, 10, progress, &patterns, &strategy, &options)
+        .expect("Scan should succeed");
+
+    let file = result
+        .files
+        .iter()
+        .find(|f| f.file_type == FileType::File && f.path.ends_with("contacts.png"))
+        .expect("Should find PNG file");
+
+    assert!(
+        file.emails
+            .iter()
+            .any(|email| email.email == "legal@acme.org"),
+        "emails: {:?}",
+        file.emails
+    );
+    assert!(
+        file.urls
+            .iter()
+            .any(|url| url.url == "https://acme.org/legal"),
         "urls: {:?}",
         file.urls
     );
