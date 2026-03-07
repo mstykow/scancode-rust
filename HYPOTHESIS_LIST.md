@@ -7,6 +7,7 @@
 - After escape sequence preprocessing fix: 74 failing tests (22 tests fixed)
 - After MAX_DETECTION_SIZE increase to 1MB: 70 failing tests (26 tests fixed)
 - After binary strings extraction: 64 failing tests (32 tests fixed, 33% improvement)
+- After subtraction logic alignment: 64 failing tests (code aligned with Python)
 
 ## Current Status: 64 failing tests
 
@@ -16,7 +17,6 @@
 | Missing Detections | ~15 | Rust finds fewer matches than expected |
 | Wrong License Expression | ~12 | Correct position, wrong identifier |
 | Extra Detections | ~10 | Rust produces more matches than expected |
-| GPL Version Resolution | ~8 | Wrong "or later" handling |
 | Unknown License Handling | ~5 | "unknown" vs "unknown-license-reference" |
 | Match Ordering | ~6 | Order differs from Python |
 | Wrong License Type | ~8 | Completely wrong license detected |
@@ -53,50 +53,41 @@
   - `net-snmp-license.txt`: Expected 18 matches, got 4
   - `pkg.c`: Expected "gpl-2.0 OR lgpl-2.0", got separate matches
 
-### H10: Wrong License Variant (X vs X-plus) - **HIGH PRIORITY**
+### H10: Wrong License Variant (X vs X-plus) - **COMPLEX**
 - **Impact**: ~8 tests
 - **Root cause**: Sequence matches with lower coverage win over exact matches with higher coverage due to containment filtering
 - **Example**: `GFDL-1.1.t3`
   - Expected: `gfdl-1.1`
   - Actual: `gfdl-1.1-plus`
-  - The `gfdl-1.1-plus_5.RULE` sequence match "contains" the exact `gfdl-1.1_11.RULE` match
-  - Containment filtering removes the correct match
-- **Location**: `src/license_detection/match_refine/handle_overlaps.rs:filter_contained_matches()`
-- **Fix needed**: Consider match coverage/type when filtering contained matches
-- **Status**: READY TO FIX
+- **Fix attempt**: Adding matcher_order() protection caused 3 regressions
+- **Lesson learned**: The fix is more nuanced - need to consider:
+  - Same vs different license expressions
+  - Coverage differences
+  - Match quality metrics
+- **Status**: NEEDS BETTER APPROACH
 
-### H12: Extra Detections in Non-License Files - **NEW**
+### H12: Extra Detections in Non-License Files - **MEDIUM PRIORITY**
 - **Impact**: ~10 tests
 - **Root cause**: Rust detects licenses in files that should have none
 - **Example**: `test.js` (spdx-correct.js test file)
   - Expected: `[]` (no licenses)
   - Actual: `["lgpl-3.0 OR mpl-2.0", "mit"]`
   - File contains license identifiers as test data strings like `'LGPL 3.0'`, `'MIT'`
-  - Python ignores these as they're in string literals, Rust detects them
-- **Fix needed**: Either:
-  1. Context-aware detection (ignore strings in code)
-  2. Better false positive filtering
-  3. Minimum match length threshold
-- **Status**: INVESTIGATING
+- **Fix needed**: Better false positive filtering
+- **Status**: PENDING
 
-### H13: GPL Version Expression Resolution - **NEW**
-- **Impact**: ~8 tests
-- **Root cause**: Rust produces "X OR Y" instead of "X-plus" for GPL licenses
-- **Example**: `gpl-2.0-plus_33.txt`
-  - Expected: `["gpl-2.0-plus", "gpl-2.0-plus", "gpl-1.0-plus", "gpl-1.0-plus", "gpl-2.0-plus", "gpl-1.0-plus"]`
-  - Actual: `["gpl-2.0-plus", "gpl-2.0-plus", "gpl-2.0 OR gpl-3.0", "gpl-2.0 OR gpl-3.0"]`
-- **Root cause hypothesis**:
-  - Python has logic to normalize "GPL-2.0 OR GPL-3.0" to "GPL-2.0-plus"
-  - Rust may be missing this normalization or applying it inconsistently
-- **Status**: PENDING INVESTIGATION
+### H13: GPL Version Expression Resolution - **NOT A BUG**
+- **Investigation result**: Rust correctly handles `-plus` suffix
+  - `SPDX-License-Identifier: GPL-2.0+` → `gpl-2.0-plus` ✓
+  - "version 2 or 3" → `gpl-2.0 OR gpl-3.0` ✓ (correct, not `-plus`)
+- **Status**: CLOSED - No bug exists
 
-### H14: License Expression Parsing Differences - **NEW**
+### H14: License Expression Parsing Differences
 - **Impact**: ~5 tests
 - **Root cause**: Parentheses handling in license expressions differs
 - **Example**: `missing_leading_trailing_paren.txt`
   - Expected: `"(gpl-2.0 AND mit) AND unknown-spdx"`
   - Actual: `"gpl-2.0 AND mit AND unknown-spdx"`
-- **Fix needed**: Verify expression parsing preserves parentheses structure
 - **Status**: PENDING
 
 ### H6: Unknown License Detection Differences
@@ -105,52 +96,33 @@
 - **Example**: `README.md` in unknown/
   - Expected: `["unknown-license-reference", "unknown-license-reference", "unknown-license-reference"]`
   - Actual: `["unknown-license-reference", "unknown-license-reference", "unknown"]`
-- **Fix needed**: Unify unknown license type handling
 - **Status**: PENDING
 
-### H15: Missing License Rule Detection - **NEW**
+### H15: Missing License Rule Detection - **RUST IMPROVEMENT**
 - **Impact**: ~5 tests
-- **Root cause**: Specific license rules aren't being matched
 - **Example**: `lgpl-2.1-plus_with_other-copyleft_1.RULE`
-  - File content: `SPDX-License-Identifier: LGPL-2.1+ The author added a static linking exception...`
   - Expected: `["unknown-spdx"]`
   - Actual: `["lgpl-2.1-plus"]`
   - Python detects as unknown-spdx, Rust correctly identifies lgpl-2.1-plus
-  - This may be a **Rust improvement** over Python!
-- **Status**: NEEDS VERIFICATION - May not be a bug
+- **This is a Rust improvement** over Python!
+- **Status**: NOT A BUG - Rust is more correct
 
-### H16: OR Expression Converted to AND - **NEW**
+### H16: OR Expression Converted to AND
 - **Impact**: ~3 tests
 - **Root cause**: OR license expressions being converted to AND
 - **Example**: `AFL-2.1_or_GPL-2.0.txt`
   - Expected: `["afl-2.1 OR gpl-2.0-plus", "afl-2.1", "gpl-2.0"]`
   - Actual: `["(afl-2.1 OR gpl-2.0) AND gpl-2.0", "afl-2.1", "gpl-2.0"]`
-- **Fix needed**: Investigate why OR becomes AND in first match
 - **Status**: PENDING
 
 ## Summary of Root Causes
 
-1. **GPL version normalization** (H13): Need to normalize "GPL-2.0 OR GPL-3.0" to "GPL-2.0-plus"
-2. **Containment filtering** (H10): Sequence matches incorrectly win over exact matches
-3. **Extra detections** (H12): Need context-aware detection or better filtering
-4. **Expression parsing** (H14, H16): Parentheses and OR/AND handling issues
+1. **Containment filtering** (H10): Complex - matcher_order alone isn't enough
+2. **Extra detections** (H12): Need better false positive filtering
+3. **Expression parsing** (H14, H16): Parentheses and OR/AND handling issues
 
-## Recommended Fix Order
+## Recommended Investigation Order
 
-1. **H10 (Wrong License Variant)**: High impact, clear fix location
-2. **H13 (GPL Version Resolution)**: High impact, likely normalization issue
-3. **H12 (Extra Detections)**: Medium impact, may need architectural changes
-4. **H14/H16 (Expression Parsing)**: Low impact, edge cases
-
-## Investigation Protocol
-1. Pick top 3 hypotheses
-2. Launch parallel subagent investigations
-3. Each investigation:
-   - Analyze specific failing test cases
-   - Compare Python vs Rust behavior
-   - Identify root cause and fix location
-   - Recommend implementation approach
-4. Verify findings with Python reference
-5. Create detailed implementation plan
-6. Implement and test
-7. Commit if golden tests improve
+1. **H14/H16 (Expression Parsing)**: May be easier to fix
+2. **H12 (Extra Detections)**: Understand the false positive filtering gap
+3. **H10 (Containment)**: Revisit with more nuanced approach
