@@ -53,6 +53,7 @@ const FIELD_WORKSPACES: &str = "workspaces";
 const FIELD_PRIVATE: &str = "private";
 const FIELD_BUGS: &str = "bugs";
 const FIELD_DIST: &str = "dist";
+const FIELD_OVERRIDES: &str = "overrides";
 const FIELD_PEER_DEPENDENCIES_META: &str = "peerDependenciesMeta";
 const FIELD_DEPENDENCIES_META: &str = "dependenciesMeta";
 
@@ -74,14 +75,8 @@ impl PackageParser for NpmParser {
             }
         };
 
-        let name = json
-            .get(FIELD_NAME)
-            .and_then(|v| v.as_str())
-            .map(String::from);
-        let version = json
-            .get(FIELD_VERSION)
-            .and_then(|v| v.as_str())
-            .map(String::from);
+        let name = extract_non_empty_string(&json, FIELD_NAME);
+        let version = extract_non_empty_string(&json, FIELD_VERSION);
         let namespace = extract_namespace(&name);
         let package_name = extract_package_name(&name);
         let description = extract_description(&json);
@@ -121,6 +116,10 @@ impl PackageParser for NpmParser {
             extra_data_map.insert("workspaces".to_string(), workspaces);
         }
 
+        if let Some(overrides) = extract_overrides(&json) {
+            extra_data_map.insert("overrides".to_string(), overrides);
+        }
+
         if let Some(private) = extract_private(&json) {
             extra_data_map.insert("private".to_string(), serde_json::Value::Bool(private));
         }
@@ -143,20 +142,12 @@ impl PackageParser for NpmParser {
         let download_url = json
             .get(FIELD_DIST)
             .and_then(extract_dist_tarball)
-            .or_else(|| {
-                if let (Some(n), Some(v)) = (&name, &version) {
-                    Some(format!(
-                        "https://registry.npmjs.org/{}/-/{}-{}.tgz",
-                        n, n, v
-                    ))
-                } else {
-                    None
-                }
-            });
+            .or_else(|| generate_registry_download_url(&namespace, &package_name, &version));
 
         let api_data_url = generate_npm_api_url(&namespace, &package_name, &version);
-        let repository_homepage_url = generate_repository_homepage_url(&package_name);
-        let repository_download_url = generate_repository_download_url(&package_name, &version);
+        let repository_homepage_url = generate_repository_homepage_url(&namespace, &package_name);
+        let repository_download_url =
+            generate_repository_download_url(&namespace, &package_name, &version);
         let vcs_url = extract_vcs_url(&json);
 
         vec![PackageData {
@@ -171,10 +162,7 @@ impl PackageParser for NpmParser {
             release_date: None,
             parties: extract_parties(&json),
             keywords: keywords_vec,
-            homepage_url: json
-                .get(FIELD_HOMEPAGE)
-                .and_then(|v| v.as_str())
-                .map(String::from),
+            homepage_url: extract_homepage_url(&json),
             download_url,
             size: None,
             sha1: None,
@@ -598,6 +586,14 @@ fn parse_alias_adapter(version_str: &str) -> Option<(&str, &str)> {
     None
 }
 
+fn extract_non_empty_string(json: &Value, field: &str) -> Option<String> {
+    json.get(field)
+        .and_then(|value| value.as_str())
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(String::from)
+}
+
 fn generate_npm_api_url(
     namespace: &Option<String>,
     name: &Option<String>,
@@ -621,22 +617,49 @@ fn generate_npm_api_url(
     Some(url)
 }
 
-fn generate_repository_homepage_url(name: &Option<String>) -> Option<String> {
-    name.as_ref()
-        .map(|n| format!("https://www.npmjs.com/package/{}", n))
+fn build_registry_package_path(
+    namespace: &Option<String>,
+    name: &Option<String>,
+) -> Option<String> {
+    match (namespace.as_ref(), name.as_ref()) {
+        (Some(namespace), Some(name)) => Some(format!("{namespace}/{name}")),
+        (None, Some(name)) => Some(name.clone()),
+        _ => None,
+    }
 }
 
-fn generate_repository_download_url(
+fn generate_repository_homepage_url(
+    namespace: &Option<String>,
+    name: &Option<String>,
+) -> Option<String> {
+    build_registry_package_path(namespace, name)
+        .map(|package_path| format!("https://www.npmjs.com/package/{package_path}"))
+}
+
+fn generate_registry_download_url(
+    namespace: &Option<String>,
     name: &Option<String>,
     version: &Option<String>,
 ) -> Option<String> {
-    match (name.as_ref(), version.as_ref()) {
-        (Some(n), Some(v)) => Some(format!(
+    match (
+        build_registry_package_path(namespace, name),
+        name.as_ref(),
+        version.as_ref(),
+    ) {
+        (Some(package_path), Some(name), Some(version)) => Some(format!(
             "https://registry.npmjs.org/{}/-/{}-{}.tgz",
-            n, n, v
+            package_path, name, version
         )),
         _ => None,
     }
+}
+
+fn generate_repository_download_url(
+    namespace: &Option<String>,
+    name: &Option<String>,
+    version: &Option<String>,
+) -> Option<String> {
+    generate_registry_download_url(namespace, name, version)
 }
 
 fn extract_dependency_group(
@@ -839,10 +862,30 @@ fn extract_dependencies_meta(json: &Value) -> Option<serde_json::Value> {
     json.get(FIELD_DEPENDENCIES_META).cloned()
 }
 
+fn extract_overrides(json: &Value) -> Option<serde_json::Value> {
+    json.get(FIELD_OVERRIDES).cloned()
+}
+
 fn extract_description(json: &Value) -> Option<String> {
     json.get(FIELD_DESCRIPTION)
         .and_then(|v| v.as_str())
         .map(String::from)
+}
+
+fn extract_homepage_url(json: &Value) -> Option<String> {
+    match json.get(FIELD_HOMEPAGE) {
+        Some(Value::String(homepage)) => normalize_non_empty_string(homepage),
+        _ => None,
+    }
+}
+
+fn normalize_non_empty_string(value: &str) -> Option<String> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        None
+    } else {
+        Some(trimmed.to_string())
+    }
 }
 
 fn extract_keywords_as_vec(json: &Value) -> Vec<String> {
@@ -890,9 +933,11 @@ fn extract_bugs(json: &Value) -> Option<String> {
     match json.get(FIELD_BUGS) {
         Some(bugs) => {
             if let Some(url) = bugs.as_str() {
-                Some(url.to_string())
+                normalize_non_empty_string(url)
             } else if let Some(obj) = bugs.as_object() {
-                obj.get("url").and_then(|v| v.as_str()).map(String::from)
+                obj.get("url")
+                    .and_then(|v| v.as_str())
+                    .and_then(normalize_non_empty_string)
             } else {
                 None
             }
