@@ -25,6 +25,9 @@ implementation-plans/
 - **[ASSEMBLY_PLAN.md](package-detection/ASSEMBLY_PLAN.md)** - Package assembly roadmap
   - Status: 🟢 Complete — All phases done (sibling merge, nested merge, workspace assembly, file reference resolution)
 
+- **[PARSER_ENHANCEMENT_PLAN.md](package-detection/PARSER_ENHANCEMENT_PLAN.md)** - Ecosystem-by-ecosystem parser enhancement backlog and execution tracker
+  - Status: 🟡 Active — open `enhancement` + `package-parsing` issue groups, sequencing, and PR validation are tracked in [PARSER_ENHANCEMENT_PLAN.md](package-detection/PARSER_ENHANCEMENT_PLAN.md)
+
 ### Text Detection (`text-detection/`)
 
 - **[COPYRIGHT_DETECTION_PLAN.md](text-detection/COPYRIGHT_DETECTION_PLAN.md)** - Copyright statement extraction
