@@ -41,7 +41,10 @@ mod tests {
         );
         assert_eq!(
             package_data.download_url,
-            Some("https://registry.npmjs.org/@example/test-package/-/@example/test-package-1.0.0.tgz".to_string())
+            Some(
+                "https://registry.npmjs.org/@example/test-package/-/test-package-1.0.0.tgz"
+                    .to_string()
+            )
         );
 
         assert_eq!(package_data.declared_license_expression, None);
@@ -93,7 +96,10 @@ mod tests {
         );
         assert_eq!(
             package_data.download_url,
-            Some("https://registry.npmjs.org/@example/test-package/-/@example/test-package-1.0.0.tgz".to_string())
+            Some(
+                "https://registry.npmjs.org/@example/test-package/-/test-package-1.0.0.tgz"
+                    .to_string()
+            )
         );
 
         assert_eq!(package_data.declared_license_expression, None);
@@ -425,6 +431,57 @@ mod tests {
         assert_eq!(package_data_2.name, None);
         assert_eq!(package_data_2.version, None);
         assert!(package_data_2.dependencies.is_empty());
+    }
+
+    #[test]
+    fn test_empty_name_or_version_does_not_create_registry_urls() {
+        let content = r#"
+{
+  "name": " ",
+  "version": "",
+  "homepage": "https://example.com"
+}
+"#;
+
+        let (_temp_file, package_path) = create_temp_package_json(content);
+        let package_data = NpmParser::extract_first_package(&package_path);
+
+        assert_eq!(package_data.name, None);
+        assert_eq!(package_data.version, None);
+        assert_eq!(package_data.download_url, None);
+        assert_eq!(package_data.repository_homepage_url, None);
+        assert_eq!(package_data.repository_download_url, None);
+        assert_eq!(package_data.api_data_url, None);
+        assert_eq!(package_data.purl, None);
+    }
+
+    #[test]
+    fn test_extract_overrides_into_extra_data() {
+        let content = r#"
+{
+  "name": "override-test",
+  "version": "1.0.0",
+  "overrides": {
+    "lodash": "4.17.21",
+    "react-scripts": {
+      "webpack": "5.74.0"
+    }
+  }
+}
+"#;
+
+        let (_temp_file, package_path) = create_temp_package_json(content);
+        let package_data = NpmParser::extract_first_package(&package_path);
+
+        let extra_data = package_data.extra_data.expect("expected extra_data");
+        let overrides = extra_data
+            .get("overrides")
+            .expect("expected overrides field");
+        assert_eq!(overrides["lodash"], Value::String("4.17.21".to_string()));
+        assert_eq!(
+            overrides["react-scripts"]["webpack"],
+            Value::String("5.74.0".to_string())
+        );
     }
 
     #[test]
@@ -860,6 +917,40 @@ mod tests {
         assert!(extra_data.contains_key("packageManager"));
         assert!(extra_data.contains_key("workspaces"));
         assert!(extra_data.contains_key("private"));
+    }
+
+    #[test]
+    fn test_homepage_array_is_ignored() {
+        let content = r#"
+{
+  "name": "test-package",
+  "version": "1.0.0",
+  "homepage": ["https://example.com"]
+}
+"#;
+
+        let (_temp_file, package_path) = create_temp_package_json(content);
+        let package_data = NpmParser::extract_first_package(&package_path);
+
+        assert_eq!(package_data.homepage_url, None);
+    }
+
+    #[test]
+    fn test_blank_bugs_values_are_ignored() {
+        let content = r#"
+{
+  "name": "test-package",
+  "version": "1.0.0",
+  "bugs": {
+    "url": "   "
+  }
+}
+"#;
+
+        let (_temp_file, package_path) = create_temp_package_json(content);
+        let package_data = NpmParser::extract_first_package(&package_path);
+
+        assert_eq!(package_data.bug_tracking_url, None);
     }
 
     #[test]
