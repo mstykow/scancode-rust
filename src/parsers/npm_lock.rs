@@ -23,6 +23,7 @@ use crate::models::{DatasourceId, Dependency, PackageData, PackageType, Resolved
 use crate::parsers::utils::{npm_purl, parse_sri};
 use log::warn;
 use serde_json::Value;
+use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 
@@ -39,6 +40,7 @@ const FIELD_INTEGRITY: &str = "integrity";
 const FIELD_DEV: &str = "dev";
 const FIELD_OPTIONAL: &str = "optional";
 const FIELD_DEV_OPTIONAL: &str = "devOptional";
+const FIELD_LINK: &str = "link";
 
 /// npm lockfile parser supporting package-lock.json v1, v2, and v3 formats.
 ///
@@ -117,7 +119,7 @@ fn parse_lockfile_v2_plus(
     json: &Value,
     root_name: String,
     root_version: String,
-    _lockfile_version: i64,
+    lockfile_version: i64,
 ) -> PackageData {
     let packages = match json.get(FIELD_PACKAGES).and_then(|v| v.as_object()) {
         Some(packages) => packages,
@@ -127,8 +129,9 @@ fn parse_lockfile_v2_plus(
         }
     };
 
+    let (root_name, root_version) = extract_root_package_identity(json, root_name, root_version);
     let (namespace, name) = extract_namespace_and_name(&root_name);
-    let purl = create_purl(&namespace, &name, &root_version);
+    let purl = create_purl(&namespace, &name, Some(root_version.as_str()));
 
     // Collect root-level dependencies from top-level sections
     let mut root_deps = std::collections::HashSet::new();
@@ -143,6 +146,11 @@ fn parse_lockfile_v2_plus(
         for key in root_dev_deps_obj.keys() {
             root_deps.insert(key.clone());
         }
+    }
+    if let Some(root_package) = packages.get("").and_then(|value| value.as_object()) {
+        collect_root_dependency_names(root_package.get(FIELD_DEPENDENCIES), &mut root_deps);
+        collect_root_dependency_names(root_package.get("devDependencies"), &mut root_deps);
+        collect_root_dependency_names(root_package.get("optionalDependencies"), &mut root_deps);
     }
 
     let mut dependencies = Vec::new();
@@ -159,10 +167,10 @@ fn parse_lockfile_v2_plus(
             continue;
         }
 
-        let version = match value.get(FIELD_VERSION).and_then(|v| v.as_str()) {
-            Some(v) => v.to_string(),
-            None => continue,
-        };
+        let version = value
+            .get(FIELD_VERSION)
+            .and_then(|v| v.as_str())
+            .map(str::to_string);
 
         let is_dev = value
             .get(FIELD_DEV)
@@ -179,22 +187,49 @@ fn parse_lockfile_v2_plus(
 
         let resolved = value.get(FIELD_RESOLVED).and_then(|v| v.as_str());
         let integrity = value.get(FIELD_INTEGRITY).and_then(|v| v.as_str());
-        let is_direct = root_deps.contains(&package_name);
+        let from = value.get("from").and_then(|v| v.as_str());
+        let in_bundle = value
+            .get("inBundle")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
+        let is_link = value
+            .get(FIELD_LINK)
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
+        let is_direct = root_deps.contains(&package_name) && is_direct_dependency_path(key);
 
-        let dependency = build_npm_dependency(
-            &package_name,
-            version,
-            is_dev,
-            is_dev_optional,
-            is_optional,
-            resolved,
-            integrity,
-            is_direct,
-            Vec::new(),
-        );
+        let dependency = match version {
+            Some(version) => build_npm_dependency(
+                &package_name,
+                version,
+                is_dev,
+                is_dev_optional,
+                is_optional,
+                resolved,
+                integrity,
+                is_direct,
+                from,
+                in_bundle,
+                Vec::new(),
+            ),
+            None if is_link => build_link_dependency(
+                &package_name,
+                is_dev,
+                is_dev_optional,
+                is_optional,
+                resolved,
+                is_direct,
+            ),
+            None => continue,
+        };
 
         dependencies.push(dependency);
     }
+
+    let extra_data = Some(HashMap::from([(
+        "lockfileVersion".to_string(),
+        Value::from(lockfile_version),
+    )]));
 
     PackageData {
         package_type: Some(NpmLockParser::PACKAGE_TYPE),
@@ -232,7 +267,7 @@ fn parse_lockfile_v2_plus(
         file_references: Vec::new(),
         is_private: false,
         is_virtual: false,
-        extra_data: None,
+        extra_data,
         dependencies,
         repository_homepage_url: None,
         repository_download_url: None,
@@ -258,7 +293,7 @@ fn parse_lockfile_v1(
     };
 
     let (namespace, name) = extract_namespace_and_name(&root_name);
-    let purl = create_purl(&namespace, &name, &root_version);
+    let purl = create_purl(&namespace, &name, Some(root_version.as_str()));
 
     let dependencies = parse_dependencies_v1(dependencies_obj);
 
@@ -340,6 +375,11 @@ fn parse_dependencies_v1_with_depth(
 
         let resolved = dep_data.get(FIELD_RESOLVED).and_then(|v| v.as_str());
         let integrity = dep_data.get(FIELD_INTEGRITY).and_then(|v| v.as_str());
+        let from = dep_data.get("from").and_then(|v| v.as_str());
+        let in_bundle = dep_data
+            .get("inBundle")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
 
         let nested_deps = dep_data
             .get(FIELD_DEPENDENCIES)
@@ -358,6 +398,8 @@ fn parse_dependencies_v1_with_depth(
             resolved,
             integrity,
             is_direct,
+            from,
+            in_bundle,
             nested_deps,
         );
 
@@ -419,13 +461,72 @@ fn extract_package_name_from_path(path: &str) -> String {
     path.to_string()
 }
 
-fn create_purl(namespace: &str, name: &str, version: &str) -> Option<String> {
+fn create_purl(namespace: &str, name: &str, version: Option<&str>) -> Option<String> {
     let full_name = if namespace.is_empty() {
         name.to_string()
     } else {
         format!("{}/{}", namespace, name)
     };
-    npm_purl(&full_name, Some(version))
+    npm_purl(&full_name, version.filter(|value| !value.is_empty()))
+}
+
+fn extract_root_package_identity(
+    json: &Value,
+    root_name: String,
+    root_version: String,
+) -> (String, String) {
+    let root_package = json
+        .get(FIELD_PACKAGES)
+        .and_then(|value| value.as_object())
+        .and_then(|packages| packages.get(""))
+        .and_then(|value| value.as_object());
+
+    let name = non_empty_string(&root_name).or_else(|| {
+        root_package
+            .and_then(|package| package.get(FIELD_NAME))
+            .and_then(|value| value.as_str())
+            .map(str::to_string)
+            .filter(|value| !value.trim().is_empty())
+    });
+    let version = non_empty_string(&root_version).or_else(|| {
+        root_package
+            .and_then(|package| package.get(FIELD_VERSION))
+            .and_then(|value| value.as_str())
+            .map(str::to_string)
+            .filter(|value| !value.trim().is_empty())
+    });
+
+    (name.unwrap_or_default(), version.unwrap_or_default())
+}
+
+fn non_empty_string(value: &str) -> Option<String> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        None
+    } else {
+        Some(trimmed.to_string())
+    }
+}
+
+fn collect_root_dependency_names(
+    value: Option<&Value>,
+    root_deps: &mut std::collections::HashSet<String>,
+) {
+    if let Some(entries) = value.and_then(|value| value.as_object()) {
+        for key in entries.keys() {
+            root_deps.insert(key.clone());
+        }
+    }
+}
+
+fn is_direct_dependency_path(package_path: &str) -> bool {
+    let node_modules_count = package_path.matches("node_modules/").count();
+
+    match node_modules_count {
+        0 => true,
+        1 => package_path.starts_with("node_modules/") || package_path.starts_with(".pnpm/"),
+        _ => false,
+    }
 }
 
 /// Parse integrity field like "sha512-base64string==" or "sha1-base64string="
@@ -476,6 +577,70 @@ fn determine_scope(
     }
 }
 
+fn parse_npm_alias_spec(version_spec: &str) -> Option<(String, String, String)> {
+    let aliased_spec = version_spec.strip_prefix("npm:")?;
+    let (aliased_name, constraint) = aliased_spec.rsplit_once('@')?;
+    let (namespace, name) = extract_namespace_and_name(aliased_name);
+
+    if name.is_empty() || constraint.trim().is_empty() {
+        None
+    } else {
+        Some((namespace, name, constraint.to_string()))
+    }
+}
+
+fn is_exact_version(version: &str) -> bool {
+    let version = version.trim();
+
+    if version.is_empty() {
+        return false;
+    }
+
+    if version.starts_with('~')
+        || version.starts_with('^')
+        || version.starts_with('>')
+        || version.starts_with('<')
+        || version.starts_with('=')
+        || version.starts_with('*')
+        || version.contains("||")
+        || version.contains(" - ")
+    {
+        return false;
+    }
+
+    !is_non_version_dependency(version)
+}
+
+fn is_non_version_dependency(version: &str) -> bool {
+    let version = version.trim();
+
+    version.starts_with("http://")
+        || version.starts_with("https://")
+        || version.starts_with("git://")
+        || version.starts_with("git+ssh://")
+        || version.starts_with("git+http://")
+        || version.starts_with("git+https://")
+        || version.starts_with("git+file://")
+        || version.starts_with("git@")
+        || version.starts_with("file:")
+        || version.starts_with("link:")
+        || version.starts_with("github:")
+        || version.starts_with("gitlab:")
+        || version.starts_with("bitbucket:")
+        || version.starts_with("gist:")
+}
+
+fn non_version_download_url(version: &str, resolved: Option<&str>) -> Option<String> {
+    resolved
+        .map(str::to_string)
+        .or_else(|| match version.trim() {
+            version if version.starts_with("http://") || version.starts_with("https://") => {
+                Some(version.to_string())
+            }
+            _ => None,
+        })
+}
+
 #[allow(clippy::too_many_arguments)]
 fn build_npm_dependency(
     package_name: &str,
@@ -486,24 +651,71 @@ fn build_npm_dependency(
     resolved: Option<&str>,
     integrity: Option<&str>,
     is_direct: bool,
+    from: Option<&str>,
+    in_bundle: bool,
     nested_deps: Vec<Dependency>,
 ) -> Dependency {
     let (dep_namespace, dep_name) = extract_namespace_and_name(package_name);
     let (scope, is_runtime, is_optional_flag) =
         determine_scope(is_dev, is_dev_optional, is_optional);
-    let dep_purl = create_purl(&dep_namespace, &dep_name, &version);
+
+    let alias_spec = parse_npm_alias_spec(&version);
+    let (purl_namespace, purl_name, resolved_version, is_pinned, dep_purl, download_url) =
+        if let Some((alias_namespace, alias_name, alias_constraint)) = alias_spec.clone() {
+            let is_pinned = is_exact_version(&alias_constraint);
+            let dep_purl = create_purl(
+                &alias_namespace,
+                &alias_name,
+                is_pinned.then_some(alias_constraint.as_str()),
+            );
+            let download_url = non_version_download_url(&alias_constraint, resolved);
+
+            (
+                alias_namespace,
+                alias_name,
+                alias_constraint,
+                is_pinned,
+                dep_purl,
+                download_url,
+            )
+        } else {
+            let is_pinned = is_exact_version(&version);
+            let dep_purl = create_purl(
+                &dep_namespace,
+                &dep_name,
+                is_pinned.then_some(version.as_str()),
+            );
+            let download_url = non_version_download_url(&version, resolved);
+
+            (
+                dep_namespace.clone(),
+                dep_name.clone(),
+                version.clone(),
+                is_pinned,
+                dep_purl,
+                download_url,
+            )
+        };
 
     let (sha1_from_integrity, sha512_from_integrity) = parse_integrity_field(integrity);
     let sha1_from_url = resolved.and_then(parse_resolved_url);
     let sha1 = sha1_from_integrity.or(sha1_from_url);
 
+    let mut dep_extra_data = HashMap::new();
+    if let Some(from) = from {
+        dep_extra_data.insert("from".to_string(), Value::String(from.to_string()));
+    }
+    if in_bundle {
+        dep_extra_data.insert("inBundle".to_string(), Value::Bool(true));
+    }
+
     let resolved_package = ResolvedPackage {
         package_type: NpmLockParser::PACKAGE_TYPE,
-        namespace: dep_namespace,
-        name: dep_name,
-        version: version.clone(),
+        namespace: purl_namespace,
+        name: purl_name,
+        version: resolved_version,
         primary_language: Some("JavaScript".to_string()),
-        download_url: resolved.map(|s| s.to_string()),
+        download_url,
         sha1,
         sha256: None,
         sha512: sha512_from_integrity,
@@ -524,10 +736,40 @@ fn build_npm_dependency(
         scope: Some(scope.to_string()),
         is_runtime: Some(is_runtime),
         is_optional: Some(is_optional_flag),
-        is_pinned: Some(true),
+        is_pinned: Some(is_pinned),
         is_direct: Some(is_direct),
         resolved_package: Some(Box::new(resolved_package)),
-        extra_data: None,
+        extra_data: (!dep_extra_data.is_empty()).then_some(dep_extra_data),
+    }
+}
+
+fn build_link_dependency(
+    package_name: &str,
+    is_dev: bool,
+    is_dev_optional: bool,
+    is_optional: bool,
+    resolved: Option<&str>,
+    is_direct: bool,
+) -> Dependency {
+    let (dep_namespace, dep_name) = extract_namespace_and_name(package_name);
+    let (scope, is_runtime, is_optional_flag) =
+        determine_scope(is_dev, is_dev_optional, is_optional);
+    let mut extra_data = HashMap::from([("link".to_string(), Value::Bool(true))]);
+
+    if let Some(resolved) = resolved {
+        extra_data.insert("resolved".to_string(), Value::String(resolved.to_string()));
+    }
+
+    Dependency {
+        purl: create_purl(&dep_namespace, &dep_name, None),
+        extracted_requirement: resolved.map(str::to_string),
+        scope: Some(scope.to_string()),
+        is_runtime: Some(is_runtime),
+        is_optional: Some(is_optional_flag),
+        is_pinned: Some(false),
+        is_direct: Some(is_direct),
+        resolved_package: None,
+        extra_data: Some(extra_data),
     }
 }
 
