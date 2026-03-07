@@ -17,6 +17,7 @@ The copyright detection engine in scancode-rust is a **complete rewrite** of Pyt
 11. **⚡ Performance**: Optional wall-clock deadline for copyright detection and parser iterations
 12. **✨ Enhanced**: Better Office/HTML demarkup for noisy `<o:...>` markup tags
 13. **✨ Enhanced**: Deterministic canonicalization for conflicting byte-identical HTML fixtures
+14. **✨ Enhanced**: EXIF/XMP image metadata clue scanning for supported image formats
 
 ## Improvement 1: Extended Year Range (Bug Fix)
 
@@ -209,13 +210,14 @@ Two upstream HTML fixtures (`url_in_html-detail_9_html.html` and `html_incorrect
 - **Default behavior**: Results are designed to closely match Python ScanCode for common copyright patterns.
 - **Intentional differences**: Some outputs are intentionally improved (for example Unicode name preservation and bug-fix correctness changes).
 - **Determinism guarantee**: Identical input bytes produce identical output; fixture names do not influence detection.
-- **Edge-case differences**: A small set of parity gaps remains in complex or unusual inputs; these are tracked in `COPYRIGHT_DETECTION_PLAN.md` as follow-up work.
+- **Edge-case differences**: Remaining differences are either intentional divergences or optional quality-tuning opportunities, and these are documented in `COPYRIGHT_DETECTION_PLAN.md`.
+- **Media metadata bonus**: Supported images can surface copyright clues from EXIF/XMP metadata even though Python's text-analysis parity baseline does not scan generic media metadata.
 - **Golden source of truth**: Repository fixtures are Rust-owned expectations, while Python fixtures remain a comparison baseline.
 
 ## Status
 
 - ✅ All Python bug fixes implemented and tested
-- ✅ Pipeline integrated into the scanner through a shared path-aware text-ingestion helper covering UTF-8 text, decoded non-UTF text, PDFs with extractable text, and binary printable strings. PEM certificate skipping remains a separate intentional divergence.
+- ✅ Pipeline integrated into the scanner through a shared path-aware text-ingestion helper covering UTF-8 text, decoded non-UTF text, PDFs with extractable text, binary printable strings, and supported-image EXIF/XMP metadata. PEM certificate skipping remains a separate intentional divergence.
 - ✨ Unicode name preservation in output (Python outputs ASCII-only via `toascii`)
 - ✅ Thread-safe for parallel file processing
 - ✅ All library tests passing, golden tests stable in CI
@@ -223,4 +225,4 @@ Two upstream HTML fixtures (`url_in_html-detail_9_html.html` and `html_incorrect
 - ✅ Optional detection runtime deadline support (`max_runtime`) wired into parser-aware detection flow
 - ✅ Public include-filter API via `CopyrightDetectionOptions`
 - ✅ Deterministic canonical output for byte-identical conflicting HTML fixtures
-- 🟢 CI remains stable with tracked parity-gap follow-up work
+- 🟢 CI remains stable with intentional divergences and optional quality follow-up work documented
