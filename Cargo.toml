@@ -21,7 +21,7 @@ include = [
 ]
 
 [package.metadata.cargo-machete]
-ignored = ["md-5"]  # Used as `md5` (crate rename) — machete can't detect without --with-metadata
+ignored = ["md-5", "kamadak-exif"]  # Used as `md5`/`exif` (crate renames) — machete can't detect without --with-metadata
 
 [package.metadata.release]
 # Sign git tags with GPG

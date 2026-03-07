@@ -101,9 +101,20 @@ pub fn extract_text_for_detection(path: &Path, bytes: &[u8]) -> (String, Extract
 
     if let Some(format) = supported_image_metadata_format(ext.as_deref()) {
         let text = extract_image_metadata_text(bytes, format);
-        if !text.is_empty() {
-            return (text, ExtractedTextKind::ImageMetadata);
-        }
+        return if text.is_empty() {
+            if is_supported_image_container(bytes, format) {
+                (String::new(), ExtractedTextKind::None)
+            } else {
+                let decoded = decode_bytes_to_string(bytes);
+                if decoded.is_empty() {
+                    (String::new(), ExtractedTextKind::None)
+                } else {
+                    (decoded, ExtractedTextKind::Decoded)
+                }
+            }
+        } else {
+            (text, ExtractedTextKind::ImageMetadata)
+        };
     }
 
     let decoded = decode_bytes_to_string(bytes);
@@ -133,6 +144,18 @@ fn supported_image_metadata_format(ext: Option<&str>) -> Option<ImageFormat> {
     }
 }
 
+fn is_supported_image_container(bytes: &[u8], format: ImageFormat) -> bool {
+    match format {
+        ImageFormat::Png => bytes.starts_with(b"\x89PNG\r\n\x1a\n"),
+        ImageFormat::Jpeg => bytes.starts_with(&[0xff, 0xd8, 0xff]),
+        ImageFormat::Tiff => bytes.starts_with(b"II\x2a\x00") || bytes.starts_with(b"MM\x00\x2a"),
+        ImageFormat::WebP => {
+            bytes.len() >= 12 && bytes.starts_with(b"RIFF") && &bytes[8..12] == b"WEBP"
+        }
+        _ => false,
+    }
+}
+
 fn extract_image_metadata_text(bytes: &[u8], format: ImageFormat) -> String {
     let mut values = Vec::new();
     values.extend(extract_exif_metadata_values(bytes));
@@ -150,7 +173,7 @@ fn extract_exif_metadata_values(bytes: &[u8]) -> Vec<String> {
     let mut values = Vec::new();
     for field in exif.fields() {
         let rendered = match field.tag {
-            exif::Tag::ImageDescription | exif::Tag::Copyright => {
+            exif::Tag::ImageDescription | exif::Tag::Copyright | exif::Tag::UserComment => {
                 Some(field.display_value().with_unit(&exif).to_string())
             }
             exif::Tag::Artist => Some(format!(
@@ -322,7 +345,10 @@ fn allowed_xmp_field(name: &str) -> Option<&'static str> {
         "creator" => Some("creator"),
         "rights" => Some("rights"),
         "description" => Some("description"),
+        "title" => Some("title"),
+        "subject" => Some("subject"),
         "UsageTerms" => Some("usage_terms"),
+        "WebStatement" => Some("web_statement"),
         _ => None,
     }
 }
