@@ -279,10 +279,7 @@ fn assign_npm_package_resources(files: &mut [FileInfo], packages: &[Package]) {
     let mut package_roots = collect_npm_package_roots(files, packages);
 
     package_roots.sort_by(|(left_root, _), (right_root, _)| {
-        right_root
-            .components()
-            .count()
-            .cmp(&left_root.components().count())
+        root_depth(right_root).cmp(&root_depth(left_root))
     });
 
     for file in files.iter_mut() {
@@ -290,9 +287,8 @@ fn assign_npm_package_resources(files: &mut [FileInfo], packages: &[Package]) {
             continue;
         }
 
-        let path = Path::new(&file.path);
         if let Some((_, package_uid)) = package_roots.iter().find(|(root, _)| {
-            path_is_within_root(path, root) && !is_first_level_node_modules(path, root)
+            path_is_within_root(&file.path, root) && !is_first_level_node_modules(&file.path, root)
         }) {
             file.for_packages.clear();
             file.for_packages.push(package_uid.clone());
@@ -300,8 +296,8 @@ fn assign_npm_package_resources(files: &mut [FileInfo], packages: &[Package]) {
     }
 }
 
-fn collect_npm_package_roots(files: &[FileInfo], packages: &[Package]) -> Vec<(PathBuf, String)> {
-    let mut package_roots: Vec<(PathBuf, String)> = files
+fn collect_npm_package_roots(files: &[FileInfo], packages: &[Package]) -> Vec<(String, String)> {
+    let mut package_roots: Vec<(String, String)> = files
         .iter()
         .filter(|file| {
             file.package_data.iter().any(|package_data| {
@@ -309,15 +305,9 @@ fn collect_npm_package_roots(files: &[FileInfo], packages: &[Package]) -> Vec<(P
             })
         })
         .filter_map(|file| {
-            file.for_packages.first().map(|package_uid| {
-                (
-                    Path::new(&file.path)
-                        .parent()
-                        .unwrap_or_else(|| Path::new(""))
-                        .to_path_buf(),
-                    package_uid.clone(),
-                )
-            })
+            file.for_packages
+                .first()
+                .map(|package_uid| (package_dir(&file.path), package_uid.clone()))
         })
         .collect();
 
@@ -334,9 +324,7 @@ fn collect_npm_package_roots(files: &[FileInfo], packages: &[Package]) -> Vec<(P
                 package
                     .datafile_paths
                     .first()
-                    .map(Path::new)
-                    .and_then(Path::parent)
-                    .map(|root| (root.to_path_buf(), package.package_uid.clone()))
+                    .map(|path| (package_dir(path), package.package_uid.clone()))
             })
             .collect();
     }
@@ -346,20 +334,39 @@ fn collect_npm_package_roots(files: &[FileInfo], packages: &[Package]) -> Vec<(P
     package_roots
 }
 
-fn path_is_within_root(path: &Path, root: &Path) -> bool {
-    root.as_os_str().is_empty() || path.starts_with(root)
+fn package_dir(path: &str) -> String {
+    path.rsplit_once('/')
+        .map(|(directory, _)| directory.to_string())
+        .unwrap_or_default()
 }
 
-fn is_first_level_node_modules(path: &Path, root: &Path) -> bool {
-    let relative = if root.as_os_str().is_empty() {
+fn root_depth(root: &str) -> usize {
+    if root.is_empty() {
+        0
+    } else {
+        root.matches('/').count() + 1
+    }
+}
+
+fn path_is_within_root(path: &str, root: &str) -> bool {
+    root.is_empty()
+        || path == root
+        || path
+            .strip_prefix(root)
+            .is_some_and(|suffix| suffix.starts_with('/'))
+}
+
+fn is_first_level_node_modules(path: &str, root: &str) -> bool {
+    let relative = if root.is_empty() {
         Some(path)
     } else {
-        path.strip_prefix(root).ok()
+        path.strip_prefix(root)
+            .and_then(|suffix| suffix.strip_prefix('/').or(Some(suffix)))
     };
 
     relative
-        .and_then(|relative| relative.components().next())
-        .is_some_and(|component| component.as_os_str() == "node_modules")
+        .and_then(|relative| relative.split('/').next())
+        .is_some_and(|component| component == "node_modules")
 }
 
 /// Group file indices by their parent directory path.
@@ -1013,6 +1020,38 @@ mod tests {
             ownerships.get("node_modules/child/node_modules/grand/package.json"),
             Some(&"pkg:npm/grand@3.0.0".to_string())
         );
+    }
+
+    #[test]
+    fn test_npm_resource_path_helpers_use_segment_aware_matching() {
+        assert_eq!(package_dir("package.json"), "");
+        assert_eq!(
+            package_dir("node_modules/child/package.json"),
+            "node_modules/child"
+        );
+
+        assert!(path_is_within_root("index.js", ""));
+        assert!(path_is_within_root(
+            "node_modules/child/index.js",
+            "node_modules/child"
+        ));
+        assert!(!path_is_within_root(
+            "node_modules/childish/index.js",
+            "node_modules/child"
+        ));
+
+        assert!(is_first_level_node_modules(
+            "node_modules/child/index.js",
+            ""
+        ));
+        assert!(is_first_level_node_modules(
+            "packages/app/node_modules/foo/index.js",
+            "packages/app"
+        ));
+        assert!(!is_first_level_node_modules(
+            "node_modules/child/index.js",
+            "node_modules/child"
+        ));
     }
 
     #[test]
