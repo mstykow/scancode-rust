@@ -5,18 +5,18 @@
     "name": "main",
     "version": "1.0.0-SNAPSHOT",
     "primary_language": "Java",
+    "description": "${groupId}:${artifactId}:${packaging}:${version}",
     "parties": [],
+    "source_packages": [
+      "pkg:maven/ur.urwerk.test.modules/main@1.0.0-SNAPSHOT?classifier=sources"
+    ],
     "extra_data": {
+      "modules": ["module-x", "module-y", "module-z"],
       "parent": {
         "artifactId": "project",
         "groupId": "ur.urwerk",
         "version": "1.0.0-SNAPSHOT"
-      },
-      "modules": [
-        "module-x",
-        "module-y",
-        "module-z"
-      ]
+      }
     },
     "repository_homepage_url": "https://repo1.maven.org/maven2/ur/urwerk/test/modules/main/1.0.0-SNAPSHOT/",
     "repository_download_url": "https://repo1.maven.org/maven2/ur/urwerk/test/modules/main/1.0.0-SNAPSHOT/main-1.0.0-SNAPSHOT.jar",
