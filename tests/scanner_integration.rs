@@ -127,6 +127,50 @@ fn build_png_with_metadata(exif: Option<Vec<u8>>, xmp: Option<&str>) -> Vec<u8> 
     png
 }
 
+fn build_jpeg_with_exif(exif: Vec<u8>) -> Vec<u8> {
+    use image::codecs::jpeg::JpegEncoder;
+    use image::{ExtendedColorType, ImageEncoder};
+
+    let mut jpeg = Vec::new();
+    let mut encoder = JpegEncoder::new_with_quality(&mut jpeg, 100);
+    encoder
+        .set_exif_metadata(exif)
+        .expect("JPEG encoder should support EXIF metadata");
+    encoder
+        .write_image(&[255, 255, 255], 1, 1, ExtendedColorType::Rgb8)
+        .expect("Failed to encode JPEG");
+    jpeg
+}
+
+fn build_webp_with_exif(exif: Vec<u8>) -> Vec<u8> {
+    use image::codecs::webp::WebPEncoder;
+    use image::{ExtendedColorType, ImageEncoder};
+
+    let mut webp = Vec::new();
+    let mut encoder = WebPEncoder::new_lossless(&mut webp);
+    encoder
+        .set_exif_metadata(exif)
+        .expect("WebP encoder should support EXIF metadata");
+    encoder
+        .write_image(&[255, 255, 255], 1, 1, ExtendedColorType::Rgb8)
+        .expect("Failed to encode WebP");
+    webp
+}
+
+fn build_tiff_with_exif(exif: Vec<u8>) -> Vec<u8> {
+    exif
+}
+
+fn build_image_with_exif(extension: &str, exif: Vec<u8>) -> Vec<u8> {
+    match extension {
+        "png" => build_png_with_metadata(Some(exif), None),
+        "jpg" => build_jpeg_with_exif(exif),
+        "tiff" => build_tiff_with_exif(exif),
+        "webp" => build_webp_with_exif(exif),
+        other => panic!("unsupported image extension: {other}"),
+    }
+}
+
 fn build_png_xmp_chunk_data(xmp: &[u8]) -> Vec<u8> {
     let mut data = b"XML:com.adobe.xmp\0\0\0\0\0".to_vec();
     data.extend_from_slice(xmp);
@@ -676,28 +720,27 @@ fn test_scanner_detects_emails_and_urls_in_pdf_text() {
 }
 
 #[test]
-fn test_scanner_detects_copyrights_in_exif_metadata() {
+fn test_scanner_detects_copyrights_in_supported_image_exif_containers() {
     use tempfile::TempDir;
 
     let temp_dir = TempDir::new().expect("Failed to create temp dir");
     let test_path = temp_dir.path();
-    let content_path = test_path.join("photo.png");
-    let png = build_png_with_metadata(
-        Some(build_exif_block(
-            exif::Tag::Copyright,
-            "Copyright 2026 Example Corp.",
-        )),
-        None,
-    );
-    let (extracted_text, kind) = extract_text_for_detection(&content_path, &png);
-    fs::write(&content_path, png).expect("Failed to write PNG fixture");
+    for extension in ["png", "jpg", "tiff", "webp"] {
+        let content_path = test_path.join(format!("photo.{extension}"));
+        let image = build_image_with_exif(
+            extension,
+            build_exif_block(exif::Tag::Copyright, "Copyright 2026 Example Corp."),
+        );
+        let (extracted_text, kind) = extract_text_for_detection(&content_path, &image);
+        fs::write(&content_path, image).expect("Failed to write image fixture");
 
-    assert_eq!(kind, ExtractedTextKind::ImageMetadata);
-    assert!(
-        extracted_text.contains("Copyright 2026 Example Corp."),
-        "extracted_text: {:?}",
-        extracted_text
-    );
+        assert_eq!(kind, ExtractedTextKind::ImageMetadata);
+        assert!(
+            extracted_text.contains("Copyright 2026 Example Corp."),
+            "{extension} extracted_text: {:?}",
+            extracted_text
+        );
+    }
 
     let progress = hidden_progress();
     let patterns: Vec<Pattern> = vec![];
@@ -716,24 +759,27 @@ fn test_scanner_detects_copyrights_in_exif_metadata() {
     let result = process_with_options(test_path, 10, progress, &patterns, &strategy, &options)
         .expect("Scan should succeed");
 
-    let file = result
-        .files
-        .iter()
-        .find(|f| f.file_type == FileType::File && f.path.ends_with("photo.png"))
-        .expect("Should find PNG file");
-
-    assert!(
-        file.copyrights
+    for extension in ["png", "jpg", "tiff", "webp"] {
+        let suffix = format!("photo.{extension}");
+        let file = result
+            .files
             .iter()
-            .any(|c| c.copyright == "Copyright 2026 Example Corp"),
-        "copyrights: {:?}",
-        file.copyrights
-    );
-    assert!(
-        file.holders.iter().any(|h| h.holder == "Example Corp"),
-        "holders: {:?}",
-        file.holders
-    );
+            .find(|f| f.file_type == FileType::File && f.path.ends_with(&suffix))
+            .unwrap_or_else(|| panic!("Should find {} file", suffix));
+
+        assert!(
+            file.copyrights
+                .iter()
+                .any(|c| c.copyright == "Copyright 2026 Example Corp"),
+            "{extension} copyrights: {:?}",
+            file.copyrights
+        );
+        assert!(
+            file.holders.iter().any(|h| h.holder == "Example Corp"),
+            "{extension} holders: {:?}",
+            file.holders
+        );
+    }
 }
 
 #[test]
@@ -809,6 +855,195 @@ fn test_scanner_detects_emails_and_urls_in_xmp_metadata() {
         "urls: {:?}",
         file.urls
     );
+}
+
+#[test]
+fn test_scanner_detects_urls_in_additional_xmp_fields() {
+    use tempfile::TempDir;
+
+    let temp_dir = TempDir::new().expect("Failed to create temp dir");
+    let test_path = temp_dir.path();
+    let content_path = test_path.join("rights.png");
+    let xmp = r#"<?xpacket begin="﻿" id="W5M0MpCehiHzreSzNTczkc9d"?>
+<x:xmpmeta xmlns:x="adobe:ns:meta/">
+  <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+    <rdf:Description
+      xmlns:dc="http://purl.org/dc/elements/1.1/"
+      xmlns:xmpRights="http://ns.adobe.com/xap/1.0/rights/">
+      <dc:subject>
+        <rdf:Bag>
+          <rdf:li>legal@acme.org</rdf:li>
+        </rdf:Bag>
+      </dc:subject>
+      <xmpRights:WebStatement>https://acme.org/rights</xmpRights:WebStatement>
+    </rdf:Description>
+  </rdf:RDF>
+</x:xmpmeta>
+<?xpacket end="w"?>"#;
+    let png = build_png_with_metadata(None, Some(xmp));
+    let (extracted_text, kind) = extract_text_for_detection(&content_path, &png);
+    fs::write(&content_path, png).expect("Failed to write PNG fixture");
+
+    assert_eq!(kind, ExtractedTextKind::ImageMetadata);
+    assert!(
+        extracted_text.contains("legal@acme.org"),
+        "extracted_text: {:?}",
+        extracted_text
+    );
+    assert!(
+        extracted_text.contains("https://acme.org/rights"),
+        "extracted_text: {:?}",
+        extracted_text
+    );
+
+    let progress = hidden_progress();
+    let patterns: Vec<Pattern> = vec![];
+    let store = create_test_store();
+    let strategy = create_test_strategy(&store);
+    let options = TextDetectionOptions {
+        detect_copyrights: false,
+        detect_emails: true,
+        detect_urls: true,
+        max_emails: 50,
+        max_urls: 50,
+        timeout_seconds: 120.0,
+        scan_cache_dir: None,
+    };
+
+    let result = process_with_options(test_path, 10, progress, &patterns, &strategy, &options)
+        .expect("Scan should succeed");
+
+    let file = result
+        .files
+        .iter()
+        .find(|f| f.file_type == FileType::File && f.path.ends_with("rights.png"))
+        .expect("Should find PNG file");
+
+    assert!(
+        file.emails
+            .iter()
+            .any(|email| email.email == "legal@acme.org"),
+        "emails: {:?}",
+        file.emails
+    );
+    assert!(
+        file.urls
+            .iter()
+            .any(|url| url.url == "https://acme.org/rights"),
+        "urls: {:?}",
+        file.urls
+    );
+}
+
+#[test]
+fn test_scanner_detects_emails_in_exif_user_comment() {
+    use tempfile::TempDir;
+
+    let temp_dir = TempDir::new().expect("Failed to create temp dir");
+    let test_path = temp_dir.path();
+    let content_path = test_path.join("note.jpg");
+    let jpeg = build_image_with_exif(
+        "jpg",
+        build_exif_block(
+            exif::Tag::UserComment,
+            "Contact legal@acme.org for support.",
+        ),
+    );
+    let (extracted_text, kind) = extract_text_for_detection(&content_path, &jpeg);
+    fs::write(&content_path, jpeg).expect("Failed to write JPEG fixture");
+
+    assert_eq!(kind, ExtractedTextKind::ImageMetadata);
+    assert!(
+        extracted_text.contains("legal@acme.org"),
+        "extracted_text: {:?}",
+        extracted_text
+    );
+
+    let progress = hidden_progress();
+    let patterns: Vec<Pattern> = vec![];
+    let store = create_test_store();
+    let strategy = create_test_strategy(&store);
+    let options = TextDetectionOptions {
+        detect_copyrights: false,
+        detect_emails: true,
+        detect_urls: false,
+        max_emails: 50,
+        max_urls: 50,
+        timeout_seconds: 120.0,
+        scan_cache_dir: None,
+    };
+
+    let result = process_with_options(test_path, 10, progress, &patterns, &strategy, &options)
+        .expect("Scan should succeed");
+
+    let file = result
+        .files
+        .iter()
+        .find(|f| f.file_type == FileType::File && f.path.ends_with("note.jpg"))
+        .expect("Should find JPEG file");
+
+    assert!(
+        file.emails
+            .iter()
+            .any(|email| email.email == "legal@acme.org"),
+        "emails: {:?}",
+        file.emails
+    );
+}
+
+#[test]
+fn test_scanner_ignores_non_clue_image_metadata() {
+    use tempfile::TempDir;
+
+    let temp_dir = TempDir::new().expect("Failed to create temp dir");
+    let test_path = temp_dir.path();
+    let content_path = test_path.join("camera.png");
+    let png = build_png_with_metadata(
+        Some(build_exif_block(exif::Tag::Software, "CameraTool 1.0")),
+        None,
+    );
+    let (extracted_text, kind) = extract_text_for_detection(&content_path, &png);
+    fs::write(&content_path, png).expect("Failed to write PNG fixture");
+
+    assert_eq!(kind, ExtractedTextKind::None);
+    assert!(
+        extracted_text.is_empty(),
+        "extracted_text: {:?}",
+        extracted_text
+    );
+
+    let progress = hidden_progress();
+    let patterns: Vec<Pattern> = vec![];
+    let store = create_test_store();
+    let strategy = create_test_strategy(&store);
+    let options = TextDetectionOptions {
+        detect_copyrights: true,
+        detect_emails: true,
+        detect_urls: true,
+        max_emails: 50,
+        max_urls: 50,
+        timeout_seconds: 120.0,
+        scan_cache_dir: None,
+    };
+
+    let result = process_with_options(test_path, 10, progress, &patterns, &strategy, &options)
+        .expect("Scan should succeed");
+
+    let file = result
+        .files
+        .iter()
+        .find(|f| f.file_type == FileType::File && f.path.ends_with("camera.png"))
+        .expect("Should find PNG file");
+
+    assert!(
+        file.copyrights.is_empty(),
+        "copyrights: {:?}",
+        file.copyrights
+    );
+    assert!(file.holders.is_empty(), "holders: {:?}", file.holders);
+    assert!(file.authors.is_empty(), "authors: {:?}", file.authors);
+    assert!(file.emails.is_empty(), "emails: {:?}", file.emails);
+    assert!(file.urls.is_empty(), "urls: {:?}", file.urls);
 }
 
 #[test]
