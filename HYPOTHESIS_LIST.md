@@ -1,23 +1,51 @@
-# Hypothesis List for 74 Failing Golden Tests
+# Hypothesis List for Failing Golden Tests
 
 ## Progress
 - Started: 96 failing tests
 - After MAX_DIST fix: 90 failing tests  
 - After minimum_containment fix: 82 failing tests (14 tests fixed)
-- After escape sequence preprocessing fix: 74 failing tests (**22 tests fixed, 22.9% improvement**)
+- After escape sequence preprocessing fix: 74 failing tests (22 tests fixed)
+- After MAX_DETECTION_SIZE increase to 1MB: 70 failing tests (26 tests fixed)
+- After binary strings extraction: 64 failing tests (32 tests fixed, 33% improvement)
+
+## Current Status: 64 failing tests
+
+### Pattern Analysis of Failures
+- **Missing Detections**: ~18 failures (Rust finds fewer matches than Python)
+- **Wrong License Expression**: ~18 failures (correct position, wrong identifier)
+- **GPL Version Resolution**: ~8 failures (wrong "or later" handling)
+- **Unknown License Handling**: ~5 failures (wrong unknown type)
+- **Missing License Rules**: ~3 failures (no rule in SPDX data)
+- **Extra Detections**: ~4 failures
+
+## Fixed Hypotheses
+
+### H2: Content Size Limit - **FIXED**
+- **Root cause**: 100KB limit truncated large files
+- **Fix**: Increased MAX_DETECTION_SIZE to 1MB
+- **Result**: 4 tests fixed
+
+### H3: CC-BY-SA vs CC-BY-NC-SA - **FIXED**
+- **Root cause**: NC-SA got higher candidate_resemblance
+- **Fix**: Added minimum_containment check to candidate selection
+- **Result**: CC-BY-SA tests now pass
+
+### H5-A: options.c Escape Sequences - **FIXED**
+- **Root cause**: Golden tests weren't applying escape sequence preprocessing
+- **Fix**: Added source file preprocessing in golden_test.rs
+- **Result**: Rule gpl-2.0-plus_412.RULE now matches correctly
+
+### H11: Binary File Detection - **FIXED**
+- **Root cause**: Rust skipped binaries, Python extracts ASCII strings
+- **Fix**: Added extract_ascii_strings() function
+- **Result**: 6 tests fixed
 
 ## Active Hypotheses
 
-### H1: QueryRun Splitting Disabled
-- **Impact**: ~25 tests (missing detections)
-- **Root cause**: QueryRun splitting is disabled, files with 4+ blank lines between licenses don't get separate matches
-- **Status**: PENDING
-
-### H2: Multi-Occurrence Deduplication
-- **Impact**: ~25 tests (missing detections of same license at different locations)
-- **Root cause IDENTIFIED**: Containment filtering removes 100% Aho matches when covered by larger seq match
-- **Example**: dojo.js expected 4 matches, got 3
-- **Status**: INVESTIGATED - Need to understand Python's detection grouping
+### H1: QueryRun Splitting Disabled - **DEFERRED**
+- **Impact**: ~18 tests (missing detections)
+- **Root cause**: QueryRun splitting is disabled, causes 37 regressions when enabled
+- **Status**: DEFERRED - regressions need to be understood first
 
 ### H3: CC-BY-SA vs CC-BY-NC-SA - **FIXED**
 - **Root cause**: NC-SA got higher candidate_resemblance than SA despite matching less text
@@ -63,6 +91,22 @@
 - **Fix needed**: Adjust candidate selection thresholds to match Python
 - **Impact**: ~2 tests
 - **Status**: PENDING
+
+### H10: Wrong License Expression - Sequence Match Wins Over Exact Match - **NEW**
+- **Impact**: ~20 tests (including GFDL-1.1.t3)
+- **Root cause IDENTIFIED**: Sequence matches with lower coverage win over exact Aho matches with higher coverage due to containment filtering
+- **Example**: `GFDL-1.1.t3`
+  - `gfdl-1.1-plus_5.RULE`: 68.6% coverage, lines 2-8, 3-seq match (WRONG)
+  - `gfdl-1.1_11.RULE`: 100% coverage, lines 2-4, 2-aho match (CORRECT)
+  - The plus_5 match spans more text (tokens 5-77) and "contains" the gfdl_11 match (tokens 5-28)
+  - Containment filtering removes gfdl_11 because it's contained in plus_5
+  - Python correctly returns gfdl-1.1, not gfdl-1.1-plus
+- **Location**: `src/license_detection/match_refine/handle_overlaps.rs:filter_contained_matches()`
+- **Fix needed**: 
+  1. Consider match coverage when deciding which match to keep in containment
+  2. Or prevent sequence matches from winning over more accurate exact matches
+  3. Check if Python has different candidate selection that prevents plus_5 from matching
+- **Status**: INVESTIGATING
 
 ## Summary of Extra Matches Root Causes
 
