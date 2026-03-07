@@ -1,0 +1,80 @@
+{
+  "dependencies": [],
+  "files_with_packages": [
+    {
+      "for_packages": ["pkg:npm/root-app@1.0.0?uuid=fixed-uid-done-for-testing-5642512d1758"],
+      "path": ".pnp.cjs"
+    },
+    {
+      "for_packages": ["pkg:npm/root-app@1.0.0?uuid=fixed-uid-done-for-testing-5642512d1758"],
+      "path": "index.js"
+    },
+    {
+      "for_packages": ["pkg:npm/child@2.0.0?uuid=fixed-uid-done-for-testing-5642512d1758"],
+      "path": "node_modules/child/index.js"
+    },
+    {
+      "for_packages": ["pkg:npm/grand@3.0.0?uuid=fixed-uid-done-for-testing-5642512d1758"],
+      "path": "node_modules/child/node_modules/grand/index.js"
+    },
+    {
+      "for_packages": ["pkg:npm/grand@3.0.0?uuid=fixed-uid-done-for-testing-5642512d1758"],
+      "path": "node_modules/child/node_modules/grand/package.json"
+    },
+    {
+      "for_packages": ["pkg:npm/child@2.0.0?uuid=fixed-uid-done-for-testing-5642512d1758"],
+      "path": "node_modules/child/package.json"
+    },
+    {
+      "for_packages": ["pkg:npm/root-app@1.0.0?uuid=fixed-uid-done-for-testing-5642512d1758"],
+      "path": "package.json"
+    }
+  ],
+  "packages": [
+    {
+      "api_data_url": "https://registry.npmjs.org/child/2.0.0",
+      "datafile_paths": ["node_modules/child/package.json"],
+      "datasource_ids": ["npm_package_json"],
+      "download_url": "https://registry.npmjs.org/child/-/child-2.0.0.tgz",
+      "name": "child",
+      "package_uid": "pkg:npm/child@2.0.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "parties": [],
+      "primary_language": "JavaScript",
+      "purl": "pkg:npm/child@2.0.0",
+      "repository_download_url": "https://registry.npmjs.org/child/-/child-2.0.0.tgz",
+      "repository_homepage_url": "https://www.npmjs.com/package/child",
+      "type": "npm",
+      "version": "2.0.0"
+    },
+    {
+      "api_data_url": "https://registry.npmjs.org/grand/3.0.0",
+      "datafile_paths": ["node_modules/child/node_modules/grand/package.json"],
+      "datasource_ids": ["npm_package_json"],
+      "download_url": "https://registry.npmjs.org/grand/-/grand-3.0.0.tgz",
+      "name": "grand",
+      "package_uid": "pkg:npm/grand@3.0.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "parties": [],
+      "primary_language": "JavaScript",
+      "purl": "pkg:npm/grand@3.0.0",
+      "repository_download_url": "https://registry.npmjs.org/grand/-/grand-3.0.0.tgz",
+      "repository_homepage_url": "https://www.npmjs.com/package/grand",
+      "type": "npm",
+      "version": "3.0.0"
+    },
+    {
+      "api_data_url": "https://registry.npmjs.org/root-app/1.0.0",
+      "datafile_paths": ["package.json"],
+      "datasource_ids": ["npm_package_json"],
+      "download_url": "https://registry.npmjs.org/root-app/-/root-app-1.0.0.tgz",
+      "name": "root-app",
+      "package_uid": "pkg:npm/root-app@1.0.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "parties": [],
+      "primary_language": "JavaScript",
+      "purl": "pkg:npm/root-app@1.0.0",
+      "repository_download_url": "https://registry.npmjs.org/root-app/-/root-app-1.0.0.tgz",
+      "repository_homepage_url": "https://www.npmjs.com/package/root-app",
+      "type": "npm",
+      "version": "1.0.0"
+    }
+  ]
+}

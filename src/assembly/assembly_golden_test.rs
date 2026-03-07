@@ -379,6 +379,14 @@ mod tests {
     }
 
     #[test]
+    fn test_assembly_npm_nested_packages() {
+        match run_assembly_golden_test("npm-nested-packages") {
+            Ok(_) => (),
+            Err(e) => panic!("Assembly golden test failed for npm-nested-packages: {}", e),
+        }
+    }
+
+    #[test]
     fn test_assembly_pnpm_workspace() {
         match run_assembly_golden_test("pnpm-workspace") {
             Ok(_) => (),
