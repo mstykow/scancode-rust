@@ -4,8 +4,7 @@ pub mod aho_match;
 mod detection;
 #[cfg(test)]
 mod investigation;
-#[cfg(test)]
-mod coverage_diagnostic_test;
+
 
 pub mod expression;
 #[cfg(test)]
@@ -271,42 +270,13 @@ impl LicenseDetectionEngine {
             }
         }
 
-        // Phase 3: Regular sequence matching on whole_run (with 70 candidates like Python)
-        const MAX_SEQ_CANDIDATES: usize = 70;
-        {
-            let whole_run = query.whole_query_run();
-            let candidates = compute_candidates_with_msets(
-                &self.index,
-                &whole_run,
-                false,
-                MAX_SEQ_CANDIDATES,
-            );
-            if !candidates.is_empty() {
-                let matches = seq_match_with_candidates(&self.index, &whole_run, &candidates);
-
-                // Add to matched_qspans to prevent double-matching in Phase 4
-                for m in &matches {
-                    if m.end_token > m.start_token {
-                        let span = query::PositionSpan::new(m.start_token, m.end_token - 1);
-                        query.subtract(&span); // Update matchables
-                        matched_qspans.push(span); // Track matched regions
-                    }
-                }
-
-                seq_all_matches.extend(matches);
-            }
-        }
-
-        // Phase 4: Query run matching
+        // Phase 3: Query run matching
+        // Python: index.py:787-812 - iterates over query_runs with high_resemblance=False
+        // NOTE: Python does NOT call query.subtract() in this loop - only in near-dupe phase
+        // The is_matchable() check prevents double-matching using matched_qspans from near-dupe
         const MAX_QUERY_RUN_CANDIDATES: usize = 70;
         {
-            let whole_run = query.whole_query_run();
-            let mut phase4_spans: Vec<query::PositionSpan> = Vec::new();
             for query_run in query.query_runs().iter() {
-                if query_run.start == whole_run.start && query_run.end == whole_run.end {
-                    continue;
-                }
-
                 if !query_run.is_matchable(false, &matched_qspans) {
                     continue;
                 }
@@ -320,23 +290,9 @@ impl LicenseDetectionEngine {
                 if !candidates.is_empty() {
                     let matches =
                         seq_match_with_candidates(&self.index, query_run, &candidates);
-
-                    // Collect spans to add to matched_qspans (apply after loop due to borrow)
-                    for m in &matches {
-                        if m.end_token > m.start_token {
-                            let span = query::PositionSpan::new(m.start_token, m.end_token - 1);
-                            phase4_spans.push(span);
-                        }
-                    }
-
                     seq_all_matches.extend(matches);
                 }
             }
-            // Apply spans after the loop completes
-            for span in &phase4_spans {
-                query.subtract(span);
-            }
-            matched_qspans.extend(phase4_spans);
         }
 
         // Merge all sequence matches ONCE (like Python's approx matcher)

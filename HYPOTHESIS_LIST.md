@@ -10,13 +10,16 @@
 
 ## Current Status: 64 failing tests
 
-### Pattern Analysis of Failures
-- **Missing Detections**: ~18 failures (Rust finds fewer matches than Python)
-- **Wrong License Expression**: ~18 failures (correct position, wrong identifier)
-- **GPL Version Resolution**: ~8 failures (wrong "or later" handling)
-- **Unknown License Handling**: ~5 failures (wrong unknown type)
-- **Missing License Rules**: ~3 failures (no rule in SPDX data)
-- **Extra Detections**: ~4 failures
+### Pattern Analysis of Failures (Updated)
+| Category | Count | Description |
+|----------|-------|-------------|
+| Missing Detections | ~15 | Rust finds fewer matches than expected |
+| Wrong License Expression | ~12 | Correct position, wrong identifier |
+| Extra Detections | ~10 | Rust produces more matches than expected |
+| GPL Version Resolution | ~8 | Wrong "or later" handling |
+| Unknown License Handling | ~5 | "unknown" vs "unknown-license-reference" |
+| Match Ordering | ~6 | Order differs from Python |
+| Wrong License Type | ~8 | Completely wrong license detected |
 
 ## Fixed Hypotheses
 
@@ -43,84 +46,101 @@
 ## Active Hypotheses
 
 ### H1: QueryRun Splitting Disabled - **DEFERRED**
-- **Impact**: ~18 tests (missing detections)
+- **Impact**: ~15 tests (missing detections)
 - **Root cause**: QueryRun splitting is disabled, causes 37 regressions when enabled
 - **Status**: DEFERRED - regressions need to be understood first
+- **Examples**:
+  - `net-snmp-license.txt`: Expected 18 matches, got 4
+  - `pkg.c`: Expected "gpl-2.0 OR lgpl-2.0", got separate matches
 
-### H3: CC-BY-SA vs CC-BY-NC-SA - **FIXED**
-- **Root cause**: NC-SA got higher candidate_resemblance than SA despite matching less text
-- **Fix**: Added minimum_containment check to candidate selection
-- **Result**: CC-BY-SA tests now pass
+### H10: Wrong License Variant (X vs X-plus) - **HIGH PRIORITY**
+- **Impact**: ~8 tests
+- **Root cause**: Sequence matches with lower coverage win over exact matches with higher coverage due to containment filtering
+- **Example**: `GFDL-1.1.t3`
+  - Expected: `gfdl-1.1`
+  - Actual: `gfdl-1.1-plus`
+  - The `gfdl-1.1-plus_5.RULE` sequence match "contains" the exact `gfdl-1.1_11.RULE` match
+  - Containment filtering removes the correct match
+- **Location**: `src/license_detection/match_refine/handle_overlaps.rs:filter_contained_matches()`
+- **Fix needed**: Consider match coverage/type when filtering contained matches
+- **Status**: READY TO FIX
 
-### H4: German Text ß Character
-- **Impact**: ~15 tests
-- **Status**: PYTHON PARITY ACHIEVED (Python has same issue)
+### H12: Extra Detections in Non-License Files - **NEW**
+- **Impact**: ~10 tests
+- **Root cause**: Rust detects licenses in files that should have none
+- **Example**: `test.js` (spdx-correct.js test file)
+  - Expected: `[]` (no licenses)
+  - Actual: `["lgpl-3.0 OR mpl-2.0", "mit"]`
+  - File contains license identifiers as test data strings like `'LGPL 3.0'`, `'MIT'`
+  - Python ignores these as they're in string literals, Rust detects them
+- **Fix needed**: Either:
+  1. Context-aware detection (ignore strings in code)
+  2. Better false positive filtering
+  3. Minimum match length threshold
+- **Status**: INVESTIGATING
 
-### H5: Extra Matches Being Created - **INVESTIGATED**
-- **Impact**: ~15 tests (Rust produces more matches than expected)
-- **Status**: ROOT CAUSES IDENTIFIED
+### H13: GPL Version Expression Resolution - **NEW**
+- **Impact**: ~8 tests
+- **Root cause**: Rust produces "X OR Y" instead of "X-plus" for GPL licenses
+- **Example**: `gpl-2.0-plus_33.txt`
+  - Expected: `["gpl-2.0-plus", "gpl-2.0-plus", "gpl-1.0-plus", "gpl-1.0-plus", "gpl-2.0-plus", "gpl-1.0-plus"]`
+  - Actual: `["gpl-2.0-plus", "gpl-2.0-plus", "gpl-2.0 OR gpl-3.0", "gpl-2.0 OR gpl-3.0"]`
+- **Root cause hypothesis**:
+  - Python has logic to normalize "GPL-2.0 OR GPL-3.0" to "GPL-2.0-plus"
+  - Rust may be missing this normalization or applying it inconsistently
+- **Status**: PENDING INVESTIGATION
 
-#### H5-A: options.c - **FIXED**
-- **Root cause**: Golden tests weren't applying escape sequence preprocessing for source files
-- **Fix**: Added source file preprocessing in `golden_test.rs:131-134`
-- **Result**: Rule gpl-2.0-plus_412.RULE now matches correctly
-
-#### H5-B: BSD-3-Clause_AND_CC0-1.0.txt - Sequence matching misses rule
-- **Root cause**: Rust uses Aho-Corasick for exact matches, missing approximate match Python finds
-- **Python**: Uses bsd-new_303.RULE via sequence matching (3-seq)
-- **Rust**: Uses 2 separate Aho matches (bsd-new_302, bsd-new_304)
-- **Fix needed**: Improve sequence candidate selection
-
-#### H5-C: warranty-disclaimer over-matching
-- **Root cause**: Multiple small warranty-disclaimer rules match where larger rules should
-- **Fix needed**: Better overlap filtering or minimum_coverage enforcement
+### H14: License Expression Parsing Differences - **NEW**
+- **Impact**: ~5 tests
+- **Root cause**: Parentheses handling in license expressions differs
+- **Example**: `missing_leading_trailing_paren.txt`
+  - Expected: `"(gpl-2.0 AND mit) AND unknown-spdx"`
+  - Actual: `"gpl-2.0 AND mit AND unknown-spdx"`
+- **Fix needed**: Verify expression parsing preserves parentheses structure
+- **Status**: PENDING
 
 ### H6: Unknown License Detection Differences
 - **Impact**: ~5 tests
+- **Root cause**: "unknown" vs "unknown-license-reference" usage differs
+- **Example**: `README.md` in unknown/
+  - Expected: `["unknown-license-reference", "unknown-license-reference", "unknown-license-reference"]`
+  - Actual: `["unknown-license-reference", "unknown-license-reference", "unknown"]`
+- **Fix needed**: Unify unknown license type handling
 - **Status**: PENDING
 
-### H7: Match Ordering Differences
+### H15: Missing License Rule Detection - **NEW**
 - **Impact**: ~5 tests
+- **Root cause**: Specific license rules aren't being matched
+- **Example**: `lgpl-2.1-plus_with_other-copyleft_1.RULE`
+  - File content: `SPDX-License-Identifier: LGPL-2.1+ The author added a static linking exception...`
+  - Expected: `["unknown-spdx"]`
+  - Actual: `["lgpl-2.1-plus"]`
+  - Python detects as unknown-spdx, Rust correctly identifies lgpl-2.1-plus
+  - This may be a **Rust improvement** over Python!
+- **Status**: NEEDS VERIFICATION - May not be a bug
+
+### H16: OR Expression Converted to AND - **NEW**
+- **Impact**: ~3 tests
+- **Root cause**: OR license expressions being converted to AND
+- **Example**: `AFL-2.1_or_GPL-2.0.txt`
+  - Expected: `["afl-2.1 OR gpl-2.0-plus", "afl-2.1", "gpl-2.0"]`
+  - Actual: `["(afl-2.1 OR gpl-2.0) AND gpl-2.0", "afl-2.1", "gpl-2.0"]`
+- **Fix needed**: Investigate why OR becomes AND in first match
 - **Status**: PENDING
 
-### H9: Sequence Matching Candidate Selection - **INVESTIGATING**
-- **Impact**: Unknown number of tests
-- **Root cause IDENTIFIED**: `high_set_intersection` check filters out rules that Python finds
-- **Example**: `aladdin-md5_and_not_rsa-md5.txt` - Python finds `aladdin-md5.RULE` via seq match, Rust doesn't
-- **Location**: `src/license_detection/seq_match/candidates.rs:325-328`
-- **Fix needed**: Adjust candidate selection thresholds to match Python
-- **Impact**: ~2 tests
-- **Status**: PENDING
+## Summary of Root Causes
 
-### H10: Wrong License Expression - Sequence Match Wins Over Exact Match - **NEW**
-- **Impact**: ~20 tests (including GFDL-1.1.t3)
-- **Root cause IDENTIFIED**: Sequence matches with lower coverage win over exact Aho matches with higher coverage due to containment filtering
-- **Example**: `GFDL-1.1.t3`
-  - `gfdl-1.1-plus_5.RULE`: 68.6% coverage, lines 2-8, 3-seq match (WRONG)
-  - `gfdl-1.1_11.RULE`: 100% coverage, lines 2-4, 2-aho match (CORRECT)
-  - The plus_5 match spans more text (tokens 5-77) and "contains" the gfdl_11 match (tokens 5-28)
-  - Containment filtering removes gfdl_11 because it's contained in plus_5
-  - Python correctly returns gfdl-1.1, not gfdl-1.1-plus
-- **Location**: `src/license_detection/match_refine/handle_overlaps.rs:filter_contained_matches()`
-- **Fix needed**: 
-  1. Consider match coverage when deciding which match to keep in containment
-  2. Or prevent sequence matches from winning over more accurate exact matches
-  3. Check if Python has different candidate selection that prevents plus_5 from matching
-- **Status**: INVESTIGATING
+1. **GPL version normalization** (H13): Need to normalize "GPL-2.0 OR GPL-3.0" to "GPL-2.0-plus"
+2. **Containment filtering** (H10): Sequence matches incorrectly win over exact matches
+3. **Extra detections** (H12): Need context-aware detection or better filtering
+4. **Expression parsing** (H14, H16): Parentheses and OR/AND handling issues
 
-## Summary of Extra Matches Root Causes
+## Recommended Fix Order
 
-1. **Sequence matching misses rules that Python finds**:
-   - Rust falls back to smaller Aho-Corasick matches
-   - Results in more matches instead of one combined match
-
-2. **ignorable_urls not properly handled**:
-   - Rules with ignorable_urls should match with/without URL punctuation
-   - Rust doesn't generate URL variants for matching
-
-3. **minimum_coverage filtering in sequence matching**:
-   - Rules with higher minimum_coverage may be filtered out incorrectly
-   - Need to verify candidate selection respects minimum_coverage
+1. **H10 (Wrong License Variant)**: High impact, clear fix location
+2. **H13 (GPL Version Resolution)**: High impact, likely normalization issue
+3. **H12 (Extra Detections)**: Medium impact, may need architectural changes
+4. **H14/H16 (Expression Parsing)**: Low impact, edge cases
 
 ## Investigation Protocol
 1. Pick top 3 hypotheses

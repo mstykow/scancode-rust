@@ -6,10 +6,10 @@ use crate::license_detection::index::LicenseIndex;
 use crate::license_detection::models::LicenseMatch;
 use crate::license_detection::query::Query;
 
-pub const MATCH_UNKNOWN: &str = "5-undetected";
+pub const MATCH_UNKNOWN: &str = "6-unknown";
 
 #[allow(dead_code)]
-pub const MATCH_UNKNOWN_ORDER: u8 = 5;
+pub const MATCH_UNKNOWN_ORDER: u8 = 6;
 
 const UNKNOWN_NGRAM_LENGTH: usize = 6;
 
