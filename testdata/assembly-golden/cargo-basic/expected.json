@@ -1,6 +1,18 @@
 {
   "dependencies": [
     {
+      "datafile_path": "Cargo.lock",
+      "datasource_id": "cargo_lock",
+      "dependency_uid": "pkg:cargo/serde?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "for_package_uid": "pkg:cargo/test-crate@0.1.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "is_direct": true,
+      "is_optional": false,
+      "is_pinned": true,
+      "is_runtime": true,
+      "purl": "pkg:cargo/serde",
+      "scope": "dependencies"
+    },
+    {
       "datafile_path": "Cargo.toml",
       "datasource_id": "cargo_toml",
       "dependency_uid": "pkg:cargo/serde?uuid=fixed-uid-done-for-testing-5642512d1758",
@@ -11,6 +23,18 @@
       "is_pinned": false,
       "is_runtime": true,
       "purl": "pkg:cargo/serde",
+      "scope": "dependencies"
+    },
+    {
+      "datafile_path": "Cargo.lock",
+      "datasource_id": "cargo_lock",
+      "dependency_uid": "pkg:cargo/tokio?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "for_package_uid": "pkg:cargo/test-crate@0.1.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "is_direct": true,
+      "is_optional": false,
+      "is_pinned": true,
+      "is_runtime": true,
+      "purl": "pkg:cargo/tokio",
       "scope": "dependencies"
     },
     {
@@ -29,30 +53,6 @@
       "is_runtime": false,
       "purl": "pkg:cargo/tokio",
       "scope": "dev-dependencies"
-    },
-    {
-      "datafile_path": "Cargo.lock",
-      "datasource_id": "cargo_lock",
-      "dependency_uid": "pkg:cargo/serde?uuid=fixed-uid-done-for-testing-5642512d1758",
-      "for_package_uid": "pkg:cargo/test-crate@0.1.0?uuid=fixed-uid-done-for-testing-5642512d1758",
-      "is_direct": true,
-      "is_optional": false,
-      "is_pinned": true,
-      "is_runtime": true,
-      "purl": "pkg:cargo/serde",
-      "scope": "dependencies"
-    },
-    {
-      "datafile_path": "Cargo.lock",
-      "datasource_id": "cargo_lock",
-      "dependency_uid": "pkg:cargo/tokio?uuid=fixed-uid-done-for-testing-5642512d1758",
-      "for_package_uid": "pkg:cargo/test-crate@0.1.0?uuid=fixed-uid-done-for-testing-5642512d1758",
-      "is_direct": true,
-      "is_optional": false,
-      "is_pinned": true,
-      "is_runtime": true,
-      "purl": "pkg:cargo/tokio",
-      "scope": "dependencies"
     }
   ],
   "files_with_packages": [
@@ -68,8 +68,8 @@
   "packages": [
     {
       "api_data_url": "https://crates.io/api/v1/crates/test-crate",
-      "datafile_paths": ["Cargo.toml", "Cargo.lock"],
-      "datasource_ids": ["cargo_toml", "cargo_lock"],
+      "datafile_paths": ["Cargo.lock", "Cargo.toml"],
+      "datasource_ids": ["cargo_lock", "cargo_toml"],
       "extra_data": {
         "rust_edition": "2021"
       },
