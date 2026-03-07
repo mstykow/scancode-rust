@@ -5,6 +5,7 @@
     "name": "jrecordbind-java5",
     "version": "2.3.4",
     "primary_language": "Java",
+    "description": "jrecordbind\nTransform fixed-length and variable-length text files into beans and back",
     "parties": [
       {
         "type": "person",
@@ -17,9 +18,11 @@
     "bug_tracking_url": "https://jrecordbind.dev.java.net/servlets/ProjectIssues",
     "code_view_url": "https://jrecordbind.dev.java.net/source/browse/jrecordbind/",
     "vcs_url": "svn:https://jrecordbind.dev.java.net/svn/jrecordbind/trunk/",
-    "extracted_license_statement": "LGPL",
+    "extracted_license_statement": "- license:\n    name: LGPL\n    url: http://www.gnu.org/copyleft/lesser.html\n",
+    "source_packages": [
+      "pkg:maven/it.assist.jrecordbind/jrecordbind-java5@2.3.4?classifier=sources"
+    ],
     "extra_data": {
-      "inception_year": "2009",
       "repositories": [
         {
           "id": "maven2-repository.dev.java.net",
@@ -27,8 +30,6 @@
           "url": "http://download.java.net/maven/2"
         }
       ],
-      "scm_developer_connection": "svn:https://jrecordbind.dev.java.net/svn/jrecordbind/trunk/",
-      "issue_tracking_system": "bugzilla",
       "distribution_repository": {
         "id": "java.net-m2-repository",
         "url": "java-net:/maven2-repository/trunk/repository/"
@@ -36,11 +37,15 @@
       "distribution_site": {
         "id": "website",
         "url": "svn:https://jrecordbind.dev.java.net/svn/jrecordbind/trunk/www/"
-      }
+      },
+      "scm_developer_connection": "svn:https://jrecordbind.dev.java.net/svn/jrecordbind/trunk/",
+      "inception_year": "2009",
+      "issue_tracking_system": "bugzilla"
     },
     "dependencies": [
       {
         "purl": "pkg:maven/relaxngDatatype/relaxngDatatype@20020414",
+        "extracted_requirement": "20020414",
         "scope": "compile",
         "is_runtime": true,
         "is_optional": false,
@@ -49,6 +54,7 @@
       },
       {
         "purl": "pkg:maven/com.sun.xml.bind/jaxb-impl@2.1.11",
+        "extracted_requirement": "2.1.11",
         "scope": "compile",
         "is_runtime": true,
         "is_optional": false,
@@ -57,6 +63,7 @@
       },
       {
         "purl": "pkg:maven/com.sun.xml.bind/jaxb-xjc@2.1.11",
+        "extracted_requirement": "2.1.11",
         "scope": "compile",
         "is_runtime": true,
         "is_optional": false,
@@ -65,6 +72,7 @@
       },
       {
         "purl": "pkg:maven/com.sun.xsom/xsom@20081112",
+        "extracted_requirement": "20081112",
         "scope": "compile",
         "is_runtime": true,
         "is_optional": false,
