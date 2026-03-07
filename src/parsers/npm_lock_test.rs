@@ -472,6 +472,77 @@ mod tests {
         assert_eq!(package_data.dependencies.len(), 0);
     }
 
+    #[test]
+    fn test_link_dependency_without_version_is_preserved() {
+        let content = r#"{
+            "name": "test",
+            "version": "1.0.0",
+            "lockfileVersion": 3,
+            "packages": {
+                "": {
+                    "name": "test",
+                    "version": "1.0.0"
+                },
+                "node_modules/local-pkg": {
+                    "resolved": "../packages/local-pkg",
+                    "link": true
+                }
+            }
+        }"#;
+
+        let (_temp, path) = create_temp_lock_file(content);
+        let package_data = NpmLockParser::extract_first_package(&path);
+
+        assert_eq!(package_data.dependencies.len(), 1);
+        let dep = &package_data.dependencies[0];
+        assert_eq!(dep.purl, Some("pkg:npm/local-pkg".to_string()));
+        assert_eq!(
+            dep.extracted_requirement,
+            Some("../packages/local-pkg".to_string())
+        );
+        assert_eq!(dep.is_pinned, Some(false));
+        assert_eq!(dep.is_direct, Some(false));
+        assert!(dep.resolved_package.is_none());
+        let extra_data = dep.extra_data.as_ref().expect("expected link extra_data");
+        assert_eq!(extra_data.get("link"), Some(&serde_json::Value::Bool(true)));
+        assert_eq!(
+            extra_data.get("resolved"),
+            Some(&serde_json::Value::String(
+                "../packages/local-pkg".to_string()
+            ))
+        );
+    }
+
+    #[test]
+    fn test_root_package_falls_back_to_packages_entry_and_keeps_lockfile_version() {
+        let content = r#"{
+            "lockfileVersion": 3,
+            "packages": {
+                "": {
+                    "name": "hidden-lock-root",
+                    "version": "2.0.0"
+                }
+            }
+        }"#;
+
+        let (_temp, path) = create_temp_lock_file(content);
+        let package_data = NpmLockParser::extract_first_package(&path);
+
+        assert_eq!(package_data.name, Some("hidden-lock-root".to_string()));
+        assert_eq!(package_data.version, Some("2.0.0".to_string()));
+        assert_eq!(
+            package_data.purl,
+            Some("pkg:npm/hidden-lock-root@2.0.0".to_string())
+        );
+        let extra_data = package_data
+            .extra_data
+            .expect("expected lockfile extra_data");
+        assert_eq!(
+            extra_data.get("lockfileVersion"),
+            Some(&serde_json::Value::from(3))
+        );
+    }
+
     // ===== Version Detection Tests =====
 
     #[test]
@@ -543,7 +614,202 @@ mod tests {
     }
 
     #[test]
-    fn test_npm_lock_v2_nested_duplicate_is_direct_bug() {
+    fn test_file_spec_dependency_is_unpinned_and_preserves_extra_data() {
+        let content = r#"{
+            "name": "test",
+            "version": "1.0.0",
+            "lockfileVersion": 3,
+            "packages": {
+                "": {
+                    "name": "test",
+                    "version": "1.0.0",
+                    "dependencies": {
+                        "local-tarball": "file:vendor/local-tarball-1.2.3.tgz"
+                    }
+                },
+                "node_modules/local-tarball": {
+                    "version": "file:vendor/local-tarball-1.2.3.tgz",
+                    "resolved": "file:vendor/local-tarball-1.2.3.tgz",
+                    "from": "file:vendor/local-tarball-1.2.3.tgz",
+                    "inBundle": true
+                }
+            }
+        }"#;
+
+        let (_temp, path) = create_temp_lock_file(content);
+        let package_data = NpmLockParser::extract_first_package(&path);
+
+        assert_eq!(package_data.dependencies.len(), 1);
+        let dep = &package_data.dependencies[0];
+        assert_eq!(dep.purl, Some("pkg:npm/local-tarball".to_string()));
+        assert_eq!(
+            dep.extracted_requirement,
+            Some("file:vendor/local-tarball-1.2.3.tgz".to_string())
+        );
+        assert_eq!(dep.is_pinned, Some(false));
+        assert_eq!(dep.is_direct, Some(true));
+
+        let resolved = dep
+            .resolved_package
+            .as_ref()
+            .expect("expected resolved package");
+        assert_eq!(resolved.version, "file:vendor/local-tarball-1.2.3.tgz");
+        assert_eq!(
+            resolved.download_url,
+            Some("file:vendor/local-tarball-1.2.3.tgz".to_string())
+        );
+
+        let extra_data = dep
+            .extra_data
+            .as_ref()
+            .expect("expected dependency extra_data");
+        assert_eq!(
+            extra_data.get("from"),
+            Some(&serde_json::Value::String(
+                "file:vendor/local-tarball-1.2.3.tgz".to_string()
+            ))
+        );
+        assert_eq!(
+            extra_data.get("inBundle"),
+            Some(&serde_json::Value::Bool(true))
+        );
+    }
+
+    #[test]
+    fn test_git_spec_dependency_is_unpinned() {
+        let content = r#"{
+            "name": "test",
+            "version": "1.0.0",
+            "lockfileVersion": 3,
+            "packages": {
+                "": {
+                    "name": "test",
+                    "version": "1.0.0",
+                    "dependencies": {
+                        "git-dep": "git+https://github.com/npm/cli.git#deadbeef"
+                    }
+                },
+                "node_modules/git-dep": {
+                    "version": "git+https://github.com/npm/cli.git#deadbeef",
+                    "resolved": "git+https://github.com/npm/cli.git#deadbeef"
+                }
+            }
+        }"#;
+
+        let (_temp, path) = create_temp_lock_file(content);
+        let package_data = NpmLockParser::extract_first_package(&path);
+
+        assert_eq!(package_data.dependencies.len(), 1);
+        let dep = &package_data.dependencies[0];
+        assert_eq!(dep.purl, Some("pkg:npm/git-dep".to_string()));
+        assert_eq!(
+            dep.extracted_requirement,
+            Some("git+https://github.com/npm/cli.git#deadbeef".to_string())
+        );
+        assert_eq!(dep.is_pinned, Some(false));
+
+        let resolved = dep
+            .resolved_package
+            .as_ref()
+            .expect("expected resolved package");
+        assert_eq!(
+            resolved.version,
+            "git+https://github.com/npm/cli.git#deadbeef"
+        );
+        assert_eq!(
+            resolved.download_url,
+            Some("git+https://github.com/npm/cli.git#deadbeef".to_string())
+        );
+    }
+
+    #[test]
+    fn test_tarball_url_dependency_uses_unpinned_purl_and_download_url() {
+        let content = r#"{
+            "name": "test",
+            "version": "1.0.0",
+            "lockfileVersion": 3,
+            "packages": {
+                "": {
+                    "name": "test",
+                    "version": "1.0.0",
+                    "dependencies": {
+                        "remote-tarball": "https://registry.npmjs.org/remote-tarball/-/remote-tarball-1.2.3.tgz"
+                    }
+                },
+                "node_modules/remote-tarball": {
+                    "version": "https://registry.npmjs.org/remote-tarball/-/remote-tarball-1.2.3.tgz"
+                }
+            }
+        }"#;
+
+        let (_temp, path) = create_temp_lock_file(content);
+        let package_data = NpmLockParser::extract_first_package(&path);
+
+        assert_eq!(package_data.dependencies.len(), 1);
+        let dep = &package_data.dependencies[0];
+        assert_eq!(dep.purl, Some("pkg:npm/remote-tarball".to_string()));
+        assert_eq!(dep.is_pinned, Some(false));
+
+        let resolved = dep
+            .resolved_package
+            .as_ref()
+            .expect("expected resolved package");
+        assert_eq!(
+            resolved.download_url,
+            Some(
+                "https://registry.npmjs.org/remote-tarball/-/remote-tarball-1.2.3.tgz".to_string()
+            )
+        );
+    }
+
+    #[test]
+    fn test_npm_alias_range_dependency_is_not_marked_pinned() {
+        let content = r#"{
+            "name": "test",
+            "version": "1.0.0",
+            "lockfileVersion": 3,
+            "packages": {
+                "": {
+                    "name": "test",
+                    "version": "1.0.0",
+                    "dependencies": {
+                        "wrap-ansi-cjs": "npm:wrap-ansi@^7.0.0"
+                    }
+                },
+                "node_modules/wrap-ansi-cjs": {
+                    "name": "wrap-ansi",
+                    "version": "npm:wrap-ansi@^7.0.0",
+                    "resolved": "https://registry.npmjs.org/wrap-ansi/-/wrap-ansi-7.0.0.tgz"
+                }
+            }
+        }"#;
+
+        let (_temp, path) = create_temp_lock_file(content);
+        let package_data = NpmLockParser::extract_first_package(&path);
+
+        assert_eq!(package_data.dependencies.len(), 1);
+        let dep = &package_data.dependencies[0];
+        assert_eq!(dep.purl, Some("pkg:npm/wrap-ansi".to_string()));
+        assert_eq!(
+            dep.extracted_requirement,
+            Some("npm:wrap-ansi@^7.0.0".to_string())
+        );
+        assert_eq!(dep.is_pinned, Some(false));
+
+        let resolved = dep
+            .resolved_package
+            .as_ref()
+            .expect("expected resolved package");
+        assert_eq!(resolved.name, "wrap-ansi");
+        assert_eq!(resolved.version, "^7.0.0");
+        assert_eq!(
+            resolved.download_url,
+            Some("https://registry.npmjs.org/wrap-ansi/-/wrap-ansi-7.0.0.tgz".to_string())
+        );
+    }
+
+    #[test]
+    fn test_npm_lock_v2_nested_duplicate_marks_only_root_entry_direct() {
         let lock_path = PathBuf::from("testdata/npm/lock-v2-nested-dups/package-lock.json");
         let package_data = NpmLockParser::extract_first_package(&lock_path);
 
@@ -565,10 +831,15 @@ mod tests {
             .iter()
             .filter(|d| d.is_direct == Some(true))
             .count();
+        let nested_count = foo_deps
+            .iter()
+            .filter(|d| d.is_direct == Some(false))
+            .count();
 
+        assert_eq!(direct_count, 1, "Only the root-level foo should be direct");
         assert_eq!(
-            direct_count, 2,
-            "BUG: Both foo instances are marked is_direct=true. Only root-level should be direct. See CODE_QUALITY_IMPROVEMENTS.md #4"
+            nested_count, 1,
+            "The nested duplicate foo should be transitive"
         );
     }
 }
