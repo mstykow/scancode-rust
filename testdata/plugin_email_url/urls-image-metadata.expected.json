@@ -1,0 +1,16 @@
+{
+  "files": [
+    {
+      "path": "image_xmp_contacts.png",
+      "type": "file",
+      "urls": [
+        {
+          "url": "https://acme.org/legal",
+          "start_line": 1,
+          "end_line": 1
+        }
+      ],
+      "scan_errors": []
+    }
+  ]
+}
