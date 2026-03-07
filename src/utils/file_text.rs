@@ -5,7 +5,7 @@
 //!
 //! Based on Python's `textcode/analysis.py:numbered_text_lines()` and `as_unicode()`.
 
-use content_inspector::{ContentType, inspect};
+use content_inspector::{inspect, ContentType};
 use std::path::Path;
 
 /// Result of extracting text from a file for license detection.
@@ -161,7 +161,7 @@ fn decode_utf32be(bytes: &[u8]) -> String {
         .collect()
 }
 
-/// Handle binary files - check for PDF or skip.
+/// Handle binary files - extract ASCII strings for license detection.
 fn handle_binary_file(bytes: &[u8], path: &Path) -> Option<FileText> {
     if is_pdf(bytes) {
         return None;
@@ -177,15 +177,66 @@ fn handle_binary_file(bytes: &[u8], path: &Path) -> Option<FileText> {
         return None;
     }
 
-    let text = decode_bytes_with_fallback(bytes);
-    if text.is_empty() || is_mostly_non_printable(&text) {
+    let text = extract_ascii_strings(bytes);
+    if text.is_empty() {
         return None;
     }
 
     Some(FileText {
         text,
-        source: TextSource::FallbackDecoding,
+        source: TextSource::BinaryStrings,
     })
+}
+
+/// Extract printable ASCII strings from binary data.
+///
+/// Matches Python's behavior from `textcode/strings2.py:extract_ascii_strings()`:
+/// - Matches sequences of printable ASCII characters (0x20-0x7E, plus tabs/newlines)
+/// - Requires minimum 4 consecutive printable chars
+/// - Joins extracted strings with newlines
+fn extract_ascii_strings(bytes: &[u8]) -> String {
+    const MIN_LEN: usize = 4;
+
+    let mut result = String::new();
+    let mut current_len = 0;
+    let mut current_start = 0;
+
+    for (i, &byte) in bytes.iter().enumerate() {
+        if is_printable_ascii(byte) {
+            if current_len == 0 {
+                current_start = i;
+            }
+            current_len += 1;
+        } else {
+            if current_len >= MIN_LEN {
+                if !result.is_empty() {
+                    result.push('\n');
+                }
+                let s = std::str::from_utf8(&bytes[current_start..current_start + current_len])
+                    .unwrap_or("");
+                result.push_str(s);
+            }
+            current_len = 0;
+        }
+    }
+
+    if current_len >= MIN_LEN {
+        if !result.is_empty() {
+            result.push('\n');
+        }
+        let s =
+            std::str::from_utf8(&bytes[current_start..current_start + current_len]).unwrap_or("");
+        result.push_str(s);
+    }
+
+    result
+}
+
+/// Check if a byte is a printable ASCII character.
+///
+/// Printable ASCII: 0x20-0x7E (space through tilde), plus tab (0x09), LF (0x0A), CR (0x0D).
+fn is_printable_ascii(byte: u8) -> bool {
+    matches!(byte, 0x20..=0x7E | 0x09 | 0x0A | 0x0D)
 }
 
 /// Check if bytes represent a PDF file.
@@ -224,30 +275,6 @@ fn should_skip_binary_extension(ext: &str) -> bool {
             | "otf"
             | "eot"
     )
-}
-
-/// Decode bytes using fallback chain: UTF-8 → LATIN-1.
-fn decode_bytes_with_fallback(bytes: &[u8]) -> String {
-    if let Ok(s) = std::str::from_utf8(bytes) {
-        return s.to_string();
-    }
-
-    bytes.iter().map(|&b| b as char).collect()
-}
-
-/// Check if text is mostly non-printable characters.
-fn is_mostly_non_printable(text: &str) -> bool {
-    if text.is_empty() {
-        return true;
-    }
-
-    let total = text.chars().count();
-    let non_printable = text
-        .chars()
-        .filter(|c| !c.is_ascii_graphic() && !c.is_ascii_whitespace())
-        .count();
-
-    non_printable > total / 2
 }
 
 #[cfg(test)]
@@ -308,26 +335,55 @@ mod tests {
     }
 
     #[test]
-    fn test_decode_bytes_with_fallback_utf8() {
-        let bytes = b"Valid UTF-8";
-        let result = decode_bytes_with_fallback(bytes);
-        assert_eq!(result, "Valid UTF-8");
+    fn test_extract_ascii_strings_basic() {
+        let bytes = b"Hello\x00World";
+        let result = extract_ascii_strings(bytes);
+        assert_eq!(result, "Hello\nWorld");
     }
 
     #[test]
-    fn test_decode_bytes_with_fallback_latin1() {
-        let bytes: Vec<u8> = (128..255).collect();
-        let result = decode_bytes_with_fallback(&bytes);
-        assert_eq!(result.chars().count(), 127);
+    fn test_extract_ascii_strings_min_length() {
+        let bytes = b"abc\x00Hello World";
+        let result = extract_ascii_strings(bytes);
+        assert_eq!(result, "Hello World");
     }
 
     #[test]
-    fn test_is_mostly_non_printable() {
-        assert!(!is_mostly_non_printable("Hello, World!"));
-        assert!(is_mostly_non_printable("\x00\x01\x02\x03\x04"));
-        assert!(!is_mostly_non_printable(
-            "Some text\nwith newlines\tand tabs"
-        ));
+    fn test_extract_ascii_strings_with_newlines() {
+        let bytes = b"MIT License\nCopyright\x00\x01Another string here";
+        let result = extract_ascii_strings(bytes);
+        assert!(result.contains("MIT License\nCopyright"));
+        assert!(result.contains("Another string here"));
+    }
+
+    #[test]
+    fn test_extract_ascii_strings_empty() {
+        let bytes = b"\x00\x01\x02\x03";
+        let result = extract_ascii_strings(bytes);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_extract_ascii_strings_short_strings() {
+        let bytes = b"abc\x00def\x00ghi";
+        let result = extract_ascii_strings(bytes);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_is_printable_ascii() {
+        assert!(is_printable_ascii(b'a'));
+        assert!(is_printable_ascii(b'Z'));
+        assert!(is_printable_ascii(b'0'));
+        assert!(is_printable_ascii(b' '));
+        assert!(is_printable_ascii(b'~'));
+        assert!(is_printable_ascii(b'\t'));
+        assert!(is_printable_ascii(b'\n'));
+        assert!(is_printable_ascii(b'\r'));
+        assert!(!is_printable_ascii(0x00));
+        assert!(!is_printable_ascii(0x1F));
+        assert!(!is_printable_ascii(0x7F));
+        assert!(!is_printable_ascii(0x80));
     }
 
     #[test]
