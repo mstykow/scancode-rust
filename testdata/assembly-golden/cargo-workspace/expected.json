@@ -3,6 +3,35 @@
     {
       "datafile_path": "crates/cli/Cargo.toml",
       "datasource_id": "cargo_toml",
+      "dependency_uid": "pkg:cargo/assert_cmd?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "extracted_requirement": "2.0",
+      "for_package_uid": "pkg:cargo/myproject-cli@0.5.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "is_direct": true,
+      "is_optional": false,
+      "is_pinned": false,
+      "is_runtime": false,
+      "purl": "pkg:cargo/assert_cmd",
+      "scope": "dev-dependencies"
+    },
+    {
+      "datafile_path": "crates/core/Cargo.toml",
+      "datasource_id": "cargo_toml",
+      "dependency_uid": "pkg:cargo/log?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "extra_data": {
+        "workspace": true
+      },
+      "extracted_requirement": "0.4",
+      "for_package_uid": "pkg:cargo/myproject-core@0.5.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "is_direct": true,
+      "is_optional": false,
+      "is_pinned": false,
+      "is_runtime": true,
+      "purl": "pkg:cargo/log",
+      "scope": "dependencies"
+    },
+    {
+      "datafile_path": "crates/cli/Cargo.toml",
+      "datasource_id": "cargo_toml",
       "dependency_uid": "pkg:cargo/myproject-core?uuid=fixed-uid-done-for-testing-5642512d1758",
       "extra_data": {
         "path": "../core"
@@ -32,51 +61,6 @@
       "scope": "dependencies"
     },
     {
-      "datafile_path": "crates/cli/Cargo.toml",
-      "datasource_id": "cargo_toml",
-      "dependency_uid": "pkg:cargo/tokio?uuid=fixed-uid-done-for-testing-5642512d1758",
-      "extra_data": {
-        "workspace": true
-      },
-      "extracted_requirement": "1.0",
-      "for_package_uid": "pkg:cargo/myproject-cli@0.5.0?uuid=fixed-uid-done-for-testing-5642512d1758",
-      "is_direct": true,
-      "is_optional": false,
-      "is_pinned": false,
-      "is_runtime": true,
-      "purl": "pkg:cargo/tokio",
-      "scope": "dependencies"
-    },
-    {
-      "datafile_path": "crates/cli/Cargo.toml",
-      "datasource_id": "cargo_toml",
-      "dependency_uid": "pkg:cargo/assert_cmd?uuid=fixed-uid-done-for-testing-5642512d1758",
-      "extracted_requirement": "2.0",
-      "for_package_uid": "pkg:cargo/myproject-cli@0.5.0?uuid=fixed-uid-done-for-testing-5642512d1758",
-      "is_direct": true,
-      "is_optional": false,
-      "is_pinned": false,
-      "is_runtime": false,
-      "purl": "pkg:cargo/assert_cmd",
-      "scope": "dev-dependencies"
-    },
-    {
-      "datafile_path": "crates/core/Cargo.toml",
-      "datasource_id": "cargo_toml",
-      "dependency_uid": "pkg:cargo/log?uuid=fixed-uid-done-for-testing-5642512d1758",
-      "extra_data": {
-        "workspace": true
-      },
-      "extracted_requirement": "0.4",
-      "for_package_uid": "pkg:cargo/myproject-core@0.5.0?uuid=fixed-uid-done-for-testing-5642512d1758",
-      "is_direct": true,
-      "is_optional": false,
-      "is_pinned": false,
-      "is_runtime": true,
-      "purl": "pkg:cargo/log",
-      "scope": "dependencies"
-    },
-    {
       "datafile_path": "crates/core/Cargo.toml",
       "datasource_id": "cargo_toml",
       "dependency_uid": "pkg:cargo/serde?uuid=fixed-uid-done-for-testing-5642512d1758",
@@ -90,6 +74,22 @@
       "is_pinned": false,
       "is_runtime": true,
       "purl": "pkg:cargo/serde",
+      "scope": "dependencies"
+    },
+    {
+      "datafile_path": "crates/cli/Cargo.toml",
+      "datasource_id": "cargo_toml",
+      "dependency_uid": "pkg:cargo/tokio?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "extra_data": {
+        "workspace": true
+      },
+      "extracted_requirement": "1.0",
+      "for_package_uid": "pkg:cargo/myproject-cli@0.5.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "is_direct": true,
+      "is_optional": false,
+      "is_pinned": false,
+      "is_runtime": true,
+      "purl": "pkg:cargo/tokio",
       "scope": "dependencies"
     }
   ],
