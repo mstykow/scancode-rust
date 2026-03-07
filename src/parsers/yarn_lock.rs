@@ -23,8 +23,9 @@
 use crate::models::{DatasourceId, Dependency, PackageData, PackageType, ResolvedPackage};
 use crate::parsers::utils::{npm_purl, parse_sri};
 use log::warn;
+use serde_json::Value as JsonValue;
 use serde_yaml::Value;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::Path;
 
@@ -34,6 +35,13 @@ use super::PackageParser;
 ///
 /// Extracts pinned dependency versions with integrity hashes from yarn.lock files.
 pub struct YarnLockParser;
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct ManifestDependencyInfo {
+    scope: &'static str,
+    is_runtime: bool,
+    is_optional: bool,
+}
 
 impl PackageParser for YarnLockParser {
     const PACKAGE_TYPE: PackageType = PackageType::Npm;
@@ -55,11 +63,12 @@ impl PackageParser for YarnLockParser {
         };
 
         let is_v2 = detect_yarn_version(&content);
+        let manifest_dependencies = load_manifest_dependency_info(path);
 
         vec![if is_v2 {
-            parse_yarn_v2(&content)
+            parse_yarn_v2(&content, &manifest_dependencies)
         } else {
-            parse_yarn_v1(&content)
+            parse_yarn_v1(&content, &manifest_dependencies)
         }]
     }
 }
@@ -73,7 +82,10 @@ pub fn detect_yarn_version(content: &str) -> bool {
 }
 
 /// Parse yarn.lock v2 format (standard YAML)
-fn parse_yarn_v2(content: &str) -> PackageData {
+fn parse_yarn_v2(
+    content: &str,
+    manifest_dependencies: &HashMap<String, ManifestDependencyInfo>,
+) -> PackageData {
     let yaml_value: Value = match serde_yaml::from_str(content) {
         Ok(val) => val,
         Err(e) => {
@@ -109,6 +121,8 @@ fn parse_yarn_v2(content: &str) -> PackageData {
 
         let (namespace_opt, name, resolved_version) = parse_yarn_v2_resolution(&resolution);
         let namespace = namespace_opt.unwrap_or_default();
+        let full_name = full_package_name(&namespace, &name);
+        let manifest_info = manifest_dependencies.get(&full_name);
         let purl = create_purl(&namespace, &name, &resolved_version);
         let checksum = extract_yaml_string(details_map, "checksum");
 
@@ -152,16 +166,30 @@ fn parse_yarn_v2(content: &str) -> PackageData {
             purl: None,
         };
 
-        // For Yarn v2+, check if this is a workspace dependency (direct)
-        // Workspace dependencies use "workspace:*" resolution
-        let is_direct = resolution.contains("workspace:");
+        let (scope, is_runtime, is_optional, is_direct) = manifest_info
+            .map(|info| {
+                (
+                    info.scope.to_string(),
+                    info.is_runtime,
+                    info.is_optional,
+                    true,
+                )
+            })
+            .unwrap_or_else(|| {
+                (
+                    "dependencies".to_string(),
+                    true,
+                    false,
+                    resolution.contains("workspace:"),
+                )
+            });
 
         let dependency = Dependency {
             purl,
             extracted_requirement: Some(resolved_version),
-            scope: Some("dependencies".to_string()),
-            is_runtime: Some(true),
-            is_optional: Some(false),
+            scope: Some(scope),
+            is_runtime: Some(is_runtime),
+            is_optional: Some(is_optional),
             is_pinned: Some(true),
             is_direct: Some(is_direct),
             resolved_package: Some(Box::new(resolved_package)),
@@ -218,7 +246,10 @@ fn parse_yarn_v2(content: &str) -> PackageData {
 }
 
 /// Parse yarn.lock v1 format (custom YAML-like)
-fn parse_yarn_v1(content: &str) -> PackageData {
+fn parse_yarn_v1(
+    content: &str,
+    manifest_dependencies: &HashMap<String, ManifestDependencyInfo>,
+) -> PackageData {
     let mut dependencies = Vec::new();
     let mut seen_purls = HashSet::new();
 
@@ -227,7 +258,7 @@ fn parse_yarn_v1(content: &str) -> PackageData {
             continue;
         }
 
-        if let Some(dep) = parse_yarn_v1_block(block) {
+        if let Some(dep) = parse_yarn_v1_block(block, manifest_dependencies) {
             if let Some(ref purl) = dep.purl {
                 if seen_purls.insert(purl.clone()) {
                     dependencies.push(dep);
@@ -338,7 +369,10 @@ fn default_package_data() -> PackageData {
 }
 
 /// Parse a single yarn v1 dependency block
-fn parse_yarn_v1_block(block: &str) -> Option<Dependency> {
+fn parse_yarn_v1_block(
+    block: &str,
+    manifest_dependencies: &HashMap<String, ManifestDependencyInfo>,
+) -> Option<Dependency> {
     let lines: Vec<&str> = block.lines().collect();
     if lines.is_empty() {
         return None;
@@ -398,7 +432,19 @@ fn parse_yarn_v1_block(block: &str) -> Option<Dependency> {
         parse_integrity_field(&integrity)
     };
 
+    let full_name = full_package_name(&namespace, &name);
+    let manifest_info = manifest_dependencies.get(&full_name);
     let purl = create_purl(&namespace, &name, &version);
+    let (scope, is_runtime, is_optional, is_direct) = manifest_info
+        .map(|info| {
+            (
+                info.scope.to_string(),
+                info.is_runtime,
+                info.is_optional,
+                true,
+            )
+        })
+        .unwrap_or_else(|| ("dependencies".to_string(), true, false, false));
 
     let resolved_package = ResolvedPackage {
         package_type: YarnLockParser::PACKAGE_TYPE,
@@ -428,14 +474,116 @@ fn parse_yarn_v1_block(block: &str) -> Option<Dependency> {
     Some(Dependency {
         purl,
         extracted_requirement: Some(constraint),
-        scope: Some("dependencies".to_string()),
-        is_runtime: Some(true),
-        is_optional: Some(false),
+        scope: Some(scope),
+        is_runtime: Some(is_runtime),
+        is_optional: Some(is_optional),
         is_pinned: Some(true),
-        is_direct: Some(true),
+        is_direct: Some(is_direct),
         resolved_package: Some(Box::new(resolved_package)),
         extra_data: None,
     })
+}
+
+fn full_package_name(namespace: &str, name: &str) -> String {
+    if namespace.is_empty() {
+        name.to_string()
+    } else {
+        format!("{namespace}/{name}")
+    }
+}
+
+fn load_manifest_dependency_info(path: &Path) -> HashMap<String, ManifestDependencyInfo> {
+    let Some(parent) = path.parent() else {
+        return HashMap::new();
+    };
+
+    let manifest_path = parent.join("package.json");
+    let Ok(content) = fs::read_to_string(manifest_path) else {
+        return HashMap::new();
+    };
+
+    let Ok(json) = serde_json::from_str::<JsonValue>(&content) else {
+        return HashMap::new();
+    };
+
+    let peer_optional = json
+        .get("peerDependenciesMeta")
+        .and_then(|value| value.as_object())
+        .map(|meta| {
+            meta.iter()
+                .filter_map(|(name, value)| {
+                    value
+                        .as_object()
+                        .and_then(|entry| entry.get("optional"))
+                        .and_then(|value| value.as_bool())
+                        .map(|optional| (name.clone(), optional))
+                })
+                .collect::<HashMap<_, _>>()
+        })
+        .unwrap_or_default();
+
+    let mut dependencies = HashMap::new();
+    insert_manifest_dependency_info(
+        &mut dependencies,
+        &json,
+        "dependencies",
+        ManifestDependencyInfo {
+            scope: "dependencies",
+            is_runtime: true,
+            is_optional: false,
+        },
+    );
+    insert_manifest_dependency_info(
+        &mut dependencies,
+        &json,
+        "devDependencies",
+        ManifestDependencyInfo {
+            scope: "devDependencies",
+            is_runtime: false,
+            is_optional: true,
+        },
+    );
+    insert_manifest_dependency_info(
+        &mut dependencies,
+        &json,
+        "optionalDependencies",
+        ManifestDependencyInfo {
+            scope: "optionalDependencies",
+            is_runtime: true,
+            is_optional: true,
+        },
+    );
+
+    if let Some(peer_dependencies) = json
+        .get("peerDependencies")
+        .and_then(|value| value.as_object())
+    {
+        for name in peer_dependencies.keys() {
+            dependencies.insert(
+                name.clone(),
+                ManifestDependencyInfo {
+                    scope: "peerDependencies",
+                    is_runtime: false,
+                    is_optional: peer_optional.get(name).copied().unwrap_or(false),
+                },
+            );
+        }
+    }
+
+    dependencies
+}
+
+fn insert_manifest_dependency_info(
+    dependencies: &mut HashMap<String, ManifestDependencyInfo>,
+    json: &JsonValue,
+    field: &str,
+    info: ManifestDependencyInfo,
+) {
+    if let Some(entries) = json.get(field).and_then(|value| value.as_object()) {
+        for name in entries.keys() {
+            dependencies.insert(name.clone(), info.clone());
+        }
+    }
 }
 
 /// Parse yarn v1 requirement line: "express@^4.0.0" or "@babel/core@^7.1.0"
