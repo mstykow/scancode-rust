@@ -20,7 +20,7 @@
 
 ## Overview
 
-Copyright detection extracts copyright statements, holder names, author information, and year ranges from source files. It is the second most important text detection feature after license detection, and is completely independent — it can be implemented in parallel with license detection.
+Copyright detection extracts copyright statements, holder names, author information, and year ranges from text-bearing scan inputs. This primarily means source and text files, and in Rust it additionally includes supported-image EXIF/XMP metadata as a beyond-parity clue source. It is the second most important text detection feature after license detection, and is completely independent — it can be implemented in parallel with license detection.
 
 ### Scope
 
@@ -54,7 +54,7 @@ Copyright detection extracts copyright statements, holder names, author informat
 - ✅ Year and year-range parsing (1960-2099)
 - ✅ Multi-line statement handling
 - ✅ Author detection
-- ✅ Scanner integration now routes decoded non-UTF text, PDFs with extractable text, and printable strings from `.dll` / `.exe` inputs through a shared runtime ingestion helper before clue extraction
+- ✅ Scanner integration now routes decoded non-UTF text, PDFs with extractable text, printable strings from `.dll` / `.exe` inputs, and supported-image EXIF/XMP metadata through a shared runtime ingestion helper before clue extraction
 - ✅ Unicode name preservation (no transliteration — names like "François Müller" kept intact)
 - ✅ Linux CREDITS file parsing
 - ✅ Junk/false-positive filtering
@@ -309,6 +309,7 @@ Documented in detail in [`docs/improvements/copyright-detection.md`](../../impro
 | 10  | ⚡ Performance | Encoded-data detection (uuencode/base64 skip for high-noise inputs)      |
 | 11  | 🔍 Enhanced    | Rust-owned copyright golden fixtures with deterministic sync/update flow |
 | 12  | 🛡️ Security    | No code execution, no global mutable state                               |
+| 13  | ✨ Enhanced    | EXIF/XMP image metadata clue extraction for supported image formats      |
 
 ---
 
@@ -323,7 +324,7 @@ Golden test suites (copyrights, holders, authors, ICS) validate output against t
 Current Rust golden coverage primarily validates the **detector over normalized text content**, not the full scanner ingestion path.
 
 - `src/copyright/golden_test.rs` loads fixture bytes through `src/copyright/golden_utils.rs::read_input_content()` and then calls `detect_copyrights(&content)` directly.
-- The golden harness now shares the same path-aware ingestion helper as the live scanner for decoded non-UTF text, PDFs with extractable text, and printable `.dll` / `.exe` strings.
+- The golden harness now shares the same path-aware ingestion helper as the live scanner for decoded non-UTF text, PDFs with extractable text, printable `.dll` / `.exe` strings, and supported-image EXIF/XMP metadata.
 - Rust currently ports the upstream `copyrights`, `holders`, `authors`, and `ics` fixture families into local copyright golden tests, but does **not** yet provide equivalent scanner-level parity coverage for upstream `credits`, `years`, `generated`, and `copyright_fossology` families.
 
 As a result, passing copyright golden tests is strong evidence that the detector logic works on the same normalized input classes as the live scanner, but it is **not sufficient evidence on its own** to replace scanner-level integration coverage.
@@ -353,16 +354,18 @@ The Rust detector and the **live scanner text-ingestion path now cover the same 
 - PDFs with extractable text, and
 - printable strings from `.dll` / `.exe` binaries.
 
+Rust also now supports a **beyond-parity** image metadata path for supported image formats, extracting clue-bearing EXIF/XMP text and feeding it into the same downstream detectors.
+
 The scanner now derives text through a shared helper in `src/utils/file.rs`, and the copyright golden harness reuses the same helper via `src/copyright/golden_utils.rs::read_input_content()`. This keeps runtime and fixture ingestion aligned for the inputs exercised by this plan.
 
 - **Python reference behavior**: `textcode.analysis.numbered_text_lines()` is path-aware and routes extractable PDFs and text-bearing binaries into the same downstream clue detectors.
 - **Current Rust runtime behavior**: `src/scanner/process.rs` now uses the shared path-aware ingestion helper before copyright/email/url/license text detection, so the live scanner no longer misses these input classes.
-- **Not part of this plan**: image/media metadata extraction. The Python reference `tests/textcode/test_analysis.py` explicitly asserts that files in `media_without_text/` yield no numbered text lines, so lack of image metadata scanning is not a parity shortfall here.
+- **Not part of this parity plan**: image/media metadata extraction. The Python reference `tests/textcode/test_analysis.py` explicitly asserts that files in `media_without_text/` yield no numbered text lines, so lack of image metadata scanning is not a parity shortfall here. Rust now implements EXIF/XMP image metadata clue extraction for supported image formats as a separate beyond-parity capability.
 - **Separate intentional divergence**: `src/scanner/process.rs` still short-circuits PEM certificate files before clue extraction. This differs from the Python reference, but it remains an explicit product decision made to resolve Rust issue `#222`, not a hidden parity gap in the copyright/email/url scanner path.
 
 **Classification**: Closed parity gap.
 
-**User impact**: The Rust CLI/runtime scanner now reaches the same copyright/email/url text-detection surfaces as the Python reference for regular text, non-UTF text, extractable PDFs, and text-bearing DLL/EXE inputs.
+**User impact**: The Rust CLI/runtime scanner now reaches the same copyright/email/url text-detection surfaces as the Python reference for regular text, non-UTF text, extractable PDFs, and text-bearing DLL/EXE inputs, while additionally surfacing clue-bearing EXIF/XMP metadata from supported image formats.
 
 **Status**: Closed.
 
@@ -446,6 +449,7 @@ Every module has comprehensive unit tests covering its core functionality. Golde
 Key coverage areas:
 
 - **Text preparation**: All normalization paths, Unicode preservation, HTML entity decoding
+- **Scanner ingestion**: end-to-end coverage for non-UTF text, PDFs, DLL/EXE printable strings, and EXIF/XMP image metadata
 - **Candidate selection**: Line grouping, multi-line handling, long-line skip, encoded-data detection
 - **Refinement**: String cleanup, junk filtering, edge cases
 - **Hints**: Hint markers, year detection, gibberish filtering

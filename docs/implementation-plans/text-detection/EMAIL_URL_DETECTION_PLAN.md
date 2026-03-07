@@ -19,7 +19,7 @@
 
 ## Overview
 
-Email and URL detection extracts email addresses and URLs from source code files for contact information and reference tracking. It is the simplest of the three text detection features (license, copyright, email/URL) — primarily regex-based with a filter pipeline to remove junk results.
+Email and URL detection extracts email addresses and URLs from text-bearing scan inputs for contact information and reference tracking. This primarily means source and text files, and in Rust it additionally includes supported-image EXIF/XMP metadata as a beyond-parity clue source. It is the simplest of the three text detection features (license, copyright, email/URL) — primarily regex-based with a filter pipeline to remove junk results.
 
 ### Scope
 
@@ -57,7 +57,7 @@ Email and URL detection extracts email addresses and URLs from source code files
 **Notes:**
 
 - Rust intentionally keeps several beyond-parity fixes (notably extended TLD length support and IPv6/private IP correctness).
-- ✅ The live Rust scanner now feeds finder detection through a shared path-aware ingestion helper in `src/utils/file.rs`, covering decoded non-UTF text, PDFs with extractable text, and printable strings from `.dll` / `.exe` inputs before the normal finder pipeline runs. PEM certificate skipping remains a separate intentional divergence in the scanner.
+- ✅ The live Rust scanner now feeds finder detection through a shared path-aware ingestion helper in `src/utils/file.rs`, covering decoded non-UTF text, PDFs with extractable text, printable strings from `.dll` / `.exe` inputs, and supported-image EXIF/XMP metadata before the normal finder pipeline runs. PEM certificate skipping remains a separate intentional divergence in the scanner.
 
 ---
 
