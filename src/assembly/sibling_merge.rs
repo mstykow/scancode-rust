@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use crate::models::{FileInfo, Package, PackageData, TopLevelDependency};
+use crate::models::{DatasourceId, FileInfo, Package, PackageData, TopLevelDependency};
 
 use super::AssemblerConfig;
 
@@ -15,10 +15,11 @@ pub fn assemble_siblings(
     config: &AssemblerConfig,
     files: &[FileInfo],
     file_indices: &[usize],
-) -> Option<(Package, Vec<TopLevelDependency>, Vec<usize>)> {
+) -> Option<(Option<Package>, Vec<TopLevelDependency>, Vec<usize>)> {
     let mut package: Option<Package> = None;
     let mut dependencies = Vec::new();
     let mut affected_indices = Vec::new();
+    let mut saw_unpackageable_npm_manifest = false;
 
     for &pattern in config.sibling_file_patterns {
         for &idx in file_indices {
@@ -36,10 +37,20 @@ pub fn assemble_siblings(
                 continue;
             }
 
-            affected_indices.push(idx);
+            let mut file_used = false;
 
             for pkg_data in &file.package_data {
                 if !is_handled_by(pkg_data, config) {
+                    continue;
+                }
+
+                if pkg_data.datasource_id == Some(DatasourceId::NpmPackageJson)
+                    && pkg_data.purl.is_none()
+                {
+                    saw_unpackageable_npm_manifest = true;
+                }
+
+                if should_skip_npm_lock_merge(package.as_ref(), pkg_data) {
                     continue;
                 }
 
@@ -47,10 +58,16 @@ pub fn assemble_siblings(
                 let Some(datasource_id) = pkg_data.datasource_id else {
                     continue;
                 };
+                file_used = true;
 
                 match &mut package {
                     None => {
-                        if pkg_data.purl.is_some() {
+                        if pkg_data.purl.is_some()
+                            && !should_skip_npm_lock_package_creation(
+                                pkg_data,
+                                saw_unpackageable_npm_manifest,
+                            )
+                        {
                             package =
                                 Some(Package::from_package_data(pkg_data, datafile_path.clone()));
                         }
@@ -73,10 +90,18 @@ pub fn assemble_siblings(
                     }
                 }
             }
+
+            if file_used {
+                affected_indices.push(idx);
+            }
         }
     }
 
-    package.map(|pkg| (pkg, dependencies, affected_indices))
+    if package.is_some() || !dependencies.is_empty() {
+        Some((package, dependencies, affected_indices))
+    } else {
+        None
+    }
 }
 
 /// Check if a filename matches a pattern. Supports:
@@ -99,4 +124,27 @@ fn is_handled_by(pkg_data: &PackageData, config: &AssemblerConfig) -> bool {
     pkg_data
         .datasource_id
         .is_some_and(|dsid| config.datasource_ids.contains(&dsid))
+}
+
+fn should_skip_npm_lock_merge(package: Option<&Package>, pkg_data: &PackageData) -> bool {
+    let Some(existing_package) = package else {
+        return false;
+    };
+
+    if pkg_data.datasource_id != Some(DatasourceId::NpmPackageLockJson) {
+        return false;
+    }
+
+    match (&existing_package.purl, &pkg_data.purl) {
+        (Some(existing_purl), Some(candidate_purl)) => existing_purl != candidate_purl,
+        _ => false,
+    }
+}
+
+fn should_skip_npm_lock_package_creation(
+    pkg_data: &PackageData,
+    saw_unpackageable_npm_manifest: bool,
+) -> bool {
+    saw_unpackageable_npm_manifest
+        && pkg_data.datasource_id == Some(DatasourceId::NpmPackageLockJson)
 }
