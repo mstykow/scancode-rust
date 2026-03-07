@@ -156,6 +156,8 @@ pub fn assemble(files: &mut [FileInfo]) -> AssemblyResult {
         }
     }
 
+    ensure_npm_manifest_packages(files, &mut packages, &mut dependencies);
+
     assign_npm_package_resources(files, &packages);
 
     file_ref_resolve::resolve_file_references(files, &mut packages, &mut dependencies);
@@ -293,6 +295,58 @@ fn assign_npm_package_resources(files: &mut [FileInfo], packages: &[Package]) {
             file.for_packages.clear();
             file.for_packages.push(package_uid.clone());
         }
+    }
+}
+
+fn ensure_npm_manifest_packages(
+    files: &mut [FileInfo],
+    packages: &mut Vec<Package>,
+    dependencies: &mut Vec<TopLevelDependency>,
+) {
+    for file in files.iter_mut() {
+        let Some(pkg_data) = file.package_data.iter().find(|package_data| {
+            package_data.datasource_id == Some(DatasourceId::NpmPackageJson)
+                && package_data.purl.is_some()
+        }) else {
+            continue;
+        };
+
+        if !file.for_packages.is_empty() {
+            continue;
+        }
+
+        if let Some(existing_package_uid) = packages
+            .iter()
+            .find(|package| package.datafile_paths.contains(&file.path))
+            .map(|package| package.package_uid.clone())
+        {
+            file.for_packages.push(existing_package_uid);
+            continue;
+        }
+
+        let package = Package::from_package_data(pkg_data, file.path.clone());
+        let package_uid = package.package_uid.clone();
+        let datasource_id = pkg_data
+            .datasource_id
+            .expect("npm manifest datasource_id must be present");
+
+        let manifest_dependencies: Vec<TopLevelDependency> = pkg_data
+            .dependencies
+            .iter()
+            .filter(|dependency| dependency.purl.is_some())
+            .map(|dependency| {
+                TopLevelDependency::from_dependency(
+                    dependency,
+                    file.path.clone(),
+                    datasource_id,
+                    Some(package_uid.clone()),
+                )
+            })
+            .collect();
+
+        file.for_packages.push(package_uid.clone());
+        packages.push(package);
+        dependencies.extend(manifest_dependencies);
     }
 }
 
@@ -1163,6 +1217,73 @@ mod tests {
                     grand_uid,
                 ),
             ]
+        );
+    }
+
+    #[test]
+    fn test_ensure_npm_manifest_packages_restores_unowned_nested_manifests() {
+        let mut files = vec![
+            create_test_file_info(
+                "package.json",
+                DatasourceId::NpmPackageJson,
+                Some("pkg:npm/root-app@1.0.0"),
+                Some("root-app"),
+                Some("1.0.0"),
+                vec![],
+            ),
+            create_test_file_info(
+                "node_modules/child/package.json",
+                DatasourceId::NpmPackageJson,
+                Some("pkg:npm/child@2.0.0"),
+                Some("child"),
+                Some("2.0.0"),
+                vec![],
+            ),
+            create_test_file_info(
+                "node_modules/child/node_modules/grand/package.json",
+                DatasourceId::NpmPackageJson,
+                Some("pkg:npm/grand@3.0.0"),
+                Some("grand"),
+                Some("3.0.0"),
+                vec![],
+            ),
+        ];
+        let mut packages = Vec::new();
+        let mut dependencies = Vec::new();
+
+        ensure_npm_manifest_packages(&mut files, &mut packages, &mut dependencies);
+
+        assert_eq!(packages.len(), 3);
+        assert!(dependencies.is_empty());
+
+        let ownerships: std::collections::HashMap<String, Vec<String>> = files
+            .iter()
+            .map(|file| (file.path.clone(), file.for_packages.clone()))
+            .collect();
+
+        assert_eq!(ownerships.get("package.json").map(Vec::len), Some(1));
+        assert_eq!(
+            ownerships
+                .get("node_modules/child/package.json")
+                .map(Vec::len),
+            Some(1)
+        );
+        assert_eq!(
+            ownerships
+                .get("node_modules/child/node_modules/grand/package.json")
+                .map(Vec::len),
+            Some(1)
+        );
+
+        let package_paths: Vec<String> = packages
+            .iter()
+            .flat_map(|package| package.datafile_paths.clone())
+            .collect();
+        assert!(package_paths.contains(&"package.json".to_string()));
+        assert!(package_paths.contains(&"node_modules/child/package.json".to_string()));
+        assert!(
+            package_paths
+                .contains(&"node_modules/child/node_modules/grand/package.json".to_string())
         );
     }
 
