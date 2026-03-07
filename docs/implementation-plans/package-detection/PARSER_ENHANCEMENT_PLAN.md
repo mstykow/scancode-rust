@@ -72,7 +72,7 @@ cargo clippy --all-targets --all-features -- -D warnings
 ```
 
 ```bash
-cargo test test_all_parsers_are_registered_and_exported
+cargo test assembly::assemblers::tests::test_every_datasource_id_is_accounted_for --lib
 ```
 
 ```bash
@@ -83,7 +83,7 @@ cargo run --quiet --bin generate-supported-formats && git diff --exit-code docs/
 
 | Order | Ecosystem             | Status  | Issue Set                                                                                                  | Primary Validation                                                                                                                                                                                                                                                                                                                                                             |
 | ----- | --------------------- | ------- | ---------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 1     | Maven                 | Planned | #122, #124, #126, #128, #131, #135, #207, #208, #211, #214                                                 | `cargo test maven`; `cargo test --features golden-tests maven_golden`; `cargo test --features golden-tests test_assembly_maven_basic`                                                                                                                                                                                                                                          |
+| 1     | Maven                 | Done    | #122, #124, #126, #128, #131, #135, #207, #208, #211, #214                                                 | `cargo test maven`; `cargo test --features golden-tests maven_golden`; `cargo test --features golden-tests test_assembly_maven_basic`                                                                                                                                                                                                                                          |
 | 2     | npm + Yarn            | Planned | #123, #125, #127, #129, #133, #197, #198, #205, #206                                                       | `cargo test npm`; `cargo test yarn`; `cargo test --features golden-tests npm_golden`; `cargo test --features golden-tests test_assembly_npm_basic`; `cargo test --features golden-tests test_assembly_npm_workspace`; `cargo test --features golden-tests test_assembly_pnpm_workspace`                                                                                        |
 | 3     | NuGet                 | Planned | #157, #159, #162, #163, #165, #215, #216                                                                   | `cargo test nuget`; `cargo test --features golden-tests nuget_golden`                                                                                                                                                                                                                                                                                                          |
 | 4     | RPM                   | Planned | #164, #166, #167, #168, #169, #170, #171                                                                   | `cargo test rpm`; `cargo test --features golden-tests rpm_golden`                                                                                                                                                                                                                                                                                                              |
@@ -131,6 +131,12 @@ Likely touchpoints:
 - `testdata/maven/`
 - `testdata/maven-golden/`
 - `testdata/assembly-golden/maven-basic/`
+
+Current status (March 7, 2026):
+
+- The Maven ecosystem batch now includes parser, unit-test, parser-golden, assembly-golden, and improvement-doc updates covering the listed issue set.
+- Verification completed with `cargo fmt --all -- --check`, `cargo clippy --all-targets --all-features -- -D warnings`, `cargo test maven --lib`, and `cargo test --features golden-tests maven_golden --lib`.
+- No intentional Maven deferrals are currently recorded in this plan; issue-closing keywords belong in the PR body.
 
 ### Python PR Scope Rule
 
