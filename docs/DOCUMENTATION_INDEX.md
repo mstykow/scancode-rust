@@ -14,6 +14,7 @@ This index helps you find the right documentation for your needs.
 - **[ARCHITECTURE.md](ARCHITECTURE.md)** - System design and components
 - **[HOW_TO_ADD_A_PARSER.md](HOW_TO_ADD_A_PARSER.md)** - Step-by-step parser implementation guide
 - **[TESTING_STRATEGY.md](TESTING_STRATEGY.md)** - Four-layer testing approach
+- **[implementation-plans/package-detection/PARSER_ENHANCEMENT_PLAN.md](implementation-plans/package-detection/PARSER_ENHANCEMENT_PLAN.md)** - Active parser enhancement backlog and execution order
 
 ### Design Decisions
 
@@ -70,6 +71,9 @@ docs/
 
 **...implement a specific feature**
 → [ARCHITECTURE.md](ARCHITECTURE.md) and [HOW_TO_ADD_A_PARSER.md](HOW_TO_ADD_A_PARSER.md)
+
+**...resume the ecosystem-by-ecosystem parser enhancement effort**
+→ [implementation-plans/package-detection/PARSER_ENHANCEMENT_PLAN.md](implementation-plans/package-detection/PARSER_ENHANCEMENT_PLAN.md)
 
 ## Document Lifecycle
 
