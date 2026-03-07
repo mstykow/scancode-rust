@@ -135,10 +135,28 @@ fn should_skip_npm_lock_merge(package: Option<&Package>, pkg_data: &PackageData)
         return false;
     }
 
-    match (&existing_package.purl, &pkg_data.purl) {
-        (Some(existing_purl), Some(candidate_purl)) => existing_purl != candidate_purl,
-        _ => false,
-    }
+    !npm_package_identity_matches(existing_package, pkg_data)
+}
+
+fn npm_package_identity_matches(package: &Package, pkg_data: &PackageData) -> bool {
+    let Some(package_name) = normalized_identity_value(package.name.as_deref()) else {
+        return false;
+    };
+    let Some(package_version) = normalized_identity_value(package.version.as_deref()) else {
+        return false;
+    };
+    let Some(candidate_name) = normalized_identity_value(pkg_data.name.as_deref()) else {
+        return false;
+    };
+    let Some(candidate_version) = normalized_identity_value(pkg_data.version.as_deref()) else {
+        return false;
+    };
+
+    package_name == candidate_name && package_version == candidate_version
+}
+
+fn normalized_identity_value(value: Option<&str>) -> Option<&str> {
+    value.map(str::trim).filter(|value| !value.is_empty())
 }
 
 fn should_skip_npm_lock_package_creation(
