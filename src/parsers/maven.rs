@@ -34,10 +34,23 @@ use std::path::Path;
 use super::PackageParser;
 
 #[derive(Clone, Default)]
-struct DependencyCoordinates {
+struct MavenDependencyData {
     group_id: Option<String>,
     artifact_id: Option<String>,
     version: Option<String>,
+    classifier: Option<String>,
+    type_: Option<String>,
+    scope: Option<String>,
+    optional: Option<String>,
+    system_path: Option<String>,
+    message: Option<String>,
+}
+
+#[derive(Clone, Default)]
+struct MavenLicenseEntry {
+    name: Option<String>,
+    url: Option<String>,
+    comments: Option<String>,
 }
 
 /// Resolves Maven property placeholders (`${property.name}`) with cycle and DoS protection.
@@ -264,6 +277,308 @@ fn resolve_maps(
     }
 }
 
+fn resolve_dependency_data(resolver: &mut PropertyResolver, dependency: &mut MavenDependencyData) {
+    resolve_option(resolver, &mut dependency.group_id);
+    resolve_option(resolver, &mut dependency.artifact_id);
+    resolve_option(resolver, &mut dependency.version);
+    resolve_option(resolver, &mut dependency.classifier);
+    resolve_option(resolver, &mut dependency.type_);
+    resolve_option(resolver, &mut dependency.scope);
+    resolve_option(resolver, &mut dependency.optional);
+    resolve_option(resolver, &mut dependency.system_path);
+    resolve_option(resolver, &mut dependency.message);
+}
+
+fn parse_maven_bool(value: Option<&str>) -> bool {
+    value.is_some_and(|value| value.trim().eq_ignore_ascii_case("true"))
+}
+
+fn normalize_maven_packaging(packaging: Option<&str>) -> Option<&str> {
+    match packaging.map(str::trim).filter(|value| !value.is_empty()) {
+        Some(
+            "ejb3" | "ear" | "aar" | "apk" | "gem" | "jar" | "nar" | "pom" | "so" | "swc" | "tar"
+            | "tar.gz" | "war" | "xar" | "zip",
+        ) => packaging.map(str::trim),
+        Some(_) => Some("jar"),
+        None => None,
+    }
+}
+
+fn resolve_license_entry(resolver: &mut PropertyResolver, license: &mut MavenLicenseEntry) {
+    resolve_option(resolver, &mut license.name);
+    resolve_option(resolver, &mut license.url);
+    resolve_option(resolver, &mut license.comments);
+}
+
+fn build_maven_qualifiers(
+    classifier: Option<&str>,
+    packaging: Option<&str>,
+) -> Option<HashMap<String, String>> {
+    let mut qualifiers = HashMap::new();
+
+    if let Some(classifier) = classifier.filter(|value| !value.trim().is_empty()) {
+        qualifiers.insert("classifier".to_string(), classifier.to_string());
+    }
+
+    if let Some(packaging) = normalize_maven_packaging(packaging)
+        .filter(|value| !value.is_empty() && *value != "jar" && *value != "pom")
+    {
+        qualifiers.insert("type".to_string(), packaging.to_string());
+    }
+
+    (!qualifiers.is_empty()).then_some(qualifiers)
+}
+
+fn build_maven_purl(
+    group_id: &str,
+    artifact_id: &str,
+    version: Option<&str>,
+    classifier: Option<&str>,
+    packaging: Option<&str>,
+) -> String {
+    let mut purl = format!("pkg:maven/{group_id}/{artifact_id}");
+
+    if let Some(version) = version.filter(|value| !value.trim().is_empty()) {
+        purl.push('@');
+        purl.push_str(version);
+    }
+
+    let qualifiers = build_maven_qualifiers(classifier, packaging);
+    if let Some(qualifiers) = qualifiers {
+        let mut query_parts = Vec::new();
+        if let Some(classifier) = qualifiers.get("classifier") {
+            query_parts.push(format!("classifier={classifier}"));
+        }
+        if let Some(type_) = qualifiers.get("type") {
+            query_parts.push(format!("type={type_}"));
+        }
+
+        if !query_parts.is_empty() {
+            purl.push('?');
+            purl.push_str(&query_parts.join("&"));
+        }
+    }
+
+    purl
+}
+
+fn build_maven_download_url(
+    group_id: &str,
+    artifact_id: &str,
+    version: &str,
+    classifier: Option<&str>,
+    packaging: Option<&str>,
+) -> String {
+    const BASE_URL: &str = "https://repo1.maven.org/maven2";
+    let group_path = group_id.replace('.', "/");
+    let extension = normalize_maven_packaging(packaging)
+        .filter(|value| *value != "pom")
+        .unwrap_or("jar");
+    let classifier_suffix = classifier
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(|value| format!("-{value}"))
+        .unwrap_or_default();
+
+    format!(
+        "{}/{}/{}/{}/{}-{}{}.{}",
+        BASE_URL,
+        group_path,
+        artifact_id,
+        version,
+        artifact_id,
+        version,
+        classifier_suffix,
+        extension
+    )
+}
+
+fn build_maven_source_package(namespace: &str, name: &str, version: &str) -> String {
+    build_maven_purl(namespace, name, Some(version), Some("sources"), None)
+}
+
+fn build_license_statement(licenses: &[MavenLicenseEntry]) -> Option<String> {
+    let rendered_entries: Vec<String> = licenses
+        .iter()
+        .filter_map(|license| {
+            let mut lines = Vec::new();
+
+            if let Some(name) = license
+                .name
+                .as_ref()
+                .filter(|value| !value.trim().is_empty())
+            {
+                lines.push(format!("    name: {name}"));
+            }
+            if let Some(url) = license
+                .url
+                .as_ref()
+                .filter(|value| !value.trim().is_empty())
+            {
+                lines.push(format!("    url: {url}"));
+            }
+            if let Some(comments) = license
+                .comments
+                .as_ref()
+                .filter(|value| !value.trim().is_empty())
+            {
+                lines.push(format!("    comments: {comments}"));
+            }
+
+            (!lines.is_empty()).then(|| format!("- license:\n{}", lines.join("\n")))
+        })
+        .collect();
+
+    if rendered_entries.is_empty() {
+        None
+    } else {
+        Some(format!("{}\n", rendered_entries.join("\n")))
+    }
+}
+
+fn dependency_extra_data(
+    dependency: &MavenDependencyData,
+) -> Option<HashMap<String, serde_json::Value>> {
+    let mut extra_data = HashMap::new();
+
+    if let Some(classifier) = dependency
+        .classifier
+        .as_ref()
+        .filter(|value| !value.trim().is_empty())
+    {
+        extra_data.insert(
+            "classifier".to_string(),
+            serde_json::Value::String(classifier.clone()),
+        );
+    }
+    if let Some(type_) = dependency
+        .type_
+        .as_ref()
+        .filter(|value| !value.trim().is_empty())
+    {
+        extra_data.insert("type".to_string(), serde_json::Value::String(type_.clone()));
+    }
+    if let Some(system_path) = dependency
+        .system_path
+        .as_ref()
+        .filter(|value| !value.trim().is_empty())
+    {
+        extra_data.insert(
+            "system_path".to_string(),
+            serde_json::Value::String(system_path.clone()),
+        );
+    }
+    if let Some(message) = dependency
+        .message
+        .as_ref()
+        .filter(|value| !value.trim().is_empty())
+    {
+        extra_data.insert(
+            "message".to_string(),
+            serde_json::Value::String(message.clone()),
+        );
+    }
+
+    (!extra_data.is_empty()).then_some(extra_data)
+}
+
+fn dependency_management_entry_to_value(
+    dependency: &MavenDependencyData,
+) -> serde_json::Map<String, serde_json::Value> {
+    let mut dep_obj = serde_json::Map::new();
+
+    if let Some(group_id) = dependency.group_id.as_ref() {
+        dep_obj.insert(
+            "groupId".to_string(),
+            serde_json::Value::String(group_id.clone()),
+        );
+    }
+    if let Some(artifact_id) = dependency.artifact_id.as_ref() {
+        dep_obj.insert(
+            "artifactId".to_string(),
+            serde_json::Value::String(artifact_id.clone()),
+        );
+    }
+    if let Some(version) = dependency.version.as_ref() {
+        dep_obj.insert(
+            "version".to_string(),
+            serde_json::Value::String(version.clone()),
+        );
+    }
+    if let Some(scope) = dependency.scope.as_ref() {
+        dep_obj.insert(
+            "scope".to_string(),
+            serde_json::Value::String(scope.clone()),
+        );
+    }
+    if let Some(type_) = dependency.type_.as_ref() {
+        dep_obj.insert("type".to_string(), serde_json::Value::String(type_.clone()));
+    }
+    if let Some(classifier) = dependency.classifier.as_ref() {
+        dep_obj.insert(
+            "classifier".to_string(),
+            serde_json::Value::String(classifier.clone()),
+        );
+    }
+    if let Some(optional) = dependency.optional.as_deref() {
+        dep_obj.insert(
+            "optional".to_string(),
+            serde_json::Value::Bool(parse_maven_bool(Some(optional))),
+        );
+    }
+    if let Some(message) = dependency.message.as_ref() {
+        dep_obj.insert(
+            "message".to_string(),
+            serde_json::Value::String(message.clone()),
+        );
+    }
+
+    dep_obj
+}
+
+fn maven_dependency_to_dependency(
+    dependency_data: &MavenDependencyData,
+    fallback_scope: Option<&str>,
+    force_non_runtime: bool,
+) -> Option<Dependency> {
+    let group_id = dependency_data.group_id.as_ref()?;
+    let artifact_id = dependency_data.artifact_id.as_ref()?;
+    let version = dependency_data.version.clone();
+    let scope = dependency_data
+        .scope
+        .clone()
+        .or_else(|| fallback_scope.map(str::to_string));
+    let explicit_optional = parse_maven_bool(dependency_data.optional.as_deref());
+
+    let (is_runtime, is_optional) = if force_non_runtime {
+        (Some(false), Some(explicit_optional))
+    } else {
+        match scope.as_deref() {
+            Some("test") | Some("provided") => (Some(false), Some(true)),
+            Some(_) => (Some(true), Some(explicit_optional)),
+            None => (None, Some(explicit_optional)),
+        }
+    };
+
+    Some(Dependency {
+        purl: Some(build_maven_purl(
+            group_id,
+            artifact_id,
+            version.as_deref(),
+            dependency_data.classifier.as_deref(),
+            dependency_data.type_.as_deref(),
+        )),
+        extracted_requirement: version.clone(),
+        scope,
+        is_runtime,
+        is_optional,
+        is_pinned: version.as_deref().map(is_maven_version_pinned),
+        is_direct: Some(true),
+        resolved_package: None,
+        extra_data: dependency_extra_data(dependency_data),
+    })
+}
+
 /// Determines if a Maven version specifier is pinned to an exact version.
 ///
 /// A version is considered pinned if it specifies an exact version without
@@ -381,10 +696,11 @@ impl PackageParser for MavenParser {
         let mut current_element = Vec::new();
         let mut in_dependencies = false;
         let mut current_dependency: Option<Dependency> = None;
-        let mut dependency_coords: Vec<DependencyCoordinates> = Vec::new();
-        let mut current_dependency_coords: Option<DependencyCoordinates> = None;
+        let mut dependency_data: Vec<MavenDependencyData> = Vec::new();
+        let mut current_dependency_data: Option<MavenDependencyData> = None;
 
-        let mut license_names: Vec<String> = Vec::new();
+        let mut licenses: Vec<MavenLicenseEntry> = Vec::new();
+        let mut current_license: Option<MavenLicenseEntry> = None;
         let mut inception_year = None;
         let mut scm_connection = None;
         let mut scm_developer_connection = None;
@@ -434,11 +750,8 @@ impl PackageParser for MavenParser {
         let mut current_mailing_list_post = None;
         let mut current_mailing_list_archive = None;
         let mut in_dependency_management = false;
-        let mut dependency_management_deps: Vec<serde_json::Map<String, serde_json::Value>> =
-            Vec::new();
-        let mut current_dep_mgmt_group_id = None;
-        let mut current_dep_mgmt_artifact_id = None;
-        let mut current_dep_mgmt_version = None;
+        let mut dependency_management_entries: Vec<MavenDependencyData> = Vec::new();
+        let mut current_dep_mgmt_dependency: Option<MavenDependencyData> = None;
         let mut in_dep_mgmt_dependency = false;
         let mut in_parent = false;
         let mut parent_group_id = None;
@@ -448,7 +761,11 @@ impl PackageParser for MavenParser {
         let mut in_properties = false;
         let mut properties: HashMap<String, String> = HashMap::new();
         let mut project_name = None;
+        let mut project_description = None;
         let mut project_packaging = None;
+        let mut project_classifier = None;
+        let mut in_relocation = false;
+        let mut relocation = MavenDependencyData::default();
 
         loop {
             match reader.read_event_into(&mut buf) {
@@ -463,9 +780,7 @@ impl PackageParser for MavenParser {
                         b"dependencies" => in_dependencies = true,
                         b"dependency" if in_dependency_management => {
                             in_dep_mgmt_dependency = true;
-                            current_dep_mgmt_group_id = None;
-                            current_dep_mgmt_artifact_id = None;
-                            current_dep_mgmt_version = None;
+                            current_dep_mgmt_dependency = Some(MavenDependencyData::default());
                         }
                         b"dependency" if in_dependencies => {
                             current_dependency = Some(Dependency {
@@ -479,7 +794,7 @@ impl PackageParser for MavenParser {
                                 resolved_package: None,
                                 extra_data: None,
                             });
-                            current_dependency_coords = Some(DependencyCoordinates::default());
+                            current_dependency_data = Some(MavenDependencyData::default());
                         }
                         b"properties" => in_properties = true,
                         b"developers" => in_developers = true,
@@ -508,8 +823,12 @@ impl PackageParser for MavenParser {
                                 timezone: None,
                             });
                         }
-                        b"license" => {}
+                        b"license" => current_license = Some(MavenLicenseEntry::default()),
                         b"distributionManagement" => in_distribution_management = true,
+                        b"relocation" if in_distribution_management => {
+                            in_relocation = true;
+                            relocation = MavenDependencyData::default();
+                        }
                         b"repository" if in_distribution_management => in_dist_repository = true,
                         b"snapshotRepository" if in_distribution_management => {
                             in_dist_snapshot_repository = true
@@ -559,16 +878,23 @@ impl PackageParser for MavenParser {
                             warn!("Failed to decode Maven property name in {:?}", path);
                         }
                     } else if in_dep_mgmt_dependency {
+                        if let Some(dep_mgmt) = current_dep_mgmt_dependency.as_mut() {
+                            match current_path {
+                                Some(b"groupId") => dep_mgmt.group_id = Some(text),
+                                Some(b"artifactId") => dep_mgmt.artifact_id = Some(text),
+                                Some(b"version") => dep_mgmt.version = Some(text),
+                                Some(b"scope") => dep_mgmt.scope = Some(text),
+                                Some(b"type") => dep_mgmt.type_ = Some(text),
+                                Some(b"classifier") => dep_mgmt.classifier = Some(text),
+                                Some(b"optional") => dep_mgmt.optional = Some(text),
+                                _ => {}
+                            }
+                        }
+                    } else if let Some(license) = &mut current_license {
                         match current_path {
-                            Some(b"groupId") => {
-                                current_dep_mgmt_group_id = Some(text);
-                            }
-                            Some(b"artifactId") => {
-                                current_dep_mgmt_artifact_id = Some(text);
-                            }
-                            Some(b"version") => {
-                                current_dep_mgmt_version = Some(text);
-                            }
+                            Some(b"name") => license.name = Some(text),
+                            Some(b"url") => license.url = Some(text),
+                            Some(b"comments") => license.comments = Some(text),
                             _ => {}
                         }
                     } else if let Some(party) = &mut current_party {
@@ -584,17 +910,17 @@ impl PackageParser for MavenParser {
                     } else if let Some(dep) = &mut current_dependency {
                         match current_path {
                             Some(b"groupId") => {
-                                if let Some(coords) = current_dependency_coords.as_mut() {
+                                if let Some(coords) = current_dependency_data.as_mut() {
                                     coords.group_id = Some(text);
                                 }
                             }
                             Some(b"artifactId") => {
-                                if let Some(coords) = current_dependency_coords.as_mut() {
+                                if let Some(coords) = current_dependency_data.as_mut() {
                                     coords.artifact_id = Some(text);
                                 }
                             }
                             Some(b"version") => {
-                                if let Some(coords) = current_dependency_coords.as_mut() {
+                                if let Some(coords) = current_dependency_data.as_mut() {
                                     coords.version = Some(text);
                                 }
                             }
@@ -602,8 +928,40 @@ impl PackageParser for MavenParser {
                                 dep.scope = Some(text.clone());
                                 dep.is_optional = Some(text == "test" || text == "provided");
                                 dep.is_runtime = Some(text != "test" && text != "provided");
+                                if let Some(coords) = current_dependency_data.as_mut() {
+                                    coords.scope = Some(text);
+                                }
                             }
-                            Some(b"optional") => dep.is_optional = Some(text == "true"),
+                            Some(b"optional") => {
+                                if let Some(coords) = current_dependency_data.as_mut() {
+                                    coords.optional = Some(text);
+                                }
+                            }
+                            Some(b"type") => {
+                                if let Some(coords) = current_dependency_data.as_mut() {
+                                    coords.type_ = Some(text);
+                                }
+                            }
+                            Some(b"classifier") => {
+                                if let Some(coords) = current_dependency_data.as_mut() {
+                                    coords.classifier = Some(text);
+                                }
+                            }
+                            Some(b"systemPath") => {
+                                if let Some(coords) = current_dependency_data.as_mut() {
+                                    coords.system_path = Some(text);
+                                }
+                            }
+                            _ => {}
+                        }
+                    } else if in_relocation {
+                        match current_path {
+                            Some(b"groupId") => relocation.group_id = Some(text),
+                            Some(b"artifactId") => relocation.artifact_id = Some(text),
+                            Some(b"version") => relocation.version = Some(text),
+                            Some(b"classifier") => relocation.classifier = Some(text),
+                            Some(b"type") => relocation.type_ = Some(text),
+                            Some(b"message") => relocation.message = Some(text),
                             _ => {}
                         }
                     } else if in_parent {
@@ -636,8 +994,14 @@ impl PackageParser for MavenParser {
                             Some(b"name") if current_element.len() == 2 => {
                                 project_name = Some(text)
                             }
+                            Some(b"description") if current_element.len() == 2 => {
+                                project_description = Some(text)
+                            }
                             Some(b"packaging") if current_element.len() == 2 => {
                                 project_packaging = Some(text)
+                            }
+                            Some(b"classifier") if current_element.len() == 2 => {
+                                project_classifier = Some(text)
                             }
                             Some(b"url") if current_element.len() == 2 => {
                                 package_data.homepage_url = Some(text)
@@ -680,12 +1044,6 @@ impl PackageParser for MavenParser {
                                     && current_element[current_element.len() - 2] == b"scm" =>
                             {
                                 scm_tag = Some(text);
-                            }
-                            Some(b"name")
-                                if current_element.len() >= 2
-                                    && current_element[current_element.len() - 2] == b"license" =>
-                            {
-                                license_names.push(text.clone());
                             }
                             Some(b"name")
                                 if current_element.len() >= 2
@@ -811,40 +1169,31 @@ impl PackageParser for MavenParser {
                         b"dependencies" => in_dependencies = false,
                         b"dependency" if in_dep_mgmt_dependency => {
                             in_dep_mgmt_dependency = false;
-                            if current_dep_mgmt_group_id.is_some()
-                                || current_dep_mgmt_artifact_id.is_some()
-                                || current_dep_mgmt_version.is_some()
+                            if let Some(dep_mgmt) = current_dep_mgmt_dependency.take()
+                                && (dep_mgmt.group_id.is_some()
+                                    || dep_mgmt.artifact_id.is_some()
+                                    || dep_mgmt.version.is_some())
                             {
-                                let mut dep_obj = serde_json::Map::new();
-                                if let Some(group_id) = current_dep_mgmt_group_id.take() {
-                                    dep_obj.insert(
-                                        "groupId".to_string(),
-                                        serde_json::Value::String(group_id),
-                                    );
-                                }
-                                if let Some(artifact_id) = current_dep_mgmt_artifact_id.take() {
-                                    dep_obj.insert(
-                                        "artifactId".to_string(),
-                                        serde_json::Value::String(artifact_id),
-                                    );
-                                }
-                                if let Some(version) = current_dep_mgmt_version.take() {
-                                    dep_obj.insert(
-                                        "version".to_string(),
-                                        serde_json::Value::String(version),
-                                    );
-                                }
-                                dependency_management_deps.push(dep_obj);
+                                dependency_management_entries.push(dep_mgmt);
                             }
                         }
                         b"dependency" => {
                             if let (Some(dep), Some(coords)) =
-                                (current_dependency.take(), current_dependency_coords.take())
+                                (current_dependency.take(), current_dependency_data.take())
                             {
                                 package_data.dependencies.push(dep);
-                                dependency_coords.push(coords);
+                                dependency_data.push(coords);
                             } else if let Some(dep) = current_dependency.take() {
                                 package_data.dependencies.push(dep);
+                            }
+                        }
+                        b"license" => {
+                            if let Some(license) = current_license.take()
+                                && (license.name.is_some()
+                                    || license.url.is_some()
+                                    || license.comments.is_some())
+                            {
+                                licenses.push(license);
                             }
                         }
                         b"developers" => in_developers = false,
@@ -860,6 +1209,7 @@ impl PackageParser for MavenParser {
                             }
                         }
                         b"distributionManagement" => in_distribution_management = false,
+                        b"relocation" => in_relocation = false,
                         b"repository" if !in_dependencies && in_distribution_management => {
                             in_dist_repository = false
                         }
@@ -1005,41 +1355,58 @@ impl PackageParser for MavenParser {
         resolve_option(&mut resolver, &mut parent_artifact_id);
         resolve_option(&mut resolver, &mut parent_version);
         resolve_option(&mut resolver, &mut parent_relative_path);
+        resolve_option(&mut resolver, &mut project_name);
+        resolve_option(&mut resolver, &mut project_description);
+        resolve_option(&mut resolver, &mut project_packaging);
+        resolve_option(&mut resolver, &mut project_classifier);
         resolve_vec(&mut resolver, &mut modules);
         resolve_maps(&mut resolver, &mut repositories);
         resolve_maps(&mut resolver, &mut plugin_repositories);
         resolve_maps(&mut resolver, &mut mailing_lists);
-        resolve_maps(&mut resolver, &mut dependency_management_deps);
+        for dependency in &mut dependency_management_entries {
+            resolve_dependency_data(&mut resolver, dependency);
+        }
+        resolve_dependency_data(&mut resolver, &mut relocation);
+        for license in &mut licenses {
+            resolve_license_entry(&mut resolver, license);
+        }
 
         for (dependency, coords) in package_data
             .dependencies
             .iter_mut()
-            .zip(dependency_coords.iter_mut())
+            .zip(dependency_data.iter_mut())
         {
-            if let Some(scope) = dependency.scope.as_mut() {
-                *scope = resolver.resolve_text(scope, 0);
-            }
-            if let Some(group_id) = coords.group_id.as_mut() {
-                *group_id = resolver.resolve_text(group_id, 0);
-            }
-            if let Some(artifact_id) = coords.artifact_id.as_mut() {
-                *artifact_id = resolver.resolve_text(artifact_id, 0);
-            }
-            if let Some(version) = coords.version.as_mut() {
-                *version = resolver.resolve_text(version, 0);
+            resolve_dependency_data(&mut resolver, coords);
+            dependency.scope = coords.scope.clone();
+            dependency.extracted_requirement = coords.version.clone();
+            dependency.extra_data = dependency_extra_data(coords);
+            dependency.is_optional = Some(parse_maven_bool(coords.optional.as_deref()));
+
+            match dependency.scope.as_deref() {
+                Some("test") | Some("provided") => {
+                    dependency.is_runtime = Some(false);
+                    dependency.is_optional = Some(true);
+                }
+                Some(_) => {
+                    dependency.is_runtime = Some(true);
+                }
+                None => {
+                    dependency.is_runtime = None;
+                }
             }
 
-            // Determine if version is pinned based on resolved version string
             if let Some(version) = &coords.version {
                 dependency.is_pinned = Some(is_maven_version_pinned(version));
             }
 
             if let (Some(group_id), Some(artifact_id)) = (&coords.group_id, &coords.artifact_id) {
-                let mut purl = format!("pkg:maven/{}/{}", group_id, artifact_id);
-                if let Some(version) = &coords.version {
-                    purl = format!("{}@{}", purl, version);
-                }
-                dependency.purl = Some(purl);
+                dependency.purl = Some(build_maven_purl(
+                    group_id,
+                    artifact_id,
+                    coords.version.as_deref(),
+                    coords.classifier.as_deref(),
+                    coords.type_.as_deref(),
+                ));
             }
         }
 
@@ -1050,25 +1417,40 @@ impl PackageParser for MavenParser {
             package_data.version = parent_version.clone();
         }
 
+        package_data.qualifiers =
+            build_maven_qualifiers(project_classifier.as_deref(), project_packaging.as_deref());
+
+        package_data.description = match (
+            project_name.as_deref().filter(|value| !value.is_empty()),
+            project_description
+                .as_deref()
+                .filter(|value| !value.is_empty()),
+        ) {
+            (Some(name), Some(description)) if name == description => Some(name.to_string()),
+            (Some(name), Some(description)) => Some(format!("{name}\n{description}")),
+            (Some(name), None) => Some(name.to_string()),
+            (None, Some(description)) => Some(description.to_string()),
+            (None, None) => None,
+        };
+
         // Construct PURL from parsed data
         if let (Some(group_id), Some(artifact_id), Some(version)) = (
             &package_data.namespace,
             &package_data.name,
             &package_data.version,
         ) {
-            // Note: The PackageURL spec requires Maven packages to be formatted as:
-            //   pkg:maven/groupId/artifactId@version
-            // where the / between groupId and artifactId remains unencoded.
-            //
-            // The PackageUrl library encodes the / as %2F when we use:
-            //   PackageUrl::new("maven", "groupId/artifactId")
-            // which produces: pkg:maven/groupId%2FartifactId@version (incorrect)
-            //
-            // Therefore, we must manually construct the PURL for Maven packages.
-            package_data.purl = Some(format!(
-                "pkg:maven/{}/{}@{}",
-                group_id, artifact_id, version
+            package_data.purl = Some(build_maven_purl(
+                group_id,
+                artifact_id,
+                Some(version),
+                project_classifier.as_deref(),
+                project_packaging.as_deref(),
             ));
+            if project_classifier.is_none() {
+                package_data
+                    .source_packages
+                    .push(build_maven_source_package(group_id, artifact_id, version));
+            }
         }
 
         if let (Some(group_id), Some(artifact_id)) = (&package_data.namespace, &package_data.name) {
@@ -1079,10 +1461,15 @@ impl PackageParser for MavenParser {
                 None,
             );
 
-            package_data.repository_download_url = package_data
-                .version
-                .as_ref()
-                .map(|ver| build_maven_download_url(group_id, artifact_id, ver));
+            package_data.repository_download_url = package_data.version.as_ref().map(|ver| {
+                build_maven_download_url(
+                    group_id,
+                    artifact_id,
+                    ver,
+                    project_classifier.as_deref(),
+                    project_packaging.as_deref(),
+                )
+            });
 
             if let Some(ver) = &package_data.version {
                 let pom_filename = format!("{}-{}.pom", artifact_id, ver);
@@ -1114,6 +1501,42 @@ impl PackageParser for MavenParser {
             package_data.download_url = Some(url.clone());
         }
 
+        if organization_name.is_some() || organization_url.is_some() {
+            package_data.parties.push(Party {
+                r#type: Some("organization".to_string()),
+                role: Some("owner".to_string()),
+                name: organization_name.clone(),
+                email: None,
+                url: organization_url.clone(),
+                organization: None,
+                organization_url: None,
+                timezone: None,
+            });
+        }
+
+        for dependency in &dependency_management_entries {
+            let fallback_scope = if dependency.scope.as_deref() == Some("import") {
+                Some("import")
+            } else {
+                Some("dependencymanagement")
+            };
+
+            if let Some(converted) =
+                maven_dependency_to_dependency(dependency, fallback_scope, true)
+            {
+                package_data.dependencies.push(converted);
+            }
+        }
+
+        if (relocation.group_id.is_some()
+            || relocation.artifact_id.is_some()
+            || relocation.version.is_some())
+            && let Some(converted) =
+                maven_dependency_to_dependency(&relocation, Some("relocation"), true)
+        {
+            package_data.dependencies.push(converted);
+        }
+
         if inception_year.is_some()
             || organization_name.is_some()
             || organization_url.is_some()
@@ -1130,8 +1553,12 @@ impl PackageParser for MavenParser {
             || !plugin_repositories.is_empty()
             || !modules.is_empty()
             || !mailing_lists.is_empty()
-            || !dependency_management_deps.is_empty()
+            || !dependency_management_entries.is_empty()
             || parent_group_id.is_some()
+            || relocation.group_id.is_some()
+            || relocation.artifact_id.is_some()
+            || relocation.version.is_some()
+            || relocation.message.is_some()
         {
             let mut extra_data = package_data.extra_data.take().unwrap_or_default();
             if let Some(year) = inception_year {
@@ -1295,15 +1722,30 @@ impl PackageParser for MavenParser {
                 );
             }
 
-            if !dependency_management_deps.is_empty() {
+            if !dependency_management_entries.is_empty() {
                 extra_data.insert(
                     "dependency_management".to_string(),
                     serde_json::Value::Array(
-                        dependency_management_deps
+                        dependency_management_entries
                             .into_iter()
-                            .map(serde_json::Value::Object)
+                            .map(|dependency| {
+                                serde_json::Value::Object(dependency_management_entry_to_value(
+                                    &dependency,
+                                ))
+                            })
                             .collect(),
                     ),
+                );
+            }
+
+            if relocation.group_id.is_some()
+                || relocation.artifact_id.is_some()
+                || relocation.version.is_some()
+                || relocation.message.is_some()
+            {
+                extra_data.insert(
+                    "relocation".to_string(),
+                    serde_json::Value::Object(dependency_management_entry_to_value(&relocation)),
                 );
             }
 
@@ -1337,11 +1779,7 @@ impl PackageParser for MavenParser {
             package_data.extra_data = Some(extra_data);
         }
 
-        // Extract license statement only - detection happens in separate engine
-        if !license_names.is_empty() {
-            let combined_license = license_names.join(" OR ");
-            package_data.extracted_license_statement = Some(combined_license);
-        }
+        package_data.extracted_license_statement = build_license_statement(&licenses);
 
         vec![package_data]
     }
@@ -1382,15 +1820,6 @@ fn build_maven_url(
     };
 
     Some(url)
-}
-
-fn build_maven_download_url(group_id: &str, artifact_id: &str, version: &str) -> String {
-    const BASE_URL: &str = "https://repo1.maven.org/maven2";
-    let group_path = group_id.replace('.', "/");
-    format!(
-        "{}/{}/{}/{}/{}-{}.jar",
-        BASE_URL, group_path, artifact_id, version, artifact_id, version
-    )
 }
 
 /// Parse pom.properties file (Java properties format)
