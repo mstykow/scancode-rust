@@ -176,22 +176,61 @@ pub fn assemble(files: &mut [FileInfo]) -> AssemblyResult {
     }
 
     for file in files.iter_mut() {
-        file.for_packages.sort();
+        file.for_packages
+            .sort_by(|left, right| stable_uid_key(left).cmp(stable_uid_key(right)));
         file.for_packages.dedup();
     }
 
-    packages.sort_by(|left, right| left.package_uid.cmp(&right.package_uid));
+    packages
+        .sort_by(|left, right| stable_package_sort_key(left).cmp(&stable_package_sort_key(right)));
     dependencies.sort_by(|left, right| {
-        left.dependency_uid
-            .cmp(&right.dependency_uid)
+        left.purl
+            .as_deref()
+            .cmp(&right.purl.as_deref())
+            .then_with(|| {
+                left.extracted_requirement
+                    .as_deref()
+                    .cmp(&right.extracted_requirement.as_deref())
+            })
+            .then_with(|| left.scope.as_deref().cmp(&right.scope.as_deref()))
             .then_with(|| left.datafile_path.cmp(&right.datafile_path))
-            .then_with(|| left.for_package_uid.cmp(&right.for_package_uid))
+            .then_with(|| {
+                left.datasource_id
+                    .to_string()
+                    .cmp(&right.datasource_id.to_string())
+            })
+            .then_with(|| {
+                left.for_package_uid
+                    .as_deref()
+                    .map(stable_uid_key)
+                    .cmp(&right.for_package_uid.as_deref().map(stable_uid_key))
+            })
     });
 
     AssemblyResult {
         packages,
         dependencies,
     }
+}
+
+fn stable_package_sort_key(package: &Package) -> (Option<&str>, Option<&str>, Option<&str>, &str) {
+    (
+        package.purl.as_deref(),
+        package.name.as_deref(),
+        package.version.as_deref(),
+        package
+            .datafile_paths
+            .first()
+            .map(String::as_str)
+            .unwrap_or(""),
+    )
+}
+
+fn stable_uid_key(uid: &str) -> &str {
+    uid.split_once("?uuid=")
+        .map(|(prefix, _)| prefix)
+        .or_else(|| uid.split_once("&uuid=").map(|(prefix, _)| prefix))
+        .unwrap_or(uid)
 }
 
 fn assemble_one_per_package_data(
