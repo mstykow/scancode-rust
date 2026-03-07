@@ -186,7 +186,10 @@ mod tests {
         paths
     }
 
-    fn assert_npm_nested_fixture_ownership(file_infos: &[FileInfo]) -> Result<(), String> {
+    fn assert_npm_nested_fixture_ownership(
+        actual: &AssemblyResult,
+        file_infos: &[FileInfo],
+    ) -> Result<(), String> {
         let expected_owned_paths = vec![
             ".pnp.cjs".to_string(),
             "index.js".to_string(),
@@ -198,10 +201,39 @@ mod tests {
         ];
         let actual_owned_paths = owned_paths(file_infos);
 
+        let manifest_debug: Vec<Value> = file_infos
+            .iter()
+            .filter(|file| file.name == "package.json")
+            .map(|file| {
+                json!({
+                    "path": file.path,
+                    "for_packages": file.for_packages,
+                    "package_data": file.package_data.iter().map(|package_data| json!({
+                        "datasource_id": package_data.datasource_id.as_ref().map(ToString::to_string),
+                        "name": package_data.name,
+                        "version": package_data.version,
+                        "purl": package_data.purl,
+                    })).collect::<Vec<_>>(),
+                })
+            })
+            .collect();
+
+        let assembled_package_paths: Vec<Value> = actual
+            .packages
+            .iter()
+            .map(|package| {
+                json!({
+                    "purl": package.purl,
+                    "datafile_paths": package.datafile_paths,
+                    "package_uid": package.package_uid,
+                })
+            })
+            .collect();
+
         if actual_owned_paths != expected_owned_paths {
             return Err(format!(
-                "Unexpected owned paths for npm-nested-packages: actual={:?}, expected={:?}",
-                actual_owned_paths, expected_owned_paths
+                "Unexpected owned paths for npm-nested-packages: actual={:?}, expected={:?}, manifests={:?}, packages={:?}",
+                actual_owned_paths, expected_owned_paths, manifest_debug, assembled_package_paths
             ));
         }
 
@@ -218,8 +250,11 @@ mod tests {
 
         if owned_manifest_paths != expected_manifest_paths {
             return Err(format!(
-                "Unexpected owned manifest paths for npm-nested-packages: actual={:?}, expected={:?}",
-                owned_manifest_paths, expected_manifest_paths
+                "Unexpected owned manifest paths for npm-nested-packages: actual={:?}, expected={:?}, manifests={:?}, packages={:?}",
+                owned_manifest_paths,
+                expected_manifest_paths,
+                manifest_debug,
+                assembled_package_paths
             ));
         }
 
@@ -367,7 +402,7 @@ mod tests {
         let result = assemble(&mut file_infos);
 
         if test_dir_name == "npm-nested-packages" {
-            assert_npm_nested_fixture_ownership(&file_infos)?;
+            assert_npm_nested_fixture_ownership(&result, &file_infos)?;
         }
 
         compare_assembly_output(&result, &file_infos, &expected_file)
