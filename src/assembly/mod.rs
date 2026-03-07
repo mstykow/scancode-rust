@@ -11,9 +11,7 @@ use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
 
-use crate::models::{
-    DatasourceId, FileInfo, Package, PackageData, PackageType, TopLevelDependency,
-};
+use crate::models::{DatasourceId, FileInfo, Package, PackageData, TopLevelDependency};
 
 pub use assemblers::ASSEMBLERS;
 
@@ -278,17 +276,7 @@ fn assemble_one_per_package_data(
 }
 
 fn assign_npm_package_resources(files: &mut [FileInfo], packages: &[Package]) {
-    let mut package_roots: Vec<(PathBuf, String)> = packages
-        .iter()
-        .filter(|package| package.package_type == Some(PackageType::Npm))
-        .filter_map(|package| {
-            package
-                .datafile_paths
-                .first()
-                .and_then(|path| Path::new(path).parent())
-                .map(|root| (root.to_path_buf(), package.package_uid.clone()))
-        })
-        .collect();
+    let mut package_roots = collect_npm_package_roots(files, packages);
 
     package_roots.sort_by(|(left_root, _), (right_root, _)| {
         right_root
@@ -298,20 +286,78 @@ fn assign_npm_package_resources(files: &mut [FileInfo], packages: &[Package]) {
     });
 
     for file in files.iter_mut() {
+        if !file.package_data.is_empty() {
+            continue;
+        }
+
         let path = Path::new(&file.path);
-        if let Some((_, package_uid)) = package_roots
-            .iter()
-            .find(|(root, _)| path.starts_with(root) && !is_first_level_node_modules(path, root))
-        {
+        if let Some((_, package_uid)) = package_roots.iter().find(|(root, _)| {
+            path_is_within_root(path, root) && !is_first_level_node_modules(path, root)
+        }) {
             file.for_packages.clear();
             file.for_packages.push(package_uid.clone());
         }
     }
 }
 
+fn collect_npm_package_roots(files: &[FileInfo], packages: &[Package]) -> Vec<(PathBuf, String)> {
+    let mut package_roots: Vec<(PathBuf, String)> = files
+        .iter()
+        .filter(|file| {
+            file.package_data.iter().any(|package_data| {
+                package_data.datasource_id == Some(DatasourceId::NpmPackageJson)
+            })
+        })
+        .filter_map(|file| {
+            file.for_packages.first().map(|package_uid| {
+                (
+                    Path::new(&file.path)
+                        .parent()
+                        .unwrap_or_else(|| Path::new(""))
+                        .to_path_buf(),
+                    package_uid.clone(),
+                )
+            })
+        })
+        .collect();
+
+    if package_roots.is_empty() {
+        package_roots = packages
+            .iter()
+            .filter(|package| {
+                package
+                    .purl
+                    .as_deref()
+                    .is_some_and(|purl| purl.starts_with("pkg:npm/"))
+            })
+            .filter_map(|package| {
+                package
+                    .datafile_paths
+                    .first()
+                    .map(Path::new)
+                    .and_then(Path::parent)
+                    .map(|root| (root.to_path_buf(), package.package_uid.clone()))
+            })
+            .collect();
+    }
+
+    package_roots.sort();
+    package_roots.dedup();
+    package_roots
+}
+
+fn path_is_within_root(path: &Path, root: &Path) -> bool {
+    root.as_os_str().is_empty() || path.starts_with(root)
+}
+
 fn is_first_level_node_modules(path: &Path, root: &Path) -> bool {
-    path.strip_prefix(root)
-        .ok()
+    let relative = if root.as_os_str().is_empty() {
+        Some(path)
+    } else {
+        path.strip_prefix(root).ok()
+    };
+
+    relative
         .and_then(|relative| relative.components().next())
         .is_some_and(|component| component.as_os_str() == "node_modules")
 }
@@ -365,6 +411,39 @@ mod tests {
                 dependencies,
                 ..Default::default()
             }],
+            license_expression: None,
+            license_detections: vec![],
+            copyrights: vec![],
+            holders: vec![],
+            authors: vec![],
+            emails: vec![],
+            urls: vec![],
+            for_packages: vec![],
+            scan_errors: vec![],
+            is_source: None,
+            source_count: None,
+        }
+    }
+
+    fn create_plain_file_info(path: &str) -> FileInfo {
+        let path_parts: Vec<&str> = path.split('/').collect();
+        let file_name = path_parts.last().unwrap_or(&"");
+        let extension = file_name.split('.').next_back().unwrap_or("");
+
+        FileInfo {
+            name: file_name.to_string(),
+            base_name: file_name.to_string(),
+            extension: extension.to_string(),
+            path: path.to_string(),
+            file_type: FileType::File,
+            mime_type: Some("text/plain".to_string()),
+            size: 100,
+            date: None,
+            sha1: None,
+            md5: None,
+            sha256: None,
+            programming_language: None,
+            package_data: vec![],
             license_expression: None,
             license_detections: vec![],
             copyrights: vec![],
@@ -855,6 +934,85 @@ mod tests {
         assert_eq!(result.dependencies[0].for_package_uid, None);
         assert!(files[0].for_packages.is_empty());
         assert!(files[1].for_packages.is_empty());
+    }
+
+    #[test]
+    fn test_assign_npm_package_resources_uses_manifest_roots_without_package_type() {
+        let mut files = vec![
+            create_plain_file_info(".pnp.cjs"),
+            create_plain_file_info("index.js"),
+            create_test_file_info(
+                "package.json",
+                DatasourceId::NpmPackageJson,
+                Some("pkg:npm/root-app@1.0.0"),
+                Some("root-app"),
+                Some("1.0.0"),
+                vec![],
+            ),
+            create_plain_file_info("node_modules/child/index.js"),
+            create_test_file_info(
+                "node_modules/child/package.json",
+                DatasourceId::NpmPackageJson,
+                Some("pkg:npm/child@2.0.0"),
+                Some("child"),
+                Some("2.0.0"),
+                vec![],
+            ),
+            create_plain_file_info("node_modules/child/node_modules/grand/index.js"),
+            create_test_file_info(
+                "node_modules/child/node_modules/grand/package.json",
+                DatasourceId::NpmPackageJson,
+                Some("pkg:npm/grand@3.0.0"),
+                Some("grand"),
+                Some("3.0.0"),
+                vec![],
+            ),
+        ];
+
+        let result = assemble(&mut files);
+
+        assert_eq!(result.packages.len(), 3);
+
+        let ownerships: HashMap<String, String> = files
+            .iter()
+            .filter(|file| !file.for_packages.is_empty())
+            .map(|file| {
+                (
+                    file.path.clone(),
+                    stable_uid_key(&file.for_packages[0]).to_string(),
+                )
+            })
+            .collect();
+
+        assert_eq!(ownerships.len(), 7);
+        assert_eq!(
+            ownerships.get(".pnp.cjs"),
+            Some(&"pkg:npm/root-app@1.0.0".to_string())
+        );
+        assert_eq!(
+            ownerships.get("index.js"),
+            Some(&"pkg:npm/root-app@1.0.0".to_string())
+        );
+        assert_eq!(
+            ownerships.get("package.json"),
+            Some(&"pkg:npm/root-app@1.0.0".to_string())
+        );
+        assert_eq!(
+            ownerships.get("node_modules/child/index.js"),
+            Some(&"pkg:npm/child@2.0.0".to_string())
+        );
+        assert_eq!(
+            ownerships.get("node_modules/child/package.json"),
+            Some(&"pkg:npm/child@2.0.0".to_string())
+        );
+        assert_eq!(
+            ownerships.get("node_modules/child/node_modules/grand/index.js"),
+            Some(&"pkg:npm/grand@3.0.0".to_string())
+        );
+        assert_eq!(
+            ownerships.get("node_modules/child/node_modules/grand/package.json"),
+            Some(&"pkg:npm/grand@3.0.0".to_string())
+        );
     }
 
     #[test]
