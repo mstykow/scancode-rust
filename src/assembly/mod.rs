@@ -297,34 +297,43 @@ fn assign_npm_package_resources(files: &mut [FileInfo], packages: &[Package]) {
 }
 
 fn collect_npm_package_roots(files: &[FileInfo], packages: &[Package]) -> Vec<(String, String)> {
-    let mut package_roots: Vec<(String, String)> = files
+    let mut package_roots: Vec<(String, String)> = packages
         .iter()
-        .filter(|file| {
-            file.package_data.iter().any(|package_data| {
-                package_data.datasource_id == Some(DatasourceId::NpmPackageJson)
-            })
+        .filter(|package| {
+            package
+                .purl
+                .as_deref()
+                .is_some_and(|purl| purl.starts_with("pkg:npm/"))
         })
-        .filter_map(|file| {
-            file.for_packages
-                .first()
-                .map(|package_uid| (package_dir(&file.path), package_uid.clone()))
+        .flat_map(|package| {
+            files.iter().filter_map(move |file| {
+                let is_matching_manifest = package.datafile_paths.contains(&file.path)
+                    && file.package_data.iter().any(|package_data| {
+                        package_data.datasource_id == Some(DatasourceId::NpmPackageJson)
+                            && package_data.purl.as_deref() == package.purl.as_deref()
+                    });
+
+                if is_matching_manifest {
+                    Some((package_dir(&file.path), package.package_uid.clone()))
+                } else {
+                    None
+                }
+            })
         })
         .collect();
 
     if package_roots.is_empty() {
-        package_roots = packages
+        package_roots = files
             .iter()
-            .filter(|package| {
-                package
-                    .purl
-                    .as_deref()
-                    .is_some_and(|purl| purl.starts_with("pkg:npm/"))
+            .filter(|file| {
+                file.package_data.iter().any(|package_data| {
+                    package_data.datasource_id == Some(DatasourceId::NpmPackageJson)
+                })
             })
-            .filter_map(|package| {
-                package
-                    .datafile_paths
+            .filter_map(|file| {
+                file.for_packages
                     .first()
-                    .map(|path| (package_dir(path), package.package_uid.clone()))
+                    .map(|package_uid| (package_dir(&file.path), package_uid.clone()))
             })
             .collect();
     }
@@ -1052,6 +1061,109 @@ mod tests {
             "node_modules/child/index.js",
             "node_modules/child"
         ));
+    }
+
+    #[test]
+    fn test_collect_npm_package_roots_uses_assembled_packages_when_file_ownership_is_partial() {
+        let root_uid = "pkg:npm/root-app@1.0.0?uuid=root".to_string();
+        let child_uid = "pkg:npm/child@2.0.0?uuid=child".to_string();
+        let grand_uid = "pkg:npm/grand@3.0.0?uuid=grand".to_string();
+
+        let mut root_manifest = create_test_file_info(
+            "package.json",
+            DatasourceId::NpmPackageJson,
+            Some("pkg:npm/root-app@1.0.0"),
+            Some("root-app"),
+            Some("1.0.0"),
+            vec![],
+        );
+        root_manifest.for_packages.push(root_uid.clone());
+
+        let child_manifest = create_test_file_info(
+            "node_modules/child/package.json",
+            DatasourceId::NpmPackageJson,
+            Some("pkg:npm/child@2.0.0"),
+            Some("child"),
+            Some("2.0.0"),
+            vec![],
+        );
+
+        let grand_manifest = create_test_file_info(
+            "node_modules/child/node_modules/grand/package.json",
+            DatasourceId::NpmPackageJson,
+            Some("pkg:npm/grand@3.0.0"),
+            Some("grand"),
+            Some("3.0.0"),
+            vec![],
+        );
+
+        let files = vec![root_manifest, child_manifest, grand_manifest];
+        let packages = vec![
+            Package {
+                package_uid: root_uid.clone(),
+                purl: Some("pkg:npm/root-app@1.0.0".to_string()),
+                datafile_paths: vec!["package.json".to_string()],
+                datasource_ids: vec![DatasourceId::NpmPackageJson],
+                ..Package::from_package_data(
+                    &PackageData {
+                        datasource_id: Some(DatasourceId::NpmPackageJson),
+                        purl: Some("pkg:npm/root-app@1.0.0".to_string()),
+                        name: Some("root-app".to_string()),
+                        version: Some("1.0.0".to_string()),
+                        ..Default::default()
+                    },
+                    "package.json".to_string(),
+                )
+            },
+            Package {
+                package_uid: child_uid.clone(),
+                purl: Some("pkg:npm/child@2.0.0".to_string()),
+                datafile_paths: vec!["node_modules/child/package.json".to_string()],
+                datasource_ids: vec![DatasourceId::NpmPackageJson],
+                ..Package::from_package_data(
+                    &PackageData {
+                        datasource_id: Some(DatasourceId::NpmPackageJson),
+                        purl: Some("pkg:npm/child@2.0.0".to_string()),
+                        name: Some("child".to_string()),
+                        version: Some("2.0.0".to_string()),
+                        ..Default::default()
+                    },
+                    "node_modules/child/package.json".to_string(),
+                )
+            },
+            Package {
+                package_uid: grand_uid.clone(),
+                purl: Some("pkg:npm/grand@3.0.0".to_string()),
+                datafile_paths: vec![
+                    "node_modules/child/node_modules/grand/package.json".to_string(),
+                ],
+                datasource_ids: vec![DatasourceId::NpmPackageJson],
+                ..Package::from_package_data(
+                    &PackageData {
+                        datasource_id: Some(DatasourceId::NpmPackageJson),
+                        purl: Some("pkg:npm/grand@3.0.0".to_string()),
+                        name: Some("grand".to_string()),
+                        version: Some("3.0.0".to_string()),
+                        ..Default::default()
+                    },
+                    "node_modules/child/node_modules/grand/package.json".to_string(),
+                )
+            },
+        ];
+
+        let roots = collect_npm_package_roots(&files, &packages);
+
+        assert_eq!(
+            roots,
+            vec![
+                ("".to_string(), root_uid),
+                ("node_modules/child".to_string(), child_uid),
+                (
+                    "node_modules/child/node_modules/grand".to_string(),
+                    grand_uid,
+                ),
+            ]
+        );
     }
 
     #[test]

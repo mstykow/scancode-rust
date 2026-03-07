@@ -176,6 +176,56 @@ mod tests {
         compare_json_values(&actual_value, &expected_value, "")
     }
 
+    fn owned_paths(file_infos: &[FileInfo]) -> Vec<String> {
+        let mut paths: Vec<String> = file_infos
+            .iter()
+            .filter(|file| !file.for_packages.is_empty())
+            .map(|file| file.path.clone())
+            .collect();
+        paths.sort();
+        paths
+    }
+
+    fn assert_npm_nested_fixture_ownership(file_infos: &[FileInfo]) -> Result<(), String> {
+        let expected_owned_paths = vec![
+            ".pnp.cjs".to_string(),
+            "index.js".to_string(),
+            "node_modules/child/index.js".to_string(),
+            "node_modules/child/node_modules/grand/index.js".to_string(),
+            "node_modules/child/node_modules/grand/package.json".to_string(),
+            "node_modules/child/package.json".to_string(),
+            "package.json".to_string(),
+        ];
+        let actual_owned_paths = owned_paths(file_infos);
+
+        if actual_owned_paths != expected_owned_paths {
+            return Err(format!(
+                "Unexpected owned paths for npm-nested-packages: actual={:?}, expected={:?}",
+                actual_owned_paths, expected_owned_paths
+            ));
+        }
+
+        let owned_manifest_paths: Vec<String> = file_infos
+            .iter()
+            .filter(|file| file.name == "package.json" && !file.for_packages.is_empty())
+            .map(|file| file.path.clone())
+            .collect();
+        let expected_manifest_paths = vec![
+            "node_modules/child/node_modules/grand/package.json".to_string(),
+            "node_modules/child/package.json".to_string(),
+            "package.json".to_string(),
+        ];
+
+        if owned_manifest_paths != expected_manifest_paths {
+            return Err(format!(
+                "Unexpected owned manifest paths for npm-nested-packages: actual={:?}, expected={:?}",
+                owned_manifest_paths, expected_manifest_paths
+            ));
+        }
+
+        Ok(())
+    }
+
     /// Recursively compare two JSON values with helpful error messages.
     fn compare_json_values(actual: &Value, expected: &Value, path: &str) -> Result<(), String> {
         match (actual, expected) {
@@ -315,6 +365,10 @@ mod tests {
 
         let mut file_infos = build_file_infos_from_directory(&test_dir)?;
         let result = assemble(&mut file_infos);
+
+        if test_dir_name == "npm-nested-packages" {
+            assert_npm_nested_fixture_ownership(&file_infos)?;
+        }
 
         compare_assembly_output(&result, &file_infos, &expected_file)
     }
