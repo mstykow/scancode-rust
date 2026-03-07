@@ -82,12 +82,10 @@ name: Test License
         result.is_err(),
         "Empty text should fail for non-deprecated license"
     );
-    assert!(
-        result
-            .unwrap_err()
-            .to_string()
-            .contains("empty text content")
-    );
+    assert!(result
+        .unwrap_err()
+        .to_string()
+        .contains("empty text content"));
 }
 
 #[test]
@@ -138,12 +136,10 @@ license_expression: mit
 
     let result = parse_rule_from_str(content, "empty-text.RULE");
     assert!(result.is_err(), "Rule with empty text should fail");
-    assert!(
-        result
-            .unwrap_err()
-            .to_string()
-            .contains("empty text content")
-    );
+    assert!(result
+        .unwrap_err()
+        .to_string()
+        .contains("empty text content"));
 }
 
 #[test]
@@ -685,4 +681,98 @@ Text."#;
     assert!(!rule.is_license_tag);
     assert!(!rule.is_license_intro);
     assert!(!rule.is_license_clue);
+}
+
+#[test]
+fn test_ibmpl_rule_loaded() {
+    let path = std::path::Path::new("reference/scancode-toolkit/src/licensedcode/data/rules");
+    if !path.exists() {
+        eprintln!("Skipping test: reference directory not found");
+        return;
+    }
+
+    let rules = load_rules_from_directory(path, false).unwrap();
+
+    let ibmpl_1 = rules.iter().find(|r| r.identifier == "ibmpl-1.0_1.RULE");
+    assert!(ibmpl_1.is_some(), "ibmpl-1.0_1.RULE should be loaded");
+
+    let rule = ibmpl_1.unwrap();
+    assert_eq!(rule.license_expression, "ibmpl-1.0");
+    assert!(rule.is_license_reference);
+    assert_eq!(rule.relevance, 100);
+
+    let expected_text = "distributed under the IBM Public License (IPL).";
+    assert_eq!(rule.text, expected_text, "Rule text should match");
+}
+
+#[test]
+fn test_ibmpl_rule_tokens() {
+    use crate::license_detection::tokenize::tokenize;
+
+    let rule_text = "distributed under the IBM Public License (IPL).";
+    let query_text = "Version 0.7.0 and above will be distributed under the IBM Public\nLicense (IPL). The IPL is an approved open source license";
+
+    let rule_tokens = tokenize(rule_text);
+    let query_tokens = tokenize(query_text);
+
+    eprintln!("Rule tokens: {:?}", rule_tokens);
+    eprintln!("Query tokens: {:?}", query_tokens);
+
+    let rule_len = rule_tokens.len();
+    let mut found = false;
+    for i in 0..=query_tokens.len().saturating_sub(rule_len) {
+        if query_tokens[i..i + rule_len] == rule_tokens[..] {
+            eprintln!("MATCH FOUND at position {}", i);
+            eprintln!("Query segment: {:?}", &query_tokens[i..i + rule_len]);
+            found = true;
+            break;
+        }
+    }
+
+    assert!(found, "Rule tokens should appear in query tokens");
+}
+
+#[test]
+fn test_ibmpl_detection() {
+    use crate::license_detection::LicenseDetectionEngine;
+    use std::path::PathBuf;
+
+    let data_path = PathBuf::from("reference/scancode-toolkit/src/licensedcode/data");
+    if !data_path.exists() {
+        eprintln!("Skipping test: reference directory not found");
+        return;
+    }
+
+    let engine = LicenseDetectionEngine::new(&data_path).expect("Failed to create engine");
+
+    // Test with exact rule text
+    let exact_text = "distributed under the IBM Public License (IPL).";
+    let detections = engine.detect(exact_text, false).expect("Detection failed");
+
+    eprintln!("Exact text match:");
+    for d in &detections {
+        let expr = d.license_expression.as_deref().unwrap_or("none");
+        let coverage = d.matches.first().map(|m| m.match_coverage).unwrap_or(0.0);
+        eprintln!("  {} (coverage: {:.1}%)", expr, coverage);
+    }
+
+    // Test with the actual test file text (split across lines)
+    let test_text = "Version 0.7.0 and above will be distributed under the IBM Public\nLicense (IPL). The IPL is an approved open source license";
+    let detections = engine.detect(test_text, false).expect("Detection failed");
+
+    eprintln!("\nTest file text match:");
+    for d in &detections {
+        let expr = d.license_expression.as_deref().unwrap_or("none");
+        let coverage = d.matches.first().map(|m| m.match_coverage).unwrap_or(0.0);
+        eprintln!("  {} (coverage: {:.1}%)", expr, coverage);
+    }
+
+    // Should find ibmpl-1.0
+    let has_ibmpl = detections.iter().any(|d| {
+        d.license_expression
+            .as_deref()
+            .map(|e| e.contains("ibmpl-1.0"))
+            .unwrap_or(false)
+    });
+    assert!(has_ibmpl, "Should detect ibmpl-1.0 in split text");
 }

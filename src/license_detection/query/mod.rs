@@ -1,7 +1,7 @@
 //! Query processing - tokenized input for license matching.
 
 use crate::license_detection::index::LicenseIndex;
-use crate::license_detection::tokenize::{STOPWORDS, tokenize_without_stopwords};
+use crate::license_detection::tokenize::{tokenize_without_stopwords, STOPWORDS};
 use std::collections::{HashMap, HashSet};
 
 /// A span representing a range of token positions.
@@ -287,7 +287,11 @@ impl<'a> Query<'a> {
                         let is_spdx_third = third_three == ["spdx", "license", "identifier"]
                             || third_three == ["spdx", "licence", "identifier"]
                             || third_three == ["licenses", "nuget", "org"];
-                        if is_spdx_third { Some(2) } else { None }
+                        if is_spdx_third {
+                            Some(2)
+                        } else {
+                            None
+                        }
                     } else {
                         None
                     }

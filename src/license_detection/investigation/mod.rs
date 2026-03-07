@@ -53,3 +53,12 @@ mod gpl_412_test;
 
 #[cfg(test)]
 mod aladdin_md5_test;
+
+#[cfg(test)]
+mod gfdl_11_candidate_test;
+
+#[cfg(test)]
+mod flex_readme_test;
+
+#[cfg(test)]
+mod gfdl_scoring_debug_test;

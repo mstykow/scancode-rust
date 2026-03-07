@@ -172,6 +172,12 @@ mod golden_tests {
                     format!("Detection failed for {}: {:?}", self.test_file.display(), e)
                 })?;
 
+            let matches = engine
+                .detect_matches(&text, unknown_licenses)
+                .map_err(|e| {
+                    format!("Detection failed for {}: {:?}", self.test_file.display(), e)
+                })?;
+
             let actual: Vec<&str> = matches
                 .iter()
                 .map(|m| m.license_expression.as_str())

@@ -4,6 +4,8 @@ pub mod aho_match;
 mod detection;
 #[cfg(test)]
 mod investigation;
+#[cfg(test)]
+mod coverage_diagnostic_test;
 
 pub mod expression;
 #[cfg(test)]
