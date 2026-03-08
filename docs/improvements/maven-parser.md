@@ -6,16 +6,17 @@
 
 ## Summary
 
-The Maven POM parser in scancode-rust now improves on the Python reference in eight important areas:
+The Maven POM parser in scancode-rust now improves on the Python reference in nine important areas:
 
 1. **🔍 Enhanced Extraction**: description handling now matches Maven `name` + `description` semantics without duplicating identical values
 2. **✨ New Feature**: `dependencyManagement` entries are surfaced as dependency records instead of being preserved only as opaque metadata
 3. **✨ New Feature**: package qualifiers, source package PURLs, and packaging-aware download URLs are emitted for Maven packages
 4. **✨ New Feature**: relocation metadata from `distributionManagement.relocation` is extracted and preserved
-5. **🐛 Bug Fix**: extracted license statements are rendered as structured Maven license records instead of flattened display text
-6. **🐛 Bug Fix**: organization parties use the correct `owner` role instead of the Python typo tracked by issue #211
-7. **✨ New Feature**: Maven 4.1.0 POMs are accepted and tested
-8. **🔍 Enhanced Extraction**: packaging aliases and property-resolved dependency scope/optional values are normalized after property resolution
+5. **🐛 Bug Fix**: extracted license statements are rendered as structured Maven license records and can include top-level XML license comments
+6. **🐛 Bug Fix**: organization parties use the correct `owner` role and developer parties are regression-tested for the `developer` spelling tracked by issue #211
+7. **✨ New Feature**: nested `META-INF/maven/**` extracted-JAR cases are validated, including the multi-POM safety case
+8. **✨ New Feature**: Maven 4.1.0 POMs are accepted and tested
+9. **🔍 Enhanced Extraction**: packaging aliases and property-resolved dependency scope/optional values are normalized after property resolution
 
 ## Improvement 1: Description De-duplication
 
@@ -80,7 +81,7 @@ Python keeps Maven license records as structured normalized data before license 
 
 ### Rust Behavior
 
-Rust now renders `extracted_license_statement` as structured Maven license records, preserving `name`, `url`, and `comments` when present. This fixes the earlier “weird display” behavior where only the license name survived.
+Rust now renders `extracted_license_statement` as structured Maven license records, preserving `name`, `url`, and `comments` when present. It also promotes top-level licenselike XML comments into the extracted license statement so package-level Maven license output can preserve comment-only declarations that Python still misses.
 
 ## Improvement 6: Correct Owner Party Role
 
@@ -90,9 +91,24 @@ The issue backlog documents a typo/problem around party role handling for Maven 
 
 ### Rust Behavior
 
-Rust now emits organization ownership parties with the correct `owner` role, preserving organization name and URL as structured party data.
+Rust now emits organization ownership parties with the correct `owner` role, preserving organization name and URL as structured party data. The parser also carries explicit regression coverage that Maven developer parties remain spelled `developer`, matching the current Python reference and guarding against the typo reported in issue #211.
 
-## Improvement 7: Maven 4.1.0 Support
+## Improvement 7: Nested META-INF Maven Validation
+
+### Python Behavior
+
+Python treats nested `META-INF/maven/<group>/<artifact>/pom.xml` resources as valid Maven origins for extracted JARs, but avoids assigning the whole archive to one package when multiple nested POMs are present.
+
+### Rust Behavior
+
+Rust now validates both sides of that contract:
+
+- a single nested `META-INF/maven/**/pom.xml` can assemble with sibling `pom.properties` and `META-INF/MANIFEST.MF`
+- multiple nested Maven POMs under the same extracted archive root intentionally skip the nested whole-archive merge, preventing one package from claiming the entire JAR
+
+This makes the extracted-JAR Maven behavior explicit instead of relying on incidental nested-merge behavior.
+
+## Improvement 8: Maven 4.1.0 Support
 
 ### Python Behavior
 
@@ -102,7 +118,7 @@ Python-era assumptions were centered on 4.0.0 POMs.
 
 Rust now explicitly tests and accepts `modelVersion` 4.1.0 POMs, including qualifier-bearing packages, managed imports, and relocation metadata. This keeps the parser compatible with modern Maven metadata.
 
-## Improvement 8: Post-resolution Dependency Normalization
+## Improvement 9: Post-resolution Dependency Normalization
 
 ### Python Behavior
 
