@@ -89,6 +89,9 @@ cargo run --quiet --bin generate-supported-formats && git diff --exit-code docs/
 - Treat parser gaps and assembly gaps separately. If the issue audit shows the remaining problem is parser-only, do not broaden the fix into assembly refactors just because those files are nearby.
 - When a bug fix is believed complete, verify it in two steps: (1) the new targeted regression test proves the behavior, and (2) the ecosystem validation suite still passes.
 
+- Cross-ecosystem parser-golden cleanup PRs are allowed when the work is specifically about removing stale non-license-engine `#[ignore]` coverage gaps. Treat those PRs as coverage-restoration work, not as completion of the ecosystem issue batches below.
+- When such a cleanup PR lands, update ecosystem rows only if the underlying GitHub issue set changed; do not mark an ecosystem `Done` merely because its parser goldens were re-enabled.
+
 ## Ecosystem Workboard
 
 | Order | Ecosystem             | Status      | Issue Set                                                                                                  | Primary Validation                                                                                                                                                                                                                                                                                                                                                             |
