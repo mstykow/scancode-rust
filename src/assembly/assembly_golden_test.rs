@@ -176,6 +176,28 @@ mod tests {
         compare_json_values(&actual_value, &expected_value, "")
     }
 
+    fn assert_npm_nested_fixture_inputs(file_infos: &[FileInfo]) -> Result<(), String> {
+        let expected_paths = vec![
+            ".pnp.cjs".to_string(),
+            "index.js".to_string(),
+            "node_modules/child/index.js".to_string(),
+            "node_modules/child/node_modules/grand/index.js".to_string(),
+            "node_modules/child/node_modules/grand/package.json".to_string(),
+            "node_modules/child/package.json".to_string(),
+            "package.json".to_string(),
+        ];
+        let actual_paths: Vec<String> = file_infos.iter().map(|file| file.path.clone()).collect();
+
+        if actual_paths != expected_paths {
+            return Err(format!(
+                "Unexpected fixture inputs for npm-nested-packages: actual={:?}, expected={:?}",
+                actual_paths, expected_paths
+            ));
+        }
+
+        Ok(())
+    }
+
     /// Recursively compare two JSON values with helpful error messages.
     fn compare_json_values(actual: &Value, expected: &Value, path: &str) -> Result<(), String> {
         match (actual, expected) {
@@ -314,6 +336,11 @@ mod tests {
         }
 
         let mut file_infos = build_file_infos_from_directory(&test_dir)?;
+
+        if test_dir_name == "npm-nested-packages" {
+            assert_npm_nested_fixture_inputs(&file_infos)?;
+        }
+
         let result = assemble(&mut file_infos);
 
         compare_assembly_output(&result, &file_infos, &expected_file)
