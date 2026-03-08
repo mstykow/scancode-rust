@@ -3,14 +3,14 @@
     {
       "datafile_path": "packages/utils/package.json",
       "datasource_id": "npm_package_json",
-      "dependency_uid": "pkg:npm/%40myorg%2Fcore?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "dependency_uid": "pkg:npm/%40myorg/core?uuid=fixed-uid-done-for-testing-5642512d1758",
       "extracted_requirement": "^1.0.0",
       "for_package_uid": "pkg:npm/%40myorg/utils@2.0.0?uuid=fixed-uid-done-for-testing-5642512d1758",
       "is_direct": true,
       "is_optional": false,
       "is_pinned": false,
       "is_runtime": true,
-      "purl": "pkg:npm/%40myorg%2Fcore",
+      "purl": "pkg:npm/%40myorg/core",
       "scope": "dependencies"
     },
     {
