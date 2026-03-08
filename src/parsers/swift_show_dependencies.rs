@@ -18,7 +18,7 @@ use std::path::Path;
 use log::warn;
 use serde::{Deserialize, Serialize};
 
-use crate::models::{DatasourceId, Dependency, PackageData, PackageType};
+use crate::models::{DatasourceId, Dependency, PackageData, PackageType, ResolvedPackage};
 
 use super::PackageParser;
 
@@ -88,61 +88,159 @@ pub(crate) fn parse_swift_show_dependencies(content: &str) -> PackageData {
     };
 
     let dependencies = flatten_dependencies(&data.dependencies);
+    let version = normalize_version(data.version);
+    let homepage_url = normalize_remote_url(data.url);
+    let purl = create_root_purl(data.name.as_deref(), version.as_deref());
 
     PackageData {
         package_type: Some(PACKAGE_TYPE),
         primary_language: Some("Swift".to_string()),
         name: data.name,
-        version: data.version,
-        homepage_url: data.url,
+        version,
+        homepage_url,
         dependencies,
         datasource_id: Some(DatasourceId::SwiftPackageShowDependencies),
+        purl,
         ..Default::default()
     }
 }
 
 fn flatten_dependencies(deps: &[SwiftDependency]) -> Vec<Dependency> {
     let mut result = Vec::new();
-    let mut queue: Vec<(&SwiftDependency, bool)> = deps.iter().map(|d| (d, true)).collect();
-
-    while let Some((dep, is_direct)) = queue.pop() {
-        if let Some(name) = &dep.name {
-            let purl = if let Some(url) = &dep.url {
-                if url.contains("github.com") {
-                    let parts: Vec<&str> = url.trim_end_matches(".git").split('/').collect();
-                    if parts.len() >= 2 {
-                        let owner = parts[parts.len() - 2];
-                        let repo = parts[parts.len() - 1];
-                        Some(format!("pkg:swift/github.com/{}/{}", owner, repo))
-                    } else {
-                        Some(format!("pkg:swift/{}", name))
-                    }
-                } else {
-                    Some(format!("pkg:swift/{}", name))
-                }
-            } else {
-                Some(format!("pkg:swift/{}", name))
-            };
-
-            result.push(Dependency {
-                purl,
-                extracted_requirement: dep.version.clone(),
-                scope: Some("dependencies".to_string()),
-                is_runtime: Some(true),
-                is_optional: Some(false),
-                is_pinned: dep.version.as_ref().map(|v| !v.contains("unspecified")),
-                is_direct: Some(is_direct),
-                resolved_package: None,
-                extra_data: None,
-            });
-        }
-
-        for child in &dep.dependencies {
-            queue.push((child, false));
-        }
+    for dep in deps {
+        flatten_dependency(dep, true, &mut result);
     }
 
     result
+}
+
+fn flatten_dependency(dep: &SwiftDependency, is_direct: bool, result: &mut Vec<Dependency>) {
+    if let Some(dependency) = build_dependency(dep, is_direct) {
+        result.push(dependency);
+    }
+
+    for child in &dep.dependencies {
+        flatten_dependency(child, false, result);
+    }
+}
+
+fn build_dependency(dep: &SwiftDependency, is_direct: bool) -> Option<Dependency> {
+    let name = dep.name.as_ref()?.clone();
+    let version = normalize_version(dep.version.clone());
+    let purl = create_dependency_purl(dep, &name, version.as_deref());
+    let nested_dependencies = dep
+        .dependencies
+        .iter()
+        .filter_map(|child| build_dependency(child, true))
+        .collect();
+
+    Some(Dependency {
+        purl: Some(purl.clone()),
+        extracted_requirement: version.clone(),
+        scope: Some("dependencies".to_string()),
+        is_runtime: Some(false),
+        is_optional: Some(false),
+        is_pinned: Some(version.is_some()),
+        is_direct: Some(is_direct),
+        resolved_package: Some(Box::new(ResolvedPackage {
+            package_type: PACKAGE_TYPE,
+            namespace: extract_namespace(dep.url.as_deref()).unwrap_or_default(),
+            name,
+            version: version.clone().unwrap_or_default(),
+            primary_language: Some("Swift".to_string()),
+            download_url: None,
+            sha1: None,
+            sha256: None,
+            sha512: None,
+            md5: None,
+            is_virtual: true,
+            extra_data: None,
+            dependencies: nested_dependencies,
+            repository_homepage_url: None,
+            repository_download_url: None,
+            api_data_url: None,
+            datasource_id: Some(DatasourceId::SwiftPackageShowDependencies),
+            purl: None,
+        })),
+        extra_data: None,
+    })
+}
+
+fn create_dependency_purl(
+    dep: &SwiftDependency,
+    fallback_name: &str,
+    version: Option<&str>,
+) -> String {
+    if let Some(url) = dep.url.as_deref()
+        && let Some((namespace, name)) = parse_url_namespace_and_name(url)
+    {
+        let mut purl = format!("pkg:swift/{}/{}", namespace, name);
+        if let Some(version) = version {
+            purl.push('@');
+            purl.push_str(version);
+        }
+        return purl;
+    }
+
+    let mut purl = format!("pkg:swift/{}", fallback_name);
+    if let Some(version) = version {
+        purl.push('@');
+        purl.push_str(version);
+    }
+    purl
+}
+
+fn create_root_purl(name: Option<&str>, version: Option<&str>) -> Option<String> {
+    let name = name?.trim();
+    if name.is_empty() {
+        return None;
+    }
+
+    let mut purl = format!("pkg:swift/{}", name);
+    if let Some(version) = version {
+        purl.push('@');
+        purl.push_str(version);
+    }
+    Some(purl)
+}
+
+fn normalize_version(version: Option<String>) -> Option<String> {
+    version.and_then(|v| {
+        let trimmed = v.trim();
+        if trimmed.is_empty() || trimmed == "unspecified" {
+            None
+        } else {
+            Some(trimmed.to_string())
+        }
+    })
+}
+
+fn normalize_remote_url(url: Option<String>) -> Option<String> {
+    url.and_then(|value| {
+        let trimmed = value.trim();
+        if trimmed.starts_with("http://") || trimmed.starts_with("https://") {
+            Some(trimmed.to_string())
+        } else {
+            None
+        }
+    })
+}
+
+fn extract_namespace(url: Option<&str>) -> Option<String> {
+    parse_url_namespace_and_name(url?).map(|(namespace, _)| namespace)
+}
+
+fn parse_url_namespace_and_name(url: &str) -> Option<(String, String)> {
+    let trimmed = url.trim().trim_end_matches('/').trim_end_matches(".git");
+    let without_scheme = trimmed
+        .strip_prefix("https://")
+        .or_else(|| trimmed.strip_prefix("http://"))?;
+    let mut parts = without_scheme.split('/');
+    let host = parts.next()?;
+    let owner = parts.next()?;
+    let repo = parts.next()?;
+
+    Some((format!("{}/{}", host, owner), repo.to_string()))
 }
 
 crate::register_parser!(
