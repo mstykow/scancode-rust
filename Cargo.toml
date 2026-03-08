@@ -75,7 +75,7 @@ inventory = "0.3.22"
 sha2 = "0.10.9"
 tar = "0.4.44"
 sys-info = "0.9.1"
-toml = "1.0.4"
+toml = "1.0.6"
 url = "2.5.8"
 quick-xml = "0.39.2"
 tera = { version = "1.20.1", default-features = false }
