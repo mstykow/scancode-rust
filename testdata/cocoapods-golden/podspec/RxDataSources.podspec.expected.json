@@ -13,7 +13,7 @@
       {
         "type": "person",
         "role": "author",
-        "name": "Krunoslav Zaher ",
+        "name": "Krunoslav Zaher",
         "email": "krunoslav.zaher@gmail.com",
         "url": null
       }
@@ -67,7 +67,41 @@
     "is_private": false,
     "is_virtual": false,
     "extra_data": {},
-    "dependencies": [],
+    "dependencies": [
+      {
+        "purl": "pkg:cocoapods/Differentiator",
+        "extracted_requirement": "~> 4.0",
+        "scope": "runtime",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true,
+        "resolved_package": {},
+        "extra_data": {}
+      },
+      {
+        "purl": "pkg:cocoapods/RxSwift",
+        "extracted_requirement": "~> 5.0",
+        "scope": "runtime",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true,
+        "resolved_package": {},
+        "extra_data": {}
+      },
+      {
+        "purl": "pkg:cocoapods/RxCocoa",
+        "extracted_requirement": "~> 5.0",
+        "scope": "runtime",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true,
+        "resolved_package": {},
+        "extra_data": {}
+      }
+    ],
     "repository_homepage_url": "https://cocoapods.org/pods/RxDataSources",
     "repository_download_url": "https://github.com/RxSwiftCommunity/RxDataSources/archive/refs/tags/4.0.1.zip",
     "api_data_url": "https://raw.githubusercontent.com/CocoaPods/Specs/blob/master/Specs/9/a/4/RxDataSources/4.0.1/RxDataSources.podspec.json",
