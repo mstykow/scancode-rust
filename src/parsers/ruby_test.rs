@@ -712,8 +712,9 @@ gem "specific-range", ">= 1.0.0", "< 1.5.0", "!= 1.2.3"
         assert!(
             rails.scope.is_none()
                 || rails.scope.as_deref() == Some("runtime")
-                || rails.scope.as_deref() == Some("dependencies"),
-            "Runtime dep scope should be None, 'runtime', or 'dependencies'"
+                || rails.scope.as_deref() == Some("dependencies")
+                || rails.scope.as_deref() == Some("dependency"),
+            "Runtime dep scope should be None, 'runtime', 'dependencies', or 'dependency'"
         );
 
         // Check development dependency

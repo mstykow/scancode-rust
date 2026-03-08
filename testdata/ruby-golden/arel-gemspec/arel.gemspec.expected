@@ -20,21 +20,21 @@
       {
         "type": "person",
         "role": "author",
-        "name": " Bryan Halmkamp",
+        "name": "Bryan Halmkamp",
         "email": null,
         "url": null
       },
       {
         "type": "person",
         "role": "author",
-        "name": " Emilio Tagua",
+        "name": "Emilio Tagua",
         "email": null,
         "url": null
       },
       {
         "type": "person",
         "role": "author",
-        "name": " Nick Kallen",
+        "name": "Nick Kallen",
         "email": null,
         "url": null
       },
@@ -49,21 +49,21 @@
         "type": "person",
         "role": "author",
         "name": null,
-        "email": " bryan@brynary.com",
+        "email": "bryan@brynary.com",
         "url": null
       },
       {
         "type": "person",
         "role": "author",
         "name": null,
-        "email": " miloops@gmail.com",
+        "email": "miloops@gmail.com",
         "url": null
       },
       {
         "type": "person",
         "role": "author",
         "name": null,
-        "email": " nick@example.org",
+        "email": "nick@example.org",
         "url": null
       }
     ],
