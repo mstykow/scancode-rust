@@ -93,30 +93,32 @@ mod tests {
         let vercel_dep = pkg
             .dependencies
             .iter()
-            .find(|d| d.purl.as_deref() == Some("pkg:swift/github.com/swift-cloud/Vercel"));
+            .find(|d| d.purl.as_deref() == Some("pkg:swift/github.com/swift-cloud/Vercel@1.15.2"));
         assert!(vercel_dep.is_some());
         let vercel = vercel_dep.unwrap();
         assert_eq!(vercel.extracted_requirement.as_deref(), Some("1.15.2"));
         assert_eq!(vercel.is_direct, Some(true));
-        assert_eq!(vercel.is_runtime, Some(true));
+        assert_eq!(vercel.is_runtime, Some(false));
 
         let vapor_dep = pkg
             .dependencies
             .iter()
-            .find(|d| d.purl.as_deref() == Some("pkg:swift/github.com/vapor/vapor"));
+            .find(|d| d.purl.as_deref() == Some("pkg:swift/github.com/vapor/vapor@4.79.0"));
         assert!(vapor_dep.is_some());
         let vapor = vapor_dep.unwrap();
         assert_eq!(vapor.extracted_requirement.as_deref(), Some("4.79.0"));
         assert_eq!(vapor.is_direct, Some(false));
+        assert_eq!(vapor.is_runtime, Some(false));
 
         let nio_dep = pkg
             .dependencies
             .iter()
-            .find(|d| d.purl.as_deref() == Some("pkg:swift/github.com/apple/swift-nio"));
+            .find(|d| d.purl.as_deref() == Some("pkg:swift/github.com/apple/swift-nio@2.58.0"));
         assert!(nio_dep.is_some());
         let nio = nio_dep.unwrap();
         assert_eq!(nio.extracted_requirement.as_deref(), Some("2.58.0"));
         assert_eq!(nio.is_direct, Some(true));
+        assert_eq!(nio.is_runtime, Some(false));
     }
 
     #[test]
