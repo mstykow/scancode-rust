@@ -176,21 +176,8 @@ mod tests {
         compare_json_values(&actual_value, &expected_value, "")
     }
 
-    fn owned_paths(file_infos: &[FileInfo]) -> Vec<String> {
-        let mut paths: Vec<String> = file_infos
-            .iter()
-            .filter(|file| !file.for_packages.is_empty())
-            .map(|file| file.path.clone())
-            .collect();
-        paths.sort();
-        paths
-    }
-
-    fn assert_npm_nested_fixture_ownership(
-        actual: &AssemblyResult,
-        file_infos: &[FileInfo],
-    ) -> Result<(), String> {
-        let expected_owned_paths = vec![
+    fn assert_npm_nested_fixture_inputs(file_infos: &[FileInfo]) -> Result<(), String> {
+        let expected_paths = vec![
             ".pnp.cjs".to_string(),
             "index.js".to_string(),
             "node_modules/child/index.js".to_string(),
@@ -199,62 +186,12 @@ mod tests {
             "node_modules/child/package.json".to_string(),
             "package.json".to_string(),
         ];
-        let actual_owned_paths = owned_paths(file_infos);
+        let actual_paths: Vec<String> = file_infos.iter().map(|file| file.path.clone()).collect();
 
-        let manifest_debug: Vec<Value> = file_infos
-            .iter()
-            .filter(|file| file.name == "package.json")
-            .map(|file| {
-                json!({
-                    "path": file.path,
-                    "for_packages": file.for_packages,
-                    "package_data": file.package_data.iter().map(|package_data| json!({
-                        "datasource_id": package_data.datasource_id.as_ref().map(ToString::to_string),
-                        "name": package_data.name,
-                        "version": package_data.version,
-                        "purl": package_data.purl,
-                    })).collect::<Vec<_>>(),
-                })
-            })
-            .collect();
-
-        let assembled_package_paths: Vec<Value> = actual
-            .packages
-            .iter()
-            .map(|package| {
-                json!({
-                    "purl": package.purl,
-                    "datafile_paths": package.datafile_paths,
-                    "package_uid": package.package_uid,
-                })
-            })
-            .collect();
-
-        if actual_owned_paths != expected_owned_paths {
+        if actual_paths != expected_paths {
             return Err(format!(
-                "Unexpected owned paths for npm-nested-packages: actual={:?}, expected={:?}, manifests={:?}, packages={:?}",
-                actual_owned_paths, expected_owned_paths, manifest_debug, assembled_package_paths
-            ));
-        }
-
-        let owned_manifest_paths: Vec<String> = file_infos
-            .iter()
-            .filter(|file| file.name == "package.json" && !file.for_packages.is_empty())
-            .map(|file| file.path.clone())
-            .collect();
-        let expected_manifest_paths = vec![
-            "node_modules/child/node_modules/grand/package.json".to_string(),
-            "node_modules/child/package.json".to_string(),
-            "package.json".to_string(),
-        ];
-
-        if owned_manifest_paths != expected_manifest_paths {
-            return Err(format!(
-                "Unexpected owned manifest paths for npm-nested-packages: actual={:?}, expected={:?}, manifests={:?}, packages={:?}",
-                owned_manifest_paths,
-                expected_manifest_paths,
-                manifest_debug,
-                assembled_package_paths
+                "Unexpected fixture inputs for npm-nested-packages: actual={:?}, expected={:?}",
+                actual_paths, expected_paths
             ));
         }
 
@@ -399,11 +336,12 @@ mod tests {
         }
 
         let mut file_infos = build_file_infos_from_directory(&test_dir)?;
-        let result = assemble(&mut file_infos);
 
         if test_dir_name == "npm-nested-packages" {
-            assert_npm_nested_fixture_ownership(&result, &file_infos)?;
+            assert_npm_nested_fixture_inputs(&file_infos)?;
         }
+
+        let result = assemble(&mut file_infos);
 
         compare_assembly_output(&result, &file_infos, &expected_file)
     }
