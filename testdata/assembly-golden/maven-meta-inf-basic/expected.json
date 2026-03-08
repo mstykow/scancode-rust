@@ -24,11 +24,11 @@
     {
       "api_data_url": "https://repo1.maven.org/maven2/com/example/nested-lib/1.0.0/nested-lib-1.0.0.pom",
       "datafile_paths": [
-        "META-INF/maven/com.example/nested-lib/pom.xml",
+        "META-INF/MANIFEST.MF",
         "META-INF/maven/com.example/nested-lib/pom.properties",
-        "META-INF/MANIFEST.MF"
+        "META-INF/maven/com.example/nested-lib/pom.xml"
       ],
-      "datasource_ids": ["maven_pom", "maven_pom_properties", "java_jar_manifest"],
+      "datasource_ids": ["java_jar_manifest", "maven_pom", "maven_pom_properties"],
       "description": "Nested Library\nNarrative from nested pom",
       "extracted_license_statement": "- license:\n    name: Apache-2.0\n",
       "name": "nested-lib",
