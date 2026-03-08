@@ -127,8 +127,13 @@ pub(super) fn is_false_positive(matches: &[LicenseMatch]) -> bool {
         return true;
     }
 
-    // Check 3: Late matches (after line 1000) with short rules and low relevance
-    if start_line > FALSE_POSITIVE_START_LINE_THRESHOLD && all_rule_length_one && all_low_relevance
+    // Check 3: Late matches (after line 1000) with short rules (<=3 tokens) and low relevance
+    // Python: any(rule_length <= 3) not all(rule_length == 1)
+    if all_low_relevance
+        && start_line > FALSE_POSITIVE_START_LINE_THRESHOLD
+        && rule_length_values
+            .iter()
+            .any(|&l| l <= FALSE_POSITIVE_RULE_LENGTH_THRESHOLD)
     {
         return true;
     }
@@ -310,32 +315,47 @@ pub(super) fn analyze_detection(matches: &[LicenseMatch], package_license: bool)
         return "";
     }
 
-    // Check for undetected matches
+    // Check 1: Undetected matches
     if is_undetected_license_matches(matches) {
         return "undetected-license-matches";
     }
 
-    // Check for perfect matches
-    if matches.iter().all(|m| m.match_coverage >= 99.99) {
-        return "";
+    // Check 2: Unknown intro before detection
+    if has_unknown_intro_before_detection(matches) {
+        return "unknown-intro-followed-by-match";
     }
 
-    // Check for false positive (unless package_license is set)
+    // Check 3: References to local files
+    if has_references_to_local_files(matches) {
+        return "unknown-reference-to-local-file";
+    }
+
+    // Check 4: False positive (unless package_license is set)
     if !package_license && is_false_positive(matches) {
         return "false-positive";
     }
 
-    // Check for license clues
-    if has_correct_license_clue_matches(matches) {
+    // Check 5: License clues
+    if !package_license && has_correct_license_clue_matches(matches) {
         return "license-clues";
     }
 
-    // Check for unknown matches
+    // Check 6: Perfect detection (correct AND no unknowns AND no extra words)
+    if is_correct_detection_non_unknown(matches) {
+        return "";
+    }
+
+    // Check 7: Unknown matches
     if has_unknown_matches(matches) {
         return "unknown-match";
     }
 
-    // Check for imperfect coverage
+    // Check 8: Low quality matches
+    if !package_license && is_low_quality_matches(matches) {
+        return "low-quality-match-fragments";
+    }
+
+    // Check 9: Imperfect coverage
     if matches
         .iter()
         .any(|m| m.match_coverage < IMPERFECT_MATCH_COVERAGE_THR - 0.01)
@@ -343,12 +363,18 @@ pub(super) fn analyze_detection(matches: &[LicenseMatch], package_license: bool)
         return "imperfect-match-coverage";
     }
 
-    // Check for extra words
+    // Check 10: Extra words
     if has_extra_words(matches) {
         return "has-extra-words";
     }
 
     ""
+}
+
+fn is_correct_detection_non_unknown(matches: &[LicenseMatch]) -> bool {
+    matches.iter().all(|m| m.match_coverage >= 99.99)
+        && !has_unknown_matches(matches)
+        && !has_extra_words(matches)
 }
 
 /// Compute detection score from matches.
