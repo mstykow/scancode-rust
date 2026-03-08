@@ -2,7 +2,7 @@
   {
     "type": "swift",
     "namespace": null,
-    "name": "MapboxMaps",
+    "name": null,
     "version": null,
     "qualifiers": {},
     "subpath": null,
@@ -35,41 +35,11 @@
     "file_references": [],
     "is_private": false,
     "is_virtual": false,
-    "extra_data": {
-      "platforms": [
-        {
-          "options": [],
-          "platformName": "ios",
-          "version": "12.0"
-        },
-        {
-          "options": [],
-          "platformName": "macos",
-          "version": "10.15"
-        },
-        {
-          "options": [],
-          "platformName": "visionos",
-          "version": "1.0"
-        }
-      ],
-      "swift_tools_version": "5.9.0"
-    },
+    "extra_data": {},
     "dependencies": [
       {
-        "purl": "pkg:swift/github.com/mapbox/turf-swift",
-        "extracted_requirement": "vers:swift/>=2.8.0|<3.0.0",
-        "scope": "dependencies",
-        "is_runtime": true,
-        "is_optional": false,
-        "is_pinned": false,
-        "is_direct": true,
-        "resolved_package": {},
-        "extra_data": {}
-      },
-      {
-        "purl": "pkg:swift/github.com/mapbox/mapbox-core-maps-ios@11.4.0-rc.2",
-        "extracted_requirement": "11.4.0-rc.2",
+        "purl": "pkg:swift/github.com/swift-server/async-http-client@1.19.0",
+        "extracted_requirement": "1.19.0",
         "scope": "dependencies",
         "is_runtime": true,
         "is_optional": false,
@@ -79,8 +49,41 @@
         "extra_data": {}
       },
       {
-        "purl": "pkg:swift/github.com/mapbox/mapbox-common-ios@24.4.0-rc.2",
-        "extracted_requirement": "24.4.0-rc.2",
+        "purl": "pkg:swift/github.com/apple/swift-atomics@1.1.0",
+        "extracted_requirement": "1.1.0",
+        "scope": "dependencies",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": true,
+        "resolved_package": {},
+        "extra_data": {}
+      },
+      {
+        "purl": "pkg:swift/github.com/apple/swift-nio@2.58.0",
+        "extracted_requirement": "2.58.0",
+        "scope": "dependencies",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": true,
+        "resolved_package": {},
+        "extra_data": {}
+      },
+      {
+        "purl": "pkg:swift/github.com/vapor/vapor@4.79.0",
+        "extracted_requirement": "4.79.0",
+        "scope": "dependencies",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": true,
+        "resolved_package": {},
+        "extra_data": {}
+      },
+      {
+        "purl": "pkg:swift/github.com/swift-cloud/Vercel@1.15.2",
+        "extracted_requirement": "1.15.2",
         "scope": "dependencies",
         "is_runtime": true,
         "is_optional": false,
@@ -93,7 +96,7 @@
     "repository_homepage_url": null,
     "repository_download_url": null,
     "api_data_url": null,
-    "datasource_id": "swift_package_manifest_json",
-    "purl": "pkg:swift/MapboxMaps"
+    "datasource_id": "swift_package_resolved",
+    "purl": null
   }
 ]
