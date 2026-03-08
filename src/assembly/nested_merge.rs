@@ -25,6 +25,10 @@ pub fn assemble_nested_patterns(
         return None;
     }
 
+    if should_skip_nested_merge(&package_root, &sibling_indices, files, config) {
+        return None;
+    }
+
     assemble_from_indices(config, files, &sibling_indices)
 }
 
@@ -104,6 +108,33 @@ fn find_nested_siblings(root: &Path, files: &[FileInfo], config: &AssemblerConfi
         })
         .map(|(idx, _)| idx)
         .collect()
+}
+
+fn should_skip_nested_merge(
+    root: &Path,
+    indices: &[usize],
+    files: &[FileInfo],
+    config: &AssemblerConfig,
+) -> bool {
+    if !config
+        .datasource_ids
+        .contains(&crate::models::DatasourceId::MavenPom)
+    {
+        return false;
+    }
+
+    let nested_pom_count = indices
+        .iter()
+        .filter(|&&idx| {
+            files[idx].package_data.iter().any(|pkg_data| {
+                pkg_data.datasource_id == Some(crate::models::DatasourceId::MavenPom)
+                    && Path::new(&files[idx].path).starts_with(root)
+                    && files[idx].path.contains("META-INF/maven/")
+            })
+        })
+        .count();
+
+    nested_pom_count > 1
 }
 
 fn matches_nested_pattern(file_path: &str, pattern: &str) -> bool {
@@ -204,8 +235,52 @@ fn is_handled_by(pkg_data: &PackageData, config: &AssemblerConfig) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::Path;
 
-    use crate::models::DatasourceId;
+    use crate::models::{DatasourceId, FileType};
+
+    fn test_file(path: &str, package_data: Vec<PackageData>) -> FileInfo {
+        let file_name = Path::new(path)
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or_default()
+            .to_string();
+        let base_name = Path::new(&file_name)
+            .file_stem()
+            .and_then(|name| name.to_str())
+            .unwrap_or_default()
+            .to_string();
+        let extension = Path::new(&file_name)
+            .extension()
+            .and_then(|ext| ext.to_str())
+            .unwrap_or_default()
+            .to_string();
+
+        FileInfo::new(
+            file_name,
+            base_name,
+            extension,
+            path.to_string(),
+            FileType::File,
+            Some("text/plain".to_string()),
+            0,
+            None,
+            None,
+            None,
+            None,
+            None,
+            package_data,
+            None,
+            vec![],
+            vec![],
+            vec![],
+            vec![],
+            vec![],
+            vec![],
+            vec![],
+            vec![],
+        )
+    }
 
     #[test]
     fn test_has_nested_patterns() {
@@ -364,5 +439,64 @@ mod tests {
 
         let root = find_package_root(&[0, 1], &files);
         assert_eq!(root, Some(PathBuf::from("my-pkg")));
+    }
+
+    #[test]
+    fn test_maven_nested_merge_skips_multiple_nested_poms() {
+        let config = AssemblerConfig {
+            datasource_ids: &[
+                DatasourceId::MavenPom,
+                DatasourceId::MavenPomProperties,
+                DatasourceId::JavaJarManifest,
+            ],
+            sibling_file_patterns: &["pom.xml", "pom.properties", "**/META-INF/MANIFEST.MF"],
+            mode: crate::assembly::AssemblyMode::SiblingMerge,
+        };
+
+        let files = vec![
+            test_file(
+                "uberjar/META-INF/MANIFEST.MF",
+                vec![PackageData {
+                    datasource_id: Some(DatasourceId::JavaJarManifest),
+                    package_type: Some(crate::models::PackageType::Maven),
+                    primary_language: Some("Java".to_string()),
+                    purl: Some("pkg:maven/com.example/app-one@1.0.0".to_string()),
+                    name: Some("app-one".to_string()),
+                    namespace: Some("com.example".to_string()),
+                    version: Some("1.0.0".to_string()),
+                    ..Default::default()
+                }],
+            ),
+            test_file(
+                "uberjar/META-INF/maven/com.example/app-one/pom.xml",
+                vec![PackageData {
+                    datasource_id: Some(DatasourceId::MavenPom),
+                    package_type: Some(crate::models::PackageType::Maven),
+                    primary_language: Some("Java".to_string()),
+                    purl: Some("pkg:maven/com.example/app-one@1.0.0".to_string()),
+                    name: Some("app-one".to_string()),
+                    namespace: Some("com.example".to_string()),
+                    version: Some("1.0.0".to_string()),
+                    ..Default::default()
+                }],
+            ),
+            test_file(
+                "uberjar/META-INF/maven/com.example/app-two/pom.xml",
+                vec![PackageData {
+                    datasource_id: Some(DatasourceId::MavenPom),
+                    package_type: Some(crate::models::PackageType::Maven),
+                    primary_language: Some("Java".to_string()),
+                    purl: Some("pkg:maven/com.example/app-two@2.0.0".to_string()),
+                    name: Some("app-two".to_string()),
+                    namespace: Some("com.example".to_string()),
+                    version: Some("2.0.0".to_string()),
+                    ..Default::default()
+                }],
+            ),
+        ];
+
+        let assembled = assemble_nested_patterns(&files, &config);
+
+        assert!(assembled.is_none());
     }
 }
