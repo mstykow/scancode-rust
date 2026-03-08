@@ -166,6 +166,7 @@ pub enum DatasourceId {
 
     // ── Maven ──
     MavenPom,
+    MavenPomProperties,
 
     // ── Microsoft ──
     MicrosoftCabinet,
@@ -374,6 +375,7 @@ impl DatasourceId {
 
             // Maven
             Self::MavenPom => "maven_pom",
+            Self::MavenPomProperties => "maven_pom_properties",
 
             // Microsoft
             Self::MicrosoftCabinet => "microsoft_cabinet",

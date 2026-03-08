@@ -436,6 +436,25 @@ fn build_license_statement(licenses: &[MavenLicenseEntry]) -> Option<String> {
     }
 }
 
+fn is_license_like_comment(comment: &str) -> bool {
+    let lowered = comment.to_ascii_lowercase();
+    [
+        "license",
+        "licensed",
+        "copyright",
+        "spdx",
+        "apache",
+        "mit",
+        "bsd",
+        "gpl",
+        "lgpl",
+        "mozilla public",
+        "eclipse public",
+    ]
+    .iter()
+    .any(|marker| lowered.contains(marker))
+}
+
 fn dependency_extra_data(
     dependency: &MavenDependencyData,
 ) -> Option<HashMap<String, serde_json::Value>> {
@@ -700,6 +719,7 @@ impl PackageParser for MavenParser {
         let mut current_dependency_data: Option<MavenDependencyData> = None;
 
         let mut licenses: Vec<MavenLicenseEntry> = Vec::new();
+        let mut xml_license_comments: Vec<String> = Vec::new();
         let mut current_license: Option<MavenLicenseEntry> = None;
         let mut inception_year = None;
         let mut scm_connection = None;
@@ -1158,6 +1178,15 @@ impl PackageParser for MavenParser {
                         }
                     }
                 }
+                Ok(Event::Comment(e)) => {
+                    let comment = e.decode().unwrap_or_default().trim().to_string();
+                    if current_element.is_empty()
+                        && !comment.is_empty()
+                        && is_license_like_comment(&comment)
+                    {
+                        xml_license_comments.push(comment);
+                    }
+                }
                 Ok(Event::End(e)) => {
                     if !current_element.is_empty() {
                         current_element.pop();
@@ -1363,12 +1392,23 @@ impl PackageParser for MavenParser {
         resolve_maps(&mut resolver, &mut repositories);
         resolve_maps(&mut resolver, &mut plugin_repositories);
         resolve_maps(&mut resolver, &mut mailing_lists);
+        for comment in &mut xml_license_comments {
+            *comment = resolver.resolve_text(comment, 0);
+        }
         for dependency in &mut dependency_management_entries {
             resolve_dependency_data(&mut resolver, dependency);
         }
         resolve_dependency_data(&mut resolver, &mut relocation);
         for license in &mut licenses {
             resolve_license_entry(&mut resolver, license);
+        }
+        for comment in xml_license_comments {
+            if !comment.trim().is_empty() {
+                licenses.push(MavenLicenseEntry {
+                    comments: Some(comment),
+                    ..Default::default()
+                });
+            }
         }
 
         for (dependency, coords) in package_data
@@ -1432,6 +1472,22 @@ impl PackageParser for MavenParser {
             (None, Some(description)) => Some(description.to_string()),
             (None, None) => None,
         };
+
+        if path.to_string_lossy().contains("META-INF/maven/") {
+            let path_str = path.to_string_lossy();
+            if let Some(meta_inf_pos) = path_str.find("META-INF/maven/") {
+                let after_maven = &path_str[meta_inf_pos + "META-INF/maven/".len()..];
+                let parts: Vec<&str> = after_maven.split('/').collect();
+                if parts.len() >= 2 {
+                    if package_data.namespace.is_none() {
+                        package_data.namespace = Some(parts[0].to_string());
+                    }
+                    if package_data.name.is_none() {
+                        package_data.name = Some(parts[1].to_string());
+                    }
+                }
+            }
+        }
 
         // Construct PURL from parsed data
         if let (Some(group_id), Some(artifact_id), Some(version)) = (
@@ -1828,12 +1884,19 @@ fn parse_pom_properties(path: &Path) -> PackageData {
         Ok(content) => content,
         Err(e) => {
             warn!("Failed to read pom.properties at {:?}: {}", path, e);
-            return default_package_data();
+            return PackageData {
+                package_type: Some(PackageType::Maven),
+                primary_language: Some("Java".to_string()),
+                datasource_id: Some(DatasourceId::MavenPomProperties),
+                ..Default::default()
+            };
         }
     };
 
     let mut package_data = default_package_data();
     package_data.package_type = Some(PackageType::Maven);
+    package_data.primary_language = Some("Java".to_string());
+    package_data.datasource_id = Some(DatasourceId::MavenPomProperties);
 
     let mut group_id: Option<String> = None;
     let mut artifact_id: Option<String> = None;
