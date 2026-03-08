@@ -379,6 +379,10 @@ mod tests {
         let package_data = MavenParser::extract_first_package(&pom_props_path);
 
         assert_eq!(package_data.package_type, Some(PackageType::Maven));
+        assert_eq!(
+            package_data.datasource_id,
+            Some(DatasourceId::MavenPomProperties)
+        );
         assert_eq!(package_data.namespace, Some("com.example.test".to_string()));
         assert_eq!(package_data.name, Some("test-library".to_string()));
         assert_eq!(package_data.version, Some("1.2.3".to_string()));
@@ -897,6 +901,96 @@ mod tests {
         assert_eq!(
             package_data.source_packages,
             vec!["pkg:maven/com.example/rich-metadata@1.2.3?classifier=sources".to_string()]
+        );
+    }
+
+    #[test]
+    fn test_extract_license_statement_includes_xml_license_comments() {
+        let content = r#"
+<!-- Licensed under the Apache License, Version 2.0 -->
+<project>
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>com.example</groupId>
+    <artifactId>commented-license</artifactId>
+    <version>1.0.0</version>
+</project>
+        "#;
+
+        let (_temp_dir, pom_path) = create_temp_pom_xml(content);
+        let package_data = MavenParser::extract_first_package(&pom_path);
+
+        assert_eq!(
+            package_data.extracted_license_statement,
+            Some(
+                "- license:\n    comments: Licensed under the Apache License, Version 2.0\n"
+                    .to_string()
+            )
+        );
+    }
+
+    #[test]
+    fn test_nested_meta_inf_pom_path_supplies_namespace() {
+        let temp_dir = TempDir::new().expect("Failed to create temp directory");
+        let nested_dir = temp_dir
+            .path()
+            .join("META-INF/maven/org.example/nested-lib");
+        fs::create_dir_all(&nested_dir).expect("Failed to create nested META-INF directory");
+
+        let pom_path = nested_dir.join("pom.xml");
+        fs::write(
+            &pom_path,
+            r#"
+<project>
+    <modelVersion>4.0.0</modelVersion>
+    <artifactId>nested-lib</artifactId>
+    <version>1.0.0</version>
+</project>
+            "#,
+        )
+        .expect("Failed to write nested pom.xml");
+
+        let package_data = MavenParser::extract_first_package(&pom_path);
+
+        assert_eq!(package_data.datasource_id, Some(DatasourceId::MavenPom));
+        assert_eq!(package_data.namespace, Some("org.example".to_string()));
+        assert_eq!(package_data.name, Some("nested-lib".to_string()));
+        assert_eq!(package_data.version, Some("1.0.0".to_string()));
+        assert_eq!(
+            package_data.purl,
+            Some("pkg:maven/org.example/nested-lib@1.0.0".to_string())
+        );
+    }
+
+    #[test]
+    fn test_developer_role_spelling_matches_python_reference() {
+        let content = r#"
+<project>
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>com.example</groupId>
+    <artifactId>role-spelling</artifactId>
+    <version>1.0.0</version>
+    <developers>
+        <developer>
+            <name>Example Dev</name>
+        </developer>
+    </developers>
+</project>
+        "#;
+
+        let (_temp_dir, pom_path) = create_temp_pom_xml(content);
+        let package_data = MavenParser::extract_first_package(&pom_path);
+
+        assert!(
+            package_data
+                .parties
+                .iter()
+                .any(|party| party.role.as_deref() == Some("developer"))
+        );
+        assert!(
+            package_data
+                .parties
+                .iter()
+                .all(|party| party.role.as_deref() != Some("developper"))
         );
     }
 
