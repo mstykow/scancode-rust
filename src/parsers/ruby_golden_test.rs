@@ -6,7 +6,6 @@ mod golden_tests {
     use std::path::PathBuf;
 
     #[test]
-    #[ignore = "Requires: (1) Multi-line %q{} string literal parsing, (2) Conditional dependency extraction from if/else blocks"]
     fn test_golden_arel_gemspec() {
         let test_file = PathBuf::from("testdata/ruby-golden/arel-gemspec/arel.gemspec");
         let expected_file =
