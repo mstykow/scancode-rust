@@ -15,7 +15,7 @@ The current npm and Yarn enhancement pass in scancode-rust improves several beha
 
 ## Python Reference Status
 
-Relevant reference signals in `reference/scancode-toolkit/src/packagedcode/npm.py`:
+Relevant reference signals from the upstream ScanCode npm/Yarn packagedcode implementation:
 
 - Python still carries TODO notes around newer npm/Yarn lockfile support and `pnp.js` / pnpm lockfile handling.
 - Python's npm assembly relies on `walk_npm()` to assign resources while skipping first-level `node_modules`.
@@ -70,25 +70,20 @@ When a sibling `package.json` exists but is not packageable, Rust now keeps lock
 
 The assembly phase also sorts `datafile_paths`, `datasource_ids`, and `for_packages`, so workspace and sibling-merge output stays deterministic across runs.
 
-## Files
+## Primary Areas Affected
 
-- `src/parsers/npm.rs`
-- `src/parsers/npm_lock.rs`
-- `src/parsers/yarn_lock.rs`
-- `src/assembly/mod.rs`
-- `src/assembly/sibling_merge.rs`
-- `src/parsers/npm_test.rs`
-- `src/parsers/npm_lock_test.rs`
-- `src/parsers/yarn_lock_test.rs`
-- `src/assembly/assembly_golden_test.rs`
-- `testdata/assembly-golden/npm-nested-packages/`
+- npm manifest parsing and metadata normalization
+- npm lockfile root identity and dependency-spec extraction
+- Yarn lockfile dependency-scope inference
+- npm/Yarn assembly behavior for sibling manifests, workspaces, deterministic ordering, and nested package ownership
+- Parser and assembly regression coverage for the affected behaviors
 
 ## Verification
 
 This enhancement set is covered by:
 
-- npm parser unit tests
-- npm lockfile unit tests
-- Yarn lockfile unit tests
-- npm parser golden tests
-- npm workspace, pnpm workspace, and nested package assembly golden tests
+- npm parser-focused unit tests
+- npm lockfile-focused unit tests
+- Yarn lockfile-focused unit tests
+- npm parser golden coverage
+- npm workspace, pnpm workspace, and nested package assembly golden coverage
