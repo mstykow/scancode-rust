@@ -322,7 +322,7 @@ fn build_dependencies_for_resolved(
 
             let resolved_version = dep_data.versions_by_base_purl.get(&base_purl);
 
-            let final_version = version.or_else(|| resolved_version.cloned());
+            let final_version = resolved_version.cloned().or(version);
             let final_requirement = requirement.or_else(|| resolved_version.cloned());
 
             let purl = create_cocoapods_purl(namespace.as_deref(), &name, final_version.as_deref());
