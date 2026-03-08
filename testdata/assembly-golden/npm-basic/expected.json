@@ -14,25 +14,12 @@
       "scope": "dependencies"
     },
     {
-      "datafile_path": "package.json",
-      "datasource_id": "npm_package_json",
-      "dependency_uid": "pkg:npm/jest?uuid=fixed-uid-done-for-testing-5642512d1758",
-      "extracted_requirement": "^29.0.0",
-      "for_package_uid": "pkg:npm/test-package@1.0.0?uuid=fixed-uid-done-for-testing-5642512d1758",
-      "is_direct": true,
-      "is_optional": true,
-      "is_pinned": false,
-      "is_runtime": false,
-      "purl": "pkg:npm/jest",
-      "scope": "devDependencies"
-    },
-    {
       "datafile_path": "package-lock.json",
       "datasource_id": "npm_package_lock_json",
       "dependency_uid": "pkg:npm/express@4.18.0?uuid=fixed-uid-done-for-testing-5642512d1758",
       "extracted_requirement": "4.18.0",
       "for_package_uid": "pkg:npm/test-package@1.0.0?uuid=fixed-uid-done-for-testing-5642512d1758",
-      "is_direct": false,
+      "is_direct": true,
       "is_optional": false,
       "is_pinned": true,
       "is_runtime": true,
@@ -50,12 +37,25 @@
       "scope": "dependencies"
     },
     {
+      "datafile_path": "package.json",
+      "datasource_id": "npm_package_json",
+      "dependency_uid": "pkg:npm/jest?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "extracted_requirement": "^29.0.0",
+      "for_package_uid": "pkg:npm/test-package@1.0.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "is_direct": true,
+      "is_optional": true,
+      "is_pinned": false,
+      "is_runtime": false,
+      "purl": "pkg:npm/jest",
+      "scope": "devDependencies"
+    },
+    {
       "datafile_path": "package-lock.json",
       "datasource_id": "npm_package_lock_json",
       "dependency_uid": "pkg:npm/jest@29.0.0?uuid=fixed-uid-done-for-testing-5642512d1758",
       "extracted_requirement": "29.0.0",
       "for_package_uid": "pkg:npm/test-package@1.0.0?uuid=fixed-uid-done-for-testing-5642512d1758",
-      "is_direct": false,
+      "is_direct": true,
       "is_optional": true,
       "is_pinned": true,
       "is_runtime": false,
@@ -86,10 +86,13 @@
   "packages": [
     {
       "api_data_url": "https://registry.npmjs.org/test-package/1.0.0",
-      "datafile_paths": ["package.json", "package-lock.json"],
+      "datafile_paths": ["package-lock.json", "package.json"],
       "datasource_ids": ["npm_package_json", "npm_package_lock_json"],
       "description": "A test package",
       "download_url": "https://registry.npmjs.org/test-package/-/test-package-1.0.0.tgz",
+      "extra_data": {
+        "lockfileVersion": 2
+      },
       "name": "test-package",
       "namespace": "",
       "package_uid": "pkg:npm/test-package@1.0.0?uuid=fixed-uid-done-for-testing-5642512d1758",
