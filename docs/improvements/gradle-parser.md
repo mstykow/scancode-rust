@@ -453,14 +453,14 @@ By eliminating code execution:
 
 ### Golden Tests
 
-**Status**: 15/19 passing (79% pass rate)
+**Status**: 19 Gradle golden tests are now active in the suite, with no parser-only ignores remaining
 
 - ✅ All 5 common patterns fully supported
 - ✅ String notation parsing
 - ✅ Map notation parsing
 - ✅ Kotlin DSL parsing
 - ✅ Project references
-- ⏭️ 4 tests intentionally ignored (architectural differences documented)
+- ✅ `groovy4`, `groovy-no-parens`, `kotlin2`, and `end2end` are exercised directly instead of being masked by parser-only ignores
 
 ### Test Data
 
@@ -507,7 +507,7 @@ For users migrating from Python ScanCode to scancode-rust:
 ## Status
 
 - ✅ **Safe tokenizer**: Complete, no code execution
-- ✅ **Full syntax support**: All 5 dependency patterns
+- ✅ **Broad syntax support**: Common Gradle dependency patterns are exercised without parser-only ignored goldens
 - ✅ **Security validation**: Proven safe against attack vectors
 - ✅ **Documentation**: Complete with security analysis
 

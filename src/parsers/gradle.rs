@@ -146,6 +146,7 @@ fn default_package_data() -> PackageData {
 enum Tok {
     Ident(String),
     Str(String),
+    MalformedStr(String),
     OpenParen,
     CloseParen,
     OpenBracket,
@@ -190,13 +191,15 @@ fn lex(input: &str) -> Vec<Tok> {
         if c == '\'' {
             i += 1;
             let start = i;
-            while i < len && chars[i] != '\'' {
+            while i < len && chars[i] != '\'' && chars[i] != '\n' {
                 i += 1;
             }
             let val: String = chars[start..i].iter().collect();
-            tokens.push(Tok::Str(val));
-            if i < len {
+            if i < len && chars[i] == '\'' {
+                tokens.push(Tok::Str(val));
                 i += 1;
+            } else {
+                tokens.push(Tok::MalformedStr(val));
             }
             continue;
         }
@@ -204,7 +207,7 @@ fn lex(input: &str) -> Vec<Tok> {
         if c == '"' {
             i += 1;
             let start = i;
-            while i < len && chars[i] != '"' {
+            while i < len && chars[i] != '"' && chars[i] != '\n' {
                 if chars[i] == '\\' && i + 1 < len {
                     i += 2;
                 } else {
@@ -212,9 +215,11 @@ fn lex(input: &str) -> Vec<Tok> {
                 }
             }
             let val: String = chars[start..i].iter().collect();
-            tokens.push(Tok::Str(val));
-            if i < len {
+            if i < len && chars[i] == '"' {
+                tokens.push(Tok::Str(val));
                 i += 1;
+            } else {
+                tokens.push(Tok::MalformedStr(val));
             }
             continue;
         }
@@ -324,6 +329,7 @@ fn find_dependency_blocks(tokens: &[Tok]) -> Vec<Vec<Tok>> {
 // Dependency extraction from blocks
 // ---------------------------------------------------------------------------
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 struct RawDep {
     namespace: String,
     name: String,
@@ -336,8 +342,7 @@ fn extract_dependencies(tokens: &[Tok]) -> Vec<Dependency> {
     let mut dependencies = Vec::new();
 
     if let Some(block) = blocks.first() {
-        let raw = parse_block(block);
-        for rd in raw {
+        for rd in parse_block(block) {
             if rd.name.is_empty() {
                 continue;
             }
@@ -411,9 +416,26 @@ fn parse_block(tokens: &[Tok]) -> Vec<RawDep> {
 
         // PATTERN: scope 'string:notation' (string notation)
         if next < tokens.len()
-            && let Tok::Str(ref val) = tokens[next]
-            && val.contains(':')
+            && matches!(
+                tokens.get(next),
+                Some(Tok::Str(_)) | Some(Tok::MalformedStr(_))
+            )
         {
+            let (val, is_malformed) = match &tokens[next] {
+                Tok::Str(val) => (val.as_str(), false),
+                Tok::MalformedStr(val) => (val.as_str(), true),
+                _ => unreachable!(),
+            };
+
+            if !val.contains(':') {
+                i = next + 1;
+                continue;
+            }
+
+            if val.chars().next().is_some_and(|c| c.is_whitespace()) {
+                break;
+            }
+
             // `scope 'str', { closure }` → skip (unparenthesized call with trailing closure)
             if next + 1 < tokens.len()
                 && tokens[next + 1] == Tok::Comma
@@ -429,6 +451,9 @@ fn parse_block(tokens: &[Tok]) -> Vec<RawDep> {
             let effective_scope = if is_multi { "" } else { &scope_name };
             let rd = parse_colon_string(val, effective_scope);
             deps.push(rd);
+            if is_malformed {
+                break;
+            }
             i = next + 1;
             while i < tokens.len() && tokens[i] == Tok::Comma {
                 i += 1;
@@ -570,7 +595,9 @@ fn parse_bracket_maps(tokens: &[Tok], deps: &mut Vec<RawDep>) {
             && let Some(end) = find_matching_bracket(tokens, i)
         {
             let map_tokens = &tokens[i + 1..end];
-            if let Some(rd) = parse_map_entries(map_tokens) {
+            if let Some(rd) = parse_map_entries(map_tokens)
+                && !contains_equivalent_map_dep(deps, &rd)
+            {
                 deps.push(rd);
             }
             i = end + 1;
@@ -578,6 +605,17 @@ fn parse_bracket_maps(tokens: &[Tok], deps: &mut Vec<RawDep>) {
         }
         i += 1;
     }
+}
+
+fn contains_equivalent_map_dep(existing: &[RawDep], candidate: &RawDep) -> bool {
+    existing.iter().any(|dep| {
+        dep.name == candidate.name
+            && dep.version == candidate.version
+            && dep.scope == candidate.scope
+            && (dep.namespace == candidate.namespace
+                || dep.namespace.is_empty()
+                || candidate.namespace.is_empty())
+    })
 }
 
 fn parse_map_entries(tokens: &[Tok]) -> Option<RawDep> {
@@ -770,7 +808,7 @@ fn create_dependency(
     let is_optional = scope_lower.contains("test");
     let is_pinned = !version.is_empty();
 
-    let purl_string = purl.to_string().replace("$", "%24");
+    let purl_string = purl.to_string().replace("$", "%24").replace('\'', "%27");
     Some(Dependency {
         purl: Some(purl_string),
         extracted_requirement: Some(version.to_string()),
@@ -934,6 +972,52 @@ dependencies {
         assert_eq!(
             deps[0].purl,
             Some("pkg:maven/org.jacoco.ant@0.7.4.201502262128".to_string())
+        );
+    }
+
+    #[test]
+    fn test_bracket_map_dedupes_exact_string_overlap() {
+        let content = r#"
+dependencies {
+    runtimeOnly 'org.springframework:spring-core:2.5',
+            'org.springframework:spring-aop:2.5'
+    runtimeOnly(
+        [group: 'org.springframework', name: 'spring-core', version: '2.5'],
+        [group: 'org.springframework', name: 'spring-aop', version: '2.5']
+    )
+}
+"#;
+
+        let tokens = lex(content);
+        let deps = extract_dependencies(&tokens);
+        assert_eq!(deps.len(), 2);
+        assert_eq!(
+            deps[0].purl,
+            Some("pkg:maven/org.springframework/spring-core@2.5".to_string())
+        );
+        assert_eq!(
+            deps[1].purl,
+            Some("pkg:maven/org.springframework/spring-aop@2.5".to_string())
+        );
+    }
+
+    #[test]
+    fn test_malformed_string_stops_cascading_false_positives() {
+        let content = r#"
+dependencies {
+    implementation "com.fasterxml.jackson:jackson-bom:2.12.2'
+    implementation" com.fasterxml.jackson.core:jackson-core"
+    testImplementation 'org.junit:junit-bom:5.7.2'"
+    testImplementation "org.junit.platform:junit-platform-commons"
+}
+"#;
+
+        let tokens = lex(content);
+        let deps = extract_dependencies(&tokens);
+        assert_eq!(deps.len(), 1);
+        assert_eq!(
+            deps[0].purl,
+            Some("pkg:maven/com.fasterxml.jackson/jackson-bom@2.12.2%27".to_string())
         );
     }
 
