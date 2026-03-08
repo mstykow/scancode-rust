@@ -39,16 +39,15 @@ At the start of each session:
 
 ## Required Touchpoints Per Ecosystem PR
 
-- Parser modules in `src/parsers/`
-- `src/parsers/mod.rs`
-- Ecosystem-specific unit tests in `src/parsers/*_test.rs`
-- Ecosystem-specific golden tests in `src/parsers/*_golden_test.rs`
-- Real fixtures under `testdata/`
-- `src/models/datasource_id.rs` when datasource coverage changes
-- `src/assembly/assemblers.rs` when package assembly membership changes
-- `src/assembly/assembly_golden_test.rs` and `testdata/assembly-golden/` when assembly behavior changes
-- `docs/SUPPORTED_FORMATS.md` when parser metadata changes
-- `docs/improvements/*.md` when Rust behavior intentionally exceeds or corrects Python behavior
+- Parser implementation for the active ecosystem
+- Parser registration when new formats or handlers are introduced
+- Focused unit tests for the changed parser behavior
+- Parser-level golden coverage when output parity/regression coverage is meaningful
+- Real fixtures under `testdata/` that exercise the changed behavior
+- Datasource coverage when new file-format identities are introduced
+- Assembly configuration and golden coverage when package grouping, ownership, workspace, or file-reference behavior changes
+- Supported-format documentation when parser coverage or advertised metadata changes
+- Improvement documentation when Rust behavior intentionally exceeds or corrects Python behavior
 
 ## Session Refresh Commands
 
@@ -135,13 +134,10 @@ Issues:
 
 Likely touchpoints:
 
-- `src/parsers/maven.rs`
-- `src/parsers/maven_test.rs`
-- `src/parsers/maven_golden_test.rs`
-- `src/assembly/assembly_golden_test.rs`
-- `testdata/maven/`
-- `testdata/maven-golden/`
-- `testdata/assembly-golden/maven-basic/`
+- Maven parser implementation and registration
+- Maven-focused unit and golden coverage
+- Maven parser fixtures and expected outputs
+- Assembly golden coverage if Maven package ownership or merging changes
 
 Current status:
 
@@ -165,19 +161,11 @@ Issues:
 
 Likely touchpoints:
 
-- `src/parsers/npm.rs`
-- `src/parsers/npm_lock.rs`
-- `src/parsers/yarn_lock.rs`
-- `src/parsers/npm_test.rs`
-- `src/parsers/npm_lock_test.rs`
-- `src/parsers/yarn_lock_test.rs`
-- `src/parsers/npm_golden_test.rs`
-- `src/assembly/mod.rs`
-- `src/assembly/sibling_merge.rs`
-- `src/assembly/assembly_golden_test.rs`
-- `testdata/assembly-golden/npm-basic/`
-- `testdata/assembly-golden/npm-nested-packages/`
-- `docs/improvements/npm-yarn-parser.md`
+- npm and Yarn parser implementation, registration, and metadata shaping
+- npm/Yarn-focused unit and parser-golden coverage
+- npm/Yarn assembly behavior for sibling merge, workspace handling, and nested package ownership
+- Representative parser and assembly fixtures under `testdata/`
+- Improvement documentation for intentional Rust-vs-Python behavior differences
 
 Current status (March 7, 2026):
 
