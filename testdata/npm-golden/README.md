@@ -6,14 +6,18 @@ Golden tests compare parser output against expected results from the original Sc
 
 ## Test Status
 
-**Currently Passing:** 5/10 tests
+**Currently Passing:** 11/11 tests
 
 - ✅ `test_golden_basic` - Basic package.json parsing
 - ✅ `test_golden_bundled_deps` - Bundled dependencies handling
 - ✅ `test_golden_authors_list_strings` - Author array extraction
 - ✅ `test_golden_authors_list_dicts` - Author dictionary arrays and raw license statement extraction
 - ✅ `test_golden_double_license` - Multiple declared-license forms preserved at parser level
-- 🔄 5 tests still ignored - See current blockers below
+- ✅ `test_golden_express_jwt` - Manifest dependency PURLs match parser-only reference semantics
+- ✅ `test_golden_from_npmjs` - Registry metadata parity, including dist hashes and VCS revision handling
+- ✅ `test_golden_chartist` - Manifest dependencies remain unversioned and unpinned
+- ✅ `test_golden_dist` - Dependency ordering and scoped PURLs match expected output
+- ✅ `test_golden_electron` - Fixture-backed parser-only golden coverage restored
 
 ## Parser vs License Engine Responsibilities
 
@@ -49,25 +53,17 @@ These fields are intentionally skipped by the parser-only comparison helper.
 1. **basic** - Minimal package.json, validates core field extraction
 2. **bundledDeps** - Bundled dependencies handling
 3. **authors_list_strings** - Author array extraction and party information
+4. **authors_list_dicts** - Author object arrays and placeholder metadata normalization
+5. **double_license** - Multiple declared-license forms preserved without scanner output
+6. **express_jwt** - Alias and requirement parity for manifest dependencies
+7. **from_npmjs** - Registry tarball/VCS metadata and installed-manifest parity
+8. **chartist** - Scoped dependency ordering and unversioned dependency PURLs
+9. **dist** - Dist metadata, dependency order preservation, and scoped PURL encoding
+10. **electron** - Parser-only fixture coverage for Electron metadata
 
-### Still-Ignored Tests
+## Ignore Policy
 
-These tests remain ignored because they currently fail for reasons outside the parser-only license-field skips:
-
-1. **express_jwt** - Dependency PURL/requirement parity gap
-2. **from_npmjs** - Expected `sha1` metadata is still missing from actual output
-3. **chartist** - Dependency pinnedness classification mismatch
-4. **dist** - Dependency ordering/PURL output mismatch
-5. **electron** - Fixture files are missing
-
-## When to Unignore Tests
-
-The remaining ignored tests should be re-enabled once their specific blockers are resolved:
-
-1. Parser/golden parity mismatches are fixed for the affected fixtures
-2. Missing fixture data is added for `electron` if that case should remain in the suite
-
-License-engine integration is still relevant for richer package/license coverage, but it is no longer the only reason a npm golden test may be ignored.
+For npm parser goldens, ignores should be reserved for cases genuinely blocked by the missing license detection engine. Parser-only parity gaps should be fixed and re-enabled in this suite rather than deferred.
 
 ## Adding New Golden Tests
 
