@@ -2085,10 +2085,9 @@ mod tests {
 
         let types_purl = types_node.purl.as_ref().unwrap();
 
-        assert!(
-            types_purl.contains("%40types%2Fnode"),
-            "BUG: Currently produces incorrect PURL with encoded slash. Got: {}. See CODE_QUALITY_IMPROVEMENTS.md #3",
-            types_purl
+        assert_eq!(
+            types_purl, "pkg:npm/%40types/node",
+            "Scoped dependency PURLs should encode only the @, not the namespace slash"
         );
 
         let babel = package_data
@@ -2103,9 +2102,10 @@ mod tests {
             })
             .expect("Should find @babel/core dependency");
 
-        assert!(
-            babel.purl.as_ref().unwrap().contains("%40babel%2Fcore"),
-            "BUG: Currently produces incorrect PURL with encoded slash. See CODE_QUALITY_IMPROVEMENTS.md #3"
+        assert_eq!(
+            babel.purl.as_deref(),
+            Some("pkg:npm/%40babel/core"),
+            "Scoped dependency PURLs should encode only the @, not the namespace slash"
         );
 
         let lodash = package_data
