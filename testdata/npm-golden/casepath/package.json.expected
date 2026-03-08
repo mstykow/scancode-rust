@@ -240,12 +240,12 @@
         "is_direct": true
       },
       {
-        "purl": "pkg:npm/phantomjs-polyfill@0.0.2",
+        "purl": "pkg:npm/phantomjs-polyfill",
         "extracted_requirement": "0.0.2",
         "scope": "devDependencies",
         "is_runtime": false,
         "is_optional": true,
-        "is_pinned": true,
+        "is_pinned": false,
         "is_direct": true
       },
       {
