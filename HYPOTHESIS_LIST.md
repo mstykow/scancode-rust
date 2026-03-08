@@ -8,15 +8,16 @@
 - After MAX_DETECTION_SIZE increase to 1MB: 70 failing tests (26 tests fixed)
 - After binary strings extraction: 64 failing tests (32 tests fixed, 33% improvement)
 - After subtraction logic alignment: 64 failing tests (code aligned with Python)
+- After analyze_detection fix: 64 failing tests (tests use raw matches, not grouped)
 
 ## Current Status: 64 failing tests
 
 ### Pattern Analysis of Failures (Updated)
 | Category | Count | Description |
 |----------|-------|-------------|
+| Extra Detections | ~15 | Rust produces more matches (license-intro, etc.) |
 | Missing Detections | ~15 | Rust finds fewer matches than expected |
 | Wrong License Expression | ~12 | Correct position, wrong identifier |
-| Extra Detections | ~10 | Rust produces more matches than expected |
 | Unknown License Handling | ~5 | "unknown" vs "unknown-license-reference" |
 | Match Ordering | ~6 | Order differs from Python |
 | Wrong License Type | ~8 | Completely wrong license detected |
@@ -45,18 +46,48 @@
 
 ## Active Hypotheses
 
+### H17: Extra License-Intro Detections - **NEW**
+- **Impact**: ~10 tests
+- **Root cause**: Rust matches license-intro rules in HTML navigation/sidebar where Python doesn't
+- **Example**: `android-sdk-preview-2015.html`
+  - Rust finds 4 `license-intro_22.RULE` matches (lines 100, 213, 557, 582)
+  - Python only finds 2 (lines 100, 213)
+  - Lines 557, 582 are in HTML nav/sidebar, not actual license text
+- **Investigation findings**:
+  - Not a containment filtering issue (no containing match exists)
+  - Python's test harness uses `idx.match()` which returns raw matches
+  - Both Python and Rust use `filter_contained_matches` but it doesn't filter these
+- **Possible causes**:
+  - Python has additional filtering for HTML context
+  - Python has proximity-based filtering for license-intros
+  - Token position calculation differs
+- **Status**: INVESTIGATING
+
 ### H1: QueryRun Splitting Disabled - **DEFERRED**
 - **Impact**: ~15 tests (missing detections)
 - **Root cause**: QueryRun splitting is disabled, causes 37 regressions when enabled
 - **Status**: DEFERRED - regressions need to be understood first
-- **Examples**:
-  - `net-snmp-license.txt`: Expected 18 matches, got 4
-  - `pkg.c`: Expected "gpl-2.0 OR lgpl-2.0", got separate matches
 
 ### H10: Wrong License Variant (X vs X-plus) - **COMPLEX**
 - **Impact**: ~8 tests
-- **Root cause**: Sequence matches with lower coverage win over exact matches with higher coverage due to containment filtering
-- **Example**: `GFDL-1.1.t3`
+- **Root cause**: Sequence matches with lower coverage win over exact matches
+- **Status**: NEEDS NUANCED FIX - matcher_order alone causes regressions
+
+### H6: Unknown License Handling
+- **Impact**: ~5 tests
+- **Root cause**: Missing ngram-based unknown matches
+- **Status**: PENDING
+
+## Investigation Findings
+
+### False Positive Filtering (H17 related):
+1. **Rust's analyze_detection() was missing checks** - Fixed but tests use raw matches
+2. **Python's detection.py has more nuanced checks**:
+   - `has_unknown_intro_before_detection` - filters intros before proper matches
+   - `has_references_to_local_files` - filters file references
+   - `is_correct_detection_non_unknown` - requires no unknowns for perfect detection
+3. **Golden tests compare raw matches** - Not grouped detections
+4. **License-intro filtering is complex** - Context-dependent, not just containment
   - Expected: `gfdl-1.1`
   - Actual: `gfdl-1.1-plus`
 - **Fix attempt**: Adding matcher_order() protection caused 3 regressions
