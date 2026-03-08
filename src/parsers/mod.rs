@@ -325,7 +325,10 @@ pub use self::misc::{
 pub use self::npm::NpmParser;
 pub use self::npm_lock::NpmLockParser;
 pub use self::npm_workspace::NpmWorkspaceParser;
-pub use self::nuget::{NupkgParser, NuspecParser, PackagesConfigParser, PackagesLockParser};
+pub use self::nuget::{
+    NupkgParser, NuspecParser, PackageReferenceProjectParser, PackagesConfigParser,
+    PackagesLockParser, ProjectJsonParser, ProjectLockJsonParser,
+};
 pub use self::opam::OpamParser;
 pub use self::os_release::OsReleaseParser;
 pub use self::pip_inspect_deplock::PipInspectDeplockParser;
@@ -464,10 +467,13 @@ register_package_handlers! {
         NpmWorkspaceParser,
         NupkgParser,
         NuspecParser,
+        PackageReferenceProjectParser,
         OpamParser,
         OsReleaseParser,
         PackagesConfigParser,
         PackagesLockParser,
+        ProjectJsonParser,
+        ProjectLockJsonParser,
         PipfileLockParser,
         PipInspectDeplockParser,
         PnpmLockParser,
