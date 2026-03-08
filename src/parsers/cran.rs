@@ -91,7 +91,7 @@ impl PackageParser for CranParser {
 
         // Parse Author field
         if let Some(author_str) = fields.get("Author") {
-            for author_part in author_str.split(",\n") {
+            for author_part in split_author_entries(author_str) {
                 if let Some(party) = parse_party(author_part, "author") {
                     parties.push(party);
                 }
@@ -328,6 +328,37 @@ fn build_description(fields: &HashMap<String, String>) -> Option<String> {
     }
 }
 
+fn split_author_entries(author_str: &str) -> Vec<&str> {
+    let mut entries = Vec::new();
+    let mut start = 0;
+    let mut bracket_depth: usize = 0;
+    let mut paren_depth: usize = 0;
+
+    for (idx, ch) in author_str.char_indices() {
+        match ch {
+            '[' => bracket_depth += 1,
+            ']' => bracket_depth = bracket_depth.saturating_sub(1),
+            '(' => paren_depth += 1,
+            ')' => paren_depth = paren_depth.saturating_sub(1),
+            ',' if bracket_depth == 0 && paren_depth == 0 => {
+                let entry = author_str[start..idx].trim();
+                if !entry.is_empty() {
+                    entries.push(entry);
+                }
+                start = idx + 1;
+            }
+            _ => {}
+        }
+    }
+
+    let final_entry = author_str[start..].trim();
+    if !final_entry.is_empty() {
+        entries.push(final_entry);
+    }
+
+    entries
+}
+
 /// Parse party information from Author or Maintainer field.
 ///
 /// Formats supported:
@@ -346,6 +377,19 @@ fn parse_party(info: &str, role: &str) -> Option<Party> {
         if parts.len() == 2 {
             let name = parts[0].trim().to_string();
             let email = parts[1].trim_end_matches('>').trim().to_string();
+
+            if !email.contains('@') {
+                return Some(Party {
+                    r#type: Some("person".to_string()),
+                    role: Some(role.to_string()),
+                    name: Some(info.to_string()),
+                    email: None,
+                    url: None,
+                    organization: None,
+                    organization_url: None,
+                    timezone: None,
+                });
+            }
 
             return Some(Party {
                 r#type: Some("person".to_string()),
