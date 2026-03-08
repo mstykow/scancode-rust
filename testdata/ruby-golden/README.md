@@ -6,10 +6,10 @@ Golden tests compare parser output against expected results from the original Sc
 
 ## Test Status
 
-**Currently Passing:** 1/4 tests
+**Current state:** 2/4 Ruby parser goldens are active; the remaining 2 are still intentionally ignored because they require license detection engine integration.
 
 - ✅ **cat-gemspec** - Passing with improvements
-- ⏸️ **arel-gemspec** - Multi-line Ruby literals, conditional dependencies (complex)
+- ✅ **arel-gemspec** - Active after parser parity fixes for `%q{}` cleanup and conditional dependency extraction
 - ⏸️ **oj-gemspec** - License detection engine required
 - ⏸️ **rubocop-gemspec** - License detection engine required
 

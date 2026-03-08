@@ -5,6 +5,7 @@
 The Ruby parser in scancode-rust **improves data structure semantics** compared to the Python reference implementation:
 
 - **🔍 Enhanced Extraction**: Semantic party model combining name and email into single structured entity (vs Python's fragmented approach)
+- **⚖️ Parity-aware fallback**: Preserve Python-compatible fragmented author/email lists when multi-entry gemspec arrays would otherwise break golden parity
 
 ## Improvement: Semantic Party Model (Enhanced Extraction)
 
@@ -200,10 +201,9 @@ Our improvements to the Ruby parser implementation:
 - ✅ Reordered dependency extraction (development first, matching Python output)
 - ✅ Semantic party model (name + email together)
 
-**Test Status**: 1/4 golden tests passing, 3 intentionally ignored due to:
+**Test Status**: 2/4 Ruby parser goldens are active. The remaining 2 are intentionally ignored only because they require license detection engine integration:
 
 - License extraction differences (requires license detection engine)
-- Ruby AST parsing for complex `%q{...}` literals (deferred)
 
 ## Implementation Details
 
@@ -292,17 +292,15 @@ Party {
 
 ### Golden Tests
 
-**Status**: 1/4 passing
+**Status**: 2 active parser goldens, 2 license-engine-blocked goldens still ignored
 
-1. ✅ `test_golden_simple_gemspec` - Basic extraction (passing)
-2. ❌ `test_golden_arel_gemspec` - Complex string literals (ignored)
-   - Requires Ruby AST parser for `%q{...}` evaluation
-   - Effort: 4-8 hours for full implementation
-3. ❌ `test_golden_oj_gemspec` - License extraction (ignored)
+1. ✅ `test_golden_cat_gemspec` - Basic extraction with semantic single-author pairing
+2. ✅ `test_golden_arel_gemspec` - `%q{}` cleanup and conditional dependency extraction now covered by the parser
+3. ⏸️ `test_golden_oj_gemspec` - License extraction (ignored)
    - Python expects `null` but we extract licenses
-   - Would need license detection alignment
-4. ❌ `test_golden_rubocop_gemspec` - License extraction (ignored)
-   - Same issue as oj_gemspec
+   - Requires license detection alignment
+4. ⏸️ `test_golden_rubocop_gemspec` - License extraction (ignored)
+   - Same issue as `oj_gemspec`
 
 ### Test Data
 
