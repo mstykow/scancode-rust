@@ -61,7 +61,6 @@ mod golden_tests {
     }
 
     #[test]
-    #[ignore = "Parser parity gap: expected dependency purl omits versioned mocha requirement"]
     fn test_golden_express_jwt() {
         let test_file = PathBuf::from("testdata/npm-golden/express-jwt-3.4.0/package.json");
         let expected_file =
@@ -76,7 +75,6 @@ mod golden_tests {
     }
 
     #[test]
-    #[ignore = "Parser parity gap: expected sha1 metadata is still missing from actual output"]
     fn test_golden_from_npmjs() {
         let test_file = PathBuf::from("testdata/npm-golden/from_npmjs/package.json");
         let expected_file = PathBuf::from("testdata/npm-golden/from_npmjs/package.json.expected");
@@ -116,7 +114,6 @@ mod golden_tests {
     }
 
     #[test]
-    #[ignore = "Parser parity gap: dependency pinnedness still differs from expected output"]
     fn test_golden_chartist() {
         let test_file = PathBuf::from("testdata/npm-golden/chartist/package.json");
         let expected_file = PathBuf::from("testdata/npm-golden/chartist/package.json.expected");
@@ -130,7 +127,6 @@ mod golden_tests {
     }
 
     #[test]
-    #[ignore = "Parser parity gap: dependency ordering/purl output still differs from expected snapshot"]
     fn test_golden_dist() {
         let test_file = PathBuf::from("testdata/npm-golden/dist/package.json");
         let expected_file = PathBuf::from("testdata/npm-golden/dist/package.json.expected");
@@ -144,7 +140,6 @@ mod golden_tests {
     }
 
     #[test]
-    #[ignore = "Missing electron golden fixtures"]
     fn test_golden_electron() {
         let test_file = PathBuf::from("testdata/npm-golden/electron/package.json");
         let expected_file = PathBuf::from("testdata/npm-golden/electron/package.json.expected");
