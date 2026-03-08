@@ -360,6 +360,17 @@ mod tests {
     }
 
     #[test]
+    fn test_assembly_maven_meta_inf_basic() {
+        match run_assembly_golden_test("maven-meta-inf-basic") {
+            Ok(_) => (),
+            Err(e) => panic!(
+                "Assembly golden test failed for maven-meta-inf-basic: {}",
+                e
+            ),
+        }
+    }
+
+    #[test]
     fn test_assembly_npm_workspace() {
         match run_assembly_golden_test("npm-workspace") {
             Ok(_) => (),
