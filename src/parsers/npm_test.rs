@@ -589,32 +589,19 @@ mod tests {
     }
 
     #[test]
-    fn test_extract_bundle_dependencies_alternative_spelling() {
+    fn test_extract_bundle_dependencies_alternative_spelling_is_ignored() {
         let package_path = PathBuf::from("testdata/npm/package-bundle-dependencies.json")
             .canonicalize()
             .unwrap();
         let package_data = NpmParser::extract_first_package(&package_path);
 
-        // Should have bundled dependencies with bundleDependencies spelling
-        assert!(!package_data.dependencies.is_empty());
-
-        // Find bundled dependencies by scope
-        let bundled_deps: Vec<_> = package_data
+        let bundled_deps_count = package_data
             .dependencies
             .iter()
             .filter(|dep| dep.scope.as_deref() == Some("bundledDependencies"))
-            .collect();
+            .count();
 
-        assert_eq!(bundled_deps.len(), 3);
-
-        // Check for expected package names
-        let purls: Vec<&str> = bundled_deps
-            .iter()
-            .filter_map(|dep| dep.purl.as_deref())
-            .collect();
-        assert!(purls.iter().any(|p| p.contains("lodash")));
-        assert!(purls.iter().any(|p| p.contains("moment")));
-        assert!(purls.iter().any(|p| p.contains("axios")));
+        assert_eq!(bundled_deps_count, 0);
     }
 
     #[test]
@@ -1894,6 +1881,30 @@ mod tests {
     }
 
     #[test]
+    fn test_extract_vcs_url_object_with_git_head() {
+        let content = r#"{
+  "name": "test-package",
+  "version": "1.0.0",
+  "gitHead": "fc7bbf03e39cc48a8924b90696d28345a6a90f3c",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/user/test-package.git"
+  }
+}"#;
+
+        let (_temp_file, path) = create_temp_package_json(content);
+        let package_data = NpmParser::extract_first_package(&path);
+
+        assert_eq!(
+            package_data.vcs_url,
+            Some(
+                "git+https://github.com/user/test-package.git@fc7bbf03e39cc48a8924b90696d28345a6a90f3c"
+                    .to_string()
+            )
+        );
+    }
+
+    #[test]
     fn test_extract_vcs_url_git_protocol() {
         let content = r#"{
   "name": "test-package",
@@ -2295,12 +2306,12 @@ mod tests {
             .expect("Should find exact dependency");
         assert_eq!(
             exact.is_pinned,
-            Some(true),
-            "Exact version should be pinned"
+            Some(false),
+            "package.json exact requirements should remain unpinned"
         );
         assert!(
-            exact.purl.as_ref().unwrap().contains("@2.0.0"),
-            "Exact version should include version in PURL"
+            exact.purl.as_ref().unwrap() == "pkg:npm/exact",
+            "package.json dependency PURLs should not include manifest requirement versions"
         );
 
         let git_dep = package_data
@@ -2317,6 +2328,116 @@ mod tests {
             git_dep.is_pinned,
             Some(false),
             "Git dependency should not be pinned"
+        );
+    }
+
+    #[test]
+    fn test_scoped_manifest_dependencies_preserve_order_and_unversioned_purls() {
+        let content = r#"
+{
+  "name": "angular-compare-validator",
+  "version": "0.1.1",
+  "dependencies": {
+    "@angular/core": ">=2.0.0",
+    "@angular/forms": ">=2.0.0",
+    "@angular/common": ">=2.0.0",
+    "rxjs": ">=5.0.0-beta.12"
+  }
+}
+"#;
+
+        let (_temp_file, package_path) = create_temp_package_json(content);
+        let package_data = NpmParser::extract_first_package(&package_path);
+
+        let dependency_purls: Vec<&str> = package_data
+            .dependencies
+            .iter()
+            .map(|dep| dep.purl.as_deref().expect("dependency should have purl"))
+            .collect();
+
+        assert_eq!(
+            dependency_purls,
+            vec![
+                "pkg:npm/%40angular/core",
+                "pkg:npm/%40angular/forms",
+                "pkg:npm/%40angular/common",
+                "pkg:npm/rxjs",
+            ]
+        );
+        assert!(
+            package_data
+                .dependencies
+                .iter()
+                .all(|dep| dep.is_pinned == Some(false))
+        );
+    }
+
+    #[test]
+    fn test_dist_shasum_populates_sha1() {
+        let content = r#"
+{
+  "name": "angular-compare-validator",
+  "version": "0.1.1",
+  "dist": {
+    "integrity": "sha512-j3DtXjUTGFrVj7KjEUdprJPd1og2zokUblhvwD4DrJPc+x8RNUrCb0CLdcDr9RZj1eTo4nw4dSo8Br3edJp8Aw==",
+    "shasum": "d35a0754c8587b0502874e3636cf0f19565d09b7"
+  }
+}
+"#;
+
+        let (_temp_file, package_path) = create_temp_package_json(content);
+        let package_data = NpmParser::extract_first_package(&package_path);
+
+        assert_eq!(
+            package_data.sha1.as_deref(),
+            Some("d35a0754c8587b0502874e3636cf0f19565d09b7")
+        );
+        assert!(package_data.sha512.is_some());
+    }
+
+    #[test]
+    fn test_party_object_url_none_is_treated_as_missing() {
+        let content = r#"
+{
+  "name": "party-url-test",
+  "version": "1.0.0",
+  "contributors": [
+    {
+      "name": "Example Contributor",
+      "email": "contributor@example.com",
+      "url": "none"
+    }
+  ]
+}
+"#;
+
+        let (_temp_file, package_path) = create_temp_package_json(content);
+        let package_data = NpmParser::extract_first_package(&package_path);
+
+        assert_eq!(package_data.parties.len(), 1);
+        assert_eq!(package_data.parties[0].url, None);
+    }
+
+    #[test]
+    fn test_dist_tarball_registry_url_is_normalized_to_https() {
+        let content = r#"
+{
+  "name": "registry-tarball-test",
+  "version": "1.0.0",
+  "dist": {
+    "tarball": "http://registry.npmjs.org/registry-tarball-test/-/registry-tarball-test-1.0.0.tgz"
+  }
+}
+"#;
+
+        let (_temp_file, package_path) = create_temp_package_json(content);
+        let package_data = NpmParser::extract_first_package(&package_path);
+
+        assert_eq!(
+            package_data.download_url.as_deref(),
+            Some(
+                "https://registry.npmjs.org/registry-tarball-test/-/registry-tarball-test-1.0.0.tgz"
+            )
         );
     }
 }
