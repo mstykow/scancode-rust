@@ -42,7 +42,6 @@ mod golden_tests {
     }
 
     #[test]
-    #[ignore = "Rust extracts 11 deps vs Python 9: bracket map + multi-value + named-params produce overlapping entries that Python's pygmars grammar handles differently"]
     fn test_golden_groovy4() {
         run_golden(
             "testdata/gradle-golden/groovy/groovy4/build.gradle",
@@ -99,7 +98,6 @@ mod golden_tests {
     }
 
     #[test]
-    #[ignore = "Intentionally malformed Gradle syntax (mismatched quotes) - Python's lexer handles these edge cases differently"]
     fn test_golden_groovy_no_parens() {
         run_golden(
             "testdata/gradle-golden/groovy/groovy-no-parens/build.gradle",
@@ -128,7 +126,6 @@ mod golden_tests {
     }
 
     #[test]
-    #[ignore = "Python extracts only from buildscript dependencies in complex multi-block Kotlin files"]
     fn test_golden_kotlin2() {
         run_golden(
             "testdata/gradle-golden/kotlin/kotlin2/build.gradle.kts",
@@ -173,11 +170,10 @@ mod golden_tests {
     // =========================================================================
 
     #[test]
-    #[ignore = "Expected file uses ScanCode full output format {packages,dependencies,files}, not parser-only array [{...}]"]
     fn test_golden_end2end() {
         run_golden(
             "testdata/gradle-golden/end2end/build.gradle",
-            "testdata/gradle-golden/end2end/build.gradle-expected.json",
+            "testdata/gradle-golden/end2end/build.gradle-package-only-expected.json",
         );
     }
 }
