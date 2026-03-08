@@ -26,6 +26,7 @@ use std::path::Path;
 
 use lazy_static::lazy_static;
 use log::warn;
+use md5::{Digest, Md5};
 use packageurl::PackageUrl;
 use regex::Regex;
 
@@ -69,11 +70,12 @@ impl PackageParser for PodspecParser {
 
         let name = extract_field(&content, &NAME_PATTERN);
         let version = extract_field(&content, &VERSION_PATTERN);
-        let _summary = extract_field(&content, &SUMMARY_PATTERN);
-        let description = extract_description(&content);
+        let summary = extract_field(&content, &SUMMARY_PATTERN);
+        let description =
+            merge_summary_and_description(summary.as_deref(), extract_description(&content));
         let homepage_url = extract_field(&content, &HOMEPAGE_PATTERN);
-        let license = extract_field(&content, &LICENSE_PATTERN);
-        let source = extract_field(&content, &SOURCE_PATTERN);
+        let license = extract_license_statement(&content);
+        let source = extract_source_url(&content);
         let authors = extract_authors(&content);
 
         let parties = authors
@@ -91,6 +93,43 @@ impl PackageParser for PodspecParser {
             .collect();
 
         let dependencies = extract_dependencies(&content);
+        let repository_homepage_url = name
+            .as_ref()
+            .map(|n| format!("https://cocoapods.org/pods/{}", n));
+        let repository_download_url = match (source.as_deref(), version.as_deref()) {
+            (Some(vcs_url), Some(version_str)) => get_repo_base_url(vcs_url)
+                .map(|base| format!("{}/archive/refs/tags/{}.zip", base, version_str)),
+            _ => None,
+        };
+        let code_view_url = match (source.as_deref(), version.as_deref()) {
+            (Some(vcs_url), Some(version_str)) => {
+                get_repo_base_url(vcs_url).map(|base| format!("{}/tree/{}", base, version_str))
+            }
+            _ => None,
+        };
+        let bug_tracking_url = source
+            .as_deref()
+            .and_then(get_repo_base_url)
+            .map(|base| format!("{}/issues/", base));
+        let api_data_url = match (name.as_deref(), version.as_deref()) {
+            (Some(name_str), Some(version_str)) => get_hashed_path(name_str).map(|hashed| {
+                format!(
+                    "https://raw.githubusercontent.com/CocoaPods/Specs/blob/master/Specs/{}/{}/{}/{}.podspec.json",
+                    hashed, name_str, version_str, name_str
+                )
+            }),
+            _ => None,
+        };
+        let purl = if let Some(name_str) = &name {
+            let mut purl = PackageUrl::new(Self::PACKAGE_TYPE.as_str(), name_str)
+                .unwrap_or_else(|_| PackageUrl::new("generic", name_str).unwrap());
+            if let Some(version_str) = &version {
+                let _ = purl.with_version(version_str);
+            }
+            Some(purl.to_string())
+        } else {
+            None
+        };
 
         vec![PackageData {
             package_type: Some(Self::PACKAGE_TYPE),
@@ -111,8 +150,8 @@ impl PackageParser for PodspecParser {
             md5: None,
             sha256: None,
             sha512: None,
-            bug_tracking_url: None,
-            code_view_url: None,
+            bug_tracking_url,
+            code_view_url,
             vcs_url: source,
             copyright: None,
             holder: None,
@@ -128,11 +167,11 @@ impl PackageParser for PodspecParser {
             file_references: Vec::new(),
             extra_data: None,
             dependencies,
-            repository_homepage_url: None,
-            repository_download_url: None,
-            api_data_url: None,
+            repository_homepage_url,
+            repository_download_url,
+            api_data_url,
             datasource_id: Some(DatasourceId::CocoapodsPodspec),
-            purl: None,
+            purl,
             is_private: false,
             is_virtual: false,
         }]
@@ -158,11 +197,30 @@ lazy_static! {
     static ref LICENSE_PATTERN: Regex = Regex::new(r"\.license\s*=\s*(.+)").unwrap();
     static ref SOURCE_PATTERN: Regex = Regex::new(r"\.source\s*=\s*(.+)").unwrap();
     static ref AUTHOR_PATTERN: Regex = Regex::new(r"\.authors?\s*=\s*(.+)").unwrap();
+    static ref SOURCE_GIT_PATTERN: Regex = Regex::new(r#":git\s*=>\s*['\"]([^'\"]+)['\"]"#).unwrap();
+    static ref SOURCE_HTTP_PATTERN: Regex = Regex::new(r#":http\s*=>\s*['\"]([^'\"]+)['\"]"#).unwrap();
 
     // Dependency patterns (using pod/dependency method calls)
     static ref DEPENDENCY_PATTERN: Regex = Regex::new(
         r#"(?:s\.)?(?:dependency|add_dependency|add_(?:runtime|development)_dependency)\s+['"]([^'"]+)['"](?:\s*,\s*(.+))?"#
     ).unwrap();
+}
+
+fn extract_license_statement(content: &str) -> Option<String> {
+    extract_field(content, &LICENSE_PATTERN).map(|value| normalize_ruby_hash_literal(&value))
+}
+
+fn normalize_ruby_hash_literal(value: &str) -> String {
+    if !value.contains('=') && !value.contains("=>") {
+        return value.to_string();
+    }
+
+    value
+        .replace("=>", "=")
+        .replace(['\'', '"'], "")
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 /// Extract a single field using a regex pattern
@@ -196,6 +254,21 @@ fn extract_description(content: &str) -> Option<String> {
         }
     }
     None
+}
+
+fn merge_summary_and_description(
+    summary: Option<&str>,
+    description: Option<String>,
+) -> Option<String> {
+    match (
+        summary.map(str::trim).filter(|s| !s.is_empty()),
+        description,
+    ) {
+        (Some(summary), Some(description)) if description.starts_with(summary) => Some(description),
+        (Some(summary), Some(description)) => Some(format!("{}\n{}", summary, description)),
+        (Some(summary), None) => Some(summary.to_string()),
+        (None, description) => description,
+    }
 }
 
 /// Extract multiline description in heredoc format
@@ -263,12 +336,47 @@ fn extract_authors(content: &str) -> Vec<(String, Option<String>)> {
     authors
 }
 
+fn extract_source_url(content: &str) -> Option<String> {
+    for line in content.lines() {
+        let cleaned_line = pre_process(line);
+        let Some(value) = SOURCE_PATTERN
+            .captures(&cleaned_line)
+            .and_then(|caps| caps.get(1))
+            .map(|m| m.as_str())
+        else {
+            continue;
+        };
+
+        if let Some(caps) = SOURCE_GIT_PATTERN.captures(value)
+            && let Some(url) = caps.get(1)
+        {
+            return Some(clean_string(url.as_str()));
+        }
+
+        if let Some(caps) = SOURCE_HTTP_PATTERN.captures(value)
+            && let Some(url) = caps.get(1)
+        {
+            return Some(clean_string(url.as_str()));
+        }
+
+        return Some(clean_string(value));
+    }
+
+    None
+}
+
 /// Parse author from hash entry format: "Name" => "email"
 fn parse_author_hash_entry(entry: &str) -> Option<(String, String)> {
     let parts: Vec<&str> = entry.split("=>").collect();
     if parts.len() == 2 {
-        let name = clean_string(parts[0].trim());
-        let email = clean_string(parts[1].trim());
+        let name = clean_string(parts[0].trim())
+            .trim()
+            .trim_matches(['\'', '"'])
+            .to_string();
+        let email = clean_string(parts[1].trim())
+            .trim()
+            .trim_matches(['\'', '"'])
+            .to_string();
         Some((name, email))
     } else {
         None
@@ -360,6 +468,35 @@ fn clean_string(s: &str) -> String {
         })
         .trim()
         .to_string()
+}
+
+fn get_repo_base_url(vcs_url: &str) -> Option<String> {
+    if vcs_url.is_empty() {
+        return None;
+    }
+
+    if vcs_url.ends_with(".git") {
+        Some(vcs_url.trim_end_matches(".git").to_string())
+    } else {
+        Some(vcs_url.to_string())
+    }
+}
+
+fn get_hashed_path(name: &str) -> Option<String> {
+    if name.is_empty() {
+        return None;
+    }
+
+    let mut hasher = Md5::new();
+    hasher.update(name.as_bytes());
+    let hash_str = format!("{:x}", hasher.finalize());
+
+    Some(format!(
+        "{}/{}/{}",
+        &hash_str[0..1],
+        &hash_str[1..2],
+        &hash_str[2..3]
+    ))
 }
 
 crate::register_parser!(

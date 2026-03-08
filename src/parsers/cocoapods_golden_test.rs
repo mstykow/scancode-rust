@@ -24,7 +24,6 @@ mod golden_tests {
     use std::path::PathBuf;
 
     #[test]
-    #[ignore = "Format incompatibility: Python uses {packages:[]} with multiple entries, Rust uses single package with dependencies array"]
     fn test_golden_podspec_json_firebase_analytics() {
         let test_file =
             PathBuf::from("testdata/cocoapods-golden/podspec.json/FirebaseAnalytics.podspec.json");
@@ -41,7 +40,6 @@ mod golden_tests {
     }
 
     #[test]
-    #[ignore = "Format incompatibility: Python uses {packages:[]} with multiple entries, Rust uses single package with dependencies array"]
     fn test_golden_podfile_lock_braintree() {
         let test_file =
             PathBuf::from("testdata/cocoapods-golden/podfile.lock/braintree_ios_Podfile.lock");
@@ -58,7 +56,6 @@ mod golden_tests {
     }
 
     #[test]
-    #[ignore = "Format incompatibility: Python uses {packages:[]} with multiple entries, Rust uses single package with dependencies array"]
     fn test_golden_podfile_lock_artsy() {
         let test_file =
             PathBuf::from("testdata/cocoapods-golden/podfile.lock/artsy_eigen_Podfile.lock");
@@ -75,7 +72,6 @@ mod golden_tests {
     }
 
     #[test]
-    #[ignore = "Format incompatibility: Python uses {packages:[]} with multiple entries, Rust uses single package with dependencies array"]
     fn test_golden_podfile_lock_solo() {
         let test_file = PathBuf::from("testdata/cocoapods-golden/assemble/solo/Podfile.lock");
         let expected_file =
@@ -90,12 +86,11 @@ mod golden_tests {
     }
 
     #[test]
-    #[ignore = "Format incompatibility: Python uses {packages:[]} with multiple entries, Rust uses single package with dependencies array"]
     fn test_golden_podspec_rxdatasources_solo() {
         let test_file =
             PathBuf::from("testdata/cocoapods-golden/assemble/solo/RxDataSources.podspec");
         let expected_file = PathBuf::from(
-            "testdata/cocoapods-golden/assemble/solo/RxDataSources.podspec-expected.json",
+            "testdata/cocoapods-golden/assemble/solo/RxDataSources-package-only.podspec-expected.json",
         );
 
         let package_data = PodspecParser::extract_first_package(&test_file);
@@ -107,7 +102,6 @@ mod golden_tests {
     }
 
     #[test]
-    #[ignore = "Format incompatibility: Python uses {packages:[]} with multiple entries, Rust uses single package with dependencies array"]
     fn test_golden_podspec_rxdatasources() {
         let test_file = PathBuf::from("testdata/cocoapods-golden/podspec/RxDataSources.podspec");
         let expected_file =
@@ -122,7 +116,6 @@ mod golden_tests {
     }
 
     #[test]
-    #[ignore = "Format incompatibility: Python uses {packages:[]} with multiple entries, Rust uses single package with dependencies array"]
     fn test_golden_podspec_starscream() {
         let test_file = PathBuf::from("testdata/cocoapods-golden/podspec/Starscream.podspec");
         let expected_file =
@@ -137,7 +130,6 @@ mod golden_tests {
     }
 
     #[test]
-    #[ignore = "Format incompatibility: Python uses {packages:[]} with multiple entries, Rust uses single package with dependencies array"]
     fn test_golden_podspec_nanopb() {
         let test_file = PathBuf::from("testdata/cocoapods-golden/podspec/nanopb.podspec");
         let expected_file =
@@ -152,7 +144,6 @@ mod golden_tests {
     }
 
     #[test]
-    #[ignore = "Format incompatibility: Python uses {packages:[]} with multiple entries, Rust uses single package with dependencies array"]
     fn test_golden_podspec_badgehub() {
         let test_file = PathBuf::from("testdata/cocoapods-golden/podspec/BadgeHub.podspec");
         let expected_file =
@@ -167,11 +158,11 @@ mod golden_tests {
     }
 
     #[test]
-    #[ignore = "Format incompatibility: Python uses {packages:[]} with multiple entries, Rust uses single package with dependencies array"]
     fn test_golden_podfile_solo() {
         let test_file = PathBuf::from("testdata/cocoapods-golden/assemble/solo/Podfile");
-        let expected_file =
-            PathBuf::from("testdata/cocoapods-golden/assemble/solo/Podfile-expected.json");
+        let expected_file = PathBuf::from(
+            "testdata/cocoapods-golden/assemble/solo/Podfile-package-only-expected.json",
+        );
 
         let package_data = PodfileParser::extract_first_package(&test_file);
 
