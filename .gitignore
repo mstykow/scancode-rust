@@ -44,3 +44,5 @@ output.json
 .env.*
 !.env.example
 node_modules/
+!testdata/**/node_modules/
+!testdata/**/node_modules/**
