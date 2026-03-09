@@ -588,7 +588,9 @@ fn apply_mark_source(files: &mut [crate::models::FileInfo]) {
 
     for entry in files.iter_mut() {
         if entry.file_type == crate::models::FileType::File {
-            entry.is_source = Some(entry.programming_language.is_some());
+            if entry.is_source != Some(false) {
+                entry.is_source = Some(entry.programming_language.is_some());
+            }
             entry.source_count = None;
         }
     }
@@ -608,9 +610,11 @@ fn apply_mark_source(files: &mut [crate::models::FileInfo]) {
         if let Some(parent) = Path::new(&entry.path).parent().and_then(|p| p.to_str()) {
             let parent_key = parent.to_string();
             if entry.file_type == crate::models::FileType::File {
-                *direct_file_count.entry(parent_key.clone()).or_insert(0) += 1;
-                if entry.is_source.unwrap_or(false) {
-                    *direct_source_file_count.entry(parent_key).or_insert(0) += 1;
+                if entry.is_source != Some(false) {
+                    *direct_file_count.entry(parent_key.clone()).or_insert(0) += 1;
+                    if entry.is_source.unwrap_or(false) {
+                        *direct_source_file_count.entry(parent_key).or_insert(0) += 1;
+                    }
                 }
             } else {
                 child_dirs

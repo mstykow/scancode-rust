@@ -248,6 +248,35 @@ fn mark_source_sets_directory_flags_at_threshold() {
 }
 
 #[test]
+fn mark_source_ignores_go_test_only_files_for_directory_threshold() {
+    let mut files = vec![
+        dir("module"),
+        file("module/main.go"),
+        file("module/helper.go"),
+        file("module/helper_test.go"),
+    ];
+    files[1].programming_language = Some("Go".to_string());
+    files[2].programming_language = Some("Go".to_string());
+    files[3].programming_language = Some("Go".to_string());
+    files[3].is_source = Some(false);
+
+    apply_mark_source(&mut files);
+
+    let module_dir = files
+        .iter()
+        .find(|f| f.path == "module")
+        .expect("module dir exists");
+    assert_eq!(module_dir.is_source, Some(true));
+    assert_eq!(module_dir.source_count, Some(2));
+
+    let test_file = files
+        .iter()
+        .find(|f| f.path == "module/helper_test.go")
+        .expect("test file exists");
+    assert_eq!(test_file.is_source, Some(false));
+}
+
+#[test]
 fn resolve_thread_count_supports_reference_compat_values() {
     assert_eq!(resolve_thread_count(-1), 1);
     assert_eq!(resolve_thread_count(0), default_parallel_threads());
