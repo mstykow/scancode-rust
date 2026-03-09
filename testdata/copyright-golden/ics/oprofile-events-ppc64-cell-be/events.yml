@@ -1,0 +1,15 @@
+what:
+  - copyrights
+  - holders
+  - holders_summary
+copyrights:
+  - (c) COPYRIGHT International Business Machines Corp. 2006
+  - Copyright OProfile authors
+holders:
+  - International Business Machines Corp.
+  - OProfile authors
+holders_summary:
+  - value: International Business Machines Corp.
+    count: 1
+  - value: OProfile authors
+    count: 1

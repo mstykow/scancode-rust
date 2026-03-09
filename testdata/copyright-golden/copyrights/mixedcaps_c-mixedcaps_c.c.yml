@@ -1,0 +1,61 @@
+what:
+  - copyrights
+  - holders
+  - holders_summary
+copyrights:
+  - COPYRIGHT (c) 1988-1994 PARADIGM
+  - COPYRIGHT (c) 2006 MYCOP MyCompany3
+  - COPYRIGHT (c) 2006 MyCompany2 MYCOP
+  - Copyright (c) 1984 NEC Systems Laboratory
+  - Copyright (c) 1988-1994 PARADIGM BY CAMBRIDGE asSOCIATES INCORPORATED
+  - Copyright (c) 1993-95 NEC Systems Laboratory
+  - Copyright (c) 1996-2003 Glyph & Cog, LLC
+  - Copyright (c) 1996. Zeus Technology Limited
+  - Copyright (c) 2000 INRIA, France Telecom
+  - Copyright (c) 2002 Juan Carlos Arevalo-Baeza
+  - Copyright (c) 2006 MYCOP MyCompany3
+  - Copyright (c) 2006 MyCompany2 MYCOP
+  - Copyright (c) 2006, FUJITA Yuji
+  - Copyright (c) 2006, SHIMODA Hiroshi
+  - Copyright (c) 2007 GNOME i18n Project
+  - Copyright (c) NEC Systems Laboratory 1993
+  - Copyright 1996-2007 Glyph & Cog, LLC.
+  - copyright (c) 2006 MYCOP MyCompany3
+  - copyright (c) 2006 MyCompany2 MYCOP
+holders:
+  - FUJITA Yuji
+  - GNOME i18n Project
+  - Glyph & Cog, LLC
+  - Glyph & Cog, LLC.
+  - INRIA, France Telecom
+  - Juan Carlos Arevalo-Baeza
+  - MYCOP MyCompany3
+  - MyCompany2 MYCOP
+  - NEC Systems Laboratory
+  - PARADIGM
+  - PARADIGM BY CAMBRIDGE asSOCIATES INCORPORATED
+  - SHIMODA Hiroshi
+  - Zeus Technology Limited
+holders_summary:
+  - value: NEC Systems Laboratory
+    count: 3
+  - value: Glyph & Cog, LLC.
+    count: 2
+  - value: MYCOP MyCompany3
+    count: 2
+  - value: MyCompany2 MYCOP
+    count: 2
+  - value: FUJITA Yuji
+    count: 1
+  - value: GNOME i18n Project
+    count: 1
+  - value: INRIA, France Telecom
+    count: 1
+  - value: Juan Carlos Arevalo-Baeza
+    count: 1
+  - value: PARADIGM
+    count: 1
+  - value: SHIMODA Hiroshi
+    count: 1
+  - value: Zeus Technology Limited
+    count: 1

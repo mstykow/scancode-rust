@@ -21,7 +21,6 @@
 use crate::models::{DatasourceId, Dependency, PackageData, PackageType, Party};
 use crate::parsers::utils::{npm_purl, parse_sri};
 use log::warn;
-use packageurl::PackageUrl;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::fs;
@@ -43,7 +42,6 @@ const FIELD_DEV_DEPENDENCIES: &str = "devDependencies";
 const FIELD_PEER_DEPENDENCIES: &str = "peerDependencies";
 const FIELD_OPTIONAL_DEPENDENCIES: &str = "optionalDependencies";
 const FIELD_BUNDLED_DEPENDENCIES: &str = "bundledDependencies";
-const FIELD_BUNDLE_DEPENDENCIES: &str = "bundleDependencies";
 const FIELD_RESOLUTIONS: &str = "resolutions";
 const FIELD_DESCRIPTION: &str = "description";
 const FIELD_KEYWORDS: &str = "keywords";
@@ -53,6 +51,7 @@ const FIELD_WORKSPACES: &str = "workspaces";
 const FIELD_PRIVATE: &str = "private";
 const FIELD_BUGS: &str = "bugs";
 const FIELD_DIST: &str = "dist";
+const FIELD_OVERRIDES: &str = "overrides";
 const FIELD_PEER_DEPENDENCIES_META: &str = "peerDependenciesMeta";
 const FIELD_DEPENDENCIES_META: &str = "dependenciesMeta";
 
@@ -74,14 +73,8 @@ impl PackageParser for NpmParser {
             }
         };
 
-        let name = json
-            .get(FIELD_NAME)
-            .and_then(|v| v.as_str())
-            .map(String::from);
-        let version = json
-            .get(FIELD_VERSION)
-            .and_then(|v| v.as_str())
-            .map(String::from);
+        let name = extract_non_empty_string(&json, FIELD_NAME);
+        let version = extract_non_empty_string(&json, FIELD_VERSION);
         let namespace = extract_namespace(&name);
         let package_name = extract_package_name(&name);
         let description = extract_description(&json);
@@ -121,6 +114,10 @@ impl PackageParser for NpmParser {
             extra_data_map.insert("workspaces".to_string(), workspaces);
         }
 
+        if let Some(overrides) = extract_overrides(&json) {
+            extra_data_map.insert("overrides".to_string(), overrides);
+        }
+
         if let Some(private) = extract_private(&json) {
             extra_data_map.insert("private".to_string(), serde_json::Value::Bool(private));
         }
@@ -135,28 +132,20 @@ impl PackageParser for NpmParser {
             Some(extra_data_map)
         };
 
-        let (dist_sha256, dist_sha512) = match json.get(FIELD_DIST) {
-            Some(dist) => extract_dist_integrity(dist),
-            None => (None, None),
+        let (dist_sha1, dist_sha256, dist_sha512) = match json.get(FIELD_DIST) {
+            Some(dist) => extract_dist_hashes(dist),
+            None => (None, None, None),
         };
 
         let download_url = json
             .get(FIELD_DIST)
             .and_then(extract_dist_tarball)
-            .or_else(|| {
-                if let (Some(n), Some(v)) = (&name, &version) {
-                    Some(format!(
-                        "https://registry.npmjs.org/{}/-/{}-{}.tgz",
-                        n, n, v
-                    ))
-                } else {
-                    None
-                }
-            });
+            .or_else(|| generate_registry_download_url(&namespace, &package_name, &version));
 
         let api_data_url = generate_npm_api_url(&namespace, &package_name, &version);
-        let repository_homepage_url = generate_repository_homepage_url(&package_name);
-        let repository_download_url = generate_repository_download_url(&package_name, &version);
+        let repository_homepage_url = generate_repository_homepage_url(&namespace, &package_name);
+        let repository_download_url =
+            generate_repository_download_url(&namespace, &package_name, &version);
         let vcs_url = extract_vcs_url(&json);
 
         vec![PackageData {
@@ -171,13 +160,10 @@ impl PackageParser for NpmParser {
             release_date: None,
             parties: extract_parties(&json),
             keywords: keywords_vec,
-            homepage_url: json
-                .get(FIELD_HOMEPAGE)
-                .and_then(|v| v.as_str())
-                .map(String::from),
+            homepage_url: extract_homepage_url(&json),
             download_url,
             size: None,
-            sha1: None,
+            sha1: dist_sha1,
             md5: None,
             sha256: dist_sha256,
             sha512: dist_sha512,
@@ -387,6 +373,15 @@ fn extract_vcs_url(json: &Value) -> Option<String> {
         |tool| format!("{}+{}", tool, vcs_repository),
     );
 
+    if let Some(vcs_revision) = json
+        .get("gitHead")
+        .and_then(|v| v.as_str())
+        .and_then(normalize_non_empty_string)
+    {
+        vcs_url.push('@');
+        vcs_url.push_str(&vcs_revision);
+    }
+
     if let Some(Value::Object(obj)) = json.get(FIELD_REPOSITORY)
         && let Some(directory) = obj.get("directory").and_then(|d| d.as_str())
     {
@@ -535,7 +530,10 @@ fn extract_party_from_field(field: &Value) -> Option<Party> {
             role: obj.get("role").and_then(|v| v.as_str()).map(String::from),
             name: obj.get("name").and_then(|v| v.as_str()).map(String::from),
             email: obj.get("email").and_then(|v| v.as_str()).map(String::from),
-            url: obj.get("url").and_then(|v| v.as_str()).map(String::from),
+            url: obj
+                .get("url")
+                .and_then(|v| v.as_str())
+                .and_then(normalize_optional_party_url),
             organization: None,
             organization_url: None,
             timezone: None,
@@ -598,6 +596,14 @@ fn parse_alias_adapter(version_str: &str) -> Option<(&str, &str)> {
     None
 }
 
+fn extract_non_empty_string(json: &Value, field: &str) -> Option<String> {
+    json.get(field)
+        .and_then(|value| value.as_str())
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(String::from)
+}
+
 fn generate_npm_api_url(
     namespace: &Option<String>,
     name: &Option<String>,
@@ -621,22 +627,49 @@ fn generate_npm_api_url(
     Some(url)
 }
 
-fn generate_repository_homepage_url(name: &Option<String>) -> Option<String> {
-    name.as_ref()
-        .map(|n| format!("https://www.npmjs.com/package/{}", n))
+fn build_registry_package_path(
+    namespace: &Option<String>,
+    name: &Option<String>,
+) -> Option<String> {
+    match (namespace.as_ref(), name.as_ref()) {
+        (Some(namespace), Some(name)) => Some(format!("{namespace}/{name}")),
+        (None, Some(name)) => Some(name.clone()),
+        _ => None,
+    }
 }
 
-fn generate_repository_download_url(
+fn generate_repository_homepage_url(
+    namespace: &Option<String>,
+    name: &Option<String>,
+) -> Option<String> {
+    build_registry_package_path(namespace, name)
+        .map(|package_path| format!("https://www.npmjs.com/package/{package_path}"))
+}
+
+fn generate_registry_download_url(
+    namespace: &Option<String>,
     name: &Option<String>,
     version: &Option<String>,
 ) -> Option<String> {
-    match (name.as_ref(), version.as_ref()) {
-        (Some(n), Some(v)) => Some(format!(
+    match (
+        build_registry_package_path(namespace, name),
+        name.as_ref(),
+        version.as_ref(),
+    ) {
+        (Some(package_path), Some(name), Some(version)) => Some(format!(
             "https://registry.npmjs.org/{}/-/{}-{}.tgz",
-            n, n, v
+            package_path, name, version
         )),
         _ => None,
     }
+}
+
+fn generate_repository_download_url(
+    namespace: &Option<String>,
+    name: &Option<String>,
+    version: &Option<String>,
+) -> Option<String> {
+    generate_registry_download_url(namespace, name, version)
 }
 
 fn extract_dependency_group(
@@ -655,15 +688,14 @@ fn extract_dependency_group(
                     let version_str = version.as_str()?;
 
                     if version_str.starts_with("workspace:") {
-                        let package_url =
-                            PackageUrl::new(NpmParser::PACKAGE_TYPE.as_str(), name).ok()?;
+                        let package_url = npm_purl(name, None)?;
                         let is_opt = if let Some(meta) = optional_meta {
                             meta.get(name).copied()
                         } else {
                             Some(is_optional)
                         };
                         return Some(Dependency {
-                            purl: Some(package_url.to_string()),
+                            purl: Some(package_url),
                             extracted_requirement: Some(version_str.to_string()),
                             scope: Some(scope.to_string()),
                             is_runtime: Some(is_runtime),
@@ -675,22 +707,15 @@ fn extract_dependency_group(
                         });
                     }
 
-                    let (actual_package_name, constraint) =
-                        if let Some(parsed) = parse_alias_adapter(version_str) {
-                            parsed
-                        } else {
-                            (name.as_str(), version_str)
-                        };
+                    let actual_package_name = if let Some((actual_package_name, _constraint)) =
+                        parse_alias_adapter(version_str)
+                    {
+                        actual_package_name
+                    } else {
+                        name.as_str()
+                    };
 
-                    let mut package_url =
-                        PackageUrl::new(NpmParser::PACKAGE_TYPE.as_str(), actual_package_name)
-                            .ok()?;
-
-                    let stripped_version = strip_version_modifier(constraint);
-                    let is_pinned_version = is_exact_version(constraint);
-                    if is_pinned_version {
-                        package_url.with_version(&stripped_version).ok()?;
-                    }
+                    let package_url = npm_purl(actual_package_name, None)?;
 
                     let is_opt = if let Some(meta) = optional_meta {
                         meta.get(name).copied()
@@ -699,12 +724,12 @@ fn extract_dependency_group(
                     };
 
                     Some(Dependency {
-                        purl: Some(package_url.to_string()),
+                        purl: Some(package_url),
                         extracted_requirement: Some(version_str.to_string()),
                         scope: Some(scope.to_string()),
                         is_runtime: Some(is_runtime),
                         is_optional: is_opt,
-                        is_pinned: Some(is_pinned_version),
+                        is_pinned: Some(false),
                         is_direct: Some(true),
                         resolved_package: None,
                         extra_data: None,
@@ -755,28 +780,15 @@ fn extract_optional_dependencies(json: &Value) -> Vec<Dependency> {
     )
 }
 
-/// Extracts bundled dependencies from `bundledDependencies` or `bundleDependencies` field.
-/// Bundled dependencies are arrays of package names without versions.
 fn extract_bundled_dependencies(json: &Value) -> Vec<Dependency> {
-    let mut bundled_deps = Vec::new();
-
-    // First try bundledDependencies (preferred spelling)
     if let Some(bundled) = json
         .get(FIELD_BUNDLED_DEPENDENCIES)
         .and_then(|v| v.as_array())
     {
-        bundled_deps.extend(extract_bundled_list(bundled));
+        extract_bundled_list(bundled)
+    } else {
+        Vec::new()
     }
-
-    // Then try bundleDependencies (alternative spelling)
-    if let Some(bundled) = json
-        .get(FIELD_BUNDLE_DEPENDENCIES)
-        .and_then(|v| v.as_array())
-    {
-        bundled_deps.extend(extract_bundled_list(bundled));
-    }
-
-    bundled_deps
 }
 
 /// Helper function to extract bundled dependencies from an array of package names.
@@ -786,10 +798,10 @@ fn extract_bundled_list(bundled_array: &[Value]) -> Vec<Dependency> {
         .filter_map(|value| {
             let name = value.as_str()?;
             // Create PURL without version for bundled dependencies
-            let package_url = PackageUrl::new(NpmParser::PACKAGE_TYPE.as_str(), name).ok()?;
+            let package_url = npm_purl(name, None)?;
 
             Some(Dependency {
-                purl: Some(package_url.to_string()),
+                purl: Some(package_url),
                 extracted_requirement: None,
                 scope: Some("bundledDependencies".to_string()),
                 is_runtime: Some(true),
@@ -839,10 +851,40 @@ fn extract_dependencies_meta(json: &Value) -> Option<serde_json::Value> {
     json.get(FIELD_DEPENDENCIES_META).cloned()
 }
 
+fn extract_overrides(json: &Value) -> Option<serde_json::Value> {
+    json.get(FIELD_OVERRIDES).cloned()
+}
+
 fn extract_description(json: &Value) -> Option<String> {
     json.get(FIELD_DESCRIPTION)
         .and_then(|v| v.as_str())
         .map(String::from)
+}
+
+fn extract_homepage_url(json: &Value) -> Option<String> {
+    match json.get(FIELD_HOMEPAGE) {
+        Some(Value::String(homepage)) => normalize_non_empty_string(homepage),
+        _ => None,
+    }
+}
+
+fn normalize_non_empty_string(value: &str) -> Option<String> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        None
+    } else {
+        Some(trimmed.to_string())
+    }
+}
+
+fn normalize_optional_party_url(value: &str) -> Option<String> {
+    let normalized = normalize_non_empty_string(value)?;
+
+    if normalized.eq_ignore_ascii_case("none") {
+        None
+    } else {
+        Some(normalized)
+    }
 }
 
 fn extract_keywords_as_vec(json: &Value) -> Vec<String> {
@@ -890,9 +932,11 @@ fn extract_bugs(json: &Value) -> Option<String> {
     match json.get(FIELD_BUGS) {
         Some(bugs) => {
             if let Some(url) = bugs.as_str() {
-                Some(url.to_string())
+                normalize_non_empty_string(url)
             } else if let Some(obj) = bugs.as_object() {
-                obj.get("url").and_then(|v| v.as_str()).map(String::from)
+                obj.get("url")
+                    .and_then(|v| v.as_str())
+                    .and_then(normalize_non_empty_string)
             } else {
                 None
             }
@@ -901,27 +945,45 @@ fn extract_bugs(json: &Value) -> Option<String> {
     }
 }
 
-fn extract_dist_integrity(dist: &Value) -> (Option<String>, Option<String>) {
-    let integrity = match dist.get("integrity").and_then(|v| v.as_str()) {
-        Some(i) => i,
-        None => return (None, None),
-    };
+fn extract_dist_hashes(dist: &Value) -> (Option<String>, Option<String>, Option<String>) {
+    let mut sha1 = dist
+        .get("shasum")
+        .and_then(|v| v.as_str())
+        .and_then(normalize_non_empty_string);
+    let mut sha256 = None;
+    let mut sha512 = None;
 
-    match parse_sri(integrity) {
-        Some((algo, hex_digest)) => match algo.as_str() {
-            "sha256" => (Some(hex_digest), None),
-            "sha512" => (None, Some(hex_digest)),
-            _ => (None, None),
-        },
-        None => (None, None),
+    if let Some(integrity) = dist.get("integrity").and_then(|v| v.as_str())
+        && let Some((algo, hex_digest)) = parse_sri(integrity)
+    {
+        match algo.as_str() {
+            "sha1" => {
+                if sha1.is_none() {
+                    sha1 = Some(hex_digest);
+                }
+            }
+            "sha256" => sha256 = Some(hex_digest),
+            "sha512" => sha512 = Some(hex_digest),
+            _ => {}
+        }
     }
+
+    (sha1, sha256, sha512)
 }
 
 fn extract_dist_tarball(dist: &Value) -> Option<String> {
     dist.get("tarball")
         .or_else(|| dist.get("dnl_url"))
         .and_then(|v| v.as_str())
-        .map(String::from)
+        .map(normalize_npm_registry_tarball_url)
+}
+
+fn normalize_npm_registry_tarball_url(url: &str) -> String {
+    if let Some(path) = url.strip_prefix("http://registry.npmjs.org/") {
+        format!("https://registry.npmjs.org/{path}")
+    } else {
+        url.to_string()
+    }
 }
 
 fn combine_extra_data(
@@ -933,22 +995,6 @@ fn combine_extra_data(
         combined.insert(key, value);
     }
     combined
-}
-
-/// Strips version modifiers (e.g., ~, ^, >=) from a version string.
-fn strip_version_modifier(version: &str) -> String {
-    version.trim_start_matches(['~', '^', '>', '=']).to_string()
-}
-
-fn is_exact_version(version: &str) -> bool {
-    !version.starts_with('~')
-        && !version.starts_with('^')
-        && !version.starts_with('>')
-        && !version.starts_with('<')
-        && !version.starts_with('=')
-        && !version.starts_with('*')
-        && !version.contains("||")
-        && !version.contains(" - ")
 }
 
 crate::register_parser!(

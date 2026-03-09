@@ -144,18 +144,18 @@ WriteMakefile(
 
 ### WriteMakefile Parameters Supported
 
-| Parameter | PackageData Field | Notes |
-|-----------|------------------|-------|
-| `NAME` | `name` | Module name |
-| `VERSION` | `version` | Version string |
-| `VERSION_FROM` | `version` | Extract from file (not implemented) |
-| `ABSTRACT` | `description` | Short description |
-| `ABSTRACT_FROM` | `description` | Extract from file (not implemented) |
-| `AUTHOR` | `parties` (role=`author`) | Author info |
-| `LICENSE` | `declared_license_expression` | License identifier |
-| `PREREQ_PM` | `dependencies` (scope=`runtime`) | Runtime deps |
-| `BUILD_REQUIRES` | `dependencies` (scope=`build`) | Build deps |
-| `TEST_REQUIRES` | `dependencies` (scope=`test`) | Test deps |
+| Parameter        | PackageData Field                | Notes                               |
+| ---------------- | -------------------------------- | ----------------------------------- |
+| `NAME`           | `name`                           | Module name                         |
+| `VERSION`        | `version`                        | Version string                      |
+| `VERSION_FROM`   | `version`                        | Extract from file (not implemented) |
+| `ABSTRACT`       | `description`                    | Short description                   |
+| `ABSTRACT_FROM`  | `description`                    | Extract from file (not implemented) |
+| `AUTHOR`         | `parties` (role=`author`)        | Author info                         |
+| `LICENSE`        | `declared_license_expression`    | License identifier                  |
+| `PREREQ_PM`      | `dependencies` (scope=`runtime`) | Runtime deps                        |
+| `BUILD_REQUIRES` | `dependencies` (scope=`build`)   | Build deps                          |
+| `TEST_REQUIRES`  | `dependencies` (scope=`test`)    | Test deps                           |
 
 ### Dependency Hash Format
 

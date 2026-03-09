@@ -22,8 +22,8 @@
     },
     {
       "for_packages": [
-        "pkg:alpine/musl@1.2.3-r0?arch=x86_64&uuid=fixed-uid-done-for-testing-5642512d1758",
-        "pkg:alpine/busybox@1.35.0-r17?arch=x86_64&uuid=fixed-uid-done-for-testing-5642512d1758"
+        "pkg:alpine/busybox@1.35.0-r17?arch=x86_64&uuid=fixed-uid-done-for-testing-5642512d1758",
+        "pkg:alpine/musl@1.2.3-r0?arch=x86_64&uuid=fixed-uid-done-for-testing-5642512d1758"
       ],
       "path": "lib/apk/db/installed"
     },
@@ -36,50 +36,8 @@
   ],
   "packages": [
     {
-      "datafile_paths": [
-        "lib/apk/db/installed"
-      ],
-      "datasource_ids": [
-        "alpine_installed_db"
-      ],
-      "description": "the musl c library (libc) implementation",
-      "extra_data": {
-        "build_timestamp": "1649396308",
-        "checksum": "Q1abc123=",
-        "compressed_size": "383304",
-        "installed_size": "622592",
-        "missing_file_references": [
-          {
-            "path": "lib/ld-musl-x86_64.so.1"
-          }
-        ]
-      },
-      "extracted_license_statement": "MIT",
-      "homepage_url": "https://musl.libc.org/",
-      "name": "musl",
-      "namespace": "alpine",
-      "package_uid": "pkg:alpine/musl@1.2.3-r0?arch=x86_64&uuid=fixed-uid-done-for-testing-5642512d1758",
-      "parties": [
-        {
-          "email": "timo.teras@iki.fi",
-          "name": "Timo Teras",
-          "role": "maintainer"
-        }
-      ],
-      "purl": "pkg:alpine/musl@1.2.3-r0?arch=x86_64",
-      "source_packages": [
-        "pkg:alpine/musl"
-      ],
-      "type": "alpine",
-      "version": "1.2.3-r0"
-    },
-    {
-      "datafile_paths": [
-        "lib/apk/db/installed"
-      ],
-      "datasource_ids": [
-        "alpine_installed_db"
-      ],
+      "datafile_paths": ["lib/apk/db/installed"],
+      "datasource_ids": ["alpine_installed_db"],
       "description": "Size optimized toolbox of many common UNIX utilities",
       "extra_data": {
         "build_timestamp": "1655134784",
@@ -105,11 +63,41 @@
         }
       ],
       "purl": "pkg:alpine/busybox@1.35.0-r17?arch=x86_64",
-      "source_packages": [
-        "pkg:alpine/busybox"
-      ],
+      "source_packages": ["pkg:alpine/busybox"],
       "type": "alpine",
       "version": "1.35.0-r17"
+    },
+    {
+      "datafile_paths": ["lib/apk/db/installed"],
+      "datasource_ids": ["alpine_installed_db"],
+      "description": "the musl c library (libc) implementation",
+      "extra_data": {
+        "build_timestamp": "1649396308",
+        "checksum": "Q1abc123=",
+        "compressed_size": "383304",
+        "installed_size": "622592",
+        "missing_file_references": [
+          {
+            "path": "lib/ld-musl-x86_64.so.1"
+          }
+        ]
+      },
+      "extracted_license_statement": "MIT",
+      "homepage_url": "https://musl.libc.org/",
+      "name": "musl",
+      "namespace": "alpine",
+      "package_uid": "pkg:alpine/musl@1.2.3-r0?arch=x86_64&uuid=fixed-uid-done-for-testing-5642512d1758",
+      "parties": [
+        {
+          "email": "timo.teras@iki.fi",
+          "name": "Timo Teras",
+          "role": "maintainer"
+        }
+      ],
+      "purl": "pkg:alpine/musl@1.2.3-r0?arch=x86_64",
+      "source_packages": ["pkg:alpine/musl"],
+      "type": "alpine",
+      "version": "1.2.3-r0"
     }
   ]
 }

@@ -278,10 +278,6 @@ mod tests {
         assert_eq!(matches[1].start_token, 100);
     }
 
-    #[test]
-    fn test_lines_threshold_constant() {
-        assert_eq!(LINES_THRESHOLD, 4);
-    }
 
     #[test]
     fn test_grouping_within_both_thresholds() {

@@ -1,0 +1,11 @@
+what:
+  - copyrights
+  - holders
+  - authors
+copyrights:
+  - Copyright 1993 United States Government
+  - Copyright 1994-2000 by Donald Becker
+holders:
+  - Donald Becker
+  - United States Government
+authors: []

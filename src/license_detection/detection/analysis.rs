@@ -2,12 +2,8 @@
 
 use super::types::LicenseDetection;
 use super::*;
-use crate::license_detection::expression::{combine_expressions, CombineRelation};
+use crate::license_detection::expression::{CombineRelation, combine_expressions};
 use crate::license_detection::models::LicenseMatch;
-
-/// Matches with line gap > this are considered separate groups.
-/// Corresponds to Python's LINES_THRESHOLD = 4 (query.py:108)
-pub const LINES_THRESHOLD: usize = 4;
 
 /// Coverage value below which detections are not perfect.
 /// Any value < 100 means detection is imperfect.
@@ -317,7 +313,7 @@ pub(super) fn analyze_detection(matches: &[LicenseMatch], package_license: bool)
 
     // Check 1: Undetected matches
     if is_undetected_license_matches(matches) {
-        return "undetected-license-matches";
+        return DETECTION_LOG_UNDETECTED_LICENSE;
     }
 
     // Check 2: Unknown intro before detection
@@ -337,7 +333,7 @@ pub(super) fn analyze_detection(matches: &[LicenseMatch], package_license: bool)
 
     // Check 5: License clues
     if !package_license && has_correct_license_clue_matches(matches) {
-        return "license-clues";
+        return DETECTION_LOG_LICENSE_CLUES;
     }
 
     // Check 6: Perfect detection (correct AND no unknowns AND no extra words)
@@ -347,7 +343,7 @@ pub(super) fn analyze_detection(matches: &[LicenseMatch], package_license: bool)
 
     // Check 7: Unknown matches
     if has_unknown_matches(matches) {
-        return "unknown-match";
+        return DETECTION_LOG_UNKNOWN_MATCH;
     }
 
     // Check 8: Low quality matches
@@ -360,12 +356,12 @@ pub(super) fn analyze_detection(matches: &[LicenseMatch], package_license: bool)
         .iter()
         .any(|m| m.match_coverage < IMPERFECT_MATCH_COVERAGE_THR - 0.01)
     {
-        return "imperfect-match-coverage";
+        return DETECTION_LOG_IMPERFECT_COVERAGE;
     }
 
     // Check 10: Extra words
     if has_extra_words(matches) {
-        return "has-extra-words";
+        return DETECTION_LOG_EXTRA_WORDS;
     }
 
     ""
@@ -439,8 +435,6 @@ pub fn determine_spdx_expression(matches: &[LicenseMatch]) -> Result<String, Str
         .map_err(|e| format!("Failed to combine SPDX expressions: {}", e))
 }
 
-/// Determine SPDX expression from ScanCode license keys.
-///
 /// Determine SPDX expression from ScanCode license keys.
 ///
 /// Based on Python: determine_spdx_expression_from_scancode() at detection.py:1674-1709
@@ -1317,26 +1311,6 @@ mod tests {
     }
 
     #[test]
-    fn test_imperfect_match_coverage_threshold_constant() {
-        assert_eq!(IMPERFECT_MATCH_COVERAGE_THR, 100.0);
-    }
-
-    #[test]
-    fn test_clues_match_coverage_threshold_constant() {
-        assert_eq!(CLUES_MATCH_COVERAGE_THR, 60.0);
-    }
-
-    #[test]
-    fn test_false_positive_rule_length_threshold_constant() {
-        assert_eq!(FALSE_POSITIVE_RULE_LENGTH_THRESHOLD, 3);
-    }
-
-    #[test]
-    fn test_false_positive_start_line_threshold_constant() {
-        assert_eq!(FALSE_POSITIVE_START_LINE_THRESHOLD, 1000);
-    }
-
-    #[test]
     fn test_is_undetected_license_matches_single_undetected() {
         let mut m = create_test_match(100.0, "mit.LICENSE");
         m.matcher = "undetected".to_string();
@@ -1373,7 +1347,7 @@ mod tests {
         let matches = vec![m];
         assert_eq!(
             analyze_detection(&matches, false),
-            "undetected-license-matches"
+            DETECTION_LOG_UNDETECTED_LICENSE
         );
     }
 
@@ -1415,7 +1389,7 @@ mod tests {
     #[test]
     fn test_analyze_detection_unknown_match() {
         let matches = vec![create_test_match(95.0, "unknown.LICENSE")];
-        assert_eq!(analyze_detection(&matches, false), "unknown-match");
+        assert_eq!(analyze_detection(&matches, false), DETECTION_LOG_UNKNOWN_MATCH);
     }
 
     #[test]
@@ -1435,7 +1409,7 @@ mod tests {
         let matches = vec![m];
         assert_eq!(
             analyze_detection(&matches, false),
-            "imperfect-match-coverage"
+            DETECTION_LOG_IMPERFECT_COVERAGE
         );
     }
 

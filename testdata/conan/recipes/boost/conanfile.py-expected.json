@@ -10,10 +10,7 @@
     "description": "Boost provides free peer-reviewed portable C++ source libraries",
     "release_date": null,
     "parties": [],
-    "keywords": [
-      "libraries",
-      "cpp"
-    ],
+    "keywords": ["libraries", "cpp"],
     "homepage_url": "https://www.boost.org",
     "download_url": null,
     "size": null,

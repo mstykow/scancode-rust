@@ -4,13 +4,13 @@ A high-performance code scanning tool written in Rust that detects licenses, cop
 
 ## Overview
 
-`scancode-rust` is designed to be a faster alternative to the Python-based [ScanCode Toolkit](https://github.com/nexB/scancode-toolkit), aiming to produce compatible output formats while delivering significantly improved performance. This tool currently scans codebases to identify:
+`scancode-rust` is designed to be a faster alternative to the Python-based [ScanCode Toolkit](https://github.com/nexB/scancode-toolkit), with a focus on drop-in replacement compatibility while delivering significantly improved performance. This tool currently scans codebases to identify:
 
 - License information
 - File metadata
 - System information
 
-More ScanCode features coming soon!
+For design details and implementation guidance, see the documentation in `docs/`.
 
 ## Features
 
@@ -60,17 +60,47 @@ The compiled binary will be available at `target/release/scancode-rust`.
 ## Usage
 
 ```sh
-scancode-rust [OPTIONS] <DIR_PATH> --output-file <OUTPUT_FILE>
+scancode-rust [OPTIONS] <DIR_PATH>...
 ```
 
 ### Options
 
 ```sh
 Options:
-  -o, --output-file <OUTPUT_FILE>    Output JSON file path
-  -d, --max-depth <MAX_DEPTH>        Maximum directory depth to scan [default: 50]
-  -e, --exclude <EXCLUDE>...         Glob patterns to exclude from scanning
+      --json <FILE>                   Write compact JSON to FILE
+      --json-pp <FILE>                Write pretty JSON to FILE
+      --json-lines <FILE>             Write JSON Lines to FILE
+      --yaml <FILE>                   Write YAML to FILE
+      --csv <FILE>                    Write CSV to FILE
+      --html <FILE>                   Write HTML report to FILE
+      --spdx-tv <FILE>                Write SPDX Tag/Value to FILE
+      --spdx-rdf <FILE>               Write SPDX RDF/XML to FILE
+      --cyclonedx <FILE>              Write CycloneDX JSON to FILE
+      --cyclonedx-xml <FILE>          Write CycloneDX XML to FILE
+      --custom-output <FILE>          Write custom templated output to FILE
+      --custom-template <FILE>        Template path (requires --custom-output)
+  -m, --max-depth <MAX_DEPTH>        Maximum recursion depth (0 means no depth limit) [default: 0]
+  -n, --processes <PROCESSES>        Number of worker processes [default: CPUs-1]
+      --timeout <TIMEOUT>            Per-file timeout in seconds [default: 120]
+  -q, --quiet                        Suppress summary and progress output
+  -v, --verbose                      Print file-by-file progress output
+      --strip-root                   Strip the root segment from reported paths
+      --full-root                    Report full absolute paths
+      --exclude <EXCLUDE>            Glob patterns to exclude from scanning (alias: --ignore)
+      --include <INCLUDE>            Glob patterns to include in output
+      --from-json                    Load from previous JSON scan file (input is positional JSON path)
+      --cache-dir <PATH>             Override cache directory for persisted scan cache data
+      --cache-clear                  Remove persisted cache data before directory scan starts
+      --max-in-memory <INT>          Max findings kept in memory before spill behavior (parity surface; behavior roadmap in caching plan)
       --no-assemble                  Disable package assembly (merging related manifest/lockfiles)
+      --filter-clues                 Remove redundant clue-level findings
+      --only-findings                Keep only files/directories with findings
+      --mark-source                  Mark source-heavy files/directories
+  -c, --copyright                    Enable copyright/holder/author detection
+  -e, --email                        Scan input for email addresses
+      --max-email <INT>              Max emails per file [default: 50; requires --email]
+  -u, --url                          Scan input for URLs
+      --max-url <INT>                Max URLs per file [default: 50; requires --url]
   -h, --help                         Print help
   -V, --version                      Print version
 ```
@@ -78,8 +108,14 @@ Options:
 ### Example
 
 ```sh
-scancode-rust ~/projects/my-codebase -o scan-results.json --exclude "*.git*" "target/*" "node_modules/*"
+scancode-rust --json-pp scan-results.json ~/projects/my-codebase --ignore "*.git*" --ignore "target/*" --ignore "node_modules/*"
 ```
+
+Use `-` as FILE to write an output stream to stdout (for example: `--json-pp -`).
+Multiple output flags can be used in a single run, matching ScanCode CLI
+behavior.
+When using `--from-json`, you can pass multiple JSON inputs; directory scan mode currently supports one input path.
+Cache location can also be controlled with the `SCANCODE_RUST_CACHE` environment variable.
 
 ## Performance
 
@@ -87,11 +123,22 @@ scancode-rust ~/projects/my-codebase -o scan-results.json --exclude "*.git*" "ta
 
 ## Output Format
 
-The tool produces JSON output compatible with ScanCode Toolkit, including:
+Implemented output formats:
 
-- Scan headers with timestamp information
-- File-level data with license and metadata information
-- System environment details
+- JSON (ScanCode-compatible baseline)
+- YAML
+- CSV
+- JSON Lines
+- SPDX (Tag-Value, RDF/XML)
+- CycloneDX (JSON, XML)
+- HTML report
+- HTML app
+- Custom template rendering
+
+Output architecture and compatibility approach are documented in:
+
+- `docs/ARCHITECTURE.md`
+- `docs/TESTING_STRATEGY.md`
 
 ## Documentation
 
@@ -126,7 +173,8 @@ To contribute to `scancode-rust`, follow these steps to set up the repository fo
    ```
 
 3. **Initialize the License Submodule**  
-   Use the following script to initialize the submodule and configure sparse checkout:
+   Use the following script to initialize the submodule and configure sparse checkout.  
+   If `pre-commit` is installed, this script also installs Git pre-commit hooks automatically:
 
    ```sh
    ./setup.sh
@@ -146,8 +194,9 @@ To contribute to `scancode-rust`, follow these steps to set up the repository fo
    cargo test
    ```
 
-6. **Set Up Pre-commit Hooks**  
-   This repository uses [pre-commit](https://pre-commit.com/) to run checks before each commit:
+6. **Install Pre-commit (if needed)**  
+   This repository uses [pre-commit](https://pre-commit.com/) to run checks before each commit.  
+   If you install `pre-commit` after running `./setup.sh`, run `pre-commit install` once:
 
    ```sh
    # Using pip
@@ -158,6 +207,13 @@ To contribute to `scancode-rust`, follow these steps to set up the repository fo
 
    # Install the hooks
    pre-commit install
+   ```
+
+   Common documentation quality commands:
+
+   ```sh
+   npm run check:docs  # markdownlint + prettier check
+   npm run fix:docs    # markdownlint auto-fix + prettier write
    ```
 
 7. **Start Developing**  
@@ -203,9 +259,9 @@ Use the `release.sh` script:
 
 Available release types:
 
-- `patch`: Increments the patch version (0.0.4 → 0.0.5)
-- `minor`: Increments the minor version (0.0.4 → 0.1.0)
-- `major`: Increments the major version (0.0.4 → 1.0.0)
+- `patch`: Increments `X.Y.Z` to `X.Y.(Z+1)`
+- `minor`: Increments `X.Y.Z` to `X.(Y+1).0`
+- `major`: Increments `X.Y.Z` to `(X+1).0.0`
 
 **What happens automatically:**
 

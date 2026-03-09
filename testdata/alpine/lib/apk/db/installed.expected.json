@@ -14,9 +14,7 @@
     ],
     "homepage_url": "https://git.alpinelinux.org/cgit/aports/tree/main/alpine-baselayout",
     "extracted_license_statement": "GPL-2.0-only",
-    "source_packages": [
-      "pkg:alpine/alpine-baselayout"
-    ],
+    "source_packages": ["pkg:alpine/alpine-baselayout"],
     "file_references": [
       {
         "path": "etc/fstab",

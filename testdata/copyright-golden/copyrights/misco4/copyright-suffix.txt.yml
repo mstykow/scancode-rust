@@ -1,0 +1,11 @@
+what:
+  - copyrights
+  - holders
+  - authors
+copyrights:
+  - Copyright (c) 2002-2003, Laurent Monin
+  - Copyright (c) 2003-2004, The ELinks Project
+holders:
+  - Laurent Monin
+  - The ELinks Project
+authors: []

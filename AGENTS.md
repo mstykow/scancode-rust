@@ -62,9 +62,10 @@ git submodule update --init   # Ensure all submodules are initialized
 # Build & Test
 cargo build                   # Development build
 cargo build --release         # Optimized build
-cargo test                    # Run all tests
+cargo test                    # Run all tests (excludes golden tests)
 cargo test <test_name>        # Run specific test (e.g., test_extract_from_testdata)
 cargo test --lib              # Test library code only (faster)
+cargo test --features golden-tests  # Include golden tests (slower, compares against Python ScanCode)
 
 # Code Quality
 cargo fmt                     # Format code
@@ -72,7 +73,7 @@ cargo clippy                  # Lint and catch mistakes
 cargo clippy --fix            # Auto-fix clippy suggestions
 
 # Run Tool
-cargo run -- <dir> -o output.json --exclude "*.git*" "target/*"
+cargo run -- --json-pp output.json <dir> --exclude "*.git*" "target/*"
 ```
 
 ## Running Single Tests
@@ -81,7 +82,7 @@ To run a specific test, use its full path from `cargo test -- --list`:
 
 ```bash
 cargo test parsers::npm_test::tests::test_extract_from_testdata
-cargo test askalono::strategy::tests::single_optimize
+cargo test parsers::npm_test::tests::test_is_match
 cargo test test_is_match       # Runs all tests with "test_is_match" in name
 ```
 
@@ -257,6 +258,13 @@ scancode-rust uses a **four-layer testing approach** for comprehensive quality a
 
 **For complete testing philosophy and guidelines**: See [`docs/TESTING_STRATEGY.md`](docs/TESTING_STRATEGY.md)
 
+### Golden Test Expected Files: Change with Care
+
+Golden test expected files (the reference JSON outputs) serve as the ground truth for regression testing. They should **not be modified casually** just to make a failing test pass.
+
+- **Default assumption**: If a golden test fails, the implementation is wrong — fix the code, not the test expectation.
+- **Updating expected files is acceptable** when the scanner output is truly correct or superior to the existing snapshot (e.g., fixing a bug from the Python reference, improved accuracy, or capturing previously missing data). Just make sure the improvement is intentional, not a side effect of a regression elsewhere.
+
 ### Quick Testing Reference
 
 **Co-located tests**: Use `#[cfg(test)] mod tests { ... }` in implementation files
@@ -282,6 +290,9 @@ mod tests {
 
 - `cargo fmt --all` - Format code and stage changes
 - `cargo clippy --all-targets --all-features -- -D warnings` - Lint with warnings as errors
+- `cargo run --quiet --bin generate-supported-formats` - Regenerate `docs/SUPPORTED_FORMATS.md` when parser files change
+- `npm run lint:md:fix` - Lint and auto-fix Markdown
+- `npm run format` - Format YAML, JSON, and Markdown with Prettier
 
 **GitHub Actions** (runs on push to main and PRs):
 
@@ -289,6 +300,7 @@ mod tests {
 - Clippy linting: `cargo clippy --all-targets --all-features -- -D warnings`
 - Compilation: `cargo check --all --verbose`
 - Test suite: `cargo test --all --verbose`
+- Golden tests: `cargo test --all --verbose --features golden-tests`
 
 **All checks must pass before merging.**
 
@@ -313,6 +325,8 @@ mod tests {
 9. **Unwrap in library code**: Use `?` or `match` instead
 10. **Breaking parallel processing**: Ensure modifications maintain thread safety
 11. **Incomplete testing**: Every feature needs comprehensive test coverage including edge cases
+12. **Modifying golden test expected files**: Don't change expected output files just to make tests pass. Only update them when the scanner output is genuinely improved — and document why. See [Golden Test Expected Files: Change with Care](#golden-test-expected-files-change-with-care).
+13. **Suppressing clippy warnings**: Never use `#[allow(...)]` or `#[expect(...)]` to ignore clippy errors or warnings as a shortcut or temporary workaround. Clippy suppressions are only acceptable when the lint is genuinely a false positive and the suppression is intended to be permanent. Every suppression must include a comment explaining why it is justified. If clippy flags something, fix the code properly.
 
 ## Porting Features from Original ScanCode
 
@@ -393,9 +407,10 @@ Before considering a feature complete:
 - [ ] All edge cases from original tests are covered
 - [ ] Known bugs from original are fixed (and tested)
 - [ ] Error handling is comprehensive and explicit
-- [ ] Code is idiomatic Rust (passes `clippy` without warnings)
+- [ ] Code is idiomatic Rust (passes `clippy` without warnings — no suppressed lints unless permanently justified)
 - [ ] Performance is equal to or better than original
 - [ ] Real-world testdata produces correct output
+- [ ] Golden test expected files are unchanged unless output genuinely improved (documented)
 - [ ] Documentation explains any intentional behavioral differences
 
 ## Parser Implementation Guidelines
@@ -518,10 +533,10 @@ Without datasource IDs, the assembler couldn't distinguish between different fil
 
 ### How They Differ from `package_type`
 
-| Field | Purpose | Example Values | Granularity |
-|-------|---------|----------------|-------------|
-| `package_type` | Ecosystem/registry identifier | `"npm"`, `"pypi"`, `"cargo"` | Coarse (ecosystem-level) |
-| `datasource_id` | Specific file format identifier | `DatasourceId::NpmPackageJson`, `DatasourceId::NpmPackageLockJson` | Fine (file-type-level) |
+| Field           | Purpose                         | Example Values                                                     | Granularity              |
+| --------------- | ------------------------------- | ------------------------------------------------------------------ | ------------------------ |
+| `package_type`  | Ecosystem/registry identifier   | `"npm"`, `"pypi"`, `"cargo"`                                       | Coarse (ecosystem-level) |
+| `datasource_id` | Specific file format identifier | `DatasourceId::NpmPackageJson`, `DatasourceId::NpmPackageLockJson` | Fine (file-type-level)   |
 
 **Key difference**: One `package_type` can have multiple `datasource_id` values.
 

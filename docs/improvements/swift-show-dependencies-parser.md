@@ -26,7 +26,7 @@ def _parse(cls, swift_dependency_relation, package_only=False):
         name=swift_dependency_relation.get("name"),  # ONLY NAME
         dependencies=dependencies,
     )
-    
+
     return models.PackageData.from_data(package_data, package_only)
 ```
 
@@ -75,7 +75,7 @@ The parser uses breadth-first traversal to flatten the nested dependency tree:
 {
   "name": "VercelUI",
   "version": "1.0.0",
-  "url": "https://github.com/vercel/VercelUI",
+  "url": "https://github.com/swift-cloud/Vercel",
   "dependencies": [
     {
       "identity": "vercel",
@@ -135,7 +135,7 @@ The parser uses breadth-first traversal to flatten the nested dependency tree:
   "primary_language": "Swift",
   "name": "VercelUI",
   "version": "1.0.0",
-  "homepage_url": "https://github.com/vercel/VercelUI",
+  "homepage_url": "https://github.com/swift-cloud/Vercel",
   "dependencies": [
     {
       "purl": "pkg:swift/github.com/swift-cloud/Vercel",

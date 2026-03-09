@@ -1,0 +1,67 @@
+what:
+  - copyrights
+  - holders
+  - holders_summary
+copyrights:
+  - Copyright (c) 1995-2000 Corporation for National Research Initiatives
+  - Copyright (c) 1999 Trolltech AS, Norway
+  - Copyright (c) 2000. OCLC Research
+  - Copyright (c) 2001 AT&T
+  - Copyright (c) 2001 EU DataGrid
+  - Copyright (c) 2002-2009 Software in the Public Interest, Inc.
+  - Copyright (c) 2002-2009 ooo-build/Go-OO Team
+  - Copyright (c) 2004 by the Perl 5 Porters
+  - Copyright (c) 2004-2006 by Henrique de Moraes Holschuh <hmh@debian.org>
+  - Copyright (c) 2006 Academy of Motion Picture Arts and Sciences
+  - Copyright (c) 2006, FUJITA Yuji <yuji@webmasters.gr.jp>
+  - Copyright (c) 2006, SHIMODA Hiroshi <piro@p.club.ne.jp>
+  - Copyright (c) 2007 James Newton-King
+  - Copyright 1991 by the Massachusetts Institute of Technology
+  - Copyright 2005-2007 Christopher Montgomery, Jean-Marc Valin, Timothy Terriberry, CSIRO, and other contributors
+holders:
+  - AT&T
+  - Academy of Motion Picture Arts and Sciences
+  - Christopher Montgomery, Jean-Marc Valin, Timothy Terriberry, CSIRO, and other contributors
+  - Corporation for National Research Initiatives
+  - EU DataGrid
+  - FUJITA Yuji
+  - Henrique de Moraes Holschuh
+  - James Newton-King
+  - OCLC Research
+  - SHIMODA Hiroshi
+  - Software in the Public Interest, Inc.
+  - Trolltech AS, Norway
+  - ooo-build/Go-OO Team
+  - the Massachusetts Institute of Technology
+  - the Perl 5 Porters
+holders_summary:
+  - value: AT&T
+    count: 1
+  - value: Academy of Motion Picture Arts and Sciences
+    count: 1
+  - value: Christopher Montgomery, Jean-Marc Valin, Timothy Terriberry, CSIRO, and other contributors
+    count: 1
+  - value: Corporation for National Research Initiatives
+    count: 1
+  - value: EU DataGrid
+    count: 1
+  - value: FUJITA Yuji
+    count: 1
+  - value: Henrique de Moraes Holschuh
+    count: 1
+  - value: James Newton-King
+    count: 1
+  - value: OCLC Research
+    count: 1
+  - value: SHIMODA Hiroshi
+    count: 1
+  - value: Software in the Public Interest, Inc.
+    count: 1
+  - value: Trolltech AS, Norway
+    count: 1
+  - value: ooo-build/Go-OO Team
+    count: 1
+  - value: the Massachusetts Institute of Technology
+    count: 1
+  - value: the Perl 5 Porters
+    count: 1

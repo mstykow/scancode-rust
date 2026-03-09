@@ -1,0 +1,11 @@
+what:
+  - copyrights
+  - holders
+  - authors
+copyrights:
+  - Copyright (c) 2018 Bootlin
+  - Copyright (c) 2018 Chen-Yu Tsai
+holders:
+  - Bootlin
+  - Chen-Yu Tsai
+authors: []

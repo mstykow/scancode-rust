@@ -23,7 +23,7 @@
 //! cargo test license_detection_golden
 //! ```
 
-#[cfg(test)]
+#[cfg(all(test, feature = "golden-tests"))]
 mod golden_tests {
     use crate::license_detection::LicenseDetectionEngine;
     use crate::utils::file_text::extract_text_for_detection;
@@ -129,7 +129,9 @@ mod golden_tests {
                     Ok(Some(text))
                 }
             } else if crate::utils::text::is_source(&self.test_file) {
-                Ok(Some(crate::utils::text::remove_verbatim_escape_sequences(&text)))
+                Ok(Some(crate::utils::text::remove_verbatim_escape_sequences(
+                    &text,
+                )))
             } else {
                 Ok(Some(text))
             }

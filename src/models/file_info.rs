@@ -6,8 +6,9 @@ use super::DatasourceId;
 use super::PackageType;
 use crate::utils::spdx::combine_license_expressions;
 
-#[derive(Debug, Builder, Serialize)]
+#[derive(Debug, Builder, Serialize, Deserialize)]
 #[builder(build_fn(skip))]
+/// File-level scan result containing metadata and detected findings.
 pub struct FileInfo {
     pub name: String,
     pub base_name: String,
@@ -29,23 +30,45 @@ pub struct FileInfo {
     #[builder(default)]
     pub programming_language: Option<String>,
     #[builder(default)]
+    #[serde(default)]
     pub package_data: Vec<PackageData>,
     #[serde(rename = "detected_license_expression_spdx")] // name used by ScanCode
     #[builder(default)]
     pub license_expression: Option<String>,
     #[builder(default)]
+    #[serde(default)]
     pub license_detections: Vec<LicenseDetection>,
     #[builder(default)]
+    #[serde(default)]
     pub copyrights: Vec<Copyright>,
     #[builder(default)]
+    #[serde(default)]
+    pub holders: Vec<Holder>,
+    #[builder(default)]
+    #[serde(default)]
+    pub authors: Vec<Author>,
+    #[builder(default)]
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub emails: Vec<OutputEmail>,
+    #[builder(default)]
+    #[serde(default)]
     pub urls: Vec<OutputURL>,
     #[builder(default)]
+    #[serde(default)]
     pub for_packages: Vec<String>,
     #[builder(default)]
+    #[serde(default)]
     pub scan_errors: Vec<String>,
+    #[builder(default)]
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub is_source: Option<bool>,
+    #[builder(default)]
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub source_count: Option<usize>,
 }
 
 impl FileInfoBuilder {
+    /// Build a [`FileInfo`] from the current builder state.
     pub fn build(&self) -> Result<FileInfo, String> {
         Ok(FileInfo::new(
             self.name.clone().ok_or("Missing field: name")?,
@@ -64,6 +87,9 @@ impl FileInfoBuilder {
             self.license_expression.clone().flatten(),
             self.license_detections.clone().unwrap_or_default(),
             self.copyrights.clone().unwrap_or_default(),
+            self.holders.clone().unwrap_or_default(),
+            self.authors.clone().unwrap_or_default(),
+            self.emails.clone().unwrap_or_default(),
             self.urls.clone().unwrap_or_default(),
             self.for_packages.clone().unwrap_or_default(),
             self.scan_errors.clone().unwrap_or_default(),
@@ -73,6 +99,7 @@ impl FileInfoBuilder {
 
 impl FileInfo {
     #[allow(clippy::too_many_arguments)]
+    /// Construct a [`FileInfo`] from fully resolved scanner fields.
     pub fn new(
         name: String,
         base_name: String,
@@ -90,6 +117,9 @@ impl FileInfo {
         mut license_expression: Option<String>,
         mut license_detections: Vec<LicenseDetection>,
         copyrights: Vec<Copyright>,
+        holders: Vec<Holder>,
+        authors: Vec<Author>,
+        emails: Vec<OutputEmail>,
         urls: Vec<OutputURL>,
         for_packages: Vec<String>,
         scan_errors: Vec<String>,
@@ -134,9 +164,14 @@ impl FileInfo {
             license_expression,
             license_detections,
             copyrights,
+            holders,
+            authors,
+            emails,
             urls,
             for_packages,
             scan_errors,
+            is_source: None,
+            source_count: None,
         }
     }
 }
@@ -294,9 +329,23 @@ pub struct Match {
     pub matched_text: Option<String>,
 }
 
-#[derive(Serialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Copyright {
     pub copyright: String,
+    pub start_line: usize,
+    pub end_line: usize,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Holder {
+    pub holder: String,
+    pub start_line: usize,
+    pub end_line: usize,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Author {
+    pub author: String,
     pub start_line: usize,
     pub end_line: usize,
 }
@@ -413,7 +462,7 @@ pub struct FileReference {
 /// - `datafile_paths`: list of all contributing files
 /// - `datasource_ids`: list of all contributing parsers
 /// - Excludes `dependencies` and `file_references` (hoisted to top-level)
-#[derive(Serialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Package {
     #[serde(rename = "type")]
     pub package_type: Option<PackageType>,
@@ -645,7 +694,7 @@ impl Package {
 ///
 /// Extends the file-level `Dependency` with traceability fields that link
 /// each dependency to its owning package and source datafile.
-#[derive(Serialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct TopLevelDependency {
     pub purl: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -722,9 +771,18 @@ pub fn build_package_uid(purl: &str) -> String {
     }
 }
 
-#[derive(Serialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct OutputEmail {
+    pub email: String,
+    pub start_line: usize,
+    pub end_line: usize,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct OutputURL {
     pub url: String,
+    pub start_line: usize,
+    pub end_line: usize,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -743,5 +801,19 @@ impl Serialize for FileType {
             FileType::Directory => "directory",
         };
         serializer.serialize_str(value)
+    }
+}
+
+impl<'de> Deserialize<'de> for FileType {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        match value.as_str() {
+            "file" => Ok(FileType::File),
+            "directory" => Ok(FileType::Directory),
+            _ => Err(serde::de::Error::custom("invalid file type")),
+        }
     }
 }

@@ -25,11 +25,7 @@
         "url": "http://johndoe.com"
       }
     ],
-    "keywords": [
-      "motion",
-      "physics",
-      "particles"
-    ],
+    "keywords": ["motion", "physics", "particles"],
     "homepage_url": null,
     "download_url": null,
     "size": null,

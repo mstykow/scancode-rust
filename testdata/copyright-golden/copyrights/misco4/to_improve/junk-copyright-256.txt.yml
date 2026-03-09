@@ -1,0 +1,9 @@
+what:
+  - copyrights
+  - holders
+  - authors
+copyrights:
+  - (c) Copyright (c) Somebody
+holders:
+  - Somebody
+authors: []

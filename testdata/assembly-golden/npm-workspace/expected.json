@@ -1,6 +1,45 @@
 {
   "dependencies": [
     {
+      "datafile_path": "packages/utils/package.json",
+      "datasource_id": "npm_package_json",
+      "dependency_uid": "pkg:npm/%40myorg/core?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "extracted_requirement": "^1.0.0",
+      "for_package_uid": "pkg:npm/%40myorg/utils@2.0.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "is_direct": true,
+      "is_optional": false,
+      "is_pinned": false,
+      "is_runtime": true,
+      "purl": "pkg:npm/%40myorg/core",
+      "scope": "dependencies"
+    },
+    {
+      "datafile_path": "packages/utils/package.json",
+      "datasource_id": "npm_package_json",
+      "dependency_uid": "pkg:npm/jest?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "extracted_requirement": "^29.0.0",
+      "for_package_uid": "pkg:npm/%40myorg/utils@2.0.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "is_direct": true,
+      "is_optional": true,
+      "is_pinned": false,
+      "is_runtime": false,
+      "purl": "pkg:npm/jest",
+      "scope": "devDependencies"
+    },
+    {
+      "datafile_path": "packages/core/package.json",
+      "datasource_id": "npm_package_json",
+      "dependency_uid": "pkg:npm/lodash?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "extracted_requirement": "^4.17.21",
+      "for_package_uid": "pkg:npm/%40myorg/core@1.0.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "is_direct": true,
+      "is_optional": false,
+      "is_pinned": false,
+      "is_runtime": true,
+      "purl": "pkg:npm/lodash",
+      "scope": "dependencies"
+    },
+    {
       "datafile_path": "package.json",
       "datasource_id": "npm_package_json",
       "dependency_uid": "pkg:npm/typescript?uuid=fixed-uid-done-for-testing-5642512d1758",
@@ -23,45 +62,6 @@
       "is_runtime": false,
       "purl": "pkg:npm/vitest",
       "scope": "devDependencies"
-    },
-    {
-      "datafile_path": "packages/core/package.json",
-      "datasource_id": "npm_package_json",
-      "dependency_uid": "pkg:npm/lodash?uuid=fixed-uid-done-for-testing-5642512d1758",
-      "extracted_requirement": "^4.17.21",
-      "for_package_uid": "pkg:npm/%40myorg/core@1.0.0?uuid=fixed-uid-done-for-testing-5642512d1758",
-      "is_direct": true,
-      "is_optional": false,
-      "is_pinned": false,
-      "is_runtime": true,
-      "purl": "pkg:npm/lodash",
-      "scope": "dependencies"
-    },
-    {
-      "datafile_path": "packages/utils/package.json",
-      "datasource_id": "npm_package_json",
-      "dependency_uid": "pkg:npm/%40myorg%2Fcore?uuid=fixed-uid-done-for-testing-5642512d1758",
-      "extracted_requirement": "^1.0.0",
-      "for_package_uid": "pkg:npm/%40myorg/utils@2.0.0?uuid=fixed-uid-done-for-testing-5642512d1758",
-      "is_direct": true,
-      "is_optional": false,
-      "is_pinned": false,
-      "is_runtime": true,
-      "purl": "pkg:npm/%40myorg%2Fcore",
-      "scope": "dependencies"
-    },
-    {
-      "datafile_path": "packages/utils/package.json",
-      "datasource_id": "npm_package_json",
-      "dependency_uid": "pkg:npm/jest?uuid=fixed-uid-done-for-testing-5642512d1758",
-      "extracted_requirement": "^29.0.0",
-      "for_package_uid": "pkg:npm/%40myorg/utils@2.0.0?uuid=fixed-uid-done-for-testing-5642512d1758",
-      "is_direct": true,
-      "is_optional": true,
-      "is_pinned": false,
-      "is_runtime": false,
-      "purl": "pkg:npm/jest",
-      "scope": "devDependencies"
     }
   ],
   "files_with_packages": [
@@ -73,29 +73,21 @@
       "path": "package.json"
     },
     {
-      "for_packages": [
-        "pkg:npm/%40myorg/core@1.0.0?uuid=fixed-uid-done-for-testing-5642512d1758"
-      ],
+      "for_packages": ["pkg:npm/%40myorg/core@1.0.0?uuid=fixed-uid-done-for-testing-5642512d1758"],
       "path": "packages/core/package.json"
     },
     {
-      "for_packages": [
-        "pkg:npm/%40myorg/utils@2.0.0?uuid=fixed-uid-done-for-testing-5642512d1758"
-      ],
+      "for_packages": ["pkg:npm/%40myorg/utils@2.0.0?uuid=fixed-uid-done-for-testing-5642512d1758"],
       "path": "packages/utils/package.json"
     }
   ],
   "packages": [
     {
       "api_data_url": "https://registry.npmjs.org/@myorg%2fcore/1.0.0",
-      "datafile_paths": [
-        "packages/core/package.json"
-      ],
-      "datasource_ids": [
-        "npm_package_json"
-      ],
+      "datafile_paths": ["packages/core/package.json"],
+      "datasource_ids": ["npm_package_json"],
       "description": "Core utilities",
-      "download_url": "https://registry.npmjs.org/@myorg/core/-/@myorg/core-1.0.0.tgz",
+      "download_url": "https://registry.npmjs.org/@myorg/core/-/core-1.0.0.tgz",
       "extracted_license_statement": "- MIT\n",
       "name": "@myorg/core",
       "namespace": "@myorg",
@@ -110,22 +102,18 @@
       ],
       "primary_language": "JavaScript",
       "purl": "pkg:npm/%40myorg/core@1.0.0",
-      "repository_download_url": "https://registry.npmjs.org/core/-/core-1.0.0.tgz",
-      "repository_homepage_url": "https://www.npmjs.com/package/core",
+      "repository_download_url": "https://registry.npmjs.org/@myorg/core/-/core-1.0.0.tgz",
+      "repository_homepage_url": "https://www.npmjs.com/package/@myorg/core",
       "type": "npm",
       "vcs_url": "git+https://github.com/myorg/monorepo.git",
       "version": "1.0.0"
     },
     {
       "api_data_url": "https://registry.npmjs.org/@myorg%2futils/2.0.0",
-      "datafile_paths": [
-        "packages/utils/package.json"
-      ],
-      "datasource_ids": [
-        "npm_package_json"
-      ],
+      "datafile_paths": ["packages/utils/package.json"],
+      "datasource_ids": ["npm_package_json"],
       "description": "Utility functions",
-      "download_url": "https://registry.npmjs.org/@myorg/utils/-/@myorg/utils-2.0.0.tgz",
+      "download_url": "https://registry.npmjs.org/@myorg/utils/-/utils-2.0.0.tgz",
       "extracted_license_statement": "- MIT\n",
       "name": "@myorg/utils",
       "namespace": "@myorg",
@@ -140,8 +128,8 @@
       ],
       "primary_language": "JavaScript",
       "purl": "pkg:npm/%40myorg/utils@2.0.0",
-      "repository_download_url": "https://registry.npmjs.org/utils/-/utils-2.0.0.tgz",
-      "repository_homepage_url": "https://www.npmjs.com/package/utils",
+      "repository_download_url": "https://registry.npmjs.org/@myorg/utils/-/utils-2.0.0.tgz",
+      "repository_homepage_url": "https://www.npmjs.com/package/@myorg/utils",
       "type": "npm",
       "vcs_url": "git+https://github.com/myorg/monorepo.git",
       "version": "2.0.0"

@@ -147,7 +147,7 @@ fn build_opam_urls(
 ) -> (Option<String>, Option<String>, Option<String>) {
     let repository_homepage_url = name
         .as_ref()
-        .map(|n| format!("{{https://opam.ocaml.org/packages}}/{{{}}}", n));
+        .map(|_| "{https://opam.ocaml.org/packages}/{name}".to_string());
 
     let api_data_url = match (name, version) {
         (Some(n), Some(v)) => Some(format!(
@@ -157,7 +157,11 @@ fn build_opam_urls(
         _ => None,
     };
 
-    let purl = name.as_ref().map(|n| format!("pkg:opam/{}", n));
+    let purl = match (name, version) {
+        (Some(n), Some(v)) => Some(format!("pkg:opam/{}@{}", n, v)),
+        (Some(n), None) => Some(format!("pkg:opam/{}", n)),
+        _ => None,
+    };
 
     (repository_homepage_url, api_data_url, purl)
 }
@@ -376,11 +380,27 @@ fn extract_version_constraint(version_part: &str) -> String {
         .trim_matches('"')
         .trim();
 
-    content.to_string()
+    content.replace('"', "")
 }
 
 /// Parse checksums from checksum array
 fn parse_checksums(lines: &[&str], i: &mut usize, data: &mut OpamData) {
+    if let Some((_, first_value)) = parse_key_value(lines[*i]) {
+        let inline = first_value.trim();
+        if !inline.is_empty() && inline != "[" {
+            if let Some((key, value)) = parse_checksum_line(inline) {
+                match key.as_str() {
+                    "sha1" => data.sha1 = Some(value),
+                    "md5" => data.md5 = Some(value),
+                    "sha256" => data.sha256 = Some(value),
+                    "sha512" => data.sha512 = Some(value),
+                    _ => {}
+                }
+            }
+            return;
+        }
+    }
+
     *i += 1;
     while *i < lines.len() {
         let line = lines[*i];

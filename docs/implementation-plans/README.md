@@ -20,10 +20,40 @@ implementation-plans/
 ### Package Detection (`package-detection/`)
 
 - **[PARSER_PLAN.md](package-detection/PARSER_PLAN.md)** - Individual file format parser implementations
-  - Status: ~98% complete — only complex binary formats remain (low priority)
+  - Status: 🟢 Complete — planned production parser/recognizer coverage is implemented; deferred and future-scope items are documented in [PARSER_PLAN.md](package-detection/PARSER_PLAN.md)
 
 - **[ASSEMBLY_PLAN.md](package-detection/ASSEMBLY_PLAN.md)** - Package assembly roadmap
-  - Status: **COMPLETE** — All phases done (sibling merge, nested merge, workspace assembly, file reference resolution)
+  - Status: 🟢 Complete — All phases done (sibling merge, nested merge, workspace assembly, file reference resolution)
+
+- **[PARSER_ENHANCEMENT_PLAN.md](package-detection/PARSER_ENHANCEMENT_PLAN.md)** - Ecosystem-by-ecosystem parser enhancement backlog and execution tracker
+  - Status: 🟡 Active — open `enhancement` + `package-parsing` issue groups, sequencing, and PR validation are tracked in [PARSER_ENHANCEMENT_PLAN.md](package-detection/PARSER_ENHANCEMENT_PLAN.md)
+
+### Text Detection (`text-detection/`)
+
+- **[COPYRIGHT_DETECTION_PLAN.md](text-detection/COPYRIGHT_DETECTION_PLAN.md)** - Copyright statement extraction
+  - Status: 🟢 Complete — scanner/runtime ingestion now covers decoded non-UTF text, PDF text, and binary printable strings; Rust also adds supported-image EXIF/XMP metadata as a beyond-parity clue source, and intentional divergences are tracked in the plan
+
+- **[EMAIL_URL_DETECTION_PLAN.md](text-detection/EMAIL_URL_DETECTION_PLAN.md)** - Email and URL extraction
+  - Status: 🟢 Complete — scanner/runtime ingestion now covers decoded non-UTF text, PDF text, and binary printable strings; Rust also adds supported-image EXIF/XMP metadata as a beyond-parity clue source, and intentional divergences are tracked in the plan
+
+### Infrastructure (`infrastructure/`)
+
+- **[CLI_PLAN.md](infrastructure/CLI_PLAN.md)** - Command-line interface parameter parity
+  - Status: 🟡 Active — implemented and pending CLI parity items are tracked in [CLI_PLAN.md](infrastructure/CLI_PLAN.md)
+
+- **[CACHING_PLAN.md](infrastructure/CACHING_PLAN.md)** - Scan result caching and incremental scanning
+  - Status: 🟡 Active — cache CLI/runtime integration is tracked in [CACHING_PLAN.md](infrastructure/CACHING_PLAN.md)
+
+- **[PROGRESS_TRACKING_PLAN.md](infrastructure/PROGRESS_TRACKING_PLAN.md)** - Enhanced progress reporting
+  - Status: 🟢 Implemented — progress manager, mode handling, summary/reporting, and integration tests are tracked in the plan document
+
+### Output Formats (`output/`)
+
+- **[OUTPUT_FORMATS_PLAN.md](output/OUTPUT_FORMATS_PLAN.md)** - SPDX, CycloneDX, CSV, YAML, HTML output
+  - Status: 🟢 Fixture-backed parity hardening complete across SPDX/CycloneDX/HTML/CSV/JSONL/YAML
+
+- **[PARITY_SCORECARD.md](output/PARITY_SCORECARD.md)** - Format-by-format parity contract and fixture coverage
+  - Status: 🟢 Maintained as the canonical output parity contract and verification checklist
 
 ## Placeholder Plans (To Be Fleshed Out)
 
@@ -31,14 +61,8 @@ These represent major architectural components not yet implemented. Each will be
 
 ### Text Detection (`text-detection/`)
 
-- **[LICENSE_DETECTION_PLAN.md](text-detection/LICENSE_DETECTION_PLAN.md)** - License text detection and matching
-  - Priority: P0 - Critical, Effort: 6-8 weeks
-
-- **[COPYRIGHT_DETECTION_PLAN.md](text-detection/COPYRIGHT_DETECTION_PLAN.md)** - Copyright statement extraction
-  - Priority: P1 - High, Effort: 3-4 weeks
-
-- **[EMAIL_URL_DETECTION_PLAN.md](text-detection/EMAIL_URL_DETECTION_PLAN.md)** - Email and URL extraction
-  - Priority: P2 - Medium, Effort: 1-2 weeks
+- **[LICENSE_DETECTION_PLAN.md](text-detection/LICENSE_DETECTION_PLAN.md)** - License text detection and matching (transition placeholder)
+  - Priority: P0 - Critical; active engine direction is the runtime ScanCode rule-loading architecture tracked in `feat-add-license-parsing`
 
 ### Post-Processing (`post-processing/`)
 
@@ -49,21 +73,10 @@ These represent major architectural components not yet implemented. Each will be
   - Priority: P2 - Medium, Effort: 2-3 weeks
   - Dependencies: License detection, copyright detection, package assembly
 
-### Output Formats (`output/`)
-
-- **[OUTPUT_FORMATS_PLAN.md](output/OUTPUT_FORMATS_PLAN.md)** - SPDX, CycloneDX, CSV, YAML, HTML output
-  - Priority: P1 - High, Effort: 4-6 weeks
-
 ### Infrastructure (`infrastructure/`)
 
 - **[PLUGIN_SYSTEM_PLAN.md](infrastructure/PLUGIN_SYSTEM_PLAN.md)** - Extensible plugin architecture
   - Priority: P3 - Low, Effort: 3-4 weeks
-
-- **[CACHING_PLAN.md](infrastructure/CACHING_PLAN.md)** - Scan result caching and incremental scanning
-  - Priority: P2 - Medium, Effort: 2-3 weeks
-
-- **[PROGRESS_TRACKING_PLAN.md](infrastructure/PROGRESS_TRACKING_PLAN.md)** - Enhanced progress reporting
-  - Priority: P3 - Low, Effort: 1-2 weeks
 
 ## Document Lifecycle
 
@@ -71,18 +84,26 @@ These represent major architectural components not yet implemented. Each will be
 2. **Planning** - Detailed analysis, design decisions, implementation phases
 3. **Active** - Work in progress, updated with status
 4. **Complete** - Feature implemented, document archived
-5. **Archived** - Moved to `docs/archived/` for historical reference
+5. **Archived** - Moved to [`docs/archived/`](../archived/) for historical reference
+
+### Documentation Style for Plan Status
+
+- Prefer stable wording (for example: "tracked in the plan document") over point-in-time snapshots.
+- Avoid embedding volatile counts, one-off verification snapshots, or temporary pass/fail badges.
+- Keep detailed status updates in the linked plan documents and CI/PR logs.
+- When referencing internal files or documents, prefer explicit relative Markdown links over plain path text.
 
 ## Relationship to Evergreen Docs
 
-These implementation plans are **temporary** and complement the **evergreen** documentation in `docs/`:
+These implementation plans are **temporary** and complement the **evergreen**
+documentation in [`docs/`](../):
 
-| Evergreen (Permanent) | Implementation Plans (Temporary) |
-|-----------------------|----------------------------------|
-| `ARCHITECTURE.md` | Component-specific implementation plans |
-| `HOW_TO_ADD_A_PARSER.md` | `PARSER_PLAN.md` |
-| `TESTING_STRATEGY.md` | Test plans within implementation docs |
-| `adr/` | Design decisions made during implementation |
-| `improvements/` | Beyond-parity features documented here |
+| Evergreen (Permanent)    | Implementation Plans (Temporary)            |
+| ------------------------ | ------------------------------------------- |
+| `ARCHITECTURE.md`        | Component-specific implementation plans     |
+| `HOW_TO_ADD_A_PARSER.md` | `PARSER_PLAN.md`                            |
+| `TESTING_STRATEGY.md`    | Test plans within implementation docs       |
+| `adr/`                   | Design decisions made during implementation |
+| `improvements/`          | Beyond-parity features documented here      |
 
 Once a feature is complete, relevant architectural decisions move to ADRs, and the implementation plan is archived.

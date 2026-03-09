@@ -19,7 +19,7 @@ The Alpine parser in scancode-rust **fixes a critical bug** and **implements a m
 def get_checksums(checksum_field):
     """
     Return a mapping of checksums from an Alpine `checksum_field` value string.
-    
+
     For example:
         Q1/xzW3F4RLfZtPxzivPuWWYTt3A=
     >>> get_checksums('Q1/xzW3F4RLfZtPxzivPuWWYTt3A=')
@@ -41,14 +41,14 @@ def get_checksums(checksum_field):
 fn decode_checksum(checksum: &str) -> Option<String> {
     // Format: Q1<base64-encoded SHA1>
     // Example: "Q1/xzW3F4RLfZtPxzivPuWWYTt3A=" → "435ff1cd6dc5e112df66d3f1ce2bcfb965984eddc0"
-    
+
     if !checksum.starts_with("Q1") {
         return None;
     }
-    
+
     // Decode base64 (skip "Q1" prefix)
     let decoded = general_purpose::STANDARD.decode(&checksum[2..]).ok()?;
-    
+
     // Convert to hex string
     Some(hex::encode(decoded))
 }
@@ -64,15 +64,15 @@ fn test_parse_alpine_file_references() {
     let result = AlpineInstalledParser::extract_package_data(
         Path::new("testdata/alpine/alpine-installed-database")
     );
-    
+
     let file_refs = result.file_references.unwrap();
     assert_eq!(file_refs.len(), 14, "Should extract all 14 file references");
-    
+
     // Verify SHA1 checksums are correctly decoded
     let sbin_apk = file_refs.iter()
         .find(|fr| fr.path == Some("sbin/apk".to_string()))
         .expect("Should find sbin/apk reference");
-    
+
     assert_eq!(
         sbin_apk.sha1,
         Some("435ff1cd6dc5e112df66d3f1ce2bcfb965984eddc0".to_string()),
@@ -91,9 +91,7 @@ fn test_parse_alpine_file_references() {
 
 ```json
 {
-  "file_references": [
-    {"path": "sbin/apk", "sha1": null}
-  ]
+  "file_references": [{ "path": "sbin/apk", "sha1": null }]
 }
 ```
 
@@ -101,9 +99,7 @@ fn test_parse_alpine_file_references() {
 
 ```json
 {
-  "file_references": [
-    {"path": "sbin/apk", "sha1": "435ff1cd6dc5e112df66d3f1ce2bcfb965984eddc0"}
-  ]
+  "file_references": [{ "path": "sbin/apk", "sha1": "435ff1cd6dc5e112df66d3f1ce2bcfb965984eddc0" }]
 }
 ```
 
@@ -133,7 +129,7 @@ fn test_parse_alpine_file_references() {
 fn extract_providers(line: &str) -> Vec<String> {
     // Provider field format: p:cmd:busybox p:/bin/sh so:libcrypto.so.1.1
     // Multiple providers space-separated
-    
+
     if let Some(providers_str) = line.strip_prefix("p:") {
         providers_str
             .split_whitespace()
@@ -165,18 +161,18 @@ fn test_parse_alpine_provider_field() {
     let result = AlpineInstalledParser::extract_package_data(
         Path::new("testdata/alpine/alpine-installed-database")
     );
-    
+
     let providers = result.extra_data["providers"]
         .as_array()
         .expect("Should have providers array");
-    
+
     assert!(providers.len() > 0, "Should extract providers");
-    
+
     // Verify specific providers
     let provider_strings: Vec<String> = providers.iter()
         .map(|v| v.as_str().unwrap().to_string())
         .collect();
-    
+
     assert!(provider_strings.contains(&"cmd:busybox".to_string()));
     assert!(provider_strings.contains(&"/bin/sh".to_string()));
 }
@@ -196,6 +192,7 @@ fn test_parse_alpine_provider_field() {
 ### Why Python Doesn't Extract This
 
 **Quote from Python source** (line 88):
+
 > "Ignored per-package fields that are documented but not used yet"
 
 **Our Decision**: Implement it anyway. It's documented in Alpine's format spec, and the data is valuable for SBOM completeness.
@@ -234,8 +231,8 @@ for line in content.lines() {
 
 ### Golden Tests
 
-- **12/13 passing** (92% pass rate)
-- **1 intentionally ignored**: Provider field test (beyond parity, documented architectural difference)
+- Golden test coverage is maintained in the parser suite and CI.
+- For current pass/ignore status, rely on test runs rather than static counts in this document.
 
 ### Test Data
 

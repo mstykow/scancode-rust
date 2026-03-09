@@ -11,12 +11,7 @@
       "description": "An internationalization and localization system for multilingual programs",
       "release_date": null,
       "parties": [],
-      "keywords": [
-        "gettext",
-        "intl",
-        "libintl",
-        "i18n"
-      ],
+      "keywords": ["gettext", "intl", "libintl", "i18n"],
       "homepage_url": "https://www.gnu.org/software/gettext",
       "download_url": "https://ftp.gnu.org/pub/gnu/gettext/gettext-0.22.tar.gz",
       "size": null,
@@ -68,14 +63,8 @@
       "repository_download_url": null,
       "api_data_url": null,
       "package_uid": "pkg:conan/libgettext@0.22?uuid=fixed-uid-done-for-testing-5642512d1758",
-      "datafile_paths": [
-        "conandata.yml",
-        "conanfile.py"
-      ],
-      "datasource_ids": [
-        "conan_conandata_yml",
-        "conan_conanfile_py"
-      ],
+      "datafile_paths": ["conandata.yml", "conanfile.py"],
+      "datasource_ids": ["conan_conandata_yml", "conan_conanfile_py"],
       "purl": "pkg:conan/libgettext@0.22"
     },
     {
@@ -89,12 +78,7 @@
       "description": "An internationalization and localization system for multilingual programs",
       "release_date": null,
       "parties": [],
-      "keywords": [
-        "gettext",
-        "intl",
-        "libintl",
-        "i18n"
-      ],
+      "keywords": ["gettext", "intl", "libintl", "i18n"],
       "homepage_url": "https://www.gnu.org/software/gettext",
       "download_url": "https://ftp.gnu.org/pub/gnu/gettext/gettext-0.21.tar.gz",
       "size": null,
@@ -146,14 +130,8 @@
       "repository_download_url": null,
       "api_data_url": null,
       "package_uid": "pkg:conan/libgettext@0.21?uuid=fixed-uid-done-for-testing-5642512d1758",
-      "datafile_paths": [
-        "conandata.yml",
-        "conanfile.py"
-      ],
-      "datasource_ids": [
-        "conan_conandata_yml",
-        "conan_conanfile_py"
-      ],
+      "datafile_paths": ["conandata.yml", "conanfile.py"],
+      "datasource_ids": ["conan_conandata_yml", "conan_conanfile_py"],
       "purl": "pkg:conan/libgettext@0.21"
     },
     {
@@ -167,12 +145,7 @@
       "description": "An internationalization and localization system for multilingual programs",
       "release_date": null,
       "parties": [],
-      "keywords": [
-        "gettext",
-        "intl",
-        "libintl",
-        "i18n"
-      ],
+      "keywords": ["gettext", "intl", "libintl", "i18n"],
       "homepage_url": "https://www.gnu.org/software/gettext",
       "download_url": "https://ftp.gnu.org/pub/gnu/gettext/gettext-0.20.1.tar.gz",
       "size": null,
@@ -224,14 +197,8 @@
       "repository_download_url": null,
       "api_data_url": null,
       "package_uid": "pkg:conan/libgettext@0.20.1?uuid=fixed-uid-done-for-testing-5642512d1758",
-      "datafile_paths": [
-        "conandata.yml",
-        "conanfile.py"
-      ],
-      "datasource_ids": [
-        "conan_conandata_yml",
-        "conan_conanfile_py"
-      ],
+      "datafile_paths": ["conandata.yml", "conanfile.py"],
+      "datasource_ids": ["conan_conandata_yml", "conan_conanfile_py"],
       "purl": "pkg:conan/libgettext@0.20.1"
     },
     {
@@ -245,12 +212,7 @@
       "description": "An internationalization and localization system for multilingual programs",
       "release_date": null,
       "parties": [],
-      "keywords": [
-        "gettext",
-        "intl",
-        "libintl",
-        "i18n"
-      ],
+      "keywords": ["gettext", "intl", "libintl", "i18n"],
       "homepage_url": "https://www.gnu.org/software/gettext",
       "download_url": null,
       "size": null,
@@ -302,12 +264,8 @@
       "repository_download_url": null,
       "api_data_url": null,
       "package_uid": "pkg:conan/libgettext?uuid=fixed-uid-done-for-testing-5642512d1758",
-      "datafile_paths": [
-        "conanfile.py"
-      ],
-      "datasource_ids": [
-        "conan_conanfile_py"
-      ],
+      "datafile_paths": ["conanfile.py"],
+      "datasource_ids": ["conan_conanfile_py"],
       "purl": "pkg:conan/libgettext"
     }
   ],
@@ -488,12 +446,7 @@
           "description": "An internationalization and localization system for multilingual programs",
           "release_date": null,
           "parties": [],
-          "keywords": [
-            "gettext",
-            "intl",
-            "libintl",
-            "i18n"
-          ],
+          "keywords": ["gettext", "intl", "libintl", "i18n"],
           "homepage_url": "https://www.gnu.org/software/gettext",
           "download_url": null,
           "size": null,
@@ -562,9 +515,7 @@
           "purl": "pkg:conan/libgettext"
         }
       ],
-      "for_packages": [
-        "pkg:conan/libgettext?uuid=fixed-uid-done-for-testing-5642512d1758"
-      ],
+      "for_packages": ["pkg:conan/libgettext?uuid=fixed-uid-done-for-testing-5642512d1758"],
       "scan_errors": []
     }
   ]

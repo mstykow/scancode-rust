@@ -93,10 +93,8 @@ scancode-rust implements a multi-phase processing pipeline based on Python ScanC
 │  Phase 5: Output                                                │
 │  ┌────────────────────────────────────────────────────────┐    │
 │  │ • JSON output (ScanCode-compatible)                     │    │
-│  │ • SPDX (RDF, JSON, YAML, tag-value)                     │    │
-│  │ • CycloneDX (JSON, XML)                                 │    │
-│  │ • CSV, YAML, HTML                                       │    │
-│  │ • Custom templates                                      │    │
+│  │ • SPDX, CycloneDX, CSV, YAML, HTML, JSONL              │    │
+│  │ • HTML app and custom templates                         │    │
 │  └────────────────────────────────────────────────────────┘    │
 │                                                                  │
 └─────────────────────────────────────────────────────────────────┘
@@ -108,24 +106,20 @@ scancode-rust implements a multi-phase processing pipeline based on Python ScanC
 - **Scanner Pipeline**: File discovery, parallel processing, progress tracking
 - **Security Layer**: DoS protection, no code execution, archive safety
 - **Package Assembly**: Sibling and nested merge strategies for combining related manifests
-- **Text Detection**: License detection, copyright detection, email/URL extraction
+- **Text Detection**: License detection (n-gram matching), copyright detection (4-stage pipeline), email/URL extraction
 - **Post-Processing**: Summarization, tallies, classification
-- **Output**: JSON (ScanCode-compatible), SPDX, CycloneDX, CSV, YAML, HTML
+- **Output**: JSON, SPDX (TV/RDF), CycloneDX (JSON/XML), CSV, YAML, JSON Lines, HTML, HTML app, custom templates
 - **Testing Infrastructure**: Unit tests, doctests, golden tests, integration tests
 - **Infrastructure**: Plugin system, caching, enhanced progress tracking
 
 ### Implementation Status
 
-For current implementation status, priorities, and effort estimates, see:
+Implementation details in this document are intentionally architecture-focused.
+For current capabilities and behavior, use:
 
-- **[implementation-plans/README.md](implementation-plans/README.md)** - Overview of all implementation plans
-- **[implementation-plans/package-detection/](implementation-plans/package-detection/)** - Package parsing and assembly
-- **[implementation-plans/text-detection/](implementation-plans/text-detection/)** - License, copyright, email/URL detection
-- **[implementation-plans/post-processing/](implementation-plans/post-processing/)** - Summarization and tallies
-- **[implementation-plans/output/](implementation-plans/output/)** - Output format support
-- **[implementation-plans/infrastructure/](implementation-plans/infrastructure/)** - Plugin system, caching, progress tracking
-
-Each plan includes detailed status, priorities (P0-P3), effort estimates, and implementation phases.
+- **[README.md](../README.md)** for user-facing features and usage
+- **[SUPPORTED_FORMATS.md](SUPPORTED_FORMATS.md)** for currently supported formats and ecosystems
+- **[TESTING_STRATEGY.md](TESTING_STRATEGY.md)** for verification and regression approach
 
 ### Plugin Architecture
 
@@ -137,7 +131,7 @@ Python ScanCode uses a plugin-based architecture with 5 plugin types:
 4. **OutputFilter Plugins**: License policy filtering, custom filters
 5. **Output Plugins**: Format-specific output (SPDX, CycloneDX, etc.)
 
-The Rust implementation will adopt a similar architecture using Rust traits and dynamic dispatch, with compile-time plugin registration for zero runtime overhead.
+The Rust implementation currently uses static, compile-time wiring (trait-based parsers and explicit pipeline stages).
 
 ## Architecture Components
 
@@ -148,7 +142,7 @@ The Rust implementation will adopt a similar architecture using Rust traits and 
 ```rust
 pub trait PackageParser {
     const PACKAGE_TYPE: &'static str;
-    
+
     fn is_match(path: &Path) -> bool;
     fn extract_packages(path: &Path) -> Vec<PackageData>;
 }
@@ -168,14 +162,14 @@ pub struct NpmParser;
 
 impl PackageParser for NpmParser {
     const PACKAGE_TYPE: &'static str = "npm";
-    
+
     fn is_match(path: &Path) -> bool {
         matches!(
             path.file_name().and_then(|n| n.to_str()),
             Some("package.json" | "package-lock.json")
         )
     }
-    
+
     fn extract_packages(path: &Path) -> Vec<PackageData> {
         // Implementation
     }
@@ -236,7 +230,7 @@ pub struct PackageData {
     pub version: Option<String>,
     pub purl: Option<String>,
     pub datasource_id: Option<DatasourceId>,
-    
+
     // Metadata
     pub description: Option<String>,
     pub primary_language: Option<String>,
@@ -244,15 +238,15 @@ pub struct PackageData {
     pub homepage_url: Option<String>,
     pub parties: Vec<Party>,
     pub keywords: Vec<String>,
-    
+
     // Dependencies
     pub dependencies: Vec<Dependency>,
-    
+
     // Licenses (extraction only - detection is separate)
     pub extracted_license_statement: Option<String>,
     pub declared_license_expression: Option<String>,
     pub license_detections: Vec<LicenseDetection>,
-    
+
     // Checksums & URLs
     pub sha1: Option<String>,
     pub md5: Option<String>,
@@ -263,7 +257,7 @@ pub struct PackageData {
     pub repository_homepage_url: Option<String>,
     pub repository_download_url: Option<String>,
     pub api_data_url: Option<String>,
-    
+
     // Additional data
     pub extra_data: Option<HashMap<String, serde_json::Value>>,
     pub source_packages: Vec<String>,
@@ -304,16 +298,17 @@ pub struct PackageData {
 │                   │                                        │
 │  4. Output        v                                        │
 │  ┌─────────────────────────────────────┐                  │
-│  │ JSON serialization                  │                  │
-│  │ ─ ScanCode Toolkit compatible       │                  │
-│  │ ─ SBOM-ready structure              │                  │
+│  │ Output format dispatch              │                  │
+│  │ ─ JSON / YAML / CSV / JSONL         │                  │
+│  │ ─ SPDX / CycloneDX / HTML / template│                  │
 │  └─────────────────────────────────────┘                  │
 │                                                            │
-│  Future: Detection Engines (Post-Parser)                  │
+│  Detection Engines (Integrated)                           │
 │  ┌───────────────────┐  ┌──────────────────┐             │
 │  │ License Detection │  │ Copyright        │             │
 │  │ ─ SPDX normalize  │  │ Detection        │             │
 │  │ ─ Confidence      │  │ ─ Holder extract │             │
+│  │ ─ Score threshold │  │ ─ Author extract │             │
 │  └───────────────────┘  └──────────────────┘             │
 └────────────────────────────────────────────────────────────┘
 ```
@@ -328,23 +323,24 @@ files.par_iter()
     .map(|(path, metadata)| {
         // Each file processed in parallel
         let file_entry = process_file(path, metadata, scan_strategy);
-        progress_bar.inc(1);
+        progress.file_completed(path, metadata.len(), &file_entry.scan_errors);
         file_entry
     })
     .collect()
 ```
 
-Inside `process_file()`, the scanner calls `try_parse_file(path)` (generated by `register_package_handlers!` macro):
+Inside `process_file()`, the scanner calls `try_parse_file(path)` (generated by `register_package_handlers!` macro), then runs license detection plus enabled text-detection options on UTF-8 content:
 
 ```rust
-// src/scanner/process.rs, line 148
+// src/scanner/process.rs — simplified flow
 if let Some(package_data) = try_parse_file(path) {
     file_info_builder.package_data(package_data);
-    Ok(())
-} else {
-    // Not a package manifest, try license detection
-    extract_license_information(...)
 }
+extract_license_information(&mut file_info_builder, text_content, scan_strategy)?;
+if text_options.detect_copyrights {
+    extract_copyright_information(&mut file_info_builder, path, &text_content);
+}
+extract_email_url_information(&mut file_info_builder, &text_content, text_options);
 ```
 
 **Benefits:**
@@ -478,22 +474,23 @@ See [ADR 0005: Auto-Generated Documentation](adr/0005-auto-generated-docs.md) fo
 
 We don't just match Python ScanCode - we improve it:
 
-| Parser | Improvement | Type |
-|--------|-------------|------|
-| **Alpine** | SHA1 checksums correctly decoded + Provider field extraction | 🐛 Bug Fix + ✨ Feature |
-| **RPM** | Full dependency extraction with version constraints | ✨ Feature |
-| **Debian** | .deb archive introspection | ✨ Feature |
-| **Conan** | conanfile.txt and conan.lock parsers (Python has neither) | ✨ Feature |
-| **Gradle** | No code execution (token lexer vs Groovy engine) | 🛡️ Security |
-| **Gradle Lockfile** | gradle.lockfile parser (Python has no equivalent) | ✨ Feature |
-| **Maven** | SCM developerConnection separation, inception_year, renamed extra_data keys for consistency | 🔍 Enhanced |
-| **npm Workspace** | pnpm-workspace.yaml extraction + workspace assembly with per-member packages (Python has stub parser + basic assembly) | ✨ Feature |
-| **Cargo Workspace** | Full `[workspace.package]` metadata inheritance + `workspace = true` dependency resolution (Python has basic assembly) | ✨ Feature |
-| **Composer** | Richer provenance metadata (7 extra fields) | 🔍 Enhanced |
-| **Ruby** | Semantic party model (unified name+email) | 🔍 Enhanced |
-| **Dart** | Proper scope handling + YAML preservation | 🔍 Enhanced |
-| **CPAN** | Full metadata extraction (Python has stubs only) | ✨ Feature |
-| **Assembly** | LazyLock static assembler lookup (zero allocation per call) | ⚡ Performance |
+| Parser                  | Improvement                                                                                                                  | Type                                      |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
+| **Alpine**              | SHA1 checksums correctly decoded + Provider field extraction                                                                 | 🐛 Bug Fix + ✨ Feature                   |
+| **RPM**                 | Full dependency extraction with version constraints                                                                          | ✨ Feature                                |
+| **Debian**              | .deb archive introspection                                                                                                   | ✨ Feature                                |
+| **Conan**               | conanfile.txt and conan.lock parsers (Python has neither)                                                                    | ✨ Feature                                |
+| **Gradle**              | No code execution (token lexer vs Groovy engine)                                                                             | 🛡️ Security                               |
+| **Gradle Lockfile**     | gradle.lockfile parser (Python has no equivalent)                                                                            | ✨ Feature                                |
+| **Maven**               | SCM developerConnection separation, inception_year, renamed extra_data keys for consistency                                  | 🔍 Enhanced                               |
+| **npm Workspace**       | pnpm-workspace.yaml extraction + workspace assembly with per-member packages (Python has stub parser + basic assembly)       | ✨ Feature                                |
+| **Cargo Workspace**     | Full `[workspace.package]` metadata inheritance + `workspace = true` dependency resolution (Python has basic assembly)       | ✨ Feature                                |
+| **Composer**            | Richer provenance metadata (7 extra fields)                                                                                  | 🔍 Enhanced                               |
+| **Ruby**                | Semantic party model (unified name+email)                                                                                    | 🔍 Enhanced                               |
+| **Dart**                | Proper scope handling + YAML preservation                                                                                    | 🔍 Enhanced                               |
+| **CPAN**                | Full metadata extraction (Python has stubs only)                                                                             | ✨ Feature                                |
+| **Copyright Detection** | Year range 2099 (was 2039), regex bug fixes, type-safe POS tags, thread-safe design, Unicode preservation, encoded-data skip | 🐛 Bug Fix + 🔍 Enhanced + ⚡ Performance |
+| **Assembly**            | LazyLock static assembler lookup (zero allocation per call)                                                                  | ⚡ Performance                            |
 
 See [docs/improvements/](improvements/) for detailed documentation of each improvement.
 
@@ -513,7 +510,7 @@ The codebase follows a modular architecture:
 
 ### Benchmarks
 
-*(To be added: criterion benchmarks for parser performance)*
+_(To be added: criterion benchmarks for parser performance)_
 
 ### Optimization Strategies
 
@@ -535,7 +532,7 @@ opt-level = 3             # Maximum optimization
 
 ## Extended Architecture
 
-The following sections describe major architectural components in detail. See [implementation-plans/](implementation-plans/) for implementation status and roadmap.
+The following sections describe major architectural components in detail.
 
 ### Text Detection Engines
 
@@ -546,7 +543,7 @@ The following sections describe major architectural components in detail. See [i
 - Confidence scoring and multi-license handling
 - Integration with existing SPDX license data
 
-**Copyright Detection** (see [COPYRIGHT_DETECTION_PLAN.md](implementation-plans/text-detection/COPYRIGHT_DETECTION_PLAN.md)):
+**Copyright Detection**:
 
 The copyright detection engine extracts copyright statements, holder names, and author information from source files using a four-stage pipeline:
 
@@ -558,18 +555,18 @@ The copyright detection engine extracts copyright statements, holder names, and 
 └──────────────┘    └──────────────┘    └──────────────┘    └──────────────┘
 ```
 
-1. **Text Preparation**: Normalizes copyright symbols (`©`, `(c)`, HTML entities), strips comment markers and markup, converts to ASCII
-2. **Candidate Selection**: Filters lines using hint markers (`opyr`, `auth`, `©`, year patterns), groups multi-line statements, filters gibberish
-3. **Lexing + Parsing**: POS-tags tokens via ~500 regex patterns (type-safe `PosTag` enum), then applies ~200 grammar rules to build parse trees identifying `COPYRIGHT`, `AUTHOR`, `NAME`, `COMPANY` structures
-4. **Tree Walk + Refinement**: Extracts `CopyrightDetection`, `HolderDetection`, `AuthorDetection` from parse trees, applies cleanup (strip unbalanced parens, deduplicate "Copyright" words, filter junk)
+1. **Text Preparation**: Normalizes copyright symbols (`©`, `(c)`, HTML entities), strips comment markers and markup, preserves Unicode (no ASCII transliteration)
+2. **Candidate Selection**: Filters lines using hint markers (`opyr`, `auth`, `©`, year patterns), groups multi-line statements, and skips encoded or non-promising content early
+3. **Lexing + Parsing**: POS-tags tokens using an ordered pattern set (type-safe `PosTag` enum), then applies grammar rules to build parse trees identifying `COPYRIGHT`, `AUTHOR`, `NAME`, `COMPANY` structures
+4. **Tree Walk + Refinement**: Extracts `CopyrightDetection`, `HolderDetection`, `AuthorDetection` from parse trees, then applies cleanup (for example unbalanced parens, duplicate "Copyright" words, and junk patterns)
 
 Key design decisions vs Python reference:
 
 - **Type-safe POS tags**: Enum-based (not string-based) — compiler catches tag typos
 - **Thread-safe**: No global mutable state (Python uses a singleton `DETECTOR`)
-- **`RegexSet`-based lexer**: Parallel multi-pattern matching vs Python's sequential scan
+- **Sequential pattern matching**: `LazyLock<Vec<(Regex, PosTag)>>` with first-match-wins semantics (RegexSet cannot preserve match order)
 - **Extended year range**: 1960-2099 (Python stops at 2039)
-- **Bug fixes**: Fixed year-year separator bug, duplicate patterns, `is_private_ip` IPv6 bug
+- **Bug fixes**: Fixed year-year separator bug, short-year typo, French/Spanish case-sensitivity, duplicate patterns
 
 Special cases handled:
 
@@ -578,9 +575,21 @@ Special cases handled:
 - "All Rights Reserved" in English, German, French, Spanish, Dutch
 - Multi-line copyright statements spanning consecutive lines
 
+Behavioral compatibility model:
+
+- **Default expectation**: Follow Python ScanCode behavior closely for copyright, holder, and author extraction.
+- **Intentional Rust differences**: Preserve Unicode names, apply correctness bug fixes from the Python reference, and keep detection thread-safe for parallel scans.
+- **Known parity gaps**: Some edge-case files still differ from Python output; these are treated as targeted follow-up work with regression tests.
+- **Fixture ownership**: Copyright golden fixtures in this repository are Rust-owned expectations; Python fixtures are a reference input, not the source of truth for local expected outputs.
+
+Migration expectation:
+
+- Most projects should observe equivalent results to Python ScanCode.
+- Where differences exist, they are either intentional improvements (for example Unicode preservation) or explicitly tracked parity gaps.
+
 Module location: `src/copyright/`
 
-**Email/URL Detection** (see [EMAIL_URL_DETECTION_PLAN.md](implementation-plans/text-detection/EMAIL_URL_DETECTION_PLAN.md)):
+**Email/URL Detection**:
 
 The email/URL detection engine is the simplest text detection feature — regex-based extraction with an ordered filter pipeline to remove junk results.
 
@@ -598,6 +607,9 @@ The email/URL detection engine is the simplest text detection feature — regex-
 1. CRLF cleanup → trailing junk stripping → empty URL filter → scheme addition → user/password stripping → invalid URL filter → canonicalization (via `url` crate) → junk host filter → junk URL filter → dedup
 
 Both support configurable thresholds (`--max-email N`, `--max-url N`, default 50).
+
+Golden regression coverage for this module uses local, repo-owned fixtures in
+`testdata/plugin_email_url/` and test execution in `src/finder/golden_test.rs`.
 
 Key design decisions vs Python reference:
 
@@ -628,9 +640,17 @@ Module location: `src/finder/`
 
 ### Output Format Support
 
+**Implementation and parity tracking:**
+
+- Multi-format output layer is implemented in `src/output/mod.rs`
+- CLI follows ScanCode-style output flags (for example `--json-pp FILE`,
+  `--spdx-tv FILE`) and dispatches through `write_output_file`
+- Format compatibility is verified through fixture-backed tests and documented
+  in `docs/TESTING_STRATEGY.md`
+
 **SBOM Formats**:
 
-- SPDX: RDF, JSON, YAML, tag-value
+- SPDX: Tag-value and RDF/XML
 - CycloneDX: JSON, XML
 - Compatibility with SBOM tooling ecosystem
 
@@ -638,7 +658,7 @@ Module location: `src/finder/`
 
 - CSV (tabular data export)
 - YAML (human-readable)
-- HTML (interactive reports)
+- HTML report + HTML app
 - Custom templates (user-defined formats)
 
 #### Infrastructure Enhancements
@@ -650,32 +670,44 @@ Module location: `src/finder/`
 - Custom output formats
 - Third-party integrations
 
-**Caching** (see [CACHING_PLAN.md](implementation-plans/infrastructure/CACHING_PLAN.md)):
+**Caching**:
 
-Two-layer caching system for scan performance optimization:
+Caching is currently split between transition-state behavior on `main` and the target runtime-rule-loading license engine architecture.
 
-1. **License Index Cache**: Persists the compiled askalono `Store` (MessagePack + zstd) to avoid rebuilding from SPDX text on each run. Existing `Store::from_cache()`/`to_cache()` infrastructure handles serialization. Version-stamped with tool version + SPDX data version. Expected speedup: 200-300ms → 20-50ms startup.
+**Transition state (`main` at time of writing):**
 
-2. **Scan Result Cache** (beyond-parity — Python has none): Content-addressed per-file cache keyed by SHA256 hash (already computed in `process_file()`). Cached data: package_data, license_detections, copyrights, programming_language. Path-dependent fields reconstructed at load time. Sharded directory layout (`ab/ab3f...postcard`) for filesystem scalability. Expected speedup: 10-50x on repeated scans.
+1. Legacy askalono-based startup still exists.
+2. Parser-local Swift cache persists `Package.swift` dump output under an XDG/HOME-derived cache path.
 
-3. **Incremental Scanning** (beyond-parity — Python has none): Scan manifest tracks `{path: (mtime, size, sha256)}` per directory. On re-scan, only files with changed mtime/size are re-hashed and re-scanned. Enables CI/CD integration (scan only changed files per commit).
+**Target unified caching architecture (aligned with `feat-add-license-parsing`):**
 
-Cache location: XDG-compliant (`~/.cache/scancode-rust/`), overridable via `SCANCODE_RUST_CACHE` env var or `--cache-dir` CLI flag. Multi-process safety via `fd-lock` file locking. Atomic writes (temp + rename) prevent corruption on crash.
+1. **License Index Cache**: Persist versioned `LicenseIndex` snapshots generated from ScanCode rules loaded at runtime.
+2. **Scan Result Cache** (beyond parity — Python has none): Content-addressed per-file cache keyed by SHA256.
+3. **Incremental Scanning** (beyond parity — Python has none): manifest-guided re-scan of changed files only.
 
-Module location: `src/cache/`
+Current caching modules on `main` live in `src/cache/` (`config`, `metadata`, `paths`, `io`, `scan_cache`) with snapshot envelope read/write, compatibility checks, sharded scan-result paths, and atomic temp-file + rename persistence.
 
-**Progress Tracking** (see [PROGRESS_TRACKING_PLAN.md](implementation-plans/infrastructure/PROGRESS_TRACKING_PLAN.md)):
+Runtime wiring is now active for scan-result caching in scanner/main:
 
-Centralized `ScanProgress` struct managing multi-phase progress bars via `indicatif::MultiProgress`:
+1. scanner read-before-scan and write-after-scan integration in `src/scanner/process.rs`
+2. startup cache bootstrap and clear wiring in `src/main.rs`
+3. cache CLI controls `--cache-dir` and `--cache-clear`, plus `SCANCODE_RUST_CACHE` override
 
-1. **Discovery phase**: Spinner while counting files. Records initial file/dir/size counts.
-2. **Scan phase**: Main progress bar with ETA, elapsed time, and file count. Integrates with rayon parallel processing via `Arc<ProgressBar>`. Rate-limited to 20 Hz (indicatif default).
-3. **Assembly phase**: Progress bar for package assembly (sibling merge, workspace merge, etc.).
-4. **Scan summary**: Files/sec, bytes/sec, error count, per-phase timings, initial/final counts.
+Remaining follow-up work is focused on index snapshot integration for the new license engine, lock-managed multi-process coordination, incremental scanning, and unified XDG-default cache ownership.
 
-Three verbosity modes: `--quiet` (hidden draw target, suppresses all stderr), default (progress bars + summary), `--verbose` (file-by-file listing + extended summary). Mutually exclusive via `clap` conflicts.
+**Progress Tracking**:
 
-Logging integration via `indicatif-log-bridge`: parser `warn!()` messages route above the progress bar without corrupting display. All progress goes to stderr; stdout reserved for structured output.
+Centralized `ScanProgress` struct manages mode-aware progress output via `indicatif::MultiProgress`:
+
+1. **Discovery phase**: Spinner/message while counting files, recording initial file/dir/size counts.
+2. **SPDX load phase**: Startup message and timing capture around license DB load.
+3. **Scan phase**: Main progress bar (default mode, TTY only) with ETA, elapsed time, and `{per_sec}` throughput; verbose mode emits file-by-file paths.
+4. **Assembly and output phases**: Phase messages/spinners with timing capture.
+5. **Scan summary**: Files/sec, bytes/sec, error count, initial/final counts (including sizes), package assembly counts, and per-phase timings.
+
+Verbosity behavior is implemented in `src/progress.rs` and wired through `src/main.rs`: quiet suppresses stderr output, default shows progress/summary, verbose shows per-file stderr output with detailed per-file errors.
+
+Logging integration uses `indicatif-log-bridge` so parser `warn!()` messages print above active progress output without corruption. Runtime wiring lives in `src/progress.rs`, with scan updates in `src/scanner/process.rs`.
 
 Module location: `src/progress.rs`
 
@@ -693,25 +725,32 @@ Ongoing quality improvements:
 
 ### How License Detection Works
 
-This tool uses the [SPDX License List Data](https://github.com/spdx/license-list-data) for license detection. The license data is:
+The project is in a transition period between legacy askalono startup on `main` and the target ScanCode-compatible runtime rule-loading model in `feat-add-license-parsing`.
 
-1. **Stored in a Git submodule** at `resources/licenses/` (sparse checkout of `json/details/` only)
-2. **Embedded at compile time** using Rust's `include_dir!` macro (see `src/main.rs`)
-3. **Built into the binary** - no runtime dependencies on external files
+**Current mainline behavior (`main`):**
 
-This means:
+1. License detection startup still initializes askalono from embedded SPDX JSON details.
+2. `setup.sh` updates the SPDX data submodule used by current embedded-license workflows.
 
-- **For users**: The binary is self-contained and portable
-- **For developers**: The submodule must be initialized before building
-- **Package size**: Only the needed JSON files are included in the published crate
+**Target model (post-merge of `feat-add-license-parsing`):**
+
+1. **Source of truth**: ScanCode `.LICENSE` and `.RULE` datasets from the `reference/scancode-toolkit` submodule.
+2. **Load mode**: Rules are loaded at runtime by `LicenseDetectionEngine` and compiled into `LicenseIndex` structures.
+3. **Performance path**: Rebuild on cold start; load from validated index snapshot cache on warm start.
+
+Target-model implications:
+
+- **For users**: license detection correctness aligns with ScanCode rule data and can be updated by refreshing rule datasets.
+- **For developers**: rule data availability and fingerprinting are first-class runtime concerns.
+- **For packaging**: cache snapshots are rebuildable artifacts; rules remain the canonical source.
 
 ### Updating the License Data
 
-**For Releases:** The `release.sh` script automatically updates the license data to the latest version before publishing. No manual action needed.
+**For Releases:** Keep the active rule/license dataset in sync with upstream data for the currently shipped engine path, and ensure snapshot cache invalidation fingerprints update with dataset/version changes.
 
 **For Development:**
 
-To initialize or update to the latest SPDX license definitions:
+To initialize or update the latest reference license/rule definitions in the submodule:
 
 ```sh
 ./setup.sh                  # Initialize/update license data to latest
@@ -725,12 +764,13 @@ git add resources/licenses
 git commit -m "chore: update SPDX license data"
 ```
 
-The `setup.sh` script:
+The `setup.sh` script currently:
 
 - Initializes the submodule with shallow clone (`--depth=1`)
 - Configures sparse checkout to only include `json/details/` (saves ~90% disk space)
 - Updates to the latest upstream version
-- The build process then embeds these files directly into the compiled binary
+
+Longer-term (target runtime-rule-loading model), rule data remains the canonical source and index snapshots are rebuildable cache artifacts.
 
 ## Related Documentation
 
@@ -739,4 +779,3 @@ The `setup.sh` script:
 - [ADRs](adr/) - Architectural decision records
 - [Improvements](improvements/) - Beyond-parity features
 - [SUPPORTED_FORMATS.md](SUPPORTED_FORMATS.md) - Complete format list (auto-generated)
-- [Implementation Plans](implementation-plans/) - Feature implementation status and roadmap

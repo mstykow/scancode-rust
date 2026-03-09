@@ -44,10 +44,10 @@ pub fn parse_dependency(dep_obj: &Value) -> Dependency {
         is_runtime: Some(is_runtime),
         // ... base fields
     };
-    
+
     // Extract additional provenance metadata
     let mut extra = serde_json::Map::new();
-    
+
     if let Some(source) = dep_obj.get("source") {
         if let Some(source_type) = source.get("type").and_then(|v| v.as_str()) {
             extra.insert("source_type".to_string(), json!(source_type));
@@ -59,7 +59,7 @@ pub fn parse_dependency(dep_obj: &Value) -> Dependency {
             extra.insert("source_reference".to_string(), json!(source_ref));
         }
     }
-    
+
     if let Some(dist) = dep_obj.get("dist") {
         if let Some(dist_type) = dist.get("type").and_then(|v| v.as_str()) {
             extra.insert("dist_type".to_string(), json!(dist_type));
@@ -71,11 +71,11 @@ pub fn parse_dependency(dep_obj: &Value) -> Dependency {
             extra.insert("dist_reference".to_string(), json!(dist_ref));
         }
     }
-    
+
     if let Some(pkg_type) = dep_obj.get("type").and_then(|v| v.as_str()) {
         extra.insert("type".to_string(), json!(pkg_type));
     }
-    
+
     dep.extra_data = serde_json::Value::Object(extra);
     dep
 }

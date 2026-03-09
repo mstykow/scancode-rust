@@ -1,0 +1,20 @@
+what:
+  - copyrights
+  - holders
+  - authors
+copyrights:
+  - Copyright (c) Dynamic Network Services, Inc
+  - Copyright (c) Dynamic Solutions
+  - Copyright (c) Dynamic System Bars Project
+  - Copyright (c) dynamic-evaluation, https://github.com/benkrause/dynamic-evaluation
+  - Copyright (c) frisB.com <play@frisb.com>
+  - Copyright (c) frisB.com play@frisb.com
+  - copyright (c) Dynamic Drive (www.dynamicdrive.com)
+holders:
+  - Dynamic Drive
+  - Dynamic Network Services, Inc
+  - Dynamic Solutions
+  - Dynamic System Bars Project
+  - dynamic-evaluation
+  - frisB.com
+authors: []

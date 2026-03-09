@@ -1,6 +1,5 @@
 //! License metadata loaded from .LICENSE files.
 
-use serde::{Deserialize, Serialize};
 
 /// License metadata loaded from .LICENSE files.
 #[derive(Debug, Clone, PartialEq)]

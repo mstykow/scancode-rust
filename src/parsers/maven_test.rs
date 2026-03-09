@@ -45,14 +45,24 @@ mod tests {
         assert_eq!(package_data.declared_license_expression_spdx, None);
         assert_eq!(package_data.license_detections.len(), 0);
         assert_eq!(
+            package_data.description,
+            Some("Demo Application\nA sample Maven project".to_string())
+        );
+        assert_eq!(
             package_data.extracted_license_statement,
-            Some("Apache License, Version 2.0".to_string())
+            Some(
+                "- license:\n    name: Apache License, Version 2.0\n    url: https://www.apache.org/licenses/LICENSE-2.0.txt\n".to_string()
+            )
         );
 
         // Check purl
         assert_eq!(
             package_data.purl,
             Some("pkg:maven/com.example/demo-app@1.0.0".to_string())
+        );
+        assert_eq!(
+            package_data.source_packages,
+            vec!["pkg:maven/com.example/demo-app@1.0.0?classifier=sources".to_string()]
         );
 
         // Check dependencies
@@ -114,9 +124,10 @@ mod tests {
         assert_eq!(package_data.declared_license_expression, None);
         assert_eq!(package_data.declared_license_expression_spdx, None);
         assert_eq!(package_data.license_detections.len(), 0);
+        assert_eq!(package_data.description, Some("Test Project".to_string()));
         assert_eq!(
             package_data.extracted_license_statement,
-            Some("MIT License".to_string())
+            Some("- license:\n    name: MIT License\n".to_string())
         );
 
         // Check purl
@@ -368,6 +379,10 @@ mod tests {
         let package_data = MavenParser::extract_first_package(&pom_props_path);
 
         assert_eq!(package_data.package_type, Some(PackageType::Maven));
+        assert_eq!(
+            package_data.datasource_id,
+            Some(DatasourceId::MavenPomProperties)
+        );
         assert_eq!(package_data.namespace, Some("com.example.test".to_string()));
         assert_eq!(package_data.name, Some("test-library".to_string()));
         assert_eq!(package_data.version, Some("1.2.3".to_string()));
@@ -583,7 +598,7 @@ mod tests {
         assert_eq!(package_data.name, Some("parent-project".to_string()));
         assert_eq!(package_data.version, Some("1.0.0".to_string()));
 
-        assert_eq!(package_data.dependencies.len(), 1);
+        assert_eq!(package_data.dependencies.len(), 4);
         let slf4j_dep = &package_data.dependencies[0];
         assert!(
             slf4j_dep
@@ -592,6 +607,17 @@ mod tests {
                 .unwrap()
                 .contains("org.slf4j/slf4j-api")
         );
+
+        let dep_mgmt_deps: Vec<_> = package_data
+            .dependencies
+            .iter()
+            .filter(|dep| dep.scope.as_deref() == Some("dependencymanagement"))
+            .collect();
+        assert_eq!(dep_mgmt_deps.len(), 3);
+        assert!(dep_mgmt_deps.iter().any(|dep| {
+            dep.purl.as_deref()
+                == Some("pkg:maven/org.springframework.boot/spring-boot-dependencies@2.7.0")
+        }));
 
         let extra_data = package_data.extra_data.expect("extra_data should exist");
 
@@ -827,6 +853,359 @@ mod tests {
         assert_eq!(
             package_data.homepage_url,
             Some("https://example.com/2.5.0".to_string())
+        );
+    }
+
+    #[test]
+    fn test_extract_structured_license_owner_and_source_package() {
+        let content = r#"
+<project>
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>com.example</groupId>
+    <artifactId>rich-metadata</artifactId>
+    <version>1.2.3</version>
+    <name>Rich Metadata</name>
+    <description>Detailed metadata package</description>
+    <organization>
+        <name>Example Org</name>
+        <url>https://example.org</url>
+    </organization>
+    <licenses>
+        <license>
+            <name>Apache-2.0</name>
+            <url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
+            <comments>Main distribution license</comments>
+        </license>
+    </licenses>
+</project>
+        "#;
+
+        let (_temp_dir, pom_path) = create_temp_pom_xml(content);
+        let package_data = MavenParser::extract_first_package(&pom_path);
+
+        assert_eq!(
+            package_data.description,
+            Some("Rich Metadata\nDetailed metadata package".to_string())
+        );
+        assert_eq!(
+            package_data.extracted_license_statement,
+            Some(
+                "- license:\n    name: Apache-2.0\n    url: https://www.apache.org/licenses/LICENSE-2.0.txt\n    comments: Main distribution license\n".to_string()
+            )
+        );
+        assert!(package_data.parties.iter().any(|party| {
+            party.role.as_deref() == Some("owner")
+                && party.name.as_deref() == Some("Example Org")
+                && party.url.as_deref() == Some("https://example.org")
+        }));
+        assert_eq!(
+            package_data.source_packages,
+            vec!["pkg:maven/com.example/rich-metadata@1.2.3?classifier=sources".to_string()]
+        );
+    }
+
+    #[test]
+    fn test_extract_license_statement_includes_xml_license_comments() {
+        let content = r#"
+<!-- Licensed under the Apache License, Version 2.0 -->
+<project>
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>com.example</groupId>
+    <artifactId>commented-license</artifactId>
+    <version>1.0.0</version>
+</project>
+        "#;
+
+        let (_temp_dir, pom_path) = create_temp_pom_xml(content);
+        let package_data = MavenParser::extract_first_package(&pom_path);
+
+        assert_eq!(
+            package_data.extracted_license_statement,
+            Some(
+                "- license:\n    comments: Licensed under the Apache License, Version 2.0\n"
+                    .to_string()
+            )
+        );
+    }
+
+    #[test]
+    fn test_nested_meta_inf_pom_path_supplies_namespace() {
+        let temp_dir = TempDir::new().expect("Failed to create temp directory");
+        let nested_dir = temp_dir
+            .path()
+            .join("META-INF/maven/org.example/nested-lib");
+        fs::create_dir_all(&nested_dir).expect("Failed to create nested META-INF directory");
+
+        let pom_path = nested_dir.join("pom.xml");
+        fs::write(
+            &pom_path,
+            r#"
+<project>
+    <modelVersion>4.0.0</modelVersion>
+    <artifactId>nested-lib</artifactId>
+    <version>1.0.0</version>
+</project>
+            "#,
+        )
+        .expect("Failed to write nested pom.xml");
+
+        let package_data = MavenParser::extract_first_package(&pom_path);
+
+        assert_eq!(package_data.datasource_id, Some(DatasourceId::MavenPom));
+        assert_eq!(package_data.namespace, Some("org.example".to_string()));
+        assert_eq!(package_data.name, Some("nested-lib".to_string()));
+        assert_eq!(package_data.version, Some("1.0.0".to_string()));
+        assert_eq!(
+            package_data.purl,
+            Some("pkg:maven/org.example/nested-lib@1.0.0".to_string())
+        );
+    }
+
+    #[test]
+    fn test_developer_role_spelling_matches_python_reference() {
+        let content = r#"
+<project>
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>com.example</groupId>
+    <artifactId>role-spelling</artifactId>
+    <version>1.0.0</version>
+    <developers>
+        <developer>
+            <name>Example Dev</name>
+        </developer>
+    </developers>
+</project>
+        "#;
+
+        let (_temp_dir, pom_path) = create_temp_pom_xml(content);
+        let package_data = MavenParser::extract_first_package(&pom_path);
+
+        assert!(
+            package_data
+                .parties
+                .iter()
+                .any(|party| party.role.as_deref() == Some("developer"))
+        );
+        assert!(
+            package_data
+                .parties
+                .iter()
+                .all(|party| party.role.as_deref() != Some("developper"))
+        );
+    }
+
+    #[test]
+    fn test_extract_model_4_1_qualifiers_dependency_management_and_relocation() {
+        let content = r#"
+<project>
+    <modelVersion>4.1.0</modelVersion>
+    <groupId>com.example</groupId>
+    <artifactId>web-app</artifactId>
+    <version>2.0.0</version>
+    <packaging>war</packaging>
+    <classifier>jakarta</classifier>
+    <name>web-app</name>
+    <description>web-app</description>
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-dependencies</artifactId>
+                <version>3.2.0</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>com.example.libs</groupId>
+                <artifactId>managed-war</artifactId>
+                <version>4.5.6</version>
+                <type>war</type>
+                <classifier>tests</classifier>
+                <optional>true</optional>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+    <distributionManagement>
+        <relocation>
+            <groupId>org.example.new</groupId>
+            <artifactId>new-web-app</artifactId>
+            <version>3.0.0</version>
+            <message>Use the relocated coordinates</message>
+        </relocation>
+    </distributionManagement>
+</project>
+        "#;
+
+        let (_temp_dir, pom_path) = create_temp_pom_xml(content);
+        let package_data = MavenParser::extract_first_package(&pom_path);
+
+        let qualifiers = package_data.qualifiers.expect("qualifiers should exist");
+        assert_eq!(
+            qualifiers.get("classifier").map(String::as_str),
+            Some("jakarta")
+        );
+        assert_eq!(qualifiers.get("type").map(String::as_str), Some("war"));
+        assert_eq!(package_data.description, Some("web-app".to_string()));
+        assert_eq!(
+            package_data.purl,
+            Some("pkg:maven/com.example/web-app@2.0.0?classifier=jakarta&type=war".to_string())
+        );
+        assert_eq!(
+            package_data.repository_download_url,
+            Some(
+                "https://repo1.maven.org/maven2/com/example/web-app/2.0.0/web-app-2.0.0-jakarta.war"
+                    .to_string()
+            )
+        );
+        assert!(package_data.source_packages.is_empty());
+
+        let import_dep = package_data
+            .dependencies
+            .iter()
+            .find(|dep| dep.scope.as_deref() == Some("import"))
+            .expect("import dependency should exist");
+        assert_eq!(
+            import_dep.purl,
+            Some("pkg:maven/org.springframework.boot/spring-boot-dependencies@3.2.0".to_string())
+        );
+        assert_eq!(import_dep.is_runtime, Some(false));
+
+        let managed_dep = package_data
+            .dependencies
+            .iter()
+            .find(|dep| dep.scope.as_deref() == Some("dependencymanagement"))
+            .expect("dependencyManagement dependency should exist");
+        assert_eq!(
+            managed_dep.purl,
+            Some(
+                "pkg:maven/com.example.libs/managed-war@4.5.6?classifier=tests&type=war"
+                    .to_string()
+            )
+        );
+        assert_eq!(managed_dep.is_optional, Some(true));
+
+        let relocation_dep = package_data
+            .dependencies
+            .iter()
+            .find(|dep| dep.scope.as_deref() == Some("relocation"))
+            .expect("relocation dependency should exist");
+        assert_eq!(
+            relocation_dep.purl,
+            Some("pkg:maven/org.example.new/new-web-app@3.0.0".to_string())
+        );
+        assert_eq!(
+            relocation_dep
+                .extra_data
+                .as_ref()
+                .and_then(|extra| extra.get("message"))
+                .and_then(|value| value.as_str()),
+            Some("Use the relocated coordinates")
+        );
+
+        let extra_data = package_data.extra_data.expect("extra_data should exist");
+        let relocation = extra_data
+            .get("relocation")
+            .and_then(|value| value.as_object())
+            .expect("relocation extra data should exist");
+        assert_eq!(
+            relocation.get("message").and_then(|value| value.as_str()),
+            Some("Use the relocated coordinates")
+        );
+    }
+
+    #[test]
+    fn test_packaging_alias_normalizes_to_jar_outputs() {
+        let content = r#"
+<project>
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>org.example</groupId>
+    <artifactId>plugin-artifact</artifactId>
+    <version>1.0.0</version>
+    <packaging>maven-plugin</packaging>
+</project>
+        "#;
+
+        let (_temp_dir, pom_path) = create_temp_pom_xml(content);
+        let package_data = MavenParser::extract_first_package(&pom_path);
+
+        assert_eq!(package_data.qualifiers, None);
+        assert_eq!(
+            package_data.purl,
+            Some("pkg:maven/org.example/plugin-artifact@1.0.0".to_string())
+        );
+        assert_eq!(
+            package_data.repository_download_url,
+            Some(
+                "https://repo1.maven.org/maven2/org/example/plugin-artifact/1.0.0/plugin-artifact-1.0.0.jar"
+                    .to_string()
+            )
+        );
+    }
+
+    #[test]
+    fn test_dependency_scope_and_optional_resolve_from_properties() {
+        let content = r#"
+<project>
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>org.example</groupId>
+    <artifactId>property-scopes</artifactId>
+    <version>1.0.0</version>
+    <properties>
+        <dep.scope>provided</dep.scope>
+        <dep.optional>true</dep.optional>
+    </properties>
+    <dependencies>
+        <dependency>
+            <groupId>org.example.libs</groupId>
+            <artifactId>runtime-helper</artifactId>
+            <version>2.0.0</version>
+            <scope>${dep.scope}</scope>
+            <optional>${dep.optional}</optional>
+        </dependency>
+    </dependencies>
+</project>
+        "#;
+
+        let (_temp_dir, pom_path) = create_temp_pom_xml(content);
+        let package_data = MavenParser::extract_first_package(&pom_path);
+        let dependency = package_data
+            .dependencies
+            .first()
+            .expect("dependency should exist");
+
+        assert_eq!(dependency.scope, Some("provided".to_string()));
+        assert_eq!(dependency.is_runtime, Some(false));
+        assert_eq!(dependency.is_optional, Some(true));
+    }
+
+    #[test]
+    fn test_relocation_message_is_preserved_without_coordinates() {
+        let content = r#"
+<project>
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>org.example</groupId>
+    <artifactId>relocation-message-only</artifactId>
+    <version>1.0.0</version>
+    <distributionManagement>
+        <relocation>
+            <message>Moved to a private repository</message>
+        </relocation>
+    </distributionManagement>
+</project>
+        "#;
+
+        let (_temp_dir, pom_path) = create_temp_pom_xml(content);
+        let package_data = MavenParser::extract_first_package(&pom_path);
+        let extra_data = package_data.extra_data.expect("extra_data should exist");
+        let relocation = extra_data
+            .get("relocation")
+            .and_then(|value| value.as_object())
+            .expect("relocation extra data should exist");
+
+        assert_eq!(package_data.dependencies.len(), 0);
+        assert_eq!(
+            relocation.get("message").and_then(|value| value.as_str()),
+            Some("Moved to a private repository")
         );
     }
 }

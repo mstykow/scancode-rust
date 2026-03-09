@@ -3,7 +3,7 @@ name: Release
 on:
   push:
     tags:
-      - 'v[0-9]+.[0-9]+.[0-9]+*'
+      - "v[0-9]+.[0-9]+.[0-9]+*"
 
 env:
   CARGO_TERM_COLOR: always
@@ -21,26 +21,26 @@ jobs:
           - target: x86_64-unknown-linux-gnu
             os: ubuntu-latest
             archive_format: tar.gz
-          
+
           - target: aarch64-unknown-linux-gnu
             os: ubuntu-latest
             archive_format: tar.gz
             use_cross: true
-          
+
           # x86_64-apple-darwin removed: macos-15-large requires paid plan
           # Intel Mac users can use Rosetta 2 to run ARM builds
-          
+
           - target: aarch64-apple-darwin
             os: macos-latest
             archive_format: tar.gz
-          
+
           - target: x86_64-pc-windows-msvc
             os: windows-latest
             archive_format: zip
             ext: .exe
 
     runs-on: ${{ matrix.os }}
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
@@ -48,7 +48,7 @@ jobs:
           submodules: recursive
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@1.93.0
+        uses: dtolnay/rust-toolchain@1.93.1
         with:
           targets: ${{ matrix.target }}
 
@@ -91,7 +91,7 @@ jobs:
         shell: pwsh
 
       - name: Upload build artifacts
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
         with:
           name: scancode-rust-${{ matrix.target }}
           path: |
@@ -102,11 +102,11 @@ jobs:
   create-release:
     name: Create Release
     needs: build
-    if: always()  # Run even if some builds fail
+    if: always() # Run even if some builds fail
     runs-on: ubuntu-latest
     steps:
       - name: Download all artifacts
-        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8
         with:
           path: artifacts
 

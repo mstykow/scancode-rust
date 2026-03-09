@@ -1,0 +1,34 @@
+what:
+  - copyrights
+  - holders
+  - holders_summary
+copyrights:
+  - (c) 1991-1992, Thomas G. Lane, Part of the Independent JPEG Group's
+  - (c) 1993, Brian C. Smith, The Regents of the University of California
+  - (c) 1994, Kongji Huang and Brian C. Smith, Cornell University
+  - (c) 2001, Lutz Müller <lutz@users.sourceforge.net>
+  - Copyright (c) 2005, Hubert Figuiere <hub@figuiere.net>
+  - Copyright (c) 2005-2009, Hubert Figuiere <hub@figuiere.net>
+  - Copyright (c) 2006, Hubert Figuiere <hub@figuiere.net>
+  - Copyright (c) 2007, David Paleino <d.paleino@gmail.com>
+  - Copyright (c) 2007, Hubert Figuiere <hub@figuiere.net>
+holders:
+  - Brian C. Smith, The Regents of the University of California
+  - David Paleino
+  - Hubert Figuiere
+  - Kongji Huang and Brian C. Smith, Cornell University
+  - Lutz Müller
+  - Thomas G. Lane, Part of the Independent JPEG Group's
+holders_summary:
+  - value: Hubert Figuiere
+    count: 5
+  - value: Brian C. Smith, The Regents of the University of California
+    count: 1
+  - value: David Paleino
+    count: 1
+  - value: Kongji Huang and Brian C. Smith, Cornell University
+    count: 1
+  - value: Lutz Müller
+    count: 1
+  - value: Thomas G. Lane, Part of the Independent JPEG Group's
+    count: 1

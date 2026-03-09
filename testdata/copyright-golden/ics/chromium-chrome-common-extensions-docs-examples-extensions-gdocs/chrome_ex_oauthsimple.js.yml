@@ -1,0 +1,12 @@
+what:
+  - copyrights
+  - holders
+  - holders_summary
+copyrights:
+  - Copyright (c) 2009, unitedHeroes.net
+  - copyright unitedHeroes.net
+holders:
+  - unitedHeroes.net
+holders_summary:
+  - value: unitedHeroes.net
+    count: 2

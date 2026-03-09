@@ -1,0 +1,69 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.3",
+  "serialNumber": "urn:uuid:ce548f93-c5aa-499a-834c-a0233495928f",
+  "version": 1,
+  "metadata": {
+    "timestamp": "2023-03-31T10:36:22Z",
+    "tools": [
+      {
+        "name": "scancode-toolkit",
+        "version": "32.0.0rc3"
+      }
+    ]
+  },
+  "components": [
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/npm@2.13.5",
+      "name": "npm",
+      "version": "2.13.5",
+      "description": "a package manager for JavaScript",
+      "author": "Isaac Z. Schlueter",
+      "scope": "required",
+      "purl": "pkg:npm/npm@2.13.5",
+      "hashes": [
+        {
+          "alg": "SHA-1",
+          "content": "a124386bce4a90506f28ad4b1d1a804a17baaf32"
+        }
+      ],
+      "licenses": [
+        {
+          "expression": "Artistic-2.0"
+        }
+      ],
+      "externalReferences": [
+        {
+          "type": "bom",
+          "url": "https://registry.npmjs.org/npm/2.13.5"
+        },
+        {
+          "type": "issue-tracker",
+          "url": "http://github.com/npm/npm/issues"
+        },
+        {
+          "type": "distribution",
+          "url": "https://registry.npmjs.org/npm/-/npm-2.13.5.tgz"
+        },
+        {
+          "type": "distribution",
+          "url": "https://registry.npmjs.org/npm/-/npm-2.13.5.tgz"
+        },
+        {
+          "type": "website",
+          "url": "https://docs.npmjs.com/"
+        },
+        {
+          "type": "website",
+          "url": "https://www.npmjs.com/package/npm"
+        },
+        {
+          "type": "vcs",
+          "url": "git+https://github.com/npm/npm.git@fc7bbf03e39cc48a8924b90696d28345a6a90f3c"
+        }
+      ]
+    }
+  ],
+  "dependencies": []
+}

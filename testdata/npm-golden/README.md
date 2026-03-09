@@ -6,12 +6,18 @@ Golden tests compare parser output against expected results from the original Sc
 
 ## Test Status
 
-**Currently Passing:** 3/10 tests (7 tests require license detection engine integration)
+**Currently Passing:** 11/11 tests
 
 - ✅ `test_golden_basic` - Basic package.json parsing
-- ✅ `test_golden_bundled_deps` - Bundled dependencies handling  
+- ✅ `test_golden_bundled_deps` - Bundled dependencies handling
 - ✅ `test_golden_authors_list_strings` - Author array extraction
-- 🔄 7 tests ignored - Require license detection engine (see below)
+- ✅ `test_golden_authors_list_dicts` - Author dictionary arrays and raw license statement extraction
+- ✅ `test_golden_double_license` - Multiple declared-license forms preserved at parser level
+- ✅ `test_golden_express_jwt` - Manifest dependency PURLs match parser-only reference semantics
+- ✅ `test_golden_from_npmjs` - Registry metadata parity, including dist hashes and VCS revision handling
+- ✅ `test_golden_chartist` - Manifest dependencies remain unversioned and unpinned
+- ✅ `test_golden_dist` - Dependency ordering and scoped PURLs match expected output
+- ✅ `test_golden_electron` - Fixture-backed parser-only golden coverage restored
 
 ## Parser vs License Engine Responsibilities
 
@@ -38,7 +44,7 @@ These fields come from ScanCode's license detection engine:
 - `license_detections[].matches[].matched_length/match_coverage` - Match metrics
 - `license_detections[].matches[].rule_*` - Rule metadata
 
-**Tests expecting these fields are ignored** until the license detection engine is integrated.
+These fields are intentionally skipped by the parser-only comparison helper.
 
 ## Test Suite Coverage
 
@@ -47,30 +53,17 @@ These fields come from ScanCode's license detection engine:
 1. **basic** - Minimal package.json, validates core field extraction
 2. **bundledDeps** - Bundled dependencies handling
 3. **authors_list_strings** - Author array extraction and party information
+4. **authors_list_dicts** - Author object arrays and placeholder metadata normalization
+5. **double_license** - Multiple declared-license forms preserved without scanner output
+6. **express_jwt** - Alias and requirement parity for manifest dependencies
+7. **from_npmjs** - Registry tarball/VCS metadata and installed-manifest parity
+8. **chartist** - Scoped dependency ordering and unversioned dependency PURLs
+9. **dist** - Dist metadata, dependency order preservation, and scoped PURL encoding
+10. **electron** - Parser-only fixture coverage for Electron metadata
 
-### Ignored Tests (Require License Engine)
+## Ignore Policy
 
-Tests that validate parser functionality but are currently ignored because they expect license detection engine fields:
-
-1. **authors_list_dicts** - Duplicate license detection objects (engine behavior)
-2. **double_license** - License identifier and advanced matching
-3. **express_jwt** - Full license scanning integration
-4. **from_npmjs** - Real-world package with complex licenses
-5. **casepath** - Advanced license detection
-6. **chartist** - Multiple license scenarios
-7. **dist** - Advanced metadata fields
-8. **electron** - Empty test directory (no files)
-
-## When to Unignore Tests
-
-The 7 ignored tests should be re-enabled once:
-
-1. License detection engine is integrated into the scanning pipeline
-2. License file scanning (not just package.json extraction) is implemented
-3. License identifier generation is functional
-4. Rule matching and scoring systems are in place
-
-Until then, the parser-only comparison function (`compare_package_data_parser_only` in `src/test_utils.rs`) skips these engine-specific fields.
+For npm parser goldens, ignores should be reserved for cases genuinely blocked by the missing license detection engine. Parser-only parity gaps should be fixed and re-enabled in this suite rather than deferred.
 
 ## Adding New Golden Tests
 

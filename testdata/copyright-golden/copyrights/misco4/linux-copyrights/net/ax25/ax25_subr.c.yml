@@ -1,0 +1,15 @@
+what:
+  - copyrights
+  - holders
+  - authors
+copyrights:
+  - Copyright (c) Alan Cox GW4PTS (alan@lxorguk.ukuu.org.uk)
+  - Copyright (c) Frederic Rible F1OAT (frible@teaser.fr)
+  - Copyright (c) Joerg Reuter DL1BKE (jreuter@yaina.de)
+  - Copyright (c) Jonathan Naylor G4KLX (g4klx@g4klx.demon.co.uk)
+holders:
+  - Alan Cox GW4PTS
+  - Frederic Rible F1OAT
+  - Joerg Reuter DL1BKE
+  - Jonathan Naylor G4KLX
+authors: []

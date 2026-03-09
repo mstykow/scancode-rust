@@ -1,0 +1,9 @@
+what:
+  - copyrights
+  - holders
+  - authors
+copyrights:
+  - Copyright (c) 2012 Mathias Bynens <mathias@qiwi.be>
+holders:
+  - Mathias Bynens
+authors: []

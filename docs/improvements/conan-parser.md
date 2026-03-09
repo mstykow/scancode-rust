@@ -47,7 +47,7 @@ boost/1.82.0
 cmake/3.26.4
 ```
 
-**Python Output**: *(no parser exists)*
+**Python Output**: _(no parser exists)_
 
 ```json
 // File not recognized — no output
@@ -89,7 +89,7 @@ cmake/3.26.4
 
 Parses the JSON-based lockfile format with `graph_lock.nodes` structure containing resolved dependency references.
 
-**Python Output**: *(no parser exists)*
+**Python Output**: _(no parser exists)_
 
 ```json
 // File not recognized — no output
@@ -115,10 +115,10 @@ Parses the JSON-based lockfile format with `graph_lock.nodes` structure containi
 
 ## Dependency Scopes
 
-| Section | Scope | is_runtime | Description |
-|---------|-------|------------|-------------|
-| `[requires]` | `install` | `true` | Runtime dependencies |
-| `[build_requires]` | `build` | `false` | Build-time dependencies |
+| Section            | Scope     | is_runtime | Description             |
+| ------------------ | --------- | ---------- | ----------------------- |
+| `[requires]`       | `install` | `true`     | Runtime dependencies    |
+| `[build_requires]` | `build`   | `false`    | Build-time dependencies |
 
 ## Conan Reference Format
 

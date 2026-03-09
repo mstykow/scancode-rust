@@ -1,0 +1,13 @@
+what:
+  - copyrights
+  - holders
+  - authors
+copyrights:
+  - Copyright (c) 2000 - 2018, Intel Corp.
+  - Copyright 2006 Microsoft Corporation
+  - Copyright 2011 Microsoft
+holders:
+  - Intel Corp.
+  - Microsoft
+  - Microsoft Corporation
+authors: []

@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - main
-      - 'renovate/*'
+      - "renovate/*"
   pull_request:
     types: [opened, reopened, synchronize]
 
@@ -23,7 +23,7 @@ jobs:
           submodules: recursive
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@1.93.0
+        uses: dtolnay/rust-toolchain@1.93.1
         with:
           components: rustfmt, clippy
 
@@ -39,8 +39,64 @@ jobs:
       - name: Check compilation
         run: cargo check --all --verbose
 
-      - name: Run tests
+      - name: Run unit/integration/e2e/doc tests
         run: cargo test --all --verbose
+
+      - name: Check for unused dependencies
+        run: ./scripts/check_unused_deps.sh
+
+  golden-tests:
+    name: Golden Tests (${{ matrix.shard }})
+    runs-on: ubuntu-latest
+    if: |
+      !(github.event_name == 'pull_request' && startsWith(github.head_ref, 'renovate/'))
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - shard: copyright
+            filter: "copyright::golden_test::tests::"
+          - shard: assembly
+            filter: "assembly::assembly_golden_test::"
+          - shard: finder
+            filter: "finder::golden_test::tests::"
+          - shard: parsers
+    steps:
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
+        with:
+          submodules: recursive
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.93.1
+
+      - name: Set up Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: golden-tests
+
+      - name: Run golden test shard
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${{ matrix.shard }}" == "parsers" ]]; then
+            shopt -s nullglob
+            parser_files=(src/parsers/*_golden_test.rs)
+            if (( ${#parser_files[@]} == 0 )); then
+              echo "No parser golden test modules found"
+              exit 1
+            fi
+
+            for parser_file in "${parser_files[@]}"; do
+              module_name="${parser_file#src/parsers/}"
+              module_name="${module_name%.rs}"
+              filter="parsers::${module_name}::"
+              echo "Running golden filter: $filter"
+              cargo test --lib --verbose --features golden-tests "$filter"
+            done
+          else
+            echo "Running golden filter: ${{ matrix.filter }}"
+            cargo test --lib --verbose --features golden-tests "${{ matrix.filter }}"
+          fi
 
   docs-quality:
     name: Documentation Quality
@@ -52,14 +108,23 @@ jobs:
         with:
           submodules: false
 
-      - name: Set up Python
-        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
+      - name: Set up Node.js
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6
         with:
-          python-version: '3.11'
+          node-version: "24"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check formatting (Prettier)
+        run: npm run format:check
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.93.1
 
       - name: Validate URLs
-        run: python3 scripts/validate_urls.py
+        run: cargo run --quiet --bin validate-urls -- --root .
         continue-on-error: true
 
       - name: Lint Markdown
-        run: npx --yes markdownlint-cli2
+        run: npm run lint:md

@@ -1,0 +1,13 @@
+what:
+  - copyrights
+  - holders
+  - holders_summary
+copyrights:
+  - Copyright (c) 2013 ARRIS Group, Inc.
+  - Copyright (c) 2014 ARRis Group, Inc.
+holders:
+  - ARRIS Group, Inc.
+  - ARRis Group, Inc.
+holders_summary:
+  - value: ARRis Group, Inc.
+    count: 2

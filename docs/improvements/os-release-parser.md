@@ -67,7 +67,7 @@ PRETTY_NAME="Debian GNU/Linux 11 (bullseye)"
 VERSION_ID="11"
 "#;
     let pkg = parse_os_release(content);
-    
+
     assert_eq!(pkg.namespace.as_deref(), Some("debian"));
     assert_eq!(pkg.name.as_deref(), Some("debian"));  // Not "distroless"
     assert_eq!(pkg.version.as_deref(), Some("11"));
@@ -81,7 +81,7 @@ PRETTY_NAME="Distroless"
 VERSION_ID="11"
 "#;
     let pkg = parse_os_release(content);
-    
+
     assert_eq!(pkg.namespace.as_deref(), Some("debian"));
     assert_eq!(pkg.name.as_deref(), Some("distroless"));  // Correctly identified
 }

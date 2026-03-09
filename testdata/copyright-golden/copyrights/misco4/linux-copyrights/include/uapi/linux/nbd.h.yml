@@ -1,0 +1,13 @@
+what:
+  - copyrights
+  - holders
+  - authors
+copyrights:
+  - Copyright (c) 1999 VMware, Inc.
+  - Copyright (c) Pavel Machek, pavel@ucw.cz
+  - Copyright (c) Steven Whitehouse
+holders:
+  - Pavel Machek
+  - Steven Whitehouse
+  - VMware, Inc.
+authors: []

@@ -29,56 +29,56 @@ In the Python reference implementation, these responsibilities are mixed within 
 
 ### Parser Responsibilities (✅ ALLOWED)
 
-| Operation | Example | Rationale |
-|-----------|---------|-----------|
-| **Extract license statements** | `"license": "MIT"` → `extracted_license_statement: "MIT"` | Raw data from manifest |
-| **Extract license URLs** | `"license": {"url": "https://..."}` → store URL | Preserve metadata |
-| **Extract license text** | `"license": {"text": "Permission is..."}` → store text | Preserve full content |
-| **Parse author/email from manifests** | `"author": "Jane <jane@example.com>"` → `Party` object | Structured manifest data |
-| **Extract dependencies with scopes** | `dependencies: {...}` → `Dependency` array | Manifest structure |
-| **Extract checksums** | `"sha256": "abc123..."` → `sha256: "abc123..."` | Direct field mapping |
+| Operation                             | Example                                                   | Rationale                |
+| ------------------------------------- | --------------------------------------------------------- | ------------------------ |
+| **Extract license statements**        | `"license": "MIT"` → `extracted_license_statement: "MIT"` | Raw data from manifest   |
+| **Extract license URLs**              | `"license": {"url": "https://..."}` → store URL           | Preserve metadata        |
+| **Extract license text**              | `"license": {"text": "Permission is..."}` → store text    | Preserve full content    |
+| **Parse author/email from manifests** | `"author": "Jane <jane@example.com>"` → `Party` object    | Structured manifest data |
+| **Extract dependencies with scopes**  | `dependencies: {...}` → `Dependency` array                | Manifest structure       |
+| **Extract checksums**                 | `"sha256": "abc123..."` → `sha256: "abc123..."`           | Direct field mapping     |
 
 ### Parser Prohibitions (❌ FORBIDDEN)
 
-| Operation | Why Forbidden | Handled By |
-|-----------|---------------|------------|
-| **Normalize licenses to SPDX** | Complex analysis, confidence scoring | License detection engine |
-| **Resolve license URLs to identifiers** | Requires URL → SPDX mapping database | License detection engine |
-| **Populate `declared_license_expression`** | Requires normalization and SPDX parsing | License detection engine |
-| **Populate `license_detections`** | Requires fuzzy matching with confidence | License detection engine |
-| **Extract copyright holders** | Requires grammar-based pattern matching | Copyright detection engine |
-| **Populate `holder` field** | Requires ClueCODE-style analysis | Copyright detection engine |
-| **Parse emails from file content** | Requires regex patterns and scanning | Email detection engine |
+| Operation                                  | Why Forbidden                           | Handled By                 |
+| ------------------------------------------ | --------------------------------------- | -------------------------- |
+| **Normalize licenses to SPDX**             | Complex analysis, confidence scoring    | License detection engine   |
+| **Resolve license URLs to identifiers**    | Requires URL → SPDX mapping database    | License detection engine   |
+| **Populate `declared_license_expression`** | Requires normalization and SPDX parsing | License detection engine   |
+| **Populate `license_detections`**          | Requires fuzzy matching with confidence | License detection engine   |
+| **Extract copyright holders**              | Requires grammar-based pattern matching | Copyright detection engine |
+| **Populate `holder` field**                | Requires ClueCODE-style analysis        | Copyright detection engine |
+| **Parse emails from file content**         | Requires regex patterns and scanning    | Email detection engine     |
 
 ### Responsibility Matrix
 
 #### License Detection
 
-| Parser Responsibility | Detection Engine Responsibility |
-|----------------------|--------------------------------|
-| ✅ Populate `extracted_license_statement` with raw data | ✅ Populate `declared_license_expression` with normalized SPDX |
-| ✅ Extract license URLs, text, fields AS-IS | ✅ Populate `declared_license_expression_spdx` with proper case |
-| ❌ NEVER call `normalize_license()` | ✅ Populate `license_detections` array with Match objects |
-| ❌ NEVER call `resolve_license_url()` | ✅ Map URLs to SPDX identifiers |
-| ❌ NEVER populate `declared_license_expression*` | ✅ Analyze license text with confidence scoring |
-| ❌ NEVER populate `license_detections` | ✅ Handle SPDX expression parsing |
+| Parser Responsibility                                   | Detection Engine Responsibility                                 |
+| ------------------------------------------------------- | --------------------------------------------------------------- |
+| ✅ Populate `extracted_license_statement` with raw data | ✅ Populate `declared_license_expression` with normalized SPDX  |
+| ✅ Extract license URLs, text, fields AS-IS             | ✅ Populate `declared_license_expression_spdx` with proper case |
+| ❌ NEVER call `normalize_license()`                     | ✅ Populate `license_detections` array with Match objects       |
+| ❌ NEVER call `resolve_license_url()`                   | ✅ Map URLs to SPDX identifiers                                 |
+| ❌ NEVER populate `declared_license_expression*`        | ✅ Analyze license text with confidence scoring                 |
+| ❌ NEVER populate `license_detections`                  | ✅ Handle SPDX expression parsing                               |
 
 #### Copyright & Holder Detection
 
-| Parser Responsibility | Detection Engine Responsibility |
-|----------------------|--------------------------------|
-| ✅ Extract raw copyright text (if in manifest) | ✅ Populate `holder` field from copyright analysis |
-| ❌ NEVER parse/extract holder names | ✅ Use grammar-based copyright detection (ClueCODE) |
-| ❌ NEVER populate `holder` field | ✅ Scan file content for copyright statements |
-| ✅ Set `holder: None` | ✅ Extract holder names with pattern matching |
+| Parser Responsibility                          | Detection Engine Responsibility                     |
+| ---------------------------------------------- | --------------------------------------------------- |
+| ✅ Extract raw copyright text (if in manifest) | ✅ Populate `holder` field from copyright analysis  |
+| ❌ NEVER parse/extract holder names            | ✅ Use grammar-based copyright detection (ClueCODE) |
+| ❌ NEVER populate `holder` field               | ✅ Scan file content for copyright statements       |
+| ✅ Set `holder: None`                          | ✅ Extract holder names with pattern matching       |
 
 #### Author/Email Parsing
 
-| Parser Responsibility (Manifests) | Detection Engine Responsibility (File Content) |
-|-----------------------------------|----------------------------------------------|
-| ✅ Parse author/email from manifests (e.g., npm) | ✅ Scan source files for email patterns |
-| ✅ Create `Party` objects with name/email/role | ✅ Parse Linux CREDITS files for authors |
-| ✅ Use utilities like `parse_name_email()` | ✅ Separate plugin for email/author detection |
+| Parser Responsibility (Manifests)                | Detection Engine Responsibility (File Content) |
+| ------------------------------------------------ | ---------------------------------------------- |
+| ✅ Parse author/email from manifests (e.g., npm) | ✅ Scan source files for email patterns        |
+| ✅ Create `Party` objects with name/email/role   | ✅ Parse Linux CREDITS files for authors       |
+| ✅ Use utilities like `parse_name_email()`       | ✅ Separate plugin for email/author detection  |
 
 ### Data Flow Architecture
 
@@ -92,7 +92,7 @@ In the Python reference implementation, these responsibilities are mixed within 
 └─────────────────┘     └──────────────────┘     └─────────────┘
      PARSER                 DETECTION                 OUTPUT
      (extraction)           (analysis)                (combined)
-     
+
 extracted_license_statement = "MIT"
                                     ──> declared_license_expression = "mit"
                                     ──> declared_license_expression_spdx = "MIT"
@@ -139,10 +139,10 @@ extracted_license_statement = "MIT"
    - Must process detection stage separately
    - Acceptable: more accurate results worth the wait
 
-3. **Detection Engine Not Yet Built**
-   - Current parsers only extract (detection TODO)
-   - Some golden tests blocked on detection engine
-   - Acceptable: prioritizing parser coverage first
+3. **Transition Period During Engine Migration**
+   - `main` may still reflect legacy implementation details while `feat-add-license-parsing` introduces `LicenseDetectionEngine`
+   - Some plan/docs references can lag until migration lands fully on default branch
+   - Acceptable: the extraction-vs-detection boundary remains stable across both implementations
 
 ## Alternatives Considered
 

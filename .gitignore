@@ -29,7 +29,6 @@ dist/
 
 # Build artifacts
 *.exe
-!testdata/**/*.exe
 
 # Development artifacts
 output.json
@@ -43,5 +42,16 @@ output.json
 .env
 .env.*
 !.env.example
+node_modules/
 
-scancode-playground/
+# Test fixtures should always be reviewable and trackable, even when they use
+# names like dist/, node_modules/, *.log, or *.exe.
+!testdata/
+!testdata/**
+
+# Keep transient SQLite journal files created while exercising test fixtures ignored.
+testdata/**/*.sqlite-shm
+testdata/**/*.sqlite-wal
+
+# copy of the reference used for extracting debug information
+reference/scancode-playground

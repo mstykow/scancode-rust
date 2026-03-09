@@ -1,31 +1,38 @@
 repos:
-- repo: local
-  hooks:
-  - id: fmt
-    name: Format Rust code and stage changes
-    entry: bash -c 'cargo fmt --all && git add -u :/*.rs'
-    language: system
-    types: [rust]
-    pass_filenames: false
-  
-  - id: clippy
-    name: Run clippy
-    entry: cargo clippy
-    args: ['--all-targets', '--all-features', '--', '-D', 'warnings']
-    language: system
-    types: [rust]
-    pass_filenames: false
-  
-  - id: generate-supported-formats
-    name: Generate docs/SUPPORTED_FORMATS.md
-    entry: bash -c 'cargo run --quiet --bin generate-supported-formats && git add docs/SUPPORTED_FORMATS.md'
-    language: system
-    pass_filenames: false
-    files: ^src/parsers/.*\.rs$
-  
-  - id: markdown-lint
-    name: Lint markdown files with auto-fix
-    entry: bash -c 'npx --yes markdownlint-cli2 --fix "**/*.md" && git add -u :/*.md'
-    language: system
-    types: [markdown]
-    pass_filenames: false
+  - repo: local
+    hooks:
+      - id: fmt
+        name: Format Rust code and stage changes
+        entry: bash -c 'cargo fmt --all && git add -u :/*.rs'
+        language: system
+        types: [rust]
+        pass_filenames: false
+
+      - id: clippy
+        name: Run clippy
+        entry: cargo clippy
+        args: ["--all-targets", "--all-features", "--", "-D", "warnings"]
+        language: system
+        types: [rust]
+        pass_filenames: false
+
+      - id: generate-supported-formats
+        name: Generate docs/SUPPORTED_FORMATS.md
+        entry: bash -c 'cargo run --quiet --bin generate-supported-formats && git add docs/SUPPORTED_FORMATS.md'
+        language: system
+        pass_filenames: false
+        files: ^src/parsers/.*\.rs$
+
+      - id: markdown-lint
+        name: Lint markdown files with auto-fix
+        entry: bash -c 'npm install --quiet && npm run lint:md:fix && git add -u :/*.md'
+        language: system
+        types: [markdown]
+        pass_filenames: false
+
+      - id: prettier
+        name: Format YAML, JSON, and Markdown with Prettier
+        entry: bash -c 'npm install --quiet && npm run format && git add -u'
+        language: system
+        files: \.(yml|yaml|json|md)$
+        pass_filenames: false

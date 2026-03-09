@@ -1,6 +1,6 @@
 # Email and URL Detection Implementation Plan
 
-> **Status**: 🟡 Planning Complete — Ready for Implementation
+> **Status**: 🟢 Implemented with scanner/runtime ingestion parity complete
 > **Priority**: P2 - Medium Priority
 > **Estimated Effort**: 1-2 weeks
 > **Dependencies**: None (independent of copyright and license detection)
@@ -19,7 +19,7 @@
 
 ## Overview
 
-Email and URL detection extracts email addresses and URLs from source code files for contact information and reference tracking. It is the simplest of the three text detection features (license, copyright, email/URL) — primarily regex-based with a filter pipeline to remove junk results.
+Email and URL detection extracts email addresses and URLs from text-bearing scan inputs for contact information and reference tracking. This primarily means source and text files, and in Rust it additionally includes supported-image EXIF/XMP metadata as a beyond-parity clue source. It is the simplest of the three text detection features (license, copyright, email/URL) — primarily regex-based with a filter pipeline to remove junk results.
 
 ### Scope
 
@@ -47,20 +47,17 @@ Email and URL detection extracts email addresses and URLs from source code files
 
 **Implemented:**
 
-- ✅ `OutputURL` struct in `file_info.rs` (url field only — missing `start_line`/`end_line`)
-- ✅ `urls` field in `FileInfo`
+- ✅ Finder module at `src/finder/` (`emails.rs`, `urls.rs`, `host.rs`, `junk_data.rs`)
+- ✅ `OutputEmail` + `emails` field in `FileInfo`
+- ✅ `OutputURL` includes `start_line`/`end_line`
+- ✅ Scanner integration via `process_with_options(...)`
+- ✅ CLI flags: `--email`, `--max-email`, `--url`, `--max-url`
+- ✅ Local golden tests and fixtures in `src/finder/golden_test.rs` and `testdata/plugin_email_url/`
 
-**Missing:**
+**Notes:**
 
-- ❌ `OutputEmail` struct (does not exist yet)
-- ❌ `emails` field in `FileInfo`
-- ❌ `start_line`/`end_line` on `OutputURL`
-- ❌ Email extraction regex and filter pipeline
-- ❌ URL extraction regex and filter pipeline
-- ❌ Junk classification data (domains, hosts, IPs, URL prefixes)
-- ❌ URL canonicalization
-- ❌ IP address validation (IPv4/IPv6, private IP detection)
-- ❌ Scanner integration
+- Rust intentionally keeps several beyond-parity fixes (notably extended TLD length support and IPv6/private IP correctness).
+- ✅ The live Rust scanner now feeds finder detection through a shared path-aware ingestion helper in `src/utils/file.rs`, covering decoded non-UTF text, PDFs with extractable text, printable strings from `.dll` / `.exe` inputs, and supported-image EXIF/XMP metadata before the normal finder pipeline runs. PEM certificate skipping remains a separate intentional divergence in the scanner.
 
 ---
 
@@ -70,13 +67,13 @@ Email and URL detection extracts email addresses and URLs from source code files
 
 The Python implementation spans three files:
 
-| File | Lines | Purpose |
-|------|-------|---------|
-| `finder.py` | 597 | Core detection: regex patterns, filter pipelines, URL canonicalization |
-| `finder_data.py` | 252 | Junk classification data: emails, hosts, IPs, URLs, domain suffixes |
-| `plugin_email.py` | 59 | Scanner plugin: `--email`, `--max-email` CLI flags |
-| `plugin_url.py` | 55 | Scanner plugin: `--url`, `--max-url` CLI flags |
-| `api.py` (relevant) | ~60 | `get_emails()`, `get_urls()` — thin wrappers with threshold |
+| File                | Lines | Purpose                                                                |
+| ------------------- | ----- | ---------------------------------------------------------------------- |
+| `finder.py`         | 597   | Core detection: regex patterns, filter pipelines, URL canonicalization |
+| `finder_data.py`    | 252   | Junk classification data: emails, hosts, IPs, URLs, domain suffixes    |
+| `plugin_email.py`   | 59    | Scanner plugin: `--email`, `--max-email` CLI flags                     |
+| `plugin_url.py`     | 55    | Scanner plugin: `--url`, `--max-url` CLI flags                         |
+| `api.py` (relevant) | ~60   | `get_emails()`, `get_urls()` — thin wrappers with threshold            |
 
 Total: ~1,023 lines (much simpler than copyright detection's ~4,675 lines).
 
@@ -164,15 +161,15 @@ r'\b[A-Z0-9._%-]+@[A-Z0-9.-]+\.[A-Z]{2,4}\b'  # case-insensitive
 
 #### Junk Classification Data (`finder_data.py`)
 
-| Dataset | Count | Purpose |
-|---------|-------|---------|
-| `JUNK_EMAILS` | 7 | Exact junk email domains (test.com, example.com, localhost, etc.) |
-| `JUNK_HOSTS_AND_DOMAINS` | 11 | Junk hosts (example.com, localhost, maps.google.com, 1.2.3.4, etc.) |
-| `JUNK_IPS` | 1 | Junk IP addresses (1.2.3.4) |
-| `JUNK_EXACT_DOMAIN_NAMES` | 8 | Exact junk domains for email host filtering (test.com, sample.com, etc.) |
-| `JUNK_URLS` | 73 | Exact junk URLs (W3C schemas, DTDs, XML namespaces, etc.) |
-| `JUNK_URL_PREFIXES` | 57 | URL prefixes to filter (Spring DTDs, Apple certs, Microsoft PKI, etc.) |
-| `JUNK_DOMAIN_SUFFIXES` | 4 | Suffix patterns to filter (.png, .jpg, .gif, .jpeg) |
+| Dataset                   | Count | Purpose                                                                  |
+| ------------------------- | ----- | ------------------------------------------------------------------------ |
+| `JUNK_EMAILS`             | 7     | Exact junk email domains (test.com, example.com, localhost, etc.)        |
+| `JUNK_HOSTS_AND_DOMAINS`  | 11    | Junk hosts (example.com, localhost, maps.google.com, 1.2.3.4, etc.)      |
+| `JUNK_IPS`                | 1     | Junk IP addresses (1.2.3.4)                                              |
+| `JUNK_EXACT_DOMAIN_NAMES` | 8     | Exact junk domains for email host filtering (test.com, sample.com, etc.) |
+| `JUNK_URLS`               | 73    | Exact junk URLs (W3C schemas, DTDs, XML namespaces, etc.)                |
+| `JUNK_URL_PREFIXES`       | 57    | URL prefixes to filter (Spring DTDs, Apple certs, Microsoft PKI, etc.)   |
+| `JUNK_DOMAIN_SUFFIXES`    | 4     | Suffix patterns to filter (.png, .jpg, .gif, .jpeg)                      |
 
 #### Output Format
 
@@ -180,9 +177,7 @@ r'\b[A-Z0-9._%-]+@[A-Z0-9.-]+\.[A-Z]{2,4}\b'  # case-insensitive
 
 ```json
 {
-  "emails": [
-    {"email": "user@example.com", "start_line": 5, "end_line": 5}
-  ]
+  "emails": [{ "email": "user@example.com", "start_line": 5, "end_line": 5 }]
 }
 ```
 
@@ -190,9 +185,7 @@ r'\b[A-Z0-9._%-]+@[A-Z0-9.-]+\.[A-Z]{2,4}\b'  # case-insensitive
 
 ```json
 {
-  "urls": [
-    {"url": "https://example.com", "start_line": 10, "end_line": 10}
-  ]
+  "urls": [{ "url": "https://example.com", "start_line": 10, "end_line": 10 }]
 }
 ```
 

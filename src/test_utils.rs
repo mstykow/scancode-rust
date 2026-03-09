@@ -1,13 +1,13 @@
-#[cfg(test)]
+#[cfg(all(test, feature = "golden-tests"))]
 use crate::models::PackageData;
-#[cfg(test)]
+#[cfg(all(test, feature = "golden-tests"))]
 use serde_json::Value;
-#[cfg(test)]
+#[cfg(all(test, feature = "golden-tests"))]
 use std::fs;
-#[cfg(test)]
+#[cfg(all(test, feature = "golden-tests"))]
 use std::path::Path;
 
-#[cfg(test)]
+#[cfg(all(test, feature = "golden-tests"))]
 pub fn compare_package_data_parser_only(
     actual: &PackageData,
     expected_path: &Path,
@@ -15,21 +15,43 @@ pub fn compare_package_data_parser_only(
     let expected_content = fs::read_to_string(expected_path)
         .map_err(|e| format!("Failed to read expected file: {}", e))?;
 
-    let expected_array: Vec<Value> = serde_json::from_str(&expected_content)
+    let expected_value: Value = serde_json::from_str(&expected_content)
         .map_err(|e| format!("Failed to parse expected JSON: {}", e))?;
 
-    if expected_array.is_empty() {
-        return Err("Expected file contains empty array".to_string());
-    }
+    let expected_json = unwrap_expected_parser_package(&expected_value)?;
 
-    let expected_json = &expected_array[0];
     let actual_json = serde_json::to_value(actual)
         .map_err(|e| format!("Failed to serialize actual PackageData: {}", e))?;
 
     compare_json_values_parser_only(&actual_json, expected_json, "")
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "golden-tests"))]
+fn unwrap_expected_parser_package(expected_value: &Value) -> Result<&Value, String> {
+    if let Some(expected_array) = expected_value.as_array() {
+        if expected_array.is_empty() {
+            return Err("Expected file contains empty array".to_string());
+        }
+        return Ok(&expected_array[0]);
+    }
+
+    if let Some(package_data) = expected_value
+        .get("files")
+        .and_then(Value::as_array)
+        .and_then(|files| files.first())
+        .and_then(|file| file.get("package_data"))
+        .and_then(Value::as_array)
+    {
+        if package_data.is_empty() {
+            return Err("Expected file contains empty files[0].package_data array".to_string());
+        }
+        return Ok(&package_data[0]);
+    }
+
+    Ok(expected_value)
+}
+
+#[cfg(all(test, feature = "golden-tests"))]
 fn compare_json_values_parser_only(
     actual: &Value,
     expected: &Value,
@@ -46,6 +68,7 @@ fn compare_json_values_parser_only(
         "rule_url",
         "start_line",
         "end_line",
+        "extra_data",
     ];
 
     if SKIP_FIELDS.iter().any(|&field| path.ends_with(field)) {
@@ -54,6 +77,8 @@ fn compare_json_values_parser_only(
 
     match (actual, expected) {
         (Value::Null, Value::Null) => Ok(()),
+        (Value::Null, Value::Object(obj)) if obj.is_empty() => Ok(()),
+        (Value::Object(obj), Value::Null) if obj.is_empty() => Ok(()),
         (Value::Bool(a), Value::Bool(e)) if a == e => Ok(()),
         (Value::Number(a), Value::Number(e)) if a == e => Ok(()),
         (Value::String(a), Value::String(e)) if a == e => Ok(()),

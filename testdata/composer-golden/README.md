@@ -17,6 +17,7 @@ Golden tests compare parser output against expected results from the original Sc
 The Rust implementation provides significantly more metadata in dependency `extra_data` compared to the original Python implementation:
 
 **Fields added to dependency `extra_data`:**
+
 - `source_type`: Version control type (e.g., "git")
 - `source_url`: Repository URL (e.g., "https://github.com/doctrine/cache.git")
 - `source_reference`: VCS commit hash
@@ -27,12 +28,14 @@ The Rust implementation provides significantly more metadata in dependency `extr
 
 **Rationale:**
 This metadata is useful for:
+
 - **Package provenance tracking** - Know exactly where packages come from
 - **Reproducible builds** - Pin to specific commits and distributions
 - **Security auditing** - Verify package sources and integrity
 - **Dependency resolution** - Better understanding of package relationships
 
 **Example:**
+
 ```json
 "extra_data": {
   "source_type": "git",
@@ -50,4 +53,5 @@ This is an **intentional improvement** over the Python implementation, providing
 ## Test Data
 
 Test files sourced from Python ScanCode reference:
+
 - `reference/scancode-toolkit/tests/packagedcode/data/phpcomposer/`

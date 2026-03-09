@@ -1,0 +1,16 @@
+what:
+  - copyrights
+  - holders
+  - holders_summary
+copyrights:
+  - (c) 1999 Entrust.net Limited
+  - (c) Kasım 2005
+  - Copyright (c) 2010 The Chromium Authors
+holders:
+  - Entrust.net Limited
+  - The Chromium Authors
+holders_summary:
+  - value: Entrust.net Limited
+    count: 2
+  - value: The Chromium Authors
+    count: 1

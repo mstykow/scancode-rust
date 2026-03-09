@@ -820,8 +820,14 @@ fn clean_gemspec_value(s: &str) -> String {
         s
     };
 
-    let s = if s.starts_with("%q{") && s.ends_with("}") {
-        &s[3..s.len() - 1]
+    let s = if let Some(stripped) = s.strip_prefix("%q{") {
+        stripped.strip_suffix('}').unwrap_or(stripped)
+    } else if let Some(stripped) = s.strip_prefix("%q<") {
+        stripped.strip_suffix('>').unwrap_or(stripped)
+    } else if let Some(stripped) = s.strip_prefix("%q[") {
+        stripped.strip_suffix(']').unwrap_or(stripped)
+    } else if let Some(stripped) = s.strip_prefix("%q(") {
+        stripped.strip_suffix(')').unwrap_or(stripped)
     } else {
         s
     };
@@ -847,6 +853,61 @@ fn extract_ruby_array(s: &str) -> Vec<String> {
         .captures_iter(s)
         .filter_map(|cap| cap.get(1).map(|m| m.as_str().to_string()))
         .collect()
+}
+
+fn extract_all_ruby_values(s: &str) -> Vec<String> {
+    let value_re = match Regex::new(r#"%q[\{<\[(]([^\}>\])]+)[\}>\])]|["']([^"']+)["']"#) {
+        Ok(r) => r,
+        Err(_) => return Vec::new(),
+    };
+
+    value_re
+        .captures_iter(s)
+        .filter_map(|caps| caps.get(1).or_else(|| caps.get(2)))
+        .map(|m| clean_gemspec_value(m.as_str()))
+        .collect()
+}
+
+fn extract_first_ruby_value(s: &str) -> Option<String> {
+    extract_all_ruby_values(s).into_iter().next()
+}
+
+fn after_first_argument(args: &str) -> &str {
+    let mut bracket_depth = 0usize;
+    let mut paren_depth = 0usize;
+    let mut in_quote: Option<char> = None;
+    let chars: Vec<(usize, char)> = args.char_indices().collect();
+    let mut i = 0;
+
+    while i < chars.len() {
+        let (idx, ch) = chars[i];
+
+        if let Some(quote) = in_quote {
+            if ch == '\\' {
+                i += 2;
+                continue;
+            }
+            if ch == quote {
+                in_quote = None;
+            }
+            i += 1;
+            continue;
+        }
+
+        match ch {
+            '\'' | '"' => in_quote = Some(ch),
+            '[' | '{' | '<' => bracket_depth += 1,
+            ']' | '}' | '>' => bracket_depth = bracket_depth.saturating_sub(1),
+            '(' => paren_depth += 1,
+            ')' => paren_depth = paren_depth.saturating_sub(1),
+            ',' if bracket_depth == 0 && paren_depth == 0 => return args[idx + 1..].trim(),
+            _ => {}
+        }
+
+        i += 1;
+    }
+
+    ""
 }
 
 /// Bug #2: Resolves variable version references like `CSV::VERSION` or `RAILS_VERSION`.
@@ -924,24 +985,12 @@ fn parse_gemspec(content: &str) -> PackageData {
         }
     };
 
-    // add_dependency / add_runtime_dependency "name", "version1", "version2"
-    let add_dep_re = match Regex::new(
-        r#"(?m)^\s*\w+\.add_(?:runtime_)?dependency\s+["']([^"']+)["'](?:\.freeze)?(?:\s*,\s*["']([^"']+)["'](?:\.freeze)?)?(?:\s*,\s*["']([^"']+)["'](?:\.freeze)?)?"#,
+    let dependency_call_re = match Regex::new(
+        r#"(?m)^\s*\w+\.(add_(?:development_|runtime_)?dependency)\s*\(?(.+?)\)?\s*$"#,
     ) {
         Ok(r) => r,
         Err(e) => {
-            warn!("Failed to compile add_dependency regex: {}", e);
-            return default_package_data();
-        }
-    };
-
-    // add_development_dependency "name", "version1", "version2"
-    let add_dev_dep_re = match Regex::new(
-        r#"(?m)^\s*\w+\.add_development_dependency\s+["']([^"']+)["'](?:\.freeze)?(?:\s*,\s*["']([^"']+)["'](?:\.freeze)?)?(?:\s*,\s*["']([^"']+)["'](?:\.freeze)?)?"#,
-    ) {
-        Ok(r) => r,
-        Err(e) => {
-            warn!("Failed to compile add_development_dependency regex: {}", e);
+            warn!("Failed to compile gemspec dependency regex: {}", e);
             return default_package_data();
         }
     };
@@ -1025,23 +1074,18 @@ fn parse_gemspec(content: &str) -> PackageData {
 
     // Build parties from authors and emails
     let mut parties: Vec<Party> = Vec::new();
-    let max_len = authors.len().max(emails.len());
 
-    for i in 0..max_len {
-        let author_name = authors.get(i).map(|s| s.as_str());
-        let email_str = emails.get(i).map(|s| s.as_str());
-
+    if authors.len() == 1 && emails.len() == 1 {
+        let email_str = emails.first().map(String::as_str);
         let (parsed_email_name, parsed_email) = match email_str {
             Some(e) => split_name_email(e),
             None => (None, None),
         };
 
-        let party_name = author_name.map(|s| s.to_string()).or(parsed_email_name);
-
         parties.push(Party {
             r#type: Some("person".to_string()),
             role: Some("author".to_string()),
-            name: party_name,
+            name: authors.first().cloned().or(parsed_email_name),
             email: parsed_email.or_else(|| {
                 email_str
                     .filter(|e| e.contains('@') && !e.contains('<'))
@@ -1052,73 +1096,74 @@ fn parse_gemspec(content: &str) -> PackageData {
             organization_url: None,
             timezone: None,
         });
+    } else {
+        for author_name in authors {
+            parties.push(Party {
+                r#type: Some("person".to_string()),
+                role: Some("author".to_string()),
+                name: Some(author_name),
+                email: None,
+                url: None,
+                organization: None,
+                organization_url: None,
+                timezone: None,
+            });
+        }
+
+        for email_str in emails {
+            let (parsed_email_name, parsed_email) = if email_str.contains('<') {
+                split_name_email(&email_str)
+            } else {
+                (None, None)
+            };
+            parties.push(Party {
+                r#type: Some("person".to_string()),
+                role: Some("author".to_string()),
+                name: parsed_email_name,
+                email: parsed_email.or_else(|| email_str.contains('@').then_some(email_str)),
+                url: None,
+                organization: None,
+                organization_url: None,
+                timezone: None,
+            });
+        }
     }
 
-    // Parse runtime dependencies (add_dependency / add_runtime_dependency)
-    for caps in add_dep_re.captures_iter(content) {
-        let dep_name = match caps.get(1) {
-            Some(m) => clean_gemspec_value(m.as_str()),
+    for caps in dependency_call_re.captures_iter(content) {
+        let method = match caps.get(1) {
+            Some(m) => m.as_str(),
+            None => continue,
+        };
+        let args = match caps.get(2) {
+            Some(m) => m.as_str(),
             None => continue,
         };
 
-        let mut version_parts = Vec::new();
-        if let Some(v) = caps.get(2) {
-            version_parts.push(clean_gemspec_value(v.as_str()));
-        }
-        if let Some(v) = caps.get(3) {
-            version_parts.push(clean_gemspec_value(v.as_str()));
-        }
-
+        let Some(dep_name) = extract_first_ruby_value(args) else {
+            continue;
+        };
+        let version_parts = extract_all_ruby_values(after_first_argument(args));
         let extracted_requirement = if version_parts.is_empty() {
             None
         } else {
             Some(version_parts.join(", "))
         };
-
         let purl = create_gem_purl(&dep_name, None);
-
-        dependencies.push(Dependency {
-            purl,
-            extracted_requirement,
-            scope: Some("runtime".to_string()),
-            is_runtime: Some(true),
-            is_optional: Some(false),
-            is_pinned: None,
-            is_direct: Some(true),
-            resolved_package: None,
-            extra_data: None,
-        });
-    }
-
-    // Parse development dependencies (add_development_dependency)
-    for caps in add_dev_dep_re.captures_iter(content) {
-        let dep_name = match caps.get(1) {
-            Some(m) => clean_gemspec_value(m.as_str()),
-            None => continue,
-        };
-
-        let mut version_parts = Vec::new();
-        if let Some(v) = caps.get(2) {
-            version_parts.push(clean_gemspec_value(v.as_str()));
-        }
-        if let Some(v) = caps.get(3) {
-            version_parts.push(clean_gemspec_value(v.as_str()));
-        }
-
-        let extracted_requirement = if version_parts.is_empty() {
-            None
+        let is_development = method == "add_development_dependency";
+        let scope = if is_development {
+            "development"
+        } else if method == "add_runtime_dependency" {
+            "runtime"
         } else {
-            Some(version_parts.join(", "))
+            "dependency"
         };
-
-        let purl = create_gem_purl(&dep_name, None);
 
         dependencies.push(Dependency {
             purl,
             extracted_requirement,
-            scope: Some("development".to_string()),
-            is_runtime: Some(false),
-            is_optional: Some(true),
+            scope: Some(scope.to_string()),
+            is_runtime: Some(!is_development),
+            is_optional: Some(is_development),
             is_pinned: None,
             is_direct: Some(true),
             resolved_package: None,
@@ -1353,8 +1398,9 @@ fn parse_gem_metadata_yaml(
         let email_str = emails.get(i).map(|s| s.as_str());
 
         let (parsed_email_name, parsed_email) = match email_str {
-            Some(e) => split_name_email(e),
+            Some(e) if e.contains('<') => split_name_email(e),
             None => (None, None),
+            _ => (None, None),
         };
 
         let party_name = author_name.map(|s| s.to_string()).or(parsed_email_name);
@@ -1636,3 +1682,47 @@ crate::register_parser!(
     "Ruby",
     Some("https://guides.rubygems.org/specification-reference/"),
 );
+
+#[cfg(test)]
+mod tests {
+    use super::parse_gemspec;
+
+    #[test]
+    fn test_clean_gemspec_value_handles_unterminated_percent_q() {
+        assert_eq!(
+            super::clean_gemspec_value("%q{Arel is a SQL AST manager for Ruby. It"),
+            "Arel is a SQL AST manager for Ruby. It"
+        );
+    }
+
+    #[test]
+    fn test_parse_gemspec_runtime_dependency_scope() {
+        let content = r#"
+Gem::Specification.new do |spec|
+  spec.name = "demo"
+  spec.version = "1.0.0"
+  spec.add_runtime_dependency "rack", "~> 3.0"
+  spec.add_dependency "thor", ">= 1.0"
+end
+"#;
+
+        let package_data = parse_gemspec(content);
+        assert_eq!(package_data.dependencies.len(), 2);
+        assert_eq!(
+            package_data.dependencies[0].scope,
+            Some("runtime".to_string())
+        );
+        assert_eq!(
+            package_data.dependencies[0].extracted_requirement,
+            Some("~> 3.0".to_string())
+        );
+        assert_eq!(
+            package_data.dependencies[1].scope,
+            Some("dependency".to_string())
+        );
+        assert_eq!(
+            package_data.dependencies[1].extracted_requirement,
+            Some(">= 1.0".to_string())
+        );
+    }
+}

@@ -1,0 +1,11 @@
+what:
+  - copyrights
+  - holders
+  - authors
+copyrights:
+  - Copyright (c) 1995, 1996 Russell King
+  - Copyright (c) People
+holders:
+  - People
+  - Russell King
+authors: []

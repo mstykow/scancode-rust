@@ -31,7 +31,7 @@ Each line follows the format: `group:artifact:version=hash`
 
 ### Before/After Comparison
 
-**Python Output**: *(no parser exists)*
+**Python Output**: _(no parser exists)_
 
 ```json
 // File not recognized — no output
@@ -67,14 +67,14 @@ Each line follows the format: `group:artifact:version=hash`
 
 ## What Gets Extracted
 
-| Field | Source | Description |
-|-------|--------|-------------|
-| `purl` | GAV coordinates | Maven-style Package URL |
-| `is_pinned` | always `true` | Lockfiles contain exact versions |
-| `resolved_package` | GAV coordinates | Full resolved package details |
-| `extra_data.group` | group segment | Maven group ID |
-| `extra_data.artifact` | artifact segment | Maven artifact ID |
-| `extra_data.hash` | hash after `=` | Dependency hash for verification |
+| Field                 | Source           | Description                      |
+| --------------------- | ---------------- | -------------------------------- |
+| `purl`                | GAV coordinates  | Maven-style Package URL          |
+| `is_pinned`           | always `true`    | Lockfiles contain exact versions |
+| `resolved_package`    | GAV coordinates  | Full resolved package details    |
+| `extra_data.group`    | group segment    | Maven group ID                   |
+| `extra_data.artifact` | artifact segment | Maven artifact ID                |
+| `extra_data.hash`     | hash after `=`   | Dependency hash for verification |
 
 ### Key Design Decisions
 

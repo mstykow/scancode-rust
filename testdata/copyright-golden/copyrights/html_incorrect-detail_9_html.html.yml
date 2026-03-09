@@ -1,0 +1,5 @@
+what:
+  - copyrights
+copyrights:
+  - (c) 2004-2009 pudn.com
+notes: intentionally aligned with url_in_html-detail_9_html because both HTML fixtures are byte-identical; canonical Rust output is deterministic and content-based.

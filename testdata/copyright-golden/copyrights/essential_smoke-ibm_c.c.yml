@@ -1,0 +1,16 @@
+what:
+  - copyrights
+  - holders
+  - holders_summary
+copyrights:
+  - (c) 2008
+  - Copyright Eclipse, IBM and others
+  - Copyright IBM and others (c) 2008
+holders:
+  - Eclipse, IBM and others
+  - IBM and others
+holders_summary:
+  - value: Eclipse, IBM and others
+    count: 1
+  - value: IBM and others
+    count: 1

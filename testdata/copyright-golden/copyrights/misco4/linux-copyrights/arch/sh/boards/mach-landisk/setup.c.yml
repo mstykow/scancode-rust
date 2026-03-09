@@ -1,0 +1,15 @@
+what:
+  - copyrights
+  - holders
+  - authors
+copyrights:
+  - (c) 2002 Atom Create Engineering Co., Ltd.
+  - Copyright (c) 2000 Kazumoto Kojima
+  - Copyright (c) 2002 Paul Mundt Copylight
+  - Copyright (c) 2005-2007 kogiidena
+holders:
+  - Atom Create Engineering Co., Ltd.
+  - Kazumoto Kojima
+  - Paul Mundt Copylight
+  - kogiidena
+authors: []

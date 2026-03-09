@@ -1,0 +1,15 @@
+what:
+  - copyrights
+  - holders
+  - holders_summary
+copyrights:
+  - Copyright (c) 2006-2008 Advanced Micro Devices
+  - Copyright OProfile authors
+holders:
+  - Advanced Micro Devices
+  - OProfile authors
+holders_summary:
+  - value: Advanced Micro Devices
+    count: 1
+  - value: OProfile authors
+    count: 1

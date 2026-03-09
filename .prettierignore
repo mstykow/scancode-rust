@@ -1,0 +1,19 @@
+# Build artifacts
+target/
+node_modules/
+
+# Git
+.git/
+
+# Submodules (external code, do not format)
+reference/
+resources/licenses/
+
+# Generated files (if any)
+*.min.js
+*.min.json
+
+# Test data files with intentional syntax errors or non-standard formats
+testdata/copyright-golden/copyrights/misco2/package-author.json
+testdata/conda/meta-yaml/abeona/meta.yaml
+testdata/conda/meta-yaml/gcnvkernel/meta.yaml

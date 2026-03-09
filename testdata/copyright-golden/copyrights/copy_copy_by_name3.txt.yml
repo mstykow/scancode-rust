@@ -1,0 +1,12 @@
+what:
+  - copyrights
+  - holders
+  - holders_summary
+copyrights:
+  - (c) by 2007
+  - Copyright (c) by 2007 Joachim Foerster <JOFT@gmx.de>
+holders:
+  - Joachim Foerster
+holders_summary:
+  - value: Joachim Foerster
+    count: 1

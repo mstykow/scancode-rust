@@ -1,0 +1,13 @@
+<project>
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>com.example</groupId>
+    <artifactId>nested-lib</artifactId>
+    <version>1.0.0</version>
+    <name>Nested Library</name>
+    <description>Narrative from nested pom</description>
+    <licenses>
+        <license>
+            <name>Apache-2.0</name>
+        </license>
+    </licenses>
+</project>

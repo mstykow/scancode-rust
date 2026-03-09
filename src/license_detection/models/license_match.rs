@@ -1,8 +1,7 @@
 //! License match result from a matching strategy.
 
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
-use std::ops::Range;
+use std::collections::HashSet;
 
 fn default_rule_length() -> usize {
     0

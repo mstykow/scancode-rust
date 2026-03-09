@@ -1,0 +1,11 @@
+what:
+  - copyrights
+  - holders
+  - holders_summary
+copyrights:
+  - Copyright (c) Sebastian Claßen, 2007 Jan Engelhardt, 2007 - 2010
+holders:
+  - Sebastian Claßen, Jan Engelhardt
+holders_summary:
+  - value: Sebastian Claßen , Jan Engelhardt
+    count: 1

@@ -132,38 +132,38 @@ We implemented real parsing for 3 formats:
 
 ### META.json (v2.0+)
 
-| CPAN Field | PackageData Field | Notes |
-|-----------|-------------------|-------|
-| `name` | `name` | Module name with hyphens |
-| `version` | `version` | String or number |
-| `abstract` | `description` | Short description |
-| `license` | `extracted_license_statement` | Array joined with " AND " |
-| `author` | `parties` (role=`author`) | Array of "Name <email>" strings |
-| `resources.homepage` | `homepage_url` | |
-| `resources.repository.url` | `vcs_url` | |
-| `resources.repository.web` | `code_view_url` | |
-| `resources.bugtracker.web` | `bug_tracking_url` | |
-| `prereqs.runtime.requires` | `dependencies` (scope=`runtime`) | |
-| `prereqs.build.requires` | `dependencies` (scope=`build`) | |
-| `prereqs.test.requires` | `dependencies` (scope=`test`) | |
-| `prereqs.configure.requires` | `dependencies` (scope=`configure`) | |
+| CPAN Field                   | PackageData Field                  | Notes                           |
+| ---------------------------- | ---------------------------------- | ------------------------------- |
+| `name`                       | `name`                             | Module name with hyphens        |
+| `version`                    | `version`                          | String or number                |
+| `abstract`                   | `description`                      | Short description               |
+| `license`                    | `extracted_license_statement`      | Array joined with " AND "       |
+| `author`                     | `parties` (role=`author`)          | Array of "Name <email>" strings |
+| `resources.homepage`         | `homepage_url`                     |                                 |
+| `resources.repository.url`   | `vcs_url`                          |                                 |
+| `resources.repository.web`   | `code_view_url`                    |                                 |
+| `resources.bugtracker.web`   | `bug_tracking_url`                 |                                 |
+| `prereqs.runtime.requires`   | `dependencies` (scope=`runtime`)   |                                 |
+| `prereqs.build.requires`     | `dependencies` (scope=`build`)     |                                 |
+| `prereqs.test.requires`      | `dependencies` (scope=`test`)      |                                 |
+| `prereqs.configure.requires` | `dependencies` (scope=`configure`) |                                 |
 
 ### META.yml (v1.4)
 
-| CPAN Field | PackageData Field | Notes |
-|-----------|-------------------|-------|
-| `name` | `name` | |
-| `version` | `version` | |
-| `abstract` / `description` | `description` | Fallback to `description` |
-| `license` | `extracted_license_statement` | String or array |
-| `author` | `parties` (role=`author`) | |
-| `resources.homepage` | `homepage_url` | |
-| `resources.repository` | `vcs_url` | Simple string in v1.4 |
-| `resources.bugtracker` | `bug_tracking_url` | |
-| `requires` | `dependencies` (scope=`runtime`) | Flat structure |
-| `build_requires` | `dependencies` (scope=`build`) | |
-| `test_requires` | `dependencies` (scope=`test`) | |
-| `configure_requires` | `dependencies` (scope=`configure`) | |
+| CPAN Field                 | PackageData Field                  | Notes                     |
+| -------------------------- | ---------------------------------- | ------------------------- |
+| `name`                     | `name`                             |                           |
+| `version`                  | `version`                          |                           |
+| `abstract` / `description` | `description`                      | Fallback to `description` |
+| `license`                  | `extracted_license_statement`      | String or array           |
+| `author`                   | `parties` (role=`author`)          |                           |
+| `resources.homepage`       | `homepage_url`                     |                           |
+| `resources.repository`     | `vcs_url`                          | Simple string in v1.4     |
+| `resources.bugtracker`     | `bug_tracking_url`                 |                           |
+| `requires`                 | `dependencies` (scope=`runtime`)   | Flat structure            |
+| `build_requires`           | `dependencies` (scope=`build`)     |                           |
+| `test_requires`            | `dependencies` (scope=`test`)      |                           |
+| `configure_requires`       | `dependencies` (scope=`configure`) |                           |
 
 ### MANIFEST
 
@@ -177,12 +177,12 @@ Simple line-by-line file list extraction:
 
 CPAN has 4 dependency scopes:
 
-| Scope | is_runtime | Description |
-|-------|-----------|-------------|
-| `runtime` | `true` | Runtime dependencies |
-| `build` | `false` | Build-time dependencies |
-| `test` | `false` | Test dependencies |
-| `configure` | `false` | Configuration dependencies |
+| Scope       | is_runtime | Description                |
+| ----------- | ---------- | -------------------------- |
+| `runtime`   | `true`     | Runtime dependencies       |
+| `build`     | `false`    | Build-time dependencies    |
+| `test`      | `false`    | Test dependencies          |
+| `configure` | `false`    | Configuration dependencies |
 
 **Note**: The `perl` dependency is filtered out (not a CPAN module).
 

@@ -1,0 +1,14 @@
+what:
+  - copyrights
+  - holders
+  - authors
+copyrights:
+  - Copyright (c) 2012 Durgadoss R <durgadoss.r@intel.com>
+  - Copyright (c) 2012 Intel Corp
+  - Copyright (c) 2014 Peter Feuerer <peter@piie.net>
+  - Copyrights Copyright (c) 2012 Intel Corp
+holders:
+  - Durgadoss R
+  - Intel Corp
+  - Peter Feuerer
+authors: []

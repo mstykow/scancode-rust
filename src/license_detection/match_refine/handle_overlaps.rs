@@ -187,7 +187,6 @@ pub fn filter_overlapping_matches(
             let current_hilen = matches[i].hilen();
             let next_hilen = matches[j].hilen();
 
-            let different_licenses = matches[i].license_expression != matches[j].license_expression;
 
             // Note: We do NOT use candidate_resemblance for tie-breaking here.
             // candidate_resemblance is a GLOBAL measure based on multiset intersection

@@ -2,9 +2,6 @@
 
 pub mod aho_match;
 mod detection;
-#[cfg(test)]
-mod investigation;
-
 
 pub mod expression;
 #[cfg(test)]
@@ -288,8 +285,7 @@ impl LicenseDetectionEngine {
                     MAX_QUERY_RUN_CANDIDATES,
                 );
                 if !candidates.is_empty() {
-                    let matches =
-                        seq_match_with_candidates(&self.index, query_run, &candidates);
+                    let matches = seq_match_with_candidates(&self.index, query_run, &candidates);
                     seq_all_matches.extend(matches);
                 }
             }

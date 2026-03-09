@@ -36,23 +36,15 @@
       "is_private": false,
       "is_virtual": false,
       "extra_data": {
-        "host": [
-          "conda-forge::python=3.7"
-        ],
-        "run": [
-          "conda-forge::python=3.7"
-        ]
+        "host": ["conda-forge::python=3.7"],
+        "run": ["conda-forge::python=3.7"]
       },
       "repository_homepage_url": null,
       "repository_download_url": null,
       "api_data_url": null,
       "package_uid": "pkg:conda/pippy@0.1.0?uuid=fixed-uid-done-for-testing-5642512d1758",
-      "datafile_paths": [
-        "meta.yaml"
-      ],
-      "datasource_ids": [
-        "conda_meta_yaml"
-      ],
+      "datafile_paths": ["meta.yaml"],
+      "datasource_ids": ["conda_meta_yaml"],
       "purl": "pkg:conda/pippy@0.1.0"
     }
   ],
@@ -250,12 +242,8 @@
           "is_private": false,
           "is_virtual": false,
           "extra_data": {
-            "host": [
-              "conda-forge::python=3.7"
-            ],
-            "run": [
-              "conda-forge::python=3.7"
-            ]
+            "host": ["conda-forge::python=3.7"],
+            "run": ["conda-forge::python=3.7"]
           },
           "dependencies": [
             {
@@ -376,9 +364,7 @@
           "purl": "pkg:conda/pippy@0.1.0"
         }
       ],
-      "for_packages": [
-        "pkg:conda/pippy@0.1.0?uuid=fixed-uid-done-for-testing-5642512d1758"
-      ],
+      "for_packages": ["pkg:conda/pippy@0.1.0?uuid=fixed-uid-done-for-testing-5642512d1758"],
       "scan_errors": []
     }
   ]

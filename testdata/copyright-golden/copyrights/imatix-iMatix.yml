@@ -1,0 +1,14 @@
+what:
+  - copyrights
+  - holders
+  - holders_summary
+copyrights:
+  - Copyright 1991-2000 iMatix Corporation
+  - Copyright 1991-2000 iMatix Corporation http://www.imatix.com
+  - Copyright 1996-2000 iMatix Corporation
+  - Parts copyright (c) 1991-2000 iMatix Corporation
+holders:
+  - iMatix Corporation
+holders_summary:
+  - value: iMatix Corporation
+    count: 5

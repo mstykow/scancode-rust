@@ -1,0 +1,16 @@
+what:
+  - copyrights
+  - holders
+  - holders_summary
+copyrights:
+  - Copyright (c) 1995, Pascal Andre (andre@via.ecp.fr)
+  - Pascal Andre, andre@chimay.via.ecp.fr. Copyright (c) 1995, Pascal Andre
+  - copyright 1997, 1998, 1999 by D'Arcy J.M. Cain (darcy@druid.net)
+holders:
+  - D'Arcy J.M. Cain
+  - Pascal Andre
+holders_summary:
+  - value: D'Arcy J.M. Cain
+    count: 1
+  - value: Pascal Andre
+    count: 1

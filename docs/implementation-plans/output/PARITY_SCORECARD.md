@@ -1,0 +1,145 @@
+# Output Format Parity Scorecard
+
+This scorecard tracks parity against Python ScanCode output format behavior and fixtures.
+
+## Reference Sources
+
+- Python implementation:
+  [`reference/scancode-toolkit/src/formattedcode/`](../../../reference/scancode-toolkit/src/formattedcode/)
+- Python fixture corpus:
+  [`reference/scancode-toolkit/tests/formattedcode/data/`](../../../reference/scancode-toolkit/tests/formattedcode/data/)
+- Local (decoupled) fixture mirror:
+  [`testdata/output-formats/`](../../../testdata/output-formats/)
+
+## Format-by-Format Status
+
+### JSON Lines
+
+- **Reference fixture**:
+  [`json/simple-expected.jsonlines`](../../../reference/scancode-toolkit/tests/formattedcode/data/json/simple-expected.jsonlines)
+- **Local fixture**:
+  [`testdata/output-formats/json-simple-expected.jsonlines`](../../../testdata/output-formats/json-simple-expected.jsonlines)
+- **Status**: 🟢 Semantically equivalent (fixture-backed)
+- **Acceptance criteria**:
+  - First entry contains `headers`
+  - Subsequent entries stream one file object per line
+  - Deterministic ordering in emitted sections
+
+### CSV
+
+- **Reference fixture**:
+  [`csv/tree/expected.csv`](../../../reference/scancode-toolkit/tests/formattedcode/data/csv/tree/expected.csv)
+  - `csv/flatten_scan/*.json-expected`
+- **Local fixture**:
+  [`testdata/output-formats/csv-tree-expected.csv`](../../../testdata/output-formats/csv-tree-expected.csv)
+- **Status**: 🟢 Semantically equivalent (fixture-backed)
+- **Acceptance criteria**:
+  - Path normalization (`/` stripping, directory suffix `/`)
+  - Stable grouped column ordering
+  - Deterministic row ordering
+
+### SPDX Tag-Value
+
+- **Reference fixtures**:
+  [`spdx/empty/expected.tv`](../../../reference/scancode-toolkit/tests/formattedcode/data/spdx/empty/expected.tv),
+  [`spdx/simple/expected.tv`](../../../reference/scancode-toolkit/tests/formattedcode/data/spdx/simple/expected.tv)
+- **Local fixtures**:
+  [`testdata/output-formats/spdx-empty-expected.tv`](../../../testdata/output-formats/spdx-empty-expected.tv),
+  [`testdata/output-formats/spdx-simple-expected.tv`](../../../testdata/output-formats/spdx-simple-expected.tv)
+- **Status**: 🟢 Semantically equivalent (fixture-backed)
+- **Acceptance criteria**:
+  - Empty scan sentinel matches Python fixture
+  - `SPDX-2.2` document baseline with stable package/file blocks
+  - Deterministic package verification code and file ordering
+
+### SPDX RDF
+
+- **Reference fixture**:
+  [`spdx/simple/expected.rdf`](../../../reference/scancode-toolkit/tests/formattedcode/data/spdx/simple/expected.rdf)
+- **Local fixture**:
+  [`testdata/output-formats/spdx-simple-expected.rdf`](../../../testdata/output-formats/spdx-simple-expected.rdf)
+- **Status**: 🟢 Semantically equivalent (fixture-backed)
+- **Acceptance criteria**:
+  - Equivalent SPDX semantics after structural normalization
+  - Deterministic handling of generated identifiers and timestamps
+
+### CycloneDX JSON
+
+- **Reference fixtures**:
+  [`cyclonedx/expected-without-packages.json`](../../../reference/scancode-toolkit/tests/formattedcode/data/cyclonedx/expected-without-packages.json),
+  [`cyclonedx/simple-expected.json`](../../../reference/scancode-toolkit/tests/formattedcode/data/cyclonedx/simple-expected.json)
+- **Local fixtures**:
+  [`testdata/output-formats/cyclonedx-expected-without-packages.json`](../../../testdata/output-formats/cyclonedx-expected-without-packages.json),
+  [`testdata/output-formats/cyclonedx-expected.json`](../../../testdata/output-formats/cyclonedx-expected.json),
+  [`testdata/output-formats/cyclonedx-dependencies-expected.json`](../../../testdata/output-formats/cyclonedx-dependencies-expected.json)
+- **Status**: 🟢 Semantically equivalent (fixture-backed)
+- **Acceptance criteria**:
+  - Empty-scan output matches Python minimal fixture
+  - Non-empty output keeps required CycloneDX fields and deterministic ordering
+
+### CycloneDX XML
+
+- **Reference fixture**:
+  [`cyclonedx/expected.xml`](../../../reference/scancode-toolkit/tests/formattedcode/data/cyclonedx/expected.xml)
+- **Local fixtures**:
+  [`testdata/output-formats/cyclonedx-expected.xml`](../../../testdata/output-formats/cyclonedx-expected.xml),
+  [`testdata/output-formats/cyclonedx-dependencies-expected.xml`](../../../testdata/output-formats/cyclonedx-dependencies-expected.xml)
+- **Status**: 🟢 Semantically equivalent (fixture-backed)
+- **Acceptance criteria**:
+  - Core metadata/components/dependencies semantically equivalent
+  - Deterministic normalization for timestamp + serial number
+
+### YAML
+
+- **Reference fixture**:
+  [`yaml/simple-expected.yaml`](../../../reference/scancode-toolkit/tests/formattedcode/data/yaml/simple-expected.yaml)
+- **Local fixture**:
+  [`testdata/output-formats/yaml-simple-expected.yaml`](../../../testdata/output-formats/yaml-simple-expected.yaml)
+- **Status**: 🟢 Semantically equivalent (fixture-backed)
+- **Acceptance criteria**:
+  - Round-trip semantic equivalence with JSON baseline
+  - Stable top-level sections and field naming
+
+### HTML (report)
+
+- **Reference fixture**:
+  [`templated/simple-expected.html`](../../../reference/scancode-toolkit/tests/formattedcode/data/templated/simple-expected.html)
+- **Local fixture**:
+  [`testdata/output-formats/html-templated-simple-expected.html`](../../../testdata/output-formats/html-templated-simple-expected.html)
+- **Status**: 🟢 Semantically equivalent (fixture-backed)
+- **Acceptance criteria**:
+  - Copyright/holders/authors/emails/urls/file/package sections present
+  - Deterministic structure for snapshot testing
+
+### HTML app
+
+- **Status**: 🟢 Implemented (outside Python fixture parity contract)
+- **Acceptance criteria**:
+  - Asset bundle creation and data wiring verified by unit tests
+
+### Custom template
+
+- **Status**: 🟢 Implemented (template contract, not Python fixture parity)
+- **Acceptance criteria**:
+  - Controlled context rendering and explicit template-path handling verified
+    by unit tests
+
+## Beyond-Parity (Allowed and Encouraged)
+
+## Verification Checklist
+
+- `cargo test --test output_format_golden`
+- `cargo test output:: --lib`
+- `cargo test --features golden-tests`
+- Record verification outcomes in CI logs and PR descriptions.
+
+Improvements are encouraged if both are true:
+
+1. Compatibility tests still pass for required parity contract.
+2. Improvement is documented as intentional (spec compliance, correctness, security, or UX).
+
+Examples:
+
+- Stronger schema validation in CycloneDX/SPDX emitters
+- Safer template rendering defaults
+- Better deterministic output ordering for reproducibility

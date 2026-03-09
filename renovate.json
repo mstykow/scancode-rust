@@ -7,11 +7,7 @@
     ":semanticCommits",
     "helpers:pinGitHubActionDigests"
   ],
-  "ignorePaths": [
-    "**/testdata/**",
-    "**/test/**/*.xml",
-    "**/test/**/*.json"
-  ],
+  "ignorePaths": ["**/testdata/**", "**/test/**/*.xml", "**/test/**/*.json"],
   "addLabels": ["dependencies"],
   "automergeType": "branch",
   "platformAutomerge": true,
@@ -31,9 +27,7 @@
     {
       "customType": "regex",
       "managerFilePatterns": ["/.github/workflows/.+\\.ya?ml$/"],
-      "matchStrings": [
-        "uses: dtolnay/rust-toolchain@(?<currentValue>\\d+\\.\\d+\\.\\d+)"
-      ],
+      "matchStrings": ["uses: dtolnay/rust-toolchain@(?<currentValue>\\d+\\.\\d+\\.\\d+)"],
       "depNameTemplate": "rust",
       "packageNameTemplate": "rust-lang/rust",
       "datasourceTemplate": "github-tags",
@@ -67,6 +61,13 @@
       "groupName": "Rust toolchain",
       "labels": ["dependencies", "rust-toolchain"],
       "minimumReleaseAge": "7 days"
+    },
+    {
+      "description": "Only update engines field for major Node.js versions",
+      "matchDepTypes": ["engines"],
+      "matchPackageNames": ["node"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "enabled": false
     },
     {
       "description": "Automerge non-major updates after release age",
@@ -115,6 +116,14 @@
       "matchPackageNames": ["rusqlite"],
       "allowedVersions": "0.37.x",
       "enabled": true
+    },
+    {
+      "description": "Group Node.js updates together (.nvmrc, Dockerfiles) - LTS only",
+      "matchDatasources": ["node-version", "docker"],
+      "matchPackageNames": ["node"],
+      "allowedVersions": "/^\\d*[02468]\\../",
+      "groupName": "Node.js",
+      "groupSlug": "node"
     }
   ]
 }

@@ -30,6 +30,7 @@ use std::fs;
 use std::path::Path;
 
 use log::warn;
+use regex::Regex;
 use serde_yaml::Value;
 
 use crate::models::{DatasourceId, Dependency, PackageData, PackageType};
@@ -77,6 +78,44 @@ fn build_purl(
     Some(purl)
 }
 
+fn build_conda_package_purl(name: Option<&str>, version: Option<&str>) -> Option<String> {
+    let name = name?;
+    build_purl("conda", None, name, version, None, None, None)
+}
+
+fn yaml_value_to_string(value: &Value) -> Option<String> {
+    match value {
+        Value::String(s) => Some(s.clone()),
+        Value::Number(n) => Some(n.to_string()),
+        Value::Bool(b) => Some(b.to_string()),
+        _ => None,
+    }
+}
+
+fn extract_conda_requirement_name(req: &str) -> Option<String> {
+    let req = req.trim();
+    if req.is_empty() {
+        return None;
+    }
+
+    let req_without_ns = req.rsplit_once("::").map(|(_, rest)| rest).unwrap_or(req);
+
+    let name = req_without_ns
+        .split_whitespace()
+        .next()
+        .unwrap_or(req_without_ns)
+        .split(['=', '<', '>', '!', '~'])
+        .next()
+        .unwrap_or(req_without_ns)
+        .trim();
+
+    if name.is_empty() {
+        None
+    } else {
+        Some(name.to_string())
+    }
+}
+
 /// Conda recipe manifest (meta.yaml) parser.
 ///
 /// Extracts package metadata and dependencies from Conda recipe files, which
@@ -118,13 +157,11 @@ impl PackageParser for CondaMetaYamlParser {
         let package_element = yaml.get("package").and_then(|v| v.as_mapping());
         let name = package_element
             .and_then(|p| p.get("name"))
-            .and_then(|v| v.as_str())
-            .map(String::from);
+            .and_then(yaml_value_to_string);
 
         let version = package_element
             .and_then(|p| p.get("version"))
-            .and_then(|v| v.as_str())
-            .map(String::from);
+            .and_then(yaml_value_to_string);
 
         let source = yaml.get("source").and_then(|v| v.as_mapping());
         let download_url = source
@@ -171,14 +208,8 @@ impl PackageParser for CondaMetaYamlParser {
                             && let Some(dep) = parse_conda_requirement(req_str, scope)
                         {
                             // Filter out pip/python from dependencies, add to extra_data
-                            if dep
-                                .purl
-                                .as_deref()
-                                .is_some_and(|p| p.contains("pkg:conda/pip"))
-                                || dep
-                                    .purl
-                                    .as_deref()
-                                    .is_some_and(|p| p.contains("pkg:conda/python"))
+                            if extract_conda_requirement_name(req_str)
+                                .is_some_and(|n| n == "pip" || n == "python")
                             {
                                 if let Some(arr) = extra_data
                                     .entry(scope.to_string())
@@ -201,6 +232,7 @@ impl PackageParser for CondaMetaYamlParser {
         pkg.datasource_id = Some(DatasourceId::CondaMetaYaml);
         pkg.name = name;
         pkg.version = version;
+        pkg.purl = build_conda_package_purl(pkg.name.as_deref(), pkg.version.as_deref());
         pkg.download_url = download_url;
         pkg.homepage_url = homepage_url;
         pkg.extracted_license_statement = extracted_license_statement;
@@ -272,6 +304,7 @@ impl PackageParser for CondaEnvironmentYmlParser {
         pkg.package_type = Some(Self::PACKAGE_TYPE);
         pkg.datasource_id = Some(DatasourceId::CondaYaml);
         pkg.name = name;
+        pkg.purl = build_conda_package_purl(pkg.name.as_deref(), pkg.version.as_deref());
         pkg.primary_language = Some("Python".to_string());
         pkg.dependencies = dependencies;
         pkg.is_private = true;
@@ -388,9 +421,14 @@ pub fn parse_conda_requirement(req: &str, scope: &str) -> Option<Dependency> {
     // Check for pinned version with `=` (no space): package=1.0
     let (name, version, is_pinned, extracted_requirement) = if name_part.contains('=') {
         let parts: Vec<&str> = name_part.splitn(2, '=').collect();
-        let n = parts[0];
+        let n = parts[0].trim();
         let v = if parts.len() > 1 {
-            Some(parts[1].to_string())
+            let parsed = parts[1].trim();
+            if parsed.is_empty() {
+                None
+            } else {
+                Some(parsed.to_string())
+            }
         } else {
             None
         };
@@ -406,9 +444,14 @@ pub fn parse_conda_requirement(req: &str, scope: &str) -> Option<Dependency> {
         } else {
             None
         };
-        (name_part, version_opt, false, Some(constraint.to_string()))
+        (
+            name_part.trim(),
+            version_opt,
+            false,
+            Some(constraint.to_string()),
+        )
     } else {
-        (name_part, None, false, None)
+        (name_part.trim(), None, false, Some(String::new()))
     };
 
     // Build PURL
@@ -463,20 +506,17 @@ fn extract_environment_dependencies(yaml: &Value) -> Vec<Dependency> {
 fn parse_environment_string_dependency(dep_str: &str) -> Option<Dependency> {
     let (namespace, dep_without_ns) = parse_conda_namespace(dep_str);
 
-    if namespace.is_none()
-        && looks_like_pip_requirement(dep_without_ns)
-        && let Ok(parsed_req) = dep_without_ns.parse::<pep508_rs::Requirement>()
-    {
-        return create_pip_dependency(parsed_req, "dependencies");
+    if let Ok(parsed_req) = dep_without_ns.parse::<pep508_rs::Requirement>() {
+        return create_pip_dependency(parsed_req, "dependencies", Some(dep_without_ns));
     }
 
     create_conda_dependency(namespace, dep_without_ns, "dependencies")
 }
 
 fn parse_conda_namespace(dep_str: &str) -> (Option<&str>, &str) {
-    if let Some((ns, rest)) = dep_str.split_once("::") {
+    if let Some((ns, rest)) = dep_str.rsplit_once("::") {
         if ns.contains('/') || ns.contains(':') {
-            (None, dep_str)
+            (None, rest)
         } else {
             (Some(ns), rest)
         }
@@ -485,26 +525,40 @@ fn parse_conda_namespace(dep_str: &str) -> (Option<&str>, &str) {
     }
 }
 
-fn looks_like_pip_requirement(dep_str: &str) -> bool {
-    dep_str.contains(">=") || dep_str.contains("==") || dep_str.contains("~=")
-}
-
 fn create_conda_dependency(
     namespace: Option<&str>,
     dep_without_ns: &str,
     scope: &str,
 ) -> Option<Dependency> {
-    let (name, version, is_pinned, extracted_requirement) =
-        if let Some((n, v)) = dep_without_ns.split_once('=') {
-            (
-                n.trim(),
-                Some(v.trim().to_string()),
-                true,
-                Some(format!("={}", v.trim())),
+    let dep = dep_without_ns.trim();
+    let name_re = match Regex::new(r"^([A-Za-z0-9_.\-]+)") {
+        Ok(re) => re,
+        Err(_) => return None,
+    };
+
+    let caps = name_re.captures(dep)?;
+    let name_match = caps.get(1)?;
+    let name = name_match.as_str().trim();
+    let rest = dep[name_match.end()..].trim();
+
+    let (version, is_pinned, extracted_requirement) = if rest.is_empty() {
+        (None, false, Some(String::new()))
+    } else {
+        let req_no_space = rest.replace(' ', "");
+        let is_exact = req_no_space.starts_with("=") || req_no_space.starts_with("==");
+        let parsed_version = if is_exact {
+            Some(
+                req_no_space
+                    .trim_start_matches('=')
+                    .trim_start_matches('=')
+                    .to_string(),
             )
         } else {
-            (dep_without_ns.trim(), None, false, None)
+            None
         };
+
+        (parsed_version, is_exact, Some(rest.to_string()))
+    };
 
     if name == "pip" || name == "python" {
         return None;
@@ -539,7 +593,7 @@ fn extract_pip_dependencies(pip_deps: &[Value]) -> Vec<Dependency> {
             if let Some(pip_req_str) = pip_dep.as_str()
                 && let Ok(parsed_req) = pip_req_str.parse::<pep508_rs::Requirement>()
             {
-                create_pip_dependency(parsed_req, "dependencies")
+                create_pip_dependency(parsed_req, "dependencies", Some(pip_req_str))
             } else {
                 None
             }
@@ -547,7 +601,11 @@ fn extract_pip_dependencies(pip_deps: &[Value]) -> Vec<Dependency> {
         .collect()
 }
 
-fn create_pip_dependency(parsed_req: pep508_rs::Requirement, scope: &str) -> Option<Dependency> {
+fn create_pip_dependency(
+    parsed_req: pep508_rs::Requirement,
+    scope: &str,
+    raw_requirement: Option<&str>,
+) -> Option<Dependency> {
     let name = parsed_req.name.to_string();
 
     if name == "pip" || name == "python" {
@@ -558,6 +616,14 @@ fn create_pip_dependency(parsed_req: pep508_rs::Requirement, scope: &str) -> Opt
         pep508_rs::VersionOrUrl::VersionSpecifier(spec) => spec.to_string(),
         pep508_rs::VersionOrUrl::Url(url) => url.to_string(),
     });
+
+    let extracted_requirement = if let Some(raw) = raw_requirement {
+        let raw = raw.trim();
+        let suffix = raw.strip_prefix(&name).unwrap_or(raw).trim().to_string();
+        Some(suffix)
+    } else {
+        Some(specs.clone().unwrap_or_default())
+    };
 
     let version = specs.as_ref().and_then(|spec_str| {
         if spec_str.starts_with("==") {
@@ -572,7 +638,7 @@ fn create_pip_dependency(parsed_req: pep508_rs::Requirement, scope: &str) -> Opt
 
     Some(Dependency {
         purl,
-        extracted_requirement: specs,
+        extracted_requirement,
         scope: Some(scope.to_string()),
         is_runtime: Some(true),
         is_optional: Some(false),

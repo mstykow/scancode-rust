@@ -13,11 +13,11 @@ use std::path::PathBuf;
 
 use anyhow::Result;
 use scancode_rust::license_detection::{
-    aho_match, compute_candidates_with_msets, create_detection_from_group, group_matches_by_region,
-    hash_match, merge_overlapping_matches, post_process_detections, refine_aho_matches,
-    refine_matches, refine_matches_without_false_positive_filter, seq_match_with_candidates,
-    sort_matches_by_line, spdx_lid_match, split_weak_matches, LicenseDetectionEngine,
-    MAX_NEAR_DUPE_CANDIDATES,
+    LicenseDetectionEngine, MAX_NEAR_DUPE_CANDIDATES, aho_match, compute_candidates_with_msets,
+    create_detection_from_group, group_matches_by_region, hash_match, merge_overlapping_matches,
+    post_process_detections, refine_aho_matches, refine_matches,
+    refine_matches_without_false_positive_filter, seq_match_with_candidates, sort_matches_by_line,
+    spdx_lid_match, split_weak_matches,
 };
 
 #[cfg(feature = "debug-pipeline")]
@@ -229,9 +229,17 @@ fn run_debug_pipeline(file_path: &str) -> Result<()> {
         sa_merged.len()
     );
     for m in sa_merged.iter() {
-        println!("  {} lines {}-{} len={} hilen={} coverage={:.1}% match_coverage={:.1}% resemblance={:.4}",
-            m.rule_identifier, m.start_line, m.end_line,
-            m.matched_length, m.hilen, m.match_coverage, m.match_coverage, m.candidate_resemblance);
+        println!(
+            "  {} lines {}-{} len={} hilen={} coverage={:.1}% match_coverage={:.1}% resemblance={:.4}",
+            m.rule_identifier,
+            m.start_line,
+            m.end_line,
+            m.matched_length,
+            m.hilen,
+            m.match_coverage,
+            m.match_coverage,
+            m.candidate_resemblance
+        );
     }
 
     // Stage 7: Refinement (with debug detail if feature enabled)

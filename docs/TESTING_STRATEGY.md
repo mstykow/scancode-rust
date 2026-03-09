@@ -50,22 +50,25 @@ scancode-rust uses a **behavior-focused, multi-layered testing approach** that p
 
 **Example**:
 
-```rust
+````rust
 /// Extracts package metadata from a manifest file.
 ///
 /// # Examples
 ///
 /// ```rust
 /// use scancode_rust::scanner::process;
+/// use scancode_rust::progress::{ProgressMode, ScanProgress};
 /// use std::path::PathBuf;
+/// use std::sync::Arc;
 ///
-/// let result = process(&PathBuf::from(".""), 50, progress, &patterns, &strategy)?;
+/// let progress = Arc::new(ScanProgress::new(ProgressMode::Quiet));
+/// let result = process(&PathBuf::from("."), 50, progress, &patterns, &strategy)?;
 /// println!("Found {} files", result.files.len());
 /// ```
 pub fn process(...) -> Result<ScanResult> {
     // Implementation
 }
-```
+````
 
 **Why This Matters**: Documentation examples that don't compile or fail are caught immediately. Users can trust that documented examples actually work.
 
@@ -178,6 +181,8 @@ fn test_golden_debian_control() {
 - Exclusion patterns work correctly
 - Max depth limits are respected
 - Empty directories handled gracefully
+- Scan-result cache entry persistence (first scan writes cache, repeat scan reuses stable findings)
+- Cache-control CLI wiring behavior (`--cache-dir`, `--cache-clear`) via startup/runtime tests
 
 **Why This Matters**: Unit tests verify components work; integration tests verify they work together correctly.
 
@@ -187,7 +192,7 @@ fn test_golden_debian_control() {
 #[test]
 fn test_scanner_discovers_all_registered_parsers() {
     let result = process("testdata/integration/multi-parser", ...);
-    
+
     assert!(result.files.iter().any(|f| f.package_data[0].package_type == Some("npm")));
     assert!(result.files.iter().any(|f| f.package_data[0].package_type == Some("pypi")));
     assert!(result.files.iter().any(|f| f.package_data[0].package_type == Some("cargo")));
@@ -257,17 +262,17 @@ fn test_scanner_discovers_all_registered_parsers() {
 
 ### When to Use Each Test Type
 
-| Scenario | Test Type |
-|----------|-----------|
-| Public API function with complex usage | Doctest |
-| New parser function | Unit test |
-| Edge case discovered | Unit test |
-| Parser fully implemented | Golden test |
-| Scanner feature added | Integration test |
-| Bug found in production | Unit test (reproduce) + fix + verify |
-| Refactoring parser internals | Unit tests should still pass |
-| Changing API signature | Doctests will break (expected) |
-| Changing output format | Golden tests will break (expected) |
+| Scenario                               | Test Type                            |
+| -------------------------------------- | ------------------------------------ |
+| Public API function with complex usage | Doctest                              |
+| New parser function                    | Unit test                            |
+| Edge case discovered                   | Unit test                            |
+| Parser fully implemented               | Golden test                          |
+| Scanner feature added                  | Integration test                     |
+| Bug found in production                | Unit test (reproduce) + fix + verify |
+| Refactoring parser internals           | Unit tests should still pass         |
+| Changing API signature                 | Doctests will break (expected)       |
+| Changing output format                 | Golden tests will break (expected)   |
 
 ---
 
@@ -324,11 +329,14 @@ testdata/
 ### All Tests
 
 ```bash
-cargo test                    # Run all tests (doctests + unit + golden + integration)
+cargo test                    # Run all tests except golden tests
 cargo test --lib              # Run only library tests (faster, excludes integration)
 cargo test --doc              # Run only doctests
 cargo test --test '*'         # Run only integration tests
+cargo test --features golden-tests  # Include golden tests (slower, compares against Python ScanCode)
 ```
+
+> **Note**: Golden tests (comparing output against Python ScanCode reference) are gated behind the `golden-tests` feature flag because they are slow and require the reference submodule. They run automatically in CI but are excluded from `cargo test` by default for faster local development.
 
 ### Specific Test Categories
 
@@ -339,6 +347,39 @@ cargo test scanner_integration  # All integration tests
 cargo test --doc              # All API documentation examples
 ```
 
+### Golden Fixture Maintenance Commands
+
+Use distinct commands for the two golden fixture domains:
+
+```bash
+# Parser golden snapshots (.expected.json)
+cargo run --bin update-parser-golden -- --list
+cargo run --bin update-parser-golden -- <ParserType> <input_file> <output_file>
+./scripts/update_parser_golden.sh <ParserType> <input_file> <output_file>
+
+# Copyright golden YAML fixtures (authors / ics / copyrights)
+# Note: "ics" here means Android Ice Cream Sandwich (Android 4.0) fixture corpus from
+# the ScanCode reference test data.
+cargo run --bin update-copyright-golden -- copyrights --list-mismatches --show-diff
+cargo run --bin update-copyright-golden -- copyrights --filter <pattern> --write
+./scripts/update_copyright_golden.sh copyrights --list-mismatches --show-diff
+```
+
+For copyright golden fixtures, this repository's YAML files are treated as Rust-owned expectations. During updates, `update-copyright-golden` strips legacy `expected_failures` keys so Python reference sync does not reintroduce Python-only xfail metadata.
+
+`update-copyright-golden --list-mismatches` is a Python-reference parity precheck (Python expected values vs current Rust detector output). This is different from golden tests, which validate Rust output against local Rust-owned fixture expectations.
+
+Recommended maintenance flow for copyright fixtures:
+
+1. Run `--list-mismatches --show-diff` to identify Python parity gaps.
+2. Use default `--write` mode (optionally with `--filter`) only for parity-safe syncs from Python reference fixture YAML.
+3. Use `--sync-actual --write` for intentional Rust-specific expectations.
+4. Run golden tests to validate local Rust-owned expectations.
+
+Parser golden snapshot maintenance is separate: `update-parser-golden` does not sync from Python reference; it always writes expected JSON from current Rust parser output.
+
+For canonical script purpose and full CLI argument reference, see [`scripts/README.md`](../scripts/README.md).
+
 ### Single Test
 
 ```bash
@@ -347,22 +388,25 @@ cargo test test_parse_dependency_with_alternatives
 
 ### Ignored Tests
 
-Some golden tests are marked with `#[ignore]` because they depend on the license detection engine (not yet implemented):
+Golden tests are gated behind the `golden-tests` feature flag:
 
 ```bash
-cargo test -- --ignored       # Run only ignored tests
-cargo test -- --include-ignored  # Run all tests including ignored ones
+cargo test --features golden-tests             # Run all tests including golden tests
+cargo test --lib --features golden-tests golden # Run only golden tests
 ```
 
 ### CI/CD
 
 Tests run automatically on:
 
-- Every commit (via pre-commit hooks: `cargo fmt`, `cargo clippy`)
+- Every commit (via pre-commit hooks: formatting, linting, and docs/file-quality checks)
 - Every push to main
 - Every pull request
 
-All tests must pass before merging. Command: `cargo test --all --verbose`
+All tests must pass before merging. Commands:
+
+- `cargo test --all --verbose` — unit tests, doctests, integration tests
+- `cargo test --all --verbose --features golden-tests` — all of the above plus golden tests
 
 ---
 

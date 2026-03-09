@@ -41,7 +41,7 @@ pub fn extract_dependency_scope(section: &str) -> Option<String> {
     // Dart pubspec.yaml has two dependency sections:
     // - dependencies: Runtime dependencies (required)
     // - dev_dependencies: Development-only dependencies
-    
+
     match section {
         "dependencies" => Some("dependencies".to_string()),
         "dev_dependencies" => Some("dev_dependencies".to_string()),
@@ -52,7 +52,7 @@ pub fn extract_dependency_scope(section: &str) -> Option<String> {
 pub fn extract_package_data(path: &Path) -> PackageData {
     let yaml = parse_pubspec_yaml(path)?;
     let mut dependencies = Vec::new();
-    
+
     // Runtime dependencies
     if let Some(deps) = yaml.get("dependencies").and_then(|d| d.as_mapping()) {
         for (name, spec) in deps.iter() {
@@ -68,7 +68,7 @@ pub fn extract_package_data(path: &Path) -> PackageData {
             }
         }
     }
-    
+
     // Development dependencies
     if let Some(dev_deps) = yaml.get("dev_dependencies").and_then(|d| d.as_mapping()) {
         for (name, spec) in dev_deps.iter() {
@@ -84,7 +84,7 @@ pub fn extract_package_data(path: &Path) -> PackageData {
             }
         }
     }
-    
+
     PackageData {
         dependencies,
         // ... other fields
@@ -99,8 +99,8 @@ pub fn extract_package_data(path: &Path) -> PackageData {
 ```json
 {
   "dependencies": [
-    {"purl": "pkg:dart/http", "extracted_requirement": "^0.13.0", "scope": null},
-    {"purl": "pkg:dart/mockito", "extracted_requirement": "^5.0.0", "scope": null}
+    { "purl": "pkg:dart/http", "extracted_requirement": "^0.13.0", "scope": null },
+    { "purl": "pkg:dart/mockito", "extracted_requirement": "^5.0.0", "scope": null }
   ]
 }
 ```
@@ -110,8 +110,18 @@ pub fn extract_package_data(path: &Path) -> PackageData {
 ```json
 {
   "dependencies": [
-    {"purl": "pkg:dart/http", "extracted_requirement": "^0.13.0", "scope": "dependencies", "is_runtime": true},
-    {"purl": "pkg:dart/mockito", "extracted_requirement": "^5.0.0", "scope": "dev_dependencies", "is_runtime": false}
+    {
+      "purl": "pkg:dart/http",
+      "extracted_requirement": "^0.13.0",
+      "scope": "dependencies",
+      "is_runtime": true
+    },
+    {
+      "purl": "pkg:dart/mockito",
+      "extracted_requirement": "^5.0.0",
+      "scope": "dev_dependencies",
+      "is_runtime": false
+    }
   ]
 }
 ```
@@ -152,7 +162,7 @@ pub fn extract_description(yaml: &Yaml) -> Option<String> {
     // - Markdown formatting (trailing newlines = paragraph breaks)
     // - Semantic accuracy (description block intent)
     // - Round-trip preservation (if re-serialized to YAML)
-    
+
     if let Yaml::String(desc) = yaml.get("description") {
         // Don't strip trailing whitespace
         // YAML block scalars preserve formatting intentionally
@@ -170,7 +180,7 @@ pub fn extract_description(yaml: &Yaml) -> Option<String> {
 ```yaml
 description: |
   A comprehensive HTTP client for Dart.
-  
+
   Features:
   - Async/await support
   - Cookie handling
@@ -209,8 +219,8 @@ description: |
 ```json
 {
   "dependencies": [
-    {"purl": "pkg:dart/http", "is_direct": true},
-    {"purl": "pkg:dart/pedantic", "is_direct": false}  // Indirect!
+    { "purl": "pkg:dart/http", "is_direct": true },
+    { "purl": "pkg:dart/pedantic", "is_direct": false } // Indirect!
   ]
 }
 ```
@@ -223,16 +233,16 @@ description: |
 pub fn extract_from_pubspec_lock(lockfile: &Path) -> Vec<Dependency> {
     // In a manifest file (pubspec.lock), all entries are "direct"
     // They represent what was explicitly locked by the user
-    
+
     // "is_direct" meaning:
     // - true: User explicitly requested this in pubspec.yaml
     // - false: Transitive dependency pulled in by another package
-    
+
     // BUT: In the lockfile view, we see the RESOLVED list
     // Each entry is what was actually locked, all "direct" from manifest perspective
-    
+
     let mut dependencies = Vec::new();
-    
+
     if let Some(packages) = lockfile.get("packages").and_then(|p| p.as_mapping()) {
         for (name, entry) in packages.iter() {
             dependencies.push(Dependency {
@@ -245,7 +255,7 @@ pub fn extract_from_pubspec_lock(lockfile: &Path) -> Vec<Dependency> {
             });
         }
     }
-    
+
     dependencies
 }
 ```
@@ -328,10 +338,10 @@ pub fn parse_pubspec_yaml(content: &str) -> Result<Yaml> {
 
 Following dependency scope conventions documented in [AGENTS.md](../../AGENTS.md#dependency-scope-conventions):
 
-| Section | Scope Value | `is_runtime` |
-|---------|-------------|-------------|
-| `dependencies` | `"dependencies"` | `true` |
-| `dev_dependencies` | `"dev_dependencies"` | `false` |
+| Section            | Scope Value          | `is_runtime` |
+| ------------------ | -------------------- | ------------ |
+| `dependencies`     | `"dependencies"`     | `true`       |
+| `dev_dependencies` | `"dev_dependencies"` | `false`      |
 
 ## Testing
 
@@ -358,24 +368,24 @@ All official test cases pass, demonstrating full feature parity plus enhancement
 
 ### Scope Field
 
-| Aspect | Python | Rust | Status |
-|--------|--------|------|--------|
-| Runtime deps scope | `null` | `"dependencies"` | ✅ Fixed |
-| Dev deps scope | `null` | `"dev_dependencies"` | ✅ Fixed |
-| is_runtime flag | Absent | `true`/`false` | ✅ Enhanced |
+| Aspect             | Python | Rust                 | Status      |
+| ------------------ | ------ | -------------------- | ----------- |
+| Runtime deps scope | `null` | `"dependencies"`     | ✅ Fixed    |
+| Dev deps scope     | `null` | `"dev_dependencies"` | ✅ Fixed    |
+| is_runtime flag    | Absent | `true`/`false`       | ✅ Enhanced |
 
 ### YAML Preservation
 
-| Aspect | Python | Rust | Status |
-|--------|--------|------|--------|
-| Trailing newlines | Stripped | Preserved | ✅ Fixed |
-| Block scalar format | Lost | Maintained | ✅ Enhanced |
+| Aspect              | Python   | Rust       | Status      |
+| ------------------- | -------- | ---------- | ----------- |
+| Trailing newlines   | Stripped | Preserved  | ✅ Fixed    |
+| Block scalar format | Lost     | Maintained | ✅ Enhanced |
 
 ### Lockfile Handling
 
-| Aspect | Python | Rust | Status |
-|--------|--------|------|--------|
-| is_direct values | Mixed | All true | ✅ Fixed |
+| Aspect               | Python  | Rust     | Status      |
+| -------------------- | ------- | -------- | ----------- |
+| is_direct values     | Mixed   | All true | ✅ Fixed    |
 | Manifest perspective | Unclear | Explicit | ✅ Enhanced |
 
 ## Impact

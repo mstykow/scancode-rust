@@ -1,0 +1,21 @@
+what:
+  - copyrights
+  - holders
+  - holders_summary
+  - authors
+copyrights:
+  - Copyright (c) 2014 The Rust Project Developers
+  - Copyright (c) AliasDotCom
+  - Copyright (c) AllThingsTalk
+holders:
+  - AliasDotCom
+  - AllThingsTalk
+  - The Rust Project Developers
+holders_summary:
+  - value: AliasDotCom
+    count: 1
+  - value: AllThingsTalk
+    count: 1
+  - value: The Rust Project Developers
+    count: 1
+authors: []

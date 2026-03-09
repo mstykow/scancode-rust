@@ -1,0 +1,11 @@
+what:
+  - copyrights
+  - holders
+  - authors
+copyrights:
+  - Copyright (c) 2003, 2006 SuSE
+  - Copyright (c) 2003, 2006 SuSE Linux AG.
+holders:
+  - SuSE
+  - SuSE Linux AG.
+authors: []

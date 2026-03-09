@@ -1,0 +1,17 @@
+what:
+  - copyrights
+  - holders
+  - authors
+copyrights:
+  - Copyright (c) 2013 Boris BREZILLON .brezillon.dev@gmail.com
+  - Copyright (c) 2013 Dmitriy B. <rzk333@gmail.com>
+  - Copyright (c) 2013 Henrik Nordström Henrik Nordström
+  - Copyright (c) 2013 Qiang Yu <yuq825@gmail.com>
+  - Copyright (c) 2013 Sergey Lapin <slapin@ossfans.org>
+holders:
+  - Boris BREZILLON
+  - Dmitriy B.
+  - Henrik Nordström Henrik Nordström
+  - Qiang Yu
+  - Sergey Lapin
+authors: []

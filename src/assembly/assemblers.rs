@@ -94,10 +94,11 @@ pub static ASSEMBLERS: &[AssemblerConfig] = &[
     AssemblerConfig {
         datasource_ids: &[
             DatasourceId::MavenPom,
+            DatasourceId::MavenPomProperties,
             DatasourceId::JavaJarManifest,
             DatasourceId::JavaOsgiManifest,
         ],
-        sibling_file_patterns: &["pom.xml", "**/META-INF/MANIFEST.MF"],
+        sibling_file_patterns: &["pom.xml", "pom.properties", "**/META-INF/MANIFEST.MF"],
         mode: AssemblyMode::SiblingMerge,
     },
     // Python/PyPI ecosystem
@@ -333,6 +334,7 @@ pub static UNASSEMBLED_DATASOURCE_IDS: &[DatasourceId] = &[
     DatasourceId::Readme,
     DatasourceId::AboutFile,
     DatasourceId::EtcOsRelease,
+    DatasourceId::Gitmodules,
     // Binary archives (require external extraction via ExtractCode before scanning)
     DatasourceId::AlpineApkArchive,
     DatasourceId::AndroidAarLibrary,

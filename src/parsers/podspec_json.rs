@@ -389,9 +389,7 @@ fn extract_dependencies(json: &Value) -> Vec<Dependency> {
                 .map(|s| s.trim().to_string())
                 .filter(|s| !s.is_empty());
 
-            let purl = PackageUrl::new(PodspecJsonParser::PACKAGE_TYPE.as_str(), name_str)
-                .ok()
-                .map(|p| p.to_string());
+            let purl = Some(format!("pkg:cocoapods/{}", name_str));
 
             dependencies.push(Dependency {
                 purl,
@@ -439,9 +437,13 @@ fn get_hashed_path(name: &str) -> Option<String> {
     let result = hasher.finalize();
     let hash_str = format!("{:x}", result);
 
-    // Take first 3 characters
     if hash_str.len() >= 3 {
-        Some(hash_str[..3].to_string())
+        Some(format!(
+            "{}/{}/{}",
+            &hash_str[0..1],
+            &hash_str[1..2],
+            &hash_str[2..3]
+        ))
     } else {
         Some(hash_str)
     }

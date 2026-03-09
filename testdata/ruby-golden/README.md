@@ -6,10 +6,10 @@ Golden tests compare parser output against expected results from the original Sc
 
 ## Test Status
 
-**Currently Passing:** 1/4 tests
+**Current state:** 2/4 Ruby parser goldens are active; the remaining 2 are still intentionally ignored because they require license detection engine integration.
 
 - ✅ **cat-gemspec** - Passing with improvements
-- ⏸️ **arel-gemspec** - Multi-line Ruby literals, conditional dependencies (complex)
+- ✅ **arel-gemspec** - Active after parser parity fixes for `%q{}` cleanup and conditional dependency extraction
 - ⏸️ **oj-gemspec** - License detection engine required
 - ⏸️ **rubocop-gemspec** - License detection engine required
 
@@ -18,21 +18,22 @@ Golden tests compare parser output against expected results from the original Sc
 ### Party/Author Extraction (Better Data Model)
 
 **Python Behavior (Fragmented):**
+
 ```json
 [
-  {"name": "蒼時弦也", "email": null},
-  {"name": null, "email": "elct9620@frost.tw"}
+  { "name": "蒼時弦也", "email": null },
+  { "name": null, "email": "elct9620@frost.tw" }
 ]
 ```
 
 **Our Behavior (Combined & Semantic):**
+
 ```json
-[
-  {"name": "蒼時弦也", "email": "elct9620@frost.tw"}
-]
+[{ "name": "蒼時弦也", "email": "elct9620@frost.tw" }]
 ```
 
 **Rationale:**
+
 - **Semantic correctness**: One person = one party record
 - **Data integrity**: Email is associated with the correct author
 - **RFC 5322 support**: Parses `"Name <email>"` format correctly
@@ -50,4 +51,5 @@ Python's approach fragments related data and loses the association between names
 ## Test Data
 
 Test files sourced from Python ScanCode reference:
+
 - `reference/scancode-toolkit/tests/packagedcode/data/rubygems/`

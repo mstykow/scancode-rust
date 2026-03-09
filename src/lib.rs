@@ -11,15 +11,15 @@
 //!
 //! ```rust,no_run
 //! use scancode_rust::scanner::process;
+//! use scancode_rust::progress::{ProgressMode, ScanProgress};
 //! use std::path::PathBuf;
 //! use std::sync::Arc;
-//! use indicatif::ProgressBar;
 //! use glob::Pattern;
 //!
 //! # fn main() -> anyhow::Result<()> {
 //! // Scan a directory
 //! let path = PathBuf::from("/path/to/codebase");
-//! let progress = Arc::new(ProgressBar::hidden());
+//! let progress = Arc::new(ScanProgress::new(ProgressMode::Quiet));
 //! let patterns: Vec<Pattern> = vec![
 //!     Pattern::new("*.git*")?,
 //!     Pattern::new("node_modules/*")?,
@@ -148,13 +148,13 @@
 //!
 //! ```rust,no_run
 //! use scancode_rust::scanner::process;
+//! use scancode_rust::progress::{ProgressMode, ScanProgress};
 //! use std::path::PathBuf;
 //! use std::sync::Arc;
-//! use indicatif::ProgressBar;
 //! use glob::Pattern;
 //!
 //! # fn main() -> anyhow::Result<()> {
-//! let progress = Arc::new(ProgressBar::hidden());
+//! let progress = Arc::new(ScanProgress::new(ProgressMode::Quiet));
 //! let patterns: Vec<Pattern> = vec![];
 //! let result = process(&PathBuf::from("."), 50, progress, &patterns)?;
 //! println!("Found {} files", result.files.len());
@@ -166,13 +166,13 @@
 //!
 //! ```rust,no_run
 //! use scancode_rust::scanner::process;
+//! use scancode_rust::progress::{ProgressMode, ScanProgress};
 //! use std::path::PathBuf;
 //! use std::sync::Arc;
-//! use indicatif::ProgressBar;
 //! use glob::Pattern;
 //!
 //! # fn main() -> anyhow::Result<()> {
-//! let progress = Arc::new(ProgressBar::hidden());
+//! let progress = Arc::new(ScanProgress::new(ProgressMode::Quiet));
 //! let patterns: Vec<Pattern> = vec![
 //!     Pattern::new("*.git*")?,
 //!     Pattern::new("node_modules/*")?,
@@ -188,6 +188,33 @@
 //! compile and run but produces no license detection output in this version.
 //!
 //! ## Comparison with Original ScanCode Toolkit
+//! ```rust,no_run
+//! use scancode_rust::scanner::process;
+//! use scancode_rust::progress::{ProgressMode, ScanProgress};
+//! use std::path::PathBuf;
+//! use std::sync::Arc;
+//! use glob::Pattern;
+//!
+//! # fn main() -> anyhow::Result<()> {
+//! let progress = Arc::new(ScanProgress::new(ProgressMode::Quiet));
+//! let patterns: Vec<Pattern> = vec![];
+//! let data_path = PathBuf::from("reference/scancode-toolkit/src/licensedcode/data");
+//! let engine = Arc::new(LicenseDetectionEngine::new(&data_path));
+//! let result = process(&PathBuf::from("."), 50, progress, &patterns, engine, false)?;
+//!
+//! for file in result.files {
+//!     for package in file.package_data {
+//!         println!("Package: {} {}",
+//!             package.name.unwrap_or_default(),
+//!             package.version.unwrap_or_default());
+//!         if let Some(license_expr) = package.declared_license_expression {
+//!             println!("  License: {}", license_expr);
+//!         }
+//!     }
+//! }
+//! # Ok(())
+//! # }
+//! ```
 //!
 //! ## Comparison with Original ScanCode Toolkit
 //!
@@ -210,10 +237,16 @@
 //! [SPDX License List](https://github.com/spdx/license-list-data) at release time.
 
 pub mod assembly;
+pub mod cache;
 pub mod cli;
+pub mod copyright;
+pub mod finder;
+pub mod golden_maintenance;
 pub mod license_detection;
 pub mod models;
+pub mod output;
 pub mod parsers;
+pub mod progress;
 pub mod scanner;
 pub mod utils;
 
@@ -221,5 +254,11 @@ pub mod utils;
 pub mod test_utils;
 
 pub use models::{ExtraData, FileInfo, FileType, Header, Output, SystemEnvironment};
+pub use output::{
+    OutputFormat, OutputWriteConfig, OutputWriter, write_output_file, writer_for_format,
+};
 pub use parsers::{NpmParser, PackageParser};
-pub use scanner::{ProcessResult, count, process};
+pub use progress::{ProgressMode, ScanProgress};
+pub use scanner::{
+    ProcessResult, TextDetectionOptions, count_with_size, process, process_with_options,
+};

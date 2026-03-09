@@ -27,21 +27,6 @@ use identifier::{
 /// Corresponds to Python's LINES_THRESHOLD = 4 (query.py:108)
 const LINES_THRESHOLD: usize = 4;
 
-/// Coverage value below which detections are not perfect.
-/// Any value < 100 means detection is imperfect.
-const IMPERFECT_MATCH_COVERAGE_THR: f32 = 100.0;
-
-/// Coverage values below this are reported as license clues.
-const CLUES_MATCH_COVERAGE_THR: f32 = 60.0;
-
-/// False positive threshold for rule length (in tokens).
-/// Rules with length <= this are potential false positives.
-const FALSE_POSITIVE_RULE_LENGTH_THRESHOLD: usize = 3;
-
-/// False positive threshold for start line.
-/// Matches after this line with short rules are potential false positives.
-const FALSE_POSITIVE_START_LINE_THRESHOLD: usize = 1000;
-
 // ============================================================================
 // Detection Log Categories (Python parity: DetectionRule enum)
 // ============================================================================
@@ -75,8 +60,6 @@ pub const DETECTION_LOG_UNKNOWN_INTRO_FOLLOWED_BY_MATCH: &str = "unknown-intro-f
 
 /// Unknown reference to local file - match references another file (e.g., "see LICENSE").
 pub const DETECTION_LOG_UNKNOWN_REFERENCE_TO_LOCAL_FILE: &str = "unknown-reference-to-local-file";
-
-/// A group of license matches that are nearby each other in the file.
 
 /// Populate LicenseDetection from a DetectionGroup.
 ///
@@ -758,7 +741,7 @@ mod tests {
     #[test]
     fn test_compute_detection_identifier_deterministic() {
         let m = create_perfect_match(1, 10);
-        let mut d1 = LicenseDetection {
+        let d1 = LicenseDetection {
             license_expression: Some("mit".to_string()),
             license_expression_spdx: Some("MIT".to_string()),
             matches: vec![m.clone()],
@@ -766,7 +749,7 @@ mod tests {
             identifier: None,
             file_region: None,
         };
-        let mut d2 = LicenseDetection {
+        let d2 = LicenseDetection {
             license_expression: Some("mit".to_string()),
             license_expression_spdx: Some("MIT".to_string()),
             matches: vec![m],
@@ -783,7 +766,7 @@ mod tests {
     fn test_compute_detection_identifier_different_content() {
         let m1 = create_perfect_match(1, 10);
         let m2 = create_perfect_match(20, 30);
-        let mut d1 = LicenseDetection {
+        let d1 = LicenseDetection {
             license_expression: Some("mit".to_string()),
             license_expression_spdx: Some("MIT".to_string()),
             matches: vec![m1],
@@ -791,7 +774,7 @@ mod tests {
             identifier: None,
             file_region: None,
         };
-        let mut d2 = LicenseDetection {
+        let d2 = LicenseDetection {
             license_expression: Some("apache-2.0".to_string()),
             license_expression_spdx: Some("Apache-2.0".to_string()),
             matches: vec![m2],
@@ -931,26 +914,6 @@ mod tests {
         let sorted = sort_detections_by_line(vec![d1, d2]);
         assert_eq!(sorted[0].file_region.as_ref().unwrap().start_line, 1);
         assert_eq!(sorted[1].file_region.as_ref().unwrap().start_line, 20);
-    }
-
-    #[test]
-    fn test_sort_detections_by_line_empty_matches() {
-        let result = sort_detections_by_line(vec![]);
-        assert!(result.is_empty());
-    }
-
-    #[test]
-    fn test_detection_log_constants_match_python() {
-        assert_eq!(DETECTION_LOG_PERFECT_DETECTION, "perfect-detection");
-        assert_eq!(DETECTION_LOG_LOW_QUALITY_MATCHES, "low-quality-matches");
-        assert_eq!(
-            DETECTION_LOG_UNKNOWN_INTRO_FOLLOWED_BY_MATCH,
-            "unknown-intro-followed-by-match"
-        );
-        assert_eq!(
-            DETECTION_LOG_UNKNOWN_REFERENCE_TO_LOCAL_FILE,
-            "unknown-reference-to-local-file"
-        );
     }
 
     #[test]

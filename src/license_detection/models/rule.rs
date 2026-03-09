@@ -1,6 +1,5 @@
 //! Rule metadata loaded from .LICENSE and .RULE files.
 
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::ops::Range;
 

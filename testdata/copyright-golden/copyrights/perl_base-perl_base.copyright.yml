@@ -1,0 +1,35 @@
+what:
+  - copyrights
+  - holders
+  - holders_summary
+copyrights:
+  - Copyright (c) 1989, 1993 The Regents of the University of California
+  - Copyright (c) 1991-2006 Unicode, Inc.
+  - Copyright (c) 1991-2008 Unicode, Inc.
+  - Copyright (c) 1994 The Regents of the University of California
+  - Copyright (c) 1995-2005 Jean-loup Gailly and Mark Adler
+  - Copyright (c) 2004 by the Perl 5 Porters
+  - Copyright 1989-2001, Larry Wall
+  - copyright (c) 1994 by the Regents of the University of California
+  - copyright (c) 1996-2007 Julian R Seward
+holders:
+  - Jean-loup Gailly and Mark Adler
+  - Julian R Seward
+  - Larry Wall
+  - The Regents of the University of California
+  - Unicode, Inc.
+  - the Perl 5 Porters
+  - the Regents of the University of California
+holders_summary:
+  - value: the Regents of the University of California
+    count: 3
+  - value: Unicode, Inc.
+    count: 2
+  - value: Jean-loup Gailly and Mark Adler
+    count: 1
+  - value: Julian R Seward
+    count: 1
+  - value: Larry Wall
+    count: 1
+  - value: the Perl 5 Porters
+    count: 1

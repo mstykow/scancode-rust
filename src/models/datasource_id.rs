@@ -166,6 +166,7 @@ pub enum DatasourceId {
 
     // ── Maven ──
     MavenPom,
+    MavenPomProperties,
 
     // ── Microsoft ──
     MicrosoftCabinet,
@@ -251,6 +252,9 @@ pub enum DatasourceId {
 
     // ── Yarn ──
     YarnLock,
+
+    // ── Git ──
+    Gitmodules,
 }
 
 impl DatasourceId {
@@ -371,6 +375,7 @@ impl DatasourceId {
 
             // Maven
             Self::MavenPom => "maven_pom",
+            Self::MavenPomProperties => "maven_pom_properties",
 
             // Microsoft
             Self::MicrosoftCabinet => "microsoft_cabinet",
@@ -450,6 +455,9 @@ impl DatasourceId {
 
             // Yarn
             Self::YarnLock => "yarn_lock",
+
+            // Git
+            Self::Gitmodules => "gitmodules",
         }
     }
 }

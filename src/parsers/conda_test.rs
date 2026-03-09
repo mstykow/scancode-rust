@@ -223,7 +223,7 @@ package:
         assert!(dep.is_some());
         let dep = dep.unwrap();
         assert_eq!(dep.purl, Some("pkg:conda/bwa".to_string()));
-        assert_eq!(dep.extracted_requirement, None);
+        assert_eq!(dep.extracted_requirement, Some(String::new()));
         assert_eq!(dep.is_pinned, Some(false));
     }
 
@@ -325,7 +325,7 @@ package:
         assert!(bwa.is_some());
         let bwa = bwa.unwrap();
         assert_eq!(bwa.purl, Some("pkg:conda/bwa".to_string()));
-        assert_eq!(bwa.extracted_requirement, None);
+        assert_eq!(bwa.extracted_requirement, Some(String::new()));
         assert_eq!(bwa.is_pinned, Some(false));
 
         // Check pandas (no version)
@@ -426,8 +426,7 @@ package:
             .find(|d| d.purl.as_deref().is_some_and(|p| p.contains("numpy")));
         assert!(numpy.is_some());
         let numpy = numpy.unwrap();
-        // Current implementation: conda-forge::numpy stays as conda with namespace
-        assert_eq!(numpy.purl, Some("pkg:conda/conda-forge/numpy".to_string()));
+        assert_eq!(numpy.purl, Some("pkg:pypi/numpy".to_string()));
 
         // Check ray (pip dependency)
         let ray = deps

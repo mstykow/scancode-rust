@@ -1,9 +1,9 @@
 //! Candidate selection using set and multiset similarity.
 
+use crate::license_detection::index::LicenseIndex;
 use crate::license_detection::index::token_sets::{
     build_set_and_mset, high_multiset_subset, high_tids_set_subset, tids_set_counter,
 };
-use crate::license_detection::index::LicenseIndex;
 use crate::license_detection::models::Rule;
 use crate::license_detection::query::QueryRun;
 use std::collections::{HashMap, HashSet};

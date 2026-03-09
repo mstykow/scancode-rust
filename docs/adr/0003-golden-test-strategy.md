@@ -69,9 +69,9 @@ scancode -p testdata/npm/package.json --json expected/npm-package.json
 fn test_golden_npm_simple() {
     let path = Path::new("testdata/npm/package.json");
     let result = NpmParser::extract_package_data(path);
-    
+
     let expected = read_expected_json("expected/npm-package.json");
-    
+
     // Compare semantically, ignoring field order
     assert_package_data_eq(result, expected);
 }
@@ -131,7 +131,7 @@ testdata/
    - Validates against proven reference implementation
 
 5. **Continuous Validation**
-   - Pre-commit hooks run tests
+   - Pre-commit hooks run fast local quality gates (format/lint/docs checks)
    - CI validates on every push
    - Automated regression detection
 
@@ -161,8 +161,8 @@ testdata/
 ```json
 {
   "packages": [
-    {"name": "Alamofire", "version": "5.4.0"},
-    {"name": "SwiftyJSON", "version": "5.0.0"}
+    { "name": "Alamofire", "version": "5.4.0" },
+    { "name": "SwiftyJSON", "version": "5.0.0" }
   ]
 }
 ```
@@ -173,8 +173,8 @@ testdata/
 {
   "name": "MyApp",
   "dependencies": [
-    {"name": "Alamofire", "version": "5.4.0"},
-    {"name": "SwiftyJSON", "version": "5.0.0"}
+    { "name": "Alamofire", "version": "5.4.0" },
+    { "name": "SwiftyJSON", "version": "5.0.0" }
   ]
 }
 ```
@@ -261,7 +261,7 @@ proptest! {
 **Approach**: Run full scancode-rust CLI, compare JSON output.
 
 ```bash
-cargo run -- testdata/npm/ -o actual.json
+cargo run -- --json-pp actual.json testdata/npm/
 diff actual.json expected.json
 ```
 
@@ -275,6 +275,17 @@ diff actual.json expected.json
 - Golden tests at parser level are more granular
 
 ## Implementation Guidelines
+
+### Feature Flag
+
+Golden tests are gated behind the `golden-tests` Cargo feature flag to keep the default `cargo test` fast:
+
+```bash
+cargo test --features golden-tests  # Include golden tests
+cargo test                          # Excludes golden tests (default)
+```
+
+All `*_golden_test.rs` modules are conditionally compiled with `#[cfg(all(test, feature = "golden-tests"))]`. CI always runs with `--features golden-tests`.
 
 ### When to Write a Golden Test
 
@@ -310,10 +321,10 @@ fn assert_package_data_eq(actual: PackageData, expected: PackageData) {
     let actual_deps = sort_by_name(actual.dependencies);
     let expected_deps = sort_by_name(expected.dependencies);
     assert_eq!(actual_deps, expected_deps);
-    
+
     // Ignore null vs missing fields
     assert_eq_optional(actual.description, expected.description);
-    
+
     // Normalize URLs (http vs https)
     assert_eq_normalized_url(actual.homepage_url, expected.homepage_url);
 }

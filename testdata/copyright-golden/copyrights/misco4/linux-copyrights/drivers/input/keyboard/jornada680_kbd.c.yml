@@ -1,0 +1,19 @@
+what:
+  - copyrights
+  - holders
+  - authors
+copyrights:
+  - Copyright (c) 2000 Niibe Yutaka (HP620 Keyb translation table)
+  - Copyright (c) 2000 Yaegashi Takeshi
+  - Copyright (c) 2000 Yaegashi Takeshi hp6xx kbd scan routine and translation table
+  - Copyright (c) 2005 Andriy Skulysh Split
+  - Copyright (c) 2006 Paul Mundt
+  - Copyright (c) 2007 Kristoffer Ericson <Kristoffer.Ericson@gmail.com>
+holders:
+  - Andriy Skulysh Split
+  - Kristoffer Ericson
+  - Niibe Yutaka (HP620 Keyb translation table)
+  - Paul Mundt
+  - Yaegashi Takeshi
+  - Yaegashi Takeshi hp6xx kbd scan routine and translation table
+authors: []

@@ -22,10 +22,12 @@ Golden tests compare parser output against expected results from the original Sc
 ## When to Unignore Tests
 
 Tests should be re-enabled once:
+
 1. License detection engine is integrated
 2. `declared_license_expression` and `declared_license_expression_spdx` are populated
 
 ## Test Data
 
 Test files sourced from Python ScanCode reference:
+
 - `reference/scancode-toolkit/tests/packagedcode/data/pubspec/`

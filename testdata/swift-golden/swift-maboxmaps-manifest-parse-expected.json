@@ -52,7 +52,8 @@
           "platformName": "visionos",
           "version": "1.0"
         }
-      ]
+      ],
+      "swift_tools_version": "5.9.0"
     },
     "dependencies": [
       {

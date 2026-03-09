@@ -1,0 +1,14 @@
+what:
+  - copyrights
+  - holders
+  - authors
+copyrights:
+  - Copyright (c) 1999-2005 Igor Pavlov
+  - Copyright (c) 2006 Alain <alain@knaff.lu>
+  - Copyright (c) 2006 Aurelien Jacobs <aurel@gnuage.org>
+holders:
+  - Alain
+  - Aurelien Jacobs
+  - Igor Pavlov
+  - the parts
+authors: []

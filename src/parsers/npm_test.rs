@@ -41,7 +41,10 @@ mod tests {
         );
         assert_eq!(
             package_data.download_url,
-            Some("https://registry.npmjs.org/@example/test-package/-/@example/test-package-1.0.0.tgz".to_string())
+            Some(
+                "https://registry.npmjs.org/@example/test-package/-/test-package-1.0.0.tgz"
+                    .to_string()
+            )
         );
 
         assert_eq!(package_data.declared_license_expression, None);
@@ -93,7 +96,10 @@ mod tests {
         );
         assert_eq!(
             package_data.download_url,
-            Some("https://registry.npmjs.org/@example/test-package/-/@example/test-package-1.0.0.tgz".to_string())
+            Some(
+                "https://registry.npmjs.org/@example/test-package/-/test-package-1.0.0.tgz"
+                    .to_string()
+            )
         );
 
         assert_eq!(package_data.declared_license_expression, None);
@@ -428,6 +434,57 @@ mod tests {
     }
 
     #[test]
+    fn test_empty_name_or_version_does_not_create_registry_urls() {
+        let content = r#"
+{
+  "name": " ",
+  "version": "",
+  "homepage": "https://example.com"
+}
+"#;
+
+        let (_temp_file, package_path) = create_temp_package_json(content);
+        let package_data = NpmParser::extract_first_package(&package_path);
+
+        assert_eq!(package_data.name, None);
+        assert_eq!(package_data.version, None);
+        assert_eq!(package_data.download_url, None);
+        assert_eq!(package_data.repository_homepage_url, None);
+        assert_eq!(package_data.repository_download_url, None);
+        assert_eq!(package_data.api_data_url, None);
+        assert_eq!(package_data.purl, None);
+    }
+
+    #[test]
+    fn test_extract_overrides_into_extra_data() {
+        let content = r#"
+{
+  "name": "override-test",
+  "version": "1.0.0",
+  "overrides": {
+    "lodash": "4.17.21",
+    "react-scripts": {
+      "webpack": "5.74.0"
+    }
+  }
+}
+"#;
+
+        let (_temp_file, package_path) = create_temp_package_json(content);
+        let package_data = NpmParser::extract_first_package(&package_path);
+
+        let extra_data = package_data.extra_data.expect("expected extra_data");
+        let overrides = extra_data
+            .get("overrides")
+            .expect("expected overrides field");
+        assert_eq!(overrides["lodash"], Value::String("4.17.21".to_string()));
+        assert_eq!(
+            overrides["react-scripts"]["webpack"],
+            Value::String("5.74.0".to_string())
+        );
+    }
+
+    #[test]
     fn test_extract_peer_dependencies() {
         let package_path = PathBuf::from("testdata/npm/package-peer-dependencies.json")
             .canonicalize()
@@ -532,32 +589,19 @@ mod tests {
     }
 
     #[test]
-    fn test_extract_bundle_dependencies_alternative_spelling() {
+    fn test_extract_bundle_dependencies_alternative_spelling_is_ignored() {
         let package_path = PathBuf::from("testdata/npm/package-bundle-dependencies.json")
             .canonicalize()
             .unwrap();
         let package_data = NpmParser::extract_first_package(&package_path);
 
-        // Should have bundled dependencies with bundleDependencies spelling
-        assert!(!package_data.dependencies.is_empty());
-
-        // Find bundled dependencies by scope
-        let bundled_deps: Vec<_> = package_data
+        let bundled_deps_count = package_data
             .dependencies
             .iter()
             .filter(|dep| dep.scope.as_deref() == Some("bundledDependencies"))
-            .collect();
+            .count();
 
-        assert_eq!(bundled_deps.len(), 3);
-
-        // Check for expected package names
-        let purls: Vec<&str> = bundled_deps
-            .iter()
-            .filter_map(|dep| dep.purl.as_deref())
-            .collect();
-        assert!(purls.iter().any(|p| p.contains("lodash")));
-        assert!(purls.iter().any(|p| p.contains("moment")));
-        assert!(purls.iter().any(|p| p.contains("axios")));
+        assert_eq!(bundled_deps_count, 0);
     }
 
     #[test]
@@ -860,6 +904,40 @@ mod tests {
         assert!(extra_data.contains_key("packageManager"));
         assert!(extra_data.contains_key("workspaces"));
         assert!(extra_data.contains_key("private"));
+    }
+
+    #[test]
+    fn test_homepage_array_is_ignored() {
+        let content = r#"
+{
+  "name": "test-package",
+  "version": "1.0.0",
+  "homepage": ["https://example.com"]
+}
+"#;
+
+        let (_temp_file, package_path) = create_temp_package_json(content);
+        let package_data = NpmParser::extract_first_package(&package_path);
+
+        assert_eq!(package_data.homepage_url, None);
+    }
+
+    #[test]
+    fn test_blank_bugs_values_are_ignored() {
+        let content = r#"
+{
+  "name": "test-package",
+  "version": "1.0.0",
+  "bugs": {
+    "url": "   "
+  }
+}
+"#;
+
+        let (_temp_file, package_path) = create_temp_package_json(content);
+        let package_data = NpmParser::extract_first_package(&package_path);
+
+        assert_eq!(package_data.bug_tracking_url, None);
     }
 
     #[test]
@@ -1803,6 +1881,30 @@ mod tests {
     }
 
     #[test]
+    fn test_extract_vcs_url_object_with_git_head() {
+        let content = r#"{
+  "name": "test-package",
+  "version": "1.0.0",
+  "gitHead": "fc7bbf03e39cc48a8924b90696d28345a6a90f3c",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/user/test-package.git"
+  }
+}"#;
+
+        let (_temp_file, path) = create_temp_package_json(content);
+        let package_data = NpmParser::extract_first_package(&path);
+
+        assert_eq!(
+            package_data.vcs_url,
+            Some(
+                "git+https://github.com/user/test-package.git@fc7bbf03e39cc48a8924b90696d28345a6a90f3c"
+                    .to_string()
+            )
+        );
+    }
+
+    #[test]
     fn test_extract_vcs_url_git_protocol() {
         let content = r#"{
   "name": "test-package",
@@ -1983,10 +2085,9 @@ mod tests {
 
         let types_purl = types_node.purl.as_ref().unwrap();
 
-        assert!(
-            types_purl.contains("%40types%2Fnode"),
-            "BUG: Currently produces incorrect PURL with encoded slash. Got: {}. See CODE_QUALITY_IMPROVEMENTS.md #3",
-            types_purl
+        assert_eq!(
+            types_purl, "pkg:npm/%40types/node",
+            "Scoped dependency PURLs should encode only the @, not the namespace slash"
         );
 
         let babel = package_data
@@ -2001,9 +2102,10 @@ mod tests {
             })
             .expect("Should find @babel/core dependency");
 
-        assert!(
-            babel.purl.as_ref().unwrap().contains("%40babel%2Fcore"),
-            "BUG: Currently produces incorrect PURL with encoded slash. See CODE_QUALITY_IMPROVEMENTS.md #3"
+        assert_eq!(
+            babel.purl.as_deref(),
+            Some("pkg:npm/%40babel/core"),
+            "Scoped dependency PURLs should encode only the @, not the namespace slash"
         );
 
         let lodash = package_data
@@ -2068,6 +2170,274 @@ mod tests {
             lodash_dep.is_optional == Some(false) || lodash_dep.is_optional.is_none(),
             "Lodash should NOT be marked optional (not in peerDependenciesMeta). Got: {:?}",
             lodash_dep.is_optional
+        );
+    }
+
+    #[test]
+    fn test_git_url_dependencies() {
+        let content = r#"
+{
+  "name": "test-package",
+  "version": "1.0.0",
+  "dependencies": {
+    "express": "git://github.com/expressjs/express.git",
+    "lodash": "git+https://github.com/lodash/lodash.git#v4.17.21",
+    "underscore": "git@github.com:jashkenas/underscore.git",
+    "moment": "github:moment/moment",
+    "axios": "axios/axios#v1.0.0"
+  }
+}
+"#;
+        let (_temp_file, package_path) = create_temp_package_json(content);
+        let package_data = NpmParser::extract_first_package(&package_path);
+
+        assert_eq!(package_data.dependencies.len(), 5);
+
+        for dep in &package_data.dependencies {
+            assert!(
+                dep.is_pinned == Some(false),
+                "Git URL dependencies should not be pinned: {:?}",
+                dep.purl
+            );
+            assert!(
+                dep.extracted_requirement.is_some(),
+                "Git URL dependencies should have extracted_requirement"
+            );
+        }
+    }
+
+    #[test]
+    fn test_url_dependencies() {
+        let content = r#"
+{
+  "name": "test-package",
+  "version": "1.0.0",
+  "dependencies": {
+    "my-package": "https://example.com/package.tgz",
+    "another": "http://example.com/another.tgz"
+  }
+}
+"#;
+        let (_temp_file, package_path) = create_temp_package_json(content);
+        let package_data = NpmParser::extract_first_package(&package_path);
+
+        assert_eq!(package_data.dependencies.len(), 2);
+
+        for dep in &package_data.dependencies {
+            assert!(
+                dep.is_pinned == Some(false),
+                "URL dependencies should not be pinned: {:?}",
+                dep.purl
+            );
+        }
+    }
+
+    #[test]
+    fn test_local_path_dependencies() {
+        let content = r#"
+{
+  "name": "test-package",
+  "version": "1.0.0",
+  "dependencies": {
+    "local-pkg": "file:../local-pkg",
+    "linked-pkg": "link:../linked-pkg"
+  }
+}
+"#;
+        let (_temp_file, package_path) = create_temp_package_json(content);
+        let package_data = NpmParser::extract_first_package(&package_path);
+
+        assert_eq!(package_data.dependencies.len(), 2);
+
+        for dep in &package_data.dependencies {
+            assert!(
+                dep.is_pinned == Some(false),
+                "Local path dependencies should not be pinned: {:?}",
+                dep.purl
+            );
+        }
+    }
+
+    #[test]
+    fn test_mixed_dependencies() {
+        let content = r#"
+{
+  "name": "test-package",
+  "version": "1.0.0",
+  "dependencies": {
+    "regular": "^4.17.0",
+    "exact": "2.0.0",
+    "git-dep": "git+https://github.com/org/repo.git",
+    "url-dep": "https://example.com/package.tgz",
+    "github-dep": "user/repo#main"
+  }
+}
+"#;
+        let (_temp_file, package_path) = create_temp_package_json(content);
+        let package_data = NpmParser::extract_first_package(&package_path);
+
+        assert_eq!(package_data.dependencies.len(), 5);
+
+        let regular = package_data
+            .dependencies
+            .iter()
+            .find(|d| {
+                d.purl
+                    .as_ref()
+                    .map(|p| p.contains("regular"))
+                    .unwrap_or(false)
+            })
+            .expect("Should find regular dependency");
+        assert_eq!(
+            regular.is_pinned,
+            Some(false),
+            "Semver range should not be pinned"
+        );
+
+        let exact = package_data
+            .dependencies
+            .iter()
+            .find(|d| {
+                d.purl
+                    .as_ref()
+                    .map(|p| p.contains("exact"))
+                    .unwrap_or(false)
+            })
+            .expect("Should find exact dependency");
+        assert_eq!(
+            exact.is_pinned,
+            Some(false),
+            "package.json exact requirements should remain unpinned"
+        );
+        assert!(
+            exact.purl.as_ref().unwrap() == "pkg:npm/exact",
+            "package.json dependency PURLs should not include manifest requirement versions"
+        );
+
+        let git_dep = package_data
+            .dependencies
+            .iter()
+            .find(|d| {
+                d.purl
+                    .as_ref()
+                    .map(|p| p.contains("git-dep"))
+                    .unwrap_or(false)
+            })
+            .expect("Should find git-dep dependency");
+        assert_eq!(
+            git_dep.is_pinned,
+            Some(false),
+            "Git dependency should not be pinned"
+        );
+    }
+
+    #[test]
+    fn test_scoped_manifest_dependencies_preserve_order_and_unversioned_purls() {
+        let content = r#"
+{
+  "name": "angular-compare-validator",
+  "version": "0.1.1",
+  "dependencies": {
+    "@angular/core": ">=2.0.0",
+    "@angular/forms": ">=2.0.0",
+    "@angular/common": ">=2.0.0",
+    "rxjs": ">=5.0.0-beta.12"
+  }
+}
+"#;
+
+        let (_temp_file, package_path) = create_temp_package_json(content);
+        let package_data = NpmParser::extract_first_package(&package_path);
+
+        let dependency_purls: Vec<&str> = package_data
+            .dependencies
+            .iter()
+            .map(|dep| dep.purl.as_deref().expect("dependency should have purl"))
+            .collect();
+
+        assert_eq!(
+            dependency_purls,
+            vec![
+                "pkg:npm/%40angular/core",
+                "pkg:npm/%40angular/forms",
+                "pkg:npm/%40angular/common",
+                "pkg:npm/rxjs",
+            ]
+        );
+        assert!(
+            package_data
+                .dependencies
+                .iter()
+                .all(|dep| dep.is_pinned == Some(false))
+        );
+    }
+
+    #[test]
+    fn test_dist_shasum_populates_sha1() {
+        let content = r#"
+{
+  "name": "angular-compare-validator",
+  "version": "0.1.1",
+  "dist": {
+    "integrity": "sha512-j3DtXjUTGFrVj7KjEUdprJPd1og2zokUblhvwD4DrJPc+x8RNUrCb0CLdcDr9RZj1eTo4nw4dSo8Br3edJp8Aw==",
+    "shasum": "d35a0754c8587b0502874e3636cf0f19565d09b7"
+  }
+}
+"#;
+
+        let (_temp_file, package_path) = create_temp_package_json(content);
+        let package_data = NpmParser::extract_first_package(&package_path);
+
+        assert_eq!(
+            package_data.sha1.as_deref(),
+            Some("d35a0754c8587b0502874e3636cf0f19565d09b7")
+        );
+        assert!(package_data.sha512.is_some());
+    }
+
+    #[test]
+    fn test_party_object_url_none_is_treated_as_missing() {
+        let content = r#"
+{
+  "name": "party-url-test",
+  "version": "1.0.0",
+  "contributors": [
+    {
+      "name": "Example Contributor",
+      "email": "contributor@example.com",
+      "url": "none"
+    }
+  ]
+}
+"#;
+
+        let (_temp_file, package_path) = create_temp_package_json(content);
+        let package_data = NpmParser::extract_first_package(&package_path);
+
+        assert_eq!(package_data.parties.len(), 1);
+        assert_eq!(package_data.parties[0].url, None);
+    }
+
+    #[test]
+    fn test_dist_tarball_registry_url_is_normalized_to_https() {
+        let content = r#"
+{
+  "name": "registry-tarball-test",
+  "version": "1.0.0",
+  "dist": {
+    "tarball": "http://registry.npmjs.org/registry-tarball-test/-/registry-tarball-test-1.0.0.tgz"
+  }
+}
+"#;
+
+        let (_temp_file, package_path) = create_temp_package_json(content);
+        let package_data = NpmParser::extract_first_package(&package_path);
+
+        assert_eq!(
+            package_data.download_url.as_deref(),
+            Some(
+                "https://registry.npmjs.org/registry-tarball-test/-/registry-tarball-test-1.0.0.tgz"
+            )
         );
     }
 }

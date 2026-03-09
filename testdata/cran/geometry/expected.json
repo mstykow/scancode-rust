@@ -1,0 +1,225 @@
+[
+  {
+    "type": "cran",
+    "namespace": null,
+    "name": "geometry",
+    "version": "0.4.2",
+    "qualifiers": {},
+    "subpath": null,
+    "primary_language": "R",
+    "description": "Mesh Generation and Surface Tessellation\nMakes the 'Qhull' library <http://www.qhull.org> available in R, in a similar manner as in Octave and MATLAB. Qhull computes convex hulls, Delaunay triangulations, halfspace intersections about a point, Voronoi diagrams, furthest-site Delaunay triangulations, and furthest-site Voronoi diagrams. It runs in 2D, 3D, 4D, and higher dimensions. It implements the Quickhull algorithm for computing the convex hull. Qhull does not support constrained Delaunay triangulations, or mesh generation of non-convex objects, but the package does include some R functions that allow for this.",
+    "release_date": null,
+    "parties": [
+      {
+        "type": "person",
+        "role": "maintainer",
+        "name": "David C. Sterratt",
+        "email": "david.c.sterratt@ed.ac.uk",
+        "url": null
+      },
+      {
+        "type": "person",
+        "role": "author",
+        "name": "Jean-Romain Roussel [cph, ctb] (wrote tsearch function with QuadTrees)",
+        "email": null,
+        "url": null
+      },
+      {
+        "type": "person",
+        "role": "author",
+        "name": "C. B. Barber [cph]",
+        "email": null,
+        "url": null
+      },
+      {
+        "type": "person",
+        "role": "author",
+        "name": "Kai Habel [cph, aut]",
+        "email": null,
+        "url": null
+      },
+      {
+        "type": "person",
+        "role": "author",
+        "name": "Raoul Grasman [cph, aut]",
+        "email": null,
+        "url": null
+      },
+      {
+        "type": "person",
+        "role": "author",
+        "name": "Robert B. Gramacy [cph, aut]",
+        "email": null,
+        "url": null
+      },
+      {
+        "type": "person",
+        "role": "author",
+        "name": "Pavlo Mozharovskyi [cph, aut]",
+        "email": null,
+        "url": null
+      },
+      {
+        "type": "person",
+        "role": "author",
+        "name": "David C. Sterratt [cph, aut, cre] (<https://orcid.org/0000-0001-9092-9099>)",
+        "email": null,
+        "url": null
+      }
+    ],
+    "keywords": [],
+    "homepage_url": "https://davidcsterratt.github.io/geometry",
+    "download_url": null,
+    "size": null,
+    "sha1": null,
+    "md5": null,
+    "sha256": null,
+    "sha512": null,
+    "bug_tracking_url": null,
+    "code_view_url": null,
+    "vcs_url": null,
+    "copyright": null,
+    "holder": null,
+    "declared_license_expression": null,
+    "declared_license_expression_spdx": null,
+    "license_detections": [],
+    "other_license_expression": null,
+    "other_license_expression_spdx": null,
+    "other_license_detections": [],
+    "extracted_license_statement": "GPL (>= 3)",
+    "notice_text": null,
+    "source_packages": [],
+    "file_references": [],
+    "is_private": false,
+    "is_virtual": false,
+    "extra_data": {},
+    "dependencies": [
+      {
+        "purl": "pkg:cran/magic",
+        "extracted_requirement": null,
+        "scope": "imports",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true,
+        "resolved_package": {},
+        "extra_data": {}
+      },
+      {
+        "purl": "pkg:cran/Rcpp",
+        "extracted_requirement": null,
+        "scope": "imports",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true,
+        "resolved_package": {},
+        "extra_data": {}
+      },
+      {
+        "purl": "pkg:cran/lpSolve",
+        "extracted_requirement": null,
+        "scope": "imports",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true,
+        "resolved_package": {},
+        "extra_data": {}
+      },
+      {
+        "purl": "pkg:cran/linprog",
+        "extracted_requirement": null,
+        "scope": "imports",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true,
+        "resolved_package": {},
+        "extra_data": {}
+      },
+      {
+        "purl": "pkg:cran/spelling",
+        "extracted_requirement": null,
+        "scope": "suggests",
+        "is_runtime": false,
+        "is_optional": true,
+        "is_pinned": false,
+        "is_direct": true,
+        "resolved_package": {},
+        "extra_data": {}
+      },
+      {
+        "purl": "pkg:cran/testthat",
+        "extracted_requirement": null,
+        "scope": "suggests",
+        "is_runtime": false,
+        "is_optional": true,
+        "is_pinned": false,
+        "is_direct": true,
+        "resolved_package": {},
+        "extra_data": {}
+      },
+      {
+        "purl": "pkg:cran/rgl",
+        "extracted_requirement": null,
+        "scope": "suggests",
+        "is_runtime": false,
+        "is_optional": true,
+        "is_pinned": false,
+        "is_direct": true,
+        "resolved_package": {},
+        "extra_data": {}
+      },
+      {
+        "purl": "pkg:cran/R.matlab",
+        "extracted_requirement": null,
+        "scope": "suggests",
+        "is_runtime": false,
+        "is_optional": true,
+        "is_pinned": false,
+        "is_direct": true,
+        "resolved_package": {},
+        "extra_data": {}
+      },
+      {
+        "purl": "pkg:cran/tripack",
+        "extracted_requirement": null,
+        "scope": "suggests",
+        "is_runtime": false,
+        "is_optional": true,
+        "is_pinned": false,
+        "is_direct": true,
+        "resolved_package": {},
+        "extra_data": {}
+      },
+      {
+        "purl": "pkg:cran/Rcpp",
+        "extracted_requirement": null,
+        "scope": "linkingto",
+        "is_runtime": false,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true,
+        "resolved_package": {},
+        "extra_data": {}
+      },
+      {
+        "purl": "pkg:cran/RcppProgress",
+        "extracted_requirement": null,
+        "scope": "linkingto",
+        "is_runtime": false,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true,
+        "resolved_package": {},
+        "extra_data": {}
+      }
+    ],
+    "repository_homepage_url": "https://cran.r-project.org/package=geometry",
+    "repository_download_url": null,
+    "api_data_url": null,
+    "datasource_id": "cran_description",
+    "purl": "pkg:cran/geometry@0.4.2"
+  }
+]

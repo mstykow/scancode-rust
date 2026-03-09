@@ -1,0 +1,15 @@
+what:
+  - copyrights
+  - holders
+  - holders_summary
+copyrights:
+  - Copyright (c) 2005 Mike Kronenberg
+  - Copyright (c) 2008 The Android Open Source Project
+holders:
+  - Mike Kronenberg
+  - The Android Open Source Project
+holders_summary:
+  - value: Android Open Source Project
+    count: 1
+  - value: Mike Kronenberg
+    count: 1

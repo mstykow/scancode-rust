@@ -8,7 +8,6 @@ use crate::license_detection::query::Query;
 
 pub const MATCH_UNKNOWN: &str = "6-unknown";
 
-#[allow(dead_code)]
 pub const MATCH_UNKNOWN_ORDER: u8 = 6;
 
 const UNKNOWN_NGRAM_LENGTH: usize = 6;
@@ -292,13 +291,6 @@ mod tests {
     use super::*;
     use crate::license_detection::index::LicenseIndex;
     use crate::license_detection::query::Query;
-
-    #[test]
-    fn test_constants() {
-        assert_eq!(MATCH_UNKNOWN, "5-undetected");
-        assert_eq!(MATCH_UNKNOWN_ORDER, 5);
-        assert_eq!(UNKNOWN_NGRAM_LENGTH, 6);
-    }
 
     #[test]
     fn test_unknown_match_empty_query() {

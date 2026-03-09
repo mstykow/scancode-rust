@@ -40,12 +40,8 @@
       "repository_download_url": null,
       "api_data_url": null,
       "package_uid": "pkg:swift/github.com/kareman/SwiftShell@5.1.0?uuid=fixed-uid-done-for-testing-5642512d1758",
-      "datafile_paths": [
-        "Package.resolved"
-      ],
-      "datasource_ids": [
-        "swift_package_resolved"
-      ],
+      "datafile_paths": ["Package.resolved"],
+      "datasource_ids": ["swift_package_resolved"],
       "purl": "pkg:swift/github.com/kareman/SwiftShell@5.1.0"
     },
     {
@@ -88,12 +84,8 @@
       "repository_download_url": null,
       "api_data_url": null,
       "package_uid": "pkg:swift/github.com/apple/swift-atomics@1.1.0?uuid=fixed-uid-done-for-testing-5642512d1758",
-      "datafile_paths": [
-        "Package.resolved"
-      ],
-      "datasource_ids": [
-        "swift_package_resolved"
-      ],
+      "datafile_paths": ["Package.resolved"],
+      "datasource_ids": ["swift_package_resolved"],
       "purl": "pkg:swift/github.com/apple/swift-atomics@1.1.0"
     }
   ],

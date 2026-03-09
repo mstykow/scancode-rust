@@ -1,0 +1,15 @@
+what:
+  - copyrights
+  - holders
+  - holders_summary
+copyrights:
+  - (c) 2003, 2004, 2005 Thomas Vander Stichele thomas at apestaart dot org
+  - Copyright (c) 2004 Scott James Remnant <scott@netsplit.com>
+holders:
+  - Scott James Remnant
+  - Thomas Vander Stichele
+holders_summary:
+  - value: Scott James Remnant
+    count: 1
+  - value: Thomas Vander Stichele
+    count: 1

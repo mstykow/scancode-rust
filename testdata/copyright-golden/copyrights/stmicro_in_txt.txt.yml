@@ -1,0 +1,15 @@
+what:
+  - copyrights
+  - holders
+  - holders_summary
+copyrights:
+  - COPYRIGHT (c) ST-Microelectronics 1998
+  - COPYRIGHT (c) STMicroelectronics 2005
+holders:
+  - ST-Microelectronics
+  - STMicroelectronics
+holders_summary:
+  - value: ST-Microelectronics
+    count: 1
+  - value: STMicroelectronics
+    count: 1

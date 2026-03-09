@@ -1,24 +1,16 @@
 {
   "abstract": "A modern Perl toolkit for web development",
-  "author": [
-    "John Doe <john@example.com>",
-    "Jane Smith <jane@example.com>"
-  ],
+  "author": ["John Doe <john@example.com>", "Jane Smith <jane@example.com>"],
   "dynamic_config": 1,
   "generated_by": "ExtUtils::MakeMaker version 7.64",
-  "license": [
-    "perl_5"
-  ],
+  "license": ["perl_5"],
   "meta-spec": {
     "url": "http://search.cpan.org/perldoc?CPAN::Meta::Spec",
     "version": "2.0"
   },
   "name": "Example-Web-Toolkit",
   "no_index": {
-    "directory": [
-      "t",
-      "inc"
-    ]
+    "directory": ["t", "inc"]
   },
   "prereqs": {
     "runtime": {

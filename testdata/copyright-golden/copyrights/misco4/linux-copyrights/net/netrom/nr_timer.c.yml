@@ -1,0 +1,11 @@
+what:
+  - copyrights
+  - holders
+  - authors
+copyrights:
+  - Copyright (c) 2002 Ralf Baechle DO1GRB (ralf@gnu.org)
+  - Copyright (c) Jonathan Naylor G4KLX (g4klx@g4klx.demon.co.uk)
+holders:
+  - Jonathan Naylor G4KLX
+  - Ralf Baechle DO1GRB
+authors: []
