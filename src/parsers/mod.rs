@@ -182,6 +182,7 @@ mod rpm_parser;
 mod rpm_specfile;
 #[cfg(test)]
 mod rpm_specfile_test;
+mod rpm_yumdb;
 mod ruby;
 #[cfg(all(test, feature = "golden-tests"))]
 mod ruby_golden_test;
@@ -347,6 +348,7 @@ pub use self::rpm_license_files::RpmLicenseFilesParser;
 pub use self::rpm_mariner_manifest::RpmMarinerManifestParser;
 pub use self::rpm_parser::RpmParser;
 pub use self::rpm_specfile::RpmSpecfileParser;
+pub use self::rpm_yumdb::RpmYumdbParser;
 pub use self::ruby::{
     GemArchiveParser, GemMetadataExtractedParser, GemfileLockParser, GemfileParser, GemspecParser,
 };
@@ -494,6 +496,7 @@ register_package_handlers! {
         RpmParser,
         RpmSpecfileParser,
         RpmSqliteDatabaseParser,
+        RpmYumdbParser,
         SwiftManifestJsonParser,
         SwiftPackageResolvedParser,
         SwiftShowDependenciesParser,
