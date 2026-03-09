@@ -26,6 +26,7 @@ use log::warn;
 use crate::models::{DatasourceId, Dependency, FileReference, PackageData, PackageType};
 
 use super::PackageParser;
+use super::rpm_parser::infer_rpm_namespace;
 
 const PACKAGE_TYPE: PackageType = PackageType::Rpm;
 
@@ -124,7 +125,12 @@ fn parse_rpm_database(
 
                 let version = build_evr_version(pkg.epoch, &pkg.version, &pkg.release);
 
-                let namespace = Some("fedora".to_string());
+                let namespace = infer_rpm_namespace(
+                    None,
+                    (!pkg.vendor.is_empty()).then_some(pkg.vendor.as_str()),
+                    Some(pkg.release.as_str()),
+                    None,
+                );
 
                 let architecture = if pkg.arch.is_empty() {
                     None
@@ -384,6 +390,32 @@ mod tests {
             Some(DatasourceId::RpmInstalledDatabaseSqlite)
         );
         assert!(pkg.name.is_some());
+    }
+
+    #[test]
+    fn test_parse_rpm_database_sqlite_preserves_release_in_version() {
+        let test_file = PathBuf::from("testdata/rpm/rpmdb.sqlite");
+
+        let pkg = RpmSqliteDatabaseParser::extract_first_package(&test_file);
+
+        assert!(
+            pkg.version
+                .as_ref()
+                .is_some_and(|version| version.contains('-'))
+        );
+    }
+
+    #[test]
+    fn test_build_file_references_skips_invalid_entries() {
+        let file_refs = build_file_references(
+            &["valid".to_string(), "".to_string(), "ignored".to_string()],
+            &[0, 0, -1],
+            &["/usr/bin/".to_string()],
+        );
+
+        assert_eq!(file_refs.len(), 2);
+        assert_eq!(file_refs[0].path, "/usr/bin/valid");
+        assert_eq!(file_refs[1].path, "/usr/bin/");
     }
 }
 
