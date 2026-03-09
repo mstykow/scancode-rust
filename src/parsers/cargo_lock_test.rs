@@ -10,6 +10,7 @@ mod tests {
     #[test]
     fn test_is_match_cargo_lock() {
         assert!(CargoLockParser::is_match(&PathBuf::from("Cargo.lock")));
+        assert!(CargoLockParser::is_match(&PathBuf::from("cargo.lock")));
         assert!(CargoLockParser::is_match(&PathBuf::from(
             "/path/to/project/Cargo.lock"
         )));
@@ -152,5 +153,46 @@ mod tests {
             non_runtime_deps.is_empty(),
             "Cargo.lock should not contain dev or build dependencies"
         );
+    }
+
+    #[test]
+    fn test_extract_root_package_when_not_first() {
+        let content = r#"
+[[package]]
+name = "serde"
+version = "1.0.228"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "abc"
+
+[[package]]
+name = "my-app"
+version = "0.4.0"
+dependencies = ["serde"]
+"#;
+
+        let temp_dir = tempfile::tempdir().unwrap();
+        let lock_path = temp_dir.path().join("Cargo.lock");
+        std::fs::write(&lock_path, content).unwrap();
+
+        let package_data = CargoLockParser::extract_first_package(&lock_path);
+
+        assert_eq!(package_data.name.as_deref(), Some("my-app"));
+        assert_eq!(package_data.version.as_deref(), Some("0.4.0"));
+        assert_eq!(package_data.purl.as_deref(), Some("pkg:cargo/my-app@0.4.0"));
+    }
+
+    #[test]
+    fn test_extract_dependencies_resolves_bare_name_versions() {
+        let lock_path = PathBuf::from("testdata/cargo/Cargo-lock-basic.lock");
+        let package_data = CargoLockParser::extract_first_package(&lock_path);
+
+        let serde_dep = package_data
+            .dependencies
+            .iter()
+            .find(|dep| dep.purl.as_ref().is_some_and(|p| p.contains("serde")))
+            .expect("Should find serde dependency");
+
+        assert_eq!(serde_dep.purl.as_deref(), Some("pkg:cargo/serde@1.0.228"));
+        assert_eq!(serde_dep.extracted_requirement.as_deref(), Some("1.0.228"));
     }
 }
