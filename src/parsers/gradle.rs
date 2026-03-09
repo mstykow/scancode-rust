@@ -26,6 +26,7 @@ use std::path::Path;
 
 use log::warn;
 use packageurl::PackageUrl;
+use serde_json::json;
 
 use crate::models::{DatasourceId, Dependency, PackageData, PackageType};
 use crate::parsers::PackageParser;
@@ -81,7 +82,13 @@ impl PackageParser for GradleParser {
         };
 
         let tokens = lex(&content);
-        let dependencies = extract_dependencies(&tokens);
+        let mut dependencies = extract_dependencies(&tokens);
+        resolve_gradle_version_catalog_aliases(path, &mut dependencies);
+        let (
+            extracted_license_statement,
+            declared_license_expression,
+            declared_license_expression_spdx,
+        ) = extract_gradle_license_metadata(&tokens);
 
         vec![PackageData {
             package_type: Some(Self::PACKAGE_TYPE),
@@ -107,13 +114,13 @@ impl PackageParser for GradleParser {
             vcs_url: None,
             copyright: None,
             holder: None,
-            declared_license_expression: None,
-            declared_license_expression_spdx: None,
+            declared_license_expression,
+            declared_license_expression_spdx,
             license_detections: Vec::new(),
             other_license_expression: None,
             other_license_expression_spdx: None,
             other_license_detections: Vec::new(),
-            extracted_license_statement: None,
+            extracted_license_statement,
             notice_text: None,
             source_packages: Vec::new(),
             file_references: Vec::new(),
@@ -335,6 +342,8 @@ struct RawDep {
     name: String,
     version: String,
     scope: String,
+    catalog_alias: Option<String>,
+    project_path: Option<String>,
 }
 
 fn extract_dependencies(tokens: &[Tok]) -> Vec<Dependency> {
@@ -346,7 +355,7 @@ fn extract_dependencies(tokens: &[Tok]) -> Vec<Dependency> {
             if rd.name.is_empty() {
                 continue;
             }
-            if let Some(dep) = create_dependency(&rd.namespace, &rd.name, &rd.version, &rd.scope) {
+            if let Some(dep) = create_dependency(&rd) {
                 dependencies.push(dep);
             }
         }
@@ -485,6 +494,8 @@ fn parse_block(tokens: &[Tok]) -> Vec<RawDep> {
                 name: last_seg.to_string(),
                 version: String::new(),
                 scope: scope_name.clone(),
+                catalog_alias: val.strip_prefix("libs.").map(|alias| alias.to_string()),
+                project_path: None,
             });
             i = next + 1;
             continue;
@@ -652,6 +663,8 @@ fn parse_map_entries(tokens: &[Tok]) -> Option<RawDep> {
         name,
         version,
         scope: String::new(),
+        catalog_alias: None,
+        project_path: None,
     })
 }
 
@@ -692,6 +705,8 @@ fn parse_named_params(scope: &str, tokens: &[Tok]) -> Option<(RawDep, usize)> {
             name,
             version,
             scope: scope.to_string(),
+            catalog_alias: None,
+            project_path: None,
         },
         i,
     ))
@@ -700,15 +715,25 @@ fn parse_named_params(scope: &str, tokens: &[Tok]) -> Option<(RawDep, usize)> {
 fn parse_project_ref(tokens: &[Tok]) -> Option<RawDep> {
     if let Some(Tok::Str(val)) = tokens.first() {
         let module_name = val.trim_start_matches(':');
-        let name = module_name.rsplit(':').next().unwrap_or(module_name);
+        let mut segments = module_name
+            .split(':')
+            .filter(|segment| !segment.is_empty())
+            .collect::<Vec<_>>();
+        let name = segments.pop().unwrap_or(module_name);
         if name.is_empty() {
             return None;
         }
         return Some(RawDep {
-            namespace: String::new(),
+            namespace: if segments.is_empty() {
+                String::new()
+            } else {
+                segments.join("/")
+            },
             name: name.to_string(),
             version: String::new(),
             scope: "project".to_string(),
+            catalog_alias: None,
+            project_path: Some(module_name.to_string()),
         });
     }
     None
@@ -736,6 +761,8 @@ fn parse_colon_string(val: &str, scope: &str) -> RawDep {
         name,
         version,
         scope: scope.to_string(),
+        catalog_alias: None,
+        project_path: None,
     }
 }
 
@@ -783,12 +810,11 @@ fn find_matching_bracket(tokens: &[Tok], start: usize) -> Option<usize> {
 // Dependency construction
 // ---------------------------------------------------------------------------
 
-fn create_dependency(
-    namespace: &str,
-    name: &str,
-    version: &str,
-    scope: &str,
-) -> Option<Dependency> {
+fn create_dependency(raw: &RawDep) -> Option<Dependency> {
+    let namespace = raw.namespace.as_str();
+    let name = raw.name.as_str();
+    let version = raw.version.as_str();
+    let scope = raw.scope.as_str();
     if name.is_empty() {
         return None;
     }
@@ -803,12 +829,18 @@ fn create_dependency(
         purl.with_version(version).ok()?;
     }
 
-    let scope_lower = scope.to_lowercase();
-    let is_runtime = !scope_lower.contains("test");
-    let is_optional = scope_lower.contains("test");
+    let (is_runtime, is_optional) = classify_scope(scope);
     let is_pinned = !version.is_empty();
 
     let purl_string = purl.to_string().replace("$", "%24").replace('\'', "%27");
+    let mut extra_data = std::collections::HashMap::new();
+    if let Some(alias) = &raw.catalog_alias {
+        extra_data.insert("catalog_alias".to_string(), json!(alias));
+    }
+    if let Some(project_path) = &raw.project_path {
+        extra_data.insert("project_path".to_string(), json!(project_path));
+    }
+
     Some(Dependency {
         purl: Some(purl_string),
         extracted_requirement: Some(version.to_string()),
@@ -818,8 +850,326 @@ fn create_dependency(
         is_pinned: Some(is_pinned),
         is_direct: Some(true),
         resolved_package: None,
-        extra_data: None,
+        extra_data: (!extra_data.is_empty()).then_some(extra_data),
     })
+}
+
+fn classify_scope(scope: &str) -> (bool, bool) {
+    let scope_lower = scope.to_lowercase();
+
+    if scope_lower.contains("test") {
+        return (false, true);
+    }
+
+    if matches!(
+        scope_lower.as_str(),
+        "compileonly" | "compileonlyapi" | "annotationprocessor" | "kapt" | "ksp"
+    ) {
+        return (false, false);
+    }
+
+    (true, false)
+}
+
+#[derive(Debug, Clone)]
+struct GradleCatalogEntry {
+    namespace: String,
+    name: String,
+    version: Option<String>,
+}
+
+fn resolve_gradle_version_catalog_aliases(path: &Path, dependencies: &mut [Dependency]) {
+    let Some(catalog_path) = find_gradle_version_catalog(path) else {
+        return;
+    };
+    let Some(entries) = parse_gradle_version_catalog(&catalog_path) else {
+        return;
+    };
+
+    for dep in dependencies.iter_mut() {
+        let alias = dep
+            .extra_data
+            .as_ref()
+            .and_then(|data| data.get("catalog_alias"))
+            .and_then(|value| value.as_str());
+        let Some(alias) = alias else {
+            continue;
+        };
+        let Some(entry) = entries.get(alias) else {
+            continue;
+        };
+
+        let mut purl = PackageUrl::new("maven", &entry.name).ok();
+        if let Some(ref mut purl) = purl {
+            if !entry.namespace.is_empty() {
+                let _ = purl.with_namespace(&entry.namespace);
+            }
+            if let Some(version) = &entry.version {
+                let _ = purl.with_version(version);
+            }
+        }
+
+        dep.purl = purl.map(|p| p.to_string());
+        dep.extracted_requirement = entry.version.clone();
+        dep.is_pinned = Some(entry.version.is_some());
+    }
+}
+
+fn find_gradle_version_catalog(path: &Path) -> Option<std::path::PathBuf> {
+    for ancestor in path.ancestors() {
+        let nested = ancestor.join("gradle").join("libs.versions.toml");
+        if nested.is_file() {
+            return Some(nested);
+        }
+
+        let sibling = ancestor.join("libs.versions.toml");
+        if sibling.is_file() {
+            return Some(sibling);
+        }
+    }
+
+    None
+}
+
+fn parse_gradle_version_catalog(
+    path: &Path,
+) -> Option<std::collections::HashMap<String, GradleCatalogEntry>> {
+    let content = fs::read_to_string(path).ok()?;
+    let mut section = "";
+    let mut versions = std::collections::HashMap::new();
+    let mut libraries = std::collections::HashMap::new();
+
+    for line in content.lines() {
+        let trimmed = line.split('#').next().unwrap_or("").trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+
+        if trimmed.starts_with('[') && trimmed.ends_with(']') {
+            section = trimmed.trim_matches(&['[', ']'][..]);
+            continue;
+        }
+
+        let Some((key, value)) = trimmed.split_once('=') else {
+            continue;
+        };
+        let key = key.trim().to_string();
+        let value = value.trim().to_string();
+
+        match section {
+            "versions" => {
+                versions.insert(key, strip_quotes(&value).to_string());
+            }
+            "libraries" => {
+                libraries.insert(key, value);
+            }
+            _ => {}
+        }
+    }
+
+    let mut result = std::collections::HashMap::new();
+    for (alias, raw_value) in libraries {
+        let Some(entry) = parse_gradle_catalog_entry(&raw_value, &versions) else {
+            continue;
+        };
+        result.insert(alias.replace('-', "."), entry);
+    }
+
+    Some(result)
+}
+
+fn parse_gradle_catalog_entry(
+    raw_value: &str,
+    versions: &std::collections::HashMap<String, String>,
+) -> Option<GradleCatalogEntry> {
+    if raw_value.starts_with('"') && raw_value.ends_with('"') {
+        let notation = strip_quotes(raw_value);
+        let mut parts = notation.split(':');
+        let namespace = parts.next()?.to_string();
+        let name = parts.next()?.to_string();
+        let version = parts.next().map(|v| v.to_string());
+        return Some(GradleCatalogEntry {
+            namespace,
+            name,
+            version,
+        });
+    }
+
+    if !(raw_value.starts_with('{') && raw_value.ends_with('}')) {
+        return None;
+    }
+
+    let inner = &raw_value[1..raw_value.len() - 1];
+    let mut fields = std::collections::HashMap::new();
+    for pair in inner.split(',') {
+        let Some((key, value)) = pair.split_once('=') else {
+            continue;
+        };
+        fields.insert(
+            key.trim().to_string(),
+            strip_quotes(value.trim()).to_string(),
+        );
+    }
+
+    let (namespace, name) = if let Some(module) = fields.get("module") {
+        let (group, artifact) = module.split_once(':')?;
+        (group.to_string(), artifact.to_string())
+    } else {
+        (
+            fields.get("group")?.to_string(),
+            fields.get("name")?.to_string(),
+        )
+    };
+
+    let version = if let Some(version) = fields.get("version") {
+        Some(version.to_string())
+    } else if let Some(version_ref) = fields.get("version.ref") {
+        versions.get(version_ref).cloned()
+    } else {
+        None
+    };
+
+    Some(GradleCatalogEntry {
+        namespace,
+        name,
+        version,
+    })
+}
+
+fn strip_quotes(value: &str) -> &str {
+    value
+        .strip_prefix('"')
+        .and_then(|v| v.strip_suffix('"'))
+        .or_else(|| value.strip_prefix('\'').and_then(|v| v.strip_suffix('\'')))
+        .unwrap_or(value)
+}
+
+fn extract_gradle_license_metadata(
+    tokens: &[Tok],
+) -> (Option<String>, Option<String>, Option<String>) {
+    let mut i = 0;
+    while i < tokens.len() {
+        if let Tok::Ident(name) = &tokens[i]
+            && name == "licenses"
+            && i + 1 < tokens.len()
+            && tokens[i + 1] == Tok::OpenBrace
+            && let Some(block_end) = find_matching_brace(tokens, i + 1)
+        {
+            let inner = &tokens[i + 2..block_end];
+            if let Some((license_name, license_url)) = parse_license_block(inner) {
+                let extracted =
+                    format_gradle_license_statement(&license_name, license_url.as_deref());
+                let declared =
+                    derive_gradle_license_expression(&license_name, license_url.as_deref());
+                return (extracted, declared.clone(), declared);
+            }
+            i = block_end + 1;
+            continue;
+        }
+        i += 1;
+    }
+
+    (None, None, None)
+}
+
+fn parse_license_block(tokens: &[Tok]) -> Option<(String, Option<String>)> {
+    let mut i = 0;
+    while i < tokens.len() {
+        if let Tok::Ident(name) = &tokens[i]
+            && name == "license"
+            && i + 1 < tokens.len()
+            && tokens[i + 1] == Tok::OpenBrace
+            && let Some(block_end) = find_matching_brace(tokens, i + 1)
+        {
+            let mut license_name = None;
+            let mut license_url = None;
+            let block = &tokens[i + 2..block_end];
+            let mut j = 0;
+            while j < block.len() {
+                if let Tok::Ident(label) = &block[j] {
+                    let normalized = label.strip_suffix(".set").unwrap_or(label);
+                    if (normalized == "name" || normalized == "url")
+                        && let Some(value) = next_string_literal(block, j + 1)
+                    {
+                        if normalized == "name" {
+                            license_name = Some(value);
+                        } else {
+                            license_url = Some(value);
+                        }
+                    }
+                }
+                j += 1;
+            }
+
+            return license_name.map(|name| (name, license_url));
+        }
+        i += 1;
+    }
+    None
+}
+
+fn next_string_literal(tokens: &[Tok], start: usize) -> Option<String> {
+    for token in tokens.iter().skip(start) {
+        match token {
+            Tok::Str(value) => return Some(value.clone()),
+            Tok::MalformedStr(value) => return Some(value.clone()),
+            Tok::Ident(_) | Tok::Colon | Tok::Equals | Tok::OpenParen | Tok::CloseParen => continue,
+            _ => break,
+        }
+    }
+    None
+}
+
+fn find_matching_brace(tokens: &[Tok], start: usize) -> Option<usize> {
+    if tokens.get(start) != Some(&Tok::OpenBrace) {
+        return None;
+    }
+    let mut depth = 1;
+    let mut i = start + 1;
+    while i < tokens.len() && depth > 0 {
+        match &tokens[i] {
+            Tok::OpenBrace => depth += 1,
+            Tok::CloseBrace => depth -= 1,
+            _ => {}
+        }
+        if depth == 0 {
+            return Some(i);
+        }
+        i += 1;
+    }
+    None
+}
+
+fn format_gradle_license_statement(name: &str, url: Option<&str>) -> Option<String> {
+    let mut output = format!("- license:\n    name: {name}\n");
+    if let Some(url) = url {
+        output.push_str(&format!("    url: {url}\n"));
+    }
+    Some(output)
+}
+
+fn derive_gradle_license_expression(name: &str, url: Option<&str>) -> Option<String> {
+    let trimmed = name.trim();
+    let candidates = [trimmed, url.unwrap_or("")];
+
+    for candidate in candidates {
+        let lower = candidate.to_ascii_lowercase();
+        if trimmed == "Apache-2.0"
+            || lower.contains("apache-2.0")
+            || lower.contains("apache license, version 2.0")
+            || lower.contains("apache.org/licenses/license-2.0")
+        {
+            return Some("Apache-2.0".to_string());
+        }
+        if trimmed == "MIT" || lower.contains("opensource.org/licenses/mit") {
+            return Some("MIT".to_string());
+        }
+        if trimmed == "BSD-2-Clause" || trimmed == "BSD-3-Clause" {
+            return Some(trimmed.to_string());
+        }
+    }
+
+    None
 }
 
 crate::register_parser!(
@@ -833,6 +1183,7 @@ crate::register_parser!(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tempfile::tempdir;
 
     #[test]
     fn test_is_match() {
@@ -1035,6 +1386,168 @@ dependencies {
         assert_eq!(deps[0].scope, Some("project".to_string()));
         assert_eq!(deps[0].purl, Some("pkg:maven/documentation".to_string()));
         assert_eq!(deps[1].purl, Some("pkg:maven/basics".to_string()));
+    }
+
+    #[test]
+    fn test_nested_project_references_preserve_parent_path() {
+        let content = r#"
+dependencies {
+    implementation(project(":libs:download"))
+    implementation(project(":libs:index"))
+}
+"#;
+        let tokens = lex(content);
+        let deps = extract_dependencies(&tokens);
+
+        assert_eq!(deps.len(), 2);
+        assert_eq!(deps[0].purl, Some("pkg:maven/libs/download".to_string()));
+        assert_eq!(deps[0].scope, Some("project".to_string()));
+        assert_eq!(deps[1].purl, Some("pkg:maven/libs/index".to_string()));
+    }
+
+    #[test]
+    fn test_compile_only_is_not_runtime() {
+        let content = r#"
+dependencies {
+    compileOnly 'org.antlr:antlr:2.7.7'
+    compileOnlyApi 'com.example:annotations:1.0.0'
+    testCompileOnly 'junit:junit:4.13'
+}
+"#;
+        let tokens = lex(content);
+        let deps = extract_dependencies(&tokens);
+
+        assert_eq!(deps.len(), 3);
+        assert_eq!(deps[0].scope, Some("compileOnly".to_string()));
+        assert_eq!(deps[0].is_runtime, Some(false));
+        assert_eq!(deps[0].is_optional, Some(false));
+
+        assert_eq!(deps[1].scope, Some("compileOnlyApi".to_string()));
+        assert_eq!(deps[1].is_runtime, Some(false));
+        assert_eq!(deps[1].is_optional, Some(false));
+
+        assert_eq!(deps[2].scope, Some("testCompileOnly".to_string()));
+        assert_eq!(deps[2].is_runtime, Some(false));
+        assert_eq!(deps[2].is_optional, Some(true));
+    }
+
+    #[test]
+    fn test_version_catalog_alias_resolution_from_libs_versions_toml() {
+        let temp_dir = tempdir().unwrap();
+        let gradle_dir = temp_dir.path().join("gradle");
+        std::fs::create_dir_all(&gradle_dir).unwrap();
+
+        std::fs::write(
+            gradle_dir.join("libs.versions.toml"),
+            r#"
+[versions]
+androidxAppcompat = "1.7.0"
+
+[libraries]
+androidx-appcompat = { module = "androidx.appcompat:appcompat", version.ref = "androidxAppcompat" }
+guardianproject-panic = { group = "info.guardianproject", name = "panic", version = "1.0.0" }
+"#,
+        )
+        .unwrap();
+
+        let build_gradle = temp_dir.path().join("build.gradle");
+        std::fs::write(
+            &build_gradle,
+            r#"
+dependencies {
+    implementation libs.androidx.appcompat
+    fullImplementation libs.guardianproject.panic
+}
+"#,
+        )
+        .unwrap();
+
+        let package_data = GradleParser::extract_first_package(&build_gradle);
+
+        assert_eq!(package_data.dependencies.len(), 2);
+        assert_eq!(
+            package_data.dependencies[0].purl,
+            Some("pkg:maven/androidx.appcompat/appcompat@1.7.0".to_string())
+        );
+        assert_eq!(
+            package_data.dependencies[0].scope,
+            Some("implementation".to_string())
+        );
+        assert_eq!(
+            package_data.dependencies[1].purl,
+            Some("pkg:maven/info.guardianproject/panic@1.0.0".to_string())
+        );
+        assert_eq!(
+            package_data.dependencies[1].scope,
+            Some("fullImplementation".to_string())
+        );
+    }
+
+    #[test]
+    fn test_extract_gradle_license_metadata_from_pom_block() {
+        let content = r#"
+plugins {
+    id 'java-library'
+    id 'maven'
+}
+
+dependencies {
+    api 'org.apache.commons:commons-text:1.1'
+}
+
+configure(install.repositories.mavenInstaller) {
+    pom.project {
+        licenses {
+            license {
+                name 'The Apache License, Version 2.0'
+                url 'http://www.apache.org/licenses/LICENSE-2.0.txt'
+            }
+        }
+    }
+}
+"#;
+
+        let temp_dir = tempdir().unwrap();
+        let build_gradle = temp_dir.path().join("build.gradle");
+        std::fs::write(&build_gradle, content).unwrap();
+
+        let package_data = GradleParser::extract_first_package(&build_gradle);
+
+        assert_eq!(
+            package_data.extracted_license_statement,
+            Some(
+                "- license:\n    name: The Apache License, Version 2.0\n    url: http://www.apache.org/licenses/LICENSE-2.0.txt\n"
+                    .to_string()
+            )
+        );
+        assert_eq!(
+            package_data.declared_license_expression_spdx,
+            Some("Apache-2.0".to_string())
+        );
+    }
+
+    #[test]
+    fn test_parse_gradle_version_catalog_helper() {
+        let temp_dir = tempdir().unwrap();
+        let catalog_path = temp_dir.path().join("libs.versions.toml");
+        std::fs::write(
+            &catalog_path,
+            r#"
+[versions]
+androidxAppcompat = "1.7.0"
+
+[libraries]
+androidx-appcompat = { module = "androidx.appcompat:appcompat", version.ref = "androidxAppcompat" }
+"#,
+        )
+        .unwrap();
+
+        let entries = parse_gradle_version_catalog(&catalog_path).unwrap();
+        let entry = entries.get("androidx.appcompat").unwrap();
+
+        assert_eq!(entry.namespace, "androidx.appcompat");
+        assert_eq!(entry.name, "appcompat");
+        assert_eq!(entry.version.as_deref(), Some("1.7.0"));
     }
 
     #[test]

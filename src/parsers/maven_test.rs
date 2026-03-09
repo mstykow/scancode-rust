@@ -138,6 +138,29 @@ mod tests {
     }
 
     #[test]
+    fn test_skip_template_placeholder_pom_coordinates() {
+        let content = r#"
+<project>
+    <groupId>${groupId}</groupId>
+    <artifactId>${artifactId}</artifactId>
+    <version>${version}</version>
+    <description>Template pom</description>
+</project>
+        "#;
+
+        let (_temp_dir, pom_path) = create_temp_pom_xml(content);
+        let package_data = MavenParser::extract_first_package(&pom_path);
+
+        assert_eq!(package_data.package_type, Some(PackageType::Maven));
+        assert_eq!(package_data.datasource_id, Some(DatasourceId::MavenPom));
+        assert_eq!(package_data.namespace, None);
+        assert_eq!(package_data.name, None);
+        assert_eq!(package_data.version, None);
+        assert_eq!(package_data.purl, None);
+        assert!(package_data.dependencies.is_empty());
+    }
+
+    #[test]
     fn test_extract_dependencies() {
         let content = r#"
 <project>
