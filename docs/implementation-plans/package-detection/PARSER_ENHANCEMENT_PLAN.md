@@ -101,7 +101,7 @@ cargo run --quiet --bin generate-supported-formats && git diff --exit-code docs/
 | 2     | npm + Yarn            | Done        | #123, #125, #127, #129, #133, #197, #198, #205, #206                                                       | `cargo test npm`; `cargo test yarn`; `cargo test --features golden-tests npm_golden`; `cargo test --features golden-tests test_assembly_npm_basic`; `cargo test --features golden-tests test_assembly_npm_workspace`; `cargo test --features golden-tests test_assembly_pnpm_workspace`; `cargo test --features golden-tests test_assembly_npm_nested_packages`                |
 | 3     | NuGet                 | In progress | #157, #159, #162, #163, #165, #215, #216                                                                   | `cargo test nuget`; `cargo test --features golden-tests nuget_golden`; `cargo test --features golden-tests test_assembly_nuget_basic`                                                                                                                                                                                                                                          |
 | 4     | RPM                   | In progress | #164, #166, #167, #168, #169, #170, #171                                                                   | `cargo test rpm`; `cargo test --features golden-tests rpm_golden`; `cargo test test_resolve_rpm_namespace --lib`; `cargo test test_merge_rpm_yumdb_metadata --lib`                                                                                                                                                                                                             |
-| 5     | Cargo                 | Planned     | #184, #189, #217                                                                                           | `cargo test cargo`; `cargo test --features golden-tests cargo_golden`; `cargo test --features golden-tests test_assembly_cargo_basic`; `cargo test --features golden-tests test_assembly_cargo_workspace`                                                                                                                                                                      |
+| 5     | Cargo                 | In progress | #184, #189, #217                                                                                           | `cargo test cargo`; `cargo test --features golden-tests cargo_golden`; `cargo test --features golden-tests test_assembly_cargo_basic`; `cargo test --features golden-tests test_assembly_cargo_workspace`                                                                                                                                                                      |
 | 6     | Go                    | Planned     | #152, #153, #155, #218                                                                                     | `cargo test go`; `cargo test --features golden-tests go_golden`; `cargo test --features golden-tests test_assembly_go_basic`                                                                                                                                                                                                                                                   |
 | 7     | Gradle                | Planned     | #130, #132, #134, #137                                                                                     | `cargo test gradle`; `cargo test --features golden-tests gradle_golden`                                                                                                                                                                                                                                                                                                        |
 | 8     | Ruby                  | Planned     | #151, #154, #156, #158, #160, #161                                                                         | `cargo test ruby`; `cargo test --features golden-tests ruby_golden`                                                                                                                                                                                                                                                                                                            |
@@ -240,6 +240,31 @@ Current status (March 9, 2026):
 - YumDB `from_repo` package sidecars now parse sibling YumDB keys and merge them back onto the matching installed RPM package under `extra_data.yumdb`.
 - Parser golden coverage now includes a real source RPM fixture (`setup-2.5.49-b1.src.rpm`) with the richer archive metadata contract.
 - PR #300 (`fix(rpm): complete the RPM enhancement batch`) is open; keep the ecosystem row `In progress` until the PR merges and the linked issues close.
+
+### Cargo PR Scope
+
+Issues:
+
+- #184 crate files not assigned to package
+- #189 workspace member file detection
+- #217 complete Rust Cargo support
+
+Likely touchpoints:
+
+- Cargo.toml and Cargo.lock parser behavior for filename matching and manifest field extraction
+- Cargo-focused unit coverage for lowercase manifests plus readme/publish metadata
+- Parser goldens for Cargo.toml and Cargo.lock cases where parity/regression coverage is meaningful
+- Assembly coverage for plain crate file ownership and Cargo workspace member file ownership
+- Improvement documentation for beyond-parity file assignment and parser parity fixes
+
+Current status (March 9, 2026):
+
+- Local work now accepts lowercase `cargo.toml` and `cargo.lock` filenames in direct parser matching, bringing parser behavior into line with the registered metadata patterns and Python reference tests.
+- Cargo.toml parsing now preserves `readme` and `publish` metadata in parser `extra_data`, and workspace readme inheritance resolves into `readme_file` for member packages when applicable.
+- Cargo parser fallbacks now retain `package_type` and `datasource_id` on error paths for both `Cargo.toml` and `Cargo.lock`.
+- Assembly now assigns plain crate files under a Cargo package root to that package while still skipping `target/` and leaving nested package roots to their own package assignments.
+- Workspace member fixtures now prove non-manifest files like `crates/cli/LICENSE` and `crates/core/README.md` are associated with the correct member package.
+- Parser golden coverage now includes a `publish = false` Cargo.toml fixture and a Cargo.lock fixture, while existing Cargo.toml goldens now capture `readme_file` extraction.
 
 ### Python PR Scope Rule
 
