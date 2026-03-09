@@ -103,7 +103,7 @@ cargo run --quiet --bin generate-supported-formats && git diff --exit-code docs/
 | 4     | RPM                   | Done    | #164, #166, #167, #168, #169, #170, #171                                                                   | `cargo test rpm`; `cargo test --features golden-tests rpm_golden`; `cargo test test_resolve_rpm_namespace --lib`; `cargo test test_merge_rpm_yumdb_metadata --lib`                                                                                                                                                                                                             |
 | 5     | Cargo                 | Done    | #184, #189, #217                                                                                           | `cargo test cargo`; `cargo test --features golden-tests cargo_golden`; `cargo test --features golden-tests test_assembly_cargo_basic`; `cargo test --features golden-tests test_assembly_cargo_workspace`                                                                                                                                                                      |
 | 6     | Go                    | Done    | #152, #153, #155, #218                                                                                     | `cargo test go`; `cargo test --features golden-tests go_golden`; `cargo test --features golden-tests test_assembly_go_basic`; `cargo test --features golden-tests test_assembly_go_graph_basic`                                                                                                                                                                                |
-| 7     | Gradle                | Planned | #130, #132, #134, #137                                                                                     | `cargo test gradle`; `cargo test --features golden-tests gradle_golden`                                                                                                                                                                                                                                                                                                        |
+| 7     | Gradle                | Done    | #130, #132, #134, #137                                                                                     | `cargo test gradle`; `cargo test --features golden-tests gradle_golden`; `cargo test test_cyclonedx_json_includes_component_license_expression --lib`; `cargo test test_skip_template_placeholder_pom_coordinates --lib`                                                                                                                                                       |
 | 8     | Ruby                  | Planned | #151, #154, #156, #158, #160, #161                                                                         | `cargo test ruby`; `cargo test --features golden-tests ruby_golden`                                                                                                                                                                                                                                                                                                            |
 | 9     | Composer              | Planned | #187, #188, #190                                                                                           | `cargo test composer`; `cargo test --features golden-tests composer_golden`; `cargo test --features golden-tests test_assembly_composer_basic`                                                                                                                                                                                                                                 |
 | 10    | Conda                 | Planned | #195, #196                                                                                                 | `cargo test conda`; `cargo test --features golden-tests conda_golden`                                                                                                                                                                                                                                                                                                          |
@@ -292,6 +292,31 @@ Current status (March 9, 2026):
 - Go assembly coverage now includes a sibling merge case for `go.mod`, `go.sum`, and `go.mod.graph` together.
 - Scanner-side Go source categorization now treats `_test.go` files and `//go:build test` / `// +build test` files as non-production source for `is_source` directory heuristics.
 - PR #305 (`fix(go): complete the Go enhancement batch`) captures the completed implementation batch.
+
+### Gradle PR Scope
+
+Issues:
+
+- #130 version catalog template POM detection
+- #132 runtime dependency scope classification
+- #134 SBOM component license extraction
+- #137 correct package identifiers from build.gradle
+
+Likely touchpoints:
+
+- Gradle build script parser behavior for scope classification, catalog alias resolution, project references, and POM license metadata
+- Focused unit coverage for `compileOnly`, version catalogs, project references, and Gradle license extraction
+- Parser goldens for version-catalog aliases and Groovy/Kotlin license-bearing publishing metadata
+- Output regression coverage for CycloneDX license emission
+- Small Maven guardrail for placeholder-only template coordinates because `#130` is locally grouped here even though its upstream reference is Maven-specific
+
+Current status (March 9, 2026):
+
+- Local work now classifies `compileOnly`, `compileOnlyApi`, `annotationProcessor`, `kapt`, and `ksp` as non-runtime Gradle scopes while keeping `test*` scopes optional.
+- Gradle parser output now extracts `pom { licenses { ... } }` metadata and promotes recognizable SPDX-like values into declared license fields consumed by CycloneDX output.
+- TOML-backed `libs.versions.toml` aliases now resolve to real Maven package identifiers from nearby version catalogs.
+- Local project references like `project(":libs:download")` now preserve parent path segments in the emitted package identifier.
+- A small Maven guardrail now skips placeholder-only `${groupId}` / `${artifactId}` / `${version}` template coordinates so the misbucketed `#130` issue is resolved without reopening a full Maven batch.
 
 ### Python PR Scope Rule
 
