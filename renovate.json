@@ -7,7 +7,14 @@
     ":semanticCommits",
     "helpers:pinGitHubActionDigests"
   ],
-  "ignorePaths": ["**/testdata/**", "**/test/**/*.xml", "**/test/**/*.json"],
+  "ignorePaths": [
+    "testdata/**",
+    "**/testdata/**",
+    "test/**",
+    "**/test/**",
+    "tests/**",
+    "**/tests/**"
+  ],
   "addLabels": ["dependencies"],
   "automergeType": "branch",
   "platformAutomerge": true,
