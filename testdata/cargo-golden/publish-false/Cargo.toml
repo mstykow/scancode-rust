@@ -1,0 +1,10 @@
+[package]
+name = "private-crate"
+version = "0.3.0"
+license = "MIT"
+repository = "https://github.com/example/private-crate"
+readme = "README.md"
+publish = false
+
+[dependencies]
+serde = "1.0"
