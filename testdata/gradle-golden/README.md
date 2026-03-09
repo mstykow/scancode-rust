@@ -75,13 +75,13 @@ The Python ScanCode Toolkit implementation uses **pygmars** (a token-based parse
 
    - **Why partial**: We preserve the literal tokenized value, but do not resolve variables or version catalogs semantically
 
-3. **Gradle version catalog / dotted identifier resolution**:
+3. **Gradle dotted identifier resolution outside catalogs**:
 
    ```groovy
    implementation libs.androidx.appcompat
    ```
 
-   - **Why partial**: Requires semantic lookup of catalog aliases or dotted identifiers, not just syntactic parsing
+   - **Why partial**: TOML-backed `libs.versions.toml` aliases can now be resolved from nearby catalogs, but arbitrary dotted identifiers (for example `dependencies.lombok`) still need semantic evaluation beyond static parsing
 
 ## Test Files Status
 
@@ -89,6 +89,7 @@ The Python ScanCode Toolkit implementation uses **pygmars** (a token-based parse
 
 - No parser-only Gradle goldens remain ignored.
 - The cleanup now exercises `groovy4`, `groovy-no-parens`, `kotlin2`, and `end2end` directly instead of masking them behind `#[ignore]`.
+- Additional parser goldens now cover TOML-backed version catalog alias resolution and Gradle POM license metadata extraction.
 - Remaining failures, if any, should now represent real parser regressions rather than deferred fixtures.
 
 ## Path Forward: Full Feature Parity
