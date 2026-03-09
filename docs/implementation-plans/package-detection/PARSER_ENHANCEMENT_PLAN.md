@@ -99,7 +99,7 @@ cargo run --quiet --bin generate-supported-formats && git diff --exit-code docs/
 | 1     | Maven                 | Done        | #122, #124, #126, #128, #131, #135, #207, #208, #211, #214                                                 | `cargo test maven`; `cargo test --features golden-tests maven_golden`; `cargo test --features golden-tests test_assembly_maven_basic`; targeted nested `META-INF/maven/**` regression coverage and datasource-accounting validation                                                                                                                                            |
 | 2     | npm + Yarn            | In progress | #123, #125, #127, #129, #133, #197, #198, #205, #206                                                       | `cargo test npm`; `cargo test yarn`; `cargo test --features golden-tests npm_golden`; `cargo test --features golden-tests test_assembly_npm_basic`; `cargo test --features golden-tests test_assembly_npm_workspace`; `cargo test --features golden-tests test_assembly_pnpm_workspace`; `cargo test --features golden-tests test_assembly_npm_nested_packages`                |
 | 3     | NuGet                 | In progress | #157, #159, #162, #163, #165, #215, #216                                                                   | `cargo test nuget`; `cargo test --features golden-tests nuget_golden`; `cargo test --features golden-tests test_assembly_nuget_basic`                                                                                                                                                                                                                                          |
-| 4     | RPM                   | Planned     | #164, #166, #167, #168, #169, #170, #171                                                                   | `cargo test rpm`; `cargo test --features golden-tests rpm_golden`                                                                                                                                                                                                                                                                                                              |
+| 4     | RPM                   | In progress | #164, #166, #167, #168, #169, #170, #171                                                                   | `cargo test rpm`; `cargo test --features golden-tests rpm_golden`; `cargo test test_resolve_rpm_namespace --lib`; `cargo test test_merge_rpm_yumdb_metadata --lib`                                                                                                                                                                                                             |
 | 5     | Cargo                 | Planned     | #184, #189, #217                                                                                           | `cargo test cargo`; `cargo test --features golden-tests cargo_golden`; `cargo test --features golden-tests test_assembly_cargo_basic`; `cargo test --features golden-tests test_assembly_cargo_workspace`                                                                                                                                                                      |
 | 6     | Go                    | Planned     | #152, #153, #155, #218                                                                                     | `cargo test go`; `cargo test --features golden-tests go_golden`; `cargo test --features golden-tests test_assembly_go_basic`                                                                                                                                                                                                                                                   |
 | 7     | Gradle                | Planned     | #130, #132, #134, #137                                                                                     | `cargo test gradle`; `cargo test --features golden-tests gradle_golden`                                                                                                                                                                                                                                                                                                        |
@@ -209,6 +209,34 @@ Current status (March 8, 2026):
 - New parser support exists for legacy `project.json`, legacy `project.lock.json`, and PackageReference `.csproj`/`.vbproj`/`.fsproj` manifests.
 - Parser goldens now cover the Fizzler modern nuspec fixture, a legacy `project.json` fixture, and a PackageReference `.csproj` fixture.
 - Assembly golden coverage now exists for a `.csproj` + `packages.config` sibling merge in `test_assembly_nuget_basic`.
+
+### RPM PR Scope
+
+Issues:
+
+- #164 missing distro namespace in RPM PURLs
+- #166 yumdb metadata collection from installed RPM rootfs
+- #167 missing RPM metadata fields
+- #168 Fedora source/VCS extra data extraction
+- #169 safe handling of missing/invalid database path data
+- #170 hash-named source RPM detection
+- #171 full RPM version preservation in container/rootfs scans
+
+Likely touchpoints:
+
+- RPM archive parsing, installed DB parsing, and file-reference post-processing
+- RPM-focused unit coverage for source RPM identity, installed EVR handling, YumDB metadata parsing, and namespace/PURL propagation
+- Parser goldens for richer RPM archive expectations where local fixtures already exist
+- Improvement documentation for beyond-parity YumDB support and content-based source RPM detection
+
+Current status (March 9, 2026):
+
+- Local work now recognizes hash-named source RPMs by RPM magic bytes instead of extension-only matching.
+- RPM archives now preserve source qualifiers, richer party/keyword/build metadata, VCS hints, and source URLs where available.
+- Installed RPM namespace propagation now rewrites package and dependency PURLs/UIDs after `os-release` inference instead of only filling the separate `namespace` field.
+- Installed RPM version regressions now have focused coverage proving `version-release` is preserved.
+- YumDB `from_repo` package sidecars now parse sibling YumDB keys and merge them back onto the matching installed RPM package under `extra_data.yumdb`.
+- Parser golden coverage now includes a real source RPM fixture (`setup-2.5.49-b1.src.rpm`) with the richer archive metadata contract.
 
 ### Python PR Scope Rule
 
