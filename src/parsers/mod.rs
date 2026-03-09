@@ -79,6 +79,7 @@ mod gitmodules;
 mod go;
 #[cfg(all(test, feature = "golden-tests"))]
 mod go_golden_test;
+mod go_mod_graph;
 #[cfg(test)]
 mod go_test;
 mod gradle;
@@ -310,6 +311,7 @@ pub use self::debian::{
 pub use self::freebsd::FreebsdCompactManifestParser;
 pub use self::gitmodules::GitmodulesParser;
 pub use self::go::{GoModParser, GoSumParser, GodepsParser};
+pub use self::go_mod_graph::GoModGraphParser;
 pub use self::gradle::GradleParser;
 pub use self::gradle_lock::GradleLockfileParser;
 pub use self::haxe::HaxeParser;
@@ -458,6 +460,7 @@ register_package_handlers! {
         GitmodulesParser,
         GodepsParser,
         GoModParser,
+        GoModGraphParser,
         GoSumParser,
         GradleLockfileParser,
         GradleParser,

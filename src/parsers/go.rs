@@ -47,7 +47,7 @@ impl PackageParser for GoModParser {
             Ok(c) => c,
             Err(e) => {
                 warn!("Failed to read go.mod at {:?}: {}", path, e);
-                return vec![default_package_data()];
+                return vec![default_go_mod_package_data()];
             }
         };
 
@@ -419,7 +419,7 @@ fn parse_retract_value(value: &str) -> Vec<String> {
     }
 }
 
-fn split_module_path(path: &str) -> (Option<String>, String) {
+pub(crate) fn split_module_path(path: &str) -> (Option<String>, String) {
     match path.rfind('/') {
         Some(idx) => {
             let namespace = &path[..idx];
@@ -444,7 +444,7 @@ fn strip_comment(line: &str) -> &str {
 ///
 /// Format: `pkg:golang/namespace/name@version`
 /// The module path is split into namespace and name for PURL construction.
-fn create_golang_purl(module_path: &str, version: Option<&str>) -> Option<String> {
+pub(crate) fn create_golang_purl(module_path: &str, version: Option<&str>) -> Option<String> {
     let (namespace, name) = split_module_path(module_path);
 
     let mut purl = match PackageUrl::new(PACKAGE_TYPE.as_str(), &name) {
@@ -490,6 +490,27 @@ fn default_package_data() -> PackageData {
     }
 }
 
+fn default_go_mod_package_data() -> PackageData {
+    PackageData {
+        datasource_id: Some(DatasourceId::GoMod),
+        ..default_package_data()
+    }
+}
+
+fn default_go_sum_package_data() -> PackageData {
+    PackageData {
+        datasource_id: Some(DatasourceId::GoSum),
+        ..default_package_data()
+    }
+}
+
+fn default_godeps_package_data() -> PackageData {
+    PackageData {
+        datasource_id: Some(DatasourceId::Godeps),
+        ..default_package_data()
+    }
+}
+
 crate::register_parser!(
     "Go go.mod module manifest",
     &["**/go.mod"],
@@ -512,7 +533,7 @@ impl PackageParser for GoSumParser {
             Ok(c) => c,
             Err(e) => {
                 warn!("Failed to read go.sum at {:?}: {}", path, e);
-                return vec![default_package_data()];
+                return vec![default_go_sum_package_data()];
             }
         };
 
@@ -633,7 +654,7 @@ impl PackageParser for GodepsParser {
             Ok(c) => c,
             Err(e) => {
                 warn!("Failed to read Godeps.json at {:?}: {}", path, e);
-                return vec![default_package_data()];
+                return vec![default_godeps_package_data()];
             }
         };
 
@@ -650,7 +671,7 @@ pub fn parse_godeps_json(content: &str) -> PackageData {
         Ok(j) => j,
         Err(e) => {
             warn!("Failed to parse Godeps.json: {}", e);
-            return default_package_data();
+            return default_godeps_package_data();
         }
     };
 

@@ -292,6 +292,7 @@ go 1.13
         let result = GoModParser::extract_first_package(&bad_path);
 
         assert_eq!(result.package_type, Some(PackageType::Golang));
+        assert_eq!(result.datasource_id, Some(DatasourceId::GoMod));
         assert!(result.dependencies.is_empty());
     }
 
@@ -1207,6 +1208,7 @@ github.com/foo/bar v0.3.1 h1:WXkYYl6Yr3qBf1K79EBnL4mak0OimBfB0XUf9Vl28OQ=
         let result = GoSumParser::extract_first_package(&bad_path);
 
         assert_eq!(result.package_type, Some(PackageType::Golang));
+        assert_eq!(result.datasource_id, Some(DatasourceId::GoSum));
         assert!(result.dependencies.is_empty());
     }
 
@@ -1458,6 +1460,7 @@ github.com/foo/bar v1.1.0/go.mod h1:jkl=
         let result = GodepsParser::extract_first_package(&bad_path);
 
         assert_eq!(result.package_type, Some(PackageType::Golang));
+        assert_eq!(result.datasource_id, Some(DatasourceId::Godeps));
         assert!(result.dependencies.is_empty());
     }
 
@@ -1468,6 +1471,7 @@ github.com/foo/bar v1.1.0/go.mod h1:jkl=
 
         // Should return default data without crashing
         assert_eq!(result.package_type, Some(PackageType::Golang));
+        assert_eq!(result.datasource_id, Some(DatasourceId::Godeps));
         assert!(result.dependencies.is_empty());
     }
 
