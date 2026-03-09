@@ -317,6 +317,7 @@ Current status (March 9, 2026):
 - TOML-backed `libs.versions.toml` aliases now resolve to real Maven package identifiers from nearby version catalogs.
 - Local project references like `project(":libs:download")` now preserve parent path segments in the emitted package identifier.
 - A small Maven guardrail now skips placeholder-only `${groupId}` / `${artifactId}` / `${version}` template coordinates so the misbucketed `#130` issue is resolved without reopening a full Maven batch.
+- PR #306 (`fix(gradle): complete the Gradle enhancement batch`) captures the completed implementation batch.
 
 ### Python PR Scope Rule
 
