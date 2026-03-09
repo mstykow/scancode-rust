@@ -20,6 +20,7 @@
     "vcs_url": "https://github.com/indygreg/PyOxidizer.git",
     "extracted_license_statement": "MPL-2.0",
     "extra_data": {
+      "readme_file": "README.md",
       "rust_edition": "2021"
     },
     "dependencies": [

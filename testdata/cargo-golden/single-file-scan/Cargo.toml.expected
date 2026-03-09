@@ -23,7 +23,8 @@
     "extra_data": {
       "rust_version": "1.85.0",
       "rust_edition": "2024",
-      "documentation_url": "https://docs.rs/constant_time_eq"
+      "documentation_url": "https://docs.rs/constant_time_eq",
+      "readme_file": "README"
     },
     "dependencies": [
       {

@@ -24,7 +24,8 @@
     "vcs_url": "https://github.com/clap-rs/clap",
     "extracted_license_statement": "MIT",
     "extra_data": {
-      "documentation_url": "https://docs.rs/clap/"
+      "documentation_url": "https://docs.rs/clap/",
+      "readme_file": "README.md"
     },
     "dependencies": [
       {
