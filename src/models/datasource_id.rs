@@ -143,6 +143,7 @@ pub enum DatasourceId {
     // ── Go ──
     Godeps,
     GoMod,
+    GoModGraph,
     GoSum,
 
     // ── Gradle ──
@@ -358,6 +359,7 @@ impl DatasourceId {
             // Go
             Self::Godeps => "godeps",
             Self::GoMod => "go_mod",
+            Self::GoModGraph => "go_mod_graph",
             Self::GoSum => "go_sum",
 
             // Gradle
