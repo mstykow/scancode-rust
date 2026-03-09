@@ -22,4 +22,21 @@ mod golden_tests {
             Err(e) => panic!("Golden test failed for RPM archive: {}", e),
         }
     }
+
+    #[test]
+    fn test_golden_source_rpm_archive() {
+        let test_file = PathBuf::from("testdata/rpm/setup-2.5.49-b1.src.rpm");
+        let expected_file = PathBuf::from("testdata/rpm/setup-2.5.49-b1.src.rpm.expected.json");
+
+        if !test_file.exists() {
+            return;
+        }
+
+        let package_data = RpmParser::extract_first_package(&test_file);
+
+        match compare_package_data_parser_only(&package_data, &expected_file) {
+            Ok(_) => (),
+            Err(e) => panic!("Golden test failed for source RPM archive: {}", e),
+        }
+    }
 }

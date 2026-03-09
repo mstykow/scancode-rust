@@ -1,0 +1,50 @@
+[
+  {
+    "type": "nuget",
+    "name": "Contoso.Utility",
+    "version": "1.0.0",
+    "description": "Useful utilities",
+    "parties": [
+      {
+        "type": "person",
+        "role": "author",
+        "name": "Jane Doe;John Doe"
+      }
+    ],
+    "homepage_url": "https://example.test/contoso",
+    "vcs_url": "git+https://github.com/example/contoso",
+    "extracted_license_statement": "MIT",
+    "extra_data": {
+      "readme_file": "README.md",
+      "license_type": "expression",
+      "repository_branch": "main",
+      "repository_commit": "abc123",
+      "icon_file": "icon.png"
+    },
+    "dependencies": [
+      {
+        "purl": "pkg:nuget/Newtonsoft.Json",
+        "extracted_requirement": "13.0.1",
+        "scope": null,
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:nuget/Serilog",
+        "extracted_requirement": "2.10.0",
+        "scope": null,
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true
+      }
+    ],
+    "repository_homepage_url": "https://www.nuget.org/packages/Contoso.Utility/1.0.0",
+    "repository_download_url": "https://www.nuget.org/api/v2/package/Contoso.Utility/1.0.0",
+    "api_data_url": "https://api.nuget.org/v3/registration3/contoso.utility/1.0.0.json",
+    "datasource_id": "nuget_csproj",
+    "purl": "pkg:nuget/Contoso.Utility@1.0.0"
+  }
+]

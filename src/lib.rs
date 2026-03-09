@@ -37,7 +37,7 @@
 //!
 //! ## Supported Ecosystems
 //!
-//! Comprehensive package metadata extraction for **12 ecosystems** with **34+ formats**:
+//! Comprehensive package metadata extraction for **12 ecosystems** with **40+ formats**:
 //!
 //! - **JavaScript/npm**: `package.json`, `package-lock.json`, `yarn.lock`, `pnpm-lock.yaml`
 //! - **Python**: `pyproject.toml`, `setup.py`, `requirements.txt`, `poetry.lock`, `Pipfile.lock`
@@ -46,10 +46,10 @@
 //! - **Go**: `go.mod`, `go.sum`, `Godeps.json`
 //! - **PHP/Composer**: `composer.json`, `composer.lock`
 //! - **Ruby**: `Gemfile`, `*.gemspec`, `*.gem` archives
-//! - **C#/.NET**: `.nuspec`, `packages.config`, `packages.lock.json`, `.nupkg`
+//! - **C#/.NET**: `.nuspec`, `packages.config`, `packages.lock.json`, `project.json`, `project.lock.json`, `*.csproj`, `*.vbproj`, `*.fsproj`, `.nupkg`
 //! - **Dart**: `pubspec.yaml`, `pubspec.lock`
 //! - **Swift/iOS**: `Package.swift`, `Package.resolved`, CocoaPods manifests
-//! - **System Packages**: Debian (control), RPM (spec), Alpine (control)
+//! - **System Packages**: Debian (control), RPM (archives, installed db, yumdb, spec), Alpine (control)
 //! - **Language-Specific**: Additional support for Haxe, CRAN, Conda, Conan, OPAM
 //!
 //! ## Architecture

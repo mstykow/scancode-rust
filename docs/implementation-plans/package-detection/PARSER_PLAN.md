@@ -75,30 +75,31 @@ These require specialized crates and have low ROI. Even Python doesn't fully par
 
 Features where Rust exceeds the Python original. Documented in detail at `docs/improvements/`.
 
-| Feature                                                             | Python equivalent                     |
-| ------------------------------------------------------------------- | ------------------------------------- |
-| `ConanfileTxtParser`, `ConanLockParser`                             | None                                  |
-| `ConanDataParser` patch/mirror metadata                             | Only primary source URL               |
-| `PackagesConfigParser` (NuGet)                                      | None                                  |
-| `GradleLockfileParser`                                              | None                                  |
-| `NpmWorkspaceParser` (pnpm-workspace.yaml)                          | NonAssemblable only                   |
-| npm/pnpm workspace exclusion patterns + sibling cleanup             | No exclusion support                  |
-| Cargo workspace `[workspace.package]` inheritance                   | Basic assembly                        |
-| `DebianCopyrightParser` (standalone DEP-5)                          | Inline in assemble phase              |
-| CPAN full metadata (META.json/yml, MANIFEST, dist.ini, Makefile.PL) | Python has stub-only handlers         |
-| Alpine SHA1 Q1-prefixed base64 decoding                             | Python returns `null` (bug)           |
-| Alpine `p:` providers field                                         | Python: "not used yet"                |
-| RPM full dependency extraction                                      | Python: `# TODO: add dependencies!!!` |
-| Debian .deb control.tar.gz extraction                               | Python: `# TODO: introspect archive`  |
-| RPM specfile full preamble parsing                                  | Python: stub                          |
-| OSGi MANIFEST.MF metadata extraction                                | Python: empty path_patterns           |
-| OS release name logic fix + URL extraction                          | Python: bug + no URLs                 |
-| Composer extra provenance fields (7 fields)                         | Basic extraction                      |
-| Ruby semantic Party model (name+email)                              | String-based                          |
-| Dart proper scope handling + YAML preservation                      | Scope always null                     |
-| Swift full dependency graph with versions                           | Root package name only                |
-| Gradle: custom lexer (no code execution)                            | Groovy engine                         |
-| npm `is_private` from `private` field                               | Supported (was missing, now fixed)    |
+| Feature                                                                                                       | Python equivalent                     |
+| ------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
+| `ConanfileTxtParser`, `ConanLockParser`                                                                       | None                                  |
+| `ConanDataParser` patch/mirror metadata                                                                       | Only primary source URL               |
+| `PackagesConfigParser`, `ProjectJsonParser`, `ProjectLockJsonParser`, `PackageReferenceProjectParser` (NuGet) | None                                  |
+| `RpmYumdbParser`                                                                                              | None                                  |
+| `GradleLockfileParser`                                                                                        | None                                  |
+| `NpmWorkspaceParser` (pnpm-workspace.yaml)                                                                    | NonAssemblable only                   |
+| npm/pnpm workspace exclusion patterns + sibling cleanup                                                       | No exclusion support                  |
+| Cargo workspace `[workspace.package]` inheritance                                                             | Basic assembly                        |
+| `DebianCopyrightParser` (standalone DEP-5)                                                                    | Inline in assemble phase              |
+| CPAN full metadata (META.json/yml, MANIFEST, dist.ini, Makefile.PL)                                           | Python has stub-only handlers         |
+| Alpine SHA1 Q1-prefixed base64 decoding                                                                       | Python returns `null` (bug)           |
+| Alpine `p:` providers field                                                                                   | Python: "not used yet"                |
+| RPM full dependency extraction                                                                                | Python: `# TODO: add dependencies!!!` |
+| Debian .deb control.tar.gz extraction                                                                         | Python: `# TODO: introspect archive`  |
+| RPM specfile full preamble parsing                                                                            | Python: stub                          |
+| OSGi MANIFEST.MF metadata extraction                                                                          | Python: empty path_patterns           |
+| OS release name logic fix + URL extraction                                                                    | Python: bug + no URLs                 |
+| Composer extra provenance fields (7 fields)                                                                   | Basic extraction                      |
+| Ruby semantic Party model (name+email)                                                                        | String-based                          |
+| Dart proper scope handling + YAML preservation                                                                | Scope always null                     |
+| Swift full dependency graph with versions                                                                     | Root package name only                |
+| Gradle: custom lexer (no code execution)                                                                      | Groovy engine                         |
+| npm `is_private` from `private` field                                                                         | Supported (was missing, now fixed)    |
 
 ---
 

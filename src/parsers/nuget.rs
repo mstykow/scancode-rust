@@ -23,7 +23,7 @@
 //! - No unwrap/expect in library code
 
 use std::fs::File;
-use std::io::BufReader;
+use std::io::{BufReader, Read};
 use std::path::Path;
 
 use log::warn;
@@ -34,6 +34,116 @@ use quick_xml::events::Event;
 use crate::models::{DatasourceId, Dependency, PackageData, PackageType, Party};
 
 use super::PackageParser;
+
+const PROJECT_FILE_EXTENSIONS: [&str; 3] = ["csproj", "vbproj", "fsproj"];
+
+#[derive(Default)]
+struct RepositoryMetadata {
+    vcs_url: Option<String>,
+    branch: Option<String>,
+    commit: Option<String>,
+}
+
+fn build_nuget_party(role: &str, name: String) -> Party {
+    Party {
+        r#type: Some("person".to_string()),
+        role: Some(role.to_string()),
+        name: Some(name),
+        email: None,
+        url: None,
+        organization: None,
+        organization_url: None,
+        timezone: None,
+    }
+}
+
+fn insert_extra_string(
+    extra_data: &mut serde_json::Map<String, serde_json::Value>,
+    key: &str,
+    value: Option<String>,
+) {
+    if let Some(value) = value
+        .map(|v| v.trim().to_string())
+        .filter(|v| !v.is_empty())
+    {
+        extra_data.insert(key.to_string(), serde_json::Value::String(value));
+    }
+}
+
+fn parse_repository_metadata(element: &quick_xml::events::BytesStart) -> RepositoryMetadata {
+    let mut repo_type = None;
+    let mut repo_url = None;
+    let mut branch = None;
+    let mut commit = None;
+
+    for attr in element.attributes().filter_map(|a| a.ok()) {
+        match attr.key.as_ref() {
+            b"type" => repo_type = String::from_utf8(attr.value.to_vec()).ok(),
+            b"url" => repo_url = String::from_utf8(attr.value.to_vec()).ok(),
+            b"branch" => branch = String::from_utf8(attr.value.to_vec()).ok(),
+            b"commit" => commit = String::from_utf8(attr.value.to_vec()).ok(),
+            _ => {}
+        }
+    }
+
+    RepositoryMetadata {
+        vcs_url: repo_url.map(|url| match repo_type {
+            Some(vcs_type) if !vcs_type.trim().is_empty() => format!("{}+{}", vcs_type, url),
+            _ => url,
+        }),
+        branch,
+        commit,
+    }
+}
+
+fn build_nuget_urls(
+    name: Option<&str>,
+    version: Option<&str>,
+) -> (Option<String>, Option<String>, Option<String>) {
+    let repository_homepage_url = name.and_then(|name| {
+        version.map(|version| format!("https://www.nuget.org/packages/{}/{}", name, version))
+    });
+
+    let repository_download_url = name.and_then(|name| {
+        version.map(|version| format!("https://www.nuget.org/api/v2/package/{}/{}", name, version))
+    });
+
+    let api_data_url = name.and_then(|name| {
+        version.map(|version| {
+            format!(
+                "https://api.nuget.org/v3/registration3/{}/{}.json",
+                name.to_lowercase(),
+                version
+            )
+        })
+    });
+
+    (
+        repository_homepage_url,
+        repository_download_url,
+        api_data_url,
+    )
+}
+
+fn build_nuget_purl(name: Option<&str>, version: Option<&str>) -> Option<String> {
+    let name = name?;
+    let mut package_url = PackageUrl::new("nuget", name).ok()?;
+
+    if let Some(version) = version {
+        package_url.with_version(version).ok()?;
+    }
+
+    Some(package_url.to_string())
+}
+
+fn project_file_datasource_id(path: &Path) -> Option<DatasourceId> {
+    match path.extension().and_then(|ext| ext.to_str()) {
+        Some("csproj") => Some(DatasourceId::NugetCsproj),
+        Some("vbproj") => Some(DatasourceId::NugetVbproj),
+        Some("fsproj") => Some(DatasourceId::NugetFsproj),
+        _ => None,
+    }
+}
 
 fn build_nuget_description(
     summary: Option<&str>,
@@ -163,8 +273,11 @@ impl PackageParser for NuspecParser {
         let mut parties = Vec::new();
         let mut dependencies = Vec::new();
         let mut extracted_license_statement = None;
+        let mut license_type = None;
         let mut copyright = None;
         let mut vcs_url = None;
+        let mut repository_branch = None;
+        let mut repository_commit = None;
 
         let mut buf = Vec::new();
         let mut current_element = String::new();
@@ -189,28 +302,16 @@ impl PackageParser for NuspecParser {
                             .find(|attr| attr.key.as_ref() == b"targetFramework")
                             .and_then(|attr| String::from_utf8(attr.value.to_vec()).ok());
                     } else if tag_name == "repository" && in_metadata {
-                        let mut repo_type = None;
-                        let mut repo_url = None;
-
-                        for attr in e.attributes().filter_map(|a| a.ok()) {
-                            match attr.key.as_ref() {
-                                b"type" => {
-                                    repo_type = String::from_utf8(attr.value.to_vec()).ok();
-                                }
-                                b"url" => {
-                                    repo_url = String::from_utf8(attr.value.to_vec()).ok();
-                                }
-                                _ => {}
-                            }
-                        }
-
-                        if let Some(url) = repo_url {
-                            vcs_url = if let Some(vcs_type) = repo_type {
-                                Some(format!("{}+{}", vcs_type, url))
-                            } else {
-                                Some(url)
-                            };
-                        }
+                        let repository = parse_repository_metadata(&e);
+                        vcs_url = repository.vcs_url;
+                        repository_branch = repository.branch;
+                        repository_commit = repository.commit;
+                    } else if tag_name == "license" && in_metadata {
+                        license_type = e
+                            .attributes()
+                            .filter_map(|a| a.ok())
+                            .find(|attr| attr.key.as_ref() == b"type")
+                            .and_then(|attr| String::from_utf8(attr.value.to_vec()).ok());
                     }
                 }
                 Ok(Event::Empty(e)) => {
@@ -223,28 +324,10 @@ impl PackageParser for NuspecParser {
                             dependencies.push(dep);
                         }
                     } else if tag_name == "repository" && in_metadata {
-                        let mut repo_type = None;
-                        let mut repo_url = None;
-
-                        for attr in e.attributes().filter_map(|a| a.ok()) {
-                            match attr.key.as_ref() {
-                                b"type" => {
-                                    repo_type = String::from_utf8(attr.value.to_vec()).ok();
-                                }
-                                b"url" => {
-                                    repo_url = String::from_utf8(attr.value.to_vec()).ok();
-                                }
-                                _ => {}
-                            }
-                        }
-
-                        if let Some(url) = repo_url {
-                            vcs_url = if let Some(vcs_type) = repo_type {
-                                Some(format!("{}+{}", vcs_type, url))
-                            } else {
-                                Some(url)
-                            };
-                        }
+                        let repository = parse_repository_metadata(&e);
+                        vcs_url = repository.vcs_url;
+                        repository_branch = repository.branch;
+                        repository_commit = repository.commit;
                     }
                 }
                 Ok(Event::Text(e)) => {
@@ -262,28 +345,10 @@ impl PackageParser for NuspecParser {
                             "title" => title = Some(text),
                             "projectUrl" => homepage_url = Some(text),
                             "authors" => {
-                                parties.push(Party {
-                                    r#type: None,
-                                    role: Some("author".to_string()),
-                                    name: Some(text),
-                                    email: None,
-                                    url: None,
-                                    organization: None,
-                                    organization_url: None,
-                                    timezone: None,
-                                });
+                                parties.push(build_nuget_party("author", text));
                             }
                             "owners" => {
-                                parties.push(Party {
-                                    r#type: None,
-                                    role: Some("owner".to_string()),
-                                    name: Some(text),
-                                    email: None,
-                                    url: None,
-                                    organization: None,
-                                    organization_url: None,
-                                    timezone: None,
-                                });
+                                parties.push(build_nuget_party("owner", text));
                             }
                             "license" => {
                                 extracted_license_statement = Some(text);
@@ -330,37 +395,10 @@ impl PackageParser for NuspecParser {
             name.as_deref(),
         );
 
-        // Build repository URLs
-        let repository_homepage_url = name.as_ref().and_then(|n| {
-            version
-                .as_ref()
-                .map(|v| format!("https://www.nuget.org/packages/{}/{}", n, v))
-        });
+        let (repository_homepage_url, repository_download_url, api_data_url) =
+            build_nuget_urls(name.as_deref(), version.as_deref());
 
-        let repository_download_url = name.as_ref().and_then(|n| {
-            version
-                .as_ref()
-                .map(|v| format!("https://www.nuget.org/api/v2/package/{}/{}", n, v))
-        });
-
-        let api_data_url = name.as_ref().and_then(|n| {
-            version.as_ref().map(|v| {
-                format!(
-                    "https://api.nuget.org/v3/registration3/{}/{}.json",
-                    n.to_lowercase(),
-                    v
-                )
-            })
-        });
-
-        // Generate PURL
-        let purl = name.as_ref().and_then(|n| {
-            let mut package_url = PackageUrl::new("nuget", n).ok()?;
-            if let Some(v) = &version {
-                package_url.with_version(v).ok()?;
-            }
-            Some(package_url.to_string())
-        });
+        let purl = build_nuget_purl(name.as_deref(), version.as_deref());
 
         // Extract license statement only - detection happens in separate engine
         // Do NOT populate declared_license_expression or license_detections here
@@ -369,6 +407,18 @@ impl PackageParser for NuspecParser {
         let license_detections = Vec::new();
 
         let holder = None;
+
+        let mut extra_data = serde_json::Map::new();
+        insert_extra_string(&mut extra_data, "license_type", license_type.clone());
+        if license_type.as_deref() == Some("file") {
+            insert_extra_string(
+                &mut extra_data,
+                "license_file",
+                extracted_license_statement.clone(),
+            );
+        }
+        insert_extra_string(&mut extra_data, "repository_branch", repository_branch);
+        insert_extra_string(&mut extra_data, "repository_commit", repository_commit);
 
         vec![PackageData {
             datasource_id: Some(DatasourceId::NugetNuspec),
@@ -387,6 +437,11 @@ impl PackageParser for NuspecParser {
             copyright,
             holder,
             vcs_url,
+            extra_data: if extra_data.is_empty() {
+                None
+            } else {
+                Some(extra_data.into_iter().collect())
+            },
             repository_homepage_url,
             repository_download_url,
             api_data_url,
@@ -596,6 +651,575 @@ impl PackageParser for PackagesLockParser {
     }
 }
 
+#[derive(Default)]
+struct ProjectReferenceData {
+    name: Option<String>,
+    version: Option<String>,
+    condition: Option<String>,
+}
+
+pub struct ProjectJsonParser;
+
+impl PackageParser for ProjectJsonParser {
+    const PACKAGE_TYPE: PackageType = PackageType::Nuget;
+
+    fn is_match(path: &Path) -> bool {
+        path.file_name()
+            .and_then(|name| name.to_str())
+            .is_some_and(|name| name == "project.json")
+    }
+
+    fn extract_packages(path: &Path) -> Vec<PackageData> {
+        let file = match File::open(path) {
+            Ok(file) => file,
+            Err(e) => {
+                warn!("Failed to open project.json at {:?}: {}", path, e);
+                return vec![default_package_data(Some(DatasourceId::NugetProjectJson))];
+            }
+        };
+
+        let parsed: serde_json::Value = match serde_json::from_reader(file) {
+            Ok(value) => value,
+            Err(e) => {
+                warn!("Failed to parse project.json at {:?}: {}", path, e);
+                return vec![default_package_data(Some(DatasourceId::NugetProjectJson))];
+            }
+        };
+
+        vec![parse_project_json_manifest(&parsed)]
+    }
+}
+
+pub struct ProjectLockJsonParser;
+
+impl PackageParser for ProjectLockJsonParser {
+    const PACKAGE_TYPE: PackageType = PackageType::Nuget;
+
+    fn is_match(path: &Path) -> bool {
+        path.file_name()
+            .and_then(|name| name.to_str())
+            .is_some_and(|name| name == "project.lock.json")
+    }
+
+    fn extract_packages(path: &Path) -> Vec<PackageData> {
+        let file = match File::open(path) {
+            Ok(file) => file,
+            Err(e) => {
+                warn!("Failed to open project.lock.json at {:?}: {}", path, e);
+                return vec![default_package_data(Some(
+                    DatasourceId::NugetProjectLockJson,
+                ))];
+            }
+        };
+
+        let parsed: serde_json::Value = match serde_json::from_reader(file) {
+            Ok(value) => value,
+            Err(e) => {
+                warn!("Failed to parse project.lock.json at {:?}: {}", path, e);
+                return vec![default_package_data(Some(
+                    DatasourceId::NugetProjectLockJson,
+                ))];
+            }
+        };
+
+        vec![parse_project_lock_manifest(&parsed)]
+    }
+}
+
+pub struct PackageReferenceProjectParser;
+
+impl PackageParser for PackageReferenceProjectParser {
+    const PACKAGE_TYPE: PackageType = PackageType::Nuget;
+
+    fn is_match(path: &Path) -> bool {
+        path.extension()
+            .and_then(|ext| ext.to_str())
+            .is_some_and(|ext| PROJECT_FILE_EXTENSIONS.contains(&ext))
+    }
+
+    fn extract_packages(path: &Path) -> Vec<PackageData> {
+        let Some(datasource_id) = project_file_datasource_id(path) else {
+            return vec![default_package_data(None)];
+        };
+
+        let file = match File::open(path) {
+            Ok(file) => file,
+            Err(e) => {
+                warn!("Failed to open project file at {:?}: {}", path, e);
+                return vec![default_package_data(Some(datasource_id))];
+            }
+        };
+
+        let reader = BufReader::new(file);
+        let mut xml_reader = Reader::from_reader(reader);
+        xml_reader.config_mut().trim_text(true);
+
+        let mut name = None;
+        let mut fallback_name = path
+            .file_stem()
+            .and_then(|stem| stem.to_str())
+            .map(|stem| stem.to_string());
+        let mut version = None;
+        let mut description = None;
+        let mut homepage_url = None;
+        let mut authors = None;
+        let mut repository_url = None;
+        let mut repository_type = None;
+        let mut repository_branch = None;
+        let mut repository_commit = None;
+        let mut extracted_license_statement = None;
+        let mut license_type = None;
+        let mut copyright = None;
+        let mut readme_file = None;
+        let mut icon_file = None;
+        let mut dependencies = Vec::new();
+
+        let mut buf = Vec::new();
+        let mut current_element = String::new();
+        let mut in_property_group = false;
+        let mut current_item_group_condition = None;
+        let mut current_package_reference: Option<ProjectReferenceData> = None;
+
+        loop {
+            match xml_reader.read_event_into(&mut buf) {
+                Ok(Event::Start(e)) => {
+                    let tag_name = String::from_utf8_lossy(e.name().as_ref()).to_string();
+                    current_element = tag_name.clone();
+
+                    match tag_name.as_str() {
+                        "PropertyGroup" => in_property_group = true,
+                        "ItemGroup" => {
+                            current_item_group_condition = e
+                                .attributes()
+                                .filter_map(|a| a.ok())
+                                .find(|attr| attr.key.as_ref() == b"Condition")
+                                .and_then(|attr| String::from_utf8(attr.value.to_vec()).ok());
+                        }
+                        "PackageReference" => {
+                            let name = e
+                                .attributes()
+                                .filter_map(|a| a.ok())
+                                .find(|attr| matches!(attr.key.as_ref(), b"Include" | b"Update"))
+                                .and_then(|attr| String::from_utf8(attr.value.to_vec()).ok());
+                            let version = e
+                                .attributes()
+                                .filter_map(|a| a.ok())
+                                .find(|attr| attr.key.as_ref() == b"Version")
+                                .and_then(|attr| String::from_utf8(attr.value.to_vec()).ok());
+                            let condition = e
+                                .attributes()
+                                .filter_map(|a| a.ok())
+                                .find(|attr| attr.key.as_ref() == b"Condition")
+                                .and_then(|attr| String::from_utf8(attr.value.to_vec()).ok())
+                                .or_else(|| current_item_group_condition.clone());
+
+                            current_package_reference = Some(ProjectReferenceData {
+                                name,
+                                version,
+                                condition,
+                            });
+                        }
+                        _ => {}
+                    }
+                }
+                Ok(Event::Empty(e)) => {
+                    let tag_name = String::from_utf8_lossy(e.name().as_ref()).to_string();
+
+                    if tag_name == "PackageReference" {
+                        let name = e
+                            .attributes()
+                            .filter_map(|a| a.ok())
+                            .find(|attr| matches!(attr.key.as_ref(), b"Include" | b"Update"))
+                            .and_then(|attr| String::from_utf8(attr.value.to_vec()).ok());
+                        let version = e
+                            .attributes()
+                            .filter_map(|a| a.ok())
+                            .find(|attr| attr.key.as_ref() == b"Version")
+                            .and_then(|attr| String::from_utf8(attr.value.to_vec()).ok());
+                        let condition = e
+                            .attributes()
+                            .filter_map(|a| a.ok())
+                            .find(|attr| attr.key.as_ref() == b"Condition")
+                            .and_then(|attr| String::from_utf8(attr.value.to_vec()).ok())
+                            .or_else(|| current_item_group_condition.clone());
+
+                        if let Some(dependency) =
+                            build_project_file_dependency(name, version, condition)
+                        {
+                            dependencies.push(dependency);
+                        }
+                    }
+                }
+                Ok(Event::Text(e)) => {
+                    let text = e.decode().ok().map(|s| s.trim().to_string());
+                    let Some(text) = text.filter(|value| !value.is_empty()) else {
+                        buf.clear();
+                        continue;
+                    };
+
+                    if current_package_reference.is_some() {
+                        if current_element.as_str() == "Version"
+                            && let Some(reference) = &mut current_package_reference
+                        {
+                            reference.version = Some(text);
+                        }
+                    } else if in_property_group {
+                        match current_element.as_str() {
+                            "PackageId" => name = Some(text),
+                            "AssemblyName" if fallback_name.is_none() => fallback_name = Some(text),
+                            "Version" if version.is_none() => version = Some(text),
+                            "PackageVersion" => version = Some(text),
+                            "Description" => description = Some(text),
+                            "PackageProjectUrl" | "ProjectUrl" => homepage_url = Some(text),
+                            "Authors" => authors = Some(text),
+                            "RepositoryUrl" => repository_url = Some(text),
+                            "RepositoryType" => repository_type = Some(text),
+                            "RepositoryBranch" => repository_branch = Some(text),
+                            "RepositoryCommit" => repository_commit = Some(text),
+                            "PackageLicenseExpression" => {
+                                extracted_license_statement = Some(text);
+                                license_type = Some("expression".to_string());
+                            }
+                            "PackageLicenseFile" => {
+                                extracted_license_statement = Some(text);
+                                license_type = Some("file".to_string());
+                            }
+                            "PackageReadmeFile" => readme_file = Some(text),
+                            "PackageIcon" => icon_file = Some(text),
+                            "Copyright" => copyright = Some(text),
+                            _ => {}
+                        }
+                    }
+                }
+                Ok(Event::End(e)) => {
+                    let tag_name = String::from_utf8_lossy(e.name().as_ref()).to_string();
+
+                    match tag_name.as_str() {
+                        "PropertyGroup" => in_property_group = false,
+                        "ItemGroup" => current_item_group_condition = None,
+                        "PackageReference" => {
+                            if let Some(reference) = current_package_reference.take()
+                                && let Some(dependency) = build_project_file_dependency(
+                                    reference.name,
+                                    reference.version,
+                                    reference.condition,
+                                )
+                            {
+                                dependencies.push(dependency);
+                            }
+                        }
+                        _ => {}
+                    }
+
+                    current_element.clear();
+                }
+                Ok(Event::Eof) => break,
+                Err(e) => {
+                    warn!("Error parsing project file at {:?}: {}", path, e);
+                    return vec![default_package_data(Some(datasource_id))];
+                }
+                _ => {}
+            }
+
+            buf.clear();
+        }
+
+        let name = name.or(fallback_name);
+        let vcs_url = repository_url.map(|url| match repository_type {
+            Some(repo_type) if !repo_type.trim().is_empty() => format!("{}+{}", repo_type, url),
+            _ => url,
+        });
+        let (repository_homepage_url, repository_download_url, api_data_url) =
+            build_nuget_urls(name.as_deref(), version.as_deref());
+
+        let mut parties = Vec::new();
+        if let Some(authors) = authors {
+            parties.push(build_nuget_party("author", authors));
+        }
+
+        let mut extra_data = serde_json::Map::new();
+        insert_extra_string(&mut extra_data, "license_type", license_type.clone());
+        if license_type.as_deref() == Some("file") {
+            insert_extra_string(
+                &mut extra_data,
+                "license_file",
+                extracted_license_statement.clone(),
+            );
+        }
+        insert_extra_string(&mut extra_data, "repository_branch", repository_branch);
+        insert_extra_string(&mut extra_data, "repository_commit", repository_commit);
+        insert_extra_string(&mut extra_data, "readme_file", readme_file);
+        insert_extra_string(&mut extra_data, "icon_file", icon_file);
+
+        vec![PackageData {
+            datasource_id: Some(datasource_id),
+            package_type: Some(Self::PACKAGE_TYPE),
+            name: name.clone(),
+            version: version.clone(),
+            purl: build_nuget_purl(name.as_deref(), version.as_deref()),
+            description,
+            homepage_url,
+            parties,
+            dependencies,
+            extracted_license_statement,
+            copyright,
+            vcs_url,
+            extra_data: if extra_data.is_empty() {
+                None
+            } else {
+                Some(extra_data.into_iter().collect())
+            },
+            repository_homepage_url,
+            repository_download_url,
+            api_data_url,
+            ..default_package_data(Some(datasource_id))
+        }]
+    }
+}
+
+fn parse_project_json_manifest(parsed: &serde_json::Value) -> PackageData {
+    let name = parsed
+        .get("name")
+        .and_then(|value| value.as_str())
+        .map(|value| value.to_string());
+    let version = parsed
+        .get("version")
+        .and_then(|value| value.as_str())
+        .map(|value| value.to_string());
+    let description = parsed
+        .get("description")
+        .and_then(|value| value.as_str())
+        .map(|value| value.to_string());
+    let homepage_url = parsed
+        .get("projectUrl")
+        .and_then(|value| value.as_str())
+        .map(|value| value.to_string());
+    let extracted_license_statement = parsed
+        .get("license")
+        .or_else(|| parsed.get("licenseUrl"))
+        .and_then(|value| value.as_str())
+        .map(|value| value.to_string());
+
+    let mut parties = Vec::new();
+    if let Some(authors) = parsed.get("authors") {
+        let author_name = if let Some(value) = authors.as_str() {
+            Some(value.to_string())
+        } else {
+            authors.as_array().map(|entries| {
+                entries
+                    .iter()
+                    .filter_map(|entry| entry.as_str())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            })
+        };
+
+        if let Some(author_name) = author_name.filter(|value| !value.is_empty()) {
+            parties.push(build_nuget_party("author", author_name));
+        }
+    }
+
+    let mut dependencies = Vec::new();
+
+    if let Some(root_dependencies) = parsed
+        .get("dependencies")
+        .and_then(|value| value.as_object())
+    {
+        for (dependency_name, dependency_spec) in root_dependencies {
+            if let Some(dependency) =
+                parse_project_json_dependency(dependency_name, dependency_spec, None)
+            {
+                dependencies.push(dependency);
+            }
+        }
+    }
+
+    if let Some(frameworks) = parsed.get("frameworks").and_then(|value| value.as_object()) {
+        for (framework, framework_value) in frameworks {
+            let Some(framework_dependencies) = framework_value
+                .get("dependencies")
+                .and_then(|value| value.as_object())
+            else {
+                continue;
+            };
+
+            for (dependency_name, dependency_spec) in framework_dependencies {
+                if let Some(dependency) = parse_project_json_dependency(
+                    dependency_name,
+                    dependency_spec,
+                    Some(framework.clone()),
+                ) {
+                    dependencies.push(dependency);
+                }
+            }
+        }
+    }
+
+    let (repository_homepage_url, repository_download_url, api_data_url) =
+        build_nuget_urls(name.as_deref(), version.as_deref());
+
+    PackageData {
+        datasource_id: Some(DatasourceId::NugetProjectJson),
+        package_type: Some(PackageType::Nuget),
+        name: name.clone(),
+        version: version.clone(),
+        purl: build_nuget_purl(name.as_deref(), version.as_deref()),
+        description,
+        homepage_url,
+        parties,
+        dependencies,
+        extracted_license_statement,
+        repository_homepage_url,
+        repository_download_url,
+        api_data_url,
+        ..default_package_data(Some(DatasourceId::NugetProjectJson))
+    }
+}
+
+fn parse_project_json_dependency(
+    dependency_name: &str,
+    dependency_spec: &serde_json::Value,
+    scope: Option<String>,
+) -> Option<Dependency> {
+    let mut extra_data = serde_json::Map::new();
+
+    let requirement = match dependency_spec {
+        serde_json::Value::String(version) => Some(version.clone()),
+        serde_json::Value::Object(object) => {
+            let requirement = object
+                .get("version")
+                .and_then(|value| value.as_str())
+                .map(|value| value.to_string());
+            insert_extra_string(
+                &mut extra_data,
+                "include",
+                object
+                    .get("include")
+                    .and_then(|value| value.as_str())
+                    .map(|value| value.to_string()),
+            );
+            insert_extra_string(
+                &mut extra_data,
+                "exclude",
+                object
+                    .get("exclude")
+                    .and_then(|value| value.as_str())
+                    .map(|value| value.to_string()),
+            );
+            insert_extra_string(
+                &mut extra_data,
+                "type",
+                object
+                    .get("type")
+                    .and_then(|value| value.as_str())
+                    .map(|value| value.to_string()),
+            );
+            requirement
+        }
+        _ => return None,
+    };
+
+    Some(Dependency {
+        purl: build_nuget_purl(Some(dependency_name), None),
+        extracted_requirement: requirement,
+        scope,
+        is_runtime: Some(true),
+        is_optional: Some(false),
+        is_pinned: Some(false),
+        is_direct: Some(true),
+        resolved_package: None,
+        extra_data: if extra_data.is_empty() {
+            None
+        } else {
+            Some(extra_data.into_iter().collect())
+        },
+    })
+}
+
+fn parse_project_lock_manifest(parsed: &serde_json::Value) -> PackageData {
+    let mut dependencies = Vec::new();
+
+    if let Some(groups) = parsed
+        .get("projectFileDependencyGroups")
+        .and_then(|value| value.as_object())
+    {
+        for (framework, entries) in groups {
+            let Some(entries) = entries.as_array() else {
+                continue;
+            };
+
+            for entry in entries.iter().filter_map(|value| value.as_str()) {
+                if let Some(dependency) = parse_project_lock_dependency(
+                    entry,
+                    (!framework.is_empty()).then(|| framework.clone()),
+                ) {
+                    dependencies.push(dependency);
+                }
+            }
+        }
+    }
+
+    PackageData {
+        datasource_id: Some(DatasourceId::NugetProjectLockJson),
+        package_type: Some(PackageType::Nuget),
+        dependencies,
+        ..default_package_data(Some(DatasourceId::NugetProjectLockJson))
+    }
+}
+
+fn parse_project_lock_dependency(entry: &str, scope: Option<String>) -> Option<Dependency> {
+    let trimmed = entry.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+
+    let mut parts = trimmed.split_whitespace();
+    let name = parts.next()?;
+    let requirement = parts.collect::<Vec<_>>().join(" ");
+
+    Some(Dependency {
+        purl: build_nuget_purl(Some(name), None),
+        extracted_requirement: (!requirement.is_empty()).then_some(requirement),
+        scope,
+        is_runtime: Some(true),
+        is_optional: Some(false),
+        is_pinned: Some(false),
+        is_direct: Some(true),
+        resolved_package: None,
+        extra_data: None,
+    })
+}
+
+fn build_project_file_dependency(
+    name: Option<String>,
+    version: Option<String>,
+    condition: Option<String>,
+) -> Option<Dependency> {
+    let name = name?.trim().to_string();
+    if name.is_empty() {
+        return None;
+    }
+
+    let mut extra_data = serde_json::Map::new();
+    insert_extra_string(&mut extra_data, "condition", condition);
+
+    Some(Dependency {
+        purl: build_nuget_purl(Some(&name), None),
+        extracted_requirement: version,
+        scope: None,
+        is_runtime: Some(true),
+        is_optional: Some(false),
+        is_pinned: Some(false),
+        is_direct: Some(true),
+        resolved_package: None,
+        extra_data: if extra_data.is_empty() {
+            None
+        } else {
+            Some(extra_data.into_iter().collect())
+        },
+    })
+}
+
 /// Parser for .nupkg files (NuGet package archives)
 pub struct NupkgParser;
 
@@ -621,7 +1245,6 @@ impl PackageParser for NupkgParser {
 
 fn extract_nupkg_archive(path: &Path) -> Result<PackageData, String> {
     use std::fs;
-    use std::io::Read;
     use zip::ZipArchive;
 
     let file_metadata =
@@ -640,13 +1263,16 @@ fn extract_nupkg_archive(path: &Path) -> Result<PackageData, String> {
         ZipArchive::new(file).map_err(|e| format!("Failed to read ZIP archive: {}", e))?;
 
     for i in 0..archive.len() {
-        let mut entry = archive
-            .by_index(i)
-            .map_err(|e| format!("Failed to read ZIP entry: {}", e))?;
+        let content = {
+            let mut entry = archive
+                .by_index(i)
+                .map_err(|e| format!("Failed to read ZIP entry: {}", e))?;
 
-        let entry_name = entry.name().to_string();
+            let entry_name = entry.name().to_string();
+            if !entry_name.ends_with(".nuspec") {
+                continue;
+            }
 
-        if entry_name.ends_with(".nuspec") {
             let entry_size = entry.size();
             if entry_size > MAX_FILE_SIZE {
                 return Err(format!(
@@ -670,12 +1296,65 @@ fn extract_nupkg_archive(path: &Path) -> Result<PackageData, String> {
             entry
                 .read_to_string(&mut content)
                 .map_err(|e| format!("Failed to read .nuspec: {}", e))?;
+            content
+        };
 
-            return parse_nuspec_content(&content);
+        let mut package_data = parse_nuspec_content(&content)?;
+
+        let license_file = package_data.extra_data.as_ref().and_then(|extra| {
+            extra
+                .get("license_file")
+                .and_then(|value| value.as_str())
+                .map(|value| value.to_string())
+        });
+
+        if let Some(license_file) = license_file
+            && let Some(license_text) = read_nupkg_license_file(&mut archive, &license_file)?
+        {
+            package_data.extracted_license_statement = Some(license_text);
         }
+
+        return Ok(package_data);
     }
 
     Err("No .nuspec file found in archive".to_string())
+}
+
+fn read_nupkg_license_file(
+    archive: &mut zip::ZipArchive<File>,
+    license_file: &str,
+) -> Result<Option<String>, String> {
+    let normalized_target = license_file.replace('\\', "/");
+
+    for i in 0..archive.len() {
+        let mut entry = archive
+            .by_index(i)
+            .map_err(|e| format!("Failed to read ZIP entry: {}", e))?;
+        let entry_name = entry.name().replace('\\', "/");
+
+        if entry_name != normalized_target
+            && !entry_name.ends_with(&format!("/{}", normalized_target))
+        {
+            continue;
+        }
+
+        let entry_size = entry.size();
+        if entry_size > MAX_FILE_SIZE {
+            return Err(format!(
+                "License file too large: {} bytes (limit: {} bytes)",
+                entry_size, MAX_FILE_SIZE
+            ));
+        }
+
+        let mut content = Vec::new();
+        entry
+            .read_to_end(&mut content)
+            .map_err(|e| format!("Failed to read license file from archive: {}", e))?;
+
+        return Ok(Some(String::from_utf8_lossy(&content).to_string()));
+    }
+
+    Ok(None)
 }
 
 fn parse_nuspec_content(content: &str) -> Result<PackageData, String> {
@@ -691,8 +1370,11 @@ fn parse_nuspec_content(content: &str) -> Result<PackageData, String> {
     let mut parties = Vec::new();
     let mut dependencies = Vec::new();
     let mut extracted_license_statement = None;
+    let mut license_type = None;
     let mut copyright = None;
     let mut vcs_url = None;
+    let mut repository_branch = None;
+    let mut repository_commit = None;
 
     let mut buf = Vec::new();
     let mut current_element = String::new();
@@ -717,24 +1399,16 @@ fn parse_nuspec_content(content: &str) -> Result<PackageData, String> {
                         .find(|attr| attr.key.as_ref() == b"targetFramework")
                         .and_then(|attr| String::from_utf8(attr.value.to_vec()).ok());
                 } else if tag_name == "repository" && in_metadata {
-                    let mut repo_type = None;
-                    let mut repo_url = None;
-
-                    for attr in e.attributes().filter_map(|a| a.ok()) {
-                        match attr.key.as_ref() {
-                            b"type" => repo_type = String::from_utf8(attr.value.to_vec()).ok(),
-                            b"url" => repo_url = String::from_utf8(attr.value.to_vec()).ok(),
-                            _ => {}
-                        }
-                    }
-
-                    if let Some(url) = repo_url {
-                        vcs_url = if let Some(vcs_type) = repo_type {
-                            Some(format!("{}+{}", vcs_type, url))
-                        } else {
-                            Some(url)
-                        };
-                    }
+                    let repository = parse_repository_metadata(&e);
+                    vcs_url = repository.vcs_url;
+                    repository_branch = repository.branch;
+                    repository_commit = repository.commit;
+                } else if tag_name == "license" && in_metadata {
+                    license_type = e
+                        .attributes()
+                        .filter_map(|a| a.ok())
+                        .find(|attr| attr.key.as_ref() == b"type")
+                        .and_then(|attr| String::from_utf8(attr.value.to_vec()).ok());
                 }
             }
             Ok(Event::Empty(e)) => {
@@ -747,24 +1421,10 @@ fn parse_nuspec_content(content: &str) -> Result<PackageData, String> {
                         dependencies.push(dep);
                     }
                 } else if tag_name == "repository" && in_metadata {
-                    let mut repo_type = None;
-                    let mut repo_url = None;
-
-                    for attr in e.attributes().filter_map(|a| a.ok()) {
-                        match attr.key.as_ref() {
-                            b"type" => repo_type = String::from_utf8(attr.value.to_vec()).ok(),
-                            b"url" => repo_url = String::from_utf8(attr.value.to_vec()).ok(),
-                            _ => {}
-                        }
-                    }
-
-                    if let Some(url) = repo_url {
-                        vcs_url = if let Some(vcs_type) = repo_type {
-                            Some(format!("{}+{}", vcs_type, url))
-                        } else {
-                            Some(url)
-                        };
-                    }
+                    let repository = parse_repository_metadata(&e);
+                    vcs_url = repository.vcs_url;
+                    repository_branch = repository.branch;
+                    repository_commit = repository.commit;
                 }
             }
             Ok(Event::Text(e)) => {
@@ -780,28 +1440,10 @@ fn parse_nuspec_content(content: &str) -> Result<PackageData, String> {
                         "description" => description = Some(text),
                         "projectUrl" => homepage_url = Some(text),
                         "authors" => {
-                            parties.push(Party {
-                                r#type: None,
-                                role: Some("author".to_string()),
-                                name: Some(text),
-                                email: None,
-                                url: None,
-                                organization: None,
-                                organization_url: None,
-                                timezone: None,
-                            });
+                            parties.push(build_nuget_party("author", text));
                         }
                         "owners" => {
-                            parties.push(Party {
-                                r#type: None,
-                                role: Some("owner".to_string()),
-                                name: Some(text),
-                                email: None,
-                                url: None,
-                                organization: None,
-                                organization_url: None,
-                                timezone: None,
-                            });
+                            parties.push(build_nuget_party("owner", text));
                         }
                         "license" => {
                             extracted_license_statement = Some(text);
@@ -838,27 +1480,8 @@ fn parse_nuspec_content(content: &str) -> Result<PackageData, String> {
         buf.clear();
     }
 
-    let repository_homepage_url = name.as_ref().and_then(|n| {
-        version
-            .as_ref()
-            .map(|v| format!("https://www.nuget.org/packages/{}/{}", n, v))
-    });
-
-    let repository_download_url = name.as_ref().and_then(|n| {
-        version
-            .as_ref()
-            .map(|v| format!("https://www.nuget.org/api/v2/package/{}/{}", n, v))
-    });
-
-    let api_data_url = name.as_ref().and_then(|n| {
-        version.as_ref().map(|v| {
-            format!(
-                "https://api.nuget.org/v3/registration3/{}/{}.json",
-                n.to_lowercase(),
-                v
-            )
-        })
-    });
+    let (repository_homepage_url, repository_download_url, api_data_url) =
+        build_nuget_urls(name.as_deref(), version.as_deref());
 
     // Extract license statement only - detection happens in separate engine
     // Do NOT populate declared_license_expression or license_detections here
@@ -867,6 +1490,18 @@ fn parse_nuspec_content(content: &str) -> Result<PackageData, String> {
     let license_detections = Vec::new();
 
     let holder = None;
+
+    let mut extra_data = serde_json::Map::new();
+    insert_extra_string(&mut extra_data, "license_type", license_type.clone());
+    if license_type.as_deref() == Some("file") {
+        insert_extra_string(
+            &mut extra_data,
+            "license_file",
+            extracted_license_statement.clone(),
+        );
+    }
+    insert_extra_string(&mut extra_data, "repository_branch", repository_branch);
+    insert_extra_string(&mut extra_data, "repository_commit", repository_commit);
 
     Ok(PackageData {
         datasource_id: Some(DatasourceId::NugetNupkg),
@@ -884,6 +1519,11 @@ fn parse_nuspec_content(content: &str) -> Result<PackageData, String> {
         copyright,
         holder,
         vcs_url,
+        extra_data: if extra_data.is_empty() {
+            None
+        } else {
+            Some(extra_data.into_iter().collect())
+        },
         repository_homepage_url,
         repository_download_url,
         api_data_url,
@@ -914,6 +1554,52 @@ crate::register_parser!(
     "C#",
     Some(
         "https://learn.microsoft.com/en-us/nuget/consume-packages/package-references-in-project-files#locking-dependencies"
+    ),
+);
+
+crate::register_parser!(
+    ".NET project.json manifest",
+    &["**/project.json"],
+    "nuget",
+    "C#",
+    Some("https://learn.microsoft.com/en-us/nuget/archive/project-json"),
+);
+
+crate::register_parser!(
+    ".NET project.lock.json lockfile",
+    &["**/project.lock.json"],
+    "nuget",
+    "C#",
+    Some("https://learn.microsoft.com/en-us/nuget/archive/project-json"),
+);
+
+crate::register_parser!(
+    ".NET PackageReference C# project file",
+    &["**/*.csproj"],
+    "nuget",
+    "C#",
+    Some(
+        "https://learn.microsoft.com/en-us/nuget/consume-packages/package-references-in-project-files"
+    ),
+);
+
+crate::register_parser!(
+    ".NET PackageReference Visual Basic project file",
+    &["**/*.vbproj"],
+    "nuget",
+    "Visual Basic .NET",
+    Some(
+        "https://learn.microsoft.com/en-us/nuget/consume-packages/package-references-in-project-files"
+    ),
+);
+
+crate::register_parser!(
+    ".NET PackageReference F# project file",
+    &["**/*.fsproj"],
+    "nuget",
+    "F#",
+    Some(
+        "https://learn.microsoft.com/en-us/nuget/consume-packages/package-references-in-project-files"
     ),
 );
 

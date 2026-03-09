@@ -191,16 +191,26 @@ pub static ASSEMBLERS: &[AssemblerConfig] = &[
     // NuGet/.NET ecosystem
     AssemblerConfig {
         datasource_ids: &[
+            DatasourceId::NugetCsproj,
+            DatasourceId::NugetFsproj,
             DatasourceId::NugetNuspec,
             DatasourceId::NugetNupkg,
+            DatasourceId::NugetProjectJson,
+            DatasourceId::NugetProjectLockJson,
             DatasourceId::NugetPackagesConfig,
             DatasourceId::NugetPackagesLock,
+            DatasourceId::NugetVbproj,
         ],
         sibling_file_patterns: &[
+            "*.csproj",
+            "*.fsproj",
             "*.nuspec",
             "*.nupkg",
+            "project.json",
+            "project.lock.json",
             "packages.config",
             "packages.lock.json",
+            "*.vbproj",
         ],
         mode: AssemblyMode::SiblingMerge,
     },
@@ -254,6 +264,11 @@ pub static ASSEMBLERS: &[AssemblerConfig] = &[
         datasource_ids: &[DatasourceId::RpmMarinerManifest],
         sibling_file_patterns: &["*.rpm.manifest"],
         mode: AssemblyMode::SiblingMerge,
+    },
+    AssemblerConfig {
+        datasource_ids: &[DatasourceId::RpmYumdb],
+        sibling_file_patterns: &["**/var/lib/yum/yumdb/*/*/from_repo"],
+        mode: AssemblyMode::OnePerPackageData,
     },
     // Microsoft Update Manifest
     AssemblerConfig {

@@ -161,6 +161,7 @@ pub fn assemble(files: &mut [FileInfo]) -> AssemblyResult {
     assign_npm_package_resources(files, &packages);
 
     file_ref_resolve::resolve_file_references(files, &mut packages, &mut dependencies);
+    file_ref_resolve::merge_rpm_yumdb_metadata(files, &mut packages);
 
     // Post-processing: workspace assembly for npm/pnpm monorepos
     workspace_merge::assemble_workspaces(files, &mut packages, &mut dependencies);

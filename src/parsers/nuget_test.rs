@@ -2,13 +2,14 @@
 mod tests {
     use super::super::PackageParser;
     use super::super::nuget::{
-        NupkgParser, NuspecParser, PackagesConfigParser, PackagesLockParser,
+        NupkgParser, NuspecParser, PackageReferenceProjectParser, PackagesConfigParser,
+        PackagesLockParser, ProjectJsonParser, ProjectLockJsonParser,
     };
     use crate::models::DatasourceId;
     use crate::models::PackageType;
     use std::io::Write;
     use std::path::PathBuf;
-    use tempfile::NamedTempFile;
+    use tempfile::{Builder, NamedTempFile};
 
     #[test]
     fn test_packages_config_is_match() {
@@ -120,6 +121,28 @@ mod tests {
         assert_eq!(parties[0].name, Some("James Newton-King".to_string()));
         assert_eq!(parties[0].role, Some("author".to_string()));
         assert_eq!(parties[1].role, Some("owner".to_string()));
+    }
+
+    #[test]
+    fn test_nuspec_parties_have_person_type() {
+        let xml = r#"<?xml version="1.0" encoding="utf-8"?>
+<package>
+  <metadata>
+    <id>Dapper</id>
+    <version>2.1.0</version>
+    <authors>Sam Saffron,Marc Gravell,Nick Craver</authors>
+    <owners>Sam Saffron,Marc Gravell,Nick Craver</owners>
+  </metadata>
+</package>"#;
+
+        let mut temp_file = NamedTempFile::new().unwrap();
+        temp_file.write_all(xml.as_bytes()).unwrap();
+
+        let package_data = NuspecParser::extract_first_package(temp_file.path());
+
+        assert_eq!(package_data.parties.len(), 2);
+        assert_eq!(package_data.parties[0].r#type.as_deref(), Some("person"));
+        assert_eq!(package_data.parties[1].r#type.as_deref(), Some("person"));
     }
 
     #[test]
@@ -240,6 +263,87 @@ mod tests {
         assert_eq!(
             package_data.extracted_license_statement,
             Some("https://opensource.org/licenses/MIT".to_string())
+        );
+    }
+
+    #[test]
+    fn test_nuspec_modern_license_expression_tracks_license_type() {
+        let xml = r#"<?xml version="1.0" encoding="utf-8"?>
+<package>
+  <metadata>
+    <id>Microsoft.WindowsPackageManager.Utils</id>
+    <version>1.0.0</version>
+    <authors>Microsoft</authors>
+    <projectUrl>https://github.com/microsoft/winget-cli</projectUrl>
+    <license type="expression">MIT</license>
+    <description>The utility binary for use with the WinGet CLI.</description>
+  </metadata>
+</package>"#;
+
+        let mut temp_file = NamedTempFile::new().unwrap();
+        temp_file.write_all(xml.as_bytes()).unwrap();
+
+        let package_data = NuspecParser::extract_first_package(temp_file.path());
+        let extra = package_data.extra_data.unwrap();
+
+        assert_eq!(
+            package_data.extracted_license_statement.as_deref(),
+            Some("MIT")
+        );
+        assert_eq!(extra["license_type"], "expression");
+    }
+
+    #[test]
+    fn test_nuspec_file_license_prefers_license_over_placeholder_url() {
+        let xml = r#"<?xml version="1.0" encoding="utf-8"?>
+<package>
+  <metadata>
+    <id>Fizzler</id>
+    <version>1.3.0</version>
+    <license type="file">COPYING.txt</license>
+    <licenseUrl>https://aka.ms/deprecateLicenseUrl</licenseUrl>
+  </metadata>
+</package>"#;
+
+        let mut temp_file = NamedTempFile::new().unwrap();
+        temp_file.write_all(xml.as_bytes()).unwrap();
+
+        let package_data = NuspecParser::extract_first_package(temp_file.path());
+        let extra = package_data.extra_data.unwrap();
+
+        assert_eq!(
+            package_data.extracted_license_statement.as_deref(),
+            Some("COPYING.txt")
+        );
+        assert_eq!(extra["license_type"], "file");
+        assert_eq!(extra["license_file"], "COPYING.txt");
+    }
+
+    #[test]
+    fn test_nuspec_repository_branch_and_commit_are_preserved() {
+        let xml = r#"<?xml version="1.0" encoding="utf-8"?>
+<package>
+  <metadata>
+    <id>Fizzler</id>
+    <version>1.3.0</version>
+    <repository type="Git" url="https://github.com/atifaziz/Fizzler" commit="8323ec7a49ce5dff579b1aa146492ee7aa0ab10d" branch="main" />
+  </metadata>
+</package>"#;
+
+        let mut temp_file = NamedTempFile::new().unwrap();
+        temp_file.write_all(xml.as_bytes()).unwrap();
+
+        let package_data = NuspecParser::extract_first_package(temp_file.path());
+        let extra = package_data.extra_data.unwrap();
+
+        assert_eq!(
+            package_data.vcs_url.as_deref(),
+            Some("Git+https://github.com/atifaziz/Fizzler")
+        );
+        assert_eq!(extra["repository_branch"], "main");
+        assert_eq!(
+            extra["repository_commit"],
+            "8323ec7a49ce5dff579b1aa146492ee7aa0ab10d"
         );
     }
 
@@ -408,6 +512,245 @@ mod tests {
 
         assert_eq!(deps[1].scope, Some("netstandard2.0".to_string()));
         assert_eq!(deps[1].is_direct, Some(false));
+    }
+
+    #[test]
+    fn test_project_json_is_match() {
+        assert!(ProjectJsonParser::is_match(&PathBuf::from("project.json")));
+        assert!(!ProjectJsonParser::is_match(&PathBuf::from(
+            "project.lock.json"
+        )));
+    }
+
+    #[test]
+    fn test_project_json_extracts_dependencies() {
+        let json = r#"{
+  "name": "Legacy.Project",
+  "version": "1.2.3",
+  "description": "Legacy project.json manifest",
+  "projectUrl": "https://example.test/legacy",
+  "dependencies": {
+    "Newtonsoft.Json": "13.0.1",
+    "Native.Package": {
+      "version": "2.0.0",
+      "include": "build, native",
+      "exclude": "contentFiles"
+    }
+  },
+  "frameworks": {
+    "net46": {
+      "dependencies": {
+        "Framework.Package": {
+          "version": "3.1.4",
+          "type": "build"
+        }
+      }
+    }
+  }
+}"#;
+
+        let mut temp_file = NamedTempFile::new().unwrap();
+        temp_file.write_all(json.as_bytes()).unwrap();
+
+        let package_data = ProjectJsonParser::extract_first_package(temp_file.path());
+
+        assert_eq!(
+            package_data.datasource_id,
+            Some(DatasourceId::NugetProjectJson)
+        );
+        assert_eq!(package_data.name.as_deref(), Some("Legacy.Project"));
+        assert_eq!(package_data.version.as_deref(), Some("1.2.3"));
+        assert_eq!(package_data.dependencies.len(), 3);
+        assert_eq!(
+            package_data.dependencies[0].purl.as_deref(),
+            Some("pkg:nuget/Newtonsoft.Json")
+        );
+        assert_eq!(
+            package_data.dependencies[1].extra_data.as_ref().unwrap()["include"],
+            "build, native"
+        );
+        assert_eq!(package_data.dependencies[2].scope.as_deref(), Some("net46"));
+        assert_eq!(
+            package_data.dependencies[2].extra_data.as_ref().unwrap()["type"],
+            "build"
+        );
+    }
+
+    #[test]
+    fn test_project_lock_json_is_match() {
+        assert!(ProjectLockJsonParser::is_match(&PathBuf::from(
+            "project.lock.json"
+        )));
+        assert!(!ProjectLockJsonParser::is_match(&PathBuf::from(
+            "packages.lock.json"
+        )));
+    }
+
+    #[test]
+    fn test_project_lock_json_extracts_dependency_groups() {
+        let json = r#"{
+  "version": 2,
+  "projectFileDependencyGroups": {
+    "": [
+      "Newtonsoft.Json >= 13.0.1"
+    ],
+    ".NETCoreApp,Version=v1.0": [
+      "Microsoft.NETCore.App >= 1.0.0"
+    ]
+  },
+  "libraries": {}
+}"#;
+
+        let mut temp_file = NamedTempFile::new().unwrap();
+        temp_file.write_all(json.as_bytes()).unwrap();
+
+        let package_data = ProjectLockJsonParser::extract_first_package(temp_file.path());
+
+        assert_eq!(
+            package_data.datasource_id,
+            Some(DatasourceId::NugetProjectLockJson)
+        );
+        assert_eq!(package_data.dependencies.len(), 2);
+        assert_eq!(
+            package_data.dependencies[0]
+                .extracted_requirement
+                .as_deref(),
+            Some(">= 13.0.1")
+        );
+        assert_eq!(package_data.dependencies[0].scope, None);
+        assert_eq!(
+            package_data.dependencies[1].scope.as_deref(),
+            Some(".NETCoreApp,Version=v1.0")
+        );
+    }
+
+    #[test]
+    fn test_package_reference_project_is_match() {
+        assert!(PackageReferenceProjectParser::is_match(&PathBuf::from(
+            "example.csproj"
+        )));
+        assert!(PackageReferenceProjectParser::is_match(&PathBuf::from(
+            "example.vbproj"
+        )));
+        assert!(PackageReferenceProjectParser::is_match(&PathBuf::from(
+            "example.fsproj"
+        )));
+        assert!(!PackageReferenceProjectParser::is_match(&PathBuf::from(
+            "example.sln"
+        )));
+    }
+
+    #[test]
+    fn test_csproj_package_reference_extracts_metadata_and_dependencies() {
+        let xml = r#"<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <PackageId>Contoso.Utility</PackageId>
+    <Version>1.0.0</Version>
+    <Description>Useful utilities</Description>
+    <Authors>Jane Doe;John Doe</Authors>
+    <PackageProjectUrl>https://example.test/contoso</PackageProjectUrl>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <RepositoryUrl>https://github.com/example/contoso</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <RepositoryBranch>main</RepositoryBranch>
+    <RepositoryCommit>abc123</RepositoryCommit>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageIcon>icon.png</PackageIcon>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
+    <PackageReference Include="Serilog">
+      <Version>2.10.0</Version>
+    </PackageReference>
+  </ItemGroup>
+</Project>"#;
+
+        let mut temp_file = Builder::new().suffix(".csproj").tempfile().unwrap();
+        temp_file.write_all(xml.as_bytes()).unwrap();
+
+        let package_data = PackageReferenceProjectParser::extract_first_package(temp_file.path());
+        let extra = package_data.extra_data.unwrap();
+
+        assert_eq!(package_data.datasource_id, Some(DatasourceId::NugetCsproj));
+        assert_eq!(package_data.name.as_deref(), Some("Contoso.Utility"));
+        assert_eq!(package_data.version.as_deref(), Some("1.0.0"));
+        assert_eq!(package_data.parties[0].r#type.as_deref(), Some("person"));
+        assert_eq!(
+            package_data.extracted_license_statement.as_deref(),
+            Some("MIT")
+        );
+        assert_eq!(
+            package_data.vcs_url.as_deref(),
+            Some("git+https://github.com/example/contoso")
+        );
+        assert_eq!(extra["license_type"], "expression");
+        assert_eq!(extra["repository_branch"], "main");
+        assert_eq!(extra["repository_commit"], "abc123");
+        assert_eq!(extra["readme_file"], "README.md");
+        assert_eq!(extra["icon_file"], "icon.png");
+        assert_eq!(package_data.dependencies.len(), 2);
+        assert_eq!(
+            package_data.dependencies[0].purl.as_deref(),
+            Some("pkg:nuget/Newtonsoft.Json")
+        );
+        assert_eq!(
+            package_data.dependencies[1]
+                .extracted_requirement
+                .as_deref(),
+            Some("2.10.0")
+        );
+    }
+
+    #[test]
+    fn test_project_file_datasource_matches_extension() {
+        let xml = r#"<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><PackageId>Visual.Basic.Package</PackageId></PropertyGroup></Project>"#;
+
+        let mut vbproj = Builder::new().suffix(".vbproj").tempfile().unwrap();
+        vbproj.write_all(xml.as_bytes()).unwrap();
+        let vb_package = PackageReferenceProjectParser::extract_first_package(vbproj.path());
+        assert_eq!(vb_package.datasource_id, Some(DatasourceId::NugetVbproj));
+
+        let mut fsproj = Builder::new().suffix(".fsproj").tempfile().unwrap();
+        fsproj.write_all(xml.as_bytes()).unwrap();
+        let fs_package = PackageReferenceProjectParser::extract_first_package(fsproj.path());
+        assert_eq!(fs_package.datasource_id, Some(DatasourceId::NugetFsproj));
+    }
+
+    #[test]
+    fn test_nupkg_extracts_embedded_license_file_contents() {
+        let nuspec = r#"<?xml version="1.0" encoding="utf-8"?>
+<package>
+  <metadata>
+    <id>Fizzler</id>
+    <version>1.3.0</version>
+    <license type="file">COPYING.txt</license>
+    <licenseUrl>https://aka.ms/deprecateLicenseUrl</licenseUrl>
+  </metadata>
+</package>"#;
+        let license_text = "GNU GENERAL PUBLIC LICENSE\nVersion 2\n";
+
+        let temp_file = Builder::new().suffix(".nupkg").tempfile().unwrap();
+        let file = temp_file.reopen().unwrap();
+        let mut zip = zip::ZipWriter::new(file);
+        let options = zip::write::SimpleFileOptions::default();
+        zip.start_file("Fizzler.nuspec", options).unwrap();
+        zip.write_all(nuspec.as_bytes()).unwrap();
+        zip.start_file("COPYING.txt", options).unwrap();
+        zip.write_all(license_text.as_bytes()).unwrap();
+        zip.finish().unwrap();
+
+        let package_data = NupkgParser::extract_first_package(temp_file.path());
+
+        assert_eq!(package_data.datasource_id, Some(DatasourceId::NugetNupkg));
+        assert_eq!(package_data.name.as_deref(), Some("Fizzler"));
+        assert_eq!(
+            package_data.extracted_license_statement.as_deref(),
+            Some(license_text)
+        );
+        assert_eq!(
+            package_data.extra_data.as_ref().unwrap()["license_file"],
+            "COPYING.txt"
+        );
     }
 
     #[test]

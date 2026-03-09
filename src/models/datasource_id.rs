@@ -186,12 +186,17 @@ pub enum DatasourceId {
     NpmPackageLockJson,
 
     // ── NuGet ──
+    NugetCsproj,
     NugetNupkg,
+    NugetProjectJson,
+    NugetProjectLockJson,
     NugetPackagesConfig,
     NugetPackagesLock,
     /// Serializes to `"nuget_nupsec"` to match Python reference value (typo in original).
     #[serde(rename = "nuget_nupsec")]
     NugetNuspec,
+    NugetVbproj,
+    NugetFsproj,
 
     // ── OCaml/opam ──
     OpamFile,
@@ -228,6 +233,7 @@ pub enum DatasourceId {
     /// Serializes to `"rpm_spefile"` to match Python reference value (typo in original).
     #[serde(rename = "rpm_spefile")]
     RpmSpecfile,
+    RpmYumdb,
 
     // ── Ruby/RubyGems ──
     Gemfile,
@@ -395,10 +401,15 @@ impl DatasourceId {
             Self::NpmPackageLockJson => "npm_package_lock_json",
 
             // NuGet
+            Self::NugetCsproj => "nuget_csproj",
             Self::NugetNupkg => "nuget_nupkg",
+            Self::NugetProjectJson => "nuget_project_json",
+            Self::NugetProjectLockJson => "nuget_project_lock_json",
             Self::NugetPackagesConfig => "nuget_packages_config",
             Self::NugetPackagesLock => "nuget_packages_lock",
             Self::NugetNuspec => "nuget_nupsec",
+            Self::NugetVbproj => "nuget_vbproj",
+            Self::NugetFsproj => "nuget_fsproj",
 
             // OCaml/opam
             Self::OpamFile => "opam_file",
@@ -433,6 +444,7 @@ impl DatasourceId {
             Self::RpmMarinerManifest => "rpm_mariner_manifest",
             Self::RpmPackageLicenses => "rpm_package_licenses",
             Self::RpmSpecfile => "rpm_spefile",
+            Self::RpmYumdb => "rpm_yumdb",
 
             // Ruby/RubyGems
             Self::Gemfile => "gemfile",

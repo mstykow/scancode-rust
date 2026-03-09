@@ -1,0 +1,24 @@
+{
+  "name": "Legacy.Project",
+  "version": "1.2.3",
+  "description": "Legacy project.json manifest",
+  "projectUrl": "https://example.test/legacy",
+  "dependencies": {
+    "Newtonsoft.Json": "13.0.1",
+    "Native.Package": {
+      "version": "2.0.0",
+      "include": "build, native",
+      "exclude": "contentFiles"
+    }
+  },
+  "frameworks": {
+    "net46": {
+      "dependencies": {
+        "Framework.Package": {
+          "version": "3.1.4",
+          "type": "build"
+        }
+      }
+    }
+  }
+}
