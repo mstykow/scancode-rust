@@ -1,0 +1,51 @@
+[
+  {
+    "type": "nuget",
+    "name": "Legacy.Project",
+    "version": "1.2.3",
+    "description": "Legacy project.json manifest",
+    "parties": [],
+    "homepage_url": "https://example.test/legacy",
+    "dependencies": [
+      {
+        "purl": "pkg:nuget/Newtonsoft.Json",
+        "extracted_requirement": "13.0.1",
+        "scope": null,
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:nuget/Native.Package",
+        "extracted_requirement": "2.0.0",
+        "scope": null,
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true,
+        "extra_data": {
+          "exclude": "contentFiles",
+          "include": "build, native"
+        }
+      },
+      {
+        "purl": "pkg:nuget/Framework.Package",
+        "extracted_requirement": "3.1.4",
+        "scope": "net46",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true,
+        "extra_data": {
+          "type": "build"
+        }
+      }
+    ],
+    "repository_homepage_url": "https://www.nuget.org/packages/Legacy.Project/1.2.3",
+    "repository_download_url": "https://www.nuget.org/api/v2/package/Legacy.Project/1.2.3",
+    "api_data_url": "https://api.nuget.org/v3/registration3/legacy.project/1.2.3.json",
+    "datasource_id": "nuget_project_json",
+    "purl": "pkg:nuget/Legacy.Project@1.2.3"
+  }
+]
