@@ -191,16 +191,26 @@ pub static ASSEMBLERS: &[AssemblerConfig] = &[
     // NuGet/.NET ecosystem
     AssemblerConfig {
         datasource_ids: &[
+            DatasourceId::NugetCsproj,
+            DatasourceId::NugetFsproj,
             DatasourceId::NugetNuspec,
             DatasourceId::NugetNupkg,
+            DatasourceId::NugetProjectJson,
+            DatasourceId::NugetProjectLockJson,
             DatasourceId::NugetPackagesConfig,
             DatasourceId::NugetPackagesLock,
+            DatasourceId::NugetVbproj,
         ],
         sibling_file_patterns: &[
+            "*.csproj",
+            "*.fsproj",
             "*.nuspec",
             "*.nupkg",
+            "project.json",
+            "project.lock.json",
             "packages.config",
             "packages.lock.json",
+            "*.vbproj",
         ],
         mode: AssemblyMode::SiblingMerge,
     },
