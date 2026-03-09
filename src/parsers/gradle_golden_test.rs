@@ -26,6 +26,14 @@ mod golden_tests {
     }
 
     #[test]
+    fn test_golden_groovy_compile_only() {
+        run_golden(
+            "testdata/gradle-golden/groovy/compile-only/build.gradle",
+            "testdata/gradle-golden/groovy/compile-only/build.gradle-expected.json",
+        );
+    }
+
+    #[test]
     fn test_golden_groovy2() {
         run_golden(
             "testdata/gradle-golden/groovy/groovy2/build.gradle",
@@ -94,6 +102,14 @@ mod golden_tests {
         run_golden(
             "testdata/gradle-golden/groovy/groovy-basic/build.gradle",
             "testdata/gradle-golden/groovy/groovy-basic/build.gradle-expected.json",
+        );
+    }
+
+    #[test]
+    fn test_golden_groovy_version_catalog() {
+        run_golden(
+            "testdata/gradle-golden/groovy/version-catalog/build.gradle",
+            "testdata/gradle-golden/groovy/version-catalog/build.gradle-expected.json",
         );
     }
 
