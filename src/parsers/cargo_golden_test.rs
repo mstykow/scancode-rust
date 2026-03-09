@@ -2,6 +2,7 @@
 mod golden_tests {
     use crate::parsers::PackageParser;
     use crate::parsers::cargo::CargoParser;
+    use crate::parsers::cargo_lock::CargoLockParser;
     use crate::test_utils::compare_package_data_parser_only;
     use std::path::PathBuf;
 
@@ -105,6 +106,41 @@ mod golden_tests {
         match compare_package_data_parser_only(&package_data, &expected_file) {
             Ok(_) => (),
             Err(e) => panic!("Golden test failed for tauri: {}", e),
+        }
+    }
+
+    #[test]
+    fn test_golden_publish_false() {
+        let test_file = PathBuf::from("testdata/cargo-golden/publish-false/Cargo.toml");
+        let expected_file =
+            PathBuf::from("testdata/cargo-golden/publish-false/Cargo.toml.expected");
+
+        if !test_file.exists() || !expected_file.exists() {
+            return;
+        }
+
+        let package_data = CargoParser::extract_first_package(&test_file);
+
+        match compare_package_data_parser_only(&package_data, &expected_file) {
+            Ok(_) => (),
+            Err(e) => panic!("Golden test failed for publish-false: {}", e),
+        }
+    }
+
+    #[test]
+    fn test_golden_cargo_lock_basic() {
+        let test_file = PathBuf::from("testdata/cargo-golden/lock-basic/Cargo.lock");
+        let expected_file = PathBuf::from("testdata/cargo-golden/lock-basic/Cargo.lock.expected");
+
+        if !test_file.exists() || !expected_file.exists() {
+            return;
+        }
+
+        let package_data = CargoLockParser::extract_first_package(&test_file);
+
+        match compare_package_data_parser_only(&package_data, &expected_file) {
+            Ok(_) => (),
+            Err(e) => panic!("Golden test failed for lock-basic: {}", e),
         }
     }
 }

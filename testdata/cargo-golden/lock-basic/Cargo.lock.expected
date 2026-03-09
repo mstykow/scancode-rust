@@ -1,0 +1,23 @@
+[
+  {
+    "type": "cargo",
+    "name": "test-project",
+    "version": "0.1.0",
+    "parties": [],
+    "sha256": "abc123def456",
+    "dependencies": [
+      {
+        "purl": "pkg:cargo/serde@1.0.228",
+        "extracted_requirement": "1.0.228",
+        "scope": "dependencies",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": true
+      }
+    ],
+    "api_data_url": "https://crates.io/api/v1/crates/test-project/0.1.0",
+    "datasource_id": "cargo_lock",
+    "purl": "pkg:cargo/test-project@0.1.0"
+  }
+]
