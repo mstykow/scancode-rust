@@ -151,15 +151,33 @@ fn strip_punctuation(text: &mut String) {
     }
 }
 
-fn fix_unbalanced_parens(text: &mut String) {
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ParenBalanceResult {
+    Balanced,
+    FixedSingleUnbalanced,
+    Mismatched,
+}
+
+fn fix_unbalanced_parens(text: &mut String) -> ParenBalanceResult {
     let open_count = text.matches('(').count();
     let close_count = text.matches(')').count();
 
+    if open_count == close_count {
+        return ParenBalanceResult::Balanced;
+    }
+
     if open_count == 1 && close_count == 0 {
         *text = text.replace('(', " ");
-    } else if close_count == 1 && open_count == 0 {
-        *text = text.replace(')', " ");
+        return ParenBalanceResult::FixedSingleUnbalanced;
     }
+
+    if close_count == 1 && open_count == 0 {
+        *text = text.replace(')', " ");
+        return ParenBalanceResult::FixedSingleUnbalanced;
+    }
+
+    ParenBalanceResult::Mismatched
 }
 
 pub(crate) fn normalize_spdx_key(key: &str) -> String {
@@ -373,7 +391,25 @@ pub(crate) fn is_bare_license_list(expression: &str) -> bool {
         && !expression.contains(')')
 }
 
+
+fn has_invalid_spdx_chars(text: &str) -> bool {
+    for c in text.chars() {
+        match c {
+            'a'..='z' | 'A'..='Z' | '0'..='9' => {}
+            ' ' | '\t' | '\n' | '\r' => {}
+            '(' | ')' | '-' | '.' | '_' | '+' | ':' => {}
+            _ => return true,
+        }
+    }
+    false
+}
+
 fn tokenize_for_recovery(text: &str) -> Vec<RecoveryToken> {
+    // If text contains invalid characters, skip recovery
+    if has_invalid_spdx_chars(text) {
+        return Vec::new();
+    }
+
     let mut tokens = Vec::new();
     let mut current = String::new();
 
@@ -417,6 +453,7 @@ fn classify_recovery_token(text: &str) -> RecoveryToken {
     }
 }
 
+
 fn is_likely_license_key(text: &str) -> bool {
     if text.len() < 2 {
         return false;
@@ -426,29 +463,16 @@ fn is_likely_license_key(text: &str) -> bool {
         .chars()
         .all(|c| c.is_alphanumeric() || c == '-' || c == '.' || c == '+' || c == '_');
 
-    let looks_like_license = text.chars().any(|c| c.is_ascii_digit())
-        || text.starts_with("gpl")
-        || text.starts_with("lgpl")
-        || text.starts_with("bsd")
-        || text.starts_with("mit")
-        || text.starts_with("apache")
-        || text.starts_with("mpl")
-        || text.starts_with("epl")
-        || text.starts_with("isc")
-        || text.starts_with("unlicense")
-        || text.starts_with("cddl")
-        || text.starts_with("ecl")
-        || text.starts_with("ogc")
-        || text.starts_with("ogl")
-        || text.starts_with("gfdl")
-        || text.starts_with("bsl")
-        || text.starts_with("postgresql")
-        || text.starts_with("ntp")
-        || text.starts_with("licenseref")
-        || text.ends_with('+')
-        || text.contains('-');
+    if !has_valid_chars {
+        return false;
+    }
 
-    has_valid_chars && looks_like_license
+    let lower = text.to_lowercase();
+    if matches!(lower.as_str(), "and" | "or" | "with") {
+        return false;
+    }
+
+    true
 }
 
 fn is_spdx_exception(text: &str) -> bool {
@@ -461,10 +485,9 @@ fn is_spdx_exception(text: &str) -> bool {
     }
     matches!(
         lowered.as_str(),
-        "linux-syscall-note" | "gpl-cc-1.0" | "llgpl" | "shl-2.0" | "shl-2.1"
+        "linux-syscall-note" | "gpl-cc-1.0" | "llgpr" | "llgpl" | "shl-2.0" | "shl-2.1"
     )
 }
-
 fn reparse_invalid_expression(text: &str) -> Option<LicenseExpression> {
     let tokens = tokenize_for_recovery(text);
 

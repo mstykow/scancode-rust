@@ -90,7 +90,7 @@ cargo test test_is_match       # Runs all tests with "test_is_match" in name
 
 To count failing golden test cases:
 ```bash
-cargo test --release -q --features golden-tests --lib license_detection::golden_test 2>&1 | /tmp/golden_tests.log | grep "failed, 0 skipped" | sed 's/.*, \([0-9]*\) failed,.*/\1/' | paste -sd+ | bc
+cargo test --release -q --features golden-tests --lib license_detection::golden_test 2>&1 | tee /tmp/golden_tests.log | grep "failed, 0 skipped" | sed 's/.*, \([0-9]*\) failed,.*/\1/' | paste -sd+ | bc
 ```
 Running golden tests is expensive, so file-based caching should be used for more complex, incremental analysis.
 ## Project Architecture
