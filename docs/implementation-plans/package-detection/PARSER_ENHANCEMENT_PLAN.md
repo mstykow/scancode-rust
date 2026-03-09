@@ -265,6 +265,7 @@ Current status (March 9, 2026):
 - Assembly now assigns plain crate files under a Cargo package root to that package while still skipping `target/` and leaving nested package roots to their own package assignments.
 - Workspace member fixtures now prove non-manifest files like `crates/cli/LICENSE` and `crates/core/README.md` are associated with the correct member package.
 - Parser golden coverage now includes a `publish = false` Cargo.toml fixture and a Cargo.lock fixture, while existing Cargo.toml goldens now capture `readme_file` extraction.
+- PR #304 (`fix(cargo): complete the Cargo enhancement batch`) is open; keep the ecosystem row `In progress` until the PR merges and the linked issues close.
 
 ### Python PR Scope Rule
 
