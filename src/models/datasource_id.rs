@@ -233,6 +233,7 @@ pub enum DatasourceId {
     /// Serializes to `"rpm_spefile"` to match Python reference value (typo in original).
     #[serde(rename = "rpm_spefile")]
     RpmSpecfile,
+    RpmYumdb,
 
     // ── Ruby/RubyGems ──
     Gemfile,
@@ -443,6 +444,7 @@ impl DatasourceId {
             Self::RpmMarinerManifest => "rpm_mariner_manifest",
             Self::RpmPackageLicenses => "rpm_package_licenses",
             Self::RpmSpecfile => "rpm_spefile",
+            Self::RpmYumdb => "rpm_yumdb",
 
             // Ruby/RubyGems
             Self::Gemfile => "gemfile",
