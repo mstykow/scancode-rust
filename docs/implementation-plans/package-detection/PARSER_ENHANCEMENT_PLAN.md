@@ -98,7 +98,7 @@ cargo run --quiet --bin generate-supported-formats && git diff --exit-code docs/
 | ----- | --------------------- | ----------- | ---------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | 1     | Maven                 | Done        | #122, #124, #126, #128, #131, #135, #207, #208, #211, #214                                                 | `cargo test maven`; `cargo test --features golden-tests maven_golden`; `cargo test --features golden-tests test_assembly_maven_basic`; targeted nested `META-INF/maven/**` regression coverage and datasource-accounting validation                                                                                                                                            |
 | 2     | npm + Yarn            | In progress | #123, #125, #127, #129, #133, #197, #198, #205, #206                                                       | `cargo test npm`; `cargo test yarn`; `cargo test --features golden-tests npm_golden`; `cargo test --features golden-tests test_assembly_npm_basic`; `cargo test --features golden-tests test_assembly_npm_workspace`; `cargo test --features golden-tests test_assembly_pnpm_workspace`; `cargo test --features golden-tests test_assembly_npm_nested_packages`                |
-| 3     | NuGet                 | Planned     | #157, #159, #162, #163, #165, #215, #216                                                                   | `cargo test nuget`; `cargo test --features golden-tests nuget_golden`                                                                                                                                                                                                                                                                                                          |
+| 3     | NuGet                 | In progress | #157, #159, #162, #163, #165, #215, #216                                                                   | `cargo test nuget`; `cargo test --features golden-tests nuget_golden`; `cargo test --features golden-tests test_assembly_nuget_basic`                                                                                                                                                                                                                                          |
 | 4     | RPM                   | Planned     | #164, #166, #167, #168, #169, #170, #171                                                                   | `cargo test rpm`; `cargo test --features golden-tests rpm_golden`                                                                                                                                                                                                                                                                                                              |
 | 5     | Cargo                 | Planned     | #184, #189, #217                                                                                           | `cargo test cargo`; `cargo test --features golden-tests cargo_golden`; `cargo test --features golden-tests test_assembly_cargo_basic`; `cargo test --features golden-tests test_assembly_cargo_workspace`                                                                                                                                                                      |
 | 6     | Go                    | Planned     | #152, #153, #155, #218                                                                                     | `cargo test go`; `cargo test --features golden-tests go_golden`; `cargo test --features golden-tests test_assembly_go_basic`                                                                                                                                                                                                                                                   |
@@ -180,6 +180,35 @@ Current status (March 7, 2026):
 - Workspace assembly now accepts array, string, and object-style workspace declarations, with coverage in npm workspace, pnpm workspace, and nested package assembly goldens.
 - Additional regression coverage now exists for npm lockfile `file:`, `git+...`, tarball URL, and `npm:` alias cases, plus the nested duplicate directness bug.
 - The workboard remains `In progress` until the npm + Yarn batch is reviewed in a check-in, committed, and opened as its own PR.
+
+### NuGet PR Scope
+
+Issues:
+
+- #157 nuspec license collection
+- #159 package license detection
+- #162 missing party types
+- #163 modern nuspec metadata structure
+- #165 license detection from nuspec files
+- #215 extra NuGet manifests
+- #216 Visual Studio / NuGet project manifest support
+
+Likely touchpoints:
+
+- NuGet parser implementation and registration for `.nuspec`, `.nupkg`, `packages.config`, `packages.lock.json`, `project.json`, `project.lock.json`, and PackageReference project files
+- NuGet-focused unit coverage for modern license metadata, archive-backed license files, project manifests, and party typing
+- Parser goldens for legacy nuspecs plus modern `.nuspec`, legacy `project.json`, and PackageReference `.csproj`
+- Assembly coverage for sibling merge of package metadata project files plus dependency-only NuGet manifests
+- Improvement documentation for beyond-parity project-manifest support and archive-backed license extraction
+
+Current status (March 8, 2026):
+
+- Local work now preserves NuGet party `type` as `person` for nuspec- and project-derived author/owner data.
+- Modern NuGet license metadata now records `license_type` and `license_file` hints in parser `extra_data`, while `.nuspec` parsing keeps file-based `<license>` entries ahead of deprecated `licenseUrl` placeholders.
+- `.nupkg` extraction now reads the referenced license file contents when a nuspec declares `<license type="file">...`, giving the package parser a real extracted license statement instead of only the placeholder path.
+- New parser support exists for legacy `project.json`, legacy `project.lock.json`, and PackageReference `.csproj`/`.vbproj`/`.fsproj` manifests.
+- Parser goldens now cover the Fizzler modern nuspec fixture, a legacy `project.json` fixture, and a PackageReference `.csproj` fixture.
+- Assembly golden coverage now exists for a `.csproj` + `packages.config` sibling merge in `test_assembly_nuget_basic`.
 
 ### Python PR Scope Rule
 
