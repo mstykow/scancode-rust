@@ -291,6 +291,7 @@ Current status (March 9, 2026):
 - A new `go.mod.graph` parser now models direct vs transitive module relationships separately from `go.sum`, keeping graph semantics out of the checksum parser.
 - Go assembly coverage now includes a sibling merge case for `go.mod`, `go.sum`, and `go.mod.graph` together.
 - Scanner-side Go source categorization now treats `_test.go` files and `//go:build test` / `// +build test` files as non-production source for `is_source` directory heuristics.
+- PR #305 (`fix(go): complete the Go enhancement batch`) captures the completed implementation batch.
 
 ### Python PR Scope Rule
 
