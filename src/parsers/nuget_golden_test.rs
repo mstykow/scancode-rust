@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod golden_tests {
     use crate::parsers::PackageParser;
-    use crate::parsers::nuget::{NuspecParser, ProjectJsonParser};
+    use crate::parsers::nuget::{NuspecParser, PackageReferenceProjectParser, ProjectJsonParser};
     use crate::test_utils::compare_package_data_parser_only;
     use std::path::PathBuf;
 
@@ -111,6 +111,22 @@ mod golden_tests {
             PathBuf::from("testdata/nuget-golden/legacy-project-json/project.json.expected");
 
         let package_data = ProjectJsonParser::extract_first_package(&test_file);
+
+        match compare_package_data_parser_only(&package_data, &expected_file) {
+            Ok(_) => (),
+            Err(e) => panic!("Golden test failed: {}", e),
+        }
+    }
+
+    #[test]
+    fn test_golden_package_reference_project() {
+        let test_file =
+            PathBuf::from("testdata/nuget-golden/package-reference/Contoso.Utility.csproj");
+        let expected_file = PathBuf::from(
+            "testdata/nuget-golden/package-reference/Contoso.Utility.csproj.expected",
+        );
+
+        let package_data = PackageReferenceProjectParser::extract_first_package(&test_file);
 
         match compare_package_data_parser_only(&package_data, &expected_file) {
             Ok(_) => (),
