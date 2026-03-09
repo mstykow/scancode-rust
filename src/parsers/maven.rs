@@ -402,10 +402,19 @@ fn has_unresolved_template_coordinates(
     name: Option<&str>,
     version: Option<&str>,
 ) -> bool {
+    const TEMPLATE_PLACEHOLDERS: &[&str] = &[
+        "${groupId}",
+        "${artifactId}",
+        "${version}",
+        "${package}",
+        "${packageName}",
+    ];
+
     [namespace, name, version]
         .into_iter()
         .flatten()
-        .any(|value| value.contains("${"))
+        .map(str::trim)
+        .any(|value| TEMPLATE_PLACEHOLDERS.contains(&value))
 }
 
 fn build_license_statement(licenses: &[MavenLicenseEntry]) -> Option<String> {
