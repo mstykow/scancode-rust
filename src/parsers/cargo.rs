@@ -45,6 +45,8 @@ const FIELD_KEYWORDS: &str = "keywords";
 const FIELD_CATEGORIES: &str = "categories";
 const FIELD_RUST_VERSION: &str = "rust-version";
 const FIELD_EDITION: &str = "edition";
+const FIELD_README: &str = "readme";
+const FIELD_PUBLISH: &str = "publish";
 
 /// Rust Cargo.toml manifest parser.
 ///
@@ -178,7 +180,9 @@ impl PackageParser for CargoParser {
     }
 
     fn is_match(path: &Path) -> bool {
-        path.file_name().is_some_and(|name| name == "Cargo.toml")
+        path.file_name()
+            .and_then(|name| name.to_str())
+            .is_some_and(|name| name.eq_ignore_ascii_case("cargo.toml"))
     }
 }
 
@@ -485,6 +489,23 @@ fn extract_extra_data(
             extra_data.insert("license_file".to_string(), json!(license_file));
         }
 
+        if let Some(readme_value) = package.get(FIELD_README) {
+            if let Some(readme_file) = readme_value.as_str() {
+                extra_data.insert("readme_file".to_string(), json!(readme_file));
+            } else if let Some(readme_enabled) = readme_value.as_bool() {
+                extra_data.insert("readme".to_string(), json!(readme_enabled));
+            } else if readme_value
+                .as_table()
+                .is_some_and(|t| t.get("workspace") == Some(&toml::Value::Boolean(true)))
+            {
+                extra_data.insert("readme".to_string(), json!("workspace"));
+            }
+        }
+
+        if let Some(publish_value) = package.get(FIELD_PUBLISH) {
+            extra_data.insert("publish".to_string(), toml_to_json(publish_value));
+        }
+
         // Check for workspace inheritance markers for other fields
         // version
         if let Some(version_value) = package.get(FIELD_VERSION)
@@ -554,7 +575,11 @@ fn extract_extra_data(
 }
 
 fn default_package_data() -> PackageData {
-    PackageData::default()
+    PackageData {
+        package_type: Some(CargoParser::PACKAGE_TYPE),
+        datasource_id: Some(DatasourceId::CargoToml),
+        ..Default::default()
+    }
 }
 
 crate::register_parser!(

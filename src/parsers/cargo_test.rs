@@ -18,9 +18,11 @@ mod tests {
     #[test]
     fn test_is_match() {
         let valid_path = PathBuf::from("/some/path/Cargo.toml");
+        let lowercase_path = PathBuf::from("/some/path/cargo.toml");
         let invalid_path = PathBuf::from("/some/path/not_cargo.toml");
 
         assert!(CargoParser::is_match(&valid_path));
+        assert!(CargoParser::is_match(&lowercase_path));
         assert!(!CargoParser::is_match(&invalid_path));
     }
 
@@ -308,6 +310,27 @@ license-file = "LICENSE.txt"
         assert!(package_data.extra_data.is_some());
         let extra_data = package_data.extra_data.unwrap();
         assert_eq!(extra_data.get("license_file"), Some(&json!("LICENSE.txt")));
+    }
+
+    #[test]
+    fn test_extract_readme_and_publish() {
+        use serde_json::json;
+
+        let content = r#"
+[package]
+name = "test-package"
+version = "0.1.0"
+license = "MIT"
+readme = "README.md"
+publish = false
+"#;
+
+        let (_temp_file, cargo_path) = create_temp_cargo_toml(content);
+        let package_data = CargoParser::extract_first_package(&cargo_path);
+
+        let extra_data = package_data.extra_data.unwrap();
+        assert_eq!(extra_data.get("readme_file"), Some(&json!("README.md")));
+        assert_eq!(extra_data.get("publish"), Some(&json!(false)));
     }
 
     #[test]
