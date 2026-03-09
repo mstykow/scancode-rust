@@ -23,7 +23,8 @@
     "extracted_license_statement": "MIT OR Apache-2.0",
     "extra_data": {
       "rust_edition": "2018",
-      "documentation_url": "http://rust-lang.github.io/rustup.rs/rustup/index.html"
+      "documentation_url": "http://rust-lang.github.io/rustup.rs/rustup/index.html",
+      "readme_file": "README.md"
     },
     "dependencies": [
       {
