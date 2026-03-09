@@ -220,6 +220,12 @@ fn process_file(
         .build()
         .expect("FileInformationBuild not completely initialized");
 
+    if file_info.programming_language.as_deref() == Some("Go")
+        && is_go_non_production_source(path).unwrap_or(false)
+    {
+        file_info.is_source = Some(false);
+    }
+
     if let (Some(scan_results_dir), Some(sha256)) = (
         text_options.scan_cache_dir.as_deref(),
         file_info.sha256.as_deref(),
@@ -622,6 +628,27 @@ fn should_skip_text_detection(path: &Path, buffer: &[u8]) -> bool {
     is_pem_certificate_file(path, buffer)
 }
 
+fn is_go_non_production_source(path: &Path) -> std::io::Result<bool> {
+    if path.extension().and_then(|ext| ext.to_str()) != Some("go") {
+        return Ok(false);
+    }
+
+    if path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .is_some_and(|name| name.ends_with("_test.go"))
+    {
+        return Ok(true);
+    }
+
+    let content = fs::read_to_string(path)?;
+    Ok(content.lines().take(10).any(|line| {
+        let trimmed = line.trim();
+        (trimmed.starts_with("//go:build") || trimmed.starts_with("// +build"))
+            && trimmed.split_whitespace().any(|token| token == "test")
+    }))
+}
+
 fn is_pem_certificate_file(_path: &Path, buffer: &[u8]) -> bool {
     let prefix_len = buffer.len().min(8192);
     let prefix = String::from_utf8_lossy(&buffer[..prefix_len]);
@@ -671,5 +698,39 @@ fn process_directory(path: &Path, metadata: &fs::Metadata) -> FileInfo {
         scan_errors: Vec::new(),
         is_source: None,
         source_count: None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_go_non_production_source;
+    use std::fs;
+    use tempfile::tempdir;
+
+    #[test]
+    fn test_is_go_non_production_source_for_test_filename() {
+        let temp_dir = tempdir().unwrap();
+        let path = temp_dir.path().join("scanner_test.go");
+        fs::write(&path, "package scanner\n").unwrap();
+
+        assert!(is_go_non_production_source(&path).unwrap());
+    }
+
+    #[test]
+    fn test_is_go_non_production_source_for_build_tag() {
+        let temp_dir = tempdir().unwrap();
+        let path = temp_dir.path().join("scanner.go");
+        fs::write(&path, "//go:build test\n\npackage scanner\n").unwrap();
+
+        assert!(is_go_non_production_source(&path).unwrap());
+    }
+
+    #[test]
+    fn test_is_go_non_production_source_for_regular_go_file() {
+        let temp_dir = tempdir().unwrap();
+        let path = temp_dir.path().join("scanner.go");
+        fs::write(&path, "package scanner\n").unwrap();
+
+        assert!(!is_go_non_production_source(&path).unwrap());
     }
 }
