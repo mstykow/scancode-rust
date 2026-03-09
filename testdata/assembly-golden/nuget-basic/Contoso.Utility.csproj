@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <PackageId>Contoso.Utility</PackageId>
+    <Version>1.0.0</Version>
+    <Description>Useful utilities</Description>
+    <Authors>Jane Doe</Authors>
+    <PackageProjectUrl>https://example.test/contoso</PackageProjectUrl>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <RepositoryUrl>https://github.com/example/contoso</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+  </PropertyGroup>
+</Project>
