@@ -80,6 +80,7 @@ Features where Rust exceeds the Python original. Documented in detail at `docs/i
 | `ConanfileTxtParser`, `ConanLockParser`                                                                       | None                                  |
 | `ConanDataParser` patch/mirror metadata                                                                       | Only primary source URL               |
 | `PackagesConfigParser`, `ProjectJsonParser`, `ProjectLockJsonParser`, `PackageReferenceProjectParser` (NuGet) | None                                  |
+| `RpmYumdbParser`                                                                                              | None                                  |
 | `GradleLockfileParser`                                                                                        | None                                  |
 | `NpmWorkspaceParser` (pnpm-workspace.yaml)                                                                    | NonAssemblable only                   |
 | npm/pnpm workspace exclusion patterns + sibling cleanup                                                       | No exclusion support                  |
