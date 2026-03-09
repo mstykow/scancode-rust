@@ -158,7 +158,7 @@ impl<'a> Query<'a> {
     /// A Result containing the Query or an error if binary detection fails
     ///
     /// Corresponds to Python: `Query.__init__()` (lines 196-295)
-    const TEXT_LINE_THRESHOLD: usize = 4;
+    const TEXT_LINE_THRESHOLD: usize = 15;
 
     pub fn new(text: &str, index: &'a LicenseIndex) -> Result<Self, anyhow::Error> {
         Self::with_options(text, index, Self::TEXT_LINE_THRESHOLD)
@@ -346,7 +346,13 @@ impl<'a> Query<'a> {
         //     len_legalese,
         //     &index.digit_only_tids,
         // );
-        let query_runs = Vec::new();
+        let query_runs = Self::compute_query_runs(
+            &tokens,
+            &tokens_by_line,
+            _line_threshold,
+            len_legalese,
+            &index.digit_only_tids,
+        );
 
         Ok(Query {
             text: text.to_string(),
