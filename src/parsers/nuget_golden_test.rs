@@ -90,4 +90,17 @@ mod golden_tests {
             Err(e) => panic!("Golden test failed: {}", e),
         }
     }
+
+    #[test]
+    fn test_golden_fizzler() {
+        let test_file = PathBuf::from("testdata/nuget-golden/fizzler/Fizzler.nuspec");
+        let expected_file = PathBuf::from("testdata/nuget-golden/fizzler/Fizzler.nuspec.expected");
+
+        let package_data = NuspecParser::extract_first_package(&test_file);
+
+        match compare_package_data_parser_only(&package_data, &expected_file) {
+            Ok(_) => (),
+            Err(e) => panic!("Golden test failed: {}", e),
+        }
+    }
 }
