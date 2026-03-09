@@ -20,11 +20,11 @@
 //! - Error handling with `warn!()` logs on parse failures
 
 use std::fs::File;
-use std::io::BufReader;
+use std::io::{BufReader, Read};
 use std::path::Path;
 
 use log::warn;
-use rpm::{Package, PackageMetadata};
+use rpm::{IndexTag, Package, PackageMetadata, RPM_MAGIC};
 
 use crate::models::{DatasourceId, Dependency, PackageData, PackageType, Party};
 
@@ -40,6 +40,116 @@ fn default_package_data() -> PackageData {
     }
 }
 
+pub(crate) fn infer_rpm_namespace(
+    distribution: Option<&str>,
+    vendor: Option<&str>,
+    release: Option<&str>,
+    dist_url: Option<&str>,
+) -> Option<String> {
+    for candidate in [distribution, vendor, dist_url].into_iter().flatten() {
+        let lower = candidate.to_ascii_lowercase();
+        if lower.contains("fedora") || lower.contains("koji") {
+            return Some("fedora".to_string());
+        }
+        if lower.contains("centos") {
+            return Some("centos".to_string());
+        }
+        if lower.contains("red hat") || lower.contains("redhat") || lower.contains("ubi") {
+            return Some("rhel".to_string());
+        }
+        if lower.contains("opensuse") {
+            return Some("opensuse".to_string());
+        }
+        if lower.contains("suse") {
+            return Some("suse".to_string());
+        }
+        if lower.contains("openmandriva") || lower.contains("mandriva") {
+            return Some("openmandriva".to_string());
+        }
+        if lower.contains("mariner") {
+            return Some("mariner".to_string());
+        }
+    }
+
+    if let Some(release) = release {
+        let lower = release.to_ascii_lowercase();
+        if lower.contains(".fc") {
+            return Some("fedora".to_string());
+        }
+        if lower.contains(".el") {
+            return Some("rhel".to_string());
+        }
+        if lower.contains("mdv") || lower.contains("mnb") {
+            return Some("openmandriva".to_string());
+        }
+        if lower.contains("suse") {
+            return Some("suse".to_string());
+        }
+    }
+
+    None
+}
+
+fn rpm_header_string(metadata: &PackageMetadata, tag: IndexTag) -> Option<String> {
+    metadata
+        .header
+        .get_entry_data_as_string(tag)
+        .ok()
+        .and_then(|value| {
+            let trimmed = value.trim();
+            if trimmed.is_empty() || trimmed == "(none)" {
+                None
+            } else {
+                Some(trimmed.to_string())
+            }
+        })
+}
+
+fn rpm_header_string_array(metadata: &PackageMetadata, tag: IndexTag) -> Option<Vec<String>> {
+    metadata
+        .header
+        .get_entry_data_as_string_array(tag)
+        .ok()
+        .map(|items| {
+            items
+                .iter()
+                .map(|item| item.trim().to_string())
+                .filter(|item| !item.is_empty() && item != "(none)")
+                .collect::<Vec<_>>()
+        })
+        .filter(|items| !items.is_empty())
+}
+
+fn infer_vcs_url(metadata: &PackageMetadata, source_urls: &[String]) -> Option<String> {
+    if let Ok(vcs) = metadata.get_vcs()
+        && !vcs.trim().is_empty()
+    {
+        return Some(vcs.to_string());
+    }
+
+    source_urls
+        .iter()
+        .find(|url| url.starts_with("git+") || url.contains("src.fedoraproject.org"))
+        .cloned()
+}
+
+fn build_rpm_qualifiers(
+    architecture: Option<&str>,
+    is_source: bool,
+) -> Option<std::collections::HashMap<String, String>> {
+    let mut qualifiers = std::collections::HashMap::new();
+
+    if let Some(arch) = architecture.filter(|arch| !arch.is_empty()) {
+        qualifiers.insert("arch".to_string(), arch.to_string());
+    }
+
+    if is_source {
+        qualifiers.insert("source".to_string(), "true".to_string());
+    }
+
+    (!qualifiers.is_empty()).then_some(qualifiers)
+}
+
 /// Parser for RPM package archives
 pub struct RpmParser;
 
@@ -47,11 +157,18 @@ impl PackageParser for RpmParser {
     const PACKAGE_TYPE: PackageType = PACKAGE_TYPE;
 
     fn is_match(path: &Path) -> bool {
-        if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
-            matches!(ext, "rpm" | "srpm")
-        } else {
-            false
+        if let Some(ext) = path.extension().and_then(|e| e.to_str())
+            && matches!(ext, "rpm" | "srpm")
+        {
+            return true;
         }
+
+        let mut file = match File::open(path) {
+            Ok(file) => file,
+            Err(_) => return false,
+        };
+        let mut magic = [0_u8; 4];
+        file.read_exact(&mut magic).is_ok() && magic == RPM_MAGIC
     }
 
     fn extract_packages(path: &Path) -> Vec<PackageData> {
@@ -72,19 +189,61 @@ impl PackageParser for RpmParser {
             }
         };
 
-        vec![parse_rpm_package(&pkg)]
+        vec![parse_rpm_package(&pkg, path)]
     }
 }
 
-fn parse_rpm_package(pkg: &Package) -> PackageData {
+fn infer_rpm_namespace_from_filename(path: &Path) -> Option<String> {
+    let filename = path.file_name()?.to_str()?.to_ascii_lowercase();
+
+    if filename.contains(".fc") {
+        return Some("fedora".to_string());
+    }
+    if filename.contains(".el") {
+        return Some("rhel".to_string());
+    }
+    if filename.contains("mdv") || filename.contains("mnb") {
+        return Some("openmandriva".to_string());
+    }
+    if filename.contains("opensuse") {
+        return Some("opensuse".to_string());
+    }
+    if filename.contains("suse") {
+        return Some("suse".to_string());
+    }
+
+    None
+}
+
+fn parse_rpm_package(pkg: &Package, path: &Path) -> PackageData {
     let metadata = &pkg.metadata;
 
     let name = metadata.get_name().ok().map(|s| s.to_string());
     let version = build_evr_version(metadata);
     let description = metadata.get_description().ok().map(|s| s.to_string());
     let homepage_url = metadata.get_url().ok().map(|s| s.to_string());
-
-    let namespace = Some("fedora".to_string());
+    let architecture = metadata.get_arch().ok().map(|s| s.to_string());
+    let path_str = path.to_string_lossy();
+    let is_source = metadata.is_source_package()
+        || path_str.ends_with(".src.rpm")
+        || path_str.ends_with(".srpm");
+    let distribution = rpm_header_string(metadata, IndexTag::RPMTAG_DISTRIBUTION);
+    let dist_url = rpm_header_string(metadata, IndexTag::RPMTAG_DISTURL);
+    let bug_tracking_url = rpm_header_string(metadata, IndexTag::RPMTAG_BUGURL);
+    let source_urls =
+        rpm_header_string_array(metadata, IndexTag::RPMTAG_SOURCE).unwrap_or_default();
+    let source_rpm = metadata
+        .get_source_rpm()
+        .ok()
+        .filter(|value| !value.is_empty())
+        .map(|value| value.to_string());
+    let namespace = infer_rpm_namespace(
+        distribution.as_deref(),
+        metadata.get_vendor().ok(),
+        metadata.get_release().ok(),
+        dist_url.as_deref(),
+    )
+    .or_else(|| infer_rpm_namespace_from_filename(path));
 
     let mut parties = Vec::new();
 
@@ -103,12 +262,25 @@ fn parse_rpm_package(pkg: &Package) -> PackageData {
         });
     }
 
+    if let Some(distribution_name) = distribution.as_ref() {
+        parties.push(Party {
+            r#type: Some("organization".to_string()),
+            role: Some("distributor".to_string()),
+            name: Some(distribution_name.clone()),
+            email: None,
+            url: None,
+            organization: None,
+            organization_url: None,
+            timezone: None,
+        });
+    }
+
     if let Ok(packager) = metadata.get_packager()
         && !packager.is_empty()
     {
         let (name_opt, email_opt) = parse_packager(packager);
         parties.push(Party {
-            r#type: None,
+            r#type: Some("person".to_string()),
             role: Some("packager".to_string()),
             name: name_opt,
             email: email_opt,
@@ -123,7 +295,52 @@ fn parse_rpm_package(pkg: &Package) -> PackageData {
 
     let dependencies = extract_rpm_dependencies(pkg, namespace.as_deref());
 
-    let architecture = metadata.get_arch().ok().map(|s| s.to_string());
+    let qualifiers = build_rpm_qualifiers(architecture.as_deref(), is_source);
+
+    let mut keywords = Vec::new();
+    if let Ok(group) = metadata.get_group()
+        && !group.is_empty()
+    {
+        keywords.push(group.to_string());
+    }
+
+    let mut extra_data = std::collections::HashMap::new();
+    if let Some(distribution) = distribution.clone() {
+        extra_data.insert(
+            "distribution".to_string(),
+            serde_json::Value::String(distribution),
+        );
+    }
+    if let Some(dist_url) = dist_url.clone() {
+        extra_data.insert("dist_url".to_string(), serde_json::Value::String(dist_url));
+    }
+    if let Ok(build_host) = metadata.get_build_host()
+        && !build_host.is_empty()
+    {
+        extra_data.insert(
+            "build_host".to_string(),
+            serde_json::Value::String(build_host.to_string()),
+        );
+    }
+    if let Ok(build_time) = metadata.get_build_time() {
+        extra_data.insert(
+            "build_time".to_string(),
+            serde_json::Value::Number(serde_json::Number::from(build_time)),
+        );
+    }
+    if !source_urls.is_empty() {
+        extra_data.insert(
+            "source_urls".to_string(),
+            serde_json::Value::Array(
+                source_urls
+                    .iter()
+                    .cloned()
+                    .map(serde_json::Value::String)
+                    .collect(),
+            ),
+        );
+    }
+    let vcs_url = infer_vcs_url(metadata, &source_urls);
 
     PackageData {
         datasource_id: Some(DatasourceId::RpmArchive),
@@ -131,17 +348,25 @@ fn parse_rpm_package(pkg: &Package) -> PackageData {
         namespace: namespace.clone(),
         name: name.clone(),
         version: version.clone(),
+        qualifiers,
         description,
         homepage_url,
+        size: metadata.get_installed_size().ok(),
         parties,
+        keywords,
+        bug_tracking_url,
         extracted_license_statement,
         dependencies,
+        source_packages: source_rpm.into_iter().collect(),
+        vcs_url,
+        extra_data: (!extra_data.is_empty()).then_some(extra_data),
         purl: name.as_ref().and_then(|n| {
             build_rpm_purl(
                 n,
                 version.as_deref(),
                 namespace.as_deref(),
                 architecture.as_deref(),
+                is_source,
             )
         }),
         ..Default::default()
@@ -162,6 +387,7 @@ fn extract_rpm_dependencies(pkg: &Package, namespace: Option<&str>) -> Vec<Depen
                 },
                 namespace,
                 None,
+                false,
             );
 
             let extracted_requirement = if !rpm_dep.version.is_empty() {
@@ -249,6 +475,7 @@ fn build_rpm_purl(
     version: Option<&str>,
     namespace: Option<&str>,
     architecture: Option<&str>,
+    is_source: bool,
 ) -> Option<String> {
     use packageurl::PackageUrl;
 
@@ -266,13 +493,19 @@ fn build_rpm_purl(
         purl.add_qualifier("arch", arch).ok()?;
     }
 
+    if is_source {
+        purl.add_qualifier("source", "true").ok()?;
+    }
+
     Some(purl.to_string())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
     use std::path::PathBuf;
+    use tempfile::NamedTempFile;
 
     #[test]
     fn test_rpm_parser_is_match() {
@@ -283,6 +516,19 @@ mod tests {
         )));
         assert!(!RpmParser::is_match(&PathBuf::from("package.deb")));
         assert!(!RpmParser::is_match(&PathBuf::from("package.tar.gz")));
+    }
+
+    #[test]
+    fn test_rpm_parser_matches_hash_named_source_rpm_by_magic() {
+        let source_fixture = PathBuf::from("testdata/rpm/setup-2.5.49-b1.src.rpm");
+        if !source_fixture.exists() {
+            return;
+        }
+
+        let temp_file = NamedTempFile::new().unwrap();
+        fs::copy(&source_fixture, temp_file.path()).unwrap();
+
+        assert!(RpmParser::is_match(temp_file.path()));
     }
 
     #[test]
@@ -310,7 +556,13 @@ mod tests {
 
     #[test]
     fn test_build_rpm_purl() {
-        let purl = build_rpm_purl("bash", Some("4.4.19-1.el7"), Some("fedora"), Some("x86_64"));
+        let purl = build_rpm_purl(
+            "bash",
+            Some("4.4.19-1.el7"),
+            Some("fedora"),
+            Some("x86_64"),
+            false,
+        );
         assert!(purl.is_some());
         let purl_str = purl.unwrap();
         assert!(purl_str.contains("pkg:rpm/fedora/bash"));
@@ -338,7 +590,7 @@ mod tests {
 
     #[test]
     fn test_build_rpm_purl_no_namespace() {
-        let purl = build_rpm_purl("package", Some("1.0-1"), None, Some("x86_64"));
+        let purl = build_rpm_purl("package", Some("1.0-1"), None, Some("x86_64"), false);
         assert!(purl.is_some());
         let purl_str = purl.unwrap();
         assert!(purl_str.starts_with("pkg:rpm/package@"));
@@ -394,6 +646,95 @@ mod tests {
             assert_eq!(pkg.name, Some("fping".to_string()));
             assert!(pkg.version.is_some());
         }
+    }
+
+    #[test]
+    fn test_rpm_archive_extracts_additional_metadata_fields() {
+        let test_file = PathBuf::from("testdata/rpm/setup-2.5.49-b1.src.rpm");
+        if !test_file.exists() {
+            return;
+        }
+
+        let pkg = RpmParser::extract_first_package(&test_file);
+
+        assert_eq!(pkg.name.as_deref(), Some("setup"));
+        assert_eq!(
+            pkg.qualifiers
+                .as_ref()
+                .and_then(|q| q.get("arch"))
+                .map(String::as_str),
+            Some("noarch")
+        );
+        assert!(!pkg.keywords.is_empty());
+        assert!(pkg.size.is_some());
+        assert!(
+            pkg.parties
+                .iter()
+                .any(|party| party.role.as_deref() == Some("packager"))
+        );
+        assert!(
+            pkg.qualifiers
+                .as_ref()
+                .is_some_and(|q| q.get("source") == Some(&"true".to_string()))
+        );
+    }
+
+    #[test]
+    fn test_source_rpm_sets_source_qualifier() {
+        let test_file = PathBuf::from("testdata/rpm/setup-2.5.49-b1.src.rpm");
+        if !test_file.exists() {
+            return;
+        }
+
+        let pkg = RpmParser::extract_first_package(&test_file);
+
+        assert!(
+            pkg.qualifiers
+                .as_ref()
+                .is_some_and(|q| q.get("source") == Some(&"true".to_string()))
+        );
+        assert!(
+            pkg.purl
+                .as_ref()
+                .is_some_and(|purl| purl.contains("source=true"))
+        );
+    }
+
+    #[test]
+    fn test_rpm_archive_extracts_vcs_and_source_metadata() {
+        let package = rpm::PackageBuilder::new(
+            "thunar-sendto-clamtk",
+            "0.08",
+            "GPL-2.0-or-later",
+            "noarch",
+            "Simple virus scanning extension for Thunar",
+        )
+        .release("2.fc40")
+        .vendor("Fedora Project")
+        .packager("Fedora Release Engineering <releng@fedoraproject.org>")
+        .group("Applications/System")
+        .vcs("git+https://src.fedoraproject.org/rpms/thunar-sendto-clamtk.git#5a3f8e92b45f46b464e6924c79d4bf3e11bb1f0e")
+        .build()
+        .unwrap();
+
+        let temp_file = NamedTempFile::new().unwrap();
+        package.write_file(temp_file.path()).unwrap();
+
+        let pkg = RpmParser::extract_first_package(temp_file.path());
+
+        assert_eq!(pkg.namespace.as_deref(), Some("fedora"));
+        assert_eq!(
+            pkg.vcs_url.as_deref(),
+            Some(
+                "git+https://src.fedoraproject.org/rpms/thunar-sendto-clamtk.git#5a3f8e92b45f46b464e6924c79d4bf3e11bb1f0e",
+            )
+        );
+        assert!(
+            pkg.extra_data
+                .as_ref()
+                .is_some_and(|extra| extra.contains_key("build_time"))
+        );
+        assert!(!pkg.keywords.is_empty());
     }
 }
 
