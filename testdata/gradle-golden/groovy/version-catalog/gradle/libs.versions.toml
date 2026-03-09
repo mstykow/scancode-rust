@@ -1,0 +1,6 @@
+[versions]
+androidxAppcompat = "1.7.0"
+
+[libraries]
+androidx-appcompat = { module = "androidx.appcompat:appcompat", version.ref = "androidxAppcompat" }
+guardianproject-panic = { group = "info.guardianproject", name = "panic", version = "1.0.0" }

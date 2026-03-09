@@ -1,0 +1,5 @@
+dependencies {
+    implementation libs.androidx.appcompat
+    fullImplementation libs.guardianproject.panic
+    implementation project(':libs:download')
+}
