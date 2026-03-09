@@ -1,0 +1,9 @@
+[package]
+name = "lowercase-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Core library for lowercase workspace"
+
+[dependencies]
+serde = { workspace = true }

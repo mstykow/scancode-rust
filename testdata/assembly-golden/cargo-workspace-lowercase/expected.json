@@ -1,0 +1,62 @@
+{
+  "dependencies": [
+    {
+      "datafile_path": "crates/core/cargo.toml",
+      "datasource_id": "cargo_toml",
+      "dependency_uid": "pkg:cargo/serde?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "extra_data": {
+        "workspace": true
+      },
+      "extracted_requirement": "1.0",
+      "for_package_uid": "pkg:cargo/lowercase-core@0.7.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "is_direct": true,
+      "is_optional": false,
+      "is_pinned": false,
+      "is_runtime": true,
+      "purl": "pkg:cargo/serde",
+      "scope": "dependencies"
+    }
+  ],
+  "files_with_packages": [
+    {
+      "for_packages": [
+        "pkg:cargo/lowercase-core@0.7.0?uuid=fixed-uid-done-for-testing-5642512d1758"
+      ],
+      "path": "cargo.toml"
+    },
+    {
+      "for_packages": [
+        "pkg:cargo/lowercase-core@0.7.0?uuid=fixed-uid-done-for-testing-5642512d1758"
+      ],
+      "path": "crates/core/README.md"
+    },
+    {
+      "for_packages": [
+        "pkg:cargo/lowercase-core@0.7.0?uuid=fixed-uid-done-for-testing-5642512d1758"
+      ],
+      "path": "crates/core/cargo.toml"
+    }
+  ],
+  "packages": [
+    {
+      "api_data_url": "https://crates.io/api/v1/crates/lowercase-core",
+      "datafile_paths": ["crates/core/cargo.toml"],
+      "datasource_ids": ["cargo_toml"],
+      "description": "Core library for lowercase workspace",
+      "extra_data": {
+        "rust_edition": "2021"
+      },
+      "extracted_license_statement": "MIT",
+      "homepage_url": "https://crates.io/crates/lowercase-core",
+      "name": "lowercase-core",
+      "package_uid": "pkg:cargo/lowercase-core@0.7.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "parties": [],
+      "primary_language": "Rust",
+      "purl": "pkg:cargo/lowercase-core@0.7.0",
+      "repository_download_url": "https://crates.io/api/v1/crates/lowercase-core/0.7.0/download",
+      "repository_homepage_url": "https://crates.io/crates/lowercase-core",
+      "type": "cargo",
+      "version": "0.7.0"
+    }
+  ]
+}

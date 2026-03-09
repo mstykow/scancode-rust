@@ -1,0 +1,12 @@
+[workspace]
+members = ["crates/core"]
+
+[workspace.package]
+version = "0.7.0"
+edition = "2021"
+license = "MIT"
+homepage = "https://example.com/lowercase"
+repository = "https://github.com/example/lowercase"
+
+[workspace.dependencies]
+serde = "1.0"
