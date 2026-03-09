@@ -102,7 +102,7 @@ cargo run --quiet --bin generate-supported-formats && git diff --exit-code docs/
 | 3     | NuGet                 | Done    | #157, #159, #162, #163, #165, #215, #216                                                                   | `cargo test nuget`; `cargo test --features golden-tests nuget_golden`; `cargo test --features golden-tests test_assembly_nuget_basic`                                                                                                                                                                                                                                          |
 | 4     | RPM                   | Done    | #164, #166, #167, #168, #169, #170, #171                                                                   | `cargo test rpm`; `cargo test --features golden-tests rpm_golden`; `cargo test test_resolve_rpm_namespace --lib`; `cargo test test_merge_rpm_yumdb_metadata --lib`                                                                                                                                                                                                             |
 | 5     | Cargo                 | Done    | #184, #189, #217                                                                                           | `cargo test cargo`; `cargo test --features golden-tests cargo_golden`; `cargo test --features golden-tests test_assembly_cargo_basic`; `cargo test --features golden-tests test_assembly_cargo_workspace`                                                                                                                                                                      |
-| 6     | Go                    | Planned | #152, #153, #155, #218                                                                                     | `cargo test go`; `cargo test --features golden-tests go_golden`; `cargo test --features golden-tests test_assembly_go_basic`                                                                                                                                                                                                                                                   |
+| 6     | Go                    | Done    | #152, #153, #155, #218                                                                                     | `cargo test go`; `cargo test --features golden-tests go_golden`; `cargo test --features golden-tests test_assembly_go_basic`; `cargo test --features golden-tests test_assembly_go_graph_basic`                                                                                                                                                                                |
 | 7     | Gradle                | Planned | #130, #132, #134, #137                                                                                     | `cargo test gradle`; `cargo test --features golden-tests gradle_golden`                                                                                                                                                                                                                                                                                                        |
 | 8     | Ruby                  | Planned | #151, #154, #156, #158, #160, #161                                                                         | `cargo test ruby`; `cargo test --features golden-tests ruby_golden`                                                                                                                                                                                                                                                                                                            |
 | 9     | Composer              | Planned | #187, #188, #190                                                                                           | `cargo test composer`; `cargo test --features golden-tests composer_golden`; `cargo test --features golden-tests test_assembly_composer_basic`                                                                                                                                                                                                                                 |
@@ -266,6 +266,31 @@ Current status (March 9, 2026):
 - Workspace member fixtures now prove non-manifest files like `crates/cli/LICENSE` and `crates/core/README.md` are associated with the correct member package.
 - Parser golden coverage now includes a `publish = false` Cargo.toml fixture and a Cargo.lock fixture, while existing Cargo.toml goldens now capture `readme_file` extraction.
 - PR #304 (`fix(cargo): complete the Cargo enhancement batch`) captures the completed implementation batch.
+
+### Go PR Scope
+
+Issues:
+
+- #152 support go.mod directives
+- #153 improve granularity of detection within go.sum/go.mod
+- #155 use Go build naming conventions and directives for file categorization and dependency scopes
+- #218 support Go module graph
+
+Likely touchpoints:
+
+- Go parser behavior for fallback datasource coverage and generated module-graph artifacts
+- Go-focused unit coverage for graph parsing and scanner-side source categorization
+- Parser goldens for `replace` directives and graph output
+- Assembly coverage for sibling merge of `go.mod`, `go.sum`, and `go.mod.graph`
+- Improvement documentation for graph support and Go test/build file categorization
+
+Current status (March 9, 2026):
+
+- Local work now keeps `datasource_id` populated on Go parser fallback/error paths for `go.mod`, `go.sum`, and `Godeps.json`.
+- Go parser goldens now cover a real upstream `replace` directive fixture (`opencensus-service`) plus a checked-in `go.mod graph` artifact.
+- A new `go.mod.graph` parser now models direct vs transitive module relationships separately from `go.sum`, keeping graph semantics out of the checksum parser.
+- Go assembly coverage now includes a sibling merge case for `go.mod`, `go.sum`, and `go.mod.graph` together.
+- Scanner-side Go source categorization now treats `_test.go` files and `//go:build test` / `// +build test` files as non-production source for `is_source` directory heuristics.
 
 ### Python PR Scope Rule
 
