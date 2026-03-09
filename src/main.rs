@@ -589,7 +589,7 @@ fn apply_mark_source(files: &mut [crate::models::FileInfo]) {
     for entry in files.iter_mut() {
         if entry.file_type == crate::models::FileType::File {
             if entry.is_source != Some(false) {
-                entry.is_source = Some(entry.programming_language.is_some());
+                entry.is_source = entry.programming_language.as_ref().map(|_| true);
             }
             entry.source_count = None;
         }
