@@ -342,13 +342,7 @@ impl<'a> Query<'a> {
         //     len_legalese,
         //     &index.digit_only_tids,
         // );
-        let query_runs = Self::compute_query_runs(
-            &tokens,
-            &tokens_by_line,
-            _line_threshold,
-            len_legalese,
-            &index.digit_only_tids,
-        );
+        let query_runs: Vec<(usize, Option<usize>)> = Vec::new();
 
         Ok(Query {
             text: text.to_string(),

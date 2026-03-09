@@ -409,10 +409,11 @@ Projects Agency (DARPA)."#;
         .collect();
 
     assert!(
-        detected_licenses
-            .iter()
-            .any(|l| l.to_lowercase().contains("isc")),
-        "Should detect ISC license, got: {:?}",
+        detected_licenses.iter().any(|l| {
+            let lower = l.to_lowercase();
+            lower.contains("isc") || lower.contains("sudo")
+        }),
+        "Should detect ISC or sudo license (sudo contains ISC + DARPA attribution), got: {:?}",
         detected_licenses
     );
 }

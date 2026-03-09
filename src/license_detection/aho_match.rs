@@ -18,11 +18,11 @@ pub const MATCH_AHO: &str = "2-aho";
 
 /// Matcher order for Aho-Corasick exact matching.
 ///
-/// Aho-Corasick matching runs after hash matching and SPDX-LID matching.
+/// Aho-Corasick matching runs after hash matching.
 ///
 /// Corresponds to Python: `MATCH_AHO_EXACT_ORDER = 1` (line 79)
 #[allow(dead_code)]
-pub const MATCH_AHO_ORDER: u8 = 2;
+pub const MATCH_AHO_ORDER: u8 = 1;
 
 /// Encode u16 token sequence as bytes.
 ///
@@ -487,7 +487,7 @@ mod tests {
     #[test]
     fn test_constants() {
         assert_eq!(MATCH_AHO, "2-aho");
-        assert_eq!(MATCH_AHO_ORDER, 2);
+        assert_eq!(MATCH_AHO_ORDER, 1);
     }
 
     #[test]

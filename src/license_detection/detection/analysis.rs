@@ -257,23 +257,9 @@ pub(super) fn filter_license_intros(matches: &[LicenseMatch]) -> Vec<LicenseMatc
 
 /// Check if a match references a local file.
 ///
-/// A match references a local file if its rule_identifier matches
-/// patterns like "mit.LICENSE" or "apache-2.0.COPYING".
-///
-/// Based on Python: is_license_reference_local_file() at detection.py:1387-1401
+/// Based on Python: is_license_reference_local_file() at detection.py:1368-1377
 pub(super) fn is_license_reference_local_file(m: &LicenseMatch) -> bool {
-    let has_reffile = m
-        .referenced_filenames
-        .as_ref()
-        .is_some_and(|v| !v.is_empty());
-    if has_reffile {
-        return true;
-    }
-
-    let local_file_patterns = ["LICENSE", "COPYING", "COPYRIGHT", "NOTICE"];
-    local_file_patterns
-        .iter()
-        .any(|pattern| m.rule_identifier.ends_with(&format!(".{}", pattern)))
+    m.referenced_filenames.as_ref().is_some_and(|v| !v.is_empty())
 }
 
 /// Filter out license reference matches that point to local files.
@@ -1453,13 +1439,15 @@ mod tests {
 
     #[test]
     fn test_is_license_reference_local_file_true() {
-        let m = create_test_match(100.0, "mit.LICENSE");
+        let mut m = create_test_match(100.0, "mit.LICENSE");
+        m.referenced_filenames = Some(vec!["LICENSE".to_string()]);
         assert!(is_license_reference_local_file(&m));
     }
 
     #[test]
     fn test_is_license_reference_local_file_true_multiple() {
-        let m = create_test_match(100.0, "apache-2.0.COPYING");
+        let mut m = create_test_match(100.0, "apache-2.0.COPYING");
+        m.referenced_filenames = Some(vec!["COPYING".to_string()]);
         assert!(is_license_reference_local_file(&m));
     }
 
@@ -1471,7 +1459,8 @@ mod tests {
 
     #[test]
     fn test_filter_license_references_filters_matches() {
-        let m1 = create_test_match(100.0, "mit.LICENSE");
+        let mut m1 = create_test_match(100.0, "mit.LICENSE");
+        m1.referenced_filenames = Some(vec!["LICENSE".to_string()]);
         let m2 = create_test_match(100.0, "mit.RULE");
         let filtered = filter_license_references(&[m1, m2]);
         assert_eq!(filtered.len(), 1);
@@ -1497,6 +1486,7 @@ mod tests {
         m1.is_license_intro = true;
         m1.matcher = "2-aho".to_string();
         m1.match_coverage = 100.0;
+        m1.referenced_filenames = Some(vec!["LICENSE".to_string()]);
         let m2 = create_test_match(100.0, "mit.RULE");
         let filtered = filter_license_intros_and_references(&[m1, m2]);
         assert_eq!(filtered.len(), 1);

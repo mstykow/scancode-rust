@@ -194,9 +194,9 @@ impl Default for LicenseMatch {
 impl LicenseMatch {
     pub fn matcher_order(&self) -> u8 {
         match self.matcher.as_str() {
-            "1-hash" => 1,
-            "1-spdx-id" => 1,
-            "2-aho" => 2,
+            "1-hash" => 0,
+            "1-spdx-id" => 2,
+            "2-aho" => 1,
             "3-seq" => 3,
             "3-spdx" => 3,
             "4-seq" => 4,

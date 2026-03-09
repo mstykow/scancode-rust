@@ -43,11 +43,11 @@ pub const MATCH_SPDX_ID: &str = "1-spdx-id";
 
 /// Matcher order for SPDX-License-Identifier based matching.
 ///
-/// SPDX-LID matching runs after hash matching.
+/// SPDX-LID matching runs after hash matching and Aho-Corasick matching.
 ///
 /// Corresponds to Python: `MATCH_SPDX_ID_ORDER = 2` (line 62)
 #[allow(dead_code)]
-pub const MATCH_SPDX_ID_ORDER: u8 = 1;
+pub const MATCH_SPDX_ID_ORDER: u8 = 2;
 
 lazy_static::lazy_static! {
     static ref SPDX_LID_PATTERN: Regex = Regex::new(

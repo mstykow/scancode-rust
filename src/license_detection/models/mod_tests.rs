@@ -686,14 +686,14 @@ mod tests {
     #[test]
     fn test_matcher_order_hash() {
         let match_result = create_license_match();
-        assert_eq!(match_result.matcher_order(), 1);
+        assert_eq!(match_result.matcher_order(), 0);
     }
 
     #[test]
     fn test_matcher_order_aho() {
         let mut match_result = create_license_match();
         match_result.matcher = "2-aho".to_string();
-        assert_eq!(match_result.matcher_order(), 2);
+        assert_eq!(match_result.matcher_order(), 1);
     }
 
     #[test]
