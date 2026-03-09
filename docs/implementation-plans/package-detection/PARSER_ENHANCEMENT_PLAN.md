@@ -1,7 +1,7 @@
 # Package Parser Enhancement Plan
 
 > **Status**: 🟡 Active — ecosystem-by-ecosystem enhancement backlog and execution tracker
-> **Updated**: March 7, 2026
+> **Updated**: March 9, 2026
 > **Dependencies**: [PARSER_PLAN.md](PARSER_PLAN.md), [ASSEMBLY_PLAN.md](ASSEMBLY_PLAN.md), [HOW_TO_ADD_A_PARSER.md](../../HOW_TO_ADD_A_PARSER.md), [TESTING_STRATEGY.md](../../TESTING_STRATEGY.md)
 
 ## Purpose
@@ -17,7 +17,8 @@ At the start of each session:
 3. Before coding, confirm the issue set is still open with GitHub.
    - Read the full issue body for every issue in the active ecosystem, not just the title or earlier notes.
 4. After finishing an ecosystem PR, update this file:
-   - mark the ecosystem `Done` or `In progress`
+   - mark the ecosystem `In progress` while its PR is open and awaiting merge
+   - mark the ecosystem `Done` only after the ecosystem PR lands and the linked issue set is closed
    - add any follow-up issues created or intentionally deferred
 5. If sequencing changes, update the order here instead of relying on chat history.
 
@@ -97,7 +98,7 @@ cargo run --quiet --bin generate-supported-formats && git diff --exit-code docs/
 | Order | Ecosystem             | Status      | Issue Set                                                                                                  | Primary Validation                                                                                                                                                                                                                                                                                                                                                             |
 | ----- | --------------------- | ----------- | ---------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | 1     | Maven                 | Done        | #122, #124, #126, #128, #131, #135, #207, #208, #211, #214                                                 | `cargo test maven`; `cargo test --features golden-tests maven_golden`; `cargo test --features golden-tests test_assembly_maven_basic`; targeted nested `META-INF/maven/**` regression coverage and datasource-accounting validation                                                                                                                                            |
-| 2     | npm + Yarn            | In progress | #123, #125, #127, #129, #133, #197, #198, #205, #206                                                       | `cargo test npm`; `cargo test yarn`; `cargo test --features golden-tests npm_golden`; `cargo test --features golden-tests test_assembly_npm_basic`; `cargo test --features golden-tests test_assembly_npm_workspace`; `cargo test --features golden-tests test_assembly_pnpm_workspace`; `cargo test --features golden-tests test_assembly_npm_nested_packages`                |
+| 2     | npm + Yarn            | Done        | #123, #125, #127, #129, #133, #197, #198, #205, #206                                                       | `cargo test npm`; `cargo test yarn`; `cargo test --features golden-tests npm_golden`; `cargo test --features golden-tests test_assembly_npm_basic`; `cargo test --features golden-tests test_assembly_npm_workspace`; `cargo test --features golden-tests test_assembly_pnpm_workspace`; `cargo test --features golden-tests test_assembly_npm_nested_packages`                |
 | 3     | NuGet                 | In progress | #157, #159, #162, #163, #165, #215, #216                                                                   | `cargo test nuget`; `cargo test --features golden-tests nuget_golden`; `cargo test --features golden-tests test_assembly_nuget_basic`                                                                                                                                                                                                                                          |
 | 4     | RPM                   | In progress | #164, #166, #167, #168, #169, #170, #171                                                                   | `cargo test rpm`; `cargo test --features golden-tests rpm_golden`; `cargo test test_resolve_rpm_namespace --lib`; `cargo test test_merge_rpm_yumdb_metadata --lib`                                                                                                                                                                                                             |
 | 5     | Cargo                 | Planned     | #184, #189, #217                                                                                           | `cargo test cargo`; `cargo test --features golden-tests cargo_golden`; `cargo test --features golden-tests test_assembly_cargo_basic`; `cargo test --features golden-tests test_assembly_cargo_workspace`                                                                                                                                                                      |
@@ -170,7 +171,7 @@ Likely touchpoints:
 - Representative parser and assembly fixtures under `testdata/`
 - Improvement documentation for intentional Rust-vs-Python behavior differences
 
-Current status (March 7, 2026):
+Current status (March 9, 2026):
 
 - Local work now preserves npm `overrides`, avoids synthetic URLs for empty npm metadata, and adds scoped API URL regression coverage.
 - Scoped npm fallback URLs now use the correct registry/tarball shape, while invalid homepage arrays and blank bugs URLs are normalized away.
@@ -179,7 +180,7 @@ Current status (March 7, 2026):
 - npm/pnpm assembly now assigns package-root files while skipping first-level `node_modules`, preserves unattached lockfile dependencies when a sibling manifest is not packageable, and emits deterministic package/file ordering.
 - Workspace assembly now accepts array, string, and object-style workspace declarations, with coverage in npm workspace, pnpm workspace, and nested package assembly goldens.
 - Additional regression coverage now exists for npm lockfile `file:`, `git+...`, tarball URL, and `npm:` alias cases, plus the nested duplicate directness bug.
-- The workboard remains `In progress` until the npm + Yarn batch is reviewed in a check-in, committed, and opened as its own PR.
+- PR #297 (`fix(npm): complete the npm and yarn enhancement batch`) has merged, so this ecosystem row is now `Done`.
 
 ### NuGet PR Scope
 
@@ -201,7 +202,7 @@ Likely touchpoints:
 - Assembly coverage for sibling merge of package metadata project files plus dependency-only NuGet manifests
 - Improvement documentation for beyond-parity project-manifest support and archive-backed license extraction
 
-Current status (March 8, 2026):
+Current status (March 9, 2026):
 
 - Local work now preserves NuGet party `type` as `person` for nuspec- and project-derived author/owner data.
 - Modern NuGet license metadata now records `license_type` and `license_file` hints in parser `extra_data`, while `.nuspec` parsing keeps file-based `<license>` entries ahead of deprecated `licenseUrl` placeholders.
@@ -209,6 +210,7 @@ Current status (March 8, 2026):
 - New parser support exists for legacy `project.json`, legacy `project.lock.json`, and PackageReference `.csproj`/`.vbproj`/`.fsproj` manifests.
 - Parser goldens now cover the Fizzler modern nuspec fixture, a legacy `project.json` fixture, and a PackageReference `.csproj` fixture.
 - Assembly golden coverage now exists for a `.csproj` + `packages.config` sibling merge in `test_assembly_nuget_basic`.
+- PR #299 (`fix(nuget): complete the NuGet enhancement batch`) is open; keep the ecosystem row `In progress` until the PR merges and the linked issues close.
 
 ### RPM PR Scope
 
@@ -237,6 +239,7 @@ Current status (March 9, 2026):
 - Installed RPM version regressions now have focused coverage proving `version-release` is preserved.
 - YumDB `from_repo` package sidecars now parse sibling YumDB keys and merge them back onto the matching installed RPM package under `extra_data.yumdb`.
 - Parser golden coverage now includes a real source RPM fixture (`setup-2.5.49-b1.src.rpm`) with the richer archive metadata contract.
+- PR #300 (`fix(rpm): complete the RPM enhancement batch`) is open; keep the ecosystem row `In progress` until the PR merges and the linked issues close.
 
 ### Python PR Scope Rule
 
