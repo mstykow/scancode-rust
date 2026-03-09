@@ -53,10 +53,17 @@ pub static ASSEMBLERS: &[AssemblerConfig] = &[
     AssemblerConfig {
         datasource_ids: &[
             DatasourceId::GoMod,
+            DatasourceId::GoModGraph,
             DatasourceId::GoSum,
             DatasourceId::Godeps,
         ],
-        sibling_file_patterns: &["go.mod", "go.sum", "Godeps.json"],
+        sibling_file_patterns: &[
+            "go.mod",
+            "go.mod.graph",
+            "go.modgraph",
+            "go.sum",
+            "Godeps.json",
+        ],
         mode: AssemblyMode::SiblingMerge,
     },
     // Dart/Flutter ecosystem
