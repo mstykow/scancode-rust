@@ -39,7 +39,7 @@ impl PackageParser for CargoLockParser {
     fn is_match(path: &Path) -> bool {
         path.file_name()
             .and_then(|name| name.to_str())
-            .is_some_and(|name| name == "Cargo.lock")
+            .is_some_and(|name| name.eq_ignore_ascii_case("cargo.lock"))
     }
 
     fn extract_packages(path: &Path) -> Vec<PackageData> {
@@ -59,7 +59,7 @@ impl PackageParser for CargoLockParser {
             }
         };
 
-        let root_package = packages.first().and_then(|v| v.as_table());
+        let root_package = select_root_package(packages);
 
         let name = root_package
             .and_then(|p| p.get("name"))
@@ -76,7 +76,7 @@ impl PackageParser for CargoLockParser {
             .and_then(|v| v.as_str())
             .map(String::from);
 
-        let dependencies = extract_all_dependencies(packages);
+        let dependencies = extract_all_dependencies(packages, root_package);
 
         let purl = match (&name, &version) {
             (Some(n), Some(v)) => PackageUrl::new("cargo", n).ok().and_then(|mut p| {
@@ -147,12 +147,38 @@ fn read_cargo_lock(path: &Path) -> Result<Value, String> {
     toml::from_str(&content).map_err(|e| format!("Failed to parse TOML: {}", e))
 }
 
-fn extract_all_dependencies(packages: &[Value]) -> Vec<Dependency> {
+fn select_root_package(packages: &[Value]) -> Option<&toml::map::Map<String, Value>> {
+    packages
+        .iter()
+        .filter_map(|package| package.as_table())
+        .find(|table| table.get("source").is_none())
+        .or_else(|| packages.first().and_then(|package| package.as_table()))
+}
+
+fn extract_all_dependencies(
+    packages: &[Value],
+    root_package: Option<&toml::map::Map<String, Value>>,
+) -> Vec<Dependency> {
     let mut all_dependencies = Vec::new();
 
-    let root_package_name = packages
-        .first()
-        .and_then(|p| p.as_table())
+    let package_versions: std::collections::HashMap<&str, Vec<&str>> = packages
+        .iter()
+        .filter_map(|package| package.as_table())
+        .filter_map(|table| {
+            Some((
+                table.get("name")?.as_str()?,
+                table.get("version")?.as_str()?,
+            ))
+        })
+        .fold(
+            std::collections::HashMap::new(),
+            |mut acc, (name, version)| {
+                acc.entry(name).or_default().push(version);
+                acc
+            },
+        );
+
+    let root_package_name = root_package
         .and_then(|t| t.get("name"))
         .and_then(|v| v.as_str())
         .unwrap_or("");
@@ -171,22 +197,31 @@ fn extract_all_dependencies(packages: &[Value]) -> Vec<Dependency> {
                 for dep in deps {
                     if let Some(dep_str) = dep.as_str() {
                         let (name, version) = parse_dependency_string(dep_str);
+                        let resolved_version = if version.is_empty() {
+                            package_versions
+                                .get(name)
+                                .and_then(|versions| (versions.len() == 1).then_some(versions[0]))
+                                .unwrap_or("")
+                        } else {
+                            version
+                        };
+
                         if !name.is_empty() {
-                            let purl = if version.is_empty() {
+                            let purl = if resolved_version.is_empty() {
                                 PackageUrl::new("cargo", name).ok().map(|p| p.to_string())
                             } else {
                                 PackageUrl::new("cargo", name).ok().and_then(|mut p| {
-                                    p.with_version(version).ok()?;
+                                    p.with_version(resolved_version).ok()?;
                                     Some(p.to_string())
                                 })
                             };
 
                             all_dependencies.push(Dependency {
                                 purl,
-                                extracted_requirement: if version.is_empty() {
+                                extracted_requirement: if resolved_version.is_empty() {
                                     None
                                 } else {
-                                    Some(version.to_string())
+                                    Some(resolved_version.to_string())
                                 },
                                 scope: Some("dependencies".to_string()),
                                 is_runtime: Some(true),
@@ -219,6 +254,7 @@ fn parse_dependency_string(dep_str: &str) -> (&str, &str) {
 fn default_package_data() -> PackageData {
     PackageData {
         package_type: Some(CargoLockParser::PACKAGE_TYPE),
+        datasource_id: Some(DatasourceId::CargoLock),
         ..Default::default()
     }
 }
