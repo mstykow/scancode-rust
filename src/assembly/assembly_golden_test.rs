@@ -371,6 +371,14 @@ mod tests {
     }
 
     #[test]
+    fn test_assembly_go_graph_basic() {
+        match run_assembly_golden_test("go-graph-basic") {
+            Ok(_) => (),
+            Err(e) => panic!("Assembly golden test failed for go-graph-basic: {}", e),
+        }
+    }
+
+    #[test]
     fn test_assembly_composer_basic() {
         match run_assembly_golden_test("composer-basic") {
             Ok(_) => (),
