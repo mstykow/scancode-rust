@@ -1,0 +1,57 @@
+[
+  {
+    "type": "rpm",
+    "name": "setup",
+    "version": "2.5.49-b1",
+    "qualifiers": {
+      "arch": "noarch",
+      "source": "true"
+    },
+    "description": "The setup package contains a set of important system configuration and\nsetup files, such as passwd, group, and profile.",
+    "parties": [
+      {
+        "type": "person",
+        "role": "packager",
+        "name": "yui",
+        "email": "yui@po.yui.mine.nu"
+      }
+    ],
+    "keywords": ["System Environment/Base"],
+    "size": 111295,
+    "extracted_license_statement": "public domain",
+    "extra_data": {
+      "build_host": "mai.yui.mine.nu",
+      "build_time": 1143601083,
+      "source_urls": ["setup-2.5.49.tar.bz2"]
+    },
+    "dependencies": [
+      {
+        "purl": "pkg:rpm/bash",
+        "scope": "install",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:rpm/tcsh",
+        "scope": "install",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:rpm/rpmlib(CompressedFileNames)@3.0.4-1",
+        "extracted_requirement": "rpmlib(CompressedFileNames) <= 3.0.4-1",
+        "scope": "install",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": true
+      }
+    ],
+    "datasource_id": "rpm_archive",
+    "purl": "pkg:rpm/setup@2.5.49-b1?arch=noarch&source=true"
+  }
+]
