@@ -265,6 +265,11 @@ pub static ASSEMBLERS: &[AssemblerConfig] = &[
         sibling_file_patterns: &["*.rpm.manifest"],
         mode: AssemblyMode::SiblingMerge,
     },
+    AssemblerConfig {
+        datasource_ids: &[DatasourceId::RpmYumdb],
+        sibling_file_patterns: &["**/var/lib/yum/yumdb/*/*/from_repo"],
+        mode: AssemblyMode::OnePerPackageData,
+    },
     // Microsoft Update Manifest
     AssemblerConfig {
         datasource_ids: &[DatasourceId::MicrosoftUpdateManifestMum],
