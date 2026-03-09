@@ -1,7 +1,7 @@
 //! Tests for query module.
 
 #[cfg(test)]
-mod test {
+mod tests {
     use crate::license_detection::index::LicenseIndex;
     use crate::license_detection::query::{PositionSpan, Query, QueryRun};
     use crate::license_detection::test_utils::create_test_index;

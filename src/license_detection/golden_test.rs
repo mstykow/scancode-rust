@@ -26,7 +26,7 @@
 #[cfg(all(test, feature = "golden-tests"))]
 mod golden_tests {
     use crate::license_detection::LicenseDetectionEngine;
-    use crate::utils::file_text::extract_text_for_detection;
+    use crate::utils::file::extract_text_for_detection;
     use once_cell::sync::Lazy;
     use serde::Deserialize;
     use std::fs;
@@ -109,16 +109,13 @@ mod golden_tests {
         /// Read file content using production text extraction.
         /// Returns None for files that should be skipped.
         fn read_test_file_content(&self) -> Result<Option<String>, String> {
-            let text = fs::read(&self.test_file)
-                .map(|buffer| extract_text_for_detection(&buffer, &self.test_file))
-                .map(|opt| opt.map(|ft| ft.text))
+            let bytes = fs::read(&self.test_file)
                 .map_err(|e| format!("Failed to read {}: {}", self.test_file.display(), e))?;
-
-            // Handle source map files specially - extract content from JSON
-            let text = match text {
-                Some(t) => t,
-                None => return Ok(None),
-            };
+            let (text, _) = extract_text_for_detection(&self.test_file, &bytes);
+            
+            if text.is_empty() {
+                return Ok(None);
+            }
 
             if crate::utils::sourcemap::is_sourcemap(&self.test_file) {
                 if let Some(sourcemap_content) =
@@ -165,14 +162,6 @@ mod golden_tests {
 
             // Use detect_matches() for raw matches like Python's idx.match()
             // This avoids the grouping step that causes false test failures
-            #[cfg(feature = "debug-pipeline")]
-            eprintln!("DEBUG TEST: {}", self.name);
-
-            let matches = engine
-                .detect_matches(&text, unknown_licenses)
-                .map_err(|e| {
-                    format!("Detection failed for {}: {:?}", self.test_file.display(), e)
-                })?;
 
             let matches = engine
                 .detect_matches(&text, unknown_licenses)

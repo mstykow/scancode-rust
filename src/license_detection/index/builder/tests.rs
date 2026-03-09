@@ -1,5 +1,5 @@
 #[cfg(test)]
-mod tests {
+mod test_cases {
     use crate::license_detection::index::LicenseIndex;
     use crate::license_detection::index::builder::{
         build_index, compute_is_approx_matchable, generate_url_variants, is_good_tokens_ngram,

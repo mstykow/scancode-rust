@@ -153,7 +153,7 @@ pub(super) fn is_low_quality_matches(matches: &[LicenseMatch]) -> bool {
     matches.iter().all(|m| {
         m.match_coverage < CLUES_MATCH_COVERAGE_THR - 0.01
             || (m.match_coverage < IMPERFECT_MATCH_COVERAGE_THR - 0.01
-                && has_extra_words(&[m.clone()]))
+                && has_extra_words(std::slice::from_ref(m)))
     })
 }
 
@@ -205,7 +205,7 @@ pub(super) fn has_unknown_intro_before_detection(matches: &[LicenseMatch]) -> bo
         }
     }
 
-    if matches.iter().any(|m| is_unknown_intro(m)) {
+    if matches.iter().any(is_unknown_intro) {
         let filtered_matches = filter_license_intros(matches);
         if filtered_matches.len() != matches.len()
             && is_match_coverage_below_threshold(
@@ -265,6 +265,7 @@ pub(super) fn is_license_reference_local_file(m: &LicenseMatch) -> bool {
 /// Filter out license reference matches that point to local files.
 ///
 /// Based on Python: filter_license_references() at detection.py:1404-1419
+#[cfg(test)]
 pub(super) fn filter_license_references(matches: &[LicenseMatch]) -> Vec<LicenseMatch> {
     matches
         .iter()
@@ -286,7 +287,7 @@ pub(super) fn filter_license_intros_and_references(matches: &[LicenseMatch]) -> 
 
 /// Check if any matches reference local files.
 fn has_references_to_local_files(matches: &[LicenseMatch]) -> bool {
-    matches.iter().any(|m| is_license_reference_local_file(m))
+    matches.iter().any(is_license_reference_local_file)
 }
 
 /// Analyze detection and return detection log message.

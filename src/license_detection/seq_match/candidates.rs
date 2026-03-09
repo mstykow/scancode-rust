@@ -354,11 +354,11 @@ pub fn compute_candidates_with_msets(
         // Check minimum_containment (Python: match_set.py:429-433)
         // Rules with minimum_coverage require a minimum containment ratio
         let minimum_containment = rule.minimum_coverage.map(|mc| mc as f32 / 100.0);
-        if let Some(min_cont) = minimum_containment {
-            if containment < min_cont {
+        if let Some(min_cont) = minimum_containment
+            && containment < min_cont
+        {
                 continue;
             }
-        }
 
         let svr = ScoresVector {
             is_highly_resemblant: (resemblance * 10.0).round() / 10.0 >= HIGH_RESEMBLANCE_THRESHOLD,
@@ -424,11 +424,11 @@ pub fn compute_candidates_with_msets(
         // Check minimum_containment (Python: match_set.py:429-433)
         // Rules with minimum_coverage require a minimum containment ratio
         let minimum_containment = rule.minimum_coverage.map(|mc| mc as f32 / 100.0);
-        if let Some(min_cont) = minimum_containment {
-            if containment < min_cont {
+        if let Some(min_cont) = minimum_containment
+            && containment < min_cont
+        {
                 continue;
             }
-        }
 
         let score_vec_rounded = ScoresVector {
             is_highly_resemblant: (resemblance * 10.0).round() / 10.0 >= HIGH_RESEMBLANCE_THRESHOLD,
@@ -1070,7 +1070,7 @@ mod tests {
             "Different license expressions should create different groups"
         );
 
-        let mut sorted = vec![candidate_nc_sa, candidate_sa];
+        let mut sorted = [candidate_nc_sa, candidate_sa];
         sorted.sort_by(|a, b| b.cmp(a));
         assert_eq!(
             sorted[0].rule.license_expression, "cc-by-sa-1.0",

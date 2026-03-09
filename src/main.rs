@@ -2,7 +2,6 @@ use anyhow::{Result, anyhow};
 use chrono::Utc;
 use clap::Parser;
 use glob::Pattern;
-use include_dir::{Dir, include_dir};
 use log::warn;
 use serde::Deserialize;
 use std::collections::{HashMap, HashSet};
@@ -651,7 +650,6 @@ fn apply_mark_source(files: &mut [crate::models::FileInfo]) {
     }
 }
 
-const LICENSES_DIR: Dir = include_dir!("resources/licenses/json/details");
 
 fn init_license_engine(rules_path: &Option<String>) -> Option<Arc<LicenseDetectionEngine>> {
     let path = match rules_path {

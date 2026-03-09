@@ -171,7 +171,7 @@ mod tests {
             .expect("Not array");
         eprintln!("Sources array length: {}", sources.len());
 
-        if let Some(first) = sources.get(0).and_then(|v| v.as_str()) {
+        if let Some(first) = sources.first().and_then(|v| v.as_str()) {
             eprintln!("First source length: {}", first.len());
             eprintln!("First 100 chars: {:?}", &first[..100.min(first.len())]);
         }

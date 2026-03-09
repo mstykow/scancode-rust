@@ -19,9 +19,11 @@ use analysis::{
     filter_license_intros_and_references,
 };
 use identifier::{
-    compute_content_identifier, compute_detection_coverage, compute_detection_identifier,
+    compute_content_identifier, compute_detection_coverage,
     python_safe_name,
 };
+#[cfg(test)]
+use identifier::compute_detection_identifier;
 
 /// Matches with line gap > this are considered separate groups.
 /// Corresponds to Python's LINES_THRESHOLD = 4 (query.py:108)
@@ -31,17 +33,8 @@ const LINES_THRESHOLD: usize = 4;
 // Detection Log Categories (Python parity: DetectionRule enum)
 // ============================================================================
 
-/// Perfect detection - all matches are exact with 100% coverage.
-pub const DETECTION_LOG_PERFECT_DETECTION: &str = "perfect-detection";
-
-/// Possible false positive detection.
-pub const DETECTION_LOG_FALSE_POSITIVE: &str = "possible-false-positive";
-
 /// License clues - low quality matches.
 pub const DETECTION_LOG_LICENSE_CLUES: &str = "license-clues";
-
-/// Low quality match fragments - similar to license clues but distinct category.
-pub const DETECTION_LOG_LOW_QUALITY_MATCHES: &str = "low-quality-matches";
 
 /// Imperfect match coverage - at least one match has coverage < 100%.
 pub const DETECTION_LOG_IMPERFECT_COVERAGE: &str = "imperfect-match-coverage";
@@ -245,6 +238,7 @@ pub fn filter_detections_by_score(
 /// See: docs/license-detection/PLAN-019-unique-detection.md
 ///
 /// Based on Python get_detections_by_id behavior in detection.py.
+#[cfg(test)]
 pub fn remove_duplicate_detections(detections: Vec<LicenseDetection>) -> Vec<LicenseDetection> {
     let mut detections_by_id: std::collections::HashMap<String, LicenseDetection> =
         std::collections::HashMap::new();
@@ -356,6 +350,7 @@ pub fn post_process_detections(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use super::identifier::compute_detection_identifier;
     use crate::license_detection::models::License;
     use crate::license_detection::models::LicenseMatch;
     use crate::license_detection::spdx_mapping::build_spdx_mapping;

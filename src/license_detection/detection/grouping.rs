@@ -101,6 +101,7 @@ pub fn sort_matches_by_line(matches: &mut [LicenseMatch]) {
 /// - All match coverages are 100%
 ///
 /// Based on Python: is_correct_detection() at detection.py:1078
+#[cfg(test)]
 pub(super) fn is_correct_detection(matches: &[LicenseMatch]) -> bool {
     if matches.is_empty() {
         return false;

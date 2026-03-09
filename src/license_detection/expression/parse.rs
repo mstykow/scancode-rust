@@ -4,7 +4,7 @@ use super::{LicenseExpression, ParseError};
 
 /// Token in a license expression.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-enum Token {
+pub(super) enum Token {
     /// License key
     License(String),
 

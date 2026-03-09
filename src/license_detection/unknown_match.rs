@@ -8,7 +8,6 @@ use crate::license_detection::query::Query;
 
 pub const MATCH_UNKNOWN: &str = "6-unknown";
 
-pub const MATCH_UNKNOWN_ORDER: u8 = 6;
 
 const UNKNOWN_NGRAM_LENGTH: usize = 6;
 

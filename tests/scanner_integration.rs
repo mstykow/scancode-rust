@@ -16,7 +16,7 @@ fn create_license_detection_engine() -> Option<Arc<LicenseDetectionEngine>> {
         eprintln!("Reference data not available at {:?}", data_path);
         return None;
     }
-    match LicenseDetectionEngine::new(&data_path) {
+    match LicenseDetectionEngine::new(data_path) {
         Ok(engine) => {
             eprintln!("License detection engine initialized for tests");
             Some(Arc::new(engine))

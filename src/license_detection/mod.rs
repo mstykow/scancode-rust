@@ -21,9 +21,6 @@ mod test_utils;
 mod tokenize;
 pub mod unknown_match;
 
-#[cfg(feature = "debug-pipeline")]
-mod debug_pipeline;
-
 use std::path::Path;
 use std::sync::Arc;
 
@@ -46,7 +43,7 @@ pub use models::LicenseMatch;
 pub use aho_match::aho_match;
 pub use hash_match::hash_match;
 pub use match_refine::{
-    filter_invalid_contained_unknown_matches, merge_overlapping_matches, refine_aho_matches,
+    filter_invalid_contained_unknown_matches, merge_overlapping_matches,
     refine_matches, refine_matches_without_false_positive_filter, split_weak_matches,
 };
 pub use seq_match::{
@@ -55,16 +52,6 @@ pub use seq_match::{
 pub use spdx_lid::spdx_lid_match;
 pub use unknown_match::unknown_match;
 
-#[cfg(feature = "debug-pipeline")]
-pub use debug_pipeline::{
-    filter_below_rule_minimum_coverage_debug_only, filter_contained_matches_debug_only,
-    filter_false_positive_matches_debug_only,
-    filter_invalid_matches_to_single_word_gibberish_debug_only,
-    filter_matches_missing_required_phrases_debug_only,
-    filter_matches_to_spurious_single_token_debug_only, filter_overlapping_matches_debug_only,
-    filter_short_matches_scattered_on_too_many_lines_debug_only,
-    filter_spurious_matches_debug_only, filter_too_short_matches_debug_only,
-};
 
 /// License detection engine that orchestrates the detection pipeline.
 ///
@@ -548,15 +535,6 @@ impl LicenseDetectionEngine {
 
         let mut sorted = refined;
         sort_matches_by_line(&mut sorted);
-
-        // DEBUG: Print match count
-        #[cfg(feature = "debug-pipeline")]
-        {
-            eprintln!("DEBUG detect_matches(): returning {} matches", sorted.len());
-            for m in &sorted {
-                eprintln!("  - {} ({})", m.rule_identifier, m.license_expression);
-            }
-        }
 
         // Return raw matches (NOT grouped) - this is Python's idx.match() behavior
         Ok(sorted)

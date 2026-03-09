@@ -1,5 +1,6 @@
 //! Detection identifier computation.
 
+#[cfg(test)]
 use super::types::LicenseDetection;
 use crate::license_detection::models::LicenseMatch;
 use crate::license_detection::tokenize::tokenize_without_stopwords;
@@ -116,6 +117,7 @@ fn python_token_tuple_repr(tokens: &[String]) -> String {
 /// NOTE: This function is currently unused. It will be used by `get_unique_detections`
 /// when implementing UniqueDetection aggregation.
 /// See: docs/license-detection/PLAN-019-unique-detection.md
+#[cfg(test)]
 pub fn compute_detection_identifier(detection: &LicenseDetection) -> String {
     let expression = detection
         .license_expression
@@ -159,7 +161,6 @@ pub(super) fn compute_detection_coverage(matches: &[LicenseMatch]) -> f32 {
     weighted_coverage.min(100.0)
 }
 
-#[cfg(test)]
 #[cfg(test)]
 mod tests {
     use super::*;

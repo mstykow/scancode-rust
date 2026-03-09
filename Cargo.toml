@@ -130,7 +130,6 @@ name = "validate-urls"
 path = "bin/validate_urls.rs"
 
 [features]
-debug-pipeline = []
 default = ["spdx"]
 golden-tests = []
 gzip = []
