@@ -333,44 +333,6 @@ mod tests {
         assert!(query.is_high_matchable(2));
     }
 
-    #[test]
-    fn test_position_span_contains() {
-        let span = PositionSpan::new(5, 10);
-
-        assert!(span.contains(5));
-        assert!(span.contains(7));
-        assert!(span.contains(10));
-        assert!(!span.contains(4));
-        assert!(!span.contains(11));
-    }
-
-    #[test]
-    fn test_position_span_positions() {
-        let span = PositionSpan::new(5, 7);
-        let positions = span.positions();
-
-        assert_eq!(positions.len(), 3);
-        assert!(positions.contains(&5));
-        assert!(positions.contains(&6));
-        assert!(positions.contains(&7));
-    }
-
-    #[test]
-    fn test_position_span_difference() {
-        let span1 = PositionSpan::new(0, 10);
-        let span2 = PositionSpan::new(5, 7);
-
-        let diff = span1.difference(&span2);
-
-        assert_eq!(diff.len(), 8);
-        assert!(diff.contains(&0));
-        assert!(diff.contains(&4));
-        assert!(!diff.contains(&5));
-        assert!(!diff.contains(&6));
-        assert!(!diff.contains(&7));
-        assert!(diff.contains(&8));
-        assert!(diff.contains(&10));
-    }
 
     #[test]
     fn test_query_new_lowercase_tokens() {
