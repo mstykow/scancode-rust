@@ -11,14 +11,14 @@
     "release_date": null,
     "parties": [
       {
-        "type": null,
+        "type": "person",
         "role": "author",
         "name": "jQuery UI Team",
         "email": null,
         "url": null
       },
       {
-        "type": null,
+        "type": "person",
         "role": "owner",
         "name": "jQuery UI Team",
         "email": null,

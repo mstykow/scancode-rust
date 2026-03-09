@@ -11,14 +11,14 @@
     "release_date": null,
     "parties": [
       {
-        "type": null,
+        "type": "person",
         "role": "author",
         "name": "Twitter, Inc.",
         "email": null,
         "url": null
       },
       {
-        "type": null,
+        "type": "person",
         "role": "owner",
         "name": "bootstrap",
         "email": null,
