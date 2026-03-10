@@ -1,0 +1,57 @@
+[
+  {
+    "type": "composer",
+    "namespace": "jandreasn",
+    "name": "a-timer",
+    "primary_language": "PHP",
+    "description": "A simple timer.",
+    "parties": [
+      {
+        "type": "person",
+        "role": "author",
+        "name": "Andreas Nilsson"
+      },
+      {
+        "type": "person",
+        "role": "vendor",
+        "name": "jandreasn"
+      }
+    ],
+    "keywords": ["timer", "timing", "benchmark"],
+    "homepage_url": "http://github.com/jandreasn/a-timer",
+    "extracted_license_statement": "MIT",
+    "dependencies": [
+      {
+        "purl": "pkg:composer/php",
+        "extracted_requirement": ">=5.6.0",
+        "scope": "require",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:composer/phpunit/phpunit",
+        "extracted_requirement": "^5.6",
+        "scope": "require-dev",
+        "is_runtime": false,
+        "is_optional": true,
+        "is_pinned": false,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:composer/squizlabs/php_codesniffer",
+        "extracted_requirement": "^2.7",
+        "scope": "require-dev",
+        "is_runtime": false,
+        "is_optional": true,
+        "is_pinned": false,
+        "is_direct": true
+      }
+    ],
+    "repository_homepage_url": "https://packagist.org/packages/jandreasn/a-timer",
+    "api_data_url": "https://packagist.org/p/packages/jandreasn/a-timer.json",
+    "datasource_id": "php_composer_json",
+    "purl": "pkg:composer/jandreasn/a-timer"
+  }
+]

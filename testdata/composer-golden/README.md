@@ -6,9 +6,10 @@ Golden tests compare parser output against expected results from the original Sc
 
 ## Test Status
 
-**Currently Passing:** 1/1 tests
+**Currently Passing:** 2/2 tests
 
 - ✅ `test_golden_composer_lock` - Passing with enhancements
+- ✅ `test_golden_composer_json_a_timer` - Passing with manifest metadata coverage
 
 ## Enhancements Over Python ScanCode
 
@@ -55,3 +56,5 @@ This is an **intentional improvement** over the Python implementation, providing
 Test files sourced from Python ScanCode reference:
 
 - `reference/scancode-toolkit/tests/packagedcode/data/phpcomposer/`
+
+Additional coverage now includes a local nested Composer assembly fixture proving alternate file names and nested package file assignment.
