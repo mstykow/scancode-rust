@@ -1,0 +1,20 @@
+PATH
+  remote: ../my-local-gem
+  specs:
+    my-local-gem (1.0.0)
+      rake (~> 13.0)
+
+GEM
+  remote: https://rubygems.org/
+  specs:
+    rake (13.0.6)
+
+PLATFORMS
+  ruby
+
+BUNDLED WITH
+   2.4.1
+
+DEPENDENCIES
+  my-local-gem!
+  rake (~> 13.0)

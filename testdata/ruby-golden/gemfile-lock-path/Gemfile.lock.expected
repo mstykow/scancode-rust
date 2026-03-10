@@ -1,0 +1,30 @@
+[
+  {
+    "type": "gem",
+    "name": "my-local-gem",
+    "version": "1.0.0",
+    "primary_language": "Ruby",
+    "parties": [],
+    "download_url": "https://rubygems.org/downloads/my-local-gem-1.0.0.gem",
+    "extra_data": {
+      "platforms": ["ruby"],
+      "bundler_version": "2.4.1"
+    },
+    "dependencies": [
+      {
+        "purl": "pkg:gem/rake@13.0.6",
+        "extracted_requirement": "~> 13.0",
+        "scope": "dependencies",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true
+      }
+    ],
+    "repository_homepage_url": "https://rubygems.org/gems/my-local-gem/versions/1.0.0",
+    "repository_download_url": "https://rubygems.org/downloads/my-local-gem-1.0.0.gem",
+    "api_data_url": "https://rubygems.org/api/v2/rubygems/my-local-gem/versions/1.0.0.json",
+    "datasource_id": "gemfile_lock",
+    "purl": "pkg:gem/my-local-gem@1.0.0"
+  }
+]

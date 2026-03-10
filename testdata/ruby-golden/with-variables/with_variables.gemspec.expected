@@ -1,0 +1,72 @@
+[
+  {
+    "type": "gem",
+    "name": "provider_dsl",
+    "version": "2.4.1",
+    "primary_language": "Ruby",
+    "description": "See the project home page for more information",
+    "parties": [
+      {
+        "type": "person",
+        "role": "author",
+        "name": "Author One"
+      },
+      {
+        "type": "person",
+        "role": "author",
+        "name": "Author Two"
+      },
+      {
+        "type": "person",
+        "role": "author",
+        "email": "author1@example.com"
+      },
+      {
+        "type": "person",
+        "role": "author",
+        "email": "author2@example.com"
+      }
+    ],
+    "homepage_url": "https://example.com/provider_dsl",
+    "download_url": "https://rubygems.org/downloads/provider_dsl-2.4.1.gem",
+    "dependencies": [
+      {
+        "purl": "pkg:gem/rake",
+        "extracted_requirement": "~> 11.3",
+        "scope": "development",
+        "is_runtime": false,
+        "is_optional": true,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:gem/rubocop",
+        "extracted_requirement": "~> 0.44.1",
+        "scope": "development",
+        "is_runtime": false,
+        "is_optional": true,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:gem/ipaddress",
+        "extracted_requirement": "~> 0.8.3",
+        "scope": "runtime",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:gem/gandi",
+        "extracted_requirement": "~> 3.3, >= 3.3.27",
+        "scope": "runtime",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_direct": true
+      }
+    ],
+    "repository_homepage_url": "https://rubygems.org/gems/provider_dsl/versions/2.4.1",
+    "repository_download_url": "https://rubygems.org/downloads/provider_dsl-2.4.1.gem",
+    "api_data_url": "https://rubygems.org/api/v2/rubygems/provider_dsl/versions/2.4.1.json",
+    "datasource_id": "gemspec",
+    "purl": "pkg:gem/provider_dsl@2.4.1"
+  }
+]
