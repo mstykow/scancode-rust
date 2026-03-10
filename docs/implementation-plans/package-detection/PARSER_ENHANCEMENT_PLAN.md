@@ -372,6 +372,7 @@ Current status (March 10, 2026):
 - Composer package-root resource assignment now associates ordinary files to the correct Composer package, including nested Composer packages under a parent project tree.
 - Parser golden coverage now includes a `composer.json` manifest fixture (`a-timer`) alongside the existing lockfile golden.
 - Assembly golden coverage now includes a nested Composer package fixture with alternate file names and nested file assignment.
+- PR #310 (`fix(composer): complete the Composer enhancement batch`) captures the completed implementation batch.
 
 ### Python PR Scope Rule
 
