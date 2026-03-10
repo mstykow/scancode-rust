@@ -1,0 +1,47 @@
+--- !ruby/object:Gem::Specification
+name: example-gem
+version: !ruby/object:Gem::Version
+  version: 1.2.3
+platform: ruby
+authors:
+- John Doe
+- Jane Smith
+date: "2024-01-15 00:00:00.000000000 Z"
+dependencies:
+- !ruby/object:Gem::Dependency
+  name: rails
+  requirement: !ruby/object:Gem::Requirement
+    requirements:
+    - - "~>"
+      - !ruby/object:Gem::Version
+        version: '5.0'
+  type: :runtime
+- !ruby/object:Gem::Dependency
+  name: nokogiri
+  requirement: !ruby/object:Gem::Requirement
+    requirements:
+    - - ">="
+      - !ruby/object:Gem::Version
+        version: '1.6'
+  type: :runtime
+- !ruby/object:Gem::Dependency
+  name: rspec
+  requirement: !ruby/object:Gem::Requirement
+    requirements:
+    - - "~>"
+      - !ruby/object:Gem::Version
+        version: '3.0'
+  type: :development
+description: A longer description of the example gem for testing purposes
+email:
+- john@example.com
+- jane@example.com
+files:
+- lib/example-gem.rb
+- LICENSE.txt
+homepage: https://example.com/example-gem
+licenses:
+- MIT
+metadata:
+  source_code_uri: https://github.com/example/example-gem
+summary: An example gem for testing
