@@ -105,7 +105,7 @@ cargo run --quiet --bin generate-supported-formats && git diff --exit-code docs/
 | 6     | Go                    | Done    | #152, #153, #155, #218                                                                                     | `cargo test go`; `cargo test --features golden-tests go_golden`; `cargo test --features golden-tests test_assembly_go_basic`; `cargo test --features golden-tests test_assembly_go_graph_basic`                                                                                                                                                                                |
 | 7     | Gradle                | Done    | #130, #132, #134, #137                                                                                     | `cargo test gradle`; `cargo test --features golden-tests gradle_golden`; `cargo test test_cyclonedx_json_includes_component_license_expression --lib`; `cargo test test_skip_template_placeholder_pom_coordinates --lib`                                                                                                                                                       |
 | 8     | Ruby                  | Done    | #151, #154, #156, #158, #160, #161                                                                         | `cargo test ruby`; `cargo test --features golden-tests ruby_golden`; `cargo test --features golden-tests test_assembly_ruby_extracted_basic`; `cargo test --bin scancode-rust`; `cargo test --test output_format_golden`                                                                                                                                                       |
-| 9     | Composer              | Planned | #187, #188, #190                                                                                           | `cargo test composer`; `cargo test --features golden-tests composer_golden`; `cargo test --features golden-tests test_assembly_composer_basic`                                                                                                                                                                                                                                 |
+| 9     | Composer              | Done    | #187, #188, #190                                                                                           | `cargo test composer`; `cargo test --features golden-tests composer_golden`; `cargo test --features golden-tests test_assembly_composer_basic`; `cargo test --features golden-tests test_assembly_composer_nested`                                                                                                                                                             |
 | 10    | Conda                 | Planned | #195, #196                                                                                                 | `cargo test conda`; `cargo test --features golden-tests conda_golden`                                                                                                                                                                                                                                                                                                          |
 | 11    | CocoaPods             | Planned | #191, #192                                                                                                 | `cargo test pod`; `cargo test --features golden-tests cocoapods_golden`                                                                                                                                                                                                                                                                                                        |
 | 12    | Alpine                | Planned | #172, #173, #174, #175                                                                                     | `cargo test alpine`; `cargo test --features golden-tests alpine_golden`; `cargo test --features golden-tests test_assembly_alpine_file_refs`                                                                                                                                                                                                                                   |
@@ -347,6 +347,31 @@ Current status (March 10, 2026):
 - Follow-up work now tags nested Ruby legal/readme/manifest files as `key_file`, promotes package metadata from those files, and computes a top-level `summary.license_clarity_score`.
 - PR #307 (`fix(ruby): complete the Ruby enhancement batch`) captures the completed main Ruby batch; the stacked follow-up PR for `#161` builds on top of it.
 - PR #308 (`fix(ruby): tag nested key files and score license clarity`) captures the completed `#161` follow-up.
+
+### Composer PR Scope
+
+Issues:
+
+- #187 slow composer.lock scanning performance
+- #188 nested PHP package detection
+- #190 support alternate file names
+
+Likely touchpoints:
+
+- Composer parser behavior for alternate file names, manifest provenance fields, and large lockfile extraction
+- Composer-focused unit coverage for alternate names, manifest `source`/`dist`, large lockfiles, and package-root assignment
+- Parser goldens for `composer.json` metadata in addition to the existing lockfile golden
+- Assembly coverage for nested Composer packages and file ownership
+- Improvement documentation for alternate-name support, nested file assignment, and lighter lockfile handling
+
+Current status (March 10, 2026):
+
+- Local work now recognizes both suffix-style and prefix-style alternate Composer manifest/lock names (for example `php.composer.json` and `composer.symfony.json`).
+- Composer manifest parsing now preserves `vcs_url`, `download_url`, and typed author/vendor parties from `source`/`dist` metadata.
+- Composer lock extraction now avoids cloning full package arrays before dependency extraction and keeps the current lightweight “one synthetic lock package plus dependencies” design.
+- Composer package-root resource assignment now associates ordinary files to the correct Composer package, including nested Composer packages under a parent project tree.
+- Parser golden coverage now includes a `composer.json` manifest fixture (`a-timer`) alongside the existing lockfile golden.
+- Assembly golden coverage now includes a nested Composer package fixture with alternate file names and nested file assignment.
 
 ### Python PR Scope Rule
 
