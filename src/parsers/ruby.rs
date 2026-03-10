@@ -33,7 +33,7 @@ use regex::Regex;
 use std::collections::HashMap;
 use std::fs::{self, File};
 use std::io::Read;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use tar::Archive;
 
 use super::PackageParser;
@@ -76,7 +76,7 @@ impl PackageParser for GemfileParser {
             Ok(c) => c,
             Err(e) => {
                 warn!("Failed to read Gemfile at {:?}: {}", path, e);
-                return vec![default_package_data()];
+                return vec![default_package_data_with_datasource(DatasourceId::Gemfile)];
             }
         };
 
@@ -106,7 +106,7 @@ fn parse_gemfile(content: &str) -> PackageData {
         Ok(r) => r,
         Err(e) => {
             warn!("Failed to compile gem regex: {}", e);
-            return default_package_data();
+            return default_package_data_with_datasource(DatasourceId::Gemfile);
         }
     };
 
@@ -115,7 +115,7 @@ fn parse_gemfile(content: &str) -> PackageData {
         Ok(r) => r,
         Err(e) => {
             warn!("Failed to compile group regex: {}", e);
-            return default_package_data();
+            return default_package_data_with_datasource(DatasourceId::Gemfile);
         }
     };
 
@@ -123,7 +123,7 @@ fn parse_gemfile(content: &str) -> PackageData {
         Ok(r) => r,
         Err(e) => {
             warn!("Failed to compile end regex: {}", e);
-            return default_package_data();
+            return default_package_data_with_datasource(DatasourceId::Gemfile);
         }
     };
 
@@ -132,7 +132,7 @@ fn parse_gemfile(content: &str) -> PackageData {
         Ok(r) => r,
         Err(e) => {
             warn!("Failed to compile symbol regex: {}", e);
-            return default_package_data();
+            return default_package_data_with_datasource(DatasourceId::Gemfile);
         }
     };
 
@@ -257,7 +257,9 @@ impl PackageParser for GemfileLockParser {
             Ok(c) => c,
             Err(e) => {
                 warn!("Failed to read Gemfile.lock at {:?}: {}", path, e);
-                return vec![default_package_data()];
+                return vec![default_package_data_with_datasource(
+                    DatasourceId::GemfileLock,
+                )];
             }
         };
 
@@ -325,7 +327,7 @@ fn parse_gemfile_lock(content: &str) -> PackageData {
         Ok(r) => r,
         Err(e) => {
             warn!("Failed to compile deps regex: {}", e);
-            return default_package_data();
+            return default_package_data_with_datasource(DatasourceId::GemfileLock);
         }
     };
 
@@ -334,7 +336,7 @@ fn parse_gemfile_lock(content: &str) -> PackageData {
         Ok(r) => r,
         Err(e) => {
             warn!("Failed to compile spec_deps regex: {}", e);
-            return default_package_data();
+            return default_package_data_with_datasource(DatasourceId::GemfileLock);
         }
     };
 
@@ -343,7 +345,7 @@ fn parse_gemfile_lock(content: &str) -> PackageData {
         Ok(r) => r,
         Err(e) => {
             warn!("Failed to compile options regex: {}", e);
-            return default_package_data();
+            return default_package_data_with_datasource(DatasourceId::GemfileLock);
         }
     };
 
@@ -352,7 +354,7 @@ fn parse_gemfile_lock(content: &str) -> PackageData {
         Ok(r) => r,
         Err(e) => {
             warn!("Failed to compile version regex: {}", e);
-            return default_package_data();
+            return default_package_data_with_datasource(DatasourceId::GemfileLock);
         }
     };
 
@@ -567,6 +569,17 @@ fn parse_gemfile_lock(content: &str) -> PackageData {
         });
     }
 
+    dependencies.sort_by(|left, right| {
+        left.purl
+            .as_deref()
+            .cmp(&right.purl.as_deref())
+            .then_with(|| {
+                left.extracted_requirement
+                    .as_deref()
+                    .cmp(&right.extracted_requirement.as_deref())
+            })
+    });
+
     // Build extra_data
     let mut extra_data = HashMap::new();
     if !platforms.is_empty() {
@@ -777,6 +790,13 @@ fn default_package_data() -> PackageData {
     }
 }
 
+fn default_package_data_with_datasource(datasource_id: DatasourceId) -> PackageData {
+    PackageData {
+        datasource_id: Some(datasource_id),
+        ..default_package_data()
+    }
+}
+
 // =============================================================================
 // Gemspec Parser (Ruby DSL)
 // =============================================================================
@@ -796,11 +816,11 @@ impl PackageParser for GemspecParser {
             Ok(c) => c,
             Err(e) => {
                 warn!("Failed to read .gemspec at {:?}: {}", path, e);
-                return vec![default_package_data()];
+                return vec![default_package_data_with_datasource(DatasourceId::Gemspec)];
             }
         };
 
-        vec![parse_gemspec(&content)]
+        vec![parse_gemspec_with_context(&content, path.parent())]
     }
 
     fn is_match(path: &Path) -> bool {
@@ -914,41 +934,120 @@ fn after_first_argument(args: &str) -> &str {
 ///
 /// Scans the file content for constant definitions matching the variable name
 /// and returns the resolved string value.
-fn resolve_variable_version(var_name: &str, content: &str) -> Option<String> {
+fn resolve_variable_version(var_name: &str, contexts: &[String]) -> Option<String> {
     let var_name = var_name.trim();
     if var_name.is_empty() {
         return None;
     }
 
-    // Try to match: VAR_NAME = "value" or VAR_NAME = 'value'
-    // Handle both simple names (VERSION) and qualified names (CSV::VERSION)
-    let parts: Vec<&str> = var_name.split("::").collect();
-
-    let escaped = regex::escape(var_name);
-    let pattern = format!(r#"(?m)^\s*{}\s*=\s*["']([^"']+)["']"#, escaped);
-    if let Ok(re) = Regex::new(&pattern)
-        && let Some(caps) = re.captures(content)
-    {
-        return caps.get(1).map(|m| m.as_str().to_string());
-    }
-
-    if parts.len() > 1
-        && let Some(last) = parts.last()
-    {
-        let escaped = regex::escape(last);
+    for candidate in candidate_constant_names(var_name) {
+        let escaped = regex::escape(&candidate);
         let pattern = format!(r#"(?m)^\s*{}\s*=\s*["']([^"']+)["']"#, escaped);
-        if let Ok(re) = Regex::new(&pattern)
-            && let Some(caps) = re.captures(content)
-        {
-            return caps.get(1).map(|m| m.as_str().to_string());
+        let Ok(re) = Regex::new(&pattern) else {
+            continue;
+        };
+
+        for context in contexts {
+            if let Some(caps) = re.captures(context) {
+                return caps.get(1).map(|m| m.as_str().to_string());
+            }
         }
     }
 
     None
 }
 
+fn resolve_variable_array(var_name: &str, contexts: &[String]) -> Option<Vec<String>> {
+    let var_name = var_name.trim();
+    if var_name.is_empty() {
+        return None;
+    }
+
+    for candidate in candidate_constant_names(var_name) {
+        let escaped = regex::escape(&candidate);
+        let pattern = format!(r#"(?m)^\s*{}\s*=\s*(\[[^\n]+\])"#, escaped);
+        let Ok(re) = Regex::new(&pattern) else {
+            continue;
+        };
+
+        for context in contexts {
+            if let Some(caps) = re.captures(context)
+                && let Some(raw) = caps.get(1)
+            {
+                let values = extract_ruby_array(raw.as_str());
+                if !values.is_empty() {
+                    return Some(values);
+                }
+            }
+        }
+    }
+
+    None
+}
+
+fn candidate_constant_names(var_name: &str) -> Vec<String> {
+    let mut names = vec![var_name.to_string()];
+    if let Some(last) = var_name.split("::").last()
+        && last != var_name
+    {
+        names.push(last.to_string());
+    }
+    names
+}
+
+fn load_required_ruby_contexts(content: &str, base_dir: Option<&Path>) -> Vec<String> {
+    let mut contexts = vec![content.to_string()];
+    let Some(base_dir) = base_dir else {
+        return contexts;
+    };
+
+    let require_re = match Regex::new(r#"(?m)^\s*require(?:_relative)?\s+["']([^"']+)["']"#) {
+        Ok(re) => re,
+        Err(_) => return contexts,
+    };
+
+    for caps in require_re.captures_iter(content) {
+        let Some(required) = caps.get(1).map(|m| m.as_str()) else {
+            continue;
+        };
+        for candidate in candidate_require_paths(base_dir, required) {
+            if let Ok(required_content) = fs::read_to_string(&candidate) {
+                contexts.push(required_content);
+                break;
+            }
+        }
+    }
+
+    contexts
+}
+
+fn candidate_require_paths(base_dir: &Path, required: &str) -> Vec<PathBuf> {
+    let relative = required.replace("::", "/");
+    let filename = if relative.ends_with(".rb") {
+        relative
+    } else {
+        format!("{}.rb", relative)
+    };
+
+    vec![
+        base_dir.join(&filename),
+        base_dir.join("lib").join(&filename),
+    ]
+}
+
+fn looks_like_constant_reference(s: &str) -> bool {
+    s.contains("::") || s.chars().next().is_some_and(|c| c.is_ascii_uppercase())
+}
+
 /// Parses a .gemspec file content and returns PackageData.
+#[cfg(test)]
 fn parse_gemspec(content: &str) -> PackageData {
+    parse_gemspec_with_context(content, None)
+}
+
+fn parse_gemspec_with_context(content: &str, base_dir: Option<&Path>) -> PackageData {
+    let contexts = load_required_ruby_contexts(content, base_dir);
+
     // Regex for spec.name = "value" or s.name = "value"
     // The spec variable name varies: spec, s, gem, etc.
     let field_re = match Regex::new(
@@ -957,7 +1056,7 @@ fn parse_gemspec(content: &str) -> PackageData {
         Ok(r) => r,
         Err(e) => {
             warn!("Failed to compile gemspec field regex: {}", e);
-            return default_package_data();
+            return default_package_data_with_datasource(DatasourceId::Gemspec);
         }
     };
 
@@ -965,7 +1064,7 @@ fn parse_gemspec(content: &str) -> PackageData {
         Ok(r) => r,
         Err(e) => {
             warn!("Failed to compile licenses regex: {}", e);
-            return default_package_data();
+            return default_package_data_with_datasource(DatasourceId::Gemspec);
         }
     };
 
@@ -973,7 +1072,7 @@ fn parse_gemspec(content: &str) -> PackageData {
         Ok(r) => r,
         Err(e) => {
             warn!("Failed to compile authors regex: {}", e);
-            return default_package_data();
+            return default_package_data_with_datasource(DatasourceId::Gemspec);
         }
     };
 
@@ -981,7 +1080,7 @@ fn parse_gemspec(content: &str) -> PackageData {
         Ok(r) => r,
         Err(e) => {
             warn!("Failed to compile email regex: {}", e);
-            return default_package_data();
+            return default_package_data_with_datasource(DatasourceId::Gemspec);
         }
     };
 
@@ -991,7 +1090,7 @@ fn parse_gemspec(content: &str) -> PackageData {
         Ok(r) => r,
         Err(e) => {
             warn!("Failed to compile gemspec dependency regex: {}", e);
-            return default_package_data();
+            return default_package_data_with_datasource(DatasourceId::Gemspec);
         }
     };
 
@@ -1018,24 +1117,40 @@ fn parse_gemspec(content: &str) -> PackageData {
         };
 
         match field_name {
-            "name" => name = Some(clean_gemspec_value(raw_value)),
+            "name" => {
+                let cleaned = clean_gemspec_value(raw_value);
+                name = if looks_like_constant_reference(&cleaned) {
+                    resolve_variable_version(&cleaned, &contexts).or(Some(cleaned))
+                } else {
+                    Some(cleaned)
+                }
+            }
             "version" => {
                 let cleaned = clean_gemspec_value(raw_value);
                 // Bug #2: Check if version is a variable reference
-                if cleaned.contains("::")
-                    || cleaned
-                        .chars()
-                        .next()
-                        .is_some_and(|c| c.is_ascii_uppercase())
-                {
-                    version = resolve_variable_version(&cleaned, content).or(Some(cleaned));
+                if looks_like_constant_reference(&cleaned) {
+                    version = resolve_variable_version(&cleaned, &contexts).or(Some(cleaned));
                 } else {
                     version = Some(cleaned);
                 }
             }
-            "summary" => summary = Some(clean_gemspec_value(raw_value)),
+            "summary" => {
+                let cleaned = clean_gemspec_value(raw_value);
+                summary = if looks_like_constant_reference(&cleaned) {
+                    resolve_variable_version(&cleaned, &contexts).or(Some(cleaned))
+                } else {
+                    Some(cleaned)
+                }
+            }
             "description" => description = Some(clean_gemspec_value(raw_value)),
-            "homepage" => homepage = Some(clean_gemspec_value(raw_value)),
+            "homepage" => {
+                let cleaned = clean_gemspec_value(raw_value);
+                homepage = if looks_like_constant_reference(&cleaned) {
+                    resolve_variable_version(&cleaned, &contexts).or(Some(cleaned))
+                } else {
+                    Some(cleaned)
+                }
+            }
             "license" => license = Some(clean_gemspec_value(raw_value)),
             _ => {}
         }
@@ -1054,6 +1169,9 @@ fn parse_gemspec(content: &str) -> PackageData {
             let raw_str = raw.as_str().trim();
             if raw_str.starts_with('[') {
                 authors = extract_ruby_array(raw_str);
+            } else if looks_like_constant_reference(raw_str) {
+                authors = resolve_variable_array(raw_str, &contexts)
+                    .unwrap_or_else(|| vec![clean_gemspec_value(raw_str)]);
             } else {
                 authors.push(clean_gemspec_value(raw_str));
             }
@@ -1066,6 +1184,9 @@ fn parse_gemspec(content: &str) -> PackageData {
             let raw_str = raw.as_str().trim();
             if raw_str.starts_with('[') {
                 emails = extract_ruby_array(raw_str);
+            } else if looks_like_constant_reference(raw_str) {
+                emails = resolve_variable_array(raw_str, &contexts)
+                    .unwrap_or_else(|| vec![clean_gemspec_value(raw_str)]);
             } else {
                 emails.push(clean_gemspec_value(raw_str));
             }
@@ -1152,10 +1273,8 @@ fn parse_gemspec(content: &str) -> PackageData {
         let is_development = method == "add_development_dependency";
         let scope = if is_development {
             "development"
-        } else if method == "add_runtime_dependency" {
-            "runtime"
         } else {
-            "dependency"
+            "runtime"
         };
 
         dependencies.push(Dependency {
@@ -1243,7 +1362,7 @@ impl PackageParser for GemArchiveParser {
             Ok(data) => data,
             Err(e) => {
                 warn!("Failed to extract .gem archive at {:?}: {}", path, e);
-                default_package_data()
+                default_package_data_with_datasource(DatasourceId::GemArchive)
             }
         }]
     }
@@ -1620,7 +1739,7 @@ impl PackageParser for GemMetadataExtractedParser {
             Ok(data) => data,
             Err(e) => {
                 warn!("Failed to extract gem metadata from {:?}: {}", path, e);
-                default_package_data()
+                default_package_data_with_datasource(DatasourceId::GemArchiveExtracted)
             }
         }]
     }
@@ -1718,7 +1837,7 @@ end
         );
         assert_eq!(
             package_data.dependencies[1].scope,
-            Some("dependency".to_string())
+            Some("runtime".to_string())
         );
         assert_eq!(
             package_data.dependencies[1].extracted_requirement,

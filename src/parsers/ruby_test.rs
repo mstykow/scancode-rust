@@ -753,6 +753,33 @@ gem "specific-range", ">= 1.0.0", "< 1.5.0", "!= 1.2.3"
         assert!(package_data.extracted_license_statement.is_some());
     }
 
+    #[test]
+    fn test_extract_gemspec_required_file_constants() {
+        use crate::parsers::ruby::GemspecParser;
+        let gemspec_path = PathBuf::from("testdata/ruby/with_variables/with_variables.gemspec");
+        let package_data = GemspecParser::extract_first_package(&gemspec_path);
+
+        assert_eq!(package_data.name, Some("provider_dsl".to_string()));
+        assert_eq!(package_data.version, Some("2.4.1".to_string()));
+        assert_eq!(
+            package_data.homepage_url,
+            Some("https://example.com/provider_dsl".to_string())
+        );
+        assert_eq!(
+            package_data.description,
+            Some("See the project home page for more information".to_string())
+        );
+
+        let author_names: Vec<_> = package_data
+            .parties
+            .iter()
+            .filter_map(|party| party.name.as_ref())
+            .cloned()
+            .collect();
+        assert!(author_names.contains(&"Author One".to_string()));
+        assert!(author_names.contains(&"Author Two".to_string()));
+    }
+
     // ==========================================================================
     // Test: Bug #1 - Frozen string handling in .gemspec
     // ==========================================================================
@@ -901,6 +928,32 @@ gem "specific-range", ">= 1.0.0", "< 1.5.0", "!= 1.2.3"
         assert_eq!(
             rub.extracted_requirement, None,
             "rubocop should have None for no version requirement"
+        );
+    }
+
+    #[test]
+    fn test_gemspec_description_does_not_create_false_dependency() {
+        use crate::parsers::ruby::GemspecParser;
+
+        let content = r#"
+Gem::Specification.new do |spec|
+  spec.name = "logstash-mixin-ecs_compatibility_support"
+  spec.version = "1.3.0"
+  spec.description = "Documentation mentions spec.add_dependency 'fake-gem', '1.0' but it is not code."
+  spec.add_dependency "logstash-core-plugin-api", ">= 1.60", "<= 2.99"
+end
+"#;
+
+        let temp_dir = TempDir::new().expect("Failed to create temp dir");
+        let gemspec_path = temp_dir.path().join("false_dependency.gemspec");
+        fs::write(&gemspec_path, content).expect("Failed to write gemspec");
+
+        let package_data = GemspecParser::extract_first_package(&gemspec_path);
+
+        assert_eq!(package_data.dependencies.len(), 1);
+        assert_eq!(
+            package_data.dependencies[0].purl,
+            Some("pkg:gem/logstash-core-plugin-api".to_string())
         );
     }
 
