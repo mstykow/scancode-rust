@@ -6,10 +6,13 @@ Golden tests compare parser output against expected results from the original Sc
 
 ## Test Status
 
-**Current state:** 2/4 Ruby parser goldens are active; the remaining 2 are still intentionally ignored because they require license detection engine integration.
+**Current state:** 5/7 Ruby parser goldens are active; the remaining 2 are still intentionally ignored because they require license detection engine integration.
 
 - ✅ **cat-gemspec** - Passing with improvements
 - ✅ **arel-gemspec** - Active after parser parity fixes for `%q{}` cleanup and conditional dependency extraction
+- ✅ **with-variables** - Active with required-file constant resolution for gemspec metadata
+- ✅ **Gemfile.lock (git)** - Active with Bundler GIT source metadata preserved in dependency extra data
+- ✅ **Gemfile.lock (path)** - Active with PATH primary-package behavior and lockfile metadata preserved
 - ⏸️ **oj-gemspec** - License detection engine required
 - ⏸️ **rubocop-gemspec** - License detection engine required
 
@@ -47,6 +50,10 @@ Python's approach fragments related data and loses the association between names
 **Ours:** Runtime dependencies have `scope: "runtime"`
 
 **Rationale:** Explicit is better than implicit. All dependency scopes should be clearly labeled.
+
+### Extracted Gem Assembly (Improved Deduplication)
+
+Rust now assembles `metadata.gz-extract` together with sibling `data.gz-extract/*.gemspec` content and deduplicates the overlapping package/dependency results, while also assigning nested files like `data.gz-extract/LICENSE.txt` and `data.gz-extract/lib/example-gem.rb` to the assembled gem package.
 
 ## Test Data
 
