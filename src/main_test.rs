@@ -453,7 +453,7 @@ fn promote_package_metadata_and_summary_from_key_files() {
 
     classify_key_files(&mut files, &packages);
     promote_package_metadata_from_key_files(&files, &mut packages);
-    let summary = compute_summary(&files).expect("summary exists");
+    let summary = compute_summary(&files, &packages).expect("summary exists");
 
     assert_eq!(packages[0].holder.as_deref(), Some("Chef Software Inc."));
     assert_eq!(
@@ -491,7 +491,7 @@ fn manifest_declared_license_contributes_to_summary_and_package_promotion() {
 
     classify_key_files(&mut files, &packages);
     promote_package_metadata_from_key_files(&files, &mut packages);
-    let summary = compute_summary(&files).expect("summary exists");
+    let summary = compute_summary(&files, &packages).expect("summary exists");
 
     assert!(files[0].is_manifest);
     assert!(files[0].is_key_file);
@@ -529,6 +529,69 @@ fn classify_key_files_does_not_tag_unreferenced_nested_legal_file() {
     assert!(nested.is_legal);
     assert!(!nested.is_top_level);
     assert!(!nested.is_key_file);
+}
+
+#[test]
+fn compute_summary_uses_package_holder_and_primary_language() {
+    let uid = "pkg:gem/demo@1.0.0?uuid=test";
+    let mut root_package = package(uid, "demo/demo.gemspec");
+    root_package.holder = Some("Example Corp.".to_string());
+    root_package.primary_language = Some("Ruby".to_string());
+
+    let mut other = package("pkg:pypi/demo?uuid=test2", "demo/setup.py");
+    other.package_type = Some(PackageType::Pypi);
+    other.purl = Some("pkg:pypi/demo".to_string());
+    other.primary_language = Some("Python".to_string());
+    other.holder = None;
+
+    let mut extra_ruby = package("pkg:gem/demo-extra@1.0.0?uuid=test3", "demo/extra.gemspec");
+    extra_ruby.name = Some("demo-extra".to_string());
+    extra_ruby.purl = Some("pkg:gem/demo-extra@1.0.0".to_string());
+
+    let files = vec![];
+    let summary =
+        compute_summary(&files, &[root_package, other, extra_ruby]).expect("summary exists");
+
+    assert_eq!(summary.declared_holder.as_deref(), Some("Example Corp."));
+    assert_eq!(summary.primary_language.as_deref(), Some("Ruby"));
+    assert_eq!(summary.other_languages.len(), 1);
+    assert_eq!(summary.other_languages[0].value.as_deref(), Some("Python"));
+    assert_eq!(summary.other_languages[0].count, 1);
+}
+
+#[test]
+fn compute_summary_uses_source_file_languages_when_packages_lack_them() {
+    let mut ruby = file("project/lib/demo.rb");
+    ruby.programming_language = Some("Ruby".to_string());
+    ruby.is_source = Some(true);
+
+    let mut ruby_two = file("project/lib/more.rb");
+    ruby_two.programming_language = Some("Ruby".to_string());
+    ruby_two.is_source = Some(true);
+
+    let mut python = file("project/tools/helper.py");
+    python.programming_language = Some("Python".to_string());
+    python.is_source = Some(true);
+
+    let summary = compute_summary(&[ruby, ruby_two, python], &[]).expect("summary exists");
+
+    assert_eq!(summary.primary_language.as_deref(), Some("Ruby"));
+    assert_eq!(summary.other_languages.len(), 1);
+    assert_eq!(summary.other_languages[0].value.as_deref(), Some("Python"));
+}
+
+#[test]
+fn compute_summary_without_license_evidence_has_no_clarity_score() {
+    let uid = "pkg:gem/demo@1.0.0?uuid=test";
+    let mut root_package = package(uid, "demo/demo.gemspec");
+    root_package.holder = Some("Example Corp.".to_string());
+    root_package.primary_language = Some("Ruby".to_string());
+
+    let summary = compute_summary(&[], &[root_package]).expect("summary exists");
+
+    assert_eq!(summary.declared_holder.as_deref(), Some("Example Corp."));
+    assert_eq!(summary.primary_language.as_deref(), Some("Ruby"));
+    assert!(summary.license_clarity_score.is_none());
 }
 
 #[test]
