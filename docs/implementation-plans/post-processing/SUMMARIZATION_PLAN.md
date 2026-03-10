@@ -1,6 +1,6 @@
 # Summarization & Analysis Implementation Plan
 
-> **Status**: 🔴 Placeholder - Not Started
+> **Status**: 🟡 In Progress — foundational summary and key-file infrastructure is implemented; broader tallies/facets/generated-code parity remains open
 > **Priority**: P2 - Medium Priority (Post-Processing Feature)
 > **Estimated Effort**: 3-4 weeks
 > **Dependencies**: LICENSE_DETECTION_PLAN.md, COPYRIGHT_DETECTION_PLAN.md, ASSEMBLY_PLAN.md
@@ -48,33 +48,44 @@ Post-scan analysis and summarization features that aggregate findings across fil
 
 - ✅ Basic scan statistics (file count, scan time)
 - ✅ Output format structure
+- ✅ Top-level `summary` output block
+- ✅ Key-file tagging foundations (`is_legal`, `is_manifest`, `is_readme`, `is_top_level`, `is_key_file`)
+- ✅ Package metadata promotion from key files
+- ✅ Initial `license_clarity_score` model/output
+- ✅ Initial non-license-dependent summary fields:
+  - `declared_holder`
+  - `primary_language`
+  - `other_languages`
 
 ### Missing
 
 - ❌ License tallies
 - ❌ Copyright tallies
 - ❌ Package tallies
-- ❌ License clarity scoring
-- ❌ File classification
+- ❌ Full Python-parity license clarity scoring heuristics
+- ❌ Broader file classification beyond current key-file/source slices
 - ❌ Facet assignment
 - ❌ Generated code detection
-- ❌ Comprehensive scan summary
+- ❌ Comprehensive scan summary parity
 
-## Implementation Phases (TBD)
+## Implementation Phases
 
-1. **Phase 1**: File classification and facet assignment
-2. **Phase 2**: License tallies
-3. **Phase 3**: Copyright tallies
-4. **Phase 4**: Package tallies
-5. **Phase 5**: License clarity scoring
-6. **Phase 6**: Generated code detection
-7. **Phase 7**: Scan summary generation
+1. **Phase 1**: File classification and key-file tagging foundations ✅
+2. **Phase 2**: Package/file metadata promotion foundations ✅
+3. **Phase 3**: Initial summary model/output structure ✅
+4. **Phase 4**: Initial non-license-dependent summary fields ✅
+5. **Phase 5**: License tallies
+6. **Phase 6**: Copyright tallies
+7. **Phase 7**: Package tallies
+8. **Phase 8**: Full license clarity parity
+9. **Phase 9**: Facets and generated-code detection
+10. **Phase 10**: Comprehensive scan summary parity
 
 ## Success Criteria
 
 - [ ] Generates accurate tallies for licenses, copyrights, packages
 - [ ] Calculates license clarity score matching Python
-- [ ] Classifies files correctly
+- [ ] Classifies files correctly beyond current key-file/source slices
 - [ ] Detects generated code
 - [ ] Golden tests pass
 
@@ -87,6 +98,7 @@ Post-scan analysis and summarization features that aggregate findings across fil
 
 ## Notes
 
-- Requires license and copyright detection to be implemented first
+- Some summarization foundations can land before full detector parity (for example key-file tagging, package metadata promotion, initial summary fields, and primary-language/holder derivation).
+- Full parity for tallies and Python-style scoring still depends on richer detector/post-processing coverage.
 - Can be implemented incrementally (one tally type at a time)
 - License clarity score is a key metric for compliance teams
