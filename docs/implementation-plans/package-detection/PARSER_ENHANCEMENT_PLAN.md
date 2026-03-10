@@ -346,6 +346,7 @@ Current status (March 10, 2026):
 - A targeted regression now proves description text does not become a fake dependency.
 - Follow-up work now tags nested Ruby legal/readme/manifest files as `key_file`, promotes package metadata from those files, and computes a top-level `summary.license_clarity_score`.
 - PR #307 (`fix(ruby): complete the Ruby enhancement batch`) captures the completed main Ruby batch; the stacked follow-up PR for `#161` builds on top of it.
+- PR #308 (`fix(ruby): tag nested key files and score license clarity`) captures the completed `#161` follow-up.
 
 ### Python PR Scope Rule
 
