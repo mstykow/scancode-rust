@@ -403,6 +403,14 @@ mod tests {
     }
 
     #[test]
+    fn test_assembly_composer_nested() {
+        match run_assembly_golden_test("composer-nested") {
+            Ok(_) => (),
+            Err(e) => panic!("Assembly golden test failed for composer-nested: {}", e),
+        }
+    }
+
+    #[test]
     fn test_assembly_maven_basic() {
         match run_assembly_golden_test("maven-basic") {
             Ok(_) => (),

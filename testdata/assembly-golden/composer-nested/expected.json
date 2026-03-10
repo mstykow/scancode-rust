@@ -1,0 +1,100 @@
+{
+  "packages": [
+    {
+      "type": "composer",
+      "namespace": "plugin",
+      "name": "package",
+      "version": "2.0.0",
+      "description": "Nested plugin package",
+      "primary_language": "PHP",
+      "parties": [
+        {
+          "type": "person",
+          "role": "vendor",
+          "name": "plugin"
+        }
+      ],
+      "repository_homepage_url": "https://packagist.org/packages/plugin/package",
+      "api_data_url": "https://packagist.org/p/packages/plugin/package.json",
+      "purl": "pkg:composer/plugin/package@2.0.0",
+      "package_uid": "pkg:composer/plugin/package@2.0.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "datafile_paths": ["packages/plugin/composer.symfony.json"],
+      "datasource_ids": ["php_composer_json"]
+    },
+    {
+      "type": "composer",
+      "namespace": "root",
+      "name": "package",
+      "version": "1.0.0",
+      "description": "Root package",
+      "primary_language": "PHP",
+      "parties": [
+        {
+          "type": "person",
+          "role": "vendor",
+          "name": "root"
+        }
+      ],
+      "repository_homepage_url": "https://packagist.org/packages/root/package",
+      "api_data_url": "https://packagist.org/p/packages/root/package.json",
+      "purl": "pkg:composer/root/package@1.0.0",
+      "package_uid": "pkg:composer/root/package@1.0.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "datafile_paths": ["php.composer.json"],
+      "datasource_ids": ["php_composer_json"]
+    }
+  ],
+  "dependencies": [
+    {
+      "purl": "pkg:composer/psr/log",
+      "extracted_requirement": "^3.0",
+      "scope": "require",
+      "is_runtime": true,
+      "is_optional": false,
+      "is_pinned": false,
+      "is_direct": true,
+      "dependency_uid": "pkg:composer/psr/log?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "for_package_uid": "pkg:composer/plugin/package@2.0.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "datafile_path": "packages/plugin/composer.symfony.json",
+      "datasource_id": "php_composer_json"
+    },
+    {
+      "purl": "pkg:composer/symfony/console",
+      "extracted_requirement": "^6.0",
+      "scope": "require",
+      "is_runtime": true,
+      "is_optional": false,
+      "is_pinned": false,
+      "is_direct": true,
+      "dependency_uid": "pkg:composer/symfony/console?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "for_package_uid": "pkg:composer/root/package@1.0.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "datafile_path": "php.composer.json",
+      "datasource_id": "php_composer_json"
+    }
+  ],
+  "files_with_packages": [
+    {
+      "path": "packages/plugin/README.md",
+      "for_packages": [
+        "pkg:composer/plugin/package@2.0.0?uuid=fixed-uid-done-for-testing-5642512d1758"
+      ]
+    },
+    {
+      "path": "packages/plugin/composer.symfony.json",
+      "for_packages": [
+        "pkg:composer/plugin/package@2.0.0?uuid=fixed-uid-done-for-testing-5642512d1758"
+      ]
+    },
+    {
+      "path": "php.composer.json",
+      "for_packages": [
+        "pkg:composer/root/package@1.0.0?uuid=fixed-uid-done-for-testing-5642512d1758"
+      ]
+    },
+    {
+      "path": "src/Root.php",
+      "for_packages": [
+        "pkg:composer/root/package@1.0.0?uuid=fixed-uid-done-for-testing-5642512d1758"
+      ]
+    }
+  ]
+}
