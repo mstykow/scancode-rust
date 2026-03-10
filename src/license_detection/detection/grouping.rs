@@ -82,20 +82,27 @@ pub(super) fn should_group_together(
     line_gap <= threshold
 }
 
-/// Sort matches by start token position (qstart in Python).
+/// Sort matches by start token position with tie-breaking criteria.
 ///
-/// Python sorts matches by `qstart` (token start position) at match.py:350-354.
-/// This ensures matches appear in file order, not alphabetical order.
+/// Python sorts matches at match.py:1099, 1220:
+/// ```python
+/// sorter = lambda m: (m.qspan.start, -m.hilen(), -m.len(), m.matcher_order)
+/// ```
+///
+/// This ensures:
+/// 1. Matches appear in file order (by start position)
+/// 2. Longer, more specific matches come first (for overlapping matches)
+/// 3. Higher hilen (legalese tokens) prioritized
+/// 4. Exact matchers take priority over approximate
 pub fn sort_matches_by_line(matches: &mut [LicenseMatch]) {
     matches.sort_by(|a, b| {
         a.start_token
             .cmp(&b.start_token)
-            .then_with(|| a.end_token.cmp(&b.end_token))
+            .then_with(|| b.hilen.cmp(&a.hilen))
+            .then_with(|| b.matched_length.cmp(&a.matched_length))
+            .then_with(|| a.matcher_order().cmp(&b.matcher_order()))
     });
 }
-
-/// Check if matches are correct detection (perfect matches).
-///
 /// A detection is correct if:
 /// - All matchers are "1-hash", "1-spdx-id", or "2-aho" (exact matchers)
 /// - All match coverages are 100%
