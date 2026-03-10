@@ -1,5 +1,7 @@
 use std::path::Path;
 
+use glob::Pattern;
+
 use crate::models::{DatasourceId, FileInfo, Package, PackageData, TopLevelDependency};
 
 use super::AssemblerConfig;
@@ -109,11 +111,20 @@ pub fn assemble_siblings(
 /// - Case-insensitive match (e.g., "Cargo.toml" vs "cargo.toml")
 /// - Glob-style prefix wildcard (e.g., "*.podspec" matches "MyLib.podspec")
 pub(crate) fn matches_pattern(file_name: &str, pattern: &str) -> bool {
-    if let Some(suffix) = pattern.strip_prefix('*') {
-        file_name.ends_with(suffix)
-            || file_name
-                .to_ascii_lowercase()
-                .ends_with(&suffix.to_ascii_lowercase())
+    if pattern.contains('*') {
+        if let Ok(glob_pattern) = Pattern::new(pattern)
+            && glob_pattern.matches(file_name)
+        {
+            return true;
+        }
+
+        let lower_name = file_name.to_ascii_lowercase();
+        let lower_pattern = pattern.to_ascii_lowercase();
+        if let Ok(glob_pattern) = Pattern::new(&lower_pattern) {
+            return glob_pattern.matches(&lower_name);
+        }
+
+        false
     } else {
         file_name == pattern || file_name.eq_ignore_ascii_case(pattern)
     }

@@ -114,6 +114,7 @@
       "package_uid": "pkg:composer/test/package@1.0.0?uuid=fixed-uid-done-for-testing-5642512d1758",
       "parties": [
         {
+          "type": "person",
           "name": "test",
           "role": "vendor"
         }

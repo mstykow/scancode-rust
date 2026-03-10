@@ -46,7 +46,12 @@ pub static ASSEMBLERS: &[AssemblerConfig] = &[
     // PHP Composer ecosystem
     AssemblerConfig {
         datasource_ids: &[DatasourceId::PhpComposerJson, DatasourceId::PhpComposerLock],
-        sibling_file_patterns: &["composer.json", "composer.lock"],
+        sibling_file_patterns: &[
+            "*composer.json",
+            "composer.*.json",
+            "*composer.lock",
+            "composer.*.lock",
+        ],
         mode: AssemblyMode::SiblingMerge,
     },
     // Go ecosystem (includes legacy Godeps)
