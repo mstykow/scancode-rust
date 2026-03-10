@@ -1,364 +1,64 @@
-# Ruby Parser: Beyond-Parity Improvements
+# Ruby Parser Improvements
 
 ## Summary
 
-The Ruby parser in scancode-rust **improves data structure semantics** compared to the Python reference implementation:
-
-- **🔍 Enhanced Extraction**: Semantic party model combining name and email into single structured entity (vs Python's fragmented approach)
-- **⚖️ Parity-aware fallback**: Preserve Python-compatible fragmented author/email lists when multi-entry gemspec arrays would otherwise break golden parity
-
-## Improvement: Semantic Party Model (Enhanced Extraction)
-
-### Python Implementation (Fragmented)
-
-**Location**: `reference/scancode-toolkit/src/packagedcode/ruby.py`
-
-**Current Python Extraction**: Separates party data into three distinct fields:
-
-```json
-{
-  "parties": [
-    {
-      "type": "person",
-      "name": "John Doe",
-      "email": "john@example.com",
-      "role": "author"
-    }
-  ]
-}
-```
-
-**Python's approach**: Three independent fields - name, email, and role - that together represent one person.
-
-### Our Rust Implementation (Semantic)
-
-**Location**: `src/parsers/ruby.rs`
-
-**Our Extraction**: Single, unified Party structure combining name and email:
-
-```rust
-pub struct Party {
-    /// Person or organization name
-    pub name: Option<String>,
-    /// Email address
-    pub email: Option<String>,
-    /// Role: author, maintainer, contributor
-    pub role: Option<String>,
-}
-
-pub fn extract_author_info(gemspec: &GemSpec) -> Vec<Party> {
-    let mut parties = Vec::new();
-
-    // Authors: typically "Name <email>" format
-    if let Some(authors) = &gemspec.authors {
-        for author_str in authors {
-            if let Some(party) = parse_author_string(author_str) {
-                parties.push(party);
-            }
-        }
-    }
-
-    // Maintainers: similar format, different role
-    if let Some(maintainers) = &gemspec.maintainers {
-        for maint_str in maintainers {
-            if let Some(mut party) = parse_author_string(maint_str) {
-                party.role = Some("maintainer".to_string());
-                parties.push(party);
-            }
-        }
-    }
-
-    parties
-}
-
-fn parse_author_string(s: &str) -> Option<Party> {
-    // Format: "John Doe <john@example.com>" or just "John Doe"
-    // Extract both in one operation, preserving semantic relationship
-
-    if let Some(email_start) = s.find('<') {
-        let name = s[..email_start].trim().to_string();
-        let email = s[email_start + 1..s.len() - 1].trim().to_string();
-        Some(Party {
-            name: Some(name),
-            email: Some(email),
-            role: Some("author".to_string()),
-        })
-    } else {
-        Some(Party {
-            name: Some(s.to_string()),
-            email: None,
-            role: Some("author".to_string()),
-        })
-    }
-}
-```
-
-### Example Output
-
-**Before (Python)**:
-
-```json
-{
-  "parties": [
-    {
-      "type": "person",
-      "name": "John Doe",
-      "email": "john@example.com",
-      "role": "author"
-    },
-    {
-      "type": "person",
-      "name": "Jane Smith",
-      "email": null,
-      "role": "author"
-    }
-  ]
-}
-```
+Rust now goes beyond the current Python ScanCode Ruby handling in several concrete ways:
 
-**After (Rust)**:
+1. resolves gemspec constants from required local Ruby files instead of leaving all external constants unresolved
+2. preserves Bundler `GIT` / `PATH` source metadata at parser level and now proves it with parser goldens
+3. merges extracted gem metadata layouts without duplicate package/dependency emission and assigns nested extracted files to the assembled gem package
 
-```json
-{
-  "parties": [
-    {
-      "name": "John Doe",
-      "email": "john@example.com",
-      "role": "author"
-    },
-    {
-      "name": "Jane Smith",
-      "email": null,
-      "role": "author"
-    }
-  ]
-}
-```
+## Python Status
 
-## Why This Matters: Semantic Correctness
+- Python already strips many literal `.freeze` suffixes and parses Gemfile.lock source sections, but several upstream Ruby issues remain open around constant resolution, extracted-gem duplication, false dependency parsing, and key-file tagging.
+- Upstream still leaves external constant references unresolved in gemspec output and does not have extracted-gem assembly regression coverage.
+- Upstream also tracks nested Ruby LICENSE/key-file tagging as a separate unresolved ecosystem/datafile-handler problem.
 
-### 1. **One Person = One Party**
+## Rust Improvements
 
-In the real world:
+### Required-file constant resolution
 
-- **John Doe <john@example.com>** represents ONE person
-- They have one identity (a name)
-- They have one contact method (an email)
-- They have one role in the project
+- Gemspec parsing now loads required local Ruby files when resolving constant-backed gemspec fields.
+- This resolves values like:
+  - `ProviderDSL::GemDescription::NAME`
+  - `ProviderDSL::GemDescription::VERSION`
+  - `ProviderDSL::GemDescription::AUTHORS`
+  - `ProviderDSL::GemDescription::EMAIL`
+  - `ProviderDSL::GemDescription::PAGE`
+- The resolver stays intentionally narrow: it only looks at local required Ruby files adjacent to the gemspec, not arbitrary Ruby load paths.
 
-Our semantic model reflects this reality by bundling these properties together in a single `Party` object.
+### Gemfile.lock source metadata proof
 
-### 2. **Data Integrity**
+- Bundler `GIT` and `PATH` metadata was already partially present in unit coverage; this batch adds parser goldens that pin:
+  - git `remote`
+  - `revision`
+  - `branch`
+  - `ref`
+  - source-type tagging
+  - PATH primary-package identity behavior
 
-Python's fragmented approach risks:
+### False-dependency protection
 
-- **Accidentally splitting one person across multiple records**
-- **Losing the relationship between name and email**
-- **Confusion about who is the actual author** (just name? just email? name+email?)
-
-Our unified approach ensures:
+- Gemspec parser coverage now explicitly proves that description text mentioning `add_dependency`-like strings does not create fake dependencies.
 
-- One `Party` object = one identifiable person
-- name and email always stay together
-- Clear semantic meaning
+### Extracted gem assembly
 
-### 3. **Downstream Processing**
+- `metadata.gz-extract` now assembles with sibling extracted gemspec/Gemfile/Gemfile.lock layouts instead of standing alone.
+- Extracted gem dependency duplication is deduped during nested merge.
+- Ruby package-root resource assignment now attaches nested files under the gem root — including subdirectory `LICENSE` files and Ruby source files — to the assembled gem package.
 
-Consumers of SBOM data need to understand: "Who wrote this code?"
+## Deferred / Not in Scope Yet
 
-**Python's approach requires manual reconstruction**:
+- **Key-file tagging / `license_clarity_score` infrastructure** is still not implemented generically in this repo.
+- So while nested Ruby files are now associated to the correct package, the specific upstream-style `key_file` / `license_clarity_score` problem remains a separate follow-up.
 
-```python
-# Consumer must manually join fields
-author = f"{party['name']} <{party['email']}>"
-# But what if email is null? How do you represent them?
-```
+## Validation
 
-**Our approach is self-documenting**:
+- `cargo test ruby --lib`
+- `cargo test --features golden-tests ruby_golden --lib`
+- `cargo test --features golden-tests test_assembly_ruby_extracted_basic --lib`
 
-```rust
-// Party struct makes it clear: this is one person
-let author = format!("{} <{}>", party.name, party.email.unwrap_or_default());
-// Type safety ensures you don't forget email
-```
+## Related Issues
 
-## Correctness vs. Compatibility Trade-off
-
-### Intentional Divergence
-
-This is an **intentional architectural improvement**, not a bug fix. We chose semantic correctness over strict Python compatibility:
-
-**Python's rationale** (implied): "Store raw fields, let consumers reconstruct meaning"
-
-**Our rationale**: "Enforce semantic relationships at the data model level"
-
-### Test Coverage
-
-Our improvements to the Ruby parser implementation:
-
-- ✅ Fixed runtime dependency scope (`None` → `"runtime"`)
-- ✅ Fixed empty version constraints (`None` → `""`)
-- ✅ Reordered dependency extraction (development first, matching Python output)
-- ✅ Semantic party model (name + email together)
-
-**Test Status**: 2/4 Ruby parser goldens are active. The remaining 2 are intentionally ignored only because they require license detection engine integration:
-
-- License extraction differences (requires license detection engine)
-
-## Implementation Details
-
-### Why Combine Name and Email?
-
-**Gemspec Format**: `gem.authors = ["John Doe <john@example.com>"]`
-
-This format inherently represents:
-
-1. Person's name
-2. Person's email
-3. They are the same person
-
-**Parsing Strategy**:
-
-- Extract the full "Name <email>" string
-- Parse into (name, email) tuple
-- Store in single Party object
-- Preserve semantic relationship
-
-### Handling Edge Cases
-
-```rust
-fn parse_author_string(s: &str) -> Option<Party> {
-    // Case 1: "Name <email@example.com>"
-    if let Some(start) = s.find('<') {
-        if let Some(end) = s.rfind('>') {
-            if start < end {
-                let name = s[..start].trim().to_string();
-                let email = s[start + 1..end].to_string();
-                return Some(Party {
-                    name: if !name.is_empty() { Some(name) } else { None },
-                    email: if !email.is_empty() { Some(email) } else { None },
-                    role: Some("author".to_string()),
-                });
-            }
-        }
-    }
-
-    // Case 2: Just "Name" (no email)
-    let trimmed = s.trim();
-    if !trimmed.is_empty() {
-        Some(Party {
-            name: Some(trimmed.to_string()),
-            email: None,
-            role: Some("author".to_string()),
-        })
-    } else {
-        None
-    }
-}
-```
-
-## Data Quality Improvements
-
-### Problem in Python
-
-When Python parses `gem.authors = ["John Doe <john@example.com>"]`:
-
-```python
-# Python stores: name, email, role as separate fields
-# But loses the fact that they came together from one string
-# Consumer doesn't know: did this name and email go together?
-```
-
-### Our Solution
-
-```rust
-// We preserve: this name and email came together
-Party {
-    name: Some("John Doe"),
-    email: Some("john@example.com"),
-    role: Some("author"),
-}
-// Consumer knows: John Doe is the actual person
-```
-
-## Testing
-
-### Unit Tests
-
-- `test_parse_author_with_email()` - Handles "Name <email>" format
-- `test_parse_author_without_email()` - Handles name-only format
-- `test_parse_empty_author()` - Handles empty strings gracefully
-- `test_extract_maintainers()` - Distinguishes author vs maintainer roles
-
-### Golden Tests
-
-**Status**: 2 active parser goldens, 2 license-engine-blocked goldens still ignored
-
-1. ✅ `test_golden_cat_gemspec` - Basic extraction with semantic single-author pairing
-2. ✅ `test_golden_arel_gemspec` - `%q{}` cleanup and conditional dependency extraction now covered by the parser
-3. ⏸️ `test_golden_oj_gemspec` - License extraction (ignored)
-   - Python expects `null` but we extract licenses
-   - Requires license detection alignment
-4. ⏸️ `test_golden_rubocop_gemspec` - License extraction (ignored)
-   - Same issue as `oj_gemspec`
-
-### Test Data
-
-- Real Gemspec files: `testdata/ruby/`
-- Covers: Rails, bundler, Sinatra packages
-- Various author/maintainer configurations
-
-## Ruby Ecosystem Context
-
-### Gemspec Format
-
-Ruby's standard package format includes:
-
-```ruby
-Gem::Specification.new do |spec|
-  spec.name          = "my-gem"
-  spec.version       = "1.0.0"
-  spec.authors       = ["John Doe <john@example.com>", "Jane Smith"]
-  spec.email         = ["john@example.com"]
-  spec.maintainers   = ["Alice <alice@example.com>"]
-  # ...
-end
-```
-
-**Note**: `authors` and `email` are separate arrays in the DSL, but semantically represent the same people.
-
-### Our Handling
-
-We parse `authors` and `email` separately to extract structured Party objects:
-
-- If email matches an author, associate them
-- If name has embedded email (common format), extract both
-- Preserve role distinction (author vs maintainer)
-
-## Impact
-
-### Use Cases Enabled
-
-1. **SBOM Generation** - Generate proper party information with correct structure
-2. **Attribution** - Create accurate contributor lists
-3. **Contact Information** - Maintain clear person-to-email relationships
-4. **Data Validation** - Type system ensures consistency
-
-## References
-
-### Python Source
-
-- Gemspec parsing: Lines 120-180
-
-### Ruby Documentation
-
-- [Gem Specification Format](https://guides.rubygems.org/specification-reference/)
-- [Gemspec Authors Field](https://guides.rubygems.org/specification-reference/#authors)
-
-### Our Implementation
-
-## Status
-
-- ✅ **Semantic party model**: Complete, validated, production-ready
-- ✅ **Author/maintainer extraction**: Full support
-- ✅ **Documentation**: Complete
+- Fixed in this batch: #151, #154, #156, #158, #160
+- Deferred follow-up: #161
