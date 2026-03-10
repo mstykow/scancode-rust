@@ -17,7 +17,7 @@ use crate::cache::CacheConfig;
 use crate::cli::Cli;
 use crate::models::{
     ExtraData, FileInfo, FileType, Header, LicenseClarityScore, Output, Package,
-    SCANCODE_OUTPUT_FORMAT_VERSION, Summary, SystemEnvironment,
+    SCANCODE_OUTPUT_FORMAT_VERSION, Summary, SystemEnvironment, TallyEntry,
 };
 use crate::output::{OutputWriteConfig, write_output_file};
 use crate::progress::{ProgressMode, ScanProgress};
@@ -742,7 +742,7 @@ fn create_output(
     let mut packages = assembly_result.packages;
     classify_key_files(&mut files, &packages);
     promote_package_metadata_from_key_files(&files, &mut packages);
-    let summary = compute_summary(&files);
+    let summary = compute_summary(&files, &packages);
 
     Output {
         summary,
@@ -924,9 +924,17 @@ fn promote_package_metadata_from_key_files(files: &[FileInfo], packages: &mut [P
     }
 }
 
-fn compute_summary(files: &[FileInfo]) -> Option<Summary> {
+fn compute_summary(files: &[FileInfo], packages: &[Package]) -> Option<Summary> {
     let key_files: Vec<&FileInfo> = files.iter().filter(|file| file.is_key_file).collect();
-    if key_files.is_empty() {
+    let declared_holder = compute_declared_holder(files, packages);
+    let primary_language = compute_primary_language(files, packages);
+    let other_languages = compute_other_languages(files, packages, primary_language.as_deref());
+
+    if key_files.is_empty()
+        && declared_holder.is_none()
+        && primary_language.is_none()
+        && other_languages.is_empty()
+    {
         return None;
     }
 
@@ -966,9 +974,8 @@ fn compute_summary(files: &[FileInfo]) -> Option<Summary> {
         score = score.saturating_sub(10);
     }
 
-    Some(Summary {
-        declared_license_expression,
-        license_clarity_score: Some(LicenseClarityScore {
+    let license_clarity_score = if declared_license || has_license_text || declared_copyrights {
+        Some(LicenseClarityScore {
             score,
             declared_license,
             identification_precision,
@@ -976,8 +983,113 @@ fn compute_summary(files: &[FileInfo]) -> Option<Summary> {
             declared_copyrights,
             conflicting_license_categories: false,
             ambiguous_compound_licensing,
-        }),
+        })
+    } else {
+        None
+    };
+
+    Some(Summary {
+        declared_license_expression,
+        license_clarity_score,
+        declared_holder,
+        primary_language,
+        other_languages,
     })
+}
+
+fn compute_declared_holder(files: &[FileInfo], packages: &[Package]) -> Option<String> {
+    let mut counts: HashMap<String, usize> = HashMap::new();
+
+    for holder in packages
+        .iter()
+        .filter_map(|package| package.holder.as_ref())
+    {
+        *counts.entry(holder.clone()).or_insert(0) += 1;
+    }
+
+    if counts.is_empty() {
+        for holder in files
+            .iter()
+            .filter(|file| file.is_key_file)
+            .flat_map(|file| file.holders.iter())
+            .map(|holder| holder.holder.clone())
+        {
+            *counts.entry(holder).or_insert(0) += 1;
+        }
+    }
+
+    counts
+        .into_iter()
+        .max_by(|left, right| left.1.cmp(&right.1).then_with(|| right.0.cmp(&left.0)))
+        .map(|(holder, _)| holder)
+}
+
+fn compute_primary_language(files: &[FileInfo], packages: &[Package]) -> Option<String> {
+    let mut counts: HashMap<String, usize> = HashMap::new();
+
+    for language in packages
+        .iter()
+        .filter_map(|package| package.primary_language.as_ref())
+    {
+        *counts.entry(language.clone()).or_insert(0) += 1;
+    }
+
+    if counts.is_empty() {
+        for language in files
+            .iter()
+            .filter(|file| file.is_source.unwrap_or(false))
+            .filter_map(|file| file.programming_language.as_ref())
+        {
+            *counts.entry(language.clone()).or_insert(0) += 1;
+        }
+    }
+
+    counts
+        .into_iter()
+        .max_by(|left, right| left.1.cmp(&right.1).then_with(|| right.0.cmp(&left.0)))
+        .map(|(language, _)| language)
+}
+
+fn compute_other_languages(
+    files: &[FileInfo],
+    packages: &[Package],
+    primary_language: Option<&str>,
+) -> Vec<TallyEntry> {
+    let mut counts: HashMap<String, usize> = HashMap::new();
+
+    for language in packages
+        .iter()
+        .filter_map(|package| package.primary_language.as_ref())
+    {
+        *counts.entry(language.clone()).or_insert(0) += 1;
+    }
+
+    if counts.is_empty() {
+        for language in files
+            .iter()
+            .filter(|file| file.is_source.unwrap_or(false))
+            .filter_map(|file| file.programming_language.as_ref())
+        {
+            *counts.entry(language.clone()).or_insert(0) += 1;
+        }
+    }
+
+    let mut tallies: Vec<TallyEntry> = counts
+        .into_iter()
+        .filter(|(language, _)| Some(language.as_str()) != primary_language)
+        .map(|(language, count)| TallyEntry {
+            value: Some(language),
+            count,
+        })
+        .collect();
+
+    tallies.sort_by(|left, right| {
+        right
+            .count
+            .cmp(&left.count)
+            .then_with(|| left.value.cmp(&right.value))
+    });
+    tallies
 }
 
 fn file_declared_license_expression(file: &FileInfo) -> Option<String> {

@@ -22,6 +22,12 @@ pub struct Summary {
     pub declared_license_expression: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub license_clarity_score: Option<LicenseClarityScore>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub declared_holder: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub primary_language: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub other_languages: Vec<TallyEntry>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
@@ -33,6 +39,13 @@ pub struct LicenseClarityScore {
     pub declared_copyrights: bool,
     pub conflicting_license_categories: bool,
     pub ambiguous_compound_licensing: bool,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+pub struct TallyEntry {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub value: Option<String>,
+    pub count: usize,
 }
 
 #[derive(Serialize, Deserialize, Debug)]

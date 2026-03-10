@@ -266,6 +266,12 @@ mod tests {
                 conflicting_license_categories: false,
                 ambiguous_compound_licensing: false,
             }),
+            declared_holder: Some("Example Corp.".to_string()),
+            primary_language: Some("Ruby".to_string()),
+            other_languages: vec![crate::models::TallyEntry {
+                value: Some("Python".to_string()),
+                count: 2,
+            }],
         });
         output.files[0].is_legal = true;
         output.files[0].is_top_level = true;
@@ -284,6 +290,9 @@ mod tests {
             "apache-2.0"
         );
         assert_eq!(value["summary"]["license_clarity_score"]["score"], 100);
+        assert_eq!(value["summary"]["declared_holder"], "Example Corp.");
+        assert_eq!(value["summary"]["primary_language"], "Ruby");
+        assert_eq!(value["summary"]["other_languages"][0]["value"], "Python");
         assert_eq!(value["files"][0]["is_key_file"], true);
     }
 
