@@ -119,7 +119,7 @@
       {
         "purl": "pkg:gem/minitest",
         "extracted_requirement": ">= 2.0.2",
-        "scope": "dependency",
+        "scope": "runtime",
         "is_runtime": true,
         "is_optional": false,
         "is_pinned": false,
@@ -130,7 +130,7 @@
       {
         "purl": "pkg:gem/hoe",
         "extracted_requirement": ">= 2.9.1",
-        "scope": "dependency",
+        "scope": "runtime",
         "is_runtime": true,
         "is_optional": false,
         "is_pinned": false,
@@ -141,7 +141,7 @@
       {
         "purl": "pkg:gem/minitest",
         "extracted_requirement": ">= 2.0.2",
-        "scope": "dependency",
+        "scope": "runtime",
         "is_runtime": true,
         "is_optional": false,
         "is_pinned": false,
@@ -152,7 +152,7 @@
       {
         "purl": "pkg:gem/hoe",
         "extracted_requirement": ">= 2.9.1",
-        "scope": "dependency",
+        "scope": "runtime",
         "is_runtime": true,
         "is_optional": false,
         "is_pinned": false,
