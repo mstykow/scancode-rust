@@ -15,10 +15,14 @@ use std::sync::Arc;
 use crate::askalono::{Store, TextData};
 use crate::cache::CacheConfig;
 use crate::cli::Cli;
-use crate::models::{ExtraData, Header, Output, SCANCODE_OUTPUT_FORMAT_VERSION, SystemEnvironment};
+use crate::models::{
+    ExtraData, FileInfo, FileType, Header, LicenseClarityScore, Output, Package,
+    SCANCODE_OUTPUT_FORMAT_VERSION, Summary, SystemEnvironment,
+};
 use crate::output::{OutputWriteConfig, write_output_file};
 use crate::progress::{ProgressMode, ScanProgress};
 use crate::scanner::{TextDetectionOptions, count_with_size, process, process_with_options};
+use crate::utils::spdx::combine_license_expressions;
 
 mod askalono;
 mod assembly;
@@ -734,7 +738,14 @@ fn create_output(
         .flatten()
         .collect();
 
+    let mut files = scan_result.files;
+    let mut packages = assembly_result.packages;
+    classify_key_files(&mut files, &packages);
+    promote_package_metadata_from_key_files(&files, &mut packages);
+    let summary = compute_summary(&files);
+
     Output {
+        summary,
         headers: vec![Header {
             start_timestamp: start_time.to_rfc3339(),
             end_timestamp: end_time.to_rfc3339(),
@@ -743,12 +754,241 @@ fn create_output(
             errors,
             output_format_version: SCANCODE_OUTPUT_FORMAT_VERSION.to_string(),
         }],
-        packages: assembly_result.packages,
+        packages,
         dependencies: assembly_result.dependencies,
-        files: scan_result.files,
+        files,
         license_references,
         license_rule_references,
     }
+}
+
+fn classify_key_files(files: &mut [FileInfo], packages: &[Package]) {
+    let package_roots = build_package_roots(packages);
+    let package_file_references = build_package_file_reference_map(files);
+
+    for file in files.iter_mut() {
+        if file.file_type != FileType::File || file.for_packages.is_empty() {
+            continue;
+        }
+
+        let basename = file
+            .path
+            .rsplit('/')
+            .next()
+            .unwrap_or(file.path.as_str())
+            .to_ascii_lowercase();
+
+        file.is_legal = is_legal_filename(&basename);
+        file.is_readme = basename.starts_with("readme");
+        file.is_manifest = !file.package_data.is_empty() || is_manifest_filename(&basename);
+
+        let path = Path::new(&file.path);
+        let is_referenced = file.for_packages.iter().any(|uid| {
+            package_file_references
+                .get(uid)
+                .is_some_and(|refs| refs.contains(file.path.as_str()))
+        });
+        let is_root_top_level = file.for_packages.iter().any(|uid| {
+            package_roots
+                .get(uid)
+                .and_then(|root| path.strip_prefix(root).ok())
+                .is_some_and(|relative| relative.components().count() == 1)
+        });
+
+        file.is_top_level = is_referenced || is_root_top_level;
+        file.is_key_file =
+            file.is_top_level && (file.is_legal || file.is_manifest || file.is_readme);
+    }
+}
+
+fn build_package_roots(packages: &[Package]) -> HashMap<String, PathBuf> {
+    let mut roots = HashMap::new();
+    for package in packages {
+        if let Some(root) = package_root(package) {
+            roots.insert(package.package_uid.clone(), root);
+        }
+    }
+    roots
+}
+
+fn package_root(package: &Package) -> Option<PathBuf> {
+    for datafile_path in &package.datafile_paths {
+        let path = Path::new(datafile_path);
+
+        if path.file_name().and_then(|n| n.to_str()) == Some("metadata.gz-extract") {
+            return path.parent().map(|p| p.to_path_buf());
+        }
+
+        if path
+            .components()
+            .any(|c| c.as_os_str() == "data.gz-extract")
+        {
+            let mut current = path;
+            while let Some(parent) = current.parent() {
+                if parent.file_name().and_then(|n| n.to_str()) == Some("data.gz-extract") {
+                    return parent.parent().map(|p| p.to_path_buf());
+                }
+                current = parent;
+            }
+        }
+
+        if let Some(parent) = path.parent() {
+            return Some(parent.to_path_buf());
+        }
+    }
+    None
+}
+
+fn build_package_file_reference_map(files: &[FileInfo]) -> HashMap<String, HashSet<String>> {
+    let mut mapping: HashMap<String, HashSet<String>> = HashMap::new();
+
+    for file in files {
+        if file.package_data.is_empty() || file.for_packages.is_empty() {
+            continue;
+        }
+
+        for package_uid in &file.for_packages {
+            let refs = mapping.entry(package_uid.clone()).or_default();
+            for pkg_data in &file.package_data {
+                for file_ref in &pkg_data.file_references {
+                    refs.insert(file_ref.path.clone());
+                }
+            }
+        }
+    }
+
+    mapping
+}
+
+fn is_legal_filename(basename: &str) -> bool {
+    basename == "license"
+        || basename.starts_with("license.")
+        || basename == "licence"
+        || basename.starts_with("licence.")
+        || basename == "copying"
+        || basename.starts_with("copying.")
+        || basename == "notice"
+        || basename.starts_with("notice.")
+}
+
+fn is_manifest_filename(basename: &str) -> bool {
+    basename.ends_with(".gemspec") || basename == "gemfile" || basename == "gemfile.lock"
+}
+
+fn promote_package_metadata_from_key_files(files: &[FileInfo], packages: &mut [Package]) {
+    for package in packages.iter_mut() {
+        let key_files: Vec<&FileInfo> = files
+            .iter()
+            .filter(|file| file.is_key_file && file.for_packages.contains(&package.package_uid))
+            .collect();
+
+        if key_files.is_empty() {
+            continue;
+        }
+
+        if package.declared_license_expression_spdx.is_none() {
+            let expressions = key_files
+                .iter()
+                .filter_map(|file| file_declared_license_expression(file));
+            if let Some(combined) = combine_license_expressions(expressions) {
+                package.declared_license_expression_spdx = Some(combined.clone());
+                if package.declared_license_expression.is_none() {
+                    package.declared_license_expression = Some(combined.to_ascii_lowercase());
+                }
+            }
+        }
+
+        if package.license_detections.is_empty() {
+            for file in &key_files {
+                package
+                    .license_detections
+                    .extend(file.license_detections.clone());
+            }
+        }
+
+        if package.copyright.is_none() {
+            package.copyright = key_files
+                .iter()
+                .flat_map(|file| file.copyrights.iter())
+                .map(|copyright| copyright.copyright.clone())
+                .next();
+        }
+
+        if package.holder.is_none() {
+            package.holder = key_files
+                .iter()
+                .flat_map(|file| file.holders.iter())
+                .map(|holder| holder.holder.clone())
+                .next();
+        }
+    }
+}
+
+fn compute_summary(files: &[FileInfo]) -> Option<Summary> {
+    let key_files: Vec<&FileInfo> = files.iter().filter(|file| file.is_key_file).collect();
+    if key_files.is_empty() {
+        return None;
+    }
+
+    let declared_expressions: Vec<String> = key_files
+        .iter()
+        .filter_map(|file| file_declared_license_expression(file))
+        .collect();
+    let declared_license_expression =
+        combine_license_expressions(declared_expressions.iter().cloned())
+            .map(|expr| expr.to_ascii_lowercase());
+
+    let declared_license = key_files.iter().any(|file| {
+        file_declared_license_expression(file).is_some() || !file.license_detections.is_empty()
+    });
+    let identification_precision = declared_license;
+    let has_license_text = key_files
+        .iter()
+        .any(|file| file.is_legal && !file.license_detections.is_empty());
+    let declared_copyrights = key_files.iter().any(|file| !file.copyrights.is_empty());
+    let ambiguous_compound_licensing =
+        declared_expressions.iter().collect::<HashSet<_>>().len() > 1;
+
+    let mut score: usize = 0;
+    if declared_license {
+        score += 40;
+    }
+    if identification_precision {
+        score += 40;
+    }
+    if has_license_text {
+        score += 10;
+    }
+    if declared_copyrights {
+        score += 10;
+    }
+    if ambiguous_compound_licensing {
+        score = score.saturating_sub(10);
+    }
+
+    Some(Summary {
+        declared_license_expression,
+        license_clarity_score: Some(LicenseClarityScore {
+            score,
+            declared_license,
+            identification_precision,
+            has_license_text,
+            declared_copyrights,
+            conflicting_license_categories: false,
+            ambiguous_compound_licensing,
+        }),
+    })
+}
+
+fn file_declared_license_expression(file: &FileInfo) -> Option<String> {
+    file.license_expression.clone().or_else(|| {
+        file.package_data.iter().find_map(|pkg| {
+            pkg.declared_license_expression_spdx
+                .clone()
+                .or_else(|| pkg.declared_license_expression.clone())
+                .or_else(|| pkg.get_license_expression())
+        })
+    })
 }
 
 #[cfg(test)]

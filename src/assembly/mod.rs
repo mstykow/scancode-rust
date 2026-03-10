@@ -507,6 +507,11 @@ mod tests {
             scan_errors: vec![],
             is_source: None,
             source_count: None,
+            is_legal: false,
+            is_manifest: false,
+            is_readme: false,
+            is_top_level: false,
+            is_key_file: false,
         }
     }
 
@@ -1155,6 +1160,11 @@ mod tests {
             scan_errors: vec![],
             is_source: None,
             source_count: None,
+            is_legal: false,
+            is_manifest: false,
+            is_readme: false,
+            is_top_level: false,
+            is_key_file: false,
         }];
 
         let result = assemble(&mut files);

@@ -65,6 +65,21 @@ pub struct FileInfo {
     #[builder(default)]
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub source_count: Option<usize>,
+    #[builder(default)]
+    #[serde(skip_serializing_if = "is_false", default)]
+    pub is_legal: bool,
+    #[builder(default)]
+    #[serde(skip_serializing_if = "is_false", default)]
+    pub is_manifest: bool,
+    #[builder(default)]
+    #[serde(skip_serializing_if = "is_false", default)]
+    pub is_readme: bool,
+    #[builder(default)]
+    #[serde(skip_serializing_if = "is_false", default)]
+    pub is_top_level: bool,
+    #[builder(default)]
+    #[serde(skip_serializing_if = "is_false", default)]
+    pub is_key_file: bool,
 }
 
 impl FileInfoBuilder {
@@ -172,6 +187,11 @@ impl FileInfo {
             scan_errors,
             is_source: None,
             source_count: None,
+            is_legal: false,
+            is_manifest: false,
+            is_readme: false,
+            is_top_level: false,
+            is_key_file: false,
         }
     }
 }

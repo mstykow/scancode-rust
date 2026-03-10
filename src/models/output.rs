@@ -6,12 +6,33 @@ pub const SCANCODE_OUTPUT_FORMAT_VERSION: &str = "4.0.0";
 #[derive(Serialize, Deserialize, Debug)]
 /// Top-level ScanCode-compatible JSON payload.
 pub struct Output {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub summary: Option<Summary>,
     pub headers: Vec<Header>,
     pub packages: Vec<Package>,
     pub dependencies: Vec<TopLevelDependency>,
     pub files: Vec<FileInfo>,
     pub license_references: Vec<LicenseReference>,
     pub license_rule_references: Vec<LicenseRuleReference>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+pub struct Summary {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub declared_license_expression: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub license_clarity_score: Option<LicenseClarityScore>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+pub struct LicenseClarityScore {
+    pub score: usize,
+    pub declared_license: bool,
+    pub identification_precision: bool,
+    pub has_license_text: bool,
+    pub declared_copyrights: bool,
+    pub conflicting_license_categories: bool,
+    pub ambiguous_compound_licensing: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug)]

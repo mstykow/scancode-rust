@@ -698,6 +698,11 @@ fn process_directory(path: &Path, metadata: &fs::Metadata) -> FileInfo {
         scan_errors: Vec::new(),
         is_source: None,
         source_count: None,
+        is_legal: false,
+        is_manifest: false,
+        is_readme: false,
+        is_top_level: false,
+        is_key_file: false,
     }
 }
 
