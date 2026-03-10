@@ -1,0 +1,105 @@
+{
+  "packages": [
+    {
+      "type": "gem",
+      "name": "example-gem",
+      "version": "1.2.3",
+      "primary_language": "Ruby",
+      "description": "A longer description of the example gem for testing purposes",
+      "release_date": "2024-01-15",
+      "parties": [
+        {
+          "type": "person",
+          "role": "author",
+          "name": "John Doe",
+          "email": "john@example.com"
+        },
+        {
+          "type": "person",
+          "role": "author",
+          "name": "Jane Smith",
+          "email": "jane@example.com"
+        }
+      ],
+      "homepage_url": "https://example.com/example-gem",
+      "download_url": "https://rubygems.org/downloads/example-gem-1.2.3.gem",
+      "code_view_url": "https://github.com/example/example-gem",
+      "vcs_url": "https://github.com/example/example-gem",
+      "extracted_license_statement": "MIT",
+      "repository_homepage_url": "https://rubygems.org/gems/example-gem/versions/1.2.3",
+      "repository_download_url": "https://rubygems.org/downloads/example-gem-1.2.3.gem",
+      "api_data_url": "https://rubygems.org/api/v2/rubygems/example-gem/versions/1.2.3.json",
+      "purl": "pkg:gem/example-gem@1.2.3",
+      "package_uid": "pkg:gem/example-gem@1.2.3?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "datafile_paths": ["data.gz-extract/example.gemspec", "metadata.gz-extract"],
+      "datasource_ids": ["gem_archive_extracted", "gemspec"]
+    }
+  ],
+  "dependencies": [
+    {
+      "purl": "pkg:gem/nokogiri",
+      "extracted_requirement": ">= 1.6",
+      "scope": "runtime",
+      "is_runtime": true,
+      "is_optional": false,
+      "is_direct": true,
+      "dependency_uid": "pkg:gem/nokogiri?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "for_package_uid": "pkg:gem/example-gem@1.2.3?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "datafile_path": "metadata.gz-extract",
+      "datasource_id": "gem_archive_extracted"
+    },
+    {
+      "purl": "pkg:gem/rails",
+      "extracted_requirement": "~> 5.0",
+      "scope": "runtime",
+      "is_runtime": true,
+      "is_optional": false,
+      "is_direct": true,
+      "dependency_uid": "pkg:gem/rails?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "for_package_uid": "pkg:gem/example-gem@1.2.3?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "datafile_path": "metadata.gz-extract",
+      "datasource_id": "gem_archive_extracted"
+    },
+    {
+      "purl": "pkg:gem/rspec",
+      "extracted_requirement": "~> 3.0",
+      "scope": "development",
+      "is_runtime": false,
+      "is_optional": true,
+      "is_direct": true,
+      "dependency_uid": "pkg:gem/rspec?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "for_package_uid": "pkg:gem/example-gem@1.2.3?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "datafile_path": "metadata.gz-extract",
+      "datasource_id": "gem_archive_extracted"
+    },
+    {
+      "purl": "pkg:gem/rubocop",
+      "scope": "development",
+      "is_runtime": false,
+      "is_optional": true,
+      "is_direct": true,
+      "dependency_uid": "pkg:gem/rubocop?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "for_package_uid": "pkg:gem/example-gem@1.2.3?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "datafile_path": "data.gz-extract/example.gemspec",
+      "datasource_id": "gemspec"
+    }
+  ],
+  "files_with_packages": [
+    {
+      "path": "data.gz-extract/LICENSE.txt",
+      "for_packages": ["pkg:gem/example-gem@1.2.3?uuid=fixed-uid-done-for-testing-5642512d1758"]
+    },
+    {
+      "path": "data.gz-extract/example.gemspec",
+      "for_packages": ["pkg:gem/example-gem@1.2.3?uuid=fixed-uid-done-for-testing-5642512d1758"]
+    },
+    {
+      "path": "data.gz-extract/lib/example-gem.rb",
+      "for_packages": ["pkg:gem/example-gem@1.2.3?uuid=fixed-uid-done-for-testing-5642512d1758"]
+    },
+    {
+      "path": "metadata.gz-extract",
+      "for_packages": ["pkg:gem/example-gem@1.2.3?uuid=fixed-uid-done-for-testing-5642512d1758"]
+    }
+  ]
+}

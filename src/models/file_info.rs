@@ -659,11 +659,18 @@ impl Package {
         fill_if_empty!(api_data_url);
 
         for party in &package_data.parties {
-            if !self
-                .parties
-                .iter()
-                .any(|p| p.name == party.name && p.role == party.role)
-            {
+            if let Some(existing) = self.parties.iter_mut().find(|p| {
+                p.role == party.role
+                    && ((p.name.is_some() && p.name == party.name)
+                        || (p.email.is_some() && p.email == party.email))
+            }) {
+                if existing.name.is_none() {
+                    existing.name = party.name.clone();
+                }
+                if existing.email.is_none() {
+                    existing.email = party.email.clone();
+                }
+            } else {
                 self.parties.push(party.clone());
             }
         }

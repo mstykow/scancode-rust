@@ -379,6 +379,17 @@ mod tests {
     }
 
     #[test]
+    fn test_assembly_ruby_extracted_basic() {
+        match run_assembly_golden_test("ruby-extracted-basic") {
+            Ok(_) => (),
+            Err(e) => panic!(
+                "Assembly golden test failed for ruby-extracted-basic: {}",
+                e
+            ),
+        }
+    }
+
+    #[test]
     fn test_assembly_composer_basic() {
         match run_assembly_golden_test("composer-basic") {
             Ok(_) => (),
