@@ -1,5 +1,8 @@
 use super::*;
-use crate::models::{Author, Copyright, FileInfo, FileType, Holder, OutputEmail, OutputURL};
+use crate::models::{
+    Author, Copyright, DatasourceId, FileInfo, FileReference, FileType, Holder, Match, OutputEmail,
+    OutputURL, Package, PackageType,
+};
 use clap::Parser;
 use serde_json::json;
 use std::fs;
@@ -76,6 +79,53 @@ fn dir(path: &str) -> FileInfo {
         Vec::new(),
         Vec::new(),
     )
+}
+
+fn package(uid: &str, path: &str) -> Package {
+    Package {
+        package_type: Some(PackageType::Gem),
+        namespace: None,
+        name: Some("inspec-bin".to_string()),
+        version: Some("6.8.2".to_string()),
+        qualifiers: None,
+        subpath: None,
+        primary_language: Some("Ruby".to_string()),
+        description: None,
+        release_date: None,
+        parties: vec![],
+        keywords: vec![],
+        homepage_url: None,
+        download_url: None,
+        size: None,
+        sha1: None,
+        md5: None,
+        sha256: None,
+        sha512: None,
+        bug_tracking_url: None,
+        code_view_url: None,
+        vcs_url: None,
+        copyright: None,
+        holder: None,
+        declared_license_expression: None,
+        declared_license_expression_spdx: None,
+        license_detections: vec![],
+        other_license_expression: None,
+        other_license_expression_spdx: None,
+        other_license_detections: vec![],
+        extracted_license_statement: None,
+        notice_text: None,
+        source_packages: vec![],
+        is_private: false,
+        is_virtual: false,
+        extra_data: None,
+        repository_homepage_url: None,
+        repository_download_url: None,
+        api_data_url: None,
+        datasource_ids: vec![DatasourceId::GemArchiveExtracted],
+        purl: Some("pkg:gem/inspec-bin@6.8.2".to_string()),
+        package_uid: uid.to_string(),
+        datafile_paths: vec![path.to_string()],
+    }
 }
 
 #[test]
@@ -274,6 +324,211 @@ fn mark_source_ignores_go_test_only_files_for_directory_threshold() {
         .find(|f| f.path == "module/helper_test.go")
         .expect("test file exists");
     assert_eq!(test_file.is_source, Some(false));
+}
+
+#[test]
+fn classify_key_files_marks_nested_ruby_license_from_file_references() {
+    let uid = "pkg:gem/inspec-bin@6.8.2?uuid=test";
+    let mut metadata_file = file("inspec-6.8.2/metadata.gz-extract");
+    metadata_file.for_packages.push(uid.to_string());
+    metadata_file.package_data = vec![crate::models::PackageData {
+        package_type: Some(PackageType::Gem),
+        datasource_id: Some(DatasourceId::GemArchiveExtracted),
+        file_references: vec![FileReference {
+            path: "inspec-6.8.2/inspec-bin/LICENSE".to_string(),
+            size: None,
+            sha1: None,
+            md5: None,
+            sha256: None,
+            sha512: None,
+            extra_data: None,
+        }],
+        ..Default::default()
+    }];
+
+    let mut license_file = file("inspec-6.8.2/inspec-bin/LICENSE");
+    license_file.for_packages.push(uid.to_string());
+    license_file.license_expression = Some("Apache-2.0".to_string());
+    license_file.copyrights = vec![Copyright {
+        copyright: "Copyright (c) 2019 Chef Software Inc.".to_string(),
+        start_line: 1,
+        end_line: 1,
+    }];
+    license_file.holders = vec![Holder {
+        holder: "Chef Software Inc.".to_string(),
+        start_line: 1,
+        end_line: 1,
+    }];
+    license_file.license_detections = vec![crate::models::LicenseDetection {
+        license_expression: "apache-2.0".to_string(),
+        license_expression_spdx: "Apache-2.0".to_string(),
+        matches: vec![Match {
+            license_expression: "apache-2.0".to_string(),
+            license_expression_spdx: "Apache-2.0".to_string(),
+            from_file: Some("inspec-6.8.2/inspec-bin/LICENSE".to_string()),
+            start_line: 1,
+            end_line: 20,
+            matcher: None,
+            score: 100.0,
+            matched_length: None,
+            match_coverage: None,
+            rule_relevance: None,
+            rule_identifier: None,
+            rule_url: None,
+            matched_text: None,
+        }],
+        identifier: None,
+    }];
+
+    let mut files = vec![metadata_file, license_file];
+    let packages = vec![package(uid, "inspec-6.8.2/metadata.gz-extract")];
+
+    classify_key_files(&mut files, &packages);
+    let license = files
+        .iter()
+        .find(|f| f.path.ends_with("/LICENSE"))
+        .expect("license file exists");
+
+    assert!(license.is_legal);
+    assert!(license.is_top_level);
+    assert!(license.is_key_file);
+}
+
+#[test]
+fn promote_package_metadata_and_summary_from_key_files() {
+    let uid = "pkg:gem/inspec-bin@6.8.2?uuid=test";
+    let mut metadata_file = file("inspec-6.8.2/metadata.gz-extract");
+    metadata_file.for_packages.push(uid.to_string());
+    metadata_file.package_data = vec![crate::models::PackageData {
+        package_type: Some(PackageType::Gem),
+        datasource_id: Some(DatasourceId::GemArchiveExtracted),
+        file_references: vec![FileReference {
+            path: "inspec-6.8.2/inspec-bin/LICENSE".to_string(),
+            size: None,
+            sha1: None,
+            md5: None,
+            sha256: None,
+            sha512: None,
+            extra_data: None,
+        }],
+        ..Default::default()
+    }];
+
+    let mut license_file = file("inspec-6.8.2/inspec-bin/LICENSE");
+    license_file.for_packages.push(uid.to_string());
+    license_file.license_expression = Some("Apache-2.0".to_string());
+    license_file.license_detections = vec![crate::models::LicenseDetection {
+        license_expression: "apache-2.0".to_string(),
+        license_expression_spdx: "Apache-2.0".to_string(),
+        matches: vec![Match {
+            license_expression: "apache-2.0".to_string(),
+            license_expression_spdx: "Apache-2.0".to_string(),
+            from_file: Some("inspec-6.8.2/inspec-bin/LICENSE".to_string()),
+            start_line: 1,
+            end_line: 20,
+            matcher: None,
+            score: 100.0,
+            matched_length: None,
+            match_coverage: None,
+            rule_relevance: None,
+            rule_identifier: None,
+            rule_url: None,
+            matched_text: None,
+        }],
+        identifier: None,
+    }];
+    license_file.copyrights = vec![Copyright {
+        copyright: "Copyright (c) 2019 Chef Software Inc.".to_string(),
+        start_line: 1,
+        end_line: 1,
+    }];
+    license_file.holders = vec![Holder {
+        holder: "Chef Software Inc.".to_string(),
+        start_line: 1,
+        end_line: 1,
+    }];
+
+    let mut files = vec![metadata_file, license_file];
+    let mut packages = vec![package(uid, "inspec-6.8.2/metadata.gz-extract")];
+
+    classify_key_files(&mut files, &packages);
+    promote_package_metadata_from_key_files(&files, &mut packages);
+    let summary = compute_summary(&files).expect("summary exists");
+
+    assert_eq!(packages[0].holder.as_deref(), Some("Chef Software Inc."));
+    assert_eq!(
+        packages[0].declared_license_expression_spdx.as_deref(),
+        Some("Apache-2.0")
+    );
+    assert_eq!(
+        summary.declared_license_expression.as_deref(),
+        Some("apache-2.0")
+    );
+    let score = summary.license_clarity_score.expect("score exists");
+    assert_eq!(score.score, 100);
+    assert!(score.declared_license);
+    assert!(score.identification_precision);
+    assert!(score.has_license_text);
+    assert!(score.declared_copyrights);
+    assert!(!score.ambiguous_compound_licensing);
+}
+
+#[test]
+fn manifest_declared_license_contributes_to_summary_and_package_promotion() {
+    let uid = "pkg:gem/demo@1.0.0?uuid=test";
+    let mut gemspec = file("demo/demo.gemspec");
+    gemspec.for_packages.push(uid.to_string());
+    gemspec.package_data = vec![crate::models::PackageData {
+        package_type: Some(PackageType::Gem),
+        datasource_id: Some(DatasourceId::Gemspec),
+        declared_license_expression: Some("mit".to_string()),
+        declared_license_expression_spdx: Some("MIT".to_string()),
+        ..Default::default()
+    }];
+
+    let mut files = vec![gemspec];
+    let mut packages = vec![package(uid, "demo/demo.gemspec")];
+
+    classify_key_files(&mut files, &packages);
+    promote_package_metadata_from_key_files(&files, &mut packages);
+    let summary = compute_summary(&files).expect("summary exists");
+
+    assert!(files[0].is_manifest);
+    assert!(files[0].is_key_file);
+    assert_eq!(
+        packages[0].declared_license_expression_spdx.as_deref(),
+        Some("MIT")
+    );
+    assert_eq!(summary.declared_license_expression.as_deref(), Some("mit"));
+    assert_eq!(summary.license_clarity_score.unwrap().score, 80);
+}
+
+#[test]
+fn classify_key_files_does_not_tag_unreferenced_nested_legal_file() {
+    let uid = "pkg:gem/demo@1.0.0?uuid=test";
+    let mut gemspec = file("demo/demo.gemspec");
+    gemspec.for_packages.push(uid.to_string());
+    gemspec.package_data = vec![crate::models::PackageData {
+        package_type: Some(PackageType::Gem),
+        datasource_id: Some(DatasourceId::Gemspec),
+        ..Default::default()
+    }];
+
+    let mut nested_license = file("demo/subdir/LICENSE");
+    nested_license.for_packages.push(uid.to_string());
+
+    let mut files = vec![gemspec, nested_license];
+    let packages = vec![package(uid, "demo/demo.gemspec")];
+
+    classify_key_files(&mut files, &packages);
+    let nested = files
+        .iter()
+        .find(|f| f.path.ends_with("subdir/LICENSE"))
+        .unwrap();
+
+    assert!(nested.is_legal);
+    assert!(!nested.is_top_level);
+    assert!(!nested.is_key_file);
 }
 
 #[test]

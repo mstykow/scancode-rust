@@ -9,6 +9,10 @@ use super::shared::{io_other, sorted_files};
 pub(crate) fn write_json_lines(output: &Output, writer: &mut dyn Write) -> io::Result<()> {
     write_jsonl_line(writer, &json!({ "headers": output.headers }))?;
 
+    if let Some(summary) = &output.summary {
+        write_jsonl_line(writer, &json!({ "summary": summary }))?;
+    }
+
     if !output.packages.is_empty() {
         write_jsonl_line(writer, &json!({ "packages": output.packages }))?;
     }

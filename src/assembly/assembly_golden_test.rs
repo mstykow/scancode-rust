@@ -130,6 +130,11 @@ mod tests {
                 scan_errors: vec![],
                 is_source: None,
                 source_count: None,
+                is_legal: false,
+                is_manifest: false,
+                is_readme: false,
+                is_top_level: false,
+                is_key_file: false,
             };
 
             file_infos.push(file_info);

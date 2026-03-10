@@ -466,6 +466,11 @@ mod tests {
                 scan_errors: vec![],
                 is_source: None,
                 source_count: None,
+                is_legal: false,
+                is_manifest: false,
+                is_readme: false,
+                is_top_level: false,
+                is_key_file: false,
             },
             FileInfo {
                 name: "libc.so".to_string(),
@@ -492,6 +497,11 @@ mod tests {
                 scan_errors: vec![],
                 is_source: None,
                 source_count: None,
+                is_legal: false,
+                is_manifest: false,
+                is_readme: false,
+                is_top_level: false,
+                is_key_file: false,
             },
             FileInfo {
                 name: "ldconfig".to_string(),
@@ -518,6 +528,11 @@ mod tests {
                 scan_errors: vec![],
                 is_source: None,
                 source_count: None,
+                is_legal: false,
+                is_manifest: false,
+                is_readme: false,
+                is_top_level: false,
+                is_key_file: false,
             },
         ];
 
@@ -634,6 +649,11 @@ mod tests {
             scan_errors: vec![],
             is_source: None,
             source_count: None,
+            is_legal: false,
+            is_manifest: false,
+            is_readme: false,
+            is_top_level: false,
+            is_key_file: false,
         }];
 
         let mut packages = vec![Package {
@@ -731,6 +751,11 @@ mod tests {
                 scan_errors: vec![],
                 is_source: None,
                 source_count: None,
+                is_legal: false,
+                is_manifest: false,
+                is_readme: false,
+                is_top_level: false,
+                is_key_file: false,
             },
             FileInfo {
                 name: "os-release".to_string(),
@@ -762,6 +787,11 @@ mod tests {
                 scan_errors: vec![],
                 is_source: None,
                 source_count: None,
+                is_legal: false,
+                is_manifest: false,
+                is_readme: false,
+                is_top_level: false,
+                is_key_file: false,
             },
         ];
 
@@ -875,6 +905,11 @@ mod tests {
                 scan_errors: vec![],
                 is_source: None,
                 source_count: None,
+                is_legal: false,
+                is_manifest: false,
+                is_readme: false,
+                is_top_level: false,
+                is_key_file: false,
             },
             FileInfo {
                 name: "from_repo".to_string(),
@@ -902,6 +937,11 @@ mod tests {
                 scan_errors: vec![],
                 is_source: None,
                 source_count: None,
+                is_legal: false,
+                is_manifest: false,
+                is_readme: false,
+                is_top_level: false,
+                is_key_file: false,
             },
         ];
 
@@ -1081,6 +1121,11 @@ mod tests {
                 scan_errors: vec![],
                 is_source: None,
                 source_count: None,
+                is_legal: false,
+                is_manifest: false,
+                is_readme: false,
+                is_top_level: false,
+                is_key_file: false,
             },
             FileInfo {
                 name: "test.so".to_string(),
@@ -1107,6 +1152,11 @@ mod tests {
                 scan_errors: vec![],
                 is_source: None,
                 source_count: None,
+                is_legal: false,
+                is_manifest: false,
+                is_readme: false,
+                is_top_level: false,
+                is_key_file: false,
             },
         ];
 

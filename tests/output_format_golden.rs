@@ -1410,6 +1410,7 @@ fn sample_output_with_sections(
     files: Vec<FileInfo>,
 ) -> Output {
     Output {
+        summary: None,
         headers: vec![sample_header(files_count, directories_count)],
         packages,
         dependencies,
@@ -1717,6 +1718,7 @@ fn sample_csv_tree_file(path: &str, name: &str) -> FileInfo {
 
 fn empty_output() -> Output {
     Output {
+        summary: None,
         headers: vec![],
         packages: vec![],
         dependencies: vec![],

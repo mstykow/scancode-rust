@@ -253,6 +253,41 @@ mod tests {
     }
 
     #[test]
+    fn test_json_writer_includes_summary_and_key_file_flags() {
+        let mut output = sample_output();
+        output.summary = Some(crate::models::Summary {
+            declared_license_expression: Some("apache-2.0".to_string()),
+            license_clarity_score: Some(crate::models::LicenseClarityScore {
+                score: 100,
+                declared_license: true,
+                identification_precision: true,
+                has_license_text: true,
+                declared_copyrights: true,
+                conflicting_license_categories: false,
+                ambiguous_compound_licensing: false,
+            }),
+        });
+        output.files[0].is_legal = true;
+        output.files[0].is_top_level = true;
+        output.files[0].is_key_file = true;
+
+        let mut bytes = Vec::new();
+        writer_for_format(OutputFormat::Json)
+            .write(&output, &mut bytes, &OutputWriteConfig::default())
+            .expect("json write should succeed");
+
+        let rendered = String::from_utf8(bytes).expect("json should be utf-8");
+        let value: Value = serde_json::from_str(&rendered).expect("valid json");
+
+        assert_eq!(
+            value["summary"]["declared_license_expression"],
+            "apache-2.0"
+        );
+        assert_eq!(value["summary"]["license_clarity_score"]["score"], 100);
+        assert_eq!(value["files"][0]["is_key_file"], true);
+    }
+
+    #[test]
     fn test_cyclonedx_xml_writer_outputs_xml() {
         let output = sample_output();
         let mut bytes = Vec::new();
@@ -330,6 +365,7 @@ mod tests {
     #[test]
     fn test_spdx_empty_scan_tag_value_matches_python_sentinel() {
         let output = Output {
+            summary: None,
             headers: vec![],
             packages: vec![],
             dependencies: vec![],
@@ -357,6 +393,7 @@ mod tests {
     #[test]
     fn test_spdx_empty_scan_rdf_matches_python_sentinel() {
         let output = Output {
+            summary: None,
             headers: vec![],
             packages: vec![],
             dependencies: vec![],
@@ -450,6 +487,7 @@ mod tests {
 
     fn sample_output() -> Output {
         Output {
+            summary: None,
             headers: vec![Header {
                 start_timestamp: "2026-01-01T00:00:00Z".to_string(),
                 end_timestamp: "2026-01-01T00:00:01Z".to_string(),
