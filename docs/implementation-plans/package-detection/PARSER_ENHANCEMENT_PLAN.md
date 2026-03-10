@@ -345,6 +345,7 @@ Current status (March 10, 2026):
 - Ruby package-root resource assignment now associates nested extracted files such as `LICENSE.txt` and Ruby source files with the assembled gem package.
 - A targeted regression now proves description text does not become a fake dependency.
 - **Issue #161 remains deferred**: nested Ruby files are now associated to the package, but true `key_file` / `license_clarity_score` infrastructure is still absent from the current repo architecture.
+- PR #307 (`fix(ruby): complete the Ruby enhancement batch`) captures the completed implementation batch with `#161` explicitly deferred.
 
 ### Python PR Scope Rule
 
