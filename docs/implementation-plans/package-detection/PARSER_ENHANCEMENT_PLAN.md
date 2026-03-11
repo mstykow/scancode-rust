@@ -1,7 +1,7 @@
 # Package Parser Enhancement Plan
 
 > **Status**: 🟡 Active — ecosystem-by-ecosystem enhancement backlog and execution tracker
-> **Updated**: March 9, 2026
+> **Updated**: March 11, 2026
 > **Dependencies**: [PARSER_PLAN.md](PARSER_PLAN.md), [ASSEMBLY_PLAN.md](ASSEMBLY_PLAN.md), [HOW_TO_ADD_A_PARSER.md](../../HOW_TO_ADD_A_PARSER.md), [TESTING_STRATEGY.md](../../TESTING_STRATEGY.md)
 
 ## Purpose
@@ -110,7 +110,7 @@ cargo run --quiet --bin generate-supported-formats && git diff --exit-code docs/
 | 11    | CocoaPods  | Done    | #191, #192                                                                                                 | `cargo test pod`; `cargo test --features golden-tests cocoapods_golden`                                                                                                                                                                                                                                                                                                        |
 | 12    | Alpine     | Done    | #172, #173, #174, #175                                                                                     | `cargo test alpine`; `cargo test --features golden-tests alpine_golden`; `cargo test --features golden-tests test_assembly_alpine_file_refs`                                                                                                                                                                                                                                   |
 | 13    | ABOUT      | Done    | #201, #202, #203, #204                                                                                     | `cargo test about`; `cargo test --features golden-tests about --lib`; `cargo test about_scan_promotes_packages_and_assigns_referenced_files --bin scancode-rust`; `cargo test about_scan_tracks_missing_file_references --bin scancode-rust`                                                                                                                                   |
-| 14    | Swift      | Planned | #193                                                                                                       | `cargo test swift`; `cargo test --features golden-tests swift_golden`                                                                                                                                                                                                                                                                                                          |
+| 14    | Swift      | Done    | #193                                                                                                       | `cargo test swift`; `cargo test --bin scancode-rust swift_scan_`; `cargo test --features golden-tests swift_golden`                                                                                                                                                                                                                                                            |
 | 15    | Conan      | Planned | #194                                                                                                       | `cargo test conan`                                                                                                                                                                                                                                                                                                                                                             |
 | 16    | Docker     | Planned | #199, #200                                                                                                 | validation to be finalized when parser files are added because this family is enhancement work around currently unsupported Docker-specific coverage                                                                                                                                                                                                                           |
 | 17    | Python     | Planned | #136, #138, #139, #140, #141, #142, #143, #144, #145, #146, #147, #148, #149, #150, #209, #210, #212, #213 | `cargo test python`; `cargo test requirements_txt`; `cargo test pipfile_lock`; `cargo test poetry_lock`; `cargo test pip_inspect_deplock`; `cargo test --features golden-tests python_golden`; `cargo test --features golden-tests requirements_txt_golden`; `cargo test --features golden-tests pipfile_lock_golden`; `cargo test --features golden-tests poetry_lock_golden` |
@@ -471,6 +471,25 @@ Current status (March 11, 2026):
 - `about_resource`, `license_file`, and `notice_file` references are now resolved relative to the ABOUT file path during scan-time package promotion, and unresolved entries are recorded in `extra_data.missing_file_references`.
 - Local parser golden coverage now exists for `apipkg.ABOUT` and `appdirs.ABOUT`, and scan-level tests prove package promotion plus missing file reference behavior.
 - PR #315 (`fix(about): complete the ABOUT enhancement batch`) captures the completed implementation batch.
+
+### Swift PR Scope
+
+Issues:
+
+- #193 determine correct top-level Swift PURLs
+
+Likely touchpoints:
+
+- Swift assembly behavior for `Package.swift.json` / `Package.swift.deplock` / `Package.resolved` / `.package.resolved` / `swift-show-dependencies.deplock`
+- Swift-focused scan-level regression coverage for manifest-owned root packages, show-dependencies precedence, resolved fallback, and resolved-only package emission
+- Focused parser test updates only where scan-level parity requires distinct top-level package shaping from parser-internal data
+
+Current status (March 11, 2026):
+
+- Swift assembly now uses manifest data to own the top-level package when `Package.swift.json` or `Package.swift.deplock` is present, instead of incorrectly trying to derive that root package from resolved dependency artifacts.
+- `swift-show-dependencies.deplock` now supersedes the assembled dependency graph without replacing the manifest-owned root package, matching the upstream ScanCode precedence contract.
+- `Package.resolved` / `.package.resolved` now act as fallback dependency enrichment when a manifest is present and emit one top-level package per resolved dependency when no manifest or show-dependencies file exists.
+- New scan-level regression tests now cover the upstream-style `fastlane_resolved_v1`, `mapboxmaps_manifest_and_resolved`, `vercelui`, and `vercelui_show_dependencies` fixtures.
 
 ### Python PR Scope Rule
 
