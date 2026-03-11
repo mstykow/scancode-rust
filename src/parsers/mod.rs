@@ -1,4 +1,6 @@
 mod about;
+#[cfg(all(test, feature = "golden-tests"))]
+mod about_golden_test;
 #[cfg(test)]
 mod about_test;
 mod alpine;
