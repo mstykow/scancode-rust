@@ -419,6 +419,7 @@ Current status (March 11, 2026):
 - `Podfile` and `Podfile.lock` dependencies now use the more honest generic `dependencies` scope and leave runtime/optional unset where CocoaPods does not encode enough information to prove those booleans safely.
 - CocoaPods parser goldens have been refreshed to the new scope contract.
 - A targeted `RxDataSources.podspec` regression now proves the parser emits a single bounded package representation instead of duplicated package information.
+- PR #312 (`fix(cocoapods): complete the CocoaPods enhancement batch`) captures the completed implementation batch.
 
 ### Python PR Scope Rule
 
