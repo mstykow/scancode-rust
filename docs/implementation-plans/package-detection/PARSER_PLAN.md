@@ -16,7 +16,7 @@ All production handlers in plan scope are covered. Some ecosystems consolidate m
 | Ecosystem           | Coverage       | Notes                                                                                          |
 | ------------------- | -------------- | ---------------------------------------------------------------------------------------------- |
 | AboutCode           | ✅ Implemented | `AboutFileParser`                                                                              |
-| Alpine              | ✅ Implemented | .apk archive + installed DB. APKBUILD not implemented (Python is stub only).                   |
+| Alpine              | ✅ Implemented | .apk archive + installed DB + APKBUILD recipe parsing                                          |
 | Autotools           | ✅ Implemented | `AutotoolsConfigureParser`                                                                     |
 | Bazel               | ✅ Implemented | `BazelBuildParser`                                                                             |
 | Bower               | ✅ Implemented | `BowerJsonParser`                                                                              |
@@ -67,7 +67,6 @@ These require specialized crates and have low ROI. Even Python doesn't fully par
 | ---------------------------- | ---------------------------------------------------------------------------- |
 | `PypiSdistArchiveHandler`    | Requires archive extraction, permanently out of scope (see ASSEMBLY_PLAN.md) |
 | `ChefCookbookTarballHandler` | Requires archive extraction                                                  |
-| `AlpineApkbuildHandler`      | Python implementation is a stub only                                         |
 
 ---
 
