@@ -39,7 +39,7 @@ mod tests {
         let path = PathBuf::from("testdata/about/appdirs.ABOUT");
         let result = AboutFileParser::extract_first_package(&path);
 
-        assert_eq!(result.package_type, Some(PackageType::About));
+        assert_eq!(result.package_type, Some(PackageType::Pypi));
         assert_eq!(result.name, Some("appdirs".to_string()));
         assert_eq!(result.version, Some("1.4.3".to_string()));
         assert_eq!(
@@ -56,6 +56,11 @@ mod tests {
             Some("https://pypi.python.org/packages/56/eb/810e700ed1349edde4cbdc1b2a21e28cdf115f9faf263f6bbf8447c1abf3/appdirs-1.4.3-py2.py3-none-any.whl#md5=9ed4b51c9611775c3078b3831072e153".to_string())
         );
         assert_eq!(result.datasource_id, Some(DatasourceId::AboutFile));
+        assert_eq!(result.purl, Some("pkg:pypi/appdirs@1.4.3".to_string()));
+        assert_eq!(
+            result.vcs_url,
+            Some("https://github.com/ActiveState/appdirs.git".to_string())
+        );
     }
 
     #[test]
@@ -75,9 +80,12 @@ mod tests {
         let path = PathBuf::from("testdata/about/appdirs.ABOUT");
         let result = AboutFileParser::extract_first_package(&path);
 
-        assert_eq!(result.file_references.len(), 1);
-        let file_ref = &result.file_references[0];
-        assert_eq!(file_ref.path, "appdirs-1.4.3-py2.py3-none-any.whl");
+        assert_eq!(result.file_references.len(), 2);
+        assert_eq!(
+            result.file_references[0].path,
+            "appdirs-1.4.3-py2.py3-none-any.whl"
+        );
+        assert_eq!(result.file_references[1].path, "appdirs.LICENSE");
     }
 
     #[test]
@@ -96,6 +104,7 @@ version: 1.0.0
         let result = AboutFileParser::extract_first_package(&file_path);
 
         assert_eq!(result.package_type, Some(PackageType::About));
+        assert_eq!(result.datasource_id, Some(DatasourceId::AboutFile));
         assert_eq!(result.name, Some("test-package".to_string()));
         assert_eq!(result.version, Some("1.0.0".to_string()));
         assert_eq!(result.homepage_url, None);
@@ -211,7 +220,7 @@ homepage_url: https://example.com/homepage
         let path = PathBuf::from("testdata/about/apipkg.ABOUT");
         let result = AboutFileParser::extract_first_package(&path);
 
-        assert_eq!(result.package_type, Some(PackageType::About));
+        assert_eq!(result.package_type, Some(PackageType::Pypi));
         assert_eq!(result.name, Some("apipkg".to_string()));
         assert_eq!(result.version, Some("1.4".to_string()));
         assert_eq!(
@@ -229,10 +238,77 @@ homepage_url: https://example.com/homepage
         assert_eq!(result.parties[0].name, Some("Holger Krekel".to_string()));
 
         // File reference
-        assert_eq!(result.file_references.len(), 1);
+        assert_eq!(result.file_references.len(), 2);
         assert_eq!(
             result.file_references[0].path,
             "apipkg-1.4-py2.py3-none-any.whl"
         );
+        assert_eq!(result.file_references[1].path, "apipkg.LICENSE");
+        assert_eq!(result.file_references[1].path, "apipkg.LICENSE");
+        assert_eq!(result.purl, Some("pkg:pypi/apipkg@1.4".to_string()));
+    }
+
+    #[test]
+    fn test_download_url_infers_github_purl_without_reporting_pkg_about() {
+        let test_content = r#"
+download_url: https://raw.githubusercontent.com/docker/docker/ff2de8dace1ba1c1f5e8542790ef5cd564375934/image/spec/v1.1.md
+"#;
+        use std::io::Write;
+        let temp_dir = tempfile::tempdir().unwrap();
+        let file_path = temp_dir.path().join("docker.ABOUT");
+        let mut file = std::fs::File::create(&file_path).unwrap();
+        file.write_all(test_content.as_bytes()).unwrap();
+
+        let result = AboutFileParser::extract_first_package(&file_path);
+
+        assert_eq!(result.package_type, Some(PackageType::Github));
+        assert_eq!(result.namespace, Some("docker".to_string()));
+        assert_eq!(result.name, Some("docker".to_string()));
+        assert_eq!(result.purl, Some("pkg:github/docker/docker".to_string()));
+    }
+
+    #[test]
+    fn test_partial_about_file_is_graceful_with_datasource() {
+        let test_content = r#"
+download_url: https://raw.githubusercontent.com/docker/docker/ff2de8dace1ba1c1f5e8542790ef5cd564375934/image/spec/v1.1.md
+"#;
+        use std::io::Write;
+        let temp_dir = tempfile::tempdir().unwrap();
+        let file_path = temp_dir.path().join("partial.ABOUT");
+        let mut file = std::fs::File::create(&file_path).unwrap();
+        file.write_all(test_content.as_bytes()).unwrap();
+
+        let result = AboutFileParser::extract_first_package(&file_path);
+
+        assert_eq!(result.datasource_id, Some(DatasourceId::AboutFile));
+        assert_eq!(result.package_type, Some(PackageType::Github));
+        assert_eq!(result.name, Some("docker".to_string()));
+        assert_eq!(result.purl, Some("pkg:github/docker/docker".to_string()));
+    }
+
+    #[test]
+    fn test_invalid_yaml_returns_about_defaults() {
+        use std::io::Write;
+        let temp_dir = tempfile::tempdir().unwrap();
+        let file_path = temp_dir.path().join("broken.ABOUT");
+        let mut file = std::fs::File::create(&file_path).unwrap();
+        file.write_all(b"::not yaml::\n[").unwrap();
+
+        let result = AboutFileParser::extract_first_package(&file_path);
+
+        assert_eq!(result.package_type, Some(PackageType::About));
+        assert_eq!(result.datasource_id, Some(DatasourceId::AboutFile));
+        assert_eq!(result.purl, None);
+    }
+
+    #[test]
+    fn test_extra_data_preserves_notice_and_notes() {
+        let path =
+            PathBuf::from("testdata/copyright-golden/copyrights/misco2/regexhq/regexhq.ABOUT");
+        let result = AboutFileParser::extract_first_package(&path);
+
+        let extra = result.extra_data.expect("extra data should exist");
+        assert!(extra.contains_key("notice_file"));
+        assert!(extra.contains_key("notes"));
     }
 }
