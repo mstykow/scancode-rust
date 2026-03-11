@@ -6,6 +6,31 @@ mod tests {
     use crate::license_detection::spdx_lid::*;
     use crate::license_detection::test_utils::{create_mock_rule_simple, create_test_index};
 
+    fn create_spdx_lookup_index(
+        entries: &[(&str, &str)],
+    ) -> crate::license_detection::index::LicenseIndex {
+        let mut index = create_test_index(&[], 0);
+
+        for (spdx_key, license_expression) in entries {
+            let rid = index.rules_by_rid.len();
+            index
+                .rules_by_rid
+                .push(create_mock_rule_simple(license_expression, 100));
+            index.rid_by_spdx_key.insert(spdx_key.to_string(), rid);
+        }
+
+        let unknown_rid = index.rules_by_rid.len();
+        index
+            .rules_by_rid
+            .push(create_mock_rule_simple("unknown-spdx", 100));
+        index
+            .rid_by_spdx_key
+            .insert("unknown-spdx".to_string(), unknown_rid);
+        index.unknown_spdx_rid = Some(unknown_rid);
+
+        index
+    }
+
     #[test]
     fn test_split_spdx_lid_standard() {
         let (prefix, expr) = split_spdx_lid("SPDX-License-Identifier: MIT");
@@ -761,6 +786,68 @@ mod tests {
     }
 
     #[test]
+    fn test_valid_outer_paren_or_chain_flattens_like_python() {
+        let index = create_spdx_lookup_index(&[
+            ("bsd-3-clause", "bsd-new"),
+            ("epl-1.0", "epl-1.0"),
+            ("apache-2.0", "apache-2.0"),
+            ("mit", "mit"),
+        ]);
+
+        let expression = "(bsd-3-clause OR epl-1.0 OR apache-2.0 OR mit)";
+        let result = find_matching_rule_for_expression(&index, expression);
+
+        assert_eq!(
+            result,
+            Some("bsd-new OR epl-1.0 OR apache-2.0 OR mit".to_string())
+        );
+    }
+
+    #[test]
+    fn test_valid_mixed_precedence_keeps_python_grouping() {
+        let index = create_spdx_lookup_index(&[
+            ("mit", "mit"),
+            ("apache-2.0", "apache-2.0"),
+            ("gpl-2.0-only", "gpl-2.0"),
+        ]);
+
+        let expression = "mit OR apache-2.0 AND gpl-2.0-only";
+        let result = find_matching_rule_for_expression(&index, expression);
+
+        assert_eq!(result, Some("mit OR (apache-2.0 AND gpl-2.0)".to_string()));
+    }
+
+    #[test]
+    fn test_valid_same_operator_or_group_flattens_like_python() {
+        let index = create_spdx_lookup_index(&[
+            ("mit", "mit"),
+            ("apache-2.0", "apache-2.0"),
+            ("gpl-2.0-only", "gpl-2.0"),
+        ]);
+
+        let expression = "(mit OR apache-2.0) OR gpl-2.0-only";
+        let result = find_matching_rule_for_expression(&index, expression);
+
+        assert_eq!(result, Some("mit OR apache-2.0 OR gpl-2.0".to_string()));
+    }
+
+    #[test]
+    fn test_recovery_parsing_uboot_unknown_line_renders_flat_or_chain() {
+        let index = create_spdx_lookup_index(&[]);
+
+        let expression = "line references more than one Unique";
+        let result = find_matching_rule_for_expression(&index, expression);
+
+        assert_eq!(
+            result,
+            Some(
+                "unknown-spdx OR unknown-spdx OR unknown-spdx OR unknown-spdx OR unknown-spdx OR unknown-spdx"
+                    .to_string()
+            )
+        );
+    }
+
+    #[test]
     fn test_uboot_bare_list_as_or() {
         let path =
             std::path::Path::new("reference/scancode-toolkit/src/licensedcode/data/licenses");
@@ -906,31 +993,13 @@ mod tests {
 
     #[test]
     fn test_recovery_parsing_keywords_with_invalid() {
-        let path =
-            std::path::Path::new("reference/scancode-toolkit/src/licensedcode/data/licenses");
-        if !path.exists() {
-            eprintln!("Skipping test: reference directory not found");
-            return;
-        }
-
-        let licenses = crate::license_detection::rules::load_licenses_from_directory(path, false)
-            .expect("Failed to load licenses");
-        let rules = crate::license_detection::rules::load_rules_from_directory(
-            std::path::Path::new("reference/scancode-toolkit/src/licensedcode/data/rules"),
-            false,
-        )
-        .expect("Failed to load rules");
-
-        let index = crate::license_detection::index::build_index(rules, licenses);
+        let index = create_spdx_lookup_index(&[("gpl-2.0", "gpl-2.0"), ("mit", "mit")]);
 
         let expression = "(GPL-2.0 AND (MIT";
         let result = find_matching_rule_for_expression(&index, expression);
-        assert!(result.is_some());
-        let expr = result.unwrap();
-        assert!(
-            expr.contains("unknown-spdx"),
-            "Expression with keywords but invalid should contain unknown-spdx, got: {}",
-            expr
+        assert_eq!(
+            result,
+            Some("(gpl-2.0 AND mit) AND unknown-spdx".to_string())
         );
     }
 

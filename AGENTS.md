@@ -65,7 +65,7 @@ cargo build --release         # Optimized build
 cargo test                    # Run all tests (excludes golden tests)
 cargo test <test_name>        # Run specific test (e.g., test_extract_from_testdata)
 cargo test --lib              # Test library code only (faster)
-cargo test --features golden-tests  # Include golden tests (slower, compares against Python ScanCode)
+cargo test --release --features golden-tests  # Local golden tests: always use --release
 
 # Code Quality
 cargo fmt                     # Format code
@@ -88,11 +88,16 @@ cargo test test_is_match       # Runs all tests with "test_is_match" in name
 
 ## Running Golden Tests
 
+For local/manual golden test runs, always use `--release` unless explicitly instructed otherwise. Debug golden test runs are far too slow for normal agent work.
+
 To count failing golden test cases:
+
 ```bash
 cargo test --release -q --features golden-tests --lib license_detection::golden_test 2>&1 | tee /tmp/golden_tests.log | grep "failed, 0 skipped" | sed 's/.*, \([0-9]*\) failed,.*/\1/' | paste -sd+ | bc
 ```
+
 Running golden tests is expensive, so file-based caching should be used for more complex, incremental analysis.
+
 ## Project Architecture
 
 **High-Level Structure:**

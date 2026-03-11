@@ -36,6 +36,12 @@ enum SpdxKeyword {
     With,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum BooleanOperator {
+    And,
+    Or,
+}
+
 /// Matcher identifier for SPDX-License-Identifier based matching.
 ///
 /// Corresponds to Python: `MATCH_SPDX_ID = '1-spdx-id'` (line 61)
@@ -150,7 +156,6 @@ fn strip_punctuation(text: &mut String) {
         text.pop();
     }
 }
-
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ParenBalanceResult {
@@ -391,7 +396,6 @@ pub(crate) fn is_bare_license_list(expression: &str) -> bool {
         && !expression.contains(')')
 }
 
-
 fn has_invalid_spdx_chars(text: &str) -> bool {
     for c in text.chars() {
         match c {
@@ -453,7 +457,6 @@ fn classify_recovery_token(text: &str) -> RecoveryToken {
     }
 }
 
-
 fn is_likely_license_key(text: &str) -> bool {
     if text.len() < 2 {
         return false;
@@ -488,7 +491,13 @@ fn is_spdx_exception(text: &str) -> bool {
         "linux-syscall-note" | "gpl-cc-1.0" | "llgpr" | "llgpl" | "shl-2.0" | "shl-2.1"
     )
 }
-fn reparse_invalid_expression(text: &str) -> Option<LicenseExpression> {
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum RecoveryRenderMode {
+    Canonical,
+    PreserveMalformedGrouping,
+}
+
+fn reparse_invalid_expression(text: &str) -> Option<(LicenseExpression, RecoveryRenderMode)> {
     let tokens = tokenize_for_recovery(text);
 
     let mut has_keywords = false;
@@ -503,12 +512,18 @@ fn reparse_invalid_expression(text: &str) -> Option<LicenseExpression> {
     }
 
     if license_keys.is_empty() {
-        return Some(LicenseExpression::License("unknown-spdx".to_string()));
+        return Some((
+            LicenseExpression::License("unknown-spdx".to_string()),
+            RecoveryRenderMode::Canonical,
+        ));
     }
 
     let all_exceptions = license_keys.iter().all(|key| is_spdx_exception(key));
     if all_exceptions {
-        return Some(LicenseExpression::License("unknown-spdx".to_string()));
+        return Some((
+            LicenseExpression::License("unknown-spdx".to_string()),
+            RecoveryRenderMode::Canonical,
+        ));
     }
 
     let expressions: Vec<LicenseExpression> = license_keys
@@ -531,7 +546,13 @@ fn reparse_invalid_expression(text: &str) -> Option<LicenseExpression> {
         };
     }
 
-    Some(result)
+    let render_mode = if has_keywords {
+        RecoveryRenderMode::PreserveMalformedGrouping
+    } else {
+        RecoveryRenderMode::Canonical
+    };
+
+    Some((result, render_mode))
 }
 
 fn convert_recovered_expression_to_scancode(
@@ -570,6 +591,79 @@ fn convert_recovered_expression_to_scancode(
     }
 }
 
+fn render_valid_scancode_expression(expr: &LicenseExpression) -> String {
+    render_canonical_boolean_expression(expr)
+}
+
+fn render_recovered_scancode_expression(
+    expr: &LicenseExpression,
+    render_mode: RecoveryRenderMode,
+) -> String {
+    match render_mode {
+        RecoveryRenderMode::Canonical => render_canonical_boolean_expression(expr),
+        RecoveryRenderMode::PreserveMalformedGrouping => expression_to_string(expr),
+    }
+}
+
+fn render_canonical_boolean_expression(expr: &LicenseExpression) -> String {
+    match expr {
+        LicenseExpression::License(key) => key.clone(),
+        LicenseExpression::LicenseRef(key) => key.clone(),
+        LicenseExpression::With { left, right } => {
+            let left_str = render_canonical_boolean_expression(left);
+            let right_str = render_canonical_boolean_expression(right);
+            format!("{} WITH {}", left_str, right_str)
+        }
+        LicenseExpression::And { .. } => render_flat_boolean_chain(expr, BooleanOperator::And),
+        LicenseExpression::Or { .. } => render_flat_boolean_chain(expr, BooleanOperator::Or),
+    }
+}
+
+fn render_flat_boolean_chain(expr: &LicenseExpression, operator: BooleanOperator) -> String {
+    let mut parts = Vec::new();
+    collect_boolean_chain(expr, operator, &mut parts);
+
+    let separator = match operator {
+        BooleanOperator::And => " AND ",
+        BooleanOperator::Or => " OR ",
+    };
+
+    parts
+        .into_iter()
+        .map(|part| render_boolean_operand(part, operator))
+        .collect::<Vec<_>>()
+        .join(separator)
+}
+
+fn collect_boolean_chain<'a>(
+    expr: &'a LicenseExpression,
+    operator: BooleanOperator,
+    parts: &mut Vec<&'a LicenseExpression>,
+) {
+    match (operator, expr) {
+        (BooleanOperator::And, LicenseExpression::And { left, right })
+        | (BooleanOperator::Or, LicenseExpression::Or { left, right }) => {
+            collect_boolean_chain(left, operator, parts);
+            collect_boolean_chain(right, operator, parts);
+        }
+        _ => parts.push(expr),
+    }
+}
+
+fn render_boolean_operand(expr: &LicenseExpression, parent_operator: BooleanOperator) -> String {
+    match expr {
+        LicenseExpression::And { .. } => match parent_operator {
+            BooleanOperator::And => render_canonical_boolean_expression(expr),
+            BooleanOperator::Or => format!("({})", render_canonical_boolean_expression(expr)),
+        },
+        LicenseExpression::Or { .. } => match parent_operator {
+            BooleanOperator::Or => render_canonical_boolean_expression(expr),
+            BooleanOperator::And => format!("({})", render_canonical_boolean_expression(expr)),
+        },
+        _ => render_canonical_boolean_expression(expr),
+    }
+}
+
 pub(crate) fn find_matching_rule_for_expression(
     index: &LicenseIndex,
     expression: &str,
@@ -589,7 +683,7 @@ pub(crate) fn find_matching_rule_for_expression(
     if let Ok(parsed) = parse_expression(expression)
         && let Some(converted) = convert_spdx_expression_to_scancode(&parsed, index)
     {
-        let result = expression_to_string(&converted);
+        let result = render_valid_scancode_expression(&converted);
         if !result.is_empty() {
             return Some(result);
         }
@@ -602,7 +696,7 @@ pub(crate) fn find_matching_rule_for_expression(
             if let Ok(parsed) = parse_expression(&or_expression)
                 && let Some(converted) = convert_spdx_expression_to_scancode(&parsed, index)
             {
-                let result = expression_to_string(&converted);
+                let result = render_valid_scancode_expression(&converted);
                 if !result.is_empty() {
                     return Some(result);
                 }
@@ -610,9 +704,9 @@ pub(crate) fn find_matching_rule_for_expression(
         }
     }
 
-    if let Some(recovered) = reparse_invalid_expression(expression) {
+    if let Some((recovered, render_mode)) = reparse_invalid_expression(expression) {
         let converted = convert_recovered_expression_to_scancode(&recovered, index);
-        let result = expression_to_string(&converted);
+        let result = render_recovered_scancode_expression(&converted, render_mode);
         if !result.is_empty() {
             return Some(result);
         }
