@@ -5,6 +5,7 @@ mod cargo_workspace_merge;
 pub mod file_ref_resolve;
 mod nested_merge;
 mod sibling_merge;
+mod swift_merge;
 mod workspace_merge;
 
 use std::collections::{HashMap, HashSet};
@@ -93,6 +94,10 @@ pub fn assemble(files: &mut [FileInfo]) -> AssemblyResult {
                 .find(|a| a.datasource_ids.first() == Some(&config_key))
                 .expect("assembler config must exist");
 
+            if config_key == DatasourceId::SwiftPackageManifestJson {
+                continue;
+            }
+
             match config.mode {
                 AssemblyMode::SiblingMerge => {
                     if let Some((pkg, deps, affected_indices)) =
@@ -167,6 +172,8 @@ pub fn assemble(files: &mut [FileInfo]) -> AssemblyResult {
             dependencies.extend(deps);
         }
     }
+
+    swift_merge::assemble_swift_packages(files, &mut packages, &mut dependencies);
 
     merge_conda_rootfs_metadata(files, &mut packages, &mut dependencies);
 
