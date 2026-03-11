@@ -402,10 +402,11 @@ fn extract_dependencies(content: &str) -> Vec<Dependency> {
     for line in content.lines() {
         let cleaned_line = pre_process(line);
         if let Some(caps) = DEPENDENCY_PATTERN.captures(&cleaned_line) {
+            let method = caps.get(0).map(|m| m.as_str()).unwrap_or("");
             let name = caps.get(1).map(|m| m.as_str()).unwrap_or("");
             let version_req = caps.get(2).map(|m| clean_string(m.as_str()));
 
-            if let Some(dep) = create_dependency(name, version_req) {
+            if let Some(dep) = create_dependency(name, version_req, method) {
                 dependencies.push(dep);
             }
         }
@@ -415,7 +416,7 @@ fn extract_dependencies(content: &str) -> Vec<Dependency> {
 }
 
 /// Create a Dependency from name and version requirement
-fn create_dependency(name: &str, version_req: Option<String>) -> Option<Dependency> {
+fn create_dependency(name: &str, version_req: Option<String>, method: &str) -> Option<Dependency> {
     if name.is_empty() {
         return None;
     }
@@ -428,12 +429,21 @@ fn create_dependency(name: &str, version_req: Option<String>) -> Option<Dependen
         .map(|v| !v.contains(&['~', '>', '<', '='][..]))
         .unwrap_or(false);
 
+    let is_development = method.contains("add_development_dependency");
+
     Some(Dependency {
         purl: Some(purl.to_string()),
         extracted_requirement: version_req,
-        scope: Some("runtime".to_string()),
-        is_runtime: Some(true),
-        is_optional: Some(false),
+        scope: Some(
+            if is_development {
+                "development"
+            } else {
+                "runtime"
+            }
+            .to_string(),
+        ),
+        is_runtime: Some(!is_development),
+        is_optional: Some(is_development),
         is_pinned: Some(is_pinned),
         is_direct: Some(true),
         resolved_package: None,
@@ -583,6 +593,32 @@ end
 
         assert_eq!(deps[1].purl, Some("pkg:cocoapods/Alamofire".to_string()));
         assert_eq!(deps[1].extracted_requirement, None);
+    }
+
+    #[test]
+    fn test_extract_runtime_and_development_dependency_scopes() {
+        let content = r#"
+Pod::Spec.new do |s|
+  s.add_dependency 'AFNetworking', '~> 4.0'
+  s.add_runtime_dependency 'Alamofire', '~> 5.0'
+  s.add_development_dependency 'Quick', '~> 7.0'
+end
+"#;
+
+        let deps = extract_dependencies(content);
+        assert_eq!(deps.len(), 3);
+
+        assert_eq!(deps[0].scope.as_deref(), Some("runtime"));
+        assert_eq!(deps[0].is_runtime, Some(true));
+        assert_eq!(deps[0].is_optional, Some(false));
+
+        assert_eq!(deps[1].scope.as_deref(), Some("runtime"));
+        assert_eq!(deps[1].is_runtime, Some(true));
+        assert_eq!(deps[1].is_optional, Some(false));
+
+        assert_eq!(deps[2].scope.as_deref(), Some("development"));
+        assert_eq!(deps[2].is_runtime, Some(false));
+        assert_eq!(deps[2].is_optional, Some(true));
     }
 
     #[test]
