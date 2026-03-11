@@ -93,6 +93,7 @@ Each area with improvements has a dedicated document:
 - **[go-parser.md](go-parser.md)** — 🐛 Bug Fix + ✨ New Feature + 🔍 Enhanced Extraction: `go.mod graph` support, replace-directive coverage, and Go test/build source categorization
 - **[conda-parser.md](conda-parser.md)** — 🐛 Bug Fix + ✨ New Feature + 🔍 Enhanced Extraction: `conda-meta` file assignment, parser golden coverage for installed-package JSON, and channel-vs-channel_url disambiguation
 - **[alpine-parser.md](alpine-parser.md)** — 🐛 Bug Fix + ✨ New Feature + 🔍 Enhanced Extraction: APKBUILD recipe parsing, raw matched-text preservation for `custom:multiple`, fileless-package proof, and HTTPS Alpine VCS URLs
+- **[about-parser.md](about-parser.md)** — 🐛 Bug Fix + ✨ New Feature + 🔍 Enhanced Extraction: PURL/type inference from `download_url`, invalid `pkg:about` suppression, graceful partial ABOUT handling, and scan-time file-reference resolution
 - **[cocoapods-parser.md](cocoapods-parser.md)** — 🐛 Bug Fix + 🔍 Enhanced Extraction: refined dependency scope semantics plus explicit RxDataSources non-duplication regression coverage
 - **[summarization-foundations.md](summarization-foundations.md)** — ✨ New Feature + 🔍 Enhanced Post-Processing: generic key-file tagging, package metadata promotion, `summary` output structure, and initial non-license-dependent summary fields
 - **[npm-git-url-dependencies.md](npm-git-url-dependencies.md)** — 🐛 Bug Fix: Correct handling of Git URLs, GitHub shortcuts, and local paths (Python treats them as pinned versions)
