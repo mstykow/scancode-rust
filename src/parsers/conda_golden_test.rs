@@ -2,6 +2,7 @@
 mod golden_tests {
     use super::super::PackageParser;
     use super::super::conda::{CondaEnvironmentYmlParser, CondaMetaYamlParser};
+    use super::super::conda_meta_json::CondaMetaJsonParser;
     use crate::test_utils::compare_package_data_parser_only;
     use std::path::PathBuf;
 
@@ -14,6 +15,7 @@ mod golden_tests {
         let package_data = match parser_type {
             "meta" => CondaMetaYamlParser::extract_first_package(&test_path),
             "env" => CondaEnvironmentYmlParser::extract_first_package(&test_path),
+            "meta-json" => CondaMetaJsonParser::extract_first_package(&test_path),
             _ => panic!("Unknown parser type: {}", parser_type),
         };
 
@@ -74,6 +76,15 @@ mod golden_tests {
             "testdata/conda/conda-yaml/phc-gnn/environment_gpu.yml",
             "testdata/conda/conda-yaml/phc-gnn/environment_gpu.yml-expected.json",
             "env",
+        );
+    }
+
+    #[test]
+    fn test_golden_conda_meta_json_tzdata() {
+        run_golden(
+            "testdata/conda/conda-meta/tzdata-2024b-h04d1e81_0.json",
+            "testdata/conda/conda-meta/tzdata-2024b-h04d1e81_0.json-expected.json",
+            "meta-json",
         );
     }
 }
