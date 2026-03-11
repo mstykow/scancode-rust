@@ -395,6 +395,7 @@ Current status (March 11, 2026):
 - Rootfs Conda assembly now merges `conda-meta/*.json` installed metadata with the matching recipe `meta.yaml` package and assigns the installed files back to that assembled package.
 - URL-like channel prefixes are no longer overloaded into namespace; they are preserved separately as `channel_url`, while symbolic channel names remain namespace-like and are also preserved as `channel` metadata.
 - Parser golden coverage now includes the existing local `tzdata` `conda-meta` fixture.
+- PR #311 (`fix(conda): complete the Conda enhancement batch`) captures the completed implementation batch.
 
 ### Python PR Scope Rule
 
