@@ -154,7 +154,7 @@ testdata/
 
 ### Documented Architectural Differences
 
-#### 1. CocoaPods & Swift: Package Structure
+#### 1. Swift: Package Structure
 
 **Python Approach**:
 
@@ -181,7 +181,11 @@ testdata/
 
 **Rationale**: Both are valid representations. Rust uses normalized `PackageData` struct for consistency. Validated via comprehensive unit tests.
 
-**Decision**: Document difference, ignore golden tests, rely on unit tests.
+**Decision**: Document the difference and rely on the appropriate test layer.
+
+For Swift, parser-only goldens may still need special handling because the Rust implementation intentionally models a graph differently from older Python expectations.
+
+For CocoaPods, parser-only goldens are active again because the current Rust fixtures and expectations now pin the parser contract directly rather than relying on the older “ignored goldens” workaround.
 
 #### 2. Alpine: Provider Field (Beyond Parity)
 

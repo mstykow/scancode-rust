@@ -95,15 +95,15 @@ Ruby DSL format for declaring CocoaPods dependencies.
 
 ## Current Implementation Status
 
-### ✅ What Works (95%+ Feature Parity)
+### ✅ What Works (Focused Parity for Current Batch)
 
 1. **JSON/YAML Formats** (100% Parity):
    - ✅ `.podspec.json` - Complete parsing
    - ✅ `Podfile.lock` - Full data aggregation
 
-2. **Ruby DSL Formats** (90%+ Coverage):
-   - ✅ `.podspec` - Core fields and dependencies
-   - ✅ `Podfile` - Standard pod declarations
+2. **Ruby DSL Formats**:
+   - ✅ `.podspec` - Core fields and refined runtime/development dependency scopes
+   - ✅ `Podfile` - Standard pod declarations with less misleading scope/runtime inference
 
 ### 🔬 Rust-Specific Improvements
 
@@ -170,7 +170,7 @@ For 100% feature parity on Ruby DSL files:
 ### Option 2: Accept Current Coverage
 
 - **Reality**: Python reference also uses regex for most podspec parsing
-- **Coverage**: 90%+ of real-world files work correctly
+- **Coverage**: current batch now covers the upstream scope-handling gap and guards against RxDataSources duplication regressions
 - **Pragmatic**: JSON formats (.podspec.json, Podfile.lock) are canonical
 
 ## Python Reference Implementation
@@ -193,6 +193,11 @@ Key insights:
 - **This is expected** and not a parser limitation
 
 The test comparator (`compare_package_data_parser_only`) automatically skips license detection fields.
+
+## Current Batch-Specific Notes
+
+- `Podfile.lock` and `Podfile` scope handling has been intentionally refined away from the older `requires` / forced-runtime contract.
+- `RxDataSources.podspec` now has an explicit regression test proving non-duplicated package output.
 
 ## Test Data Structure
 
