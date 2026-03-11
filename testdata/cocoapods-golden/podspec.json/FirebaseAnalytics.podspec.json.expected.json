@@ -1,149 +1,134 @@
 [
   {
     "type": "cocoapods",
-    "namespace": null,
     "name": "FirebaseAnalytics",
     "version": "8.1.1",
-    "qualifiers": {},
-    "subpath": null,
     "primary_language": "Objective-C",
     "description": "Firebase Analytics for iOS. Firebase Analytics is a free, out-of-the-box analytics solution that inspires actionable insights based on app usage and user engagement.",
-    "release_date": null,
     "parties": [
       {
         "type": "organization",
         "role": "owner",
-        "name": "Google, Inc.",
-        "email": null,
-        "url": null
+        "name": "Google, Inc."
       }
     ],
-    "keywords": [],
     "homepage_url": "https://firebase.google.com/features/analytics/",
     "download_url": "https://dl.google.com/firebase/ios/analytics/19ed8dba01e90708/FirebaseAnalytics-8.1.1.tar.gz",
-    "size": null,
-    "sha1": null,
-    "md5": null,
-    "sha256": null,
-    "sha512": null,
-    "bug_tracking_url": null,
-    "code_view_url": null,
-    "vcs_url": null,
-    "copyright": null,
-    "holder": null,
-    "declared_license_expression": "unknown",
-    "declared_license_expression_spdx": "LicenseRef-scancode-unknown",
-    "license_detections": [
-      {
-        "license_expression": "unknown",
-        "license_expression_spdx": "LicenseRef-scancode-unknown",
-        "matches": [
-          {
-            "license_expression": "unknown",
-            "license_expression_spdx": "LicenseRef-scancode-unknown",
-            "from_file": null,
-            "start_line": 1,
-            "end_line": 1,
-            "matcher": "5-undetected",
-            "score": 100.0,
-            "matched_length": 5,
-            "match_coverage": 100.0,
-            "rule_relevance": 100,
-            "rule_identifier": "package-manifest-unknown-d2754fbb513aa8b758a4d140049dd6bef0aedd05",
-            "rule_url": "https://github.com/nexB/scancode-toolkit/tree/develop/src/licensedcode/data/rules/package-manifest-unknown-d2754fbb513aa8b758a4d140049dd6bef0aedd05",
-            "matched_text": "license Copyright 2021 Google Copyright"
-          }
-        ],
-        "identifier": "unknown-2756ab9e-693f-0884-d593-b587cd688a83"
-      }
-    ],
-    "other_license_expression": null,
-    "other_license_expression_spdx": null,
-    "other_license_detections": [],
     "extracted_license_statement": "Copyright 2021 Google Copyright",
-    "notice_text": null,
-    "source_packages": [],
-    "file_references": [],
-    "is_private": false,
-    "is_virtual": false,
-    "extra_data": {},
+    "extra_data": {
+      "podspec.json": {
+        "authors": "Google, Inc.",
+        "cocoapods_version": ">= 1.10.0",
+        "default_subspecs": "AdIdSupport",
+        "dependencies": {
+          "FirebaseCore": "~> 8.0",
+          "FirebaseInstallations": "~> 8.0",
+          "GoogleUtilities/AppDelegateSwizzler": "~> 7.4",
+          "GoogleUtilities/MethodSwizzler": "~> 7.4",
+          "GoogleUtilities/NSData+zlib": "~> 7.4",
+          "GoogleUtilities/Network": "~> 7.4",
+          "nanopb": "~> 2.30908.0"
+        },
+        "description": "Firebase Analytics is a free, out-of-the-box analytics solution that inspires actionable insights based on app usage and user engagement.",
+        "frameworks": ["StoreKit"],
+        "homepage": "https://firebase.google.com/features/analytics/",
+        "libraries": ["c++", "sqlite3", "z"],
+        "license": {
+          "text": "Copyright 2021 Google",
+          "type": "Copyright"
+        },
+        "name": "FirebaseAnalytics",
+        "platforms": {
+          "ios": "9.0"
+        },
+        "source": {
+          "http": "https://dl.google.com/firebase/ios/analytics/19ed8dba01e90708/FirebaseAnalytics-8.1.1.tar.gz"
+        },
+        "summary": "Firebase Analytics for iOS",
+        "version": "8.1.1",
+        "subspecs": [
+          {
+            "name": "AdIdSupport",
+            "dependencies": {
+              "FirebaseAnalytics/Base": "8.1.1",
+              "GoogleAppMeasurement": "8.1.1"
+            }
+          },
+          {
+            "name": "WithoutAdIdSupport",
+            "dependencies": {
+              "FirebaseAnalytics/Base": "8.1.1",
+              "GoogleAppMeasurement/WithoutAdIdSupport": "8.1.1"
+            }
+          },
+          {
+            "name": "Base",
+            "vendored_frameworks": ["Frameworks/FirebaseAnalytics.xcframework"]
+          }
+        ]
+      },
+      "source": {
+        "http": "https://dl.google.com/firebase/ios/analytics/19ed8dba01e90708/FirebaseAnalytics-8.1.1.tar.gz"
+      },
+      "dependencies": {
+        "FirebaseCore": "~> 8.0",
+        "FirebaseInstallations": "~> 8.0",
+        "GoogleUtilities/AppDelegateSwizzler": "~> 7.4",
+        "GoogleUtilities/MethodSwizzler": "~> 7.4",
+        "GoogleUtilities/NSData+zlib": "~> 7.4",
+        "GoogleUtilities/Network": "~> 7.4",
+        "nanopb": "~> 2.30908.0"
+      }
+    },
     "dependencies": [
       {
         "purl": "pkg:cocoapods/FirebaseCore",
         "extracted_requirement": "~> 8.0",
-        "scope": "dependencies",
+        "scope": "runtime",
         "is_runtime": true,
-        "is_optional": null,
-        "is_pinned": null,
-        "is_direct": null,
-        "resolved_package": {},
-        "extra_data": {}
+        "is_optional": false
       },
       {
         "purl": "pkg:cocoapods/FirebaseInstallations",
         "extracted_requirement": "~> 8.0",
-        "scope": "dependencies",
+        "scope": "runtime",
         "is_runtime": true,
-        "is_optional": null,
-        "is_pinned": null,
-        "is_direct": null,
-        "resolved_package": {},
-        "extra_data": {}
+        "is_optional": false
       },
       {
         "purl": "pkg:cocoapods/GoogleUtilities/AppDelegateSwizzler",
         "extracted_requirement": "~> 7.4",
-        "scope": "dependencies",
+        "scope": "runtime",
         "is_runtime": true,
-        "is_optional": null,
-        "is_pinned": null,
-        "is_direct": null,
-        "resolved_package": {},
-        "extra_data": {}
+        "is_optional": false
       },
       {
         "purl": "pkg:cocoapods/GoogleUtilities/MethodSwizzler",
         "extracted_requirement": "~> 7.4",
-        "scope": "dependencies",
+        "scope": "runtime",
         "is_runtime": true,
-        "is_optional": null,
-        "is_pinned": null,
-        "is_direct": null,
-        "resolved_package": {},
-        "extra_data": {}
+        "is_optional": false
       },
       {
         "purl": "pkg:cocoapods/GoogleUtilities/NSData+zlib",
         "extracted_requirement": "~> 7.4",
-        "scope": "dependencies",
+        "scope": "runtime",
         "is_runtime": true,
-        "is_optional": null,
-        "is_pinned": null,
-        "is_direct": null,
-        "resolved_package": {},
-        "extra_data": {}
+        "is_optional": false
       },
       {
         "purl": "pkg:cocoapods/GoogleUtilities/Network",
         "extracted_requirement": "~> 7.4",
-        "scope": "dependencies",
+        "scope": "runtime",
         "is_runtime": true,
-        "is_optional": null,
-        "is_pinned": null,
-        "is_direct": null,
-        "resolved_package": {},
-        "extra_data": {}
+        "is_optional": false
       },
       {
         "purl": "pkg:cocoapods/nanopb",
         "extracted_requirement": "~> 2.30908.0",
-        "scope": "dependencies",
+        "scope": "runtime",
         "is_runtime": true,
-        "is_optional": null,
-        "is_pinned": null,
-        "is_direct": null,
-        "resolved_package": {},
-        "extra_data": {}
+        "is_optional": false
       }
     ],
     "repository_homepage_url": "https://cocoapods.org/pods/FirebaseAnalytics",
