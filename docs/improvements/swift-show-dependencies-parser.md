@@ -55,7 +55,7 @@ Extracts complete dependency graph with full metadata:
    - `is_direct` - `true` for direct deps, `false` for transitive
    - `is_pinned` - `true` if version is not "unspecified"
    - `scope` - Always "dependencies"
-   - `is_runtime` - Always `true`
+   - `is_runtime` - Left unset for runtime classification purposes in the current Swift scan contract
 
 ### Implementation Approach
 
@@ -141,7 +141,7 @@ The parser uses breadth-first traversal to flatten the nested dependency tree:
       "purl": "pkg:swift/github.com/swift-cloud/Vercel",
       "extracted_requirement": "1.15.2",
       "scope": "dependencies",
-      "is_runtime": true,
+      "is_runtime": false,
       "is_optional": false,
       "is_pinned": true,
       "is_direct": true
@@ -150,7 +150,7 @@ The parser uses breadth-first traversal to flatten the nested dependency tree:
       "purl": "pkg:swift/github.com/vapor/vapor",
       "extracted_requirement": "4.79.0",
       "scope": "dependencies",
-      "is_runtime": true,
+      "is_runtime": false,
       "is_optional": false,
       "is_pinned": true,
       "is_direct": false
@@ -159,7 +159,7 @@ The parser uses breadth-first traversal to flatten the nested dependency tree:
       "purl": "pkg:swift/github.com/apple/swift-nio",
       "extracted_requirement": "2.58.0",
       "scope": "dependencies",
-      "is_runtime": true,
+      "is_runtime": false,
       "is_optional": false,
       "is_pinned": true,
       "is_direct": true
