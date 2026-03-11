@@ -2,10 +2,13 @@
 
 ## Summary
 
-The Alpine parser in scancode-rust **fixes a critical bug** and **implements a missing feature** from the Python reference implementation:
+The Alpine parser in scancode-rust now combines existing beyond-parity improvements with the current Alpine enhancement batch:
 
 1. **🐛 Bug Fix**: SHA1 checksums correctly decoded (Python always returns `null`)
 2. **✨ New Feature**: Provider field extraction (Python explicitly ignores this field)
+3. **✨ New Feature**: Static APKBUILD recipe parsing with real local fixture coverage
+4. **🐛 Bug Fix**: Alpine commit metadata now produces `git+https://...` VCS URLs
+5. **🐛 Bug Fix / Proof**: Packages with no files are still detected and retained
 
 ## Improvement 1: SHA1 Checksum Decoding (Bug Fix)
 
@@ -197,6 +200,52 @@ fn test_parse_alpine_provider_field() {
 
 **Our Decision**: Implement it anyway. It's documented in Alpine's format spec, and the data is valuable for SBOM completeness.
 
+## Improvement 3: APKBUILD Recipe Parsing
+
+### Python Implementation (Current)
+
+Current Python ScanCode already has an APKBUILD parser on `develop`, but the local Rust planning docs had drifted and still described it as a missing/stub surface.
+
+### Our Rust Implementation
+
+Rust now parses checked-in `APKBUILD` recipes statically, without executing shell code.
+
+Implemented coverage includes:
+
+- `pkgname`, `pkgver`, `pkgrel` → package identity and `pkgver-rpkgrel`
+- `pkgdesc`
+- `url`
+- `license`
+- `source`
+- `sha512sums`, `sha256sums`, `md5sums`
+- variable expansion for the upstream fixture forms we need now:
+  - `${pkgver//./-}`
+  - `${pkgver//./_}`
+  - `${var::8}`
+
+### Why This Matters
+
+This closes the most visible Alpine parser gap in Rust without violating the security-first parsing rule: we still do **not** execute shell or evaluate arbitrary shell functions.
+
+## Improvement 4: HTTPS VCS URL Generation
+
+Python `develop` already emits Alpine commit URLs as `git+https://...`, and Rust now matches that behavior for installed-db commit metadata.
+
+### Before
+
+- no `vcs_url` from Alpine installed-db commit field
+
+### After
+
+- `c:<commit>` now becomes:
+  - `git+https://git.alpinelinux.org/aports/commit/?id=<commit>`
+
+## Improvement 5: Fileless Package Detection Proof
+
+The Alpine batch now explicitly proves that packages with no file references are still preserved as packages rather than being dropped.
+
+This matters for packages like `libc-utils` and for APKBUILD “dummy package” patterns such as `linux-firmware`’s `none()` subpackage.
+
 ## Implementation Notes
 
 ### Challenge: Case-Sensitive Field Parsing
@@ -228,11 +277,18 @@ for line in content.lines() {
 
 - `test_parse_alpine_file_references()` - Verifies SHA1 decoding (14 references)
 - `test_parse_alpine_provider_field()` - Verifies provider extraction
+- `test_parse_apkbuild_icu_reference()` - Verifies APKBUILD package/source/checksum parsing
+- `test_parse_apkbuild_custom_multiple_license_uses_raw_matched_text()` - Verifies `custom:multiple` keeps raw matched text while normalizing declared license fields
+- `test_parse_alpine_no_files_package_still_detected()` - Verifies fileless package detection is preserved
+- `test_parse_alpine_commit_generates_https_vcs_url()` - Verifies HTTPS VCS URL synthesis from commit metadata
 
 ### Golden Tests
 
 - Golden test coverage is maintained in the parser suite and CI.
 - For current pass/ignore status, rely on test runs rather than static counts in this document.
+- APKBUILD parser goldens now exist for:
+  - `icu/APKBUILD`
+  - `linux-firmware/APKBUILD`
 
 ### Test Data
 
