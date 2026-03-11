@@ -411,6 +411,59 @@ mod tests {
     }
 
     #[test]
+    fn test_assembly_conda_rootfs_assigns_meta_json_files() {
+        let test_dir = PathBuf::from("testdata/conda/assembly/opt/conda");
+        let mut file_infos = build_file_infos_from_directory(&test_dir)
+            .expect("should build file infos from Conda rootfs fixture");
+        let result = assemble(&mut file_infos);
+
+        let conda_pkg = result
+            .packages
+            .iter()
+            .find(|pkg| pkg.package_type == Some(crate::models::PackageType::Conda))
+            .expect("expected assembled conda package");
+
+        assert_eq!(conda_pkg.name.as_deref(), Some("requests"));
+        assert!(
+            conda_pkg
+                .datasource_ids
+                .contains(&crate::models::DatasourceId::CondaMetaJson)
+        );
+        assert!(
+            conda_pkg
+                .datasource_ids
+                .contains(&crate::models::DatasourceId::CondaMetaYaml)
+        );
+        assert!(
+            conda_pkg
+                .datafile_paths
+                .iter()
+                .any(|path| path.contains("conda-meta/requests-2.32.3-py312h06a4308_1.json"))
+        );
+        assert!(conda_pkg.datafile_paths.iter().any(|path| {
+            path.contains("pkgs/requests-2.32.3-py312h06a4308_1/info/recipe/meta.yaml")
+        }));
+
+        let assigned_paths = [
+            "lib/python3.12/site-packages/requests/__init__.py",
+            "lib/python3.12/site-packages/requests-2.32.3.dist-info/METADATA",
+            "lib/python3.12/site-packages/requests-2.32.3.dist-info/LICENSE",
+        ];
+
+        for expected_path in assigned_paths {
+            let file = file_infos
+                .iter()
+                .find(|file| file.path == expected_path)
+                .unwrap_or_else(|| panic!("missing file fixture: {expected_path}"));
+            assert!(
+                file.for_packages.contains(&conda_pkg.package_uid),
+                "expected {expected_path} to be assigned to {}",
+                conda_pkg.package_uid
+            );
+        }
+    }
+
+    #[test]
     fn test_assembly_maven_basic() {
         match run_assembly_golden_test("maven-basic") {
             Ok(_) => (),

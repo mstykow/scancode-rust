@@ -167,7 +167,15 @@ pub static ASSEMBLERS: &[AssemblerConfig] = &[
             DatasourceId::CondaYaml,
             DatasourceId::CondaMetaJson,
         ],
-        sibling_file_patterns: &["meta.yaml", "environment.yml"],
+        sibling_file_patterns: &[
+            "meta.yaml",
+            "meta.yml",
+            "environment.yml",
+            "environment.yaml",
+            "conda.yaml",
+            "env.yaml",
+            "*.json",
+        ],
         mode: AssemblyMode::SiblingMerge,
     },
     // RPM specfile (source packages)

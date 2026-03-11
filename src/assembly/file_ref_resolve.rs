@@ -42,6 +42,7 @@ const RPM_DATASOURCE_IDS: &[DatasourceId] = &[
     DatasourceId::RpmInstalledDatabaseSqlite,
 ];
 const RPM_YUMDB_PATH_SUFFIX: &str = "var/lib/yum/yumdb/";
+const CONDA_META_PATH_SEGMENT: &str = "conda-meta/";
 
 pub fn resolve_file_references(
     files: &mut [FileInfo],
@@ -51,6 +52,51 @@ pub fn resolve_file_references(
     let path_index = build_path_index(&*files);
 
     for package in packages.iter_mut() {
+        if is_conda_meta_package(package)
+            && let Some(conda_meta_path) = package
+                .datafile_paths
+                .iter()
+                .find(|path| path.contains(CONDA_META_PATH_SEGMENT))
+            && let Some(root) = compute_conda_root(Some(conda_meta_path.as_str()))
+        {
+            let file_references = collect_file_references(
+                files,
+                &path_index,
+                conda_meta_path,
+                &package.datasource_ids,
+                &[DatasourceId::CondaMetaJson],
+                package.purl.as_deref(),
+            );
+
+            let mut missing_refs = Vec::new();
+            for file_ref in &file_references {
+                let resolved_path = format!("{}{}", root, file_ref.path.trim_start_matches('/'));
+                if let Some(&file_idx) = path_index.get(&resolved_path) {
+                    let package_uid = package.package_uid.clone();
+                    if !files[file_idx].for_packages.contains(&package_uid) {
+                        files[file_idx].for_packages.push(package_uid);
+                    }
+                } else {
+                    missing_refs.push(file_ref.path.clone());
+                }
+            }
+
+            if !missing_refs.is_empty() {
+                missing_refs.sort();
+                let missing_refs_json: Vec<serde_json::Value> = missing_refs
+                    .into_iter()
+                    .map(|path| serde_json::json!({"path": path}))
+                    .collect();
+
+                let extra_data = package.extra_data.get_or_insert_with(HashMap::new);
+                extra_data.insert(
+                    "missing_file_references".to_string(),
+                    serde_json::Value::Array(missing_refs_json),
+                );
+            }
+            continue;
+        }
+
         if let Some(config) = find_db_config(package) {
             let datafile_path = match package.datafile_paths.first() {
                 Some(path) => path,
@@ -109,6 +155,18 @@ pub fn resolve_file_references(
             }
         }
     }
+}
+
+fn is_conda_meta_package(package: &Package) -> bool {
+    package
+        .datasource_ids
+        .contains(&DatasourceId::CondaMetaJson)
+}
+
+fn compute_conda_root(datafile_path: Option<&str>) -> Option<String> {
+    let path = datafile_path?;
+    let idx = path.rfind(CONDA_META_PATH_SEGMENT)?;
+    Some(path[..idx].to_string())
 }
 
 pub fn merge_rpm_yumdb_metadata(files: &mut [FileInfo], packages: &mut Vec<Package>) {
