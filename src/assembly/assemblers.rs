@@ -343,6 +343,11 @@ pub static ASSEMBLERS: &[AssemblerConfig] = &[
         sibling_file_patterns: &["installed"],
         mode: AssemblyMode::OnePerPackageData,
     },
+    AssemblerConfig {
+        datasource_ids: &[DatasourceId::AlpineApkbuild],
+        sibling_file_patterns: &["APKBUILD"],
+        mode: AssemblyMode::SiblingMerge,
+    },
     // RPM installed package databases (BDB, NDB, SQLite)
     AssemblerConfig {
         datasource_ids: &[
