@@ -92,6 +92,7 @@ Each area with improvements has a dedicated document:
 - **[nuget-parser.md](nuget-parser.md)** — 🐛 Bug Fix + ✨ New Feature + 🔍 Enhanced Extraction: modern nuspec license hints, `.nupkg` license-file extraction, and support for legacy/project-style NuGet manifests
 - **[cargo-parser.md](cargo-parser.md)** — 🐛 Bug Fix + ✨ New Feature + 🔍 Enhanced Extraction: crate/workspace file ownership, lowercase Cargo file matching, and `readme`/`publish` manifest parity
 - **[go-parser.md](go-parser.md)** — 🐛 Bug Fix + ✨ New Feature + 🔍 Enhanced Extraction: `go.mod graph` support, replace-directive coverage, and Go test/build source categorization
+- **[cocoapods-parser.md](cocoapods-parser.md)** — 🐛 Bug Fix + 🔍 Enhanced Extraction: refined dependency scope semantics plus explicit RxDataSources non-duplication regression coverage
 - **[summarization-foundations.md](summarization-foundations.md)** — ✨ New Feature + 🔍 Enhanced Post-Processing: generic key-file tagging, package metadata promotion, `summary` output structure, and initial non-license-dependent summary fields
 - **[npm-git-url-dependencies.md](npm-git-url-dependencies.md)** — 🐛 Bug Fix: Correct handling of Git URLs, GitHub shortcuts, and local paths (Python treats them as pinned versions)
 - **[gitmodules-parser.md](gitmodules-parser.md)** — ✨ New Feature: Git submodule dependency extraction (Python has no equivalent parser)
