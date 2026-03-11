@@ -12,6 +12,9 @@ mod tests {
             "/opt/conda/conda-meta/package.json"
         )));
         assert!(CondaMetaJsonParser::is_match(&PathBuf::from(
+            "conda-meta/package.json"
+        )));
+        assert!(CondaMetaJsonParser::is_match(&PathBuf::from(
             "/some/path/conda-meta/requests-2.32.3-py312h06a4308_1.json"
         )));
         assert!(!CondaMetaJsonParser::is_match(&PathBuf::from(
@@ -108,6 +111,28 @@ mod tests {
         let files = extra.get("files").and_then(|v| v.as_array());
         assert!(files.is_some());
         assert_eq!(files.unwrap().len(), 3);
+        assert_eq!(pkg.file_references.len(), 5);
+    }
+
+    #[test]
+    fn test_parse_tzdata_fixture_and_preserve_channel_url() {
+        let path = PathBuf::from("testdata/conda/conda-meta/tzdata-2024b-h04d1e81_0.json");
+        let pkg = CondaMetaJsonParser::extract_first_package(&path);
+
+        assert_eq!(pkg.name.as_deref(), Some("tzdata"));
+        assert_eq!(pkg.version.as_deref(), Some("2024b"));
+        assert_eq!(pkg.datasource_id, Some(DatasourceId::CondaMetaJson));
+        assert_eq!(pkg.purl.as_deref(), Some("pkg:conda/tzdata@2024b"));
+        let extra = pkg.extra_data.as_ref().unwrap();
+        assert_eq!(
+            extra.get("channel").and_then(|v| v.as_str()),
+            Some("https://repo.anaconda.com/pkgs/main/noarch")
+        );
+        assert!(
+            pkg.file_references
+                .iter()
+                .any(|r| r.path.contains("share/zoneinfo/zone.tab"))
+        );
     }
 
     #[test]
