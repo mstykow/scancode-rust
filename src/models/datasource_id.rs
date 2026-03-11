@@ -38,6 +38,7 @@ pub enum DatasourceId {
 
     // ── Alpine ──
     AlpineApkArchive,
+    AlpineApkbuild,
     AlpineInstalledDb,
 
     // ── Android ──
@@ -277,6 +278,7 @@ impl DatasourceId {
 
             // Alpine
             Self::AlpineApkArchive => "alpine_apk_archive",
+            Self::AlpineApkbuild => "alpine_apkbuild",
             Self::AlpineInstalledDb => "alpine_installed_db",
 
             // Android

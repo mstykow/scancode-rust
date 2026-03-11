@@ -283,7 +283,7 @@ pub trait PackageParser {
 }
 
 pub use self::about::AboutFileParser;
-pub use self::alpine::{AlpineApkParser, AlpineInstalledParser};
+pub use self::alpine::{AlpineApkParser, AlpineApkbuildParser, AlpineInstalledParser};
 pub use self::autotools::AutotoolsConfigureParser;
 pub use self::bazel::BazelBuildParser;
 pub use self::bower::BowerJsonParser;
@@ -414,6 +414,7 @@ register_package_handlers! {
     parsers: [
         AboutFileParser,
         AlpineApkParser,
+        AlpineApkbuildParser,
         AlpineInstalledParser,
         AutotoolsConfigureParser,
         BazelBuildParser,

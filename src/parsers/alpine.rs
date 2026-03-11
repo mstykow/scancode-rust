@@ -23,7 +23,10 @@ use std::path::Path;
 
 use log::warn;
 
-use crate::models::{DatasourceId, Dependency, FileReference, PackageData, PackageType, Party};
+use crate::models::{
+    DatasourceId, Dependency, FileReference, LicenseDetection, Match, PackageData, PackageType,
+    Party,
+};
 use crate::parsers::utils::{read_file_to_string, split_name_email};
 
 use super::PackageParser;
@@ -40,6 +43,8 @@ fn default_package_data(datasource_id: DatasourceId) -> PackageData {
 
 /// Parser for Alpine Linux installed package database
 pub struct AlpineInstalledParser;
+
+pub struct AlpineApkbuildParser;
 
 impl PackageParser for AlpineInstalledParser {
     const PACKAGE_TYPE: PackageType = PACKAGE_TYPE;
@@ -60,6 +65,26 @@ impl PackageParser for AlpineInstalledParser {
         };
 
         parse_alpine_installed_db(&content)
+    }
+}
+
+impl PackageParser for AlpineApkbuildParser {
+    const PACKAGE_TYPE: PackageType = PACKAGE_TYPE;
+
+    fn is_match(path: &Path) -> bool {
+        path.file_name().and_then(|n| n.to_str()) == Some("APKBUILD")
+    }
+
+    fn extract_packages(path: &Path) -> Vec<PackageData> {
+        let content = match read_file_to_string(path) {
+            Ok(c) => c,
+            Err(e) => {
+                warn!("Failed to read APKBUILD {:?}: {}", path, e);
+                return vec![default_package_data(DatasourceId::AlpineApkbuild)];
+            }
+        };
+
+        vec![parse_apkbuild(&content)]
     }
 }
 
@@ -169,6 +194,8 @@ fn parse_alpine_package_paragraph(
     } else {
         Vec::new()
     };
+    let vcs_url = get_first(headers, "c")
+        .map(|commit| format!("git+https://git.alpinelinux.org/aports/commit/?id={commit}"));
 
     let mut dependencies = Vec::new();
     for dep in get_all(headers, "D") {
@@ -234,6 +261,7 @@ fn parse_alpine_package_paragraph(
         version: version.clone(),
         description,
         homepage_url,
+        vcs_url,
         parties,
         extracted_license_statement,
         source_packages,
@@ -248,6 +276,296 @@ fn parse_alpine_package_paragraph(
             Some(extra_data)
         },
         ..Default::default()
+    }
+}
+
+fn parse_apkbuild(content: &str) -> PackageData {
+    let variables = parse_apkbuild_variables(content);
+
+    let name = variables.get("pkgname").cloned();
+    let version = match (variables.get("pkgver"), variables.get("pkgrel")) {
+        (Some(ver), Some(rel)) => Some(format!("{}-r{}", ver, rel)),
+        (Some(ver), None) => Some(ver.clone()),
+        _ => None,
+    };
+    let description = variables.get("pkgdesc").cloned();
+    let homepage_url = variables.get("url").cloned();
+    let extracted_license_statement = variables.get("license").cloned();
+    let (declared_license_expression, declared_license_expression_spdx, license_detections) =
+        build_apkbuild_license_data(extracted_license_statement.as_deref());
+
+    let mut extra_data = HashMap::new();
+    if let Some(source) = variables.get("source") {
+        let sources_value: Vec<serde_json::Value> = parse_apkbuild_sources(source)
+            .into_iter()
+            .map(|(file_name, url)| serde_json::json!({ "file_name": file_name, "url": url }))
+            .collect();
+        if !sources_value.is_empty() {
+            extra_data.insert(
+                "sources".to_string(),
+                serde_json::Value::Array(sources_value),
+            );
+        }
+    }
+    for (field, checksum_key) in [
+        ("sha512sums", "sha512"),
+        ("sha256sums", "sha256"),
+        ("md5sums", "md5"),
+    ] {
+        if let Some(checksums) = variables.get(field) {
+            let checksum_entries: Vec<serde_json::Value> = parse_apkbuild_checksums(checksums)
+                .into_iter()
+                .map(|(file_name, checksum)| serde_json::json!({ "file_name": file_name, checksum_key: checksum }))
+                .collect();
+            if !checksum_entries.is_empty() {
+                match extra_data.get_mut("checksums") {
+                    Some(serde_json::Value::Array(existing)) => existing.extend(checksum_entries),
+                    _ => {
+                        extra_data.insert(
+                            "checksums".to_string(),
+                            serde_json::Value::Array(checksum_entries),
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    PackageData {
+        datasource_id: Some(DatasourceId::AlpineApkbuild),
+        package_type: Some(PACKAGE_TYPE),
+        namespace: None,
+        name: name.clone(),
+        version: version.clone(),
+        description,
+        homepage_url,
+        extracted_license_statement,
+        declared_license_expression,
+        declared_license_expression_spdx,
+        license_detections,
+        purl: name
+            .as_deref()
+            .and_then(|n| build_alpine_purl(n, version.as_deref(), None)),
+        extra_data: (!extra_data.is_empty()).then_some(extra_data),
+        ..default_package_data(DatasourceId::AlpineApkbuild)
+    }
+}
+
+fn parse_apkbuild_variables(content: &str) -> HashMap<String, String> {
+    let mut raw = HashMap::new();
+    let mut lines = content.lines().peekable();
+    let mut brace_depth = 0usize;
+
+    while let Some(line) = lines.next() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() || trimmed.starts_with('#') {
+            continue;
+        }
+        if trimmed.ends_with("(){") || trimmed.ends_with("() {") {
+            brace_depth += 1;
+            continue;
+        }
+        if brace_depth > 0 {
+            brace_depth += trimmed.chars().filter(|c| *c == '{').count();
+            brace_depth = brace_depth.saturating_sub(trimmed.chars().filter(|c| *c == '}').count());
+            continue;
+        }
+        let Some((name, value)) = trimmed.split_once('=') else {
+            continue;
+        };
+        let mut value = value.trim().to_string();
+        if value.starts_with('"') && !value.ends_with('"') {
+            while let Some(next) = lines.peek() {
+                value.push('\n');
+                value.push_str(next);
+                let current = lines.next().unwrap();
+                if current.trim_end().ends_with('"') {
+                    break;
+                }
+            }
+        }
+        raw.insert(name.trim().to_string(), value);
+    }
+
+    let mut resolved = HashMap::new();
+    for key in [
+        "pkgname",
+        "pkgver",
+        "pkgrel",
+        "pkgdesc",
+        "url",
+        "license",
+        "source",
+        "sha512sums",
+        "sha256sums",
+        "md5sums",
+    ] {
+        if let Some(value) = raw.get(key) {
+            resolved.insert(key.to_string(), resolve_apkbuild_value(value, &raw));
+        }
+    }
+    resolved
+}
+
+fn resolve_apkbuild_value(value: &str, variables: &HashMap<String, String>) -> String {
+    let mut resolved = strip_wrapping_quotes(value.trim()).to_string();
+    for _ in 0..8 {
+        let previous = resolved.clone();
+        for (name, raw_value) in variables {
+            let raw_value = strip_wrapping_quotes(raw_value.trim());
+            let resolved_raw = resolve_apkbuild_value_no_recursion(raw_value, variables);
+            let value_resolved = strip_wrapping_quotes(&resolved_raw);
+            resolved = resolved.replace(
+                &format!("${{{name}//./-}}"),
+                &value_resolved.replace('.', "-"),
+            );
+            resolved = resolved.replace(
+                &format!("${{{name}//./_}}"),
+                &value_resolved.replace('.', "_"),
+            );
+            resolved = resolved.replace(
+                &format!("${{{name}::8}}"),
+                &value_resolved.chars().take(8).collect::<String>(),
+            );
+            resolved = resolved.replace(&format!("${{{name}}}"), value_resolved);
+            resolved = resolved.replace(&format!("${name}"), value_resolved);
+        }
+        if resolved == previous {
+            break;
+        }
+    }
+    resolved
+}
+
+fn resolve_apkbuild_value_no_recursion(value: &str, variables: &HashMap<String, String>) -> String {
+    let mut resolved = strip_wrapping_quotes(value.trim()).to_string();
+    for (name, raw_value) in variables {
+        let raw_value = strip_wrapping_quotes(raw_value.trim());
+        resolved = resolved.replace(&format!("${{{name}//./-}}"), &raw_value.replace('.', "-"));
+        resolved = resolved.replace(&format!("${{{name}//./_}}"), &raw_value.replace('.', "_"));
+        resolved = resolved.replace(
+            &format!("${{{name}::8}}"),
+            &raw_value.chars().take(8).collect::<String>(),
+        );
+        resolved = resolved.replace(&format!("${{{name}}}"), raw_value);
+        resolved = resolved.replace(&format!("${name}"), raw_value);
+    }
+    resolved
+}
+
+fn strip_wrapping_quotes(value: &str) -> &str {
+    value
+        .strip_prefix('"')
+        .and_then(|v| v.strip_suffix('"'))
+        .or_else(|| value.strip_prefix('\'').and_then(|v| v.strip_suffix('\'')))
+        .unwrap_or(value)
+}
+
+fn parse_apkbuild_sources(value: &str) -> Vec<(Option<String>, Option<String>)> {
+    value
+        .split_whitespace()
+        .filter(|part| !part.is_empty())
+        .map(|part| {
+            if let Some((file_name, url)) = part.split_once("::") {
+                (Some(file_name.to_string()), Some(url.to_string()))
+            } else if part.contains("://") {
+                (None, Some(part.to_string()))
+            } else {
+                (Some(part.to_string()), None)
+            }
+        })
+        .collect()
+}
+
+fn parse_apkbuild_checksums(value: &str) -> Vec<(String, String)> {
+    value
+        .lines()
+        .flat_map(|line| line.split_whitespace())
+        .collect::<Vec<_>>()
+        .chunks(2)
+        .filter_map(|chunk| {
+            if chunk.len() == 2 {
+                Some((chunk[1].to_string(), chunk[0].to_string()))
+            } else {
+                None
+            }
+        })
+        .collect()
+}
+
+fn build_apkbuild_license_data(
+    extracted: Option<&str>,
+) -> (Option<String>, Option<String>, Vec<LicenseDetection>) {
+    let Some(extracted) = extracted.map(str::trim).filter(|s| !s.is_empty()) else {
+        return (None, None, Vec::new());
+    };
+
+    let (declared, declared_spdx) = if extracted == "custom:multiple" {
+        (
+            Some("unknown-license-reference".to_string()),
+            Some("LicenseRef-scancode-unknown-license-reference".to_string()),
+        )
+    } else {
+        let parts: Vec<&str> = extracted
+            .split_whitespace()
+            .filter(|part| *part != "AND")
+            .collect();
+        let declared_parts: Vec<String> = parts
+            .iter()
+            .map(|part| match *part {
+                "MIT" => "mit".to_string(),
+                "ICU" => "x11".to_string(),
+                "Unicode-TOU" => "unicode-tou".to_string(),
+                "Ruby" => "ruby".to_string(),
+                "BSD-2-Clause" => "bsd-simplified".to_string(),
+                "BSD-3-Clause" => "bsd-new".to_string(),
+                other => other.to_ascii_lowercase(),
+            })
+            .collect();
+        let spdx_parts: Vec<String> = parts.iter().map(|part| part.to_string()).collect();
+        (
+            combine_license_expressions_in_order(declared_parts),
+            combine_license_expressions_in_order(spdx_parts),
+        )
+    };
+
+    let Some(declared_expr) = declared.clone() else {
+        return (None, None, Vec::new());
+    };
+    let Some(declared_spdx_expr) = declared_spdx.clone() else {
+        return (declared, declared_spdx, Vec::new());
+    };
+
+    let detection = LicenseDetection {
+        license_expression: declared_expr.clone(),
+        license_expression_spdx: declared_spdx_expr.clone(),
+        matches: vec![Match {
+            license_expression: declared_expr,
+            license_expression_spdx: declared_spdx_expr,
+            from_file: None,
+            start_line: 1,
+            end_line: 1,
+            matcher: Some("1-spdx-id".to_string()),
+            score: 100.0,
+            matched_length: Some(extracted.split_whitespace().count()),
+            match_coverage: Some(100.0),
+            rule_relevance: Some(100),
+            rule_identifier: None,
+            rule_url: None,
+            matched_text: Some(extracted.to_string()),
+        }],
+        identifier: None,
+    };
+
+    (declared, declared_spdx, vec![detection])
+}
+
+fn combine_license_expressions_in_order(expressions: Vec<String>) -> Option<String> {
+    let expressions: Vec<String> = expressions.into_iter().filter(|e| !e.is_empty()).collect();
+    if expressions.is_empty() {
+        None
+    } else {
+        Some(expressions.join(" AND "))
     }
 }
 
@@ -802,6 +1120,110 @@ p:so:libtest.so.1
     }
 
     #[test]
+    fn test_alpine_apkbuild_parser_is_match() {
+        assert!(AlpineApkbuildParser::is_match(&PathBuf::from("APKBUILD")));
+        assert!(AlpineApkbuildParser::is_match(&PathBuf::from(
+            "/path/to/APKBUILD"
+        )));
+        assert!(!AlpineApkbuildParser::is_match(&PathBuf::from("apkbuild")));
+        assert!(!AlpineApkbuildParser::is_match(&PathBuf::from(
+            "APKBUILD.txt"
+        )));
+    }
+
+    #[test]
+    fn test_parse_apkbuild_icu_reference() {
+        let path = PathBuf::from(
+            "reference/scancode-toolkit/tests/packagedcode/data/alpine/apkbuild/alpine14/main/icu/APKBUILD",
+        );
+        let pkg = AlpineApkbuildParser::extract_first_package(&path);
+
+        assert_eq!(pkg.datasource_id, Some(DatasourceId::AlpineApkbuild));
+        assert_eq!(pkg.name.as_deref(), Some("icu"));
+        assert_eq!(pkg.version.as_deref(), Some("67.1-r2"));
+        assert_eq!(
+            pkg.description.as_deref(),
+            Some("International Components for Unicode library")
+        );
+        assert_eq!(
+            pkg.homepage_url.as_deref(),
+            Some("http://site.icu-project.org/")
+        );
+        assert_eq!(
+            pkg.extracted_license_statement.as_deref(),
+            Some("MIT ICU Unicode-TOU")
+        );
+        assert_eq!(
+            pkg.declared_license_expression_spdx.as_deref(),
+            Some("MIT AND ICU AND Unicode-TOU")
+        );
+        let extra = pkg.extra_data.as_ref().unwrap();
+        assert!(extra.contains_key("sources"));
+        assert!(extra.contains_key("checksums"));
+    }
+
+    #[test]
+    fn test_parse_apkbuild_custom_multiple_license_uses_raw_matched_text() {
+        let path = PathBuf::from(
+            "reference/scancode-toolkit/tests/packagedcode/data/alpine/apkbuild/alpine13/main/linux-firmware/APKBUILD",
+        );
+        let pkg = AlpineApkbuildParser::extract_first_package(&path);
+
+        assert_eq!(pkg.name.as_deref(), Some("linux-firmware"));
+        assert_eq!(pkg.version.as_deref(), Some("20201218-r0"));
+        assert_eq!(
+            pkg.extracted_license_statement.as_deref(),
+            Some("custom:multiple")
+        );
+        assert_eq!(
+            pkg.declared_license_expression.as_deref(),
+            Some("unknown-license-reference")
+        );
+        assert_eq!(
+            pkg.declared_license_expression_spdx.as_deref(),
+            Some("LicenseRef-scancode-unknown-license-reference")
+        );
+        let matched = pkg.license_detections[0].matches[0].matched_text.as_deref();
+        assert_eq!(matched, Some("custom:multiple"));
+    }
+
+    #[test]
+    fn test_parse_alpine_no_files_package_still_detected() {
+        let path = PathBuf::from(
+            "reference/scancode-toolkit/tests/packagedcode/data/alpine/full-installed/installed",
+        );
+        let content = std::fs::read_to_string(&path).expect("read installed db fixture");
+        let packages = parse_alpine_installed_db(&content);
+        let libc_utils = packages
+            .into_iter()
+            .find(|pkg| pkg.name.as_deref() == Some("libc-utils"))
+            .expect("libc-utils package should exist");
+
+        assert_eq!(libc_utils.file_references.len(), 0);
+        assert!(
+            libc_utils
+                .purl
+                .as_deref()
+                .is_some_and(|p| p.contains("libc-utils"))
+        );
+    }
+
+    #[test]
+    fn test_parse_alpine_commit_generates_https_vcs_url() {
+        let content =
+            "P:test-package\nV:1.0-r0\nA:x86_64\nc:cb70ca5c6d6db0399d2dd09189c5d57827bce5cd\n";
+        let (_dir, path) = create_temp_installed_db(content);
+        let pkg = AlpineInstalledParser::extract_first_package(&path);
+
+        assert_eq!(
+            pkg.vcs_url.as_deref(),
+            Some(
+                "git+https://git.alpinelinux.org/aports/commit/?id=cb70ca5c6d6db0399d2dd09189c5d57827bce5cd"
+            )
+        );
+    }
+
+    #[test]
     fn test_parse_alpine_virtual_package() {
         let content = "P:.postgis-rundeps
 V:20210104.190748
@@ -837,4 +1259,12 @@ crate::register_parser!(
     "alpine",
     "",
     Some("https://wiki.alpinelinux.org/wiki/Apk_spec"),
+);
+
+crate::register_parser!(
+    "Alpine Linux APKBUILD recipe",
+    &["**/APKBUILD"],
+    "alpine",
+    "Shell",
+    Some("https://wiki.alpinelinux.org/wiki/APKBUILD_Reference"),
 );
