@@ -109,7 +109,7 @@ cargo run --quiet --bin generate-supported-formats && git diff --exit-code docs/
 | 10    | Conda      | Done    | #195, #196                                                                                                 | `cargo test conda`; `cargo test --features golden-tests conda_golden`; `cargo test test_assembly_conda_rootfs_assigns_meta_json_files --lib`                                                                                                                                                                                                                                   |
 | 11    | CocoaPods  | Done    | #191, #192                                                                                                 | `cargo test pod`; `cargo test --features golden-tests cocoapods_golden`                                                                                                                                                                                                                                                                                                        |
 | 12    | Alpine     | Done    | #172, #173, #174, #175                                                                                     | `cargo test alpine`; `cargo test --features golden-tests alpine_golden`; `cargo test --features golden-tests test_assembly_alpine_file_refs`                                                                                                                                                                                                                                   |
-| 13    | ABOUT      | Planned | #201, #202, #203, #204                                                                                     | `cargo test about`                                                                                                                                                                                                                                                                                                                                                             |
+| 13    | ABOUT      | Done    | #201, #202, #203, #204                                                                                     | `cargo test about`; `cargo test --features golden-tests about --lib`; `cargo test about_scan_promotes_packages_and_assigns_referenced_files --bin scancode-rust`; `cargo test about_scan_tracks_missing_file_references --bin scancode-rust`                                                                                                                                   |
 | 14    | Swift      | Planned | #193                                                                                                       | `cargo test swift`; `cargo test --features golden-tests swift_golden`                                                                                                                                                                                                                                                                                                          |
 | 15    | Conan      | Planned | #194                                                                                                       | `cargo test conan`                                                                                                                                                                                                                                                                                                                                                             |
 | 16    | Docker     | Planned | #199, #200                                                                                                 | validation to be finalized when parser files are added because this family is enhancement work around currently unsupported Docker-specific coverage                                                                                                                                                                                                                           |
@@ -445,6 +445,31 @@ Current status (March 11, 2026):
 - Fileless Alpine packages are now explicitly covered by regression tests so they are not silently dropped.
 - Alpine parser golden coverage now includes both installed-db and APKBUILD fixtures.
 - PR #314 (`fix(alpine): complete the Alpine enhancement batch`) captures the completed implementation batch.
+
+### ABOUT PR Scope
+
+Issues:
+
+- #201 improve ABOUT fully qualified PURLs using `download_url`
+- #202 stop reporting invalid `pkg:about` PURLs
+- #203 handle partial/incomplete ABOUT files gracefully
+- #204 fix ABOUT package root / file-reference dependency on direct file access
+
+Likely touchpoints:
+
+- ABOUT parser behavior for explicit PURL aliases, `download_url`-based type inference, and graceful fallback metadata retention
+- ABOUT-focused unit coverage for PyPI/GitHub PURL inference, invalid YAML fallback, and extra preserved ABOUT fields
+- Parser goldens for local `apipkg.ABOUT` and `appdirs.ABOUT` fixtures
+- Scan-time package promotion and file-reference resolution for `about_resource`, `license_file`, and `notice_file`
+- Improvement documentation for invalid `pkg:about` suppression and path-based file-reference resolution
+
+Current status (March 11, 2026):
+
+- ABOUT files now infer real ecosystem PURLs from recognized `download_url` hosts (currently PyPI wheel URLs and GitHub raw/source URLs) when no explicit PURL is present.
+- Rust no longer synthesizes invalid `pkg:about/...` URLs just because the metadata file itself is an `.ABOUT` file.
+- Invalid YAML and other malformed ABOUT files now keep `package_type = about` and `datasource_id = about_file` on fallback.
+- `about_resource`, `license_file`, and `notice_file` references are now resolved relative to the ABOUT file path during scan-time package promotion, and unresolved entries are recorded in `extra_data.missing_file_references`.
+- Local parser golden coverage now exists for `apipkg.ABOUT` and `appdirs.ABOUT`, and scan-level tests prove package promotion plus missing file reference behavior.
 
 ### Python PR Scope Rule
 
