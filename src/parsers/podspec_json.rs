@@ -394,9 +394,9 @@ fn extract_dependencies(json: &Value) -> Vec<Dependency> {
             dependencies.push(Dependency {
                 purl,
                 extracted_requirement: requirement_str,
-                scope: Some(FIELD_DEPENDENCIES.to_string()),
+                scope: Some("runtime".to_string()),
                 is_runtime: Some(true),
-                is_optional: None,
+                is_optional: Some(false),
                 is_pinned: None,
                 is_direct: None,
                 resolved_package: None,

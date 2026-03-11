@@ -242,8 +242,9 @@ mod tests {
             firebase_core.extracted_requirement,
             Some("~> 8.0".to_string())
         );
-        assert_eq!(firebase_core.scope, Some("dependencies".to_string()));
+        assert_eq!(firebase_core.scope, Some("runtime".to_string()));
         assert_eq!(firebase_core.is_runtime, Some(true));
+        assert_eq!(firebase_core.is_optional, Some(false));
     }
 
     #[test]
