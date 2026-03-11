@@ -46,7 +46,7 @@ fn default_package_data(datasource_id: Option<DatasourceId>) -> PackageData {
 }
 
 /// Build a PURL (Package URL) for Conda or PyPI packages
-fn build_purl(
+pub(crate) fn build_purl(
     package_type: &str,
     namespace: Option<&str>,
     name: &str,
@@ -404,11 +404,7 @@ pub fn parse_conda_requirement(req: &str, scope: &str) -> Option<Dependency> {
     let req = req.trim();
 
     // Handle namespace prefix (conda-forge::package)
-    let (namespace, req_without_ns) = if let Some((ns, rest)) = req.split_once("::") {
-        (Some(ns), rest)
-    } else {
-        (None, req)
-    };
+    let (namespace, channel_url, req_without_ns) = parse_conda_channel_prefix(req);
 
     // Split on first space to separate name from version constraint
     let (name_part, version_constraint) =
@@ -471,6 +467,14 @@ pub fn parse_conda_requirement(req: &str, scope: &str) -> Option<Dependency> {
         _ => (false, true), // build, host, test are all optional
     };
 
+    let mut extra_data = HashMap::new();
+    if let Some(namespace) = namespace {
+        extra_data.insert("channel".to_string(), serde_json::json!(namespace));
+    }
+    if let Some(channel_url) = channel_url {
+        extra_data.insert("channel_url".to_string(), serde_json::json!(channel_url));
+    }
+
     Some(Dependency {
         purl,
         extracted_requirement,
@@ -480,7 +484,7 @@ pub fn parse_conda_requirement(req: &str, scope: &str) -> Option<Dependency> {
         is_pinned: Some(is_pinned),
         is_direct: Some(true),
         resolved_package: None,
-        extra_data: None,
+        extra_data: (!extra_data.is_empty()).then_some(extra_data),
     })
 }
 
@@ -504,29 +508,30 @@ fn extract_environment_dependencies(yaml: &Value) -> Vec<Dependency> {
 }
 
 fn parse_environment_string_dependency(dep_str: &str) -> Option<Dependency> {
-    let (namespace, dep_without_ns) = parse_conda_namespace(dep_str);
+    let (namespace, channel_url, dep_without_ns) = parse_conda_channel_prefix(dep_str);
 
     if let Ok(parsed_req) = dep_without_ns.parse::<pep508_rs::Requirement>() {
         return create_pip_dependency(parsed_req, "dependencies", Some(dep_without_ns));
     }
 
-    create_conda_dependency(namespace, dep_without_ns, "dependencies")
+    create_conda_dependency(namespace, channel_url, dep_without_ns, "dependencies")
 }
 
-fn parse_conda_namespace(dep_str: &str) -> (Option<&str>, &str) {
+fn parse_conda_channel_prefix(dep_str: &str) -> (Option<&str>, Option<&str>, &str) {
     if let Some((ns, rest)) = dep_str.rsplit_once("::") {
         if ns.contains('/') || ns.contains(':') {
-            (None, rest)
+            (None, Some(ns), rest)
         } else {
-            (Some(ns), rest)
+            (Some(ns), None, rest)
         }
     } else {
-        (None, dep_str)
+        (None, None, dep_str)
     }
 }
 
 fn create_conda_dependency(
     namespace: Option<&str>,
+    channel_url: Option<&str>,
     dep_without_ns: &str,
     scope: &str,
 ) -> Option<Dependency> {
@@ -573,6 +578,14 @@ fn create_conda_dependency(
         None,
         None,
     );
+    let mut extra_data = HashMap::new();
+    if let Some(namespace) = namespace {
+        extra_data.insert("channel".to_string(), serde_json::json!(namespace));
+    }
+    if let Some(channel_url) = channel_url {
+        extra_data.insert("channel_url".to_string(), serde_json::json!(channel_url));
+    }
+
     Some(Dependency {
         purl,
         extracted_requirement,
@@ -582,7 +595,7 @@ fn create_conda_dependency(
         is_pinned: Some(is_pinned),
         is_direct: Some(true),
         resolved_package: None,
-        extra_data: None,
+        extra_data: (!extra_data.is_empty()).then_some(extra_data),
     })
 }
 

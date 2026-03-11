@@ -467,6 +467,29 @@ package:
         assert_eq!(dep.purl, Some("pkg:conda/pytorch/pytorch@1.12".to_string()));
         assert_eq!(dep.scope, Some("run".to_string()));
         assert_eq!(dep.is_pinned, Some(true));
+        assert_eq!(
+            dep.extra_data
+                .as_ref()
+                .and_then(|m| m.get("channel"))
+                .and_then(|v| v.as_str()),
+            Some("pytorch")
+        );
+    }
+
+    #[test]
+    fn test_parse_conda_requirement_with_url_prefix_does_not_become_namespace() {
+        let dep = parse_conda_requirement("https://104.17.92.24:443::flask=1.0.2", "run");
+
+        assert!(dep.is_some());
+        let dep = dep.unwrap();
+        assert_eq!(dep.purl, Some("pkg:conda/flask@1.0.2".to_string()));
+        assert_eq!(
+            dep.extra_data
+                .as_ref()
+                .and_then(|m| m.get("channel_url"))
+                .and_then(|v| v.as_str()),
+            Some("https://104.17.92.24:443")
+        );
     }
 
     #[test]
