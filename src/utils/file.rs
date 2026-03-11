@@ -122,16 +122,18 @@ pub fn extract_text_for_detection(path: &Path, bytes: &[u8]) -> (String, Extract
         return (decoded, ExtractedTextKind::Decoded);
     }
 
-    if matches!(ext.as_deref(), Some("dll") | Some("exe")) {
-        let text = extract_printable_strings(bytes);
-        return if text.is_empty() {
-            (String::new(), ExtractedTextKind::None)
-        } else {
-            (text, ExtractedTextKind::BinaryStrings)
-        };
+    // Skip string extraction for PDFs - they have their own text extraction above
+    // and we don't want to extract strings from PDF binary content
+    if matches!(ext.as_deref(), Some("pdf")) {
+        return (String::new(), ExtractedTextKind::None);
     }
 
-    (String::new(), ExtractedTextKind::None)
+    let text = extract_printable_strings(bytes);
+    if text.is_empty() {
+        (String::new(), ExtractedTextKind::None)
+    } else {
+        (text, ExtractedTextKind::BinaryStrings)
+    }
 }
 
 fn supported_image_metadata_format(ext: Option<&str>) -> Option<ImageFormat> {
