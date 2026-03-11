@@ -107,7 +107,7 @@ cargo run --quiet --bin generate-supported-formats && git diff --exit-code docs/
 | 8     | Ruby                  | Done    | #151, #154, #156, #158, #160, #161                                                                         | `cargo test ruby`; `cargo test --features golden-tests ruby_golden`; `cargo test --features golden-tests test_assembly_ruby_extracted_basic`; `cargo test --bin scancode-rust`; `cargo test --test output_format_golden`                                                                                                                                                       |
 | 9     | Composer              | Done    | #187, #188, #190                                                                                           | `cargo test composer`; `cargo test --features golden-tests composer_golden`; `cargo test --features golden-tests test_assembly_composer_basic`; `cargo test --features golden-tests test_assembly_composer_nested`                                                                                                                                                             |
 | 10    | Conda                 | Done    | #195, #196                                                                                                 | `cargo test conda`; `cargo test --features golden-tests conda_golden`; `cargo test test_assembly_conda_rootfs_assigns_meta_json_files --lib`                                                                                                                                                                                                                                   |
-| 11    | CocoaPods             | Planned | #191, #192                                                                                                 | `cargo test pod`; `cargo test --features golden-tests cocoapods_golden`                                                                                                                                                                                                                                                                                                        |
+| 11    | CocoaPods             | Done    | #191, #192                                                                                                 | `cargo test pod`; `cargo test --features golden-tests cocoapods_golden`                                                                                                                                                                                                                                                                                                        |
 | 12    | Alpine                | Planned | #172, #173, #174, #175                                                                                     | `cargo test alpine`; `cargo test --features golden-tests alpine_golden`; `cargo test --features golden-tests test_assembly_alpine_file_refs`                                                                                                                                                                                                                                   |
 | 13    | ABOUT                 | Planned | #201, #202, #203, #204                                                                                     | `cargo test about`                                                                                                                                                                                                                                                                                                                                                             |
 | 14    | Swift                 | Planned | #193                                                                                                       | `cargo test swift`; `cargo test --features golden-tests swift_golden`                                                                                                                                                                                                                                                                                                          |
@@ -396,6 +396,29 @@ Current status (March 11, 2026):
 - URL-like channel prefixes are no longer overloaded into namespace; they are preserved separately as `channel_url`, while symbolic channel names remain namespace-like and are also preserved as `channel` metadata.
 - Parser golden coverage now includes the existing local `tzdata` `conda-meta` fixture.
 - PR #311 (`fix(conda): complete the Conda enhancement batch`) captures the completed implementation batch.
+
+### CocoaPods PR Scope
+
+Issues:
+
+- #191 refine CocoaPods scope handling
+- #192 duplicated package info in podspec
+
+Likely touchpoints:
+
+- CocoaPods parser behavior for `.podspec`, `.podspec.json`, `Podfile`, and `Podfile.lock` scope semantics
+- CocoaPods-focused unit coverage for runtime vs development dependency handling
+- Parser goldens for `.podspec.json`, `Podfile`, and `Podfile.lock` after the refined scope contract
+- Explicit regression proof that `RxDataSources.podspec` stays bounded and non-duplicated
+- Improvement documentation for scope semantics and duplication protection
+
+Current status (March 11, 2026):
+
+- Local work now distinguishes runtime vs development dependency scope in `.podspec` parsing instead of flattening everything to runtime.
+- `.podspec.json` dependencies now use the same runtime-oriented scope contract as `.podspec`.
+- `Podfile` and `Podfile.lock` dependencies now use the more honest generic `dependencies` scope and leave runtime/optional unset where CocoaPods does not encode enough information to prove those booleans safely.
+- CocoaPods parser goldens have been refreshed to the new scope contract.
+- A targeted `RxDataSources.podspec` regression now proves the parser emits a single bounded package representation instead of duplicated package information.
 
 ### Python PR Scope Rule
 
