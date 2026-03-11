@@ -1,17 +1,4 @@
 //! Golden tests for CocoaPods parsers.
-//!
-//! These tests are currently ignored due to format incompatibility between
-//! Python reference expected files and Rust implementation:
-//!
-//! - Python: Extracts each dependency/pod as a separate package in `{"packages": [...]}`
-//! - Rust: Extracts single PackageData with dependencies in `dependencies` array
-//!
-//! Both approaches are valid. Python's approach better matches ScanCode's multi-package
-//! model, while Rust's approach better matches manifest file structure (one podspec/Podfile
-//! declares multiple dependencies).
-//!
-//! Comprehensive unit tests in `podspec_json_test.rs`, `podfile_lock_test.rs`, and DSL
-//! parser unit tests already verify correct parsing for all CocoaPods formats.
 
 #[cfg(test)]
 mod golden_tests {
@@ -113,6 +100,21 @@ mod golden_tests {
             Ok(_) => (),
             Err(e) => panic!("Golden test failed: {}", e),
         }
+    }
+
+    #[test]
+    fn test_rxdatasources_podspec_has_no_duplicate_dependencies() {
+        let test_file = PathBuf::from("testdata/cocoapods-golden/podspec/RxDataSources.podspec");
+        let package_data = PodspecParser::extract_first_package(&test_file);
+
+        assert_eq!(package_data.name.as_deref(), Some("RxDataSources"));
+        assert_eq!(package_data.dependencies.len(), 3);
+
+        let mut unique_purls = std::collections::BTreeSet::new();
+        for dep in &package_data.dependencies {
+            unique_purls.insert(dep.purl.clone());
+        }
+        assert_eq!(unique_purls.len(), package_data.dependencies.len());
     }
 
     #[test]
