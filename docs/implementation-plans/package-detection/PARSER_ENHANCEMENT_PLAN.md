@@ -470,6 +470,7 @@ Current status (March 11, 2026):
 - Invalid YAML and other malformed ABOUT files now keep `package_type = about` and `datasource_id = about_file` on fallback.
 - `about_resource`, `license_file`, and `notice_file` references are now resolved relative to the ABOUT file path during scan-time package promotion, and unresolved entries are recorded in `extra_data.missing_file_references`.
 - Local parser golden coverage now exists for `apipkg.ABOUT` and `appdirs.ABOUT`, and scan-level tests prove package promotion plus missing file reference behavior.
+- PR #315 (`fix(about): complete the ABOUT enhancement batch`) captures the completed implementation batch.
 
 ### Python PR Scope Rule
 
