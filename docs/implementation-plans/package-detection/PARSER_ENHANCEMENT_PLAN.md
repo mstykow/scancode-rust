@@ -421,6 +421,31 @@ Current status (March 11, 2026):
 - A targeted `RxDataSources.podspec` regression now proves the parser emits a single bounded package representation instead of duplicated package information.
 - PR #312 (`fix(cocoapods): complete the CocoaPods enhancement batch`) captures the completed implementation batch.
 
+### Alpine PR Scope
+
+Issues:
+
+- #172 implement APKBUILD parser
+- #173 fix APKBUILD matched license text
+- #174 handle packages with no files
+- #175 fix Alpine VCS URL scheme
+
+Likely touchpoints:
+
+- Alpine parser behavior for APKBUILD recipe variables, sources, checksums, and license handling
+- Alpine-focused unit coverage for `custom:multiple`, fileless installed packages, and HTTPS VCS URL generation
+- Parser goldens for installed DB plus representative APKBUILD fixtures
+- Existing installed-db file-reference assembly coverage (kept unchanged as the parser-side proof already exists)
+- Improvement documentation for APKBUILD parsing and current-vs-upstream Alpine differences
+
+Current status (March 11, 2026):
+
+- Local work now includes a static `APKBUILD` parser with local fixture-backed coverage for `icu` and `linux-firmware`.
+- The `custom:multiple` APKBUILD license case now preserves raw `matched_text` while still normalizing declared license fields.
+- Installed package commit metadata now emits `git+https://git.alpinelinux.org/aports/commit/?id=...` VCS URLs.
+- Fileless Alpine packages are now explicitly covered by regression tests so they are not silently dropped.
+- Alpine parser golden coverage now includes both installed-db and APKBUILD fixtures.
+
 ### Python PR Scope Rule
 
 Include only:
