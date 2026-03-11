@@ -195,12 +195,31 @@ pub fn filter_overlapping_matches(
             // See: CC-BY-SA-2.0 vs CC-BY-NC-SA-2.0 where NC-SA has higher
             // candidate_resemblance but lower actual coverage.
 
+            // When overlap is >= 90%, prefer higher coverage when lengths are equal.
+            // This ensures that for matches with identical qspan, the one with better
+            // coverage is kept. See: gfdl-1.1 vs gfdl-1.1-plus where both match the
+            // same text but gfdl-1.1 has higher coverage.
             if extra_large_next && current_len_val >= next_len_val {
+                // If lengths are equal, prefer higher coverage
+                if current_len_val == next_len_val
+                    && matches[i].match_coverage < matches[j].match_coverage
+                {
+                    discarded.push(matches.remove(i));
+                    i = i.saturating_sub(1);
+                    break;
+                }
                 discarded.push(matches.remove(j));
                 continue;
             }
 
             if extra_large_current && current_len_val <= next_len_val {
+                // If lengths are equal, prefer higher coverage
+                if current_len_val == next_len_val
+                    && matches[i].match_coverage < matches[j].match_coverage
+                {
+                    discarded.push(matches.remove(j));
+                    continue;
+                }
                 discarded.push(matches.remove(i));
                 i = i.saturating_sub(1);
                 break;
@@ -1077,5 +1096,38 @@ mod tests {
 
         assert_eq!(to_keep.len(), 0);
         assert_eq!(to_discard.len(), 1);
+    }
+
+    #[test]
+    fn test_filter_overlapping_matches_prefers_higher_coverage() {
+        // Regression test: when two matches have identical qspan (100% overlap),
+        // the one with higher coverage should be kept.
+        // This was a bug where gfdl-1.1-plus (68.6%) was kept over gfdl-1.1 (78.7%)
+        // because they had identical tokens, hilen, and matcher_order.
+        let index = LicenseIndex::with_legalese_count(10);
+        
+        let mut m1 = create_test_match("gfdl-1.1_13.RULE", 1, 10, 78.7, 78.7, 100);
+        m1.start_token = 5;
+        m1.end_token = 77;
+        m1.matched_length = 48;
+        m1.hilen = 14;
+        m1.matcher = "3-seq".to_string();
+        m1.qspan_positions = Some((5..77).collect());
+        
+        let mut m2 = create_test_match("gfdl-1.1-plus_5.RULE", 1, 10, 68.6, 68.6, 100);
+        m2.start_token = 5;
+        m2.end_token = 77;
+        m2.matched_length = 48;
+        m2.hilen = 14;
+        m2.matcher = "3-seq".to_string();
+        m2.qspan_positions = Some((5..77).collect());
+
+        let matches = vec![m1, m2];
+        let (kept, _discarded) = filter_overlapping_matches(matches, &index);
+        
+        // Should keep the match with higher coverage (gfdl-1.1 at 78.7%)
+        assert_eq!(kept.len(), 1);
+        assert_eq!(kept[0].rule_identifier, "gfdl-1.1_13.RULE");
+        assert!(kept[0].match_coverage > 70.0);
     }
 }
