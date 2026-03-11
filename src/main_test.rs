@@ -6,6 +6,12 @@ use crate::models::{
 use clap::Parser;
 use serde_json::json;
 use std::fs;
+use std::sync::Arc;
+
+use crate::askalono::{ScanStrategy, Store};
+use crate::assembly;
+use crate::progress::{ProgressMode, ScanProgress};
+use crate::scanner::TextDetectionOptions;
 
 fn file(path: &str) -> FileInfo {
     FileInfo::new(
@@ -79,6 +85,24 @@ fn dir(path: &str) -> FileInfo {
         Vec::new(),
         Vec::new(),
     )
+}
+
+fn about_scan_and_assemble(path: &Path) -> assembly::AssemblyResult {
+    let store = Box::leak(Box::new(Store::new()));
+    let strategy = ScanStrategy::new(store);
+    let progress = Arc::new(ScanProgress::new(ProgressMode::Quiet));
+    let result = crate::scanner::process_with_options(
+        path,
+        0,
+        progress,
+        &[],
+        &strategy,
+        &TextDetectionOptions::default(),
+    )
+    .expect("about scan should succeed");
+
+    let mut files = result.files;
+    assembly::assemble(&mut files)
 }
 
 fn package(uid: &str, path: &str) -> Package {
@@ -592,6 +616,70 @@ fn compute_summary_without_license_evidence_has_no_clarity_score() {
     assert_eq!(summary.declared_holder.as_deref(), Some("Example Corp."));
     assert_eq!(summary.primary_language.as_deref(), Some("Ruby"));
     assert!(summary.license_clarity_score.is_none());
+}
+
+#[test]
+fn about_scan_promotes_packages_and_assigns_referenced_files() {
+    let result = about_scan_and_assemble(Path::new("testdata/about"));
+
+    assert_eq!(result.packages.len(), 2);
+    let apipkg = result
+        .packages
+        .iter()
+        .find(|pkg| pkg.name.as_deref() == Some("apipkg"))
+        .expect("apipkg package exists");
+    let appdirs = result
+        .packages
+        .iter()
+        .find(|pkg| pkg.name.as_deref() == Some("appdirs"))
+        .expect("appdirs package exists");
+
+    assert_eq!(apipkg.package_type, Some(PackageType::Pypi));
+    assert_eq!(appdirs.package_type, Some(PackageType::Pypi));
+    assert_eq!(apipkg.purl.as_deref(), Some("pkg:pypi/apipkg@1.4"));
+    assert_eq!(appdirs.purl.as_deref(), Some("pkg:pypi/appdirs@1.4.3"));
+}
+
+#[test]
+fn about_scan_tracks_missing_file_references() {
+    let result = about_scan_and_assemble(Path::new("testdata/about"));
+
+    let apipkg = result
+        .packages
+        .iter()
+        .find(|pkg| pkg.name.as_deref() == Some("apipkg"))
+        .expect("apipkg package exists");
+    let appdirs = result
+        .packages
+        .iter()
+        .find(|pkg| pkg.name.as_deref() == Some("appdirs"))
+        .expect("appdirs package exists");
+
+    let apipkg_missing = apipkg
+        .extra_data
+        .as_ref()
+        .and_then(|extra| extra.get("missing_file_references"))
+        .and_then(|value| value.as_array())
+        .expect("apipkg missing refs should exist");
+    let apipkg_missing_paths: Vec<_> = apipkg_missing
+        .iter()
+        .filter_map(|value| value.get("path").and_then(|path| path.as_str()))
+        .collect();
+    assert_eq!(apipkg_missing_paths, vec!["apipkg.LICENSE"]);
+
+    let missing = appdirs
+        .extra_data
+        .as_ref()
+        .and_then(|extra| extra.get("missing_file_references"))
+        .and_then(|value| value.as_array())
+        .expect("appdirs missing refs should exist");
+
+    let missing_paths: Vec<_> = missing
+        .iter()
+        .filter_map(|value| value.get("path").and_then(|path| path.as_str()))
+        .collect();
+    assert!(missing_paths.contains(&"appdirs-1.4.3-py2.py3-none-any.whl"));
+    assert!(missing_paths.contains(&"appdirs.LICENSE"));
 }
 
 #[test]
