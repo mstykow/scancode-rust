@@ -176,6 +176,16 @@ pub(super) fn is_undetected_license_matches(matches: &[LicenseMatch]) -> bool {
 ///
 /// Based on Python: has_unknown_intro_before_detection() at detection.py:1196
 pub(super) fn has_unknown_intro_before_detection(matches: &[LicenseMatch]) -> bool {
+    // Python: if len(license_matches) == 1: return False
+    if matches.len() == 1 {
+        return false;
+    }
+
+    // Python: if all([is_unknown_intro(match) for match in license_matches]): return False
+    if matches.iter().all(is_unknown_intro) {
+        return false;
+    }
+
     for m in matches {
         if m.matcher == "undetected" {
             continue;

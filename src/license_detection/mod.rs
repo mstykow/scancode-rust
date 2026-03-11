@@ -64,7 +64,7 @@ pub struct LicenseDetectionEngine {
     spdx_mapping: SpdxMapping,
 }
 
-const MAX_DETECTION_SIZE: usize = 1024 * 1024; // 1MB
+const MAX_DETECTION_SIZE: usize = 10 * 1024 * 1024; // 10MB
 
 impl LicenseDetectionEngine {
     /// Create a new license detection engine from a directory of license rules.
