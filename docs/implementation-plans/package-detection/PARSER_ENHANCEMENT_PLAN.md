@@ -106,7 +106,7 @@ cargo run --quiet --bin generate-supported-formats && git diff --exit-code docs/
 | 7     | Gradle                | Done    | #130, #132, #134, #137                                                                                     | `cargo test gradle`; `cargo test --features golden-tests gradle_golden`; `cargo test test_cyclonedx_json_includes_component_license_expression --lib`; `cargo test test_skip_template_placeholder_pom_coordinates --lib`                                                                                                                                                       |
 | 8     | Ruby                  | Done    | #151, #154, #156, #158, #160, #161                                                                         | `cargo test ruby`; `cargo test --features golden-tests ruby_golden`; `cargo test --features golden-tests test_assembly_ruby_extracted_basic`; `cargo test --bin scancode-rust`; `cargo test --test output_format_golden`                                                                                                                                                       |
 | 9     | Composer              | Done    | #187, #188, #190                                                                                           | `cargo test composer`; `cargo test --features golden-tests composer_golden`; `cargo test --features golden-tests test_assembly_composer_basic`; `cargo test --features golden-tests test_assembly_composer_nested`                                                                                                                                                             |
-| 10    | Conda                 | Planned | #195, #196                                                                                                 | `cargo test conda`; `cargo test --features golden-tests conda_golden`                                                                                                                                                                                                                                                                                                          |
+| 10    | Conda                 | Done    | #195, #196                                                                                                 | `cargo test conda`; `cargo test --features golden-tests conda_golden`; `cargo test test_assembly_conda_rootfs_assigns_meta_json_files --lib`                                                                                                                                                                                                                                   |
 | 11    | CocoaPods             | Planned | #191, #192                                                                                                 | `cargo test pod`; `cargo test --features golden-tests cocoapods_golden`                                                                                                                                                                                                                                                                                                        |
 | 12    | Alpine                | Planned | #172, #173, #174, #175                                                                                     | `cargo test alpine`; `cargo test --features golden-tests alpine_golden`; `cargo test --features golden-tests test_assembly_alpine_file_refs`                                                                                                                                                                                                                                   |
 | 13    | ABOUT                 | Planned | #201, #202, #203, #204                                                                                     | `cargo test about`                                                                                                                                                                                                                                                                                                                                                             |
@@ -373,6 +373,28 @@ Current status (March 10, 2026):
 - Parser golden coverage now includes a `composer.json` manifest fixture (`a-timer`) alongside the existing lockfile golden.
 - Assembly golden coverage now includes a nested Composer package fixture with alternate file names and nested file assignment.
 - PR #310 (`fix(composer): complete the Composer enhancement batch`) captures the completed implementation batch.
+
+### Conda PR Scope
+
+Issues:
+
+- #195 parse conda-meta files for installed package files
+- #196 resolve namespace and repo URL ambiguity
+
+Likely touchpoints:
+
+- Conda parser behavior for `conda-meta` package identity and channel-prefix handling
+- Conda-focused unit coverage for URL-like channel prefixes and symbolic channel namespace retention
+- Parser goldens for `conda-meta/*.json` installed-package metadata
+- Rootfs assembly coverage for `conda-meta/*.json` + recipe `meta.yaml` merged package/file assignment
+- Improvement documentation for installed file assignment and channel disambiguation
+
+Current status (March 11, 2026):
+
+- Local work now emits `conda-meta` `file_references` for installed files, extracted package directories, and package tarball paths.
+- Rootfs Conda assembly now merges `conda-meta/*.json` installed metadata with the matching recipe `meta.yaml` package and assigns the installed files back to that assembled package.
+- URL-like channel prefixes are no longer overloaded into namespace; they are preserved separately as `channel_url`, while symbolic channel names remain namespace-like and are also preserved as `channel` metadata.
+- Parser golden coverage now includes the existing local `tzdata` `conda-meta` fixture.
 
 ### Python PR Scope Rule
 
