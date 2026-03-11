@@ -367,6 +367,11 @@ pub static ASSEMBLERS: &[AssemblerConfig] = &[
         sibling_file_patterns: &["status"],
         mode: AssemblyMode::OnePerPackageData,
     },
+    AssemblerConfig {
+        datasource_ids: &[DatasourceId::AboutFile],
+        sibling_file_patterns: &["*.ABOUT"],
+        mode: AssemblyMode::OnePerPackageData,
+    },
 ];
 
 /// Datasource IDs that are intentionally NOT assembled.
@@ -381,7 +386,6 @@ pub static ASSEMBLERS: &[AssemblerConfig] = &[
 pub static UNASSEMBLED_DATASOURCE_IDS: &[DatasourceId] = &[
     // Non-package metadata
     DatasourceId::Readme,
-    DatasourceId::AboutFile,
     DatasourceId::EtcOsRelease,
     DatasourceId::Gitmodules,
     // Binary archives (require external extraction via ExtractCode before scanning)

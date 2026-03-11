@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::path::Path;
 use std::str::FromStr;
 
 use crate::models::{DatasourceId, FileInfo, Package, TopLevelDependency};
@@ -52,6 +53,56 @@ pub fn resolve_file_references(
     let path_index = build_path_index(&*files);
 
     for package in packages.iter_mut() {
+        if package.datasource_ids.contains(&DatasourceId::AboutFile)
+            && let Some(datafile_path) = package.datafile_paths.first()
+        {
+            let root = Path::new(datafile_path)
+                .parent()
+                .map(|p| p.to_string_lossy().to_string())
+                .unwrap_or_default();
+
+            let file_references = collect_file_references(
+                files,
+                &path_index,
+                datafile_path,
+                &package.datasource_ids,
+                &[DatasourceId::AboutFile],
+                package.purl.as_deref(),
+            );
+
+            let mut missing_refs = Vec::new();
+            for file_ref in &file_references {
+                let resolved_path = if root.is_empty() {
+                    file_ref.path.clone()
+                } else {
+                    format!("{}/{}", root, file_ref.path.trim_start_matches('/'))
+                };
+                if let Some(&file_idx) = path_index.get(&resolved_path) {
+                    let package_uid = package.package_uid.clone();
+                    if !files[file_idx].for_packages.contains(&package_uid) {
+                        files[file_idx].for_packages.push(package_uid);
+                    }
+                } else {
+                    missing_refs.push(file_ref.path.clone());
+                }
+            }
+
+            if !missing_refs.is_empty() {
+                missing_refs.sort();
+                let missing_refs_json: Vec<serde_json::Value> = missing_refs
+                    .into_iter()
+                    .map(|path| serde_json::json!({"path": path}))
+                    .collect();
+
+                let extra_data = package.extra_data.get_or_insert_with(HashMap::new);
+                extra_data.insert(
+                    "missing_file_references".to_string(),
+                    serde_json::Value::Array(missing_refs_json),
+                );
+            }
+            continue;
+        }
+
         if is_conda_meta_package(package)
             && let Some(conda_meta_path) = package
                 .datafile_paths
