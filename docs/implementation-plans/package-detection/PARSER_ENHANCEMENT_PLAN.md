@@ -554,14 +554,13 @@ Closed after audit as already covered or nonblocking:
 
 Remaining Python follow-up candidates:
 
-- #144 ancillary package file collection for assembled Python packages
 - #149 remaining wheel vs sdist metadata-quality deltas after the current parser batch
 
 Current status (March 12, 2026):
 
 - PR #319 (`fix(python): complete the Python enhancement batch`) covers the concrete parser and metadata gaps that still reproduced locally.
 - The closed issues above were re-audited against current local behavior and did not remain as distinct Rust parser defects after the batch verification.
-- The remaining open Python issues were narrowed to follow-up candidates after the parser batch; `#150` is now addressed in the dedicated follow-up PR, while `#144` and `#149` remain open for later targeted work.
+- The remaining open Python issues were narrowed to follow-up candidates after the parser batch; `#150` is already addressed, `#144` is addressed in the current follow-up slice, and `#149` remains open for later targeted work.
 
 ### Python Follow-up PR Scope (#150)
 
@@ -585,6 +584,29 @@ Current status (March 12, 2026):
 - Standalone Python `PKG-INFO` now collects sibling `installed-files.txt` file references.
 - Python file-reference resolution now assigns referenced files back to the assembled package for installed metadata under `site-packages/` and `dist-packages/`.
 - The follow-up deliberately stays file-reference-driven and does not broaden into generic whole-tree Python file harvesting.
+
+### Python Follow-up PR Scope (#144)
+
+Issue:
+
+- #144 ancillary package file collection for assembled Python packages
+
+Narrowed implementation target:
+
+- sibling `SOURCES.txt` next to source-layout `.egg-info/PKG-INFO`
+- file-reference-driven assignment of the listed source-package files during scans
+
+Likely touchpoints:
+
+- standalone `PKG-INFO` ancillary `SOURCES.txt` collection in the Python parser
+- Python source-layout file-reference resolution rooted above the `.egg-info` directory
+- scan-level regression coverage for source-package layouts that list package files in `SOURCES.txt`
+
+Current status (March 12, 2026):
+
+- Standalone source-package `.egg-info/PKG-INFO` now collects sibling `SOURCES.txt` entries as `file_references`.
+- Source-layout Python scans now assign `SOURCES.txt`-listed files such as `setup.py` and package modules back to the assembled Python package.
+- This follow-up deliberately stays `SOURCES.txt`-driven and does not broaden into generic whole-tree Python file harvesting.
 
 ### Debian PR Scope Rule
 

@@ -57,6 +57,18 @@ This stays intentionally narrow:
 - it supports installed Python metadata layouts,
 - and it does **not** broaden into generic whole-tree Python file harvesting.
 
+### 5b. Source-package `SOURCES.txt` ancillary file collection
+
+Rust now also reads sibling `SOURCES.txt` next to source-layout `.egg-info/PKG-INFO` files.
+
+That lets source-package metadata carry explicit ancillary file references such as:
+
+- `setup.py`
+- `.egg-info/*` sidecars
+- package source files listed in `SOURCES.txt`
+
+When those source-layout refs are present, Rust can assign the referenced files back to the assembled Python package during scans without falling back to broad root-tree harvesting.
+
 ### 6. Saved PyPI JSON support
 
 Rust now supports parsing saved `pypi.json` payloads and extracts core package metadata, project URLs, artifact download data, and private-package classifier state.
@@ -75,6 +87,7 @@ This support is intentionally scoped to the exact local filename `pypi.json`.
 - `#147` PKG-INFO / METADATA license-file signal preservation via `file_references`
 - `#148` private-package classifier support
 - `#209` PyPI JSON parse support
+- `#144` narrow source-package ancillary file collection via `SOURCES.txt`
 - `#150` installed Python metadata file-to-package assignment in scans
 
 ### Verified as already covered locally or audited as nonblocking
@@ -89,7 +102,6 @@ This support is intentionally scoped to the exact local filename `pypi.json`.
 
 ### Umbrella / partially overlapping issues
 
-- `#144`
 - `#149`
 
 These were treated as umbrella quality/collection issues rather than as evidence of one remaining single parser defect after the local audit.
@@ -105,6 +117,8 @@ Coverage includes:
 - PKG-INFO / METADATA license-file reference coverage
 - standalone metadata sibling `RECORD` / `installed-files.txt` coverage
 - scan-level installed Python file assignment coverage for `.dist-info` and `.egg-info`
+- sibling `SOURCES.txt` extraction from source-package `.egg-info/PKG-INFO`
+- scan-level source-layout assignment coverage for `SOURCES.txt`-listed files
 - a new pyproject parser golden
 - the existing metadata and setup.cfg parser goldens
 - the broader Python parser test suite
