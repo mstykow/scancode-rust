@@ -826,6 +826,192 @@ Test package description.
     }
 
     #[test]
+    fn test_extract_metadata_requires_dist_from_anonapi_wheel() {
+        let path = PathBuf::from(
+            "reference/scancode-toolkit/tests/packagedcode/data/pypi/unpacked_wheel/metadata-2.1/with_sources/anonapi-0.0.19.dist-info/METADATA",
+        );
+        let package_data = PythonParser::extract_first_package(&path);
+
+        assert_eq!(package_data.name, Some("anonapi".to_string()));
+        assert_eq!(package_data.dependencies.len(), 1);
+
+        let dep = &package_data.dependencies[0];
+        assert_eq!(dep.purl.as_deref(), Some("pkg:pypi/pyyaml"));
+        assert_eq!(dep.extracted_requirement, None);
+        assert_eq!(dep.scope.as_deref(), Some("install"));
+        assert_eq!(dep.is_optional, Some(false));
+        assert_eq!(dep.is_runtime, Some(true));
+    }
+
+    #[test]
+    fn test_extract_pkg_info_recovers_anonapi_sdist_requires_txt_dependency() {
+        let path = PathBuf::from(
+            "reference/scancode-toolkit/tests/packagedcode/data/pypi/unpacked_sdist/metadata-1.2/anonapi-0.0.19/PKG-INFO",
+        );
+        let package_data = PythonParser::extract_first_package(&path);
+
+        assert_eq!(package_data.name, Some("anonapi".to_string()));
+        assert_eq!(package_data.dependencies.len(), 1);
+        let dep = &package_data.dependencies[0];
+        assert_eq!(dep.purl.as_deref(), Some("pkg:pypi/pyyaml"));
+        assert_eq!(dep.scope.as_deref(), Some("install"));
+        assert_eq!(dep.is_optional, Some(false));
+    }
+
+    #[test]
+    fn test_extract_metadata_requires_dist_jinja2_extras() {
+        let path = PathBuf::from(
+            "reference/scancode-toolkit/tests/packagedcode/data/pypi/unpacked_wheel/metadata-2.0/Jinja2-2.10.dist-info/METADATA",
+        );
+        let package_data = PythonParser::extract_first_package(&path);
+
+        let install_dep = package_data
+            .dependencies
+            .iter()
+            .find(|dep| dep.purl.as_deref() == Some("pkg:pypi/markupsafe"))
+            .expect("MarkupSafe install dependency should be extracted");
+        assert_eq!(install_dep.extracted_requirement.as_deref(), Some(">=0.23"));
+        assert_eq!(install_dep.scope.as_deref(), Some("install"));
+        assert_eq!(install_dep.is_optional, Some(false));
+
+        let extra_dep = package_data
+            .dependencies
+            .iter()
+            .find(|dep| dep.purl.as_deref() == Some("pkg:pypi/babel"))
+            .expect("Babel extra dependency should be extracted");
+        assert_eq!(extra_dep.extracted_requirement.as_deref(), Some(">=0.8"));
+        assert_eq!(extra_dep.scope.as_deref(), Some("i18n"));
+        assert_eq!(extra_dep.is_optional, Some(true));
+    }
+
+    #[test]
+    fn test_extract_metadata_requires_dist_urllib3_markers() {
+        let path = PathBuf::from(
+            "reference/scancode-toolkit/tests/packagedcode/data/pypi/unpacked_wheel/metadata-2.0/urllib3-1.26.4.dist-info/METADATA",
+        );
+        let package_data = PythonParser::extract_first_package(&path);
+
+        let secure_dep = package_data
+            .dependencies
+            .iter()
+            .find(|dep| dep.purl.as_deref() == Some("pkg:pypi/pyopenssl"))
+            .expect("secure extra dependency should be extracted");
+        assert_eq!(secure_dep.extracted_requirement.as_deref(), Some(">=0.14"));
+        assert_eq!(secure_dep.scope.as_deref(), Some("secure"));
+        assert_eq!(secure_dep.is_optional, Some(true));
+
+        let marker_dep = package_data
+            .dependencies
+            .iter()
+            .find(|dep| dep.purl.as_deref() == Some("pkg:pypi/ipaddress"))
+            .expect("marker-bearing extra dependency should be extracted");
+        let marker_data = marker_dep
+            .extra_data
+            .as_ref()
+            .expect("marker extra_data should be preserved");
+        assert_eq!(
+            marker_data
+                .get("python_version")
+                .and_then(|value| value.as_str()),
+            Some("== 2.7")
+        );
+
+        let socks_dep = package_data
+            .dependencies
+            .iter()
+            .find(|dep| dep.purl.as_deref() == Some("pkg:pypi/pysocks"))
+            .expect("socks extra dependency should be extracted");
+        assert_eq!(
+            socks_dep.extracted_requirement.as_deref(),
+            Some("!=1.5.7,<2.0,>=1.5.6")
+        );
+        assert_eq!(socks_dep.scope.as_deref(), Some("socks"));
+        assert_eq!(socks_dep.is_optional, Some(true));
+    }
+
+    #[test]
+    fn test_extract_pkg_info_requires_dist_extras() {
+        let path = PathBuf::from(
+            "reference/scancode-toolkit/tests/packagedcode/data/pypi/metadata/v20/PKG-INFO",
+        );
+        let package_data = PythonParser::extract_first_package(&path);
+
+        let srv_dep = package_data
+            .dependencies
+            .iter()
+            .find(|dep| dep.purl.as_deref() == Some("pkg:pypi/dnspython"))
+            .expect("srv extra dependency should be extracted from PKG-INFO");
+        assert_eq!(
+            srv_dep.extracted_requirement.as_deref(),
+            Some("<2.0.0,>=1.8.0")
+        );
+        assert_eq!(srv_dep.scope.as_deref(), Some("srv"));
+        assert_eq!(srv_dep.is_optional, Some(true));
+    }
+
+    #[test]
+    fn test_extract_pkg_info_recovers_distinct_requires_txt_marker_variants() {
+        let temp_dir = TempDir::new().expect("Failed to create temp dir");
+        let egg_info = temp_dir.path().join("celery.egg-info");
+        fs::create_dir_all(&egg_info).expect("Failed to create egg-info dir");
+
+        fs::write(
+            egg_info.join("PKG-INFO"),
+            "Metadata-Version: 1.2\nName: celery\nVersion: 5.2.3\n",
+        )
+        .expect("Failed to write PKG-INFO");
+        fs::write(
+            egg_info.join("requires.txt"),
+            "[tblib:python_version < \"3.8.0\"]\ntblib>=1.3.0\n\n[tblib:python_version >= \"3.8.0\"]\ntblib>=1.5.0\n",
+        )
+        .expect("Failed to write requires.txt");
+
+        let package_data = PythonParser::extract_first_package(&egg_info.join("PKG-INFO"));
+        let tblib_deps: Vec<&Dependency> = package_data
+            .dependencies
+            .iter()
+            .filter(|dep| dep.purl.as_deref() == Some("pkg:pypi/tblib"))
+            .collect();
+
+        assert_eq!(tblib_deps.len(), 2);
+        assert!(tblib_deps.iter().any(|dep| {
+            dep.extracted_requirement.as_deref() == Some(">=1.3.0")
+                && dep.scope.as_deref() == Some("tblib")
+                && dep
+                    .extra_data
+                    .as_ref()
+                    .and_then(|extra| extra.get("python_version"))
+                    .and_then(|value| value.as_str())
+                    == Some("< 3.8.0")
+        }));
+        assert!(tblib_deps.iter().any(|dep| {
+            dep.extracted_requirement.as_deref() == Some(">=1.5.0")
+                && dep.scope.as_deref() == Some("tblib")
+                && dep
+                    .extra_data
+                    .as_ref()
+                    .and_then(|extra| extra.get("python_version"))
+                    .and_then(|value| value.as_str())
+                    == Some(">= 3.8.0")
+        }));
+    }
+
+    #[test]
+    fn test_extract_metadata_requires_dist_pinned_version() {
+        let (_temp_dir, file_path) = create_temp_file(
+            "Metadata-Version: 2.1\nName: demo\nVersion: 1.0.0\nRequires-Dist: helper==1.2.3\n",
+            "METADATA",
+        );
+        let package_data = PythonParser::extract_first_package(&file_path);
+
+        assert_eq!(package_data.dependencies.len(), 1);
+        let dep = &package_data.dependencies[0];
+        assert_eq!(dep.purl.as_deref(), Some("pkg:pypi/helper@1.2.3"));
+        assert_eq!(dep.extracted_requirement.as_deref(), Some("==1.2.3"));
+        assert_eq!(dep.is_pinned, Some(true));
+    }
+
+    #[test]
     fn test_is_match_wheel_extension() {
         let wheel_path = PathBuf::from("/some/path/package-1.0.0-py3-none-any.whl");
         let wheel_uppercase = PathBuf::from("/some/path/package-1.0.0-py3-none-any.WHL");
