@@ -191,7 +191,9 @@ pub fn refine_aho_matches(
     let non_gibberish =
         filter_invalid_matches_to_single_word_gibberish(index, &non_scattered, query);
 
-    let (non_contained, discarded_contained) = filter_contained_matches(&non_gibberish);
+    let merged_again = merge_overlapping_matches(&non_gibberish);
+
+    let (non_contained, discarded_contained) = filter_contained_matches(&merged_again);
 
     let (kept, discarded_overlapping) = filter_overlapping_matches(non_contained, index);
 
@@ -415,6 +417,27 @@ mod tests {
         let refined = refine_matches(&index, matches, &query);
 
         assert_eq!(refined.len(), 2);
+    }
+
+    #[test]
+    fn test_refine_aho_matches_restores_inner_merge_before_containment() {
+        let index = LicenseIndex::with_legalese_count(10);
+
+        let mut first = create_test_match("#1", 1, 10, 0.9, 50.0, 100);
+        first.rule_length = 20;
+        first.rule_start_token = 0;
+
+        let mut second = create_test_match("#1", 11, 20, 0.85, 50.0, 100);
+        second.rule_length = 20;
+        second.rule_start_token = 10;
+
+        let query = Query::new("test text", &index).unwrap();
+        let refined = refine_aho_matches(&index, vec![first, second], &query);
+
+        assert_eq!(refined.len(), 1);
+        assert_eq!(refined[0].rule_identifier, "#1");
+        assert_eq!(refined[0].start_line, 1);
+        assert_eq!(refined[0].end_line, 20);
     }
 
     #[test]

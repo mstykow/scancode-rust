@@ -24,6 +24,34 @@ fn create_engine_from_reference() -> Option<LicenseDetectionEngine> {
     })
 }
 
+fn count_license_expression_matches(
+    engine: &LicenseDetectionEngine,
+    fixture_path: &str,
+    expected_expression: &str,
+) -> usize {
+    let text = std::fs::read_to_string(fixture_path)
+        .unwrap_or_else(|e| panic!("Failed to read fixture {fixture_path}: {e}"));
+
+    engine
+        .detect_matches(&text, false)
+        .expect("Detection should succeed")
+        .into_iter()
+        .filter(|m| m.license_expression == expected_expression)
+        .count()
+}
+
+fn detect_fixture_matches(
+    engine: &LicenseDetectionEngine,
+    fixture_path: &str,
+) -> Vec<LicenseMatch> {
+    let text = std::fs::read_to_string(fixture_path)
+        .unwrap_or_else(|e| panic!("Failed to read fixture {fixture_path}: {e}"));
+
+    engine
+        .detect_matches(&text, false)
+        .expect("Detection should succeed")
+}
+
 #[test]
 fn test_engine_new_with_reference_rules() {
     let Some(engine) = create_engine_from_reference() else {
@@ -538,6 +566,175 @@ fn test_spdx_in_comment() {
     assert!(
         !detections.is_empty(),
         "Should detect SPDX identifier in comment"
+    );
+}
+
+#[test]
+fn test_spdx_lines_do_not_get_rediscovered_as_seq_false_positives() {
+    let Some(engine) = create_engine_from_reference() else {
+        eprintln!("Skipping test: reference directory not found");
+        return;
+    };
+
+    let text = std::fs::read_to_string("testdata/license-golden/datadriven/external/spdx/uboot.c")
+        .expect("Failed to read uboot.c SPDX fixture");
+
+    let matches = engine
+        .detect_matches(&text, false)
+        .expect("Detection should succeed");
+    let match_exprs: Vec<&str> = matches
+        .iter()
+        .map(|m| m.license_expression.as_str())
+        .collect();
+
+    assert!(
+        !match_exprs.contains(&"bsd-plus-patent"),
+        "SPDX lines should not be rediscovered as bsd-plus-patent: {:?}",
+        match_exprs
+    );
+    assert!(
+        !match_exprs.contains(&"gpl-2.0 OR bsd-simplified"),
+        "SPDX lines should not be rediscovered as gpl-2.0 OR bsd-simplified: {:?}",
+        match_exprs
+    );
+
+    let detections = engine
+        .detect(&text, false)
+        .expect("Detection should succeed");
+    let detection_exprs: Vec<&str> = detections
+        .iter()
+        .filter_map(|d| d.license_expression.as_deref())
+        .collect();
+
+    assert!(
+        !detection_exprs.contains(&"bsd-plus-patent"),
+        "Grouped detections should not contain bsd-plus-patent: {:?}",
+        detection_exprs
+    );
+    assert!(
+        !detection_exprs.contains(&"gpl-2.0 OR bsd-simplified"),
+        "Grouped detections should not contain gpl-2.0 OR bsd-simplified: {:?}",
+        detection_exprs
+    );
+}
+
+#[test]
+fn test_spdx_complex2_html_matches_expected_expression() {
+    let Some(engine) = create_engine_from_reference() else {
+        eprintln!("Skipping test: reference directory not found");
+        return;
+    };
+
+    let text =
+        std::fs::read_to_string("testdata/license-golden/datadriven/external/spdx/complex2.html")
+            .expect("Failed to read complex2.html SPDX fixture");
+
+    let composite_matches: Vec<_> = engine
+        .detect_matches(&text, false)
+        .expect("Detection should succeed")
+        .into_iter()
+        .filter(|m| {
+            m.license_expression
+                == "epl-2.0 OR apache-2.0 OR gpl-2.0 WITH classpath-exception-2.0 OR gpl-2.0 WITH openjdk-exception"
+        })
+        .collect();
+
+    assert_eq!(composite_matches.len(), 1);
+    assert_eq!(
+        composite_matches[0].matcher,
+        crate::license_detection::aho_match::MATCH_AHO,
+    );
+    assert_eq!(composite_matches[0].match_coverage, 100.0);
+}
+
+#[test]
+fn test_spdx_complex_short_html_still_has_multiple_composite_matches() {
+    let Some(engine) = create_engine_from_reference() else {
+        eprintln!("Skipping test: reference directory not found");
+        return;
+    };
+
+    let count = count_license_expression_matches(
+        &engine,
+        "testdata/license-golden/datadriven/external/spdx/complex-short.html",
+        "epl-2.0 OR apache-2.0 OR gpl-2.0 WITH classpath-exception-2.0 OR gpl-2.0 WITH openjdk-exception",
+    );
+
+    assert!(
+        count >= 3,
+        "expected at least 3 composite matches, got {count}"
+    );
+}
+
+#[test]
+fn test_spdx_complex_readme_detect_matches_recovers_bounded_notice_preamble_seq_match() {
+    let Some(engine) = create_engine_from_reference() else {
+        eprintln!("Skipping test: reference directory not found");
+        return;
+    };
+
+    let seq_matches: Vec<_> = detect_fixture_matches(
+        &engine,
+        "testdata/license-golden/datadriven/external/spdx/complex-readme.txt",
+    )
+    .into_iter()
+    .filter(|m| m.matcher == crate::license_detection::seq_match::MATCH_SEQ)
+    .collect();
+
+    assert!(
+        seq_matches.iter().any(|m| {
+            m.license_expression.contains("epl-2.0 OR apache-2.0")
+                && m.start_line <= 14
+                && m.end_line < 28
+        }),
+        "expected a bounded seq notice match before section A, got: {:?}",
+        seq_matches
+            .iter()
+            .map(|m| (&m.license_expression, m.start_line, m.end_line, &m.matcher))
+            .collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn test_spdx_complex_readme_detect_matches_keeps_nearby_embedded_matches() {
+    let Some(engine) = create_engine_from_reference() else {
+        eprintln!("Skipping test: reference directory not found");
+        return;
+    };
+
+    let matches = detect_fixture_matches(
+        &engine,
+        "testdata/license-golden/datadriven/external/spdx/complex-readme.txt",
+    );
+    let expressions: Vec<&str> = matches
+        .iter()
+        .map(|m| m.license_expression.as_str())
+        .collect();
+
+    assert!(
+        expressions.contains(&"epl-2.0 OR apache-2.0 OR gpl-2.0 WITH classpath-exception-2.0 OR gpl-2.0 WITH openjdk-exception"),
+        "expected the SPDX composite match to remain present: {:?}",
+        expressions
+    );
+    assert!(
+        expressions.contains(&"unicode"),
+        "expected nearby unicode matches to remain present: {:?}",
+        expressions
+    );
+    assert!(
+        expressions.contains(&"public-domain"),
+        "expected nearby MurmurHash3 public-domain match to remain present: {:?}",
+        expressions
+    );
+    assert!(
+        expressions.contains(&"mit"),
+        "expected nearby libffi MIT match to remain present: {:?}",
+        expressions
+    );
+    assert!(
+        expressions.contains(&"zlib"),
+        "expected nearby zlib/CuTest matches to remain present: {:?}",
+        expressions
     );
 }
 

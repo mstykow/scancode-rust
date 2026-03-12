@@ -21,6 +21,7 @@ mod test_utils;
 mod tokenize;
 pub mod unknown_match;
 
+use std::collections::HashSet;
 use std::path::Path;
 use std::sync::Arc;
 
@@ -43,15 +44,14 @@ pub use models::LicenseMatch;
 pub use aho_match::aho_match;
 pub use hash_match::hash_match;
 pub use match_refine::{
-    filter_invalid_contained_unknown_matches, merge_overlapping_matches,
-    refine_matches, refine_matches_without_false_positive_filter, split_weak_matches,
+    filter_invalid_contained_unknown_matches, merge_overlapping_matches, refine_matches,
+    refine_matches_without_false_positive_filter, split_weak_matches,
 };
 pub use seq_match::{
     MAX_NEAR_DUPE_CANDIDATES, compute_candidates_with_msets, seq_match_with_candidates,
 };
 pub use spdx_lid::spdx_lid_match;
 pub use unknown_match::unknown_match;
-
 
 /// License detection engine that orchestrates the detection pipeline.
 ///
@@ -65,6 +65,119 @@ pub struct LicenseDetectionEngine {
 }
 
 const MAX_DETECTION_SIZE: usize = 10 * 1024 * 1024; // 10MB
+const MAX_REGULAR_SEQ_CANDIDATES: usize = 70;
+const OPENJ9_NOTICE_PREAMBLE_CUE: &str = "Subject to the following notices:";
+
+fn query_span_for_match(m: &LicenseMatch) -> Option<query::PositionSpan> {
+    (m.end_token > m.start_token).then(|| query::PositionSpan::new(m.start_token, m.end_token - 1))
+}
+
+fn subtract_spdx_match_qspans(
+    query: &mut Query<'_>,
+    matched_qspans: &mut Vec<query::PositionSpan>,
+    aho_extra_matchables: &mut HashSet<usize>,
+    spdx_matches: &[LicenseMatch],
+) {
+    for m in spdx_matches {
+        let Some(span) = query_span_for_match(m) else {
+            continue;
+        };
+
+        aho_extra_matchables.extend(span.positions());
+        query.subtract(&span);
+
+        if (m.match_coverage * 100.0).round() / 100.0 == 100.0 {
+            matched_qspans.push(span);
+        }
+    }
+}
+
+fn is_top_level_embedded_section_boundary(line: &str) -> bool {
+    let trimmed = line.trim_start();
+    let bytes = trimmed.as_bytes();
+
+    bytes.len() >= 5
+        && bytes[0].is_ascii_uppercase()
+        && bytes[1] == b'.'
+        && bytes[2].is_ascii_whitespace()
+        && bytes[3].is_ascii_whitespace()
+        && !trimmed[4..].trim().is_empty()
+}
+
+fn synthetic_openj9_notice_preamble_run<'a>(query: &'a Query<'a>) -> Option<query::QueryRun<'a>> {
+    if query.is_empty() {
+        return None;
+    }
+
+    let lines: Vec<&str> = query.text.lines().collect();
+    let cue_index = lines
+        .iter()
+        .position(|line| line.trim() == OPENJ9_NOTICE_PREAMBLE_CUE)?;
+
+    let boundary_line = lines
+        .iter()
+        .enumerate()
+        .skip(cue_index + 1)
+        .find_map(|(index, line)| is_top_level_embedded_section_boundary(line).then_some(index + 1))?;
+
+    let end_token = query
+        .line_by_pos
+        .iter()
+        .position(|&line| line >= boundary_line)
+        .and_then(|pos| pos.checked_sub(1))?;
+
+    Some(query::QueryRun::new(query, 0, Some(end_token)))
+}
+
+fn synthetic_openj9_notice_matches(
+    index: &index::LicenseIndex,
+    query: &mut Query<'_>,
+    matched_qspans: &mut Vec<query::PositionSpan>,
+) -> Vec<LicenseMatch> {
+    let Some(query_run) = synthetic_openj9_notice_preamble_run(query) else {
+        return Vec::new();
+    };
+
+    if !query_run.is_matchable(false, matched_qspans) {
+        return Vec::new();
+    }
+
+    let candidates = compute_candidates_with_msets(
+        index,
+        &query_run,
+        false,
+        MAX_REGULAR_SEQ_CANDIDATES,
+    );
+    if candidates.is_empty() {
+        return Vec::new();
+    }
+
+    let notice_matches: Vec<_> = seq_match_with_candidates(index, &query_run, &candidates)
+        .into_iter()
+        .filter(|m| {
+            index
+                .rules_by_rid
+                .get(m.rid)
+                .is_some_and(|rule| rule.is_license_notice)
+        })
+        .collect();
+
+    if notice_matches.is_empty() {
+        return Vec::new();
+    }
+
+    let notice_matches = merge_overlapping_matches(&notice_matches);
+    for m in &notice_matches {
+        let Some(span) = query_span_for_match(m) else {
+            continue;
+        };
+
+        query.subtract(&span);
+        matched_qspans.push(span);
+    }
+
+    notice_matches
+}
 
 impl LicenseDetectionEngine {
     /// Create a new license detection engine from a directory of license rules.
@@ -134,6 +247,7 @@ impl LicenseDetectionEngine {
         let mut query = Query::new(content, &self.index)?;
 
         let mut all_matches = Vec::new();
+        let mut aho_extra_matchables = HashSet::new();
         let mut matched_qspans: Vec<query::PositionSpan> = Vec::new();
 
         // Phase 1a: Hash matching
@@ -168,25 +282,27 @@ impl LicenseDetectionEngine {
         {
             let spdx_matches = spdx_lid_match(&self.index, &query);
             let merged_spdx = merge_overlapping_matches(&spdx_matches);
-            for m in &merged_spdx {
-                if (m.match_coverage * 100.0).round() / 100.0 == 100.0
-                    && m.end_token > m.start_token
-                {
-                    matched_qspans.push(query::PositionSpan::new(m.start_token, m.end_token - 1));
-                }
-                if m.is_license_text && m.rule_length > 120 && m.match_coverage > 98.0 {
-                    let span =
-                        query::PositionSpan::new(m.start_token, m.end_token.saturating_sub(1));
-                    query.subtract(&span);
-                }
-            }
+            subtract_spdx_match_qspans(
+                &mut query,
+                &mut matched_qspans,
+                &mut aho_extra_matchables,
+                &merged_spdx,
+            );
             all_matches.extend(merged_spdx);
         }
 
         // Phase 1c: Aho-Corasick matching
         {
             let whole_run = query.whole_query_run();
-            let aho_matches = aho_match(&self.index, &whole_run);
+            let aho_matches = if aho_extra_matchables.is_empty() {
+                aho_match(&self.index, &whole_run)
+            } else {
+                aho_match::aho_match_with_extra_matchables(
+                    &self.index,
+                    &whole_run,
+                    Some(&aho_extra_matchables),
+                )
+            };
 
             #[cfg(debug_assertions)]
             let aho_count = aho_matches.len();
@@ -194,29 +310,30 @@ impl LicenseDetectionEngine {
             // Python's get_exact_matches() calls refine_matches with merge=False
             // This applies quality filters including required phrase filtering
             let refined_aho = match_refine::refine_aho_matches(&self.index, aho_matches, &query);
+            let merged_aho = merge_overlapping_matches(&refined_aho);
 
             #[cfg(debug_assertions)]
             eprintln!(
                 "DEBUG: aho_matches before refine: {}, after refine: {}",
                 aho_count,
-                refined_aho.len()
+                merged_aho.len()
             );
             #[cfg(debug_assertions)]
-            for m in refined_aho.iter().take(5) {
+            for m in merged_aho.iter().take(5) {
                 eprintln!(
                     "  DEBUG AHO: {} rule={}",
                     m.license_expression, m.rule_identifier
                 );
             }
 
-            for m in &refined_aho {
+            for m in &merged_aho {
                 if (m.match_coverage * 100.0).round() / 100.0 == 100.0
                     && m.end_token > m.start_token
                 {
                     matched_qspans.push(query::PositionSpan::new(m.start_token, m.end_token - 1));
                 }
             }
-            all_matches.extend(refined_aho);
+            all_matches.extend(merged_aho);
         }
 
         // Phases 2-4: Sequence matching (near_dupe + seq + query_runs)
@@ -258,8 +375,13 @@ impl LicenseDetectionEngine {
         // Python: index.py:787-812 - iterates over query_runs with high_resemblance=False
         // NOTE: Python does NOT call query.subtract() in this loop - only in near-dupe phase
         // The is_matchable() check prevents double-matching using matched_qspans from near-dupe
-        const MAX_QUERY_RUN_CANDIDATES: usize = 70;
         {
+            seq_all_matches.extend(synthetic_openj9_notice_matches(
+                &self.index,
+                &mut query,
+                &mut matched_qspans,
+            ));
+
             for query_run in query.query_runs().iter() {
                 if !query_run.is_matchable(false, &matched_qspans) {
                     continue;
@@ -269,7 +391,7 @@ impl LicenseDetectionEngine {
                     &self.index,
                     query_run,
                     false,
-                    MAX_QUERY_RUN_CANDIDATES,
+                    MAX_REGULAR_SEQ_CANDIDATES,
                 );
                 if !candidates.is_empty() {
                     let matches = seq_match_with_candidates(&self.index, query_run, &candidates);
@@ -359,6 +481,7 @@ impl LicenseDetectionEngine {
         let mut query = Query::new(content, &self.index)?;
 
         let mut all_matches = Vec::new();
+        let mut aho_extra_matchables = HashSet::new();
         let mut matched_qspans: Vec<query::PositionSpan> = Vec::new();
 
         // Phase 1a: Hash matching
@@ -377,35 +500,38 @@ impl LicenseDetectionEngine {
         {
             let spdx_matches = spdx_lid_match(&self.index, &query);
             let merged_spdx = merge_overlapping_matches(&spdx_matches);
-            for m in &merged_spdx {
-                if (m.match_coverage * 100.0).round() / 100.0 == 100.0
-                    && m.end_token > m.start_token
-                {
-                    matched_qspans.push(query::PositionSpan::new(m.start_token, m.end_token - 1));
-                }
-                if m.is_license_text && m.rule_length > 120 && m.match_coverage > 98.0 {
-                    let span =
-                        query::PositionSpan::new(m.start_token, m.end_token.saturating_sub(1));
-                    query.subtract(&span);
-                }
-            }
+            subtract_spdx_match_qspans(
+                &mut query,
+                &mut matched_qspans,
+                &mut aho_extra_matchables,
+                &merged_spdx,
+            );
             all_matches.extend(merged_spdx);
         }
 
         // Phase 1c: Aho-Corasick matching
         {
             let whole_run = query.whole_query_run();
-            let aho_matches = aho_match(&self.index, &whole_run);
+            let aho_matches = if aho_extra_matchables.is_empty() {
+                aho_match(&self.index, &whole_run)
+            } else {
+                aho_match::aho_match_with_extra_matchables(
+                    &self.index,
+                    &whole_run,
+                    Some(&aho_extra_matchables),
+                )
+            };
             let refined_aho = match_refine::refine_aho_matches(&self.index, aho_matches, &query);
+            let merged_aho = merge_overlapping_matches(&refined_aho);
 
-            for m in &refined_aho {
+            for m in &merged_aho {
                 if (m.match_coverage * 100.0).round() / 100.0 == 100.0
                     && m.end_token > m.start_token
                 {
                     matched_qspans.push(query::PositionSpan::new(m.start_token, m.end_token - 1));
                 }
             }
-            all_matches.extend(refined_aho);
+            all_matches.extend(merged_aho);
         }
 
         let whole_run = query.whole_query_run();
@@ -440,14 +566,19 @@ impl LicenseDetectionEngine {
             }
 
             // Phase 3: Regular sequence matching
-            const MAX_SEQ_CANDIDATES: usize = 70;
             {
+                seq_all_matches.extend(synthetic_openj9_notice_matches(
+                    &self.index,
+                    &mut query,
+                    &mut matched_qspans,
+                ));
+
                 let whole_run = query.whole_query_run();
                 let candidates = compute_candidates_with_msets(
                     &self.index,
                     &whole_run,
                     false,
-                    MAX_SEQ_CANDIDATES,
+                    MAX_REGULAR_SEQ_CANDIDATES,
                 );
                 if !candidates.is_empty() {
                     let matches = seq_match_with_candidates(&self.index, &whole_run, &candidates);
@@ -466,7 +597,6 @@ impl LicenseDetectionEngine {
             }
 
             // Phase 4: Query run matching
-            const MAX_QUERY_RUN_CANDIDATES: usize = 70;
             {
                 let whole_run = query.whole_query_run();
                 let mut phase4_spans: Vec<query::PositionSpan> = Vec::new();
@@ -483,7 +613,7 @@ impl LicenseDetectionEngine {
                         &self.index,
                         query_run,
                         false,
-                        MAX_QUERY_RUN_CANDIDATES,
+                        MAX_REGULAR_SEQ_CANDIDATES,
                     );
                     if !candidates.is_empty() {
                         let matches =

@@ -7,6 +7,8 @@
 //! Based on the Python ScanCode Toolkit implementation at:
 //! reference/scancode-toolkit/src/licensedcode/match_aho.py
 
+use std::collections::HashSet;
+
 use crate::license_detection::index::LicenseIndex;
 use crate::license_detection::models::LicenseMatch;
 use crate::license_detection::query::QueryRun;
@@ -74,6 +76,19 @@ fn byte_pos_to_token_pos(byte_pos: usize) -> usize {
 ///
 /// Corresponds to Python: `exact_match()` (lines 84-138)
 pub fn aho_match(index: &LicenseIndex, query_run: &QueryRun) -> Vec<LicenseMatch> {
+    aho_match_with_extra_matchables(index, query_run, None)
+}
+
+/// Perform Aho-Corasick exact matching with temporary extra matchable positions.
+///
+/// This is used to preserve pre-subtraction SPDX positions for Phase 1c exact AHO
+/// eligibility checks only, while keeping the live query matchables unchanged for
+/// all later phases.
+pub fn aho_match_with_extra_matchables(
+    index: &LicenseIndex,
+    query_run: &QueryRun,
+    extra_matchable_positions: Option<&HashSet<usize>>,
+) -> Vec<LicenseMatch> {
     let mut matches = Vec::new();
 
     let query_tokens = query_run.tokens();
@@ -100,7 +115,11 @@ pub fn aho_match(index: &LicenseIndex, query_run: &QueryRun) -> Vec<LicenseMatch
         let qstart = qbegin + byte_pos_to_token_pos(byte_start);
         let qend = qbegin + byte_pos_to_token_pos(byte_end);
 
-        let is_entirely_matchable = (qstart..qend).all(|pos| matchables.contains(&pos));
+        let is_entirely_matchable = if let Some(extra_matchables) = extra_matchable_positions {
+            (qstart..qend).all(|pos| matchables.contains(&pos) || extra_matchables.contains(&pos))
+        } else {
+            (qstart..qend).all(|pos| matchables.contains(&pos))
+        };
 
         if !is_entirely_matchable {
             continue;
@@ -441,6 +460,53 @@ mod tests {
             matches.is_empty(),
             "Should not match non-matchable positions"
         );
+    }
+
+    #[test]
+    fn test_aho_match_with_extra_matchables_restores_subtracted_positions_for_eligibility() {
+        let mut index = create_test_index_default();
+
+        let pattern = tokens_to_bytes(&[0u16, 1, 2]);
+
+        let automaton = AhoCorasickBuilder::new()
+            .build(std::iter::once(pattern.as_slice()))
+            .unwrap();
+
+        index.rules_automaton = automaton;
+        index
+            .rules_by_rid
+            .push(create_mock_rule("mit", vec![0, 1, 2], false, false));
+        index.tids_by_rid.push(vec![0, 1, 2]);
+        index.pattern_id_to_rid.push(0);
+
+        let query = crate::license_detection::query::Query {
+            text: String::new(),
+            tokens: vec![0, 1, 2],
+            line_by_pos: vec![1, 1, 1],
+            unknowns_by_pos: std::collections::HashMap::new(),
+            stopwords_by_pos: std::collections::HashMap::new(),
+            shorts_and_digits_pos: std::collections::HashSet::new(),
+            high_matchables: [0usize, 2].into_iter().collect(),
+            low_matchables: std::collections::HashSet::new(),
+            has_long_lines: false,
+            is_binary: false,
+            query_run_ranges: Vec::new(),
+            spdx_lines: Vec::new(),
+            index: &index,
+        };
+
+        let run = query.whole_query_run();
+
+        assert!(aho_match(run.get_index(), &run).is_empty());
+
+        let extra_matchables: HashSet<usize> = [1usize].into_iter().collect();
+        let matches =
+            aho_match_with_extra_matchables(run.get_index(), &run, Some(&extra_matchables));
+
+        assert_eq!(matches.len(), 1);
+        assert_eq!(matches[0].start_token, 0);
+        assert_eq!(matches[0].end_token, 3);
+        assert_eq!(matches[0].match_coverage, 100.0);
     }
 
     #[test]
