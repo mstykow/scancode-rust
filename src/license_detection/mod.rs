@@ -67,9 +67,83 @@ pub struct LicenseDetectionEngine {
 const MAX_DETECTION_SIZE: usize = 10 * 1024 * 1024; // 10MB
 const MAX_REGULAR_SEQ_CANDIDATES: usize = 70;
 const OPENJ9_NOTICE_PREAMBLE_CUE: &str = "Subject to the following notices:";
+const MAX_REDUNDANT_SEQ_CONTAINER_BOUNDARY_GAP: usize = 8;
+const MAX_REDUNDANT_SEQ_CONTAINER_UNMATCHED_GAP: usize = 2;
 
 fn query_span_for_match(m: &LicenseMatch) -> Option<query::PositionSpan> {
     (m.end_token > m.start_token).then(|| query::PositionSpan::new(m.start_token, m.end_token - 1))
+}
+
+fn has_full_match_coverage(m: &LicenseMatch) -> bool {
+    ((m.match_coverage * 100.0).round() / 100.0) == 100.0
+}
+
+fn is_redundant_same_expression_seq_container(
+    container: &LicenseMatch,
+    candidate_contained_matches: &[LicenseMatch],
+) -> bool {
+    if container.matcher != seq_match::MATCH_SEQ || !has_full_match_coverage(container) {
+        return false;
+    }
+
+    let mut contained: Vec<&LicenseMatch> = candidate_contained_matches
+        .iter()
+        .filter(|m| {
+            m.matcher == aho_match::MATCH_AHO
+                && has_full_match_coverage(m)
+                && m.license_expression == container.license_expression
+                && container.qcontains(m)
+        })
+        .collect();
+
+    if contained.len() < 2 {
+        return false;
+    }
+
+    contained.sort_by_key(|m| m.qspan_bounds());
+
+    let (container_start, container_end) = container.qspan_bounds();
+    let (first_start, _) = contained[0].qspan_bounds();
+    let (_, last_end) = contained[contained.len() - 1].qspan_bounds();
+    if container_start != first_start || container_end != last_end {
+        return false;
+    }
+
+    let container_qspan: HashSet<usize> = container.qspan().into_iter().collect();
+    let mut total_gap = 0;
+    let mut bridged_gap_tokens = 0;
+    for pair in contained.windows(2) {
+        let (_, previous_end) = pair[0].qspan_bounds();
+        let (next_start, _) = pair[1].qspan_bounds();
+
+        if next_start < previous_end {
+            return false;
+        }
+
+        total_gap += next_start - previous_end;
+        bridged_gap_tokens += (previous_end..next_start)
+            .filter(|position| container_qspan.contains(position))
+            .count();
+    }
+
+    if total_gap == 0
+        || total_gap > MAX_REDUNDANT_SEQ_CONTAINER_BOUNDARY_GAP
+        || bridged_gap_tokens == 0
+    {
+        return false;
+    }
+
+    total_gap.saturating_sub(bridged_gap_tokens) <= MAX_REDUNDANT_SEQ_CONTAINER_UNMATCHED_GAP
+}
+
+fn filter_redundant_same_expression_seq_containers(
+    seq_matches: Vec<LicenseMatch>,
+    candidate_contained_matches: &[LicenseMatch],
+) -> Vec<LicenseMatch> {
+    seq_matches
+        .into_iter()
+        .filter(|m| !is_redundant_same_expression_seq_container(m, candidate_contained_matches))
+        .collect()
 }
 
 fn subtract_spdx_match_qspans(
@@ -114,11 +188,14 @@ fn synthetic_openj9_notice_preamble_run<'a>(query: &'a Query<'a>) -> Option<quer
         .iter()
         .position(|line| line.trim() == OPENJ9_NOTICE_PREAMBLE_CUE)?;
 
-    let boundary_line = lines
-        .iter()
-        .enumerate()
-        .skip(cue_index + 1)
-        .find_map(|(index, line)| is_top_level_embedded_section_boundary(line).then_some(index + 1))?;
+    let boundary_line =
+        lines
+            .iter()
+            .enumerate()
+            .skip(cue_index + 1)
+            .find_map(|(index, line)| {
+                is_top_level_embedded_section_boundary(line).then_some(index + 1)
+            })?;
 
     let end_token = query
         .line_by_pos
@@ -142,12 +219,8 @@ fn synthetic_openj9_notice_matches(
         return Vec::new();
     }
 
-    let candidates = compute_candidates_with_msets(
-        index,
-        &query_run,
-        false,
-        MAX_REGULAR_SEQ_CANDIDATES,
-    );
+    let candidates =
+        compute_candidates_with_msets(index, &query_run, false, MAX_REGULAR_SEQ_CANDIDATES);
     if candidates.is_empty() {
         return Vec::new();
     }
@@ -402,6 +475,7 @@ impl LicenseDetectionEngine {
 
         // Merge all sequence matches ONCE (like Python's approx matcher)
         let merged_seq = merge_overlapping_matches(&seq_all_matches);
+        let merged_seq = filter_redundant_same_expression_seq_containers(merged_seq, &all_matches);
         all_matches.extend(merged_seq);
 
         // Step 1: Initial refine WITHOUT false positive filtering
@@ -638,6 +712,8 @@ impl LicenseDetectionEngine {
             }
 
             let merged_seq = merge_overlapping_matches(&seq_all_matches);
+            let merged_seq =
+                filter_redundant_same_expression_seq_containers(merged_seq, &all_matches);
             all_matches.extend(merged_seq);
         }
 

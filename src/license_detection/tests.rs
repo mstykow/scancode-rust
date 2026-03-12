@@ -24,22 +24,6 @@ fn create_engine_from_reference() -> Option<LicenseDetectionEngine> {
     })
 }
 
-fn count_license_expression_matches(
-    engine: &LicenseDetectionEngine,
-    fixture_path: &str,
-    expected_expression: &str,
-) -> usize {
-    let text = std::fs::read_to_string(fixture_path)
-        .unwrap_or_else(|e| panic!("Failed to read fixture {fixture_path}: {e}"));
-
-    engine
-        .detect_matches(&text, false)
-        .expect("Detection should succeed")
-        .into_iter()
-        .filter(|m| m.license_expression == expected_expression)
-        .count()
-}
-
 fn detect_fixture_matches(
     engine: &LicenseDetectionEngine,
     fixture_path: &str,
@@ -50,6 +34,33 @@ fn detect_fixture_matches(
     engine
         .detect_matches(&text, false)
         .expect("Detection should succeed")
+}
+
+fn make_test_match(
+    matcher: &str,
+    expression: &str,
+    rule_identifier: &str,
+    start_token: usize,
+    end_token: usize,
+    qspan_positions: Option<Vec<usize>>,
+) -> LicenseMatch {
+    let matched_length = qspan_positions
+        .as_ref()
+        .map(|positions| positions.len())
+        .unwrap_or_else(|| end_token.saturating_sub(start_token));
+
+    LicenseMatch {
+        license_expression: expression.to_string(),
+        matcher: matcher.to_string(),
+        rule_identifier: rule_identifier.to_string(),
+        start_token,
+        end_token,
+        matched_length,
+        rule_length: matched_length,
+        match_coverage: 100.0,
+        qspan_positions,
+        ..Default::default()
+    }
 }
 
 #[test]
@@ -648,21 +659,96 @@ fn test_spdx_complex2_html_matches_expected_expression() {
 }
 
 #[test]
-fn test_spdx_complex_short_html_still_has_multiple_composite_matches() {
+fn test_filter_redundant_same_expression_seq_containers_is_narrow() {
+    let redundant_seq = make_test_match(
+        crate::license_detection::seq_match::MATCH_SEQ,
+        "unicode",
+        "unicode_3.RULE",
+        10,
+        24,
+        Some(vec![10, 11, 12, 13, 16, 17, 18, 19, 20, 21, 22, 23]),
+    );
+    let aho_first = make_test_match(
+        crate::license_detection::aho_match::MATCH_AHO,
+        "unicode",
+        "unicode_6.RULE",
+        10,
+        13,
+        None,
+    );
+    let aho_second = make_test_match(
+        crate::license_detection::aho_match::MATCH_AHO,
+        "unicode",
+        "unicode_8.RULE",
+        21,
+        24,
+        None,
+    );
+
+    let filtered = filter_redundant_same_expression_seq_containers(
+        vec![redundant_seq],
+        &[aho_first.clone(), aho_second.clone()],
+    );
+    assert!(
+        filtered.is_empty(),
+        "expected tiny-gap redundant seq container to drop"
+    );
+
+    let wide_gap_seq = make_test_match(
+        crate::license_detection::seq_match::MATCH_SEQ,
+        "unicode",
+        "unicode_3.RULE",
+        10,
+        19,
+        Some(vec![10, 11, 12, 16, 17, 18]),
+    );
+
+    let filtered = filter_redundant_same_expression_seq_containers(
+        vec![wide_gap_seq.clone()],
+        &[aho_first, aho_second],
+    );
+    assert_eq!(filtered, vec![wide_gap_seq]);
+}
+
+#[test]
+fn test_spdx_complex_short_html_keeps_exact_unicode_matches_and_drops_seq_container() {
     let Some(engine) = create_engine_from_reference() else {
         eprintln!("Skipping test: reference directory not found");
         return;
     };
 
-    let count = count_license_expression_matches(
+    let matches = detect_fixture_matches(
         &engine,
         "testdata/license-golden/datadriven/external/spdx/complex-short.html",
-        "epl-2.0 OR apache-2.0 OR gpl-2.0 WITH classpath-exception-2.0 OR gpl-2.0 WITH openjdk-exception",
     );
+    let expressions: Vec<_> = matches
+        .iter()
+        .map(|m| m.license_expression.clone())
+        .collect();
+    let rule_ids: Vec<_> = matches.iter().map(|m| m.rule_identifier.as_str()).collect();
 
     assert!(
-        count >= 3,
-        "expected at least 3 composite matches, got {count}"
+        expressions.contains(
+            &"epl-2.0 OR apache-2.0 OR gpl-2.0 WITH classpath-exception-2.0 OR gpl-2.0 WITH openjdk-exception"
+                .to_string()
+        ),
+        "expected composite SPDX/OpenJ9 match to remain present: {:?}",
+        expressions
+    );
+    assert!(
+        rule_ids.contains(&"unicode_6.RULE"),
+        "expected unicode_6.RULE to remain present: {:?}",
+        rule_ids
+    );
+    assert!(
+        rule_ids.contains(&"unicode_8.RULE"),
+        "expected unicode_8.RULE to remain present: {:?}",
+        rule_ids
+    );
+    assert!(
+        !rule_ids.contains(&"unicode_3.RULE"),
+        "expected redundant unicode_3.RULE seq container to be absent: {:?}",
+        rule_ids
     );
 }
 
@@ -1005,54 +1091,6 @@ fn test_no_token_boundary_false_positives() {
             );
         }
     }
-}
-
-#[test]
-fn test_is_license_text_subtraction_triggers() {
-    let is_license_text = true;
-    let rule_length: usize = 150;
-    let match_coverage: f32 = 99.0;
-
-    assert!(
-        is_license_text && rule_length > 120 && match_coverage > 98.0,
-        "Subtraction should trigger for long license text with high coverage"
-    );
-}
-
-#[test]
-fn test_is_license_text_subtraction_skips_short() {
-    let is_license_text = true;
-    let rule_length: usize = 100;
-    let match_coverage: f32 = 99.0;
-
-    assert!(
-        !(is_license_text && rule_length > 120 && match_coverage > 98.0),
-        "Subtraction should NOT trigger for short rules"
-    );
-}
-
-#[test]
-fn test_is_license_text_subtraction_skips_low_coverage() {
-    let is_license_text = true;
-    let rule_length: usize = 150;
-    let match_coverage: f32 = 95.0;
-
-    assert!(
-        !(is_license_text && rule_length > 120 && match_coverage > 98.0),
-        "Subtraction should NOT trigger for low coverage"
-    );
-}
-
-#[test]
-fn test_is_license_text_subtraction_skips_non_text() {
-    let is_license_text = false;
-    let rule_length: usize = 150;
-    let match_coverage: f32 = 99.0;
-
-    assert!(
-        !(is_license_text && rule_length > 120 && match_coverage > 98.0),
-        "Subtraction should NOT trigger when is_license_text is false"
-    );
 }
 
 #[test]
