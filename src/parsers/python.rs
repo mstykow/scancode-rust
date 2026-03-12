@@ -172,6 +172,13 @@ fn merge_sibling_metadata_file_references(path: &Path, package_data: &mut Packag
         {
             extra_refs.extend(parse_installed_files_txt(&content));
         }
+
+        let sources_path = parent.join("SOURCES.txt");
+        if sources_path.exists()
+            && let Ok(content) = read_file_to_string(&sources_path)
+        {
+            extra_refs.extend(parse_sources_txt(&content));
+        }
     }
 
     for file_ref in extra_refs {
@@ -575,6 +582,23 @@ pub fn parse_installed_files_txt(content: &str) -> Vec<FileReference> {
     content
         .lines()
         .map(|line| line.trim())
+        .filter(|line| !line.is_empty())
+        .map(|path| FileReference {
+            path: path.to_string(),
+            size: None,
+            sha1: None,
+            md5: None,
+            sha256: None,
+            sha512: None,
+            extra_data: None,
+        })
+        .collect()
+}
+
+pub fn parse_sources_txt(content: &str) -> Vec<FileReference> {
+    content
+        .lines()
+        .map(str::trim)
         .filter(|line| !line.is_empty())
         .map(|path| FileReference {
             path: path.to_string(),
