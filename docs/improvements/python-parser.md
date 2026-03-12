@@ -6,7 +6,7 @@
 
 ## Summary
 
-**🐛 Bug Fix + ✨ New Feature + 🔍 Enhanced Extraction**: Rust now extracts richer Python manifest metadata, resolves imported sibling dunder metadata for setup.py, preserves PKG-INFO license-file references, and supports saved `pypi.json` API payloads.
+**🐛 Bug Fix + ✨ New Feature + 🔍 Enhanced Extraction**: Rust now extracts richer Python manifest metadata, resolves imported sibling dunder metadata for setup.py, preserves PKG-INFO license-file references, supports saved `pypi.json` API payloads, and extracts RFC822 dependency metadata from wheels and source-package metadata.
 
 ## What changed
 
@@ -75,6 +75,22 @@ Rust now supports parsing saved `pypi.json` payloads and extracts core package m
 
 This support is intentionally scoped to the exact local filename `pypi.json`.
 
+### 7. RFC822 dependency extraction for wheel and source metadata
+
+Rust now extracts dependency metadata from RFC822-style Python metadata files:
+
+- `Requires-Dist`
+- extra-scoped requirements expressed through `extra == ...` markers
+- sibling `.egg-info/requires.txt` when source-package metadata needs the extra dependency evidence
+
+This now covers the concrete wheel-vs-sdist gap left under `#149`:
+
+- wheel `METADATA` dependencies are no longer dropped,
+- extra-scoped dependencies are mapped to the extra name as scope,
+- simple marker data like `python_version == '2.7'` is preserved structurally,
+- pinned `==` / `===` requirements are marked pinned and embedded in the dependency PURL,
+- and source-package `.egg-info/requires.txt` can recover dependency evidence that plain `PKG-INFO` alone does not carry.
+
 ## Verified issue relevance
 
 ### Implemented as real remaining gaps
@@ -89,6 +105,7 @@ This support is intentionally scoped to the exact local filename `pypi.json`.
 - `#209` PyPI JSON parse support
 - `#144` narrow source-package ancillary file collection via `SOURCES.txt`
 - `#150` installed Python metadata file-to-package assignment in scans
+- `#149` RFC822 wheel/source dependency metadata parity
 
 ### Verified as already covered locally or audited as nonblocking
 
@@ -99,12 +116,6 @@ This support is intentionally scoped to the exact local filename `pypi.json`.
 - `#210`
 - `#212`
 - `#213`
-
-### Umbrella / partially overlapping issues
-
-- `#149`
-
-These were treated as umbrella quality/collection issues rather than as evidence of one remaining single parser defect after the local audit.
 
 ## Coverage
 
@@ -119,6 +130,7 @@ Coverage includes:
 - scan-level installed Python file assignment coverage for `.dist-info` and `.egg-info`
 - sibling `SOURCES.txt` extraction from source-package `.egg-info/PKG-INFO`
 - scan-level source-layout assignment coverage for `SOURCES.txt`-listed files
+- wheel/source RFC822 dependency extraction coverage for bare, extra-scoped, marker-bearing, pinned, and source-package `.egg-info/requires.txt` cases
 - a new pyproject parser golden
 - the existing metadata and setup.cfg parser goldens
 - the broader Python parser test suite
