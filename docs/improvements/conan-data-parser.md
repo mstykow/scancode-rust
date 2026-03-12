@@ -6,7 +6,7 @@
 
 ## Summary
 
-**🔍 Enhanced Extraction**: Python only extracts sources. Rust also extracts patch metadata and mirror URLs.
+**🔍 Enhanced Extraction**: Python only extracts source URLs and checksums. Rust also extracts patch metadata and preserves all source URLs in `extra_data.mirror_urls`.
 
 ## Python Limitation
 
@@ -136,7 +136,7 @@ patches:
 
 ## Test Coverage
 
-12 comprehensive test cases:
+Coverage includes:
 
 - Basic sources extraction
 - Multiple URLs (mirrors)

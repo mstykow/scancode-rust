@@ -150,6 +150,6 @@ Only exact versions (without range operators) are marked as `is_pinned: true`.
 
 ## Status
 
-- ✅ **Implementation**: Complete — all three parsers production-ready
-- ✅ **Testing**: Unit tests covering all formats and edge cases
-- ✅ **Documentation**: Complete
+- ✅ **Implementation**: Complete — all three Conan parsers are implemented
+- ✅ **Testing**: Core parser coverage exists here, with `conandata.yml` recipe-backed and golden coverage documented separately in `conan-data-parser.md`
+- ✅ **Documentation**: Complete for the parser split currently implemented in Rust

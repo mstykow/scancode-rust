@@ -505,7 +505,7 @@ Likely touchpoints:
 
 Current status (March 12, 2026):
 
-- Rust already preserved all download URLs from multi-URL `conandata.yml` entries under `extra_data.mirror_urls` while keeping the first URL as `download_url` for current upstream parity.
+- Rust already preserves all download URLs from multi-URL `conandata.yml` entries under `extra_data.mirror_urls`, while still using the primary URL as `download_url`.
 - Conan parser regression coverage now uses the real Boost and libzip recipe fixtures to prove all source URLs are retained.
 - Conan parser golden coverage is now wired for the existing Boost, libgettext, and libzip `conandata.yml` expected outputs, giving this beyond-parity behavior concrete fixture-backed evidence.
 
