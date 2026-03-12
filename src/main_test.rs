@@ -171,6 +171,25 @@ fn docker_scan_and_assemble(path: &Path) -> (Vec<FileInfo>, assembly::AssemblyRe
     (files, assembly_result)
 }
 
+fn python_scan_and_assemble(path: &Path) -> (Vec<FileInfo>, assembly::AssemblyResult) {
+    let store = Box::leak(Box::new(Store::new()));
+    let strategy = ScanStrategy::new(store);
+    let progress = Arc::new(ScanProgress::new(ProgressMode::Quiet));
+    let result = crate::scanner::process_with_options(
+        path,
+        0,
+        progress,
+        &[],
+        &strategy,
+        &TextDetectionOptions::default(),
+    )
+    .expect("python scan should succeed");
+
+    let mut files = result.files;
+    let assembly_result = assembly::assemble(&mut files);
+    (files, assembly_result)
+}
+
 fn normalize_test_uuids(json_str: &str) -> String {
     let re = Regex::new(r"uuid=[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
         .expect("uuid regex should compile");
@@ -969,6 +988,91 @@ fn containerfile_scan_keeps_package_data_unassembled() {
         .find(|file| file.path.ends_with("Containerfile.expected.json"))
         .expect("expected fixture JSON should also be scanned");
     assert!(expected_json.package_data.is_empty());
+}
+
+#[test]
+fn python_metadata_scan_assigns_referenced_site_packages_files() {
+    let temp_dir = tempfile::TempDir::new().expect("create temp dir");
+    let site_packages = temp_dir.path().join("venv/lib/python3.11/site-packages");
+    let dist_info = site_packages.join("click-8.0.4.dist-info");
+    let package_dir = site_packages.join("click");
+
+    fs::create_dir_all(&dist_info).expect("create dist-info dir");
+    fs::create_dir_all(&package_dir).expect("create package dir");
+    fs::write(
+        dist_info.join("METADATA"),
+        "Metadata-Version: 2.1\nName: click\nVersion: 8.0.4\n",
+    )
+    .expect("write METADATA");
+    fs::write(
+        dist_info.join("RECORD"),
+        "click/__init__.py,,0\nclick/core.py,,10\nclick-8.0.4.dist-info/LICENSE.rst,,20\n",
+    )
+    .expect("write RECORD");
+    fs::write(dist_info.join("LICENSE.rst"), "license text").expect("write LICENSE.rst");
+    fs::write(package_dir.join("__init__.py"), "").expect("write __init__.py");
+    fs::write(package_dir.join("core.py"), "def click():\n    pass\n").expect("write core.py");
+
+    let (files, result) = python_scan_and_assemble(temp_dir.path());
+
+    let package = result
+        .packages
+        .iter()
+        .find(|package| package.name.as_deref() == Some("click"))
+        .expect("click package should be assembled");
+
+    let core_file = files
+        .iter()
+        .find(|file| file.path.ends_with("site-packages/click/core.py"))
+        .expect("core.py should be scanned");
+    let license_file = files
+        .iter()
+        .find(|file| {
+            file.path
+                .ends_with("site-packages/click-8.0.4.dist-info/LICENSE.rst")
+        })
+        .expect("license file should be scanned");
+
+    assert!(core_file.for_packages.contains(&package.package_uid));
+    assert!(license_file.for_packages.contains(&package.package_uid));
+}
+
+#[test]
+fn python_pkg_info_scan_assigns_installed_files_entries() {
+    let temp_dir = tempfile::TempDir::new().expect("create temp dir");
+    let site_packages = temp_dir.path().join("venv/lib/python3.11/site-packages");
+    let egg_info = site_packages.join("examplepkg.egg-info");
+    let package_dir = site_packages.join("examplepkg");
+
+    fs::create_dir_all(&egg_info).expect("create egg-info dir");
+    fs::create_dir_all(&package_dir).expect("create package dir");
+    fs::write(
+        egg_info.join("PKG-INFO"),
+        "Metadata-Version: 1.2\nName: examplepkg\nVersion: 1.0.0\n",
+    )
+    .expect("write PKG-INFO");
+    fs::write(
+        egg_info.join("installed-files.txt"),
+        "../examplepkg/__init__.py\n../examplepkg/core.py\n",
+    )
+    .expect("write installed-files.txt");
+    fs::write(package_dir.join("__init__.py"), "").expect("write __init__.py");
+    fs::write(package_dir.join("core.py"), "VALUE = 1\n").expect("write core.py");
+
+    let (files, result) = python_scan_and_assemble(temp_dir.path());
+
+    let package = result
+        .packages
+        .iter()
+        .find(|package| package.name.as_deref() == Some("examplepkg"))
+        .expect("examplepkg package should be assembled");
+
+    let core_file = files
+        .iter()
+        .find(|file| file.path.ends_with("site-packages/examplepkg/core.py"))
+        .expect("core.py should be scanned");
+
+    assert!(core_file.for_packages.contains(&package.package_uid));
 }
 
 #[test]

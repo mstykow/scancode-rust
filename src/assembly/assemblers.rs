@@ -134,6 +134,8 @@ pub static ASSEMBLERS: &[AssemblerConfig] = &[
             "pyproject.toml",
             "setup.py",
             "setup.cfg",
+            "PKG-INFO",
+            "METADATA",
             "pypi.json",
             "requirements*.txt",
             "Pipfile",
