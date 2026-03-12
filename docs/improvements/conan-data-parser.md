@@ -136,10 +136,13 @@ patches:
 
 ## Test Coverage
 
-9 comprehensive test cases:
+12 comprehensive test cases:
 
 - Basic sources extraction
 - Multiple URLs (mirrors)
+- Real Boost recipe multi-URL fixture
+- Real libzip recipe multi-URL fixture
+- Parser goldens for boost, libgettext, and libzip `conandata.yml` fixtures
 - Patches with full metadata
 - Mirror URLs in extra_data
 - Patches without matching source version
