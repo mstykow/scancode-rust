@@ -215,6 +215,76 @@ sources:
     }
 
     #[test]
+    fn test_real_boost_fixture_preserves_all_source_urls() {
+        let path = PathBuf::from("testdata/conan/recipes/boost/manifest/conandata.yml");
+        let packages = ConanDataParser::extract_packages(&path);
+
+        let pkg = packages
+            .iter()
+            .find(|package| package.version.as_deref() == Some("1.84.0"))
+            .expect("boost 1.84.0 package should exist");
+
+        assert_eq!(
+            pkg.download_url.as_deref(),
+            Some(
+                "https://boostorg.jfrog.io/artifactory/main/release/1.84.0/source/boost_1_84_0.tar.bz2"
+            )
+        );
+
+        let mirrors = pkg
+            .extra_data
+            .as_ref()
+            .and_then(|extra| extra.get("mirror_urls"))
+            .and_then(|value| value.as_array())
+            .expect("boost mirror_urls should exist");
+
+        assert_eq!(mirrors.len(), 2);
+        assert_eq!(
+            mirrors[0].as_str(),
+            Some(
+                "https://boostorg.jfrog.io/artifactory/main/release/1.84.0/source/boost_1_84_0.tar.bz2"
+            )
+        );
+        assert_eq!(
+            mirrors[1].as_str(),
+            Some("https://sourceforge.net/projects/boost/files/boost/1.84.0/boost_1_84_0.tar.bz2")
+        );
+    }
+
+    #[test]
+    fn test_real_libzip_fixture_preserves_all_source_urls() {
+        let path = PathBuf::from("testdata/conan/recipes/libzip/manifest/conandata.yml");
+        let packages = ConanDataParser::extract_packages(&path);
+
+        let pkg = packages
+            .iter()
+            .find(|package| package.version.as_deref() == Some("1.10.1"))
+            .expect("libzip 1.10.1 package should exist");
+
+        assert_eq!(
+            pkg.download_url.as_deref(),
+            Some("https://libzip.org/download/libzip-1.10.1.tar.gz")
+        );
+
+        let mirrors = pkg
+            .extra_data
+            .as_ref()
+            .and_then(|extra| extra.get("mirror_urls"))
+            .and_then(|value| value.as_array())
+            .expect("libzip mirror_urls should exist");
+
+        assert_eq!(mirrors.len(), 2);
+        assert_eq!(
+            mirrors[0].as_str(),
+            Some("https://libzip.org/download/libzip-1.10.1.tar.gz")
+        );
+        assert_eq!(
+            mirrors[1].as_str(),
+            Some("https://github.com/nih-at/libzip/releases/download/v1.10.1/libzip-1.10.1.tar.gz")
+        );
+    }
+
+    #[test]
     fn test_parse_patches_without_matching_source() {
         let content = r#"
 sources:
