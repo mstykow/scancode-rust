@@ -76,6 +76,7 @@ mod debian;
 mod debian_golden_test;
 #[cfg(test)]
 mod debian_test;
+mod docker;
 mod freebsd;
 #[cfg(test)]
 mod freebsd_test;
@@ -312,6 +313,7 @@ pub use self::debian::{
     DebianInstalledListParser, DebianInstalledMd5sumsParser, DebianInstalledParser,
     DebianMd5sumInPackageParser, DebianOrigTarParser,
 };
+pub use self::docker::DockerfileParser;
 pub use self::freebsd::FreebsdCompactManifestParser;
 pub use self::gitmodules::GitmodulesParser;
 pub use self::go::{GoModParser, GoSumParser, GodepsParser};
@@ -456,6 +458,7 @@ register_package_handlers! {
         DebianInstalledParser,
         DebianMd5sumInPackageParser,
         DebianOrigTarParser,
+        DockerfileParser,
         FreebsdCompactManifestParser,
         GemArchiveParser,
         GemfileLockParser,
