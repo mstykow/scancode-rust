@@ -7,7 +7,7 @@
     "qualifiers": {},
     "subpath": null,
     "primary_language": "Python",
-    "description": null,
+    "description": "A built-package format for Python",
     "release_date": null,
     "parties": [
       {
@@ -16,9 +16,16 @@
         "name": "Daniel Holth",
         "email": "dholth@fastmail.fm",
         "url": null
+      },
+      {
+        "type": "person",
+        "role": "maintainer",
+        "name": "Alex Gronholm",
+        "email": "alex.gronholm@nextday.fi",
+        "url": null
       }
     ],
-    "keywords": [],
+    "keywords": ["wheel", "packaging"],
     "homepage_url": "https://github.com/pypa/wheel",
     "download_url": null,
     "size": null,
@@ -26,7 +33,7 @@
     "md5": null,
     "sha256": null,
     "sha512": null,
-    "bug_tracking_url": null,
+    "bug_tracking_url": "https://github.com/pypa/wheel/issues",
     "code_view_url": null,
     "vcs_url": null,
     "copyright": null,
