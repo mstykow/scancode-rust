@@ -151,8 +151,60 @@ fn extract_from_rfc822_metadata(path: &Path, datasource_id: DatasourceId) -> Pac
 
     let metadata = super::rfc822::parse_rfc822_content(&content);
     let mut package_data = build_package_data_from_rfc822(&metadata, datasource_id);
+    merge_sibling_metadata_dependencies(path, &mut package_data);
     merge_sibling_metadata_file_references(path, &mut package_data);
     package_data
+}
+
+fn merge_sibling_metadata_dependencies(path: &Path, package_data: &mut PackageData) {
+    let mut extra_dependencies = Vec::new();
+
+    if let Some(parent) = path.parent() {
+        let direct_requires = parent.join("requires.txt");
+        if direct_requires.exists()
+            && let Ok(content) = read_file_to_string(&direct_requires)
+        {
+            extra_dependencies.extend(parse_requires_txt(&content));
+        }
+
+        let sibling_egg_info_requires = parent
+            .read_dir()
+            .ok()
+            .into_iter()
+            .flatten()
+            .flatten()
+            .find_map(|entry| {
+                let child_path = entry.path();
+                if child_path.is_dir()
+                    && child_path
+                        .file_name()
+                        .and_then(|name| name.to_str())
+                        .is_some_and(|name| name.ends_with(".egg-info"))
+                {
+                    let requires = child_path.join("requires.txt");
+                    requires.exists().then_some(requires)
+                } else {
+                    None
+                }
+            });
+
+        if let Some(requires_path) = sibling_egg_info_requires
+            && let Ok(content) = read_file_to_string(&requires_path)
+        {
+            extra_dependencies.extend(parse_requires_txt(&content));
+        }
+    }
+
+    for dependency in extra_dependencies {
+        if !package_data.dependencies.iter().any(|existing| {
+            existing.purl == dependency.purl
+                && existing.scope == dependency.scope
+                && existing.extracted_requirement == dependency.extracted_requirement
+                && existing.extra_data == dependency.extra_data
+        }) {
+            package_data.dependencies.push(dependency);
+        }
+    }
 }
 
 fn merge_sibling_metadata_file_references(path: &Path, package_data: &mut PackageData) {
@@ -798,6 +850,7 @@ fn build_package_data_from_rfc822(
         .collect();
 
     let project_urls = get_header_all(&metadata.headers, "project-url");
+    let dependencies = extract_rfc822_dependencies(&metadata.headers);
     let (mut bug_tracking_url, mut code_view_url, mut vcs_url) = (None, None, None);
 
     if !project_urls.is_empty() {
@@ -900,7 +953,7 @@ fn build_package_data_from_rfc822(
         is_private: false,
         is_virtual: false,
         extra_data,
-        dependencies: Vec::new(),
+        dependencies,
         repository_homepage_url,
         repository_download_url,
         api_data_url,
@@ -2254,6 +2307,212 @@ fn value_to_string_pairs(value: &Value) -> Option<Vec<(String, String)>> {
         .collect::<Option<Vec<_>>>()?;
     pairs.sort_by(|left, right| left.0.cmp(&right.0));
     Some(pairs)
+}
+
+fn extract_rfc822_dependencies(headers: &HashMap<String, Vec<String>>) -> Vec<Dependency> {
+    let requires_dist = super::rfc822::get_header_all(headers, "requires-dist");
+    requires_dist
+        .iter()
+        .filter_map(|entry| build_rfc822_dependency(entry))
+        .collect()
+}
+
+fn build_rfc822_dependency(entry: &str) -> Option<Dependency> {
+    build_python_dependency(entry, "install", false, None)
+}
+
+fn build_python_dependency(
+    entry: &str,
+    default_scope: &str,
+    default_optional: bool,
+    marker_override: Option<&str>,
+) -> Option<Dependency> {
+    let (requirement_part, marker_part) = entry
+        .split_once(';')
+        .map(|(req, marker)| (req.trim(), Some(marker.trim())))
+        .unwrap_or((entry.trim(), None));
+
+    let name = extract_setup_cfg_dependency_name(requirement_part)?;
+    let requirement = normalize_rfc822_requirement(requirement_part);
+    let (scope, is_optional, marker, marker_data) = parse_rfc822_marker(
+        marker_part.or(marker_override),
+        default_scope,
+        default_optional,
+    );
+    let mut purl = PackageUrl::new(PythonParser::PACKAGE_TYPE.as_str(), &name).ok()?;
+
+    let is_pinned = requirement
+        .as_deref()
+        .is_some_and(|req| req.starts_with("==") || req.starts_with("==="));
+    if is_pinned
+        && let Some(version) = requirement
+            .as_deref()
+            .map(|req| req.trim_start_matches('='))
+    {
+        purl.with_version(version).ok()?;
+    }
+
+    let mut extra_data = HashMap::new();
+    extra_data.extend(marker_data);
+    if let Some(marker) = marker {
+        extra_data.insert("marker".to_string(), serde_json::Value::String(marker));
+    }
+
+    Some(Dependency {
+        purl: Some(purl.to_string()),
+        extracted_requirement: requirement,
+        scope: Some(scope),
+        is_runtime: Some(true),
+        is_optional: Some(is_optional),
+        is_pinned: Some(is_pinned),
+        is_direct: Some(true),
+        resolved_package: None,
+        extra_data: if extra_data.is_empty() {
+            None
+        } else {
+            Some(extra_data)
+        },
+    })
+}
+
+fn normalize_rfc822_requirement(requirement_part: &str) -> Option<String> {
+    let name = extract_setup_cfg_dependency_name(requirement_part)?;
+    let trimmed = requirement_part.trim();
+    let mut remainder = trimmed[name.len()..].trim();
+
+    if let Some(stripped) = remainder.strip_prefix('[')
+        && let Some(end_idx) = stripped.find(']')
+    {
+        remainder = stripped[end_idx + 1..].trim();
+    }
+
+    let remainder = remainder
+        .strip_prefix('(')
+        .and_then(|value| value.strip_suffix(')'))
+        .unwrap_or(remainder)
+        .trim();
+
+    if remainder.is_empty() {
+        return None;
+    }
+
+    let mut specifiers: Vec<String> = remainder
+        .split(',')
+        .map(|specifier| specifier.trim().replace(' ', ""))
+        .filter(|specifier| !specifier.is_empty())
+        .collect();
+    specifiers.sort();
+    Some(specifiers.join(","))
+}
+
+fn parse_rfc822_marker(
+    marker_part: Option<&str>,
+    default_scope: &str,
+    default_optional: bool,
+) -> (
+    String,
+    bool,
+    Option<String>,
+    HashMap<String, serde_json::Value>,
+) {
+    let Some(marker) = marker_part.filter(|marker| !marker.trim().is_empty()) else {
+        return (
+            default_scope.to_string(),
+            default_optional,
+            None,
+            HashMap::new(),
+        );
+    };
+
+    let extra_re = Regex::new(r#"extra\s*==\s*['\"]([^'\"]+)['\"]"#)
+        .expect("extra marker regex should compile");
+    let mut extra_data = HashMap::new();
+
+    if let Some(python_version) = extract_marker_field(marker, "python_version") {
+        extra_data.insert(
+            "python_version".to_string(),
+            serde_json::Value::String(python_version),
+        );
+    }
+    if let Some(sys_platform) = extract_marker_field(marker, "sys_platform") {
+        extra_data.insert(
+            "sys_platform".to_string(),
+            serde_json::Value::String(sys_platform),
+        );
+    }
+
+    if let Some(captures) = extra_re.captures(marker)
+        && let Some(scope) = captures.get(1)
+    {
+        return (
+            scope.as_str().to_string(),
+            true,
+            Some(marker.trim().to_string()),
+            extra_data,
+        );
+    }
+
+    (
+        default_scope.to_string(),
+        default_optional,
+        Some(marker.trim().to_string()),
+        extra_data,
+    )
+}
+
+fn extract_marker_field(marker: &str, field: &str) -> Option<String> {
+    let re = Regex::new(&format!(
+        r#"{}\s*(==|!=|<=|>=|<|>)\s*['\"]([^'\"]+)['\"]"#,
+        field
+    ))
+    .ok()?;
+    let captures = re.captures(marker)?;
+    let operator = captures.get(1)?.as_str();
+    let value = captures.get(2)?.as_str();
+    Some(format!("{} {}", operator, value))
+}
+
+fn parse_requires_txt(content: &str) -> Vec<Dependency> {
+    let mut dependencies = Vec::new();
+    let mut current_scope = "install".to_string();
+    let mut current_optional = false;
+    let mut current_marker: Option<String> = None;
+
+    for line in content.lines() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() || trimmed.starts_with('#') {
+            continue;
+        }
+
+        if trimmed.starts_with('[') && trimmed.ends_with(']') {
+            let inner = &trimmed[1..trimmed.len() - 1];
+            if let Some(rest) = inner.strip_prefix(':') {
+                current_scope = "install".to_string();
+                current_optional = false;
+                current_marker = Some(rest.trim().to_string());
+            } else if let Some((scope, marker)) = inner.split_once(':') {
+                current_scope = scope.trim().to_string();
+                current_optional = true;
+                current_marker = Some(marker.trim().to_string());
+            } else {
+                current_scope = inner.trim().to_string();
+                current_optional = true;
+                current_marker = None;
+            }
+            continue;
+        }
+
+        if let Some(dependency) = build_python_dependency(
+            trimmed,
+            &current_scope,
+            current_optional,
+            current_marker.as_deref(),
+        ) {
+            dependencies.push(dependency);
+        }
+    }
+
+    dependencies
 }
 
 fn has_private_classifier(classifiers: &[String]) -> bool {
