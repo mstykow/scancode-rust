@@ -1,0 +1,33 @@
+{
+  "info": {
+    "name": "attrs",
+    "version": "24.1.0",
+    "summary": "Classes Without Boilerplate",
+    "description": "Longer attrs description",
+    "home_page": "https://www.attrs.org/",
+    "author": "Hynek Schlawack",
+    "author_email": "hs@example.com",
+    "license": "MIT",
+    "keywords": "attrs,dataclasses",
+    "classifiers": ["Private :: Do Not Upload"],
+    "project_urls": {
+      "Documentation": "https://www.attrs.org/",
+      "Source": "https://github.com/python-attrs/attrs",
+      "Issues": "https://github.com/python-attrs/attrs/issues"
+    }
+  },
+  "urls": [
+    {
+      "packagetype": "bdist_wheel",
+      "url": "https://files.pythonhosted.org/packages/example/attrs-24.1.0-py3-none-any.whl",
+      "size": 12345,
+      "digests": { "sha256": "wheelhash" }
+    },
+    {
+      "packagetype": "sdist",
+      "url": "https://files.pythonhosted.org/packages/source/a/attrs/attrs-24.1.0.tar.gz",
+      "size": 67890,
+      "digests": { "sha256": "sdisthash" }
+    }
+  ]
+}

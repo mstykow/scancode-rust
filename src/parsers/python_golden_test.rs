@@ -30,4 +30,30 @@ mod golden_tests {
             Err(e) => panic!("Golden test failed: {}", e),
         }
     }
+
+    #[test]
+    fn test_golden_pyproject_toml() {
+        let test_file = PathBuf::from("testdata/python/pyproject.toml");
+        let expected_file = PathBuf::from("testdata/python/golden/pyproject.toml-expected.json");
+
+        let package_data = PythonParser::extract_first_package(&test_file);
+
+        match compare_package_data_parser_only(&package_data, &expected_file) {
+            Ok(_) => (),
+            Err(e) => panic!("Golden test failed: {}", e),
+        }
+    }
+
+    #[test]
+    fn test_golden_pypi_json() {
+        let test_file = PathBuf::from("testdata/python/pypi.json");
+        let expected_file = PathBuf::from("testdata/python/golden/pypi.json-expected.json");
+
+        let package_data = PythonParser::extract_first_package(&test_file);
+
+        match compare_package_data_parser_only(&package_data, &expected_file) {
+            Ok(_) => (),
+            Err(e) => panic!("Golden test failed: {}", e),
+        }
+    }
 }
