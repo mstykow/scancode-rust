@@ -63,6 +63,9 @@ docs/
 **...see where Rust exceeds Python**
 → [improvements/](improvements/)
 
+**...understand the recent Swift ecosystem improvements**
+→ [improvements/swift-parser.md](improvements/swift-parser.md)
+
 **...track implementation quality and behavior**
 → [TESTING_STRATEGY.md](TESTING_STRATEGY.md)
 
