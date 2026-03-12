@@ -150,7 +150,39 @@ fn extract_from_rfc822_metadata(path: &Path, datasource_id: DatasourceId) -> Pac
     };
 
     let metadata = super::rfc822::parse_rfc822_content(&content);
-    build_package_data_from_rfc822(&metadata, datasource_id)
+    let mut package_data = build_package_data_from_rfc822(&metadata, datasource_id);
+    merge_sibling_metadata_file_references(path, &mut package_data);
+    package_data
+}
+
+fn merge_sibling_metadata_file_references(path: &Path, package_data: &mut PackageData) {
+    let mut extra_refs = Vec::new();
+
+    if let Some(parent) = path.parent() {
+        let record_path = parent.join("RECORD");
+        if record_path.exists()
+            && let Ok(content) = read_file_to_string(&record_path)
+        {
+            extra_refs.extend(parse_record_csv(&content));
+        }
+
+        let installed_files_path = parent.join("installed-files.txt");
+        if installed_files_path.exists()
+            && let Ok(content) = read_file_to_string(&installed_files_path)
+        {
+            extra_refs.extend(parse_installed_files_txt(&content));
+        }
+    }
+
+    for file_ref in extra_refs {
+        if !package_data
+            .file_references
+            .iter()
+            .any(|existing| existing.path == file_ref.path)
+        {
+            package_data.file_references.push(file_ref);
+        }
+    }
 }
 
 fn validate_zip_archive<R: Read + std::io::Seek>(
