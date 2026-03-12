@@ -740,6 +740,63 @@ Test package description.
     }
 
     #[test]
+    fn test_extract_metadata_reads_sibling_record_csv() {
+        let temp_dir = TempDir::new().expect("Failed to create temp dir");
+        let dist_info = temp_dir.path().join("click-8.0.4.dist-info");
+        fs::create_dir_all(&dist_info).expect("Failed to create dist-info dir");
+
+        fs::write(
+            dist_info.join("METADATA"),
+            "Metadata-Version: 2.1\nName: click\nVersion: 8.0.4\n",
+        )
+        .expect("Failed to write METADATA");
+        fs::write(
+            dist_info.join("RECORD"),
+            "click/__init__.py,,0\nclick/core.py,,10\nclick-8.0.4.dist-info/LICENSE.rst,,20\n",
+        )
+        .expect("Failed to write RECORD");
+
+        let package_data = PythonParser::extract_first_package(&dist_info.join("METADATA"));
+        let file_paths: Vec<&str> = package_data
+            .file_references
+            .iter()
+            .map(|file_ref| file_ref.path.as_str())
+            .collect();
+
+        assert!(file_paths.contains(&"click/__init__.py"));
+        assert!(file_paths.contains(&"click/core.py"));
+        assert!(file_paths.contains(&"click-8.0.4.dist-info/LICENSE.rst"));
+    }
+
+    #[test]
+    fn test_extract_pkg_info_reads_sibling_installed_files_txt() {
+        let temp_dir = TempDir::new().expect("Failed to create temp dir");
+        let egg_info = temp_dir.path().join("examplepkg.egg-info");
+        fs::create_dir_all(&egg_info).expect("Failed to create egg-info dir");
+
+        fs::write(
+            egg_info.join("PKG-INFO"),
+            "Metadata-Version: 1.2\nName: examplepkg\nVersion: 1.0.0\n",
+        )
+        .expect("Failed to write PKG-INFO");
+        fs::write(
+            egg_info.join("installed-files.txt"),
+            "../examplepkg/__init__.py\n../examplepkg/core.py\n",
+        )
+        .expect("Failed to write installed-files.txt");
+
+        let package_data = PythonParser::extract_first_package(&egg_info.join("PKG-INFO"));
+        let file_paths: Vec<&str> = package_data
+            .file_references
+            .iter()
+            .map(|file_ref| file_ref.path.as_str())
+            .collect();
+
+        assert!(file_paths.contains(&"../examplepkg/__init__.py"));
+        assert!(file_paths.contains(&"../examplepkg/core.py"));
+    }
+
+    #[test]
     fn test_is_match_wheel_extension() {
         let wheel_path = PathBuf::from("/some/path/package-1.0.0-py3-none-any.whl");
         let wheel_uppercase = PathBuf::from("/some/path/package-1.0.0-py3-none-any.WHL");
