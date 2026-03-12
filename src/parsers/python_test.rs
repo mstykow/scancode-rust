@@ -24,6 +24,7 @@ mod tests {
         let pkg_info_path = PathBuf::from("/some/path/PKG-INFO");
         let metadata_path = PathBuf::from("/some/path/METADATA");
         let pip_inspect_path = PathBuf::from("/some/path/pip-inspect.deplock");
+        let pypi_json_path = PathBuf::from("/some/path/pypi.json");
         let invalid_path = PathBuf::from("/some/path/not_python.txt");
 
         assert!(PythonParser::is_match(&pyproject_path));
@@ -32,6 +33,7 @@ mod tests {
         assert!(PythonParser::is_match(&pkg_info_path));
         assert!(PythonParser::is_match(&metadata_path));
         assert!(PythonParser::is_match(&pip_inspect_path));
+        assert!(PythonParser::is_match(&pypi_json_path));
         assert!(!PythonParser::is_match(&invalid_path));
     }
 
@@ -731,6 +733,10 @@ Test package description.
         assert_eq!(license_files.len(), 2);
         assert_eq!(license_files[0].as_str().unwrap(), "LICENSE");
         assert_eq!(license_files[1].as_str().unwrap(), "COPYING.txt");
+
+        assert_eq!(package_data.file_references.len(), 2);
+        assert_eq!(package_data.file_references[0].path, "LICENSE");
+        assert_eq!(package_data.file_references[1].path, "COPYING.txt");
     }
 
     #[test]
@@ -1219,6 +1225,67 @@ test = coverage>=6.0
     }
 
     #[test]
+    fn test_setup_cfg_extracts_richer_metadata() {
+        let path = PathBuf::from("testdata/python/golden/setup_cfg_wheel/setup.cfg");
+        let package_data = PythonParser::extract_first_package(&path);
+
+        assert_eq!(package_data.name, Some("wheel".to_string()));
+        assert_eq!(
+            package_data.description,
+            Some("A built-package format for Python".to_string())
+        );
+        assert_eq!(
+            package_data.keywords,
+            vec!["wheel".to_string(), "packaging".to_string()]
+        );
+
+        let maintainer = package_data
+            .parties
+            .iter()
+            .find(|party| party.role.as_deref() == Some("maintainer"))
+            .expect("maintainer should be extracted from setup.cfg");
+        assert_eq!(maintainer.name.as_deref(), Some("Alex Gronholm"));
+        assert_eq!(
+            maintainer.email.as_deref(),
+            Some("alex.gronholm@nextday.fi")
+        );
+
+        assert_eq!(
+            package_data.bug_tracking_url.as_deref(),
+            Some("https://github.com/pypa/wheel/issues")
+        );
+
+        let extra_data = package_data
+            .extra_data
+            .as_ref()
+            .expect("setup.cfg extra_data should exist");
+
+        assert_eq!(
+            extra_data
+                .get("python_requires")
+                .and_then(|value| value.as_str()),
+            Some(">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*")
+        );
+
+        let project_urls = extra_data
+            .get("project_urls")
+            .and_then(|value| value.as_object())
+            .expect("project_urls should be retained in extra_data");
+        assert_eq!(
+            project_urls
+                .get("Documentation")
+                .and_then(|value| value.as_str()),
+            Some("https://wheel.readthedocs.io/")
+        );
+        assert_eq!(
+            project_urls
+                .get("Changelog")
+                .and_then(|value| value.as_str()),
+            Some("https://wheel.readthedocs.io/en/stable/news.html")
+        );
+    }
+
+    #[test]
     fn test_setup_py_extras_require_scopes() {
         let content = r#"
 from setuptools import setup
@@ -1263,6 +1330,248 @@ setup(
             .collect();
         assert_eq!(test_deps.len(), 1);
         assert!(test_deps.iter().all(|d| d.is_optional == Some(true)));
+    }
+
+    #[test]
+    fn test_setup_py_project_urls_ordered_dict() {
+        let content = r#"
+from collections import OrderedDict
+from setuptools import setup
+
+setup(
+    name="flask",
+    version="3.0.0",
+    project_urls=OrderedDict([
+        ("Documentation", "https://flask.palletsprojects.com/"),
+        ("Source", "https://github.com/pallets/flask"),
+        ("Issues", "https://github.com/pallets/flask/issues"),
+    ]),
+)
+"#;
+
+        let (_temp_dir, file_path) = create_temp_file(content, "setup.py");
+        let package_data = PythonParser::extract_first_package(&file_path);
+
+        assert_eq!(package_data.name, Some("flask".to_string()));
+        assert_eq!(
+            package_data.code_view_url.as_deref(),
+            Some("https://github.com/pallets/flask")
+        );
+        assert_eq!(
+            package_data.bug_tracking_url.as_deref(),
+            Some("https://github.com/pallets/flask/issues")
+        );
+
+        let extra_data = package_data
+            .extra_data
+            .as_ref()
+            .expect("setup.py project_urls should be preserved");
+        let project_urls = extra_data
+            .get("project_urls")
+            .and_then(|value| value.as_object())
+            .expect("project_urls should be stored in extra_data");
+        assert_eq!(
+            project_urls
+                .get("Documentation")
+                .and_then(|value| value.as_str()),
+            Some("https://flask.palletsprojects.com/")
+        );
+    }
+
+    #[test]
+    fn test_pyproject_private_classifier_marks_package_private() {
+        let content = r#"
+[project]
+name = "private-package"
+version = "1.0.0"
+classifiers = ["Private :: Do Not Upload"]
+"#;
+
+        let (_temp_dir, file_path) = create_temp_file(content, "pyproject.toml");
+        let package_data = PythonParser::extract_first_package(&file_path);
+
+        assert!(package_data.is_private);
+    }
+
+    #[test]
+    fn test_extract_from_pypi_json() {
+        let content = r#"
+{
+  "info": {
+    "name": "attrs",
+    "version": "24.1.0",
+    "summary": "Classes Without Boilerplate",
+    "description": "Longer attrs description",
+    "home_page": "https://www.attrs.org/",
+    "author": "Hynek Schlawack",
+    "author_email": "hs@example.com",
+    "license": "MIT",
+    "keywords": "attrs,dataclasses",
+    "classifiers": ["Private :: Do Not Upload"],
+    "project_urls": {
+      "Documentation": "https://www.attrs.org/",
+      "Source": "https://github.com/python-attrs/attrs",
+      "Issues": "https://github.com/python-attrs/attrs/issues"
+    }
+  },
+  "urls": [
+    {
+      "packagetype": "bdist_wheel",
+      "url": "https://files.pythonhosted.org/packages/example/attrs-24.1.0-py3-none-any.whl",
+      "size": 12345,
+      "digests": {"sha256": "wheelhash"}
+    },
+    {
+      "packagetype": "sdist",
+      "url": "https://files.pythonhosted.org/packages/source/a/attrs/attrs-24.1.0.tar.gz",
+      "size": 67890,
+      "digests": {"sha256": "sdisthash"}
+    }
+  ]
+}
+"#;
+
+        let (_temp_dir, file_path) = create_temp_file(content, "pypi.json");
+        let package_data = PythonParser::extract_first_package(&file_path);
+
+        assert_eq!(package_data.name, Some("attrs".to_string()));
+        assert_eq!(package_data.version, Some("24.1.0".to_string()));
+        assert_eq!(
+            package_data.description,
+            Some("Longer attrs description".to_string())
+        );
+        assert_eq!(
+            package_data.homepage_url,
+            Some("https://www.attrs.org/".to_string())
+        );
+        assert_eq!(
+            package_data.code_view_url,
+            Some("https://github.com/python-attrs/attrs".to_string())
+        );
+        assert_eq!(
+            package_data.bug_tracking_url,
+            Some("https://github.com/python-attrs/attrs/issues".to_string())
+        );
+        assert_eq!(
+            package_data.download_url,
+            Some(
+                "https://files.pythonhosted.org/packages/source/a/attrs/attrs-24.1.0.tar.gz"
+                    .to_string()
+            )
+        );
+        assert_eq!(package_data.sha256, Some("sdisthash".to_string()));
+        assert_eq!(package_data.size, Some(67890));
+        assert_eq!(
+            package_data.keywords,
+            vec!["attrs".to_string(), "dataclasses".to_string()]
+        );
+        assert!(package_data.is_private);
+        assert_eq!(package_data.datasource_id, Some(DatasourceId::PypiJson));
+        assert_eq!(package_data.purl, Some("pkg:pypi/attrs@24.1.0".to_string()));
+    }
+
+    #[test]
+    fn test_setup_py_resolves_sibling_dunder_metadata() {
+        let temp_dir = TempDir::new().expect("Failed to create temp dir");
+        let package_dir = temp_dir.path().join("examplepkg");
+        fs::create_dir_all(&package_dir).expect("Failed to create package dir");
+
+        let setup_path = temp_dir.path().join("setup.py");
+        fs::write(
+            &setup_path,
+            r#"
+from setuptools import setup
+from examplepkg.__about__ import __author__, __license__, __version__
+
+setup(
+    name="examplepkg",
+    version=__version__,
+    author=__author__,
+    license=__license__,
+)
+"#,
+        )
+        .expect("Failed to write setup.py");
+
+        fs::write(
+            package_dir.join("__about__.py"),
+            r#"
+__version__ = "2.4.6"
+__author__ = "Example Author"
+__license__ = "Apache-2.0"
+"#,
+        )
+        .expect("Failed to write __about__.py");
+
+        let package_data = PythonParser::extract_first_package(&setup_path);
+
+        assert_eq!(package_data.name, Some("examplepkg".to_string()));
+        assert_eq!(package_data.version, Some("2.4.6".to_string()));
+        assert_eq!(
+            package_data.extracted_license_statement,
+            Some("Apache-2.0".to_string())
+        );
+
+        let author = package_data
+            .parties
+            .iter()
+            .find(|party| party.role.as_deref() == Some("author"))
+            .expect("author should be resolved from sibling dunder metadata");
+        assert_eq!(author.name.as_deref(), Some("Example Author"));
+    }
+
+    #[test]
+    fn test_setup_py_prefers_imported_dunder_module() {
+        let temp_dir = TempDir::new().expect("Failed to create temp dir");
+        let package_dir = temp_dir.path().join("examplepkg");
+        fs::create_dir_all(&package_dir).expect("Failed to create package dir");
+
+        let setup_path = temp_dir.path().join("setup.py");
+        fs::write(
+            &setup_path,
+            r#"
+from setuptools import setup
+from examplepkg.__about__ import __version__
+
+setup(name="examplepkg", version=__version__)
+"#,
+        )
+        .expect("Failed to write setup.py");
+
+        fs::write(package_dir.join("__about__.py"), r#"__version__ = "2.4.6""#)
+            .expect("Failed to write imported dunder file");
+        fs::write(package_dir.join("other.py"), r#"__version__ = "9.9.9""#)
+            .expect("Failed to write unrelated dunder file");
+
+        let package_data = PythonParser::extract_first_package(&setup_path);
+
+        assert_eq!(package_data.version, Some("2.4.6".to_string()));
+    }
+
+    #[test]
+    fn test_setup_py_resolves_sibling_dunder_metadata_in_src_layout() {
+        let temp_dir = TempDir::new().expect("Failed to create temp dir");
+        let package_dir = temp_dir.path().join("src").join("examplepkg");
+        fs::create_dir_all(&package_dir).expect("Failed to create src package dir");
+
+        let setup_path = temp_dir.path().join("setup.py");
+        fs::write(
+            &setup_path,
+            r#"
+from setuptools import setup
+from examplepkg.__about__ import __version__
+
+setup(name="examplepkg", version=__version__)
+"#,
+        )
+        .expect("Failed to write setup.py");
+
+        fs::write(package_dir.join("__about__.py"), r#"__version__ = "3.1.4""#)
+            .expect("Failed to write src-layout dunder file");
+
+        let package_data = PythonParser::extract_first_package(&setup_path);
+
+        assert_eq!(package_data.version, Some("3.1.4".to_string()));
     }
 
     #[test]
