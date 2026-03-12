@@ -556,13 +556,35 @@ Remaining Python follow-up candidates:
 
 - #144 ancillary package file collection for assembled Python packages
 - #149 remaining wheel vs sdist metadata-quality deltas after the current parser batch
-- #150 Python file-to-package assignment during assembled scans
 
 Current status (March 12, 2026):
 
 - PR #319 (`fix(python): complete the Python enhancement batch`) covers the concrete parser and metadata gaps that still reproduced locally.
 - The closed issues above were re-audited against current local behavior and did not remain as distinct Rust parser defects after the batch verification.
-- The remaining open Python issues have been narrowed to the three follow-up candidates above and should be treated as separate post-batch work, not as blockers for the completed Python row.
+- The remaining open Python issues were narrowed to follow-up candidates after the parser batch; `#150` is now addressed in the dedicated follow-up PR, while `#144` and `#149` remain open for later targeted work.
+
+### Python Follow-up PR Scope (#150)
+
+Issue:
+
+- #150 Python file-to-package assignment during assembled scans
+
+Narrow related fallout:
+
+- parser-side sibling `RECORD` / `installed-files.txt` collection needed so installed metadata files actually expose assignable file references
+
+Likely touchpoints:
+
+- standalone `METADATA` / `PKG-INFO` ancillary file-reference collection in the Python parser
+- Python-specific file-reference resolution for installed metadata under `site-packages/` and `dist-packages/`
+- scan-level regression coverage for `.dist-info` and `.egg-info` installed layouts
+
+Current status (March 12, 2026):
+
+- Standalone Python `METADATA` now collects sibling `RECORD` file references.
+- Standalone Python `PKG-INFO` now collects sibling `installed-files.txt` file references.
+- Python file-reference resolution now assigns referenced files back to the assembled package for installed metadata under `site-packages/` and `dist-packages/`.
+- The follow-up deliberately stays file-reference-driven and does not broaden into generic whole-tree Python file harvesting.
 
 ### Debian PR Scope Rule
 
