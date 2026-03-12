@@ -206,7 +206,7 @@ Rust's `MavenParser` has **integrated OSGi detection**:
 
 ## Test Coverage
 
-5 comprehensive test cases:
+Coverage includes:
 
 - OSGi manifest detection
 - Bundle metadata extraction

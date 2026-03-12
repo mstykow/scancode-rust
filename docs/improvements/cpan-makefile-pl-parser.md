@@ -199,7 +199,7 @@ These features would require a full Perl parser or code execution, which poses s
 
 ## Test Coverage
 
-7 comprehensive test cases:
+Coverage includes:
 
 - Basic WriteMakefile parsing
 - Dependency extraction with all scopes
