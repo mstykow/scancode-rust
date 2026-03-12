@@ -50,6 +50,11 @@ const PYTHON_METADATA_DATASOURCE_IDS: &[DatasourceId] = &[
 ];
 const PYTHON_SITE_PACKAGES_SEGMENTS: &[&str] = &["site-packages/", "dist-packages/"];
 
+struct PythonMetadataResolution {
+    base_path: String,
+    allowed_root: String,
+}
+
 pub fn resolve_file_references(
     files: &mut [FileInfo],
     packages: &mut [Package],
@@ -212,7 +217,7 @@ pub fn resolve_file_references(
             continue;
         }
 
-        if let Some(python_root) = find_python_metadata_root(package) {
+        if let Some(python_resolution) = find_python_metadata_root(package) {
             let datafile_path = match package
                 .datafile_paths
                 .iter()
@@ -233,7 +238,15 @@ pub fn resolve_file_references(
 
             let mut missing_refs = Vec::new();
             for file_ref in &file_references {
-                let resolved_path = normalize_relative_path(&python_root, &file_ref.path);
+                let Some(resolved_path) = normalize_relative_path(
+                    &python_resolution.base_path,
+                    &python_resolution.allowed_root,
+                    &file_ref.path,
+                ) else {
+                    missing_refs.push(file_ref.path.clone());
+                    continue;
+                };
+
                 if let Some(&file_idx) = path_index.get(&resolved_path) {
                     let package_uid = package.package_uid.clone();
                     if !files[file_idx].for_packages.contains(&package_uid) {
@@ -265,7 +278,7 @@ fn is_python_metadata_layout(path: &str) -> bool {
     path.ends_with("/METADATA") || path.ends_with("/PKG-INFO")
 }
 
-fn find_python_metadata_root(package: &Package) -> Option<String> {
+fn find_python_metadata_root(package: &Package) -> Option<PythonMetadataResolution> {
     let datafile_path = package
         .datafile_paths
         .iter()
@@ -283,20 +296,38 @@ fn find_python_metadata_root(package: &Package) -> Option<String> {
         if let Some(idx) = datafile_path.rfind(segment) {
             if datafile_path.ends_with("/METADATA") {
                 let root_end = idx + segment.len();
-                return Some(datafile_path[..root_end].to_string());
+                let root = datafile_path[..root_end].to_string();
+                return Some(PythonMetadataResolution {
+                    base_path: root.clone(),
+                    allowed_root: root,
+                });
             }
 
             if datafile_path.ends_with("/PKG-INFO") {
                 let parent = Path::new(datafile_path).parent()?;
-                return Some(parent.to_string_lossy().to_string());
+                let allowed_root = datafile_path[..idx + segment.len()].to_string();
+                return Some(PythonMetadataResolution {
+                    base_path: parent.to_string_lossy().to_string(),
+                    allowed_root,
+                });
             }
         }
+    }
+
+    if datafile_path.ends_with(".egg-info/PKG-INFO") {
+        let metadata_parent = Path::new(datafile_path).parent()?;
+        let project_root = metadata_parent.parent()?;
+        let project_root = project_root.to_string_lossy().to_string();
+        return Some(PythonMetadataResolution {
+            base_path: project_root.clone(),
+            allowed_root: project_root,
+        });
     }
 
     None
 }
 
-fn normalize_relative_path(base: &str, relative: &str) -> String {
+fn normalize_relative_path(base: &str, allowed_root: &str, relative: &str) -> Option<String> {
     let joined = Path::new(base).join(relative.trim_start_matches('/'));
     let mut normalized = Path::new("").to_path_buf();
 
@@ -310,7 +341,12 @@ fn normalize_relative_path(base: &str, relative: &str) -> String {
         }
     }
 
-    normalized.to_string_lossy().to_string()
+    let normalized_str = normalized.to_string_lossy().to_string();
+    if Path::new(&normalized_str).starts_with(Path::new(allowed_root)) {
+        Some(normalized_str)
+    } else {
+        None
+    }
 }
 
 fn is_conda_meta_package(package: &Package) -> bool {
@@ -2066,5 +2102,146 @@ mod tests {
         resolve_file_references(&mut files, &mut packages, &mut dependencies);
 
         assert!(files[1].for_packages.is_empty());
+    }
+
+    #[test]
+    fn test_python_sources_file_references_do_not_escape_project_root() {
+        let mut files = vec![
+            FileInfo {
+                name: "PKG-INFO".to_string(),
+                base_name: "PKG-INFO".to_string(),
+                extension: String::new(),
+                path: "project/PyJPString.egg-info/PKG-INFO".to_string(),
+                file_type: FileType::File,
+                mime_type: None,
+                size: 100,
+                date: None,
+                sha1: None,
+                md5: None,
+                sha256: None,
+                programming_language: None,
+                package_data: vec![PackageData {
+                    datasource_id: Some(DatasourceId::PypiSdistPkginfo),
+                    purl: Some("pkg:pypi/PyJPString@0.0.3".to_string()),
+                    name: Some("PyJPString".to_string()),
+                    version: Some("0.0.3".to_string()),
+                    file_references: vec![FileReference {
+                        path: "../../outside.py".to_string(),
+                        size: None,
+                        sha1: None,
+                        md5: None,
+                        sha256: None,
+                        sha512: None,
+                        extra_data: None,
+                    }],
+                    ..Default::default()
+                }],
+                license_expression: None,
+                license_detections: vec![],
+                copyrights: vec![],
+                holders: vec![],
+                authors: vec![],
+                emails: vec![],
+                urls: vec![],
+                for_packages: vec![],
+                scan_errors: vec![],
+                is_source: None,
+                source_count: None,
+                is_legal: false,
+                is_manifest: false,
+                is_readme: false,
+                is_top_level: false,
+                is_key_file: false,
+            },
+            FileInfo {
+                name: "outside.py".to_string(),
+                base_name: "outside".to_string(),
+                extension: "py".to_string(),
+                path: "outside.py".to_string(),
+                file_type: FileType::File,
+                mime_type: None,
+                size: 10,
+                date: None,
+                sha1: None,
+                md5: None,
+                sha256: None,
+                programming_language: None,
+                package_data: vec![],
+                license_expression: None,
+                license_detections: vec![],
+                copyrights: vec![],
+                holders: vec![],
+                authors: vec![],
+                emails: vec![],
+                urls: vec![],
+                for_packages: vec![],
+                scan_errors: vec![],
+                is_source: None,
+                source_count: None,
+                is_legal: false,
+                is_manifest: false,
+                is_readme: false,
+                is_top_level: false,
+                is_key_file: false,
+            },
+        ];
+
+        let mut packages = vec![Package {
+            package_type: Some(PackageType::Pypi),
+            namespace: None,
+            name: Some("PyJPString".to_string()),
+            version: Some("0.0.3".to_string()),
+            qualifiers: None,
+            subpath: None,
+            primary_language: None,
+            description: None,
+            release_date: None,
+            parties: vec![],
+            keywords: vec![],
+            homepage_url: None,
+            download_url: None,
+            size: None,
+            sha1: None,
+            md5: None,
+            sha256: None,
+            sha512: None,
+            bug_tracking_url: None,
+            code_view_url: None,
+            vcs_url: None,
+            copyright: None,
+            holder: None,
+            declared_license_expression: None,
+            declared_license_expression_spdx: None,
+            license_detections: vec![],
+            other_license_expression: None,
+            other_license_expression_spdx: None,
+            other_license_detections: vec![],
+            extracted_license_statement: None,
+            notice_text: None,
+            source_packages: vec![],
+            is_private: false,
+            is_virtual: false,
+            extra_data: None,
+            repository_homepage_url: None,
+            repository_download_url: None,
+            api_data_url: None,
+            purl: Some("pkg:pypi/PyJPString@0.0.3".to_string()),
+            package_uid: "pkg:pypi/PyJPString@0.0.3?uuid=test-uuid".to_string(),
+            datafile_paths: vec!["project/PyJPString.egg-info/PKG-INFO".to_string()],
+            datasource_ids: vec![DatasourceId::PypiSdistPkginfo],
+        }];
+
+        let mut dependencies = vec![];
+
+        resolve_file_references(&mut files, &mut packages, &mut dependencies);
+
+        assert!(files[1].for_packages.is_empty());
+        let missing = packages[0]
+            .extra_data
+            .as_ref()
+            .and_then(|extra| extra.get("missing_file_references"))
+            .and_then(|value| value.as_array())
+            .expect("missing_file_references should be recorded");
+        assert_eq!(missing.len(), 1);
     }
 }
