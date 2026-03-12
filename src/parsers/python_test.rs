@@ -797,6 +797,35 @@ Test package description.
     }
 
     #[test]
+    fn test_extract_pkg_info_reads_sibling_sources_txt() {
+        let temp_dir = TempDir::new().expect("Failed to create temp dir");
+        let egg_info = temp_dir.path().join("PyJPString.egg-info");
+        fs::create_dir_all(&egg_info).expect("Failed to create egg-info dir");
+
+        fs::write(
+            egg_info.join("PKG-INFO"),
+            "Metadata-Version: 1.0\nName: PyJPString\nVersion: 0.0.3\n",
+        )
+        .expect("Failed to write PKG-INFO");
+        fs::write(
+            egg_info.join("SOURCES.txt"),
+            "setup.py\nPyJPString.egg-info/PKG-INFO\nPyJPString.egg-info/top_level.txt\njpstring/__init__.py\n",
+        )
+        .expect("Failed to write SOURCES.txt");
+
+        let package_data = PythonParser::extract_first_package(&egg_info.join("PKG-INFO"));
+        let file_paths: Vec<&str> = package_data
+            .file_references
+            .iter()
+            .map(|file_ref| file_ref.path.as_str())
+            .collect();
+
+        assert!(file_paths.contains(&"setup.py"));
+        assert!(file_paths.contains(&"PyJPString.egg-info/top_level.txt"));
+        assert!(file_paths.contains(&"jpstring/__init__.py"));
+    }
+
+    #[test]
     fn test_is_match_wheel_extension() {
         let wheel_path = PathBuf::from("/some/path/package-1.0.0-py3-none-any.whl");
         let wheel_uppercase = PathBuf::from("/some/path/package-1.0.0-py3-none-any.WHL");
