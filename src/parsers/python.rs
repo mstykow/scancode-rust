@@ -44,7 +44,7 @@ use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::Read;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use toml::Value as TomlValue;
 use toml::map::Map as TomlMap;
 use zip::ZipArchive;
@@ -96,6 +96,8 @@ impl PackageParser for PythonParser {
                 extract_from_rfc822_metadata(path, DatasourceId::PypiSdistPkginfo)
             } else if path.file_name().unwrap_or_default() == "METADATA" {
                 extract_from_rfc822_metadata(path, DatasourceId::PypiWheelMetadata)
+            } else if path.file_name().unwrap_or_default() == "pypi.json" {
+                extract_from_pypi_json(path)
             } else if path.file_name().unwrap_or_default() == "pip-inspect.deplock" {
                 extract_from_pip_inspect(path)
             } else if path
@@ -121,6 +123,7 @@ impl PackageParser for PythonParser {
                 || filename == "setup.py"
                 || filename == "PKG-INFO"
                 || filename == "METADATA"
+                || filename == "pypi.json"
                 || filename == "pip-inspect.deplock")
         {
             return true;
@@ -717,12 +720,26 @@ fn build_package_data_from_rfc822(
             "license_files".to_string(),
             serde_json::Value::Array(
                 license_files
-                    .into_iter()
+                    .iter()
+                    .cloned()
                     .map(serde_json::Value::String)
                     .collect(),
             ),
         );
     }
+
+    let file_references = license_files
+        .iter()
+        .map(|path| FileReference {
+            path: path.clone(),
+            size: None,
+            sha1: None,
+            md5: None,
+            sha256: None,
+            sha512: None,
+            extra_data: None,
+        })
+        .collect();
 
     let project_urls = get_header_all(&metadata.headers, "project-url");
     let (mut bug_tracking_url, mut code_view_url, mut vcs_url) = (None, None, None);
@@ -823,7 +840,7 @@ fn build_package_data_from_rfc822(
         extracted_license_statement,
         notice_text: None,
         source_packages: Vec::new(),
-        file_references: Vec::new(),
+        file_references,
         is_private: false,
         is_virtual: false,
         extra_data,
@@ -1010,6 +1027,16 @@ fn extract_from_pyproject_toml(path: &Path) -> PackageData {
         .get(FIELD_VERSION)
         .and_then(|v| v.as_str())
         .map(String::from);
+    let classifiers = project_table
+        .get("classifiers")
+        .and_then(|value| value.as_array())
+        .map(|values| {
+            values
+                .iter()
+                .filter_map(|value| value.as_str().map(ToOwned::to_owned))
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
 
     // Extract license statement only - detection happens in separate engine
     let license_detections = Vec::new();
@@ -1106,7 +1133,7 @@ fn extract_from_pyproject_toml(path: &Path) -> PackageData {
         notice_text: None,
         source_packages: Vec::new(),
         file_references: Vec::new(),
-        is_private: false,
+        is_private: has_private_classifier(&classifiers),
         is_virtual: false,
         extra_data: None,
         dependencies: [dependencies, optional_dependencies].concat(),
@@ -1450,6 +1477,13 @@ impl LiteralEvaluator {
                 keywords,
                 ..
             }) => {
+                if keywords.is_empty()
+                    && let Some(name) = dotted_name(func.as_ref(), depth + 1)
+                    && matches!(name.as_str(), "OrderedDict" | "collections.OrderedDict")
+                {
+                    return self.evaluate_ordered_dict(args, depth + 1);
+                }
+
                 if !args.is_empty() {
                     return None;
                 }
@@ -1481,6 +1515,31 @@ impl LiteralEvaluator {
             ast::Constant::None => Some(Value::None),
             _ => None,
         }
+    }
+
+    fn evaluate_ordered_dict(&mut self, args: &[ast::Expr], depth: usize) -> Option<Value> {
+        if args.len() != 1 {
+            return None;
+        }
+
+        let items = match self.evaluate_expr(&args[0], depth)? {
+            Value::List(items) | Value::Tuple(items) => items,
+            _ => return None,
+        };
+
+        let mut dict = HashMap::new();
+        for item in items {
+            let Value::Tuple(values) = item else {
+                return None;
+            };
+            if values.len() != 2 {
+                return None;
+            }
+            let key = value_to_string(&values[0])?;
+            dict.insert(key, values[1].clone());
+        }
+
+        Some(Value::Dict(dict))
     }
 }
 
@@ -1521,6 +1580,8 @@ fn extract_from_setup_py(path: &Path) -> PackageData {
         package_data.version = extract_setup_value(&content, "version");
     }
 
+    fill_from_sibling_dunder_metadata(path, &content, &mut package_data);
+
     if package_data.purl.is_none() {
         package_data.purl = build_setup_py_purl(
             package_data.name.as_deref(),
@@ -1529,6 +1590,144 @@ fn extract_from_setup_py(path: &Path) -> PackageData {
     }
 
     package_data
+}
+
+fn fill_from_sibling_dunder_metadata(path: &Path, content: &str, package_data: &mut PackageData) {
+    if package_data.version.is_some()
+        && package_data.extracted_license_statement.is_some()
+        && package_data
+            .parties
+            .iter()
+            .any(|party| party.role.as_deref() == Some("author") && party.name.is_some())
+    {
+        return;
+    }
+
+    let Some(root) = path.parent() else {
+        return;
+    };
+
+    let dunder_metadata = collect_sibling_dunder_metadata(root, content);
+
+    if package_data.version.is_none() {
+        package_data.version = dunder_metadata.version;
+    }
+
+    if package_data.extracted_license_statement.is_none() {
+        package_data.extracted_license_statement = dunder_metadata.license;
+    }
+
+    let has_author = package_data
+        .parties
+        .iter()
+        .any(|party| party.role.as_deref() == Some("author") && party.name.is_some());
+
+    if !has_author && let Some(author) = dunder_metadata.author {
+        package_data.parties.push(Party {
+            r#type: Some("person".to_string()),
+            role: Some("author".to_string()),
+            name: Some(author),
+            email: None,
+            url: None,
+            organization: None,
+            organization_url: None,
+            timezone: None,
+        });
+    }
+}
+
+#[derive(Default)]
+struct DunderMetadata {
+    version: Option<String>,
+    author: Option<String>,
+    license: Option<String>,
+}
+
+fn collect_sibling_dunder_metadata(root: &Path, content: &str) -> DunderMetadata {
+    let statements = match ast::Suite::parse(content, "<setup.py>") {
+        Ok(statements) => statements,
+        Err(_) => return DunderMetadata::default(),
+    };
+
+    let version_re = Regex::new(r#"(?m)^\s*__version__\s*=\s*['\"]([^'\"]+)['\"]"#).ok();
+    let author_re = Regex::new(r#"(?m)^\s*__author__\s*=\s*['\"]([^'\"]+)['\"]"#).ok();
+    let license_re = Regex::new(r#"(?m)^\s*__license__\s*=\s*['\"]([^'\"]+)['\"]"#).ok();
+    let mut metadata = DunderMetadata::default();
+
+    for module in imported_dunder_modules(&statements) {
+        let Some(path) = resolve_imported_module_path(root, &module) else {
+            continue;
+        };
+        let Ok(module_content) = read_file_to_string(&path) else {
+            continue;
+        };
+
+        if metadata.version.is_none() {
+            metadata.version = version_re
+                .as_ref()
+                .and_then(|regex| regex.captures(&module_content))
+                .and_then(|captures| captures.get(1))
+                .map(|match_| match_.as_str().to_string());
+        }
+
+        if metadata.author.is_none() {
+            metadata.author = author_re
+                .as_ref()
+                .and_then(|regex| regex.captures(&module_content))
+                .and_then(|captures| captures.get(1))
+                .map(|match_| match_.as_str().to_string());
+        }
+
+        if metadata.license.is_none() {
+            metadata.license = license_re
+                .as_ref()
+                .and_then(|regex| regex.captures(&module_content))
+                .and_then(|captures| captures.get(1))
+                .map(|match_| match_.as_str().to_string());
+        }
+
+        if metadata.version.is_some() && metadata.author.is_some() && metadata.license.is_some() {
+            return metadata;
+        }
+    }
+
+    metadata
+}
+
+fn imported_dunder_modules(statements: &[ast::Stmt]) -> Vec<String> {
+    let mut modules = Vec::new();
+
+    for statement in statements {
+        let ast::Stmt::ImportFrom(ast::StmtImportFrom { module, names, .. }) = statement else {
+            continue;
+        };
+        let Some(module) = module.as_ref().map(|name| name.as_str()) else {
+            continue;
+        };
+        let imports_dunder = names.iter().any(|alias| {
+            matches!(
+                alias.name.as_str(),
+                "__version__" | "__author__" | "__license__"
+            )
+        });
+        if imports_dunder {
+            modules.push(module.to_string());
+        }
+    }
+
+    modules
+}
+
+fn resolve_imported_module_path(root: &Path, module: &str) -> Option<PathBuf> {
+    let relative = PathBuf::from_iter(module.split('.'));
+    let candidates = [
+        root.join(relative.with_extension("py")),
+        root.join(&relative).join("__init__.py"),
+        root.join("src").join(relative.with_extension("py")),
+        root.join("src").join(relative).join("__init__.py"),
+    ];
+
+    candidates.into_iter().find(|candidate| candidate.exists())
 }
 
 /// Extracts package metadata from setup.py using AST parsing (NO CODE EXECUTION).
@@ -1813,6 +2012,10 @@ fn build_setup_py_package_data(values: &HashMap<String, Value>) -> PackageData {
     let maintainer = get_value_string(values, "maintainer");
     let maintainer_email = get_value_string(values, "maintainer_email");
     let license = get_value_string(values, "license");
+    let classifiers = values
+        .get("classifiers")
+        .and_then(value_to_string_list)
+        .unwrap_or_default();
 
     let mut parties = Vec::new();
     if author.is_some() || author_email.is_some() {
@@ -1849,6 +2052,26 @@ fn build_setup_py_package_data(values: &HashMap<String, Value>) -> PackageData {
 
     let dependencies = build_setup_py_dependencies(values);
     let purl = build_setup_py_purl(name.as_deref(), version.as_deref());
+    let mut homepage_from_project_urls = None;
+    let (mut bug_tracking_url, mut code_view_url, mut vcs_url) = (None, None, None);
+    let mut extra_data = HashMap::new();
+
+    if let Some(parsed_project_urls) = values.get("project_urls").and_then(value_to_string_pairs) {
+        apply_project_url_mappings(
+            &parsed_project_urls,
+            &mut homepage_from_project_urls,
+            &mut bug_tracking_url,
+            &mut code_view_url,
+            &mut vcs_url,
+            &mut extra_data,
+        );
+    }
+
+    let extra_data = if extra_data.is_empty() {
+        None
+    } else {
+        Some(extra_data)
+    };
 
     PackageData {
         package_type: Some(PythonParser::PACKAGE_TYPE),
@@ -1862,16 +2085,16 @@ fn build_setup_py_package_data(values: &HashMap<String, Value>) -> PackageData {
         release_date: None,
         parties,
         keywords: Vec::new(),
-        homepage_url,
+        homepage_url: homepage_url.or(homepage_from_project_urls),
         download_url: None,
         size: None,
         sha1: None,
         md5: None,
         sha256: None,
         sha512: None,
-        bug_tracking_url: None,
-        code_view_url: None,
-        vcs_url: None,
+        bug_tracking_url,
+        code_view_url,
+        vcs_url,
         copyright: None,
         holder: None,
         declared_license_expression,
@@ -1884,9 +2107,9 @@ fn build_setup_py_package_data(values: &HashMap<String, Value>) -> PackageData {
         notice_text: None,
         source_packages: Vec::new(),
         file_references: Vec::new(),
-        is_private: false,
+        is_private: has_private_classifier(&classifiers),
         is_virtual: false,
-        extra_data: None,
+        extra_data,
         dependencies,
         repository_homepage_url: None,
         repository_download_url: None,
@@ -1962,6 +2185,25 @@ fn value_to_string_list(value: &Value) -> Option<Vec<String>> {
         }
         _ => None,
     }
+}
+
+fn value_to_string_pairs(value: &Value) -> Option<Vec<(String, String)>> {
+    let Value::Dict(dict) = value else {
+        return None;
+    };
+
+    let mut pairs: Vec<(String, String)> = dict
+        .iter()
+        .map(|(key, value)| Some((key.clone(), value_to_string(value)?)))
+        .collect::<Option<Vec<_>>>()?;
+    pairs.sort_by(|left, right| left.0.cmp(&right.0));
+    Some(pairs)
+}
+
+fn has_private_classifier(classifiers: &[String]) -> bool {
+    classifiers
+        .iter()
+        .any(|classifier| classifier.eq_ignore_ascii_case("Private :: Do Not Upload"))
 }
 
 fn build_setup_py_purl(name: Option<&str>, version: Option<&str>) -> Option<String> {
@@ -2055,6 +2297,214 @@ fn package_data_to_resolved(pkg: &PackageData) -> crate::models::ResolvedPackage
         datasource_id: pkg.datasource_id,
         purl: pkg.purl.clone(),
     }
+}
+
+fn extract_from_pypi_json(path: &Path) -> PackageData {
+    let default = PackageData {
+        package_type: Some(PythonParser::PACKAGE_TYPE),
+        datasource_id: Some(DatasourceId::PypiJson),
+        ..Default::default()
+    };
+
+    let content = match read_file_to_string(path) {
+        Ok(content) => content,
+        Err(error) => {
+            warn!("Failed to read pypi.json at {:?}: {}", path, error);
+            return default;
+        }
+    };
+
+    let root: serde_json::Value = match serde_json::from_str(&content) {
+        Ok(value) => value,
+        Err(error) => {
+            warn!("Failed to parse pypi.json at {:?}: {}", path, error);
+            return default;
+        }
+    };
+
+    let Some(info) = root.get("info").and_then(|value| value.as_object()) else {
+        warn!("No info object found in pypi.json at {:?}", path);
+        return default;
+    };
+
+    let name = info
+        .get("name")
+        .and_then(|value| value.as_str())
+        .map(ToOwned::to_owned);
+    let version = info
+        .get("version")
+        .and_then(|value| value.as_str())
+        .map(ToOwned::to_owned);
+    let summary = info
+        .get("summary")
+        .and_then(|value| value.as_str())
+        .map(ToOwned::to_owned);
+    let description = info
+        .get("description")
+        .and_then(|value| value.as_str())
+        .filter(|value| !value.trim().is_empty())
+        .map(ToOwned::to_owned)
+        .or(summary);
+    let mut homepage_url = info
+        .get("home_page")
+        .and_then(|value| value.as_str())
+        .map(ToOwned::to_owned);
+    let author = info
+        .get("author")
+        .and_then(|value| value.as_str())
+        .filter(|value| !value.trim().is_empty())
+        .map(ToOwned::to_owned);
+    let author_email = info
+        .get("author_email")
+        .and_then(|value| value.as_str())
+        .filter(|value| !value.trim().is_empty())
+        .map(ToOwned::to_owned);
+    let license = info
+        .get("license")
+        .and_then(|value| value.as_str())
+        .filter(|value| !value.trim().is_empty())
+        .map(ToOwned::to_owned);
+    let keywords = parse_setup_cfg_keywords(
+        info.get("keywords")
+            .and_then(|value| value.as_str())
+            .map(ToOwned::to_owned),
+    );
+    let classifiers = info
+        .get("classifiers")
+        .and_then(|value| value.as_array())
+        .map(|values| {
+            values
+                .iter()
+                .filter_map(|value| value.as_str().map(ToOwned::to_owned))
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+
+    let mut parties = Vec::new();
+    if author.is_some() || author_email.is_some() {
+        parties.push(Party {
+            r#type: Some("person".to_string()),
+            role: Some("author".to_string()),
+            name: author,
+            email: author_email,
+            url: None,
+            organization: None,
+            organization_url: None,
+            timezone: None,
+        });
+    }
+
+    let mut bug_tracking_url = None;
+    let mut code_view_url = None;
+    let mut vcs_url = None;
+    let mut extra_data = HashMap::new();
+
+    let parsed_project_urls = info
+        .get("project_urls")
+        .and_then(|value| value.as_object())
+        .map(|map| {
+            let mut pairs: Vec<(String, String)> = map
+                .iter()
+                .filter_map(|(key, value)| Some((key.clone(), value.as_str()?.to_string())))
+                .collect();
+            pairs.sort_by(|left, right| left.0.cmp(&right.0));
+            pairs
+        })
+        .unwrap_or_default();
+
+    apply_project_url_mappings(
+        &parsed_project_urls,
+        &mut homepage_url,
+        &mut bug_tracking_url,
+        &mut code_view_url,
+        &mut vcs_url,
+        &mut extra_data,
+    );
+
+    let (download_url, size, sha256) = root
+        .get("urls")
+        .and_then(|value| value.as_array())
+        .map(|urls| select_pypi_json_artifact(urls))
+        .unwrap_or((None, None, None));
+
+    let (repository_homepage_url, repository_download_url, api_data_url, purl) =
+        build_pypi_urls(name.as_deref(), version.as_deref());
+
+    PackageData {
+        package_type: Some(PythonParser::PACKAGE_TYPE),
+        namespace: None,
+        name,
+        version,
+        qualifiers: None,
+        subpath: None,
+        primary_language: None,
+        description,
+        release_date: None,
+        parties,
+        keywords,
+        homepage_url: homepage_url.or(repository_homepage_url.clone()),
+        download_url,
+        size,
+        sha1: None,
+        md5: None,
+        sha256,
+        sha512: None,
+        bug_tracking_url,
+        code_view_url,
+        vcs_url,
+        copyright: None,
+        holder: None,
+        declared_license_expression: None,
+        declared_license_expression_spdx: None,
+        license_detections: Vec::new(),
+        other_license_expression: None,
+        other_license_expression_spdx: None,
+        other_license_detections: Vec::new(),
+        extracted_license_statement: license,
+        notice_text: None,
+        source_packages: Vec::new(),
+        file_references: Vec::new(),
+        is_private: has_private_classifier(&classifiers),
+        is_virtual: false,
+        extra_data: if extra_data.is_empty() {
+            None
+        } else {
+            Some(extra_data)
+        },
+        dependencies: Vec::new(),
+        repository_homepage_url,
+        repository_download_url,
+        api_data_url,
+        datasource_id: Some(DatasourceId::PypiJson),
+        purl,
+    }
+}
+
+fn select_pypi_json_artifact(
+    urls: &[serde_json::Value],
+) -> (Option<String>, Option<u64>, Option<String>) {
+    let selected = urls
+        .iter()
+        .find(|entry| entry.get("packagetype").and_then(|value| value.as_str()) == Some("sdist"))
+        .or_else(|| urls.first());
+
+    let Some(entry) = selected else {
+        return (None, None, None);
+    };
+
+    let download_url = entry
+        .get("url")
+        .and_then(|value| value.as_str())
+        .map(ToOwned::to_owned);
+    let size = entry.get("size").and_then(|value| value.as_u64());
+    let sha256 = entry
+        .get("digests")
+        .and_then(|value| value.as_object())
+        .and_then(|digests| digests.get("sha256"))
+        .and_then(|value| value.as_str())
+        .map(ToOwned::to_owned);
+
+    (download_url, size, sha256)
 }
 
 fn extract_from_pip_inspect(path: &Path) -> PackageData {
@@ -2328,10 +2778,20 @@ fn extract_from_setup_cfg(path: &Path) -> PackageData {
     let sections = parse_setup_cfg(&content);
     let name = get_ini_value(&sections, "metadata", "name");
     let version = get_ini_value(&sections, "metadata", "version");
+    let description = get_ini_value(&sections, "metadata", "description");
     let author = get_ini_value(&sections, "metadata", "author");
     let author_email = get_ini_value(&sections, "metadata", "author_email");
+    let maintainer = get_ini_value(&sections, "metadata", "maintainer");
+    let maintainer_email = get_ini_value(&sections, "metadata", "maintainer_email");
     let license = get_ini_value(&sections, "metadata", "license");
-    let homepage_url = get_ini_value(&sections, "metadata", "url");
+    let mut homepage_url = get_ini_value(&sections, "metadata", "url");
+    let classifiers = get_ini_values(&sections, "metadata", "classifiers");
+    let keywords = parse_setup_cfg_keywords(get_ini_value(&sections, "metadata", "keywords"));
+    let python_requires = get_ini_value(&sections, "options", "python_requires");
+    let parsed_project_urls =
+        parse_setup_cfg_project_urls(&get_ini_values(&sections, "metadata", "project_urls"));
+    let (mut bug_tracking_url, mut code_view_url, mut vcs_url) = (None, None, None);
+    let mut extra_data = HashMap::new();
 
     let mut parties = Vec::new();
     if author.is_some() || author_email.is_some() {
@@ -2347,6 +2807,19 @@ fn extract_from_setup_cfg(path: &Path) -> PackageData {
         });
     }
 
+    if maintainer.is_some() || maintainer_email.is_some() {
+        parties.push(Party {
+            r#type: Some("person".to_string()),
+            role: Some("maintainer".to_string()),
+            name: maintainer,
+            email: maintainer_email,
+            url: None,
+            organization: None,
+            organization_url: None,
+            timezone: None,
+        });
+    }
+
     // Extract license statement only - detection happens in separate engine
     let declared_license_expression = None;
     let declared_license_expression_spdx = None;
@@ -2354,6 +2827,28 @@ fn extract_from_setup_cfg(path: &Path) -> PackageData {
     let extracted_license_statement = license.clone();
 
     let dependencies = extract_setup_cfg_dependencies(&sections);
+
+    if let Some(value) = python_requires {
+        extra_data.insert(
+            "python_requires".to_string(),
+            serde_json::Value::String(value),
+        );
+    }
+
+    apply_project_url_mappings(
+        &parsed_project_urls,
+        &mut homepage_url,
+        &mut bug_tracking_url,
+        &mut code_view_url,
+        &mut vcs_url,
+        &mut extra_data,
+    );
+
+    let extra_data = if extra_data.is_empty() {
+        None
+    } else {
+        Some(extra_data)
+    };
 
     let purl = name.as_ref().and_then(|n| {
         let mut package_url = PackageUrl::new(PythonParser::PACKAGE_TYPE.as_str(), n).ok()?;
@@ -2371,10 +2866,10 @@ fn extract_from_setup_cfg(path: &Path) -> PackageData {
         qualifiers: None,
         subpath: None,
         primary_language: Some("Python".to_string()),
-        description: None,
+        description,
         release_date: None,
         parties,
-        keywords: Vec::new(),
+        keywords,
         homepage_url,
         download_url: None,
         size: None,
@@ -2382,9 +2877,9 @@ fn extract_from_setup_cfg(path: &Path) -> PackageData {
         md5: None,
         sha256: None,
         sha512: None,
-        bug_tracking_url: None,
-        code_view_url: None,
-        vcs_url: None,
+        bug_tracking_url,
+        code_view_url,
+        vcs_url,
         copyright: None,
         holder: None,
         declared_license_expression,
@@ -2397,15 +2892,103 @@ fn extract_from_setup_cfg(path: &Path) -> PackageData {
         notice_text: None,
         source_packages: Vec::new(),
         file_references: Vec::new(),
-        is_private: false,
+        is_private: has_private_classifier(&classifiers),
         is_virtual: false,
-        extra_data: None,
+        extra_data,
         dependencies,
         repository_homepage_url: None,
         repository_download_url: None,
         api_data_url: None,
         datasource_id: Some(DatasourceId::PypiSetupCfg),
         purl,
+    }
+}
+
+fn parse_setup_cfg_keywords(value: Option<String>) -> Vec<String> {
+    let Some(keywords) = value else {
+        return Vec::new();
+    };
+
+    keywords
+        .split(',')
+        .map(str::trim)
+        .filter(|keyword| !keyword.is_empty())
+        .map(ToOwned::to_owned)
+        .collect()
+}
+
+fn parse_setup_cfg_project_urls(entries: &[String]) -> Vec<(String, String)> {
+    entries
+        .iter()
+        .filter_map(|entry| {
+            let (label, url) = entry.split_once('=')?;
+            let label = label.trim();
+            let url = url.trim();
+            if label.is_empty() || url.is_empty() {
+                None
+            } else {
+                Some((label.to_string(), url.to_string()))
+            }
+        })
+        .collect()
+}
+
+fn apply_project_url_mappings(
+    parsed_urls: &[(String, String)],
+    homepage_url: &mut Option<String>,
+    bug_tracking_url: &mut Option<String>,
+    code_view_url: &mut Option<String>,
+    vcs_url: &mut Option<String>,
+    extra_data: &mut HashMap<String, serde_json::Value>,
+) {
+    for (label, url) in parsed_urls {
+        let label_lower = label.to_lowercase();
+
+        if bug_tracking_url.is_none()
+            && matches!(
+                label_lower.as_str(),
+                "tracker"
+                    | "bug reports"
+                    | "bug tracker"
+                    | "issues"
+                    | "issue tracker"
+                    | "github: issues"
+            )
+        {
+            *bug_tracking_url = Some(url.clone());
+        } else if code_view_url.is_none()
+            && matches!(label_lower.as_str(), "source" | "source code" | "code")
+        {
+            *code_view_url = Some(url.clone());
+        } else if vcs_url.is_none()
+            && matches!(
+                label_lower.as_str(),
+                "github" | "gitlab" | "github: repo" | "repository"
+            )
+        {
+            *vcs_url = Some(url.clone());
+        } else if homepage_url.is_none()
+            && matches!(label_lower.as_str(), "website" | "homepage" | "home")
+        {
+            *homepage_url = Some(url.clone());
+        } else if label_lower == "changelog" {
+            extra_data.insert(
+                "changelog_url".to_string(),
+                serde_json::Value::String(url.clone()),
+            );
+        }
+    }
+
+    let project_urls_json: serde_json::Map<String, serde_json::Value> = parsed_urls
+        .iter()
+        .map(|(label, url)| (label.clone(), serde_json::Value::String(url.clone())))
+        .collect();
+
+    if !project_urls_json.is_empty() {
+        extra_data.insert(
+            "project_urls".to_string(),
+            serde_json::Value::Object(project_urls_json),
+        );
     }
 }
 
@@ -2723,11 +3306,12 @@ fn default_package_data() -> PackageData {
 }
 
 crate::register_parser!(
-    "Python package manifests (pyproject.toml, setup.py, setup.cfg, PKG-INFO, METADATA, .whl, .egg)",
+    "Python package manifests (pyproject.toml, setup.py, setup.cfg, pypi.json, PKG-INFO, METADATA, .whl, .egg)",
     &[
         "**/pyproject.toml",
         "**/setup.py",
         "**/setup.cfg",
+        "**/pypi.json",
         "**/PKG-INFO",
         "**/METADATA",
         "**/*.whl",
