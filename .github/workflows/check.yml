@@ -23,7 +23,7 @@ jobs:
           submodules: recursive
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@1.93.1
+        uses: dtolnay/rust-toolchain@1.94.0
         with:
           components: rustfmt, clippy
 
@@ -67,7 +67,7 @@ jobs:
           submodules: recursive
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@1.93.1
+        uses: dtolnay/rust-toolchain@1.94.0
 
       - name: Set up Rust cache
         uses: Swatinem/rust-cache@v2
@@ -120,7 +120,7 @@ jobs:
         run: npm run format:check
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@1.93.1
+        uses: dtolnay/rust-toolchain@1.94.0
 
       - name: Validate URLs
         run: cargo run --quiet --bin validate-urls -- --root .
