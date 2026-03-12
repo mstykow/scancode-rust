@@ -4,6 +4,9 @@
 **File**: `src/parsers/swift_show_dependencies.rs`  
 **Python Reference**: `src/packagedcode/swift.py` (SwiftShowDependenciesDepLockHandler)
 
+> For the broader Swift ecosystem assembly and top-level package improvements added later,
+> see [swift-parser.md](swift-parser.md).
+
 ## Summary
 
 **🔍 Enhanced Extraction**: Python only extracts package name. Rust extracts full dependency graph with versions, URLs, and direct/transitive marking.
@@ -55,7 +58,7 @@ Extracts complete dependency graph with full metadata:
    - `is_direct` - `true` for direct deps, `false` for transitive
    - `is_pinned` - `true` if version is not "unspecified"
    - `scope` - Always "dependencies"
-   - `is_runtime` - Left unset for runtime classification purposes in the current Swift scan contract
+   - `is_runtime` - Set to `false` for these dependency edges in the current Swift scan contract
 
 ### Implementation Approach
 
@@ -186,7 +189,7 @@ The parser uses breadth-first traversal to flatten the nested dependency tree:
 
 ## Test Coverage
 
-5 comprehensive test cases:
+Coverage includes:
 
 - Basic package name extraction
 - Full dependency graph with nesting
