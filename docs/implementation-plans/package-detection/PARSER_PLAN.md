@@ -108,7 +108,6 @@ The following ecosystems are defined in the [purl-spec types index](https://gith
 
 | purl type          | Ecosystem     | Manifest files / detection signals                   | Priority |
 | ------------------ | ------------- | ---------------------------------------------------- | -------- |
-| `docker`           | Docker/OCI    | `Dockerfile`, `docker-compose.yml`, image manifests  | High     |
 | `hex`              | Elixir/Erlang | `mix.exs`, `mix.lock`                                | Medium   |
 | `hackage`          | Haskell       | `*.cabal`, `cabal.project`, `stack.yaml`             | Medium   |
 | `swid`             | SWID tags     | `*.swidtag` (ISO 19770-2 XML)                        | Medium   |
@@ -126,7 +125,7 @@ The following ecosystems are defined in the [purl-spec types index](https://gith
 | `qpkg`             | QNAP NAS      | Proprietary format, very niche                       | N/A      |
 | `vscode-extension` | VS Code       | `package.json` with `engines.vscode` (subset of npm) | N/A      |
 
-High-priority candidates (`docker`, `hex`, `hackage`) have well-defined manifest formats and broad adoption.
+High-priority candidates (`hex`, `hackage`) have well-defined manifest formats and broad adoption.
 
 ---
 
