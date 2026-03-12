@@ -40,6 +40,8 @@ mod conan;
 mod conan_data;
 #[cfg(test)]
 mod conan_data_test;
+#[cfg(all(test, feature = "golden-tests"))]
+mod conan_golden_test;
 #[cfg(test)]
 mod conan_test;
 mod conda;
