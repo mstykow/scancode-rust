@@ -152,6 +152,25 @@ fn swift_scan_and_assemble(path: &Path) -> Value {
     })
 }
 
+fn docker_scan_and_assemble(path: &Path) -> (Vec<FileInfo>, assembly::AssemblyResult) {
+    let store = Box::leak(Box::new(Store::new()));
+    let strategy = ScanStrategy::new(store);
+    let progress = Arc::new(ScanProgress::new(ProgressMode::Quiet));
+    let result = crate::scanner::process_with_options(
+        path,
+        0,
+        progress,
+        &[],
+        &strategy,
+        &TextDetectionOptions::default(),
+    )
+    .expect("docker scan should succeed");
+
+    let mut files = result.files;
+    let assembly_result = assembly::assemble(&mut files);
+    (files, assembly_result)
+}
+
 fn normalize_test_uuids(json_str: &str) -> String {
     let re = Regex::new(r"uuid=[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
         .expect("uuid regex should compile");
@@ -923,6 +942,33 @@ fn swift_scan_falls_back_to_resolved_when_show_dependencies_missing() {
         "testdata/swift-golden/packages/mapboxmaps_manifest_and_resolved",
         "testdata/swift-golden/swift-mapboxmaps-manifest-and-resolved-package-expected.json",
     );
+}
+
+#[test]
+fn containerfile_scan_keeps_package_data_unassembled() {
+    let (files, result) = docker_scan_and_assemble(Path::new("testdata/docker-golden/pulp"));
+
+    assert!(result.packages.is_empty());
+    assert!(result.dependencies.is_empty());
+
+    let containerfile = files
+        .iter()
+        .find(|file| file.path.ends_with("Containerfile"))
+        .expect("Containerfile should be scanned");
+
+    assert!(containerfile.for_packages.is_empty());
+    assert_eq!(containerfile.package_data.len(), 1);
+
+    let package = &containerfile.package_data[0];
+    assert_eq!(package.package_type, Some(PackageType::Docker));
+    assert_eq!(package.datasource_id, Some(DatasourceId::Dockerfile));
+    assert_eq!(package.name.as_deref(), Some("Pulp OCI image"));
+
+    let expected_json = files
+        .iter()
+        .find(|file| file.path.ends_with("Containerfile.expected.json"))
+        .expect("expected fixture JSON should also be scanned");
+    assert!(expected_json.package_data.is_empty());
 }
 
 #[test]
