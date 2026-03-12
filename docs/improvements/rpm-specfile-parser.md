@@ -193,7 +193,7 @@ These are complex features that Python also doesn't implement. The focus is on e
 
 ## Test Coverage
 
-6 comprehensive test cases:
+Coverage includes:
 
 - Basic preamble parsing
 - Dependency extraction with version constraints

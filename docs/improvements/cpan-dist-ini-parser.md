@@ -140,7 +140,7 @@ Test::More = 0.88
 
 ## Test Coverage
 
-6 comprehensive test cases:
+Coverage includes:
 
 - Basic metadata extraction
 - Dependency parsing with scopes
