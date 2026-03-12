@@ -1076,6 +1076,59 @@ fn python_pkg_info_scan_assigns_installed_files_entries() {
 }
 
 #[test]
+fn python_pkg_info_scan_assigns_sources_entries() {
+    let temp_dir = tempfile::TempDir::new().expect("create temp dir");
+    let egg_info = temp_dir.path().join("PyJPString.egg-info");
+    let package_dir = temp_dir.path().join("jpstring");
+
+    fs::create_dir_all(&egg_info).expect("create egg-info dir");
+    fs::create_dir_all(&package_dir).expect("create package dir");
+    fs::write(
+        egg_info.join("PKG-INFO"),
+        "Metadata-Version: 1.0\nName: PyJPString\nVersion: 0.0.3\n",
+    )
+    .expect("write PKG-INFO");
+    fs::write(
+        egg_info.join("SOURCES.txt"),
+        "setup.py\nPyJPString.egg-info/PKG-INFO\nPyJPString.egg-info/top_level.txt\njpstring/__init__.py\n",
+    )
+    .expect("write SOURCES.txt");
+    fs::write(
+        temp_dir.path().join("setup.py"),
+        "from setuptools import setup\n",
+    )
+    .expect("write setup.py");
+    fs::write(egg_info.join("top_level.txt"), "jpstring\n").expect("write top_level.txt");
+    fs::write(package_dir.join("__init__.py"), "").expect("write __init__.py");
+
+    let (files, result) = python_scan_and_assemble(temp_dir.path());
+
+    let package = result
+        .packages
+        .iter()
+        .find(|package| package.name.as_deref() == Some("PyJPString"))
+        .expect("PyJPString package should be assembled");
+
+    let setup_file = files
+        .iter()
+        .find(|file| file.path.ends_with("setup.py"))
+        .expect("setup.py should be scanned");
+    let module_init = files
+        .iter()
+        .find(|file| file.path.ends_with("jpstring/__init__.py"))
+        .expect("module __init__.py should be scanned");
+    let top_level = files
+        .iter()
+        .find(|file| file.path.ends_with("PyJPString.egg-info/top_level.txt"))
+        .expect("top_level.txt should be scanned");
+
+    assert!(setup_file.for_packages.contains(&package.package_uid));
+    assert!(module_init.for_packages.contains(&package.package_uid));
+    assert!(top_level.for_packages.contains(&package.package_uid));
+    assert!(package.extra_data.is_none());
+}
+
+#[test]
 fn resolve_thread_count_supports_reference_compat_values() {
     assert_eq!(resolve_thread_count(-1), 1);
     assert_eq!(resolve_thread_count(0), default_parallel_threads());
