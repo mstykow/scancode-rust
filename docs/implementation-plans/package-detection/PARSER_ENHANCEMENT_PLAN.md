@@ -113,7 +113,7 @@ cargo run --quiet --bin generate-supported-formats && git diff --exit-code docs/
 | 14    | Swift      | Done    | #193                                                             | `cargo test swift`; `cargo test --bin scancode-rust swift_scan_`; `cargo test --features golden-tests swift_golden`                                                                                                                                                                                                                                                                                                                                                       |
 | 15    | Conan      | Done    | #194                                                             | `cargo test conan`; `cargo test --features golden-tests conan_golden`                                                                                                                                                                                                                                                                                                                                                                                                     |
 | 16    | Docker     | Done    | #199, #200                                                       | `cargo test docker --lib`; `cargo test containerfile_scan_keeps_package_data_unassembled --bin scancode-rust`; `cargo test --features golden-tests docker_golden --lib`                                                                                                                                                                                                                                                                                                   |
-| 17    | Python     | Done    | #136, #138, #139, #140, #143, #147, #148, #209                   | `cargo test python`; `cargo test requirements_txt`; `cargo test pipfile_lock`; `cargo test poetry_lock`; `cargo test pip_inspect_deplock`; `cargo test --features golden-tests python_golden`; `cargo test --features golden-tests requirements_txt_golden`; `cargo test --features golden-tests pipfile_lock_golden`; `cargo test --features golden-tests poetry_lock_golden`; `cargo test assembly::assemblers::tests::test_every_datasource_id_is_accounted_for --lib` |
+| 17    | Python     | Done    | #136, #138, #139, #140, #143, #144, #147, #148, #149, #150, #209 | `cargo test python`; `cargo test requirements_txt`; `cargo test pipfile_lock`; `cargo test poetry_lock`; `cargo test pip_inspect_deplock`; `cargo test --features golden-tests python_golden`; `cargo test --features golden-tests requirements_txt_golden`; `cargo test --features golden-tests pipfile_lock_golden`; `cargo test --features golden-tests poetry_lock_golden`; `cargo test assembly::assemblers::tests::test_every_datasource_id_is_accounted_for --lib` |
 | 18    | Debian     | Planned | #176, #177, #178, #179, #180, #181, #182, #183, #185, #186, #219 | `cargo test debian`; `cargo test --features golden-tests debian_golden`                                                                                                                                                                                                                                                                                                                                                                                                   |
 
 ## Detailed Scoping Rules
@@ -552,15 +552,11 @@ Closed after audit as already covered or nonblocking:
 - #212 `setuptools.setup()` detection in setup.py
 - #213 requirements-driven dependency inclusion
 
-Remaining Python follow-up candidates:
-
-- #149 remaining wheel vs sdist metadata-quality deltas after the current parser batch
-
 Current status (March 12, 2026):
 
 - PR #319 (`fix(python): complete the Python enhancement batch`) covers the concrete parser and metadata gaps that still reproduced locally.
 - The closed issues above were re-audited against current local behavior and did not remain as distinct Rust parser defects after the batch verification.
-- The remaining open Python issues were narrowed to follow-up candidates after the parser batch; `#150` is already addressed, `#144` is addressed in the current follow-up slice, and `#149` remains open for later targeted work.
+- The remaining open Python issues were narrowed to follow-up candidates after the parser batch; `#150`, `#144`, and `#149` are now each addressed in dedicated follow-up PRs.
 
 ### Python Follow-up PR Scope (#150)
 
@@ -607,6 +603,34 @@ Current status (March 12, 2026):
 - Standalone source-package `.egg-info/PKG-INFO` now collects sibling `SOURCES.txt` entries as `file_references`.
 - Source-layout Python scans now assign `SOURCES.txt`-listed files such as `setup.py` and package modules back to the assembled Python package.
 - This follow-up deliberately stays `SOURCES.txt`-driven and does not broaden into generic whole-tree Python file harvesting.
+
+### Python Follow-up PR Scope (#149)
+
+Issue:
+
+- #149 remaining wheel vs sdist metadata-quality deltas after the current parser batch
+
+Narrowed implementation target:
+
+- RFC822 dependency extraction from wheel `METADATA` and source `PKG-INFO`
+- extra-scoped dependency shaping from `extra == ...` markers and sibling `.egg-info/requires.txt`
+- simple structured marker preservation (for example `python_version == '2.7'`)
+- pinned `==` / `===` dependency detection
+- sibling `.egg-info/requires.txt` recovery where source metadata needs extra dependency evidence
+
+Likely touchpoints:
+
+- `build_package_data_from_rfc822()` dependency population
+- source-package dependency recovery from sibling `.egg-info/requires.txt`
+- focused parser regression tests for wheel-vs-sdist pairs and metadata/v20 extras
+
+Current status (March 12, 2026):
+
+- Wheel `METADATA` no longer drops `Requires-Dist` dependencies.
+- Extra-scoped wheel dependencies are now preserved with the extra name as scope and `is_optional = true`.
+- Marker-bearing dependencies now preserve structured fields like `python_version` in dependency `extra_data`.
+- Single `==` / `===` dependency specifiers are now treated as pinned and embedded in the emitted dependency PURL.
+- Source-package metadata can recover dependency evidence from sibling `.egg-info/requires.txt` when plain `PKG-INFO` alone does not carry that information.
 
 ### Debian PR Scope Rule
 
