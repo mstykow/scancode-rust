@@ -77,6 +77,10 @@ mod debian_golden_test;
 #[cfg(test)]
 mod debian_test;
 mod docker;
+#[cfg(all(test, feature = "golden-tests"))]
+mod docker_golden_test;
+#[cfg(test)]
+mod docker_test;
 mod freebsd;
 #[cfg(test)]
 mod freebsd_test;

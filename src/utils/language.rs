@@ -80,7 +80,10 @@ pub fn detect_language(path: &Path, content: &[u8]) -> String {
         .map(|s| s.to_lowercase())
         .unwrap_or_default();
 
-    if file_name == "dockerfile" || file_name.starts_with("dockerfile.") {
+    if matches!(
+        file_name.as_str(),
+        "dockerfile" | "containerfile" | "containerfile.core"
+    ) {
         return "Dockerfile".to_string();
     } else if file_name == "makefile" {
         return "Makefile".to_string();
@@ -112,4 +115,22 @@ pub fn detect_language(path: &Path, content: &[u8]) -> String {
     }
 
     "Unknown".to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::detect_language;
+    use std::path::Path;
+
+    #[test]
+    fn detect_language_supports_containerfile_names() {
+        assert_eq!(
+            detect_language(Path::new("Containerfile"), b"FROM scratch\n"),
+            "Dockerfile"
+        );
+        assert_eq!(
+            detect_language(Path::new("containerfile.core"), b"FROM scratch\n"),
+            "Dockerfile"
+        );
+    }
 }
