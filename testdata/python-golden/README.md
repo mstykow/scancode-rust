@@ -4,19 +4,14 @@
 
 Golden tests compare parser output against expected results from the original ScanCode Toolkit to ensure compatibility.
 
-## Test Status
-
-**Currently Passing:** 2/2 tests
-
-- ✅ `test_golden_metadata` - Passes (PKG-INFO/METADATA files)
-- ✅ `test_golden_setup_cfg` - Passes (setup.cfg file)
-
 ## Test Coverage
 
-### Passing Tests
+Coverage includes:
 
-1. **metadata** - PKG-INFO/METADATA parser
-2. **setup_cfg** - setup.cfg parser
+- **metadata** - PKG-INFO/METADATA parser
+- **setup_cfg** - setup.cfg parser
+- **pyproject.toml** - pyproject manifest parser
+- **pypi.json** - saved PyPI JSON parser
 
 ## Test Data
 
