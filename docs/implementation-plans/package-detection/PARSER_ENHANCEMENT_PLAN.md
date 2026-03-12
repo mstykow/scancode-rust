@@ -112,7 +112,7 @@ cargo run --quiet --bin generate-supported-formats && git diff --exit-code docs/
 | 13    | ABOUT      | Done    | #201, #202, #203, #204                                                                                     | `cargo test about`; `cargo test --features golden-tests about --lib`; `cargo test about_scan_promotes_packages_and_assigns_referenced_files --bin scancode-rust`; `cargo test about_scan_tracks_missing_file_references --bin scancode-rust`                                                                                                                                   |
 | 14    | Swift      | Done    | #193                                                                                                       | `cargo test swift`; `cargo test --bin scancode-rust swift_scan_`; `cargo test --features golden-tests swift_golden`                                                                                                                                                                                                                                                            |
 | 15    | Conan      | Done    | #194                                                                                                       | `cargo test conan`; `cargo test --features golden-tests conan_golden`                                                                                                                                                                                                                                                                                                          |
-| 16    | Docker     | Planned | #199, #200                                                                                                 | validation to be finalized when parser files are added because this family is enhancement work around currently unsupported Docker-specific coverage                                                                                                                                                                                                                           |
+| 16    | Docker     | Done    | #199, #200                                                                                                 | `cargo test docker --lib`; `cargo test containerfile_scan_keeps_package_data_unassembled --bin scancode-rust`; `cargo test --features golden-tests docker_golden --lib`                                                                                                                                                                                                        |
 | 17    | Python     | Planned | #136, #138, #139, #140, #141, #142, #143, #144, #145, #146, #147, #148, #149, #150, #209, #210, #212, #213 | `cargo test python`; `cargo test requirements_txt`; `cargo test pipfile_lock`; `cargo test poetry_lock`; `cargo test pip_inspect_deplock`; `cargo test --features golden-tests python_golden`; `cargo test --features golden-tests requirements_txt_golden`; `cargo test --features golden-tests pipfile_lock_golden`; `cargo test --features golden-tests poetry_lock_golden` |
 | 18    | Debian     | Planned | #176, #177, #178, #179, #180, #181, #182, #183, #185, #186, #219                                           | `cargo test debian`; `cargo test --features golden-tests debian_golden`                                                                                                                                                                                                                                                                                                        |
 
@@ -508,6 +508,26 @@ Current status (March 12, 2026):
 - Rust already preserves all download URLs from multi-URL `conandata.yml` entries under `extra_data.mirror_urls`, while still using the primary URL as `download_url`.
 - Conan parser regression coverage now uses the real Boost and libzip recipe fixtures to prove all source URLs are retained.
 - Conan parser golden coverage is now wired for the existing Boost, libgettext, and libzip `conandata.yml` expected outputs, giving this beyond-parity behavior concrete fixture-backed evidence.
+
+### Docker PR Scope
+
+Issues:
+
+- #199 support `Containerfile` as an alternative Dockerfile name
+- #200 treat Dockerfile and Containerfile as non-assembled package data and collect OCI labels
+
+Likely touchpoints:
+
+- new Docker parser for Dockerfile-like files
+- parser registration plus package-type / datasource-id plumbing
+- intentionally unassembled datasource accounting
+- real fixture coverage for Dockerfile and Containerfile OCI label extraction
+
+Current status (March 12, 2026):
+
+- Rust now recognizes `Dockerfile`, `Containerfile`, and `Containerfile.core` as Docker package-data files.
+- OCI labels under `org.opencontainers.image.*` are mapped into package metadata and also preserved in `extra_data.oci_labels`.
+- Dockerfile and Containerfile outputs are intentionally left non-assembled, with scan-level regression coverage proving they remain file-level package data.
 
 ### Python PR Scope Rule
 
