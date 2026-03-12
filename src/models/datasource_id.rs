@@ -138,6 +138,8 @@ pub enum DatasourceId {
     DebianOriginalSourceTarball,
     DebianSourceControlDsc,
 
+    Dockerfile,
+
     // ── FreeBSD ──
     FreebsdCompactManifest,
 
@@ -354,6 +356,7 @@ impl DatasourceId {
             Self::DebianMd5SumsInExtractedDeb => "debian_md5sums_in_extracted_deb",
             Self::DebianOriginalSourceTarball => "debian_original_source_tarball",
             Self::DebianSourceControlDsc => "debian_source_control_dsc",
+            Self::Dockerfile => "dockerfile",
 
             // FreeBSD
             Self::FreebsdCompactManifest => "freebsd_compact_manifest",
