@@ -1,0 +1,104 @@
+[
+  {
+    "type": "pypi",
+    "name": "anonapi",
+    "version": "0.0.19",
+    "primary_language": "Python",
+    "description": "Client and tools for working with the anoymization web API\n=======\nAnonAPI\n=======\n\n.. image:: https://img.shields.io/pypi/v/anonapi.svg\n    :target: https://pypi.python.org/pypi/anonapi\n\n.. image:: https://img.shields.io/travis/sjoerdk/anonapi.svg\n    :target: https://travis-ci.org/sjoerdk/anonapi\n\n.. image:: https://readthedocs.org/projects/anonapi/badge/?version=latest\n    :target: https://anonapi.readthedocs.io/en/latest/?badge=latest\n    :alt: Documentation Status\n\n.. image:: https://api.codeclimate.com/v1/badges/5c3b7f45f6a476d0f21e/maintainability\n    :target: https://codeclimate.com/github/sjoerdk/anonapi/maintainability\n    :alt: Maintainability\n\n.. image:: https://codecov.io/gh/sjoerdk/anonapi/branch/master/graph/badge.svg\n    :target: https://codecov.io/gh/sjoerdk/anonapi\n\n.. image:: https://pyup.io/repos/github/comic/evalutils/shield.svg\n    :target: https://pyup.io/repos/github/sjoerdk/anonapi/\n    :alt: Updates\n\n.. image:: https://img.shields.io/badge/code%20style-black-000000.svg\n    :target: https://github.com/ambv/black\n\n\n\nClient and tools for working with the IDIS web API\n\n\n* Free software: MIT license\n* Documentation: https://anonapi.readthedocs.io.\n\n\nFeatures\n--------\n\n* Interact with IDIS anonymization server web API via https\n* Create, modify, cancel anonymization jobs\n* CLI (Command Line Interface) for quick overview of jobs and cancel/restart job.\n* CLI can save servers and credentials locally for convenience\n* Python code with examples for fully automated interaction\n\nCredits\n-------\n\nThis package was created with Cookiecutter_ and the `audreyr/cookiecutter-pypackage`_ project template.\n\n.. _Cookiecutter: https://github.com/audreyr/cookiecutter\n.. _`audreyr/cookiecutter-pypackage`: https://github.com/audreyr/cookiecutter-pypackage\n\n\n=======\nHistory\n=======\n\n0.0.1 (2018-10-23)\n------------------\n\n* First release on PyPI\n\n0.0.2-0.0.8 (2018-10-23)\n------------------------\n\n* Fixed deployment and packaging issues, pre-alpha\n\n0.0.9 (2018-10-23)\n------------------\n\n* Added distutil entry_points to have 'anon' console command after pip install\n\n0.0.10-0.0.18 (2018-11-12)\n------------------\n\n* Fixed deployment, docs\n\n0.0.19 (2018-11-14)\n------------------\n\n* set python 3.6 Required in setup.py",
+    "parties": [
+      {
+        "type": "person",
+        "role": "author",
+        "name": "Sjoerd Kerkstra",
+        "email": "sjoerd.kerkstra@radboudumc.nl"
+      }
+    ],
+    "keywords": [
+      "Development Status :: 2 - Pre-Alpha",
+      "Intended Audience :: Developers",
+      "Natural Language :: English",
+      "Programming Language :: Python :: 3.6",
+      "Programming Language :: Python :: 3.7"
+    ],
+    "homepage_url": "https://github.com/sjoerdk/anonapi",
+    "extracted_license_statement": "license: MIT license\nclassifiers:\n  - 'License :: OSI Approved :: MIT License'\n",
+    "file_references": [
+      {
+        "path": "anonapi/__init__.py",
+        "size": 174,
+        "sha256": "f1504e1080e9632d0915284ac7911f0c17699b7ec7e3c7100f50b476f70e04cc"
+      },
+      {
+        "path": "anonapi/anon.py",
+        "size": 20963,
+        "sha256": "063d21326ac8804039a02c59aef6d8a5427deb6b70367739113e3a9f9aa9e0f8"
+      },
+      {
+        "path": "anonapi/client.py",
+        "size": 8760,
+        "sha256": "655986fbd8a218ddbcca09f7a925c81c5bf4437e2947d94e8d85f8189bf0e36c"
+      },
+      {
+        "path": "anonapi/objects.py",
+        "size": 545,
+        "sha256": "646ba0fed816cb282981ef74a13d967db49fc3cf69161c5319c998a9102d0d77"
+      },
+      {
+        "path": "anonapi/settings.py",
+        "size": 4535,
+        "sha256": "fde17bfd73e416b2b27a75f3bc2926092a208093993a99bc094a823a3c384e1a"
+      },
+      {
+        "path": "anonapi-0.0.19.dist-info/AUTHORS.rst",
+        "size": 183,
+        "sha256": "12e371c87dc7eca8ec20ea8ed1cc6cc447a28695c138785472e21af8f977b7c6"
+      },
+      {
+        "path": "anonapi-0.0.19.dist-info/LICENSE",
+        "size": 1096,
+        "sha256": "23c1a546d526776adc2af49f02048318fb433dfa5cd64045f511405051860b9f"
+      },
+      {
+        "path": "anonapi-0.0.19.dist-info/METADATA",
+        "size": 2813,
+        "sha256": "1e3440a9c2bbf717c82f56d28f2bab29f997bd957c96adae3579a672b694fbdd"
+      },
+      {
+        "path": "anonapi-0.0.19.dist-info/WHEEL",
+        "size": 110,
+        "sha256": "0a2850bc29ec1994011801cb11431fd08740e1f45db92fcd0544cc8024edbcf3"
+      },
+      {
+        "path": "anonapi-0.0.19.dist-info/entry_points.txt",
+        "size": 44,
+        "sha256": "1d1968430e1007e93f245304da0b3b18f32f92be3e3dd3c8a790fa28204c6418"
+      },
+      {
+        "path": "anonapi-0.0.19.dist-info/top_level.txt",
+        "size": 8,
+        "sha256": "858c66b5750f609b53381138225e23895dd94df54184c2000b9ff97ca601b937"
+      },
+      {
+        "path": "anonapi-0.0.19.dist-info/RECORD"
+      }
+    ],
+    "extra_data": {
+      "requires_python": ">=3.6"
+    },
+    "dependencies": [
+      {
+        "purl": "pkg:pypi/pyyaml",
+        "scope": "install",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true
+      }
+    ],
+    "repository_homepage_url": "https://pypi.org/project/anonapi",
+    "repository_download_url": "https://pypi.org/packages/source/a/anonapi/anonapi-0.0.19.tar.gz",
+    "api_data_url": "https://pypi.org/pypi/anonapi/0.0.19/json",
+    "datasource_id": "pypi_wheel_metadata",
+    "purl": "pkg:pypi/anonapi@0.0.19"
+  }
+]

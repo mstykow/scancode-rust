@@ -1,0 +1,44 @@
+[
+  {
+    "type": "pypi",
+    "name": "anonapi",
+    "version": "0.0.19",
+    "primary_language": "Python",
+    "description": "Client and tools for working with the anoymization web API\n======= AnonAPI =======  .. image:: https://img.shields.io/pypi/v/anonapi.svg :target: https://pypi.python.org/pypi/anonapi",
+    "parties": [
+      {
+        "type": "person",
+        "role": "author",
+        "name": "Sjoerd Kerkstra",
+        "email": "sjoerd.kerkstra@radboudumc.nl"
+      }
+    ],
+    "keywords": [
+      "Development Status :: 2 - Pre-Alpha",
+      "Intended Audience :: Developers",
+      "Natural Language :: English",
+      "Programming Language :: Python :: 3.6",
+      "Programming Language :: Python :: 3.7"
+    ],
+    "homepage_url": "https://github.com/sjoerdk/anonapi",
+    "extracted_license_statement": "license: MIT license\nclassifiers:\n  - 'License :: OSI Approved :: MIT License'\n",
+    "extra_data": {
+      "requires_python": ">=3.6"
+    },
+    "dependencies": [
+      {
+        "purl": "pkg:pypi/pyyaml",
+        "scope": "install",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true
+      }
+    ],
+    "repository_homepage_url": "https://pypi.org/project/anonapi",
+    "repository_download_url": "https://pypi.org/packages/source/a/anonapi/anonapi-0.0.19.tar.gz",
+    "api_data_url": "https://pypi.org/pypi/anonapi/0.0.19/json",
+    "datasource_id": "pypi_sdist_pkginfo",
+    "purl": "pkg:pypi/anonapi@0.0.19"
+  }
+]
