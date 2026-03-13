@@ -10,6 +10,7 @@ The Debian `.deb` parser in scancode-rust implements missing direct-archive beha
 - **🐛 Bug Fix**: Debian DEP-5 `License:` header paragraphs now emit detections in file order with preserved header casing and absolute line numbers, including standalone bottom license paragraphs
 - **🐛 Bug Fix**: Debian DEP-5 header-paragraph licenses can now become the primary detection when the `Files: *` paragraph has no usable `License:` field
 - **🔍 Enhanced Extraction**: installed Debian package metadata from `status` / `status.d` now integrates matching `info/*.list` and `info/*.md5sums` sidecars during rootfs/container scans
+- **⚡ Performance**: Debian copyright paragraph parsing now avoids the extra paragraph reparse/rescan cycle on large DEP-5 files
 
 ## Improvement: .deb Archive Introspection (New Feature)
 
@@ -308,6 +309,40 @@ Proof points:
 - explicit Ubuntu namespace matching regression
 - explicit multiarch isolation regression
 - scan-level `status.d` regression proving dependency retention and installed-file assignment together
+
+## Improvement: Debian Copyright Parsing Hot-Path Optimization
+
+**Area**: `debian/copyright` parser performance  
+**Issue**: local `#177`, upstream `aboutcode-org/scancode-toolkit#2642`
+
+Rust now avoids the most obvious repeated work inside DEP-5 paragraph processing.
+
+Before this slice, each Debian copyright paragraph was:
+
+1. accumulated as raw lines,
+2. joined into a new string,
+3. reparsed through the generic RFC822 paragraph parser,
+4. cloned again for later rescanning, and
+5. rescanned to rediscover the `License:` header line.
+
+Now the Debian parser finalizes each paragraph in one local pass:
+
+- build the paragraph headers directly,
+- capture the first `License:` header line while walking those lines,
+- keep the same parser-visible semantics for primary/other detections,
+- and avoid the extra per-paragraph reparse/rescan cycle.
+
+This is intentionally narrow:
+
+- it is a Debian-local optimization only,
+- it does not refactor the shared `rfc822` parser,
+- it does not attempt broader scanner or license-engine performance work,
+- and it leaves Debian copyright semantics unchanged.
+
+Proof points:
+
+- existing Debian parser tests and Debian goldens still pass unchanged
+- an ignored large-fixture performance probe now exercises the real `bsdutils` and `clamav` DEP-5 files repeatedly for local before/after measurement
 
 ## Implementation Details
 
