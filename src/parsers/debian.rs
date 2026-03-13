@@ -1438,17 +1438,20 @@ impl PackageParser for DebianDebParser {
 
 fn extract_deb_archive(path: &Path) -> Result<PackageData, String> {
     use flate2::read::GzDecoder;
+    use liblzma::read::XzDecoder;
     use std::io::{Cursor, Read};
 
     let file = std::fs::File::open(path).map_err(|e| format!("Failed to open .deb file: {}", e))?;
 
     let mut archive = ar::Archive::new(file);
+    let mut package: Option<PackageData> = None;
 
     while let Some(entry_result) = archive.next_entry() {
         let mut entry = entry_result.map_err(|e| format!("Failed to read ar entry: {}", e))?;
 
         let entry_name = std::str::from_utf8(entry.header().identifier())
             .map_err(|e| format!("Invalid entry name: {}", e))?;
+        let entry_name = entry_name.trim().to_string();
 
         if entry_name == "control.tar.gz" || entry_name.starts_with("control.tar") {
             let mut control_data = Vec::new();
@@ -1456,46 +1459,140 @@ fn extract_deb_archive(path: &Path) -> Result<PackageData, String> {
                 .read_to_end(&mut control_data)
                 .map_err(|e| format!("Failed to read control.tar.gz: {}", e))?;
 
-            let decoder = GzDecoder::new(Cursor::new(control_data));
-            let mut tar_archive = tar::Archive::new(decoder);
-
-            for tar_entry_result in tar_archive
-                .entries()
-                .map_err(|e| format!("Failed to read tar entries: {}", e))?
-            {
-                let mut tar_entry =
-                    tar_entry_result.map_err(|e| format!("Failed to read tar entry: {}", e))?;
-
-                let tar_path = tar_entry
-                    .path()
-                    .map_err(|e| format!("Failed to get tar path: {}", e))?;
-
-                if tar_path.ends_with("control") {
-                    let mut control_content = String::new();
-                    tar_entry
-                        .read_to_string(&mut control_content)
-                        .map_err(|e| format!("Failed to read control file: {}", e))?;
-
-                    let paragraphs = rfc822::parse_rfc822_paragraphs(&control_content);
-                    if paragraphs.is_empty() {
-                        return Err("No paragraphs in control file".to_string());
-                    }
-
-                    if let Some(package) =
-                        build_package_from_paragraph(&paragraphs[0], None, DatasourceId::DebianDeb)
-                    {
-                        return Ok(package);
-                    } else {
-                        return Err("Failed to parse control file".to_string());
-                    }
+            if entry_name.ends_with(".gz") {
+                let decoder = GzDecoder::new(Cursor::new(control_data));
+                if let Some(parsed_package) = parse_control_tar_archive(decoder)? {
+                    package = Some(parsed_package);
+                }
+            } else if entry_name.ends_with(".xz") {
+                let decoder = XzDecoder::new(Cursor::new(control_data));
+                if let Some(parsed_package) = parse_control_tar_archive(decoder)? {
+                    package = Some(parsed_package);
                 }
             }
+        } else if entry_name.starts_with("data.tar") {
+            let mut data = Vec::new();
+            entry
+                .read_to_end(&mut data)
+                .map_err(|e| format!("Failed to read data archive: {}", e))?;
 
-            return Err("control file not found in control.tar.gz".to_string());
+            let Some(current_package) = package.as_mut() else {
+                continue;
+            };
+
+            if entry_name.ends_with(".gz") {
+                let decoder = GzDecoder::new(Cursor::new(data));
+                merge_deb_data_archive(decoder, current_package)?;
+            } else if entry_name.ends_with(".xz") {
+                let decoder = XzDecoder::new(Cursor::new(data));
+                merge_deb_data_archive(decoder, current_package)?;
+            }
         }
     }
 
-    Err(".deb archive does not contain control.tar.gz".to_string())
+    package.ok_or_else(|| ".deb archive does not contain control.tar.* metadata".to_string())
+}
+
+fn parse_control_tar_archive<R: std::io::Read>(reader: R) -> Result<Option<PackageData>, String> {
+    use std::io::Read;
+
+    let mut tar_archive = tar::Archive::new(reader);
+
+    for tar_entry_result in tar_archive
+        .entries()
+        .map_err(|e| format!("Failed to read tar entries: {}", e))?
+    {
+        let mut tar_entry =
+            tar_entry_result.map_err(|e| format!("Failed to read tar entry: {}", e))?;
+
+        let tar_path = tar_entry
+            .path()
+            .map_err(|e| format!("Failed to get tar path: {}", e))?;
+
+        if tar_path.ends_with("control") {
+            let mut control_content = String::new();
+            tar_entry
+                .read_to_string(&mut control_content)
+                .map_err(|e| format!("Failed to read control file: {}", e))?;
+
+            let paragraphs = rfc822::parse_rfc822_paragraphs(&control_content);
+            if paragraphs.is_empty() {
+                return Err("No paragraphs in control file".to_string());
+            }
+
+            if let Some(package) =
+                build_package_from_paragraph(&paragraphs[0], None, DatasourceId::DebianDeb)
+            {
+                return Ok(Some(package));
+            }
+
+            return Err("Failed to parse control file".to_string());
+        }
+    }
+
+    Ok(None)
+}
+
+fn merge_deb_data_archive<R: std::io::Read>(
+    reader: R,
+    package: &mut PackageData,
+) -> Result<(), String> {
+    use std::io::Read;
+
+    let mut tar_archive = tar::Archive::new(reader);
+
+    for tar_entry_result in tar_archive
+        .entries()
+        .map_err(|e| format!("Failed to read data tar entries: {}", e))?
+    {
+        let mut tar_entry =
+            tar_entry_result.map_err(|e| format!("Failed to read data tar entry: {}", e))?;
+
+        let tar_path = tar_entry
+            .path()
+            .map_err(|e| format!("Failed to get data tar path: {}", e))?;
+        let tar_path_str = tar_path.to_string_lossy();
+
+        if tar_path_str.ends_with(&format!(
+            "/usr/share/doc/{}/copyright",
+            package.name.as_deref().unwrap_or_default()
+        )) || tar_path_str.ends_with(&format!(
+            "usr/share/doc/{}/copyright",
+            package.name.as_deref().unwrap_or_default()
+        )) {
+            let mut copyright_content = String::new();
+            tar_entry
+                .read_to_string(&mut copyright_content)
+                .map_err(|e| format!("Failed to read copyright file from data tar: {}", e))?;
+
+            let copyright_pkg = parse_copyright_file(&copyright_content, package.name.as_deref());
+            merge_debian_copyright_into_package(package, &copyright_pkg);
+            break;
+        }
+    }
+
+    Ok(())
+}
+
+fn merge_debian_copyright_into_package(target: &mut PackageData, copyright: &PackageData) {
+    if target.extracted_license_statement.is_none() {
+        target.extracted_license_statement = copyright.extracted_license_statement.clone();
+    }
+
+    for party in &copyright.parties {
+        if !target.parties.iter().any(|existing| {
+            existing.r#type == party.r#type
+                && existing.role == party.role
+                && existing.name == party.name
+                && existing.email == party.email
+                && existing.url == party.url
+                && existing.organization == party.organization
+                && existing.organization_url == party.organization_url
+                && existing.timezone == party.timezone
+        }) {
+            target.parties.push(party.clone());
+        }
+    }
 }
 
 fn parse_deb_filename(filename: &str) -> PackageData {
@@ -1719,7 +1816,131 @@ mod tests {
     use super::*;
     use crate::models::DatasourceId;
     use crate::models::PackageType;
+    use ar::{Builder as ArBuilder, Header as ArHeader};
+    use flate2::Compression;
+    use flate2::write::GzEncoder;
+    use liblzma::write::XzEncoder;
+    use std::io::Cursor;
     use std::path::PathBuf;
+    use tar::{Builder as TarBuilder, Header as TarHeader};
+    use tempfile::NamedTempFile;
+
+    fn create_synthetic_deb_with_control_tar_xz() -> NamedTempFile {
+        let mut control_tar = Vec::new();
+        {
+            let encoder = XzEncoder::new(&mut control_tar, 6);
+            let mut tar_builder = TarBuilder::new(encoder);
+
+            let control_content = b"Package: synthetic\nVersion: 1.2.3\nArchitecture: amd64\nDescription: Synthetic deb\nHomepage: https://example.com\n";
+            let mut header = TarHeader::new_gnu();
+            header
+                .set_path("control")
+                .expect("control tar path should be valid");
+            header.set_size(control_content.len() as u64);
+            header.set_mode(0o644);
+            header.set_cksum();
+            tar_builder
+                .append(&header, Cursor::new(control_content))
+                .expect("control file should be appended to tar.xz");
+            tar_builder.finish().expect("control tar.xz should finish");
+        }
+
+        let deb = NamedTempFile::new().expect("temp deb file should be created");
+        {
+            let mut builder = ArBuilder::new(
+                deb.reopen()
+                    .expect("temporary deb file should reopen for writing"),
+            );
+
+            let debian_binary = b"2.0\n";
+            let mut debian_binary_header =
+                ArHeader::new(b"debian-binary".to_vec(), debian_binary.len() as u64);
+            debian_binary_header.set_mode(0o100644);
+            builder
+                .append(&debian_binary_header, Cursor::new(debian_binary))
+                .expect("debian-binary entry should be appended");
+
+            let mut control_header =
+                ArHeader::new(b"control.tar.xz".to_vec(), control_tar.len() as u64);
+            control_header.set_mode(0o100644);
+            builder
+                .append(&control_header, Cursor::new(control_tar))
+                .expect("control.tar.xz entry should be appended");
+        }
+
+        deb
+    }
+
+    fn create_synthetic_deb_with_copyright() -> NamedTempFile {
+        let mut control_tar = Vec::new();
+        {
+            let encoder = GzEncoder::new(&mut control_tar, Compression::default());
+            let mut tar_builder = TarBuilder::new(encoder);
+
+            let control_content = b"Package: synthetic\nVersion: 9.9.9\nArchitecture: all\nDescription: Synthetic deb with copyright\n";
+            let mut header = TarHeader::new_gnu();
+            header
+                .set_path("control")
+                .expect("control tar path should be valid");
+            header.set_size(control_content.len() as u64);
+            header.set_mode(0o644);
+            header.set_cksum();
+            tar_builder
+                .append(&header, Cursor::new(control_content))
+                .expect("control file should be appended to tar.gz");
+            tar_builder.finish().expect("control tar.gz should finish");
+        }
+
+        let mut data_tar = Vec::new();
+        {
+            let encoder = GzEncoder::new(&mut data_tar, Compression::default());
+            let mut tar_builder = TarBuilder::new(encoder);
+
+            let copyright = b"Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/\nFiles: *\nCopyright: 2024 Example Org\nLicense: Apache-2.0\n Licensed under the Apache License, Version 2.0.\n";
+            let mut header = TarHeader::new_gnu();
+            header
+                .set_path("./usr/share/doc/synthetic/copyright")
+                .expect("copyright path should be valid");
+            header.set_size(copyright.len() as u64);
+            header.set_mode(0o644);
+            header.set_cksum();
+            tar_builder
+                .append(&header, Cursor::new(copyright))
+                .expect("copyright file should be appended to data tar");
+            tar_builder.finish().expect("data tar.gz should finish");
+        }
+
+        let deb = NamedTempFile::new().expect("temp deb file should be created");
+        {
+            let mut builder = ArBuilder::new(
+                deb.reopen()
+                    .expect("temporary deb file should reopen for writing"),
+            );
+
+            let debian_binary = b"2.0\n";
+            let mut debian_binary_header =
+                ArHeader::new(b"debian-binary".to_vec(), debian_binary.len() as u64);
+            debian_binary_header.set_mode(0o100644);
+            builder
+                .append(&debian_binary_header, Cursor::new(debian_binary))
+                .expect("debian-binary entry should be appended");
+
+            let mut control_header =
+                ArHeader::new(b"control.tar.gz".to_vec(), control_tar.len() as u64);
+            control_header.set_mode(0o100644);
+            builder
+                .append(&control_header, Cursor::new(control_tar))
+                .expect("control.tar.gz entry should be appended");
+
+            let mut data_header = ArHeader::new(b"data.tar.gz".to_vec(), data_tar.len() as u64);
+            data_header.set_mode(0o100644);
+            builder
+                .append(&data_header, Cursor::new(data_tar))
+                .expect("data.tar.gz entry should be appended");
+        }
+
+        deb
+    }
 
     // ====== Namespace detection ======
 
@@ -2804,6 +3025,35 @@ Copyright (C) 2015-2018 Example Corp";
 
         assert!(pkg.purl.as_ref().unwrap().contains("adduser"));
         assert!(pkg.purl.as_ref().unwrap().contains("3.112ubuntu1"));
+    }
+
+    #[test]
+    fn test_extract_deb_archive_with_control_tar_xz() {
+        let deb = create_synthetic_deb_with_control_tar_xz();
+
+        let pkg = DebianDebParser::extract_first_package(deb.path());
+
+        assert_eq!(pkg.name, Some("synthetic".to_string()));
+        assert_eq!(pkg.version, Some("1.2.3".to_string()));
+        assert_eq!(pkg.description, Some("Synthetic deb".to_string()));
+        assert_eq!(pkg.homepage_url, Some("https://example.com".to_string()));
+    }
+
+    #[test]
+    fn test_extract_deb_archive_collects_embedded_copyright_metadata() {
+        let deb = create_synthetic_deb_with_copyright();
+
+        let pkg = DebianDebParser::extract_first_package(deb.path());
+
+        assert_eq!(pkg.name, Some("synthetic".to_string()));
+        assert_eq!(
+            pkg.extracted_license_statement,
+            Some("Apache-2.0".to_string())
+        );
+        assert!(pkg.parties.iter().any(|party| {
+            party.role.as_deref() == Some("copyright-holder")
+                && party.name.as_deref() == Some("Example Org")
+        }));
     }
 
     #[test]

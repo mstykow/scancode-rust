@@ -2323,6 +2323,7 @@ dependencies = [
  "inventory",
  "kamadak-exif",
  "lazy_static",
+ "liblzma",
  "log",
  "md-5",
  "mime_guess",
