@@ -652,7 +652,8 @@ Current status (March 12, 2026):
 - The Debian batch is now in progress from a narrow direct-archive slice instead of attempting the whole issue set at once.
 - Current local work adds direct `.deb` `control.tar.xz` support and merges embedded `/usr/share/doc/<pkg>/copyright` metadata from `data.tar.*` back onto the same package.
 - A scan-level regression now proves `debian/control` + `debian/copyright` source trees already assemble into a Debian package and classify keyfiles correctly through the main pipeline, so `#219` no longer appears to need a larger parser refactor.
-- The remaining Debian copyright-detection issue cluster (`#176`, `#178`, `#179`, `#180`, `#181`, `#183`) should be treated as a separate follow-up slice unless the current PR grows to include explicit `license_detections` work.
+- The current follow-up slice now adds parser-level primary `license_detections` for the top `Files: *` DEP-5 license field, which is enough to address `#183` but not the rest of the Debian copyright-detection cluster.
+- The remaining Debian copyright-detection follow-up cluster after this slice is `#176`, `#178`, `#179`, `#180`, and `#181`.
 
 ## PR Template Checklist
 
