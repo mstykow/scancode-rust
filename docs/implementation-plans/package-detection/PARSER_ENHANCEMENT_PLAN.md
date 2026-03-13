@@ -655,7 +655,8 @@ Current status (March 12, 2026):
 - The current follow-up slice now adds parser-level primary `license_detections` for the top `Files: *` DEP-5 license field, which is enough to address `#183` but not the rest of the Debian copyright-detection cluster.
 - The current stacked follow-up slice after `#183` now covers `#176`, `#178`, `#179`, and `#180` by emitting all DEP-5 `License:` header paragraph detections in file order with preserved casing and absolute line numbers.
 - The next stacked follow-up after that now addresses `#181` by falling back to the header paragraph license when `Files: *` has no usable `License:` field.
-- The remaining Debian follow-up issues after the copyright cluster are `#177`, `#185`, and `#186`.
+- The current metadata/control follow-up now addresses `#185` and `#186` by integrating installed `status` / `status.d` package metadata with matching `info/*.list` / `*.md5sums` sidecars during rootfs/container scans.
+- The remaining Debian follow-up issue after that is `#177`.
 
 ## PR Template Checklist
 
