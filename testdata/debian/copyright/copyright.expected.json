@@ -1,0 +1,140 @@
+[
+  {
+    "type": "deb",
+    "namespace": "debian",
+    "parties": [
+      {
+        "role": "copyright-holder",
+        "name": "Paul Moore <pmoore@redhat.com>"
+      },
+      {
+        "role": "copyright-holder",
+        "name": "Ashley Lai <adlai@us.ibm.com>"
+      },
+      {
+        "role": "copyright-holder",
+        "name": "Corey Bryant <coreyb@linux.vnet.ibm.com>"
+      },
+      {
+        "role": "copyright-holder",
+        "name": "Eduardo Otubo <otubo@linux.vnet.ibm.com>"
+      },
+      {
+        "role": "copyright-holder",
+        "name": "Eric Paris <eparis@redhat.com>"
+      },
+      {
+        "role": "copyright-holder",
+        "name": "Vitaly Shukela <vi0oss@gmail.com>"
+      },
+      {
+        "role": "copyright-holder",
+        "name": "Bob Jenkins <bob_jenkins@burtleburtle.net>"
+      },
+      {
+        "role": "copyright-holder",
+        "name": "Kees Cook <kees@debian.org>"
+      }
+    ],
+    "declared_license_expression": "lgpl-2.1",
+    "declared_license_expression_spdx": "LGPL-2.1-only",
+    "license_detections": [
+      {
+        "license_expression": "lgpl-2.1",
+        "license_expression_spdx": "LGPL-2.1-only",
+        "matches": [
+          {
+            "license_expression": "lgpl-2.1",
+            "license_expression_spdx": "LGPL-2.1-only",
+            "start_line": 11,
+            "end_line": 11,
+            "matcher": "1-spdx-id",
+            "score": 100.0,
+            "matched_length": 1,
+            "match_coverage": 100.0,
+            "rule_relevance": 100,
+            "matched_text": "License: LGPL-2.1"
+          }
+        ]
+      }
+    ],
+    "other_license_expression": "lgpl-2.1",
+    "other_license_expression_spdx": "LGPL-2.1-only",
+    "other_license_detections": [
+      {
+        "license_expression": "lgpl-2.1",
+        "license_expression_spdx": "LGPL-2.1-only",
+        "matches": [
+          {
+            "license_expression": "lgpl-2.1",
+            "license_expression_spdx": "LGPL-2.1-only",
+            "start_line": 15,
+            "end_line": 15,
+            "matcher": "1-spdx-id",
+            "score": 100.0,
+            "matched_length": 1,
+            "match_coverage": 100.0,
+            "rule_relevance": 100,
+            "matched_text": "License: LGPL-2.1"
+          }
+        ]
+      },
+      {
+        "license_expression": "lgpl-2.1",
+        "license_expression_spdx": "LGPL-2.1-only",
+        "matches": [
+          {
+            "license_expression": "lgpl-2.1",
+            "license_expression_spdx": "LGPL-2.1-only",
+            "start_line": 19,
+            "end_line": 19,
+            "matcher": "1-spdx-id",
+            "score": 100.0,
+            "matched_length": 1,
+            "match_coverage": 100.0,
+            "rule_relevance": 100,
+            "matched_text": "License: LGPL-2.1"
+          }
+        ]
+      },
+      {
+        "license_expression": "lgpl-2.1",
+        "license_expression_spdx": "LGPL-2.1-only",
+        "matches": [
+          {
+            "license_expression": "lgpl-2.1",
+            "license_expression_spdx": "LGPL-2.1-only",
+            "start_line": 23,
+            "end_line": 23,
+            "matcher": "1-spdx-id",
+            "score": 100.0,
+            "matched_length": 1,
+            "match_coverage": 100.0,
+            "rule_relevance": 100,
+            "matched_text": "License: LGPL-2.1"
+          }
+        ]
+      },
+      {
+        "license_expression": "lgpl-2.1",
+        "license_expression_spdx": "LGPL-2.1-only",
+        "matches": [
+          {
+            "license_expression": "lgpl-2.1",
+            "license_expression_spdx": "LGPL-2.1-only",
+            "start_line": 25,
+            "end_line": 25,
+            "matcher": "1-spdx-id",
+            "score": 100.0,
+            "matched_length": 1,
+            "match_coverage": 100.0,
+            "rule_relevance": 100,
+            "matched_text": "License: LGPL-2.1"
+          }
+        ]
+      }
+    ],
+    "extracted_license_statement": "LGPL-2.1",
+    "datasource_id": "debian_copyright"
+  }
+]
