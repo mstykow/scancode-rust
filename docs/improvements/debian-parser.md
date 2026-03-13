@@ -7,6 +7,7 @@ The Debian `.deb` parser in scancode-rust implements missing direct-archive beha
 - **✨ New Feature**: direct `.deb` archive introspection from `control.tar.gz` and `control.tar.xz`
 - **🔍 Enhanced Extraction**: direct `.deb` scans now also read package-matching `/usr/share/doc/<pkg>/copyright` metadata from `data.tar.gz` and `data.tar.xz`
 - **🐛 Bug Fix**: Debian DEP-5 top-level `Files: *` license declarations now emit a parser-level primary `license_detection` with preserved header casing and absolute line numbers
+- **🐛 Bug Fix**: Debian DEP-5 `License:` header paragraphs now emit detections in file order with preserved header casing and absolute line numbers, including standalone bottom license paragraphs
 
 ## Improvement: .deb Archive Introspection (New Feature)
 
@@ -223,6 +224,31 @@ This is intentionally narrow:
 Proof point:
 
 - the `bsdutils` upstream Debian copyright fixture now produces a primary detection with matched text `License: GPL-2+` at absolute line `47`
+
+## Improvement: DEP-5 License Header Paragraph Detections
+
+**Area**: `debian/copyright` DEP-5 paragraph detection  
+**Issues**: local `#176`, `#178`, `#179`, `#180`
+
+Rust now emits parser-level detections for **all** DEP-5 `License:` header paragraphs, not just the primary `Files: *` paragraph.
+
+What this specifically adds:
+
+- detection order now follows file order
+- `matched_text` preserves the original `License:` header casing from the file
+- line numbers are absolute file line numbers, not paragraph-relative offsets
+- standalone bottom `License:` paragraphs are no longer dropped when they have their own paragraph in the file
+
+This is still intentionally narrow:
+
+- it is based on explicit `License:` header lines
+- it does not yet do full paragraph-body license text detection parity
+- it does not close the remaining Debian copyright issue `#181`
+
+Proof points:
+
+- local fixture `testdata/debian/copyright/copyright` now emits ordered detections at lines `11`, `15`, `19`, `23`, and `25`
+- upstream `clamav` fixture now includes the bottom standalone `License: Zlib` paragraph at absolute line `732`
 
 ## Implementation Details
 
