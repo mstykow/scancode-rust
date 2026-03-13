@@ -1281,6 +1281,7 @@ fn parse_copyright_file(content: &str, package_name: Option<&str>) -> PackageDat
     let mut parties = Vec::new();
     let mut license_statements = Vec::new();
     let mut primary_license_detection = None;
+    let mut header_license_detection = None;
     let mut other_license_detections = Vec::new();
 
     if is_dep5 {
@@ -1317,16 +1318,23 @@ fn parse_copyright_file(content: &str, package_name: Option<&str>) -> PackageDat
                 {
                     let detection =
                         build_primary_license_detection(license_name, matched_text, line_no);
-                    if primary_license_detection.is_none()
-                        && rfc822::get_header_first(&para.metadata.headers, "files").as_deref()
-                            == Some("*")
+                    let is_header_paragraph =
+                        rfc822::get_header_first(&para.metadata.headers, "format").is_some();
+                    if rfc822::get_header_first(&para.metadata.headers, "files").as_deref()
+                        == Some("*")
                     {
                         primary_license_detection = Some(detection);
+                    } else if is_header_paragraph {
+                        header_license_detection.get_or_insert(detection);
                     } else {
                         other_license_detections.push(detection);
                     }
                 }
             }
+        }
+
+        if primary_license_detection.is_none() && header_license_detection.is_some() {
+            primary_license_detection = header_license_detection;
         }
     } else {
         let copyright_block = extract_unstructured_field(content, "Copyright:");
@@ -3192,6 +3200,41 @@ License: LGPL-2.1
             .expect("bottom standalone Zlib license paragraph should be detected");
         assert_eq!(last_zlib.matches[0].start_line, 732);
         assert_eq!(last_zlib.matches[0].end_line, 732);
+    }
+
+    #[test]
+    fn test_parse_copyright_uses_header_paragraph_as_primary_when_files_star_is_blank() {
+        let path = PathBuf::from(
+            "reference/scancode-toolkit/tests/packagedcode/data/debian/copyright/crafted_for_tests/test_license_nameless",
+        );
+        let pkg = DebianCopyrightParser::extract_first_package(&path);
+
+        assert_eq!(pkg.license_detections.len(), 1);
+        let primary = &pkg.license_detections[0];
+        assert_eq!(
+            primary.matches[0].matched_text.as_deref(),
+            Some("License: LGPL-3+ or GPL-2+")
+        );
+        assert_eq!(primary.matches[0].start_line, 8);
+        assert_eq!(primary.matches[0].end_line, 8);
+
+        assert!(pkg.other_license_detections.iter().any(|detection| {
+            detection.matches[0].matched_text.as_deref() == Some("License: GPL-2+")
+        }));
+    }
+
+    #[test]
+    fn test_parse_copyright_prefers_files_star_primary_over_header_paragraph() {
+        let content = "Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/\nUpstream-Name: foo\nLicense: MIT\n\nFiles: *\nCopyright: 2024 Example\nLicense: GPL-2+\n";
+        let pkg = parse_copyright_file(content, Some("foo"));
+
+        assert_eq!(pkg.license_detections.len(), 1);
+        let primary = &pkg.license_detections[0];
+        assert_eq!(
+            primary.matches[0].matched_text.as_deref(),
+            Some("License: GPL-2+")
+        );
+        assert_eq!(primary.matches[0].start_line, 7);
     }
 
     #[test]
