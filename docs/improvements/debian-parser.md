@@ -2,9 +2,10 @@
 
 ## Summary
 
-The Debian .deb parser in scancode-rust **implements a missing feature** from the Python reference implementation:
+The Debian `.deb` parser in scancode-rust implements missing direct-archive behavior beyond the Python reference implementation:
 
-- **✨ New Feature**: Full `.deb` archive introspection with control.tar.gz extraction (Python has TODO: "introspect archive")
+- **✨ New Feature**: direct `.deb` archive introspection from `control.tar.gz` and `control.tar.xz`
+- **🔍 Enhanced Extraction**: direct `.deb` scans now also read package-matching `/usr/share/doc/<pkg>/copyright` metadata from `data.tar.gz` and `data.tar.xz`
 
 ## Improvement: .deb Archive Introspection (New Feature)
 
@@ -28,13 +29,13 @@ class DebianDebHandler(DatafileHandler):
         pass
 ```
 
-**Current Python Behavior**: The .deb parser exists but only handles the archive **after** extraction. It does NOT extract the archive itself, leaving the work to external tools.
+**Current Python Behavior**: The `.deb` parser exists but only handles the archive **after** extraction. It does not introspect the archive directly, so direct `.deb` scans miss both control metadata and embedded package copyright metadata.
 
 ### Our Rust Implementation (Complete)
 
 **Location**: `src/parsers/debian.rs`
 
-**Implementation**: Full `.deb` archive extraction and control file parsing:
+**Implementation**: direct `.deb` archive extraction and metadata parsing:
 
 ```rust
 pub fn extract_package_data(path: &Path) -> PackageData {
@@ -75,6 +76,16 @@ pub fn extract_package_data(path: &Path) -> PackageData {
 }
 ```
 
+### Additional embedded copyright support
+
+After parsing `control.tar.*`, Rust now also inspects `data.tar.gz` / `data.tar.xz` for package copyright metadata under paths like:
+
+```text
+./usr/share/doc/<package>/copyright
+```
+
+If a path matches the current package name, that file is parsed with the existing Debian copyright parser and its extracted license statement / copyright-holder parties are merged back onto the `.deb` package.
+
 ### Architecture
 
 **.deb File Structure**:
@@ -93,7 +104,10 @@ example.deb (AR archive)
     └── ...
 ```
 
-**We extract**: `control.tar.gz` → parse `control` file → populate PackageData
+**We extract**:
+
+- `control.tar.gz` or `control.tar.xz` → parse `control` file → populate PackageData
+- package-matching copyright file from `data.tar.gz` or `data.tar.xz` → parse Debian copyright metadata → merge license/copyright details onto the same package
 
 ### Example Output
 
@@ -137,9 +151,24 @@ example.deb (AR archive)
 
 ### Verification
 
-**Test Case**: .deb archive introspection
+**Test Cases**: `.deb` archive introspection
 
 ```rust
+#[test]
+fn test_extract_deb_archive_with_control_tar_xz() {
+    // synthetic .deb with control.tar.xz
+}
+
+#[test]
+fn test_extract_deb_archive_collects_embedded_copyright_metadata() {
+    // synthetic .deb with data.tar.gz usr/share/doc/<pkg>/copyright
+}
+
+#[test]
+fn test_extract_deb_archive_collects_embedded_copyright_from_data_tar_xz() {
+    // synthetic .deb with data.tar.xz usr/share/doc/<pkg>/copyright
+}
+
 #[test]
 fn test_debian_deb_introspection() {
     let result = DebianDebParser::extract_package_data(
@@ -169,7 +198,7 @@ fn test_debian_deb_introspection() {
 }
 ```
 
-**Result**: ✅ Full metadata extraction from .deb archive
+**Result**: ✅ Direct `.deb` control metadata extraction, xz control support, and package-matching embedded copyright metadata merging
 
 ## Implementation Details
 
@@ -185,6 +214,7 @@ fn test_debian_deb_introspection() {
 
 - `ar` crate for AR archive reading
 - `flate2` for gzip decompression
+- `liblzma` for xz decompression
 - `tar` crate for tarball extraction
 - `tempfile` for temporary directory
 
