@@ -1313,9 +1313,7 @@ fn parse_copyright_file(content: &str, package_name: Option<&str>) -> PackageDat
                     license_statements.push(license_name.to_string());
                 }
 
-                if let Some((matched_text, line_no)) =
-                    find_header_line(&para.raw_lines, para.start_line, "license")
-                {
+                if let Some((matched_text, line_no)) = para.license_header_line.clone() {
                     let detection =
                         build_primary_license_detection(license_name, matched_text, line_no);
                     let is_header_paragraph =
@@ -1406,8 +1404,7 @@ fn parse_copyright_file(content: &str, package_name: Option<&str>) -> PackageDat
 #[derive(Debug)]
 struct CopyrightParagraph {
     metadata: Rfc822Metadata,
-    start_line: usize,
-    raw_lines: Vec<String>,
+    license_header_line: Option<(String, usize)>,
 }
 
 fn parse_copyright_paragraphs_with_lines(content: &str) -> Vec<CopyrightParagraph> {
@@ -1419,20 +1416,10 @@ fn parse_copyright_paragraphs_with_lines(content: &str) -> Vec<CopyrightParagrap
         let line_no = idx + 1;
         if line.is_empty() {
             if !current_lines.is_empty() {
-                let paragraph_text = current_lines.join("\n");
-                let metadata = rfc822::parse_rfc822_paragraphs(&paragraph_text)
-                    .into_iter()
-                    .next()
-                    .unwrap_or_else(|| Rfc822Metadata {
-                        headers: HashMap::new(),
-                        body: String::new(),
-                    });
-                paragraphs.push(CopyrightParagraph {
-                    metadata,
-                    start_line: current_start_line,
-                    raw_lines: current_lines.clone(),
-                });
-                current_lines.clear();
+                paragraphs.push(finalize_copyright_paragraph(
+                    std::mem::take(&mut current_lines),
+                    current_start_line,
+                ));
             }
             current_start_line = line_no + 1;
         } else {
@@ -1444,36 +1431,64 @@ fn parse_copyright_paragraphs_with_lines(content: &str) -> Vec<CopyrightParagrap
     }
 
     if !current_lines.is_empty() {
-        let paragraph_text = current_lines.join("\n");
-        let metadata = rfc822::parse_rfc822_paragraphs(&paragraph_text)
-            .into_iter()
-            .next()
-            .unwrap_or_else(|| Rfc822Metadata {
-                headers: HashMap::new(),
-                body: String::new(),
-            });
-        paragraphs.push(CopyrightParagraph {
-            metadata,
-            start_line: current_start_line,
-            raw_lines: current_lines,
-        });
+        paragraphs.push(finalize_copyright_paragraph(
+            current_lines,
+            current_start_line,
+        ));
     }
 
     paragraphs
 }
 
-fn find_header_line(
-    raw_lines: &[String],
-    start_line: usize,
-    header_name: &str,
-) -> Option<(String, usize)> {
+fn finalize_copyright_paragraph(raw_lines: Vec<String>, start_line: usize) -> CopyrightParagraph {
+    let mut headers: HashMap<String, Vec<String>> = HashMap::new();
+    let mut current_name: Option<String> = None;
+    let mut current_value = String::new();
+    let mut license_header_line = None;
+
     for (idx, line) in raw_lines.iter().enumerate() {
-        let lower = line.to_ascii_lowercase();
-        if lower.starts_with(&format!("{}:", header_name)) {
-            return Some((line.trim_end().to_string(), start_line + idx));
+        if line.starts_with(' ') || line.starts_with('\t') {
+            if current_name.is_some() {
+                current_value.push('\n');
+                current_value.push_str(line);
+            }
+            continue;
+        }
+
+        if let Some(name) = current_name.take() {
+            add_copyright_header_value(&mut headers, &name, &current_value);
+            current_value.clear();
+        }
+
+        if let Some((name, value)) = line.split_once(':') {
+            let normalized_name = name.trim().to_ascii_lowercase();
+            if normalized_name == "license" && license_header_line.is_none() {
+                license_header_line = Some((line.trim_end().to_string(), start_line + idx));
+            }
+            current_name = Some(normalized_name);
+            current_value = value.trim_start().to_string();
         }
     }
-    None
+
+    if let Some(name) = current_name.take() {
+        add_copyright_header_value(&mut headers, &name, &current_value);
+    }
+
+    CopyrightParagraph {
+        metadata: Rfc822Metadata {
+            headers,
+            body: String::new(),
+        },
+        license_header_line,
+    }
+}
+
+fn add_copyright_header_value(headers: &mut HashMap<String, Vec<String>>, name: &str, value: &str) {
+    let entry = headers.entry(name.to_string()).or_default();
+    let trimmed = value.trim_end();
+    if !trimmed.is_empty() {
+        entry.push(trimmed.to_string());
+    }
 }
 
 fn build_primary_license_detection(
@@ -3235,6 +3250,72 @@ License: LGPL-2.1
             Some("License: GPL-2+")
         );
         assert_eq!(primary.matches[0].start_line, 7);
+    }
+
+    #[test]
+    #[ignore = "performance probe for Debian copyright parsing"]
+    fn test_debian_copyright_perf_guardrail_large_dep5_fixtures() {
+        use std::hint::black_box;
+        use std::time::Instant;
+
+        let fixtures = [
+            (
+                "reference/scancode-toolkit/tests/packagedcode/data/debian/copyright/debian-slim-2021-04-07/usr/share/doc/bsdutils/copyright",
+                Some("bsdutils"),
+                47usize,
+            ),
+            (
+                "reference/scancode-toolkit/tests/packagedcode/data/debian/copyright/debian-2019-11-15/main/c/clamav/stable_copyright",
+                Some("clamav"),
+                47usize,
+            ),
+        ];
+
+        let iterations = 100usize;
+        let start = Instant::now();
+
+        for _ in 0..iterations {
+            for (path, package_name, expected_line) in fixtures {
+                let content =
+                    read_file_to_string(Path::new(path)).expect("fixture should be readable");
+                let pkg = black_box(parse_copyright_file(&content, package_name));
+                assert!(!pkg.license_detections.is_empty());
+                assert_eq!(
+                    pkg.license_detections[0].matches[0].start_line,
+                    expected_line
+                );
+            }
+        }
+
+        eprintln!(
+            "Debian copyright perf probe: parsed {} fixtures x {} iterations in {:?}",
+            fixtures.len(),
+            iterations,
+            start.elapsed()
+        );
+    }
+
+    #[test]
+    fn test_finalize_copyright_paragraph_matches_rfc822_headers_and_license_line() {
+        let raw_lines = vec![
+            "Files: *".to_string(),
+            "Copyright: 2024 Example Org".to_string(),
+            "License: Apache-2.0".to_string(),
+            " Licensed under the Apache License, Version 2.0.".to_string(),
+        ];
+
+        let paragraph = finalize_copyright_paragraph(raw_lines.clone(), 10);
+        let expected = rfc822::parse_rfc822_paragraphs(&raw_lines.join("\n"))
+            .into_iter()
+            .next()
+            .expect("reference RFC822 paragraph should parse");
+
+        assert_eq!(paragraph.metadata.headers, expected.headers);
+        assert_eq!(paragraph.metadata.body, expected.body);
+        assert_eq!(
+            paragraph.license_header_line,
+            Some(("License: Apache-2.0".to_string(), 12))
+        );
     }
 
     #[test]
