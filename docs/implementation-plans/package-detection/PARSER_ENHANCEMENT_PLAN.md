@@ -649,15 +649,12 @@ Exclude from the Debian PR:
 
 Current status (March 12, 2026):
 
-- The Debian batch is now in progress from a narrow direct-archive slice instead of attempting the whole issue set at once.
-- Current local work adds direct `.deb` `control.tar.xz` support and merges embedded `/usr/share/doc/<pkg>/copyright` metadata from `data.tar.*` back onto the same package.
-- A scan-level regression now proves `debian/control` + `debian/copyright` source trees already assemble into a Debian package and classify keyfiles correctly through the main pipeline, so `#219` no longer appears to need a larger parser refactor.
-- The current follow-up slice now adds parser-level primary `license_detections` for the top `Files: *` DEP-5 license field, which is enough to address `#183` but not the rest of the Debian copyright-detection cluster.
-- The current stacked follow-up slice after `#183` now covers `#176`, `#178`, `#179`, and `#180` by emitting all DEP-5 `License:` header paragraph detections in file order with preserved casing and absolute line numbers.
-- The next stacked follow-up after that now addresses `#181` by falling back to the header paragraph license when `Files: *` has no usable `License:` field.
-- The current metadata/control follow-up now addresses `#185` and `#186` by integrating installed `status` / `status.d` package metadata with matching `info/*.list` / `*.md5sums` sidecars during rootfs/container scans.
-- The final Debian slice now addresses `#177` by removing the extra per-paragraph reparse/rescan cycle in DEP-5 copyright parsing while keeping parser semantics and golden output stable.
-- With that performance slice complete, the Debian ecosystem batch is now fully covered by the merged/archive/stacked follow-up PR sequence.
+- The Debian ecosystem batch is complete.
+- Direct `.deb` archive scans now extract metadata from both `control.tar.gz` and `control.tar.xz`, and they merge package-matching `/usr/share/doc/<pkg>/copyright` metadata from `data.tar.gz` and `data.tar.xz`.
+- Debian DEP-5 copyright parsing now emits coherent primary, paragraph-level, and fallback `license_detections` with preserved header casing and absolute file line numbers.
+- Debian source trees with `debian/control` and `debian/copyright` already assemble into one package and classify the expected key files in the main pipeline.
+- Installed Debian package metadata from `status` / `status.d` now integrates matching `info/*.list` and `*.md5sums` sidecars during rootfs/container scans, including Ubuntu namespace matching and multiarch isolation.
+- Debian copyright parsing now avoids the extra per-paragraph reparse/rescan cycle while keeping parser semantics and golden output stable.
 
 ## PR Template Checklist
 
