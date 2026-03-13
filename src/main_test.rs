@@ -1201,6 +1201,65 @@ fn python_pkg_info_scan_assigns_sources_entries() {
 }
 
 #[test]
+fn debian_status_d_scan_assigns_installed_files_and_keeps_dependencies() {
+    let temp_dir = tempfile::TempDir::new().expect("create temp dir");
+    let status_dir = temp_dir.path().join("var/lib/dpkg/status.d");
+    let info_dir = temp_dir.path().join("var/lib/dpkg/info");
+    let bin_dir = temp_dir.path().join("bin");
+    let doc_dir = temp_dir.path().join("usr/share/doc/bash");
+
+    fs::create_dir_all(&status_dir).expect("create status.d dir");
+    fs::create_dir_all(&info_dir).expect("create info dir");
+    fs::create_dir_all(&bin_dir).expect("create bin dir");
+    fs::create_dir_all(&doc_dir).expect("create doc dir");
+
+    fs::write(
+        status_dir.join("bash"),
+        "Package: bash\nStatus: install ok installed\nPriority: required\nSection: shells\nMaintainer: GNU Bash Maintainers <bash@example.com>\nArchitecture: amd64\nVersion: 5.2-1\nDepends: libc6 (>= 2.36)\nDescription: GNU Bourne Again SHell\n shell\n",
+    )
+    .expect("write status.d package");
+    fs::write(
+        info_dir.join("bash.list"),
+        "/bin/bash\n/usr/share/doc/bash/copyright\n",
+    )
+    .expect("write bash.list");
+    fs::write(
+        info_dir.join("bash.md5sums"),
+        "77506afebd3b7e19e937a678a185b62e  bin/bash\n9632d707e9eca8b3ba2b1a98c1c3fdce  usr/share/doc/bash/copyright\n",
+    )
+    .expect("write bash.md5sums");
+    fs::write(bin_dir.join("bash"), "#!/bin/sh\n").expect("write /bin/bash");
+    fs::write(doc_dir.join("copyright"), "copyright text\n")
+        .expect("write /usr/share/doc/bash/copyright");
+
+    let (files, result) = python_scan_and_assemble(temp_dir.path());
+
+    let package = result
+        .packages
+        .iter()
+        .find(|package| package.name.as_deref() == Some("bash"))
+        .expect("bash package should be assembled from status.d");
+
+    assert!(result.dependencies.iter().any(|dep| {
+        dep.purl.as_deref() == Some("pkg:deb/debian/libc6")
+            && dep.scope.as_deref() == Some("depends")
+            && dep.for_package_uid.as_deref() == Some(&package.package_uid)
+    }));
+
+    let bash_file = files
+        .iter()
+        .find(|file| file.path.ends_with("/bin/bash"))
+        .expect("/bin/bash should be scanned");
+    let copyright_file = files
+        .iter()
+        .find(|file| file.path.ends_with("/usr/share/doc/bash/copyright"))
+        .expect("copyright file should be scanned");
+
+    assert!(bash_file.for_packages.contains(&package.package_uid));
+    assert!(copyright_file.for_packages.contains(&package.package_uid));
+}
+
+#[test]
 fn resolve_thread_count_supports_reference_compat_values() {
     assert_eq!(resolve_thread_count(-1), 1);
     assert_eq!(resolve_thread_count(0), default_parallel_threads());

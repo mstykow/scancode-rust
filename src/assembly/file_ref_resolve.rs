@@ -49,6 +49,10 @@ const PYTHON_METADATA_DATASOURCE_IDS: &[DatasourceId] = &[
     DatasourceId::PypiSdistPkginfo,
 ];
 const PYTHON_SITE_PACKAGES_SEGMENTS: &[&str] = &["site-packages/", "dist-packages/"];
+const DEBIAN_INSTALLED_SUPPLEMENTAL_DATASOURCE_IDS: &[DatasourceId] = &[
+    DatasourceId::DebianInstalledFilesList,
+    DatasourceId::DebianInstalledMd5Sums,
+];
 
 struct PythonMetadataResolution {
     base_path: String,
@@ -166,7 +170,7 @@ pub fn resolve_file_references(
 
             let root = compute_root(datafile_path, config.path_suffix);
 
-            let file_references = collect_file_references(
+            let mut file_references = collect_file_references(
                 files,
                 &path_index,
                 datafile_path,
@@ -174,6 +178,13 @@ pub fn resolve_file_references(
                 config.datasource_ids,
                 package.purl.as_deref(),
             );
+
+            if is_debian_installed_package(package) {
+                merge_file_references(
+                    &mut file_references,
+                    collect_debian_installed_file_references(files, package),
+                );
+            }
 
             let mut missing_refs = Vec::new();
 
@@ -531,6 +542,113 @@ fn is_rpm_package(package: &Package) -> bool {
         }
     }
     false
+}
+
+fn is_debian_installed_package(package: &Package) -> bool {
+    package
+        .datasource_ids
+        .contains(&DatasourceId::DebianInstalledStatusDb)
+        || package
+            .datasource_ids
+            .contains(&DatasourceId::DebianDistrolessInstalledDb)
+}
+
+fn collect_debian_installed_file_references(
+    files: &[FileInfo],
+    package: &Package,
+) -> Vec<crate::models::FileReference> {
+    let mut refs = Vec::new();
+
+    for file in files {
+        for pkg_data in &file.package_data {
+            let Some(dsid) = pkg_data.datasource_id else {
+                continue;
+            };
+            if !DEBIAN_INSTALLED_SUPPLEMENTAL_DATASOURCE_IDS.contains(&dsid) {
+                continue;
+            }
+
+            if pkg_data.name != package.name {
+                continue;
+            }
+            if !debian_installed_namespace_matches(&pkg_data.namespace, &package.namespace) {
+                continue;
+            }
+            if !debian_installed_arch_matches(&pkg_data.qualifiers, &package.qualifiers) {
+                continue;
+            }
+
+            merge_file_references(&mut refs, pkg_data.file_references.clone());
+        }
+    }
+
+    refs
+}
+
+fn debian_installed_namespace_matches(
+    supplemental_namespace: &Option<String>,
+    package_namespace: &Option<String>,
+) -> bool {
+    match (
+        supplemental_namespace.as_deref(),
+        package_namespace.as_deref(),
+    ) {
+        (None, _) => true,
+        (Some("debian"), Some("ubuntu")) => true,
+        (Some(left), Some(right)) => left == right,
+        (Some(_), None) => true,
+    }
+}
+
+fn debian_installed_arch_matches(
+    supplemental_qualifiers: &Option<HashMap<String, String>>,
+    package_qualifiers: &Option<HashMap<String, String>>,
+) -> bool {
+    let supplemental_arch = supplemental_qualifiers
+        .as_ref()
+        .and_then(|qualifiers| qualifiers.get("arch"));
+    let package_arch = package_qualifiers
+        .as_ref()
+        .and_then(|qualifiers| qualifiers.get("arch"));
+
+    match (supplemental_arch, package_arch) {
+        (Some(left), Some(right)) => left == right,
+        (Some(_), None) => false,
+        _ => true,
+    }
+}
+
+fn merge_file_references(
+    target: &mut Vec<crate::models::FileReference>,
+    incoming: Vec<crate::models::FileReference>,
+) {
+    for file_ref in incoming {
+        if let Some(existing) = target
+            .iter_mut()
+            .find(|existing| existing.path == file_ref.path)
+        {
+            if existing.size.is_none() {
+                existing.size = file_ref.size;
+            }
+            if existing.sha1.is_none() {
+                existing.sha1 = file_ref.sha1.clone();
+            }
+            if existing.md5.is_none() {
+                existing.md5 = file_ref.md5.clone();
+            }
+            if existing.sha256.is_none() {
+                existing.sha256 = file_ref.sha256.clone();
+            }
+            if existing.sha512.is_none() {
+                existing.sha512 = file_ref.sha512.clone();
+            }
+            if existing.extra_data.is_none() {
+                existing.extra_data = file_ref.extra_data.clone();
+            }
+        } else {
+            target.push(file_ref);
+        }
+    }
 }
 
 fn resolve_rpm_namespace(
@@ -2243,5 +2361,708 @@ mod tests {
             .and_then(|value| value.as_array())
             .expect("missing_file_references should be recorded");
         assert_eq!(missing.len(), 1);
+    }
+
+    #[test]
+    fn test_resolve_debian_installed_file_references_from_status_db() {
+        let mut files = vec![
+            FileInfo {
+                name: "status".to_string(),
+                base_name: "status".to_string(),
+                extension: String::new(),
+                path: "rootfs/var/lib/dpkg/status".to_string(),
+                file_type: FileType::File,
+                mime_type: None,
+                size: 100,
+                date: None,
+                sha1: None,
+                md5: None,
+                sha256: None,
+                programming_language: None,
+                package_data: vec![PackageData {
+                    datasource_id: Some(DatasourceId::DebianInstalledStatusDb),
+                    package_type: Some(PackageType::Deb),
+                    namespace: Some("debian".to_string()),
+                    name: Some("bash".to_string()),
+                    version: Some("5.2-1".to_string()),
+                    purl: Some("pkg:deb/debian/bash@5.2-1?arch=amd64".to_string()),
+                    ..Default::default()
+                }],
+                license_expression: None,
+                license_detections: vec![],
+                copyrights: vec![],
+                holders: vec![],
+                authors: vec![],
+                emails: vec![],
+                urls: vec![],
+                for_packages: vec![],
+                scan_errors: vec![],
+                is_source: None,
+                source_count: None,
+                is_legal: false,
+                is_manifest: false,
+                is_readme: false,
+                is_top_level: false,
+                is_key_file: false,
+            },
+            FileInfo {
+                name: "bash.list".to_string(),
+                base_name: "bash".to_string(),
+                extension: "list".to_string(),
+                path: "rootfs/var/lib/dpkg/info/bash.list".to_string(),
+                file_type: FileType::File,
+                mime_type: None,
+                size: 40,
+                date: None,
+                sha1: None,
+                md5: None,
+                sha256: None,
+                programming_language: None,
+                package_data: vec![PackageData {
+                    datasource_id: Some(DatasourceId::DebianInstalledFilesList),
+                    package_type: Some(PackageType::Deb),
+                    namespace: Some("debian".to_string()),
+                    name: Some("bash".to_string()),
+                    purl: Some("pkg:deb/debian/bash".to_string()),
+                    file_references: vec![
+                        FileReference {
+                            path: "/bin/bash".to_string(),
+                            size: None,
+                            sha1: None,
+                            md5: None,
+                            sha256: None,
+                            sha512: None,
+                            extra_data: None,
+                        },
+                        FileReference {
+                            path: "/usr/share/doc/bash/copyright".to_string(),
+                            size: None,
+                            sha1: None,
+                            md5: None,
+                            sha256: None,
+                            sha512: None,
+                            extra_data: None,
+                        },
+                    ],
+                    ..Default::default()
+                }],
+                license_expression: None,
+                license_detections: vec![],
+                copyrights: vec![],
+                holders: vec![],
+                authors: vec![],
+                emails: vec![],
+                urls: vec![],
+                for_packages: vec![],
+                scan_errors: vec![],
+                is_source: None,
+                source_count: None,
+                is_legal: false,
+                is_manifest: false,
+                is_readme: false,
+                is_top_level: false,
+                is_key_file: false,
+            },
+            FileInfo {
+                name: "bash.md5sums".to_string(),
+                base_name: "bash".to_string(),
+                extension: "md5sums".to_string(),
+                path: "rootfs/var/lib/dpkg/info/bash.md5sums".to_string(),
+                file_type: FileType::File,
+                mime_type: None,
+                size: 40,
+                date: None,
+                sha1: None,
+                md5: None,
+                sha256: None,
+                programming_language: None,
+                package_data: vec![PackageData {
+                    datasource_id: Some(DatasourceId::DebianInstalledMd5Sums),
+                    package_type: Some(PackageType::Deb),
+                    namespace: Some("debian".to_string()),
+                    name: Some("bash".to_string()),
+                    purl: Some("pkg:deb/debian/bash".to_string()),
+                    file_references: vec![FileReference {
+                        path: "bin/bash".to_string(),
+                        size: None,
+                        sha1: None,
+                        md5: Some("77506afebd3b7e19e937a678a185b62e".to_string()),
+                        sha256: None,
+                        sha512: None,
+                        extra_data: None,
+                    }],
+                    ..Default::default()
+                }],
+                license_expression: None,
+                license_detections: vec![],
+                copyrights: vec![],
+                holders: vec![],
+                authors: vec![],
+                emails: vec![],
+                urls: vec![],
+                for_packages: vec![],
+                scan_errors: vec![],
+                is_source: None,
+                source_count: None,
+                is_legal: false,
+                is_manifest: false,
+                is_readme: false,
+                is_top_level: false,
+                is_key_file: false,
+            },
+            FileInfo {
+                name: "bash".to_string(),
+                base_name: "bash".to_string(),
+                extension: String::new(),
+                path: "rootfs/bin/bash".to_string(),
+                file_type: FileType::File,
+                mime_type: None,
+                size: 20,
+                date: None,
+                sha1: None,
+                md5: None,
+                sha256: None,
+                programming_language: None,
+                package_data: vec![],
+                license_expression: None,
+                license_detections: vec![],
+                copyrights: vec![],
+                holders: vec![],
+                authors: vec![],
+                emails: vec![],
+                urls: vec![],
+                for_packages: vec![],
+                scan_errors: vec![],
+                is_source: None,
+                source_count: None,
+                is_legal: false,
+                is_manifest: false,
+                is_readme: false,
+                is_top_level: false,
+                is_key_file: false,
+            },
+            FileInfo {
+                name: "copyright".to_string(),
+                base_name: "copyright".to_string(),
+                extension: String::new(),
+                path: "rootfs/usr/share/doc/bash/copyright".to_string(),
+                file_type: FileType::File,
+                mime_type: None,
+                size: 20,
+                date: None,
+                sha1: None,
+                md5: None,
+                sha256: None,
+                programming_language: None,
+                package_data: vec![],
+                license_expression: None,
+                license_detections: vec![],
+                copyrights: vec![],
+                holders: vec![],
+                authors: vec![],
+                emails: vec![],
+                urls: vec![],
+                for_packages: vec![],
+                scan_errors: vec![],
+                is_source: None,
+                source_count: None,
+                is_legal: false,
+                is_manifest: false,
+                is_readme: false,
+                is_top_level: false,
+                is_key_file: false,
+            },
+        ];
+
+        let mut packages = vec![Package {
+            package_type: Some(PackageType::Deb),
+            namespace: Some("debian".to_string()),
+            name: Some("bash".to_string()),
+            version: Some("5.2-1".to_string()),
+            qualifiers: Some(HashMap::from([("arch".to_string(), "amd64".to_string())])),
+            subpath: None,
+            primary_language: None,
+            description: None,
+            release_date: None,
+            parties: vec![],
+            keywords: vec![],
+            homepage_url: None,
+            download_url: None,
+            size: None,
+            sha1: None,
+            md5: None,
+            sha256: None,
+            sha512: None,
+            bug_tracking_url: None,
+            code_view_url: None,
+            vcs_url: None,
+            copyright: None,
+            holder: None,
+            declared_license_expression: None,
+            declared_license_expression_spdx: None,
+            license_detections: vec![],
+            other_license_expression: None,
+            other_license_expression_spdx: None,
+            other_license_detections: vec![],
+            extracted_license_statement: None,
+            notice_text: None,
+            source_packages: vec![],
+            is_private: false,
+            is_virtual: false,
+            extra_data: None,
+            repository_homepage_url: None,
+            repository_download_url: None,
+            api_data_url: None,
+            purl: Some("pkg:deb/debian/bash@5.2-1?arch=amd64".to_string()),
+            package_uid: "pkg:deb/debian/bash@5.2-1?arch=amd64&uuid=test-uuid".to_string(),
+            datafile_paths: vec!["rootfs/var/lib/dpkg/status".to_string()],
+            datasource_ids: vec![DatasourceId::DebianInstalledStatusDb],
+        }];
+
+        let mut dependencies = vec![];
+        resolve_file_references(&mut files, &mut packages, &mut dependencies);
+
+        assert_eq!(
+            files[3].for_packages,
+            vec!["pkg:deb/debian/bash@5.2-1?arch=amd64&uuid=test-uuid".to_string()]
+        );
+        assert_eq!(
+            files[4].for_packages,
+            vec!["pkg:deb/debian/bash@5.2-1?arch=amd64&uuid=test-uuid".to_string()]
+        );
+    }
+
+    #[test]
+    fn test_resolve_debian_installed_file_references_matches_ubuntu_package_namespace() {
+        let mut files = vec![
+            FileInfo {
+                name: "status".to_string(),
+                base_name: "status".to_string(),
+                extension: String::new(),
+                path: "rootfs/var/lib/dpkg/status".to_string(),
+                file_type: FileType::File,
+                mime_type: None,
+                size: 100,
+                date: None,
+                sha1: None,
+                md5: None,
+                sha256: None,
+                programming_language: None,
+                package_data: vec![PackageData {
+                    datasource_id: Some(DatasourceId::DebianInstalledStatusDb),
+                    package_type: Some(PackageType::Deb),
+                    namespace: Some("ubuntu".to_string()),
+                    name: Some("bash".to_string()),
+                    version: Some("5.2-1ubuntu1".to_string()),
+                    purl: Some("pkg:deb/ubuntu/bash@5.2-1ubuntu1?arch=amd64".to_string()),
+                    ..Default::default()
+                }],
+                license_expression: None,
+                license_detections: vec![],
+                copyrights: vec![],
+                holders: vec![],
+                authors: vec![],
+                emails: vec![],
+                urls: vec![],
+                for_packages: vec![],
+                scan_errors: vec![],
+                is_source: None,
+                source_count: None,
+                is_legal: false,
+                is_manifest: false,
+                is_readme: false,
+                is_top_level: false,
+                is_key_file: false,
+            },
+            FileInfo {
+                name: "bash.list".to_string(),
+                base_name: "bash".to_string(),
+                extension: "list".to_string(),
+                path: "rootfs/var/lib/dpkg/info/bash.list".to_string(),
+                file_type: FileType::File,
+                mime_type: None,
+                size: 40,
+                date: None,
+                sha1: None,
+                md5: None,
+                sha256: None,
+                programming_language: None,
+                package_data: vec![PackageData {
+                    datasource_id: Some(DatasourceId::DebianInstalledFilesList),
+                    package_type: Some(PackageType::Deb),
+                    namespace: Some("debian".to_string()),
+                    name: Some("bash".to_string()),
+                    purl: Some("pkg:deb/debian/bash".to_string()),
+                    file_references: vec![FileReference {
+                        path: "/bin/bash".to_string(),
+                        size: None,
+                        sha1: None,
+                        md5: None,
+                        sha256: None,
+                        sha512: None,
+                        extra_data: None,
+                    }],
+                    ..Default::default()
+                }],
+                license_expression: None,
+                license_detections: vec![],
+                copyrights: vec![],
+                holders: vec![],
+                authors: vec![],
+                emails: vec![],
+                urls: vec![],
+                for_packages: vec![],
+                scan_errors: vec![],
+                is_source: None,
+                source_count: None,
+                is_legal: false,
+                is_manifest: false,
+                is_readme: false,
+                is_top_level: false,
+                is_key_file: false,
+            },
+            FileInfo {
+                name: "bash".to_string(),
+                base_name: "bash".to_string(),
+                extension: String::new(),
+                path: "rootfs/bin/bash".to_string(),
+                file_type: FileType::File,
+                mime_type: None,
+                size: 20,
+                date: None,
+                sha1: None,
+                md5: None,
+                sha256: None,
+                programming_language: None,
+                package_data: vec![],
+                license_expression: None,
+                license_detections: vec![],
+                copyrights: vec![],
+                holders: vec![],
+                authors: vec![],
+                emails: vec![],
+                urls: vec![],
+                for_packages: vec![],
+                scan_errors: vec![],
+                is_source: None,
+                source_count: None,
+                is_legal: false,
+                is_manifest: false,
+                is_readme: false,
+                is_top_level: false,
+                is_key_file: false,
+            },
+        ];
+
+        let mut packages = vec![Package {
+            package_type: Some(PackageType::Deb),
+            namespace: Some("ubuntu".to_string()),
+            name: Some("bash".to_string()),
+            version: Some("5.2-1ubuntu1".to_string()),
+            qualifiers: Some(HashMap::from([("arch".to_string(), "amd64".to_string())])),
+            subpath: None,
+            primary_language: None,
+            description: None,
+            release_date: None,
+            parties: vec![],
+            keywords: vec![],
+            homepage_url: None,
+            download_url: None,
+            size: None,
+            sha1: None,
+            md5: None,
+            sha256: None,
+            sha512: None,
+            bug_tracking_url: None,
+            code_view_url: None,
+            vcs_url: None,
+            copyright: None,
+            holder: None,
+            declared_license_expression: None,
+            declared_license_expression_spdx: None,
+            license_detections: vec![],
+            other_license_expression: None,
+            other_license_expression_spdx: None,
+            other_license_detections: vec![],
+            extracted_license_statement: None,
+            notice_text: None,
+            source_packages: vec![],
+            is_private: false,
+            is_virtual: false,
+            extra_data: None,
+            repository_homepage_url: None,
+            repository_download_url: None,
+            api_data_url: None,
+            purl: Some("pkg:deb/ubuntu/bash@5.2-1ubuntu1?arch=amd64".to_string()),
+            package_uid: "pkg:deb/ubuntu/bash@5.2-1ubuntu1?arch=amd64&uuid=test-uuid".to_string(),
+            datafile_paths: vec!["rootfs/var/lib/dpkg/status".to_string()],
+            datasource_ids: vec![DatasourceId::DebianInstalledStatusDb],
+        }];
+
+        let mut dependencies = vec![];
+        resolve_file_references(&mut files, &mut packages, &mut dependencies);
+
+        assert_eq!(
+            files[2].for_packages,
+            vec!["pkg:deb/ubuntu/bash@5.2-1ubuntu1?arch=amd64&uuid=test-uuid".to_string()]
+        );
+    }
+
+    #[test]
+    fn test_resolve_debian_installed_file_references_respects_arch_qualifier() {
+        let mut files = vec![
+            FileInfo {
+                name: "status".to_string(),
+                base_name: "status".to_string(),
+                extension: String::new(),
+                path: "rootfs/var/lib/dpkg/status".to_string(),
+                file_type: FileType::File,
+                mime_type: None,
+                size: 100,
+                date: None,
+                sha1: None,
+                md5: None,
+                sha256: None,
+                programming_language: None,
+                package_data: vec![PackageData {
+                    datasource_id: Some(DatasourceId::DebianInstalledStatusDb),
+                    package_type: Some(PackageType::Deb),
+                    namespace: Some("debian".to_string()),
+                    name: Some("libc6".to_string()),
+                    version: Some("2.36-1".to_string()),
+                    purl: Some("pkg:deb/debian/libc6@2.36-1?arch=amd64".to_string()),
+                    qualifiers: Some(HashMap::from([("arch".to_string(), "amd64".to_string())])),
+                    ..Default::default()
+                }],
+                license_expression: None,
+                license_detections: vec![],
+                copyrights: vec![],
+                holders: vec![],
+                authors: vec![],
+                emails: vec![],
+                urls: vec![],
+                for_packages: vec![],
+                scan_errors: vec![],
+                is_source: None,
+                source_count: None,
+                is_legal: false,
+                is_manifest: false,
+                is_readme: false,
+                is_top_level: false,
+                is_key_file: false,
+            },
+            FileInfo {
+                name: "libc6:amd64.list".to_string(),
+                base_name: "libc6:amd64".to_string(),
+                extension: "list".to_string(),
+                path: "rootfs/var/lib/dpkg/info/libc6:amd64.list".to_string(),
+                file_type: FileType::File,
+                mime_type: None,
+                size: 20,
+                date: None,
+                sha1: None,
+                md5: None,
+                sha256: None,
+                programming_language: None,
+                package_data: vec![PackageData {
+                    datasource_id: Some(DatasourceId::DebianInstalledFilesList),
+                    package_type: Some(PackageType::Deb),
+                    namespace: Some("debian".to_string()),
+                    name: Some("libc6".to_string()),
+                    qualifiers: Some(HashMap::from([("arch".to_string(), "amd64".to_string())])),
+                    purl: Some("pkg:deb/debian/libc6?arch=amd64".to_string()),
+                    file_references: vec![FileReference {
+                        path: "/lib/x86_64-linux-gnu/libc.so.6".to_string(),
+                        size: None,
+                        sha1: None,
+                        md5: None,
+                        sha256: None,
+                        sha512: None,
+                        extra_data: None,
+                    }],
+                    ..Default::default()
+                }],
+                license_expression: None,
+                license_detections: vec![],
+                copyrights: vec![],
+                holders: vec![],
+                authors: vec![],
+                emails: vec![],
+                urls: vec![],
+                for_packages: vec![],
+                scan_errors: vec![],
+                is_source: None,
+                source_count: None,
+                is_legal: false,
+                is_manifest: false,
+                is_readme: false,
+                is_top_level: false,
+                is_key_file: false,
+            },
+            FileInfo {
+                name: "libc6:i386.list".to_string(),
+                base_name: "libc6:i386".to_string(),
+                extension: "list".to_string(),
+                path: "rootfs/var/lib/dpkg/info/libc6:i386.list".to_string(),
+                file_type: FileType::File,
+                mime_type: None,
+                size: 20,
+                date: None,
+                sha1: None,
+                md5: None,
+                sha256: None,
+                programming_language: None,
+                package_data: vec![PackageData {
+                    datasource_id: Some(DatasourceId::DebianInstalledFilesList),
+                    package_type: Some(PackageType::Deb),
+                    namespace: Some("debian".to_string()),
+                    name: Some("libc6".to_string()),
+                    qualifiers: Some(HashMap::from([("arch".to_string(), "i386".to_string())])),
+                    purl: Some("pkg:deb/debian/libc6?arch=i386".to_string()),
+                    file_references: vec![FileReference {
+                        path: "/lib/i386-linux-gnu/libc.so.6".to_string(),
+                        size: None,
+                        sha1: None,
+                        md5: None,
+                        sha256: None,
+                        sha512: None,
+                        extra_data: None,
+                    }],
+                    ..Default::default()
+                }],
+                license_expression: None,
+                license_detections: vec![],
+                copyrights: vec![],
+                holders: vec![],
+                authors: vec![],
+                emails: vec![],
+                urls: vec![],
+                for_packages: vec![],
+                scan_errors: vec![],
+                is_source: None,
+                source_count: None,
+                is_legal: false,
+                is_manifest: false,
+                is_readme: false,
+                is_top_level: false,
+                is_key_file: false,
+            },
+            FileInfo {
+                name: "libc.so.6".to_string(),
+                base_name: "libc.so".to_string(),
+                extension: "6".to_string(),
+                path: "rootfs/lib/x86_64-linux-gnu/libc.so.6".to_string(),
+                file_type: FileType::File,
+                mime_type: None,
+                size: 10,
+                date: None,
+                sha1: None,
+                md5: None,
+                sha256: None,
+                programming_language: None,
+                package_data: vec![],
+                license_expression: None,
+                license_detections: vec![],
+                copyrights: vec![],
+                holders: vec![],
+                authors: vec![],
+                emails: vec![],
+                urls: vec![],
+                for_packages: vec![],
+                scan_errors: vec![],
+                is_source: None,
+                source_count: None,
+                is_legal: false,
+                is_manifest: false,
+                is_readme: false,
+                is_top_level: false,
+                is_key_file: false,
+            },
+            FileInfo {
+                name: "libc.so.6".to_string(),
+                base_name: "libc.so".to_string(),
+                extension: "6".to_string(),
+                path: "rootfs/lib/i386-linux-gnu/libc.so.6".to_string(),
+                file_type: FileType::File,
+                mime_type: None,
+                size: 10,
+                date: None,
+                sha1: None,
+                md5: None,
+                sha256: None,
+                programming_language: None,
+                package_data: vec![],
+                license_expression: None,
+                license_detections: vec![],
+                copyrights: vec![],
+                holders: vec![],
+                authors: vec![],
+                emails: vec![],
+                urls: vec![],
+                for_packages: vec![],
+                scan_errors: vec![],
+                is_source: None,
+                source_count: None,
+                is_legal: false,
+                is_manifest: false,
+                is_readme: false,
+                is_top_level: false,
+                is_key_file: false,
+            },
+        ];
+
+        let mut packages = vec![Package {
+            package_type: Some(PackageType::Deb),
+            namespace: Some("debian".to_string()),
+            name: Some("libc6".to_string()),
+            version: Some("2.36-1".to_string()),
+            qualifiers: Some(HashMap::from([("arch".to_string(), "amd64".to_string())])),
+            subpath: None,
+            primary_language: None,
+            description: None,
+            release_date: None,
+            parties: vec![],
+            keywords: vec![],
+            homepage_url: None,
+            download_url: None,
+            size: None,
+            sha1: None,
+            md5: None,
+            sha256: None,
+            sha512: None,
+            bug_tracking_url: None,
+            code_view_url: None,
+            vcs_url: None,
+            copyright: None,
+            holder: None,
+            declared_license_expression: None,
+            declared_license_expression_spdx: None,
+            license_detections: vec![],
+            other_license_expression: None,
+            other_license_expression_spdx: None,
+            other_license_detections: vec![],
+            extracted_license_statement: None,
+            notice_text: None,
+            source_packages: vec![],
+            is_private: false,
+            is_virtual: false,
+            extra_data: None,
+            repository_homepage_url: None,
+            repository_download_url: None,
+            api_data_url: None,
+            purl: Some("pkg:deb/debian/libc6@2.36-1?arch=amd64".to_string()),
+            package_uid: "pkg:deb/debian/libc6@2.36-1?arch=amd64&uuid=test-uuid".to_string(),
+            datafile_paths: vec!["rootfs/var/lib/dpkg/status".to_string()],
+            datasource_ids: vec![DatasourceId::DebianInstalledStatusDb],
+        }];
+
+        let mut dependencies = vec![];
+        resolve_file_references(&mut files, &mut packages, &mut dependencies);
+
+        assert_eq!(
+            files[3].for_packages,
+            vec!["pkg:deb/debian/libc6@2.36-1?arch=amd64&uuid=test-uuid".to_string()]
+        );
+        assert!(files[4].for_packages.is_empty());
     }
 }
