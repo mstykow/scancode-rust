@@ -6,6 +6,7 @@ The Debian `.deb` parser in scancode-rust implements missing direct-archive beha
 
 - **✨ New Feature**: direct `.deb` archive introspection from `control.tar.gz` and `control.tar.xz`
 - **🔍 Enhanced Extraction**: direct `.deb` scans now also read package-matching `/usr/share/doc/<pkg>/copyright` metadata from `data.tar.gz` and `data.tar.xz`
+- **🐛 Bug Fix**: Debian DEP-5 top-level `Files: *` license declarations now emit a parser-level primary `license_detection` with preserved header casing and absolute line numbers
 
 ## Improvement: .deb Archive Introspection (New Feature)
 
@@ -199,6 +200,29 @@ fn test_debian_deb_introspection() {
 ```
 
 **Result**: ✅ Direct `.deb` control metadata extraction, xz control support, and package-matching embedded copyright metadata merging
+
+## Improvement: Primary DEP-5 License Detection
+
+**Area**: `debian/copyright` DEP-5 parsing  
+**Issue**: local `#183`, upstream `aboutcode-org/scancode-toolkit#3424`
+
+Rust now emits a parser-level primary `license_detection` for the top `Files: *` `License:` paragraph in DEP-5 Debian copyright files.
+
+What this specifically adds:
+
+- a non-empty `license_detections` entry for the primary Debian copyright license
+- preserved `matched_text` casing from the original `License:` header line
+- absolute file `start_line` / `end_line` instead of paragraph-relative numbering for that primary detection
+
+This is intentionally narrow:
+
+- it covers the primary `Files: *` paragraph only
+- it does not claim full paragraph-by-paragraph Debian copyright detection parity
+- it does not close the rest of the Debian copyright issue cluster on its own
+
+Proof point:
+
+- the `bsdutils` upstream Debian copyright fixture now produces a primary detection with matched text `License: GPL-2+` at absolute line `47`
 
 ## Implementation Details
 
