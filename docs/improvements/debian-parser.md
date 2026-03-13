@@ -8,6 +8,7 @@ The Debian `.deb` parser in scancode-rust implements missing direct-archive beha
 - **🔍 Enhanced Extraction**: direct `.deb` scans now also read package-matching `/usr/share/doc/<pkg>/copyright` metadata from `data.tar.gz` and `data.tar.xz`
 - **🐛 Bug Fix**: Debian DEP-5 top-level `Files: *` license declarations now emit a parser-level primary `license_detection` with preserved header casing and absolute line numbers
 - **🐛 Bug Fix**: Debian DEP-5 `License:` header paragraphs now emit detections in file order with preserved header casing and absolute line numbers, including standalone bottom license paragraphs
+- **🐛 Bug Fix**: Debian DEP-5 header-paragraph licenses can now become the primary detection when the `Files: *` paragraph has no usable `License:` field
 
 ## Improvement: .deb Archive Introspection (New Feature)
 
@@ -249,6 +250,29 @@ Proof points:
 
 - local fixture `testdata/debian/copyright/copyright` now emits ordered detections at lines `11`, `15`, `19`, `23`, and `25`
 - upstream `clamav` fixture now includes the bottom standalone `License: Zlib` paragraph at absolute line `732`
+
+## Improvement: Header-Paragraph Primary Fallback
+
+**Area**: `debian/copyright` DEP-5 primary detection fallback  
+**Issue**: local `#181`, upstream `aboutcode-org/scancode-toolkit#2977`
+
+Rust now falls back to the DEP-5 header paragraph license as the primary detection when the `Files: *` paragraph has no usable `License:` field.
+
+What this specifically adds:
+
+- nameless/blank `Files: *` license fields no longer leave the package without any primary detection
+- the header-paragraph `License:` line is preserved as the primary `matched_text`
+- the primary line number remains absolute in the source file
+
+This stays intentionally narrow:
+
+- it handles the header-paragraph fallback only
+- it does not attempt full paragraph-body license-text parsing parity
+- it does not broaden into Debian control/container work
+
+Proof point:
+
+- upstream crafted fixture `test_license_nameless` now promotes `License: LGPL-3+ or GPL-2+` from line `8` as the primary detection when the later `Files: *` paragraph has a blank `License:` field
 
 ## Implementation Details
 
