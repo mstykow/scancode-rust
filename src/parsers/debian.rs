@@ -37,7 +37,10 @@ use log::warn;
 use packageurl::PackageUrl;
 use regex::Regex;
 
-use crate::models::{DatasourceId, Dependency, FileReference, PackageData, PackageType, Party};
+use crate::models::{
+    DatasourceId, Dependency, FileReference, LicenseDetection, Match, PackageData, PackageType,
+    Party,
+};
 use crate::parsers::rfc822::{self, Rfc822Metadata};
 use crate::parsers::utils::{read_file_to_string, split_name_email};
 
@@ -1266,20 +1269,23 @@ fn extract_package_name_from_path(path: &Path) -> Option<String> {
 }
 
 fn parse_copyright_file(content: &str, package_name: Option<&str>) -> PackageData {
-    let paragraphs = rfc822::parse_rfc822_paragraphs(content);
+    let paragraphs = parse_copyright_paragraphs_with_lines(content);
 
     let is_dep5 = paragraphs
         .first()
-        .and_then(|p| rfc822::get_header_first(&p.headers, "format"))
+        .and_then(|p| rfc822::get_header_first(&p.metadata.headers, "format"))
         .is_some();
 
     let namespace = Some("debian".to_string());
     let mut parties = Vec::new();
     let mut license_statements = Vec::new();
+    let mut primary_license_detection = None;
 
     if is_dep5 {
         for para in &paragraphs {
-            if let Some(copyright_text) = rfc822::get_header_first(&para.headers, "copyright") {
+            if let Some(copyright_text) =
+                rfc822::get_header_first(&para.metadata.headers, "copyright")
+            {
                 for holder in parse_copyright_holders(&copyright_text) {
                     if !holder.is_empty() {
                         parties.push(Party {
@@ -1296,12 +1302,25 @@ fn parse_copyright_file(content: &str, package_name: Option<&str>) -> PackageDat
                 }
             }
 
-            if let Some(license) = rfc822::get_header_first(&para.headers, "license") {
+            if let Some(license) = rfc822::get_header_first(&para.metadata.headers, "license") {
                 let license_name = license.lines().next().unwrap_or(&license).trim();
                 if !license_name.is_empty()
                     && !license_statements.contains(&license_name.to_string())
                 {
                     license_statements.push(license_name.to_string());
+                }
+
+                if primary_license_detection.is_none()
+                    && rfc822::get_header_first(&para.metadata.headers, "files").as_deref()
+                        == Some("*")
+                    && let Some((matched_text, line_no)) =
+                        find_header_line(&para.raw_lines, para.start_line, "license")
+                {
+                    primary_license_detection = Some(build_primary_license_detection(
+                        license_name,
+                        matched_text,
+                        line_no,
+                    ));
                 }
             }
         }
@@ -1336,15 +1355,146 @@ fn parse_copyright_file(content: &str, package_name: Option<&str>) -> PackageDat
         Some(license_statements.join(" AND "))
     };
 
+    let license_detections = primary_license_detection.into_iter().collect::<Vec<_>>();
+    let declared_license_expression = license_detections
+        .first()
+        .map(|detection| detection.license_expression.clone());
+    let declared_license_expression_spdx = license_detections
+        .first()
+        .map(|detection| detection.license_expression_spdx.clone());
+
     PackageData {
         datasource_id: Some(DatasourceId::DebianCopyright),
         package_type: Some(PACKAGE_TYPE),
         namespace: namespace.clone(),
         name: package_name.map(|s| s.to_string()),
         parties,
+        declared_license_expression,
+        declared_license_expression_spdx,
+        license_detections,
         extracted_license_statement,
         purl: package_name.and_then(|n| build_debian_purl(n, None, namespace.as_deref(), None)),
         ..Default::default()
+    }
+}
+
+#[derive(Debug)]
+struct CopyrightParagraph {
+    metadata: Rfc822Metadata,
+    start_line: usize,
+    raw_lines: Vec<String>,
+}
+
+fn parse_copyright_paragraphs_with_lines(content: &str) -> Vec<CopyrightParagraph> {
+    let mut paragraphs = Vec::new();
+    let mut current_lines = Vec::new();
+    let mut current_start_line = 1usize;
+
+    for (idx, line) in content.lines().enumerate() {
+        let line_no = idx + 1;
+        if line.is_empty() {
+            if !current_lines.is_empty() {
+                let paragraph_text = current_lines.join("\n");
+                let metadata = rfc822::parse_rfc822_paragraphs(&paragraph_text)
+                    .into_iter()
+                    .next()
+                    .unwrap_or_else(|| Rfc822Metadata {
+                        headers: HashMap::new(),
+                        body: String::new(),
+                    });
+                paragraphs.push(CopyrightParagraph {
+                    metadata,
+                    start_line: current_start_line,
+                    raw_lines: current_lines.clone(),
+                });
+                current_lines.clear();
+            }
+            current_start_line = line_no + 1;
+        } else {
+            if current_lines.is_empty() {
+                current_start_line = line_no;
+            }
+            current_lines.push(line.to_string());
+        }
+    }
+
+    if !current_lines.is_empty() {
+        let paragraph_text = current_lines.join("\n");
+        let metadata = rfc822::parse_rfc822_paragraphs(&paragraph_text)
+            .into_iter()
+            .next()
+            .unwrap_or_else(|| Rfc822Metadata {
+                headers: HashMap::new(),
+                body: String::new(),
+            });
+        paragraphs.push(CopyrightParagraph {
+            metadata,
+            start_line: current_start_line,
+            raw_lines: current_lines,
+        });
+    }
+
+    paragraphs
+}
+
+fn find_header_line(
+    raw_lines: &[String],
+    start_line: usize,
+    header_name: &str,
+) -> Option<(String, usize)> {
+    for (idx, line) in raw_lines.iter().enumerate() {
+        let lower = line.to_ascii_lowercase();
+        if lower.starts_with(&format!("{}:", header_name)) {
+            return Some((line.trim_end().to_string(), start_line + idx));
+        }
+    }
+    None
+}
+
+fn build_primary_license_detection(
+    license_name: &str,
+    matched_text: String,
+    line_no: usize,
+) -> LicenseDetection {
+    let (license_expression, license_expression_spdx) = normalize_debian_license_name(license_name);
+
+    LicenseDetection {
+        license_expression: license_expression.clone(),
+        license_expression_spdx: license_expression_spdx.clone(),
+        matches: vec![Match {
+            license_expression,
+            license_expression_spdx,
+            from_file: None,
+            start_line: line_no,
+            end_line: line_no,
+            matcher: Some("1-spdx-id".to_string()),
+            score: 100.0,
+            matched_length: Some(license_name.split_whitespace().count()),
+            match_coverage: Some(100.0),
+            rule_relevance: Some(100),
+            rule_identifier: None,
+            rule_url: None,
+            matched_text: Some(matched_text),
+        }],
+        identifier: None,
+    }
+}
+
+fn normalize_debian_license_name(license_name: &str) -> (String, String) {
+    match license_name.trim() {
+        "GPL-2+" => ("gpl-2.0-plus".to_string(), "GPL-2.0-or-later".to_string()),
+        "GPL-2" => ("gpl-2.0".to_string(), "GPL-2.0-only".to_string()),
+        "LGPL-2+" => ("lgpl-2.0-plus".to_string(), "LGPL-2.0-or-later".to_string()),
+        "LGPL-2.1" => ("lgpl-2.1".to_string(), "LGPL-2.1-only".to_string()),
+        "LGPL-2.1+" => ("lgpl-2.1-plus".to_string(), "LGPL-2.1-or-later".to_string()),
+        "LGPL-3+" => ("lgpl-3.0-plus".to_string(), "LGPL-3.0-or-later".to_string()),
+        "MIT" => ("mit".to_string(), "MIT".to_string()),
+        "BSD-4-clause" => ("bsd-original-uc".to_string(), "BSD-4-Clause-UC".to_string()),
+        "public-domain" => (
+            "public-domain".to_string(),
+            "LicenseRef-scancode-public-domain".to_string(),
+        ),
+        other => (other.to_ascii_lowercase(), other.to_string()),
     }
 }
 
@@ -2936,6 +3086,30 @@ License: LGPL-2.1
         assert!(pkg.parties.len() >= 2);
         assert_eq!(pkg.parties[0].role, Some("copyright-holder".to_string()));
         assert!(pkg.parties[0].name.as_ref().unwrap().contains("Paul Moore"));
+    }
+
+    #[test]
+    fn test_parse_copyright_primary_license_detection_from_bsdutils_fixture() {
+        let path = PathBuf::from(
+            "reference/scancode-toolkit/tests/packagedcode/data/debian/copyright/debian-slim-2021-04-07/usr/share/doc/bsdutils/copyright",
+        );
+        let pkg = DebianCopyrightParser::extract_first_package(&path);
+
+        assert_eq!(pkg.name, Some("bsdutils".to_string()));
+        let extracted = pkg
+            .extracted_license_statement
+            .as_deref()
+            .expect("license statement should exist");
+        assert!(extracted.contains("GPL-2+"));
+        assert!(!pkg.license_detections.is_empty());
+
+        let primary = &pkg.license_detections[0];
+        assert_eq!(
+            primary.matches[0].matched_text.as_deref(),
+            Some("License: GPL-2+")
+        );
+        assert_eq!(primary.matches[0].start_line, 47);
+        assert_eq!(primary.matches[0].end_line, 47);
     }
 
     #[test]
