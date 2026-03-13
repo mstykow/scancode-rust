@@ -9,6 +9,7 @@ The Debian `.deb` parser in scancode-rust implements missing direct-archive beha
 - **🐛 Bug Fix**: Debian DEP-5 top-level `Files: *` license declarations now emit a parser-level primary `license_detection` with preserved header casing and absolute line numbers
 - **🐛 Bug Fix**: Debian DEP-5 `License:` header paragraphs now emit detections in file order with preserved header casing and absolute line numbers, including standalone bottom license paragraphs
 - **🐛 Bug Fix**: Debian DEP-5 header-paragraph licenses can now become the primary detection when the `Files: *` paragraph has no usable `License:` field
+- **🔍 Enhanced Extraction**: installed Debian package metadata from `status` / `status.d` now integrates matching `info/*.list` and `info/*.md5sums` sidecars during rootfs/container scans
 
 ## Improvement: .deb Archive Introspection (New Feature)
 
@@ -273,6 +274,40 @@ This stays intentionally narrow:
 Proof point:
 
 - upstream crafted fixture `test_license_nameless` now promotes `License: LGPL-3+ or GPL-2+` from line `8` as the primary detection when the later `Files: *` paragraph has a blank `License:` field
+
+## Improvement: Installed Debian Metadata Integration
+
+**Area**: installed package metadata from `var/lib/dpkg/status`, `status.d`, and `info/*`  
+**Issues**: local `#185`, `#186`
+
+Rust now integrates Debian installed-package sidecar metadata into the assembled installed package view.
+
+What this specifically adds:
+
+- installed packages parsed from `var/lib/dpkg/status`
+- distroless/container-style installed packages parsed from `var/lib/dpkg/status.d/*`
+- sidecar file references from matching `var/lib/dpkg/info/*.list`
+- sidecar checksum/file-reference details from matching `var/lib/dpkg/info/*.md5sums`
+- safe matching for Ubuntu-family namespaces and multiarch sidecar filenames
+
+This means installed Debian packages in rootfs/container scans can now:
+
+- keep their dependency info from the control-like status file
+- attach actual installed files back to the assembled package
+- attach md5-backed file references from matching sidecars
+
+This is still intentionally narrow:
+
+- it does not attempt performance work (`#177`)
+- it does not broaden into non-Debian container inventory
+- it is explicitly about Debian installed metadata integration, not generic scanner refactors
+
+Proof points:
+
+- unit resolver coverage for regular `status` + `info/*.list` / `*.md5sums`
+- explicit Ubuntu namespace matching regression
+- explicit multiarch isolation regression
+- scan-level `status.d` regression proving dependency retention and installed-file assignment together
 
 ## Implementation Details
 
