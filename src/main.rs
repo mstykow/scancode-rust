@@ -865,6 +865,8 @@ fn is_legal_filename(basename: &str) -> bool {
         || basename.starts_with("license.")
         || basename == "licence"
         || basename.starts_with("licence.")
+        || basename == "copyright"
+        || basename.starts_with("copyright.")
         || basename == "copying"
         || basename.starts_with("copying.")
         || basename == "notice"

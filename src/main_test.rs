@@ -190,6 +190,28 @@ fn python_scan_and_assemble(path: &Path) -> (Vec<FileInfo>, assembly::AssemblyRe
     (files, assembly_result)
 }
 
+fn debian_scan_and_assemble_with_keyfiles(
+    path: &Path,
+) -> (Vec<FileInfo>, assembly::AssemblyResult) {
+    let store = Box::leak(Box::new(Store::new()));
+    let strategy = ScanStrategy::new(store);
+    let progress = Arc::new(ScanProgress::new(ProgressMode::Quiet));
+    let result = crate::scanner::process_with_options(
+        path,
+        0,
+        progress,
+        &[],
+        &strategy,
+        &TextDetectionOptions::default(),
+    )
+    .expect("debian scan should succeed");
+
+    let mut files = result.files;
+    let assembly_result = assembly::assemble(&mut files);
+    classify_key_files(&mut files, &assembly_result.packages);
+    (files, assembly_result)
+}
+
 fn normalize_test_uuids(json_str: &str) -> String {
     let re = Regex::new(r"uuid=[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
         .expect("uuid regex should compile");
@@ -1013,7 +1035,8 @@ fn python_metadata_scan_assigns_referenced_site_packages_files() {
     fs::write(package_dir.join("__init__.py"), "").expect("write __init__.py");
     fs::write(package_dir.join("core.py"), "def click():\n    pass\n").expect("write core.py");
 
-    let (files, result) = python_scan_and_assemble(temp_dir.path());
+    let (mut files, result) = debian_scan_and_assemble_with_keyfiles(temp_dir.path());
+    classify_key_files(&mut files, &result.packages);
 
     let package = result
         .packages
@@ -1059,7 +1082,7 @@ fn python_pkg_info_scan_assigns_installed_files_entries() {
     fs::write(package_dir.join("__init__.py"), "").expect("write __init__.py");
     fs::write(package_dir.join("core.py"), "VALUE = 1\n").expect("write core.py");
 
-    let (files, result) = python_scan_and_assemble(temp_dir.path());
+    let (files, result) = debian_scan_and_assemble_with_keyfiles(temp_dir.path());
 
     let package = result
         .packages
@@ -1073,6 +1096,55 @@ fn python_pkg_info_scan_assigns_installed_files_entries() {
         .expect("core.py should be scanned");
 
     assert!(core_file.for_packages.contains(&package.package_uid));
+}
+
+#[test]
+fn debian_directory_scan_assembles_package_and_marks_keyfiles() {
+    let temp_dir = tempfile::TempDir::new().expect("create temp dir");
+    let package_root = temp_dir.path().join("mypkg");
+    let debian_dir = package_root.join("debian");
+
+    fs::create_dir_all(&debian_dir).expect("create debian dir");
+    fs::write(
+        debian_dir.join("control"),
+        "Source: mypkg\nSection: utils\nPriority: optional\nMaintainer: Example Maintainer <example@example.com>\nStandards-Version: 4.6.2\n\nPackage: mypkg\nArchitecture: all\nDepends: bash\nDescription: sample package\n sample package long description\n",
+    )
+    .expect("write debian/control");
+    fs::write(
+        debian_dir.join("copyright"),
+        "Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/\nFiles: *\nCopyright: 2024 Example Org\nLicense: Apache-2.0\n Licensed under the Apache License, Version 2.0.\n",
+    )
+    .expect("write debian/copyright");
+
+    let (files, result) = debian_scan_and_assemble_with_keyfiles(temp_dir.path());
+
+    let package = result
+        .packages
+        .iter()
+        .find(|package| package.name.as_deref() == Some("mypkg"))
+        .expect("debian package should be assembled");
+
+    let control = files
+        .iter()
+        .find(|file| file.path.ends_with("mypkg/debian/control"))
+        .expect("control file should be scanned");
+    let copyright = files
+        .iter()
+        .find(|file| file.path.ends_with("mypkg/debian/copyright"))
+        .expect("copyright file should be scanned");
+
+    assert!(
+        control.is_manifest,
+        "control file should be manifest; file_type={:?}, for_packages={:?}, package_data_len={}",
+        control.file_type,
+        control.for_packages,
+        control.package_data.len()
+    );
+    assert!(control.is_key_file, "control keyfile flag missing");
+    assert!(copyright.is_legal, "copyright should be legal");
+    assert!(copyright.is_key_file, "copyright keyfile flag missing");
+    assert!(control.for_packages.contains(&package.package_uid));
+    assert!(copyright.for_packages.contains(&package.package_uid));
 }
 
 #[test]
