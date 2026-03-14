@@ -213,6 +213,11 @@ pub static ASSEMBLERS: &[AssemblerConfig] = &[
         sibling_file_patterns: &["build.gradle", "build.gradle.kts", "gradle.lockfile"],
         mode: AssemblyMode::SiblingMerge,
     },
+    AssemblerConfig {
+        datasource_ids: &[DatasourceId::GradleModule],
+        sibling_file_patterns: &["*.module"],
+        mode: AssemblyMode::OnePerPackageData,
+    },
     // CPAN/Perl ecosystem
     AssemblerConfig {
         datasource_ids: &[
