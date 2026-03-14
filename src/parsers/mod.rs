@@ -163,6 +163,11 @@ mod poetry_lock;
 mod poetry_lock_golden_test;
 #[cfg(test)]
 mod poetry_lock_test;
+mod pylock_toml;
+#[cfg(all(test, feature = "golden-tests"))]
+mod pylock_toml_golden_test;
+#[cfg(test)]
+mod pylock_toml_test;
 mod python;
 #[cfg(all(test, feature = "golden-tests"))]
 mod python_golden_test;
@@ -357,6 +362,7 @@ pub use self::podfile_lock::PodfileLockParser;
 pub use self::podspec::PodspecParser;
 pub use self::podspec_json::PodspecJsonParser;
 pub use self::poetry_lock::PoetryLockParser;
+pub use self::pylock_toml::PylockTomlParser;
 pub use self::python::PythonParser;
 pub use self::readme::ReadmeParser;
 pub use self::requirements_txt::RequirementsTxtParser;
@@ -505,6 +511,7 @@ register_package_handlers! {
         PodspecJsonParser,
         PodspecParser,
         PoetryLockParser,
+        PylockTomlParser,
         PubspecLockParser,
         PubspecYamlParser,
         PythonParser,
