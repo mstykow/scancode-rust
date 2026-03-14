@@ -138,6 +138,9 @@ pub enum DatasourceId {
     DebianOriginalSourceTarball,
     DebianSourceControlDsc,
 
+    DenoJson,
+    DenoLock,
+
     Dockerfile,
 
     // ── FreeBSD ──
@@ -359,6 +362,8 @@ impl DatasourceId {
             Self::DebianMd5SumsInExtractedDeb => "debian_md5sums_in_extracted_deb",
             Self::DebianOriginalSourceTarball => "debian_original_source_tarball",
             Self::DebianSourceControlDsc => "debian_source_control_dsc",
+            Self::DenoJson => "deno_json",
+            Self::DenoLock => "deno_lock",
             Self::Dockerfile => "dockerfile",
 
             // FreeBSD
