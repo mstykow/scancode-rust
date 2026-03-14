@@ -210,6 +210,11 @@ mod swift_show_dependencies;
 #[cfg(test)]
 mod swift_show_dependencies_test;
 pub mod utils;
+mod uv_lock;
+#[cfg(all(test, feature = "golden-tests"))]
+mod uv_lock_golden_test;
+#[cfg(test)]
+mod uv_lock_test;
 mod yarn_lock;
 #[cfg(test)]
 mod yarn_lock_test;
@@ -367,6 +372,7 @@ pub use self::ruby::{
 pub use self::swift_manifest_json::SwiftManifestJsonParser;
 pub use self::swift_resolved::SwiftPackageResolvedParser;
 pub use self::swift_show_dependencies::SwiftShowDependenciesParser;
+pub use self::uv_lock::UvLockParser;
 pub use self::yarn_lock::YarnLockParser;
 
 /// Registers all parsers and recognizers, generating dispatch functions.
@@ -502,6 +508,7 @@ register_package_handlers! {
         PubspecLockParser,
         PubspecYamlParser,
         PythonParser,
+        UvLockParser,
         ReadmeParser,
         RequirementsTxtParser,
         RpmBdbDatabaseParser,
