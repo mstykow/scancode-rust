@@ -15,6 +15,7 @@ use super::PackageParser;
 
 const FIELD_LOCK_VERSION: &str = "lock-version";
 const FIELD_CREATED_BY: &str = "created-by";
+const SUPPORTED_LOCK_VERSION: &str = "1.0";
 const FIELD_REQUIRES_PYTHON: &str = "requires-python";
 const FIELD_ENVIRONMENTS: &str = "environments";
 const FIELD_EXTRAS: &str = "extras";
@@ -83,10 +84,30 @@ impl PackageParser for PylockTomlParser {
 }
 
 fn parse_pylock_toml(toml_content: &TomlValue) -> PackageData {
+    let lock_version = toml_content
+        .get(FIELD_LOCK_VERSION)
+        .and_then(TomlValue::as_str);
+    if lock_version != Some(SUPPORTED_LOCK_VERSION) {
+        warn!(
+            "Invalid pylock.toml: missing or unsupported lock-version {:?}",
+            lock_version
+        );
+        return default_package_data();
+    }
+
+    let created_by = toml_content
+        .get(FIELD_CREATED_BY)
+        .and_then(TomlValue::as_str);
+    if created_by.is_none() {
+        warn!("Invalid pylock.toml: missing required created-by field");
+        return default_package_data();
+    }
+
     let Some(package_values) = toml_content
         .get(FIELD_PACKAGES)
         .and_then(TomlValue::as_array)
     else {
+        warn!("Invalid pylock.toml: missing required packages array");
         return default_package_data();
     };
 
@@ -95,6 +116,7 @@ fn parse_pylock_toml(toml_content: &TomlValue) -> PackageData {
         .filter_map(TomlValue::as_table)
         .collect();
     if package_tables.is_empty() {
+        warn!("Invalid pylock.toml: packages array does not contain package tables");
         return default_package_data();
     }
 
