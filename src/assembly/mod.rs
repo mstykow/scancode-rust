@@ -1034,6 +1034,72 @@ mod tests {
     }
 
     #[test]
+    fn test_assemble_python_pyproject_with_uv_lock() {
+        let mut files = vec![
+            create_test_file_info(
+                "project/pyproject.toml",
+                DatasourceId::PypiPyprojectToml,
+                Some("pkg:pypi/uv-demo@0.1.0"),
+                Some("uv-demo"),
+                Some("0.1.0"),
+                vec![],
+            ),
+            create_test_file_info(
+                "project/uv.lock",
+                DatasourceId::PypiUvLock,
+                Some("pkg:pypi/uv-demo@0.1.0"),
+                Some("uv-demo"),
+                Some("0.1.0"),
+                vec![Dependency {
+                    purl: Some("pkg:pypi/requests@2.32.5".to_string()),
+                    extracted_requirement: Some(">=2.32.5".to_string()),
+                    scope: None,
+                    is_runtime: Some(true),
+                    is_optional: Some(false),
+                    is_pinned: Some(true),
+                    is_direct: Some(true),
+                    resolved_package: None,
+                    extra_data: None,
+                }],
+            ),
+        ];
+
+        let result = assemble(&mut files);
+
+        assert_eq!(
+            result.packages.len(),
+            1,
+            "Expected exactly one merged Python package"
+        );
+        let package = &result.packages[0];
+        assert_eq!(package.name, Some("uv-demo".to_string()));
+        assert!(
+            package
+                .datafile_paths
+                .contains(&"project/pyproject.toml".to_string())
+        );
+        assert!(
+            package
+                .datafile_paths
+                .contains(&"project/uv.lock".to_string())
+        );
+        assert!(
+            package
+                .datasource_ids
+                .contains(&DatasourceId::PypiPyprojectToml)
+        );
+        assert!(package.datasource_ids.contains(&DatasourceId::PypiUvLock));
+
+        assert_eq!(result.dependencies.len(), 1);
+        assert_eq!(
+            result.dependencies[0].purl.as_deref(),
+            Some("pkg:pypi/requests@2.32.5")
+        );
+        assert_eq!(files[0].for_packages.len(), 1);
+        assert_eq!(files[1].for_packages.len(), 1);
+    }
+
+    #[test]
     fn test_assemble_no_matching_datasource() {
         let mut files = vec![create_test_file_info(
             "project/unknown.json",
