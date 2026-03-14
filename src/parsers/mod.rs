@@ -105,6 +105,11 @@ mod gradle_golden_test;
 mod gradle_lock;
 #[cfg(test)]
 mod gradle_lock_test;
+mod gradle_module;
+#[cfg(all(test, feature = "golden-tests"))]
+mod gradle_module_golden_test;
+#[cfg(test)]
+mod gradle_module_test;
 mod haxe;
 #[cfg(all(test, feature = "golden-tests"))]
 mod haxe_golden_test;
@@ -344,6 +349,7 @@ pub use self::go::{GoModParser, GoSumParser, GodepsParser};
 pub use self::go_mod_graph::GoModGraphParser;
 pub use self::gradle::GradleParser;
 pub use self::gradle_lock::GradleLockfileParser;
+pub use self::gradle_module::GradleModuleParser;
 pub use self::haxe::HaxeParser;
 pub use self::maven::MavenParser;
 pub use self::microsoft_update_manifest::MicrosoftUpdateManifestParser;
@@ -500,6 +506,7 @@ register_package_handlers! {
         GoSumParser,
         GradleLockfileParser,
         GradleParser,
+        GradleModuleParser,
         HaxeParser,
         MavenParser,
         MicrosoftUpdateManifestParser,
