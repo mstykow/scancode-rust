@@ -25,11 +25,6 @@
       }
     ],
     "extra_data": {
-      "gradle_version": "8.7",
-      "component_attributes": {
-        "org.gradle.status": "release"
-      },
-      "format_version": "1.1",
       "variants": [
         {
           "name": "apiElements",
@@ -60,7 +55,12 @@
             "org.gradle.usage": "java-runtime"
           }
         }
-      ]
+      ],
+      "format_version": "1.1",
+      "component_attributes": {
+        "org.gradle.status": "release"
+      },
+      "gradle_version": "8.7"
     },
     "dependencies": [
       {
@@ -73,10 +73,34 @@
         "is_direct": true,
         "extra_data": {
           "variant_scopes": ["compile", "runtime"],
-          "variant_names": ["apiElements", "runtimeElements"],
+          "variant_dependency_entries": [
+            {
+              "variant_name": "apiElements",
+              "variant_scope": "compile",
+              "dependency": {
+                "group": "com.squareup.moshi",
+                "module": "moshi",
+                "version": {
+                  "requires": "1.15.1"
+                }
+              }
+            },
+            {
+              "variant_name": "runtimeElements",
+              "variant_scope": "runtime",
+              "dependency": {
+                "group": "com.squareup.moshi",
+                "module": "moshi",
+                "version": {
+                  "requires": "1.15.1"
+                }
+              }
+            }
+          ],
           "version": {
             "requires": "1.15.1"
-          }
+          },
+          "variant_names": ["apiElements", "runtimeElements"]
         }
       },
       {
@@ -88,11 +112,35 @@
         "is_pinned": true,
         "is_direct": true,
         "extra_data": {
-          "variant_scopes": ["compile", "runtime"],
           "variant_names": ["apiElements", "runtimeElements"],
+          "variant_scopes": ["compile", "runtime"],
           "version": {
             "requires": "2.11.0"
-          }
+          },
+          "variant_dependency_entries": [
+            {
+              "variant_name": "apiElements",
+              "variant_scope": "compile",
+              "dependency": {
+                "group": "com.squareup.retrofit2",
+                "module": "retrofit",
+                "version": {
+                  "requires": "2.11.0"
+                }
+              }
+            },
+            {
+              "variant_name": "runtimeElements",
+              "variant_scope": "runtime",
+              "dependency": {
+                "group": "com.squareup.retrofit2",
+                "module": "retrofit",
+                "version": {
+                  "requires": "2.11.0"
+                }
+              }
+            }
+          ]
         }
       }
     ],

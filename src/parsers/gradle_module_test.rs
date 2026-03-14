@@ -87,6 +87,29 @@ mod tests {
         assert_eq!(annotation.scope.as_deref(), Some("compile"));
         assert_eq!(annotation.is_runtime, Some(true));
         assert_eq!(annotation.is_optional, Some(false));
+        let annotation_extra = annotation
+            .extra_data
+            .as_ref()
+            .expect("annotation extra_data missing");
+        let variant_entries = annotation_extra
+            .get("variant_dependency_entries")
+            .and_then(|value| value.as_array())
+            .expect("variant_dependency_entries should be present");
+        assert_eq!(variant_entries.len(), 2);
+        assert!(variant_entries.iter().any(|entry| {
+            entry
+                .as_object()
+                .and_then(|obj| obj.get("variant_name"))
+                .and_then(|value| value.as_str())
+                == Some("releaseApiElements")
+        }));
+        assert!(variant_entries.iter().any(|entry| {
+            entry
+                .as_object()
+                .and_then(|obj| obj.get("variant_name"))
+                .and_then(|value| value.as_str())
+                == Some("releaseRuntimeElements")
+        }));
 
         let appcompat = package_data
             .dependencies
@@ -174,6 +197,90 @@ mod tests {
         let variant = variants[0].as_object().unwrap();
         assert!(variant.contains_key("dependency_constraints"));
         assert!(variant.contains_key("available_at"));
+    }
+
+    #[test]
+    fn test_extract_preserves_conflicting_variant_dependency_metadata() {
+        let temp_dir = tempdir().unwrap();
+        let file_path = temp_dir.path().join("conflicting.module");
+        let content = r#"{
+  "formatVersion": "1.1",
+  "component": {
+    "group": "com.example",
+    "module": "conflicting",
+    "version": "1.0.0"
+  },
+  "variants": [
+    {
+      "name": "apiElements",
+      "attributes": {
+        "org.gradle.usage": "java-api"
+      },
+      "dependencies": [
+        {
+          "group": "org.sample",
+          "module": "dep",
+          "version": { "requires": "1.0.0" },
+          "reason": "api path"
+        }
+      ]
+    },
+    {
+      "name": "runtimeElements",
+      "attributes": {
+        "org.gradle.usage": "java-runtime"
+      },
+      "dependencies": [
+        {
+          "group": "org.sample",
+          "module": "dep",
+          "version": { "requires": "1.0.0" },
+          "reason": "runtime path",
+          "requestedCapabilities": [
+            {
+              "group": "org.sample",
+              "name": "cap",
+              "version": "1.0"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}"#;
+        fs::write(&file_path, content).unwrap();
+
+        let package_data = GradleModuleParser::extract_first_package(&file_path);
+        assert_eq!(package_data.dependencies.len(), 1);
+
+        let dependency = &package_data.dependencies[0];
+        let extra_data = dependency
+            .extra_data
+            .as_ref()
+            .expect("dependency extra_data missing");
+        let variant_entries = extra_data
+            .get("variant_dependency_entries")
+            .and_then(|value| value.as_array())
+            .expect("variant_dependency_entries should be present");
+        assert_eq!(variant_entries.len(), 2);
+        assert!(variant_entries.iter().any(|entry| {
+            let entry = entry.as_object().unwrap();
+            entry.get("variant_name").and_then(|value| value.as_str()) == Some("apiElements")
+                && entry
+                    .get("dependency")
+                    .and_then(|value| value.get("reason"))
+                    .and_then(|value| value.as_str())
+                    == Some("api path")
+        }));
+        assert!(variant_entries.iter().any(|entry| {
+            let entry = entry.as_object().unwrap();
+            entry.get("variant_name").and_then(|value| value.as_str()) == Some("runtimeElements")
+                && entry
+                    .get("dependency")
+                    .and_then(|value| value.get("requestedCapabilities"))
+                    .and_then(|value| value.as_array())
+                    .is_some()
+        }));
     }
 
     #[test]

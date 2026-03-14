@@ -47,8 +47,6 @@ struct ExtractedDependency {
     is_optional: Option<bool>,
     is_pinned: Option<bool>,
     extra_data: Option<HashMap<String, Value>>,
-    variant_names: HashSet<String>,
-    variant_scopes: HashSet<String>,
     precedence: u8,
 }
 
@@ -341,10 +339,6 @@ fn extract_variant_data(variants: Option<&Vec<Value>>) -> ExtractedVariantData {
             entry.purl = purl;
             entry.extracted_requirement = requirement.clone();
             entry.is_pinned = Some(requirement.as_deref().is_some_and(is_exact_version));
-            entry.variant_names.insert(variant_name.clone());
-            if let Some(scope_name) = scope.as_ref() {
-                entry.variant_scopes.insert(scope_name.clone());
-            }
             entry.extra_data = merge_dependency_extra_data(entry.extra_data.take(), dep_extra_data);
         }
     }
@@ -390,6 +384,24 @@ fn build_dependency_extra_data(
             Value::Array(vec![Value::String(scope.to_string())]),
         );
     }
+
+    let mut variant_entry = JsonMap::new();
+    variant_entry.insert(
+        "variant_name".to_string(),
+        Value::String(variant_name.to_string()),
+    );
+    if let Some(scope) = scope {
+        variant_entry.insert(
+            "variant_scope".to_string(),
+            Value::String(scope.to_string()),
+        );
+    }
+    variant_entry.insert("dependency".to_string(), Value::Object(dependency.clone()));
+    extra.insert(
+        "variant_dependency_entries".to_string(),
+        Value::Array(vec![Value::Object(variant_entry)]),
+    );
+
     for field in [
         FIELD_ATTRIBUTES,
         "reason",
@@ -416,11 +428,36 @@ fn merge_dependency_extra_data(
         (Some(mut current), Some(mut next)) => {
             merge_string_arrays(&mut current, &mut next, "variant_names");
             merge_string_arrays(&mut current, &mut next, "variant_scopes");
+            merge_object_arrays(&mut current, &mut next, "variant_dependency_entries");
             for (key, value) in next {
                 current.entry(key).or_insert(value);
             }
             Some(current)
         }
+    }
+}
+
+fn merge_object_arrays(
+    current: &mut HashMap<String, Value>,
+    next: &mut HashMap<String, Value>,
+    key: &str,
+) {
+    let existing = current
+        .remove(key)
+        .and_then(|value| value.as_array().cloned());
+    let incoming = next.remove(key).and_then(|value| value.as_array().cloned());
+
+    let mut values = Vec::new();
+    for array in [existing, incoming].into_iter().flatten() {
+        for value in array {
+            if !values.contains(&value) {
+                values.push(value);
+            }
+        }
+    }
+
+    if !values.is_empty() {
+        current.insert(key.to_string(), Value::Array(values));
     }
 }
 
