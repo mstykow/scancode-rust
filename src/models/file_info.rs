@@ -743,7 +743,12 @@ impl Package {
                 .as_deref()
                 .filter(|value| !value.trim().is_empty()),
         ) {
-            let mut purl = PackageUrl::new(package_type.as_str(), name).ok()?;
+            let purl_type = match package_type {
+                PackageType::Deno => "generic",
+                _ => package_type.as_str(),
+            };
+
+            let mut purl = PackageUrl::new(purl_type, name).ok()?;
 
             if let Some(namespace) = self
                 .namespace
