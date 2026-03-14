@@ -150,6 +150,122 @@ mod tests {
     }
 
     #[test]
+    fn test_extract_from_pylock_toml_missing_lock_version_returns_default() {
+        let temp_dir = tempdir().expect("failed to create temp dir");
+        let file_path = temp_dir.path().join("pylock.toml");
+        let content = r#"
+created-by = "mousebender"
+
+[[packages]]
+name = "requests"
+version = "2.32.3"
+"#;
+        fs::write(&file_path, content).expect("failed to write pylock.toml");
+
+        let package_data = PylockTomlParser::extract_first_package(&file_path);
+
+        assert_eq!(package_data.package_type, Some(PackageType::Pypi));
+        assert_eq!(
+            package_data.datasource_id,
+            Some(DatasourceId::PypiPylockToml)
+        );
+        assert!(package_data.dependencies.is_empty());
+        assert!(package_data.extra_data.is_none());
+    }
+
+    #[test]
+    fn test_extract_from_pylock_toml_unsupported_lock_version_returns_default() {
+        let temp_dir = tempdir().expect("failed to create temp dir");
+        let file_path = temp_dir.path().join("pylock.toml");
+        let content = r#"
+lock-version = "2.0"
+created-by = "mousebender"
+
+[[packages]]
+name = "requests"
+version = "2.32.3"
+"#;
+        fs::write(&file_path, content).expect("failed to write pylock.toml");
+
+        let package_data = PylockTomlParser::extract_first_package(&file_path);
+
+        assert_eq!(package_data.package_type, Some(PackageType::Pypi));
+        assert_eq!(
+            package_data.datasource_id,
+            Some(DatasourceId::PypiPylockToml)
+        );
+        assert!(package_data.dependencies.is_empty());
+        assert!(package_data.extra_data.is_none());
+    }
+
+    #[test]
+    fn test_extract_from_pylock_toml_missing_created_by_returns_default() {
+        let temp_dir = tempdir().expect("failed to create temp dir");
+        let file_path = temp_dir.path().join("pylock.toml");
+        let content = r#"
+lock-version = "1.0"
+
+[[packages]]
+name = "requests"
+version = "2.32.3"
+"#;
+        fs::write(&file_path, content).expect("failed to write pylock.toml");
+
+        let package_data = PylockTomlParser::extract_first_package(&file_path);
+
+        assert_eq!(package_data.package_type, Some(PackageType::Pypi));
+        assert_eq!(
+            package_data.datasource_id,
+            Some(DatasourceId::PypiPylockToml)
+        );
+        assert!(package_data.dependencies.is_empty());
+        assert!(package_data.extra_data.is_none());
+    }
+
+    #[test]
+    fn test_extract_from_pylock_toml_missing_packages_returns_default() {
+        let temp_dir = tempdir().expect("failed to create temp dir");
+        let file_path = temp_dir.path().join("pylock.toml");
+        let content = r#"
+lock-version = "1.0"
+created-by = "mousebender"
+"#;
+        fs::write(&file_path, content).expect("failed to write pylock.toml");
+
+        let package_data = PylockTomlParser::extract_first_package(&file_path);
+
+        assert_eq!(package_data.package_type, Some(PackageType::Pypi));
+        assert_eq!(
+            package_data.datasource_id,
+            Some(DatasourceId::PypiPylockToml)
+        );
+        assert!(package_data.dependencies.is_empty());
+        assert!(package_data.extra_data.is_none());
+    }
+
+    #[test]
+    fn test_extract_from_pylock_toml_empty_packages_array_returns_default() {
+        let temp_dir = tempdir().expect("failed to create temp dir");
+        let file_path = temp_dir.path().join("pylock.toml");
+        let content = r#"
+lock-version = "1.0"
+created-by = "mousebender"
+packages = []
+"#;
+        fs::write(&file_path, content).expect("failed to write pylock.toml");
+
+        let package_data = PylockTomlParser::extract_first_package(&file_path);
+
+        assert_eq!(package_data.package_type, Some(PackageType::Pypi));
+        assert_eq!(
+            package_data.datasource_id,
+            Some(DatasourceId::PypiPylockToml)
+        );
+        assert!(package_data.dependencies.is_empty());
+        assert!(package_data.extra_data.is_none());
+    }
+
+    #[test]
     fn test_extract_from_pylock_toml_shared_root_dependency_is_classified_conservatively() {
         let temp_dir = tempdir().expect("failed to create temp dir");
         let file_path = temp_dir.path().join("pylock.toml");
