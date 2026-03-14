@@ -149,6 +149,11 @@ pub static ASSEMBLERS: &[AssemblerConfig] = &[
         ],
         mode: AssemblyMode::SiblingMerge,
     },
+    AssemblerConfig {
+        datasource_ids: &[DatasourceId::DenoJson, DatasourceId::DenoLock],
+        sibling_file_patterns: &["deno.json", "deno.jsonc", "deno.lock"],
+        mode: AssemblyMode::SiblingMerge,
+    },
     // Ruby/RubyGems ecosystem
     AssemblerConfig {
         datasource_ids: &[
