@@ -55,17 +55,28 @@ impl PackageParser for DenoParser {
 }
 
 fn parse_deno_config(json: &Value) -> PackageData {
-    let name = extract_non_empty_string(json, FIELD_NAME);
+    let raw_name = extract_non_empty_string(json, FIELD_NAME);
+    let (namespace, name) = raw_name
+        .as_deref()
+        .map(split_package_identity)
+        .map(|(namespace, name)| {
+            (
+                namespace.map(|value| value.to_string()),
+                Some(name.to_string()),
+            )
+        })
+        .unwrap_or((None, None));
     let version = extract_non_empty_string(json, FIELD_VERSION);
     let dependencies = extract_import_dependencies(json);
     let extra_data = extract_extra_data(json);
-    let purl = name
-        .as_deref()
-        .and_then(|name| create_deno_package_purl(name, version.as_deref()));
+    let purl = match (namespace.as_deref(), name.as_deref(), version.as_deref()) {
+        (_, Some(name), version) => create_generic_purl(namespace.as_deref(), name, version),
+        _ => None,
+    };
 
     PackageData {
         package_type: Some(DenoParser::PACKAGE_TYPE),
-        namespace: None,
+        namespace,
         name,
         version,
         qualifiers: None,
@@ -213,11 +224,6 @@ fn extract_non_empty_string(json: &Value, field: &str) -> Option<String> {
         .map(|value| value.to_string())
 }
 
-fn create_deno_package_purl(name: &str, version: Option<&str>) -> Option<String> {
-    let (namespace, package_name) = split_scoped_name(name);
-    create_generic_purl(namespace.as_deref(), &package_name, version)
-}
-
 fn create_npm_purl(namespace: Option<&str>, name: &str, version: Option<&str>) -> Option<String> {
     let mut purl = PackageUrl::new("npm", name).ok()?;
     if let Some(namespace) = namespace {
@@ -264,16 +270,13 @@ fn create_remote_purl(specifier: &str) -> Option<String> {
     create_generic_purl(namespace.as_deref(), &name, None)
 }
 
-fn split_scoped_name(name: &str) -> (Option<String>, String) {
+fn split_package_identity(name: &str) -> (Option<&str>, &str) {
     if let Some(scoped) = name.strip_prefix('@')
         && let Some(slash_index) = scoped.find('/')
     {
-        return (
-            Some(format!("@{}", &scoped[..slash_index])),
-            scoped[slash_index + 1..].to_string(),
-        );
+        return (Some(&name[..slash_index + 1]), &scoped[slash_index + 1..]);
     }
-    (None, name.to_string())
+    (None, name)
 }
 
 fn is_exact_version(version: &str) -> bool {

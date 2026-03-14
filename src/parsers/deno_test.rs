@@ -44,7 +44,8 @@ mod tests {
         assert_eq!(package_data.package_type, Some(PackageType::Deno));
         assert_eq!(package_data.primary_language.as_deref(), Some("TypeScript"));
         assert_eq!(package_data.datasource_id, Some(DatasourceId::DenoJson));
-        assert_eq!(package_data.name.as_deref(), Some("@scancode/deno-sample"));
+        assert_eq!(package_data.namespace.as_deref(), Some("@scancode"));
+        assert_eq!(package_data.name.as_deref(), Some("deno-sample"));
         assert_eq!(package_data.version.as_deref(), Some("1.0.0"));
         assert_eq!(
             package_data.purl.as_deref(),
@@ -109,7 +110,8 @@ mod tests {
         let package_data = DenoParser::extract_first_package(&file_path);
 
         assert_eq!(package_data.datasource_id, Some(DatasourceId::DenoJson));
-        assert_eq!(package_data.name.as_deref(), Some("@std/jsonc"));
+        assert_eq!(package_data.namespace.as_deref(), Some("@std"));
+        assert_eq!(package_data.name.as_deref(), Some("jsonc"));
         assert_eq!(package_data.version.as_deref(), Some("1.0.2"));
         assert_eq!(package_data.dependencies.len(), 1);
     }
