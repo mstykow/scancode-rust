@@ -59,6 +59,7 @@ image = { version = "0.25.10", default-features = false, features = ["jpeg", "pn
 include_dir = "0.7.4"
 indicatif = "0.18.4"
 indicatif-log-bridge = "0.2.3"
+json5 = "0.4.1"
 kamadak-exif = "0.6.1"
 md-5 = "0.10.6"
 mime_guess = "2.0.5"

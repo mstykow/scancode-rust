@@ -76,6 +76,12 @@ mod debian;
 mod debian_golden_test;
 #[cfg(test)]
 mod debian_test;
+mod deno;
+mod deno_lock;
+#[cfg(test)]
+mod deno_lock_test;
+#[cfg(test)]
+mod deno_test;
 mod docker;
 #[cfg(all(test, feature = "golden-tests"))]
 mod docker_golden_test;
@@ -327,6 +333,8 @@ pub use self::debian::{
     DebianInstalledListParser, DebianInstalledMd5sumsParser, DebianInstalledParser,
     DebianMd5sumInPackageParser, DebianOrigTarParser,
 };
+pub use self::deno::DenoParser;
+pub use self::deno_lock::DenoLockParser;
 pub use self::docker::DockerfileParser;
 pub use self::freebsd::FreebsdCompactManifestParser;
 pub use self::gitmodules::GitmodulesParser;
@@ -474,6 +482,8 @@ register_package_handlers! {
         DebianInstalledParser,
         DebianMd5sumInPackageParser,
         DebianOrigTarParser,
+        DenoParser,
+        DenoLockParser,
         DockerfileParser,
         FreebsdCompactManifestParser,
         GemArchiveParser,
