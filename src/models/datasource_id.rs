@@ -155,6 +155,7 @@ pub enum DatasourceId {
     // ── Gradle ──
     BuildGradle,
     GradleLockfile,
+    GradleModule,
 
     // ── Haxe ──
     HaxelibJson,
@@ -378,6 +379,7 @@ impl DatasourceId {
             // Gradle
             Self::BuildGradle => "build_gradle",
             Self::GradleLockfile => "gradle_lockfile",
+            Self::GradleModule => "gradle_module",
 
             // Haxe
             Self::HaxelibJson => "haxelib_json",
