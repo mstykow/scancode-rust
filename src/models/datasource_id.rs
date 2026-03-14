@@ -225,6 +225,7 @@ pub enum DatasourceId {
     PypiSdistPkginfo,
     PypiSetupCfg,
     PypiSetupPy,
+    PypiUvLock,
     PypiWheel,
     PypiWheelMetadata,
 
@@ -442,6 +443,7 @@ impl DatasourceId {
             Self::PypiSdistPkginfo => "pypi_sdist_pkginfo",
             Self::PypiSetupCfg => "pypi_setup_cfg",
             Self::PypiSetupPy => "pypi_setup_py",
+            Self::PypiUvLock => "pypi_uv_lock",
             Self::PypiWheel => "pypi_wheel",
             Self::PypiWheelMetadata => "pypi_wheel_metadata",
 
