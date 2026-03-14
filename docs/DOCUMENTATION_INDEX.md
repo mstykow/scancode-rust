@@ -14,7 +14,6 @@ This index helps you find the right documentation for your needs.
 - **[ARCHITECTURE.md](ARCHITECTURE.md)** - System design and components
 - **[HOW_TO_ADD_A_PARSER.md](HOW_TO_ADD_A_PARSER.md)** - Step-by-step parser implementation guide
 - **[TESTING_STRATEGY.md](TESTING_STRATEGY.md)** - Four-layer testing approach
-- **[implementation-plans/package-detection/PARSER_ENHANCEMENT_PLAN.md](implementation-plans/package-detection/PARSER_ENHANCEMENT_PLAN.md)** - Active parser enhancement backlog and execution order
 
 ### Design Decisions
 
@@ -63,20 +62,8 @@ docs/
 **...see where Rust exceeds Python**
 → [improvements/](improvements/)
 
-**...understand the recent Swift ecosystem improvements**
-→ [improvements/swift-parser.md](improvements/swift-parser.md)
-
 **...track implementation quality and behavior**
 → [TESTING_STRATEGY.md](TESTING_STRATEGY.md)
-
-**...configure cache behavior and controls**
-→ [README.md](../README.md) and [implementation-plans/infrastructure/CACHING_PLAN.md](implementation-plans/infrastructure/CACHING_PLAN.md)
-
-**...implement a specific feature**
-→ [ARCHITECTURE.md](ARCHITECTURE.md) and [HOW_TO_ADD_A_PARSER.md](HOW_TO_ADD_A_PARSER.md)
-
-**...resume the ecosystem-by-ecosystem parser enhancement effort**
-→ [implementation-plans/package-detection/PARSER_ENHANCEMENT_PLAN.md](implementation-plans/package-detection/PARSER_ENHANCEMENT_PLAN.md)
 
 ## Document Lifecycle
 
