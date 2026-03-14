@@ -40,6 +40,7 @@ use log::warn;
 use packageurl::PackageUrl;
 use regex::Regex;
 use rustpython_parser::{Parse, ast};
+use serde_json::{Map as JsonMap, Value as JsonValue};
 use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
@@ -63,6 +64,8 @@ const FIELD_HOMEPAGE: &str = "homepage";
 const FIELD_REPOSITORY: &str = "repository";
 const FIELD_DEPENDENCIES: &str = "dependencies";
 const FIELD_OPTIONAL_DEPENDENCIES: &str = "optional-dependencies";
+const FIELD_DEPENDENCY_GROUPS: &str = "dependency-groups";
+const FIELD_DEV_DEPENDENCIES: &str = "dev-dependencies";
 const MAX_SETUP_PY_BYTES: usize = 1_048_576;
 const MAX_SETUP_PY_AST_NODES: usize = 10_000;
 const MAX_SETUP_PY_AST_DEPTH: usize = 50;
@@ -1097,12 +1100,14 @@ fn extract_from_pyproject_toml(path: &Path) -> PackageData {
         }
     };
 
+    let tool_table = toml_content.get("tool").and_then(|v| v.as_table());
+
     // Handle both PEP 621 (project table) and poetry formats
     let project_table =
         if let Some(project) = toml_content.get(FIELD_PROJECT).and_then(|v| v.as_table()) {
             // Standard PEP 621 format with [project] table
             project.clone()
-        } else if let Some(tool) = toml_content.get("tool").and_then(|v| v.as_table()) {
+        } else if let Some(tool) = tool_table {
             if let Some(poetry) = tool.get("poetry").and_then(|v| v.as_table()) {
                 // Poetry format with [tool.poetry] table
                 poetry.clone()
@@ -1156,7 +1161,8 @@ fn extract_from_pyproject_toml(path: &Path) -> PackageData {
     // URLs can be in different formats depending on the tool (poetry, flit, etc.)
     let (homepage_url, repository_url) = extract_urls(&project_table);
 
-    let (dependencies, optional_dependencies) = extract_dependencies(&project_table);
+    let (dependencies, optional_dependencies) = extract_dependencies(&project_table, &toml_content);
+    let extra_data = extract_pyproject_extra_data(&toml_content);
 
     // Create package URL
     let purl = name.as_ref().and_then(|n| {
@@ -1244,7 +1250,7 @@ fn extract_from_pyproject_toml(path: &Path) -> PackageData {
         file_references: Vec::new(),
         is_private: has_private_classifier(&classifiers),
         is_virtual: false,
-        extra_data: None,
+        extra_data,
         dependencies: [dependencies, optional_dependencies].concat(),
         repository_homepage_url: None,
         repository_download_url: None,
@@ -1351,6 +1357,7 @@ fn extract_parties(project: &TomlMap<String, TomlValue>) -> Vec<Party> {
 
 fn extract_dependencies(
     project: &TomlMap<String, TomlValue>,
+    toml_content: &TomlValue,
 ) -> (Vec<Dependency>, Vec<Dependency>) {
     let mut dependencies = Vec::new();
     let mut optional_dependencies = Vec::new();
@@ -1395,20 +1402,20 @@ fn extract_dependencies(
     }
 
     // Handle Poetry dev-dependencies
-    if let Some(dev_deps_value) = project.get("dev-dependencies") {
+    if let Some(dev_deps_value) = project.get(FIELD_DEV_DEPENDENCIES) {
         match dev_deps_value {
             TomlValue::Array(arr) => {
                 optional_dependencies.extend(parse_dependency_array(
                     arr,
                     true,
-                    Some("dev-dependencies"),
+                    Some(FIELD_DEV_DEPENDENCIES),
                 ));
             }
             TomlValue::Table(table) => {
                 optional_dependencies.extend(parse_dependency_table(
                     table,
                     true,
-                    Some("dev-dependencies"),
+                    Some(FIELD_DEV_DEPENDENCIES),
                 ));
             }
             _ => {}
@@ -1440,7 +1447,87 @@ fn extract_dependencies(
         }
     }
 
+    if let Some(groups_table) = toml_content
+        .get(FIELD_DEPENDENCY_GROUPS)
+        .and_then(|value| value.as_table())
+    {
+        for (group_name, deps) in groups_table {
+            match deps {
+                TomlValue::Array(arr) => {
+                    optional_dependencies.extend(parse_dependency_array(
+                        arr,
+                        true,
+                        Some(group_name),
+                    ));
+                }
+                TomlValue::Table(table) => {
+                    optional_dependencies.extend(parse_dependency_table(
+                        table,
+                        true,
+                        Some(group_name),
+                    ));
+                }
+                _ => {}
+            }
+        }
+    }
+
+    if let Some(dev_deps_value) = toml_content
+        .get("tool")
+        .and_then(|value| value.as_table())
+        .and_then(|tool| tool.get("uv"))
+        .and_then(|value| value.as_table())
+        .and_then(|uv| uv.get(FIELD_DEV_DEPENDENCIES))
+    {
+        match dev_deps_value {
+            TomlValue::Array(arr) => {
+                optional_dependencies.extend(parse_dependency_array(arr, true, Some("dev")));
+            }
+            TomlValue::Table(table) => {
+                optional_dependencies.extend(parse_dependency_table(table, true, Some("dev")));
+            }
+            _ => {}
+        }
+    }
+
     (dependencies, optional_dependencies)
+}
+
+fn extract_pyproject_extra_data(toml_content: &TomlValue) -> Option<HashMap<String, JsonValue>> {
+    let mut extra_data = HashMap::new();
+
+    if let Some(tool_uv) = toml_content
+        .get("tool")
+        .and_then(|value| value.as_table())
+        .and_then(|tool| tool.get("uv"))
+    {
+        extra_data.insert("tool_uv".to_string(), toml_value_to_json(tool_uv));
+    }
+
+    if extra_data.is_empty() {
+        None
+    } else {
+        Some(extra_data)
+    }
+}
+
+fn toml_value_to_json(value: &TomlValue) -> JsonValue {
+    match value {
+        TomlValue::String(value) => JsonValue::String(value.clone()),
+        TomlValue::Integer(value) => JsonValue::String(value.to_string()),
+        TomlValue::Float(value) => JsonValue::String(value.to_string()),
+        TomlValue::Boolean(value) => JsonValue::Bool(*value),
+        TomlValue::Datetime(value) => JsonValue::String(value.to_string()),
+        TomlValue::Array(values) => {
+            JsonValue::Array(values.iter().map(toml_value_to_json).collect())
+        }
+        TomlValue::Table(values) => JsonValue::Object(
+            values
+                .iter()
+                .map(|(key, value)| (key.clone(), toml_value_to_json(value)))
+                .collect::<JsonMap<String, JsonValue>>(),
+        ),
+    }
 }
 
 fn parse_dependency_table(
