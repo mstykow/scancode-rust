@@ -1432,6 +1432,81 @@ docs = ["sphinx>=5.0"]
     }
 
     #[test]
+    fn test_pyproject_extracts_uv_dependency_groups_and_tool_config() {
+        let content = r#"
+[project]
+name = "uv-project"
+version = "0.4.0"
+dependencies = ["requests>=2.32"]
+
+[dependency-groups]
+dev = ["pytest>=8.0", "ruff>=0.5"]
+lint = ["mypy>=1.10"]
+
+[tool.uv]
+default-groups = ["dev", "lint"]
+dev-dependencies = ["coverage>=7.0"]
+
+[tool.uv.sources]
+requests = { git = "https://github.com/psf/requests" }
+"#;
+
+        let (_temp_dir, file_path) = create_temp_file(content, "pyproject.toml");
+        let package_data = PythonParser::extract_first_package(&file_path);
+
+        assert_eq!(package_data.name.as_deref(), Some("uv-project"));
+        assert_eq!(package_data.version.as_deref(), Some("0.4.0"));
+        assert_eq!(package_data.dependencies.len(), 5);
+
+        let dev_deps: Vec<&Dependency> = package_data
+            .dependencies
+            .iter()
+            .filter(|d| d.scope.as_deref() == Some("dev"))
+            .collect();
+        assert_eq!(dev_deps.len(), 3);
+        assert!(dev_deps.iter().all(|d| d.is_optional == Some(true)));
+        assert!(dev_deps.iter().all(|d| d.is_runtime == Some(false)));
+
+        let lint_deps: Vec<&Dependency> = package_data
+            .dependencies
+            .iter()
+            .filter(|d| d.scope.as_deref() == Some("lint"))
+            .collect();
+        assert_eq!(lint_deps.len(), 1);
+        assert!(lint_deps.iter().all(|d| d.is_optional == Some(true)));
+
+        let extra_data = package_data
+            .extra_data
+            .as_ref()
+            .expect("tool.uv data should be preserved");
+        let tool_uv = extra_data
+            .get("tool_uv")
+            .and_then(|value| value.as_object())
+            .expect("tool_uv should be stored as an object");
+
+        let default_groups = tool_uv
+            .get("default-groups")
+            .and_then(|value| value.as_array())
+            .expect("default-groups should be stored");
+        assert_eq!(default_groups.len(), 2);
+        assert_eq!(default_groups[0].as_str(), Some("dev"));
+        assert_eq!(default_groups[1].as_str(), Some("lint"));
+
+        let sources = tool_uv
+            .get("sources")
+            .and_then(|value| value.as_object())
+            .expect("tool.uv.sources should be preserved");
+        let requests = sources
+            .get("requests")
+            .and_then(|value| value.as_object())
+            .expect("requests source should be retained");
+        assert_eq!(
+            requests.get("git").and_then(|value| value.as_str()),
+            Some("https://github.com/psf/requests")
+        );
+    }
+
+    #[test]
     fn test_setup_cfg_extras_require_scopes() {
         let content = r#"
 [metadata]
