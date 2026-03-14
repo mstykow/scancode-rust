@@ -1,24 +1,32 @@
 # scancode-rust
 
-A high-performance code scanning tool written in Rust that detects licenses, copyrights, and other relevant metadata in source code.
+A high-performance Rust rewrite of [ScanCode Toolkit](https://github.com/aboutcode-org/scancode-toolkit) for scanning codebases for licenses, package metadata, file metadata, and related provenance data.
 
 ## Overview
 
-`scancode-rust` is designed to be a faster alternative to the Python-based [ScanCode Toolkit](https://github.com/nexB/scancode-toolkit), with a focus on drop-in replacement compatibility while delivering significantly improved performance. This tool currently scans codebases to identify:
+`scancode-rust` is built as a ScanCode-compatible replacement project with a strong focus on correctness, feature parity, safety, and performance.
 
-- License information
-- File metadata
-- System information
+Today the repository covers high-level scanning workflows for:
 
-For design details and implementation guidance, see the documentation in `docs/`.
+- License detection and license reference output
+- Package and dependency metadata extraction across many ecosystems
+- Package assembly for related manifests and lockfiles
+- File metadata and scan environment metadata
+- Optional copyright, holder, and author detection
+- Optional email and URL extraction
+- Multiple output formats, including ScanCode-style JSON, YAML, SPDX, CycloneDX, HTML, and custom templates
+
+For architecture, supported formats, testing, and contributor guidance, start with the [Documentation Index](docs/DOCUMENTATION_INDEX.md).
 
 ## Features
 
-- Efficient file scanning with multi-threading
-- Compatible output format with ScanCode Toolkit
-- Progress indication for large scans
-- Configurable scan depth
-- File/directory exclusion patterns
+- Parallel scanning with Rust-native performance
+- ScanCode-compatible JSON output and broad output-format support
+- Broad package-manifest and lockfile coverage across many ecosystems
+- Package assembly for sibling, nested, and workspace-style inputs
+- Include/exclude filtering, path normalization, and scan-result filtering
+- Persistent scan-cache controls for repeated runs
+- Security-first parsing with explicit safeguards and compatibility-focused tradeoffs where needed
 
 ## Installation
 
@@ -34,8 +42,8 @@ Download the appropriate binary for your platform from the [GitHub Releases](htt
 
 - **Linux (x64)**: `scancode-rust-x86_64-unknown-linux-gnu.tar.gz`
 - **Linux (ARM64)**: `scancode-rust-aarch64-unknown-linux-gnu.tar.gz`
-- **macOS (Apple Silicon & Intel)**: `scancode-rust-aarch64-apple-darwin.tar.gz`
-  - Intel Macs: Use Rosetta 2 for native-like performance
+- **macOS (Apple Silicon)**: `scancode-rust-aarch64-apple-darwin.tar.gz`
+  - Intel Macs can use the ARM build via Rosetta 2
 - **Windows**: `scancode-rust-x86_64-pc-windows-msvc.zip`
 
 Extract and place the binary in your system's PATH:
@@ -49,9 +57,9 @@ sudo mv scancode-rust /usr/local/bin/
 ### Build from Source
 
 ```sh
-git clone https://github.com/yourusername/scancode-rust.git
+git clone https://github.com/mstykow/scancode-rust.git
 cd scancode-rust
-./setup.sh  # Initialize the submodule and configure sparse checkout
+./setup.sh  # Initialize submodules and configure sparse checkout for embedded license data
 cargo build --release
 ```
 
@@ -60,50 +68,26 @@ The compiled binary will be available at `target/release/scancode-rust`.
 ## Usage
 
 ```sh
-scancode-rust [OPTIONS] <DIR_PATH>...
+scancode-rust --json-pp <FILE> [OPTIONS] <DIR_PATH>...
 ```
 
-### Options
+At least one output option is required.
+
+For the complete CLI surface, run:
 
 ```sh
-Options:
-      --json <FILE>                   Write compact JSON to FILE
-      --json-pp <FILE>                Write pretty JSON to FILE
-      --json-lines <FILE>             Write JSON Lines to FILE
-      --yaml <FILE>                   Write YAML to FILE
-      --csv <FILE>                    Write CSV to FILE
-      --html <FILE>                   Write HTML report to FILE
-      --spdx-tv <FILE>                Write SPDX Tag/Value to FILE
-      --spdx-rdf <FILE>               Write SPDX RDF/XML to FILE
-      --cyclonedx <FILE>              Write CycloneDX JSON to FILE
-      --cyclonedx-xml <FILE>          Write CycloneDX XML to FILE
-      --custom-output <FILE>          Write custom templated output to FILE
-      --custom-template <FILE>        Template path (requires --custom-output)
-  -m, --max-depth <MAX_DEPTH>        Maximum recursion depth (0 means no depth limit) [default: 0]
-  -n, --processes <PROCESSES>        Number of worker processes [default: CPUs-1]
-      --timeout <TIMEOUT>            Per-file timeout in seconds [default: 120]
-  -q, --quiet                        Suppress summary and progress output
-  -v, --verbose                      Print file-by-file progress output
-      --strip-root                   Strip the root segment from reported paths
-      --full-root                    Report full absolute paths
-      --exclude <EXCLUDE>            Glob patterns to exclude from scanning (alias: --ignore)
-      --include <INCLUDE>            Glob patterns to include in output
-      --from-json                    Load from previous JSON scan file (input is positional JSON path)
-      --cache-dir <PATH>             Override cache directory for persisted scan cache data
-      --cache-clear                  Remove persisted cache data before directory scan starts
-      --max-in-memory <INT>          Max findings kept in memory before spill behavior (parity surface; behavior roadmap in caching plan)
-      --no-assemble                  Disable package assembly (merging related manifest/lockfiles)
-      --filter-clues                 Remove redundant clue-level findings
-      --only-findings                Keep only files/directories with findings
-      --mark-source                  Mark source-heavy files/directories
-  -c, --copyright                    Enable copyright/holder/author detection
-  -e, --email                        Scan input for email addresses
-      --max-email <INT>              Max emails per file [default: 50; requires --email]
-  -u, --url                          Scan input for URLs
-      --max-url <INT>                Max URLs per file [default: 50; requires --url]
-  -h, --help                         Print help
-  -V, --version                      Print version
+scancode-rust --help
 ```
+
+Commonly used options include:
+
+- `--json`, `--json-pp`, `--json-lines`, `--yaml`, `--html`, `--csv`
+- `--spdx-tv`, `--spdx-rdf`, `--cyclonedx`, `--cyclonedx-xml`
+- `--custom-output`, `--custom-template`
+- `--exclude/--ignore`, `--include`, `--max-depth`, `--processes`
+- `--cache-dir`, `--cache-clear`, `--from-json`, `--no-assemble`
+- `--filter-clues`, `--only-findings`, `--mark-source`
+- `--copyright`, `--email`, `--url`
 
 ### Example
 
@@ -112,38 +96,41 @@ scancode-rust --json-pp scan-results.json ~/projects/my-codebase --ignore "*.git
 ```
 
 Use `-` as FILE to write an output stream to stdout (for example: `--json-pp -`).
-Multiple output flags can be used in a single run, matching ScanCode CLI
-behavior.
+Multiple output flags can be used in a single run, matching ScanCode CLI behavior.
 When using `--from-json`, you can pass multiple JSON inputs; directory scan mode currently supports one input path.
 Cache location can also be controlled with the `SCANCODE_RUST_CACHE` environment variable.
+
+For the generated package-format support matrix, see [Supported Formats](docs/SUPPORTED_FORMATS.md).
 
 ## Performance
 
 `scancode-rust` is designed to be significantly faster than the Python-based ScanCode Toolkit, especially for large codebases, thanks to native Rust performance and parallel processing. See [Architecture: Performance Characteristics](docs/ARCHITECTURE.md#performance-characteristics) for details.
 
-## Output Format
+## Output Formats
 
 Implemented output formats:
 
 - JSON (ScanCode-compatible baseline)
 - YAML
-- CSV
 - JSON Lines
+- CSV
 - SPDX (Tag-Value, RDF/XML)
 - CycloneDX (JSON, XML)
 - HTML report
-- HTML app
 - Custom template rendering
+
+Additional parity-oriented outputs such as the HTML app surface are present in the codebase, but the README focuses on the primary user-facing formats above.
 
 Output architecture and compatibility approach are documented in:
 
-- `docs/ARCHITECTURE.md`
-- `docs/TESTING_STRATEGY.md`
+- [Architecture](docs/ARCHITECTURE.md)
+- [Testing Strategy](docs/TESTING_STRATEGY.md)
 
 ## Documentation
 
+- **[Documentation Index](docs/DOCUMENTATION_INDEX.md)** - Best starting point for navigating the docs set
 - **[Architecture](docs/ARCHITECTURE.md)** - System design, processing pipeline, and design decisions
-- **[Supported Formats](docs/SUPPORTED_FORMATS.md)** - Complete list of supported package ecosystems and file formats
+- **[Supported Formats](docs/SUPPORTED_FORMATS.md)** - Generated support matrix for package ecosystems and file formats
 - **[How to Add a Parser](docs/HOW_TO_ADD_A_PARSER.md)** - Step-by-step guide for adding new parsers
 - **[Testing Strategy](docs/TESTING_STRATEGY.md)** - Testing approach and guidelines
 - **[ADRs](docs/adr/)** - Architectural decision records
@@ -172,16 +159,16 @@ To contribute to `scancode-rust`, follow these steps to set up the repository fo
    cd scancode-rust
    ```
 
-3. **Initialize the License Submodule**  
-   Use the following script to initialize the submodule and configure sparse checkout.  
+3. **Initialize and Update Embedded License Data**  
+   Use the following script to initialize submodules, configure sparse checkout, and update the embedded SPDX license-data submodule to the latest upstream state.  
    If `pre-commit` is installed, this script also installs Git pre-commit hooks automatically:
 
    ```sh
    ./setup.sh
    ```
 
-4. **Install Dependencies**  
-   Install the required Rust dependencies using `cargo`:
+4. **Build the Project**  
+   Build the project with Cargo:
 
    ```sh
    cargo build
@@ -196,6 +183,7 @@ To contribute to `scancode-rust`, follow these steps to set up the repository fo
 
 6. **Install Pre-commit (if needed)**  
    This repository uses [pre-commit](https://pre-commit.com/) to run checks before each commit.  
+   For documentation hooks and commands, install Node.js and npm first (`package.json` currently requires Node `>=24`).
    If you install `pre-commit` after running `./setup.sh`, run `pre-commit install` once:
 
    ```sh
@@ -217,10 +205,10 @@ To contribute to `scancode-rust`, follow these steps to set up the repository fo
    ```
 
 7. **Start Developing**  
-   You can now make changes and test them locally. Use `cargo run` to execute the tool:
+   You can now make changes and test them locally. Use `cargo run --bin scancode-rust` to execute the tool:
 
    ```sh
-   cargo run -- [OPTIONS] <DIR_PATH>
+   cargo run --bin scancode-rust -- [OPTIONS] <DIR_PATH>
    ```
 
 ## Publishing a Release (Maintainers Only)
@@ -273,9 +261,9 @@ Available release types:
 6. Publishes to crates.io
 7. Pushes commits and tag to GitHub
 8. GitHub Actions workflow is triggered by the tag
-9. Builds binaries for all platforms:
+9. Builds binaries for all published targets:
    - Linux: x64 and ARM64
-   - macOS: ARM64 (Apple Silicon, works on Intel via Rosetta 2)
+   - macOS: ARM64 (Apple Silicon; Intel Macs can use Rosetta 2 with the ARM build)
    - Windows: x64
 10. Creates archives (.tar.gz/.zip) and SHA256 checksums
 11. Creates a GitHub Release with all artifacts and auto-generated release notes
