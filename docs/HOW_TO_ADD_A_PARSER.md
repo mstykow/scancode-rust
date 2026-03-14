@@ -17,7 +17,7 @@ Adding a parser involves:
 2. **Implementation** - Create the parser module
 3. **Testing** - Add comprehensive tests
 4. **Registration** - Register the parser with the scanner
-5. **Golden Tests** - Add regression tests (optional)
+5. **Golden Tests** - Add regression tests (expected for new production parsers)
 6. **Assembly Support** - Add manifest/lockfile merging (if applicable)
 7. **Validation** - Verify against reference implementation
 8. **Documentation** - Document the implementation
@@ -334,6 +334,7 @@ mod tests {
 - [ ] Different dependency scopes
 - [ ] Malformed input handled gracefully
 - [ ] Edge cases (empty, minimal, complex)
+- [ ] Golden fixtures added for representative parser outputs
 
 ### Integration Test Verification
 
@@ -397,9 +398,11 @@ register_package_handlers! {
 cargo run --bin update-parser-golden -- --list | grep MyEcosystemParser
 ```
 
-## Step 5: Add Golden Tests (Optional but Recommended)
+## Step 5: Add Golden Tests (Expected for New Production Parsers)
 
 Golden tests compare parser output against reference `.expected.json` files to catch regressions.
+
+For new production parser work in this repository, treat golden tests as the default expectation rather than a nice-to-have. The only reasonable exception is an explicitly incremental parser slice with a documented follow-up task to add the missing goldens before calling the ecosystem support complete.
 
 ### Generate Expected Output
 
