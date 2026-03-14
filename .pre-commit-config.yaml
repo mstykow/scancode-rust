@@ -3,10 +3,9 @@ repos:
     hooks:
       - id: fmt
         name: Format Rust code and stage changes
-        entry: bash -c 'cargo fmt --all && git add -u :/*.rs'
+        entry: bash -c 'cargo fmt -- "$@" && git add -- "$@"' --
         language: system
         types: [rust]
-        pass_filenames: false
 
       - id: clippy
         name: Run clippy
@@ -26,14 +25,12 @@ repos:
 
       - id: markdown-lint
         name: Lint markdown files with auto-fix
-        entry: bash -c 'npm install --quiet && npm run lint:md:fix && git add -u :/*.md'
+        entry: bash -c 'npm exec -- markdownlint-cli2 --fix --no-globs "$@" && git add -- "$@"' --
         language: system
         types: [markdown]
-        pass_filenames: false
 
       - id: prettier
         name: Format YAML, JSON, and Markdown with Prettier
-        entry: bash -c 'npm install --quiet && npm run format && git add -u'
+        entry: bash -c 'npm exec -- prettier --write "$@" && git add -- "$@"' --
         language: system
         files: \.(yml|yaml|json|md)$
-        pass_filenames: false
