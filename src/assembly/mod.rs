@@ -1100,6 +1100,132 @@ mod tests {
     }
 
     #[test]
+    fn test_assemble_python_pyproject_with_pylock_toml() {
+        let mut files = vec![
+            create_test_file_info(
+                "project/pyproject.toml",
+                DatasourceId::PypiPyprojectToml,
+                Some("pkg:pypi/pylock-demo@0.1.0"),
+                Some("pylock-demo"),
+                Some("0.1.0"),
+                vec![],
+            ),
+            create_test_file_info(
+                "project/pylock.toml",
+                DatasourceId::PypiPylockToml,
+                None,
+                None,
+                None,
+                vec![Dependency {
+                    purl: Some("pkg:pypi/requests@2.32.3".to_string()),
+                    extracted_requirement: None,
+                    scope: None,
+                    is_runtime: Some(true),
+                    is_optional: Some(false),
+                    is_pinned: Some(true),
+                    is_direct: Some(true),
+                    resolved_package: None,
+                    extra_data: None,
+                }],
+            ),
+        ];
+
+        let result = assemble(&mut files);
+
+        assert_eq!(
+            result.packages.len(),
+            1,
+            "Expected exactly one merged Python package"
+        );
+        let package = &result.packages[0];
+        assert_eq!(package.name, Some("pylock-demo".to_string()));
+        assert!(
+            package
+                .datafile_paths
+                .contains(&"project/pyproject.toml".to_string())
+        );
+        assert!(
+            package
+                .datafile_paths
+                .contains(&"project/pylock.toml".to_string())
+        );
+        assert!(
+            package
+                .datasource_ids
+                .contains(&DatasourceId::PypiPyprojectToml)
+        );
+        assert!(
+            package
+                .datasource_ids
+                .contains(&DatasourceId::PypiPylockToml)
+        );
+
+        assert_eq!(result.dependencies.len(), 1);
+        assert_eq!(
+            result.dependencies[0].purl.as_deref(),
+            Some("pkg:pypi/requests@2.32.3")
+        );
+        assert_eq!(files[0].for_packages.len(), 1);
+        assert_eq!(files[1].for_packages.len(), 1);
+    }
+
+    #[test]
+    fn test_assemble_python_pyproject_with_named_pylock_toml() {
+        let mut files = vec![
+            create_test_file_info(
+                "project/pyproject.toml",
+                DatasourceId::PypiPyprojectToml,
+                Some("pkg:pypi/pylock-demo@0.1.0"),
+                Some("pylock-demo"),
+                Some("0.1.0"),
+                vec![],
+            ),
+            create_test_file_info(
+                "project/pylock.dev.toml",
+                DatasourceId::PypiPylockToml,
+                None,
+                None,
+                None,
+                vec![Dependency {
+                    purl: Some("pkg:pypi/pytest@8.3.5".to_string()),
+                    extracted_requirement: None,
+                    scope: Some("dev".to_string()),
+                    is_runtime: Some(false),
+                    is_optional: Some(false),
+                    is_pinned: Some(true),
+                    is_direct: Some(true),
+                    resolved_package: None,
+                    extra_data: None,
+                }],
+            ),
+        ];
+
+        let result = assemble(&mut files);
+
+        assert_eq!(
+            result.packages.len(),
+            1,
+            "Expected exactly one merged Python package"
+        );
+        let package = &result.packages[0];
+        assert!(
+            package
+                .datafile_paths
+                .contains(&"project/pylock.dev.toml".to_string())
+        );
+        assert!(
+            package
+                .datasource_ids
+                .contains(&DatasourceId::PypiPylockToml)
+        );
+        assert_eq!(result.dependencies.len(), 1);
+        assert_eq!(
+            result.dependencies[0].purl.as_deref(),
+            Some("pkg:pypi/pytest@8.3.5")
+        );
+    }
+
+    #[test]
     fn test_assemble_no_matching_datasource() {
         let mut files = vec![create_test_file_info(
             "project/unknown.json",
