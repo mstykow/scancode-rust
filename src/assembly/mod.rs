@@ -305,8 +305,8 @@ fn merge_conda_rootfs_metadata(
         };
 
         let old_uid = json_package_uids.get(&pkg_data.purl).cloned();
-        let new_uid = packages[target_idx].package_uid.clone();
         packages[target_idx].update(&pkg_data, json_path);
+        let new_uid = packages[target_idx].package_uid.clone();
 
         if let Some(old_uid) = old_uid {
             for file in files.iter_mut() {
@@ -1100,6 +1100,152 @@ mod tests {
     }
 
     #[test]
+    fn test_assemble_python_pyproject_with_uv_lock_backfills_version_and_refreshes_uids() {
+        let mut files = vec![
+            create_test_file_info(
+                "project/pyproject.toml",
+                DatasourceId::PypiPyprojectToml,
+                Some("pkg:pypi/uv-demo"),
+                Some("uv-demo"),
+                None,
+                vec![Dependency {
+                    purl: Some("pkg:pypi/httpx@0.27.0".to_string()),
+                    extracted_requirement: Some(">=0.27.0".to_string()),
+                    scope: None,
+                    is_runtime: Some(true),
+                    is_optional: Some(false),
+                    is_pinned: Some(false),
+                    is_direct: Some(true),
+                    resolved_package: None,
+                    extra_data: None,
+                }],
+            ),
+            create_test_file_info(
+                "project/uv.lock",
+                DatasourceId::PypiUvLock,
+                Some("pkg:pypi/uv-demo@0.1.0"),
+                Some("uv-demo"),
+                Some("0.1.0"),
+                vec![Dependency {
+                    purl: Some("pkg:pypi/anyio@4.4.0".to_string()),
+                    extracted_requirement: Some("==4.4.0".to_string()),
+                    scope: Some("dev".to_string()),
+                    is_runtime: Some(false),
+                    is_optional: Some(true),
+                    is_pinned: Some(true),
+                    is_direct: Some(true),
+                    resolved_package: None,
+                    extra_data: None,
+                }],
+            ),
+        ];
+
+        let result = assemble(&mut files);
+
+        assert_eq!(result.packages.len(), 1);
+        let package = &result.packages[0];
+        assert_eq!(package.version.as_deref(), Some("0.1.0"));
+        assert_eq!(package.purl.as_deref(), Some("pkg:pypi/uv-demo@0.1.0"));
+        assert!(
+            package
+                .package_uid
+                .starts_with("pkg:pypi/uv-demo@0.1.0?uuid=")
+        );
+        assert_eq!(result.dependencies.len(), 2);
+        assert!(
+            result.dependencies.iter().all(|dep| {
+                dep.for_package_uid.as_deref() == Some(package.package_uid.as_str())
+            })
+        );
+    }
+
+    #[test]
+    fn test_assemble_python_pyproject_skips_uv_lock_with_same_name_different_version() {
+        let mut files = vec![
+            create_test_file_info(
+                "project/pyproject.toml",
+                DatasourceId::PypiPyprojectToml,
+                Some("pkg:pypi/uv-demo@0.1.0"),
+                Some("uv-demo"),
+                Some("0.1.0"),
+                vec![],
+            ),
+            create_test_file_info(
+                "project/uv.lock",
+                DatasourceId::PypiUvLock,
+                Some("pkg:pypi/uv-demo@0.2.0"),
+                Some("uv-demo"),
+                Some("0.2.0"),
+                vec![Dependency {
+                    purl: Some("pkg:pypi/requests@2.32.5".to_string()),
+                    extracted_requirement: Some("==2.32.5".to_string()),
+                    scope: None,
+                    is_runtime: Some(true),
+                    is_optional: Some(false),
+                    is_pinned: Some(true),
+                    is_direct: Some(true),
+                    resolved_package: None,
+                    extra_data: None,
+                }],
+            ),
+        ];
+
+        let result = assemble(&mut files);
+
+        assert_eq!(result.packages.len(), 1);
+        assert_eq!(result.packages[0].version.as_deref(), Some("0.1.0"));
+        assert_eq!(
+            result.packages[0].datafile_paths,
+            vec!["project/pyproject.toml".to_string()]
+        );
+        assert!(result.dependencies.is_empty());
+        assert!(files[1].for_packages.is_empty());
+    }
+
+    #[test]
+    fn test_assemble_python_pyproject_skips_uv_lock_with_same_version_different_name() {
+        let mut files = vec![
+            create_test_file_info(
+                "project/pyproject.toml",
+                DatasourceId::PypiPyprojectToml,
+                Some("pkg:pypi/uv-demo@0.1.0"),
+                Some("uv-demo"),
+                Some("0.1.0"),
+                vec![],
+            ),
+            create_test_file_info(
+                "project/uv.lock",
+                DatasourceId::PypiUvLock,
+                Some("pkg:pypi/other-demo@0.1.0"),
+                Some("other-demo"),
+                Some("0.1.0"),
+                vec![Dependency {
+                    purl: Some("pkg:pypi/requests@2.32.5".to_string()),
+                    extracted_requirement: Some("==2.32.5".to_string()),
+                    scope: None,
+                    is_runtime: Some(true),
+                    is_optional: Some(false),
+                    is_pinned: Some(true),
+                    is_direct: Some(true),
+                    resolved_package: None,
+                    extra_data: None,
+                }],
+            ),
+        ];
+
+        let result = assemble(&mut files);
+
+        assert_eq!(result.packages.len(), 1);
+        assert_eq!(result.packages[0].name.as_deref(), Some("uv-demo"));
+        assert_eq!(
+            result.packages[0].datafile_paths,
+            vec!["project/pyproject.toml".to_string()]
+        );
+        assert!(result.dependencies.is_empty());
+        assert!(files[1].for_packages.is_empty());
+    }
+
+    #[test]
     fn test_assemble_python_pyproject_with_pylock_toml() {
         let mut files = vec![
             create_test_file_info(
@@ -1433,6 +1579,39 @@ mod tests {
             package.sha256,
             Some("abc123".to_string()),
             "New sha256 should be filled"
+        );
+    }
+
+    #[test]
+    fn test_package_update_refreshes_purl_when_version_is_backfilled() {
+        let initial_pkg_data = PackageData {
+            datasource_id: Some(DatasourceId::PypiPyprojectToml),
+            purl: Some("pkg:pypi/test-package".to_string()),
+            name: Some("test-package".to_string()),
+            version: None,
+            ..Default::default()
+        };
+
+        let mut package =
+            Package::from_package_data(&initial_pkg_data, "pyproject.toml".to_string());
+        let original_uid = package.package_uid.clone();
+
+        let update_pkg_data = PackageData {
+            datasource_id: Some(DatasourceId::PypiUvLock),
+            purl: Some("pkg:pypi/test-package@0.2.0".to_string()),
+            name: Some("test-package".to_string()),
+            version: Some("0.2.0".to_string()),
+            ..Default::default()
+        };
+
+        package.update(&update_pkg_data, "uv.lock".to_string());
+
+        assert_eq!(package.purl.as_deref(), Some("pkg:pypi/test-package@0.2.0"));
+        assert_ne!(package.package_uid, original_uid);
+        assert!(
+            package
+                .package_uid
+                .starts_with("pkg:pypi/test-package@0.2.0?uuid=")
         );
     }
 
