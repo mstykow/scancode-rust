@@ -35,42 +35,42 @@ This file is intended to work incrementally.
 
 All production handlers in the original plan scope are covered. Some ecosystems consolidate multiple Python handlers into fewer Rust parsers by design.
 
-| Ecosystem             | Coverage       | Notes                                                                            |
-| --------------------- | -------------- | -------------------------------------------------------------------------------- |
-| AboutCode             | ✅ Implemented | `AboutFileParser`                                                                |
-| Alpine                | ✅ Implemented | `.apk` archive + installed DB + `APKBUILD` recipe parsing                        |
-| Autotools             | ✅ Implemented | `AutotoolsConfigureParser`                                                       |
-| Bazel                 | ✅ Implemented | `BazelBuildParser`                                                               |
-| Bower                 | ✅ Implemented | `BowerJsonParser`                                                                |
-| Buck                  | ✅ Implemented | `BuckBuildParser`, `BuckMetadataBzlParser`                                       |
-| Cargo/Rust            | ✅ Implemented | `CargoParser`, `CargoLockParser` + workspace assembly                            |
-| Chef                  | ✅ Implemented | `metadata.rb`, `metadata.json`. Cookbook `.tgz` not implemented (archive).       |
-| CocoaPods             | ✅ Implemented | `Podfile`, `Podfile.lock`, `.podspec`, `.podspec.json`                           |
-| Conan                 | ✅ Implemented | ⭐ Beyond parity: added `conanfile.txt`, `conan.lock`, `conandata.yml`           |
-| Conda                 | ✅ Implemented | `conda-meta` JSON, `environment.yml`, `meta.yaml`                                |
-| CPAN                  | ✅ Implemented | ⭐ Beyond parity: `META.json`, `META.yml`, `MANIFEST`, `dist.ini`, `Makefile.PL` |
-| CRAN/R                | ✅ Implemented | `CranParser`                                                                     |
-| Dart/Pub              | ✅ Implemented | `pubspec.yaml`, `pubspec.lock`                                                   |
-| Debian                | ✅ Implemented | Includes ⭐ `.deb` introspection, copyright, distroless, `md5sums` variants      |
-| Docker                | ✅ Implemented | `Dockerfile`, `Containerfile`, OCI label extraction                              |
-| FreeBSD               | ✅ Implemented | `FreebsdCompactManifestParser`                                                   |
-| Git submodules        | ✅ Implemented | `GitmodulesParser`                                                               |
-| Go                    | ✅ Implemented | `go.mod`, `go.sum`, `Godeps.json`, `go.mod.graph`                                |
-| Gradle                | ✅ Implemented | ⭐ Beyond parity: added `GradleLockfileParser`                                   |
-| Haxe                  | ✅ Implemented | `HaxeParser`                                                                     |
-| Linux Distro          | ✅ Implemented | `OsReleaseParser` ⭐ fixes name logic bug + extracts URLs                        |
-| Maven/Java            | ✅ Implemented | `pom.xml`, `MANIFEST.MF`, ⭐ OSGi metadata + SCM/CI/issue management             |
-| npm/yarn/pnpm         | ✅ Implemented | Consolidates v1/v2 yarn, shrinkwrap variants + workspace assembly                |
-| NuGet                 | ✅ Implemented | ⭐ Beyond parity: added `PackagesConfigParser`                                   |
-| OCaml/opam            | ✅ Implemented | `OpamParser`                                                                     |
-| PHP/Composer          | ✅ Implemented | `ComposerJsonParser`, `ComposerLockParser` ⭐ extra provenance fields            |
-| Python/PyPI           | ✅ Implemented | Consolidates many handlers, includes `pip-inspect.deplock` and `uv.lock`         |
-| README                | ✅ Implemented | `ReadmeParser`                                                                   |
-| RPM                   | ✅ Implemented | ⭐ Specfile, DB (3 variants), license files, Mariner, archive                    |
-| Ruby                  | ✅ Implemented | Gemspec, Gemfile, lockfile, `.gem` archive, extracted metadata                   |
-| Swift                 | ✅ Implemented | `Package.resolved`, `Package.swift.json`, ⭐ full dependency graph               |
-| Windows Update        | ✅ Implemented | `MicrosoftUpdateManifestParser`                                                  |
-| `misc.py` recognizers | ✅ Implemented | All recognizers implemented, including magic byte detection                      |
+| Ecosystem             | Coverage       | Notes                                                                                    |
+| --------------------- | -------------- | ---------------------------------------------------------------------------------------- |
+| AboutCode             | ✅ Implemented | `AboutFileParser`                                                                        |
+| Alpine                | ✅ Implemented | `.apk` archive + installed DB + `APKBUILD` recipe parsing                                |
+| Autotools             | ✅ Implemented | `AutotoolsConfigureParser`                                                               |
+| Bazel                 | ✅ Implemented | `BazelBuildParser`                                                                       |
+| Bower                 | ✅ Implemented | `BowerJsonParser`                                                                        |
+| Buck                  | ✅ Implemented | `BuckBuildParser`, `BuckMetadataBzlParser`                                               |
+| Cargo/Rust            | ✅ Implemented | `CargoParser`, `CargoLockParser` + workspace assembly                                    |
+| Chef                  | ✅ Implemented | `metadata.rb`, `metadata.json`. Cookbook `.tgz` not implemented (archive).               |
+| CocoaPods             | ✅ Implemented | `Podfile`, `Podfile.lock`, `.podspec`, `.podspec.json`                                   |
+| Conan                 | ✅ Implemented | ⭐ Beyond parity: added `conanfile.txt`, `conan.lock`, `conandata.yml`                   |
+| Conda                 | ✅ Implemented | `conda-meta` JSON, `environment.yml`, `meta.yaml`                                        |
+| CPAN                  | ✅ Implemented | ⭐ Beyond parity: `META.json`, `META.yml`, `MANIFEST`, `dist.ini`, `Makefile.PL`         |
+| CRAN/R                | ✅ Implemented | `CranParser`                                                                             |
+| Dart/Pub              | ✅ Implemented | `pubspec.yaml`, `pubspec.lock`                                                           |
+| Debian                | ✅ Implemented | Includes ⭐ `.deb` introspection, copyright, distroless, `md5sums` variants              |
+| Docker                | ✅ Implemented | `Dockerfile`, `Containerfile`, OCI label extraction                                      |
+| FreeBSD               | ✅ Implemented | `FreebsdCompactManifestParser`                                                           |
+| Git submodules        | ✅ Implemented | `GitmodulesParser`                                                                       |
+| Go                    | ✅ Implemented | `go.mod`, `go.sum`, `Godeps.json`, `go.mod.graph`                                        |
+| Gradle                | ✅ Implemented | ⭐ Beyond parity: added `GradleLockfileParser`                                           |
+| Haxe                  | ✅ Implemented | `HaxeParser`                                                                             |
+| Linux Distro          | ✅ Implemented | `OsReleaseParser` ⭐ fixes name logic bug + extracts URLs                                |
+| Maven/Java            | ✅ Implemented | `pom.xml`, `MANIFEST.MF`, ⭐ OSGi metadata + SCM/CI/issue management                     |
+| npm/yarn/pnpm         | ✅ Implemented | Consolidates v1/v2 yarn, shrinkwrap variants + workspace assembly                        |
+| NuGet                 | ✅ Implemented | ⭐ Beyond parity: added `PackagesConfigParser`                                           |
+| OCaml/opam            | ✅ Implemented | `OpamParser`                                                                             |
+| PHP/Composer          | ✅ Implemented | `ComposerJsonParser`, `ComposerLockParser` ⭐ extra provenance fields                    |
+| Python/PyPI           | ✅ Implemented | Consolidates many handlers, includes `pip-inspect.deplock`, `uv.lock`, and `pylock.toml` |
+| README                | ✅ Implemented | `ReadmeParser`                                                                           |
+| RPM                   | ✅ Implemented | ⭐ Specfile, DB (3 variants), license files, Mariner, archive                            |
+| Ruby                  | ✅ Implemented | Gemspec, Gemfile, lockfile, `.gem` archive, extracted metadata                           |
+| Swift                 | ✅ Implemented | `Package.resolved`, `Package.swift.json`, ⭐ full dependency graph                       |
+| Windows Update        | ✅ Implemented | `MicrosoftUpdateManifestParser`                                                          |
+| `misc.py` recognizers | ✅ Implemented | All recognizers implemented, including magic byte detection                              |
 
 ---
 
@@ -82,14 +82,13 @@ The tables below classify the current open `package-parsing` / `new-parser` issu
 
 These issues either extend already-strong ecosystems, add high-signal lock/workspace files, or enable broad package/dependency ingestion with relatively clear formats.
 
-| Issue Set | Opportunity                     | Why this creates value                                                                                                                                      | Current overlap / notes                                                                         |
-| --------- | ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| #116      | `pylock.toml` (PEP 751)         | Adds the emerging standardized Python lockfile format rather than a tool-specific one-off, making it strategically useful for long-term ecosystem coverage. | Natural fit beside `pyproject.toml`, Poetry, Pipfile, and `pip-inspect.deplock`.                |
-| #105      | Deno (`deno.json`, `deno.lock`) | Adds a modern JS/TS package workflow with clear manifests, explicit lockfiles, and strong package-registry semantics.                                       | Reuses much of the existing npm/yarn/pnpm design thinking while targeting a distinct ecosystem. |
-| #99       | Go workspaces (`go.work`)       | Adds workspace-level ownership and dependency context to an ecosystem that already has strong module and graph support.                                     | High leverage because Go parsing and assembly already exist.                                    |
-| #102      | Bazel modules (`MODULE.bazel`)  | Extends the existing Bazel parser into the newer module system and aligns with purl-spec evolution.                                                         | Clear adjacency to current Bazel coverage.                                                      |
-| #117      | NuGet `.deps.json`              | Adds dependency evidence often found beside compiled .NET outputs, improving scan quality in built application trees where manifests are missing.           | Complements existing `.nuspec`, `packages.config`, project-file, and lockfile coverage.         |
-| #97       | Gradle `.module` files          | Adds Gradle-native published metadata with dependency semantics beyond what can always be recovered from `build.gradle`.                                    | Good follow-on to the existing Gradle parser and lockfile support.                              |
+| Issue Set | Opportunity                     | Why this creates value                                                                                                                            | Current overlap / notes                                                                         |
+| --------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| #105      | Deno (`deno.json`, `deno.lock`) | Adds a modern JS/TS package workflow with clear manifests, explicit lockfiles, and strong package-registry semantics.                             | Reuses much of the existing npm/yarn/pnpm design thinking while targeting a distinct ecosystem. |
+| #99       | Go workspaces (`go.work`)       | Adds workspace-level ownership and dependency context to an ecosystem that already has strong module and graph support.                           | High leverage because Go parsing and assembly already exist.                                    |
+| #102      | Bazel modules (`MODULE.bazel`)  | Extends the existing Bazel parser into the newer module system and aligns with purl-spec evolution.                                               | Clear adjacency to current Bazel coverage.                                                      |
+| #117      | NuGet `.deps.json`              | Adds dependency evidence often found beside compiled .NET outputs, improving scan quality in built application trees where manifests are missing. | Complements existing `.nuspec`, `packages.config`, project-file, and lockfile coverage.         |
+| #97       | Gradle `.module` files          | Adds Gradle-native published metadata with dependency semantics beyond what can always be recovered from `build.gradle`.                          | Good follow-on to the existing Gradle parser and lockfile support.                              |
 
 ### Medium-Value Opportunities
 
