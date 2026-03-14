@@ -1,0 +1,12 @@
+{
+  // package identity
+  "name": "@std/jsonc",
+  "version": "1.0.2",
+  "exports": {
+    ".": "./mod.ts",
+    "./parse": "./parse.ts",
+  },
+  "imports": {
+    "@std/assert": "jsr:@std/assert@1",
+  },
+}

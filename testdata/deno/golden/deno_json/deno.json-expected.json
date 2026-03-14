@@ -1,0 +1,71 @@
+[
+  {
+    "type": "deno",
+    "namespace": "@scancode",
+    "name": "deno-sample",
+    "version": "1.0.0",
+    "primary_language": "TypeScript",
+    "parties": [],
+    "extra_data": {
+      "exports": "./mod.ts",
+      "lock": {
+        "path": "./deno.lock",
+        "frozen": false
+      },
+      "scopes": {
+        "https://deno.land/x/oak/": {
+          "https://deno.land/x/dep/mod.ts": "./patched.ts"
+        }
+      },
+      "links": ["../local-package"],
+      "tasks": {
+        "test": "deno test"
+      },
+      "imports": {
+        "@std/assert": "jsr:@std/assert@^1.0.0",
+        "chalk": "npm:chalk@5",
+        "oak": "https://deno.land/x/oak/mod.ts"
+      }
+    },
+    "dependencies": [
+      {
+        "purl": "pkg:generic/jsr.io/%40std/assert",
+        "extracted_requirement": "jsr:@std/assert@^1.0.0",
+        "scope": "imports",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true,
+        "extra_data": {
+          "import_alias": "@std/assert"
+        }
+      },
+      {
+        "purl": "pkg:npm/chalk",
+        "extracted_requirement": "npm:chalk@5",
+        "scope": "imports",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": true,
+        "extra_data": {
+          "import_alias": "chalk"
+        }
+      },
+      {
+        "purl": "pkg:generic/deno.land/x/oak/mod.ts",
+        "extracted_requirement": "https://deno.land/x/oak/mod.ts",
+        "scope": "imports",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true,
+        "extra_data": {
+          "import_alias": "oak"
+        }
+      }
+    ],
+    "datasource_id": "deno_json",
+    "purl": "pkg:generic/%40scancode/deno-sample@1.0.0"
+  }
+]

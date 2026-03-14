@@ -77,6 +77,8 @@ mod debian_golden_test;
 #[cfg(test)]
 mod debian_test;
 mod deno;
+#[cfg(all(test, feature = "golden-tests"))]
+mod deno_golden_test;
 mod deno_lock;
 #[cfg(test)]
 mod deno_lock_test;
