@@ -94,7 +94,7 @@ strum = { version = "0.28.0", features = ["derive"] }
 
 [dev-dependencies]
 # own
-tempfile = "3.26.0"
+tempfile = "3.27.0"
 
 [profile.release]
 # Enable link-time optimization for better cross-module optimizations
