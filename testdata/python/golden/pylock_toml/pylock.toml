@@ -1,0 +1,89 @@
+lock-version = "1.0"
+created-by = "mousebender"
+requires-python = ">=3.12"
+environments = ["sys_platform == 'linux'"]
+extras = ["docs"]
+dependency-groups = ["dev"]
+default-groups = ["default"]
+
+[[packages]]
+name = "requests"
+version = "2.32.3"
+requires-python = ">=3.8"
+dependencies = [
+    { name = "urllib3", version = "2.2.3" },
+]
+
+[[packages.wheels]]
+name = "requests-2.32.3-py3-none-any.whl"
+url = "https://files.pythonhosted.org/packages/requests-2.32.3-py3-none-any.whl"
+size = 62574
+hashes = { sha256 = "reqwheelhash" }
+
+[[packages]]
+name = "urllib3"
+version = "2.2.3"
+
+[[packages.wheels]]
+name = "urllib3-2.2.3-py3-none-any.whl"
+url = "https://files.pythonhosted.org/packages/urllib3-2.2.3-py3-none-any.whl"
+size = 12345
+hashes = { sha256 = "urllib3wheelhash" }
+
+[[packages]]
+name = "pytest"
+version = "8.3.5"
+marker = "'dev' in dependency_groups"
+dependencies = [
+    { name = "pluggy", version = "1.5.0" },
+]
+
+[[packages.wheels]]
+name = "pytest-8.3.5-py3-none-any.whl"
+url = "https://files.pythonhosted.org/packages/pytest-8.3.5-py3-none-any.whl"
+size = 55555
+hashes = { sha256 = "pytestwheelhash" }
+
+[[packages]]
+name = "pluggy"
+version = "1.5.0"
+marker = "'dev' in dependency_groups"
+
+[[packages.wheels]]
+name = "pluggy-1.5.0-py3-none-any.whl"
+url = "https://files.pythonhosted.org/packages/pluggy-1.5.0-py3-none-any.whl"
+size = 44444
+hashes = { sha256 = "pluggywheelhash" }
+
+[[packages]]
+name = "sphinx"
+version = "8.2.3"
+marker = "'docs' in extras"
+dependencies = [
+    { name = "jinja2", version = "3.1.6" },
+]
+
+[[packages.wheels]]
+name = "sphinx-8.2.3-py3-none-any.whl"
+url = "https://files.pythonhosted.org/packages/sphinx-8.2.3-py3-none-any.whl"
+size = 33333
+hashes = { sha256 = "sphinxwheelhash" }
+
+[[packages]]
+name = "jinja2"
+version = "3.1.6"
+marker = "'docs' in extras"
+
+[[packages.wheels]]
+name = "jinja2-3.1.6-py3-none-any.whl"
+url = "https://files.pythonhosted.org/packages/jinja2-3.1.6-py3-none-any.whl"
+size = 22222
+hashes = { sha256 = "jinja2wheelhash" }
+
+[[packages]]
+name = "local-editable"
+requires-python = ">=3.12"
+
+[packages.directory]
+path = "./local-editable"
+editable = true
