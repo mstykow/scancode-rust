@@ -1,0 +1,35 @@
+[
+  {
+    "type": "deno",
+    "namespace": "@std",
+    "name": "jsonc",
+    "version": "1.0.2",
+    "primary_language": "TypeScript",
+    "parties": [],
+    "extra_data": {
+      "exports": {
+        ".": "./mod.ts",
+        "./parse": "./parse.ts"
+      },
+      "imports": {
+        "@std/assert": "jsr:@std/assert@1"
+      }
+    },
+    "dependencies": [
+      {
+        "purl": "pkg:generic/jsr.io/%40std/assert",
+        "extracted_requirement": "jsr:@std/assert@1",
+        "scope": "imports",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": true,
+        "extra_data": {
+          "import_alias": "@std/assert"
+        }
+      }
+    ],
+    "datasource_id": "deno_json",
+    "purl": "pkg:generic/%40std/jsonc@1.0.2"
+  }
+]
