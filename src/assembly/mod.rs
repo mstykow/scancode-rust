@@ -1372,6 +1372,74 @@ mod tests {
     }
 
     #[test]
+    fn test_assemble_deno_json_with_deno_lock() {
+        let mut files = vec![
+            create_test_file_info(
+                "project/deno.json",
+                DatasourceId::DenoJson,
+                Some("pkg:generic/%40scancode/deno-sample@1.0.0"),
+                Some("@scancode/deno-sample"),
+                Some("1.0.0"),
+                vec![Dependency {
+                    purl: Some("pkg:npm/chalk".to_string()),
+                    extracted_requirement: Some("npm:chalk@5".to_string()),
+                    scope: Some("imports".to_string()),
+                    is_runtime: Some(true),
+                    is_optional: Some(false),
+                    is_pinned: Some(false),
+                    is_direct: Some(true),
+                    resolved_package: None,
+                    extra_data: None,
+                }],
+            ),
+            create_test_file_info(
+                "project/deno.lock",
+                DatasourceId::DenoLock,
+                None,
+                None,
+                None,
+                vec![Dependency {
+                    purl: Some("pkg:npm/chalk@5.6.2".to_string()),
+                    extracted_requirement: Some("npm:chalk@5".to_string()),
+                    scope: Some("imports".to_string()),
+                    is_runtime: Some(true),
+                    is_optional: Some(false),
+                    is_pinned: Some(true),
+                    is_direct: Some(true),
+                    resolved_package: None,
+                    extra_data: None,
+                }],
+            ),
+        ];
+
+        let result = assemble(&mut files);
+
+        assert_eq!(
+            result.packages.len(),
+            1,
+            "Expected exactly one merged Deno package"
+        );
+        let package = &result.packages[0];
+        assert_eq!(package.name, Some("@scancode/deno-sample".to_string()));
+        assert!(
+            package
+                .datafile_paths
+                .contains(&"project/deno.json".to_string())
+        );
+        assert!(
+            package
+                .datafile_paths
+                .contains(&"project/deno.lock".to_string())
+        );
+        assert!(package.datasource_ids.contains(&DatasourceId::DenoJson));
+        assert!(package.datasource_ids.contains(&DatasourceId::DenoLock));
+
+        assert_eq!(result.dependencies.len(), 2);
+        assert_eq!(files[0].for_packages.len(), 1);
+        assert_eq!(files[1].for_packages.len(), 1);
+    }
+
+    #[test]
     fn test_assemble_no_matching_datasource() {
         let mut files = vec![create_test_file_info(
             "project/unknown.json",
