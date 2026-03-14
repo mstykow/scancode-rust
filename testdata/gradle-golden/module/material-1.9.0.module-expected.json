@@ -23,7 +23,6 @@
       }
     ],
     "extra_data": {
-      "format_version": "1.1",
       "variants": [
         {
           "name": "releaseApiElements",
@@ -40,10 +39,11 @@
           }
         }
       ],
-      "gradle_version": "7.3.3",
       "component_attributes": {
         "org.gradle.status": "release"
-      }
+      },
+      "gradle_version": "7.3.3",
+      "format_version": "1.1"
     },
     "dependencies": [
       {
@@ -56,10 +56,34 @@
         "is_direct": true,
         "extra_data": {
           "variant_names": ["releaseApiElements", "releaseRuntimeElements"],
-          "variant_scopes": ["compile", "runtime"],
           "version": {
             "requires": "1.2.0"
-          }
+          },
+          "variant_scopes": ["compile", "runtime"],
+          "variant_dependency_entries": [
+            {
+              "variant_name": "releaseApiElements",
+              "variant_scope": "compile",
+              "dependency": {
+                "group": "androidx.annotation",
+                "module": "annotation",
+                "version": {
+                  "requires": "1.2.0"
+                }
+              }
+            },
+            {
+              "variant_name": "releaseRuntimeElements",
+              "variant_scope": "runtime",
+              "dependency": {
+                "group": "androidx.annotation",
+                "module": "annotation",
+                "version": {
+                  "requires": "1.2.0"
+                }
+              }
+            }
+          ]
         }
       },
       {
@@ -71,8 +95,21 @@
         "is_pinned": true,
         "is_direct": true,
         "extra_data": {
-          "variant_scopes": ["compile"],
           "variant_names": ["releaseApiElements"],
+          "variant_dependency_entries": [
+            {
+              "variant_name": "releaseApiElements",
+              "variant_scope": "compile",
+              "dependency": {
+                "group": "androidx.appcompat",
+                "module": "appcompat",
+                "version": {
+                  "requires": "1.5.0"
+                }
+              }
+            }
+          ],
+          "variant_scopes": ["compile"],
           "version": {
             "requires": "1.5.0"
           }
@@ -88,10 +125,23 @@
         "is_direct": true,
         "extra_data": {
           "variant_names": ["releaseRuntimeElements"],
-          "variant_scopes": ["runtime"],
           "version": {
             "requires": "2.15.0"
-          }
+          },
+          "variant_scopes": ["runtime"],
+          "variant_dependency_entries": [
+            {
+              "variant_name": "releaseRuntimeElements",
+              "variant_scope": "runtime",
+              "dependency": {
+                "group": "com.google.errorprone",
+                "module": "error_prone_annotations",
+                "version": {
+                  "requires": "2.15.0"
+                }
+              }
+            }
+          ]
         }
       }
     ],
