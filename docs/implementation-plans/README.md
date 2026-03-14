@@ -25,8 +25,8 @@ implementation-plans/
 - **[ASSEMBLY_PLAN.md](package-detection/ASSEMBLY_PLAN.md)** - Package assembly roadmap
   - Status: 🟢 Complete — All phases done (sibling merge, nested merge, workspace assembly, file reference resolution)
 
-- **[PARSER_ENHANCEMENT_PLAN.md](package-detection/PARSER_ENHANCEMENT_PLAN.md)** - Ecosystem-by-ecosystem parser enhancement backlog and execution tracker
-  - Status: 🟡 Active — open `enhancement` + `package-parsing` issue groups, sequencing, and PR validation are tracked in [PARSER_ENHANCEMENT_PLAN.md](package-detection/PARSER_ENHANCEMENT_PLAN.md)
+- **[PARSER_ENHANCEMENT_PLAN.md](package-detection/PARSER_ENHANCEMENT_PLAN.md)** - Ecosystem-by-ecosystem parser enhancement campaign record
+  - Status: 🟢 Complete — kept as living historical documentation of the completed parser enhancement campaign, including issue scope, validation patterns, and implementation learnings
 
 ### Text Detection (`text-detection/`)
 
@@ -83,8 +83,7 @@ These represent major architectural components not yet implemented. Each will be
 1. **Placeholder** - Brief description of component, scope, and dependencies
 2. **Planning** - Detailed analysis, design decisions, implementation phases
 3. **Active** - Work in progress, updated with status
-4. **Complete** - Feature implemented, document archived
-5. **Archived** - Moved to [`docs/archived/`](../archived/) for historical reference
+4. **Complete** - Feature implemented, document retained as completed living documentation or archived if it no longer has ongoing maintainer value
 
 ### Documentation Style for Plan Status
 

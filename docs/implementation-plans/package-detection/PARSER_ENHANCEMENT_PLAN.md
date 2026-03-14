@@ -1,26 +1,20 @@
 # Package Parser Enhancement Plan
 
-> **Status**: 🟡 Active — ecosystem-by-ecosystem enhancement backlog and execution tracker
+> **Status**: 🟢 Complete — living historical record of the completed parser enhancement campaign
 > **Updated**: March 12, 2026
 > **Dependencies**: [PARSER_PLAN.md](PARSER_PLAN.md), [ASSEMBLY_PLAN.md](ASSEMBLY_PLAN.md), [HOW_TO_ADD_A_PARSER.md](../../HOW_TO_ADD_A_PARSER.md), [TESTING_STRATEGY.md](../../TESTING_STRATEGY.md)
 
 ## Purpose
 
-This document is the durable workboard for open package-parser enhancement work. It exists so future sessions can resume the effort without rebuilding the issue inventory, sequencing, or testing expectations from scratch.
+This document is a historical record of the completed package-parser enhancement campaign. It is kept for maintainers who want the issue inventory, sequencing rationale, validation expectations, and PR mapping that were used while the ecosystem-by-ecosystem effort was active.
 
-## How to Use This Plan
+## Current Role
 
-At the start of each session:
+This file is no longer an active workboard.
 
-1. Read this file first.
-2. Pick the next ecosystem marked `Planned` unless priorities changed.
-3. Before coding, confirm the issue set is still open with GitHub.
-   - Read the full issue body for every issue in the active ecosystem, not just the title or earlier notes.
-4. After finishing an ecosystem PR, update this file:
-   - mark the ecosystem `Done` once the implementation work, tests, docs, and PR are complete
-   - use the detailed scope section to note whether the PR is still open, merged, or followed by later cleanup
-   - add any follow-up issues created or intentionally deferred
-5. If sequencing changes, update the order here instead of relying on chat history.
+- All parser-enhancement ecosystem rows in this campaign were completed.
+- Active parser coverage status now lives in [PARSER_PLAN.md](../../implementation-plans/package-detection/PARSER_PLAN.md).
+- The sections below are preserved as living historical implementation notes rather than instructions for new work.
 
 ## Ground Rules
 
@@ -50,9 +44,9 @@ At the start of each session:
 - Supported-format documentation when parser coverage or advertised metadata changes
 - Improvement documentation when Rust behavior intentionally exceeds or corrects Python behavior
 
-## Session Refresh Commands
+## Historical Refresh Commands
 
-Refresh the enhancement backlog:
+These commands were used while the enhancement campaign was active:
 
 ```bash
 gh issue list --state open --label package-parsing --label enhancement --limit 200
