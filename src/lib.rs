@@ -41,9 +41,10 @@
 //!
 //! ## Supported Ecosystems
 //!
-//! Comprehensive package metadata extraction for **12 ecosystems** with **40+ formats**:
+//! Comprehensive package metadata extraction across major ecosystems with **40+ formats**:
 //!
 //! - **JavaScript/npm**: `package.json`, `package-lock.json`, `yarn.lock`, `pnpm-lock.yaml`
+//! - **Deno**: `deno.json`, `deno.jsonc`, `deno.lock`
 //! - **Python**: `pyproject.toml`, `setup.py`, `requirements.txt`, `poetry.lock`, `Pipfile.lock`, `uv.lock`, `pylock.toml`
 //! - **Rust**: `Cargo.toml`, `Cargo.lock`
 //! - **Java/Maven**: `pom.xml`, Maven repositories, Gradle manifests
