@@ -360,6 +360,14 @@ mod tests {
     }
 
     #[test]
+    fn test_assembly_bun_basic() {
+        match run_assembly_golden_test("bun-basic") {
+            Ok(_) => (),
+            Err(e) => panic!("Assembly golden test failed for bun-basic: {}", e),
+        }
+    }
+
+    #[test]
     fn test_assembly_cargo_basic() {
         match run_assembly_golden_test("cargo-basic") {
             Ok(_) => (),

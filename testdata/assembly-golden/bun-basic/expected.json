@@ -1,0 +1,108 @@
+{
+  "dependencies": [
+    {
+      "datafile_path": "package.json",
+      "datasource_id": "npm_package_json",
+      "dependency_uid": "pkg:npm/express?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "extracted_requirement": "^4.18.0",
+      "for_package_uid": "pkg:npm/test-package@1.0.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "is_direct": true,
+      "is_optional": false,
+      "is_pinned": false,
+      "is_runtime": true,
+      "purl": "pkg:npm/express",
+      "scope": "dependencies"
+    },
+    {
+      "datafile_path": "bun.lock",
+      "datasource_id": "bun_lock",
+      "dependency_uid": "pkg:npm/express@4.18.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "extracted_requirement": "4.18.0",
+      "for_package_uid": "pkg:npm/test-package@1.0.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "is_direct": true,
+      "is_optional": false,
+      "is_pinned": true,
+      "is_runtime": true,
+      "purl": "pkg:npm/express@4.18.0",
+      "resolved_package": {
+        "datasource_id": "bun_lock",
+        "dependencies": [],
+        "download_url": "https://registry.npmjs.org/express/-/express-4.18.0.tgz",
+        "is_virtual": true,
+        "name": "express",
+        "primary_language": "JavaScript",
+        "type": "npm",
+        "version": "4.18.0"
+      },
+      "scope": "dependencies"
+    },
+    {
+      "datafile_path": "package.json",
+      "datasource_id": "npm_package_json",
+      "dependency_uid": "pkg:npm/jest?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "extracted_requirement": "^29.0.0",
+      "for_package_uid": "pkg:npm/test-package@1.0.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "is_direct": true,
+      "is_optional": true,
+      "is_pinned": false,
+      "is_runtime": false,
+      "purl": "pkg:npm/jest",
+      "scope": "devDependencies"
+    },
+    {
+      "datafile_path": "bun.lock",
+      "datasource_id": "bun_lock",
+      "dependency_uid": "pkg:npm/jest@29.0.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "extracted_requirement": "29.0.0",
+      "for_package_uid": "pkg:npm/test-package@1.0.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "is_direct": true,
+      "is_optional": true,
+      "is_pinned": true,
+      "is_runtime": false,
+      "purl": "pkg:npm/jest@29.0.0",
+      "resolved_package": {
+        "datasource_id": "bun_lock",
+        "dependencies": [],
+        "download_url": "https://registry.npmjs.org/jest/-/jest-29.0.0.tgz",
+        "is_virtual": true,
+        "name": "jest",
+        "primary_language": "JavaScript",
+        "type": "npm",
+        "version": "29.0.0"
+      },
+      "scope": "devDependencies"
+    }
+  ],
+  "files_with_packages": [
+    {
+      "for_packages": ["pkg:npm/test-package@1.0.0?uuid=fixed-uid-done-for-testing-5642512d1758"],
+      "path": "bun.lock"
+    },
+    {
+      "for_packages": ["pkg:npm/test-package@1.0.0?uuid=fixed-uid-done-for-testing-5642512d1758"],
+      "path": "package.json"
+    }
+  ],
+  "packages": [
+    {
+      "api_data_url": "https://registry.npmjs.org/test-package/1.0.0",
+      "datafile_paths": ["bun.lock", "package.json"],
+      "datasource_ids": ["bun_lock", "npm_package_json"],
+      "description": "A test package",
+      "download_url": "https://registry.npmjs.org/test-package/-/test-package-1.0.0.tgz",
+      "extra_data": {
+        "lockfileVersion": 1
+      },
+      "name": "test-package",
+      "namespace": "",
+      "package_uid": "pkg:npm/test-package@1.0.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "parties": [],
+      "primary_language": "JavaScript",
+      "purl": "pkg:npm/test-package@1.0.0",
+      "repository_download_url": "https://registry.npmjs.org/test-package/-/test-package-1.0.0.tgz",
+      "repository_homepage_url": "https://www.npmjs.com/package/test-package",
+      "type": "npm",
+      "version": "1.0.0"
+    }
+  ]
+}

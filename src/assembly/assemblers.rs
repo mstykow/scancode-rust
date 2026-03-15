@@ -10,6 +10,7 @@ pub static ASSEMBLERS: &[AssemblerConfig] = &[
     // so "npm_shrinkwrap_json" is NOT a real datasource_id.
     AssemblerConfig {
         datasource_ids: &[
+            DatasourceId::BunLock,
             DatasourceId::NpmPackageJson,
             DatasourceId::NpmPackageLockJson,
             DatasourceId::YarnLock,
@@ -18,6 +19,7 @@ pub static ASSEMBLERS: &[AssemblerConfig] = &[
         ],
         sibling_file_patterns: &[
             "package.json",
+            "bun.lock",
             "package-lock.json",
             "npm-shrinkwrap.json",
             "yarn.lock",

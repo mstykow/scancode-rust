@@ -159,12 +159,18 @@ fn should_skip_lock_merge(package: Option<&Package>, pkg_data: &PackageData) -> 
     };
 
     should_skip_npm_lock_merge(existing_package, pkg_data)
+        || should_skip_bun_lock_merge(existing_package, pkg_data)
         || should_skip_python_uv_lock_merge(existing_package, pkg_data)
         || should_skip_python_pip_cache_merge(existing_package, pkg_data)
 }
 
 fn should_skip_npm_lock_merge(package: &Package, pkg_data: &PackageData) -> bool {
     pkg_data.datasource_id == Some(DatasourceId::NpmPackageLockJson)
+        && !npm_package_identity_matches(package, pkg_data)
+}
+
+fn should_skip_bun_lock_merge(package: &Package, pkg_data: &PackageData) -> bool {
+    pkg_data.datasource_id == Some(DatasourceId::BunLock)
         && !npm_package_identity_matches(package, pkg_data)
 }
 

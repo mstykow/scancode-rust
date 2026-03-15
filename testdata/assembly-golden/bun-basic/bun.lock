@@ -1,0 +1,19 @@
+{
+  "lockfileVersion": 1,
+  "workspaces": {
+    "": {
+      "name": "test-package",
+      "version": "1.0.0",
+      "dependencies": {
+        "express": "^4.18.0",
+      },
+      "devDependencies": {
+        "jest": "^29.0.0",
+      },
+    },
+  },
+  "packages": {
+    "express": ["express@4.18.0", "https://registry.npmjs.org/express/-/express-4.18.0.tgz", {}, "sha512-xyz123"],
+    "jest": ["jest@29.0.0", "https://registry.npmjs.org/jest/-/jest-29.0.0.tgz", {}, "sha512-abc456"],
+  },
+}
