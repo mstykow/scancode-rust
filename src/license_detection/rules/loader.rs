@@ -269,7 +269,23 @@ pub fn parse_rule_file(path: &Path) -> Result<Rule> {
         ));
     }
 
-    let fm: RuleFrontmatter = match serde_yaml::from_str(yaml_content) {
+    let frontmatter_value: serde_yaml::Value = match serde_yaml::from_str(yaml_content) {
+        Ok(value) => value,
+        Err(e) => {
+            return Err(anyhow!(
+                "Failed to parse rule frontmatter YAML in {}: {}\nContent was:\n{}",
+                path.display(),
+                e,
+                yaml_content
+            ));
+        }
+    };
+
+    let has_stored_minimum_coverage = frontmatter_value.as_mapping().is_some_and(|mapping| {
+        mapping.contains_key(serde_yaml::Value::String("minimum_coverage".to_string()))
+    });
+
+    let fm: RuleFrontmatter = match serde_yaml::from_value(frontmatter_value) {
         Ok(fm) => fm,
         Err(e) => {
             return Err(anyhow!(
@@ -317,6 +333,7 @@ pub fn parse_rule_file(path: &Path) -> Result<Rule> {
         is_from_license: false,
         relevance,
         minimum_coverage,
+        has_stored_minimum_coverage,
         is_continuous: fm.is_continuous.unwrap_or(false),
         required_phrase_spans: vec![],
         stopwords_by_pos: HashMap::new(),
@@ -757,6 +774,7 @@ MIT License"#,
                 is_from_license: false,
                 relevance: 100,
                 minimum_coverage: None,
+                has_stored_minimum_coverage: false,
                 is_continuous: false,
                 required_phrase_spans: vec![],
                 stopwords_by_pos: HashMap::new(),
@@ -799,6 +817,7 @@ MIT License"#,
                 is_from_license: false,
                 relevance: 100,
                 minimum_coverage: None,
+                has_stored_minimum_coverage: false,
                 is_continuous: false,
                 required_phrase_spans: vec![],
                 stopwords_by_pos: HashMap::new(),
@@ -848,6 +867,7 @@ MIT License"#,
             is_from_license: false,
             relevance: 100,
             minimum_coverage: None,
+            has_stored_minimum_coverage: false,
             is_continuous: false,
             required_phrase_spans: vec![],
             stopwords_by_pos: HashMap::new(),
@@ -897,6 +917,7 @@ MIT License"#,
                 is_from_license: false,
                 relevance: 100,
                 minimum_coverage: None,
+                has_stored_minimum_coverage: false,
                 is_continuous: false,
                 required_phrase_spans: vec![],
                 stopwords_by_pos: HashMap::new(),
@@ -939,6 +960,7 @@ MIT License"#,
                 is_from_license: false,
                 relevance: 100,
                 minimum_coverage: None,
+                has_stored_minimum_coverage: false,
                 is_continuous: false,
                 required_phrase_spans: vec![],
                 stopwords_by_pos: HashMap::new(),

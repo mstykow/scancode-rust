@@ -236,6 +236,7 @@ mod integration_tests {
             is_from_license: false,
             relevance: 100,
             minimum_coverage,
+            has_stored_minimum_coverage: false,
             is_continuous: false,
             required_phrase_spans: vec![],
             stopwords_by_pos: HashMap::new(),

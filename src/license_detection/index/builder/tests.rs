@@ -46,6 +46,7 @@ mod test_cases {
             is_from_license: false,
             relevance: 100,
             minimum_coverage: None,
+            has_stored_minimum_coverage: false,
             is_continuous: false,
             referenced_filenames: None,
             ignorable_urls: None,
@@ -95,6 +96,13 @@ mod test_cases {
         }
     }
 
+    fn create_medium_rule_text() -> String {
+        (0..25)
+            .map(|i| format!("token{i}"))
+            .collect::<Vec<_>>()
+            .join(" ")
+    }
+
     #[test]
     #[ignore = "Rust-specific enhancement: URL variant hash generation for http/https ignorable URLs. Python does not generate separate hashes for URL variants, so this test is not applicable for Python parity verification."]
     fn test_build_index_empty() {
@@ -140,6 +148,31 @@ mod test_cases {
         assert!(index.false_positive_rids.contains(&rid));
         assert!(!index.regular_rids.contains(&rid));
         assert!(index.rid_by_hash.is_empty());
+    }
+
+    #[test]
+    fn test_build_index_preserves_stored_minimum_coverage() {
+        let medium_rule_text = create_medium_rule_text();
+
+        let mut stored_rule = create_test_rule(&medium_rule_text, false);
+        stored_rule.identifier = "stored.RULE".to_string();
+        stored_rule.minimum_coverage = Some(99);
+        stored_rule.has_stored_minimum_coverage = true;
+
+        let mut computed_rule = create_test_rule(&medium_rule_text, false);
+        computed_rule.identifier = "computed.RULE".to_string();
+
+        let index = build_index(vec![stored_rule, computed_rule], vec![]);
+
+        let stored = &index.rules_by_rid
+            [find_rid_by_identifier(&index, "stored.RULE").expect("stored rule should exist")];
+        assert_eq!(stored.minimum_coverage, Some(99));
+        assert!(stored.has_stored_minimum_coverage);
+
+        let computed = &index.rules_by_rid
+            [find_rid_by_identifier(&index, "computed.RULE").expect("computed rule should exist")];
+        assert_eq!(computed.minimum_coverage, Some(50));
+        assert!(!computed.has_stored_minimum_coverage);
     }
 
     #[test]

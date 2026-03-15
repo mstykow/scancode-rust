@@ -112,7 +112,7 @@ pub fn generate_url_variants(text: &str, ignorable_urls: &Option<Vec<String>>) -
 }
 
 fn build_rule_from_license(license: &License) -> Option<Rule> {
-    let minimum_coverage = license.minimum_coverage.unwrap_or(0);
+    let has_stored_minimum_coverage = license.minimum_coverage.is_some();
 
     let text = if license.text.is_empty() {
         "unknown-spdx license identifier".to_string()
@@ -135,11 +135,8 @@ fn build_rule_from_license(license: &License) -> Option<Rule> {
         is_required_phrase: false,
         is_from_license: true,
         relevance: 100,
-        minimum_coverage: if minimum_coverage > 0 {
-            Some(minimum_coverage)
-        } else {
-            None
-        },
+        minimum_coverage: license.minimum_coverage,
+        has_stored_minimum_coverage,
         is_continuous: false,
         required_phrase_spans: vec![],
         stopwords_by_pos: HashMap::new(),
@@ -437,7 +434,9 @@ pub fn build_index(rules: Vec<Rule>, licenses: Vec<License>) -> LicenseIndex {
 
         let (updated_coverage, min_matched_length, min_high_matched_length) =
             compute_thresholds_occurrences(rule.minimum_coverage, rule_length, rule.high_length);
-        rule.minimum_coverage = updated_coverage;
+        if !rule.has_stored_minimum_coverage {
+            rule.minimum_coverage = updated_coverage;
+        }
         rule.min_matched_length = min_matched_length;
         rule.min_high_matched_length = min_high_matched_length;
 

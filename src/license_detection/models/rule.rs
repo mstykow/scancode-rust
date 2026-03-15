@@ -55,6 +55,9 @@ pub struct Rule {
     /// Minimum match coverage percentage (0-100) if specified
     pub minimum_coverage: Option<u8>,
 
+    /// True if minimum_coverage was explicitly stored in source frontmatter
+    pub has_stored_minimum_coverage: bool,
+
     /// Tokens must appear in order if true
     pub is_continuous: bool,
 

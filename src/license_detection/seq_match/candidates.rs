@@ -357,8 +357,8 @@ pub fn compute_candidates_with_msets(
         if let Some(min_cont) = minimum_containment
             && containment < min_cont
         {
-                continue;
-            }
+            continue;
+        }
 
         let svr = ScoresVector {
             is_highly_resemblant: (resemblance * 10.0).round() / 10.0 >= HIGH_RESEMBLANCE_THRESHOLD,
@@ -427,8 +427,8 @@ pub fn compute_candidates_with_msets(
         if let Some(min_cont) = minimum_containment
             && containment < min_cont
         {
-                continue;
-            }
+            continue;
+        }
 
         let score_vec_rounded = ScoresVector {
             is_highly_resemblant: (resemblance * 10.0).round() / 10.0 >= HIGH_RESEMBLANCE_THRESHOLD,
@@ -626,6 +626,7 @@ mod tests {
                 is_from_license: false,
                 relevance: 100,
                 minimum_coverage: None,
+                has_stored_minimum_coverage: false,
                 is_continuous: true,
                 referenced_filenames: None,
                 ignorable_urls: None,
@@ -687,6 +688,7 @@ mod tests {
                 is_from_license: false,
                 relevance: 100,
                 minimum_coverage: None,
+                has_stored_minimum_coverage: false,
                 is_continuous: true,
                 referenced_filenames: None,
                 ignorable_urls: None,
@@ -740,6 +742,7 @@ mod tests {
             is_from_license: false,
             relevance: 100,
             minimum_coverage: None,
+            has_stored_minimum_coverage: false,
             is_continuous: true,
             referenced_filenames: None,
             ignorable_urls: None,
@@ -843,6 +846,7 @@ mod tests {
             is_from_license: false,
             relevance: 100,
             minimum_coverage: None,
+            has_stored_minimum_coverage: false,
             is_continuous: true,
             referenced_filenames: None,
             ignorable_urls: None,
@@ -946,6 +950,7 @@ mod tests {
             is_from_license: false,
             relevance: 100,
             minimum_coverage: None,
+            has_stored_minimum_coverage: false,
             is_continuous: true,
             referenced_filenames: None,
             ignorable_urls: None,
@@ -989,6 +994,7 @@ mod tests {
             is_from_license: false,
             relevance: 100,
             minimum_coverage: None,
+            has_stored_minimum_coverage: false,
             is_continuous: true,
             referenced_filenames: None,
             ignorable_urls: None,

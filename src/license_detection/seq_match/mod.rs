@@ -90,6 +90,7 @@ mod tests {
             is_from_license: false,
             relevance: 100,
             minimum_coverage: None,
+            has_stored_minimum_coverage: false,
             is_continuous: true,
             referenced_filenames: None,
             ignorable_urls: None,

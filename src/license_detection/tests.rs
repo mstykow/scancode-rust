@@ -50,6 +50,12 @@ fn summarize_raw_matches(matches: &[LicenseMatch]) -> Vec<(String, String, usize
         .collect()
 }
 
+fn sorted_raw_matches(matches: &[LicenseMatch]) -> Vec<(String, String, usize, usize)> {
+    let mut summary = summarize_raw_matches(matches);
+    summary.sort();
+    summary
+}
+
 fn assert_raw_match_present(
     matches: &[LicenseMatch],
     rule_identifier: &str,
@@ -727,6 +733,90 @@ fn test_png_h_detect_matches_match_python_raw_rules() {
         !matches
             .iter()
             .any(|m| m.rule_identifier == "unknown-license-reference_301.RULE")
+    );
+}
+
+#[test]
+fn test_standard_ml_nj_and_x11_and_x11_opengroup_detect_matches_match_python_raw_rules() {
+    let Some(engine) = create_engine_from_reference() else {
+        eprintln!("Skipping test: reference directory not found");
+        return;
+    };
+
+    let matches = detect_fixture_matches(
+        &engine,
+        "testdata/license-golden/datadriven/lic4/standard-ml-nj_and_x11_and_x11-opengroup.txt",
+    );
+
+    assert_eq!(
+        sorted_raw_matches(&matches),
+        vec![
+            (
+                "historical_4.RULE".to_string(),
+                crate::license_detection::aho_match::MATCH_AHO.to_string(),
+                9,
+                32,
+            ),
+            (
+                "x11-opengroup_1.RULE".to_string(),
+                crate::license_detection::aho_match::MATCH_AHO.to_string(),
+                36,
+                54,
+            ),
+            (
+                "x11-xconsortium_1.RULE".to_string(),
+                crate::license_detection::aho_match::MATCH_AHO.to_string(),
+                59,
+                79,
+            ),
+        ]
+    );
+    assert!(
+        !matches
+            .iter()
+            .any(|m| m.rule_identifier == "x11-bitstream_4.RULE")
+    );
+}
+
+#[test]
+fn test_standard_ml_nj_and_x11_and_x11_opengroup_1_detect_matches_match_python_raw_rules() {
+    let Some(engine) = create_engine_from_reference() else {
+        eprintln!("Skipping test: reference directory not found");
+        return;
+    };
+
+    let matches = detect_fixture_matches(
+        &engine,
+        "testdata/license-golden/datadriven/lic4/standard-ml-nj_and_x11_and_x11-opengroup_1.txt",
+    );
+
+    assert_eq!(
+        sorted_raw_matches(&matches),
+        vec![
+            (
+                "historical_4.RULE".to_string(),
+                crate::license_detection::aho_match::MATCH_AHO.to_string(),
+                9,
+                32,
+            ),
+            (
+                "x11-opengroup_1.RULE".to_string(),
+                crate::license_detection::aho_match::MATCH_AHO.to_string(),
+                36,
+                54,
+            ),
+            (
+                "x11-xconsortium_1.RULE".to_string(),
+                crate::license_detection::aho_match::MATCH_AHO.to_string(),
+                59,
+                79,
+            ),
+        ]
+    );
+    assert!(
+        !matches
+            .iter()
+            .any(|m| m.rule_identifier == "x11-bitstream_4.RULE")
     );
 }
 

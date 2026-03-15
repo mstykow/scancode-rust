@@ -281,14 +281,29 @@ License text here."#;
 fn test_parse_rule_minimum_coverage() {
     let content = r#"---
 license_expression: test
-minimum_coverage: 90
+minimum_coverage: 99
 ---
 Rule text."#;
 
     let result = parse_rule_from_str(content, "min-coverage.RULE");
     assert!(result.is_ok());
     let rule = result.unwrap();
-    assert_eq!(rule.minimum_coverage, Some(90));
+    assert_eq!(rule.minimum_coverage, Some(99));
+    assert!(rule.has_stored_minimum_coverage);
+}
+
+#[test]
+fn test_parse_rule_without_minimum_coverage_has_no_stored_provenance() {
+    let content = r#"---
+license_expression: test
+---
+Rule text."#;
+
+    let result = parse_rule_from_str(content, "no-min-coverage.RULE");
+    assert!(result.is_ok());
+    let rule = result.unwrap();
+    assert_eq!(rule.minimum_coverage, None);
+    assert!(!rule.has_stored_minimum_coverage);
 }
 
 #[test]
