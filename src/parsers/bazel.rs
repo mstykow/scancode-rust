@@ -432,7 +432,12 @@ fn expr_to_json(expr: &ast::Expr) -> Option<JsonValue> {
         ast::Expr::Constant(ast::ExprConstant { value, .. }) => match value {
             ast::Constant::Str(value) => Some(JsonValue::String(value.clone())),
             ast::Constant::Bool(value) => Some(JsonValue::Bool(*value)),
-            ast::Constant::Int(value) => Some(JsonValue::String(value.to_string())),
+            ast::Constant::Int(value) => value
+                .to_string()
+                .parse::<i64>()
+                .ok()
+                .map(|value| JsonValue::Number(value.into()))
+                .or_else(|| Some(JsonValue::String(value.to_string()))),
             ast::Constant::None => Some(JsonValue::Null),
             _ => None,
         },
