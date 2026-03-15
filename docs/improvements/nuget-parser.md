@@ -2,15 +2,16 @@
 
 ## Summary
 
-Rust now goes beyond the released Python ScanCode NuGet support in three concrete ways:
+Rust now goes beyond the released Python ScanCode NuGet support in four concrete ways:
 
 1. parses additional NuGet and Visual Studio manifests (`project.json`, `project.lock.json`, and PackageReference project files)
-2. preserves modern nuspec license hints (`license_type`, `license_file`) instead of collapsing everything to deprecated `licenseUrl` fallbacks
-3. reads archive-backed license file contents from `.nupkg` files when the nuspec points at a packaged license file
+2. parses `.deps.json` runtime dependency graphs from built .NET outputs
+3. preserves modern nuspec license hints (`license_type`, `license_file`) instead of collapsing everything to deprecated `licenseUrl` fallbacks
+4. reads archive-backed license file contents from `.nupkg` files when the nuspec points at a packaged license file
 
 ## Python Status
 
-- Released ScanCode handles `.nuspec`, `.nupkg`, and `packages.lock.json`, but not `project.json`, `project.lock.json`, or PackageReference project files.
+- Released ScanCode handles `.nuspec`, `.nupkg`, and `packages.lock.json`, but not `project.json`, `project.lock.json`, PackageReference project files, or `.deps.json` runtime graphs.
 - Upstream enhancement issues explicitly ask for these extra manifests and modern nuspec/license improvements.
 - Python also keeps NuGet party `type` empty and does not extract packaged license file contents from `.nupkg` archives.
 
@@ -21,6 +22,7 @@ Rust now goes beyond the released Python ScanCode NuGet support in three concret
 - `project.json` now extracts package metadata plus direct and framework-specific dependencies.
 - `project.lock.json` now extracts dependency groups from `projectFileDependencyGroups`.
 - PackageReference `.csproj`, `.vbproj`, and `.fsproj` files now extract package metadata and `<PackageReference>` dependencies.
+- `.deps.json` now extracts runtime-target-aware resolved dependency graphs from built .NET outputs.
 
 ### Modern nuspec metadata
 
