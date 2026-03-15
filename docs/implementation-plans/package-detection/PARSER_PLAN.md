@@ -57,7 +57,7 @@ All production handlers in the original plan scope are covered. Some ecosystems 
 | Docker                | ✅ Implemented | `Dockerfile`, `Containerfile`, OCI label extraction                                      |
 | FreeBSD               | ✅ Implemented | `FreebsdCompactManifestParser`                                                           |
 | Git submodules        | ✅ Implemented | `GitmodulesParser`                                                                       |
-| Go                    | ✅ Implemented | `go.mod`, `go.sum`, `Godeps.json`, `go.mod.graph`                                        |
+| Go                    | ✅ Implemented | `go.mod`, `go.sum`, `Godeps.json`, `go.mod.graph`, `go.work`                             |
 | Gradle                | ✅ Implemented | ⭐ Beyond parity: added `GradleLockfileParser`                                           |
 | Haxe                  | ✅ Implemented | `HaxeParser`                                                                             |
 | Linux Distro          | ✅ Implemented | `OsReleaseParser` ⭐ fixes name logic bug + extracts URLs                                |
@@ -87,7 +87,6 @@ These issues now combine the strongest intrinsic value with visible upstream imp
 | Issue Set | Opportunity                    | Why this creates value                                                                                                                            | Current overlap / notes                                                                                     |
 | --------- | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
 | #97       | Gradle `.module` files         | Adds Gradle-native published metadata with dependency semantics beyond what can always be recovered from `build.gradle`.                          | Strongest upstream signal today: three open ref-impl PRs (`#4808`, `#4780`, `#4652`).                       |
-| #99       | Go workspaces (`go.work`)      | Adds workspace-level ownership and dependency context to an ecosystem that already has strong module and graph support.                           | High leverage because Go parsing and assembly already exist; upstream PR `#4793` is open.                   |
 | #102      | Bazel modules (`MODULE.bazel`) | Extends the existing Bazel parser into the newer module system and aligns with purl-spec evolution.                                               | Clear adjacency to current Bazel coverage; upstream PR `#4806` is open.                                     |
 | #117      | NuGet `.deps.json`             | Adds dependency evidence often found beside compiled .NET outputs, improving scan quality in built application trees where manifests are missing. | Complements existing `.nuspec`, `packages.config`, project-file, and lockfile coverage; PR `#4803` is open. |
 

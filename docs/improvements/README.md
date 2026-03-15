@@ -90,6 +90,7 @@ Each area with improvements has a dedicated document:
 - **[conan-data-parser.md](conan-data-parser.md)** — 🔍 Enhanced Extraction: Patches metadata + mirror/fallback URL extraction
 - **[docker-parser.md](docker-parser.md)** — ✨ New Feature + 🔍 Enhanced Extraction: Dockerfile/Containerfile recognition, OCI label extraction, and non-assembled package data handling
 - **[deno-parser.md](deno-parser.md)** — ✨ New Feature: `deno.json(c)` identity/import parsing, `deno.lock` v5 extraction, and sibling assembly support
+- **[go-work-parser.md](go-work-parser.md)** — ✨ New Feature: `go.work` parsing with workspace-member recovery, replace metadata extraction, and root-module assembly support
 - **[pylock-toml-parser.md](pylock-toml-parser.md)** — ✨ New Feature: standardized `pylock.toml` parsing, dependency graph recovery, provenance extraction, and Python sibling assembly support
 - **[uv-lock-parser.md](uv-lock-parser.md)** — ✨ New Feature: uv.lock root-package recovery, dependency groups, resolved package extraction, and Python sibling assembly support
 - **[python-parser.md](python-parser.md)** — 🐛 Bug Fix + ✨ New Feature + 🔍 Enhanced Extraction: richer `setup.cfg` metadata, setup.py imported-dunder/project-URL fixes, private classifier support, installed/source metadata file-reference handling, exact-filename `pypi.json` parsing, and RFC822 dependency extraction
