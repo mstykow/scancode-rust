@@ -2,8 +2,8 @@
 mod tests {
     use super::super::PackageParser;
     use super::super::nuget::{
-        NupkgParser, NuspecParser, PackageReferenceProjectParser, PackagesConfigParser,
-        PackagesLockParser, ProjectJsonParser, ProjectLockJsonParser,
+        DotNetDepsJsonParser, NupkgParser, NuspecParser, PackageReferenceProjectParser,
+        PackagesConfigParser, PackagesLockParser, ProjectJsonParser, ProjectLockJsonParser,
     };
     use crate::models::DatasourceId;
     use crate::models::PackageType;
@@ -622,6 +622,245 @@ mod tests {
             package_data.dependencies[1].scope.as_deref(),
             Some(".NETCoreApp,Version=v1.0")
         );
+    }
+
+    #[test]
+    fn test_dotnet_deps_json_is_match() {
+        assert!(DotNetDepsJsonParser::is_match(&PathBuf::from(
+            "ExampleApp.deps.json"
+        )));
+        assert!(!DotNetDepsJsonParser::is_match(&PathBuf::from(
+            "ExampleApp.runtimeconfig.json"
+        )));
+    }
+
+    #[test]
+    fn test_dotnet_deps_json_extracts_root_and_dependencies() {
+        let package_data = DotNetDepsJsonParser::extract_first_package(&PathBuf::from(
+            "testdata/nuget-golden/deps-json/ExampleApp.deps.json",
+        ));
+
+        assert_eq!(
+            package_data.datasource_id,
+            Some(DatasourceId::NugetDepsJson)
+        );
+        assert_eq!(package_data.package_type, Some(PackageType::Nuget));
+        assert_eq!(package_data.name.as_deref(), Some("ExampleApp"));
+        assert_eq!(package_data.version.as_deref(), Some("1.0.0"));
+        assert_eq!(
+            package_data.purl.as_deref(),
+            Some("pkg:nuget/ExampleApp@1.0.0")
+        );
+
+        let extra = package_data
+            .extra_data
+            .as_ref()
+            .expect("extra_data should exist");
+        assert_eq!(
+            extra
+                .get("runtime_target_name")
+                .and_then(|value| value.as_str()),
+            Some(".NETCoreApp,Version=v8.0/win-x64")
+        );
+        assert_eq!(
+            extra
+                .get("target_framework")
+                .and_then(|value| value.as_str()),
+            Some(".NETCoreApp,Version=v8.0")
+        );
+        assert_eq!(
+            extra
+                .get("runtime_identifier")
+                .and_then(|value| value.as_str()),
+            Some("win-x64")
+        );
+        assert_eq!(
+            extra
+                .get("runtime_signature")
+                .and_then(|value| value.as_str()),
+            Some("signature-value")
+        );
+
+        assert_eq!(package_data.dependencies.len(), 4);
+
+        let newtonsoft = package_data
+            .dependencies
+            .iter()
+            .find(|dep| dep.purl.as_deref() == Some("pkg:nuget/Newtonsoft.Json@13.0.1"))
+            .expect("Newtonsoft.Json dependency missing");
+        assert_eq!(newtonsoft.is_direct, Some(true));
+        let newtonsoft_extra = newtonsoft.extra_data.as_ref().expect("extra_data missing");
+        assert_eq!(newtonsoft_extra["type"], "package");
+        assert_eq!(newtonsoft_extra["sha512"], "newton-hash");
+
+        let transitive = package_data
+            .dependencies
+            .iter()
+            .find(|dep| dep.purl.as_deref() == Some("pkg:nuget/System.Text.Json@8.0.0"))
+            .expect("System.Text.Json dependency missing");
+        assert_eq!(transitive.is_direct, Some(false));
+        assert_eq!(transitive.is_runtime, Some(false));
+        assert_eq!(transitive.is_optional, Some(true));
+
+        let project_ref = package_data
+            .dependencies
+            .iter()
+            .find(|dep| dep.purl.as_deref() == Some("pkg:nuget/Project.Ref@1.0.0"))
+            .expect("Project.Ref dependency missing");
+        let project_ref_extra = project_ref.extra_data.as_ref().expect("extra_data missing");
+        assert_eq!(project_ref_extra["type"], "project");
+    }
+
+    #[test]
+    fn test_dotnet_deps_json_fallback_target_selection() {
+        let json = r#"{
+  "targets": {
+    ".NETCoreApp,Version=v9.0": {
+      "FallbackApp/2.0.0": {
+        "dependencies": {
+          "NUnit": "3.14.0"
+        }
+      },
+      "NUnit/3.14.0": {}
+    }
+  },
+  "libraries": {
+    "FallbackApp/2.0.0": { "type": "project" },
+    "NUnit/3.14.0": { "type": "package" }
+  }
+}"#;
+
+        let mut temp_file = NamedTempFile::new().unwrap();
+        temp_file.write_all(json.as_bytes()).unwrap();
+
+        let package_data = DotNetDepsJsonParser::extract_first_package(temp_file.path());
+        assert_eq!(package_data.name.as_deref(), Some("FallbackApp"));
+        assert_eq!(package_data.dependencies.len(), 1);
+        assert_eq!(
+            package_data.dependencies[0].scope.as_deref(),
+            Some(".NETCoreApp,Version=v9.0")
+        );
+    }
+
+    #[test]
+    fn test_dotnet_deps_json_without_project_root_returns_dependency_only_package() {
+        let json = r#"{
+  "runtimeTarget": {
+    "name": ".NETCoreApp,Version=v8.0/linux-x64"
+  },
+  "targets": {
+    ".NETCoreApp,Version=v8.0/linux-x64": {
+      "Newtonsoft.Json/13.0.1": {},
+      "Serilog/2.12.0": {}
+    }
+  },
+  "libraries": {
+    "Newtonsoft.Json/13.0.1": { "type": "package" },
+    "Serilog/2.12.0": { "type": "package" }
+  }
+}"#;
+
+        let temp_dir = tempfile::tempdir().unwrap();
+        let file_path = temp_dir.path().join("ExampleApp.deps.json");
+        std::fs::write(&file_path, json).unwrap();
+
+        let package_data = DotNetDepsJsonParser::extract_first_package(&file_path);
+        assert_eq!(package_data.name.as_deref(), Some("ExampleApp"));
+        assert_eq!(package_data.purl.as_deref(), Some("pkg:nuget/ExampleApp"));
+        assert_eq!(package_data.dependencies.len(), 2);
+        assert!(
+            package_data
+                .dependencies
+                .iter()
+                .all(|dep| dep.is_direct.is_none())
+        );
+    }
+
+    #[test]
+    fn test_dotnet_deps_json_without_project_root_and_without_named_path_stays_anonymous() {
+        let json = r#"{
+  "targets": {
+    ".NETCoreApp,Version=v8.0": {
+      "Newtonsoft.Json/13.0.1": {},
+      "Serilog/2.12.0": {}
+    }
+  },
+  "libraries": {
+    "Newtonsoft.Json/13.0.1": { "type": "package" },
+    "Serilog/2.12.0": { "type": "package" }
+  }
+}"#;
+
+        let mut temp_file = NamedTempFile::new().unwrap();
+        temp_file.write_all(json.as_bytes()).unwrap();
+
+        let package_data = DotNetDepsJsonParser::extract_first_package(temp_file.path());
+        assert!(package_data.name.is_none());
+        assert!(package_data.purl.is_none());
+        assert_eq!(package_data.dependencies.len(), 2);
+    }
+
+    #[test]
+    fn test_dotnet_deps_json_prefers_project_root_matching_filename() {
+        let json = r#"{
+  "runtimeTarget": {
+    "name": ".NETCoreApp,Version=v8.0/win-x64"
+  },
+  "targets": {
+    ".NETCoreApp,Version=v8.0/win-x64": {
+      "ExampleApp/1.0.0": {
+        "dependencies": {
+          "Newtonsoft.Json": "13.0.1"
+        }
+      },
+      "SupportProject/1.1.0": {
+        "dependencies": {
+          "Serilog": "2.12.0"
+        }
+      },
+      "Newtonsoft.Json/13.0.1": {},
+      "Serilog/2.12.0": {}
+    }
+  },
+  "libraries": {
+    "ExampleApp/1.0.0": { "type": "project" },
+    "SupportProject/1.1.0": { "type": "project" },
+    "Newtonsoft.Json/13.0.1": { "type": "package" },
+    "Serilog/2.12.0": { "type": "package" }
+  }
+}"#;
+
+        let temp_dir = tempfile::tempdir().unwrap();
+        let file_path = temp_dir.path().join("ExampleApp.deps.json");
+        std::fs::write(&file_path, json).unwrap();
+
+        let package_data = DotNetDepsJsonParser::extract_first_package(&file_path);
+
+        assert_eq!(package_data.name.as_deref(), Some("ExampleApp"));
+        let direct_names: Vec<_> = package_data
+            .dependencies
+            .iter()
+            .filter(|dep| dep.is_direct == Some(true))
+            .filter_map(|dep| dep.purl.as_deref())
+            .collect();
+        assert!(direct_names.contains(&"pkg:nuget/Newtonsoft.Json@13.0.1"));
+        assert!(!direct_names.contains(&"pkg:nuget/Serilog@2.12.0"));
+    }
+
+    #[test]
+    fn test_dotnet_deps_json_malformed_returns_default() {
+        let json = r#"{"runtimeTarget": "broken""#;
+
+        let mut temp_file = NamedTempFile::new().unwrap();
+        temp_file.write_all(json.as_bytes()).unwrap();
+
+        let package_data = DotNetDepsJsonParser::extract_first_package(temp_file.path());
+        assert_eq!(package_data.package_type, Some(PackageType::Nuget));
+        assert_eq!(
+            package_data.datasource_id,
+            Some(DatasourceId::NugetDepsJson)
+        );
+        assert!(package_data.dependencies.is_empty());
     }
 
     #[test]
