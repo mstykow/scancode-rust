@@ -504,6 +504,13 @@ fn default_go_sum_package_data() -> PackageData {
     }
 }
 
+fn default_go_work_package_data() -> PackageData {
+    PackageData {
+        datasource_id: Some(DatasourceId::GoWork),
+        ..default_package_data()
+    }
+}
+
 fn default_godeps_package_data() -> PackageData {
     PackageData {
         datasource_id: Some(DatasourceId::Godeps),
@@ -638,6 +645,383 @@ crate::register_parser!(
     "golang",
     "Go",
     Some("https://go.dev/ref/mod#go-sum-files"),
+);
+
+pub struct GoWorkParser;
+
+impl PackageParser for GoWorkParser {
+    const PACKAGE_TYPE: PackageType = PACKAGE_TYPE;
+
+    fn extract_packages(path: &Path) -> Vec<PackageData> {
+        let content = match fs::read_to_string(path) {
+            Ok(c) => c,
+            Err(e) => {
+                warn!("Failed to read go.work at {:?}: {}", path, e);
+                return vec![default_go_work_package_data()];
+            }
+        };
+
+        vec![parse_go_work(&content, path)]
+    }
+
+    fn is_match(path: &Path) -> bool {
+        path.file_name().is_some_and(|name| name == "go.work")
+    }
+}
+
+pub fn parse_go_work(content: &str, work_path: &Path) -> PackageData {
+    let mut go_version: Option<String> = None;
+    let mut toolchain: Option<String> = None;
+    let mut use_paths: Vec<String> = Vec::new();
+    let mut replace_deps: Vec<Dependency> = Vec::new();
+    let mut unresolved_use_paths: Vec<String> = Vec::new();
+    let mut block_state = BlockState::None;
+
+    for line in content.lines() {
+        let trimmed = line.trim();
+
+        if trimmed.is_empty() || trimmed.starts_with("//") {
+            continue;
+        }
+
+        if trimmed == ")" {
+            block_state = BlockState::None;
+            continue;
+        }
+
+        if block_state != BlockState::None {
+            match block_state {
+                BlockState::Require => {
+                    let use_path = extract_single_go_token(trimmed);
+                    if let Some(use_path) = use_path.filter(|path| !path.is_empty()) {
+                        use_paths.push(use_path.to_string());
+                    }
+                }
+                BlockState::Replace => {
+                    if let Some(dep) = parse_workspace_replace_line(trimmed) {
+                        replace_deps.push(dep);
+                    }
+                }
+                _ => {}
+            }
+            continue;
+        }
+
+        if trimmed.starts_with("use") && trimmed.contains('(') {
+            block_state = BlockState::Require;
+            continue;
+        }
+        if trimmed.starts_with("replace") && trimmed.contains('(') {
+            block_state = BlockState::Replace;
+            continue;
+        }
+
+        if let Some(version) = trimmed.strip_prefix("go ") {
+            let version = strip_comment(version).trim();
+            if !version.is_empty() {
+                go_version = Some(version.to_string());
+            }
+            continue;
+        }
+
+        if let Some(tc) = trimmed.strip_prefix("toolchain ") {
+            let tc = strip_comment(tc).trim();
+            if !tc.is_empty() {
+                toolchain = Some(tc.to_string());
+            }
+            continue;
+        }
+
+        if let Some(rest) = trimmed.strip_prefix("use ") {
+            let use_path = extract_single_go_token(rest);
+            if let Some(use_path) = use_path.filter(|path| !path.is_empty()) {
+                use_paths.push(use_path.to_string());
+            }
+            continue;
+        }
+
+        if let Some(rest) = trimmed.strip_prefix("replace ") {
+            if let Some(dep) = parse_workspace_replace_line(rest) {
+                replace_deps.push(dep);
+            }
+            continue;
+        }
+    }
+
+    if go_version.is_none() || use_paths.is_empty() {
+        warn!("Invalid go.work: missing go directive or use directive");
+        return default_go_work_package_data();
+    }
+
+    let (mut dependencies, unresolved) = resolve_workspace_use_dependencies(work_path, &use_paths);
+    dependencies.extend(replace_deps);
+    unresolved_use_paths.extend(unresolved);
+
+    let mut extra_data = HashMap::new();
+    if let Some(v) = go_version {
+        extra_data.insert("go_version".to_string(), serde_json::Value::String(v));
+    }
+    if let Some(tc) = toolchain {
+        extra_data.insert("toolchain".to_string(), serde_json::Value::String(tc));
+    }
+    extra_data.insert(
+        "use_paths".to_string(),
+        serde_json::Value::Array(
+            use_paths
+                .iter()
+                .cloned()
+                .map(serde_json::Value::String)
+                .collect(),
+        ),
+    );
+    if !unresolved_use_paths.is_empty() {
+        extra_data.insert(
+            "unresolved_use_paths".to_string(),
+            serde_json::Value::Array(
+                unresolved_use_paths
+                    .into_iter()
+                    .map(serde_json::Value::String)
+                    .collect(),
+            ),
+        );
+    }
+
+    PackageData {
+        package_type: Some(PACKAGE_TYPE),
+        namespace: None,
+        name: None,
+        version: None,
+        qualifiers: None,
+        subpath: None,
+        primary_language: Some("Go".to_string()),
+        description: None,
+        release_date: None,
+        parties: Vec::new(),
+        keywords: Vec::new(),
+        homepage_url: None,
+        download_url: None,
+        size: None,
+        sha1: None,
+        md5: None,
+        sha256: None,
+        sha512: None,
+        bug_tracking_url: None,
+        code_view_url: None,
+        vcs_url: None,
+        copyright: None,
+        holder: None,
+        declared_license_expression: None,
+        declared_license_expression_spdx: None,
+        license_detections: Vec::new(),
+        other_license_expression: None,
+        other_license_expression_spdx: None,
+        other_license_detections: Vec::new(),
+        extracted_license_statement: None,
+        notice_text: None,
+        source_packages: Vec::new(),
+        file_references: Vec::new(),
+        is_private: false,
+        is_virtual: false,
+        extra_data: Some(extra_data),
+        dependencies,
+        repository_homepage_url: None,
+        repository_download_url: None,
+        api_data_url: None,
+        datasource_id: Some(DatasourceId::GoWork),
+        purl: None,
+    }
+}
+
+fn resolve_workspace_use_dependencies(
+    work_path: &Path,
+    use_paths: &[String],
+) -> (Vec<Dependency>, Vec<String>) {
+    let Some(base_dir) = work_path.parent() else {
+        return (Vec::new(), use_paths.to_vec());
+    };
+
+    let mut dependencies = Vec::new();
+    let mut unresolved = Vec::new();
+
+    for use_path in use_paths {
+        let go_mod_path = base_dir.join(use_path).join("go.mod");
+        let module_path = fs::read_to_string(&go_mod_path)
+            .ok()
+            .and_then(|content| extract_module_path_from_go_mod(&content));
+
+        let purl = module_path
+            .as_deref()
+            .and_then(|module_path| create_golang_purl(module_path, None));
+
+        if purl.is_none() {
+            unresolved.push(use_path.clone());
+            continue;
+        }
+
+        let mut extra_data = HashMap::new();
+        extra_data.insert(
+            "workspace_path".to_string(),
+            serde_json::Value::String(use_path.clone()),
+        );
+        if let Some(module_path) = module_path {
+            extra_data.insert(
+                "workspace_module_path".to_string(),
+                serde_json::Value::String(module_path),
+            );
+        }
+
+        dependencies.push(Dependency {
+            purl,
+            extracted_requirement: Some(use_path.clone()),
+            scope: Some("use".to_string()),
+            is_runtime: Some(true),
+            is_optional: Some(false),
+            is_pinned: Some(false),
+            is_direct: Some(true),
+            resolved_package: None,
+            extra_data: Some(extra_data),
+        });
+    }
+
+    (dependencies, unresolved)
+}
+
+fn extract_module_path_from_go_mod(content: &str) -> Option<String> {
+    for line in content.lines() {
+        let trimmed = line.trim();
+        if let Some(module_path) = trimmed.strip_prefix("module ") {
+            let module_path = strip_comment(module_path).trim();
+            if !module_path.is_empty() {
+                return Some(module_path.to_string());
+            }
+        }
+    }
+    None
+}
+
+fn parse_workspace_replace_line(line: &str) -> Option<Dependency> {
+    let line = strip_comment(line).trim();
+    let parts: Vec<&str> = line.splitn(2, "=>").collect();
+    if parts.len() != 2 {
+        return None;
+    }
+
+    let old_parts = parse_go_tokens(parts[0]);
+    let new_parts = parse_go_tokens(parts[1]);
+    if old_parts.is_empty() || new_parts.is_empty() {
+        return None;
+    }
+
+    let old_module = old_parts[0].as_str();
+    let old_version = old_parts.get(1).map(|s| s.as_str());
+    let new_module = new_parts[0].as_str();
+    let new_version = new_parts.get(1).cloned();
+    let is_local_path = new_module.starts_with("./")
+        || new_module.starts_with("../")
+        || new_module.starts_with('/')
+        || new_module.starts_with('~');
+
+    let purl = if is_local_path {
+        None
+    } else {
+        create_golang_purl(new_module, new_version.as_deref())
+    };
+
+    let mut extra = std::collections::HashMap::new();
+    extra.insert(
+        "replace_old".to_string(),
+        serde_json::Value::String(old_module.to_string()),
+    );
+    extra.insert(
+        "replace_new".to_string(),
+        serde_json::Value::String(new_module.to_string()),
+    );
+    if let Some(ref v) = new_version {
+        extra.insert(
+            "replace_version".to_string(),
+            serde_json::Value::String(v.clone()),
+        );
+    }
+    if let Some(ov) = old_version {
+        extra.insert(
+            "replace_old_version".to_string(),
+            serde_json::Value::String(ov.to_string()),
+        );
+    }
+    if is_local_path {
+        extra.insert(
+            "replace_local_path".to_string(),
+            serde_json::Value::Bool(true),
+        );
+    }
+
+    Some(Dependency {
+        purl,
+        extracted_requirement: new_version,
+        scope: Some("replace".to_string()),
+        is_runtime: Some(true),
+        is_optional: Some(false),
+        is_pinned: Some(false),
+        is_direct: Some(true),
+        resolved_package: None,
+        extra_data: Some(extra),
+    })
+}
+
+fn extract_single_go_token(value: &str) -> Option<String> {
+    parse_go_tokens(value).into_iter().next()
+}
+
+fn parse_go_tokens(value: &str) -> Vec<String> {
+    let mut tokens = Vec::new();
+    let mut current = String::new();
+    let mut quote: Option<char> = None;
+    let mut chars = value.chars().peekable();
+
+    while let Some(ch) = chars.next() {
+        if let Some(active_quote) = quote {
+            if ch == active_quote {
+                quote = None;
+                continue;
+            }
+
+            if active_quote == '"' && ch == '\\' {
+                if let Some(next) = chars.next() {
+                    current.push(next);
+                }
+                continue;
+            }
+
+            current.push(ch);
+            continue;
+        }
+
+        match ch {
+            '"' | '`' => {
+                quote = Some(ch);
+            }
+            c if c.is_whitespace() => {
+                if !current.is_empty() {
+                    tokens.push(std::mem::take(&mut current));
+                }
+            }
+            _ => current.push(ch),
+        }
+    }
+
+    if !current.is_empty() {
+        tokens.push(current);
+    }
+
+    tokens
+}
+
+crate::register_parser!(
+    "Go go.work workspace file",
+    &["**/go.work"],
+    "golang",
+    "Go",
+    Some("https://go.dev/ref/mod#go-work-files"),
 );
 
 // ============================================================================

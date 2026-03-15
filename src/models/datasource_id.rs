@@ -151,6 +151,7 @@ pub enum DatasourceId {
     GoMod,
     GoModGraph,
     GoSum,
+    GoWork,
 
     // ── Gradle ──
     BuildGradle,
@@ -375,6 +376,7 @@ impl DatasourceId {
             Self::GoMod => "go_mod",
             Self::GoModGraph => "go_mod_graph",
             Self::GoSum => "go_sum",
+            Self::GoWork => "go_work",
 
             // Gradle
             Self::BuildGradle => "build_gradle",
