@@ -160,6 +160,7 @@ fn should_skip_lock_merge(package: Option<&Package>, pkg_data: &PackageData) -> 
 
     should_skip_npm_lock_merge(existing_package, pkg_data)
         || should_skip_python_uv_lock_merge(existing_package, pkg_data)
+        || should_skip_python_pip_cache_merge(existing_package, pkg_data)
 }
 
 fn should_skip_npm_lock_merge(package: &Package, pkg_data: &PackageData) -> bool {
@@ -194,6 +195,20 @@ fn should_skip_python_uv_lock_merge(package: &Package, pkg_data: &PackageData) -
             .datasource_ids
             .contains(&DatasourceId::PypiPyprojectToml)
         && !python_uv_identity_matches(package, pkg_data)
+}
+
+fn should_skip_python_pip_cache_merge(package: &Package, pkg_data: &PackageData) -> bool {
+    pkg_data.datasource_id.is_some_and(|dsid| {
+        matches!(
+            dsid,
+            DatasourceId::PypiWheel | DatasourceId::PypiPipOriginJson
+        )
+    }) && package.datasource_ids.iter().any(|dsid| {
+        matches!(
+            dsid,
+            DatasourceId::PypiWheel | DatasourceId::PypiPipOriginJson
+        )
+    }) && !python_uv_identity_matches(package, pkg_data)
 }
 
 fn python_uv_identity_matches(package: &Package, pkg_data: &PackageData) -> bool {

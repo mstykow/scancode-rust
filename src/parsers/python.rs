@@ -99,6 +99,8 @@ impl PackageParser for PythonParser {
                 extract_from_rfc822_metadata(path, DatasourceId::PypiSdistPkginfo)
             } else if path.file_name().unwrap_or_default() == "METADATA" {
                 extract_from_rfc822_metadata(path, DatasourceId::PypiWheelMetadata)
+            } else if is_pip_cache_origin_json(path) {
+                extract_from_pip_origin_json(path)
             } else if path.file_name().unwrap_or_default() == "pypi.json" {
                 extract_from_pypi_json(path)
             } else if path.file_name().unwrap_or_default() == "pip-inspect.deplock" {
@@ -127,7 +129,8 @@ impl PackageParser for PythonParser {
                 || filename == "PKG-INFO"
                 || filename == "METADATA"
                 || filename == "pypi.json"
-                || filename == "pip-inspect.deplock")
+                || filename == "pip-inspect.deplock"
+                || is_pip_cache_origin_json(path))
         {
             return true;
         }
@@ -143,6 +146,296 @@ impl PackageParser for PythonParser {
     }
 }
 
+#[derive(Debug, Clone)]
+struct InstalledWheelMetadata {
+    wheel_tags: Vec<String>,
+    wheel_version: Option<String>,
+    wheel_generator: Option<String>,
+    root_is_purelib: Option<bool>,
+    compressed_tag: Option<String>,
+}
+
+fn merge_sibling_wheel_metadata(path: &Path, package_data: &mut PackageData) {
+    let Some(parent) = path.parent() else {
+        return;
+    };
+
+    if !parent
+        .file_name()
+        .and_then(|name| name.to_str())
+        .is_some_and(|name| name.ends_with(".dist-info"))
+    {
+        return;
+    }
+
+    let wheel_path = parent.join("WHEEL");
+    if !wheel_path.exists() {
+        return;
+    }
+
+    let Ok(content) = read_file_to_string(&wheel_path) else {
+        warn!("Failed to read sibling WHEEL file at {:?}", wheel_path);
+        return;
+    };
+
+    let Some(wheel_metadata) = parse_installed_wheel_metadata(&content) else {
+        return;
+    };
+
+    apply_installed_wheel_metadata(package_data, &wheel_metadata);
+}
+
+fn parse_installed_wheel_metadata(content: &str) -> Option<InstalledWheelMetadata> {
+    use super::rfc822::{get_header_all, get_header_first};
+
+    let metadata = super::rfc822::parse_rfc822_content(content);
+    let wheel_tags = get_header_all(&metadata.headers, "tag");
+    if wheel_tags.is_empty() {
+        return None;
+    }
+
+    let wheel_version = get_header_first(&metadata.headers, "wheel-version");
+    let wheel_generator = get_header_first(&metadata.headers, "generator");
+    let root_is_purelib =
+        get_header_first(&metadata.headers, "root-is-purelib").and_then(|value| {
+            match value.to_ascii_lowercase().as_str() {
+                "true" => Some(true),
+                "false" => Some(false),
+                _ => None,
+            }
+        });
+
+    let compressed_tag = compress_wheel_tags(&wheel_tags);
+
+    Some(InstalledWheelMetadata {
+        wheel_tags,
+        wheel_version,
+        wheel_generator,
+        root_is_purelib,
+        compressed_tag,
+    })
+}
+
+fn compress_wheel_tags(tags: &[String]) -> Option<String> {
+    if tags.is_empty() {
+        return None;
+    }
+
+    if tags.len() == 1 {
+        return Some(tags[0].clone());
+    }
+
+    let mut python_tags = Vec::new();
+    let mut abi_tag: Option<&str> = None;
+    let mut platform_tag: Option<&str> = None;
+
+    for tag in tags {
+        let mut parts = tag.splitn(3, '-');
+        let python = parts.next()?;
+        let abi = parts.next()?;
+        let platform = parts.next()?;
+
+        if abi_tag.is_some_and(|existing| existing != abi)
+            || platform_tag.is_some_and(|existing| existing != platform)
+        {
+            return None;
+        }
+
+        abi_tag = Some(abi);
+        platform_tag = Some(platform);
+        python_tags.push(python.to_string());
+    }
+
+    Some(format!(
+        "{}-{}-{}",
+        python_tags.join("."),
+        abi_tag?,
+        platform_tag?
+    ))
+}
+
+fn apply_installed_wheel_metadata(
+    package_data: &mut PackageData,
+    wheel_metadata: &InstalledWheelMetadata,
+) {
+    let extra_data = package_data.extra_data.get_or_insert_with(HashMap::new);
+    extra_data.insert(
+        "wheel_tags".to_string(),
+        JsonValue::Array(
+            wheel_metadata
+                .wheel_tags
+                .iter()
+                .cloned()
+                .map(JsonValue::String)
+                .collect(),
+        ),
+    );
+
+    if let Some(wheel_version) = &wheel_metadata.wheel_version {
+        extra_data.insert(
+            "wheel_version".to_string(),
+            JsonValue::String(wheel_version.clone()),
+        );
+    }
+
+    if let Some(wheel_generator) = &wheel_metadata.wheel_generator {
+        extra_data.insert(
+            "wheel_generator".to_string(),
+            JsonValue::String(wheel_generator.clone()),
+        );
+    }
+
+    if let Some(root_is_purelib) = wheel_metadata.root_is_purelib {
+        extra_data.insert(
+            "root_is_purelib".to_string(),
+            JsonValue::Bool(root_is_purelib),
+        );
+    }
+
+    if let (Some(name), Some(version), Some(extension)) = (
+        package_data.name.as_deref(),
+        package_data.version.as_deref(),
+        wheel_metadata.compressed_tag.as_deref(),
+    ) {
+        package_data.purl = build_pypi_purl_with_extension(name, Some(version), extension);
+    }
+}
+
+fn is_pip_cache_origin_json(path: &Path) -> bool {
+    path.file_name().and_then(|name| name.to_str()) == Some("origin.json")
+        && path.ancestors().skip(1).any(|ancestor| {
+            ancestor
+                .file_name()
+                .and_then(|name| name.to_str())
+                .is_some_and(|name| name.eq_ignore_ascii_case("wheels"))
+        })
+}
+
+fn extract_from_pip_origin_json(path: &Path) -> PackageData {
+    let content = match read_file_to_string(path) {
+        Ok(content) => content,
+        Err(e) => {
+            warn!("Failed to read pip cache origin.json at {:?}: {}", path, e);
+            return default_package_data();
+        }
+    };
+
+    let root: JsonValue = match serde_json::from_str(&content) {
+        Ok(root) => root,
+        Err(e) => {
+            warn!("Failed to parse pip cache origin.json at {:?}: {}", path, e);
+            return default_package_data();
+        }
+    };
+
+    let Some(download_url) = root.get("url").and_then(|value| value.as_str()) else {
+        warn!("No url found in pip cache origin.json at {:?}", path);
+        return default_package_data();
+    };
+
+    let sibling_wheel = find_sibling_cached_wheel(path);
+    let name_version = parse_name_version_from_origin_url(download_url).or_else(|| {
+        sibling_wheel
+            .as_ref()
+            .map(|wheel_info| (wheel_info.name.clone(), wheel_info.version.clone()))
+    });
+
+    let Some((name, version)) = name_version else {
+        warn!(
+            "Failed to infer package name/version from pip cache origin.json at {:?}",
+            path
+        );
+        return default_package_data();
+    };
+
+    let (repository_homepage_url, repository_download_url, api_data_url, plain_purl) =
+        build_pypi_urls(Some(&name), Some(&version));
+    let purl = sibling_wheel
+        .as_ref()
+        .and_then(|wheel_info| build_wheel_purl(Some(&name), Some(&version), wheel_info))
+        .or(plain_purl);
+
+    PackageData {
+        package_type: Some(PythonParser::PACKAGE_TYPE),
+        primary_language: Some("Python".to_string()),
+        name: Some(name),
+        version: Some(version),
+        datasource_id: Some(DatasourceId::PypiPipOriginJson),
+        download_url: Some(download_url.to_string()),
+        sha256: extract_sha256_from_origin_json(&root),
+        repository_homepage_url,
+        repository_download_url,
+        api_data_url,
+        purl,
+        ..Default::default()
+    }
+}
+
+fn find_sibling_cached_wheel(path: &Path) -> Option<WheelInfo> {
+    let parent = path.parent()?;
+    let entries = parent.read_dir().ok()?;
+
+    for entry in entries.flatten() {
+        let sibling_path = entry.path();
+        if sibling_path
+            .extension()
+            .is_some_and(|ext| ext.eq_ignore_ascii_case("whl"))
+            && let Some(wheel_info) = parse_wheel_filename(&sibling_path)
+        {
+            return Some(wheel_info);
+        }
+    }
+
+    None
+}
+
+fn parse_name_version_from_origin_url(url: &str) -> Option<(String, String)> {
+    let file_name = url.rsplit('/').next()?;
+
+    if file_name.ends_with(".whl") {
+        return parse_wheel_filename(Path::new(file_name))
+            .map(|wheel_info| (wheel_info.name, wheel_info.version));
+    }
+
+    let stem = strip_python_archive_extension(file_name)?;
+    let (name, version) = stem.rsplit_once('-')?;
+    if name.is_empty() || version.is_empty() {
+        return None;
+    }
+
+    Some((name.replace('_', "-"), version.to_string()))
+}
+
+fn strip_python_archive_extension(file_name: &str) -> Option<&str> {
+    [".tar.gz", ".tar.bz2", ".tar.xz", ".tgz", ".zip", ".whl"]
+        .iter()
+        .find_map(|suffix| file_name.strip_suffix(suffix))
+}
+
+fn extract_sha256_from_origin_json(root: &JsonValue) -> Option<String> {
+    root.pointer("/archive_info/hashes/sha256")
+        .and_then(|value| value.as_str())
+        .map(ToOwned::to_owned)
+        .or_else(|| {
+            root.pointer("/archive_info/hash")
+                .and_then(|value| value.as_str())
+                .and_then(normalize_origin_hash)
+        })
+}
+
+fn normalize_origin_hash(hash: &str) -> Option<String> {
+    if let Some(value) = hash.strip_prefix("sha256=") {
+        return Some(value.to_string());
+    }
+    if let Some(value) = hash.strip_prefix("sha256:") {
+        return Some(value.to_string());
+    }
+    if hash.len() == 64 && hash.chars().all(|ch| ch.is_ascii_hexdigit()) {
+        return Some(hash.to_string());
+    }
+    None
+}
+
 fn extract_from_rfc822_metadata(path: &Path, datasource_id: DatasourceId) -> PackageData {
     let content = match read_file_to_string(path) {
         Ok(content) => content,
@@ -156,6 +449,9 @@ fn extract_from_rfc822_metadata(path: &Path, datasource_id: DatasourceId) -> Pac
     let mut package_data = build_package_data_from_rfc822(&metadata, datasource_id);
     merge_sibling_metadata_dependencies(path, &mut package_data);
     merge_sibling_metadata_file_references(path, &mut package_data);
+    if datasource_id == DatasourceId::PypiWheelMetadata {
+        merge_sibling_wheel_metadata(path, &mut package_data);
+    }
     package_data
 }
 
@@ -1086,6 +1382,19 @@ pub(crate) fn build_pypi_urls(
         api_data_url,
         purl,
     )
+}
+
+fn build_pypi_purl_with_extension(
+    name: &str,
+    version: Option<&str>,
+    extension: &str,
+) -> Option<String> {
+    let mut package_url = PackageUrl::new(PythonParser::PACKAGE_TYPE.as_str(), name).ok()?;
+    if let Some(ver) = version {
+        package_url.with_version(ver).ok()?;
+    }
+    package_url.add_qualifier("extension", extension).ok()?;
+    Some(package_url.to_string())
 }
 
 fn extract_from_pyproject_toml(path: &Path) -> PackageData {
@@ -3708,7 +4017,7 @@ fn default_package_data() -> PackageData {
 }
 
 crate::register_parser!(
-    "Python package manifests (pyproject.toml, setup.py, setup.cfg, pypi.json, PKG-INFO, METADATA, .whl, .egg)",
+    "Python package manifests (pyproject.toml, setup.py, setup.cfg, pypi.json, PKG-INFO, METADATA, pip cache origin.json, .whl, .egg)",
     &[
         "**/pyproject.toml",
         "**/setup.py",
@@ -3716,6 +4025,7 @@ crate::register_parser!(
         "**/pypi.json",
         "**/PKG-INFO",
         "**/METADATA",
+        "**/origin.json",
         "**/*.whl",
         "**/*.egg"
     ],
