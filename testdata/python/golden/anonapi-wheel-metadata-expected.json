@@ -83,7 +83,11 @@
       }
     ],
     "extra_data": {
-      "requires_python": ">=3.6"
+      "requires_python": ">=3.6",
+      "wheel_generator": "bdist_wheel (0.32.2)",
+      "wheel_tags": ["py2-none-any", "py3-none-any"],
+      "wheel_version": "1.0",
+      "root_is_purelib": true
     },
     "dependencies": [
       {
@@ -99,6 +103,6 @@
     "repository_download_url": "https://pypi.org/packages/source/a/anonapi/anonapi-0.0.19.tar.gz",
     "api_data_url": "https://pypi.org/pypi/anonapi/0.0.19/json",
     "datasource_id": "pypi_wheel_metadata",
-    "purl": "pkg:pypi/anonapi@0.0.19"
+    "purl": "pkg:pypi/anonapi@0.0.19?extension=py2.py3-none-any"
   }
 ]

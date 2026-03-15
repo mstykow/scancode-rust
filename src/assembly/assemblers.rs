@@ -115,6 +115,11 @@ pub static ASSEMBLERS: &[AssemblerConfig] = &[
         sibling_file_patterns: &["pom.xml", "pom.properties", "**/META-INF/MANIFEST.MF"],
         mode: AssemblyMode::SiblingMerge,
     },
+    AssemblerConfig {
+        datasource_ids: &[DatasourceId::PypiWheel, DatasourceId::PypiPipOriginJson],
+        sibling_file_patterns: &["*.whl", "origin.json"],
+        mode: AssemblyMode::SiblingMerge,
+    },
     // Python/PyPI ecosystem
     AssemblerConfig {
         datasource_ids: &[

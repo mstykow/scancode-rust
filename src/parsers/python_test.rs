@@ -769,6 +769,80 @@ Test package description.
     }
 
     #[test]
+    fn test_extract_metadata_reads_sibling_wheel_tags_and_builds_detailed_purl() {
+        let temp_dir = TempDir::new().expect("Failed to create temp dir");
+        let dist_info = temp_dir.path().join("demo-1.0.0.dist-info");
+        fs::create_dir_all(&dist_info).expect("Failed to create dist-info dir");
+
+        fs::write(
+            dist_info.join("METADATA"),
+            "Metadata-Version: 2.1\nName: demo\nVersion: 1.0.0\n",
+        )
+        .expect("Failed to write METADATA");
+        fs::write(
+            dist_info.join("WHEEL"),
+            "Wheel-Version: 1.0\nGenerator: bdist_wheel (0.37.1)\nRoot-Is-Purelib: true\nTag: py2-none-any\nTag: py3-none-any\n",
+        )
+        .expect("Failed to write WHEEL");
+
+        let package_data = PythonParser::extract_first_package(&dist_info.join("METADATA"));
+
+        assert_eq!(
+            package_data.datasource_id,
+            Some(DatasourceId::PypiWheelMetadata)
+        );
+        assert_eq!(
+            package_data.purl.as_deref(),
+            Some("pkg:pypi/demo@1.0.0?extension=py2.py3-none-any")
+        );
+
+        let extra_data = package_data.extra_data.expect("extra_data should exist");
+        let wheel_tags = extra_data
+            .get("wheel_tags")
+            .and_then(|value| value.as_array())
+            .expect("wheel_tags should be present as an array");
+        assert_eq!(wheel_tags.len(), 2);
+        assert_eq!(wheel_tags[0].as_str(), Some("py2-none-any"));
+        assert_eq!(wheel_tags[1].as_str(), Some("py3-none-any"));
+        assert_eq!(
+            extra_data
+                .get("wheel_version")
+                .and_then(|value| value.as_str()),
+            Some("1.0")
+        );
+        assert_eq!(
+            extra_data
+                .get("wheel_generator")
+                .and_then(|value| value.as_str()),
+            Some("bdist_wheel (0.37.1)")
+        );
+        assert_eq!(
+            extra_data
+                .get("root_is_purelib")
+                .and_then(|value| value.as_bool()),
+            Some(true)
+        );
+    }
+
+    #[test]
+    fn test_extract_metadata_without_sibling_wheel_keeps_plain_purl() {
+        let (_temp_dir, metadata_path) = create_temp_file(
+            "Metadata-Version: 2.1\nName: demo\nVersion: 1.0.0\n",
+            "METADATA",
+        );
+
+        let package_data = PythonParser::extract_first_package(&metadata_path);
+
+        assert_eq!(package_data.purl.as_deref(), Some("pkg:pypi/demo@1.0.0"));
+        assert!(
+            package_data
+                .extra_data
+                .as_ref()
+                .is_none_or(|extra| !extra.contains_key("wheel_tags"))
+        );
+    }
+
+    #[test]
     fn test_extract_pkg_info_reads_sibling_installed_files_txt() {
         let temp_dir = TempDir::new().expect("Failed to create temp dir");
         let egg_info = temp_dir.path().join("examplepkg.egg-info");
@@ -1240,6 +1314,98 @@ Test package description.
     fn test_pip_inspect_is_match() {
         let pip_inspect_path = PathBuf::from("/some/path/pip-inspect.deplock");
         assert!(PythonParser::is_match(&pip_inspect_path));
+    }
+
+    #[test]
+    fn test_pip_cache_origin_json_is_match_only_in_pip_wheels_cache() {
+        let cache_origin = PathBuf::from("/tmp/.cache/pip/wheels/eb/60/37/cachehash/origin.json");
+        let generic_origin = PathBuf::from("/tmp/project/origin.json");
+
+        assert!(PythonParser::is_match(&cache_origin));
+        assert!(!PythonParser::is_match(&generic_origin));
+    }
+
+    #[test]
+    fn test_extract_from_pip_cache_origin_json() {
+        let temp_dir = TempDir::new().expect("Failed to create temp dir");
+        let cache_dir = temp_dir
+            .path()
+            .join(".cache")
+            .join("pip")
+            .join("wheels")
+            .join("eb")
+            .join("60")
+            .join("37")
+            .join("ee40403cbd895ccdb57eb28b03b0afabeb449d5df9ce776a0d");
+        fs::create_dir_all(&cache_dir).expect("Failed to create pip cache dir");
+
+        let origin_path = cache_dir.join("origin.json");
+        fs::write(
+            &origin_path,
+            r#"{
+                "archive_info": {
+                    "hash": "sha256=a5488a3dd1fd021ce33f969780b88fe0f7eebb76eb20996d7318f307612a045b",
+                    "hashes": {
+                        "sha256": "a5488a3dd1fd021ce33f969780b88fe0f7eebb76eb20996d7318f307612a045b"
+                    }
+                },
+                "url": "https://files.pythonhosted.org/packages/48/30/4559d06bad5bb627733dac1ef28c34f5e35f1461247ba63e5f6366901277/construct-2.10.68.tar.gz"
+            }"#,
+        )
+        .expect("Failed to write origin.json");
+
+        let package_data = PythonParser::extract_first_package(&origin_path);
+
+        assert_eq!(package_data.package_type, Some(PackageType::Pypi));
+        assert_eq!(package_data.primary_language, Some("Python".to_string()));
+        assert_eq!(
+            package_data.datasource_id,
+            Some(DatasourceId::PypiPipOriginJson)
+        );
+        assert_eq!(package_data.name, Some("construct".to_string()));
+        assert_eq!(package_data.version, Some("2.10.68".to_string()));
+        assert_eq!(
+            package_data.download_url.as_deref(),
+            Some(
+                "https://files.pythonhosted.org/packages/48/30/4559d06bad5bb627733dac1ef28c34f5e35f1461247ba63e5f6366901277/construct-2.10.68.tar.gz"
+            )
+        );
+        assert_eq!(
+            package_data.sha256.as_deref(),
+            Some("a5488a3dd1fd021ce33f969780b88fe0f7eebb76eb20996d7318f307612a045b")
+        );
+        assert_eq!(
+            package_data.purl.as_deref(),
+            Some("pkg:pypi/construct@2.10.68")
+        );
+        assert_eq!(
+            package_data.repository_homepage_url.as_deref(),
+            Some("https://pypi.org/project/construct")
+        );
+    }
+
+    #[test]
+    fn test_invalid_pip_cache_origin_json_returns_default_package() {
+        let temp_dir = TempDir::new().expect("Failed to create temp dir");
+        let cache_dir = temp_dir
+            .path()
+            .join(".cache")
+            .join("pip")
+            .join("wheels")
+            .join("aa")
+            .join("bb")
+            .join("cc")
+            .join("badcache");
+        fs::create_dir_all(&cache_dir).expect("Failed to create pip cache dir");
+
+        let origin_path = cache_dir.join("origin.json");
+        fs::write(&origin_path, "{not-valid-json").expect("Failed to write invalid origin.json");
+
+        let package_data = PythonParser::extract_first_package(&origin_path);
+
+        assert!(package_data.name.is_none());
+        assert!(package_data.version.is_none());
+        assert!(package_data.purl.is_none());
     }
 
     #[test]
