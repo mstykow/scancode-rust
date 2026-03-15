@@ -1,0 +1,20 @@
+[
+  {
+    "type": "bazel",
+    "name": "minimal_module",
+    "parties": [],
+    "dependencies": [
+      {
+        "purl": "pkg:bazel/rules_python@0.24.0",
+        "extracted_requirement": "0.24.0",
+        "scope": "dependencies",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": true
+      }
+    ],
+    "datasource_id": "bazel_module",
+    "purl": "pkg:bazel/minimal_module"
+  }
+]
