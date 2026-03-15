@@ -1,4 +1,4 @@
-# Python Parser: Manifest Metadata, Dunder Fallbacks, and PyPI JSON
+# Python Parser: Manifest Metadata, Installed Provenance, Dunder Fallbacks, and PyPI JSON
 
 **Area**: Python package metadata extraction  
 **Files**: `src/parsers/python.rs`, `src/parsers/python_test.rs`, `src/parsers/python_golden_test.rs`  
@@ -6,7 +6,7 @@
 
 ## Summary
 
-**🐛 Bug Fix + ✨ New Feature + 🔍 Enhanced Extraction**: Rust now extracts richer Python manifest metadata, resolves imported sibling dunder metadata for setup.py, preserves PKG-INFO license-file references, supports saved `pypi.json` API payloads, and extracts RFC822 dependency metadata from wheels and source-package metadata.
+**🐛 Bug Fix + ✨ New Feature + 🔍 Enhanced Extraction**: Rust now extracts richer Python manifest metadata, resolves imported sibling dunder metadata for setup.py, preserves PKG-INFO license-file references, enriches installed wheel metadata and pip cache provenance, supports saved `pypi.json` API payloads, and extracts RFC822 dependency metadata from wheels and source-package metadata.
 
 ## What changed
 
@@ -69,6 +69,35 @@ That lets source-package metadata carry explicit ancillary file references such 
 
 When those source-layout refs are present, Rust can assign the referenced files back to the assembled Python package during scans without falling back to broad root-tree harvesting.
 
+### 5c. Installed `WHEEL` metadata and pip cache `origin.json` provenance
+
+Rust now also captures two high-value installed-wheel metadata surfaces that were still missing from the Python family:
+
+- sibling `.dist-info/WHEEL` next to installed `METADATA`
+- pip wheel-cache `origin.json` provenance under cache `wheels/` layouts
+
+For installed `.dist-info` metadata, Rust now:
+
+- preserves `wheel_tags`
+- preserves `wheel_version`
+- preserves `wheel_generator`
+- preserves `root_is_purelib`
+- upgrades the package PURL with an `extension=` qualifier when wheel tags can be losslessly compressed (for example `py2.py3-none-any`)
+
+For pip wheel-cache provenance, Rust now:
+
+- extracts the cached package name/version from the source archive URL (with sibling wheel fallback)
+- preserves the source `download_url`
+- preserves `sha256` provenance from `archive_info`
+- emits a PyPI package row for cache provenance
+- merges `origin.json` with a sibling cached `.whl` when their identities match
+
+This keeps the behavior intentionally narrow:
+
+- installed `WHEEL` data enriches the sibling `METADATA` package rather than creating duplicate standalone package rows
+- `origin.json` is only matched in pip wheel-cache style paths
+- cache provenance only merges onto sibling wheels when package identity agrees
+
 ### 6. Saved PyPI JSON support
 
 Rust now supports parsing saved `pypi.json` payloads and extracts core package metadata, project URLs, artifact download data, and private-package classifier state.
@@ -105,6 +134,8 @@ This now covers the concrete wheel-vs-sdist gap left under `#149`:
 - `#209` PyPI JSON parse support
 - `#144` narrow source-package ancillary file collection via `SOURCES.txt`
 - `#150` installed Python metadata file-to-package assignment in scans
+- `#111` installed wheel metadata via sibling `WHEEL`
+- `#112` pip cache provenance via `origin.json`
 - `#149` RFC822 wheel/source dependency metadata parity
 
 ### Verified as already covered locally or audited as nonblocking
@@ -127,7 +158,10 @@ Coverage includes:
 - private classifier coverage
 - PKG-INFO / METADATA license-file reference coverage
 - standalone metadata sibling `RECORD` / `installed-files.txt` coverage
+- installed metadata sibling `WHEEL` coverage, including multi-tag wheel compression into detailed PURLs
 - scan-level installed Python file assignment coverage for `.dist-info` and `.egg-info`
+- pip cache `origin.json` extraction coverage
+- pip cache wheel+origin assembly coverage, including mismatched-wheel guard coverage
 - sibling `SOURCES.txt` extraction from source-package `.egg-info/PKG-INFO`
 - scan-level source-layout assignment coverage for `SOURCES.txt`-listed files
 - wheel/source RFC822 dependency extraction coverage for bare, extra-scoped, marker-bearing, pinned, and source-package `.egg-info/requires.txt` cases
