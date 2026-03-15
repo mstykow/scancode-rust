@@ -20,7 +20,9 @@
         "lock": {
           "path": "./deno.lock",
           "frozen": false
-        }
+        },
+        "version": "5",
+        "workspace_dependencies": ["jsr:@std/assert@1", "npm:chalk@5"]
       },
       "purl": "pkg:generic/%40scancode/deno-sample@1.0.0",
       "package_uid": "pkg:generic/%40scancode/deno-sample@1.0.0?uuid=fixed-uid-done-for-testing-5642512d1758",
