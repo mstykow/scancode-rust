@@ -491,6 +491,14 @@ mod tests {
     }
 
     #[test]
+    fn test_assembly_go_workspace_basic() {
+        match run_assembly_golden_test("go-workspace-basic") {
+            Ok(_) => (),
+            Err(e) => panic!("Assembly golden test failed for go-workspace-basic: {}", e),
+        }
+    }
+
+    #[test]
     fn test_assembly_nuget_basic() {
         match run_assembly_golden_test("nuget-basic") {
             Ok(_) => (),
