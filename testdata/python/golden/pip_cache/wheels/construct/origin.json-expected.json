@@ -1,0 +1,17 @@
+[
+  {
+    "type": "pypi",
+    "name": "construct",
+    "version": "2.10.68",
+    "primary_language": "Python",
+    "parties": [],
+    "download_url": "https://files.pythonhosted.org/packages/48/30/4559d06bad5bb627733dac1ef28c34f5e35f1461247ba63e5f6366901277/construct-2.10.68.tar.gz",
+    "sha256": "a5488a3dd1fd021ce33f969780b88fe0f7eebb76eb20996d7318f307612a045b",
+    "repository_homepage_url": "https://pypi.org/project/construct",
+    "repository_download_url": "https://pypi.org/packages/source/c/construct/construct-2.10.68.tar.gz",
+    "api_data_url": "https://pypi.org/pypi/construct/2.10.68/json",
+    "datasource_id": "pypi_pip_origin_json",
+    "purl": "pkg:pypi/construct@2.10.68?extension=py3-none-any",
+    "dependencies": []
+  }
+]
