@@ -979,6 +979,49 @@ mod tests {
     }
 
     #[test]
+    fn test_assemble_npm_package_json_skips_mismatched_bun_lock() {
+        let mut files = vec![
+            create_test_file_info(
+                "project/package.json",
+                DatasourceId::NpmPackageJson,
+                Some("pkg:npm/my-app@1.0.0"),
+                Some("my-app"),
+                Some("1.0.0"),
+                vec![],
+            ),
+            create_test_file_info(
+                "project/bun.lock",
+                DatasourceId::BunLock,
+                Some("pkg:npm/other-app@2.0.0"),
+                Some("other-app"),
+                Some("2.0.0"),
+                vec![Dependency {
+                    purl: Some("pkg:npm/left-pad@1.3.0".to_string()),
+                    extracted_requirement: Some("1.3.0".to_string()),
+                    scope: Some("dependencies".to_string()),
+                    is_runtime: Some(true),
+                    is_optional: Some(false),
+                    is_pinned: Some(true),
+                    is_direct: Some(true),
+                    resolved_package: None,
+                    extra_data: None,
+                }],
+            ),
+        ];
+
+        let result = assemble(&mut files);
+
+        assert_eq!(result.packages.len(), 1);
+        assert_eq!(result.packages[0].name.as_deref(), Some("my-app"));
+        assert_eq!(
+            result.packages[0].datafile_paths,
+            vec!["project/package.json".to_string()]
+        );
+        assert!(result.dependencies.is_empty());
+        assert!(files[1].for_packages.is_empty());
+    }
+
+    #[test]
     fn test_assemble_cargo_toml_with_lock() {
         let mut files = vec![
             create_test_file_info(
@@ -1313,6 +1356,101 @@ mod tests {
         );
         assert_eq!(files[0].for_packages.len(), 1);
         assert_eq!(files[1].for_packages.len(), 1);
+    }
+
+    #[test]
+    fn test_assemble_bun_workspace_hoists_root_lockfile_dependencies() {
+        let mut root_file = create_test_file_info(
+            "project/package.json",
+            DatasourceId::NpmPackageJson,
+            None,
+            None,
+            None,
+            vec![Dependency {
+                purl: Some("pkg:npm/typescript".to_string()),
+                extracted_requirement: Some("^5.0.0".to_string()),
+                scope: Some("devDependencies".to_string()),
+                is_runtime: Some(false),
+                is_optional: Some(true),
+                is_pinned: Some(false),
+                is_direct: Some(true),
+                resolved_package: None,
+                extra_data: None,
+            }],
+        );
+        root_file.package_data[0].extra_data = Some(HashMap::from([(
+            "workspaces".to_string(),
+            serde_json::json!(["packages/*"]),
+        )]));
+
+        let mut files = vec![
+            root_file,
+            create_test_file_info(
+                "project/bun.lock",
+                DatasourceId::BunLock,
+                None,
+                None,
+                None,
+                vec![Dependency {
+                    purl: Some("pkg:npm/typescript@5.8.3".to_string()),
+                    extracted_requirement: Some("5.8.3".to_string()),
+                    scope: Some("devDependencies".to_string()),
+                    is_runtime: Some(false),
+                    is_optional: Some(true),
+                    is_pinned: Some(true),
+                    is_direct: Some(true),
+                    resolved_package: None,
+                    extra_data: None,
+                }],
+            ),
+            create_test_file_info(
+                "project/packages/core/package.json",
+                DatasourceId::NpmPackageJson,
+                Some("pkg:npm/%40myorg/core@1.0.0"),
+                Some("@myorg/core"),
+                Some("1.0.0"),
+                vec![],
+            ),
+            create_test_file_info(
+                "project/packages/utils/package.json",
+                DatasourceId::NpmPackageJson,
+                Some("pkg:npm/%40myorg/utils@2.0.0"),
+                Some("@myorg/utils"),
+                Some("2.0.0"),
+                vec![],
+            ),
+        ];
+
+        let result = assemble(&mut files);
+
+        assert_eq!(result.packages.len(), 2);
+        assert!(
+            result
+                .packages
+                .iter()
+                .any(|pkg| pkg.name.as_deref() == Some("@myorg/core"))
+        );
+        assert!(
+            result
+                .packages
+                .iter()
+                .any(|pkg| pkg.name.as_deref() == Some("@myorg/utils"))
+        );
+
+        let bun_dep = result
+            .dependencies
+            .iter()
+            .find(|dep| dep.datasource_id == DatasourceId::BunLock)
+            .expect("expected bun.lock hoisted dependency");
+        assert_eq!(bun_dep.purl.as_deref(), Some("pkg:npm/typescript@5.8.3"));
+        assert_eq!(bun_dep.datafile_path, "project/bun.lock");
+        assert!(bun_dep.for_package_uid.is_none());
+
+        let bun_file = files
+            .iter()
+            .find(|file| file.path == "project/bun.lock")
+            .expect("expected bun.lock file");
+        assert_eq!(bun_file.for_packages.len(), 2);
     }
 
     #[test]
