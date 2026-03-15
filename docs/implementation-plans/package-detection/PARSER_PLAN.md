@@ -41,7 +41,7 @@ All production handlers in the original plan scope are covered. Some ecosystems 
 | AboutCode             | ✅ Implemented | `AboutFileParser`                                                                        |
 | Alpine                | ✅ Implemented | `.apk` archive + installed DB + `APKBUILD` recipe parsing                                |
 | Autotools             | ✅ Implemented | `AutotoolsConfigureParser`                                                               |
-| Bazel                 | ✅ Implemented | `BazelBuildParser`                                                                       |
+| Bazel                 | ✅ Implemented | `BazelBuildParser`, `BazelModuleParser`                                                  |
 | Bower                 | ✅ Implemented | `BowerJsonParser`                                                                        |
 | Buck                  | ✅ Implemented | `BuckBuildParser`, `BuckMetadataBzlParser`                                               |
 | Cargo/Rust            | ✅ Implemented | `CargoParser`, `CargoLockParser` + workspace assembly                                    |
@@ -84,10 +84,9 @@ The tables below classify the current open `package-parsing` / `new-parser` issu
 
 These issues now combine the strongest intrinsic value with visible upstream implementation momentum.
 
-| Issue Set | Opportunity                    | Why this creates value                                                                                                                            | Current overlap / notes                                                                                     |
-| --------- | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| #102      | Bazel modules (`MODULE.bazel`) | Extends the existing Bazel parser into the newer module system and aligns with purl-spec evolution.                                               | Clear adjacency to current Bazel coverage; upstream PR `#4806` is open.                                     |
-| #117      | NuGet `.deps.json`             | Adds dependency evidence often found beside compiled .NET outputs, improving scan quality in built application trees where manifests are missing. | Complements existing `.nuspec`, `packages.config`, project-file, and lockfile coverage; PR `#4803` is open. |
+| Issue Set | Opportunity        | Why this creates value                                                                                                                            | Current overlap / notes                                                                                     |
+| --------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| #117      | NuGet `.deps.json` | Adds dependency evidence often found beside compiled .NET outputs, improving scan quality in built application trees where manifests are missing. | Complements existing `.nuspec`, `packages.config`, project-file, and lockfile coverage; PR `#4803` is open. |
 
 ### Medium-Value Opportunities
 
