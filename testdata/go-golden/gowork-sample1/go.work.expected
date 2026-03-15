@@ -1,0 +1,58 @@
+[
+  {
+    "type": "golang",
+    "primary_language": "Go",
+    "parties": [],
+    "extra_data": {
+      "toolchain": "go1.21.5",
+      "use_paths": [
+        "./mymodule",
+        "./tools/formatter"
+      ],
+      "go_version": "1.21"
+    },
+    "dependencies": [
+      {
+        "purl": "pkg:golang/example.com/mymodule",
+        "extracted_requirement": "./mymodule",
+        "scope": "use",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true,
+        "extra_data": {
+          "workspace_module_path": "example.com/mymodule",
+          "workspace_path": "./mymodule"
+        }
+      },
+      {
+        "purl": "pkg:golang/example.com/formatter",
+        "extracted_requirement": "./tools/formatter",
+        "scope": "use",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true,
+        "extra_data": {
+          "workspace_path": "./tools/formatter",
+          "workspace_module_path": "example.com/formatter"
+        }
+      },
+      {
+        "purl": null,
+        "extracted_requirement": "../forks/net",
+        "scope": "replace",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true,
+        "extra_data": {
+          "replace_old": "golang.org/x/net",
+          "replace_local_path": true,
+          "replace_new": "../forks/net"
+        }
+      }
+    ],
+    "datasource_id": "go_work"
+  }
+]

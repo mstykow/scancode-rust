@@ -1,0 +1,27 @@
+[
+  {
+    "type": "golang",
+    "primary_language": "Go",
+    "parties": [],
+    "extra_data": {
+      "use_paths": ["./myapp"],
+      "go_version": "1.18"
+    },
+    "dependencies": [
+      {
+        "purl": "pkg:golang/example.com/myapp",
+        "extracted_requirement": "./myapp",
+        "scope": "use",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true,
+        "extra_data": {
+          "workspace_path": "./myapp",
+          "workspace_module_path": "example.com/myapp"
+        }
+      }
+    ],
+    "datasource_id": "go_work"
+  }
+]
