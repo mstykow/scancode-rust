@@ -60,10 +60,12 @@ pub static ASSEMBLERS: &[AssemblerConfig] = &[
             DatasourceId::GoMod,
             DatasourceId::GoModGraph,
             DatasourceId::GoSum,
+            DatasourceId::GoWork,
             DatasourceId::Godeps,
         ],
         sibling_file_patterns: &[
             "go.mod",
+            "go.work",
             "go.mod.graph",
             "go.modgraph",
             "go.sum",

@@ -1440,6 +1440,71 @@ mod tests {
     }
 
     #[test]
+    fn test_assemble_go_mod_with_go_work() {
+        let mut files = vec![
+            create_test_file_info(
+                "project/go.mod",
+                DatasourceId::GoMod,
+                Some("pkg:golang/example.com/project"),
+                Some("project"),
+                None,
+                vec![],
+            ),
+            create_test_file_info(
+                "project/go.work",
+                DatasourceId::GoWork,
+                None,
+                None,
+                None,
+                vec![Dependency {
+                    purl: Some("pkg:golang/example.com/mymodule".to_string()),
+                    extracted_requirement: Some("./mymodule".to_string()),
+                    scope: Some("use".to_string()),
+                    is_runtime: Some(true),
+                    is_optional: Some(false),
+                    is_pinned: Some(false),
+                    is_direct: Some(true),
+                    resolved_package: None,
+                    extra_data: None,
+                }],
+            ),
+        ];
+
+        files[1].package_data[0].extra_data = Some(std::collections::HashMap::from([(
+            "use_paths".to_string(),
+            serde_json::json!(["./mymodule"]),
+        )]));
+
+        let result = assemble(&mut files);
+
+        assert_eq!(
+            result.packages.len(),
+            1,
+            "Expected exactly one merged Go package"
+        );
+        let package = &result.packages[0];
+        assert_eq!(package.name, Some("project".to_string()));
+        assert!(
+            package
+                .datafile_paths
+                .contains(&"project/go.mod".to_string())
+        );
+        assert!(
+            package
+                .datafile_paths
+                .contains(&"project/go.work".to_string())
+        );
+        assert!(package.datasource_ids.contains(&DatasourceId::GoMod));
+        assert!(package.datasource_ids.contains(&DatasourceId::GoWork));
+        let extra_data = package
+            .extra_data
+            .as_ref()
+            .expect("merged extra_data missing");
+        assert!(extra_data.contains_key("use_paths"));
+        assert_eq!(result.dependencies.len(), 1);
+    }
+
+    #[test]
     fn test_assemble_no_matching_datasource() {
         let mut files = vec![create_test_file_info(
             "project/unknown.json",
