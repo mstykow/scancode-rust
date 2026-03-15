@@ -1,0 +1,54 @@
+[
+  {
+    "type": "bazel",
+    "name": "my_sample_project",
+    "version": "0.5.0",
+    "parties": [],
+    "extra_data": {
+      "compatibility_level": 1
+    },
+    "dependencies": [
+      {
+        "purl": "pkg:bazel/rules_python@0.24.0",
+        "extracted_requirement": "0.24.0",
+        "scope": "dependencies",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:bazel/rules_go@0.41.0",
+        "extracted_requirement": "0.41.0",
+        "scope": "dependencies",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:bazel/googletest@1.14.0",
+        "extracted_requirement": "1.14.0",
+        "scope": "dev",
+        "is_runtime": false,
+        "is_optional": true,
+        "is_pinned": true,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:bazel/abseil-cpp@20230802.0",
+        "extracted_requirement": "20230802.0",
+        "scope": "dependencies",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": true,
+        "extra_data": {
+          "repo_name": "com_google_absl"
+        }
+      }
+    ],
+    "datasource_id": "bazel_module",
+    "purl": "pkg:bazel/my_sample_project@0.5.0"
+  }
+]
