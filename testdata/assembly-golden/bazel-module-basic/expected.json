@@ -1,0 +1,53 @@
+{
+  "packages": [
+    {
+      "type": "bazel",
+      "name": "my_sample_project",
+      "version": "0.5.0",
+      "parties": [],
+      "extra_data": {
+        "compatibility_level": 1
+      },
+      "purl": "pkg:bazel/my_sample_project@0.5.0",
+      "package_uid": "pkg:bazel/my_sample_project@0.5.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "datafile_paths": ["MODULE.bazel"],
+      "datasource_ids": ["bazel_module"]
+    }
+  ],
+  "dependencies": [
+    {
+      "purl": "pkg:bazel/rules_go@0.41.0",
+      "extracted_requirement": "0.41.0",
+      "scope": "dependencies",
+      "is_runtime": true,
+      "is_optional": false,
+      "is_pinned": true,
+      "is_direct": true,
+      "dependency_uid": "pkg:bazel/rules_go@0.41.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "for_package_uid": "pkg:bazel/my_sample_project@0.5.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "datafile_path": "MODULE.bazel",
+      "datasource_id": "bazel_module"
+    },
+    {
+      "purl": "pkg:bazel/rules_python@0.24.0",
+      "extracted_requirement": "0.24.0",
+      "scope": "dependencies",
+      "is_runtime": true,
+      "is_optional": false,
+      "is_pinned": true,
+      "is_direct": true,
+      "dependency_uid": "pkg:bazel/rules_python@0.24.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "for_package_uid": "pkg:bazel/my_sample_project@0.5.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "datafile_path": "MODULE.bazel",
+      "datasource_id": "bazel_module"
+    }
+  ],
+  "files_with_packages": [
+    {
+      "path": "MODULE.bazel",
+      "for_packages": [
+        "pkg:bazel/my_sample_project@0.5.0?uuid=fixed-uid-done-for-testing-5642512d1758"
+      ]
+    }
+  ]
+}
