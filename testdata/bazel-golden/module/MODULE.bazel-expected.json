@@ -5,7 +5,8 @@
     "version": "0.5.0",
     "parties": [],
     "extra_data": {
-      "compatibility_level": 1
+      "compatibility_level": 1,
+      "bazel_compatibility": [">=7.0.0", "<9.0.0"]
     },
     "dependencies": [
       {
@@ -15,7 +16,10 @@
         "is_runtime": true,
         "is_optional": false,
         "is_pinned": true,
-        "is_direct": true
+        "is_direct": true,
+        "extra_data": {
+          "registry": "https://registry.bazel.build"
+        }
       },
       {
         "purl": "pkg:bazel/rules_go@0.41.0",
