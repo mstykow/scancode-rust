@@ -539,6 +539,14 @@ mod tests {
     }
 
     #[test]
+    fn test_assembly_bazel_module_basic() {
+        match run_assembly_golden_test("bazel-module-basic") {
+            Ok(_) => (),
+            Err(e) => panic!("Assembly golden test failed for bazel-module-basic: {}", e),
+        }
+    }
+
+    #[test]
     fn test_assembly_cargo_workspace() {
         match run_assembly_golden_test("cargo-workspace") {
             Ok(_) => (),

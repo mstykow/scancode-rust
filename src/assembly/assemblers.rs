@@ -338,6 +338,11 @@ pub static ASSEMBLERS: &[AssemblerConfig] = &[
         sibling_file_patterns: &["BUILD"],
         mode: AssemblyMode::SiblingMerge,
     },
+    AssemblerConfig {
+        datasource_ids: &[DatasourceId::BazelModule],
+        sibling_file_patterns: &["MODULE.bazel"],
+        mode: AssemblyMode::OnePerPackageData,
+    },
     // Buck (build system)
     AssemblerConfig {
         datasource_ids: &[DatasourceId::BuckFile, DatasourceId::BuckMetadata],
