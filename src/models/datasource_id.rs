@@ -54,6 +54,7 @@ pub enum DatasourceId {
 
     // ── Bazel ──
     BazelBuild,
+    BazelModule,
 
     // ── Bower ──
     BowerJson,
@@ -367,6 +368,7 @@ impl DatasourceId {
             Self::DenoJson => "deno_json",
             Self::DenoLock => "deno_lock",
             Self::Dockerfile => "dockerfile",
+            Self::BazelModule => "bazel_module",
 
             // FreeBSD
             Self::FreebsdCompactManifest => "freebsd_compact_manifest",

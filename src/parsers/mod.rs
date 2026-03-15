@@ -10,6 +10,10 @@ mod autotools;
 #[cfg(test)]
 mod autotools_test;
 mod bazel;
+#[cfg(all(test, feature = "golden-tests"))]
+mod bazel_module_golden_test;
+#[cfg(test)]
+mod bazel_module_test;
 #[cfg(test)]
 mod bazel_test;
 mod bower;
@@ -319,7 +323,7 @@ pub trait PackageParser {
 pub use self::about::AboutFileParser;
 pub use self::alpine::{AlpineApkParser, AlpineApkbuildParser, AlpineInstalledParser};
 pub use self::autotools::AutotoolsConfigureParser;
-pub use self::bazel::BazelBuildParser;
+pub use self::bazel::{BazelBuildParser, BazelModuleParser};
 pub use self::bower::BowerJsonParser;
 pub use self::buck::{BuckBuildParser, BuckMetadataBzlParser};
 pub use self::cargo::CargoParser;
@@ -458,6 +462,7 @@ register_package_handlers! {
         AlpineInstalledParser,
         AutotoolsConfigureParser,
         BazelBuildParser,
+        BazelModuleParser,
         BowerJsonParser,
         BuckBuildParser,
         BuckMetadataBzlParser,
