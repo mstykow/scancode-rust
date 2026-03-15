@@ -238,7 +238,7 @@ Python `develop` already emits Alpine commit URLs as `git+https://...`, and Rust
 ### After
 
 - `c:<commit>` now becomes:
-  - `git+https://git.alpinelinux.org/aports/commit/?id=<commit>`
+  - `git+https://git.alpinelinux.org/aports/commit/?id={commit}`
 
 ## Improvement 5: Fileless Package Detection Proof
 

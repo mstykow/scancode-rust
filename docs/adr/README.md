@@ -23,17 +23,33 @@ Each ADR follows a consistent structure:
 
 ## Index of ADRs
 
-| ADR                                     | Title                              | Status   | Date       |
-| --------------------------------------- | ---------------------------------- | -------- | ---------- |
-| [0001](0001-trait-based-parsers.md)     | Trait-Based Parser Architecture    | Accepted | 2026-02-08 |
-| [0002](0002-extraction-vs-detection.md) | Extraction vs Detection Separation | Accepted | 2026-02-08 |
-| [0003](0003-golden-test-strategy.md)    | Golden Test Strategy               | Accepted | 2026-02-08 |
-| [0004](0004-security-first-parsing.md)  | Security-First Parsing             | Accepted | 2026-02-08 |
-| [0005](0005-auto-generated-docs.md)     | Auto-Generated Documentation       | Accepted | 2026-02-08 |
+| ADR                                                  | Title                                           | Status   | Date       |
+| ---------------------------------------------------- | ----------------------------------------------- | -------- | ---------- |
+| [0001](0001-trait-based-parsers.md)                  | Trait-Based Parser Architecture                 | Accepted | 2026-02-08 |
+| [0002](0002-extraction-vs-detection.md)              | Extraction vs Detection Separation              | Accepted | 2026-02-08 |
+| [0003](0003-golden-test-strategy.md)                 | Golden Test Strategy                            | Accepted | 2026-02-08 |
+| [0004](0004-security-first-parsing.md)               | Security-First Parsing                          | Accepted | 2026-02-08 |
+| [0005](0005-auto-generated-docs.md)                  | Auto-Generated Documentation                    | Accepted | 2026-02-08 |
+| [0006](0006-datasourceid-driven-package-assembly.md) | DatasourceId-Driven Multi-Pass Package Assembly | Accepted | 2026-03-14 |
+
+## When to Create a New ADR
+
+Create an ADR when a decision is:
+
+- **Cross-cutting** - affects multiple modules, subsystems, or contributor workflows
+- **Durable** - expected to stay true long enough that future contributors will need the rationale
+- **Constraint-setting** - defines rules, contracts, or invariants other work must follow
+- **Trade-off heavy** - reasonable alternatives existed and the choice needs justification
+
+Avoid new ADRs for:
+
+- Single-parser implementation details
+- Temporary transition states that are still actively changing
+- Small refactors without project-wide consequences
 
 ## Creating a New ADR
 
-1. Copy the template: `cp template.md 000N-short-title.md`
+1. Copy the template: `cp docs/adr/template.md docs/adr/000N-short-title.md`
 2. Fill in the sections with your decision context and rationale
 3. Update this README with the new entry
 4. Submit for review via pull request

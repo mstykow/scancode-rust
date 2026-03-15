@@ -17,11 +17,11 @@ This index helps you find the right documentation for your needs.
 
 ### Design Decisions
 
-- **[adr/](adr/)** - Architectural Decision Records
+- **[adr/README.md](adr/README.md)** - Architectural Decision Records index and guidance
 
 ### Beyond-Parity Features
 
-- **[improvements/](improvements/)** - Features where Rust exceeds Python
+- **[improvements/README.md](improvements/README.md)** - Beyond-parity improvements index and per-area links
 
 ## For Maintainers
 
@@ -57,10 +57,10 @@ docs/
 → [SUPPORTED_FORMATS.md](SUPPORTED_FORMATS.md)
 
 **...understand a design decision**
-→ [adr/](adr/)
+→ [adr/README.md](adr/README.md)
 
 **...see where Rust exceeds Python**
-→ [improvements/](improvements/)
+→ [improvements/README.md](improvements/README.md)
 
 **...track implementation quality and behavior**
 → [TESTING_STRATEGY.md](TESTING_STRATEGY.md)
@@ -73,8 +73,8 @@ docs/
 - **HOW_TO_ADD_A_PARSER.md** - Updated as parser patterns change
 - **TESTING_STRATEGY.md** - Updated as testing approach evolves
 - **SUPPORTED_FORMATS.md** - Auto-generated, always current
-- **adr/** - Immutable once written (new ADRs added as needed)
-- **improvements/** - Documents added as beyond-parity features are implemented
+- **adr/README.md** - ADR index; individual ADRs are immutable once written
+- **improvements/README.md** - Landing page for beyond-parity improvement documents
 
 ## Contributing
 

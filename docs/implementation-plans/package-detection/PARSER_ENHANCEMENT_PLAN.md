@@ -435,7 +435,7 @@ Current status (March 11, 2026):
 
 - Local work now includes a static `APKBUILD` parser with local fixture-backed coverage for `icu` and `linux-firmware`.
 - The `custom:multiple` APKBUILD license case now preserves raw `matched_text` while still normalizing declared license fields.
-- Installed package commit metadata now emits `git+https://git.alpinelinux.org/aports/commit/?id=...` VCS URLs.
+- Installed package commit metadata now emits `git+https://git.alpinelinux.org/aports/commit/?id={commit}` VCS URLs.
 - Fileless Alpine packages are now explicitly covered by regression tests so they are not silently dropped.
 - Alpine parser golden coverage now includes both installed-db and APKBUILD fixtures.
 - PR #314 (`fix(alpine): complete the Alpine enhancement batch`) captures the completed implementation batch.
