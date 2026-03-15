@@ -1,0 +1,78 @@
+{
+  "packages": [
+    {
+      "type": "golang",
+      "namespace": "example.com",
+      "name": "mymodule",
+      "primary_language": "Go",
+      "parties": [],
+      "homepage_url": "https://pkg.go.dev/example.com/mymodule",
+      "vcs_url": "https://example.com/mymodule.git",
+      "extra_data": {
+        "go_version": "1.21"
+      },
+      "repository_homepage_url": "https://pkg.go.dev/example.com/mymodule",
+      "purl": "pkg:golang/example.com/mymodule",
+      "package_uid": "pkg:golang/example.com/mymodule?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "datafile_paths": ["mymodule/go.mod"],
+      "datasource_ids": ["go_mod"]
+    },
+    {
+      "type": "golang",
+      "namespace": "example.com",
+      "name": "project",
+      "primary_language": "Go",
+      "parties": [],
+      "homepage_url": "https://pkg.go.dev/example.com/project",
+      "vcs_url": "https://example.com/project.git",
+      "extra_data": {
+        "go_version": "1.21",
+        "use_paths": ["./mymodule"]
+      },
+      "repository_homepage_url": "https://pkg.go.dev/example.com/project",
+      "purl": "pkg:golang/example.com/project",
+      "package_uid": "pkg:golang/example.com/project?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "datafile_paths": ["go.mod", "go.work"],
+      "datasource_ids": ["go_mod", "go_work"]
+    }
+  ],
+  "dependencies": [
+    {
+      "purl": "pkg:golang/example.com/mymodule",
+      "extracted_requirement": "./mymodule",
+      "scope": "use",
+      "is_runtime": true,
+      "is_optional": false,
+      "is_pinned": false,
+      "is_direct": true,
+      "extra_data": {
+        "workspace_path": "./mymodule",
+        "workspace_module_path": "example.com/mymodule"
+      },
+      "dependency_uid": "pkg:golang/example.com/mymodule?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "for_package_uid": "pkg:golang/example.com/project?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "datafile_path": "go.work",
+      "datasource_id": "go_work"
+    }
+  ],
+  "files_with_packages": [
+    {
+      "path": "go.mod",
+      "for_packages": [
+        "pkg:golang/example.com/project?uuid=fixed-uid-done-for-testing-5642512d1758"
+      ]
+    },
+    {
+      "path": "go.work",
+      "for_packages": [
+        "pkg:golang/example.com/project?uuid=fixed-uid-done-for-testing-5642512d1758"
+      ]
+    },
+    {
+      "path": "mymodule/go.mod",
+      "for_packages": [
+        "pkg:golang/example.com/mymodule?uuid=fixed-uid-done-for-testing-5642512d1758"
+      ]
+    }
+  ]
+}
