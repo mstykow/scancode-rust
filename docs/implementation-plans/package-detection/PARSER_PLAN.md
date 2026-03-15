@@ -162,7 +162,7 @@ These require specialized crates and have low ROI. Even Python does not fully pa
 
 ---
 
-## Future: Missing purl-spec Ecosystems Not Yet Backed By Open GitHub Issues
+## Future: Missing purl-spec And Other High-Signal Ecosystems Not Yet Backed By Open GitHub Issues
 
 The previous plan listed purl-spec types that neither Python nor Rust handled. Some of those are now covered by explicit GitHub issues and therefore moved into the issue-driven sections above:
 
@@ -188,11 +188,7 @@ The remaining notable purl types without a dedicated open parser issue are:
 | `qpkg`             | QNAP NAS      | Proprietary format                              | N/A      | Very niche and format-specific.                                                                                                                           |
 | `vscode-extension` | VS Code       | `package.json` with `engines.vscode`            | N/A      | Effectively a subset of the existing npm parser family.                                                                                                   |
 
----
-
-## Additional High-Signal Parser Gaps Not Yet Reflected In The GitHub Backlog
-
-The review that promoted Bun also surfaced several **concrete manifest / lockfile gaps that are not currently represented in the open upstream issue backlog at all**. These are worth tracking here so they do not stay invisible simply because no canonical GitHub issue exists yet.
+The same review that promoted Bun also surfaced several **concrete manifest / lockfile gaps that are not currently represented in the open upstream issue backlog at all**. These are worth tracking in this future-looking section so they do not stay invisible simply because no canonical GitHub issue exists yet.
 
 These candidates were screened to ensure they are:
 
@@ -201,7 +197,7 @@ These candidates were screened to ensure they are:
 - backed by a clear manifest or lockfile format rather than loose metadata, and
 - large enough in OSS usage to merit at least **high-medium** attention.
 
-### Strongest Newly Identified Gaps
+### Additional High-Signal Non-purl Gaps
 
 | Opportunity                      | Manifest files / detection signals                          | Priority    | Why it matters now                                                                                                                                                                       | Current overlap / notes                                                                                                                                                                                                                                         |
 | -------------------------------- | ----------------------------------------------------------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
