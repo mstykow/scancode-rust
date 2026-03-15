@@ -63,7 +63,7 @@ All production handlers in the original plan scope are covered. Some ecosystems 
 | Linux Distro          | ✅ Implemented | `OsReleaseParser` ⭐ fixes name logic bug + extracts URLs                                |
 | Maven/Java            | ✅ Implemented | `pom.xml`, `MANIFEST.MF`, ⭐ OSGi metadata + SCM/CI/issue management                     |
 | npm/yarn/pnpm         | ✅ Implemented | Consolidates v1/v2 yarn, shrinkwrap variants + workspace assembly                        |
-| NuGet                 | ✅ Implemented | ⭐ Beyond parity: added `PackagesConfigParser`                                           |
+| NuGet                 | ✅ Implemented | ⭐ Beyond parity: added `PackagesConfigParser` and `DotNetDepsJsonParser`                |
 | OCaml/opam            | ✅ Implemented | `OpamParser`                                                                             |
 | PHP/Composer          | ✅ Implemented | `ComposerJsonParser`, `ComposerLockParser` ⭐ extra provenance fields                    |
 | Python/PyPI           | ✅ Implemented | Consolidates many handlers, includes `pip-inspect.deplock`, `uv.lock`, and `pylock.toml` |
@@ -84,9 +84,8 @@ The tables below classify the current open `package-parsing` / `new-parser` issu
 
 These issues now combine the strongest intrinsic value with visible upstream implementation momentum.
 
-| Issue Set | Opportunity        | Why this creates value                                                                                                                            | Current overlap / notes                                                                                     |
-| --------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| #117      | NuGet `.deps.json` | Adds dependency evidence often found beside compiled .NET outputs, improving scan quality in built application trees where manifests are missing. | Complements existing `.nuspec`, `packages.config`, project-file, and lockfile coverage; PR `#4803` is open. |
+| Issue Set | Opportunity | Why this creates value | Current overlap / notes |
+| --------- | ----------- | ---------------------- | ----------------------- |
 
 ### Medium-Value Opportunities
 

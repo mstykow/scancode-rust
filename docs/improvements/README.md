@@ -106,7 +106,7 @@ Most areas with improvements have a dedicated document. Cross-cutting security h
 - **[cpan-makefile-pl-parser.md](cpan-makefile-pl-parser.md)** — ✨ New Feature: Makefile.PL WriteMakefile extraction (Python has no parse method)
 - **[osgi-manifest-parser.md](osgi-manifest-parser.md)** — ✨ New Feature: OSGi bundle metadata extraction (Python has empty patterns)
 - **[maven-parser.md](maven-parser.md)** — 🐛 Bug Fix + ✨ New Feature + 🔍 Enhanced Extraction: structured licenses, dependencyManagement/relocation/qualifier support, Maven 4.1.0 coverage, and richer normalized metadata
-- **[nuget-parser.md](nuget-parser.md)** — 🐛 Bug Fix + ✨ New Feature + 🔍 Enhanced Extraction: modern nuspec license hints, `.nupkg` license-file extraction, and support for legacy/project-style NuGet manifests
+- **[nuget-parser.md](nuget-parser.md)** — 🐛 Bug Fix + ✨ New Feature + 🔍 Enhanced Extraction: modern nuspec license hints, `.nupkg` license-file extraction, `.deps.json` runtime graph parsing, and support for legacy/project-style NuGet manifests
 - **[cargo-parser.md](cargo-parser.md)** — 🐛 Bug Fix + ✨ New Feature + 🔍 Enhanced Extraction: crate/workspace file ownership, lowercase Cargo file matching, and `readme`/`publish` manifest parity
 - **[go-parser.md](go-parser.md)** — 🐛 Bug Fix + ✨ New Feature + 🔍 Enhanced Extraction: `go.mod graph` support, replace-directive coverage, and Go test/build source categorization
 - **[conda-parser.md](conda-parser.md)** — 🐛 Bug Fix + ✨ New Feature + 🔍 Enhanced Extraction: `conda-meta` file assignment, parser golden coverage for installed-package JSON, and channel-vs-channel_url disambiguation
