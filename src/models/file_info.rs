@@ -679,7 +679,17 @@ impl Package {
         fill_if_empty!(other_license_expression_spdx);
         fill_if_empty!(extracted_license_statement);
         fill_if_empty!(notice_text);
-        fill_if_empty!(extra_data);
+        match (&mut self.extra_data, &package_data.extra_data) {
+            (None, Some(extra_data)) => {
+                self.extra_data = Some(extra_data.clone());
+            }
+            (Some(existing), Some(incoming)) => {
+                for (key, value) in incoming {
+                    existing.entry(key.clone()).or_insert_with(|| value.clone());
+                }
+            }
+            _ => {}
+        }
         fill_if_empty!(repository_homepage_url);
         fill_if_empty!(repository_download_url);
         fill_if_empty!(api_data_url);
