@@ -99,6 +99,8 @@ mod go_golden_test;
 mod go_mod_graph;
 #[cfg(test)]
 mod go_test;
+#[cfg(test)]
+mod go_work_test;
 mod gradle;
 #[cfg(all(test, feature = "golden-tests"))]
 mod gradle_golden_test;
@@ -345,7 +347,7 @@ pub use self::deno_lock::DenoLockParser;
 pub use self::docker::DockerfileParser;
 pub use self::freebsd::FreebsdCompactManifestParser;
 pub use self::gitmodules::GitmodulesParser;
-pub use self::go::{GoModParser, GoSumParser, GodepsParser};
+pub use self::go::{GoModParser, GoSumParser, GoWorkParser, GodepsParser};
 pub use self::go_mod_graph::GoModGraphParser;
 pub use self::gradle::GradleParser;
 pub use self::gradle_lock::GradleLockfileParser;
@@ -504,6 +506,7 @@ register_package_handlers! {
         GoModParser,
         GoModGraphParser,
         GoSumParser,
+        GoWorkParser,
         GradleLockfileParser,
         GradleParser,
         GradleModuleParser,
