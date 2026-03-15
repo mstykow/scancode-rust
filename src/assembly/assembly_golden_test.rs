@@ -507,6 +507,17 @@ mod tests {
     }
 
     #[test]
+    fn test_assembly_nuget_deps_json_basic() {
+        match run_assembly_golden_test("nuget-deps-json-basic") {
+            Ok(_) => (),
+            Err(e) => panic!(
+                "Assembly golden test failed for nuget-deps-json-basic: {}",
+                e
+            ),
+        }
+    }
+
+    #[test]
     fn test_assembly_npm_workspace() {
         match run_assembly_golden_test("npm-workspace") {
             Ok(_) => (),

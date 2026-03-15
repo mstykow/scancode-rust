@@ -264,6 +264,11 @@ pub static ASSEMBLERS: &[AssemblerConfig] = &[
         ],
         mode: AssemblyMode::SiblingMerge,
     },
+    AssemblerConfig {
+        datasource_ids: &[DatasourceId::NugetDepsJson],
+        sibling_file_patterns: &["*.deps.json"],
+        mode: AssemblyMode::OnePerPackageData,
+    },
     // Swift/SPM ecosystem
     AssemblerConfig {
         datasource_ids: &[

@@ -1,0 +1,23 @@
+{
+  "runtimeTarget": {
+    "name": ".NETCoreApp,Version=v8.0/win-x64",
+    "signature": "signature-value"
+  },
+  "targets": {
+    ".NETCoreApp,Version=v8.0/win-x64": {
+      "ExampleApp/1.0.0": {
+        "dependencies": {
+          "Newtonsoft.Json": "13.0.1",
+          "Serilog": "2.12.0"
+        }
+      },
+      "Newtonsoft.Json/13.0.1": {},
+      "Serilog/2.12.0": {}
+    }
+  },
+  "libraries": {
+    "ExampleApp/1.0.0": { "type": "project" },
+    "Newtonsoft.Json/13.0.1": { "type": "package" },
+    "Serilog/2.12.0": { "type": "package" }
+  }
+}
