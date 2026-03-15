@@ -22,6 +22,11 @@ mod bower_test;
 mod buck;
 #[cfg(test)]
 mod buck_test;
+mod bun_lock;
+#[cfg(all(test, feature = "golden-tests"))]
+mod bun_lock_golden_test;
+#[cfg(test)]
+mod bun_lock_test;
 mod cargo;
 #[cfg(all(test, feature = "golden-tests"))]
 mod cargo_golden_test;
@@ -326,6 +331,7 @@ pub use self::autotools::AutotoolsConfigureParser;
 pub use self::bazel::{BazelBuildParser, BazelModuleParser};
 pub use self::bower::BowerJsonParser;
 pub use self::buck::{BuckBuildParser, BuckMetadataBzlParser};
+pub use self::bun_lock::BunLockParser;
 pub use self::cargo::CargoParser;
 #[cfg_attr(not(test), allow(unused_imports))]
 pub use self::cargo_lock::CargoLockParser;
@@ -464,6 +470,7 @@ register_package_handlers! {
         BazelBuildParser,
         BazelModuleParser,
         BowerJsonParser,
+        BunLockParser,
         BuckBuildParser,
         BuckMetadataBzlParser,
         CargoLockParser,

@@ -67,6 +67,8 @@ pub enum DatasourceId {
     #[serde(rename = "buck_metadata")]
     BuckMetadata,
 
+    BunLock,
+
     // ── Cargo/Rust ──
     CargoLock,
     CargoToml,
@@ -420,6 +422,7 @@ impl DatasourceId {
             Self::MeteorPackage => "meteor_package",
 
             // npm
+            Self::BunLock => "bun_lock",
             Self::NpmPackageJson => "npm_package_json",
             Self::NpmPackageLockJson => "npm_package_lock_json",
 
