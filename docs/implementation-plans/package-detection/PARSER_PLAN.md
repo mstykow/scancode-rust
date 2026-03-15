@@ -190,6 +190,40 @@ The remaining notable purl types without a dedicated open parser issue are:
 
 ---
 
+## Additional High-Signal Parser Gaps Not Yet Reflected In The GitHub Backlog
+
+The review that promoted Bun also surfaced several **concrete manifest / lockfile gaps that are not currently represented in the open upstream issue backlog at all**. These are worth tracking here so they do not stay invisible simply because no canonical GitHub issue exists yet.
+
+These candidates were screened to ensure they are:
+
+- not already implemented in `src/parsers/` or `docs/SUPPORTED_FORMATS.md`,
+- not already listed elsewhere in this plan,
+- backed by a clear manifest or lockfile format rather than loose metadata, and
+- large enough in OSS usage to merit at least **high-medium** attention.
+
+### Strongest Newly Identified Gaps
+
+| Opportunity                      | Manifest files / detection signals                          | Priority    | Why it matters now                                                                                                                                                                       | Current overlap / notes                                                                                                                                                                                                                                         |
+| -------------------------------- | ----------------------------------------------------------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Modern vcpkg manifest mode       | `vcpkg.json`, `vcpkg-configuration.json`, `vcpkg-lock.json` | High        | vcpkg now recommends manifest mode for most users, and the JSON manifest family carries clear package identity, dependency, feature, and registry semantics for a large C/C++ ecosystem. | The existing GitHub-tracked vcpkg row only covers legacy `portfile.cmake` / `CONTROL` work. This newer manifest-mode family is a separate and likely higher-value gap that should get its own upstream issue.                                                   |
+| NuGet Central Package Management | `Directory.Packages.props`                                  | High        | Central package management is now common in large modern .NET repos and materially improves dependency graph capture by centralizing PackageReference versions.                          | This is a genuine missing piece inside an otherwise strong NuGet family: Rust already supports `*.csproj`, `*.fsproj`, `*.vbproj`, `packages.lock.json`, `project.json`, and `project.lock.json`, but not the central version file that many repos now rely on. |
+| Helm charts                      | `Chart.yaml`, `Chart.lock`                                  | High-Medium | Helm charts are first-class packages in the Kubernetes ecosystem, and `Chart.lock` adds explicit dependency-state value rather than just descriptive metadata.                           | Treat this as package parsing, not generic deployment config. The lack of a purl-specific row or upstream issue should not hide its real ecosystem reach across many major OSS repos.                                                                           |
+| Pixi                             | `pixi.toml`, `pixi.lock`                                    | High-Medium | Pixi is a fast-growing reproducible environment manager with a crisp manifest+lockfile model and strong adjacency to already-covered Python/Conda package detection work.                | This is the same kind of modern ecosystem follow-on that Bun represented: easy to miss in parity-focused planning even though it is clearly becoming part of real-world repos.                                                                                  |
+| Clojure manifests                | `deps.edn`, `project.clj`                                   | High-Medium | These are bona fide dependency manifests for an established JVM ecosystem and would close a JVM-family blind spot not covered by Maven/Gradle/SBT.                                       | Best tracked as one ecosystem row even though it spans the Clojure CLI and Leiningen toolchains. The current roadmap already recognizes JVM follow-ons such as SBT and Ivy, making this omission more noticeable.                                               |
+
+### Next Tier From The Same Review
+
+These also appear to be real parser gaps, but they currently rank below the group above on combined ecosystem size, adjacency, or clarity of package semantics.
+
+| Opportunity       | Manifest files / detection signals | Priority | Notes                                                                                                                                     |
+| ----------------- | ---------------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| R `renv` lockfile | `renv.lock`                        | Medium   | Real reproducible-environment lockfile with clear structure, but narrower and more lockfile-only than the top group.                      |
+| Paket             | `paket.dependencies`, `paket.lock` | Medium   | Valid .NET dependency workflow, but secondary in impact compared with `Directory.Packages.props` and the rest of the modern NuGet family. |
+
+When one of these gaps becomes active work, prefer creating a dedicated upstream issue first so the issue-driven sections above can absorb it cleanly in the next backlog refresh.
+
+---
+
 ## Quality Gates
 
 Every new handler must satisfy:
