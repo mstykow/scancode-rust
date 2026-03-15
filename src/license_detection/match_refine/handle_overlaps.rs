@@ -51,7 +51,7 @@ pub fn filter_contained_matches(
         a.qstart()
             .cmp(&b.qstart())
             .then_with(|| b.hilen.cmp(&a.hilen))
-            .then_with(|| b.matched_length.cmp(&a.matched_length))
+            .then_with(|| b.len().cmp(&a.len()))
             .then_with(|| a.matcher_order().cmp(&b.matcher_order()))
     });
 
@@ -133,7 +133,7 @@ pub fn filter_overlapping_matches(
         a.qstart()
             .cmp(&b.qstart())
             .then_with(|| b.hilen.cmp(&a.hilen))
-            .then_with(|| b.matched_length.cmp(&a.matched_length))
+            .then_with(|| b.len().cmp(&a.len()))
             .then_with(|| a.matcher_order().cmp(&b.matcher_order()))
     });
 
@@ -161,8 +161,8 @@ pub fn filter_overlapping_matches(
                 continue;
             }
 
-            let next_len = matches[j].matched_length;
-            let current_len = matches[i].matched_length;
+            let next_len = matches[j].len();
+            let current_len = matches[i].len();
 
             if next_len == 0 || current_len == 0 {
                 j += 1;
@@ -182,11 +182,10 @@ pub fn filter_overlapping_matches(
             let medium_current = overlap_ratio_to_current >= OVERLAP_MEDIUM;
             let small_current = overlap_ratio_to_current >= OVERLAP_SMALL;
 
-            let current_len_val = matches[i].matched_length;
-            let next_len_val = matches[j].matched_length;
+            let current_len_val = matches[i].len();
+            let next_len_val = matches[j].len();
             let current_hilen = matches[i].hilen();
             let next_hilen = matches[j].hilen();
-
 
             // Note: We do NOT use candidate_resemblance for tie-breaking here.
             // candidate_resemblance is a GLOBAL measure based on multiset intersection
@@ -325,7 +324,7 @@ pub fn filter_overlapping_matches(
 
                     if cpo > 0 && cno > 0 {
                         let overlap_len = cpo + cno;
-                        let clen = matches[i].matched_length;
+                        let clen = matches[i].len();
 
                         if overlap_len as f64 >= clen as f64 * 0.9 {
                             discarded.push(matches.remove(i));
@@ -1105,7 +1104,7 @@ mod tests {
         // This was a bug where gfdl-1.1-plus (68.6%) was kept over gfdl-1.1 (78.7%)
         // because they had identical tokens, hilen, and matcher_order.
         let index = LicenseIndex::with_legalese_count(10);
-        
+
         let mut m1 = create_test_match("gfdl-1.1_13.RULE", 1, 10, 78.7, 78.7, 100);
         m1.start_token = 5;
         m1.end_token = 77;
@@ -1113,7 +1112,7 @@ mod tests {
         m1.hilen = 14;
         m1.matcher = "3-seq".to_string();
         m1.qspan_positions = Some((5..77).collect());
-        
+
         let mut m2 = create_test_match("gfdl-1.1-plus_5.RULE", 1, 10, 68.6, 68.6, 100);
         m2.start_token = 5;
         m2.end_token = 77;
@@ -1124,7 +1123,7 @@ mod tests {
 
         let matches = vec![m1, m2];
         let (kept, _discarded) = filter_overlapping_matches(matches, &index);
-        
+
         // Should keep the match with higher coverage (gfdl-1.1 at 78.7%)
         assert_eq!(kept.len(), 1);
         assert_eq!(kept[0].rule_identifier, "gfdl-1.1_13.RULE");

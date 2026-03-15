@@ -36,6 +36,39 @@ fn detect_fixture_matches(
         .expect("Detection should succeed")
 }
 
+fn summarize_raw_matches(matches: &[LicenseMatch]) -> Vec<(String, String, usize, usize)> {
+    matches
+        .iter()
+        .map(|m| {
+            (
+                m.rule_identifier.clone(),
+                m.matcher.clone(),
+                m.start_line,
+                m.end_line,
+            )
+        })
+        .collect()
+}
+
+fn assert_raw_match_present(
+    matches: &[LicenseMatch],
+    rule_identifier: &str,
+    matcher: &str,
+    start_line: usize,
+    end_line: usize,
+) {
+    assert!(
+        matches.iter().any(|m| {
+            m.rule_identifier == rule_identifier
+                && m.matcher == matcher
+                && m.start_line == start_line
+                && m.end_line == end_line
+        }),
+        "expected ({rule_identifier}, {matcher}, {start_line}, {end_line}) in {:?}",
+        summarize_raw_matches(matches)
+    );
+}
+
 fn make_test_match(
     matcher: &str,
     expression: &str,
@@ -659,7 +692,308 @@ fn test_spdx_complex2_html_matches_expected_expression() {
 }
 
 #[test]
-fn test_filter_redundant_same_expression_seq_containers_is_narrow() {
+fn test_png_h_detect_matches_match_python_raw_rules() {
+    let Some(engine) = create_engine_from_reference() else {
+        eprintln!("Skipping test: reference directory not found");
+        return;
+    };
+
+    let matches = detect_fixture_matches(
+        &engine,
+        "testdata/license-golden/datadriven/external/slic-tests/png.h",
+    );
+
+    assert_eq!(
+        matches.len(),
+        2,
+        "png.h should collapse to the two Python raw matches: {:?}",
+        summarize_raw_matches(&matches)
+    );
+
+    assert!(matches.iter().any(|m| {
+        m.rule_identifier == "libpng_27.RULE"
+            && m.matcher == crate::license_detection::aho_match::MATCH_AHO
+            && m.start_line == 8
+            && m.end_line == 8
+    }));
+    assert!(matches.iter().any(|m| {
+        m.rule_identifier == "libpng.SPDX.RULE"
+            && m.matcher == crate::license_detection::seq_match::MATCH_SEQ
+            && m.start_line == 297
+            && m.end_line == 401
+    }));
+    assert!(!matches.iter().any(|m| m.rule_identifier == "libpng_4.RULE"));
+    assert!(
+        !matches
+            .iter()
+            .any(|m| m.rule_identifier == "unknown-license-reference_301.RULE")
+    );
+}
+
+#[test]
+fn test_libevent_license_detect_matches_match_python_raw_rules() {
+    let Some(engine) = create_engine_from_reference() else {
+        eprintln!("Skipping test: reference directory not found");
+        return;
+    };
+
+    let matches = detect_fixture_matches(
+        &engine,
+        "testdata/license-golden/datadriven/lic3/libevent.LICENSE",
+    );
+
+    assert_eq!(
+        matches.len(),
+        7,
+        "libevent.LICENSE should keep the seven Python raw matches"
+    );
+
+    for (rule_identifier, start_line, end_line) in [
+        ("bsd-new_400.RULE", 1, 2),
+        ("bsd-new_98.RULE", 8, 28),
+        ("bsd-new_401.RULE", 31, 32),
+        ("isc_21.RULE", 57, 58),
+        ("isc_14.RULE", 63, 73),
+        ("mit_97.RULE", 77, 78),
+        ("mit.LICENSE", 83, 99),
+    ] {
+        assert!(matches.iter().any(|m| {
+            m.rule_identifier == rule_identifier
+                && m.matcher == crate::license_detection::aho_match::MATCH_AHO
+                && m.start_line == start_line
+                && m.end_line == end_line
+        }));
+    }
+
+    assert!(!matches.iter().any(|m| {
+        m.rule_identifier == "bsd-new_174.RULE"
+            || (m.license_expression == "bsd-new" && m.start_line == 1 && m.end_line == 33)
+    }));
+}
+
+#[test]
+fn test_zlib_txt_detect_matches_match_python_raw_rules() {
+    let Some(engine) = create_engine_from_reference() else {
+        eprintln!("Skipping test: reference directory not found");
+        return;
+    };
+
+    let matches = detect_fixture_matches(
+        &engine,
+        "testdata/license-golden/datadriven/external/OS-Licenses-master/zlib.txt",
+    );
+
+    let zlib_matches: Vec<_> = matches
+        .iter()
+        .filter(|m| m.license_expression == "zlib")
+        .collect();
+    assert_eq!(
+        zlib_matches.len(),
+        2,
+        "zlib.txt should keep the two Python raw zlib matches"
+    );
+
+    assert!(zlib_matches.iter().any(|m| {
+        m.rule_identifier == "zlib_92.RULE"
+            && m.matcher == crate::license_detection::aho_match::MATCH_AHO
+            && m.start_line == 1
+            && m.end_line == 1
+    }));
+    assert!(zlib_matches.iter().any(|m| {
+        m.rule_identifier == "zlib.LICENSE"
+            && m.matcher == crate::license_detection::aho_match::MATCH_AHO
+            && m.start_line == 4
+            && m.end_line == 12
+    }));
+    assert!(!zlib_matches.iter().any(|m| {
+        m.matcher == crate::license_detection::seq_match::MATCH_SEQ
+            && m.start_line == 1
+            && m.end_line == 12
+    }));
+}
+
+#[test]
+fn test_notice_txt_detect_matches_match_python_raw_rules() {
+    let Some(engine) = create_engine_from_reference() else {
+        eprintln!("Skipping test: reference directory not found");
+        return;
+    };
+
+    let matches = detect_fixture_matches(
+        &engine,
+        "testdata/license-golden/datadriven/external/slic-tests/2/NOTICE.txt",
+    );
+
+    assert_eq!(
+        matches.len(),
+        2,
+        "NOTICE.txt should keep the two Python raw IJG matches: {:?}",
+        summarize_raw_matches(&matches)
+    );
+
+    assert_raw_match_present(
+        &matches,
+        "ijg_13.RULE",
+        crate::license_detection::aho_match::MATCH_AHO,
+        1,
+        8,
+    );
+    assert_raw_match_present(
+        &matches,
+        "ijg_9.RULE",
+        crate::license_detection::aho_match::MATCH_AHO,
+        11,
+        38,
+    );
+}
+
+#[test]
+fn test_not_spdx_detect_matches_match_python_raw_rules() {
+    let Some(engine) = create_engine_from_reference() else {
+        eprintln!("Skipping test: reference directory not found");
+        return;
+    };
+
+    let matches = detect_fixture_matches(
+        &engine,
+        "testdata/license-golden/datadriven/external/spdx/not-spdx",
+    );
+
+    assert_eq!(
+        matches.len(),
+        3,
+        "not-spdx should keep the three Python raw AHO matches: {:?}",
+        summarize_raw_matches(&matches)
+    );
+
+    assert_raw_match_present(
+        &matches,
+        "gpl-3.0-plus_98.RULE",
+        crate::license_detection::aho_match::MATCH_AHO,
+        3,
+        6,
+    );
+    assert_raw_match_present(
+        &matches,
+        "gpl-1.0-plus_421.RULE",
+        crate::license_detection::aho_match::MATCH_AHO,
+        8,
+        11,
+    );
+    assert_raw_match_present(
+        &matches,
+        "gpl-3.0-plus_50.RULE",
+        crate::license_detection::aho_match::MATCH_AHO,
+        13,
+        13,
+    );
+}
+
+#[test]
+fn test_openssh_license_detect_matches_match_python_raw_rules() {
+    let Some(engine) = create_engine_from_reference() else {
+        eprintln!("Skipping test: reference directory not found");
+        return;
+    };
+
+    let matches = detect_fixture_matches(
+        &engine,
+        "testdata/license-golden/datadriven/lic4/openssh.LICENSE",
+    );
+
+    assert_eq!(
+        matches.len(),
+        13,
+        "openssh.LICENSE should keep the thirteen Python raw matches: {:?}",
+        summarize_raw_matches(&matches)
+    );
+
+    for (rule_identifier, matcher, start_line, end_line) in [
+        (
+            "bsd-new_and_other-permissive_4.RULE",
+            crate::license_detection::aho_match::MATCH_AHO,
+            3,
+            7,
+        ),
+        (
+            "tatu-ylonen2.RULE",
+            crate::license_detection::aho_match::MATCH_AHO,
+            13,
+            76,
+        ),
+        (
+            "gary-s-brown.LICENSE",
+            crate::license_detection::aho_match::MATCH_AHO,
+            83,
+            84,
+        ),
+        (
+            "bsd-new_1023.RULE",
+            crate::license_detection::aho_match::MATCH_AHO,
+            88,
+            88,
+        ),
+        (
+            "other-permissive_kalle-kaukonen_4.RULE",
+            crate::license_detection::aho_match::MATCH_AHO,
+            94,
+            102,
+        ),
+        (
+            "other-permissive_kalle-kaukonen_2.RULE",
+            crate::license_detection::seq_match::MATCH_SEQ,
+            108,
+            114,
+        ),
+        (
+            "ssh-keyscan.LICENSE",
+            crate::license_detection::aho_match::MATCH_AHO,
+            113,
+            115,
+        ),
+        (
+            "public-domain_73.RULE",
+            crate::license_detection::aho_match::MATCH_AHO,
+            119,
+            120,
+        ),
+        (
+            "public-domain-disclaimer.LICENSE",
+            crate::license_detection::aho_match::MATCH_AHO,
+            130,
+            142,
+        ),
+        (
+            "bsd-original-uc_5.RULE",
+            crate::license_detection::aho_match::MATCH_AHO,
+            145,
+            146,
+        ),
+        (
+            "bsd-original-uc_3.RULE",
+            crate::license_detection::aho_match::MATCH_AHO,
+            154,
+            180,
+        ),
+        (
+            "bsd-simplified_87.RULE",
+            crate::license_detection::aho_match::MATCH_AHO,
+            183,
+            184,
+        ),
+        (
+            "bsd-simplified_8.RULE",
+            crate::license_detection::aho_match::MATCH_AHO,
+            196,
+            214,
+        ),
+    ] {
+        assert_raw_match_present(&matches, rule_identifier, matcher, start_line, end_line);
+    }
+}
+
+#[test]
+fn test_filter_redundant_same_expression_seq_containers_drops_tiny_gap_unicode_wrapper() {
     let redundant_seq = make_test_match(
         crate::license_detection::seq_match::MATCH_SEQ,
         "unicode",
@@ -693,7 +1027,91 @@ fn test_filter_redundant_same_expression_seq_containers_is_narrow() {
         filtered.is_empty(),
         "expected tiny-gap redundant seq container to drop"
     );
+}
 
+#[test]
+fn test_filter_redundant_same_expression_seq_containers_drops_small_boundary_wrapper() {
+    let redundant_seq = make_test_match(
+        crate::license_detection::seq_match::MATCH_SEQ,
+        "bsd-new",
+        "bsd-new_174.RULE",
+        9,
+        25,
+        Some(vec![9, 10, 11, 12, 13, 15, 16, 17, 18, 19, 21, 22, 23, 24]),
+    );
+    let aho_first = make_test_match(
+        crate::license_detection::aho_match::MATCH_AHO,
+        "bsd-new",
+        "bsd-new_400.RULE",
+        10,
+        14,
+        None,
+    );
+    let aho_second = make_test_match(
+        crate::license_detection::aho_match::MATCH_AHO,
+        "bsd-new",
+        "bsd-new_98.RULE",
+        17,
+        20,
+        None,
+    );
+    let aho_third = make_test_match(
+        crate::license_detection::aho_match::MATCH_AHO,
+        "bsd-new",
+        "bsd-new_401.RULE",
+        22,
+        25,
+        None,
+    );
+
+    let filtered = filter_redundant_same_expression_seq_containers(
+        vec![redundant_seq],
+        &[aho_first, aho_second, aho_third],
+    );
+    assert!(
+        filtered.is_empty(),
+        "expected small bridge and boundary filler wrapper to drop"
+    );
+}
+
+#[test]
+fn test_filter_redundant_same_expression_seq_containers_keeps_material_boundary_wrapper() {
+    let material_seq = make_test_match(
+        crate::license_detection::seq_match::MATCH_SEQ,
+        "unicode",
+        "unicode_3.RULE",
+        1,
+        24,
+        Some(vec![
+            1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 16, 17, 18, 19, 20, 21, 22, 23,
+        ]),
+    );
+    let aho_first = make_test_match(
+        crate::license_detection::aho_match::MATCH_AHO,
+        "unicode",
+        "unicode_6.RULE",
+        10,
+        13,
+        None,
+    );
+    let aho_second = make_test_match(
+        crate::license_detection::aho_match::MATCH_AHO,
+        "unicode",
+        "unicode_8.RULE",
+        21,
+        24,
+        None,
+    );
+
+    let filtered = filter_redundant_same_expression_seq_containers(
+        vec![material_seq.clone()],
+        &[aho_first, aho_second],
+    );
+    assert_eq!(filtered, vec![material_seq]);
+}
+
+#[test]
+fn test_filter_redundant_same_expression_seq_containers_keeps_wide_gap_unicode_wrapper() {
     let wide_gap_seq = make_test_match(
         crate::license_detection::seq_match::MATCH_SEQ,
         "unicode",
@@ -701,6 +1119,22 @@ fn test_filter_redundant_same_expression_seq_containers_is_narrow() {
         10,
         19,
         Some(vec![10, 11, 12, 16, 17, 18]),
+    );
+    let aho_first = make_test_match(
+        crate::license_detection::aho_match::MATCH_AHO,
+        "unicode",
+        "unicode_6.RULE",
+        10,
+        13,
+        None,
+    );
+    let aho_second = make_test_match(
+        crate::license_detection::aho_match::MATCH_AHO,
+        "unicode",
+        "unicode_8.RULE",
+        21,
+        24,
+        None,
     );
 
     let filtered = filter_redundant_same_expression_seq_containers(
@@ -759,26 +1193,39 @@ fn test_spdx_complex_readme_detect_matches_recovers_bounded_notice_preamble_seq_
         return;
     };
 
-    let seq_matches: Vec<_> = detect_fixture_matches(
+    let matches = detect_fixture_matches(
         &engine,
         "testdata/license-golden/datadriven/external/spdx/complex-readme.txt",
-    )
-    .into_iter()
-    .filter(|m| m.matcher == crate::license_detection::seq_match::MATCH_SEQ)
-    .collect();
+    );
 
-    assert!(
-        seq_matches.iter().any(|m| {
-            m.license_expression.contains("epl-2.0 OR apache-2.0")
-                && m.start_line <= 14
-                && m.end_line < 28
-        }),
-        "expected a bounded seq notice match before section A, got: {:?}",
+    let seq_matches: Vec<_> = matches
+        .into_iter()
+        .filter(|m| m.matcher == crate::license_detection::seq_match::MATCH_SEQ)
+        .collect();
+
+    let target_expression = "((epl-2.0 OR apache-2.0) OR (gpl-2.0 WITH classpath-exception-2.0 AND gpl-2.0 WITH openjdk-exception)) AND unicode AND public-domain AND mit AND zlib AND zlib";
+    let bounded_notice_matches: Vec<_> = seq_matches
+        .iter()
+        .filter(|m| {
+            m.license_expression == target_expression && m.start_line == 5 && m.end_line == 25
+        })
+        .collect();
+
+    assert_eq!(
+        bounded_notice_matches.len(),
+        1,
+        "expected the Python raw bounded notice seq match, got: {:?}",
         seq_matches
             .iter()
-            .map(|m| (&m.license_expression, m.start_line, m.end_line, &m.matcher))
+            .map(|m| (&m.license_expression, &m.matcher, m.start_line, m.end_line))
             .collect::<Vec<_>>()
     );
+    assert_eq!(
+        bounded_notice_matches[0].matcher,
+        crate::license_detection::seq_match::MATCH_SEQ
+    );
+    assert_eq!(bounded_notice_matches[0].start_line, 5);
+    assert_eq!(bounded_notice_matches[0].end_line, 25);
 }
 
 #[test]
@@ -821,6 +1268,155 @@ fn test_spdx_complex_readme_detect_matches_keeps_nearby_embedded_matches() {
         expressions.contains(&"zlib"),
         "expected nearby zlib/CuTest matches to remain present: {:?}",
         expressions
+    );
+}
+
+#[test]
+fn test_spdx_complex_readme_detect_matches_match_python_raw_signature() {
+    let Some(engine) = create_engine_from_reference() else {
+        eprintln!("Skipping test: reference directory not found");
+        return;
+    };
+
+    let matches = detect_fixture_matches(
+        &engine,
+        "testdata/license-golden/datadriven/external/spdx/complex-readme.txt",
+    );
+    let composite_seq_expression = "((epl-2.0 OR apache-2.0) OR (gpl-2.0 WITH classpath-exception-2.0 AND gpl-2.0 WITH openjdk-exception)) AND unicode AND public-domain AND mit AND zlib AND zlib";
+    let composite_exact_expression = "epl-2.0 OR apache-2.0 OR gpl-2.0 WITH classpath-exception-2.0 OR gpl-2.0 WITH openjdk-exception";
+
+    assert_eq!(
+        matches.len(),
+        9,
+        "complex-readme raw matches should align with Python: {:?}",
+        summarize_raw_matches(&matches)
+    );
+
+    let bounded_composite_seq: Vec<_> = matches
+        .iter()
+        .filter(|m| {
+            m.license_expression == composite_seq_expression
+                && m.matcher == crate::license_detection::seq_match::MATCH_SEQ
+                && m.start_line == 5
+                && m.end_line == 25
+        })
+        .collect();
+    assert_eq!(
+        bounded_composite_seq.len(),
+        1,
+        "expected exactly one bounded composite seq match: {:?}",
+        summarize_raw_matches(&matches)
+    );
+
+    let composite_spdx_exact: Vec<_> = matches
+        .iter()
+        .filter(|m| {
+            m.license_expression == composite_exact_expression
+                && m.matcher == crate::license_detection::aho_match::MATCH_AHO
+                && m.start_line == 12
+                && m.end_line == 12
+        })
+        .collect();
+    assert_eq!(
+        composite_spdx_exact.len(),
+        1,
+        "expected exactly one composite SPDX/OpenJ9 exact match: {:?}",
+        summarize_raw_matches(&matches)
+    );
+
+    let epl_or_apache_exact: Vec<_> = matches
+        .iter()
+        .filter(|m| {
+            m.license_expression == "epl-2.0 OR apache-2.0"
+                && m.matcher == crate::license_detection::aho_match::MATCH_AHO
+                && m.start_line == 23
+                && m.end_line == 487
+        })
+        .collect();
+    assert_eq!(
+        epl_or_apache_exact.len(),
+        1,
+        "expected exactly one long epl/apache exact match: {:?}",
+        summarize_raw_matches(&matches)
+    );
+
+    for (expression, matcher, start_line, end_line) in [
+        (
+            "unicode",
+            crate::license_detection::aho_match::MATCH_AHO,
+            490,
+            496,
+        ),
+        (
+            "unicode",
+            crate::license_detection::aho_match::MATCH_AHO,
+            498,
+            506,
+        ),
+        (
+            "public-domain",
+            crate::license_detection::aho_match::MATCH_AHO,
+            509,
+            509,
+        ),
+        (
+            "mit",
+            crate::license_detection::aho_match::MATCH_AHO,
+            517,
+            534,
+        ),
+        (
+            "zlib",
+            crate::license_detection::aho_match::MATCH_AHO,
+            539,
+            556,
+        ),
+        (
+            "zlib",
+            crate::license_detection::aho_match::MATCH_AHO,
+            561,
+            578,
+        ),
+    ] {
+        assert!(
+            matches.iter().any(|m| {
+                m.license_expression == expression
+                    && m.matcher == matcher
+                    && m.start_line == start_line
+                    && m.end_line == end_line
+            }),
+            "expected ({expression}, {matcher}, {start_line}, {end_line}) in {:?}",
+            summarize_raw_matches(&matches)
+        );
+    }
+
+    assert_eq!(
+        matches
+            .iter()
+            .filter(|m| {
+                m.license_expression == composite_exact_expression
+                    && m.matcher == crate::license_detection::aho_match::MATCH_AHO
+            })
+            .count(),
+        1,
+        "unexpected duplicate composite exact match: {:?}",
+        summarize_raw_matches(&matches)
+    );
+
+    for expression in ["epl-1.0", "gpl-2.0", "apache-2.0"] {
+        assert!(
+            !matches.iter().any(|m| m.license_expression == expression),
+            "did not expect extra {expression} match in {:?}",
+            summarize_raw_matches(&matches)
+        );
+    }
+
+    assert!(
+        !matches.iter().any(|m| {
+            m.license_expression == "zlib" && (m.start_line < 539 || m.end_line < 556)
+        }),
+        "did not expect an extra early zlib match in {:?}",
+        summarize_raw_matches(&matches)
     );
 }
 

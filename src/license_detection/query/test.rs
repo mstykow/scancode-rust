@@ -288,8 +288,10 @@ mod tests {
     #[test]
     fn test_query_run_is_not_matchable_digits_only() {
         let mut index = create_query_test_index();
-        let _ = index.dictionary.get_or_assign("123");
-        let _ = index.dictionary.get_or_assign("456");
+        let tid_123 = index.dictionary.get_or_assign("123");
+        let tid_456 = index.dictionary.get_or_assign("456");
+        let _ = index.digit_only_tids.insert(tid_123);
+        let _ = index.digit_only_tids.insert(tid_456);
 
         let query = Query::new("123 456", &index).unwrap();
         let run = QueryRun::new(&query, 0, Some(1));
@@ -332,7 +334,6 @@ mod tests {
         assert!(!query.is_high_matchable(1));
         assert!(query.is_high_matchable(2));
     }
-
 
     #[test]
     fn test_query_new_lowercase_tokens() {
@@ -551,7 +552,8 @@ mod tests {
     #[test]
     fn test_query_run_is_digits_only_mixed() {
         let mut index = create_query_test_index();
-        let _ = index.dictionary.get_or_assign("123");
+        let tid_123 = index.dictionary.get_or_assign("123");
+        let _ = index.digit_only_tids.insert(tid_123);
         let _ = index.dictionary.get_or_assign("license");
 
         let query = Query::new("123 license", &index).unwrap();
@@ -580,14 +582,11 @@ mod tests {
     fn test_query_run_splitting_single_run() {
         let index = create_query_test_index();
         let text = "license copyright permission";
-        let query = Query::new(text, &index).unwrap();
-
-        // Query run splitting is disabled; query_run_ranges is empty
-        // and query_runs() returns [whole_query_run()]
-        assert!(query.query_run_ranges.is_empty());
+        let query = Query::with_options(text, &index, 4).unwrap();
 
         let runs = query.query_runs();
         assert_eq!(runs.len(), 1);
+        assert_eq!(query.query_run_ranges, vec![(0, Some(2))]);
         assert_eq!(runs[0].start, 0);
         assert_eq!(runs[0].end, Some(2));
     }
@@ -596,37 +595,37 @@ mod tests {
     fn test_query_run_splitting_with_empty_lines() {
         let index = create_query_test_index();
         let text = "license\n\n\n\n\ncopyright";
-        let query = Query::new(text, &index).unwrap();
+        let query = Query::with_options(text, &index, 4).unwrap();
 
-        // Query run splitting is disabled; always returns whole file as one run
-        assert!(query.query_run_ranges.is_empty());
         let runs = query.query_runs();
-        assert_eq!(runs.len(), 1);
+        assert_eq!(query.query_run_ranges, vec![(0, Some(0)), (1, Some(1))]);
+        assert_eq!(runs.len(), 2);
+        assert_eq!(runs[0].start, 0);
+        assert_eq!(runs[0].end, Some(0));
+        assert_eq!(runs[1].start, 1);
+        assert_eq!(runs[1].end, Some(1));
     }
 
     #[test]
     fn test_query_run_splitting_below_threshold() {
         let index = create_query_test_index();
         let text = "license\n\n\ncopyright";
-        let query = Query::new(text, &index).unwrap();
+        let query = Query::with_options(text, &index, 4).unwrap();
 
-        // Query run splitting is disabled
-        assert!(query.query_run_ranges.is_empty());
         let runs = query.query_runs();
         assert_eq!(runs.len(), 1);
+        assert_eq!(query.query_run_ranges, vec![(0, Some(1))]);
     }
 
     #[test]
     fn test_query_run_splitting_empty_query() {
         let index = create_query_test_index();
-        let query = Query::new("", &index).unwrap();
+        let query = Query::with_options("", &index, 4).unwrap();
 
-        // Empty query has no runs
         assert!(query.query_run_ranges.is_empty());
 
         let runs = query.query_runs();
-        assert_eq!(runs.len(), 1);
-        assert_eq!(runs[0].end, None);
+        assert!(runs.is_empty());
     }
 
     #[test]
@@ -676,13 +675,88 @@ mod tests {
     fn test_query_run_splitting_multiple_segments() {
         let index = create_query_test_index();
         let text = "license\n\n\n\n\ncopyright\n\n\n\n\npermission";
-        let query = Query::new(text, &index).unwrap();
-
-        // Query run splitting is disabled; returns whole file as one run
-        assert!(query.query_run_ranges.is_empty());
+        let query = Query::with_options(text, &index, 4).unwrap();
 
         let runs = query.query_runs();
-        assert_eq!(runs.len(), 1);
+        assert_eq!(
+            query.query_run_ranges,
+            vec![(0, Some(0)), (1, Some(1)), (2, Some(2))]
+        );
+        assert_eq!(runs.len(), 3);
+    }
+
+    #[test]
+    fn test_query_run_splitting_breaks_long_low_value_line_into_pseudo_lines() {
+        let mut index = create_query_test_index();
+        let low_tokens: Vec<String> = (0..25).map(|i| format!("word{}", i)).collect();
+        for token in &low_tokens {
+            let _ = index.dictionary.get_or_assign(token);
+        }
+
+        let text = format!("{} license", low_tokens.join(" "));
+        let query = Query::with_options(&text, &index, 1).unwrap();
+
+        assert!(query.has_long_lines);
+        assert_eq!(query.query_run_ranges, vec![(0, Some(24)), (25, Some(25))]);
+    }
+
+    #[test]
+    fn test_query_run_splitting_unknown_only_lines_count_toward_threshold() {
+        let index = create_query_test_index();
+        let text = "license\nfoobar bazqux\nbleep bloop\ncopyright";
+        let query = Query::with_options(text, &index, 2).unwrap();
+
+        assert_eq!(query.query_run_ranges, vec![(0, Some(0)), (1, Some(1))]);
+    }
+
+    #[test]
+    fn test_query_run_splitting_low_only_lines_count_toward_threshold() {
+        let mut index = create_query_test_index();
+        let _ = index.dictionary.get_or_assign("word1");
+        let _ = index.dictionary.get_or_assign("word2");
+
+        let text = "license\nword1 word2\nword1\ncopyright";
+        let query = Query::with_options(text, &index, 2).unwrap();
+
+        assert_eq!(query.query_run_ranges, vec![(0, Some(3)), (4, Some(4))]);
+    }
+
+    #[test]
+    fn test_query_run_splitting_digits_only_lines_do_not_emit_final_digits_only_run() {
+        let mut index = create_query_test_index();
+        let tid_123 = index.dictionary.get_or_assign("123");
+        let tid_456 = index.dictionary.get_or_assign("456");
+        let _ = index.digit_only_tids.insert(tid_123);
+        let _ = index.digit_only_tids.insert(tid_456);
+
+        let text = "license\n123\n456";
+        let query = Query::with_options(text, &index, 1).unwrap();
+
+        assert_eq!(query.query_run_ranges, vec![(0, Some(1))]);
+    }
+
+    #[test]
+    fn test_query_run_splitting_breaks_at_exact_threshold() {
+        let index = create_query_test_index();
+        let text = "license\n\n\ncopyright";
+        let query = Query::with_options(text, &index, 2).unwrap();
+
+        assert_eq!(query.query_run_ranges, vec![(0, Some(0)), (1, Some(1))]);
+    }
+
+    #[test]
+    fn test_query_run_splitting_exact_long_line_boundary_does_not_split() {
+        let mut index = create_query_test_index();
+        let low_tokens: Vec<String> = (0..24).map(|i| format!("word{}", i)).collect();
+        for token in &low_tokens {
+            let _ = index.dictionary.get_or_assign(token);
+        }
+
+        let text = format!("{} license", low_tokens.join(" "));
+        let query = Query::with_options(&text, &index, 1).unwrap();
+
+        assert!(!query.has_long_lines);
+        assert_eq!(query.query_run_ranges, vec![(0, Some(24))]);
     }
 
     #[test]

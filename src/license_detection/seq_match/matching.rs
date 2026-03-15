@@ -282,7 +282,9 @@ pub fn seq_match_with_candidates(
                         continue;
                     }
 
-                    let qspan_positions: Vec<usize> = (qpos..qpos + mlen).collect();
+                    let qspan_positions: Vec<usize> = (qpos..qpos + mlen)
+                        .map(|pos| pos + query_run.start)
+                        .collect();
                     let ispan_positions: Vec<usize> = (ipos..ipos + mlen).collect();
                     let hispan_positions: Vec<usize> = (ipos..ipos + mlen)
                         .filter(|&p| rule_tokens.get(p).is_some_and(|t| *t < len_legalese as u16))

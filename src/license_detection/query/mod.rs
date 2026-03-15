@@ -157,8 +157,10 @@ impl<'a> Query<'a> {
     /// # Returns
     /// A Result containing the Query or an error if binary detection fails
     ///
-    /// Corresponds to Python: `Query.__init__()` (lines 196-295)
+    /// Detection scans file-like text, so this uses Python's
+    /// `build_query(..., text_line_threshold=15)` threshold.
     const TEXT_LINE_THRESHOLD: usize = 15;
+    const MAX_TOKEN_PER_LINE: usize = 25;
 
     pub fn new(text: &str, index: &'a LicenseIndex) -> Result<Self, anyhow::Error> {
         Self::with_options(text, index, Self::TEXT_LINE_THRESHOLD)
@@ -166,19 +168,12 @@ impl<'a> Query<'a> {
 
     /// Iterate over query runs.
     ///
-    /// If query runs is empty (not yet computed), returns a single run
-    /// covering the whole query.
-    ///
     /// Corresponds to Python: `query.query_runs` property iteration
     pub fn query_runs(&self) -> Vec<QueryRun<'_>> {
-        if self.query_run_ranges.is_empty() {
-            vec![self.whole_query_run()]
-        } else {
-            self.query_run_ranges
-                .iter()
-                .map(|&(start, end)| QueryRun::new(self, start, end))
-                .collect()
-        }
+        self.query_run_ranges
+            .iter()
+            .map(|&(start, end)| QueryRun::new(self, start, end))
+            .collect()
     }
 
     /// Create a new query with custom line threshold.
@@ -186,7 +181,7 @@ impl<'a> Query<'a> {
     /// # Arguments
     /// * `text` - The input text to tokenize
     /// * `index` - The license index containing the token dictionary
-    /// * `_line_threshold` - Number of empty/junk lines to break a new run (default 4)
+    /// * `line_threshold` - Number of empty/junk lines to break a new run (default 4)
     ///
     /// # Returns
     /// A Result containing the Query or an error if binary detection fails
@@ -195,7 +190,7 @@ impl<'a> Query<'a> {
     pub fn with_options(
         text: &str,
         index: &'a LicenseIndex,
-        _line_threshold: usize,
+        line_threshold: usize,
     ) -> Result<Self, anyhow::Error> {
         let is_binary = Self::detect_binary(text)?;
         let has_long_lines = Self::detect_long_lines(text);
@@ -215,13 +210,13 @@ impl<'a> Query<'a> {
         let mut started = false;
         let mut current_line = 1usize;
 
-        let mut tokens_by_line: Vec<Vec<u16>> = Vec::new();
+        let mut tokens_by_line: Vec<Vec<Option<u16>>> = Vec::new();
 
         for line in text.lines() {
             let line_trimmed = line.trim();
-            let mut line_tokens: Vec<u16> = Vec::new();
+            let mut line_tokens: Vec<Option<u16>> = Vec::new();
 
-            let line_first_known_pos = known_pos + 1;
+            let mut line_first_known_pos = None;
 
             for token in tokenize_without_stopwords(line_trimmed) {
                 let is_stopword = stopwords_set.contains(token.as_str());
@@ -233,15 +228,21 @@ impl<'a> Query<'a> {
                         started = true;
                         tokens.push(tid);
                         line_by_pos.push(current_line);
-                        line_tokens.push(tid);
+                        line_tokens.push(Some(tid));
+
+                        if line_first_known_pos.is_none() {
+                            line_first_known_pos = Some(known_pos);
+                        }
 
                         if token.len() == 1 || token.chars().all(|c| c.is_ascii_digit()) {
                             let _ = shorts_and_digits_pos.insert(known_pos as usize);
                         }
                     } else if !started {
                         *unknowns_by_pos.entry(None).or_insert(0) += 1;
+                        line_tokens.push(None);
                     } else {
                         *unknowns_by_pos.entry(Some(known_pos)).or_insert(0) += 1;
+                        line_tokens.push(None);
                     }
                 } else if !started {
                     *stopwords_by_pos.entry(None).or_insert(0) += 1;
@@ -299,11 +300,13 @@ impl<'a> Query<'a> {
             };
 
             if let Some(offset) = spdx_start_offset {
-                let spdx_start_known_pos = line_first_known_pos + offset;
-                if spdx_start_known_pos <= line_last_known_pos {
-                    let spdx_start = spdx_start_known_pos as usize;
-                    let spdx_end = (line_last_known_pos + 1) as usize;
-                    spdx_lines.push((line_trimmed.to_string(), spdx_start, spdx_end));
+                if let Some(line_first_known_pos) = line_first_known_pos {
+                    let spdx_start_known_pos = line_first_known_pos + offset;
+                    if spdx_start_known_pos <= line_last_known_pos {
+                        let spdx_start = spdx_start_known_pos as usize;
+                        let spdx_end = (line_last_known_pos + 1) as usize;
+                        spdx_lines.push((line_trimmed.to_string(), spdx_start, spdx_end));
+                    }
                 }
             }
 
@@ -325,24 +328,14 @@ impl<'a> Query<'a> {
             .map(|(pos, _tid)| pos)
             .collect();
 
-        // Compute query runs by splitting on 4+ consecutive junk lines.
-        // Double-matching prevention: is_matchable() with matched_qspans exclusion
-        // in Phase 4 (mod.rs:286) handles this. query.subtract() is called after
-        // near-dupe matches (mod.rs:252) to update high/low_matchables.
-        //
-        // TODO: QueryRun causes 37 regressions due to issues with multi-license
-        // detection in files with large junk sections. The candidate selection
-        // fix (preferring higher coverage) is correct and has been kept.
-        // QueryRun needs further investigation before re-enabling.
-        //
-        // let query_runs = Self::compute_query_runs(
-        //     &tokens,
-        //     &tokens_by_line,
-        //     _line_threshold,
-        //     len_legalese,
-        //     &index.digit_only_tids,
-        // );
-        let query_runs: Vec<(usize, Option<usize>)> = Vec::new();
+        let query_runs = Self::compute_query_runs(
+            &tokens,
+            &tokens_by_line,
+            line_threshold,
+            len_legalese,
+            &index.digit_only_tids,
+            has_long_lines,
+        );
 
         Ok(Query {
             text: text.to_string(),
@@ -360,7 +353,6 @@ impl<'a> Query<'a> {
             index,
         })
     }
-
 
     /// Detect if text is binary content.
     ///
@@ -405,6 +397,101 @@ impl<'a> Query<'a> {
     fn detect_long_lines(text: &str) -> bool {
         text.lines()
             .any(|line| tokenize_without_stopwords(line).len() > 25)
+    }
+
+    fn break_long_lines(lines: &[Vec<Option<u16>>]) -> Vec<Vec<Option<u16>>> {
+        lines
+            .iter()
+            .flat_map(|line| {
+                if line.len() <= Self::MAX_TOKEN_PER_LINE {
+                    vec![line.clone()]
+                } else {
+                    line.chunks(Self::MAX_TOKEN_PER_LINE)
+                        .map(|chunk| chunk.to_vec())
+                        .collect()
+                }
+            })
+            .collect()
+    }
+
+    fn compute_query_runs(
+        tokens: &[u16],
+        tokens_by_line: &[Vec<Option<u16>>],
+        line_threshold: usize,
+        len_legalese: usize,
+        digit_only_tids: &HashSet<u16>,
+        has_long_lines: bool,
+    ) -> Vec<(usize, Option<usize>)> {
+        let processed_lines = if has_long_lines {
+            Self::break_long_lines(tokens_by_line)
+        } else {
+            tokens_by_line.to_vec()
+        };
+
+        let mut query_runs = Vec::new();
+        let mut query_run_start = 0usize;
+        let mut query_run_end = None;
+        let mut empty_lines = 0usize;
+        let mut pos = 0usize;
+
+        for line_tokens in processed_lines {
+            if query_run_end.is_some() && empty_lines >= line_threshold {
+                query_runs.push((query_run_start, query_run_end));
+                query_run_start = pos;
+                query_run_end = None;
+                empty_lines = 0;
+            }
+
+            if query_run_end.is_none() {
+                query_run_start = pos;
+            }
+
+            if line_tokens.is_empty() {
+                empty_lines += 1;
+                continue;
+            }
+
+            let line_is_all_digit = line_tokens.iter().all(|token_id| {
+                token_id
+                    .map(|tid| digit_only_tids.contains(&tid))
+                    .unwrap_or(true)
+            });
+            let mut line_has_known_tokens = false;
+            let mut line_has_good_tokens = false;
+
+            for token_id in line_tokens {
+                if let Some(tid) = token_id {
+                    line_has_known_tokens = true;
+                    if (tid as usize) < len_legalese {
+                        line_has_good_tokens = true;
+                    }
+                    query_run_end = Some(pos);
+                    pos += 1;
+                }
+            }
+
+            if line_is_all_digit || !line_has_known_tokens {
+                empty_lines += 1;
+                continue;
+            }
+
+            if line_has_good_tokens {
+                empty_lines = 0;
+            } else {
+                empty_lines += 1;
+            }
+        }
+
+        if let Some(end) = query_run_end {
+            let is_digits_only = tokens.get(query_run_start..=end).is_some_and(|run_tokens| {
+                run_tokens.iter().all(|tid| digit_only_tids.contains(tid))
+            });
+            if !is_digits_only {
+                query_runs.push((query_run_start, Some(end)));
+            }
+        }
+
+        query_runs
     }
 
     /// Get the length of the query in tokens.
@@ -595,7 +682,7 @@ impl<'a> Query<'a> {
         )
     }
 
-    /// Subtract matched positions from matchables.
+    /// Subtract matched span positions from matchables.
     ///
     /// This removes the positions from both high and low matchables.
     ///
