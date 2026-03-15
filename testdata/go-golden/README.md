@@ -6,7 +6,7 @@ Golden tests compare parser output against expected results from the original Sc
 
 ## Test Status
 
-**Currently Passing:** 6/6 tests
+**Currently Passing:** 8/8 tests
 
 - ✅ `test_golden_kingpin_mod`
 - ✅ `test_golden_sample_mod`
@@ -14,6 +14,8 @@ Golden tests compare parser output against expected results from the original Sc
 - ✅ `test_golden_sample2_sum`
 - ✅ `test_golden_sample3_sum`
 - ✅ `test_golden_sample_graph`
+- ✅ `test_golden_gowork_sample1`
+- ✅ `test_golden_gowork_sample2`
 
 ## Test Coverage
 
@@ -25,9 +27,13 @@ Golden tests compare parser output against expected results from the original Sc
 4. **sample2-sum** - `go.sum` dedup coverage
 5. **sample3-sum** - `go.sum` `/go.mod` line handling
 6. **sample-graph** - `go.mod graph` direct vs transitive dependency coverage
+7. **gowork-sample1** - `go.work` block `use`, `toolchain`, and `replace` coverage
+8. **gowork-sample2** - `go.work` inline `use` coverage
 
 ## Test Data
 
 Test files sourced from Python ScanCode reference:
 
 - `reference/scancode-toolkit/tests/packagedcode/data/golang/`
+
+Workspace member `go.mod` files under the `gowork-*` fixtures are local companion files used to resolve module paths for `use` entries.
