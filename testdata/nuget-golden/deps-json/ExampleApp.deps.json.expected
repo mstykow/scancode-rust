@@ -1,0 +1,94 @@
+[
+  {
+    "type": "nuget",
+    "name": "ExampleApp",
+    "version": "1.0.0",
+    "parties": [],
+    "extra_data": {
+      "target_framework": ".NETCoreApp,Version=v8.0",
+      "runtime_signature": "signature-value",
+      "runtime_target_name": ".NETCoreApp,Version=v8.0/win-x64",
+      "runtime_identifier": "win-x64"
+    },
+    "dependencies": [
+      {
+        "purl": "pkg:nuget/Newtonsoft.Json@13.0.1",
+        "extracted_requirement": "13.0.1",
+        "scope": ".NETCoreApp,Version=v8.0/win-x64",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": true,
+        "extra_data": {
+          "sha512": "newton-hash",
+          "target_name": ".NETCoreApp,Version=v8.0/win-x64",
+          "path": "newtonsoft.json/13.0.1",
+          "type": "package",
+          "hashPath": "newtonsoft.json.13.0.1.nupkg.sha512",
+          "serviceable": true,
+          "runtime": {
+            "lib/net8.0/Newtonsoft.Json.dll": {}
+          }
+        }
+      },
+      {
+        "purl": "pkg:nuget/Serilog@2.12.0",
+        "extracted_requirement": "2.12.0",
+        "scope": ".NETCoreApp,Version=v8.0/win-x64",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": true,
+        "extra_data": {
+          "target_name": ".NETCoreApp,Version=v8.0/win-x64",
+          "sha512": "serilog-hash",
+          "runtime": {
+            "lib/net8.0/Serilog.dll": {}
+          },
+          "type": "package",
+          "serviceable": true,
+          "runtimeStoreManifestName": "runtime-manifest",
+          "path": "serilog/2.12.0"
+        }
+      },
+      {
+        "purl": "pkg:nuget/System.Text.Json@8.0.0",
+        "extracted_requirement": "8.0.0",
+        "scope": ".NETCoreApp,Version=v8.0/win-x64",
+        "is_runtime": false,
+        "is_optional": true,
+        "is_pinned": true,
+        "is_direct": false,
+        "extra_data": {
+          "type": "package",
+          "sha512": "stj-hash",
+          "target_name": ".NETCoreApp,Version=v8.0/win-x64",
+          "serviceable": true,
+          "compileOnly": true
+        }
+      },
+      {
+        "purl": "pkg:nuget/Project.Ref@1.0.0",
+        "extracted_requirement": "1.0.0",
+        "scope": ".NETCoreApp,Version=v8.0/win-x64",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": true,
+        "extra_data": {
+          "serviceable": false,
+          "target_name": ".NETCoreApp,Version=v8.0/win-x64",
+          "runtime": {
+            "Project.Ref.dll": {}
+          },
+          "type": "project"
+        }
+      }
+    ],
+    "repository_homepage_url": "https://www.nuget.org/packages/ExampleApp/1.0.0",
+    "repository_download_url": "https://www.nuget.org/api/v2/package/ExampleApp/1.0.0",
+    "api_data_url": "https://api.nuget.org/v3/registration3/exampleapp/1.0.0.json",
+    "datasource_id": "nuget_deps_json",
+    "purl": "pkg:nuget/ExampleApp@1.0.0"
+  }
+]

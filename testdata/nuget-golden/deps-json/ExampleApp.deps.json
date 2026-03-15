@@ -1,0 +1,79 @@
+{
+  "runtimeTarget": {
+    "name": ".NETCoreApp,Version=v8.0/win-x64",
+    "signature": "signature-value"
+  },
+  "targets": {
+    ".NETCoreApp,Version=v8.0": {
+      "ExampleApp/1.0.0": {
+        "dependencies": {
+          "Newtonsoft.Json": "13.0.1"
+        }
+      }
+    },
+    ".NETCoreApp,Version=v8.0/win-x64": {
+      "ExampleApp/1.0.0": {
+        "dependencies": {
+          "Newtonsoft.Json": "13.0.1",
+          "Serilog": "2.12.0",
+          "Project.Ref": "1.0.0"
+        },
+        "runtime": {
+          "ExampleApp.dll": {}
+        }
+      },
+      "Newtonsoft.Json/13.0.1": {
+        "runtime": {
+          "lib/net8.0/Newtonsoft.Json.dll": {}
+        }
+      },
+      "Serilog/2.12.0": {
+        "dependencies": {
+          "System.Text.Json": "8.0.0"
+        },
+        "runtime": {
+          "lib/net8.0/Serilog.dll": {}
+        }
+      },
+      "System.Text.Json/8.0.0": {
+        "compileOnly": true
+      },
+      "Project.Ref/1.0.0": {
+        "runtime": {
+          "Project.Ref.dll": {}
+        }
+      }
+    }
+  },
+  "libraries": {
+    "ExampleApp/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": "example-hash",
+      "path": "ExampleApp/1.0.0"
+    },
+    "Newtonsoft.Json/13.0.1": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "newton-hash",
+      "path": "newtonsoft.json/13.0.1",
+      "hashPath": "newtonsoft.json.13.0.1.nupkg.sha512"
+    },
+    "Serilog/2.12.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "serilog-hash",
+      "path": "serilog/2.12.0",
+      "runtimeStoreManifestName": "runtime-manifest"
+    },
+    "System.Text.Json/8.0.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "stj-hash"
+    },
+    "Project.Ref/1.0.0": {
+      "type": "project",
+      "serviceable": false
+    }
+  }
+}
