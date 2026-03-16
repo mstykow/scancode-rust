@@ -486,6 +486,7 @@ fn remove_root_level_dependencies(dependencies: &mut Vec<TopLevelDependency>, ro
             dependency.datasource_id,
             DatasourceId::NpmPackageJson
                 | DatasourceId::BunLock
+                | DatasourceId::BunLockb
                 | DatasourceId::NpmPackageLockJson
                 | DatasourceId::YarnLock
                 | DatasourceId::PnpmLockYaml
@@ -604,6 +605,7 @@ fn hoist_root_dependencies(
 
         let datasource_id = match file_name {
             "bun.lock" => Some(DatasourceId::BunLock),
+            "bun.lockb" => Some(DatasourceId::BunLockb),
             "package-lock.json" => Some(DatasourceId::NpmPackageLockJson),
             "yarn.lock" => Some(DatasourceId::YarnLock),
             "pnpm-lock.yaml" => Some(DatasourceId::PnpmLockYaml),
