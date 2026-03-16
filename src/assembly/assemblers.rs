@@ -462,6 +462,7 @@ pub static UNASSEMBLED_DATASOURCE_IDS: &[DatasourceId] = &[
     DatasourceId::DebianMd5SumsInExtractedDeb,
     DatasourceId::DebianSourceControlDsc,
     DatasourceId::Dockerfile,
+    DatasourceId::HexMixLock,
     DatasourceId::JavaEarApplicationXml,
     DatasourceId::JavaWarWebXml,
     DatasourceId::JbossServiceXml,
