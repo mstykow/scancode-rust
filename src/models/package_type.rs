@@ -94,6 +94,7 @@ pub enum PackageType {
     Shar,
     Squashfs,
     Swift,
+    Vcpkg,
     War,
     #[serde(rename = "windows-update")]
     WindowsUpdate,
@@ -159,6 +160,7 @@ impl PackageType {
             Self::Shar => "shar",
             Self::Squashfs => "squashfs",
             Self::Swift => "swift",
+            Self::Vcpkg => "vcpkg",
             Self::War => "war",
             Self::WindowsUpdate => "windows-update",
         }
@@ -210,6 +212,7 @@ mod tests {
         assert_eq!(PackageType::Cargo.as_str(), "cargo");
         assert_eq!(PackageType::Pypi.as_str(), "pypi");
         assert_eq!(PackageType::Alpm.as_str(), "alpm");
+        assert_eq!(PackageType::Vcpkg.as_str(), "vcpkg");
     }
 
     #[test]

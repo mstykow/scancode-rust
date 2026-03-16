@@ -1,0 +1,26 @@
+{
+  "name": "fmt",
+  "version": "10.1.1",
+  "port-version": 7,
+  "description": "Formatting library for C++.",
+  "homepage": "https://github.com/fmtlib/fmt",
+  "license": "MIT",
+  "maintainers": ["fmt maintainers <fmt@example.com>"],
+  "dependencies": [
+    {
+      "name": "vcpkg-cmake",
+      "host": true
+    },
+    {
+      "name": "vcpkg-cmake-config",
+      "host": true
+    }
+  ],
+  "default-features": ["unicode"],
+  "features": {
+    "unicode": {
+      "description": "Unicode support",
+      "dependencies": ["icu"]
+    }
+  }
+}
