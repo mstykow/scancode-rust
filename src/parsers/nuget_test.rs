@@ -10,7 +10,14 @@ mod tests {
     use crate::models::PackageType;
     use std::io::Write;
     use std::path::PathBuf;
-    use tempfile::{Builder, NamedTempFile};
+    use tempfile::{Builder, NamedTempFile, TempDir};
+
+    fn write_directory_packages_props(contents: &str) -> (TempDir, PathBuf) {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let path = temp_dir.path().join("Directory.Packages.props");
+        std::fs::write(&path, contents).unwrap();
+        (temp_dir, path)
+    }
 
     #[test]
     fn test_packages_config_is_match() {
@@ -906,14 +913,7 @@ mod tests {
   </ItemGroup>
 </Project>"#;
 
-        let mut temp_file = Builder::new()
-            .prefix("Directory.Packages")
-            .suffix(".props")
-            .tempfile()
-            .unwrap();
-        temp_file.write_all(xml.as_bytes()).unwrap();
-        let path = temp_file.path().with_file_name("Directory.Packages.props");
-        std::fs::rename(temp_file.path(), &path).unwrap();
+        let (_temp_dir, path) = write_directory_packages_props(xml);
 
         let package_data = CentralPackageManagementPropsParser::extract_first_package(&path);
         assert_eq!(package_data.package_type, Some(PackageType::Nuget));
@@ -963,14 +963,7 @@ mod tests {
   </ItemGroup>
 </Project>"#;
 
-        let mut temp_file = Builder::new()
-            .prefix("Directory.Packages")
-            .suffix(".props")
-            .tempfile()
-            .unwrap();
-        temp_file.write_all(xml.as_bytes()).unwrap();
-        let path = temp_file.path().with_file_name("Directory.Packages.props");
-        std::fs::rename(temp_file.path(), &path).unwrap();
+        let (_temp_dir, path) = write_directory_packages_props(xml);
 
         let package_data = CentralPackageManagementPropsParser::extract_first_package(&path);
         assert_eq!(package_data.dependencies.len(), 1);
@@ -1021,14 +1014,7 @@ mod tests {
     fn test_directory_packages_props_malformed_returns_default() {
         let xml = r#"<Project><ItemGroup><PackageVersion Include="Newtonsoft.Json""#;
 
-        let mut temp_file = Builder::new()
-            .prefix("Directory.Packages")
-            .suffix(".props")
-            .tempfile()
-            .unwrap();
-        temp_file.write_all(xml.as_bytes()).unwrap();
-        let path = temp_file.path().with_file_name("Directory.Packages.props");
-        std::fs::rename(temp_file.path(), &path).unwrap();
+        let (_temp_dir, path) = write_directory_packages_props(xml);
 
         let package_data = CentralPackageManagementPropsParser::extract_first_package(&path);
         assert_eq!(package_data.package_type, Some(PackageType::Nuget));
