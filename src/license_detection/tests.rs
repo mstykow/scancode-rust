@@ -28,11 +28,19 @@ fn detect_fixture_matches(
     engine: &LicenseDetectionEngine,
     fixture_path: &str,
 ) -> Vec<LicenseMatch> {
+    detect_fixture_matches_with_unknown_licenses(engine, fixture_path, false)
+}
+
+fn detect_fixture_matches_with_unknown_licenses(
+    engine: &LicenseDetectionEngine,
+    fixture_path: &str,
+    unknown_licenses: bool,
+) -> Vec<LicenseMatch> {
     let text = std::fs::read_to_string(fixture_path)
         .unwrap_or_else(|e| panic!("Failed to read fixture {fixture_path}: {e}"));
 
     engine
-        .detect_matches(&text, false)
+        .detect_matches(&text, unknown_licenses)
         .expect("Detection should succeed")
 }
 
@@ -52,6 +60,25 @@ fn summarize_raw_matches(matches: &[LicenseMatch]) -> Vec<(String, String, usize
 
 fn sorted_raw_matches(matches: &[LicenseMatch]) -> Vec<(String, String, usize, usize)> {
     let mut summary = summarize_raw_matches(matches);
+    summary.sort();
+    summary
+}
+
+fn sorted_raw_matches_with_normalized_unknown_ids(
+    matches: &[LicenseMatch],
+) -> Vec<(String, String, usize, usize)> {
+    let mut summary: Vec<_> = matches
+        .iter()
+        .map(|m| {
+            let rule_identifier = if m.rule_identifier.starts_with("license-detection-unknown-") {
+                "license-detection-unknown".to_string()
+            } else {
+                m.rule_identifier.clone()
+            };
+
+            (rule_identifier, m.matcher.clone(), m.start_line, m.end_line)
+        })
+        .collect();
     summary.sort();
     summary
 }
@@ -976,6 +1003,212 @@ fn test_not_spdx_detect_matches_match_python_raw_rules() {
         crate::license_detection::aho_match::MATCH_AHO,
         13,
         13,
+    );
+}
+
+#[test]
+fn test_unknown_readme_detect_matches_unknown_mode_matches_python_raw_rules() {
+    let Some(engine) = create_engine_from_reference() else {
+        eprintln!("Skipping test: reference directory not found");
+        return;
+    };
+
+    let matches = detect_fixture_matches_with_unknown_licenses(
+        &engine,
+        "testdata/license-golden/datadriven/unknown/README.md",
+        true,
+    );
+
+    assert_eq!(
+        sorted_raw_matches(&matches),
+        vec![
+            (
+                "unknown-license-reference_341.RULE".to_string(),
+                "2-aho".to_string(),
+                6,
+                6,
+            ),
+            (
+                "unknown-license-reference_344.RULE".to_string(),
+                "2-aho".to_string(),
+                4,
+                4,
+            ),
+            (
+                "unknown-license-reference_348.RULE".to_string(),
+                "2-aho".to_string(),
+                44,
+                44,
+            ),
+        ]
+    );
+}
+
+#[test]
+fn test_unknown_cisco_detect_matches_unknown_mode_matches_python_raw_rules() {
+    let Some(engine) = create_engine_from_reference() else {
+        eprintln!("Skipping test: reference directory not found");
+        return;
+    };
+
+    let matches = detect_fixture_matches_with_unknown_licenses(
+        &engine,
+        "testdata/license-golden/datadriven/unknown/cisco.txt",
+        true,
+    );
+
+    assert_eq!(
+        sorted_raw_matches_with_normalized_unknown_ids(&matches),
+        vec![
+            (
+                "license-detection-unknown".to_string(),
+                crate::license_detection::unknown_match::MATCH_UNKNOWN.to_string(),
+                1,
+                16,
+            ),
+            (
+                "license-detection-unknown".to_string(),
+                crate::license_detection::unknown_match::MATCH_UNKNOWN.to_string(),
+                24,
+                32,
+            ),
+            (
+                "warranty-disclaimer_21.RULE".to_string(),
+                crate::license_detection::seq_match::MATCH_SEQ.to_string(),
+                20,
+                22,
+            ),
+        ]
+    );
+}
+
+#[test]
+fn test_unknown_ucware_eula_detect_matches_unknown_mode_matches_python_raw_rules() {
+    let Some(engine) = create_engine_from_reference() else {
+        eprintln!("Skipping test: reference directory not found");
+        return;
+    };
+
+    let matches = detect_fixture_matches_with_unknown_licenses(
+        &engine,
+        "testdata/license-golden/datadriven/unknown/ucware-eula.txt",
+        true,
+    );
+
+    assert_eq!(
+        sorted_raw_matches_with_normalized_unknown_ids(&matches),
+        vec![
+            (
+                "license-detection-unknown".to_string(),
+                crate::license_detection::unknown_match::MATCH_UNKNOWN.to_string(),
+                3,
+                31,
+            ),
+            (
+                "license-detection-unknown".to_string(),
+                crate::license_detection::unknown_match::MATCH_UNKNOWN.to_string(),
+                31,
+                31,
+            ),
+            (
+                "license-intro_21.RULE".to_string(),
+                crate::license_detection::aho_match::MATCH_AHO.to_string(),
+                1,
+                1,
+            ),
+            (
+                "license-intro_22.RULE".to_string(),
+                crate::license_detection::aho_match::MATCH_AHO.to_string(),
+                3,
+                3,
+            ),
+            (
+                "swrule.LICENSE".to_string(),
+                crate::license_detection::seq_match::MATCH_SEQ.to_string(),
+                31,
+                31,
+            ),
+            (
+                "warranty-disclaimer_24.RULE".to_string(),
+                crate::license_detection::aho_match::MATCH_AHO.to_string(),
+                31,
+                31,
+            ),
+        ]
+    );
+}
+
+#[test]
+fn test_unknown_citrix_detect_matches_unknown_mode_matches_python_raw_rules() {
+    let Some(engine) = create_engine_from_reference() else {
+        eprintln!("Skipping test: reference directory not found");
+        return;
+    };
+
+    let matches = detect_fixture_matches_with_unknown_licenses(
+        &engine,
+        "testdata/license-golden/datadriven/unknown/citrix.txt",
+        true,
+    );
+
+    assert_eq!(
+        sorted_raw_matches_with_normalized_unknown_ids(&matches),
+        vec![
+            (
+                "commercial-option_33.RULE".to_string(),
+                crate::license_detection::aho_match::MATCH_AHO.to_string(),
+                236,
+                236,
+            ),
+            (
+                "free-unknown_85.RULE".to_string(),
+                crate::license_detection::aho_match::MATCH_AHO.to_string(),
+                138,
+                139,
+            ),
+            (
+                "free-unknown_88.RULE".to_string(),
+                crate::license_detection::aho_match::MATCH_AHO.to_string(),
+                33,
+                33,
+            ),
+            (
+                "free-unknown_88.RULE".to_string(),
+                crate::license_detection::aho_match::MATCH_AHO.to_string(),
+                140,
+                140,
+            ),
+            (
+                "gpl-1.0-plus_33.RULE".to_string(),
+                crate::license_detection::aho_match::MATCH_AHO.to_string(),
+                16,
+                16,
+            ),
+            (
+                "license-detection-unknown".to_string(),
+                crate::license_detection::unknown_match::MATCH_UNKNOWN.to_string(),
+                1,
+                12,
+            ),
+            (
+                "license-detection-unknown".to_string(),
+                crate::license_detection::unknown_match::MATCH_UNKNOWN.to_string(),
+                236,
+                266,
+            ),
+            (
+                "unknown-license-reference_351.RULE".to_string(),
+                crate::license_detection::aho_match::MATCH_AHO.to_string(),
+                197,
+                197,
+            ),
+            (
+                "warranty-disclaimer_24.RULE".to_string(),
+                crate::license_detection::aho_match::MATCH_AHO.to_string(),
+                43,
+                43,
+            ),
+        ]
     );
 }
 

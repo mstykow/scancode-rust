@@ -8,6 +8,7 @@ use std::collections::HashSet;
 use crate::license_detection::index::LicenseIndex;
 use crate::license_detection::models::LicenseMatch;
 use crate::license_detection::query::Query;
+use crate::license_detection::unknown_match::MATCH_UNKNOWN;
 
 /// Filter spurious matches with low density.
 ///
@@ -23,7 +24,7 @@ pub(crate) fn filter_spurious_matches(
     matches
         .iter()
         .filter(|m| {
-            let is_seq_or_unknown = m.matcher == "3-seq" || m.matcher == "5-unknown";
+            let is_seq_or_unknown = m.matcher == "3-seq" || m.matcher == MATCH_UNKNOWN;
             if !is_seq_or_unknown {
                 return true;
             }
@@ -753,7 +754,7 @@ mod tests {
         let index = LicenseIndex::with_legalese_count(10);
         let query = Query::new("test text", &index).unwrap();
         let mut m = create_test_match("#1", 1, 10, 1.0, 100.0, 100);
-        m.matcher = "5-unknown".to_string();
+        m.matcher = MATCH_UNKNOWN.to_string();
         m.matched_length = 5;
         m.start_token = 0;
         m.end_token = 100;

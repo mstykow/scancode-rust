@@ -1,19 +1,39 @@
 //! Unknown license detection using ngram matching.
 
 use aho_corasick::AhoCorasick;
+use once_cell::sync::Lazy;
+use regex::Regex;
+use sha1::{Digest, Sha1};
 
 use crate::license_detection::index::LicenseIndex;
 use crate::license_detection::models::LicenseMatch;
 use crate::license_detection::query::Query;
+use crate::license_detection::tokenize::STOPWORDS;
 
 pub const MATCH_UNKNOWN: &str = "6-unknown";
-
 
 const UNKNOWN_NGRAM_LENGTH: usize = 6;
 
 const MIN_NGRAM_MATCHES: usize = 3;
 
 const MIN_REGION_LENGTH: usize = 5;
+
+static QUERY_PATTERN: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"[^_\W]+\+?[^_\W]*").expect("Invalid regex pattern"));
+static MATCHED_TEXT_PATTERN: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"(?P<token>[^_\W]+\+?[^_\W]*)|(?P<punct>[_\W\s\+]+[_\W\s]?)")
+        .expect("Invalid matched text regex pattern")
+});
+
+#[derive(Clone)]
+struct MatchedTextToken {
+    value: String,
+    line_num: usize,
+    pos: Option<usize>,
+    is_text: bool,
+    is_known: bool,
+    is_matched: bool,
+}
 
 pub fn unknown_match(
     index: &LicenseIndex,
@@ -159,7 +179,7 @@ fn get_matched_ngrams(
     let offset = UNKNOWN_NGRAM_LENGTH;
     let mut matches = Vec::new();
 
-    for m in automaton.find_iter(&region_bytes) {
+    for m in automaton.find_overlapping_iter(&region_bytes) {
         let local_qend = m.end() / 2;
         let qend = start + local_qend;
         let qstart = qend.saturating_sub(offset);
@@ -232,6 +252,9 @@ fn create_unknown_match_from_qspan(
         .copied()
         .unwrap_or(start_line);
 
+    let synthetic_rule_text =
+        build_unknown_rule_text(query, &qspan_positions, start_line, end_line);
+    let rule_identifier = build_unknown_rule_identifier(&synthetic_rule_text);
     let matched_text = query.matched_text(start_line, end_line);
 
     let ngram_count = qspan.len();
@@ -253,7 +276,7 @@ fn create_unknown_match_from_qspan(
         rule_length: match_len,
         match_coverage: 100.0,
         rule_relevance: 50,
-        rule_identifier: "unknown".to_string(),
+        rule_identifier,
         rule_url: String::new(),
         matched_text: Some(matched_text),
         referenced_filenames: None,
@@ -273,6 +296,266 @@ fn create_unknown_match_from_qspan(
         candidate_containment: 0.0,
     }
     .into()
+}
+
+fn build_unknown_rule_text(
+    query: &Query,
+    qspan_positions: &[usize],
+    start_line: usize,
+    end_line: usize,
+) -> String {
+    let Some(&start_pos) = qspan_positions.first() else {
+        return String::new();
+    };
+    let Some(&end_pos) = qspan_positions.last() else {
+        return String::new();
+    };
+
+    let matched_positions: std::collections::HashSet<usize> =
+        qspan_positions.iter().copied().collect();
+    let tokens = tokenize_matched_unknown_text(&query.text, query);
+    let reportable_tokens = collect_reportable_unknown_tokens(
+        tokens,
+        &matched_positions,
+        start_pos,
+        end_pos,
+        start_line,
+        end_line,
+    );
+    let line_endings = collect_line_endings(&query.text);
+
+    render_unknown_rule_tokens(&reportable_tokens, &line_endings)
+}
+
+fn tokenize_matched_unknown_text(text: &str, query: &Query) -> Vec<MatchedTextToken> {
+    let mut tokens = Vec::new();
+    let mut pos = 0usize;
+    let mut line_num = 1usize;
+
+    for line in text.split_inclusive('\n') {
+        for capture in MATCHED_TEXT_PATTERN.captures_iter(line) {
+            if let Some(token_match) = capture.name("token") {
+                let token_text = token_match.as_str();
+                let retokenized: Vec<String> = QUERY_PATTERN
+                    .find_iter(&token_text.to_lowercase())
+                    .map(|m| m.as_str().to_string())
+                    .filter(|token| !STOPWORDS.contains(token.as_str()))
+                    .collect();
+
+                if retokenized.is_empty() {
+                    tokens.push(MatchedTextToken {
+                        value: token_text.to_string(),
+                        line_num,
+                        pos: None,
+                        is_text: true,
+                        is_known: false,
+                        is_matched: false,
+                    });
+                } else if retokenized.len() == 1 {
+                    let token = &retokenized[0];
+                    let is_known = query.index.dictionary.get(token).is_some();
+                    let token_pos = if is_known {
+                        let current_pos = pos;
+                        pos += 1;
+                        Some(current_pos)
+                    } else {
+                        None
+                    };
+
+                    tokens.push(MatchedTextToken {
+                        value: token_text.to_string(),
+                        line_num,
+                        pos: token_pos,
+                        is_text: true,
+                        is_known,
+                        is_matched: false,
+                    });
+                } else {
+                    for token in retokenized {
+                        let is_known = query.index.dictionary.get(&token).is_some();
+                        let token_pos = if is_known {
+                            let current_pos = pos;
+                            pos += 1;
+                            Some(current_pos)
+                        } else {
+                            None
+                        };
+
+                        tokens.push(MatchedTextToken {
+                            value: token,
+                            line_num,
+                            pos: token_pos,
+                            is_text: true,
+                            is_known,
+                            is_matched: false,
+                        });
+                    }
+                }
+            } else if let Some(punct_match) = capture.name("punct") {
+                tokens.push(MatchedTextToken {
+                    value: punct_match.as_str().to_string(),
+                    line_num,
+                    pos: None,
+                    is_text: false,
+                    is_known: false,
+                    is_matched: false,
+                });
+            }
+        }
+
+        line_num += 1;
+    }
+
+    tokens
+}
+
+fn collect_reportable_unknown_tokens(
+    tokens: Vec<MatchedTextToken>,
+    matched_positions: &std::collections::HashSet<usize>,
+    start_pos: usize,
+    end_pos: usize,
+    start_line: usize,
+    end_line: usize,
+) -> Vec<MatchedTextToken> {
+    let mut reportable = Vec::new();
+    let mut started = false;
+    let mut finished = false;
+    let mut end_real_pos = None;
+    let mut last_real_pos = None;
+
+    for (real_pos, mut token) in tokens.into_iter().enumerate() {
+        if token.line_num < start_line {
+            continue;
+        }
+
+        if token.line_num > end_line {
+            break;
+        }
+
+        let mut is_included = false;
+
+        if token
+            .pos
+            .is_some_and(|pos| token.is_known && matched_positions.contains(&pos))
+        {
+            token.is_matched = true;
+            is_included = true;
+        }
+
+        if !started && token.pos == Some(start_pos) {
+            started = true;
+            is_included = true;
+        }
+
+        if started && !finished {
+            is_included = true;
+        }
+
+        if token.pos == Some(end_pos) {
+            finished = true;
+            started = false;
+            end_real_pos = Some(real_pos);
+        }
+
+        if finished && !started && end_real_pos.is_some() && last_real_pos == end_real_pos {
+            end_real_pos = None;
+            if !token.is_text && !token.value.trim().is_empty() {
+                is_included = true;
+            }
+        }
+
+        last_real_pos = Some(real_pos);
+
+        if is_included {
+            reportable.push(token);
+        }
+    }
+
+    reportable
+}
+
+fn collect_line_endings(text: &str) -> Vec<String> {
+    text.split_inclusive('\n')
+        .map(|line| {
+            if line.ends_with("\r\n") {
+                "\r\n".to_string()
+            } else if line.ends_with('\n') {
+                "\n".to_string()
+            } else {
+                String::new()
+            }
+        })
+        .collect()
+}
+
+fn render_unknown_rule_tokens(tokens: &[MatchedTextToken], line_endings: &[String]) -> String {
+    let mut rendered = String::new();
+    let mut previous_line: Option<usize> = None;
+
+    for token in tokens {
+        if let Some(prev_line) = previous_line {
+            if token.line_num > prev_line {
+                for line in prev_line..token.line_num {
+                    if let Some(line_ending) = line_endings.get(line.saturating_sub(1)) {
+                        rendered.push_str(line_ending.as_str());
+                    }
+                }
+            }
+        }
+
+        let token_value = if token.is_text {
+            token.value.as_str()
+        } else {
+            token
+                .value
+                .strip_suffix("\r\n")
+                .or_else(|| token.value.strip_suffix('\n'))
+                .unwrap_or(token.value.as_str())
+        };
+
+        if token.is_text && !STOPWORDS.contains(token.value.to_lowercase().as_str()) {
+            if token.is_matched {
+                rendered.push_str(token_value);
+            } else {
+                rendered.push('.');
+            }
+        } else {
+            rendered.push_str(token_value);
+        }
+
+        previous_line = Some(token.line_num);
+    }
+
+    rendered
+}
+
+fn build_unknown_rule_identifier(rule_text: &str) -> String {
+    let content = format!("None{}", python_str_repr(rule_text));
+    let mut hasher = Sha1::new();
+    hasher.update(content.as_bytes());
+    let digest = hasher.finalize();
+
+    format!("license-detection-unknown-{digest:x}")
+}
+
+fn python_str_repr(text: &str) -> String {
+    let use_double_quotes = text.contains('\'') && !text.contains('"');
+    let quote = if use_double_quotes { '"' } else { '\'' };
+    let mut escaped = String::with_capacity(text.len());
+
+    for ch in text.chars() {
+        match ch {
+            '\\' => escaped.push_str("\\\\"),
+            '\n' => escaped.push_str("\\n"),
+            '\r' => escaped.push_str("\\r"),
+            '\t' => escaped.push_str("\\t"),
+            '\'' if !use_double_quotes => escaped.push_str("\\'"),
+            '"' if use_double_quotes => escaped.push_str("\\\""),
+            _ => escaped.push(ch),
+        }
+    }
+
+    format!("{quote}{escaped}{quote}")
 }
 
 fn calculate_score(ngram_count: usize, match_len: usize) -> f32 {
@@ -417,6 +700,21 @@ mod tests {
         for (qstart, qend) in &matches {
             assert_eq!(*qend - *qstart, UNKNOWN_NGRAM_LENGTH);
         }
+    }
+
+    #[test]
+    fn test_get_matched_ngrams_keeps_overlapping_matches() {
+        let tokens = vec![1u16, 2, 3, 1, 2, 3, 1, 2, 3];
+        let overlapping_ngram: Vec<u8> = tokens[..UNKNOWN_NGRAM_LENGTH]
+            .iter()
+            .flat_map(|tid| tid.to_le_bytes())
+            .collect();
+        let automaton = AhoCorasick::new(std::iter::once(overlapping_ngram.as_slice()))
+            .expect("Failed to create automaton");
+
+        let matches = get_matched_ngrams(&tokens, 0, tokens.len(), &automaton);
+
+        assert_eq!(matches, vec![(0, 6), (3, 9)]);
     }
 
     #[test]

@@ -479,12 +479,13 @@ pub fn build_index(rules: Vec<Rule>, licenses: Vec<License>) -> LicenseIndex {
 
     let unknown_automaton = if unknown_automaton_patterns.is_empty() {
         AhoCorasickBuilder::new()
+            .match_kind(aho_corasick::MatchKind::Standard)
             .build(std::iter::empty::<&[u8]>())
             .expect("Failed to build empty unknown automaton")
     } else {
         let unique_patterns: HashSet<Vec<u8>> = unknown_automaton_patterns.into_iter().collect();
         AhoCorasickBuilder::new()
-            .match_kind(aho_corasick::MatchKind::LeftmostFirst)
+            .match_kind(aho_corasick::MatchKind::Standard)
             .build(&unique_patterns)
             .expect("Failed to build unknown automaton")
     };

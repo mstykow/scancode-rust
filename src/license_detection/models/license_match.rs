@@ -200,7 +200,7 @@ impl LicenseMatch {
             "3-seq" => 3,
             "3-spdx" => 3,
             "4-seq" => 4,
-            "5-unknown" => 5,
+            "6-unknown" => 6,
             _ => 9,
         }
     }
@@ -247,7 +247,6 @@ impl LicenseMatch {
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
-
 
     #[allow(dead_code)]
     fn qregion_len(&self) -> usize {

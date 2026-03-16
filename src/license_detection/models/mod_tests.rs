@@ -717,8 +717,8 @@ mod tests {
     #[test]
     fn test_matcher_order_unknown() {
         let mut match_result = create_license_match();
-        match_result.matcher = "5-unknown".to_string();
-        assert_eq!(match_result.matcher_order(), 5);
+        match_result.matcher = "6-unknown".to_string();
+        assert_eq!(match_result.matcher_order(), 6);
     }
 
     #[test]

@@ -571,7 +571,7 @@ mod tests {
 
         let mut weak_unknown = LicenseMatch {
             license_expression: "unknown".to_string(),
-            matcher: "5-unknown".to_string(),
+            matcher: "6-unknown".to_string(),
             matched_length: 30,
             match_coverage: 50.0,
             ..LicenseMatch::default()
