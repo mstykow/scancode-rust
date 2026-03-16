@@ -452,6 +452,9 @@ pub static UNASSEMBLED_DATASOURCE_IDS: &[DatasourceId] = &[
     DatasourceId::SharShellArchive,
     DatasourceId::SquashfsDiskImage,
     // Supplementary metadata (not primary package definitions)
+    DatasourceId::ArchAurinfo,
+    DatasourceId::ArchPkginfo,
+    DatasourceId::ArchSrcinfo,
     DatasourceId::Axis2ModuleXml,
     DatasourceId::DebianControlExtractedDeb,
     DatasourceId::DebianInstalledFilesList,
