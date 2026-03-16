@@ -1502,6 +1502,249 @@ fn build_project_file_dependency(
     })
 }
 
+#[derive(Default)]
+struct CentralPackageVersionData {
+    name: Option<String>,
+    version: Option<String>,
+    condition: Option<String>,
+}
+
+fn build_directory_packages_dependency(
+    name: Option<String>,
+    version: Option<String>,
+    condition: Option<String>,
+) -> Option<Dependency> {
+    let name = name?.trim().to_string();
+    if name.is_empty() {
+        return None;
+    }
+
+    let mut extra_data = serde_json::Map::new();
+    insert_extra_string(&mut extra_data, "condition", condition);
+
+    Some(Dependency {
+        purl: build_nuget_purl(Some(&name), None),
+        extracted_requirement: version,
+        scope: Some("package_version".to_string()),
+        is_runtime: Some(true),
+        is_optional: Some(false),
+        is_pinned: Some(false),
+        is_direct: Some(true),
+        resolved_package: None,
+        extra_data: if extra_data.is_empty() {
+            None
+        } else {
+            Some(extra_data.into_iter().collect())
+        },
+    })
+}
+
+pub struct CentralPackageManagementPropsParser;
+
+impl PackageParser for CentralPackageManagementPropsParser {
+    const PACKAGE_TYPE: PackageType = PackageType::Nuget;
+
+    fn is_match(path: &Path) -> bool {
+        path.file_name().and_then(|name| name.to_str()) == Some("Directory.Packages.props")
+    }
+
+    fn extract_packages(path: &Path) -> Vec<PackageData> {
+        let file = match File::open(path) {
+            Ok(file) => file,
+            Err(e) => {
+                warn!(
+                    "Failed to open Directory.Packages.props at {:?}: {}",
+                    path, e
+                );
+                return vec![default_package_data(Some(
+                    DatasourceId::NugetDirectoryPackagesProps,
+                ))];
+            }
+        };
+
+        let reader = BufReader::new(file);
+        let mut xml_reader = Reader::from_reader(reader);
+        xml_reader.config_mut().trim_text(true);
+
+        let mut dependencies = Vec::new();
+        let mut buf = Vec::new();
+        let mut current_element = String::new();
+        let mut current_item_group_condition = None;
+        let mut current_package_version: Option<CentralPackageVersionData> = None;
+        let mut manage_package_versions_centrally = None;
+        let mut central_package_transitive_pinning_enabled = None;
+        let mut central_package_version_override_enabled = None;
+
+        loop {
+            match xml_reader.read_event_into(&mut buf) {
+                Ok(Event::Start(e)) => {
+                    let tag_name = String::from_utf8_lossy(e.name().as_ref()).to_string();
+                    current_element = tag_name.clone();
+
+                    match tag_name.as_str() {
+                        "ItemGroup" => {
+                            current_item_group_condition = e
+                                .attributes()
+                                .filter_map(|a| a.ok())
+                                .find(|attr| attr.key.as_ref() == b"Condition")
+                                .and_then(|attr| String::from_utf8(attr.value.to_vec()).ok());
+                        }
+                        "PackageVersion" => {
+                            let name = e
+                                .attributes()
+                                .filter_map(|a| a.ok())
+                                .find(|attr| matches!(attr.key.as_ref(), b"Include" | b"Update"))
+                                .and_then(|attr| String::from_utf8(attr.value.to_vec()).ok());
+                            let version = e
+                                .attributes()
+                                .filter_map(|a| a.ok())
+                                .find(|attr| attr.key.as_ref() == b"Version")
+                                .and_then(|attr| String::from_utf8(attr.value.to_vec()).ok());
+                            let condition = e
+                                .attributes()
+                                .filter_map(|a| a.ok())
+                                .find(|attr| attr.key.as_ref() == b"Condition")
+                                .and_then(|attr| String::from_utf8(attr.value.to_vec()).ok())
+                                .or_else(|| current_item_group_condition.clone());
+
+                            current_package_version = Some(CentralPackageVersionData {
+                                name,
+                                version,
+                                condition,
+                            });
+                        }
+                        _ => {}
+                    }
+                }
+                Ok(Event::Empty(e)) => {
+                    let tag_name = String::from_utf8_lossy(e.name().as_ref()).to_string();
+                    if tag_name == "PackageVersion" {
+                        let name = e
+                            .attributes()
+                            .filter_map(|a| a.ok())
+                            .find(|attr| matches!(attr.key.as_ref(), b"Include" | b"Update"))
+                            .and_then(|attr| String::from_utf8(attr.value.to_vec()).ok());
+                        let version = e
+                            .attributes()
+                            .filter_map(|a| a.ok())
+                            .find(|attr| attr.key.as_ref() == b"Version")
+                            .and_then(|attr| String::from_utf8(attr.value.to_vec()).ok());
+                        let condition = e
+                            .attributes()
+                            .filter_map(|a| a.ok())
+                            .find(|attr| attr.key.as_ref() == b"Condition")
+                            .and_then(|attr| String::from_utf8(attr.value.to_vec()).ok())
+                            .or_else(|| current_item_group_condition.clone());
+
+                        if let Some(dependency) =
+                            build_directory_packages_dependency(name, version, condition)
+                        {
+                            dependencies.push(dependency);
+                        }
+                    }
+                }
+                Ok(Event::Text(e)) => {
+                    let text = e.decode().ok().map(|s| s.trim().to_string());
+                    let Some(text) = text.filter(|value| !value.is_empty()) else {
+                        buf.clear();
+                        continue;
+                    };
+
+                    if current_package_version.is_some() {
+                        if current_element.as_str() == "Version"
+                            && let Some(entry) = &mut current_package_version
+                        {
+                            entry.version = Some(text);
+                        }
+                    } else {
+                        match current_element.as_str() {
+                            "ManagePackageVersionsCentrally" => {
+                                manage_package_versions_centrally =
+                                    Some(text.eq_ignore_ascii_case("true"))
+                            }
+                            "CentralPackageTransitivePinningEnabled" => {
+                                central_package_transitive_pinning_enabled =
+                                    Some(text.eq_ignore_ascii_case("true"))
+                            }
+                            "CentralPackageVersionOverrideEnabled" => {
+                                central_package_version_override_enabled =
+                                    Some(text.eq_ignore_ascii_case("true"))
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+                Ok(Event::End(e)) => {
+                    let tag_name = String::from_utf8_lossy(e.name().as_ref()).to_string();
+
+                    match tag_name.as_str() {
+                        "ItemGroup" => current_item_group_condition = None,
+                        "PackageVersion" => {
+                            if let Some(entry) = current_package_version.take()
+                                && let Some(dependency) = build_directory_packages_dependency(
+                                    entry.name,
+                                    entry.version,
+                                    entry.condition,
+                                )
+                            {
+                                dependencies.push(dependency);
+                            }
+                        }
+                        _ => {}
+                    }
+
+                    current_element.clear();
+                }
+                Ok(Event::Eof) => break,
+                Err(e) => {
+                    warn!(
+                        "Error parsing Directory.Packages.props at {:?}: {}",
+                        path, e
+                    );
+                    return vec![default_package_data(Some(
+                        DatasourceId::NugetDirectoryPackagesProps,
+                    ))];
+                }
+                _ => {}
+            }
+
+            buf.clear();
+        }
+
+        let mut extra_data = serde_json::Map::new();
+        if let Some(value) = manage_package_versions_centrally {
+            extra_data.insert(
+                "manage_package_versions_centrally".to_string(),
+                serde_json::Value::Bool(value),
+            );
+        }
+        if let Some(value) = central_package_transitive_pinning_enabled {
+            extra_data.insert(
+                "central_package_transitive_pinning_enabled".to_string(),
+                serde_json::Value::Bool(value),
+            );
+        }
+        if let Some(value) = central_package_version_override_enabled {
+            extra_data.insert(
+                "central_package_version_override_enabled".to_string(),
+                serde_json::Value::Bool(value),
+            );
+        }
+
+        vec![PackageData {
+            datasource_id: Some(DatasourceId::NugetDirectoryPackagesProps),
+            package_type: Some(Self::PACKAGE_TYPE),
+            dependencies,
+            extra_data: if extra_data.is_empty() {
+                None
+            } else {
+                Some(extra_data.into_iter().collect())
+            },
+            ..default_package_data(Some(DatasourceId::NugetDirectoryPackagesProps))
+        }]
+    }
+}
+
 /// Parser for .nupkg files (NuGet package archives)
 pub struct NupkgParser;
 
@@ -1812,6 +2055,14 @@ fn parse_nuspec_content(content: &str) -> Result<PackageData, String> {
         ..default_package_data(Some(DatasourceId::NugetNupkg))
     })
 }
+
+crate::register_parser!(
+    ".NET Directory.Packages.props central package management manifest",
+    &["**/Directory.Packages.props"],
+    "nuget",
+    "C#",
+    Some("https://learn.microsoft.com/en-us/nuget/consume-packages/central-package-management"),
+);
 
 crate::register_parser!(
     ".NET packages.config manifest",

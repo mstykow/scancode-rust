@@ -2,7 +2,8 @@
 mod golden_tests {
     use crate::parsers::PackageParser;
     use crate::parsers::nuget::{
-        DotNetDepsJsonParser, NuspecParser, PackageReferenceProjectParser, ProjectJsonParser,
+        CentralPackageManagementPropsParser, DotNetDepsJsonParser, NuspecParser,
+        PackageReferenceProjectParser, ProjectJsonParser,
     };
     use crate::test_utils::compare_package_data_parser_only;
     use std::path::PathBuf;
@@ -143,6 +144,23 @@ mod golden_tests {
             PathBuf::from("testdata/nuget-golden/deps-json/ExampleApp.deps.json.expected.json");
 
         let package_data = DotNetDepsJsonParser::extract_first_package(&test_file);
+
+        match compare_package_data_parser_only(&package_data, &expected_file) {
+            Ok(_) => (),
+            Err(e) => panic!("Golden test failed: {}", e),
+        }
+    }
+
+    #[test]
+    fn test_golden_directory_packages_props() {
+        let test_file = PathBuf::from(
+            "testdata/nuget-golden/central-package-management/Directory.Packages.props",
+        );
+        let expected_file = PathBuf::from(
+            "testdata/nuget-golden/central-package-management/Directory.Packages.props.expected.json",
+        );
+
+        let package_data = CentralPackageManagementPropsParser::extract_first_package(&test_file);
 
         match compare_package_data_parser_only(&package_data, &expected_file) {
             Ok(_) => (),
