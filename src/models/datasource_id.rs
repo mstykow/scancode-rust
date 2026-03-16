@@ -41,6 +41,7 @@ pub enum DatasourceId {
     AlpineApkbuild,
     AlpineInstalledDb,
 
+    // ── Arch Linux ──
     ArchAurinfo,
     ArchPkginfo,
     ArchSrcinfo,
@@ -71,6 +72,7 @@ pub enum DatasourceId {
     #[serde(rename = "buck_metadata")]
     BuckMetadata,
 
+    // ── Bun ──
     BunLock,
     BunLockb,
 
@@ -146,9 +148,11 @@ pub enum DatasourceId {
     DebianOriginalSourceTarball,
     DebianSourceControlDsc,
 
+    // ── Deno ──
     DenoJson,
     DenoLock,
 
+    // ── Docker ──
     Dockerfile,
 
     // ── FreeBSD ──
@@ -278,6 +282,9 @@ pub enum DatasourceId {
     SwiftPackageResolved,
     SwiftPackageShowDependencies,
 
+    // ── vcpkg ──
+    VcpkgJson,
+
     // ── Yarn ──
     YarnLock,
 
@@ -301,6 +308,7 @@ impl DatasourceId {
             Self::AlpineApkbuild => "alpine_apkbuild",
             Self::AlpineInstalledDb => "alpine_installed_db",
 
+            // Arch Linux
             Self::ArchAurinfo => "arch_aurinfo",
             Self::ArchPkginfo => "arch_pkginfo",
             Self::ArchSrcinfo => "arch_srcinfo",
@@ -505,6 +513,9 @@ impl DatasourceId {
             Self::SwiftPackageManifestJson => "swift_package_manifest_json",
             Self::SwiftPackageResolved => "swift_package_resolved",
             Self::SwiftPackageShowDependencies => "swift_package_show_dependencies",
+
+            // vcpkg
+            Self::VcpkgJson => "vcpkg_json",
 
             // Yarn
             Self::YarnLock => "yarn_lock",

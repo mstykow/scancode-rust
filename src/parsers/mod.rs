@@ -254,6 +254,11 @@ mod uv_lock;
 mod uv_lock_golden_test;
 #[cfg(test)]
 mod uv_lock_test;
+mod vcpkg;
+#[cfg(all(test, feature = "golden-tests"))]
+mod vcpkg_golden_test;
+#[cfg(test)]
+mod vcpkg_test;
 mod yarn_lock;
 #[cfg(test)]
 mod yarn_lock_test;
@@ -419,6 +424,7 @@ pub use self::swift_manifest_json::SwiftManifestJsonParser;
 pub use self::swift_resolved::SwiftPackageResolvedParser;
 pub use self::swift_show_dependencies::SwiftShowDependenciesParser;
 pub use self::uv_lock::UvLockParser;
+pub use self::vcpkg::VcpkgManifestParser;
 pub use self::yarn_lock::YarnLockParser;
 
 /// Registers all parsers and recognizers, generating dispatch functions.
@@ -566,6 +572,7 @@ register_package_handlers! {
         PubspecYamlParser,
         PythonParser,
         UvLockParser,
+        VcpkgManifestParser,
         ReadmeParser,
         RequirementsTxtParser,
         RpmBdbDatabaseParser,
