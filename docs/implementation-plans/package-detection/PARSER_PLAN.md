@@ -59,6 +59,7 @@ All production handlers in the original plan scope are covered. Some ecosystems 
 | FreeBSD               | ✅ Implemented | `FreebsdCompactManifestParser`                                                                                                                              |
 | Git submodules        | ✅ Implemented | `GitmodulesParser`                                                                                                                                          |
 | Go                    | ✅ Implemented | `go.mod`, `go.sum`, `Godeps.json`, `go.mod.graph`, `go.work`                                                                                                |
+| Haskell / Hackage     | ✅ Implemented | `*.cabal`, `cabal.project`, `stack.yaml` + sibling assembly                                                                                                 |
 | Hex / Elixir          | ✅ Implemented | `mix.lock` lockfile parsing; standalone `mix.exs` project metadata remains follow-up work                                                                   |
 | Gradle                | ✅ Implemented | ⭐ Beyond parity: added `GradleLockfileParser` and `GradleModuleParser`                                                                                     |
 | Haxe                  | ✅ Implemented | `HaxeParser`                                                                                                                                                |
@@ -82,14 +83,6 @@ All production handlers in the original plan scope are covered. Some ecosystems 
 ## Ranked Parser Opportunities
 
 The tables below classify the current open parser backlog by **value created**, not by easiest implementation order. This now includes both older local issues and new local issues created directly from the roadmap review, with related upstream ScanCode issues noted where relevant. Open upstream Python-reference PR activity is still used as a demand signal when it materially changes priority.
-
-### Highest-Value Opportunities
-
-These issues now create the most value overall after balancing ecosystem reach, package/dependency signal quality, reuse of existing Rust parser families, and upstream implementation momentum. Not every row has equally strong upstream PR activity, but all of them now outrank the remaining medium set on overall impact.
-
-| Issue Set / Status | Opportunity                                                  | Why this creates value                                                                                      | Current overlap / notes                                                                                                                                                           |
-| ------------------ | ------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| #344               | Haskell / Hackage (`*.cabal`, `cabal.project`, `stack.yaml`) | Covers a visible language ecosystem with multiple standard manifest targets and clear dependency semantics. | Previously only a future purl-spec note; now promoted into the highest-value ranking with explicit issue tracking. Related upstream issue: `aboutcode-org/scancode-toolkit#4817`. |
 
 ### Medium-Value Opportunities
 
