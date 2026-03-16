@@ -83,6 +83,15 @@ pub static ASSEMBLERS: &[AssemblerConfig] = &[
         sibling_file_patterns: &["pubspec.yaml", "pubspec.lock"],
         mode: AssemblyMode::SiblingMerge,
     },
+    AssemblerConfig {
+        datasource_ids: &[
+            DatasourceId::HackageCabal,
+            DatasourceId::HackageCabalProject,
+            DatasourceId::HackageStackYaml,
+        ],
+        sibling_file_patterns: &["*.cabal", "cabal.project", "stack.yaml"],
+        mode: AssemblyMode::SiblingMerge,
+    },
     // Chef ecosystem
     AssemblerConfig {
         datasource_ids: &[

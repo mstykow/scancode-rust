@@ -3,6 +3,7 @@ mod assemblers;
 mod assembly_golden_test;
 mod cargo_workspace_merge;
 pub mod file_ref_resolve;
+mod hackage_merge;
 mod nested_merge;
 mod sibling_merge;
 mod swift_merge;
@@ -95,6 +96,23 @@ pub fn assemble(files: &mut [FileInfo]) -> AssemblyResult {
                 .expect("assembler config must exist");
 
             if config_key == DatasourceId::SwiftPackageManifestJson {
+                continue;
+            }
+
+            if config_key == DatasourceId::HackageCabal {
+                let results = hackage_merge::assemble_hackage_packages(files, file_indices);
+                for (package, deps, assigned_indices) in results {
+                    if let Some(package) = package {
+                        let package_uid = package.package_uid.clone();
+                        for idx in &assigned_indices {
+                            if !files[*idx].for_packages.contains(&package_uid) {
+                                files[*idx].for_packages.push(package_uid.clone());
+                            }
+                        }
+                        packages.push(package);
+                    }
+                    dependencies.extend(deps);
+                }
                 continue;
             }
 
@@ -1399,6 +1417,88 @@ mod tests {
         );
         assert_eq!(files[0].for_packages.len(), 1);
         assert_eq!(files[1].for_packages.len(), 1);
+    }
+
+    #[test]
+    fn test_assemble_hackage_multiple_cabal_files_do_not_collapse_into_one_package() {
+        let mut files = vec![
+            create_test_file_info(
+                "project/alpha.cabal",
+                DatasourceId::HackageCabal,
+                Some("pkg:hackage/alpha@1.0.0"),
+                Some("alpha"),
+                Some("1.0.0"),
+                vec![Dependency {
+                    purl: Some("pkg:hackage/base".to_string()),
+                    extracted_requirement: Some(">=4.14 && <5".to_string()),
+                    scope: Some("build-depends".to_string()),
+                    is_runtime: Some(true),
+                    is_optional: Some(false),
+                    is_pinned: Some(false),
+                    is_direct: Some(true),
+                    resolved_package: None,
+                    extra_data: None,
+                }],
+            ),
+            create_test_file_info(
+                "project/beta.cabal",
+                DatasourceId::HackageCabal,
+                Some("pkg:hackage/beta@2.0.0"),
+                Some("beta"),
+                Some("2.0.0"),
+                vec![],
+            ),
+            create_test_file_info(
+                "project/cabal.project",
+                DatasourceId::HackageCabalProject,
+                None,
+                None,
+                None,
+                vec![Dependency {
+                    purl: Some("pkg:hackage/lens@5.2.1".to_string()),
+                    extracted_requirement: Some("5.2.1".to_string()),
+                    scope: Some("extra-packages".to_string()),
+                    is_runtime: None,
+                    is_optional: Some(false),
+                    is_pinned: Some(true),
+                    is_direct: Some(true),
+                    resolved_package: None,
+                    extra_data: None,
+                }],
+            ),
+        ];
+
+        let result = assemble(&mut files);
+
+        assert_eq!(result.packages.len(), 2);
+        assert!(
+            result
+                .packages
+                .iter()
+                .any(|package| package.name.as_deref() == Some("alpha"))
+        );
+        assert!(
+            result
+                .packages
+                .iter()
+                .any(|package| package.name.as_deref() == Some("beta"))
+        );
+        assert!(
+            result
+                .packages
+                .iter()
+                .all(|package| package.datafile_paths.len() == 1)
+        );
+        assert!(
+            result.dependencies.iter().any(|dependency| {
+                dependency.purl.as_deref() == Some("pkg:hackage/lens@5.2.1")
+                    && dependency.for_package_uid.is_none()
+            }),
+            "project-level Hackage dependency should stay unowned when multiple sibling manifests exist"
+        );
+        assert!(files[0].for_packages.len() == 1);
+        assert!(files[1].for_packages.len() == 1);
+        assert!(files[2].for_packages.is_empty());
     }
 
     #[test]
