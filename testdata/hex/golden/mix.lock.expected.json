@@ -1,0 +1,158 @@
+[
+  {
+    "type": "hex",
+    "primary_language": "Elixir",
+    "parties": [],
+    "dependencies": [
+      {
+        "purl": "pkg:hex/plug@1.18.1",
+        "extracted_requirement": "1.18.1",
+        "scope": "dependencies",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": false,
+        "resolved_package": {
+          "type": "hex",
+          "name": "plug",
+          "version": "1.18.1",
+          "primary_language": "Elixir",
+          "sha256": "5067f26f7745b7e31bc3368bc1a2b818b9779faa959b49c934c17730efc911cf",
+          "is_virtual": true,
+          "extra_data": {
+            "repo": "hexpm",
+            "outer_checksum": "57a57db70df2b422b564437d2d33cf8d33cd16339c1edb190cd11b1a3a546cc2",
+            "managers": ["mix"]
+          },
+          "dependencies": [
+            {
+              "purl": "pkg:hex/mime",
+              "extracted_requirement": "~> 1.0 or ~> 2.0",
+              "scope": "dependencies",
+              "is_runtime": true,
+              "is_optional": false,
+              "is_pinned": false,
+              "is_direct": true
+            },
+            {
+              "purl": "pkg:hex/plug_crypto",
+              "extracted_requirement": "~> 1.1.1 or ~> 1.2 or ~> 2.0",
+              "scope": "dependencies",
+              "is_runtime": true,
+              "is_optional": false,
+              "is_pinned": false,
+              "is_direct": true
+            },
+            {
+              "purl": "pkg:hex/telemetry",
+              "extracted_requirement": "~> 0.4.3 or ~> 1.0",
+              "scope": "dependencies",
+              "is_runtime": true,
+              "is_optional": false,
+              "is_pinned": false,
+              "is_direct": true
+            }
+          ],
+          "repository_homepage_url": "https://hex.pm/packages/plug",
+          "api_data_url": "https://hex.pm/api/packages/plug",
+          "datasource_id": "hex_mix_lock",
+          "purl": "pkg:hex/plug@1.18.1"
+        },
+        "extra_data": {
+          "app": "plug"
+        }
+      },
+      {
+        "purl": "pkg:hex/plug_crypto@2.1.1",
+        "extracted_requirement": "2.1.1",
+        "scope": "dependencies",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": false,
+        "resolved_package": {
+          "type": "hex",
+          "name": "plug_crypto",
+          "version": "2.1.1",
+          "primary_language": "Elixir",
+          "sha256": "19bda8184399cb24afa10be734f84a16ea0a2bc65054e23a62bb10f06bc89491",
+          "is_virtual": true,
+          "extra_data": {
+            "repo": "hexpm",
+            "managers": ["mix"],
+            "outer_checksum": "6470bce6ffe41c8bd497612ffde1a7e4af67f36a15eea5f921af71cf3e11247c"
+          },
+          "dependencies": [],
+          "repository_homepage_url": "https://hex.pm/packages/plug_crypto",
+          "api_data_url": "https://hex.pm/api/packages/plug_crypto",
+          "datasource_id": "hex_mix_lock",
+          "purl": "pkg:hex/plug_crypto@2.1.1"
+        },
+        "extra_data": {
+          "app": "plug_crypto"
+        }
+      },
+      {
+        "purl": "pkg:hex/mime@1.6.0",
+        "extracted_requirement": "1.6.0",
+        "scope": "dependencies",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": false,
+        "resolved_package": {
+          "type": "hex",
+          "name": "mime",
+          "version": "1.6.0",
+          "primary_language": "Elixir",
+          "sha256": "dabde576a497cef4bbdd60aceee8160e02a6c89250d6c0b29e56c0dfb00db3d2",
+          "is_virtual": true,
+          "extra_data": {
+            "outer_checksum": "31a1a8613f8321143dde1dafc36006a17d28d02bdfecb9e95a880fa7aabd19a7",
+            "repo": "hexpm",
+            "managers": ["mix"]
+          },
+          "dependencies": [],
+          "repository_homepage_url": "https://hex.pm/packages/mime",
+          "api_data_url": "https://hex.pm/api/packages/mime",
+          "datasource_id": "hex_mix_lock",
+          "purl": "pkg:hex/mime@1.6.0"
+        },
+        "extra_data": {
+          "app": "mime"
+        }
+      },
+      {
+        "purl": "pkg:hex/telemetry@1.3.0",
+        "extracted_requirement": "1.3.0",
+        "scope": "dependencies",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": false,
+        "resolved_package": {
+          "type": "hex",
+          "name": "telemetry",
+          "version": "1.3.0",
+          "primary_language": "Elixir",
+          "sha256": "fedebbae410d715cf8e7062c96a1ef32ec22e764197f70cda73d82778d61e7a2",
+          "is_virtual": true,
+          "extra_data": {
+            "repo": "hexpm",
+            "outer_checksum": "7015fc8919dbe63764f4b4b87a95b7c0996bd539e0d499be6ec9d7f3875b79e6",
+            "managers": ["rebar3"]
+          },
+          "dependencies": [],
+          "repository_homepage_url": "https://hex.pm/packages/telemetry",
+          "api_data_url": "https://hex.pm/api/packages/telemetry",
+          "datasource_id": "hex_mix_lock",
+          "purl": "pkg:hex/telemetry@1.3.0"
+        },
+        "extra_data": {
+          "app": "telemetry"
+        }
+      }
+    ],
+    "datasource_id": "hex_mix_lock"
+  }
+]
