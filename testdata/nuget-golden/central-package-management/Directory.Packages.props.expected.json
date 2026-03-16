@@ -1,0 +1,43 @@
+[
+  {
+    "type": "nuget",
+    "parties": [],
+    "extra_data": {
+      "manage_package_versions_centrally": true,
+      "central_package_version_override_enabled": true
+    },
+    "dependencies": [
+      {
+        "purl": "pkg:nuget/Newtonsoft.Json",
+        "extracted_requirement": "13.0.3",
+        "scope": "package_version",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:nuget/Serilog",
+        "extracted_requirement": "3.1.1",
+        "scope": "package_version",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true,
+        "extra_data": {
+          "condition": "'$(TargetFramework)' == 'net8.0'"
+        }
+      },
+      {
+        "purl": "pkg:nuget/NUnit",
+        "extracted_requirement": "4.0.1",
+        "scope": "package_version",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true
+      }
+    ],
+    "datasource_id": "nuget_directory_packages_props"
+  }
+]

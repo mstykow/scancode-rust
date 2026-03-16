@@ -2,8 +2,9 @@
 mod tests {
     use super::super::PackageParser;
     use super::super::nuget::{
-        DotNetDepsJsonParser, NupkgParser, NuspecParser, PackageReferenceProjectParser,
-        PackagesConfigParser, PackagesLockParser, ProjectJsonParser, ProjectLockJsonParser,
+        CentralPackageManagementPropsParser, DotNetDepsJsonParser, NupkgParser, NuspecParser,
+        PackageReferenceProjectParser, PackagesConfigParser, PackagesLockParser, ProjectJsonParser,
+        ProjectLockJsonParser,
     };
     use crate::models::DatasourceId;
     use crate::models::PackageType;
@@ -877,6 +878,165 @@ mod tests {
         assert!(!PackageReferenceProjectParser::is_match(&PathBuf::from(
             "example.sln"
         )));
+    }
+
+    #[test]
+    fn test_directory_packages_props_is_match() {
+        assert!(CentralPackageManagementPropsParser::is_match(
+            &PathBuf::from("Directory.Packages.props")
+        ));
+        assert!(!CentralPackageManagementPropsParser::is_match(
+            &PathBuf::from("Directory.Build.props")
+        ));
+        assert!(!CentralPackageManagementPropsParser::is_match(
+            &PathBuf::from("packages.props")
+        ));
+    }
+
+    #[test]
+    fn test_directory_packages_props_extracts_package_versions() {
+        let xml = r#"<Project>
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageVersion Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageVersion Include="Serilog" Version="3.1.1" Condition="'$(TargetFramework)' == 'net8.0'" />
+  </ItemGroup>
+</Project>"#;
+
+        let mut temp_file = Builder::new()
+            .prefix("Directory.Packages")
+            .suffix(".props")
+            .tempfile()
+            .unwrap();
+        temp_file.write_all(xml.as_bytes()).unwrap();
+        let path = temp_file.path().with_file_name("Directory.Packages.props");
+        std::fs::rename(temp_file.path(), &path).unwrap();
+
+        let package_data = CentralPackageManagementPropsParser::extract_first_package(&path);
+        assert_eq!(package_data.package_type, Some(PackageType::Nuget));
+        assert_eq!(
+            package_data.datasource_id,
+            Some(DatasourceId::NugetDirectoryPackagesProps)
+        );
+        assert!(package_data.name.is_none());
+        assert!(package_data.version.is_none());
+        assert_eq!(package_data.dependencies.len(), 2);
+
+        let dep1 = &package_data.dependencies[0];
+        assert_eq!(dep1.purl.as_deref(), Some("pkg:nuget/Newtonsoft.Json"));
+        assert_eq!(dep1.extracted_requirement.as_deref(), Some("13.0.3"));
+        assert_eq!(dep1.scope.as_deref(), Some("package_version"));
+        assert_eq!(dep1.is_direct, Some(true));
+
+        let dep2 = &package_data.dependencies[1];
+        assert_eq!(dep2.purl.as_deref(), Some("pkg:nuget/Serilog"));
+        assert_eq!(dep2.extracted_requirement.as_deref(), Some("3.1.1"));
+        let extra = dep2.extra_data.as_ref().unwrap();
+        assert_eq!(
+            extra.get("condition").and_then(|v| v.as_str()),
+            Some("'$(TargetFramework)' == 'net8.0'")
+        );
+
+        let package_extra = package_data.extra_data.as_ref().unwrap();
+        assert_eq!(
+            package_extra
+                .get("manage_package_versions_centrally")
+                .and_then(|v| v.as_bool()),
+            Some(true)
+        );
+        assert_eq!(
+            package_extra
+                .get("central_package_transitive_pinning_enabled")
+                .and_then(|v| v.as_bool()),
+            Some(true)
+        );
+    }
+
+    #[test]
+    fn test_directory_packages_props_extracts_update_entries() {
+        let xml = r#"<Project>
+  <ItemGroup Condition="'$(TargetFramework)' == 'net472'">
+    <PackageVersion Update="NUnit" Version="4.0.1" />
+  </ItemGroup>
+</Project>"#;
+
+        let mut temp_file = Builder::new()
+            .prefix("Directory.Packages")
+            .suffix(".props")
+            .tempfile()
+            .unwrap();
+        temp_file.write_all(xml.as_bytes()).unwrap();
+        let path = temp_file.path().with_file_name("Directory.Packages.props");
+        std::fs::rename(temp_file.path(), &path).unwrap();
+
+        let package_data = CentralPackageManagementPropsParser::extract_first_package(&path);
+        assert_eq!(package_data.dependencies.len(), 1);
+        let dep = &package_data.dependencies[0];
+        assert_eq!(dep.purl.as_deref(), Some("pkg:nuget/NUnit"));
+        assert_eq!(dep.extracted_requirement.as_deref(), Some("4.0.1"));
+        let extra = dep.extra_data.as_ref().unwrap();
+        assert_eq!(
+            extra.get("condition").and_then(|v| v.as_str()),
+            Some("'$(TargetFramework)' == 'net472'")
+        );
+    }
+
+    #[test]
+    fn test_csproj_versionless_package_reference_remains_unresolved_in_this_slice() {
+        let xml = r#"<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <PackageId>Contoso.Utility</PackageId>
+    <Version>1.0.0</Version>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" />
+    <PackageReference Include="Serilog">
+      <Version>2.10.0</Version>
+    </PackageReference>
+  </ItemGroup>
+</Project>"#;
+
+        let mut temp_file = Builder::new().suffix(".csproj").tempfile().unwrap();
+        temp_file.write_all(xml.as_bytes()).unwrap();
+
+        let package_data = PackageReferenceProjectParser::extract_first_package(temp_file.path());
+        assert_eq!(package_data.dependencies.len(), 2);
+        assert_eq!(
+            package_data.dependencies[0].purl.as_deref(),
+            Some("pkg:nuget/Newtonsoft.Json")
+        );
+        assert!(package_data.dependencies[0].extracted_requirement.is_none());
+        assert_eq!(
+            package_data.dependencies[1]
+                .extracted_requirement
+                .as_deref(),
+            Some("2.10.0")
+        );
+    }
+
+    #[test]
+    fn test_directory_packages_props_malformed_returns_default() {
+        let xml = r#"<Project><ItemGroup><PackageVersion Include="Newtonsoft.Json""#;
+
+        let mut temp_file = Builder::new()
+            .prefix("Directory.Packages")
+            .suffix(".props")
+            .tempfile()
+            .unwrap();
+        temp_file.write_all(xml.as_bytes()).unwrap();
+        let path = temp_file.path().with_file_name("Directory.Packages.props");
+        std::fs::rename(temp_file.path(), &path).unwrap();
+
+        let package_data = CentralPackageManagementPropsParser::extract_first_package(&path);
+        assert_eq!(package_data.package_type, Some(PackageType::Nuget));
+        assert_eq!(
+            package_data.datasource_id,
+            Some(DatasourceId::NugetDirectoryPackagesProps)
+        );
+        assert!(package_data.dependencies.is_empty());
     }
 
     #[test]
