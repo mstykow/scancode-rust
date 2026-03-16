@@ -1,0 +1,81 @@
+[
+  {
+    "type": "alpm",
+    "namespace": "arch",
+    "name": "python-construct",
+    "version": "1:2.10.68-3",
+    "description": "Parsing library sample package",
+    "parties": [
+      {
+        "type": "person",
+        "role": "packager",
+        "name": "Max Example",
+        "email": "max@example.com"
+      }
+    ],
+    "homepage_url": "https://github.com/construct/construct",
+    "size": 123456,
+    "extracted_license_statement": "MIT",
+    "source_packages": ["pkg:alpm/arch/python-construct@1:2.10.68-3?arch=x86_64"],
+    "extra_data": {
+      "conflict": ["python-construct-git"],
+      "provides": ["python-construct-legacy"],
+      "makedepend": "python-build",
+      "builddate": 1712345678,
+      "checkdepend": "python-pytest",
+      "replaces": ["python-construct-beta"],
+      "depend": ["python", "python-arrow>=1.2"],
+      "optdepend": "python-ruamel-yaml: YAML support",
+      "arch": ["x86_64"]
+    },
+    "dependencies": [
+      {
+        "purl": "pkg:alpm/arch/python-pytest",
+        "extracted_requirement": "python-pytest",
+        "scope": "checkdepend",
+        "is_runtime": false,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:alpm/arch/python",
+        "extracted_requirement": "python",
+        "scope": "depend",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:alpm/arch/python-arrow",
+        "extracted_requirement": "python-arrow>=1.2",
+        "scope": "depend",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:alpm/arch/python-build",
+        "extracted_requirement": "python-build",
+        "scope": "makedepend",
+        "is_runtime": false,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:alpm/arch/python-ruamel-yaml",
+        "extracted_requirement": "python-ruamel-yaml: YAML support",
+        "scope": "optdepend",
+        "is_runtime": true,
+        "is_optional": true,
+        "is_pinned": false,
+        "is_direct": true
+      }
+    ],
+    "datasource_id": "arch_pkginfo",
+    "purl": "pkg:alpm/arch/python-construct@1:2.10.68-3?arch=x86_64"
+  }
+]

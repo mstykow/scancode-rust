@@ -41,6 +41,10 @@ pub enum DatasourceId {
     AlpineApkbuild,
     AlpineInstalledDb,
 
+    ArchAurinfo,
+    ArchPkginfo,
+    ArchSrcinfo,
+
     // ── Android ──
     AndroidAarLibrary,
     AndroidApk,
@@ -296,6 +300,10 @@ impl DatasourceId {
             Self::AlpineApkArchive => "alpine_apk_archive",
             Self::AlpineApkbuild => "alpine_apkbuild",
             Self::AlpineInstalledDb => "alpine_installed_db",
+
+            Self::ArchAurinfo => "arch_aurinfo",
+            Self::ArchPkginfo => "arch_pkginfo",
+            Self::ArchSrcinfo => "arch_srcinfo",
 
             // Android
             Self::AndroidAarLibrary => "android_aar_library",

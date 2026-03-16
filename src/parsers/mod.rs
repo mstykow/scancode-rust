@@ -6,6 +6,11 @@ mod about_test;
 mod alpine;
 #[cfg(all(test, feature = "golden-tests"))]
 mod alpine_golden_test;
+mod arch;
+#[cfg(all(test, feature = "golden-tests"))]
+mod arch_golden_test;
+#[cfg(test)]
+mod arch_test;
 mod autotools;
 #[cfg(test)]
 mod autotools_test;
@@ -332,6 +337,7 @@ pub trait PackageParser {
 
 pub use self::about::AboutFileParser;
 pub use self::alpine::{AlpineApkParser, AlpineApkbuildParser, AlpineInstalledParser};
+pub use self::arch::{ArchPkginfoParser, ArchSrcinfoParser};
 pub use self::autotools::AutotoolsConfigureParser;
 pub use self::bazel::{BazelBuildParser, BazelModuleParser};
 pub use self::bower::BowerJsonParser;
@@ -472,6 +478,8 @@ register_package_handlers! {
         AlpineApkParser,
         AlpineApkbuildParser,
         AlpineInstalledParser,
+        ArchPkginfoParser,
+        ArchSrcinfoParser,
         AutotoolsConfigureParser,
         BazelBuildParser,
         BazelModuleParser,

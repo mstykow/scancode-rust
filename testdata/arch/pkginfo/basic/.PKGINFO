@@ -1,0 +1,18 @@
+pkgname = python-construct
+pkgbase = python-construct
+pkgver = 1:2.10.68-3
+pkgdesc = Parsing library sample package
+url = https://github.com/construct/construct
+builddate = 1712345678
+packager = Max Example <max@example.com>
+size = 123456
+arch = x86_64
+license = MIT
+depend = python
+depend = python-arrow>=1.2
+makedepend = python-build
+checkdepend = python-pytest
+optdepend = python-ruamel-yaml: YAML support
+provides = python-construct-legacy
+conflict = python-construct-git
+replaces = python-construct-beta
