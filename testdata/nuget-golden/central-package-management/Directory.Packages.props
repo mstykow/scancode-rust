@@ -6,6 +6,6 @@
   <ItemGroup>
     <PackageVersion Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageVersion Include="Serilog" Version="3.1.1" Condition="'$(TargetFramework)' == 'net8.0'" />
-    <PackageVersion Update="NUnit" Version="4.0.1" />
+    <PackageVersion Update="NUnit" Version="4.5.1" />
   </ItemGroup>
 </Project>
