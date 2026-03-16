@@ -131,6 +131,11 @@ mod gradle_module;
 mod gradle_module_golden_test;
 #[cfg(test)]
 mod gradle_module_test;
+mod hackage;
+#[cfg(all(test, feature = "golden-tests"))]
+mod hackage_golden_test;
+#[cfg(test)]
+mod hackage_test;
 mod haxe;
 #[cfg(all(test, feature = "golden-tests"))]
 mod haxe_golden_test;
@@ -384,6 +389,7 @@ pub use self::go_mod_graph::GoModGraphParser;
 pub use self::gradle::GradleParser;
 pub use self::gradle_lock::GradleLockfileParser;
 pub use self::gradle_module::GradleModuleParser;
+pub use self::hackage::{HackageCabalParser, HackageCabalProjectParser, HackageStackYamlParser};
 pub use self::haxe::HaxeParser;
 pub use self::hex_lock::HexLockParser;
 pub use self::maven::MavenParser;
@@ -550,6 +556,9 @@ register_package_handlers! {
         GradleLockfileParser,
         GradleParser,
         GradleModuleParser,
+        HackageCabalParser,
+        HackageCabalProjectParser,
+        HackageStackYamlParser,
         HaxeParser,
         HexLockParser,
         MavenParser,
