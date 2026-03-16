@@ -217,6 +217,83 @@ fn is_top_level_embedded_section_boundary(line: &str) -> bool {
         && !trimmed[4..].trim().is_empty()
 }
 
+fn openj9_notice_list_number(line: &str) -> Option<usize> {
+    let trimmed = line.trim_start();
+    let digit_count = trimmed
+        .bytes()
+        .take_while(|byte| byte.is_ascii_digit())
+        .count();
+    if digit_count == 0 || trimmed.as_bytes().get(digit_count) != Some(&b'.') {
+        return None;
+    }
+
+    trimmed[..digit_count].parse().ok()
+}
+
+fn openj9_notice_block_positions(query: &Query<'_>) -> Option<HashSet<usize>> {
+    if query.is_empty() {
+        return None;
+    }
+
+    let lines: Vec<&str> = query.text.lines().collect();
+    let cue_line = lines
+        .iter()
+        .position(|line| line.trim() == OPENJ9_NOTICE_PREAMBLE_CUE)
+        .map(|index| index + 1)?;
+
+    let mut last_notice_line = None;
+    let mut expected_notice_number = 1;
+
+    for (index, line) in lines.iter().enumerate().skip(cue_line) {
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            if last_notice_line.is_some() {
+                break;
+            }
+            continue;
+        }
+
+        if openj9_notice_list_number(trimmed) == Some(expected_notice_number) {
+            last_notice_line = Some(index + 1);
+            expected_notice_number += 1;
+            continue;
+        }
+
+        if last_notice_line.is_some() {
+            break;
+        }
+    }
+
+    let last_notice_line = last_notice_line?;
+    let positions: HashSet<usize> = query
+        .line_by_pos
+        .iter()
+        .enumerate()
+        .filter_map(|(position, &line)| {
+            (line >= cue_line && line <= last_notice_line).then_some(position)
+        })
+        .collect();
+
+    (!positions.is_empty()).then_some(positions)
+}
+
+fn has_exact_aho_openj9_notice_block_coverage(
+    query: &Query<'_>,
+    exact_aho_matches: &[LicenseMatch],
+) -> bool {
+    let Some(notice_block_positions) = openj9_notice_block_positions(query) else {
+        return false;
+    };
+
+    let covered_positions: HashSet<usize> = exact_aho_matches
+        .iter()
+        .filter(|m| m.matcher == aho_match::MATCH_AHO && has_full_match_coverage(m))
+        .flat_map(|m| m.qspan())
+        .collect();
+
+    notice_block_positions.is_subset(&covered_positions)
+}
+
 fn synthetic_openj9_notice_preamble_run<'a>(query: &'a Query<'a>) -> Option<query::QueryRun<'a>> {
     if query.is_empty() {
         return None;
@@ -249,7 +326,12 @@ fn synthetic_openj9_notice_matches(
     index: &index::LicenseIndex,
     query: &mut Query<'_>,
     matched_qspans: &mut Vec<query::PositionSpan>,
+    exact_aho_covers_notice_block: bool,
 ) -> Vec<LicenseMatch> {
+    if exact_aho_covers_notice_block {
+        return Vec::new();
+    }
+
     let Some(query_run) = synthetic_openj9_notice_preamble_run(query) else {
         return Vec::new();
     };
@@ -375,6 +457,7 @@ fn collect_whole_query_exact_followup_matches(
     query: &mut Query<'_>,
     matched_qspans: &mut Vec<query::PositionSpan>,
     whole_run: &query::QueryRun<'_>,
+    exact_aho_covers_notice_block: bool,
 ) -> Vec<LicenseMatch> {
     let mut seq_all_matches = Vec::new();
 
@@ -382,6 +465,7 @@ fn collect_whole_query_exact_followup_matches(
         index,
         query,
         matched_qspans,
+        exact_aho_covers_notice_block,
     ));
 
     if whole_run.is_matchable(false, matched_qspans) {
@@ -410,11 +494,14 @@ fn collect_whole_query_exact_followup_matches(
 fn regular_seq_runs<'a>(
     query: &'a Query<'a>,
     entrypoint: RegularSeqEntrypoint,
+    exact_aho_covers_notice_block: bool,
 ) -> Vec<query::QueryRun<'a>> {
     match entrypoint {
         RegularSeqEntrypoint::QueryRuns => query.query_runs(),
         RegularSeqEntrypoint::DetectMatchesRawParity => {
-            if synthetic_openj9_notice_preamble_run(query).is_some() {
+            if !exact_aho_covers_notice_block
+                && synthetic_openj9_notice_preamble_run(query).is_some()
+            {
                 vec![query.live_whole_query_run()]
             } else {
                 query.query_runs()
@@ -429,10 +516,11 @@ fn collect_regular_seq_matches(
     matched_qspans: &[query::PositionSpan],
     candidate_contained_matches: &[LicenseMatch],
     entrypoint: RegularSeqEntrypoint,
+    exact_aho_covers_notice_block: bool,
 ) -> Vec<LicenseMatch> {
     let mut seq_all_matches = Vec::new();
 
-    for query_run in regular_seq_runs(query, entrypoint) {
+    for query_run in regular_seq_runs(query, entrypoint, exact_aho_covers_notice_block) {
         if !query_run.is_matchable(false, matched_qspans) {
             continue;
         }
@@ -584,6 +672,8 @@ impl LicenseDetectionEngine {
                 &mut matched_qspans,
                 &refined_aho,
             );
+            let exact_aho_covers_notice_block =
+                has_exact_aho_openj9_notice_block_coverage(&query, &merged_aho);
             all_matches.extend(merged_aho);
 
             let whole_query_followup = collect_whole_query_exact_followup_matches(
@@ -591,6 +681,7 @@ impl LicenseDetectionEngine {
                 &mut query,
                 &mut matched_qspans,
                 &whole_query_run,
+                exact_aho_covers_notice_block,
             );
             all_matches.extend(whole_query_followup);
 
@@ -600,6 +691,7 @@ impl LicenseDetectionEngine {
                 &matched_qspans,
                 &candidate_contained_matches,
                 RegularSeqEntrypoint::QueryRuns,
+                exact_aho_covers_notice_block,
             );
             all_matches.extend(merged_seq);
         }
@@ -729,6 +821,8 @@ impl LicenseDetectionEngine {
                 &mut matched_qspans,
                 &refined_aho,
             );
+            let exact_aho_covers_notice_block =
+                has_exact_aho_openj9_notice_block_coverage(&query, &merged_aho);
             all_matches.extend(merged_aho);
 
             let whole_query_followup = collect_whole_query_exact_followup_matches(
@@ -736,6 +830,7 @@ impl LicenseDetectionEngine {
                 &mut query,
                 &mut matched_qspans,
                 &whole_query_run,
+                exact_aho_covers_notice_block,
             );
             all_matches.extend(whole_query_followup);
 
@@ -745,6 +840,7 @@ impl LicenseDetectionEngine {
                 &matched_qspans,
                 &candidate_contained_matches,
                 RegularSeqEntrypoint::DetectMatchesRawParity,
+                exact_aho_covers_notice_block,
             );
             all_matches.extend(merged_seq);
         }

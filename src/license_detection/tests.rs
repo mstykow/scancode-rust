@@ -756,9 +756,11 @@ fn test_png_h_detect_matches_match_python_raw_rules() {
             && m.end_line == 401
     }));
     assert!(!matches.iter().any(|m| m.rule_identifier == "libpng_4.RULE"));
-    assert!(!matches
-        .iter()
-        .any(|m| m.rule_identifier == "unknown-license-reference_301.RULE"));
+    assert!(
+        !matches
+            .iter()
+            .any(|m| m.rule_identifier == "unknown-license-reference_301.RULE")
+    );
 }
 
 #[test]
@@ -796,9 +798,11 @@ fn test_standard_ml_nj_and_x11_and_x11_opengroup_detect_matches_match_python_raw
             ),
         ]
     );
-    assert!(!matches
-        .iter()
-        .any(|m| m.rule_identifier == "x11-bitstream_4.RULE"));
+    assert!(
+        !matches
+            .iter()
+            .any(|m| m.rule_identifier == "x11-bitstream_4.RULE")
+    );
 }
 
 #[test]
@@ -836,9 +840,11 @@ fn test_standard_ml_nj_and_x11_and_x11_opengroup_1_detect_matches_match_python_r
             ),
         ]
     );
-    assert!(!matches
-        .iter()
-        .any(|m| m.rule_identifier == "x11-bitstream_4.RULE"));
+    assert!(
+        !matches
+            .iter()
+            .any(|m| m.rule_identifier == "x11-bitstream_4.RULE")
+    );
 }
 
 #[test]
@@ -1835,6 +1841,64 @@ fn test_spdx_complex_readme_detect_matches_match_python_raw_signature() {
             m.license_expression == "zlib" && (m.start_line < 539 || m.end_line < 556)
         }),
         "did not expect an extra early zlib match in {:?}",
+        summarize_raw_matches(&matches)
+    );
+}
+
+#[test]
+fn test_eclipse_openj9_detect_matches_match_python_raw_signature() {
+    let Some(engine) = create_engine_from_reference() else {
+        eprintln!("Skipping test: reference directory not found");
+        return;
+    };
+
+    let matches = detect_fixture_matches(
+        &engine,
+        "testdata/license-golden/datadriven/lic1/eclipse-openj9.LICENSE",
+    );
+
+    let mut signature: Vec<_> = matches
+        .iter()
+        .map(|m| (m.rule_identifier.clone(), m.matcher.clone()))
+        .collect();
+    signature.sort();
+
+    assert_eq!(
+        signature.len(),
+        8,
+        "eclipse-openj9 raw matches should align with Python: {:?}",
+        summarize_raw_matches(&matches)
+    );
+    assert_eq!(
+        signature,
+        vec![
+            (
+                "epl-2.0_or_apache-2.0_4.RULE".to_string(),
+                "2-aho".to_string()
+            ),
+            (
+                "epl-2.0_or_apache-2.0_or_gpl-2.0_with_openjdk-exception_and_others3.RULE"
+                    .to_string(),
+                "2-aho".to_string()
+            ),
+            ("mit.LICENSE".to_string(), "2-aho".to_string()),
+            ("public-domain_64.RULE".to_string(), "2-aho".to_string()),
+            ("unicode_6.RULE".to_string(), "2-aho".to_string()),
+            ("unicode_8.RULE".to_string(), "2-aho".to_string()),
+            ("zlib.LICENSE".to_string(), "2-aho".to_string()),
+            ("zlib_17.RULE".to_string(), "2-aho".to_string()),
+        ],
+        "eclipse-openj9 raw signature mismatch: {:?}",
+        summarize_raw_matches(&matches)
+    );
+
+    assert!(
+        !matches.iter().any(|m| {
+            m.rule_identifier
+                == "epl-2.0_or_apache-2.0_or_gpl-2.0_with_openjdk-exception_and_others2.RULE"
+                && m.matcher == crate::license_detection::seq_match::MATCH_SEQ
+        }),
+        "did not expect the synthetic OpenJ9 seq wrapper in {:?}",
         summarize_raw_matches(&matches)
     );
 }
