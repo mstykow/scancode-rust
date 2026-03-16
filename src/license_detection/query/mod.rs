@@ -1,7 +1,7 @@
 //! Query processing - tokenized input for license matching.
 
 use crate::license_detection::index::LicenseIndex;
-use crate::license_detection::tokenize::{STOPWORDS, tokenize_without_stopwords};
+use crate::license_detection::tokenize::{tokenize_without_stopwords, STOPWORDS};
 use std::collections::{HashMap, HashSet};
 
 /// A span representing a range of token positions.
@@ -307,7 +307,11 @@ impl<'a> Query<'a> {
                         let is_spdx_third = third_three == ["spdx", "license", "identifier"]
                             || third_three == ["spdx", "licence", "identifier"]
                             || third_three == ["licenses", "nuget", "org"];
-                        if is_spdx_third { Some(2) } else { None }
+                        if is_spdx_third {
+                            Some(2)
+                        } else {
+                            None
+                        }
                     } else {
                         None
                     }
@@ -607,14 +611,6 @@ impl<'a> Query<'a> {
     /// Corresponds to Python: `whole_query_run()` method (lines 306-317)
     pub fn whole_query_run(&self) -> QueryRun<'a> {
         QueryRun::whole_query_snapshot(self)
-    }
-
-    /// Get a live whole-query run backed by the current query state.
-    pub(crate) fn live_whole_query_run(&self) -> QueryRun<'_> {
-        if self.is_empty() {
-            return QueryRun::new(self, 0, None);
-        }
-        QueryRun::new(self, 0, Some(self.tokens.len() - 1))
     }
 
     /// Get all matchable token positions.

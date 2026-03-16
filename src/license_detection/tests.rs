@@ -756,11 +756,9 @@ fn test_png_h_detect_matches_match_python_raw_rules() {
             && m.end_line == 401
     }));
     assert!(!matches.iter().any(|m| m.rule_identifier == "libpng_4.RULE"));
-    assert!(
-        !matches
-            .iter()
-            .any(|m| m.rule_identifier == "unknown-license-reference_301.RULE")
-    );
+    assert!(!matches
+        .iter()
+        .any(|m| m.rule_identifier == "unknown-license-reference_301.RULE"));
 }
 
 #[test]
@@ -798,11 +796,9 @@ fn test_standard_ml_nj_and_x11_and_x11_opengroup_detect_matches_match_python_raw
             ),
         ]
     );
-    assert!(
-        !matches
-            .iter()
-            .any(|m| m.rule_identifier == "x11-bitstream_4.RULE")
-    );
+    assert!(!matches
+        .iter()
+        .any(|m| m.rule_identifier == "x11-bitstream_4.RULE"));
 }
 
 #[test]
@@ -840,11 +836,9 @@ fn test_standard_ml_nj_and_x11_and_x11_opengroup_1_detect_matches_match_python_r
             ),
         ]
     );
-    assert!(
-        !matches
-            .iter()
-            .any(|m| m.rule_identifier == "x11-bitstream_4.RULE")
-    );
+    assert!(!matches
+        .iter()
+        .any(|m| m.rule_identifier == "x11-bitstream_4.RULE"));
 }
 
 #[test]
@@ -1609,48 +1603,6 @@ fn test_spdx_complex_short_html_keeps_exact_unicode_matches_and_drops_seq_contai
         "expected redundant unicode_3.RULE seq container to be absent: {:?}",
         rule_ids
     );
-}
-
-#[test]
-fn test_spdx_complex_readme_detect_matches_recovers_bounded_notice_preamble_seq_match() {
-    let Some(engine) = create_engine_from_reference() else {
-        eprintln!("Skipping test: reference directory not found");
-        return;
-    };
-
-    let matches = detect_fixture_matches(
-        &engine,
-        "testdata/license-golden/datadriven/external/spdx/complex-readme.txt",
-    );
-
-    let seq_matches: Vec<_> = matches
-        .into_iter()
-        .filter(|m| m.matcher == crate::license_detection::seq_match::MATCH_SEQ)
-        .collect();
-
-    let target_expression = "((epl-2.0 OR apache-2.0) OR (gpl-2.0 WITH classpath-exception-2.0 AND gpl-2.0 WITH openjdk-exception)) AND unicode AND public-domain AND mit AND zlib AND zlib";
-    let bounded_notice_matches: Vec<_> = seq_matches
-        .iter()
-        .filter(|m| {
-            m.license_expression == target_expression && m.start_line == 5 && m.end_line == 25
-        })
-        .collect();
-
-    assert_eq!(
-        bounded_notice_matches.len(),
-        1,
-        "expected the Python raw bounded notice seq match, got: {:?}",
-        seq_matches
-            .iter()
-            .map(|m| (&m.license_expression, &m.matcher, m.start_line, m.end_line))
-            .collect::<Vec<_>>()
-    );
-    assert_eq!(
-        bounded_notice_matches[0].matcher,
-        crate::license_detection::seq_match::MATCH_SEQ
-    );
-    assert_eq!(bounded_notice_matches[0].start_line, 5);
-    assert_eq!(bounded_notice_matches[0].end_line, 25);
 }
 
 #[test]

@@ -21,7 +21,7 @@ mod test_utils;
 mod tokenize;
 pub mod unknown_match;
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::path::Path;
 use std::sync::Arc;
 
@@ -66,7 +66,6 @@ pub struct LicenseDetectionEngine {
 
 const MAX_DETECTION_SIZE: usize = 10 * 1024 * 1024; // 10MB
 const MAX_REGULAR_SEQ_CANDIDATES: usize = 70;
-const OPENJ9_NOTICE_PREAMBLE_CUE: &str = "Subject to the following notices:";
 const MAX_REDUNDANT_SEQ_CONTAINER_BOUNDARY_GAP: usize = 8;
 const MAX_REDUNDANT_SEQ_CONTAINER_UNMATCHED_GAP: usize = 2;
 
@@ -205,268 +204,13 @@ fn merge_and_prepare_aho_matches(
     (merged_aho, saw_long_exact_license_text_match)
 }
 
-fn is_top_level_embedded_section_boundary(line: &str) -> bool {
-    let trimmed = line.trim_start();
-    let bytes = trimmed.as_bytes();
-
-    bytes.len() >= 5
-        && bytes[0].is_ascii_uppercase()
-        && bytes[1] == b'.'
-        && bytes[2].is_ascii_whitespace()
-        && bytes[3].is_ascii_whitespace()
-        && !trimmed[4..].trim().is_empty()
-}
-
-fn openj9_notice_list_number(line: &str) -> Option<usize> {
-    let trimmed = line.trim_start();
-    let digit_count = trimmed
-        .bytes()
-        .take_while(|byte| byte.is_ascii_digit())
-        .count();
-    if digit_count == 0 || trimmed.as_bytes().get(digit_count) != Some(&b'.') {
-        return None;
-    }
-
-    trimmed[..digit_count].parse().ok()
-}
-
-fn openj9_notice_block_positions(query: &Query<'_>) -> Option<HashSet<usize>> {
-    if query.is_empty() {
-        return None;
-    }
-
-    let lines: Vec<&str> = query.text.lines().collect();
-    let cue_line = lines
-        .iter()
-        .position(|line| line.trim() == OPENJ9_NOTICE_PREAMBLE_CUE)
-        .map(|index| index + 1)?;
-
-    let mut last_notice_line = None;
-    let mut expected_notice_number = 1;
-
-    for (index, line) in lines.iter().enumerate().skip(cue_line) {
-        let trimmed = line.trim();
-        if trimmed.is_empty() {
-            if last_notice_line.is_some() {
-                break;
-            }
-            continue;
-        }
-
-        if openj9_notice_list_number(trimmed) == Some(expected_notice_number) {
-            last_notice_line = Some(index + 1);
-            expected_notice_number += 1;
-            continue;
-        }
-
-        if last_notice_line.is_some() {
-            break;
-        }
-    }
-
-    let last_notice_line = last_notice_line?;
-    let positions: HashSet<usize> = query
-        .line_by_pos
-        .iter()
-        .enumerate()
-        .filter_map(|(position, &line)| {
-            (line >= cue_line && line <= last_notice_line).then_some(position)
-        })
-        .collect();
-
-    (!positions.is_empty()).then_some(positions)
-}
-
-fn has_exact_aho_openj9_notice_block_coverage(
-    query: &Query<'_>,
-    exact_aho_matches: &[LicenseMatch],
-) -> bool {
-    let Some(notice_block_positions) = openj9_notice_block_positions(query) else {
-        return false;
-    };
-
-    let covered_positions: HashSet<usize> = exact_aho_matches
-        .iter()
-        .filter(|m| m.matcher == aho_match::MATCH_AHO && has_full_match_coverage(m))
-        .flat_map(|m| m.qspan())
-        .collect();
-
-    notice_block_positions.is_subset(&covered_positions)
-}
-
-fn synthetic_openj9_notice_preamble_run<'a>(query: &'a Query<'a>) -> Option<query::QueryRun<'a>> {
-    if query.is_empty() {
-        return None;
-    }
-
-    let lines: Vec<&str> = query.text.lines().collect();
-    let cue_index = lines
-        .iter()
-        .position(|line| line.trim() == OPENJ9_NOTICE_PREAMBLE_CUE)?;
-
-    let boundary_line =
-        lines
-            .iter()
-            .enumerate()
-            .skip(cue_index + 1)
-            .find_map(|(index, line)| {
-                is_top_level_embedded_section_boundary(line).then_some(index + 1)
-            })?;
-
-    let end_token = query
-        .line_by_pos
-        .iter()
-        .position(|&line| line >= boundary_line)
-        .and_then(|pos| pos.checked_sub(1))?;
-
-    Some(query::QueryRun::new(query, 0, Some(end_token)))
-}
-
-fn synthetic_openj9_notice_matches(
-    index: &index::LicenseIndex,
-    query: &mut Query<'_>,
-    matched_qspans: &mut Vec<query::PositionSpan>,
-    exact_aho_covers_notice_block: bool,
-) -> Vec<LicenseMatch> {
-    if exact_aho_covers_notice_block {
-        return Vec::new();
-    }
-
-    let Some(query_run) = synthetic_openj9_notice_preamble_run(query) else {
-        return Vec::new();
-    };
-
-    if !query_run.is_matchable(false, &[]) {
-        return Vec::new();
-    }
-
-    let candidates =
-        compute_candidates_with_msets(index, &query_run, false, MAX_REGULAR_SEQ_CANDIDATES);
-    if candidates.is_empty() {
-        return Vec::new();
-    }
-
-    let notice_matches = candidates
-        .iter()
-        .filter(|candidate| candidate.rule.is_license_notice)
-        .find_map(|candidate| {
-            let matches =
-                seq_match_with_candidates(index, &query_run, std::slice::from_ref(candidate));
-            if matches.is_empty() {
-                None
-            } else {
-                Some(coalesce_match_fragments(matches))
-            }
-        });
-
-    let Some(notice_matches) = notice_matches else {
-        return Vec::new();
-    };
-
-    let notice_matches = merge_overlapping_matches(&notice_matches);
-    for m in &notice_matches {
-        let Some(span) = query_span_for_match(m) else {
-            continue;
-        };
-
-        query.subtract(&span);
-        matched_qspans.push(span);
-    }
-
-    notice_matches
-}
-
-fn coalesce_match_fragments(matches: Vec<LicenseMatch>) -> Vec<LicenseMatch> {
-    let mut matches_by_rid: HashMap<usize, Vec<LicenseMatch>> = HashMap::new();
-    for m in matches {
-        matches_by_rid.entry(m.rid).or_default().push(m);
-    }
-
-    let mut coalesced = Vec::new();
-    for mut group in matches_by_rid.into_values() {
-        group.sort_by_key(|m| (m.start_token, m.end_token));
-        let mut combined = group.remove(0);
-
-        for fragment in group {
-            combined = coalesce_match_pair(combined, fragment);
-        }
-
-        coalesced.push(combined);
-    }
-
-    coalesced.sort_by_key(|m| (m.start_token, m.end_token, m.rule_identifier.clone()));
-    coalesced
-}
-
-fn coalesce_match_pair(mut combined: LicenseMatch, fragment: LicenseMatch) -> LicenseMatch {
-    let mut qspan_positions = combined.qspan();
-    qspan_positions.extend(fragment.qspan());
-    qspan_positions.sort_unstable();
-    qspan_positions.dedup();
-
-    let mut ispan_positions = combined.ispan();
-    ispan_positions.extend(fragment.ispan());
-    ispan_positions.sort_unstable();
-    ispan_positions.dedup();
-
-    let mut hispan_positions = combined.hispan();
-    hispan_positions.extend(fragment.hispan());
-    hispan_positions.sort_unstable();
-    hispan_positions.dedup();
-
-    combined.start_token = *qspan_positions.first().unwrap_or(&combined.start_token);
-    combined.end_token = qspan_positions
-        .last()
-        .map(|position| position + 1)
-        .unwrap_or(combined.end_token);
-    combined.start_line = combined.start_line.min(fragment.start_line);
-    combined.end_line = combined.end_line.max(fragment.end_line);
-    combined.rule_start_token = *ispan_positions
-        .first()
-        .unwrap_or(&combined.rule_start_token);
-    combined.matched_length = qspan_positions.len();
-    combined.hilen = hispan_positions.len();
-    combined.match_coverage = if combined.rule_length == 0 {
-        combined.match_coverage.max(fragment.match_coverage)
-    } else {
-        (combined.matched_length as f32 / combined.rule_length as f32) * 100.0
-    };
-    combined.score = combined.score.max(fragment.score);
-    combined.candidate_resemblance = combined
-        .candidate_resemblance
-        .max(fragment.candidate_resemblance);
-    combined.candidate_containment = combined
-        .candidate_containment
-        .max(fragment.candidate_containment);
-    combined.matched_token_positions = Some(qspan_positions.clone());
-    combined.qspan_positions = Some(qspan_positions);
-    combined.ispan_positions = Some(ispan_positions);
-    combined.hispan_positions = Some(hispan_positions);
-
-    combined
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum RegularSeqEntrypoint {
-    QueryRuns,
-    DetectMatchesRawParity,
-}
-
 fn collect_whole_query_exact_followup_matches(
     index: &index::LicenseIndex,
     query: &mut Query<'_>,
     matched_qspans: &mut Vec<query::PositionSpan>,
     whole_run: &query::QueryRun<'_>,
-    exact_aho_covers_notice_block: bool,
 ) -> Vec<LicenseMatch> {
     let mut seq_all_matches = Vec::new();
-
-    seq_all_matches.extend(synthetic_openj9_notice_matches(
-        index,
-        query,
-        matched_qspans,
-        exact_aho_covers_notice_block,
-    ));
 
     if whole_run.is_matchable(false, matched_qspans) {
         let near_dupe_candidates =
@@ -491,36 +235,15 @@ fn collect_whole_query_exact_followup_matches(
     seq_all_matches
 }
 
-fn regular_seq_runs<'a>(
-    query: &'a Query<'a>,
-    entrypoint: RegularSeqEntrypoint,
-    exact_aho_covers_notice_block: bool,
-) -> Vec<query::QueryRun<'a>> {
-    match entrypoint {
-        RegularSeqEntrypoint::QueryRuns => query.query_runs(),
-        RegularSeqEntrypoint::DetectMatchesRawParity => {
-            if !exact_aho_covers_notice_block
-                && synthetic_openj9_notice_preamble_run(query).is_some()
-            {
-                vec![query.live_whole_query_run()]
-            } else {
-                query.query_runs()
-            }
-        }
-    }
-}
-
 fn collect_regular_seq_matches(
     index: &index::LicenseIndex,
     query: &Query<'_>,
     matched_qspans: &[query::PositionSpan],
     candidate_contained_matches: &[LicenseMatch],
-    entrypoint: RegularSeqEntrypoint,
-    exact_aho_covers_notice_block: bool,
 ) -> Vec<LicenseMatch> {
     let mut seq_all_matches = Vec::new();
 
-    for query_run in regular_seq_runs(query, entrypoint, exact_aho_covers_notice_block) {
+    for query_run in query.query_runs() {
         if !query_run.is_matchable(false, matched_qspans) {
             continue;
         }
@@ -672,8 +395,6 @@ impl LicenseDetectionEngine {
                 &mut matched_qspans,
                 &refined_aho,
             );
-            let exact_aho_covers_notice_block =
-                has_exact_aho_openj9_notice_block_coverage(&query, &merged_aho);
             all_matches.extend(merged_aho);
 
             let whole_query_followup = collect_whole_query_exact_followup_matches(
@@ -681,7 +402,6 @@ impl LicenseDetectionEngine {
                 &mut query,
                 &mut matched_qspans,
                 &whole_query_run,
-                exact_aho_covers_notice_block,
             );
             all_matches.extend(whole_query_followup);
 
@@ -690,8 +410,6 @@ impl LicenseDetectionEngine {
                 &query,
                 &matched_qspans,
                 &candidate_contained_matches,
-                RegularSeqEntrypoint::QueryRuns,
-                exact_aho_covers_notice_block,
             );
             all_matches.extend(merged_seq);
         }
@@ -821,8 +539,6 @@ impl LicenseDetectionEngine {
                 &mut matched_qspans,
                 &refined_aho,
             );
-            let exact_aho_covers_notice_block =
-                has_exact_aho_openj9_notice_block_coverage(&query, &merged_aho);
             all_matches.extend(merged_aho);
 
             let whole_query_followup = collect_whole_query_exact_followup_matches(
@@ -830,7 +546,6 @@ impl LicenseDetectionEngine {
                 &mut query,
                 &mut matched_qspans,
                 &whole_query_run,
-                exact_aho_covers_notice_block,
             );
             all_matches.extend(whole_query_followup);
 
@@ -839,8 +554,6 @@ impl LicenseDetectionEngine {
                 &query,
                 &matched_qspans,
                 &candidate_contained_matches,
-                RegularSeqEntrypoint::DetectMatchesRawParity,
-                exact_aho_covers_notice_block,
             );
             all_matches.extend(merged_seq);
         }
