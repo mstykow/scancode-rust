@@ -466,6 +466,7 @@ pub static UNASSEMBLED_DATASOURCE_IDS: &[DatasourceId] = &[
     DatasourceId::JavaWarWebXml,
     DatasourceId::JbossServiceXml,
     DatasourceId::RpmPackageLicenses,
+    DatasourceId::VcpkgJson,
 ];
 
 #[cfg(test)]
