@@ -1,0 +1,140 @@
+[
+  {
+    "type": "npm",
+    "name": "migrate-bun-lockb-v2",
+    "primary_language": "JavaScript",
+    "parties": [],
+    "extra_data": {
+      "lockfileVersion": 2,
+      "meta_hash": "b9927bfb7908a620d68ada06aeac0e7bf460658dbcef45edbfb50f09003dd7df"
+    },
+    "dependencies": [
+      {
+        "purl": "pkg:npm/is-even@1.0.0",
+        "extracted_requirement": "^1.0.0",
+        "scope": "dependencies",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": true,
+        "resolved_package": {
+          "type": "npm",
+          "name": "is-even",
+          "version": "1.0.0",
+          "primary_language": "JavaScript",
+          "download_url": "https://registry.npmjs.org/is-even/-/is-even-1.0.0.tgz",
+          "sha512": "2c4867900749aa27380dbaa7e7c034cb9d885e81d696cb9ea9090a7cc7dd1272181bc035b26fc61e274a912eb2bd794ca11ae4337e1cb079d742d3aa71bf89ce",
+          "is_virtual": true,
+          "dependencies": [
+            {
+              "purl": "pkg:npm/is-odd@0.1.2",
+              "extracted_requirement": "^0.1.2",
+              "scope": "dependencies",
+              "is_runtime": true,
+              "is_optional": false,
+              "is_pinned": true,
+              "is_direct": false,
+              "resolved_package": {
+                "type": "npm",
+                "name": "is-odd",
+                "version": "0.1.2",
+                "primary_language": "JavaScript",
+                "download_url": "https://registry.npmjs.org/is-odd/-/is-odd-0.1.2.tgz",
+                "sha512": "462ec2d8aee8e48ad453d50423c968b17242083fd4b6c688ae4479b3121c160e3143d7112579560390d0bd3134c8373492bbd234bb11197375d543d2e8ac9f07",
+                "is_virtual": true,
+                "dependencies": [
+                  {
+                    "purl": "pkg:npm/is-number@3.0.0",
+                    "extracted_requirement": "^3.0.0",
+                    "scope": "dependencies",
+                    "is_runtime": true,
+                    "is_optional": false,
+                    "is_pinned": true,
+                    "is_direct": false,
+                    "resolved_package": {
+                      "type": "npm",
+                      "name": "is-number",
+                      "version": "3.0.0",
+                      "primary_language": "JavaScript",
+                      "download_url": "https://registry.npmjs.org/is-number/-/is-number-3.0.0.tgz",
+                      "sha512": "e1c6e80aa2299621fe980bc535e823650e2480a73765485056bdc7bd66d2879ab7587daff3672df93d98d61754e4676da2bc7f70b89f423a826cbedba739cb4e",
+                      "is_virtual": true,
+                      "dependencies": [
+                        {
+                          "purl": "pkg:npm/kind-of@3.2.2",
+                          "extracted_requirement": "^3.0.2",
+                          "scope": "dependencies",
+                          "is_runtime": true,
+                          "is_optional": false,
+                          "is_pinned": true,
+                          "is_direct": false,
+                          "resolved_package": {
+                            "type": "npm",
+                            "name": "kind-of",
+                            "version": "3.2.2",
+                            "primary_language": "JavaScript",
+                            "download_url": "https://registry.npmjs.org/kind-of/-/kind-of-3.2.2.tgz",
+                            "sha512": "34e5bd4105cca191a0fe8aa754da0d4d320510889dd7adbb5827df50124474cc58029abb98d13b0a9cee7083dcf99420db93e17a3ec8252997de13bea1b94eb5",
+                            "is_virtual": true,
+                            "dependencies": [
+                              {
+                                "purl": "pkg:npm/is-buffer@1.1.6",
+                                "extracted_requirement": "^1.1.5",
+                                "scope": "dependencies",
+                                "is_runtime": true,
+                                "is_optional": false,
+                                "is_pinned": true,
+                                "is_direct": false,
+                                "resolved_package": {
+                                  "type": "npm",
+                                  "name": "is-buffer",
+                                  "version": "1.1.6",
+                                  "primary_language": "JavaScript",
+                                  "download_url": "https://registry.npmjs.org/is-buffer/-/is-buffer-1.1.6.tgz",
+                                  "sha512": "35c7402f0a579139b966fbdb93ba303944af56f04a0e028fe7f7b07d71339e64057ece194666a739e2814e34558e46b7405a0de9727ef45dd44aa7c7a93694e7",
+                                  "is_virtual": true,
+                                  "dependencies": [],
+                                  "datasource_id": "bun_lockb"
+                                }
+                              }
+                            ],
+                            "datasource_id": "bun_lockb"
+                          }
+                        }
+                      ],
+                      "datasource_id": "bun_lockb"
+                    }
+                  }
+                ],
+                "datasource_id": "bun_lockb"
+              }
+            }
+          ],
+          "datasource_id": "bun_lockb"
+        }
+      },
+      {
+        "purl": "pkg:npm/jquery@3.7.1",
+        "extracted_requirement": "~3.7.1",
+        "scope": "dependencies",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": true,
+        "resolved_package": {
+          "type": "npm",
+          "name": "jquery",
+          "version": "3.7.1",
+          "primary_language": "JavaScript",
+          "download_url": "https://registry.npmjs.org/jquery/-/jquery-3.7.1.tgz",
+          "sha512": "9b86afafcc8bf2498537ca6cadb14516607f21fd7888de68f67c3f3609e733e9326c326946c0329d5d81b1fa5362b4d1cac6147400d50fb0a45148b3824a4b7e",
+          "is_virtual": true,
+          "dependencies": [],
+          "datasource_id": "bun_lockb"
+        }
+      }
+    ],
+    "datasource_id": "bun_lockb",
+    "purl": "pkg:npm/migrate-bun-lockb-v2"
+  }
+]

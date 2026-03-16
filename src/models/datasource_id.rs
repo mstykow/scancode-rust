@@ -68,6 +68,7 @@ pub enum DatasourceId {
     BuckMetadata,
 
     BunLock,
+    BunLockb,
 
     // ── Cargo/Rust ──
     CargoLock,
@@ -423,6 +424,7 @@ impl DatasourceId {
 
             // npm
             Self::BunLock => "bun_lock",
+            Self::BunLockb => "bun_lockb",
             Self::NpmPackageJson => "npm_package_json",
             Self::NpmPackageLockJson => "npm_package_lock_json",
 
