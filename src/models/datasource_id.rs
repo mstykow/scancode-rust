@@ -165,6 +165,11 @@ pub enum DatasourceId {
     GoSum,
     GoWork,
 
+    // ── Haskell / Hackage ──
+    HackageCabal,
+    HackageCabalProject,
+    HackageStackYaml,
+
     // ── Gradle ──
     BuildGradle,
     GradleLockfile,
@@ -405,6 +410,11 @@ impl DatasourceId {
             Self::GoSum => "go_sum",
             Self::GoWork => "go_work",
 
+            // Haskell / Hackage
+            Self::HackageCabal => "hackage_cabal",
+            Self::HackageCabalProject => "hackage_cabal_project",
+            Self::HackageStackYaml => "hackage_stack_yaml",
+
             // Gradle
             Self::BuildGradle => "build_gradle",
             Self::GradleLockfile => "gradle_lockfile",
@@ -572,6 +582,7 @@ mod tests {
             DatasourceId::PypiPyprojectToml.as_str(),
             "pypi_pyproject_toml"
         );
+        assert_eq!(DatasourceId::HackageCabal.as_str(), "hackage_cabal");
     }
 
     #[test]
