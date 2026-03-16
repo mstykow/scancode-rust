@@ -1,0 +1,99 @@
+[
+  {
+    "type": "hackage",
+    "name": "example-hackage",
+    "version": "0.1.0.0",
+    "primary_language": "Haskell",
+    "description": "Example Hackage package\n\nExample Hackage package.\n\nMore details for parser golden coverage.",
+    "parties": [
+      {
+        "type": "person",
+        "role": "author",
+        "name": "Alice Example",
+        "email": "alice@example.com"
+      },
+      {
+        "type": "person",
+        "role": "author",
+        "name": "Bob Example"
+      },
+      {
+        "type": "person",
+        "role": "maintainer",
+        "name": "Carol Maintainer",
+        "email": "carol@example.com"
+      }
+    ],
+    "keywords": ["Web", "CLI", "parser", "haskell"],
+    "homepage_url": "https://example.com/example-hackage",
+    "bug_tracking_url": "https://example.com/example-hackage/issues",
+    "vcs_url": "https://github.com/example/example-hackage.git",
+    "extracted_license_statement": "BSD-3-Clause",
+    "dependencies": [
+      {
+        "purl": "pkg:hackage/base",
+        "extracted_requirement": ">=4.14 && <5",
+        "scope": "build-depends",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:hackage/text@1.2.5.0",
+        "extracted_requirement": "==1.2.5.0",
+        "scope": "build-depends",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:hackage/base",
+        "extracted_requirement": ">=4.14 && <5",
+        "scope": "build-depends",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:hackage/example-hackage",
+        "scope": "build-depends",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:hackage/optparse-applicative",
+        "extracted_requirement": ">=0.17",
+        "scope": "build-depends",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:hackage/base",
+        "scope": "build-depends",
+        "is_runtime": false,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:hackage/hspec",
+        "extracted_requirement": ">=2.10",
+        "scope": "build-depends",
+        "is_runtime": false,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true
+      }
+    ],
+    "repository_homepage_url": "https://hackage.haskell.org/package/example-hackage-0.1.0.0",
+    "datasource_id": "hackage_cabal",
+    "purl": "pkg:hackage/example-hackage@0.1.0.0"
+  }
+]

@@ -1,0 +1,58 @@
+[
+  {
+    "type": "hackage",
+    "primary_language": "Haskell",
+    "parties": [],
+    "dependencies": [
+      {
+        "purl": null,
+        "extracted_requirement": ".",
+        "scope": "packages",
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true
+      },
+      {
+        "purl": null,
+        "extracted_requirement": "subdir/package-a",
+        "scope": "packages",
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true
+      },
+      {
+        "purl": null,
+        "extracted_requirement": "https://github.com/commercialhaskell/pantry.git",
+        "scope": "packages",
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:hackage/aeson@2.2.1.0",
+        "extracted_requirement": "2.2.1.0",
+        "scope": "extra-deps",
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:hackage/text@2.0.2",
+        "extracted_requirement": "2.0.2",
+        "scope": "extra-deps",
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": true
+      },
+      {
+        "purl": null,
+        "extracted_requirement": "https://github.com/haskell/wai.git",
+        "scope": "extra-deps",
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": true
+      }
+    ],
+    "datasource_id": "hackage_stack_yaml"
+  }
+]
