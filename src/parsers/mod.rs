@@ -136,6 +136,11 @@ mod haxe;
 mod haxe_golden_test;
 #[cfg(test)]
 mod haxe_test;
+mod hex_lock;
+#[cfg(all(test, feature = "golden-tests"))]
+mod hex_lock_golden_test;
+#[cfg(test)]
+mod hex_lock_test;
 mod maven;
 #[cfg(all(test, feature = "golden-tests"))]
 mod maven_golden_test;
@@ -380,6 +385,7 @@ pub use self::gradle::GradleParser;
 pub use self::gradle_lock::GradleLockfileParser;
 pub use self::gradle_module::GradleModuleParser;
 pub use self::haxe::HaxeParser;
+pub use self::hex_lock::HexLockParser;
 pub use self::maven::MavenParser;
 pub use self::microsoft_update_manifest::MicrosoftUpdateManifestParser;
 pub use self::misc::{
@@ -545,6 +551,7 @@ register_package_handlers! {
         GradleParser,
         GradleModuleParser,
         HaxeParser,
+        HexLockParser,
         MavenParser,
         MicrosoftUpdateManifestParser,
         NpmLockParser,

@@ -173,6 +173,9 @@ pub enum DatasourceId {
     // ── Haxe ──
     HaxelibJson,
 
+    // ── Hex/Elixir ──
+    HexMixLock,
+
     // ── Java ──
     AntIvyXml,
     JavaEarApplicationXml,
@@ -409,6 +412,9 @@ impl DatasourceId {
 
             // Haxe
             Self::HaxelibJson => "haxelib_json",
+
+            // Hex/Elixir
+            Self::HexMixLock => "hex_mix_lock",
 
             // Java
             Self::AntIvyXml => "ant_ivy_xml",
