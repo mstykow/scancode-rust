@@ -67,6 +67,7 @@ pub enum PackageType {
     Gem,
     Github,
     Golang,
+    Hackage,
     Haxe,
     Hex,
     Installshield,
@@ -137,6 +138,7 @@ impl PackageType {
             Self::Gem => "gem",
             Self::Github => "github",
             Self::Golang => "golang",
+            Self::Hackage => "hackage",
             Self::Haxe => "haxe",
             Self::Hex => "hex",
             Self::Installshield => "installshield",
@@ -215,6 +217,7 @@ mod tests {
         assert_eq!(PackageType::Pypi.as_str(), "pypi");
         assert_eq!(PackageType::Alpm.as_str(), "alpm");
         assert_eq!(PackageType::Vcpkg.as_str(), "vcpkg");
+        assert_eq!(PackageType::Hackage.as_str(), "hackage");
         assert_eq!(PackageType::Hex.as_str(), "hex");
     }
 
