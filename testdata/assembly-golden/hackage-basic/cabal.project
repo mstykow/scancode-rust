@@ -1,0 +1,12 @@
+packages:
+  ./*.cabal
+extra-packages:
+  lens-5.2.1
+import: ./shared.project
+
+source-repository-package
+  type: git
+  location: https://github.com/commercialhaskell/pantry.git
+  tag: 0123456789abcdef
+
+allow-newer: true

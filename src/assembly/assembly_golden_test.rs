@@ -507,6 +507,14 @@ mod tests {
     }
 
     #[test]
+    fn test_assembly_hackage_basic() {
+        match run_assembly_golden_test("hackage-basic") {
+            Ok(_) => (),
+            Err(e) => panic!("Assembly golden test failed for hackage-basic: {}", e),
+        }
+    }
+
+    #[test]
     fn test_assembly_nuget_basic() {
         match run_assembly_golden_test("nuget-basic") {
             Ok(_) => (),

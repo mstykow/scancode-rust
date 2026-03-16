@@ -1,0 +1,20 @@
+cabal-version:      3.0
+name:               aaa-example-hackage
+version:            0.1.0.0
+synopsis:           Assembly Hackage package
+description:
+  Assembly Hackage package.
+license:            BSD-3-Clause
+homepage:           https://example.com/aaa-example-hackage
+bug-reports:        https://example.com/aaa-example-hackage/issues
+author:             Alice Example <alice@example.com>
+maintainer:         Carol Maintainer <carol@example.com>
+category:           Web
+source-repository head
+  type: git
+  location: https://github.com/example/aaa-example-hackage.git
+
+library
+  build-depends:
+      base >=4.14 && <5,
+      text ==1.2.5.0
