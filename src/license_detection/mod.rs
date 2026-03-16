@@ -193,7 +193,7 @@ fn merge_and_prepare_aho_matches(
         if index
             .rules_by_rid
             .get(m.rid)
-            .is_some_and(|rule| rule.is_license_text && !rule.is_from_license)
+            .is_some_and(|rule| rule.is_license_text)
             && m.rule_length > 120
             && m.match_coverage > 98.0
         {

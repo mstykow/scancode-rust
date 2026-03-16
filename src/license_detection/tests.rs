@@ -756,11 +756,9 @@ fn test_png_h_detect_matches_match_python_raw_rules() {
             && m.end_line == 401
     }));
     assert!(!matches.iter().any(|m| m.rule_identifier == "libpng_4.RULE"));
-    assert!(
-        !matches
-            .iter()
-            .any(|m| m.rule_identifier == "unknown-license-reference_301.RULE")
-    );
+    assert!(!matches
+        .iter()
+        .any(|m| m.rule_identifier == "unknown-license-reference_301.RULE"));
 }
 
 #[test]
@@ -798,11 +796,9 @@ fn test_standard_ml_nj_and_x11_and_x11_opengroup_detect_matches_match_python_raw
             ),
         ]
     );
-    assert!(
-        !matches
-            .iter()
-            .any(|m| m.rule_identifier == "x11-bitstream_4.RULE")
-    );
+    assert!(!matches
+        .iter()
+        .any(|m| m.rule_identifier == "x11-bitstream_4.RULE"));
 }
 
 #[test]
@@ -840,11 +836,9 @@ fn test_standard_ml_nj_and_x11_and_x11_opengroup_1_detect_matches_match_python_r
             ),
         ]
     );
-    assert!(
-        !matches
-            .iter()
-            .any(|m| m.rule_identifier == "x11-bitstream_4.RULE")
-    );
+    assert!(!matches
+        .iter()
+        .any(|m| m.rule_identifier == "x11-bitstream_4.RULE"));
 }
 
 #[test]
@@ -972,6 +966,63 @@ fn test_zlib_txt_detect_matches_match_python_raw_rules() {
             && m.start_line == 1
             && m.end_line == 12
     }));
+}
+
+#[test]
+fn test_aladdin_md5_and_not_rsa_md5_detect_matches_match_python_raw_signature() {
+    let Some(engine) = create_engine_from_reference() else {
+        eprintln!("Skipping test: reference directory not found");
+        return;
+    };
+
+    let matches = detect_fixture_matches(
+        &engine,
+        "testdata/license-golden/datadriven/lic2/aladdin-md5_and_not_rsa-md5.txt",
+    );
+
+    assert_eq!(
+        sorted_raw_matches(&matches),
+        vec![
+            (
+                "aladdin-md5.RULE".to_string(),
+                crate::license_detection::seq_match::MATCH_SEQ.to_string(),
+                26,
+                34,
+            ),
+            (
+                "zlib.LICENSE".to_string(),
+                crate::license_detection::aho_match::MATCH_AHO.to_string(),
+                4,
+                18,
+            ),
+        ],
+        "aladdin-md5_and_not_rsa-md5 raw matches should align with Python: {:?}",
+        summarize_raw_matches(&matches)
+    );
+
+    assert!(
+        matches.iter().all(|m| m.license_expression == "zlib"),
+        "expected all matches to keep Python's zlib expression: {:?}",
+        matches
+            .iter()
+            .map(|m| (
+                &m.rule_identifier,
+                &m.license_expression,
+                &m.matcher,
+                m.start_line,
+                m.end_line
+            ))
+            .collect::<Vec<_>>()
+    );
+    assert!(
+        !matches.iter().any(|m| {
+            m.matcher == crate::license_detection::seq_match::MATCH_SEQ
+                && m.start_line == 4
+                && m.end_line == 34
+        }),
+        "unexpected seq wrapper spanning lines 4-34: {:?}",
+        summarize_raw_matches(&matches)
+    );
 }
 
 #[test]
