@@ -144,6 +144,25 @@ pub struct Query<'a> {
     pub index: &'a LicenseIndex,
 }
 
+fn matched_text_from_text(text: &str, start_line: usize, end_line: usize) -> String {
+    if start_line == 0 || end_line == 0 || start_line > end_line {
+        return String::new();
+    }
+
+    text.lines()
+        .enumerate()
+        .filter_map(|(idx, line)| {
+            let line_num = idx + 1;
+            if line_num >= start_line && line_num <= end_line {
+                Some(line)
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
 impl<'a> Query<'a> {
     /// Create a new query from text string and license index.
     ///
@@ -586,7 +605,12 @@ impl<'a> Query<'a> {
     /// Get a query run covering the entire query.
     ///
     /// Corresponds to Python: `whole_query_run()` method (lines 306-317)
-    pub fn whole_query_run(&self) -> QueryRun<'_> {
+    pub fn whole_query_run(&self) -> QueryRun<'a> {
+        QueryRun::whole_query_snapshot(self)
+    }
+
+    /// Get a live whole-query run backed by the current query state.
+    pub(crate) fn live_whole_query_run(&self) -> QueryRun<'_> {
         if self.is_empty() {
             return QueryRun::new(self, 0, None);
         }
@@ -718,24 +742,18 @@ impl<'a> Query<'a> {
     ///
     /// Corresponds to Python: `matched_text()` method in match.py (lines 757-795)
     pub fn matched_text(&self, start_line: usize, end_line: usize) -> String {
-        if start_line == 0 || end_line == 0 || start_line > end_line {
-            return String::new();
-        }
-
-        self.text
-            .lines()
-            .enumerate()
-            .filter_map(|(idx, line)| {
-                let line_num = idx + 1;
-                if line_num >= start_line && line_num <= end_line {
-                    Some(line)
-                } else {
-                    None
-                }
-            })
-            .collect::<Vec<_>>()
-            .join("\n")
+        matched_text_from_text(&self.text, start_line, end_line)
     }
+}
+
+#[derive(Debug, Clone)]
+struct WholeQueryRunSnapshot<'a> {
+    index: &'a LicenseIndex,
+    text: String,
+    tokens: Vec<u16>,
+    line_by_pos: Vec<usize>,
+    high_matchables: HashSet<usize>,
+    low_matchables: HashSet<usize>,
 }
 
 /// A query run is a slice of query tokens identified by a start and end positions.
@@ -747,7 +765,8 @@ impl<'a> Query<'a> {
 /// reference/scancode-toolkit/src/licensedcode/query.py (lines 720-914)
 #[derive(Debug, Clone)]
 pub struct QueryRun<'a> {
-    query: &'a Query<'a>,
+    query: Option<&'a Query<'a>>,
+    whole_query_snapshot: Option<WholeQueryRunSnapshot<'a>>,
     pub start: usize,
     pub end: Option<usize>,
 }
@@ -762,24 +781,119 @@ impl<'a> QueryRun<'a> {
     ///
     /// Corresponds to Python: `QueryRun.__init__()` (lines 735-749)
     pub fn new(query: &'a Query<'a>, start: usize, end: Option<usize>) -> Self {
-        Self { query, start, end }
+        Self {
+            query: Some(query),
+            whole_query_snapshot: None,
+            start,
+            end,
+        }
+    }
+
+    fn whole_query_snapshot(query: &Query<'a>) -> Self {
+        let end = if query.is_empty() {
+            None
+        } else {
+            Some(query.tokens.len() - 1)
+        };
+
+        Self {
+            query: None,
+            whole_query_snapshot: Some(WholeQueryRunSnapshot {
+                index: query.index,
+                text: query.text.clone(),
+                tokens: query.tokens.clone(),
+                line_by_pos: query.line_by_pos.clone(),
+                high_matchables: query.high_matchables.clone(),
+                low_matchables: query.low_matchables.clone(),
+            }),
+            start: 0,
+            end,
+        }
+    }
+
+    fn source_tokens(&self) -> &[u16] {
+        if let Some(query) = self.query {
+            &query.tokens
+        } else {
+            &self
+                .whole_query_snapshot
+                .as_ref()
+                .expect("snapshot-backed whole query run should have snapshot data")
+                .tokens
+        }
+    }
+
+    fn source_line_by_pos(&self) -> &[usize] {
+        if let Some(query) = self.query {
+            &query.line_by_pos
+        } else {
+            &self
+                .whole_query_snapshot
+                .as_ref()
+                .expect("snapshot-backed whole query run should have snapshot data")
+                .line_by_pos
+        }
+    }
+
+    fn source_text(&self) -> &str {
+        if let Some(query) = self.query {
+            &query.text
+        } else {
+            &self
+                .whole_query_snapshot
+                .as_ref()
+                .expect("snapshot-backed whole query run should have snapshot data")
+                .text
+        }
+    }
+
+    fn source_high_matchables(&self) -> &HashSet<usize> {
+        if let Some(query) = self.query {
+            &query.high_matchables
+        } else {
+            &self
+                .whole_query_snapshot
+                .as_ref()
+                .expect("snapshot-backed whole query run should have snapshot data")
+                .high_matchables
+        }
+    }
+
+    fn source_low_matchables(&self) -> &HashSet<usize> {
+        if let Some(query) = self.query {
+            &query.low_matchables
+        } else {
+            &self
+                .whole_query_snapshot
+                .as_ref()
+                .expect("snapshot-backed whole query run should have snapshot data")
+                .low_matchables
+        }
     }
 
     /// Get the license index used by this query run.
     pub fn get_index(&self) -> &LicenseIndex {
-        self.query.index
+        if let Some(query) = self.query {
+            query.index
+        } else {
+            self.whole_query_snapshot
+                .as_ref()
+                .expect("snapshot-backed whole query run should have snapshot data")
+                .index
+        }
     }
 
     /// Get the underlying query reference.
     pub fn query(&self) -> &Query<'a> {
         self.query
+            .expect("snapshot-backed whole query run does not expose a live parent query")
     }
 
     /// Get the start line number of this query run.
     ///
     /// Corresponds to Python: `start_line` property (lines 771-773)
     pub fn start_line(&self) -> Option<usize> {
-        self.query.line_by_pos.get(self.start).copied()
+        self.source_line_by_pos().get(self.start).copied()
     }
 
     /// Get the end line number of this query run.
@@ -787,7 +901,7 @@ impl<'a> QueryRun<'a> {
     /// Corresponds to Python: `end_line` property (lines 775-777)
     pub fn end_line(&self) -> Option<usize> {
         self.end
-            .and_then(|e| self.query.line_by_pos.get(e).copied())
+            .and_then(|e| self.source_line_by_pos().get(e).copied())
     }
 
     /// Get the line number for a specific token position.
@@ -798,7 +912,7 @@ impl<'a> QueryRun<'a> {
     /// # Returns
     /// The line number (1-based), or None if position is out of range
     pub fn line_for_pos(&self, pos: usize) -> Option<usize> {
-        self.query.line_by_pos.get(pos).copied()
+        self.source_line_by_pos().get(pos).copied()
     }
 
     /// Get the sequence of token IDs for this run.
@@ -808,7 +922,7 @@ impl<'a> QueryRun<'a> {
     /// Corresponds to Python: `tokens` property (lines 779-786)
     pub fn tokens(&self) -> &[u16] {
         match self.end {
-            Some(end) => &self.query.tokens[self.start..=end],
+            Some(end) => &self.source_tokens()[self.start..=end],
             None => &[],
         }
     }
@@ -830,7 +944,7 @@ impl<'a> QueryRun<'a> {
     pub fn is_digits_only(&self) -> bool {
         self.tokens()
             .iter()
-            .all(|tid| self.query.index.digit_only_tids.contains(tid))
+            .all(|tid| self.get_index().digit_only_tids.contains(tid))
     }
 
     /// Check if this query run has matchable tokens.
@@ -913,8 +1027,7 @@ impl<'a> QueryRun<'a> {
     ///
     /// Corresponds to Python: `high_matchables` property (lines 851-861)
     pub fn high_matchables(&self) -> HashSet<usize> {
-        self.query
-            .high_matchables
+        self.source_high_matchables()
             .iter()
             .filter(|&&pos| pos >= self.start && pos <= self.end.unwrap_or(usize::MAX))
             .copied()
@@ -927,8 +1040,7 @@ impl<'a> QueryRun<'a> {
     ///
     /// Corresponds to Python: `low_matchables` property (lines 839-849)
     pub fn low_matchables(&self) -> HashSet<usize> {
-        self.query
-            .low_matchables
+        self.source_low_matchables()
             .iter()
             .filter(|&&pos| pos >= self.start && pos <= self.end.unwrap_or(usize::MAX))
             .copied()
@@ -946,7 +1058,7 @@ impl<'a> QueryRun<'a> {
     /// # Returns
     /// The matched text, or empty string if lines are out of range
     pub fn matched_text(&self, start_line: usize, end_line: usize) -> String {
-        self.query.matched_text(start_line, end_line)
+        matched_text_from_text(self.source_text(), start_line, end_line)
     }
 }
 

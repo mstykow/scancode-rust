@@ -374,6 +374,7 @@ fn collect_whole_query_exact_followup_matches(
     index: &index::LicenseIndex,
     query: &mut Query<'_>,
     matched_qspans: &mut Vec<query::PositionSpan>,
+    whole_run: &query::QueryRun<'_>,
 ) -> Vec<LicenseMatch> {
     let mut seq_all_matches = Vec::new();
 
@@ -383,15 +384,13 @@ fn collect_whole_query_exact_followup_matches(
         matched_qspans,
     ));
 
-    let whole_run = query.whole_query_run();
-
     if whole_run.is_matchable(false, matched_qspans) {
         let near_dupe_candidates =
-            compute_candidates_with_msets(index, &whole_run, true, MAX_NEAR_DUPE_CANDIDATES);
+            compute_candidates_with_msets(index, whole_run, true, MAX_NEAR_DUPE_CANDIDATES);
 
         if !near_dupe_candidates.is_empty() {
             let near_dupe_matches =
-                seq_match_with_candidates(index, &whole_run, &near_dupe_candidates);
+                seq_match_with_candidates(index, whole_run, &near_dupe_candidates);
 
             for m in &near_dupe_matches {
                 if m.end_token > m.start_token {
@@ -416,7 +415,7 @@ fn regular_seq_runs<'a>(
         RegularSeqEntrypoint::QueryRuns => query.query_runs(),
         RegularSeqEntrypoint::DetectMatchesRawParity => {
             if synthetic_openj9_notice_preamble_run(query).is_some() {
-                vec![query.whole_query_run()]
+                vec![query.live_whole_query_run()]
             } else {
                 query.query_runs()
             }
@@ -516,6 +515,7 @@ impl LicenseDetectionEngine {
         };
 
         let mut query = Query::new(content, &self.index)?;
+        let whole_query_run = query.whole_query_run();
 
         let mut all_matches = Vec::new();
         let mut candidate_contained_matches = Vec::new();
@@ -525,8 +525,7 @@ impl LicenseDetectionEngine {
         // Phase 1a: Hash matching
         // Python returns immediately if hash matches found (index.py:987-991)
         {
-            let whole_run = query.whole_query_run();
-            let hash_matches = hash_match(&self.index, &whole_run);
+            let hash_matches = hash_match(&self.index, &whole_query_run);
 
             if !hash_matches.is_empty() {
                 let mut matches = hash_matches;
@@ -565,13 +564,12 @@ impl LicenseDetectionEngine {
 
         // Phase 1c: Aho-Corasick matching
         {
-            let whole_run = query.whole_query_run();
             let aho_matches = if aho_extra_matchables.is_empty() {
-                aho_match(&self.index, &whole_run)
+                aho_match(&self.index, &whole_query_run)
             } else {
                 aho_match::aho_match_with_extra_matchables(
                     &self.index,
-                    &whole_run,
+                    &whole_query_run,
                     Some(&aho_extra_matchables),
                 )
             };
@@ -592,6 +590,7 @@ impl LicenseDetectionEngine {
                 &self.index,
                 &mut query,
                 &mut matched_qspans,
+                &whole_query_run,
             );
             all_matches.extend(whole_query_followup);
 
@@ -680,6 +679,7 @@ impl LicenseDetectionEngine {
         };
 
         let mut query = Query::new(content, &self.index)?;
+        let whole_query_run = query.whole_query_run();
 
         let mut all_matches = Vec::new();
         let mut candidate_contained_matches = Vec::new();
@@ -688,8 +688,7 @@ impl LicenseDetectionEngine {
 
         // Phase 1a: Hash matching
         {
-            let whole_run = query.whole_query_run();
-            let hash_matches = hash_match(&self.index, &whole_run);
+            let hash_matches = hash_match(&self.index, &whole_query_run);
 
             if !hash_matches.is_empty() {
                 let mut matches = hash_matches;
@@ -713,13 +712,12 @@ impl LicenseDetectionEngine {
 
         // Phase 1c: Aho-Corasick matching
         {
-            let whole_run = query.whole_query_run();
             let aho_matches = if aho_extra_matchables.is_empty() {
-                aho_match(&self.index, &whole_run)
+                aho_match(&self.index, &whole_query_run)
             } else {
                 aho_match::aho_match_with_extra_matchables(
                     &self.index,
-                    &whole_run,
+                    &whole_query_run,
                     Some(&aho_extra_matchables),
                 )
             };
@@ -737,6 +735,7 @@ impl LicenseDetectionEngine {
                 &self.index,
                 &mut query,
                 &mut matched_qspans,
+                &whole_query_run,
             );
             all_matches.extend(whole_query_followup);
 

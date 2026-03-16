@@ -806,4 +806,29 @@ mod tests {
         assert!(query.is_high_matchable(2));
         assert!(query.is_high_matchable(3));
     }
+
+    #[test]
+    fn test_whole_query_run_snapshot_preserves_pre_subtraction_matchables() {
+        let index = create_query_test_index();
+        let mut query = Query::new("license copyright permission", &index).unwrap();
+
+        let whole_run = query.whole_query_run();
+        let before_subtraction = whole_run.high_matchables();
+        assert_eq!(before_subtraction.len(), 3);
+        assert!(before_subtraction.contains(&0));
+        assert!(before_subtraction.contains(&1));
+        assert!(before_subtraction.contains(&2));
+
+        query.subtract(&PositionSpan::new(0, 1));
+
+        let snapshot_after_subtraction = whole_run.high_matchables();
+        assert_eq!(snapshot_after_subtraction, before_subtraction);
+
+        let live_run = query.query_runs().into_iter().next().unwrap();
+        let live_matchables = live_run.high_matchables();
+        assert_eq!(live_matchables.len(), 1);
+        assert!(live_matchables.contains(&2));
+        assert!(!live_matchables.contains(&0));
+        assert!(!live_matchables.contains(&1));
+    }
 }

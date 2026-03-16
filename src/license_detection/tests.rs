@@ -848,6 +848,51 @@ fn test_standard_ml_nj_and_x11_and_x11_opengroup_1_detect_matches_match_python_r
 }
 
 #[test]
+fn test_x11_danse_detect_matches_match_python_raw_rules() {
+    let Some(engine) = create_engine_from_reference() else {
+        eprintln!("Skipping test: reference directory not found");
+        return;
+    };
+
+    let matches = detect_fixture_matches(
+        &engine,
+        "testdata/license-golden/datadriven/lic4/x11_danse.txt",
+    );
+
+    assert_eq!(
+        sorted_raw_matches(&matches),
+        vec![(
+            "x11_and_other-permissive_1.RULE".to_string(),
+            crate::license_detection::seq_match::MATCH_SEQ.to_string(),
+            3,
+            38,
+        )],
+        "x11_danse.txt should match the Python raw output exactly"
+    );
+    assert!(
+        !matches
+            .iter()
+            .any(|m| m.rule_identifier == "license-intro_94.RULE"),
+        "license-intro_94.RULE should be absent: {:?}",
+        summarize_raw_matches(&matches)
+    );
+    assert!(
+        !matches
+            .iter()
+            .any(|m| m.rule_identifier == "other-permissive_339.RULE"),
+        "other-permissive_339.RULE should be absent: {:?}",
+        summarize_raw_matches(&matches)
+    );
+    assert!(
+        !matches
+            .iter()
+            .any(|m| m.rule_identifier == "x11_danse2.RULE"),
+        "x11_danse2.RULE should be absent: {:?}",
+        summarize_raw_matches(&matches)
+    );
+}
+
+#[test]
 fn test_libevent_license_detect_matches_match_python_raw_rules() {
     let Some(engine) = create_engine_from_reference() else {
         eprintln!("Skipping test: reference directory not found");
