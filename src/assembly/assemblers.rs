@@ -11,6 +11,7 @@ pub static ASSEMBLERS: &[AssemblerConfig] = &[
     AssemblerConfig {
         datasource_ids: &[
             DatasourceId::BunLock,
+            DatasourceId::BunLockb,
             DatasourceId::NpmPackageJson,
             DatasourceId::NpmPackageLockJson,
             DatasourceId::YarnLock,
@@ -20,6 +21,7 @@ pub static ASSEMBLERS: &[AssemblerConfig] = &[
         sibling_file_patterns: &[
             "package.json",
             "bun.lock",
+            "bun.lockb",
             "package-lock.json",
             "npm-shrinkwrap.json",
             "yarn.lock",

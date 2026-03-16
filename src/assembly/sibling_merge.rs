@@ -170,7 +170,9 @@ fn should_skip_npm_lock_merge(package: &Package, pkg_data: &PackageData) -> bool
 }
 
 fn should_skip_bun_lock_merge(package: &Package, pkg_data: &PackageData) -> bool {
-    pkg_data.datasource_id == Some(DatasourceId::BunLock)
+    pkg_data
+        .datasource_id
+        .is_some_and(|id| matches!(id, DatasourceId::BunLock | DatasourceId::BunLockb))
         && !npm_package_identity_matches(package, pkg_data)
 }
 
