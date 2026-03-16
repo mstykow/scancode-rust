@@ -1,10 +1,10 @@
-# Bun Lock Parser: Text Lockfile Dependency Extraction
+# Bun Lock Parser: Text Lockfile Extraction and Legacy Binary Compatibility
 
 ## Summary
 
-Rust now parses Bun's text-based `bun.lock` format and integrates it into the existing npm-family assembly flow.
+Rust now parses Bun's text-based `bun.lock` format, and it also adds a first static compatibility layer for legacy binary `bun.lockb` fixtures Bun still migrates.
 
-This adds Bun lockfile dependency visibility that the Python reference does not currently provide, while intentionally leaving legacy binary `bun.lockb` support as separate follow-up work.
+This adds Bun lockfile dependency visibility that the Python reference does not currently provide, while keeping the still-unverified current binary format and any deeper Bun-specific binary sections as explicit follow-up work.
 
 ## Python Reference Status
 
@@ -64,19 +64,39 @@ This includes:
 - identity guarding so mismatched Bun lockfiles do not merge into the wrong npm package
 - workspace hoisting for root Bun lockfile dependencies in npm-style monorepos
 
+### 6. Static legacy `bun.lockb` v2 compatibility
+
+Rust now statically parses Bun's official legacy `bun.lockb.v2` migration fixtures without shelling out to Bun.
+
+The parser currently:
+
+- validates Bun's binary magic header
+- validates the legacy format version before decoding
+- reconstructs root package identity
+- reconstructs direct dependency scopes from dependency behavior flags
+- reconstructs resolved package versions, resolved URLs, integrity, and nested dependency edges
+- prefers sibling `bun.lock` when both text and binary lockfiles are present
+- integrates `bun.lockb` into the same npm-family sibling/workspace assembly hooks as Bun text lockfiles
+
+This stays inside the project's security boundary: no subprocess parsing, no execution of Bun against untrusted inputs, and fail-closed behavior on unsupported versions.
+
 ## Scope Boundary
 
-This improvement intentionally covers the **current Bun text lockfile** only.
+This improvement now covers:
 
-Legacy binary `bun.lockb` remains follow-up work because:
+- the current text-based `bun.lock`
+- legacy Bun binary lockfile **format v2** compatibility, using Bun's own committed migration fixtures as the oracle
 
-- Bun itself treats the text lockfile as the current default
-- the binary format is much less reviewable and less well documented publicly
-- the migration path from `bun.lockb` to `bun.lock` is already an official Bun workflow
+Remaining Bun binary follow-up work is intentionally narrower than before because:
+
+- Bun's current binary serializer version is newer than the legacy v2 fixtures we can verify today
+- optional tagged binary sections and current-format parity still need source-coupled validation before they should be claimed as fully supported
+- the migration path from `bun.lockb` to `bun.lock` remains the official Bun direction of travel
 
 ## Primary Areas Affected
 
 - Bun lockfile parsing
+- legacy Bun binary compatibility parsing
 - npm-family sibling assembly
 - npm-family workspace dependency hoisting
 - parser and assembly regression coverage for Bun lockfiles
@@ -87,6 +107,9 @@ This improvement is covered by:
 
 - Bun parser-focused unit tests
 - Bun parser golden coverage
+- legacy `bun.lockb` parser-focused unit tests
+- legacy `bun.lockb` parser golden coverage
 - Bun sibling assembly golden coverage
+- legacy `bun.lockb` mismatch/workspace assembly regression coverage
 - Bun workspace assembly regression coverage
 - Bun lockfile mismatch assembly coverage
