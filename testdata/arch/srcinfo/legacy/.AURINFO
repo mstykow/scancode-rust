@@ -1,0 +1,10 @@
+pkgbase = aur-legacy
+	pkgdesc = Legacy AUR metadata sample
+	pkgver = 0.9.0
+	pkgrel = 4
+	url = https://aur.archlinux.org/packages/aur-legacy
+	arch = any
+	license = BSD
+	depends = pacman
+
+pkgname = aur-legacy

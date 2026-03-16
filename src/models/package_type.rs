@@ -38,6 +38,7 @@ use std::str::FromStr;
 #[serde(rename_all = "snake_case")]
 pub enum PackageType {
     About,
+    Alpm,
     Alpine,
     Android,
     AndroidLib,
@@ -105,6 +106,7 @@ impl PackageType {
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::About => "about",
+            Self::Alpm => "alpm",
             Self::Alpine => "alpine",
             Self::Android => "android",
             Self::AndroidLib => "android_lib",
@@ -207,6 +209,7 @@ mod tests {
         assert_eq!(PackageType::Npm.as_str(), "npm");
         assert_eq!(PackageType::Cargo.as_str(), "cargo");
         assert_eq!(PackageType::Pypi.as_str(), "pypi");
+        assert_eq!(PackageType::Alpm.as_str(), "alpm");
     }
 
     #[test]
