@@ -50,6 +50,18 @@
   },
   "packageRules": [
     {
+      "description": "Never update dependency fixtures in test directories",
+      "matchFileNames": [
+        "testdata/**",
+        "**/testdata/**",
+        "test/**",
+        "**/test/**",
+        "tests/**",
+        "**/tests/**"
+      ],
+      "enabled": false
+    },
+    {
       "description": "Rust toolchain updates require testing",
       "matchDatasources": ["rust-version", "github-tags"],
       "matchDepNames": ["rust"],
