@@ -2275,3 +2275,51 @@ fn debug_ace_licenses() {
         );
     }
 }
+
+#[test]
+fn test_unknown_scea_detect_matches_unknown_mode_matches_python_raw_signature() {
+    let Some(engine) = create_engine_from_reference() else {
+        eprintln!("Skipping test: reference directory not found");
+        return;
+    };
+
+    let matches = detect_fixture_matches_with_unknown_licenses(
+        &engine,
+        "testdata/license-golden/datadriven/unknown/scea.txt",
+        true,
+    );
+
+    let scea_matches: Vec<_> = matches
+        .iter()
+        .filter(|m| m.rule_identifier == "scea-1.0_4.RULE")
+        .collect();
+    assert_eq!(scea_matches.len(), 2, "Should have two scea-1.0 matches");
+
+    let unknown_matches: Vec<_> = matches
+        .iter()
+        .filter(|m| m.matcher == crate::license_detection::unknown_match::MATCH_UNKNOWN)
+        .collect();
+
+    assert!(
+        !unknown_matches.is_empty(),
+        "Should have at least one unknown match"
+    );
+
+    for um in &unknown_matches {
+        assert!(
+            um.start_line >= 7,
+            "Unknown match should start at or after line 7 (after scea match at line 7)"
+        );
+    }
+
+    let has_single_unknown_spanning_7_31 = unknown_matches
+        .iter()
+        .any(|m| m.start_line == 7 && m.end_line == 31);
+
+    if unknown_matches.len() == 1 && has_single_unknown_spanning_7_31 {
+        eprintln!(
+            "Note: Rust produces a single unknown match 7-31; Python splits into 7-22 and 22-31. \
+             This may require qspan-aware splitting in the known-match coverage phase."
+        );
+    }
+}

@@ -121,7 +121,7 @@ fn compute_covered_positions(
     let mut covered = std::collections::HashSet::new();
 
     for m in known_matches {
-        for pos in m.start_token..m.end_token {
+        for pos in m.qspan() {
             covered.insert(pos);
         }
     }
@@ -759,29 +759,83 @@ mod tests {
     }
 
     #[test]
-    fn test_compute_covered_positions_single_match() {
+    fn test_compute_covered_positions_gapped_qspan() {
         let index = LicenseIndex::with_legalese_count(10);
         let query = Query::new("some license text here", &index).expect("Failed to create query");
 
         let known_matches = vec![LicenseMatch {
             rid: 0,
-            license_expression: "mit".to_string(),
-            license_expression_spdx: "MIT".to_string(),
+            license_expression: "test".to_string(),
+            license_expression_spdx: "TEST".to_string(),
             from_file: None,
             start_line: 1,
             end_line: 1,
             start_token: 0,
-            end_token: 3,
+            end_token: 10,
             matcher: "test".to_string(),
             score: 1.0,
-            matched_length: 3,
-            rule_length: 3,
+            matched_length: 6,
+            rule_length: 6,
             matched_token_positions: None,
             match_coverage: 100.0,
             rule_relevance: 100,
             rule_identifier: "test-rule".to_string(),
             rule_url: String::new(),
-            matched_text: Some("some license text".to_string()),
+            matched_text: Some("matched text".to_string()),
+            referenced_filenames: None,
+            is_license_intro: false,
+            is_license_clue: false,
+            is_license_reference: false,
+            is_license_tag: false,
+            is_license_text: false,
+            is_from_license: false,
+            hilen: 1,
+            rule_start_token: 0,
+            qspan_positions: Some(vec![0, 1, 2, 7, 8, 9]),
+            ispan_positions: None,
+            hispan_positions: None,
+            candidate_resemblance: 0.0,
+            candidate_containment: 0.0,
+        }];
+
+        let covered = compute_covered_positions(&query, &known_matches);
+
+        assert!(covered.contains(&0), "Should contain position 0");
+        assert!(covered.contains(&2), "Should contain position 2");
+        assert!(covered.contains(&7), "Should contain position 7");
+        assert!(covered.contains(&9), "Should contain position 9");
+        assert!(!covered.contains(&3), "Should NOT contain position 3 (gap)");
+        assert!(!covered.contains(&5), "Should NOT contain position 5 (gap)");
+        assert!(
+            !covered.contains(&10),
+            "Should NOT contain position 10 (outside)"
+        );
+    }
+
+    #[test]
+    fn test_compute_covered_positions_fallback_contiguous() {
+        let index = LicenseIndex::with_legalese_count(10);
+        let query = Query::new("some license text here", &index).expect("Failed to create query");
+
+        let known_matches = vec![LicenseMatch {
+            rid: 0,
+            license_expression: "test".to_string(),
+            license_expression_spdx: "TEST".to_string(),
+            from_file: None,
+            start_line: 1,
+            end_line: 1,
+            start_token: 5,
+            end_token: 10,
+            matcher: "test".to_string(),
+            score: 1.0,
+            matched_length: 5,
+            rule_length: 5,
+            matched_token_positions: None,
+            match_coverage: 100.0,
+            rule_relevance: 100,
+            rule_identifier: "test-rule".to_string(),
+            rule_url: String::new(),
+            matched_text: Some("matched text".to_string()),
             referenced_filenames: None,
             is_license_intro: false,
             is_license_clue: false,
@@ -800,9 +854,79 @@ mod tests {
 
         let covered = compute_covered_positions(&query, &known_matches);
 
+        assert!(covered.contains(&5), "Should contain position 5");
+        assert!(covered.contains(&7), "Should contain position 7");
+        assert!(covered.contains(&9), "Should contain position 9");
         assert!(
-            covered.contains(&0) || covered.is_empty(),
-            "Should track covered positions"
+            !covered.contains(&4),
+            "Should NOT contain position 4 (before)"
+        );
+        assert!(
+            !covered.contains(&10),
+            "Should NOT contain position 10 (after)"
+        );
+    }
+
+    #[test]
+    fn test_compute_covered_positions_qspan_creates_extra_unmatched_region() {
+        let index = LicenseIndex::with_legalese_count(10);
+        let query = Query::new("some license text here", &index).expect("Failed to create query");
+
+        let known_matches = vec![LicenseMatch {
+            rid: 0,
+            license_expression: "test".to_string(),
+            license_expression_spdx: "TEST".to_string(),
+            from_file: None,
+            start_line: 1,
+            end_line: 1,
+            start_token: 0,
+            end_token: 15,
+            matcher: "test".to_string(),
+            score: 1.0,
+            matched_length: 8,
+            rule_length: 8,
+            matched_token_positions: None,
+            match_coverage: 100.0,
+            rule_relevance: 100,
+            rule_identifier: "test-rule".to_string(),
+            rule_url: String::new(),
+            matched_text: Some("matched text".to_string()),
+            referenced_filenames: None,
+            is_license_intro: false,
+            is_license_clue: false,
+            is_license_reference: false,
+            is_license_tag: false,
+            is_license_text: false,
+            is_from_license: false,
+            hilen: 1,
+            rule_start_token: 0,
+            qspan_positions: Some(vec![0, 1, 2, 3, 11, 12, 13, 14]),
+            ispan_positions: None,
+            hispan_positions: None,
+            candidate_resemblance: 0.0,
+            candidate_containment: 0.0,
+        }];
+
+        let covered = compute_covered_positions(&query, &known_matches);
+        let regions = find_unmatched_regions(20, &covered);
+
+        assert!(
+            regions.contains(&(4, 11)),
+            "Should have unmatched region 4-11 (the gap in qspan_positions), got: {:?}",
+            regions
+        );
+        assert!(
+            regions.contains(&(15, 20)),
+            "Should have trailing unmatched region 15-20, got: {:?}",
+            regions
+        );
+
+        let contiguous_covered: std::collections::HashSet<usize> = (0..15).collect();
+        let contiguous_regions = find_unmatched_regions(20, &contiguous_covered);
+        assert_eq!(
+            contiguous_regions,
+            vec![(15, 20)],
+            "Contiguous coverage would collapse the gap, producing only trailing region"
         );
     }
 
