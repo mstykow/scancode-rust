@@ -592,6 +592,7 @@ pub static UNASSEMBLED_DATASOURCE_IDS: &[DatasourceId] = &[
     DatasourceId::JbossServiceXml,
     DatasourceId::NugetDirectoryPackagesProps,
     DatasourceId::RpmPackageLicenses,
+    DatasourceId::SbtBuildSbt,
     DatasourceId::VcpkgJson,
 ];
 
