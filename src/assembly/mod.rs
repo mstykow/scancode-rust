@@ -12,6 +12,7 @@ mod hackage_merge;
 mod nested_merge;
 mod npm_resource_assign;
 mod npm_workspace_merge;
+mod nuget_cpm_resolve;
 mod ruby_resource_assign;
 mod sibling_merge;
 mod swift_merge;
