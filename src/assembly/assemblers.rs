@@ -4,7 +4,8 @@ use strum::EnumIter;
 use super::{
     AssemblerConfig, AssemblyMode, DirectoryMergeOutput, cargo_resource_assign,
     cargo_workspace_merge, composer_resource_assign, conda_rootfs_merge, file_ref_resolve,
-    hackage_merge, npm_resource_assign, npm_workspace_merge, ruby_resource_assign, swift_merge,
+    hackage_merge, npm_resource_assign, npm_workspace_merge, nuget_cpm_resolve,
+    ruby_resource_assign, swift_merge,
 };
 
 #[derive(Clone, Copy)]
@@ -22,6 +23,7 @@ pub(super) enum PostAssemblyPassKind {
     RpmYumdbMerge,
     NpmWorkspaceMerge,
     CargoWorkspaceMerge,
+    NugetCpmResolve,
     CargoResourceAssign,
     ComposerResourceAssign,
     RubyResourceAssign,
@@ -45,6 +47,7 @@ pub(super) static POST_ASSEMBLY_PASSES: &[PostAssemblyPassKind] = &[
     PostAssemblyPassKind::RpmYumdbMerge,
     PostAssemblyPassKind::NpmWorkspaceMerge,
     PostAssemblyPassKind::CargoWorkspaceMerge,
+    PostAssemblyPassKind::NugetCpmResolve,
     PostAssemblyPassKind::CargoResourceAssign,
     PostAssemblyPassKind::ComposerResourceAssign,
     PostAssemblyPassKind::RubyResourceAssign,
@@ -97,6 +100,9 @@ impl PostAssemblyPassKind {
             }
             Self::CargoWorkspaceMerge => {
                 cargo_workspace_merge::assemble_cargo_workspaces(files, packages, dependencies)
+            }
+            Self::NugetCpmResolve => {
+                nuget_cpm_resolve::resolve_nuget_cpm_versions(files, dependencies)
             }
             Self::CargoResourceAssign => {
                 cargo_resource_assign::assign_cargo_package_resources(files, packages)
