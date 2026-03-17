@@ -1011,6 +1011,48 @@ mod tests {
     }
 
     #[test]
+    fn test_csproj_package_reference_preserves_literal_version_override_metadata() {
+        let xml = r#"<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" VersionOverride="13.0.3" />
+    <PackageReference Include="Serilog">
+      <VersionOverride>2.12.0</VersionOverride>
+    </PackageReference>
+  </ItemGroup>
+</Project>"#;
+
+        let mut temp_file = Builder::new().suffix(".csproj").tempfile().unwrap();
+        temp_file.write_all(xml.as_bytes()).unwrap();
+
+        let package_data = PackageReferenceProjectParser::extract_first_package(temp_file.path());
+        assert_eq!(package_data.dependencies.len(), 2);
+
+        let first_extra = package_data.dependencies[0]
+            .extra_data
+            .as_ref()
+            .expect("first PackageReference extra_data missing");
+        assert_eq!(
+            first_extra
+                .get("version_override")
+                .and_then(|value| value.as_str()),
+            Some("13.0.3")
+        );
+        assert!(package_data.dependencies[0].extracted_requirement.is_none());
+
+        let second_extra = package_data.dependencies[1]
+            .extra_data
+            .as_ref()
+            .expect("second PackageReference extra_data missing");
+        assert_eq!(
+            second_extra
+                .get("version_override")
+                .and_then(|value| value.as_str()),
+            Some("2.12.0")
+        );
+        assert!(package_data.dependencies[1].extracted_requirement.is_none());
+    }
+
+    #[test]
     fn test_directory_packages_props_malformed_returns_default() {
         let xml = r#"<Project><ItemGroup><PackageVersion Include="Newtonsoft.Json""#;
 

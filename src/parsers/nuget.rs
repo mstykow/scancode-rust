@@ -937,6 +937,7 @@ fn split_library_key(key: &str) -> Option<(&str, &str)> {
 struct ProjectReferenceData {
     name: Option<String>,
     version: Option<String>,
+    version_override: Option<String>,
     condition: Option<String>,
 }
 
@@ -1088,6 +1089,11 @@ impl PackageParser for PackageReferenceProjectParser {
                                 .filter_map(|a| a.ok())
                                 .find(|attr| attr.key.as_ref() == b"Version")
                                 .and_then(|attr| String::from_utf8(attr.value.to_vec()).ok());
+                            let version_override = e
+                                .attributes()
+                                .filter_map(|a| a.ok())
+                                .find(|attr| attr.key.as_ref() == b"VersionOverride")
+                                .and_then(|attr| String::from_utf8(attr.value.to_vec()).ok());
                             let condition = e
                                 .attributes()
                                 .filter_map(|a| a.ok())
@@ -1098,6 +1104,7 @@ impl PackageParser for PackageReferenceProjectParser {
                             current_package_reference = Some(ProjectReferenceData {
                                 name,
                                 version,
+                                version_override,
                                 condition,
                             });
                         }
@@ -1118,6 +1125,11 @@ impl PackageParser for PackageReferenceProjectParser {
                             .filter_map(|a| a.ok())
                             .find(|attr| attr.key.as_ref() == b"Version")
                             .and_then(|attr| String::from_utf8(attr.value.to_vec()).ok());
+                        let version_override = e
+                            .attributes()
+                            .filter_map(|a| a.ok())
+                            .find(|attr| attr.key.as_ref() == b"VersionOverride")
+                            .and_then(|attr| String::from_utf8(attr.value.to_vec()).ok());
                         let condition = e
                             .attributes()
                             .filter_map(|a| a.ok())
@@ -1125,9 +1137,12 @@ impl PackageParser for PackageReferenceProjectParser {
                             .and_then(|attr| String::from_utf8(attr.value.to_vec()).ok())
                             .or_else(|| current_item_group_condition.clone());
 
-                        if let Some(dependency) =
-                            build_project_file_dependency(name, version, condition)
-                        {
+                        if let Some(dependency) = build_project_file_dependency(
+                            name,
+                            version,
+                            version_override,
+                            condition,
+                        ) {
                             dependencies.push(dependency);
                         }
                     }
@@ -1144,6 +1159,10 @@ impl PackageParser for PackageReferenceProjectParser {
                             && let Some(reference) = &mut current_package_reference
                         {
                             reference.version = Some(text);
+                        } else if current_element.as_str() == "VersionOverride"
+                            && let Some(reference) = &mut current_package_reference
+                        {
+                            reference.version_override = Some(text);
                         }
                     } else if in_property_group {
                         match current_element.as_str() {
@@ -1184,6 +1203,7 @@ impl PackageParser for PackageReferenceProjectParser {
                                 && let Some(dependency) = build_project_file_dependency(
                                     reference.name,
                                     reference.version,
+                                    reference.version_override,
                                     reference.condition,
                                 )
                             {
@@ -1475,6 +1495,7 @@ fn parse_project_lock_dependency(entry: &str, scope: Option<String>) -> Option<D
 fn build_project_file_dependency(
     name: Option<String>,
     version: Option<String>,
+    version_override: Option<String>,
     condition: Option<String>,
 ) -> Option<Dependency> {
     let name = name?.trim().to_string();
@@ -1484,6 +1505,7 @@ fn build_project_file_dependency(
 
     let mut extra_data = serde_json::Map::new();
     insert_extra_string(&mut extra_data, "condition", condition);
+    insert_extra_string(&mut extra_data, "version_override", version_override);
 
     Some(Dependency {
         purl: build_nuget_purl(Some(&name), None),
