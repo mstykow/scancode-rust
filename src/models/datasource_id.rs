@@ -178,6 +178,10 @@ pub enum DatasourceId {
     // ── Haxe ──
     HaxelibJson,
 
+    // ── Helm ──
+    HelmChartLock,
+    HelmChartYaml,
+
     // ── Hex/Elixir ──
     HexMixLock,
 
@@ -425,6 +429,10 @@ impl DatasourceId {
 
             // Haxe
             Self::HaxelibJson => "haxelib_json",
+
+            // Helm
+            Self::HelmChartLock => "helm_chart_lock",
+            Self::HelmChartYaml => "helm_chart_yaml",
 
             // Hex/Elixir
             Self::HexMixLock => "hex_mix_lock",
