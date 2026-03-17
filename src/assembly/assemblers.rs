@@ -1,6 +1,115 @@
-use crate::models::DatasourceId;
+use crate::models::{DatasourceId, FileInfo, Package, TopLevelDependency};
+use strum::EnumIter;
 
-use super::{AssemblerConfig, AssemblyMode};
+use super::{
+    AssemblerConfig, AssemblyMode, DirectoryMergeOutput, cargo_resource_assign,
+    cargo_workspace_merge, composer_resource_assign, conda_rootfs_merge, file_ref_resolve,
+    hackage_merge, npm_resource_assign, npm_workspace_merge, ruby_resource_assign, swift_merge,
+};
+
+#[derive(Clone, Copy)]
+pub(super) enum SpecialDirectoryMergerKind {
+    Skip,
+    Hackage,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, EnumIter)]
+pub(super) enum PostAssemblyPassKind {
+    SwiftMerge,
+    CondaRootfsMerge,
+    NpmResourceAssign,
+    FileReferenceResolve,
+    RpmYumdbMerge,
+    NpmWorkspaceMerge,
+    CargoWorkspaceMerge,
+    CargoResourceAssign,
+    ComposerResourceAssign,
+    RubyResourceAssign,
+}
+
+pub(super) fn special_directory_merger_for(
+    config_key: DatasourceId,
+) -> Option<SpecialDirectoryMergerKind> {
+    match config_key {
+        DatasourceId::HackageCabal => Some(SpecialDirectoryMergerKind::Hackage),
+        DatasourceId::SwiftPackageManifestJson => Some(SpecialDirectoryMergerKind::Skip),
+        _ => None,
+    }
+}
+
+pub(super) static POST_ASSEMBLY_PASSES: &[PostAssemblyPassKind] = &[
+    PostAssemblyPassKind::SwiftMerge,
+    PostAssemblyPassKind::CondaRootfsMerge,
+    PostAssemblyPassKind::NpmResourceAssign,
+    PostAssemblyPassKind::FileReferenceResolve,
+    PostAssemblyPassKind::RpmYumdbMerge,
+    PostAssemblyPassKind::NpmWorkspaceMerge,
+    PostAssemblyPassKind::CargoWorkspaceMerge,
+    PostAssemblyPassKind::CargoResourceAssign,
+    PostAssemblyPassKind::ComposerResourceAssign,
+    PostAssemblyPassKind::RubyResourceAssign,
+];
+
+pub(super) fn run_post_assembly_passes(
+    files: &mut [FileInfo],
+    packages: &mut Vec<Package>,
+    dependencies: &mut Vec<TopLevelDependency>,
+) {
+    for pass in POST_ASSEMBLY_PASSES {
+        pass.run(files, packages, dependencies);
+    }
+}
+
+impl SpecialDirectoryMergerKind {
+    pub(super) fn run(
+        self,
+        files: &[FileInfo],
+        file_indices: &[usize],
+    ) -> Vec<DirectoryMergeOutput> {
+        match self {
+            Self::Skip => Vec::new(),
+            Self::Hackage => hackage_merge::assemble_hackage_packages(files, file_indices),
+        }
+    }
+}
+
+impl PostAssemblyPassKind {
+    fn run(
+        self,
+        files: &mut [FileInfo],
+        packages: &mut Vec<Package>,
+        dependencies: &mut Vec<TopLevelDependency>,
+    ) {
+        match self {
+            Self::SwiftMerge => swift_merge::assemble_swift_packages(files, packages, dependencies),
+            Self::CondaRootfsMerge => {
+                conda_rootfs_merge::merge_conda_rootfs_metadata(files, packages, dependencies)
+            }
+            Self::NpmResourceAssign => {
+                npm_resource_assign::assign_npm_package_resources(files, packages)
+            }
+            Self::FileReferenceResolve => {
+                file_ref_resolve::resolve_file_references(files, packages, dependencies)
+            }
+            Self::RpmYumdbMerge => file_ref_resolve::merge_rpm_yumdb_metadata(files, packages),
+            Self::NpmWorkspaceMerge => {
+                npm_workspace_merge::assemble_npm_workspaces(files, packages, dependencies)
+            }
+            Self::CargoWorkspaceMerge => {
+                cargo_workspace_merge::assemble_cargo_workspaces(files, packages, dependencies)
+            }
+            Self::CargoResourceAssign => {
+                cargo_resource_assign::assign_cargo_package_resources(files, packages)
+            }
+            Self::ComposerResourceAssign => {
+                composer_resource_assign::assign_composer_package_resources(files, packages)
+            }
+            Self::RubyResourceAssign => {
+                ruby_resource_assign::assign_ruby_package_resources(files, packages)
+            }
+        }
+    }
+}
 
 pub static ASSEMBLERS: &[AssemblerConfig] = &[
     // ── Sibling-merge assemblers ──
@@ -513,5 +622,42 @@ mod tests {
             "Datasource IDs in NEITHER ASSEMBLERS nor UNASSEMBLED: {missing:?}\n\
              Add each to an AssemblerConfig in ASSEMBLERS, or to UNASSEMBLED_DATASOURCE_IDS."
         );
+    }
+
+    #[test]
+    fn test_post_assembly_passes_are_unique() {
+        let unique: HashSet<PostAssemblyPassKind> = POST_ASSEMBLY_PASSES.iter().copied().collect();
+
+        assert_eq!(
+            unique.len(),
+            POST_ASSEMBLY_PASSES.len(),
+            "POST_ASSEMBLY_PASSES contains duplicate entries"
+        );
+    }
+
+    #[test]
+    fn test_every_post_assembly_pass_kind_is_registered_once() {
+        let registered: HashSet<PostAssemblyPassKind> =
+            POST_ASSEMBLY_PASSES.iter().copied().collect();
+
+        let missing: Vec<_> = PostAssemblyPassKind::iter()
+            .filter(|pass| !registered.contains(pass))
+            .collect();
+
+        assert!(
+            missing.is_empty(),
+            "Post-assembly pass variants not registered in POST_ASSEMBLY_PASSES: {missing:?}"
+        );
+
+        for pass in PostAssemblyPassKind::iter() {
+            let count = POST_ASSEMBLY_PASSES
+                .iter()
+                .filter(|registered| **registered == pass)
+                .count();
+            assert_eq!(
+                count, 1,
+                "Post-assembly pass {pass:?} should be registered exactly once"
+            );
+        }
     }
 }

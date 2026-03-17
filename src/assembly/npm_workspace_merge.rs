@@ -1,4 +1,4 @@
-//! Workspace assembly for npm/pnpm monorepos.
+//! npm/pnpm workspace assembly for monorepos.
 //!
 //! This module implements a post-processing pass that detects npm/pnpm workspace
 //! roots in already-assembled packages, removes incorrectly-created root Packages,
@@ -39,7 +39,7 @@ use crate::models::{DatasourceId, FileInfo, Package, PackageData, TopLevelDepend
 /// * `files` - Mutable slice of all scanned files
 /// * `packages` - Mutable vector of assembled packages (will be modified)
 /// * `dependencies` - Mutable vector of top-level dependencies (will be modified)
-pub fn assemble_workspaces(
+pub fn assemble_npm_workspaces(
     files: &mut [FileInfo],
     packages: &mut Vec<Package>,
     dependencies: &mut Vec<TopLevelDependency>,
