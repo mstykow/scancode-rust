@@ -1,0 +1,26 @@
+[
+  {
+    "type": "meson",
+    "name": "guardrails",
+    "primary_language": "c",
+    "parties": [],
+    "extra_data": {
+      "languages": ["c"]
+    },
+    "dependencies": [
+      {
+        "purl": "pkg:generic/meson/libcurl",
+        "scope": "dependencies",
+        "is_runtime": true,
+        "is_optional": true,
+        "is_pinned": false,
+        "is_direct": true,
+        "extra_data": {
+          "required": false
+        }
+      }
+    ],
+    "datasource_id": "meson_build",
+    "purl": "pkg:meson/guardrails"
+  }
+]
