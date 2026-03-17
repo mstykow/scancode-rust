@@ -62,7 +62,10 @@ pub fn filter_contained_matches(
             let current = matches[i].clone();
             let next = matches[j].clone();
 
-            if next.end_token > current.end_token {
+            let (_, current_qend) = current.qspan_bounds();
+            let (_, next_qend) = next.qspan_bounds();
+
+            if next_qend > current_qend {
                 break;
             }
 
@@ -141,10 +144,10 @@ pub fn filter_overlapping_matches(
     while i < matches.len().saturating_sub(1) {
         let mut j = i + 1;
         while j < matches.len() {
-            let current_end = matches[i].end_token;
-            let next_start = matches[j].start_token;
+            let (_, current_qend) = matches[i].qspan_bounds();
+            let (next_qstart, _) = matches[j].qspan_bounds();
 
-            if next_start >= current_end {
+            if next_qstart > current_qend {
                 break;
             }
 

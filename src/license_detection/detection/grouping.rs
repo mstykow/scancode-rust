@@ -1,7 +1,7 @@
 //! Match grouping functions.
 
-use super::LINES_THRESHOLD;
 use super::types::DetectionGroup;
+use super::LINES_THRESHOLD;
 use crate::license_detection::models::LicenseMatch;
 
 pub fn group_matches_by_region(matches: &[LicenseMatch]) -> Vec<DetectionGroup> {
@@ -99,7 +99,7 @@ pub fn sort_matches_by_line(matches: &mut [LicenseMatch]) {
         a.start_token
             .cmp(&b.start_token)
             .then_with(|| b.hilen.cmp(&a.hilen))
-            .then_with(|| b.matched_length.cmp(&a.matched_length))
+            .then_with(|| b.len().cmp(&a.len()))
             .then_with(|| a.matcher_order().cmp(&b.matcher_order()))
     });
 }
@@ -285,7 +285,6 @@ mod tests {
         assert_eq!(matches[0].start_token, 10);
         assert_eq!(matches[1].start_token, 100);
     }
-
 
     #[test]
     fn test_grouping_within_both_thresholds() {
