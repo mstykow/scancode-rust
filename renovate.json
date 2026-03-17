@@ -15,6 +15,14 @@
     "tests/**",
     "**/tests/**"
   ],
+  "excludeCommitPaths": [
+    "testdata/**",
+    "**/testdata/**",
+    "test/**",
+    "**/test/**",
+    "tests/**",
+    "**/tests/**"
+  ],
   "addLabels": ["dependencies"],
   "automergeType": "branch",
   "platformAutomerge": true,
