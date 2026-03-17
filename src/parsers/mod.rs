@@ -152,6 +152,8 @@ mod maven_golden_test;
 #[cfg(test)]
 mod maven_test;
 mod meson;
+#[cfg(all(test, feature = "golden-tests"))]
+mod meson_golden_test;
 #[cfg(test)]
 mod meson_test;
 pub mod metadata;
