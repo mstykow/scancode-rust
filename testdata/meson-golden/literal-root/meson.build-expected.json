@@ -7,9 +7,9 @@
     "parties": [],
     "extracted_license_statement": "BSD-2-Clause\nGPL-2.0-or-later",
     "extra_data": {
-      "meson_version": ">=0.47.0",
+      "license_files": ["COPYING", "LICENSES/BSD"],
       "languages": ["c", "cpp"],
-      "license_files": ["COPYING", "LICENSES/BSD"]
+      "meson_version": ">=0.47.0"
     },
     "dependencies": [
       {
@@ -27,16 +27,16 @@
       {
         "purl": "pkg:generic/meson/threads",
         "scope": "dependencies",
-        "is_runtime": true,
+        "is_runtime": false,
         "is_optional": true,
         "is_pinned": false,
         "is_direct": true,
         "extra_data": {
-          "method": "system",
           "modules": ["core", "extra"],
-          "required": false,
+          "method": "system",
+          "native": true,
           "fallback": ["threads-subproject", "threads_dep"],
-          "native": true
+          "required": false
         }
       },
       {
