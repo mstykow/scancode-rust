@@ -34,6 +34,9 @@
       {
         "purl": "pkg:nuget/Serilog",
         "extracted_requirement": "2.10.0",
+        "extra_data": {
+          "version_override": "2.12.0"
+        },
         "scope": null,
         "is_runtime": true,
         "is_optional": false,
