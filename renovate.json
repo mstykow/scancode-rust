@@ -15,14 +15,6 @@
     "tests/**",
     "**/tests/**"
   ],
-  "excludeCommitPaths": [
-    "testdata/**",
-    "**/testdata/**",
-    "test/**",
-    "**/test/**",
-    "tests/**",
-    "**/tests/**"
-  ],
   "addLabels": ["dependencies"],
   "automergeType": "branch",
   "platformAutomerge": true,
@@ -67,6 +59,19 @@
         "tests/**",
         "**/tests/**"
       ],
+      "enabled": false
+    },
+    {
+      "description": "Never raise vulnerability fix updates for dependency fixtures in test directories",
+      "matchFileNames": [
+        "testdata/**",
+        "**/testdata/**",
+        "test/**",
+        "**/test/**",
+        "tests/**",
+        "**/tests/**"
+      ],
+      "matchJsonata": ["$exists(vulnerabilityFixVersion)"],
       "enabled": false
     },
     {
