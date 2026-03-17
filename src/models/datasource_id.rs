@@ -196,6 +196,7 @@ pub enum DatasourceId {
     // ── Maven ──
     MavenPom,
     MavenPomProperties,
+    MesonBuild,
 
     SbtBuildSbt,
 
@@ -443,6 +444,7 @@ impl DatasourceId {
             // Maven
             Self::MavenPom => "maven_pom",
             Self::MavenPomProperties => "maven_pom_properties",
+            Self::MesonBuild => "meson_build",
             Self::SbtBuildSbt => "sbt_build_sbt",
 
             // Microsoft

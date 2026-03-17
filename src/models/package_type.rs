@@ -80,6 +80,7 @@ pub enum PackageType {
     #[serde(rename = "linux-distro")]
     LinuxDistro,
     Maven,
+    Meson,
     Meteor,
     Mozilla,
     Npm,
@@ -149,6 +150,7 @@ impl PackageType {
             Self::JbossService => "jboss-service",
             Self::LinuxDistro => "linux-distro",
             Self::Maven => "maven",
+            Self::Meson => "meson",
             Self::Meteor => "meteor",
             Self::Mozilla => "mozilla",
             Self::Npm => "npm",
