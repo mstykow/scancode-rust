@@ -365,6 +365,200 @@ mod tests {
     }
 
     #[test]
+    fn test_assemble_nuget_cpm_prefers_version_override_when_enabled() {
+        let mut props_file = create_test_file_info(
+            "repo/Directory.Packages.props",
+            DatasourceId::NugetDirectoryPackagesProps,
+            None,
+            None,
+            None,
+            vec![create_test_central_dependency(
+                "pkg:nuget/Newtonsoft.Json",
+                Some("13.0.3"),
+                None,
+            )],
+        );
+        props_file.package_data[0].extra_data = Some(HashMap::from([
+            ("manage_package_versions_centrally".to_string(), json!(true)),
+            (
+                "central_package_version_override_enabled".to_string(),
+                json!(true),
+            ),
+        ]));
+
+        let mut files = vec![
+            create_test_file_info(
+                "repo/src/Contoso.Utility.csproj",
+                DatasourceId::NugetCsproj,
+                Some("pkg:nuget/Contoso.Utility@1.0.0"),
+                Some("Contoso.Utility"),
+                Some("1.0.0"),
+                vec![create_test_dependency(
+                    "pkg:nuget/Newtonsoft.Json",
+                    None,
+                    Some(HashMap::from([(
+                        "version_override".to_string(),
+                        json!("14.0.1"),
+                    )])),
+                )],
+            ),
+            props_file,
+        ];
+
+        let result = assemble(&mut files);
+
+        assert_eq!(result.dependencies.len(), 1);
+        assert_eq!(
+            result.dependencies[0].extracted_requirement.as_deref(),
+            Some("14.0.1")
+        );
+    }
+
+    #[test]
+    fn test_assemble_nuget_cpm_ignores_version_override_when_not_enabled() {
+        let mut props_file = create_test_file_info(
+            "repo/Directory.Packages.props",
+            DatasourceId::NugetDirectoryPackagesProps,
+            None,
+            None,
+            None,
+            vec![create_test_central_dependency(
+                "pkg:nuget/Newtonsoft.Json",
+                Some("13.0.3"),
+                None,
+            )],
+        );
+        props_file.package_data[0].extra_data = Some(HashMap::from([(
+            "manage_package_versions_centrally".to_string(),
+            json!(true),
+        )]));
+
+        let mut files = vec![
+            create_test_file_info(
+                "repo/src/Contoso.Utility.csproj",
+                DatasourceId::NugetCsproj,
+                Some("pkg:nuget/Contoso.Utility@1.0.0"),
+                Some("Contoso.Utility"),
+                Some("1.0.0"),
+                vec![create_test_dependency(
+                    "pkg:nuget/Newtonsoft.Json",
+                    None,
+                    Some(HashMap::from([(
+                        "version_override".to_string(),
+                        json!("14.0.1"),
+                    )])),
+                )],
+            ),
+            props_file,
+        ];
+
+        let result = assemble(&mut files);
+
+        assert_eq!(result.dependencies.len(), 1);
+        assert_eq!(
+            result.dependencies[0].extracted_requirement.as_deref(),
+            Some("13.0.3")
+        );
+    }
+
+    #[test]
+    fn test_assemble_nuget_cpm_ignores_version_override_without_matching_central_entry() {
+        let mut props_file = create_test_file_info(
+            "repo/Directory.Packages.props",
+            DatasourceId::NugetDirectoryPackagesProps,
+            None,
+            None,
+            None,
+            vec![create_test_central_dependency(
+                "pkg:nuget/Serilog",
+                Some("3.1.1"),
+                None,
+            )],
+        );
+        props_file.package_data[0].extra_data = Some(HashMap::from([
+            ("manage_package_versions_centrally".to_string(), json!(true)),
+            (
+                "central_package_version_override_enabled".to_string(),
+                json!(true),
+            ),
+        ]));
+
+        let mut files = vec![
+            create_test_file_info(
+                "repo/src/Contoso.Utility.csproj",
+                DatasourceId::NugetCsproj,
+                Some("pkg:nuget/Contoso.Utility@1.0.0"),
+                Some("Contoso.Utility"),
+                Some("1.0.0"),
+                vec![create_test_dependency(
+                    "pkg:nuget/Newtonsoft.Json",
+                    None,
+                    Some(HashMap::from([(
+                        "version_override".to_string(),
+                        json!("14.0.1"),
+                    )])),
+                )],
+            ),
+            props_file,
+        ];
+
+        let result = assemble(&mut files);
+
+        assert_eq!(result.dependencies.len(), 1);
+        assert!(result.dependencies[0].extracted_requirement.is_none());
+    }
+
+    #[test]
+    fn test_assemble_nuget_cpm_ignores_non_literal_version_override() {
+        let mut props_file = create_test_file_info(
+            "repo/Directory.Packages.props",
+            DatasourceId::NugetDirectoryPackagesProps,
+            None,
+            None,
+            None,
+            vec![create_test_central_dependency(
+                "pkg:nuget/Newtonsoft.Json",
+                Some("13.0.3"),
+                None,
+            )],
+        );
+        props_file.package_data[0].extra_data = Some(HashMap::from([
+            ("manage_package_versions_centrally".to_string(), json!(true)),
+            (
+                "central_package_version_override_enabled".to_string(),
+                json!(true),
+            ),
+        ]));
+
+        let mut files = vec![
+            create_test_file_info(
+                "repo/src/Contoso.Utility.csproj",
+                DatasourceId::NugetCsproj,
+                Some("pkg:nuget/Contoso.Utility@1.0.0"),
+                Some("Contoso.Utility"),
+                Some("1.0.0"),
+                vec![create_test_dependency(
+                    "pkg:nuget/Newtonsoft.Json",
+                    None,
+                    Some(HashMap::from([(
+                        "version_override".to_string(),
+                        json!("$(NewtonsoftJsonVersion)"),
+                    )])),
+                )],
+            ),
+            props_file,
+        ];
+
+        let result = assemble(&mut files);
+
+        assert_eq!(result.dependencies.len(), 1);
+        assert_eq!(
+            result.dependencies[0].extracted_requirement.as_deref(),
+            Some("13.0.3")
+        );
+    }
+
+    #[test]
     fn test_assemble_nuget_cpm_leaves_dependency_unresolved_when_matches_are_ambiguous() {
         let mut props_file = create_test_file_info(
             "repo/Directory.Packages.props",
