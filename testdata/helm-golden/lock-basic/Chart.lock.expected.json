@@ -1,0 +1,37 @@
+[
+  {
+    "type": "helm",
+    "parties": [],
+    "extra_data": {
+      "generated": "2025-08-13T19:31:58.340987883Z",
+      "digest": "sha256:1234abcd"
+    },
+    "dependencies": [
+      {
+        "purl": "pkg:helm/common@2.31.4",
+        "extracted_requirement": "2.31.4",
+        "scope": "dependencies",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": true,
+        "extra_data": {
+          "repository": "oci://registry-1.docker.io/bitnamicharts"
+        }
+      },
+      {
+        "purl": "pkg:helm/metrics@1.2.3",
+        "extracted_requirement": "1.2.3",
+        "scope": "dependencies",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": true,
+        "extra_data": {
+          "repository": "https://charts.example.test"
+        }
+      }
+    ],
+    "datasource_id": "helm_chart_lock"
+  }
+]
