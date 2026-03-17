@@ -522,22 +522,35 @@ read src/license_detection/seq_match/candidates.rs
 - Remaining BSD note:
   - `testdata/license-golden/datadriven/external/fossology-tests/BSD/BSD-3-Clause_AND_CC0-1.0.txt` is a different issue: Rust already builds the Python `bsd-new_303.RULE` wrapper, then drops it in same-expression seq-container pruning.
 
-## Current remaining failing fixtures after the qspan-distance fix (8 total)
+## 2026-03-17 final-stage cleanup round
+
+- Current uncommitted work reduces the full release golden count from `8` to `5`.
+- Three changes drove this round:
+  1. `src/license_detection/match_refine/mod.rs` now keeps false-positive rules out of the weak-match bucket even if their fallback Rust-side expression is `unknown`, which fixes `unknown/scea.txt`.
+  2. `src/license_detection/mod.rs` gained a narrow one-sided same-expression seq-container exemption, which fixes the final `lic1/gpl_and_gpl_and_gpl_and_lgpl-2.0_and_other.txt` case.
+  3. `src/license_detection/mod.rs` also gained a narrow single-bridge-token same-expression seq-container exemption, which fixes `external/fossology-tests/BSD/BSD-3-Clause_AND_CC0-1.0.txt`.
+- Focused regressions were added for:
+  - `unknown/scea.txt` weak-splitting behavior
+  - `lic1/gpl_and_gpl_and_gpl_and_lgpl-2.0_and_other.txt`
+  - `external/fossology-tests/BSD/BSD-3-Clause_AND_CC0-1.0.txt`
+- Current green partitions after this round:
+  - `unknown`
+  - `lic1`
+  - `external_part2`
+  - `lic4_part2`
+
+## Current remaining failing fixtures after the final-stage cleanup round (5 total)
 
 - `datadriven/external/atarashi/CECILL-C.c`
-- `datadriven/external/fossology-tests/BSD/BSD-3-Clause_AND_CC0-1.0.txt`
 - `datadriven/external/spdx/complex-short.html`
-- `datadriven/lic1/gpl_and_gpl_and_gpl_and_lgpl-2.0_and_other.txt`
 - `datadriven/lic2/android-sdk-preview-2015.html`
 - `datadriven/lic2/basename.elf`
 - `datadriven/lic2/bsd-new_156.pdf`
-- `datadriven/unknown/scea.txt`
 
 ## Recommended next target from here
 
-1. Strongest next diagnostic targets now:
-   - `testdata/license-golden/datadriven/lic2/android-sdk-preview-2015.html` for seq/refine overproduction
-   - `testdata/license-golden/datadriven/lic1/gpl_and_gpl_and_gpl_and_lgpl-2.0_and_other.txt` as the last remaining `lic1` case
-   - `testdata/license-golden/datadriven/external/fossology-tests/BSD/BSD-3-Clause_AND_CC0-1.0.txt` as a clean same-expression seq-container-pruning case
-2. The current known full count is `8`.
-3. Re-run the full release golden suite after every targeted fix; the approx-matchable pool and query-run changes have shown broad cutoff effects.
+1. Highest-leverage remaining target is still `testdata/license-golden/datadriven/lic2/android-sdk-preview-2015.html`.
+2. Safest isolated remaining target is `testdata/license-golden/datadriven/external/atarashi/CECILL-C.c`.
+3. `testdata/license-golden/datadriven/lic2/bsd-new_156.pdf` remains a feature-gap-style extraction issue; see `docs/license-detection/PLAN-008-pdf-text-extraction.md`.
+4. `testdata/license-golden/datadriven/external/spdx/complex-short.html` remains the trickiest structural mismatch still open.
+5. The current known full count is `5`.

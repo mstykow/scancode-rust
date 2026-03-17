@@ -1250,6 +1250,37 @@ fn test_bsd_2_clause_and_imlib2_detect_matches_match_python_raw_rules() {
 }
 
 #[test]
+fn test_bsd_3_clause_and_cc0_detect_matches_match_python_raw_rules() {
+    let Some(engine) = create_engine_from_reference() else {
+        eprintln!("Skipping test: reference directory not found");
+        return;
+    };
+
+    let matches = detect_fixture_matches(
+        &engine,
+        "testdata/license-golden/datadriven/external/fossology-tests/BSD/BSD-3-Clause_AND_CC0-1.0.txt",
+    );
+
+    assert_eq!(
+        sorted_raw_matches(&matches),
+        vec![
+            (
+                "bsd-new_303.RULE".to_string(),
+                crate::license_detection::seq_match::MATCH_SEQ.to_string(),
+                9,
+                11,
+            ),
+            (
+                "cc0-1.0_37.RULE".to_string(),
+                crate::license_detection::seq_match::MATCH_SEQ.to_string(),
+                22,
+                28,
+            ),
+        ]
+    );
+}
+
+#[test]
 fn test_xunit_sln_detect_matches_match_python_raw_rules() {
     let Some(engine) = create_engine_from_reference() else {
         eprintln!("Skipping test: reference directory not found");
@@ -1300,6 +1331,42 @@ fn test_complex_el_detect_matches_keep_python_lgpl_container() {
             .iter()
             .any(|m| m.rule_identifier == "lgpl-2.0-plus_36.RULE"),
         "expected shorter LGPL body child to be absorbed by the container: {:?}",
+        summarize_raw_matches(&matches)
+    );
+}
+
+#[test]
+fn test_gpl_and_gpl_and_gpl_and_lgpl_detect_matches_match_python_raw_expressions() {
+    let Some(engine) = create_engine_from_reference() else {
+        eprintln!("Skipping test: reference directory not found");
+        return;
+    };
+
+    let matches = detect_fixture_matches(
+        &engine,
+        "testdata/license-golden/datadriven/lic1/gpl_and_gpl_and_gpl_and_lgpl-2.0_and_other.txt",
+    );
+
+    let expressions: Vec<_> = matches
+        .iter()
+        .map(|m| m.license_expression.as_str())
+        .collect();
+
+    assert_eq!(
+        expressions,
+        vec![
+            "gpl-1.0-plus",
+            "gpl-1.0-plus",
+            "lgpl-2.1-plus",
+            "lgpl-2.1-plus",
+            "gpl-1.0-plus",
+        ]
+    );
+    assert!(
+        !matches
+            .iter()
+            .any(|m| m.rule_identifier == "license-intro_25.RULE"),
+        "the Python raw output does not keep license-intro_25.RULE here: {:?}",
         summarize_raw_matches(&matches)
     );
 }
@@ -1795,6 +1862,76 @@ fn test_filter_redundant_same_expression_seq_containers_keeps_single_material_ch
     let filtered = filter_redundant_same_expression_seq_containers(
         vec![seq_container.clone()],
         &[bare_single_word, long_body],
+    );
+    assert_eq!(filtered, vec![seq_container]);
+}
+
+#[test]
+fn test_filter_redundant_same_expression_seq_containers_keeps_single_bridge_token_wrapper() {
+    let seq_container = make_test_match(
+        crate::license_detection::seq_match::MATCH_SEQ,
+        "bsd-new",
+        "bsd-new_303.RULE",
+        28,
+        44,
+        Some(vec![28, 29, 30, 31, 32, 33, 34, 35, 36, 40, 41, 42, 43]),
+    );
+    let aho_first = make_test_match(
+        crate::license_detection::aho_match::MATCH_AHO,
+        "bsd-new",
+        "bsd-new_302.RULE",
+        28,
+        36,
+        None,
+    );
+    let aho_second = make_test_match(
+        crate::license_detection::aho_match::MATCH_AHO,
+        "bsd-new",
+        "bsd-new_304.RULE",
+        40,
+        44,
+        None,
+    );
+
+    let filtered = filter_redundant_same_expression_seq_containers(
+        vec![seq_container.clone()],
+        &[aho_first, aho_second],
+    );
+    assert_eq!(filtered, vec![seq_container]);
+}
+
+#[test]
+fn test_filter_redundant_same_expression_seq_containers_keeps_small_one_sided_boundary_wrapper() {
+    let seq_container = make_test_match(
+        crate::license_detection::seq_match::MATCH_SEQ,
+        "gpl-1.0-plus",
+        "gpl_64.RULE",
+        1645,
+        1661,
+        Some(vec![
+            1645, 1646, 1647, 1648, 1649, 1650, 1651, 1652, 1653, 1654, 1657, 1658, 1659, 1660,
+        ]),
+    );
+    let aho_first = make_test_match(
+        crate::license_detection::aho_match::MATCH_AHO,
+        "gpl-1.0-plus",
+        "gpl-1.0-plus_359.RULE",
+        1648,
+        1655,
+        None,
+    );
+    let aho_second = make_test_match(
+        crate::license_detection::aho_match::MATCH_AHO,
+        "gpl-1.0-plus",
+        "gpl_63.RULE",
+        1657,
+        1661,
+        None,
+    );
+
+    let filtered = filter_redundant_same_expression_seq_containers(
+        vec![seq_container.clone()],
+        &[aho_first, aho_second],
     );
     assert_eq!(filtered, vec![seq_container]);
 }

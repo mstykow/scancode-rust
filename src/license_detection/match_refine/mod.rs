@@ -84,12 +84,16 @@ pub fn filter_invalid_contained_unknown_matches(
 /// Tuple of (good_matches, weak_matches)
 ///
 /// Based on Python: `split_weak_matches()` (match.py:1740-1765)
-pub fn split_weak_matches(matches: &[LicenseMatch]) -> (Vec<LicenseMatch>, Vec<LicenseMatch>) {
+pub fn split_weak_matches(
+    index: &LicenseIndex,
+    matches: &[LicenseMatch],
+) -> (Vec<LicenseMatch>, Vec<LicenseMatch>) {
     let mut good = Vec::new();
     let mut weak = Vec::new();
 
     for m in matches {
-        let is_weak = m.has_unknown()
+        let is_false_positive = index.false_positive_rids.contains(&m.rid);
+        let is_weak = (!is_false_positive && m.has_unknown())
             || (m.matcher == "3-seq" && m.len() <= SMALL_RULE && m.match_coverage <= 25.0);
 
         if is_weak {
@@ -501,7 +505,8 @@ mod tests {
         m.end_token = 100;
         m.rule_length = 100;
 
-        let (good, weak) = split_weak_matches(&[m.clone()]);
+        let index = LicenseIndex::with_legalese_count(10);
+        let (good, weak) = split_weak_matches(&index, &[m.clone()]);
         assert!(weak.contains(&m));
         assert!(!good.contains(&m));
     }
@@ -518,9 +523,30 @@ mod tests {
         m.end_token = 10;
         m.rule_length = 50;
 
-        let (good, weak) = split_weak_matches(&[m.clone()]);
+        let index = LicenseIndex::with_legalese_count(10);
+        let (good, weak) = split_weak_matches(&index, &[m.clone()]);
         assert!(weak.contains(&m));
         assert!(!good.contains(&m));
+    }
+
+    #[test]
+    fn test_split_weak_matches_keeps_false_positive_unknown_out_of_weak_bucket() {
+        let m = LicenseMatch {
+            rid: 42,
+            license_expression: "unknown".to_string(),
+            matcher: "2-aho".to_string(),
+            matched_length: 3,
+            rule_length: 3,
+            match_coverage: 100.0,
+            ..LicenseMatch::default()
+        };
+
+        let mut index = LicenseIndex::with_legalese_count(10);
+        index.false_positive_rids.insert(42);
+
+        let (good, weak) = split_weak_matches(&index, std::slice::from_ref(&m));
+        assert!(good.contains(&m));
+        assert!(!weak.contains(&m));
     }
 
     #[test]
@@ -535,7 +561,8 @@ mod tests {
         m.end_token = 10;
         m.rule_length = 15;
 
-        let (good, weak) = split_weak_matches(&[m.clone()]);
+        let index = LicenseIndex::with_legalese_count(10);
+        let (good, weak) = split_weak_matches(&index, &[m.clone()]);
         assert!(good.contains(&m));
         assert!(!weak.contains(&m));
     }
@@ -552,7 +579,8 @@ mod tests {
         m.end_token = 10;
         m.rule_length = 15;
 
-        let (good, weak) = split_weak_matches(&[m.clone()]);
+        let index = LicenseIndex::with_legalese_count(10);
+        let (good, weak) = split_weak_matches(&index, &[m.clone()]);
         assert!(good.contains(&m));
         assert!(!weak.contains(&m));
     }
@@ -590,7 +618,8 @@ mod tests {
         weak_seq.rule_length = 50;
 
         let matches = vec![good_match.clone(), weak_unknown.clone(), weak_seq.clone()];
-        let (good, weak) = split_weak_matches(&matches);
+        let index = LicenseIndex::with_legalese_count(10);
+        let (good, weak) = split_weak_matches(&index, &matches);
 
         assert_eq!(good.len(), 1);
         assert_eq!(weak.len(), 2);

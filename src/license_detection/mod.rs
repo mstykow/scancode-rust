@@ -135,6 +135,40 @@ fn is_redundant_same_expression_seq_container(
         .difference(&bridge_positions)
         .count();
 
+    if container_only_positions.len() == 1
+        && container_only_boundary_positions == 0
+        && child_only_positions.is_empty()
+    {
+        return false;
+    }
+
+    if child_only_positions.is_empty()
+        && container_only_positions.len() == container_only_boundary_positions
+        && container_only_boundary_positions <= 3
+    {
+        let earliest_child = contained
+            .iter()
+            .map(|m| m.qspan_bounds().0)
+            .min()
+            .unwrap_or(usize::MAX);
+        let latest_child = contained
+            .iter()
+            .map(|m| m.qspan_bounds().1.saturating_sub(1))
+            .max()
+            .unwrap_or(0);
+
+        let is_one_sided_boundary = container_only_positions
+            .iter()
+            .all(|pos| *pos < earliest_child)
+            || container_only_positions
+                .iter()
+                .all(|pos| *pos > latest_child);
+
+        if is_one_sided_boundary {
+            return false;
+        }
+    }
+
     let max_container_only_positions =
         MAX_REDUNDANT_SEQ_CONTAINER_BOUNDARY_GAP * contained.len() + 1;
     let max_container_boundary_positions =
@@ -428,7 +462,7 @@ impl LicenseDetectionEngine {
         // Python: index.py:1079-1118 - only runs when unknown_licenses=True
         let refined_matches = if unknown_licenses {
             // Split weak from good - Python: index.py:1083
-            let (good_matches, weak_matches) = split_weak_matches(&merged_matches);
+            let (good_matches, weak_matches) = split_weak_matches(&self.index, &merged_matches);
 
             // Unknown detection on uncovered regions - Python: index.py:1093-1114
             let unknown_matches = unknown_match(&self.index, &query, &good_matches);
@@ -569,7 +603,7 @@ impl LicenseDetectionEngine {
 
         // Step 2: Unknown detection and weak match handling
         let refined_matches = if unknown_licenses {
-            let (good_matches, weak_matches) = split_weak_matches(&merged_matches);
+            let (good_matches, weak_matches) = split_weak_matches(&self.index, &merged_matches);
             let unknown_matches = unknown_match(&self.index, &query, &good_matches);
             let filtered_unknown =
                 filter_invalid_contained_unknown_matches(&unknown_matches, &good_matches);
