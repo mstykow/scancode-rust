@@ -476,7 +476,20 @@ read src/license_detection/seq_match/candidates.rs
   - the `.jar` fix is parity-oriented but narrower than Python's broader type-based archive gating
   - the seq-container fix is still Rust-local logic, but moves behavior toward Python and is constrained by targeted tests
 
-## Current remaining failing fixtures after the archive + seq-container pass (15 total)
+## 2026-03-17 physical-line run-shaping fix
+
+- Current uncommitted work reduces the full release golden count from `15` to `14`.
+- The change is in `src/license_detection/query/mod.rs`: `compute_query_runs()` now evaluates line quality once per original physical line, even when long lines are split into 25-token pseudo-lines.
+- This prevents Rust from splitting runs between synthetic chunks of the same source line.
+- Confirmed direct impact:
+  - `testdata/license-golden/datadriven/lic1/devdocs_README.md` is now green.
+  - `lic1` partition improved from `2` failures to `1`.
+- Important verifier caveat:
+  - this is a tactical parity improvement, not a literal Python port.
+  - Python's long-line handling is still driven by file/type metadata, while Rust still decides from raw text only.
+  - So describe this as a targeted run-fragmentation fix, not as complete query parity.
+
+## Current remaining failing fixtures after the physical-line run-shaping fix (14 total)
 
 - `datadriven/external/atarashi/CECILL-C.c`
 - `datadriven/external/fossology-tests/BSD/BSD-3-Clause_AND_CC0-1.0.txt`
@@ -485,7 +498,6 @@ read src/license_detection/seq_match/candidates.rs
 - `datadriven/external/license_tools/spdx-correct.js/test.js`
 - `datadriven/external/licensecheck/fedora/MIT`
 - `datadriven/external/spdx/complex-short.html`
-- `datadriven/lic1/devdocs_README.md`
 - `datadriven/lic1/gpl_and_gpl_and_gpl_and_lgpl-2.0_and_other.txt`
 - `datadriven/lic2/android-sdk-preview-2015.html`
 - `datadriven/lic2/autoconf_aclocal.m4`
@@ -501,8 +513,8 @@ read src/license_detection/seq_match/candidates.rs
    - `testdata/license-golden/datadriven/external/fossology-tests/Dual-license/aclocal.m4`
    - `testdata/license-golden/datadriven/external/spdx/complex-short.html`
    - possibly `testdata/license-golden/datadriven/external/fossology-tests/Dual-license/Oracle+Sun_oracle_index.html`
-2. Important refined conclusion: the earlier attempt to port Python pre-tokenization long-line splitting into `src/license_detection/query/mod.rs` did **not** change the failing fixtures and was reverted. Do not assume that long-line splitting alone explains the remaining autoconf issues.
+2. The newer physical-line run-shaping fix helped `devdocs_README.md`, but it did **not** fix the autoconf/Android family. So the remaining autoconf issues are not explained solely by synthetic chunk boundaries.
 3. The currently strongest remaining diagnostic targets are:
    - `testdata/license-golden/datadriven/lic2/android-sdk-preview-2015.html` for seq/refine overproduction
-   - `testdata/license-golden/datadriven/lic1/devdocs_README.md` for a direct extra `unknown-license-reference_222.RULE`
-4. Re-run the full release golden suite after every targeted fix; the current known full count is `15`.
+   - `testdata/license-golden/datadriven/lic1/gpl_and_gpl_and_gpl_and_lgpl-2.0_and_other.txt` as the last remaining `lic1` case
+4. Re-run the full release golden suite after every targeted fix; the current known full count is `14`.

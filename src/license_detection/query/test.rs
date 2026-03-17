@@ -686,7 +686,7 @@ mod tests {
     }
 
     #[test]
-    fn test_query_run_splitting_breaks_long_low_value_line_into_pseudo_lines() {
+    fn test_query_run_splitting_keeps_good_long_line_in_single_run() {
         let mut index = create_query_test_index();
         let low_tokens: Vec<String> = (0..25).map(|i| format!("word{}", i)).collect();
         for token in &low_tokens {
@@ -697,7 +697,7 @@ mod tests {
         let query = Query::with_options(&text, &index, 1).unwrap();
 
         assert!(query.has_long_lines);
-        assert_eq!(query.query_run_ranges, vec![(0, Some(24)), (25, Some(25))]);
+        assert_eq!(query.query_run_ranges, vec![(0, Some(25))]);
     }
 
     #[test]
@@ -757,6 +757,21 @@ mod tests {
 
         assert!(!query.has_long_lines);
         assert_eq!(query.query_run_ranges, vec![(0, Some(24))]);
+    }
+
+    #[test]
+    fn test_query_run_splitting_does_not_break_between_chunks_of_same_physical_line() {
+        let mut index = create_query_test_index();
+        let low_tokens: Vec<String> = (0..30).map(|i| format!("word{}", i)).collect();
+        for token in &low_tokens {
+            let _ = index.dictionary.get_or_assign(token);
+        }
+
+        let text = format!("license\nword0 word1\n{} license", low_tokens.join(" "));
+        let query = Query::with_options(&text, &index, 2).unwrap();
+
+        assert!(query.has_long_lines);
+        assert_eq!(query.query_run_ranges, vec![(0, Some(33))]);
     }
 
     #[test]
