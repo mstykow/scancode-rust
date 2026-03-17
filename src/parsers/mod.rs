@@ -141,6 +141,11 @@ mod haxe;
 mod haxe_golden_test;
 #[cfg(test)]
 mod haxe_test;
+mod helm;
+#[cfg(all(test, feature = "golden-tests"))]
+mod helm_golden_test;
+#[cfg(test)]
+mod helm_test;
 mod hex_lock;
 #[cfg(all(test, feature = "golden-tests"))]
 mod hex_lock_golden_test;
@@ -401,6 +406,7 @@ pub use self::gradle_lock::GradleLockfileParser;
 pub use self::gradle_module::GradleModuleParser;
 pub use self::hackage::{HackageCabalParser, HackageCabalProjectParser, HackageStackYamlParser};
 pub use self::haxe::HaxeParser;
+pub use self::helm::{HelmChartLockParser, HelmChartYamlParser};
 pub use self::hex_lock::HexLockParser;
 pub use self::maven::MavenParser;
 pub use self::meson::MesonParser;
@@ -571,6 +577,8 @@ register_package_handlers! {
         HackageCabalParser,
         HackageCabalProjectParser,
         HackageStackYamlParser,
+        HelmChartYamlParser,
+        HelmChartLockParser,
         HaxeParser,
         HexLockParser,
         MavenParser,
