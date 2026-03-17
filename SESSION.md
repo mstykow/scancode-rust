@@ -489,32 +489,44 @@ read src/license_detection/seq_match/candidates.rs
   - Python's long-line handling is still driven by file/type metadata, while Rust still decides from raw text only.
   - So describe this as a targeted run-fragmentation fix, not as complete query parity.
 
-## Current remaining failing fixtures after the physical-line run-shaping fix (14 total)
+## 2026-03-17 approx-matchable timing parity + stale snapshot cleanup
+
+- Current uncommitted work reduces the full release golden count from `14` to `10`.
+- Main parity change: `src/license_detection/index/builder/mod.rs` now computes `approx_matchable_rids` before final `is_small` / `is_tiny` flags are derived, matching Python's index-build ordering.
+- Builder regressions were added in `src/license_detection/index/builder/tests.rs` to lock this timing behavior.
+- Direct confirmed effects from this pass:
+  - `testdata/license-golden/datadriven/lic2/autoconf_aclocal.m4` is now green
+  - `testdata/license-golden/datadriven/external/license_tools/spdx-correct.js/test.js` is now green
+  - `testdata/license-golden/datadriven/external/licensecheck/fedora/MIT` is now green
+  - `testdata/license-golden/datadriven/external/fossology-tests/Dual-license/Oracle+Sun_oracle_index.html` is now green
+- Snapshot cleanup:
+  - `testdata/license-golden/datadriven/external/fossology-tests/Dual-license/aclocal.m4.yml` was stale relative to current Python and the mirrored upstream reference.
+  - Local expected value was updated from `fsfap-no-warranty-disclaimer` to `fsf-ap`.
+  - This was snapshot drift, not a Python logic bug.
+- New side effect to watch:
+  - `testdata/license-golden/datadriven/lic4/xunit.sln` is now failing with an extra `unknown-license-reference`; this appears to be a new cutoff/candidate-pool side effect from the broader approx-matchable parity fix.
+
+## Current remaining failing fixtures after the approx-matchable pass (10 total)
 
 - `datadriven/external/atarashi/CECILL-C.c`
+- `datadriven/external/fossology-tests/BSD/BSD-2-Clause_AND_Imlib2.txt`
 - `datadriven/external/fossology-tests/BSD/BSD-3-Clause_AND_CC0-1.0.txt`
-- `datadriven/external/fossology-tests/Dual-license/Oracle+Sun_oracle_index.html`
-- `datadriven/external/fossology-tests/Dual-license/aclocal.m4`
-- `datadriven/external/license_tools/spdx-correct.js/test.js`
-- `datadriven/external/licensecheck/fedora/MIT`
 - `datadriven/external/spdx/complex-short.html`
 - `datadriven/lic1/gpl_and_gpl_and_gpl_and_lgpl-2.0_and_other.txt`
 - `datadriven/lic2/android-sdk-preview-2015.html`
-- `datadriven/lic2/autoconf_aclocal.m4`
 - `datadriven/lic2/basename.elf`
 - `datadriven/lic2/bsd-new_156.pdf`
-- `datadriven/unknown/cigna-go-you-mobile-app-eula.txt`
+- `datadriven/lic4/xunit.sln`
 - `datadriven/unknown/scea.txt`
 
 ## Recommended next target from here
 
-1. Best next cluster remains the autoconf/complex-short family:
-   - `testdata/license-golden/datadriven/lic2/autoconf_aclocal.m4`
-   - `testdata/license-golden/datadriven/external/fossology-tests/Dual-license/aclocal.m4`
-   - `testdata/license-golden/datadriven/external/spdx/complex-short.html`
-   - possibly `testdata/license-golden/datadriven/external/fossology-tests/Dual-license/Oracle+Sun_oracle_index.html`
-2. The newer physical-line run-shaping fix helped `devdocs_README.md`, but it did **not** fix the autoconf/Android family. So the remaining autoconf issues are not explained solely by synthetic chunk boundaries.
-3. The currently strongest remaining diagnostic targets are:
+1. Strongest next diagnostic targets now:
    - `testdata/license-golden/datadriven/lic2/android-sdk-preview-2015.html` for seq/refine overproduction
    - `testdata/license-golden/datadriven/lic1/gpl_and_gpl_and_gpl_and_lgpl-2.0_and_other.txt` as the last remaining `lic1` case
-4. Re-run the full release golden suite after every targeted fix; the current known full count is `14`.
+   - `testdata/license-golden/datadriven/lic4/xunit.sln` as a likely new candidate-pool side effect to keep bounded
+2. The BSD duplicate/extra-reference pair is also a plausible shared cluster now:
+   - `testdata/license-golden/datadriven/external/fossology-tests/BSD/BSD-2-Clause_AND_Imlib2.txt`
+   - `testdata/license-golden/datadriven/external/fossology-tests/BSD/BSD-3-Clause_AND_CC0-1.0.txt`
+3. The current known full count is `10`.
+4. Re-run the full release golden suite after every targeted fix; the approx-matchable pool change has broad cutoff effects.

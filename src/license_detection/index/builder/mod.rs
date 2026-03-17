@@ -10,16 +10,16 @@ use aho_corasick::AhoCorasickBuilder;
 use std::collections::{HashMap, HashSet};
 
 use crate::license_detection::hash_match::compute_hash;
-use crate::license_detection::index::LicenseIndex;
 use crate::license_detection::index::dictionary::TokenDictionary;
 use crate::license_detection::index::token_sets::{
     build_set_and_mset, high_multiset_subset, high_tids_set_subset, multiset_counter,
     tids_set_counter,
 };
+use crate::license_detection::index::LicenseIndex;
 use crate::license_detection::models::{License, Rule};
 use crate::license_detection::rules::legalese;
 use crate::license_detection::rules::thresholds::{
-    SMALL_RULE, TINY_RULE, compute_thresholds_occurrences, compute_thresholds_unique,
+    compute_thresholds_occurrences, compute_thresholds_unique, SMALL_RULE, TINY_RULE,
 };
 use crate::license_detection::tokenize::{
     parse_required_phrase_spans, tokenize, tokenize_with_stopwords,
@@ -390,11 +390,9 @@ pub fn build_index(rules: Vec<Rule>, licenses: Vec<License>) -> LicenseIndex {
 
         regular_rids.insert(rid);
 
-        let is_approx_matchable = {
-            rule.is_small = rule_length < SMALL_RULE;
-            rule.is_tiny = rule_length < TINY_RULE;
-            compute_is_approx_matchable(&rule)
-        };
+        // Match Python indexing order: approx-matchable membership is decided
+        // before compute_thresholds() later derives final is_small/is_tiny flags.
+        let is_approx_matchable = compute_is_approx_matchable(&rule);
 
         if rule_length >= UNKNOWN_NGRAM_LENGTH {
             let tids_ngrams = ngrams(&rule_token_ids, UNKNOWN_NGRAM_LENGTH);
@@ -448,6 +446,8 @@ pub fn build_index(rules: Vec<Rule>, licenses: Vec<License>) -> LicenseIndex {
         );
         rule.min_matched_length_unique = min_matched_length_unique;
         rule.min_high_matched_length_unique = min_high_matched_length_unique;
+        rule.is_small = rule_length < SMALL_RULE;
+        rule.is_tiny = rule_length < TINY_RULE;
 
         if let Some(ref spdx_key) = rule.spdx_license_key {
             rid_by_spdx_key.insert(spdx_key.to_lowercase(), rid);

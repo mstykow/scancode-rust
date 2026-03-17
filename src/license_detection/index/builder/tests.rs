@@ -1,10 +1,10 @@
 #[cfg(test)]
 mod test_cases {
-    use crate::license_detection::index::LicenseIndex;
     use crate::license_detection::index::builder::{
         build_index, compute_is_approx_matchable, generate_url_variants, is_good_tokens_ngram,
         ngrams, tokens_to_bytes,
     };
+    use crate::license_detection::index::LicenseIndex;
     use crate::license_detection::models::{License, Rule};
 
     fn find_rid_by_identifier(index: &LicenseIndex, identifier: &str) -> Option<usize> {
@@ -576,6 +576,40 @@ mod test_cases {
             let postings = &index.high_postings_by_rid[&rid];
             assert!(!postings.is_empty(), "Postings should have entries");
         }
+    }
+
+    #[test]
+    fn test_build_index_keeps_tiny_rule_approx_matchable_for_python_parity() {
+        let mut tiny_rule = create_test_rule("permission granted authorized", false);
+        tiny_rule.identifier = "tiny-legalese.RULE".to_string();
+
+        let index = build_index(vec![tiny_rule], vec![]);
+        let rid = find_rid_by_identifier(&index, "tiny-legalese.RULE").expect("tiny rule");
+        let stored_rule = &index.rules_by_rid[rid];
+
+        assert!(stored_rule.is_tiny);
+        assert!(index.approx_matchable_rids.contains(&rid));
+        assert!(index.high_postings_by_rid.contains_key(&rid));
+        assert!(!compute_is_approx_matchable(stored_rule));
+    }
+
+    #[test]
+    fn test_build_index_keeps_small_reference_rule_approx_matchable_for_python_parity() {
+        let mut reference_rule = create_test_rule(
+            "licensed under this license permission granted today",
+            false,
+        );
+        reference_rule.identifier = "small-reference.RULE".to_string();
+        reference_rule.is_license_reference = true;
+
+        let index = build_index(vec![reference_rule], vec![]);
+        let rid = find_rid_by_identifier(&index, "small-reference.RULE").expect("reference rule");
+        let stored_rule = &index.rules_by_rid[rid];
+
+        assert!(stored_rule.is_small);
+        assert!(index.approx_matchable_rids.contains(&rid));
+        assert!(index.high_postings_by_rid.contains_key(&rid));
+        assert!(!compute_is_approx_matchable(stored_rule));
     }
 
     #[test]
