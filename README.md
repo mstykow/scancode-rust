@@ -211,19 +211,6 @@ To contribute to `scancode-rust`, follow these steps to set up the repository fo
    cargo run --bin scancode-rust -- [OPTIONS] <DIR_PATH>
    ```
 
-   For the common local test workflow, prefer the repository helper script:
-
-   ```sh
-   ./scripts/dev.sh            # lib + integration + doctests, serially
-   ./scripts/dev.sh full       # include golden tests when needed
-   ```
-
-   If you intentionally want concurrent Cargo commands on the same machine, isolate them so they do not fight over the default target directory:
-
-   ```sh
-   ./scripts/dev.sh isolated --name golden test --lib --features golden-tests
-   ```
-
 ## Publishing a Release (Maintainers Only)
 
 Releases are automated using [`cargo-release`](https://github.com/crate-ci/cargo-release) and GitHub Actions.
