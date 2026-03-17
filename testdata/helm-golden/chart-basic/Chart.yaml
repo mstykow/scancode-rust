@@ -1,0 +1,37 @@
+apiVersion: v2
+name: nginx
+version: 22.1.1
+appVersion: 1.29.1
+kubeVersion: ">=1.25.0-0"
+description: Example Helm chart
+type: application
+home: https://example.com/nginx
+icon: https://example.com/icon.png
+keywords:
+  - nginx
+  - reverse-proxy
+sources:
+  - https://github.com/example/nginx-chart
+maintainers:
+  - name: Jane Doe
+    email: jane@example.com
+    url: https://example.com/jane
+annotations:
+  artifacthub.io/license: Apache-2.0
+dependencies:
+  - name: common
+    version: 2.x.x
+    repository: oci://registry-1.docker.io/bitnamicharts
+    tags:
+      - common
+    alias: shared
+  - name: metrics
+    version: 1.2.3
+    repository: https://charts.example.test
+    condition: metrics.enabled
+    import-values:
+      - child: exports.data
+        parent: metricsData
+  - name: sidecar
+    version: 1.2.3+linux.x86_64
+    repository: https://charts.example.test

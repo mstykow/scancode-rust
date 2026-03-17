@@ -1,0 +1,9 @@
+dependencies:
+  - name: common
+    repository: oci://registry-1.docker.io/bitnamicharts
+    version: 2.31.4
+  - name: metrics
+    repository: https://charts.example.test
+    version: 1.2.3
+digest: sha256:1234abcd
+generated: "2025-08-13T19:31:58.340987883Z"
