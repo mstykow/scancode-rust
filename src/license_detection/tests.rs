@@ -1281,6 +1281,34 @@ fn test_bsd_3_clause_and_cc0_detect_matches_match_python_raw_rules() {
 }
 
 #[test]
+fn test_cecill_c_detect_matches_keep_spdx_and_long_notice() {
+    let Some(engine) = create_engine_from_reference() else {
+        eprintln!("Skipping test: reference directory not found");
+        return;
+    };
+
+    let matches = detect_fixture_matches(
+        &engine,
+        "testdata/license-golden/datadriven/external/atarashi/CECILL-C.c",
+    );
+
+    assert_eq!(
+        matches
+            .iter()
+            .map(|m| m.license_expression.as_str())
+            .collect::<Vec<_>>(),
+        vec!["cecill-c", "cecill-c-en"]
+    );
+    assert!(
+        !matches
+            .iter()
+            .any(|m| m.rule_identifier == "cecill-c_3.RULE"),
+        "mixed SPDX/title AHO reference should be filtered out: {:?}",
+        summarize_raw_matches(&matches)
+    );
+}
+
+#[test]
 fn test_xunit_sln_detect_matches_match_python_raw_rules() {
     let Some(engine) = create_engine_from_reference() else {
         eprintln!("Skipping test: reference directory not found");

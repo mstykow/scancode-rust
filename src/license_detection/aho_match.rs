@@ -220,6 +220,40 @@ pub fn aho_match_with_extra_matchables(
         matches.push(license_match);
     }
 
+    if let Some(extra_matchables) = extra_matchable_positions {
+        let live_matchables = query_run.matchables(true);
+        matches = matches
+            .iter()
+            .enumerate()
+            .filter(|(i, m)| {
+                if !m.is_license_reference {
+                    return true;
+                }
+
+                let uses_extra =
+                    (m.start_token..m.end_token).any(|pos| extra_matchables.contains(&pos));
+                let uses_live = (m.start_token..m.end_token)
+                    .any(|pos| live_matchables.contains(&pos) && !extra_matchables.contains(&pos));
+
+                if !(uses_extra && uses_live) {
+                    return true;
+                }
+
+                !matches.iter().enumerate().any(|(j, inner)| {
+                    j != *i
+                        && inner.is_license_reference
+                        && inner.rule_identifier.starts_with("spdx_license_id_")
+                        && inner.license_expression == m.license_expression
+                        && inner.start_token >= m.start_token
+                        && inner.end_token <= m.end_token
+                        && (inner.start_token..inner.end_token)
+                            .all(|pos| extra_matchables.contains(&pos))
+                })
+            })
+            .map(|(_, m)| m.clone())
+            .collect();
+    }
+
     matches
 }
 
@@ -507,6 +541,61 @@ mod tests {
         assert_eq!(matches[0].start_token, 0);
         assert_eq!(matches[0].end_token, 3);
         assert_eq!(matches[0].match_coverage, 100.0);
+    }
+
+    #[test]
+    fn test_aho_match_with_extra_matchables_drops_mixed_reference_when_spdx_submatch_exists() {
+        let mut index = create_test_index_default();
+
+        let short_pattern = tokens_to_bytes(&[0u16, 1]);
+        let long_pattern = tokens_to_bytes(&[0u16, 1, 2]);
+
+        let automaton = AhoCorasickBuilder::new()
+            .build([short_pattern.as_slice(), long_pattern.as_slice()])
+            .unwrap();
+
+        index.rules_automaton = automaton;
+
+        let mut short_rule = create_mock_rule("cecill-c", vec![0, 1], false, false);
+        short_rule.identifier = "spdx_license_id_cecill-c_for_cecill-c.RULE".to_string();
+        short_rule.is_license_reference = true;
+        index.rules_by_rid.push(short_rule);
+        index.tids_by_rid.push(vec![0, 1]);
+        index.pattern_id_to_rid.push(0);
+
+        let mut long_rule = create_mock_rule("cecill-c", vec![0, 1, 2], false, false);
+        long_rule.identifier = "cecill-c_3.RULE".to_string();
+        long_rule.is_license_reference = true;
+        index.rules_by_rid.push(long_rule);
+        index.tids_by_rid.push(vec![0, 1, 2]);
+        index.pattern_id_to_rid.push(1);
+
+        let query = crate::license_detection::query::Query {
+            text: String::new(),
+            tokens: vec![0, 1, 2],
+            line_by_pos: vec![1, 1, 1],
+            unknowns_by_pos: std::collections::HashMap::new(),
+            stopwords_by_pos: std::collections::HashMap::new(),
+            shorts_and_digits_pos: std::collections::HashSet::new(),
+            high_matchables: [2usize].into_iter().collect(),
+            low_matchables: std::collections::HashSet::new(),
+            has_long_lines: false,
+            is_binary: false,
+            query_run_ranges: Vec::new(),
+            spdx_lines: Vec::new(),
+            index: &index,
+        };
+
+        let run = query.whole_query_run();
+        let extra_matchables: HashSet<usize> = [0usize, 1].into_iter().collect();
+        let matches =
+            aho_match_with_extra_matchables(run.get_index(), &run, Some(&extra_matchables));
+
+        assert_eq!(matches.len(), 1);
+        assert_eq!(
+            matches[0].rule_identifier,
+            "spdx_license_id_cecill-c_for_cecill-c.RULE"
+        );
     }
 
     #[test]
