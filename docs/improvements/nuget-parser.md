@@ -67,4 +67,4 @@ That keeps the implementation truthful: it improves real CPM dependency recovery
 ## Related Issues
 
 - #157, #159, #162, #163, #165, #215, #216
-- #340, #368 NuGet Central Package Management support and nearest-ancestor backfill
+- #340 NuGet Central Package Management follow-up semantics
