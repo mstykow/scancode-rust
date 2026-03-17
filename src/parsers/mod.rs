@@ -151,6 +151,9 @@ mod maven;
 mod maven_golden_test;
 #[cfg(test)]
 mod maven_test;
+mod meson;
+#[cfg(test)]
+mod meson_test;
 pub mod metadata;
 mod microsoft_update_manifest;
 #[cfg(test)]
@@ -398,6 +401,7 @@ pub use self::hackage::{HackageCabalParser, HackageCabalProjectParser, HackageSt
 pub use self::haxe::HaxeParser;
 pub use self::hex_lock::HexLockParser;
 pub use self::maven::MavenParser;
+pub use self::meson::MesonParser;
 pub use self::microsoft_update_manifest::MicrosoftUpdateManifestParser;
 pub use self::misc::{
     AndroidApkRecognizer, AndroidLibraryRecognizer, AppleDmgRecognizer, Axis2MarRecognizer,
@@ -568,6 +572,7 @@ register_package_handlers! {
         HaxeParser,
         HexLockParser,
         MavenParser,
+        MesonParser,
         MicrosoftUpdateManifestParser,
         NpmLockParser,
         NpmParser,
