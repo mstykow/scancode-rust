@@ -514,6 +514,16 @@ if path.ends_with("pyproject.toml") {
 1. Every new file format needs a corresponding `DatasourceId` variant in `src/models/datasource_id.rs`
 2. Datasource IDs are globally unique — enforced at compile time by the enum
 3. The `datasource_id` field must NEVER be `None` in production code paths
+4. Every new `DatasourceId` must be classified in `src/assembly/assemblers.rs` — either in an `AssemblerConfig` or in `UNASSEMBLED_DATASOURCE_IDS`
+
+### Classify Every Datasource for Assembly Accounting
+
+Even when your parser does **not** need manifest/lockfile merging, you still need to classify its datasource for assembly accounting.
+
+- If the datasource participates in package assembly, add it to the appropriate `AssemblerConfig` in `src/assembly/assemblers.rs`.
+- If it is intentionally standalone or otherwise not assembled, add it to `UNASSEMBLED_DATASOURCE_IDS` in that same file.
+
+This is enforced by the `assembly::assemblers::tests::test_every_datasource_id_is_accounted_for` test. If you skip this step, CI fails even if your parser logic and parser tests are correct.
 
 ### Check if Assembly is Needed
 
@@ -525,6 +535,8 @@ Does your ecosystem have:
 
 If **YES** to any, your parser needs assembly support.
 
+If **NO**, your datasource still needs an explicit entry in `UNASSEMBLED_DATASOURCE_IDS` so the assembly-accounting test knows the omission is intentional.
+
 ### Add Assembler Configuration
 
 Edit `src/assembly/assemblers.rs` and add your ecosystem to the `ASSEMBLERS` array:
@@ -532,8 +544,12 @@ Edit `src/assembly/assemblers.rs` and add your ecosystem to the `ASSEMBLERS` arr
 ```rust
 // Add to the ASSEMBLERS array
 AssemblerConfig {
-    datasource_ids: &["my_ecosystem_manifest", "my_ecosystem_lock"],
+    datasource_ids: &[
+        DatasourceId::MyEcosystemManifest,
+        DatasourceId::MyEcosystemLock,
+    ],
     sibling_file_patterns: &["manifest.ext", "lockfile.ext"],
+    mode: AssemblyMode::SiblingMerge,
 },
 ```
 
@@ -543,6 +559,15 @@ AssemblerConfig {
 - `sibling_file_patterns`: Filenames to look for in the same directory (order matters - first is primary)
 - Patterns support exact match, case-insensitive match, and glob wildcards (`*.podspec`)
 - The assembler will only merge packages whose `datasource_id` values are listed in the same `AssemblerConfig`
+
+If your parser is intentionally **not** assembled, add it to `UNASSEMBLED_DATASOURCE_IDS` instead:
+
+```rust
+pub static UNASSEMBLED_DATASOURCE_IDS: &[DatasourceId] = &[
+    // ... existing entries ...
+    DatasourceId::MyEcosystemManifest,
+];
+```
 
 ### Add Assembly Golden Tests
 
@@ -594,12 +619,14 @@ Create test fixtures in `testdata/assembly-golden/<ecosystem>-basic/`:
 
 ### Assembly Checklist
 
-- [ ] Assembler config added to `src/assembly/assemblers.rs`
+- [ ] Datasource classified in `src/assembly/assemblers.rs` (`ASSEMBLERS` or `UNASSEMBLED_DATASOURCE_IDS`)
+- [ ] Assembler config added to `src/assembly/assemblers.rs` when assembly is needed
 - [ ] `datasource_ids` match parser `datasource_id` values
 - [ ] `sibling_file_patterns` match actual filenames
 - [ ] Test fixtures created in `testdata/assembly-golden/<ecosystem>-basic/`
 - [ ] Golden test function added to `src/assembly/assembly_golden_test.rs`
 - [ ] Assembly test passes: `cargo test test_assembly_<ecosystem>_basic`
+- [ ] Datasource accounting test passes: `cargo test test_every_datasource_id_is_accounted_for --lib`
 - [ ] Expected JSON reviewed and committed
 
 ### Common Assembly Patterns
@@ -923,15 +950,18 @@ Before submitting your parser:
 - [ ] Parser added to `register_package_handlers!` macro
 - [ ] `register_parser!` macro added at end of parser file
 - [ ] Integration test passes: `cargo test test_all_parsers_are_registered_and_exported`
+- [ ] Datasource classified in `ASSEMBLERS` or `UNASSEMBLED_DATASOURCE_IDS`
 - [ ] Pre-commit hooks pass
 - [ ] SUPPORTED_FORMATS.md auto-updated
 
 ### Assembly (If Applicable)
 
+- [ ] Datasource classified in `src/assembly/assemblers.rs`
 - [ ] Assembler config added to `src/assembly/assemblers.rs`
 - [ ] Assembly golden test created in `testdata/assembly-golden/`
 - [ ] Assembly test function added to `src/assembly/assembly_golden_test.rs`
 - [ ] Assembly test passes: `cargo test test_assembly_<ecosystem>_basic`
+- [ ] Datasource accounting test passes: `cargo test test_every_datasource_id_is_accounted_for --lib`
 
 ### Validation
 
