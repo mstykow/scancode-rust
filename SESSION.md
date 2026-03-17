@@ -465,7 +465,18 @@ read src/license_detection/seq_match/candidates.rs
 - Important conclusion: the next likely fix surface is again `src/license_detection/query/mod.rs`, not another immediate rewrite of `candidates.rs`.
 - Separate investigation suggests using `rid` as candidate tie-break is probably parity-safe here because Rust and Python shared approx-matchable rule ordering appears aligned by identifier.
 
-## Current remaining failing fixtures after the candidate pass (17 total)
+## 2026-03-17 archive + seq-container parity pass
+
+- Current uncommitted work reduces the full release golden count from `17` to `15`.
+- Two fixes are responsible for that improvement:
+  1. `src/utils/file.rs` now skips generic binary-string extraction for real `.jar` archives (extension + ZIP magic), which fixes `testdata/license-golden/datadriven/lic1/do-not_detect-licenses-in-archive.jar`.
+  2. `src/license_detection/mod.rs` now keeps same-expression seq containers unless there are at least two material exact child matches, which fixes `testdata/license-golden/datadriven/lic1/complex.el` by preserving Python's `lgpl-2.0-plus_55.RULE` container.
+- Added focused regressions for the seq-container fix in `src/license_detection/tests.rs`.
+- No-code verification result:
+  - the `.jar` fix is parity-oriented but narrower than Python's broader type-based archive gating
+  - the seq-container fix is still Rust-local logic, but moves behavior toward Python and is constrained by targeted tests
+
+## Current remaining failing fixtures after the archive + seq-container pass (15 total)
 
 - `datadriven/external/atarashi/CECILL-C.c`
 - `datadriven/external/fossology-tests/BSD/BSD-3-Clause_AND_CC0-1.0.txt`
@@ -474,9 +485,7 @@ read src/license_detection/seq_match/candidates.rs
 - `datadriven/external/license_tools/spdx-correct.js/test.js`
 - `datadriven/external/licensecheck/fedora/MIT`
 - `datadriven/external/spdx/complex-short.html`
-- `datadriven/lic1/complex.el`
 - `datadriven/lic1/devdocs_README.md`
-- `datadriven/lic1/do-not_detect-licenses-in-archive.jar`
 - `datadriven/lic1/gpl_and_gpl_and_gpl_and_lgpl-2.0_and_other.txt`
 - `datadriven/lic2/android-sdk-preview-2015.html`
 - `datadriven/lic2/autoconf_aclocal.m4`
@@ -487,7 +496,13 @@ read src/license_detection/seq_match/candidates.rs
 
 ## Recommended next target from here
 
-1. Investigate the query-run mismatch for `testdata/license-golden/datadriven/lic2/autoconf_aclocal.m4` and `testdata/license-golden/datadriven/external/fossology-tests/Dual-license/aclocal.m4`.
-2. Compare Python file/location-based query construction in `reference/scancode-toolkit/src/licensedcode/query.py` with Rust `src/license_detection/query/mod.rs` for the relevant line range.
-3. Verify whether the same query-run mismatch also explains `complex-short.html` and possibly `Oracle+Sun_oracle_index.html`.
-4. After any query-run fix, re-run the full release golden suite because this area can reshuffle candidate sets broadly.
+1. Best next cluster remains the autoconf/complex-short family:
+   - `testdata/license-golden/datadriven/lic2/autoconf_aclocal.m4`
+   - `testdata/license-golden/datadriven/external/fossology-tests/Dual-license/aclocal.m4`
+   - `testdata/license-golden/datadriven/external/spdx/complex-short.html`
+   - possibly `testdata/license-golden/datadriven/external/fossology-tests/Dual-license/Oracle+Sun_oracle_index.html`
+2. Important refined conclusion: the earlier attempt to port Python pre-tokenization long-line splitting into `src/license_detection/query/mod.rs` did **not** change the failing fixtures and was reverted. Do not assume that long-line splitting alone explains the remaining autoconf issues.
+3. The currently strongest remaining diagnostic targets are:
+   - `testdata/license-golden/datadriven/lic2/android-sdk-preview-2015.html` for seq/refine overproduction
+   - `testdata/license-golden/datadriven/lic1/devdocs_README.md` for a direct extra `unknown-license-reference_222.RULE`
+4. Re-run the full release golden suite after every targeted fix; the current known full count is `15`.

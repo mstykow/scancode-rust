@@ -101,6 +101,11 @@ fn is_redundant_same_expression_seq_container(
         return false;
     }
 
+    let material_children = contained.iter().filter(|m| m.matched_length > 1).count();
+    if material_children < 2 {
+        return false;
+    }
+
     contained.sort_by_key(|m| m.qspan_bounds());
 
     let container_qspan: HashSet<usize> = container.qspan().into_iter().collect();

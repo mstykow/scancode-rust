@@ -122,6 +122,10 @@ pub fn extract_text_for_detection(path: &Path, bytes: &[u8]) -> (String, Extract
         return (decoded, ExtractedTextKind::Decoded);
     }
 
+    if matches!(ext.as_deref(), Some("jar")) && is_zip_archive(bytes) {
+        return (String::new(), ExtractedTextKind::None);
+    }
+
     // Skip string extraction for PDFs - they have their own text extraction above
     // and we don't want to extract strings from PDF binary content
     if matches!(ext.as_deref(), Some("pdf")) {
@@ -425,6 +429,12 @@ fn extract_pdf_text(bytes: &[u8]) -> String {
     }
 }
 
+fn is_zip_archive(bytes: &[u8]) -> bool {
+    bytes.starts_with(b"PK\x03\x04")
+        || bytes.starts_with(b"PK\x05\x06")
+        || bytes.starts_with(b"PK\x07\x08")
+}
+
 pub fn extract_printable_strings(bytes: &[u8]) -> String {
     const MIN_LEN: usize = 4;
     const MAX_OUTPUT_BYTES: usize = 2_000_000;
@@ -485,4 +495,23 @@ pub fn extract_printable_strings(bytes: &[u8]) -> String {
     }
 
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::Path;
+
+    use super::{ExtractedTextKind, extract_text_for_detection};
+
+    #[test]
+    fn test_extract_text_for_detection_skips_jar_archives() {
+        let path = Path::new("testdata/license-golden/datadriven/lic1/do-not_detect-licenses-in-archive.jar");
+        let bytes = std::fs::read(path).expect("failed to read jar fixture");
+
+        let (text, kind) = extract_text_for_detection(path, &bytes);
+
+        assert!(text.is_empty());
+        assert_eq!(kind, ExtractedTextKind::None);
+    }
+
 }

@@ -1219,6 +1219,44 @@ fn test_d_zlib_and_gfdl_detect_matches_match_python_raw_expressions() {
 }
 
 #[test]
+fn test_complex_el_detect_matches_keep_python_lgpl_container() {
+    let Some(engine) = create_engine_from_reference() else {
+        eprintln!("Skipping test: reference directory not found");
+        return;
+    };
+
+    let matches = detect_fixture_matches(
+        &engine,
+        "testdata/license-golden/datadriven/lic1/complex.el",
+    );
+
+    assert!(
+        matches.iter().any(|m| {
+            m.rule_identifier == "lgpl-2.0-plus_55.RULE"
+                && m.matcher == crate::license_detection::seq_match::MATCH_SEQ
+                && m.start_line == 37
+                && m.end_line == 54
+        }),
+        "expected Python LGPL container to remain present: {:?}",
+        summarize_raw_matches(&matches)
+    );
+    assert!(
+        !matches
+            .iter()
+            .any(|m| m.rule_identifier == "lgpl_bare_single_word.RULE"),
+        "expected bare single-word LGPL child to be absorbed by the container: {:?}",
+        summarize_raw_matches(&matches)
+    );
+    assert!(
+        !matches
+            .iter()
+            .any(|m| m.rule_identifier == "lgpl-2.0-plus_36.RULE"),
+        "expected shorter LGPL body child to be absorbed by the container: {:?}",
+        summarize_raw_matches(&matches)
+    );
+}
+
+#[test]
 fn test_unknown_readme_detect_matches_unknown_mode_matches_python_raw_rules() {
     let Some(engine) = create_engine_from_reference() else {
         eprintln!("Skipping test: reference directory not found");
@@ -1677,6 +1715,40 @@ fn test_filter_redundant_same_expression_seq_containers_keeps_wide_gap_unicode_w
         &[aho_first, aho_second],
     );
     assert_eq!(filtered, vec![wide_gap_seq]);
+}
+
+#[test]
+fn test_filter_redundant_same_expression_seq_containers_keeps_single_material_child_wrapper() {
+    let seq_container = make_test_match(
+        crate::license_detection::seq_match::MATCH_SEQ,
+        "lgpl-2.0-plus",
+        "lgpl-2.0-plus_55.RULE",
+        148,
+        270,
+        Some((148..151).chain(154..270).collect()),
+    );
+    let bare_single_word = make_test_match(
+        crate::license_detection::aho_match::MATCH_AHO,
+        "lgpl-2.0-plus",
+        "lgpl_bare_single_word.RULE",
+        149,
+        150,
+        None,
+    );
+    let long_body = make_test_match(
+        crate::license_detection::aho_match::MATCH_AHO,
+        "lgpl-2.0-plus",
+        "lgpl-2.0-plus_36.RULE",
+        154,
+        270,
+        None,
+    );
+
+    let filtered = filter_redundant_same_expression_seq_containers(
+        vec![seq_container.clone()],
+        &[bare_single_word, long_body],
+    );
+    assert_eq!(filtered, vec![seq_container]);
 }
 
 #[test]
