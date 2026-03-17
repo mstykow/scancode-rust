@@ -545,6 +545,17 @@ mod tests {
     }
 
     #[test]
+    fn test_assembly_nuget_cpm_version_override() {
+        match run_assembly_golden_test("nuget-cpm-version-override") {
+            Ok(_) => (),
+            Err(e) => panic!(
+                "Assembly golden test failed for nuget-cpm-version-override: {}",
+                e
+            ),
+        }
+    }
+
+    #[test]
     fn test_assembly_npm_workspace() {
         match run_assembly_golden_test("npm-workspace") {
             Ok(_) => (),

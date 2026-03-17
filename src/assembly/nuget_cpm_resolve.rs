@@ -29,6 +29,11 @@ pub(super) fn resolve_nuget_cpm_versions(
             continue;
         }
 
+        if let Some(version_override) = resolve_package_version_override(dependency, props_data) {
+            dependency.extracted_requirement = Some(version_override);
+            continue;
+        }
+
         if let Some(version) = resolve_central_package_version(dependency, props_data) {
             dependency.extracted_requirement = Some(version);
         }
@@ -81,6 +86,42 @@ fn is_central_package_management_enabled(package_data: &PackageData) -> bool {
         == Some(true)
 }
 
+fn is_central_package_version_override_enabled(package_data: &PackageData) -> bool {
+    package_data
+        .extra_data
+        .as_ref()
+        .and_then(|extra_data| extra_data.get("central_package_version_override_enabled"))
+        .and_then(|value| value.as_bool())
+        == Some(true)
+}
+
+fn resolve_package_version_override(
+    dependency: &TopLevelDependency,
+    package_data: &PackageData,
+) -> Option<String> {
+    if !is_central_package_version_override_enabled(package_data) {
+        return None;
+    }
+
+    let version_override = dependency_version_override(dependency)?;
+    if !is_literal_version_override(version_override) {
+        return None;
+    }
+
+    let dependency_purl = dependency.purl.as_deref()?;
+    let dependency_condition = dependency_condition(dependency);
+
+    let matching_central_versions = package_data
+        .dependencies
+        .iter()
+        .filter(|candidate| candidate.scope.as_deref() == Some("package_version"))
+        .filter(|candidate| candidate.purl.as_deref() == Some(dependency_purl))
+        .filter(|candidate| condition_matches(dependency_condition, candidate_condition(candidate)))
+        .count();
+
+    (matching_central_versions == 1).then(|| version_override.to_string())
+}
+
 fn resolve_central_package_version(
     dependency: &TopLevelDependency,
     package_data: &PackageData,
@@ -112,6 +153,20 @@ fn dependency_condition(dependency: &TopLevelDependency) -> Option<&str> {
         .as_ref()
         .and_then(|extra_data| extra_data.get("condition"))
         .and_then(|value| value.as_str())
+}
+
+fn dependency_version_override(dependency: &TopLevelDependency) -> Option<&str> {
+    dependency
+        .extra_data
+        .as_ref()
+        .and_then(|extra_data| extra_data.get("version_override"))
+        .and_then(|value| value.as_str())
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+}
+
+fn is_literal_version_override(value: &str) -> bool {
+    !value.contains("$(")
 }
 
 fn candidate_condition(candidate: &crate::models::Dependency) -> Option<&str> {
