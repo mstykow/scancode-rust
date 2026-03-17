@@ -534,6 +534,17 @@ mod tests {
     }
 
     #[test]
+    fn test_assembly_nuget_cpm_nearest_ancestor() {
+        match run_assembly_golden_test("nuget-cpm-nearest-ancestor") {
+            Ok(_) => (),
+            Err(e) => panic!(
+                "Assembly golden test failed for nuget-cpm-nearest-ancestor: {}",
+                e
+            ),
+        }
+    }
+
+    #[test]
     fn test_assembly_npm_workspace() {
         match run_assembly_golden_test("npm-workspace") {
             Ok(_) => (),

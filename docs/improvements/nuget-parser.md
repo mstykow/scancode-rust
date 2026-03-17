@@ -8,7 +8,7 @@ Rust now goes beyond the released Python ScanCode NuGet support in five concrete
 2. parses `.deps.json` runtime dependency graphs from built .NET outputs
 3. preserves modern nuspec license hints (`license_type`, `license_file`) instead of collapsing everything to deprecated `licenseUrl` fallbacks
 4. reads archive-backed license file contents from `.nupkg` files when the nuspec points at a packaged license file
-5. parses standalone NuGet Central Package Management files (`Directory.Packages.props`)
+5. parses NuGet Central Package Management files (`Directory.Packages.props`) and statically backfills nearest-ancestor central versions into versionless project dependencies
 
 ## Python Status
 
@@ -24,21 +24,26 @@ Rust now goes beyond the released Python ScanCode NuGet support in five concrete
 - `project.lock.json` now extracts dependency groups from `projectFileDependencyGroups`.
 - PackageReference `.csproj`, `.vbproj`, and `.fsproj` files now extract package metadata and `<PackageReference>` dependencies.
 - `Directory.Packages.props` now extracts central `PackageVersion` declarations as dependency metadata, including `Condition` and central-package-management feature flags.
+- Assembly now backfills versionless PackageReference dependencies from the nearest ancestor `Directory.Packages.props` when exactly one static central-version match is available.
 - `.deps.json` now extracts runtime-target-aware resolved dependency graphs from built .NET outputs.
 
-### Standalone CPM parsing (no resolution overclaim)
+### Static CPM backfill (nearest ancestor only)
 
-Rust now parses `Directory.Packages.props` as a standalone NuGet metadata surface.
+Rust now uses `Directory.Packages.props` in two truthful ways: it still parses the file as standalone NuGet metadata, and it now applies its central versions to versionless PackageReference dependencies during assembly when a narrow static match is available.
 
-This first CPM slice intentionally:
+This CPM slice intentionally:
 
 - extracts `<PackageVersion Include="..." Version="..." />` and `<PackageVersion Update="..." Version="..." />`
 - preserves `Condition` metadata on central package-version entries
 - preserves central flags such as `ManagePackageVersionsCentrally`, `CentralPackageTransitivePinningEnabled`, and `CentralPackageVersionOverrideEnabled`
-- does **not** attempt to backfill versionless `PackageReference` entries from ancestor props files
+- backfills versionless `PackageReference` entries from the nearest ancestor `Directory.Packages.props` when central package management is enabled and there is exactly one matching central entry
+- prefers explicit project-file versions over central backfill
+- treats conditioned central versions as applicable only when the project dependency carries the exact same raw condition string
 - does **not** evaluate parent imports or full MSBuild semantics
+- does **not** chain multiple `Directory.Packages.props` files through explicit `<Import>` evaluation
+- does **not** implement broader MSBuild condition/property resolution or VersionOverride semantics
 
-That keeps the parser truthful: it adds CPM file visibility now without pretending that full central-version resolution already works.
+That keeps the implementation truthful: it improves real CPM dependency recovery without pretending that full MSBuild-driven central-version resolution already works.
 
 ### Modern nuspec metadata
 
@@ -57,8 +62,9 @@ That keeps the parser truthful: it adds CPM file visibility now without pretendi
 - `cargo test nuget --lib`
 - `cargo test --features golden-tests nuget_golden --lib`
 - `cargo test --features golden-tests test_assembly_nuget_basic --lib`
+- `cargo test --lib test_assembly_nuget_cpm_nearest_ancestor`
 
 ## Related Issues
 
 - #157, #159, #162, #163, #165, #215, #216
-- #340 standalone `Directory.Packages.props` parser support
+- #340, #368 NuGet Central Package Management support and nearest-ancestor backfill
