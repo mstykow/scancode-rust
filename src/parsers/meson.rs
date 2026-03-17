@@ -70,7 +70,9 @@ fn parse_meson_build(content: &str) -> Result<PackageData, String> {
             continue;
         }
 
-        let parsed = parse_statement(trimmed)?;
+        let Ok(parsed) = parse_statement(trimmed) else {
+            continue;
+        };
         match parsed {
             Statement::Expr(expr) | Statement::Assignment(expr) => {
                 handle_top_level_expr(&expr, &mut package, &mut extra_data, &mut dependencies)
@@ -187,6 +189,7 @@ fn extract_dependencies_from_call(call: &CallExpr) -> Vec<Dependency> {
             .join(", ")
     });
     let required = call.keyword.get("required").and_then(expr_as_bool);
+    let native = call.keyword.get("native").and_then(expr_as_bool);
 
     dependency_names
         .into_iter()
@@ -208,7 +211,7 @@ fn extract_dependencies_from_call(call: &CallExpr) -> Vec<Dependency> {
             if let Some(method) = call.keyword.get("method").and_then(expr_as_string) {
                 extra_data.insert("method".to_string(), JsonValue::String(method.to_string()));
             }
-            if let Some(native) = call.keyword.get("native").and_then(expr_as_bool) {
+            if let Some(native) = native {
                 extra_data.insert("native".to_string(), JsonValue::Bool(native));
             }
 
@@ -242,7 +245,7 @@ fn extract_dependencies_from_call(call: &CallExpr) -> Vec<Dependency> {
                     .clone()
                     .filter(|value| !value.is_empty()),
                 scope: Some("dependencies".to_string()),
-                is_runtime: Some(true),
+                is_runtime: Some(native != Some(true)),
                 is_optional: Some(required == Some(false)),
                 is_pinned: Some(false),
                 is_direct: Some(true),

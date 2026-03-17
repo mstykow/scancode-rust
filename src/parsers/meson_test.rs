@@ -123,6 +123,7 @@ dependency('libarchive', version: ['>=3.0.0', '<4.0.0'])
             .find(|dep| dep.purl.as_deref() == Some("pkg:generic/meson/threads"))
             .expect("threads dependency missing");
         assert_eq!(threads.extracted_requirement, None);
+        assert_eq!(threads.is_runtime, Some(false));
         assert_eq!(threads.is_optional, Some(true));
         let threads_extra = threads
             .extra_data
@@ -245,6 +246,37 @@ dependency(
         assert_eq!(
             package_data.dependencies[0].purl.as_deref(),
             Some("pkg:generic/meson/fmt")
+        );
+    }
+
+    #[test]
+    fn test_skips_unsupported_top_level_noise_after_valid_project() {
+        let content = r#"
+project('noise-safe', 'c', version: '1.0.0')
+
+dependency('zlib')
+answer = 42
+meson.project_version().split('.')
+dependency('fmt', required: false)
+        "#;
+
+        let (_temp_dir, path) = create_temp_meson_build(content);
+        let package_data = MesonParser::extract_first_package(&path);
+
+        assert_eq!(package_data.name.as_deref(), Some("noise-safe"));
+        assert_eq!(package_data.version.as_deref(), Some("1.0.0"));
+        assert_eq!(package_data.dependencies.len(), 2);
+        assert!(
+            package_data
+                .dependencies
+                .iter()
+                .any(|dep| dep.purl.as_deref() == Some("pkg:generic/meson/zlib"))
+        );
+        assert!(
+            package_data
+                .dependencies
+                .iter()
+                .any(|dep| dep.purl.as_deref() == Some("pkg:generic/meson/fmt"))
         );
     }
 
