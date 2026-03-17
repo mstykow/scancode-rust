@@ -506,17 +506,31 @@ read src/license_detection/seq_match/candidates.rs
 - New side effect to watch:
   - `testdata/license-golden/datadriven/lic4/xunit.sln` is now failing with an extra `unknown-license-reference`; this appears to be a new cutoff/candidate-pool side effect from the broader approx-matchable parity fix.
 
-## Current remaining failing fixtures after the approx-matchable pass (10 total)
+## 2026-03-17 qspan-distance parity fix
+
+- Current uncommitted work reduces the full release golden count from `10` to `8`.
+- Main code fix: `src/license_detection/models/license_match.rs` now computes `qdistance_to()` using Python span-distance semantics (inclusive ends), rather than Rust's previous exclusive-end shortcut.
+- This stops Rust from merging sparse `unknown-license-reference_339.RULE` fragments into synthetic 100% seq matches before minimum-coverage filtering.
+- Focused regressions were added for:
+  - `testdata/license-golden/datadriven/external/fossology-tests/BSD/BSD-2-Clause_AND_Imlib2.txt`
+  - `testdata/license-golden/datadriven/lic4/xunit.sln`
+  - unit coverage for gapped qspan distance in `src/license_detection/models/mod_tests.rs`
+- Confirmed direct improvements:
+  - `testdata/license-golden/datadriven/external/fossology-tests/BSD/BSD-2-Clause_AND_Imlib2.txt` is now green
+  - `testdata/license-golden/datadriven/lic4/xunit.sln` is now green
+  - `lic4_part2` is fully green again
+- Remaining BSD note:
+  - `testdata/license-golden/datadriven/external/fossology-tests/BSD/BSD-3-Clause_AND_CC0-1.0.txt` is a different issue: Rust already builds the Python `bsd-new_303.RULE` wrapper, then drops it in same-expression seq-container pruning.
+
+## Current remaining failing fixtures after the qspan-distance fix (8 total)
 
 - `datadriven/external/atarashi/CECILL-C.c`
-- `datadriven/external/fossology-tests/BSD/BSD-2-Clause_AND_Imlib2.txt`
 - `datadriven/external/fossology-tests/BSD/BSD-3-Clause_AND_CC0-1.0.txt`
 - `datadriven/external/spdx/complex-short.html`
 - `datadriven/lic1/gpl_and_gpl_and_gpl_and_lgpl-2.0_and_other.txt`
 - `datadriven/lic2/android-sdk-preview-2015.html`
 - `datadriven/lic2/basename.elf`
 - `datadriven/lic2/bsd-new_156.pdf`
-- `datadriven/lic4/xunit.sln`
 - `datadriven/unknown/scea.txt`
 
 ## Recommended next target from here
@@ -524,9 +538,6 @@ read src/license_detection/seq_match/candidates.rs
 1. Strongest next diagnostic targets now:
    - `testdata/license-golden/datadriven/lic2/android-sdk-preview-2015.html` for seq/refine overproduction
    - `testdata/license-golden/datadriven/lic1/gpl_and_gpl_and_gpl_and_lgpl-2.0_and_other.txt` as the last remaining `lic1` case
-   - `testdata/license-golden/datadriven/lic4/xunit.sln` as a likely new candidate-pool side effect to keep bounded
-2. The BSD duplicate/extra-reference pair is also a plausible shared cluster now:
-   - `testdata/license-golden/datadriven/external/fossology-tests/BSD/BSD-2-Clause_AND_Imlib2.txt`
-   - `testdata/license-golden/datadriven/external/fossology-tests/BSD/BSD-3-Clause_AND_CC0-1.0.txt`
-3. The current known full count is `10`.
-4. Re-run the full release golden suite after every targeted fix; the approx-matchable pool change has broad cutoff effects.
+   - `testdata/license-golden/datadriven/external/fossology-tests/BSD/BSD-3-Clause_AND_CC0-1.0.txt` as a clean same-expression seq-container-pruning case
+2. The current known full count is `8`.
+3. Re-run the full release golden suite after every targeted fix; the approx-matchable pool and query-run changes have shown broad cutoff effects.

@@ -1219,6 +1219,54 @@ fn test_d_zlib_and_gfdl_detect_matches_match_python_raw_expressions() {
 }
 
 #[test]
+fn test_bsd_2_clause_and_imlib2_detect_matches_match_python_raw_rules() {
+    let Some(engine) = create_engine_from_reference() else {
+        eprintln!("Skipping test: reference directory not found");
+        return;
+    };
+
+    let matches = detect_fixture_matches(
+        &engine,
+        "testdata/license-golden/datadriven/external/fossology-tests/BSD/BSD-2-Clause_AND_Imlib2.txt",
+    );
+
+    assert_eq!(
+        sorted_raw_matches(&matches),
+        vec![
+            (
+                "bsd-simplified_and_imlib2_2.RULE".to_string(),
+                crate::license_detection::aho_match::MATCH_AHO.to_string(),
+                2,
+                2,
+            ),
+            (
+                "bsd-simplified_and_imlib2_3.RULE".to_string(),
+                crate::license_detection::aho_match::MATCH_AHO.to_string(),
+                3,
+                3,
+            ),
+        ]
+    );
+}
+
+#[test]
+fn test_xunit_sln_detect_matches_match_python_raw_rules() {
+    let Some(engine) = create_engine_from_reference() else {
+        eprintln!("Skipping test: reference directory not found");
+        return;
+    };
+
+    let matches =
+        detect_fixture_matches(&engine, "testdata/license-golden/datadriven/lic4/xunit.sln");
+
+    assert!(
+        matches.is_empty(),
+        "xunit.sln should have no raw matches: {:?}",
+        summarize_raw_matches(&matches)
+    );
+}
+
+#[test]
 fn test_complex_el_detect_matches_keep_python_lgpl_container() {
     let Some(engine) = create_engine_from_reference() else {
         eprintln!("Skipping test: reference directory not found");

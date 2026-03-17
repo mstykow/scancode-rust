@@ -1277,8 +1277,24 @@ mod tests {
         let mut b = create_license_match();
         b.start_token = 15;
         b.end_token = 20;
-        assert_eq!(a.qdistance_to(&b), 10);
-        assert_eq!(b.qdistance_to(&a), 10);
+        assert_eq!(a.qdistance_to(&b), 11);
+        assert_eq!(b.qdistance_to(&a), 11);
+    }
+
+    #[test]
+    fn test_qdistance_to_gapped_spans_matches_python_semantics() {
+        let mut a = create_license_match();
+        a.qspan_positions = Some(vec![55]);
+        a.start_token = 55;
+        a.end_token = 56;
+
+        let mut b = create_license_match();
+        b.qspan_positions = Some(vec![57, 58]);
+        b.start_token = 57;
+        b.end_token = 59;
+
+        assert_eq!(a.qdistance_to(&b), 2);
+        assert_eq!(b.qdistance_to(&a), 2);
     }
 
     #[test]

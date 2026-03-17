@@ -493,10 +493,12 @@ impl LicenseMatch {
             return 0;
         }
 
-        let (self_start, self_end) = self.qspan_bounds();
-        let (other_start, other_end) = other.qspan_bounds();
+        let (self_start, self_end_exclusive) = self.qspan_bounds();
+        let (other_start, other_end_exclusive) = other.qspan_bounds();
+        let self_end = self_end_exclusive.saturating_sub(1);
+        let other_end = other_end_exclusive.saturating_sub(1);
 
-        if self_end == other_start || other_end == self_start {
+        if self_end + 1 == other_start || other_end + 1 == self_start {
             return 1;
         }
 
