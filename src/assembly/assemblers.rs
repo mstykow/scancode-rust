@@ -590,6 +590,7 @@ pub static UNASSEMBLED_DATASOURCE_IDS: &[DatasourceId] = &[
     DatasourceId::JavaEarApplicationXml,
     DatasourceId::JavaWarWebXml,
     DatasourceId::JbossServiceXml,
+    DatasourceId::MesonBuild,
     DatasourceId::NugetDirectoryPackagesProps,
     DatasourceId::RpmPackageLicenses,
     DatasourceId::SbtBuildSbt,
