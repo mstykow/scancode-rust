@@ -53,3 +53,4 @@ fi
 
 echo ""
 echo "Setup complete. Run 'cargo build --release' to embed license data into the binary."
+echo "For common local test phases, use './scripts/dev.sh'."

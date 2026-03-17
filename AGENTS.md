@@ -61,10 +61,15 @@ git submodule update --init   # Ensure all submodules are initialized
 # Build & Test
 cargo build                   # Development build
 cargo build --release         # Optimized build
-cargo test                    # Run all tests (excludes golden tests)
-cargo test <test_name>        # Run specific test (e.g., test_extract_from_testdata)
-cargo test --lib              # Test library code only (faster)
-cargo test --features golden-tests  # Include golden tests (slower, compares against Python ScanCode)
+./scripts/dev.sh              # Canonical local test entrypoint: lib + integration + doctests
+./scripts/dev.sh full         # Include golden tests serially
+./scripts/dev.sh unit <filter> # Targeted library test loop
+./scripts/dev.sh integration <target-or-filter>... # Target integration suites by path/name
+./scripts/dev.sh parser-golden <parser>...  # Compile parser golden tests once, run many filters
+./scripts/dev.sh cargo build  # Shared-target build with wrapper lock
+./scripts/dev.sh cargo clippy --lib --bins --all-features -- -D warnings # Shared-target clippy
+./scripts/dev.sh isolated [--name <name>] <cargo...> # Opt-in parallel workflow with isolated target dir
+cargo test <test_name>        # Raw Cargo fallback for one-off test filters
 
 # Code Quality
 cargo fmt                     # Format code
@@ -84,6 +89,16 @@ cargo test parsers::npm_test::tests::test_extract_from_testdata
 cargo test parsers::npm_test::tests::test_is_match
 cargo test test_is_match       # Runs all tests with "test_is_match" in name
 ```
+
+## Agent Workflow Guidance
+
+- Prefer `./scripts/dev.sh` for routine local verification so agents converge on one cache-friendly workflow.
+- Shared-target `./scripts/dev.sh` modes take a repo-local lock, so parallel agents wait instead of stampeding the default Cargo target dir.
+- Prefer `./scripts/dev.sh cargo <cargo...>` over raw `cargo <...>` when the command builds against the shared target dir.
+- Prefer `./scripts/dev.sh isolated <cargo...>` when multiple agents must run Cargo concurrently on the same machine and you do not care about naming the isolated target dir yourself.
+- Prefer `./scripts/dev.sh isolated --name <name> <cargo...>` when multiple agents must run Cargo concurrently and you want predictable cache reuse for a named lane.
+- Avoid launching multiple raw `cargo test` / `cargo clippy` commands in parallel against the default target dir unless lock contention is acceptable.
+- Treat raw Cargo commands as the escape hatch for unusual one-off cases, not the default agent workflow.
 
 ## Project Architecture
 
