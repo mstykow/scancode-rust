@@ -3,7 +3,8 @@
 ## Current objective
 
 - Continue reducing release-mode golden test failures by aligning Rust license detection with the Python reference.
-- The current active target is `testdata/license-golden/datadriven/external/slic-tests/png.h`.
+- The current active target is **GPL candidate ranking parity**, centered on `testdata/license-golden/datadriven/lic1/gpl-2.0-plus_33.txt` and `src/license_detection/seq_match/candidates.rs`.
+- Secondary queued targets remain `testdata/license-golden/datadriven/unknown/scea.txt`, `testdata/license-golden/datadriven/unknown/cigna-go-you-mobile-app-eula.txt`, and an `is_spdx_exception()` audit.
 - User rule: do not invent new heuristics when Python behavior is known; prefer the smallest Python-aligned fix.
 
 ## Process constraints from the user
@@ -22,14 +23,19 @@
 
 ## Important repo state
 
-- Working tree is dirty. `git status --short` currently shows modifications in many files, including:
+- Working tree is dirty. `git status --short` currently shows user/worktree changes in:
   - `.gitignore`
   - `AGENTS.md`
-  - multiple files under `src/license_detection/`
+  - `src/license_detection/detection/analysis.rs`
+  - `src/license_detection/detection/mod.rs`
+  - `src/license_detection/golden_test.rs`
+  - `src/license_detection/models/license.rs`
   - `src/main.rs`
   - `src/utils/text.rs`
-- Do not revert unrelated user changes.
-- `SESSION.md` did not exist before this write.
+  - untracked `debug_gpl3_candidate.py`
+- These changes were already present outside the latest parity-only commit work. Do not revert unrelated user changes.
+- Latest committed state on this branch is now `56261c96` - `Use qspan_bounds() for overlap filtering parity (18->18)`.
+- `SESSION.md` is tracked now and should be kept current as work progresses.
 
 ## Confirmed baseline and prior good commits
 
@@ -373,4 +379,115 @@ These may still exist and can be useful for debugging, but should not be committ
 - Key Python reference: `match_set.py:354` - `candidates = sorted(filter_dupes(sortable_candidates), reverse=True)[:top]`
 - ScoresVector fields (in priority order): `is_highly_resemblant`, `containment`, `resemblance`, `matched_length`
 - `matched_length` is rounded as `round(matched_length / 20, 1)` in Python.
+- Important likely parity bug: Python uses banker's rounding for `round(x, 1)` while Rust currently uses `f32::round()`-style half-away rounding on scaled values. Example confirmed locally: Python `round(4.35, 1) == 4.3`, while half-away rounding yields `4.4`.
+- This can affect all rounded `ScoresVector` fields in Rust candidate ranking: `is_highly_resemblant`, `containment`, `resemblance`, and `matched_length`.
+- Separate verification found that rounding is a real parity bug but likely **not** the sole GPL root cause: even with Python-style rounding, `gpl-3.0_561.RULE` still appears to remain outside Python's kept top-70 set.
+- Higher-priority candidate-ranking parity gaps to check next:
+  - step-1 pre-truncation sort parity before `top_n * 10`
+  - multiset-phase `min_high_matched_length` / `min_matched_length` threshold filtering parity
+  - dupe-group key quantization also needs Python-compatible rounding once the helper exists
+- Suspected fix surface is `src/license_detection/seq_match/candidates.rs`, especially:
+  - rounded score construction around `matched_length`
+  - Python-compatible 1-decimal rounding helper
+  - step-1 candidate sort/truncate parity
+  - step-2 threshold filtering parity
+  - `ScoresVector` ordering / comparison
+  - duplicate filtering and final `top_n` truncation
 - Full release golden count remains at 18.
+
+## How to continue from here
+
+1. Re-check `src/license_detection/seq_match/candidates.rs` against Python `reference/scancode-toolkit/src/licensedcode/match_set.py` before editing.
+2. Focus on the `gpl-3.0_561.RULE` candidate path for `testdata/license-golden/datadriven/lic1/gpl-2.0-plus_33.txt`:
+   - confirm Python ranking inputs for that candidate,
+   - confirm Rust ranking inputs for the same candidate,
+   - identify the first score component or tie-break that diverges.
+3. Prioritize these candidate-ranking details in order:
+   - step-1 candidate sort/truncate parity before `top_n * 10`,
+   - multiset-phase threshold checks (`min_high_matched_length`, `min_matched_length`, `minimum_containment`),
+   - Python `round(x, 1)` parity vs Rust float rounding,
+   - `matched_length` scaling parity,
+   - `ScoresVector` comparison order,
+   - `filter_dupes()` parity,
+   - final `top_n` truncation parity.
+4. Only after the GPL ranking issue is understood, implement the smallest Python-aligned fix and add a focused regression test for `gpl-2.0-plus_33.txt` raw matches.
+5. After implementation, use a separate no-code-change verification subagent, then run:
+   - focused GPL tests,
+   - `cargo test --all --verbose`,
+   - `cargo test --release --features golden-tests --lib license_detection::golden_test`
+6. Commit only if the full release golden failing count improves below `18`; include before/after counts in the commit message.
+
+## Useful continuation commands for the next agent
+
+```bash
+# Current golden failing count
+cargo test --release -q --features golden-tests --lib license_detection::golden_test 2>&1 | tee /tmp/golden_tests.log | grep "failed, 0 skipped" | sed 's/.*, \([0-9]*\) failed,.*/\1/' | paste -sd+ | bc
+
+# Show current failing fixtures
+cargo test --release --features golden-tests --lib license_detection::golden_test 2>&1 | grep "mismatch for"
+
+# Python reference ranking area
+read reference/scancode-toolkit/src/licensedcode/match_set.py
+
+# Rust ranking area
+read src/license_detection/seq_match/candidates.rs
+```
+
+## 2026-03-17 candidate-selection parity pass
+
+- A Python-parity pass landed locally in `src/license_detection/seq_match/candidates.rs` and improved the full release golden count from `18` to `17`.
+- Main changes in that pass:
+  - step-1 candidate pre-truncation sort now uses rounded/full score ordering before `top_n * 10`
+  - step-2 multiset refinement now enforces occurrence-based `min_high_matched_length` and `min_matched_length`
+  - rounded candidate fields now use a Python-oriented 1-decimal helper instead of scaled Rust `round()`
+  - final candidate ordering now falls back after rounded/full vectors consistently with Python tuple ordering
+  - focused regressions were added in `src/license_detection/tests.rs` for:
+    - `testdata/license-golden/datadriven/lic1/gpl-2.0-plus_33.txt`
+    - `testdata/license-golden/datadriven/lic4/kde_licenses_test.txt`
+    - `testdata/license-golden/datadriven/lic1/d-zlib_and_gfdl-1.2_and_gpl_and_gpl_and_other.txt`
+- Confirmed improvements from this pass:
+  - `testdata/license-golden/datadriven/lic1/gpl-2.0-plus_33.txt` is now green
+  - `testdata/license-golden/datadriven/lic4/kde_licenses_test.txt` is now green
+  - `testdata/license-golden/datadriven/lic1/d-zlib_and_gfdl-1.2_and_gpl_and_gpl_and_other.txt` is now green
+- A no-code-change verification subagent confirmed this pass is broadly Python-aligned and does not appear to introduce Rust-only heuristics.
+
+## New follow-up finding after the candidate pass
+
+- The candidate pass also surfaced new ordering-sensitive regressions, especially:
+  - `testdata/license-golden/datadriven/lic2/autoconf_aclocal.m4`
+  - `testdata/license-golden/datadriven/external/fossology-tests/Dual-license/aclocal.m4`
+  - `testdata/license-golden/datadriven/external/fossology-tests/Dual-license/Oracle+Sun_oracle_index.html`
+  - `testdata/license-golden/datadriven/external/spdx/complex-short.html`
+- Focused investigation on `testdata/license-golden/datadriven/lic2/autoconf_aclocal.m4` found the wrong Rust raw match is `lgpl-3.0_or_lgpl-2.1_1.RULE`.
+- That divergence is **not** primarily in step-2 candidate refinement; it appears upstream in query-run shaping:
+  - Python keeps that rule far below the step-1 cutoff on a larger file/location-based run.
+  - Rust currently builds a smaller run for the same region, which lets the rule survive candidate selection.
+- Important conclusion: the next likely fix surface is again `src/license_detection/query/mod.rs`, not another immediate rewrite of `candidates.rs`.
+- Separate investigation suggests using `rid` as candidate tie-break is probably parity-safe here because Rust and Python shared approx-matchable rule ordering appears aligned by identifier.
+
+## Current remaining failing fixtures after the candidate pass (17 total)
+
+- `datadriven/external/atarashi/CECILL-C.c`
+- `datadriven/external/fossology-tests/BSD/BSD-3-Clause_AND_CC0-1.0.txt`
+- `datadriven/external/fossology-tests/Dual-license/Oracle+Sun_oracle_index.html`
+- `datadriven/external/fossology-tests/Dual-license/aclocal.m4`
+- `datadriven/external/license_tools/spdx-correct.js/test.js`
+- `datadriven/external/licensecheck/fedora/MIT`
+- `datadriven/external/spdx/complex-short.html`
+- `datadriven/lic1/complex.el`
+- `datadriven/lic1/devdocs_README.md`
+- `datadriven/lic1/do-not_detect-licenses-in-archive.jar`
+- `datadriven/lic1/gpl_and_gpl_and_gpl_and_lgpl-2.0_and_other.txt`
+- `datadriven/lic2/android-sdk-preview-2015.html`
+- `datadriven/lic2/autoconf_aclocal.m4`
+- `datadriven/lic2/basename.elf`
+- `datadriven/lic2/bsd-new_156.pdf`
+- `datadriven/unknown/cigna-go-you-mobile-app-eula.txt`
+- `datadriven/unknown/scea.txt`
+
+## Recommended next target from here
+
+1. Investigate the query-run mismatch for `testdata/license-golden/datadriven/lic2/autoconf_aclocal.m4` and `testdata/license-golden/datadriven/external/fossology-tests/Dual-license/aclocal.m4`.
+2. Compare Python file/location-based query construction in `reference/scancode-toolkit/src/licensedcode/query.py` with Rust `src/license_detection/query/mod.rs` for the relevant line range.
+3. Verify whether the same query-run mismatch also explains `complex-short.html` and possibly `Oracle+Sun_oracle_index.html`.
+4. After any query-run fix, re-run the full release golden suite because this area can reshuffle candidate sets broadly.

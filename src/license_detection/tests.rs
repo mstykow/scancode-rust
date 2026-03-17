@@ -1103,6 +1103,122 @@ fn test_not_spdx_detect_matches_match_python_raw_rules() {
 }
 
 #[test]
+fn test_gpl_2_0_plus_33_detect_matches_match_python_raw_expressions() {
+    let Some(engine) = create_engine_from_reference() else {
+        eprintln!("Skipping test: reference directory not found");
+        return;
+    };
+
+    let matches = detect_fixture_matches(
+        &engine,
+        "testdata/license-golden/datadriven/lic1/gpl-2.0-plus_33.txt",
+    );
+
+    let expressions: Vec<_> = matches
+        .iter()
+        .map(|m| m.license_expression.as_str())
+        .collect();
+
+    assert_eq!(
+        expressions,
+        vec![
+            "gpl-2.0-plus",
+            "gpl-2.0-plus",
+            "gpl-1.0-plus",
+            "gpl-1.0-plus",
+            "gpl-2.0-plus",
+            "gpl-1.0-plus",
+        ]
+    );
+    assert!(
+        !matches.iter().any(|m| m.license_expression == "gpl-3.0"),
+        "Python does not keep a gpl-3.0 raw match here: {:?}",
+        summarize_raw_matches(&matches)
+    );
+}
+
+#[test]
+fn test_kde_licenses_detect_matches_match_python_raw_expressions() {
+    let Some(engine) = create_engine_from_reference() else {
+        eprintln!("Skipping test: reference directory not found");
+        return;
+    };
+
+    let matches = detect_fixture_matches(
+        &engine,
+        "testdata/license-golden/datadriven/lic4/kde_licenses_test.txt",
+    );
+
+    let expressions: Vec<_> = matches
+        .iter()
+        .map(|m| m.license_expression.as_str())
+        .collect();
+
+    assert_eq!(
+        expressions,
+        vec![
+            "gpl-2.0 OR gpl-3.0 OR kde-accepted-gpl",
+            "lgpl-2.1 OR lgpl-3.0 OR kde-accepted-lgpl",
+            "gpl-2.0-plus",
+            "gpl-3.0",
+            "gpl-3.0-plus",
+            "gpl-3.0-plus",
+            "gpl-3.0-plus",
+            "lgpl-2.1",
+            "lgpl-2.1",
+            "lgpl-2.1-plus",
+            "bsd-simplified AND bsd-new",
+            "x11-xconsortium",
+            "x11-xconsortium",
+            "mit",
+            "mit",
+        ]
+    );
+}
+
+#[test]
+fn test_d_zlib_and_gfdl_detect_matches_match_python_raw_expressions() {
+    let Some(engine) = create_engine_from_reference() else {
+        eprintln!("Skipping test: reference directory not found");
+        return;
+    };
+
+    let matches = detect_fixture_matches(
+        &engine,
+        "testdata/license-golden/datadriven/lic1/d-zlib_and_gfdl-1.2_and_gpl_and_gpl_and_other.txt",
+    );
+
+    let expressions: Vec<_> = matches
+        .iter()
+        .map(|m| m.license_expression.as_str())
+        .collect();
+
+    assert_eq!(
+        expressions,
+        vec![
+            "gpl-2.0-plus AND gpl-3.0-plus",
+            "gpl-1.0-plus WITH mif-exception",
+            "gpl-1.0-plus WITH ada-linking-exception",
+            "gpl-1.0-plus",
+            "gpl-1.0-plus",
+            "gpl-1.0-plus WITH gcc-compiler-exception-2.0",
+            "gpl-1.0-plus WITH classpath-exception-2.0",
+            "gpl-1.0-plus WITH gcc-linking-exception-2.0",
+            "linking-exception-2.0-plus",
+            "gpl-1.0-plus WITH gcc-linking-exception-2.0",
+            "gpl-1.0-plus WITH linking-exception-2.0-plus",
+            "gpl-2.0-plus",
+            "unknown-license-reference",
+            "d-zlib",
+            "lgpl-2.0-plus WITH linking-exception-2.0-plus",
+            "unknown-license-reference",
+            "mit",
+            "gfdl-1.2",
+        ]
+    );
+}
+
+#[test]
 fn test_unknown_readme_detect_matches_unknown_mode_matches_python_raw_rules() {
     let Some(engine) = create_engine_from_reference() else {
         eprintln!("Skipping test: reference directory not found");

@@ -96,19 +96,95 @@ impl Ord for Candidate {
         // So it compares (svr, svf) tuple first, which means:
         // 1. Compare rounded (svr) first
         // 2. Then compare full (svf) if rounded is equal
-        //
-        // Python's filter_dupes uses rank_key = (sv_full, rule.identifier) with reverse=True
-        // This means: higher sv_full wins, then HIGHER identifier alphabetically wins
-        // Example: "cc-by-sa-1.0" > "cc-by-nc-sa-1.0" alphabetically, so SA wins tiebreaker
-        //
-        // CRITICAL: Python does NOT use rule length or relevance as tiebreakers.
-        // Adding extra tiebreakers causes bugs like preferring cc-by-nc-sa over cc-by-sa
-        // because NC-SA has shorter rule text.
-        self.score_vec_rounded
-            .cmp(&other.score_vec_rounded)
-            .then_with(|| self.score_vec_full.cmp(&other.score_vec_full))
-            .then_with(|| self.rule.identifier.cmp(&other.rule.identifier))
+        // 3. Then compare rid if scores are still equal.
+        compare_candidate_rank(
+            &self.score_vec_rounded,
+            &self.score_vec_full,
+            self.rid,
+            &other.score_vec_rounded,
+            &other.score_vec_full,
+            other.rid,
+        )
     }
+}
+
+fn compare_candidate_rank(
+    rounded: &ScoresVector,
+    full: &ScoresVector,
+    rid: usize,
+    other_rounded: &ScoresVector,
+    other_full: &ScoresVector,
+    other_rid: usize,
+) -> std::cmp::Ordering {
+    rounded
+        .cmp(other_rounded)
+        .then_with(|| full.cmp(other_full))
+        .then_with(|| rid.cmp(&other_rid))
+}
+
+fn python_round_tenths(value: f64) -> f32 {
+    let rendered = format!("{value:.20}");
+    let (whole, frac) = rendered.split_once('.').unwrap_or((rendered.as_str(), "0"));
+
+    let whole_part: i64 = whole.parse().unwrap_or(0);
+    let mut frac_chars = frac.chars();
+    let tenths = frac_chars
+        .next()
+        .and_then(|c| c.to_digit(10))
+        .unwrap_or(0) as i64;
+    let rest: String = frac_chars.collect();
+
+    let threshold = format!("5{}", "0".repeat(rest.len().saturating_sub(1)));
+    let should_round_up = if rest > threshold {
+        true
+    } else if rest == threshold {
+        tenths % 2 == 1
+    } else {
+        false
+    };
+
+    let mut scaled = whole_part * 10 + tenths;
+    if should_round_up {
+        scaled += 1;
+    }
+
+    scaled as f32 / 10.0
+}
+
+fn quantize_tenths(value: f32) -> i32 {
+    format!("{value:.1}")
+        .chars()
+        .filter(|c| *c != '.')
+        .collect::<String>()
+        .parse()
+        .unwrap_or(0)
+}
+
+fn build_score_vectors(
+    resemblance: f64,
+    containment: f64,
+    matched_length: usize,
+    rid: usize,
+) -> (ScoresVector, ScoresVector) {
+    let amplified_resemblance = resemblance * resemblance;
+
+    let score_vec_rounded = ScoresVector {
+        is_highly_resemblant: python_round_tenths(resemblance) >= HIGH_RESEMBLANCE_THRESHOLD,
+        containment: python_round_tenths(containment),
+        resemblance: python_round_tenths(amplified_resemblance),
+        matched_length: python_round_tenths(matched_length as f64 / 20.0),
+        rid,
+    };
+
+    let score_vec_full = ScoresVector {
+        is_highly_resemblant: resemblance >= f64::from(HIGH_RESEMBLANCE_THRESHOLD),
+        containment: containment as f32,
+        resemblance: amplified_resemblance as f32,
+        matched_length: matched_length as f32,
+        rid,
+    };
+
+    (score_vec_rounded, score_vec_full)
 }
 
 /// Key for grouping duplicate candidates.
@@ -144,9 +220,9 @@ pub(super) fn filter_dupes(candidates: Vec<Candidate>) -> Vec<Candidate> {
         let key = DupeGroupKey {
             license_expression: candidate.rule.license_expression.clone(),
             is_highly_resemblant: candidate.score_vec_rounded.is_highly_resemblant,
-            containment: (candidate.score_vec_rounded.containment * 10.0).round() as i32,
-            resemblance: (candidate.score_vec_rounded.resemblance * 10.0).round() as i32,
-            matched_length: (candidate.score_vec_rounded.matched_length * 10.0).round() as i32,
+            containment: quantize_tenths(candidate.score_vec_rounded.containment),
+            resemblance: quantize_tenths(candidate.score_vec_rounded.resemblance),
+            matched_length: quantize_tenths(candidate.score_vec_rounded.matched_length),
             rule_length: candidate.rule.tokens.len(),
         };
         groups.entry(key).or_default().push(candidate);
@@ -251,25 +327,10 @@ pub(super) fn compute_set_similarity(
     }
 
     let union_length = query_length + rule_length - matched_length;
-    let resemblance = matched_length as f32 / union_length as f32;
-    let containment = matched_length as f32 / rule_length as f32;
-    let amplified_resemblance = resemblance.powi(2);
+    let resemblance = matched_length as f64 / union_length as f64;
+    let containment = matched_length as f64 / rule_length as f64;
 
-    let score_vec_rounded = ScoresVector {
-        is_highly_resemblant: (resemblance * 10.0).round() / 10.0 >= HIGH_RESEMBLANCE_THRESHOLD,
-        containment: (containment * 10.0).round() / 10.0,
-        resemblance: (amplified_resemblance * 10.0).round() / 10.0,
-        matched_length: ((matched_length as f32 / 20.0) * 10.0).round() / 10.0,
-        rid: 0,
-    };
-
-    let score_vec_full = ScoresVector {
-        is_highly_resemblant: resemblance >= HIGH_RESEMBLANCE_THRESHOLD,
-        containment,
-        resemblance: amplified_resemblance,
-        matched_length: matched_length as f32,
-        rid: 0,
-    };
+    let (score_vec_rounded, score_vec_full) = build_score_vectors(resemblance, containment, matched_length, 0);
 
     Some((score_vec_rounded, score_vec_full))
 }
@@ -347,34 +408,19 @@ pub fn compute_candidates_with_msets(
         }
 
         let union_len = qset_len + iset_len - matched_length;
-        let resemblance = matched_length as f32 / union_len as f32;
-        let containment = matched_length as f32 / iset_len as f32;
-        let amplified_resemblance = resemblance.powi(2);
+        let resemblance = matched_length as f64 / union_len as f64;
+        let containment = matched_length as f64 / iset_len as f64;
 
         // Check minimum_containment (Python: match_set.py:429-433)
         // Rules with minimum_coverage require a minimum containment ratio
-        let minimum_containment = rule.minimum_coverage.map(|mc| mc as f32 / 100.0);
+        let minimum_containment = rule.minimum_coverage.map(|mc| mc as f64 / 100.0);
         if let Some(min_cont) = minimum_containment
             && containment < min_cont
         {
             continue;
         }
 
-        let svr = ScoresVector {
-            is_highly_resemblant: (resemblance * 10.0).round() / 10.0 >= HIGH_RESEMBLANCE_THRESHOLD,
-            containment: (containment * 10.0).round() / 10.0,
-            resemblance: (amplified_resemblance * 10.0).round() / 10.0,
-            matched_length: ((matched_length as f32 / 20.0) * 10.0).round() / 10.0,
-            rid,
-        };
-
-        let svf = ScoresVector {
-            is_highly_resemblant: resemblance >= HIGH_RESEMBLANCE_THRESHOLD,
-            containment,
-            resemblance: amplified_resemblance,
-            matched_length: matched_length as f32,
-            rid,
-        };
+        let (svr, svf) = build_score_vectors(resemblance, containment, matched_length, rid);
 
         if high_resemblance && (!svr.is_highly_resemblant || !svf.is_highly_resemblant) {
             continue;
@@ -387,7 +433,9 @@ pub fn compute_candidates_with_msets(
         return Vec::new();
     }
 
-    step1_candidates.sort_by(|a, b| b.1.cmp(&a.1));
+    step1_candidates.sort_by(|a, b| {
+        compare_candidate_rank(&b.0, &b.1, b.2, &a.0, &a.1, a.2)
+    });
 
     step1_candidates.truncate(top_n * 10);
 
@@ -406,9 +454,17 @@ pub fn compute_candidates_with_msets(
             continue;
         }
 
+        let high_matched_length: usize = high_intersection_mset.values().sum();
+        if high_matched_length < rule.min_high_matched_length {
+            continue;
+        }
+
         // Compute scores using FULL multisets (Python: matched_length = counter(intersection))
         let full_intersection_mset = multisets_intersector(&query_mset, rule_mset);
         let matched_length: usize = full_intersection_mset.values().sum();
+        if matched_length < rule.min_matched_length {
+            continue;
+        }
         let qset_len: usize = query_mset.values().sum();
         let iset_len: usize = rule_mset.values().sum();
 
@@ -417,34 +473,20 @@ pub fn compute_candidates_with_msets(
         }
 
         let union_len = qset_len + iset_len - matched_length;
-        let resemblance = matched_length as f32 / union_len as f32;
-        let containment = matched_length as f32 / iset_len as f32;
-        let amplified_resemblance = resemblance.powi(2);
+        let resemblance = matched_length as f64 / union_len as f64;
+        let containment = matched_length as f64 / iset_len as f64;
 
         // Check minimum_containment (Python: match_set.py:429-433)
         // Rules with minimum_coverage require a minimum containment ratio
-        let minimum_containment = rule.minimum_coverage.map(|mc| mc as f32 / 100.0);
+        let minimum_containment = rule.minimum_coverage.map(|mc| mc as f64 / 100.0);
         if let Some(min_cont) = minimum_containment
             && containment < min_cont
         {
             continue;
         }
 
-        let score_vec_rounded = ScoresVector {
-            is_highly_resemblant: (resemblance * 10.0).round() / 10.0 >= HIGH_RESEMBLANCE_THRESHOLD,
-            containment: (containment * 10.0).round() / 10.0,
-            resemblance: (amplified_resemblance * 10.0).round() / 10.0,
-            matched_length: ((matched_length as f32 / 20.0) * 10.0).round() / 10.0,
-            rid,
-        };
-
-        let score_vec_full = ScoresVector {
-            is_highly_resemblant: resemblance >= HIGH_RESEMBLANCE_THRESHOLD,
-            containment,
-            resemblance: amplified_resemblance,
-            matched_length: matched_length as f32,
-            rid,
-        };
+        let (score_vec_rounded, score_vec_full) =
+            build_score_vectors(resemblance, containment, matched_length, rid);
 
         if high_resemblance
             && (!score_vec_rounded.is_highly_resemblant || !score_vec_full.is_highly_resemblant)
@@ -492,6 +534,16 @@ mod tests {
         };
 
         assert!(sv1 > sv2);
+    }
+
+    #[test]
+    fn test_python_round_tenths_matches_python_half_even_behavior() {
+        assert_eq!(python_round_tenths(0.05), 0.1);
+        assert_eq!(python_round_tenths(0.15), 0.1);
+        assert_eq!(python_round_tenths(0.25), 0.2);
+        assert_eq!(python_round_tenths(2.25), 2.2);
+        assert_eq!(python_round_tenths(4.35), 4.3);
+        assert_eq!(python_round_tenths(6.65), 6.7);
     }
 
     #[test]
@@ -933,7 +985,7 @@ mod tests {
     }
 
     #[test]
-    fn test_alphabetical_tiebreaker_cc_by_sa_vs_nc_sa() {
+    fn test_filter_dupes_prefers_higher_identifier_when_full_scores_tie() {
         let rule_sa = Rule {
             identifier: "cc-by-sa-1.0.RULE".to_string(),
             license_expression: "cc-by-sa-1.0".to_string(),
@@ -1062,12 +1114,7 @@ mod tests {
             high_set_intersection: HashSet::new(),
         };
 
-        assert!(
-            candidate_sa > candidate_nc_sa,
-            "cc-by-sa-1.0 should rank higher than cc-by-nc-sa-1.0 due to alphabetical tiebreaker (with reverse=True, 's' > 'n' after 'cc-by-')"
-        );
-
-        let candidates = vec![candidate_nc_sa.clone(), candidate_sa.clone()];
+        let candidates = vec![candidate_nc_sa, candidate_sa];
         let filtered = filter_dupes(candidates);
 
         assert_eq!(
@@ -1076,11 +1123,108 @@ mod tests {
             "Different license expressions should create different groups"
         );
 
-        let mut sorted = [candidate_nc_sa, candidate_sa];
+        let mut same_group_candidates = vec![filtered[0].clone(), filtered[1].clone()];
+        for candidate in &mut same_group_candidates {
+            candidate.rule.license_expression = "same".to_string();
+            candidate.rule.tokens = vec![0; 100];
+        }
+
+        let deduped = filter_dupes(same_group_candidates);
+        assert_eq!(deduped.len(), 1);
+        assert_eq!(deduped[0].rule.identifier, "cc-by-sa-1.0.RULE");
+    }
+
+    #[test]
+    fn test_candidate_ordering_uses_rid_after_equal_scores() {
+        let rule_a = Rule {
+            identifier: "a.RULE".to_string(),
+            license_expression: "a".to_string(),
+            text: String::new(),
+            tokens: vec![0; 10],
+            is_license_text: true,
+            is_license_notice: false,
+            is_license_reference: false,
+            is_license_tag: false,
+            is_license_intro: false,
+            is_license_clue: false,
+            is_false_positive: false,
+            is_required_phrase: false,
+            is_from_license: false,
+            relevance: 100,
+            minimum_coverage: None,
+            has_stored_minimum_coverage: false,
+            is_continuous: true,
+            referenced_filenames: None,
+            ignorable_urls: None,
+            ignorable_emails: None,
+            ignorable_copyrights: None,
+            ignorable_holders: None,
+            ignorable_authors: None,
+            language: None,
+            notes: None,
+            length_unique: 0,
+            high_length_unique: 0,
+            high_length: 0,
+            min_matched_length: 0,
+            min_high_matched_length: 0,
+            min_matched_length_unique: 0,
+            min_high_matched_length_unique: 0,
+            is_small: false,
+            is_tiny: false,
+            starts_with_license: false,
+            ends_with_license: false,
+            is_deprecated: false,
+            spdx_license_key: None,
+            other_spdx_license_keys: vec![],
+            required_phrase_spans: vec![],
+            stopwords_by_pos: std::collections::HashMap::new(),
+        };
+
+        let candidate_low_rid = Candidate {
+            score_vec_rounded: ScoresVector {
+                is_highly_resemblant: true,
+                containment: 0.9,
+                resemblance: 0.8,
+                matched_length: 10.0,
+                rid: 1,
+            },
+            score_vec_full: ScoresVector {
+                is_highly_resemblant: true,
+                containment: 0.9,
+                resemblance: 0.8,
+                matched_length: 10.0,
+                rid: 1,
+            },
+            rid: 1,
+            rule: Rule {
+                identifier: "z.RULE".to_string(),
+                ..rule_a.clone()
+            },
+            high_set_intersection: HashSet::new(),
+        };
+
+        let candidate_high_rid = Candidate {
+            score_vec_rounded: ScoresVector {
+                rid: 2,
+                ..candidate_low_rid.score_vec_rounded.clone()
+            },
+            score_vec_full: ScoresVector {
+                rid: 2,
+                ..candidate_low_rid.score_vec_full.clone()
+            },
+            rid: 2,
+            rule: Rule {
+                identifier: "a.RULE".to_string(),
+                ..rule_a
+            },
+            high_set_intersection: HashSet::new(),
+        };
+
+        let mut sorted = [candidate_low_rid, candidate_high_rid];
         sorted.sort_by(|a, b| b.cmp(a));
         assert_eq!(
-            sorted[0].rule.license_expression, "cc-by-sa-1.0",
-            "cc-by-sa-1.0 should be ranked first (alphabetically higher with reverse sort)"
+            sorted[0].rid, 2,
+            "Python final candidate tuple ordering falls back to higher rid after equal scores"
         );
     }
 }
