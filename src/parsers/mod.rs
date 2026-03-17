@@ -247,6 +247,11 @@ mod ruby;
 mod ruby_golden_test;
 #[cfg(test)]
 mod ruby_test;
+mod sbt;
+#[cfg(all(test, feature = "golden-tests"))]
+mod sbt_golden_test;
+#[cfg(test)]
+mod sbt_test;
 #[cfg(all(test, feature = "golden-tests"))]
 mod swift_golden_test;
 mod swift_manifest_json;
@@ -433,6 +438,7 @@ pub use self::rpm_yumdb::RpmYumdbParser;
 pub use self::ruby::{
     GemArchiveParser, GemMetadataExtractedParser, GemfileLockParser, GemfileParser, GemspecParser,
 };
+pub use self::sbt::SbtParser;
 pub use self::swift_manifest_json::SwiftManifestJsonParser;
 pub use self::swift_resolved::SwiftPackageResolvedParser;
 pub use self::swift_show_dependencies::SwiftShowDependenciesParser;
@@ -601,6 +607,7 @@ register_package_handlers! {
         RpmSpecfileParser,
         RpmSqliteDatabaseParser,
         RpmYumdbParser,
+        SbtParser,
         SwiftManifestJsonParser,
         SwiftPackageResolvedParser,
         SwiftShowDependenciesParser,
