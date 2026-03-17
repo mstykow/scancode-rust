@@ -336,7 +336,17 @@ cargo test --test '*'         # Run only integration tests
 cargo test --features golden-tests  # Include golden tests (slower, compares against Python ScanCode)
 ```
 
+Repository helper scripts for local development:
+
+```bash
+./scripts/dev.sh              # lib + integration + doctests, serially
+./scripts/dev.sh full         # same, plus golden tests
+./scripts/dev.sh parser-golden about cargo
+./scripts/dev.sh isolated --name golden test --lib --features golden-tests
+```
+
 > **Note**: Golden tests (comparing output against Python ScanCode reference) are gated behind the `golden-tests` feature flag because they are slow and require the reference submodule. They run automatically in CI but are excluded from `cargo test` by default for faster local development.
+> **Workflow note**: `cargo test` and `cargo test --features golden-tests` use different build graphs. On the same machine, run them serially if you want maximum cache reuse and to avoid Cargo lock contention. `./scripts/dev.sh` bakes that serial path in. Only split them into concurrent jobs when you also isolate build output with `./scripts/dev.sh isolated ...` or a separate `CARGO_TARGET_DIR`.
 
 ### Specific Test Categories
 
