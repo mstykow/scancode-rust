@@ -64,7 +64,7 @@ impl PackageParser for CpanMetaJsonParser {
             Ok(json) => json,
             Err(e) => {
                 warn!("Failed to parse META.json at {:?}: {}", path, e);
-                return vec![default_package_data()];
+                return vec![default_package_data(DatasourceId::CpanMetaJson)];
             }
         };
 
@@ -122,7 +122,7 @@ impl PackageParser for CpanMetaYmlParser {
             Ok(yaml) => yaml,
             Err(e) => {
                 warn!("Failed to parse META.yml at {:?}: {}", path, e);
-                return vec![default_package_data()];
+                return vec![default_package_data(DatasourceId::CpanMetaYml)];
             }
         };
 
@@ -179,7 +179,7 @@ impl PackageParser for CpanManifestParser {
             Ok(content) => content,
             Err(e) => {
                 warn!("Failed to read MANIFEST at {:?}: {}", path, e);
-                return vec![default_package_data()];
+                return vec![default_package_data(DatasourceId::CpanManifest)];
             }
         };
 
@@ -212,9 +212,11 @@ impl PackageParser for CpanManifestParser {
     }
 }
 
-fn default_package_data() -> PackageData {
+fn default_package_data(datasource_id: DatasourceId) -> PackageData {
     PackageData {
         package_type: Some(CpanMetaJsonParser::PACKAGE_TYPE),
+        primary_language: Some("Perl".to_string()),
+        datasource_id: Some(datasource_id),
         ..Default::default()
     }
 }
