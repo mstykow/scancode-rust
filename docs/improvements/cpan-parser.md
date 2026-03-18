@@ -5,6 +5,7 @@
 Our Rust implementation improves on the Python reference by:
 
 - ✨ **Real Parsing**: Python has stub-only handlers with no parse() method
+- 🐛 **Safer Fallback Identity**: malformed META files and unreadable MANIFEST inputs now preserve `package_type`, `datasource_id`, and `primary_language`
 - 🔍 **Full Metadata**: We extract complete metadata from META.json and META.yml
 - 📦 **Dependency Extraction**: All 4 dependency scopes (runtime, build, test, configure)
 - 👥 **Author Extraction**: Complete party information from author fields
@@ -208,7 +209,8 @@ Supports "Name <email>" format:
 
 ### Error Handling
 
-- Graceful fallback to default PackageData on parse errors
+- Graceful fallback to datasource-specific `PackageData` on parse/read errors
+- Preserves `package_type`, `primary_language`, and `datasource_id` even when CPAN inputs are malformed or unreadable
 - Warning logs for debugging
 - No panics in library code
 
@@ -230,7 +232,7 @@ Supports "Name <email>" format:
 ## Status
 
 - ✅ **Implementation**: Complete, validated, production-ready
-- ✅ **Testing**: 16+ unit tests covering all features
+- ✅ **Testing**: 22 unit tests covering parsing plus fallback identity hardening
 - ✅ **Documentation**: Complete
 - ⏳ **Future**: Makefile.PL and dist.ini parsers (deferred - very complex)
 
