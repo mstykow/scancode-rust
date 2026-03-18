@@ -197,7 +197,7 @@ docs/
 
 # Hook behavior is configured in .pre-commit-config.yaml.
 # The docs regeneration hook runs this command when parser files change:
-cargo run --quiet --bin generate-supported-formats
+cargo run --quiet --manifest-path xtask/Cargo.toml --bin generate-supported-formats
 
 # Then it stages the generated file:
 git add docs/SUPPORTED_FORMATS.md

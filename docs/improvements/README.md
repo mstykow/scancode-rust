@@ -167,4 +167,4 @@ When implementing a parser or detection subsystem, if you discover:
 
 - [ADR 0002: Extraction vs Detection Separation](../adr/0002-extraction-vs-detection.md) - Why we separate concerns better than Python
 - [ADR 0004: Security-First Parsing](../adr/0004-security-first-parsing.md) - Our security advantages over Python
-- [SUPPORTED_FORMATS.md](../SUPPORTED_FORMATS.md) - Auto-generated list of all supported formats (run `cargo run --bin generate-supported-formats`)
+- [SUPPORTED_FORMATS.md](../SUPPORTED_FORMATS.md) - Auto-generated list of all supported formats (run `cargo run --manifest-path xtask/Cargo.toml --bin generate-supported-formats`)

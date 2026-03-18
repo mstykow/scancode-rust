@@ -353,15 +353,15 @@ Use distinct commands for the two golden fixture domains:
 
 ```bash
 # Parser golden snapshots (.expected.json)
-cargo run --bin update-parser-golden -- --list
-cargo run --bin update-parser-golden -- <ParserType> <input_file> <output_file>
+cargo run --manifest-path xtask/Cargo.toml --bin update-parser-golden -- --list
+cargo run --manifest-path xtask/Cargo.toml --bin update-parser-golden -- <ParserType> <input_file> <output_file>
 ./scripts/update_parser_golden.sh <ParserType> <input_file> <output_file>
 
 # Copyright golden YAML fixtures (authors / ics / copyrights)
 # Note: "ics" here means Android Ice Cream Sandwich (Android 4.0) fixture corpus from
 # the ScanCode reference test data.
-cargo run --bin update-copyright-golden -- copyrights --list-mismatches --show-diff
-cargo run --bin update-copyright-golden -- copyrights --filter <pattern> --write
+cargo run --manifest-path xtask/Cargo.toml --bin update-copyright-golden -- copyrights --list-mismatches --show-diff
+cargo run --manifest-path xtask/Cargo.toml --bin update-copyright-golden -- copyrights --filter <pattern> --write
 ./scripts/update_copyright_golden.sh copyrights --list-mismatches --show-diff
 ```
 

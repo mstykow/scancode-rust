@@ -37,7 +37,7 @@ This first slice focuses on the highest-value metadata surface from Meson’s ow
 - `cargo test meson --lib`
 - `cargo test --features golden-tests meson_golden --lib`
 - `cargo test test_all_parsers_are_registered_and_exported --test scanner_integration`
-- `cargo run --bin generate-supported-formats`
+- `cargo run --manifest-path xtask/Cargo.toml --bin generate-supported-formats`
 - `cargo build`
 
 ## Related Issues

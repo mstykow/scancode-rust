@@ -494,7 +494,9 @@ macro_rules! register_package_handlers {
             None
         }
 
-        #[allow(dead_code)] // Used by bin/update_parser_golden.rs, not library code
+        // Used by the parser-golden maintenance tool in `xtask`.
+        // Scanner runtime dispatch goes through `try_parse_file()` instead.
+        #[allow(dead_code)]
         pub fn parse_by_type_name(type_name: &str, path: &Path) -> Option<PackageData> {
             match type_name {
                 $(
@@ -507,7 +509,9 @@ macro_rules! register_package_handlers {
             }
         }
 
-        #[allow(dead_code)] // Used by bin/update_parser_golden.rs and tests/scanner_integration.rs
+        // Used by the parser-golden maintenance tool in `xtask` and by
+        // `tests/scanner_integration.rs` to verify parser registration.
+        #[allow(dead_code)]
         pub fn list_parser_types() -> Vec<&'static str> {
             vec![
                 $(

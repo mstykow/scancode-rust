@@ -1,0 +1,38 @@
+[package]
+name = "scancode-rust-xtask"
+version = "0.0.0"
+edition = "2024"
+publish = false
+autobins = false
+
+[dependencies]
+anyhow = "1.0.102"
+clap = { version = "4.6.0", features = ["derive"] }
+inventory = "0.3.22"
+lazy_static = "1.5.0"
+rayon = "1.11.0"
+regex = "1.12.3"
+scancode-rust = { path = ".." }
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = { version = "1.0.149", features = ["preserve_order"] }
+serde_yaml = "0.9.34"
+url = "2.5.8"
+
+[dev-dependencies]
+tempfile = "3.27.0"
+
+[[bin]]
+name = "update-parser-golden"
+path = "src/bin/update_parser_golden.rs"
+
+[[bin]]
+name = "update-copyright-golden"
+path = "src/bin/update_copyright_golden.rs"
+
+[[bin]]
+name = "validate-urls"
+path = "src/bin/validate_urls.rs"
+
+[[bin]]
+name = "generate-supported-formats"
+path = "src/bin/generate_supported_formats.rs"

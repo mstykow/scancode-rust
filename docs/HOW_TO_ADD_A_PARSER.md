@@ -395,7 +395,7 @@ register_package_handlers! {
 
 ```bash
 # Should include "MyEcosystemParser" in output
-cargo run --bin update-parser-golden -- --list | grep MyEcosystemParser
+cargo run --manifest-path xtask/Cargo.toml --bin update-parser-golden -- --list | grep MyEcosystemParser
 ```
 
 ## Step 5: Add Golden Tests (Expected for New Production Parsers)
@@ -410,10 +410,10 @@ Use the test generator utility to create expected output files:
 
 ```bash
 # List all available parser types
-cargo run --bin update-parser-golden -- --list
+cargo run --manifest-path xtask/Cargo.toml --bin update-parser-golden -- --list
 
 # Generate expected output using parser struct name
-cargo run --bin update-parser-golden -- MyEcosystemParser \
+cargo run --manifest-path xtask/Cargo.toml --bin update-parser-golden -- MyEcosystemParser \
   testdata/<ecosystem>/sample.json \
   testdata/<ecosystem>/sample.json.expected.json
 

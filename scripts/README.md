@@ -1,81 +1,17 @@
 # Scripts Documentation
 
-## Local Development Workflow Helpers
-
-### Canonical Entry Point
-
-`dev.sh` is the stable, agent-friendly front door for local Rust workflows.
-
-**Why this exists**: agentic tooling works better when the repository exposes one obvious entrypoint instead of expecting every agent to rediscover which script or Cargo command to use. `dev.sh` delegates to the narrower helper scripts underneath.
-
-Examples:
-
-```bash
-./scripts/dev.sh
-./scripts/dev.sh full
-./scripts/dev.sh cargo build
-./scripts/dev.sh cargo clippy --lib --bins --all-features -- -D warnings
-./scripts/dev.sh integration tests/output_format_golden.rs test_spdx
-./scripts/dev.sh parser-golden about cargo
-./scripts/dev.sh isolated test --lib --no-run
-./scripts/dev.sh isolated --name golden test --lib --features golden-tests
-```
-
-Shared-target modes in `dev.sh` take a repository-local lock by default. If two agents both call `./scripts/dev.sh unit ...`, the second one waits instead of racing Cargo for the default target directory. Set `SCANCODE_RUST_DEV_NO_LOCK=1` only when you explicitly want to bypass that safeguard.
-
-`./scripts/dev.sh cargo ...` extends that same safeguard to non-test compile workflows like `build`, `check`, `clippy`, and `run`.
-
-### Serial Test Runner
-
-`dev_test.sh` packages the common local test flows into a single serial runner so developers can reuse the default Cargo target directory instead of manually juggling multiple `cargo test` commands.
-
-**Why this exists**: running lib, integration, doc, and golden test commands separately encourages repeated first-build cost and lock contention when developers kick them off in multiple terminals. This script keeps the cache-friendly path explicit.
-
-Examples:
-
-```bash
-./scripts/dev_test.sh                  # lib + integration + doctests
-./scripts/dev_test.sh full             # lib + integration + doctests + golden
-./scripts/dev_test.sh unit npm_test    # targeted lib tests
-./scripts/dev_test.sh integration tests/output_format_golden.rs test_spdx
-./scripts/dev_test.sh parser-golden about cargo
-./scripts/dev_test.sh parser-golden src/parsers/about_golden_test.rs
-```
-
-`parser-golden` is special: it compiles the golden lib test binary once with `--no-run`, then executes parser filters directly from that binary instead of re-entering Cargo for each parser module.
-
-### Isolated Cargo Wrapper
-
-`cargo_isolated.sh` runs Cargo with `CARGO_TARGET_DIR=target/isolated/<name>`.
-
-**Why this exists**: sometimes local development really does need two Cargo commands alive at once. In that case, isolated target directories reduce artifact-directory lock contention at the cost of extra disk use and less cache reuse.
-
-Examples:
-
-```bash
-./scripts/cargo_isolated.sh test --lib --no-run
-./scripts/cargo_isolated.sh --name golden test --lib --features golden-tests
-./scripts/cargo_isolated.sh run --bin scancode-rust -- --help
-```
-
-For day-to-day use, prefer `./scripts/dev.sh`. Reach for `cargo_isolated.sh` only when deliberate parallelism matters more than shared caching.
-
-If no explicit isolation name is provided, `cargo_isolated.sh` derives one from an agent/session environment variable when available and otherwise falls back to the current shell PID. Use `--name <name>` when you want predictable cache reuse for a named lane.
-
-For humans and agents alike, prefer `./scripts/dev.sh` as the canonical interface and treat `dev_test.sh` / `cargo_isolated.sh` as implementation details.
-
 ## Golden Fixture Helper Scripts
 
 ### Parser Golden Snapshots
 
-`update_parser_golden.sh` updates parser `.expected.json` golden snapshots by invoking the `update-parser-golden` binary.
+`update_parser_golden.sh` updates parser `.expected.json` golden snapshots by invoking the `update-parser-golden` binary from the unpublished `xtask/` helper crate.
 
 **Why this exists**: it regenerates parser golden expectations directly from parser output so fixture updates stay deterministic and aligned with parser behavior.
 
 Show CLI help:
 
 ```bash
-cargo run --bin update-parser-golden -- --help
+cargo run --manifest-path xtask/Cargo.toml --bin update-parser-golden -- --help
 ./scripts/update_parser_golden.sh --help
 ```
 
@@ -92,14 +28,14 @@ CLI arguments:
 
 ### Copyright Golden YAML Fixtures
 
-`update_copyright_golden.sh` syncs and updates copyright golden YAML fixtures (authors / ics / copyrights).
+`update_copyright_golden.sh` syncs and updates copyright golden YAML fixtures (authors / ics / copyrights) by invoking the `update-copyright-golden` binary from the unpublished `xtask/` helper crate.
 
 **Why this exists**: it keeps copyright golden YAMLs in sync with the Rust detector and with Rust-owned fixture policy while preserving reviewable mismatch workflows.
 
 Show CLI help:
 
 ```bash
-cargo run --bin update-copyright-golden -- --help
+cargo run --manifest-path xtask/Cargo.toml --bin update-copyright-golden -- --help
 ./scripts/update_copyright_golden.sh --help
 ```
 
@@ -172,7 +108,7 @@ Useful examples:
 
 ### Purpose
 
-`validate-urls` systematically validates all URLs in production documentation and Rust docstrings to catch broken links before they reach users.
+`validate-urls` systematically validates all URLs in production documentation and Rust docstrings to catch broken links before they reach users. The binary lives in the unpublished `xtask/` helper crate so it stays out of the published crate package.
 
 ### What It Validates
 
@@ -195,7 +131,7 @@ Useful examples:
 
 ```bash
 # Manual run
-cargo run --quiet --bin validate-urls -- --root .
+cargo run --quiet --manifest-path xtask/Cargo.toml --bin validate-urls -- --root .
 
 # Exit codes:
 #   0 = All URLs valid
@@ -229,7 +165,7 @@ Example output:
 
 ```yaml
 - name: Validate Documentation URLs
-  run: cargo run --quiet --bin validate-urls -- --root .
+  run: cargo run --quiet --manifest-path xtask/Cargo.toml --bin validate-urls -- --root .
   continue-on-error: true # Informational only - doesn't block PRs
 ```
 
