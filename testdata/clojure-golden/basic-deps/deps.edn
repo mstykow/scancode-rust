@@ -1,0 +1,10 @@
+{:paths ["src" "resources"]
+ :deps {org.clojure/clojure {:mvn/version "1.12.0"}
+        io.github.clojure/tools.build {:git/url "https://github.com/clojure/tools.build.git"
+                                       :git/tag "v0.10.5"
+                                       :git/sha "abc1234"}
+        my.local/lib {:local/root "../lib"}
+        exact/lib {:mvn/version "=1.5.0"}}
+ :mvn/repos {"clojars" {:url "https://repo.clojars.org/"}}
+ :aliases {:test {:extra-deps {lambdaisland/kaocha {:mvn/version "1.91.1392"}}}
+           :build {:deps {io.github.clojure/tools.cli {:mvn/version "1.1.230"}}}}}
