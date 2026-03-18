@@ -26,7 +26,7 @@
 #[cfg(all(test, feature = "golden-tests"))]
 mod golden_tests {
     use crate::license_detection::LicenseDetectionEngine;
-    use crate::utils::file::extract_text_for_detection;
+    use crate::utils::file::{ExtractedTextKind, extract_text_for_detection};
     use once_cell::sync::Lazy;
     use serde::Deserialize;
     use std::fs;
@@ -108,10 +108,10 @@ mod golden_tests {
 
         /// Read file content using production text extraction.
         /// Returns None for files that should be skipped.
-        fn read_test_file_content(&self) -> Result<Option<String>, String> {
+        fn read_test_file_content(&self) -> Result<Option<(String, ExtractedTextKind)>, String> {
             let bytes = fs::read(&self.test_file)
                 .map_err(|e| format!("Failed to read {}: {}", self.test_file.display(), e))?;
-            let (text, _) = extract_text_for_detection(&self.test_file, &bytes);
+            let (text, text_kind) = extract_text_for_detection(&self.test_file, &bytes);
             
             if text.is_empty() {
                 return Ok(None);
@@ -121,16 +121,17 @@ mod golden_tests {
                 if let Some(sourcemap_content) =
                     crate::utils::sourcemap::extract_sourcemap_content(&text)
                 {
-                    Ok(Some(sourcemap_content))
+                    Ok(Some((sourcemap_content, text_kind)))
                 } else {
-                    Ok(Some(text))
+                    Ok(Some((text, text_kind)))
                 }
             } else if crate::utils::text::is_source(&self.test_file) {
-                Ok(Some(crate::utils::text::remove_verbatim_escape_sequences(
-                    &text,
+                Ok(Some((
+                    crate::utils::text::remove_verbatim_escape_sequences(&text),
+                    text_kind,
                 )))
             } else {
-                Ok(Some(text))
+                Ok(Some((text, text_kind)))
             }
         }
 
@@ -140,7 +141,7 @@ mod golden_tests {
             engine: &LicenseDetectionEngine,
             unknown_licenses: bool,
         ) -> Result<(), String> {
-            let text = match self.read_test_file_content()? {
+            let (text, text_kind) = match self.read_test_file_content()? {
                 Some(t) => t,
                 None => {
                     let expected: Vec<&str> = self
@@ -164,7 +165,11 @@ mod golden_tests {
             // This avoids the grouping step that causes false test failures
 
             let matches = engine
-                .detect_matches(&text, unknown_licenses)
+                .detect_matches_with_kind(
+                    &text,
+                    unknown_licenses,
+                    matches!(text_kind, ExtractedTextKind::BinaryStrings),
+                )
                 .map_err(|e| {
                     format!("Detection failed for {}: {:?}", self.test_file.display(), e)
                 })?;

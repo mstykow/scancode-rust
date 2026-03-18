@@ -775,6 +775,22 @@ mod tests {
     }
 
     #[test]
+    fn test_query_from_extracted_text_uses_binary_line_threshold_and_flag() {
+        let index = create_query_test_index();
+        let text = format!("license\n{}copyright", "\n".repeat(20));
+
+        let text_query = Query::new(&text, &index).unwrap();
+        let binary_query = Query::from_extracted_text(&text, &index, true).unwrap();
+
+        assert_eq!(
+            text_query.query_run_ranges,
+            vec![(0, Some(0)), (1, Some(1))]
+        );
+        assert_eq!(binary_query.query_run_ranges, vec![(0, Some(1))]);
+        assert!(binary_query.is_binary);
+    }
+
+    #[test]
     fn test_query_subtract_removes_positions() {
         let index = create_query_test_index();
         let mut query = Query::new("license copyright permission", &index).unwrap();

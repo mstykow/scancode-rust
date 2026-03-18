@@ -372,6 +372,7 @@ fn extract_information_from_content(
         text_content_for_license_detection,
         license_engine,
         include_text,
+        from_binary_strings,
     )
 }
 
@@ -613,12 +614,13 @@ fn extract_license_information(
     text_content: String,
     license_engine: Option<Arc<LicenseDetectionEngine>>,
     include_text: bool,
+    from_binary_strings: bool,
 ) -> Result<(), Error> {
     let Some(engine) = license_engine else {
         return Ok(());
     };
 
-    match engine.detect(&text_content, false) {
+    match engine.detect_with_kind(&text_content, false, from_binary_strings) {
         Ok(detections) => {
             let model_detections: Vec<LicenseDetection> = detections
                 .into_iter()

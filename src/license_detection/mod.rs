@@ -351,6 +351,15 @@ impl LicenseDetectionEngine {
     /// # Returns
     /// A Result containing a vector of LicenseDetection objects
     pub fn detect(&self, text: &str, unknown_licenses: bool) -> Result<Vec<LicenseDetection>> {
+        self.detect_with_kind(text, unknown_licenses, false)
+    }
+
+    pub fn detect_with_kind(
+        &self,
+        text: &str,
+        unknown_licenses: bool,
+        binary_derived: bool,
+    ) -> Result<Vec<LicenseDetection>> {
         let clean_text = strip_utf8_bom_str(text);
 
         let content = if clean_text.len() > MAX_DETECTION_SIZE {
@@ -364,7 +373,7 @@ impl LicenseDetectionEngine {
             clean_text
         };
 
-        let mut query = Query::new(content, &self.index)?;
+        let mut query = Query::from_extracted_text(content, &self.index, binary_derived)?;
         let whole_query_run = query.whole_query_run();
 
         let mut all_matches = Vec::new();
@@ -514,6 +523,15 @@ impl LicenseDetectionEngine {
     /// # Returns
     /// A Result containing a vector of LicenseMatch objects (ungrouped)
     pub fn detect_matches(&self, text: &str, unknown_licenses: bool) -> Result<Vec<LicenseMatch>> {
+        self.detect_matches_with_kind(text, unknown_licenses, false)
+    }
+
+    pub fn detect_matches_with_kind(
+        &self,
+        text: &str,
+        unknown_licenses: bool,
+        binary_derived: bool,
+    ) -> Result<Vec<LicenseMatch>> {
         let clean_text = strip_utf8_bom_str(text);
 
         let content = if clean_text.len() > MAX_DETECTION_SIZE {
@@ -527,7 +545,7 @@ impl LicenseDetectionEngine {
             clean_text
         };
 
-        let mut query = Query::new(content, &self.index)?;
+        let mut query = Query::from_extracted_text(content, &self.index, binary_derived)?;
         let whole_query_run = query.whole_query_run();
 
         let mut all_matches = Vec::new();

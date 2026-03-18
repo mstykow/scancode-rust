@@ -1326,6 +1326,79 @@ fn test_xunit_sln_detect_matches_match_python_raw_rules() {
 }
 
 #[test]
+fn test_basename_elf_detect_matches_match_python_raw_rules() {
+    let Some(engine) = create_engine_from_reference() else {
+        eprintln!("Skipping test: reference directory not found");
+        return;
+    };
+
+    let path = std::path::Path::new("testdata/license-golden/datadriven/lic2/basename.elf");
+    let bytes = std::fs::read(path).expect("failed to read basename.elf fixture");
+    let (text, kind) = crate::utils::file::extract_text_for_detection(path, &bytes);
+
+    let matches = engine
+        .detect_matches_with_kind(
+            &text,
+            false,
+            matches!(kind, crate::utils::file::ExtractedTextKind::BinaryStrings),
+        )
+        .expect("detection should succeed");
+
+    assert_eq!(matches.len(), 1);
+    assert_eq!(matches[0].rule_identifier, "gpl-3.0-plus_14.RULE");
+    assert_eq!(
+        matches[0].matcher,
+        crate::license_detection::aho_match::MATCH_AHO
+    );
+    assert_eq!(matches[0].license_expression, "gpl-3.0-plus");
+}
+
+#[test]
+fn test_faq_doctree_detect_matches_preserve_two_bsd_new_hits() {
+    let Some(engine) = create_engine_from_reference() else {
+        eprintln!("Skipping test: reference directory not found");
+        return;
+    };
+
+    let path =
+        std::path::Path::new("testdata/license-golden/datadriven/lic2/2189-bsd-bin/faq.doctree");
+    let bytes = std::fs::read(path).expect("failed to read faq.doctree fixture");
+    let (text, kind) = crate::utils::file::extract_text_for_detection(path, &bytes);
+
+    let matches = engine
+        .detect_matches_with_kind(
+            &text,
+            false,
+            matches!(kind, crate::utils::file::ExtractedTextKind::BinaryStrings),
+        )
+        .expect("detection should succeed");
+
+    assert_eq!(matches.len(), 2);
+    assert_eq!(
+        matches
+            .iter()
+            .map(|m| (
+                m.rule_identifier.as_str(),
+                m.matcher.as_str(),
+                m.license_expression.as_str()
+            ))
+            .collect::<Vec<_>>(),
+        vec![
+            (
+                "bsd-new_242.RULE",
+                crate::license_detection::aho_match::MATCH_AHO,
+                "bsd-new"
+            ),
+            (
+                "bsd-new_242.RULE",
+                crate::license_detection::aho_match::MATCH_AHO,
+                "bsd-new"
+            ),
+        ],
+    );
+}
+
+#[test]
 fn test_complex_el_detect_matches_keep_python_lgpl_container() {
     let Some(engine) = create_engine_from_reference() else {
         eprintln!("Skipping test: reference directory not found");

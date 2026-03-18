@@ -179,10 +179,25 @@ impl<'a> Query<'a> {
     /// Detection scans file-like text, so this uses Python's
     /// `build_query(..., text_line_threshold=15)` threshold.
     const TEXT_LINE_THRESHOLD: usize = 15;
+    const BINARY_LINE_THRESHOLD: usize = 50;
     const MAX_TOKEN_PER_LINE: usize = 25;
 
     pub fn new(text: &str, index: &'a LicenseIndex) -> Result<Self, anyhow::Error> {
         Self::with_options(text, index, Self::TEXT_LINE_THRESHOLD)
+    }
+
+    pub fn from_extracted_text(
+        text: &str,
+        index: &'a LicenseIndex,
+        binary_derived: bool,
+    ) -> Result<Self, anyhow::Error> {
+        let line_threshold = if binary_derived {
+            Self::BINARY_LINE_THRESHOLD
+        } else {
+            Self::TEXT_LINE_THRESHOLD
+        };
+
+        Self::with_source_options(text, index, line_threshold, Some(binary_derived))
     }
 
     /// Iterate over query runs.
@@ -211,7 +226,19 @@ impl<'a> Query<'a> {
         index: &'a LicenseIndex,
         line_threshold: usize,
     ) -> Result<Self, anyhow::Error> {
-        let is_binary = Self::detect_binary(text)?;
+        Self::with_source_options(text, index, line_threshold, None)
+    }
+
+    fn with_source_options(
+        text: &str,
+        index: &'a LicenseIndex,
+        line_threshold: usize,
+        binary_derived: Option<bool>,
+    ) -> Result<Self, anyhow::Error> {
+        let is_binary = match binary_derived {
+            Some(is_binary) => is_binary,
+            None => Self::detect_binary(text)?,
+        };
         let has_long_lines = Self::detect_long_lines(text);
 
         let stopwords_set = &*STOPWORDS;

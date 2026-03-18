@@ -197,6 +197,8 @@ pub fn refine_aho_matches(
 
     let merged_again = merge_overlapping_matches(&non_gibberish);
 
+    let merged_again = filter_binary_low_coverage_same_expression_seq_bridges(merged_again, query);
+
     let (non_contained, discarded_contained) = filter_contained_matches(&merged_again);
 
     let (kept, discarded_overlapping) = filter_overlapping_matches(non_contained, index);
@@ -256,6 +258,8 @@ fn refine_matches_internal(
 
     let merged_again = merge_overlapping_matches(&non_gibberish);
 
+    let merged_again = filter_binary_low_coverage_same_expression_seq_bridges(merged_again, query);
+
     let (non_contained, discarded_contained) = filter_contained_matches(&merged_again);
 
     let (kept, discarded_overlapping) = filter_overlapping_matches(non_contained, index);
@@ -293,6 +297,33 @@ fn refine_matches_internal(
     update_match_scores(&mut final_scored, query);
 
     final_scored
+}
+
+fn filter_binary_low_coverage_same_expression_seq_bridges(
+    matches: Vec<LicenseMatch>,
+    query: &Query,
+) -> Vec<LicenseMatch> {
+    if !query.is_binary {
+        return matches;
+    }
+
+    matches
+        .iter()
+        .filter(|m| {
+            if m.matcher != "3-seq" || m.match_coverage >= 90.0 {
+                return true;
+            }
+
+            !matches.iter().any(|other| {
+                other.matcher == "2-aho"
+                    && other.match_coverage >= 100.0
+                    && other.license_expression == m.license_expression
+                    && other.qoverlap(m) > 0
+                    && !m.qcontains(other)
+            })
+        })
+        .cloned()
+        .collect()
 }
 
 #[cfg(test)]
@@ -421,6 +452,34 @@ mod tests {
         let refined = refine_matches(&index, matches, &query);
 
         assert_eq!(refined.len(), 2);
+    }
+
+    #[test]
+    fn test_filter_binary_low_coverage_same_expression_seq_bridges_drops_seq_bridge() {
+        let index = LicenseIndex::with_legalese_count(10);
+        let query = Query::from_extracted_text("binary strings", &index, true).unwrap();
+
+        let mut exact = create_test_match("#1", 140, 140, 100.0, 100.0, 100);
+        exact.license_expression = "bsd-new".to_string();
+        exact.matcher = "2-aho".to_string();
+        exact.start_token = 10;
+        exact.end_token = 16;
+        exact.matched_length = 6;
+
+        let mut seq = create_test_match("#2", 140, 141, 10.0, 52.9, 100);
+        seq.license_expression = "bsd-new".to_string();
+        seq.matcher = "3-seq".to_string();
+        seq.start_token = 10;
+        seq.end_token = 18;
+        seq.matched_length = 7;
+        seq.qspan_positions = Some(vec![10, 11, 12, 13, 14, 16, 17]);
+
+        let filtered = filter_binary_low_coverage_same_expression_seq_bridges(
+            vec![seq.clone(), exact.clone()],
+            &query,
+        );
+
+        assert_eq!(filtered, vec![exact]);
     }
 
     #[test]
