@@ -2,12 +2,13 @@
 
 ## Test Status
 
-**Currently Passing:** 10/10 tests
+**Currently Passing:** 11/11 tests
 
 - ✅ Legacy `.nuspec` fixtures remain covered
 - ✅ Modern `.nuspec` coverage now includes file-based license metadata (`Fizzler`)
 - ✅ Legacy `project.json` and PackageReference `.csproj` fixtures now have parser goldens
 - ✅ `.deps.json` runtime dependency graph fixtures now have parser golden coverage
+- ✅ Standalone `Directory.Packages.props` CPM parsing now has parser golden coverage
 
 **Why parser-only**: NuGet parser goldens verify manifest extraction only. License detection fields (`declared_license_expression*`, `license_detections`) are intentionally validated elsewhere because this suite compares `PackageData` parser output, not full scan-time license analysis.
 
@@ -30,6 +31,7 @@ Modern/additional manifest parser goldens:
 8. **legacy-project-json** - legacy `project.json` direct and framework-specific dependencies
 9. **package-reference** - PackageReference `.csproj` metadata and dependencies
 10. **deps-json** - `.deps.json` runtime-target dependency graph with direct, transitive, and compile-only entries
+11. **central-package-management** - standalone `Directory.Packages.props` with central versions and CPM flags
 
 ## Test Data
 
@@ -69,6 +71,7 @@ in the `DatasourceId` enum documents this.
 - Copyright and holder information
 - Repository and API URLs
 - Legacy `project.json` and PackageReference project metadata/dependencies
+- Standalone `Directory.Packages.props` package versions and CPM flags
 - `.deps.json` runtime-target metadata, direct/transitive dependency edges, and compile-only flags
 
 **What Parser Does NOT Do** (by design):

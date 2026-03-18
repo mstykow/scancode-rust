@@ -105,6 +105,7 @@ Currently tested ecosystems:
 - **Cargo** - `Cargo.toml` + `Cargo.lock`
 - **Go** - `go.mod` + `go.sum`
 - **Composer** - `composer.json` + `composer.lock`
+- **NuGet CPM** - `Directory.Packages.props` + PackageReference project files
 
 Additional ecosystems can be added by:
 
