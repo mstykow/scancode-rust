@@ -434,9 +434,9 @@ pub use self::npm::NpmParser;
 pub use self::npm_lock::NpmLockParser;
 pub use self::npm_workspace::NpmWorkspaceParser;
 pub use self::nuget::{
-    CentralPackageManagementPropsParser, DotNetDepsJsonParser, NupkgParser, NuspecParser,
-    PackageReferenceProjectParser, PackagesConfigParser, PackagesLockParser, ProjectJsonParser,
-    ProjectLockJsonParser,
+    CentralPackageManagementPropsParser, DirectoryBuildPropsParser, DotNetDepsJsonParser,
+    NupkgParser, NuspecParser, PackageReferenceProjectParser, PackagesConfigParser,
+    PackagesLockParser, ProjectJsonParser, ProjectLockJsonParser,
 };
 pub use self::opam::OpamParser;
 pub use self::os_release::OsReleaseParser;
@@ -603,6 +603,7 @@ register_package_handlers! {
         NpmWorkspaceParser,
         DotNetDepsJsonParser,
         CentralPackageManagementPropsParser,
+        DirectoryBuildPropsParser,
         NupkgParser,
         NuspecParser,
         PackageReferenceProjectParser,
