@@ -1,0 +1,94 @@
+[
+  {
+    "type": "maven",
+    "primary_language": "Clojure",
+    "parties": [],
+    "extra_data": {
+      "mvn_repos": {
+        "clojars": {
+          "url": "https://repo.clojars.org/"
+        }
+      },
+      "paths": ["src", "resources"],
+      "aliases": {
+        "test": {
+          "extra-deps": {
+            "lambdaisland/kaocha": {
+              "mvn/version": "1.91.1392"
+            }
+          }
+        },
+        "build": {
+          "deps": {
+            "io.github.clojure/tools.cli": {
+              "mvn/version": "1.1.230"
+            }
+          }
+        }
+      }
+    },
+    "dependencies": [
+      {
+        "purl": "pkg:maven/org.clojure/clojure@1.12.0",
+        "extracted_requirement": "1.12.0",
+        "scope": null,
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:maven/io.github.clojure/tools.build",
+        "scope": null,
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true,
+        "extra_data": {
+          "git_url": "https://github.com/clojure/tools.build.git",
+          "git_tag": "v0.10.5",
+          "git_sha": "abc1234"
+        }
+      },
+      {
+        "purl": "pkg:maven/my.local/lib",
+        "scope": null,
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true,
+        "extra_data": {
+          "local_root": "../lib"
+        }
+      },
+      {
+        "purl": "pkg:maven/exact/lib@1.5.0",
+        "extracted_requirement": "=1.5.0",
+        "scope": null,
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:maven/lambdaisland/kaocha@1.91.1392",
+        "extracted_requirement": "1.91.1392",
+        "scope": "test",
+        "is_runtime": false,
+        "is_optional": true,
+        "is_pinned": true,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:maven/io.github.clojure/tools.cli@1.1.230",
+        "extracted_requirement": "1.1.230",
+        "scope": "build",
+        "is_runtime": false,
+        "is_optional": true,
+        "is_pinned": true,
+        "is_direct": true
+      }
+    ],
+    "datasource_id": "clojure_deps_edn"
+  }
+]
