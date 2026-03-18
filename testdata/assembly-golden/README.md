@@ -106,6 +106,7 @@ Currently tested ecosystems:
 - **Go** - `go.mod` + `go.sum`
 - **Composer** - `composer.json` + `composer.lock`
 - **NuGet CPM** - `Directory.Packages.props` + PackageReference project files
+- **NuGet CPM + Directory.Build.props** - bounded build-props-backed central version and VersionOverride resolution
 
 Additional ecosystems can be added by:
 
