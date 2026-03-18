@@ -24,6 +24,8 @@ This first slice is intentionally narrow: it extracts only top-level literal met
 
 - Rust now extracts literal external dependencies from `libraryDependencies += ...` and `libraryDependencies ++= Seq(...)`.
 - Supported dependency forms include both `%` and `%%` operators plus literal scope suffixes such as `% Test`, `% "test"`, and `% "provided"`.
+- Rust now also supports top-level config-prefixed dependency statements such as `Test / libraryDependencies += ...`, `Runtime / libraryDependencies += ...`, and `Provided / libraryDependencies ++= Seq(...)`.
+- When a config prefix exists and the dependency itself does not already declare an explicit trailing `% scope`, Rust maps the prefix into the same dependency scope/runtime semantics it already uses for trailing SBT scopes.
 - Dependencies are emitted as Maven package URLs because SBT resolves external artifacts from the JVM/Maven ecosystem.
 - For `%%`, Rust preserves the literal artifact name written in `build.sbt` and records that the dependency used SBT cross-version syntax instead of guessing a Scala binary suffix that would require evaluation.
 
@@ -36,6 +38,7 @@ This first slice is intentionally narrow: it extracts only top-level literal met
 
 - Unsupported constructs are skipped instead of guessed.
 - Rust does **not** execute Scala, invoke `sbt`, parse arbitrary `*.sbt`, parse `plugins.sbt`, parse `project/*.scala`, or attempt multi-project graph semantics.
+- Rust still does **not** descend into `project.settings(...)` or broader multi-project setting graphs in this slice.
 
 ## Validation
 
