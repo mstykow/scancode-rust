@@ -48,6 +48,11 @@ mod cargo_test;
 mod chef;
 #[cfg(test)]
 mod chef_test;
+mod clojure;
+#[cfg(all(test, feature = "golden-tests"))]
+mod clojure_golden_test;
+#[cfg(test)]
+mod clojure_test;
 #[cfg(all(test, feature = "golden-tests"))]
 mod cocoapods_golden_test;
 mod composer;
@@ -383,6 +388,7 @@ pub use self::cargo::CargoParser;
 #[cfg_attr(not(test), allow(unused_imports))]
 pub use self::cargo_lock::CargoLockParser;
 pub use self::chef::{ChefMetadataJsonParser, ChefMetadataRbParser};
+pub use self::clojure::{ClojureDepsEdnParser, ClojureProjectCljParser};
 pub use self::composer::{ComposerJsonParser, ComposerLockParser};
 pub use self::conan::{ConanFilePyParser, ConanLockParser, ConanfileTxtParser};
 pub use self::conan_data::ConanDataParser;
@@ -535,6 +541,8 @@ register_package_handlers! {
         CargoParser,
         ChefMetadataJsonParser,
         ChefMetadataRbParser,
+        ClojureDepsEdnParser,
+        ClojureProjectCljParser,
         ComposerJsonParser,
         ComposerLockParser,
         ConanDataParser,
