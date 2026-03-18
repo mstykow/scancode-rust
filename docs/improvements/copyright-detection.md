@@ -194,7 +194,7 @@ Two upstream HTML fixtures (`url_in_html-detail_9_html.html` and `html_incorrect
   - holder: `pudn.com`
 - Drop `upload_log.asp?e=...` link-only false positives as metadata noise, not copyright statements.
 - Add deterministic regression tests asserting both fixtures produce the same result.
-- Use `update-copyright-golden --sync-actual` to keep local Rust-owned YAML fixtures aligned with canonical output.
+- Use `./scripts/update_copyright_golden.sh <authors|ics|copyrights> --sync-actual --write` to keep local Rust-owned YAML fixtures aligned with canonical output.
 
 **Impact**: Higher semantic quality, deterministic behavior, and simpler maintenance than fixture-name-dependent parity hacks.
 

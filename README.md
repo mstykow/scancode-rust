@@ -59,7 +59,7 @@ sudo mv scancode-rust /usr/local/bin/
 ```sh
 git clone https://github.com/mstykow/scancode-rust.git
 cd scancode-rust
-./setup.sh  # Initialize submodules and configure sparse checkout for embedded license data
+./setup.sh  # Initialize submodules and configure sparse checkout for project inputs
 cargo build --release
 ```
 
@@ -159,8 +159,8 @@ To contribute to `scancode-rust`, follow these steps to set up the repository fo
    cd scancode-rust
    ```
 
-3. **Initialize and Update Embedded License Data**  
-   Use the following script to initialize submodules, configure sparse checkout, and update the embedded SPDX license-data submodule to the latest upstream state.  
+3. **Initialize and Update Project Submodules**  
+   Use the following script to initialize submodules, configure sparse checkout, and update the SPDX license-data submodule to the latest upstream state.  
    If `pre-commit` is installed, this script also installs Git pre-commit hooks automatically:
 
    ```sh
@@ -272,6 +272,10 @@ Available release types:
 
 Monitor the [GitHub Actions workflow](https://github.com/mstykow/scancode-rust/actions) to verify completion.
 
+## Credits
+
+`scancode-rust` is an independent Rust rewrite of [ScanCode Toolkit](https://github.com/aboutcode-org/scancode-toolkit). It uses the upstream ScanCode Toolkit project by nexB Inc. and the AboutCode community as a reference for compatibility, behavior, and parity validation. We are grateful to nexB Inc. and the AboutCode community for the reference implementation and the extensive license and copyright research behind it. See [`NOTICE`](NOTICE) for preserved upstream attribution notices applicable to materials included in this repository and to distributions that include ScanCode-derived data.
+
 ## License
 
-This project is licensed under the [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0).
+The scancode-rust project code is licensed under the [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0). See [`NOTICE`](NOTICE) for preserved upstream attribution notices for included ScanCode Toolkit materials.

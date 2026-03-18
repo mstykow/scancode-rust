@@ -87,6 +87,6 @@ When adding documentation:
 
 ## Maintenance
 
-- **SUPPORTED_FORMATS.md**: Regenerate with `cargo run --bin generate-supported-formats`
+- **SUPPORTED_FORMATS.md**: Regenerate with `cargo run --manifest-path xtask/Cargo.toml --bin generate-supported-formats`
 - **ADRs**: Add new ADRs for significant design decisions
 - **Improvements**: Document beyond-parity features as they're implemented

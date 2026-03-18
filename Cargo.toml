@@ -10,14 +10,14 @@ categories = ["command-line-utilities", "development-tools"]
 readme = "README.md"
 authors = ["Maxim Stykow", "Adrian Braemer"]
 # Include only files needed to build from source
-# See "License Data Architecture" section in README.md for details on how license data is embedded
 include = [
-    "src/**/*",
-    "resources/licenses/json/details/**/*.json",
-    "Cargo.toml",
-    "Cargo.lock",
-    "README.md",
-    "LICENSE",
+    "/src/**/*",
+    "/resources/licenses/json/details/**/*.json",
+    "/Cargo.toml",
+    "/Cargo.lock",
+    "/README.md",
+    "/LICENSE",
+    "/NOTICE",
 ]
 
 [package.metadata.cargo-machete]
@@ -89,7 +89,7 @@ env_logger = "0.11.9"
 # Linux package parsers
 ar = "0.9"           # Unix ar archive format (for .deb)
 rpm = { version = "0.19.0", default-features = false, features = ["gzip-compression", "xz-compression", "zstd-compression", "bzip2-compression"] }
-rpmdb = { git = "https://github.com/yybit/rpmdb-rs", rev = "8a20c8b8" }
+rpmdb = { version = "0.1.0", git = "https://github.com/yybit/rpmdb-rs", rev = "8a20c8b8" }
 strum = { version = "0.28.0", features = ["derive"] }
 
 [dev-dependencies]
@@ -112,22 +112,6 @@ strip = true
 [[bin]]
 name = "scancode-rust"
 path = "src/main.rs"
-
-[[bin]]
-name = "generate-supported-formats"
-path = "src/bin/generate_supported_formats.rs"
-
-[[bin]]
-name = "update-parser-golden"
-path = "bin/update_parser_golden.rs"
-
-[[bin]]
-name = "update-copyright-golden"
-path = "bin/update_copyright_golden.rs"
-
-[[bin]]
-name = "validate-urls"
-path = "bin/validate_urls.rs"
 
 [features]
 default = ["spdx"]

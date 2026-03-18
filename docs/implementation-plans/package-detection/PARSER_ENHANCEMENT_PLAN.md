@@ -73,7 +73,7 @@ cargo test assembly::assemblers::tests::test_every_datasource_id_is_accounted_fo
 ```
 
 ```bash
-cargo run --quiet --bin generate-supported-formats && git diff --exit-code docs/SUPPORTED_FORMATS.md
+cargo run --quiet --manifest-path xtask/Cargo.toml --bin generate-supported-formats && git diff --exit-code docs/SUPPORTED_FORMATS.md
 ```
 
 ## Execution Learnings From Completed Batches

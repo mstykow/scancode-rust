@@ -17,7 +17,7 @@ repos:
 
       - id: generate-supported-formats
         name: Generate docs/SUPPORTED_FORMATS.md
-        entry: bash -c 'cargo run --quiet --bin generate-supported-formats && git add docs/SUPPORTED_FORMATS.md'
+        entry: bash -c 'cargo run --quiet --manifest-path xtask/Cargo.toml --bin generate-supported-formats && git add docs/SUPPORTED_FORMATS.md'
         language: system
         pass_filenames: false
         files: ^src/parsers/.*\.rs$
@@ -28,9 +28,11 @@ repos:
         entry: bash -c 'npm exec -- markdownlint-cli2 --fix --no-globs "$@" && git add -- "$@"' --
         language: system
         types: [markdown]
+        require_serial: true
 
       - id: prettier
         name: Format YAML, JSON, and Markdown with Prettier
         entry: bash -c 'npm exec -- prettier --write "$@" && git add -- "$@"' --
         language: system
         files: \.(yml|yaml|json|md)$
+        require_serial: true

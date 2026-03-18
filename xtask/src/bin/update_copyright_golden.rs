@@ -197,7 +197,7 @@ fn main() -> Result<()> {
     let show_diff = args.show_diff;
     let filter = args.filter;
 
-    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
     let ours_root = repo_root.join("testdata/copyright-golden").join(suite);
     let ref_root = repo_root
         .join("reference/scancode-toolkit/tests/cluecode/data")

@@ -44,7 +44,7 @@ This slice focuses on the high-value official metadata surface from Helm itself:
 - `cargo test test_assembly_helm_basic --lib`
 - `cargo test test_every_datasource_id_is_accounted_for --lib`
 - `cargo test test_all_parsers_are_registered_and_exported --test scanner_integration`
-- `cargo run --bin generate-supported-formats`
+- `cargo run --manifest-path xtask/Cargo.toml --bin generate-supported-formats`
 - `npm run check:docs`
 - `cargo build`
 - `cargo clippy --all-targets --all-features -- -D warnings`

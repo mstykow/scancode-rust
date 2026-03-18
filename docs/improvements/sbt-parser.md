@@ -50,7 +50,7 @@ This first slice is intentionally narrow: it extracts only top-level literal met
 
 - `cargo test sbt --lib`
 - `cargo test --features golden-tests sbt_golden --lib`
-- `cargo run --bin generate-supported-formats`
+- `cargo run --manifest-path xtask/Cargo.toml --bin generate-supported-formats`
 - `cargo build`
 
 ## Related Issues
