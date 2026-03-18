@@ -1,0 +1,37 @@
+[workspace]
+name = "pixi-demo"
+version = "1.2.3"
+authors = ["Jane Doe <jane@example.com>"]
+description = "Example Pixi workspace"
+license = "MIT"
+homepage = "https://example.com/pixi-demo"
+repository = "https://github.com/example/pixi-demo"
+documentation = "https://docs.example.com/pixi-demo"
+channels = ["conda-forge", "https://repo.prefix.dev/example"]
+platforms = ["linux-64", "osx-arm64"]
+requires-pixi = ">=0.40"
+exclude-newer = "2025-01-01"
+
+[dependencies]
+python = "3.12.*"
+numpy = { version = "2.1.0", channel = "conda-forge" }
+
+[pypi-dependencies]
+requests = ">=2.32,<3"
+localpkg = { path = ".", editable = true }
+
+[feature.docs.dependencies]
+sphinx = "8.2.3"
+
+[feature.test.pypi-dependencies]
+pytest = { version = "8.4.0", extras = ["dev"] }
+
+[environments]
+default = ["docs"]
+test = { features = ["test"], solve-group = "default" }
+
+[tasks]
+test = "pytest"
+
+[pypi-options]
+index-url = "https://pypi.org/simple"
