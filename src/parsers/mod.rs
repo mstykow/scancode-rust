@@ -201,6 +201,11 @@ mod pipfile_lock;
 mod pipfile_lock_golden_test;
 #[cfg(test)]
 mod pipfile_lock_test;
+mod pixi;
+#[cfg(all(test, feature = "golden-tests"))]
+mod pixi_golden_test;
+#[cfg(test)]
+mod pixi_test;
 mod pnpm_lock;
 #[cfg(test)]
 mod pnpm_lock_test;
@@ -431,6 +436,7 @@ pub use self::opam::OpamParser;
 pub use self::os_release::OsReleaseParser;
 pub use self::pip_inspect_deplock::PipInspectDeplockParser;
 pub use self::pipfile_lock::PipfileLockParser;
+pub use self::pixi::{PixiLockParser, PixiTomlParser};
 pub use self::pnpm_lock::PnpmLockParser;
 pub use self::podfile::PodfileParser;
 pub use self::podfile_lock::PodfileLockParser;
@@ -600,6 +606,8 @@ register_package_handlers! {
         ProjectLockJsonParser,
         PipfileLockParser,
         PipInspectDeplockParser,
+        PixiTomlParser,
+        PixiLockParser,
         PnpmLockParser,
         PodfileLockParser,
         PodfileParser,
