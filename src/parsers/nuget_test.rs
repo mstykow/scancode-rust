@@ -2,9 +2,9 @@
 mod tests {
     use super::super::PackageParser;
     use super::super::nuget::{
-        CentralPackageManagementPropsParser, DotNetDepsJsonParser, NupkgParser, NuspecParser,
-        PackageReferenceProjectParser, PackagesConfigParser, PackagesLockParser, ProjectJsonParser,
-        ProjectLockJsonParser,
+        CentralPackageManagementPropsParser, DirectoryBuildPropsParser, DotNetDepsJsonParser,
+        NupkgParser, NuspecParser, PackageReferenceProjectParser, PackagesConfigParser,
+        PackagesLockParser, ProjectJsonParser, ProjectLockJsonParser,
     };
     use crate::models::DatasourceId;
     use crate::models::PackageType;
@@ -15,6 +15,13 @@ mod tests {
     fn write_directory_packages_props(contents: &str) -> (TempDir, PathBuf) {
         let temp_dir = tempfile::tempdir().unwrap();
         let path = temp_dir.path().join("Directory.Packages.props");
+        std::fs::write(&path, contents).unwrap();
+        (temp_dir, path)
+    }
+
+    fn write_directory_build_props(contents: &str) -> (TempDir, PathBuf) {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let path = temp_dir.path().join("Directory.Build.props");
         std::fs::write(&path, contents).unwrap();
         (temp_dir, path)
     }
@@ -901,6 +908,19 @@ mod tests {
     }
 
     #[test]
+    fn test_directory_build_props_is_match() {
+        assert!(DirectoryBuildPropsParser::is_match(&PathBuf::from(
+            "Directory.Build.props"
+        )));
+        assert!(!DirectoryBuildPropsParser::is_match(&PathBuf::from(
+            "Directory.Packages.props"
+        )));
+        assert!(!DirectoryBuildPropsParser::is_match(&PathBuf::from(
+            "Directory.Build.targets"
+        )));
+    }
+
+    #[test]
     fn test_directory_packages_props_extracts_package_versions() {
         let xml = r#"<Project>
   <PropertyGroup>
@@ -1034,6 +1054,139 @@ mod tests {
             Some(
                 "$([MSBuild]::GetPathOfFileAbove(Directory.Packages.props, $(MSBuildThisFileDirectory)..))"
             )
+        );
+    }
+
+    #[test]
+    fn test_directory_build_props_extracts_properties_and_imported_parent_values() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let root_props = temp_dir.path().join("Directory.Build.props");
+        std::fs::write(
+            &root_props,
+            r#"<Project>
+  <PropertyGroup>
+    <ManageVersions>true</ManageVersions>
+    <NewtonsoftJsonVersion>13.0.3</NewtonsoftJsonVersion>
+  </PropertyGroup>
+</Project>"#,
+        )
+        .unwrap();
+
+        let child_dir = temp_dir.path().join("src");
+        std::fs::create_dir_all(&child_dir).unwrap();
+        let child_props = child_dir.join("Directory.Build.props");
+        std::fs::write(
+            &child_props,
+            r#"<Project>
+  <Import Project="$([MSBuild]::GetPathOfFileAbove(Directory.Build.props, $(MSBuildThisFileDirectory)..))" />
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>$(ManageVersions)</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+</Project>"#,
+        )
+        .unwrap();
+
+        let package_data = DirectoryBuildPropsParser::extract_first_package(&child_props);
+        assert_eq!(package_data.package_type, Some(PackageType::Nuget));
+        assert_eq!(
+            package_data.datasource_id,
+            Some(DatasourceId::NugetDirectoryBuildProps)
+        );
+        let extra_data = package_data
+            .extra_data
+            .as_ref()
+            .expect("missing extra_data");
+        assert_eq!(
+            extra_data
+                .get("manage_package_versions_centrally")
+                .and_then(|v| v.as_bool()),
+            Some(true)
+        );
+        assert_eq!(
+            extra_data
+                .get("property_values")
+                .and_then(|v| v.get("NewtonsoftJsonVersion"))
+                .and_then(|v| v.as_str()),
+            Some("13.0.3")
+        );
+        assert_eq!(
+            extra_data
+                .get("import_projects")
+                .and_then(|v| v.as_array())
+                .and_then(|v| v.first())
+                .and_then(|v| v.as_str()),
+            Some(
+                "$([MSBuild]::GetPathOfFileAbove(Directory.Build.props, $(MSBuildThisFileDirectory)..))"
+            )
+        );
+    }
+
+    #[test]
+    fn test_directory_build_props_ignores_unsupported_import_targets() {
+        let xml = r#"<Project>
+  <Import Project="../Directory.Build.targets" />
+  <PropertyGroup>
+    <NewtonsoftJsonVersion>13.0.3</NewtonsoftJsonVersion>
+  </PropertyGroup>
+</Project>"#;
+
+        let (_temp_dir, path) = write_directory_build_props(xml);
+        let package_data = DirectoryBuildPropsParser::extract_first_package(&path);
+        let extra_data = package_data
+            .extra_data
+            .as_ref()
+            .expect("missing extra_data");
+        assert!(
+            extra_data
+                .get("import_projects")
+                .and_then(|value| value.as_array())
+                .is_none_or(|values| values.is_empty())
+        );
+        assert_eq!(
+            extra_data
+                .get("property_values")
+                .and_then(|v| v.get("NewtonsoftJsonVersion"))
+                .and_then(|v| v.as_str()),
+            Some("13.0.3")
+        );
+    }
+
+    #[test]
+    fn test_directory_build_props_ignores_conditioned_imports_and_property_groups() {
+        let xml = r#"<Project>
+  <Import Project="$([MSBuild]::GetPathOfFileAbove(Directory.Build.props, $(MSBuildThisFileDirectory)..))" Condition="'$(TargetFramework)' == 'net8.0'" />
+  <PropertyGroup Condition="'$(TargetFramework)' == 'net8.0'">
+    <NewtonsoftJsonVersion>13.0.3</NewtonsoftJsonVersion>
+  </PropertyGroup>
+  <PropertyGroup>
+    <ManageVersions>true</ManageVersions>
+  </PropertyGroup>
+</Project>"#;
+
+        let (_temp_dir, path) = write_directory_build_props(xml);
+        let package_data = DirectoryBuildPropsParser::extract_first_package(&path);
+        let extra_data = package_data
+            .extra_data
+            .as_ref()
+            .expect("missing extra_data");
+        assert!(
+            extra_data
+                .get("import_projects")
+                .and_then(|value| value.as_array())
+                .is_none_or(|values| values.is_empty())
+        );
+        assert!(
+            extra_data
+                .get("property_values")
+                .and_then(|v| v.get("NewtonsoftJsonVersion"))
+                .is_none()
+        );
+        assert_eq!(
+            extra_data
+                .get("property_values")
+                .and_then(|v| v.get("ManageVersions"))
+                .and_then(|v| v.as_str()),
+            Some("true")
         );
     }
 
@@ -1191,6 +1344,39 @@ mod tests {
                 .and_then(|value| value.as_bool()),
             Some(true)
         );
+    }
+
+    #[test]
+    fn test_csproj_conditioned_property_group_does_not_enable_version_override() {
+        let xml = r#"<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup Condition="'$(TargetFramework)' == 'net8.0'">
+    <CentralPackageVersionOverrideEnabled>true</CentralPackageVersionOverrideEnabled>
+    <NewtonsoftJsonVersion>13.0.3</NewtonsoftJsonVersion>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" VersionOverride="$(NewtonsoftJsonVersion)" />
+  </ItemGroup>
+</Project>"#;
+
+        let mut temp_file = Builder::new().suffix(".csproj").tempfile().unwrap();
+        temp_file.write_all(xml.as_bytes()).unwrap();
+
+        let package_data = PackageReferenceProjectParser::extract_first_package(temp_file.path());
+        assert!(
+            package_data
+                .extra_data
+                .as_ref()
+                .and_then(|value| value.get("central_package_version_override_enabled"))
+                .is_none()
+        );
+        let dep_extra = package_data.dependencies[0].extra_data.as_ref().unwrap();
+        assert_eq!(
+            dep_extra
+                .get("version_override")
+                .and_then(|value| value.as_str()),
+            Some("$(NewtonsoftJsonVersion)")
+        );
+        assert!(dep_extra.get("version_override_resolved").is_none());
     }
 
     #[test]
