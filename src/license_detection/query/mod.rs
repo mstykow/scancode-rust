@@ -453,6 +453,10 @@ impl<'a> Query<'a> {
         lines
             .iter()
             .flat_map(|line| {
+                if line.is_empty() {
+                    return Vec::new();
+                }
+
                 if line.len() <= Self::MAX_TOKEN_PER_LINE {
                     vec![line.clone()]
                 } else {
@@ -472,16 +476,10 @@ impl<'a> Query<'a> {
         digit_only_tids: &HashSet<u16>,
         has_long_lines: bool,
     ) -> Vec<(usize, Option<usize>)> {
-        let processed_lines: Vec<Vec<Vec<Option<u16>>>> = if has_long_lines {
-            tokens_by_line
-                .iter()
-                .map(|line| Self::break_long_lines(std::slice::from_ref(line)))
-                .collect()
+        let processed_lines = if has_long_lines {
+            Self::break_long_lines(tokens_by_line)
         } else {
-            tokens_by_line
-                .iter()
-                .map(|line| vec![line.clone()])
-                .collect()
+            tokens_by_line.to_vec()
         };
 
         let mut query_runs = Vec::new();
@@ -490,7 +488,7 @@ impl<'a> Query<'a> {
         let mut empty_lines = 0usize;
         let mut pos = 0usize;
 
-        for line_chunks in processed_lines {
+        for line_tokens in processed_lines {
             if query_run_end.is_some() && empty_lines >= line_threshold {
                 query_runs.push((query_run_start, query_run_end));
                 query_run_start = pos;
@@ -502,29 +500,27 @@ impl<'a> Query<'a> {
                 query_run_start = pos;
             }
 
-            if line_chunks.iter().all(|chunk| chunk.is_empty()) {
+            if line_tokens.is_empty() {
                 empty_lines += 1;
                 continue;
             }
 
+            let line_is_all_digit = line_tokens.iter().all(|token_id| {
+                token_id
+                    .map(|tid| digit_only_tids.contains(&tid))
+                    .unwrap_or(true)
+            });
             let mut line_has_known_tokens = false;
             let mut line_has_good_tokens = false;
-            let mut line_is_all_digit = true;
 
-            for line_tokens in line_chunks {
-                for token_id in line_tokens {
-                    line_is_all_digit &= token_id
-                        .map(|tid| digit_only_tids.contains(&tid))
-                        .unwrap_or(true);
-
-                    if let Some(tid) = token_id {
-                        line_has_known_tokens = true;
-                        if (tid as usize) < len_legalese {
-                            line_has_good_tokens = true;
-                        }
-                        query_run_end = Some(pos);
-                        pos += 1;
+            for token_id in line_tokens {
+                if let Some(tid) = token_id {
+                    line_has_known_tokens = true;
+                    if (tid as usize) < len_legalese {
+                        line_has_good_tokens = true;
                     }
+                    query_run_end = Some(pos);
+                    pos += 1;
                 }
             }
 

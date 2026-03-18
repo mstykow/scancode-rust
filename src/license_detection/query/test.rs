@@ -686,7 +686,7 @@ mod tests {
     }
 
     #[test]
-    fn test_query_run_splitting_keeps_good_long_line_in_single_run() {
+    fn test_query_run_splitting_breaks_good_long_line_into_python_pseudolines() {
         let mut index = create_query_test_index();
         let low_tokens: Vec<String> = (0..25).map(|i| format!("word{}", i)).collect();
         for token in &low_tokens {
@@ -697,7 +697,7 @@ mod tests {
         let query = Query::with_options(&text, &index, 1).unwrap();
 
         assert!(query.has_long_lines);
-        assert_eq!(query.query_run_ranges, vec![(0, Some(25))]);
+        assert_eq!(query.query_run_ranges, vec![(0, Some(24)), (25, Some(25))]);
     }
 
     #[test]
@@ -760,7 +760,7 @@ mod tests {
     }
 
     #[test]
-    fn test_query_run_splitting_does_not_break_between_chunks_of_same_physical_line() {
+    fn test_query_run_splitting_uses_python_pseudoline_boundaries() {
         let mut index = create_query_test_index();
         let low_tokens: Vec<String> = (0..30).map(|i| format!("word{}", i)).collect();
         for token in &low_tokens {
@@ -771,7 +771,7 @@ mod tests {
         let query = Query::with_options(&text, &index, 2).unwrap();
 
         assert!(query.has_long_lines);
-        assert_eq!(query.query_run_ranges, vec![(0, Some(33))]);
+        assert_eq!(query.query_run_ranges, vec![(0, Some(27)), (28, Some(33))]);
     }
 
     #[test]

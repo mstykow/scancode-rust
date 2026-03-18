@@ -1473,6 +1473,56 @@ fn test_gpl_and_gpl_and_gpl_and_lgpl_detect_matches_match_python_raw_expressions
 }
 
 #[test]
+fn test_android_sdk_preview_detect_matches_match_python_raw_rules() {
+    let Some(engine) = create_engine_from_reference() else {
+        eprintln!("Skipping test: reference directory not found");
+        return;
+    };
+
+    let matches = detect_fixture_matches(
+        &engine,
+        "testdata/license-golden/datadriven/lic2/android-sdk-preview-2015.html",
+    );
+
+    assert_eq!(
+        sorted_raw_matches(&matches),
+        vec![
+            (
+                "android-sdk-preview-2015_1.RULE".to_string(),
+                crate::license_detection::seq_match::MATCH_SEQ.to_string(),
+                557,
+                728,
+            ),
+            (
+                "android-sdk-preview-2015_4.RULE".to_string(),
+                crate::license_detection::aho_match::MATCH_AHO.to_string(),
+                98,
+                98,
+            ),
+            (
+                "cc-by-2.5_2.RULE".to_string(),
+                crate::license_detection::aho_match::MATCH_AHO.to_string(),
+                763,
+                767,
+            ),
+            (
+                "license-intro_22.RULE".to_string(),
+                crate::license_detection::aho_match::MATCH_AHO.to_string(),
+                100,
+                100,
+            ),
+            (
+                "license-intro_22.RULE".to_string(),
+                crate::license_detection::aho_match::MATCH_AHO.to_string(),
+                213,
+                213,
+            ),
+        ],
+        "android-sdk-preview-2015.html raw matches should align with Python"
+    );
+}
+
+#[test]
 fn test_unknown_readme_detect_matches_unknown_mode_matches_python_raw_rules() {
     let Some(engine) = create_engine_from_reference() else {
         eprintln!("Skipping test: reference directory not found");
