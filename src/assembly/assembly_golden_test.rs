@@ -564,6 +564,17 @@ mod tests {
     }
 
     #[test]
+    fn test_assembly_nuget_cpm_imported_parent() {
+        match run_assembly_golden_test("nuget-cpm-imported-parent") {
+            Ok(_) => (),
+            Err(e) => panic!(
+                "Assembly golden test failed for nuget-cpm-imported-parent: {}",
+                e
+            ),
+        }
+    }
+
+    #[test]
     fn test_assembly_npm_workspace() {
         match run_assembly_golden_test("npm-workspace") {
             Ok(_) => (),
