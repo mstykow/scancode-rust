@@ -271,31 +271,31 @@ fn tokenize(statement: &str) -> Vec<Token> {
             continue;
         }
 
-        if statement[index..].starts_with("++=") {
+        if matches_chars(&chars, index, &['+', '+', '=']) {
             tokens.push(Token::Symbol("++="));
             index += 3;
             continue;
         }
 
-        if statement[index..].starts_with(":=") {
+        if matches_chars(&chars, index, &[':', '=']) {
             tokens.push(Token::Symbol(":="));
             index += 2;
             continue;
         }
 
-        if statement[index..].starts_with("+=") {
+        if matches_chars(&chars, index, &['+', '=']) {
             tokens.push(Token::Symbol("+="));
             index += 2;
             continue;
         }
 
-        if statement[index..].starts_with("%%") {
+        if matches_chars(&chars, index, &['%', '%']) {
             tokens.push(Token::Symbol("%%"));
             index += 2;
             continue;
         }
 
-        if statement[index..].starts_with("->") {
+        if matches_chars(&chars, index, &['-', '>']) {
             tokens.push(Token::Symbol("->"));
             index += 2;
             continue;
@@ -366,6 +366,10 @@ fn is_ident_start(ch: char) -> bool {
 
 fn is_ident_char(ch: char) -> bool {
     ch.is_ascii_alphanumeric() || ch == '_' || ch == '.'
+}
+
+fn matches_chars(chars: &[char], index: usize, expected: &[char]) -> bool {
+    chars.get(index..index + expected.len()) == Some(expected)
 }
 
 fn resolve_string_aliases(statements: &[String]) -> HashMap<String, String> {
@@ -589,20 +593,42 @@ fn parse_library_dependencies(
     tokens: &[Token],
     aliases: &HashMap<String, String>,
 ) -> Option<Vec<Dependency>> {
+    let (inherited_scope, tokens) = parse_dependency_setting_prefix(tokens)?;
+
     match tokens {
         [Token::Ident(name), Token::Symbol("+="), expr @ ..] if name == "libraryDependencies" => {
-            parse_dependency_expr(expr, aliases).map(|dependency| vec![dependency])
+            parse_dependency_expr(expr, aliases, inherited_scope.as_deref())
+                .map(|dependency| vec![dependency])
         }
         [Token::Ident(name), Token::Symbol("++="), expr @ ..] if name == "libraryDependencies" => {
-            parse_dependency_seq(expr, aliases)
+            parse_dependency_seq(expr, aliases, inherited_scope.as_deref())
         }
         _ => None,
     }
 }
 
+fn parse_dependency_setting_prefix(tokens: &[Token]) -> Option<(Option<String>, &[Token])> {
+    match tokens {
+        [Token::Ident(scope), Token::Symbol("/"), rest @ ..]
+            if is_supported_config_scope(scope) =>
+        {
+            Some((Some(scope.to_ascii_lowercase()), rest))
+        }
+        _ => Some((None, tokens)),
+    }
+}
+
+fn is_supported_config_scope(scope: &str) -> bool {
+    matches!(
+        scope,
+        "Compile" | "Runtime" | "Provided" | "Test" | "compile" | "runtime" | "provided" | "test"
+    )
+}
+
 fn parse_dependency_seq(
     tokens: &[Token],
     aliases: &HashMap<String, String>,
+    inherited_scope: Option<&str>,
 ) -> Option<Vec<Dependency>> {
     let [
         Token::Ident(seq),
@@ -619,7 +645,7 @@ fn parse_dependency_seq(
 
     let mut dependencies = Vec::new();
     for item in split_by_top_level_commas(inner) {
-        if let Some(dependency) = parse_dependency_expr(item, aliases) {
+        if let Some(dependency) = parse_dependency_expr(item, aliases, inherited_scope) {
             dependencies.push(dependency);
         }
     }
@@ -699,6 +725,7 @@ fn outer_parens_wrap_all(tokens: &[Token]) -> bool {
 fn parse_dependency_expr(
     tokens: &[Token],
     aliases: &HashMap<String, String>,
+    inherited_scope: Option<&str>,
 ) -> Option<Dependency> {
     let tokens = strip_outer_parens(tokens);
     if tokens.len() != 5 && tokens.len() != 7 {
@@ -718,7 +745,7 @@ fn parse_dependency_expr(
     let group = parse_literal_string_expr(&tokens[0..1], aliases)?;
     let artifact = parse_literal_string_expr(&tokens[2..3], aliases)?;
     let version = parse_literal_string_expr(&tokens[4..5], aliases)?;
-    let scope = if tokens.len() == 7 {
+    let explicit_scope = if tokens.len() == 7 {
         if tokens.get(5) != Some(&Token::Symbol("%")) {
             return None;
         }
@@ -726,6 +753,7 @@ fn parse_dependency_expr(
     } else {
         None
     };
+    let scope = explicit_scope.or_else(|| inherited_scope.map(ToOwned::to_owned));
 
     build_dependency(group, artifact, version, scope, operator)
 }
