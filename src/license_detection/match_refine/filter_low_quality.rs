@@ -701,7 +701,7 @@ mod tests {
     #[test]
     fn test_filter_spurious_matches_keeps_non_seq_matchers() {
         let index = LicenseIndex::with_legalese_count(10);
-        let query = Query::new("test text", &index).unwrap();
+        let query = Query::from_extracted_text("test text", &index, false).unwrap();
         let matches = vec![
             LicenseMatch {
                 matcher: "1-hash".to_string(),
@@ -722,7 +722,7 @@ mod tests {
     #[test]
     fn test_filter_spurious_matches_keeps_high_density_seq() {
         let index = LicenseIndex::with_legalese_count(10);
-        let query = Query::new("test text", &index).unwrap();
+        let query = Query::from_extracted_text("test text", &index, false).unwrap();
         let mut m = create_test_match("#1", 1, 10, 1.0, 100.0, 100);
         m.matcher = "3-seq".to_string();
         m.matched_length = 50;
@@ -736,7 +736,7 @@ mod tests {
     #[test]
     fn test_filter_spurious_matches_filters_low_density_short() {
         let index = LicenseIndex::with_legalese_count(10);
-        let query = Query::new("test text", &index).unwrap();
+        let query = Query::from_extracted_text("test text", &index, false).unwrap();
         let mut m = create_test_match("#1", 1, 10, 1.0, 100.0, 100);
         m.matcher = "3-seq".to_string();
         m.matched_length = 5;
@@ -752,7 +752,7 @@ mod tests {
     #[test]
     fn test_filter_spurious_matches_filters_unknown_matcher() {
         let index = LicenseIndex::with_legalese_count(10);
-        let query = Query::new("test text", &index).unwrap();
+        let query = Query::from_extracted_text("test text", &index, false).unwrap();
         let mut m = create_test_match("#1", 1, 10, 1.0, 100.0, 100);
         m.matcher = MATCH_UNKNOWN.to_string();
         m.matched_length = 5;
@@ -768,7 +768,7 @@ mod tests {
     #[test]
     fn test_filter_spurious_matches_keeps_medium_length() {
         let index = LicenseIndex::with_legalese_count(10);
-        let query = Query::new("test text", &index).unwrap();
+        let query = Query::from_extracted_text("test text", &index, false).unwrap();
         let mut m = create_test_match("#1", 1, 10, 1.0, 100.0, 100);
         m.matcher = "3-seq".to_string();
         m.matched_length = 25;
@@ -785,7 +785,7 @@ mod tests {
     #[test]
     fn test_filter_spurious_matches_empty() {
         let index = LicenseIndex::with_legalese_count(10);
-        let query = Query::new("test text", &index).unwrap();
+        let query = Query::from_extracted_text("test text", &index, false).unwrap();
         let matches: Vec<LicenseMatch> = vec![];
         let filtered = filter_spurious_matches(&matches, &query);
         assert_eq!(filtered.len(), 0);

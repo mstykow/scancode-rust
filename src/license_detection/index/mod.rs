@@ -153,7 +153,6 @@ pub struct LicenseIndex {
     /// Other rules can only be matched exactly using the automaton.
     ///
     /// Corresponds to Python: `self.approx_matchable_rids = set()` (line 234)
-    #[allow(dead_code)]
     pub approx_matchable_rids: HashSet<usize>,
 
     /// Mapping from ScanCode license key to License object.

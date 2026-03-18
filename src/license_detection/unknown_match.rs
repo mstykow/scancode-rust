@@ -493,12 +493,12 @@ fn render_unknown_rule_tokens(tokens: &[MatchedTextToken], line_endings: &[Strin
     let mut previous_line: Option<usize> = None;
 
     for token in tokens {
-        if let Some(prev_line) = previous_line {
-            if token.line_num > prev_line {
-                for line in prev_line..token.line_num {
-                    if let Some(line_ending) = line_endings.get(line.saturating_sub(1)) {
-                        rendered.push_str(line_ending.as_str());
-                    }
+        if let Some(prev_line) = previous_line
+            && token.line_num > prev_line
+        {
+            for line in prev_line..token.line_num {
+                if let Some(line_ending) = line_endings.get(line.saturating_sub(1)) {
+                    rendered.push_str(line_ending.as_str());
                 }
             }
         }
@@ -577,7 +577,7 @@ mod tests {
     #[test]
     fn test_unknown_match_empty_query() {
         let index = LicenseIndex::with_legalese_count(10);
-        let query = Query::new("", &index).expect("Failed to create query");
+        let query = Query::from_extracted_text("", &index, false).expect("Failed to create query");
         let known_matches = vec![];
 
         let matches = unknown_match(&index, &query, &known_matches);
@@ -761,7 +761,7 @@ mod tests {
     #[test]
     fn test_compute_covered_positions_gapped_qspan() {
         let index = LicenseIndex::with_legalese_count(10);
-        let query = Query::new("some license text here", &index).expect("Failed to create query");
+        let query = Query::from_extracted_text("some license text here", &index, false).expect("Failed to create query");
 
         let known_matches = vec![LicenseMatch {
             rid: 0,
@@ -815,7 +815,7 @@ mod tests {
     #[test]
     fn test_compute_covered_positions_fallback_contiguous() {
         let index = LicenseIndex::with_legalese_count(10);
-        let query = Query::new("some license text here", &index).expect("Failed to create query");
+        let query = Query::from_extracted_text("some license text here", &index, false).expect("Failed to create query");
 
         let known_matches = vec![LicenseMatch {
             rid: 0,
@@ -870,7 +870,7 @@ mod tests {
     #[test]
     fn test_compute_covered_positions_qspan_creates_extra_unmatched_region() {
         let index = LicenseIndex::with_legalese_count(10);
-        let query = Query::new("some license text here", &index).expect("Failed to create query");
+        let query = Query::from_extracted_text("some license text here", &index, false).expect("Failed to create query");
 
         let known_matches = vec![LicenseMatch {
             rid: 0,
@@ -959,7 +959,7 @@ mod tests {
     fn test_unknown_match_with_known_matches() {
         let index = LicenseIndex::with_legalese_count(10);
         let text = "some text that is license related and should be detected";
-        let query = Query::new(text, &index).expect("Failed to create query");
+        let query = Query::from_extracted_text(text, &index, false).expect("Failed to create query");
 
         let known_matches = vec![LicenseMatch {
             rid: 0,

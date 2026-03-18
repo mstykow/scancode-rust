@@ -965,7 +965,7 @@ SOFTWARE."#;
         let index = build_index(rules, licenses);
 
         let text = std::fs::read_to_string(test_file).unwrap();
-        let query = Query::new(&text, &index).expect("Query creation failed");
+        let query = Query::from_extracted_text(&text, &index, false).expect("Query creation failed");
 
         eprintln!("Query token count: {}", query.tokens.len());
 

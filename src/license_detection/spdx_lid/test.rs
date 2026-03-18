@@ -299,7 +299,7 @@ mod tests {
             .push(create_mock_rule_simple("apache-2.0", 100));
 
         let text = "SPDX-License-Identifier: MIT";
-        let query = Query::new(text, &index).unwrap();
+        let query = Query::from_extracted_text(text, &index, false).unwrap();
         let matches = spdx_lid_match(&index, &query);
 
         assert_eq!(matches.len(), 1);
@@ -316,7 +316,7 @@ mod tests {
         index.rules_by_rid.push(create_mock_rule_simple("mit", 90));
 
         let text = "SPDX-License-Identifier: mit";
-        let query = Query::new(text, &index).unwrap();
+        let query = Query::from_extracted_text(text, &index, false).unwrap();
         let matches = spdx_lid_match(&index, &query);
 
         assert_eq!(matches.len(), 1);
@@ -332,7 +332,7 @@ mod tests {
             .push(create_mock_rule_simple("apache-2.0", 100));
 
         let text = "SPDX-License-Identifier: OR\n# SPDX-License-Identifier: MIT\n# SPDX-License-Identifier: Apache-2.0";
-        let query = Query::new(text, &index).unwrap();
+        let query = Query::from_extracted_text(text, &index, false).unwrap();
         let matches = spdx_lid_match(&index, &query);
 
         assert_eq!(matches.len(), 3);
@@ -343,7 +343,7 @@ mod tests {
         let index = create_test_index(&[("mit", 0)], 1);
 
         let text = "/* Regular comment */";
-        let query = Query::new(text, &index).unwrap();
+        let query = Query::from_extracted_text(text, &index, false).unwrap();
         let matches = spdx_lid_match(&index, &query);
 
         assert!(matches.is_empty());
@@ -355,7 +355,7 @@ mod tests {
         index.rules_by_rid.push(create_mock_rule_simple("mit", 80));
 
         let text = "SPDX-License-Identifier: MIT";
-        let query = Query::new(text, &index).unwrap();
+        let query = Query::from_extracted_text(text, &index, false).unwrap();
         let matches = spdx_lid_match(&index, &query);
 
         assert_eq!(matches.len(), 1);
@@ -432,7 +432,7 @@ mod tests {
             .push(create_mock_rule_simple("classpath-exception-2.0", 100));
 
         let text = "SPDX-License-Identifier: GPL-2.0 WITH Classpath-exception-2.0";
-        let query = Query::new(text, &index).unwrap();
+        let query = Query::from_extracted_text(text, &index, false).unwrap();
         let matches = spdx_lid_match(&index, &query);
 
         assert!(
@@ -479,7 +479,7 @@ mod tests {
         let index = create_test_index(&[("mit", 0)], 1);
 
         let text = "";
-        let query = Query::new(text, &index).unwrap();
+        let query = Query::from_extracted_text(text, &index, false).unwrap();
         let matches = spdx_lid_match(&index, &query);
 
         assert!(matches.is_empty(), "Empty text should produce no matches");
@@ -490,7 +490,7 @@ mod tests {
         let index = create_test_index(&[("mit", 0)], 1);
 
         let text = "   \n\t  ";
-        let query = Query::new(text, &index).unwrap();
+        let query = Query::from_extracted_text(text, &index, false).unwrap();
         let matches = spdx_lid_match(&index, &query);
 
         assert!(
@@ -571,7 +571,7 @@ mod tests {
         index.rules_by_rid.push(create_mock_rule_simple("mit", 100));
 
         let text = "Some preamble text\nSPDX-License-Identifier: MIT\nMore text";
-        let query = Query::new(text, &index).unwrap();
+        let query = Query::from_extracted_text(text, &index, false).unwrap();
 
         let matches = spdx_lid_match(&index, &query);
 

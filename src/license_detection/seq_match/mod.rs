@@ -135,7 +135,7 @@ mod tests {
         add_test_rule(&mut index, "license copyright granted", "test-license");
 
         let text = "license copyright granted here";
-        let query = Query::new(text, &index).unwrap();
+        let query = Query::from_extracted_text(text, &index, false).unwrap();
         let query_run = query.whole_query_run();
 
         let candidates = compute_candidates_with_msets(&index, &query_run, false, 50);
@@ -156,7 +156,7 @@ mod tests {
         );
 
         let text = "license copyright";
-        let query = Query::new(text, &index).unwrap();
+        let query = Query::from_extracted_text(text, &index, false).unwrap();
         let query_run = query.whole_query_run();
 
         let candidates = compute_candidates_with_msets(&index, &query_run, false, 50);
@@ -176,7 +176,7 @@ mod tests {
         add_test_rule(&mut index, "license copyright", "test-license");
 
         let text = "";
-        let query = Query::new(text, &index).unwrap();
+        let query = Query::from_extracted_text(text, &index, false).unwrap();
         let query_run = query.whole_query_run();
 
         let candidates = compute_candidates_with_msets(&index, &query_run, false, 50);
@@ -198,7 +198,7 @@ mod tests {
         add_test_rule(&mut index, "word1 word2 word3", "test-license");
 
         let text = "word1 word2 word3";
-        let query = Query::new(text, &index).unwrap();
+        let query = Query::from_extracted_text(text, &index, false).unwrap();
         let query_run = query.whole_query_run();
 
         let candidates = compute_candidates_with_msets(&index, &query_run, false, 50);
@@ -217,7 +217,7 @@ mod tests {
         add_test_rule(&mut index, "license copyright granted", "test-license");
 
         let text = "license copyright granted some text license copyright granted more text";
-        let query = Query::new(text, &index).unwrap();
+        let query = Query::from_extracted_text(text, &index, false).unwrap();
         let query_run = query.whole_query_run();
 
         let candidates = compute_candidates_with_msets(&index, &query_run, false, 50);
@@ -258,7 +258,7 @@ mod tests {
         add_test_rule(&mut index, "license copyright granted", "test-license");
 
         let text = "line one\nlicense copyright granted\nline three";
-        let query = Query::new(text, &index).unwrap();
+        let query = Query::from_extracted_text(text, &index, false).unwrap();
         let query_run = query.whole_query_run();
 
         let candidates = compute_candidates_with_msets(&index, &query_run, false, 50);
@@ -297,7 +297,7 @@ mod tests {
         );
 
         let text = "line one\nlicense copyright\nline three";
-        let query = Query::new(text, &index).unwrap();
+        let query = Query::from_extracted_text(text, &index, false).unwrap();
         let query_run = query.whole_query_run();
 
         let candidates = compute_candidates_with_msets(&index, &query_run, false, 50);

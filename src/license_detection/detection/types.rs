@@ -59,7 +59,6 @@ pub struct LicenseDetection {
 
 /// A file has one or more file-regions, which are separate regions of the file
 /// containing some license information.
-#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct FileRegion {
     /// File path

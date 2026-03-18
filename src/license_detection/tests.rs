@@ -2467,7 +2467,7 @@ fn debug_duplicate_mit_licenses() {
     use crate::license_detection::aho_match::aho_match;
     use crate::license_detection::query::Query;
 
-    let query = Query::new(&mit25_text, &engine.index).unwrap();
+    let query = Query::from_extracted_text(&mit25_text, &engine.index, false).unwrap();
     let run = query.whole_query_run();
 
     // Get raw aho matches

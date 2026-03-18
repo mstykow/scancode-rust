@@ -217,7 +217,6 @@ impl LicenseMatch {
         }
     }
 
-    #[allow(dead_code)]
     pub fn is_small(
         &self,
         min_matched_len: usize,
@@ -233,7 +232,6 @@ impl LicenseMatch {
         false
     }
 
-    #[allow(dead_code)]
     pub fn len(&self) -> usize {
         if let Some(positions) = &self.qspan_positions {
             positions.len()
@@ -248,7 +246,6 @@ impl LicenseMatch {
         self.len() == 0
     }
 
-    #[allow(dead_code)]
     fn qregion_len(&self) -> usize {
         if let Some(positions) = &self.qspan_positions {
             if positions.is_empty() {

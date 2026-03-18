@@ -551,7 +551,7 @@ mod tests {
     #[test]
     fn test_update_match_scores_basic() {
         let index = LicenseIndex::with_legalese_count(10);
-        let query = Query::new("test text", &index).unwrap();
+        let query = Query::from_extracted_text("test text", &index, false).unwrap();
         let mut matches = vec![create_test_match("#1", 1, 10, 0.5, 100.0, 100)];
 
         update_match_scores(&mut matches, &query);
@@ -562,7 +562,7 @@ mod tests {
     #[test]
     fn test_update_match_scores_multiple() {
         let index = LicenseIndex::with_legalese_count(10);
-        let query = Query::new("test text", &index).unwrap();
+        let query = Query::from_extracted_text("test text", &index, false).unwrap();
         let mut matches = vec![
             create_test_match("#1", 1, 10, 0.5, 100.0, 80),
             create_test_match("#2", 15, 25, 0.5, 100.0, 100),
@@ -577,7 +577,7 @@ mod tests {
     #[test]
     fn test_update_match_scores_idempotent() {
         let index = LicenseIndex::with_legalese_count(10);
-        let query = Query::new("test text", &index).unwrap();
+        let query = Query::from_extracted_text("test text", &index, false).unwrap();
         let mut matches = vec![create_test_match("#1", 1, 10, 50.0, 50.0, 100)];
 
         update_match_scores(&mut matches, &query);
@@ -592,7 +592,7 @@ mod tests {
     #[test]
     fn test_update_match_scores_empty() {
         let index = LicenseIndex::with_legalese_count(10);
-        let query = Query::new("test text", &index).unwrap();
+        let query = Query::from_extracted_text("test text", &index, false).unwrap();
         let mut matches: Vec<LicenseMatch> = vec![];
         update_match_scores(&mut matches, &query);
         assert_eq!(matches.len(), 0);

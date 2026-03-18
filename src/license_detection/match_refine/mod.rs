@@ -402,7 +402,7 @@ mod tests {
 
         let matches = vec![m1, m2, m3, m4];
 
-        let query = Query::new("test text", &index).unwrap();
+        let query = Query::from_extracted_text("test text", &index, false).unwrap();
         let refined = refine_matches(&index, matches, &query);
 
         assert_eq!(refined.len(), 2);
@@ -419,7 +419,7 @@ mod tests {
     fn test_refine_matches_empty() {
         let index = LicenseIndex::with_legalese_count(10);
         let matches: Vec<LicenseMatch> = vec![];
-        let query = Query::new("", &index).unwrap();
+        let query = Query::from_extracted_text("", &index, false).unwrap();
 
         let refined = refine_matches(&index, matches, &query);
 
@@ -430,7 +430,7 @@ mod tests {
     fn test_refine_matches_single() {
         let index = LicenseIndex::with_legalese_count(10);
         let matches = vec![create_test_match("#1", 1, 10, 0.5, 100.0, 100)];
-        let query = Query::new("test text", &index).unwrap();
+        let query = Query::from_extracted_text("test text", &index, false).unwrap();
 
         let refined = refine_matches(&index, matches, &query);
 
@@ -447,7 +447,7 @@ mod tests {
             create_test_match("#2", 20, 30, 0.85, 85.0, 100),
         ];
 
-        let query = Query::new("test text", &index).unwrap();
+        let query = Query::from_extracted_text("test text", &index, false).unwrap();
 
         let refined = refine_matches(&index, matches, &query);
 
@@ -494,7 +494,7 @@ mod tests {
         second.rule_length = 20;
         second.rule_start_token = 10;
 
-        let query = Query::new("test text", &index).unwrap();
+        let query = Query::from_extracted_text("test text", &index, false).unwrap();
         let refined = refine_aho_matches(&index, vec![first, second], &query);
 
         assert_eq!(refined.len(), 1);
@@ -513,7 +513,7 @@ mod tests {
             create_test_match("#3", 40, 50, 0.8, 80.0, 100),
         ];
 
-        let query = Query::new("test text", &index).unwrap();
+        let query = Query::from_extracted_text("test text", &index, false).unwrap();
         let refined = refine_matches(&index, matches, &query);
 
         assert_eq!(refined.len(), 3);
@@ -543,7 +543,7 @@ mod tests {
 
         let matches = vec![m1, m2, m3, m4];
 
-        let query = Query::new("test text", &index).unwrap();
+        let query = Query::from_extracted_text("test text", &index, false).unwrap();
         let refined = refine_matches(&index, matches, &query);
 
         assert!(
@@ -714,7 +714,7 @@ mod tests {
             }
         }
 
-        let query = Query::new(&text, &index).unwrap();
+        let query = Query::from_extracted_text(&text, &index, false).unwrap();
         let run = query.whole_query_run();
 
         let rule_20733 = index.rules_by_rid.get(20733);
@@ -866,7 +866,7 @@ mod tests {
         let text =
             std::fs::read_to_string("testdata/license-golden/datadriven/lic1/gpl-2.0-plus_1.txt")
                 .unwrap();
-        let query = Query::new(&text, &index).unwrap();
+        let query = Query::from_extracted_text(&text, &index, false).unwrap();
         let run = query.whole_query_run();
 
         let matches = aho_match::aho_match(&index, &run);

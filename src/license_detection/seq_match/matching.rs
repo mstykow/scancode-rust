@@ -29,7 +29,6 @@ use super::{Candidate, MATCH_SEQ};
 ///
 /// Tuple of (query_start, rule_start, match_length)
 #[allow(clippy::too_many_arguments, clippy::needless_range_loop)]
-#[allow(dead_code)]
 pub(super) fn find_longest_match(
     query_tokens: &[u16],
     rule_tokens: &[u16],
@@ -124,7 +123,6 @@ pub(super) fn find_longest_match(
 /// # Returns
 ///
 /// Vector of matching blocks as (query_pos, rule_pos, length)
-#[allow(dead_code)]
 pub(super) fn match_blocks(
     query_tokens: &[u16],
     rule_tokens: &[u16],

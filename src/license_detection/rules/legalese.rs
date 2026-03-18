@@ -4558,7 +4558,6 @@ pub fn is_legalese(word: &str) -> bool {
 }
 
 /// Get the number of legalese tokens in the dictionary.
-#[allow(dead_code)]
 pub fn legalese_count() -> usize {
     LEGALESE.len()
 }

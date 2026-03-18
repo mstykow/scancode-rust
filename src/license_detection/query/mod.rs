@@ -27,22 +27,12 @@ impl PositionSpan {
 
     /// Check if this span contains a position.
     pub fn contains(&self, pos: usize) -> bool {
-        pos >= self.start && pos <= self.end
+        self.start <= pos && pos <= self.end
     }
 
     /// Get all positions in this span as a HashSet.
     pub fn positions(&self) -> HashSet<usize> {
         (self.start..=self.end).collect()
-    }
-
-    /// Subtract another span from this span.
-    ///
-    /// Returns positions in self that are not in other.
-    pub fn difference(&self, other: &PositionSpan) -> HashSet<usize> {
-        self.positions()
-            .difference(&other.positions())
-            .copied()
-            .collect()
     }
 }
 
@@ -115,11 +105,6 @@ pub struct Query<'a> {
     /// Corresponds to Python: `self.low_matchables` (line 294)
     pub low_matchables: HashSet<usize>,
 
-    /// True if the query contains very long lines (e.g., minified JS/CSS)
-    ///
-    /// Corresponds to Python: `self.has_long_lines = False` (line 222)
-    pub has_long_lines: bool,
-
     /// True if the query is detected as binary content
     ///
     /// Corresponds to Python: `self.is_binary = False` (line 225)
@@ -182,10 +167,6 @@ impl<'a> Query<'a> {
     const BINARY_LINE_THRESHOLD: usize = 50;
     const MAX_TOKEN_PER_LINE: usize = 25;
 
-    pub fn new(text: &str, index: &'a LicenseIndex) -> Result<Self, anyhow::Error> {
-        Self::with_options(text, index, Self::TEXT_LINE_THRESHOLD)
-    }
-
     pub fn from_extracted_text(
         text: &str,
         index: &'a LicenseIndex,
@@ -208,25 +189,6 @@ impl<'a> Query<'a> {
             .iter()
             .map(|&(start, end)| QueryRun::new(self, start, end))
             .collect()
-    }
-
-    /// Create a new query with custom line threshold.
-    ///
-    /// # Arguments
-    /// * `text` - The input text to tokenize
-    /// * `index` - The license index containing the token dictionary
-    /// * `line_threshold` - Number of empty/junk lines to break a new run (default 4)
-    ///
-    /// # Returns
-    /// A Result containing the Query or an error if binary detection fails
-    ///
-    /// Corresponds to Python: `Query.__init__()` with line_threshold parameter
-    pub fn with_options(
-        text: &str,
-        index: &'a LicenseIndex,
-        line_threshold: usize,
-    ) -> Result<Self, anyhow::Error> {
-        Self::with_source_options(text, index, line_threshold, None)
     }
 
     fn with_source_options(
@@ -349,14 +311,14 @@ impl<'a> Query<'a> {
                 None
             };
 
-            if let Some(offset) = spdx_start_offset {
-                if let Some(line_first_known_pos) = line_first_known_pos {
-                    let spdx_start_known_pos = line_first_known_pos + offset;
-                    if spdx_start_known_pos <= line_last_known_pos {
-                        let spdx_start = spdx_start_known_pos as usize;
-                        let spdx_end = (line_last_known_pos + 1) as usize;
-                        spdx_lines.push((line_trimmed.to_string(), spdx_start, spdx_end));
-                    }
+            if let Some(offset) = spdx_start_offset
+                && let Some(line_first_known_pos) = line_first_known_pos
+            {
+                let spdx_start_known_pos = line_first_known_pos + offset;
+                if spdx_start_known_pos <= line_last_known_pos {
+                    let spdx_start = spdx_start_known_pos as usize;
+                    let spdx_end = (line_last_known_pos + 1) as usize;
+                    spdx_lines.push((line_trimmed.to_string(), spdx_start, spdx_end));
                 }
             }
 
@@ -396,7 +358,6 @@ impl<'a> Query<'a> {
             shorts_and_digits_pos,
             high_matchables,
             low_matchables,
-            has_long_lines,
             is_binary,
             query_run_ranges: query_runs,
             spdx_lines,
@@ -513,15 +474,13 @@ impl<'a> Query<'a> {
             let mut line_has_known_tokens = false;
             let mut line_has_good_tokens = false;
 
-            for token_id in line_tokens {
-                if let Some(tid) = token_id {
-                    line_has_known_tokens = true;
-                    if (tid as usize) < len_legalese {
-                        line_has_good_tokens = true;
-                    }
-                    query_run_end = Some(pos);
-                    pos += 1;
+            for tid in line_tokens.into_iter().flatten() {
+                line_has_known_tokens = true;
+                if (tid as usize) < len_legalese {
+                    line_has_good_tokens = true;
                 }
+                query_run_end = Some(pos);
+                pos += 1;
             }
 
             if line_is_all_digit || !line_has_known_tokens {
@@ -550,58 +509,6 @@ impl<'a> Query<'a> {
 
     /// Get the length of the query in tokens.
     ///
-    /// # Arguments
-    /// * `with_unknown` - If true, include unknown tokens in the count
-    ///
-    /// # Returns
-    /// The number of tokens
-    ///
-    /// Corresponds to Python: `tokens_length()` method (lines 296-304)
-    pub fn tokens_length(&self, with_unknown: bool) -> usize {
-        let length = self.tokens.len();
-        if with_unknown {
-            length + self.unknowns_by_pos.values().sum::<usize>()
-        } else {
-            length
-        }
-    }
-
-    /// Check if a token position has a short or digit-only token.
-    ///
-    /// # Arguments
-    /// * `pos` - The token position
-    ///
-    /// # Returns
-    /// true if the position has a short or digit-only token
-    #[inline]
-    pub fn is_short_or_digit(&self, pos: usize) -> bool {
-        self.shorts_and_digits_pos.contains(&pos)
-    }
-
-    /// Get the number of unknown tokens after a given position.
-    ///
-    /// # Arguments
-    /// * `pos` - The token position (None for before first token)
-    ///
-    /// # Returns
-    /// The count of unknown tokens
-    #[inline]
-    pub fn unknown_count_after(&self, pos: Option<i32>) -> usize {
-        self.unknowns_by_pos.get(&pos).copied().unwrap_or(0)
-    }
-
-    /// Get the number of stopwords after a given position.
-    ///
-    /// # Arguments
-    /// * `pos` - The token position (None for before first token)
-    ///
-    /// # Returns
-    /// The count of stopwords
-    #[inline]
-    pub fn stopword_count_after(&self, pos: Option<i32>) -> usize {
-        self.stopwords_by_pos.get(&pos).copied().unwrap_or(0)
-    }
-
     /// Get the line number for a token position.
     ///
     /// # Arguments
@@ -614,123 +521,17 @@ impl<'a> Query<'a> {
         self.line_by_pos.get(pos).copied()
     }
 
-    /// Get the token ID at a position.
-    ///
-    /// # Arguments
-    /// * `pos` - The token position
-    ///
-    /// # Returns
-    /// The token ID if position is valid
-    #[inline]
-    pub fn token_at(&self, pos: usize) -> Option<u16> {
-        self.tokens.get(pos).copied()
-    }
-
     /// Check if the query is empty (no known tokens).
     #[inline]
     pub fn is_empty(&self) -> bool {
         self.tokens.is_empty()
     }
 
-    /// Get the number of known tokens.
-    #[inline]
-    pub fn len(&self) -> usize {
-        self.tokens.len()
-    }
     /// Get a query run covering the entire query.
     ///
     /// Corresponds to Python: `whole_query_run()` method (lines 306-317)
     pub fn whole_query_run(&self) -> QueryRun<'a> {
         QueryRun::whole_query_snapshot(self)
-    }
-
-    /// Get all matchable token positions.
-    ///
-    /// Corresponds to Python: `matchables` property (lines 336-341)
-    pub fn matchables(&self) -> HashSet<usize> {
-        self.low_matchables
-            .union(&self.high_matchables)
-            .copied()
-            .collect()
-    }
-
-    /// Get matched token positions (tokens that are not matchable).
-    ///
-    /// Corresponds to Python: `matched` property (lines 343-350)
-    pub fn matched(&self) -> HashSet<usize> {
-        let all_positions: HashSet<usize> = (0..self.tokens.len()).collect();
-        all_positions
-            .difference(&self.matchables())
-            .copied()
-            .collect()
-    }
-
-    /// Check if a position is a high-value legalese token.
-    ///
-    /// # Arguments
-    /// * `pos` - The token position to check
-    #[inline]
-    pub fn is_high_matchable(&self, pos: usize) -> bool {
-        self.high_matchables.contains(&pos)
-    }
-
-    /// Check if a position is a low-value token.
-    ///
-    /// # Arguments
-    /// * `pos` - The token position to check
-    #[inline]
-    pub fn is_low_matchable(&self, pos: usize) -> bool {
-        self.low_matchables.contains(&pos)
-    }
-
-    /// Get high-value matchable positions within a range.
-    ///
-    /// # Arguments
-    /// * `start` - Start position (inclusive)
-    /// * `end` - End position (inclusive, or None for unbounded)
-    ///
-    /// Corresponds to Python: `high_matchables` property in QueryRun (lines 851-861)
-    pub fn high_matchables(&self, start: &usize, end: &Option<usize>) -> Option<HashSet<usize>> {
-        if *start >= self.tokens.len() {
-            return None;
-        }
-
-        let end_pos = end
-            .unwrap_or(self.tokens.len() - 1)
-            .min(self.tokens.len() - 1);
-
-        Some(
-            self.high_matchables
-                .iter()
-                .filter(|&&pos| pos >= *start && pos <= end_pos)
-                .copied()
-                .collect(),
-        )
-    }
-
-    /// Get low-value matchable positions within a range.
-    ///
-    /// # Arguments
-    /// * `start` - Start position (inclusive)
-    /// * `end` - End position (inclusive, or None for unbounded)
-    ///
-    /// Corresponds to Python: `low_matchables` property in QueryRun (lines 839-849)
-    pub fn low_matchables(&self, start: &usize, end: &Option<usize>) -> Option<HashSet<usize>> {
-        if *start >= self.tokens.len() {
-            return None;
-        }
-
-        let end_pos = end
-            .unwrap_or(self.tokens.len() - 1)
-            .min(self.tokens.len() - 1);
-
-        Some(
-            self.low_matchables
-                .iter()
-                .filter(|&&pos| pos >= *start && pos <= end_pos)
-                .copied()
-                .collect(),
-        )
     }
 
     /// Subtract matched span positions from matchables.
@@ -910,27 +711,6 @@ impl<'a> QueryRun<'a> {
         }
     }
 
-    /// Get the underlying query reference.
-    pub fn query(&self) -> &Query<'a> {
-        self.query
-            .expect("snapshot-backed whole query run does not expose a live parent query")
-    }
-
-    /// Get the start line number of this query run.
-    ///
-    /// Corresponds to Python: `start_line` property (lines 771-773)
-    pub fn start_line(&self) -> Option<usize> {
-        self.source_line_by_pos().get(self.start).copied()
-    }
-
-    /// Get the end line number of this query run.
-    ///
-    /// Corresponds to Python: `end_line` property (lines 775-777)
-    pub fn end_line(&self) -> Option<usize> {
-        self.end
-            .and_then(|e| self.source_line_by_pos().get(e).copied())
-    }
-
     /// Get the line number for a specific token position.
     ///
     /// # Arguments
@@ -1054,9 +834,10 @@ impl<'a> QueryRun<'a> {
     ///
     /// Corresponds to Python: `high_matchables` property (lines 851-861)
     pub fn high_matchables(&self) -> HashSet<usize> {
+        let live_span = PositionSpan::new(self.start, self.end.unwrap_or(usize::MAX));
         self.source_high_matchables()
             .iter()
-            .filter(|&&pos| pos >= self.start && pos <= self.end.unwrap_or(usize::MAX))
+            .filter(|&&pos| live_span.contains(pos))
             .copied()
             .collect()
     }
@@ -1067,9 +848,10 @@ impl<'a> QueryRun<'a> {
     ///
     /// Corresponds to Python: `low_matchables` property (lines 839-849)
     pub fn low_matchables(&self) -> HashSet<usize> {
+        let live_span = PositionSpan::new(self.start, self.end.unwrap_or(usize::MAX));
         self.source_low_matchables()
             .iter()
-            .filter(|&&pos| pos >= self.start && pos <= self.end.unwrap_or(usize::MAX))
+            .filter(|&&pos| live_span.contains(pos))
             .copied()
             .collect()
     }

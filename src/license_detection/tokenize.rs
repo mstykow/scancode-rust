@@ -110,7 +110,6 @@ pub(crate) static STOPWORDS: Lazy<HashSet<&'static str>> = Lazy::new(|| {
 ///
 /// This matches word-like sequences while preserving trailing `+` characters.
 /// Uses Unicode-aware matching to match Python's `re.UNICODE` behavior.
-#[allow(dead_code)]
 static QUERY_PATTERN: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"[^_\W]+\+?[^_\W]*").expect("Invalid regex pattern"));
 
@@ -128,7 +127,6 @@ static QUERY_PATTERN: Lazy<Regex> =
 /// let tokens = tokenize("Hello World!");
 /// assert_eq!(tokens, vec!["hello", "world"]);
 /// ```
-#[allow(dead_code)]
 pub fn tokenize(text: &str) -> Vec<String> {
     if text.is_empty() {
         return Vec::new();
@@ -162,7 +160,6 @@ pub fn tokenize(text: &str) -> Vec<String> {
 /// let tokens = tokenize_without_stopwords("Hello World div");
 /// assert_eq!(tokens, vec!["hello", "world", "div"]);
 /// ```
-#[allow(dead_code)]
 pub fn tokenize_without_stopwords(text: &str) -> Vec<String> {
     if text.is_empty() {
         return Vec::new();
@@ -181,21 +178,6 @@ pub fn tokenize_without_stopwords(text: &str) -> Vec<String> {
     }
 
     tokens
-}
-
-/// Normalizes text before tokenization.
-///
-/// Currently a passthrough as the Python implementation doesn't do
-/// special normalization beyond lowercasing in the tokenizer.
-///
-/// # Arguments
-/// * `text` - The input text
-///
-/// # Returns
-/// Normalized text
-#[allow(dead_code)]
-pub fn normalize_text(text: &str) -> String {
-    text.to_string()
 }
 
 /// Parse {{...}} required phrase markers from rule text.
@@ -456,16 +438,8 @@ mod tests {
         let result = tokenize("{{Hi}}some {{}}Text with{{noth+-_!@ing}}   {{junk}}spAces!");
         assert_eq!(
             result,
-            vec![
-                "hi", "some", "text", "with", "noth+", "ing", "junk", "spaces"
-            ]
+            vec!["hi", "some", "text", "with", "noth+", "ing", "junk", "spaces"]
         );
-    }
-
-    #[test]
-    fn test_normalize_text_passthrough() {
-        let result = normalize_text("Hello   World");
-        assert_eq!(result, "Hello   World");
     }
 
     #[test]
