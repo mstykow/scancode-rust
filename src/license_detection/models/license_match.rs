@@ -232,7 +232,7 @@ impl LicenseMatch {
         false
     }
 
-    pub fn len(&self) -> usize {
+    pub(crate) fn len(&self) -> usize {
         if let Some(positions) = &self.qspan_positions {
             positions.len()
         } else if let Some(positions) = &self.matched_token_positions {
@@ -240,10 +240,6 @@ impl LicenseMatch {
         } else {
             self.end_token.saturating_sub(self.start_token)
         }
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
     }
 
     fn qregion_len(&self) -> usize {
@@ -478,11 +474,6 @@ impl LicenseMatch {
                 }
             }
         }
-    }
-
-    #[allow(dead_code)]
-    pub fn has_gaps(&self) -> bool {
-        self.qspan_positions.is_some() || self.ispan_positions.is_some()
     }
 
     pub fn qdistance_to(&self, other: &LicenseMatch) -> usize {
