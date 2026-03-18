@@ -110,6 +110,10 @@ pub enum DatasourceId {
     CondaMetaJson,
     CondaMetaYaml,
 
+    // ── Clojure ──
+    ClojureDepsEdn,
+    ClojureProjectClj,
+
     // ── CPAN/Perl ──
     CpanDistIni,
     /// Matches Python reference value.
@@ -376,6 +380,10 @@ impl DatasourceId {
             Self::CondaYaml => "conda_yaml",
             Self::CondaMetaJson => "conda_meta_json",
             Self::CondaMetaYaml => "conda_meta_yaml",
+
+            // Clojure
+            Self::ClojureDepsEdn => "clojure_deps_edn",
+            Self::ClojureProjectClj => "clojure_project_clj",
 
             // CPAN/Perl
             Self::CpanDistIni => "cpan_dist_ini",

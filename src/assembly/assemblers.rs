@@ -592,6 +592,8 @@ pub static UNASSEMBLED_DATASOURCE_IDS: &[DatasourceId] = &[
     DatasourceId::ArchPkginfo,
     DatasourceId::ArchSrcinfo,
     DatasourceId::Axis2ModuleXml,
+    DatasourceId::ClojureDepsEdn,
+    DatasourceId::ClojureProjectClj,
     DatasourceId::DebianControlExtractedDeb,
     DatasourceId::DebianInstalledFilesList,
     DatasourceId::DebianInstalledMd5Sums,
