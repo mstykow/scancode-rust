@@ -978,6 +978,108 @@ mod tests {
     }
 
     #[test]
+    fn test_directory_packages_props_extracts_imported_parent_metadata_and_property_backed_versions()
+     {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let root_props = temp_dir.path().join("Directory.Packages.props");
+        std::fs::write(
+            &root_props,
+            r#"<Project>
+  <PropertyGroup>
+    <ManageVersions>true</ManageVersions>
+    <NewtonsoftJsonVersion>13.0.3</NewtonsoftJsonVersion>
+  </PropertyGroup>
+</Project>"#,
+        )
+        .unwrap();
+
+        let child_dir = temp_dir.path().join("src");
+        std::fs::create_dir_all(&child_dir).unwrap();
+        let child_props = child_dir.join("Directory.Packages.props");
+        std::fs::write(
+            &child_props,
+            r#"<Project>
+  <Import Project="$([MSBuild]::GetPathOfFileAbove(Directory.Packages.props, $(MSBuildThisFileDirectory)..))" />
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>$(ManageVersions)</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageVersion Include="Newtonsoft.Json" Version="$(NewtonsoftJsonVersion)" />
+  </ItemGroup>
+</Project>"#,
+        )
+        .unwrap();
+
+        let package_data = CentralPackageManagementPropsParser::extract_first_package(&child_props);
+        assert_eq!(package_data.dependencies.len(), 1);
+        assert_eq!(
+            package_data.dependencies[0]
+                .extracted_requirement
+                .as_deref(),
+            Some("13.0.3")
+        );
+        let package_extra = package_data.extra_data.as_ref().unwrap();
+        assert_eq!(
+            package_extra
+                .get("manage_package_versions_centrally")
+                .and_then(|v| v.as_bool()),
+            Some(true)
+        );
+        assert_eq!(
+            package_extra
+                .get("import_projects")
+                .and_then(|v| v.as_array())
+                .and_then(|v| v.first())
+                .and_then(|v| v.as_str()),
+            Some(
+                "$([MSBuild]::GetPathOfFileAbove(Directory.Packages.props, $(MSBuildThisFileDirectory)..))"
+            )
+        );
+    }
+
+    #[test]
+    fn test_directory_packages_props_ignores_non_cpm_import_targets() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let build_props = temp_dir.path().join("Directory.Build.props");
+        std::fs::write(
+            &build_props,
+            r#"<Project>
+  <PropertyGroup>
+    <NewtonsoftJsonVersion>13.0.3</NewtonsoftJsonVersion>
+  </PropertyGroup>
+</Project>"#,
+        )
+        .unwrap();
+
+        let child_dir = temp_dir.path().join("src");
+        std::fs::create_dir_all(&child_dir).unwrap();
+        let child_props = child_dir.join("Directory.Packages.props");
+        std::fs::write(
+            &child_props,
+            r#"<Project>
+  <Import Project="../Directory.Build.props" />
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageVersion Include="Newtonsoft.Json" Version="$(NewtonsoftJsonVersion)" />
+  </ItemGroup>
+</Project>"#,
+        )
+        .unwrap();
+
+        let package_data = CentralPackageManagementPropsParser::extract_first_package(&child_props);
+        assert_eq!(package_data.dependencies.len(), 0);
+        assert!(
+            package_data
+                .extra_data
+                .as_ref()
+                .and_then(|data| data.get("import_projects"))
+                .is_none()
+        );
+    }
+
+    #[test]
     fn test_csproj_versionless_package_reference_remains_unresolved_in_this_slice() {
         let xml = r#"<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
@@ -1050,6 +1152,45 @@ mod tests {
             Some("2.12.0")
         );
         assert!(package_data.dependencies[1].extracted_requirement.is_none());
+    }
+
+    #[test]
+    fn test_csproj_package_reference_preserves_property_backed_version_override_metadata() {
+        let xml = r#"<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <CentralOverridesEnabled>true</CentralOverridesEnabled>
+    <NewtonsoftJsonVersion>13.0.3</NewtonsoftJsonVersion>
+    <CentralPackageVersionOverrideEnabled>$(CentralOverridesEnabled)</CentralPackageVersionOverrideEnabled>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" VersionOverride="$(NewtonsoftJsonVersion)" />
+  </ItemGroup>
+</Project>"#;
+
+        let mut temp_file = Builder::new().suffix(".csproj").tempfile().unwrap();
+        temp_file.write_all(xml.as_bytes()).unwrap();
+
+        let package_data = PackageReferenceProjectParser::extract_first_package(temp_file.path());
+        let dep_extra = package_data.dependencies[0].extra_data.as_ref().unwrap();
+        assert_eq!(
+            dep_extra
+                .get("version_override")
+                .and_then(|value| value.as_str()),
+            Some("$(NewtonsoftJsonVersion)")
+        );
+        assert_eq!(
+            dep_extra
+                .get("version_override_resolved")
+                .and_then(|value| value.as_str()),
+            Some("13.0.3")
+        );
+        let package_extra = package_data.extra_data.as_ref().unwrap();
+        assert_eq!(
+            package_extra
+                .get("central_package_version_override_enabled")
+                .and_then(|value| value.as_bool()),
+            Some(true)
+        );
     }
 
     #[test]
