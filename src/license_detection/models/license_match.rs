@@ -2,9 +2,77 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
+use std::fmt;
+use std::str::FromStr;
 
 fn default_rule_length() -> usize {
     0
+}
+
+/// Internal matcher kind used to create a license match.
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Default, Serialize, Deserialize,
+)]
+pub enum MatcherKind {
+    #[serde(rename = "1-hash")]
+    #[default]
+    Hash,
+    #[serde(rename = "1-spdx-id", alias = "3-spdx")]
+    SpdxId,
+    #[serde(rename = "2-aho")]
+    Aho,
+    #[serde(rename = "3-seq", alias = "4-seq")]
+    Seq,
+    #[serde(rename = "5-undetected", alias = "undetected")]
+    Undetected,
+    #[serde(rename = "6-unknown")]
+    Unknown,
+}
+
+impl MatcherKind {
+    pub const fn precedence(self) -> u8 {
+        match self {
+            Self::Hash => 0,
+            Self::Aho => 1,
+            Self::SpdxId => 2,
+            Self::Seq => 3,
+            Self::Undetected => 4,
+            Self::Unknown => 6,
+        }
+    }
+
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Hash => "1-hash",
+            Self::SpdxId => "1-spdx-id",
+            Self::Aho => "2-aho",
+            Self::Seq => "3-seq",
+            Self::Undetected => "5-undetected",
+            Self::Unknown => "6-unknown",
+        }
+    }
+}
+
+impl fmt::Display for MatcherKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+impl FromStr for MatcherKind {
+    type Err = &'static str;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "1-hash" => Ok(Self::Hash),
+            "1-spdx-id" | "3-spdx" => Ok(Self::SpdxId),
+            "2-aho" => Ok(Self::Aho),
+            "3-seq" | "4-seq" => Ok(Self::Seq),
+            "5-undetected" | "undetected" => Ok(Self::Undetected),
+            "6-unknown" => Ok(Self::Unknown),
+            _ => Err("unknown matcher kind"),
+        }
+    }
 }
 
 /// License match result from a matching strategy.
@@ -40,8 +108,8 @@ pub struct LicenseMatch {
     #[serde(default)]
     pub end_token: usize,
 
-    /// Name of the matching strategy used
-    pub matcher: String,
+    /// Matching strategy used to create this match.
+    pub matcher: MatcherKind,
 
     /// Match score 0.0-1.0
     pub score: f32,
@@ -163,7 +231,7 @@ impl Default for LicenseMatch {
             end_line: 0,
             start_token: 0,
             end_token: 0,
-            matcher: String::new(),
+            matcher: MatcherKind::default(),
             score: 0.0,
             matched_length: 0,
             rule_length: 0,
@@ -193,16 +261,7 @@ impl Default for LicenseMatch {
 
 impl LicenseMatch {
     pub fn matcher_order(&self) -> u8 {
-        match self.matcher.as_str() {
-            "1-hash" => 0,
-            "1-spdx-id" => 2,
-            "2-aho" => 1,
-            "3-seq" => 3,
-            "3-spdx" => 3,
-            "4-seq" => 4,
-            "6-unknown" => 6,
-            _ => 9,
-        }
+        self.matcher.precedence()
     }
 
     pub fn hilen(&self) -> usize {

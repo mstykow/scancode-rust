@@ -34,6 +34,7 @@ use crate::license_detection::spdx_mapping::{SpdxMapping, build_spdx_mapping};
 use crate::utils::text::strip_utf8_bom_str;
 
 use crate::license_detection::detection::populate_detection_from_group_with_spdx;
+use crate::license_detection::models::MatcherKind;
 
 pub use detection::{
     LicenseDetection, create_detection_from_group, group_matches_by_region,
@@ -83,14 +84,14 @@ fn is_redundant_same_expression_seq_container(
 ) -> bool {
     let container_is_redundant_coverage =
         has_full_match_coverage(container) || container.match_coverage >= 99.0;
-    if container.matcher != seq_match::MATCH_SEQ || !container_is_redundant_coverage {
+    if container.matcher != MatcherKind::Seq || !container_is_redundant_coverage {
         return false;
     }
 
     let mut contained: Vec<&LicenseMatch> = candidate_contained_matches
         .iter()
         .filter(|m| {
-            m.matcher == aho_match::MATCH_AHO
+            m.matcher == MatcherKind::Aho
                 && has_full_match_coverage(m)
                 && m.license_expression == container.license_expression
                 && (container.qcontains(m) || container.qoverlap(m) > 0)

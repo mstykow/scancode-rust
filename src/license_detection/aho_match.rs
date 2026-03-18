@@ -10,20 +10,10 @@
 use std::collections::HashSet;
 
 use crate::license_detection::index::LicenseIndex;
-use crate::license_detection::models::LicenseMatch;
+use crate::license_detection::models::{LicenseMatch, MatcherKind};
 use crate::license_detection::query::QueryRun;
 
-/// Matcher identifier for Aho-Corasick exact matching.
-///
-/// Corresponds to Python: `MATCH_AHO_EXACT = '2-aho'` (line 78)
-pub const MATCH_AHO: &str = "2-aho";
-
-/// Matcher order for Aho-Corasick exact matching.
-///
-/// Aho-Corasick matching runs after hash matching.
-///
-/// Corresponds to Python: `MATCH_AHO_EXACT_ORDER = 1` (line 79)
-pub const MATCH_AHO_ORDER: u8 = 1;
+pub const MATCH_AHO: MatcherKind = MatcherKind::Aho;
 
 /// Encode u16 token sequence as bytes.
 ///
@@ -189,7 +179,7 @@ pub fn aho_match_with_extra_matchables(
             end_line,
             start_token: qstart,
             end_token: qend,
-            matcher: MATCH_AHO.to_string(),
+            matcher: MATCH_AHO,
             score,
             matched_length,
             rule_length,
@@ -633,8 +623,8 @@ mod tests {
 
     #[test]
     fn test_constants() {
-        assert_eq!(MATCH_AHO, "2-aho");
-        assert_eq!(MATCH_AHO_ORDER, 1);
+        assert_eq!(MATCH_AHO.as_str(), "2-aho");
+        assert_eq!(MATCH_AHO.precedence(), 1);
     }
 
     #[test]

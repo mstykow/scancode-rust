@@ -6,21 +6,11 @@
 use sha1::{Digest, Sha1};
 
 use crate::license_detection::index::LicenseIndex;
-use crate::license_detection::models::LicenseMatch;
+use crate::license_detection::models::{LicenseMatch, MatcherKind};
 use crate::license_detection::query::QueryRun;
 use crate::license_detection::spans::Span;
 
-/// Matcher identifier for hash-based matching.
-///
-/// Corresponds to Python: `MATCH_HASH = '1-hash'` (line 40)
-pub const MATCH_HASH: &str = "1-hash";
-
-/// Matcher order for hash-based matching.
-///
-/// Hash matching is the fastest and has highest priority (0).
-///
-/// Corresponds to Python: `MATCH_HASH_ORDER = 0` (line 41)
-pub const MATCH_HASH_ORDER: u8 = 0;
+pub const MATCH_HASH: MatcherKind = MatcherKind::Hash;
 
 /// Compute a SHA1 hash of a token sequence.
 ///
@@ -43,15 +33,6 @@ pub fn compute_hash(tokens: &[u16]) -> [u8; 20] {
     }
 
     hasher.finalize().into()
-}
-
-/// Compute a hash of a rule's token sequence.
-///
-/// This is an alias for `compute_hash` to match the Python API.
-///
-/// Corresponds to Python: `index_hash()` (lines 52-56)
-pub fn index_hash(rule_tokens: &[u16]) -> [u8; 20] {
-    compute_hash(rule_tokens)
 }
 
 /// Perform hash-based matching for a query run.
@@ -107,7 +88,7 @@ pub fn hash_match(index: &LicenseIndex, query_run: &QueryRun) -> Vec<LicenseMatc
             end_line,
             start_token: query_run.start,
             end_token: query_run.end.map_or(query_run.start, |e| e + 1),
-            matcher: MATCH_HASH.to_string(),
+            matcher: MATCH_HASH,
             score: 1.0,
             matched_length,
             rule_length,
@@ -274,9 +255,12 @@ mod tests {
     fn test_index_hash() {
         let rule_tokens = vec![10u16, 20, 30];
         let hash1 = compute_hash(&rule_tokens);
-        let hash2 = index_hash(&rule_tokens);
+        let hash2 = compute_hash(&rule_tokens);
 
-        assert_eq!(hash1, hash2, "index_hash should be same as compute_hash");
+        assert_eq!(
+            hash1, hash2,
+            "compute_hash should be stable for rule tokens"
+        );
     }
 
     #[test]

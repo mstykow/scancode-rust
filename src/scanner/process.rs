@@ -662,14 +662,14 @@ fn convert_detection_to_model(
     let matches: Vec<Match> = detection
         .matches
         .into_iter()
-        .map(|m| Match {
-            license_expression: m.license_expression,
-            license_expression_spdx: m.license_expression_spdx,
-            from_file: m.from_file,
-            start_line: m.start_line,
-            end_line: m.end_line,
-            matcher: Some(m.matcher),
-            score: m.score as f64,
+            .map(|m| Match {
+                license_expression: m.license_expression,
+                license_expression_spdx: m.license_expression_spdx,
+                from_file: m.from_file,
+                start_line: m.start_line,
+                end_line: m.end_line,
+                matcher: Some(m.matcher.to_string()),
+                score: m.score as f64,
             matched_length: Some(m.matched_length),
             match_coverage: Some(m.match_coverage as f64),
             rule_relevance: Some(m.rule_relevance as usize),

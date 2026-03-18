@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests {
     use crate::license_detection::index::LicenseIndex;
-    use crate::license_detection::models::{License, LicenseMatch, Rule};
+    use crate::license_detection::models::{License, LicenseMatch, MatcherKind, Rule};
     use std::collections::HashMap;
 
     fn create_test_index() -> LicenseIndex {
@@ -85,7 +85,7 @@ mod tests {
             end_line: 5,
             start_token: 0,
             end_token: 100,
-            matcher: "1-hash".to_string(),
+            matcher: crate::license_detection::models::MatcherKind::Hash,
             score: 0.95,
             matched_length: 100,
             rule_length: 100,
@@ -489,7 +489,7 @@ mod tests {
         assert_eq!(match_result.from_file, Some("README.md".to_string()));
         assert_eq!(match_result.start_line, 1);
         assert_eq!(match_result.end_line, 5);
-        assert_eq!(match_result.matcher, "1-hash");
+        assert_eq!(match_result.matcher, MatcherKind::Hash);
         assert!((match_result.score - 0.95).abs() < 0.001);
     }
 
@@ -504,7 +504,7 @@ mod tests {
             end_line: 0,
             start_token: 0,
             end_token: 0,
-            matcher: String::new(),
+            matcher: MatcherKind::Hash,
             score: 0.0,
             matched_length: 0,
             rule_length: 0,
@@ -610,7 +610,7 @@ mod tests {
             "from_file": "LICENSE",
             "start_line": 10,
             "end_line": 20,
-            "matcher": "2-hash",
+            "matcher": "1-hash",
             "score": 0.99,
             "matched_length": 500,
             "match_coverage": 99.0,
@@ -655,7 +655,7 @@ mod tests {
             end_line: 5,
             start_token: 0,
             end_token: 100,
-            matcher: "1-hash".to_string(),
+            matcher: crate::license_detection::models::MatcherKind::Hash,
             score: 0.95,
             matched_length: 100,
             rule_length: 100,
@@ -696,36 +696,29 @@ mod tests {
     #[test]
     fn test_matcher_order_aho() {
         let mut match_result = create_license_match();
-        match_result.matcher = "2-aho".to_string();
+        match_result.matcher = MatcherKind::Aho;
         assert_eq!(match_result.matcher_order(), 1);
     }
 
     #[test]
     fn test_matcher_order_spdx() {
         let mut match_result = create_license_match();
-        match_result.matcher = "3-spdx".to_string();
-        assert_eq!(match_result.matcher_order(), 3);
+        match_result.matcher = MatcherKind::SpdxId;
+        assert_eq!(match_result.matcher_order(), 2);
     }
 
     #[test]
     fn test_matcher_order_seq() {
         let mut match_result = create_license_match();
-        match_result.matcher = "4-seq".to_string();
-        assert_eq!(match_result.matcher_order(), 4);
+        match_result.matcher = MatcherKind::Seq;
+        assert_eq!(match_result.matcher_order(), 3);
     }
 
     #[test]
     fn test_matcher_order_unknown() {
         let mut match_result = create_license_match();
-        match_result.matcher = "6-unknown".to_string();
+        match_result.matcher = MatcherKind::Unknown;
         assert_eq!(match_result.matcher_order(), 6);
-    }
-
-    #[test]
-    fn test_matcher_order_invalid() {
-        let mut match_result = create_license_match();
-        match_result.matcher = "invalid".to_string();
-        assert_eq!(match_result.matcher_order(), 9);
     }
 
     #[test]

@@ -114,9 +114,14 @@ pub(super) fn is_correct_detection(matches: &[LicenseMatch]) -> bool {
         return false;
     }
 
-    let all_valid_matchers = matches
-        .iter()
-        .all(|m| m.matcher == "1-hash" || m.matcher == "1-spdx-id" || m.matcher == "2-aho");
+    let all_valid_matchers = matches.iter().all(|m| {
+        matches!(
+            m.matcher,
+            crate::license_detection::models::MatcherKind::Hash
+                | crate::license_detection::models::MatcherKind::SpdxId
+                | crate::license_detection::models::MatcherKind::Aho
+        )
+    });
 
     let all_perfect_coverage = matches.iter().all(|m| m.match_coverage >= 100.0 - 0.01);
 
@@ -143,7 +148,7 @@ mod tests {
             end_line,
             start_token: 0,
             end_token: 0,
-            matcher: matcher.to_string(),
+            matcher: matcher.parse().expect("invalid test matcher"),
             score: 95.0,
             matched_length: 100,
             match_coverage: 95.0,
@@ -185,7 +190,7 @@ mod tests {
             end_line,
             start_token,
             end_token,
-            matcher: "1-hash".to_string(),
+            matcher: crate::license_detection::models::MatcherKind::Hash,
             score: 95.0,
             matched_length: 100,
             match_coverage: 95.0,
@@ -398,7 +403,7 @@ mod tests {
 
     #[test]
     fn test_is_correct_detection_unknown_matcher() {
-        let mut m = create_test_match(1, 5, "unknown", "mit.LICENSE");
+        let mut m = create_test_match(1, 5, "6-unknown", "mit.LICENSE");
         m.match_coverage = 100.0;
         let matches = vec![m];
         assert!(!is_correct_detection(&matches));

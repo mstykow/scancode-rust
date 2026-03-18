@@ -351,7 +351,7 @@ mod tests {
             end_line,
             start_token: 0,
             end_token: 0,
-            matcher: matcher.to_string(),
+            matcher: matcher.parse().expect("invalid test matcher"),
             score: 95.0,
             matched_length: 100,
             match_coverage: 95.0,

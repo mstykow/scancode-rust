@@ -5,7 +5,7 @@ pub mod license_match;
 pub mod rule;
 
 pub use license::License;
-pub use license_match::LicenseMatch;
+pub use license_match::{LicenseMatch, MatcherKind};
 pub use rule::Rule;
 
 #[cfg(test)]

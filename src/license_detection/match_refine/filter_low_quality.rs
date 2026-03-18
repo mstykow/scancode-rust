@@ -6,9 +6,8 @@
 use std::collections::HashSet;
 
 use crate::license_detection::index::LicenseIndex;
-use crate::license_detection::models::LicenseMatch;
+use crate::license_detection::models::{LicenseMatch, MatcherKind};
 use crate::license_detection::query::Query;
-use crate::license_detection::unknown_match::MATCH_UNKNOWN;
 
 /// Filter spurious matches with low density.
 ///
@@ -24,7 +23,8 @@ pub(crate) fn filter_spurious_matches(
     matches
         .iter()
         .filter(|m| {
-            let is_seq_or_unknown = m.matcher == "3-seq" || m.matcher == MATCH_UNKNOWN;
+            let is_seq_or_unknown =
+                m.matcher == MatcherKind::Seq || m.matcher == MatcherKind::Unknown;
             if !is_seq_or_unknown {
                 return true;
             }
@@ -73,7 +73,7 @@ pub(crate) fn filter_below_rule_minimum_coverage(
     matches
         .iter()
         .filter(|m| {
-            if m.matcher != "3-seq" {
+            if m.matcher != MatcherKind::Seq {
                 return true;
             }
 
@@ -343,7 +343,7 @@ pub(crate) fn filter_matches_to_spurious_single_token(
     matches
         .iter()
         .filter(|m| {
-            if m.matcher != "3-seq" {
+            if m.matcher != MatcherKind::Seq {
                 return true;
             }
             if m.len() != 1 {
@@ -521,7 +521,7 @@ pub(crate) fn filter_too_short_matches(
     matches
         .iter()
         .filter(|m| {
-            if m.matcher != "3-seq" {
+            if m.matcher != MatcherKind::Seq {
                 return true;
             }
 
@@ -544,6 +544,7 @@ pub(crate) fn filter_too_short_matches(
 mod tests {
     use super::*;
     use crate::license_detection::models::Rule;
+    use crate::license_detection::unknown_match::MATCH_UNKNOWN;
 
     fn parse_rule_id(rule_identifier: &str) -> Option<usize> {
         let trimmed = rule_identifier.trim();
@@ -574,7 +575,7 @@ mod tests {
             end_line,
             start_token: start_line,
             end_token: end_line + 1,
-            matcher: "2-aho".to_string(),
+            matcher: crate::license_detection::models::MatcherKind::Aho,
             score,
             matched_length: matched_len,
             rule_length: rule_len,
@@ -617,7 +618,7 @@ mod tests {
             end_line: end_token.saturating_sub(1),
             start_token,
             end_token,
-            matcher: "2-aho".to_string(),
+            matcher: crate::license_detection::models::MatcherKind::Aho,
             score: 1.0,
             matched_length,
             rule_length: matched_length,
@@ -704,12 +705,12 @@ mod tests {
         let query = Query::from_extracted_text("test text", &index, false).unwrap();
         let matches = vec![
             LicenseMatch {
-                matcher: "1-hash".to_string(),
+                matcher: crate::license_detection::models::MatcherKind::Hash,
                 matched_length: 5,
                 ..create_test_match("#1", 1, 10, 1.0, 100.0, 100)
             },
             LicenseMatch {
-                matcher: "2-aho".to_string(),
+                matcher: crate::license_detection::models::MatcherKind::Aho,
                 matched_length: 5,
                 ..create_test_match("#2", 1, 10, 1.0, 100.0, 100)
             },
@@ -724,7 +725,7 @@ mod tests {
         let index = LicenseIndex::with_legalese_count(10);
         let query = Query::from_extracted_text("test text", &index, false).unwrap();
         let mut m = create_test_match("#1", 1, 10, 1.0, 100.0, 100);
-        m.matcher = "3-seq".to_string();
+        m.matcher = crate::license_detection::models::MatcherKind::Seq;
         m.matched_length = 50;
         m.matched_token_positions = Some((0..50).collect());
 
@@ -738,7 +739,7 @@ mod tests {
         let index = LicenseIndex::with_legalese_count(10);
         let query = Query::from_extracted_text("test text", &index, false).unwrap();
         let mut m = create_test_match("#1", 1, 10, 1.0, 100.0, 100);
-        m.matcher = "3-seq".to_string();
+        m.matcher = crate::license_detection::models::MatcherKind::Seq;
         m.matched_length = 5;
         m.start_token = 0;
         m.end_token = 100;
@@ -754,7 +755,7 @@ mod tests {
         let index = LicenseIndex::with_legalese_count(10);
         let query = Query::from_extracted_text("test text", &index, false).unwrap();
         let mut m = create_test_match("#1", 1, 10, 1.0, 100.0, 100);
-        m.matcher = MATCH_UNKNOWN.to_string();
+        m.matcher = MATCH_UNKNOWN;
         m.matched_length = 5;
         m.start_token = 0;
         m.end_token = 100;
@@ -770,7 +771,7 @@ mod tests {
         let index = LicenseIndex::with_legalese_count(10);
         let query = Query::from_extracted_text("test text", &index, false).unwrap();
         let mut m = create_test_match("#1", 1, 10, 1.0, 100.0, 100);
-        m.matcher = "3-seq".to_string();
+        m.matcher = crate::license_detection::models::MatcherKind::Seq;
         m.matched_length = 25;
         m.start_token = 0;
         m.end_token = 30;
@@ -814,7 +815,7 @@ mod tests {
         let index = LicenseIndex::with_legalese_count(10);
 
         let mut m = create_test_match("#1", 1, 10, 0.9, 50.0, 100);
-        m.matcher = "2-aho".to_string();
+        m.matcher = crate::license_detection::models::MatcherKind::Aho;
         m.matched_length = 2;
 
         let matches = vec![m];
@@ -871,7 +872,7 @@ mod tests {
         });
 
         let mut m = create_test_match("#0", 1, 10, 0.9, 50.0, 100);
-        m.matcher = "3-seq".to_string();
+        m.matcher = crate::license_detection::models::MatcherKind::Seq;
         m.matched_length = 5;
         m.hilen = 2;
 
@@ -929,7 +930,7 @@ mod tests {
         });
 
         let mut m = create_test_match("#0", 1, 10, 0.9, 90.0, 100);
-        m.matcher = "3-seq".to_string();
+        m.matcher = crate::license_detection::models::MatcherKind::Seq;
         m.matched_length = 15;
         m.hilen = 8;
 
@@ -943,7 +944,7 @@ mod tests {
     fn test_filter_below_rule_minimum_coverage_keeps_non_seq() {
         let index = LicenseIndex::with_legalese_count(10);
         let mut m = create_test_match("#0", 1, 10, 0.9, 50.0, 100);
-        m.matcher = "2-aho".to_string();
+        m.matcher = crate::license_detection::models::MatcherKind::Aho;
 
         let matches = vec![m];
         let filtered = filter_below_rule_minimum_coverage(&index, &matches);
@@ -999,7 +1000,7 @@ mod tests {
         });
 
         let mut m = create_test_match("#0", 1, 10, 0.9, 50.0, 100);
-        m.matcher = "3-seq".to_string();
+        m.matcher = crate::license_detection::models::MatcherKind::Seq;
 
         let matches = vec![m];
         let filtered = filter_below_rule_minimum_coverage(&index, &matches);

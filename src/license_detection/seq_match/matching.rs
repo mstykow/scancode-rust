@@ -310,7 +310,7 @@ pub fn seq_match_with_candidates(
                         end_line,
                         start_token: abs_qpos,
                         end_token: abs_qend + 1,
-                        matcher: MATCH_SEQ.to_string(),
+                        matcher: MATCH_SEQ,
                         score,
                         matched_length: mlen,
                         rule_length,

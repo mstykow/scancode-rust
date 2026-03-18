@@ -49,7 +49,7 @@ mod tests {
             end_line,
             start_token: 0,
             end_token: 0,
-            matcher: "1-hash".to_string(),
+            matcher: crate::license_detection::models::MatcherKind::Hash,
             score: 95.0,
             matched_length: 100,
             match_coverage: 95.0,

@@ -430,7 +430,7 @@ mod tests {
             end_line,
             start_token: start_line,
             end_token: end_line + 1,
-            matcher: "2-aho".to_string(),
+            matcher: crate::license_detection::models::MatcherKind::Aho,
             score,
             matched_length: matched_len,
             rule_length: rule_len,
@@ -473,7 +473,7 @@ mod tests {
             end_line: end_token.saturating_sub(1),
             start_token,
             end_token,
-            matcher: "2-aho".to_string(),
+            matcher: crate::license_detection::models::MatcherKind::Aho,
             score: 1.0,
             matched_length,
             rule_length: matched_length,
@@ -1113,7 +1113,7 @@ mod tests {
         m1.end_token = 77;
         m1.matched_length = 48;
         m1.hilen = 14;
-        m1.matcher = "3-seq".to_string();
+        m1.matcher = crate::license_detection::models::MatcherKind::Seq;
         m1.qspan_positions = Some((5..77).collect());
 
         let mut m2 = create_test_match("gfdl-1.1-plus_5.RULE", 1, 10, 68.6, 68.6, 100);
@@ -1121,7 +1121,7 @@ mod tests {
         m2.end_token = 77;
         m2.matched_length = 48;
         m2.hilen = 14;
-        m2.matcher = "3-seq".to_string();
+        m2.matcher = crate::license_detection::models::MatcherKind::Seq;
         m2.qspan_positions = Some((5..77).collect());
 
         let matches = vec![m1, m2];

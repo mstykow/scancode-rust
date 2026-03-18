@@ -16,11 +16,13 @@
 use regex::Regex;
 
 use crate::license_detection::expression::{
-    LicenseExpression, expression_to_string, parse_expression,
+    expression_to_string, parse_expression, LicenseExpression,
 };
 use crate::license_detection::index::LicenseIndex;
-use crate::license_detection::models::LicenseMatch;
+use crate::license_detection::models::{LicenseMatch, MatcherKind};
 use crate::license_detection::query::Query;
+
+pub const MATCH_SPDX_ID: MatcherKind = MatcherKind::SpdxId;
 
 #[derive(Debug, Clone, PartialEq)]
 enum RecoveryToken {
@@ -41,18 +43,6 @@ enum BooleanOperator {
     And,
     Or,
 }
-
-/// Matcher identifier for SPDX-License-Identifier based matching.
-///
-/// Corresponds to Python: `MATCH_SPDX_ID = '1-spdx-id'` (line 61)
-pub const MATCH_SPDX_ID: &str = "1-spdx-id";
-
-/// Matcher order for SPDX-License-Identifier based matching.
-///
-/// SPDX-LID matching runs after hash matching and Aho-Corasick matching.
-///
-/// Corresponds to Python: `MATCH_SPDX_ID_ORDER = 2` (line 62)
-pub const MATCH_SPDX_ID_ORDER: u8 = 2;
 
 lazy_static::lazy_static! {
     static ref SPDX_LID_PATTERN: Regex = Regex::new(
@@ -351,7 +341,7 @@ pub fn spdx_lid_match(index: &LicenseIndex, query: &Query) -> Vec<LicenseMatch> 
                 end_line,
                 start_token: *start_token,
                 end_token: *end_token,
-                matcher: MATCH_SPDX_ID.to_string(),
+                matcher: MATCH_SPDX_ID,
                 score,
                 matched_length,
                 rule_length,

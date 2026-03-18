@@ -2,8 +2,8 @@
 
 use super::types::LicenseDetection;
 use super::*;
-use crate::license_detection::expression::{CombineRelation, combine_expressions};
-use crate::license_detection::models::LicenseMatch;
+use crate::license_detection::expression::{combine_expressions, CombineRelation};
+use crate::license_detection::models::{LicenseMatch, MatcherKind};
 
 /// Coverage value below which detections are not perfect.
 /// Any value < 100 means detection is imperfect.
@@ -169,7 +169,7 @@ pub(super) fn has_correct_license_clue_matches(matches: &[LicenseMatch]) -> bool
 /// Returns true if matches were detected by the "undetected" matcher.
 /// Based on Python: is_undetected_license_matches() at detection.py:1376
 pub(super) fn is_undetected_license_matches(matches: &[LicenseMatch]) -> bool {
-    !matches.is_empty() && matches.iter().all(|m| m.matcher == "undetected")
+    !matches.is_empty() && matches.iter().all(|m| m.matcher == MatcherKind::Undetected)
 }
 
 /// Check if there are unknown license intros before detection.
@@ -187,7 +187,7 @@ pub(super) fn has_unknown_intro_before_detection(matches: &[LicenseMatch]) -> bo
     }
 
     for m in matches {
-        if m.matcher == "undetected" {
+        if m.matcher == MatcherKind::Undetected {
             continue;
         }
         let has_unknown = m.license_expression.contains("unknown");
@@ -196,7 +196,7 @@ pub(super) fn has_unknown_intro_before_detection(matches: &[LicenseMatch]) -> bo
         if has_unknown && is_intro {
             // Check if there's a non-intro, non-unknown match after this
             let has_unknown_intro = matches.iter().any(|other| {
-                other.matcher != "undetected"
+                other.matcher != MatcherKind::Undetected
                     && other.start_line > m.start_line
                     && !other.rule_identifier.contains("unknown")
                     && !other.license_expression.contains("unknown")
@@ -251,7 +251,7 @@ pub(super) fn is_license_intro(match_item: &LicenseMatch) -> bool {
     (match_item.is_license_intro
         || match_item.is_license_clue
         || match_item.license_expression == "free-unknown")
-        && (match_item.matcher == "2-aho" || match_item.match_coverage >= 99.99)
+        && (match_item.matcher == MatcherKind::Aho || match_item.match_coverage >= 99.99)
 }
 
 /// Filter out license intro matches from a list of matches.
@@ -474,7 +474,7 @@ pub(super) fn classify_detection(detection: &LicenseDetection, min_score: f32) -
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::license_detection::models::LicenseMatch;
+    use crate::license_detection::models::{LicenseMatch, MatcherKind};
 
     fn create_test_match(coverage: f32, rule_identifier: &str) -> LicenseMatch {
         LicenseMatch {
@@ -486,7 +486,7 @@ mod tests {
             end_line: 10,
             start_token: 0,
             end_token: 0,
-            matcher: "1-hash".to_string(),
+            matcher: crate::license_detection::models::MatcherKind::Hash,
             score: 95.0,
             matched_length: 100,
             match_coverage: coverage,
@@ -535,7 +535,7 @@ mod tests {
             end_line,
             start_token: 0,
             end_token: 0,
-            matcher: matcher.to_string(),
+            matcher: matcher.parse().expect("invalid test matcher"),
             score,
             matched_length,
             rule_length,
@@ -1306,7 +1306,7 @@ mod tests {
     #[test]
     fn test_is_undetected_license_matches_single_undetected() {
         let mut m = create_test_match(100.0, "mit.LICENSE");
-        m.matcher = "undetected".to_string();
+        m.matcher = crate::license_detection::models::MatcherKind::Undetected;
         let matches = vec![m];
         assert!(is_undetected_license_matches(&matches));
     }
@@ -1320,9 +1320,9 @@ mod tests {
     #[test]
     fn test_is_undetected_license_matches_multiple() {
         let mut m1 = create_test_match(100.0, "mit.LICENSE");
-        m1.matcher = "undetected".to_string();
+        m1.matcher = crate::license_detection::models::MatcherKind::Undetected;
         let mut m2 = create_test_match(100.0, "apache.LICENSE");
-        m2.matcher = "undetected".to_string();
+        m2.matcher = crate::license_detection::models::MatcherKind::Undetected;
         let matches = vec![m1, m2];
         assert!(is_undetected_license_matches(&matches));
     }
@@ -1336,7 +1336,7 @@ mod tests {
     #[test]
     fn test_analyze_detection_undetected() {
         let mut m = create_test_match(100.0, "mit.LICENSE");
-        m.matcher = "undetected".to_string();
+        m.matcher = crate::license_detection::models::MatcherKind::Undetected;
         let matches = vec![m];
         assert_eq!(
             analyze_detection(&matches, false),
@@ -1494,7 +1494,7 @@ mod tests {
     fn test_filter_license_intros_and_references_filters_both() {
         let mut m1 = create_test_match(100.0, "mit.LICENSE");
         m1.is_license_intro = true;
-        m1.matcher = "2-aho".to_string();
+        m1.matcher = MatcherKind::Aho;
         m1.match_coverage = 100.0;
         m1.referenced_filenames = Some(vec!["LICENSE".to_string()]);
         let m2 = create_test_match(100.0, "mit.RULE");

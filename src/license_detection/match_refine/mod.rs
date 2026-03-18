@@ -12,7 +12,7 @@ mod handle_overlaps;
 mod merge;
 
 use crate::license_detection::index::LicenseIndex;
-use crate::license_detection::models::LicenseMatch;
+use crate::license_detection::models::{LicenseMatch, MatcherKind};
 use crate::license_detection::query::Query;
 
 // Internal use only
@@ -94,7 +94,9 @@ pub fn split_weak_matches(
     for m in matches {
         let is_false_positive = index.false_positive_rids.contains(&m.rid);
         let is_weak = (!is_false_positive && m.has_unknown())
-            || (m.matcher == "3-seq" && m.len() <= SMALL_RULE && m.match_coverage <= 25.0);
+            || (m.matcher == MatcherKind::Seq
+                && m.len() <= SMALL_RULE
+                && m.match_coverage <= 25.0);
 
         if is_weak {
             weak.push(m.clone());
@@ -310,12 +312,12 @@ fn filter_binary_low_coverage_same_expression_seq_bridges(
     matches
         .iter()
         .filter(|m| {
-            if m.matcher != "3-seq" || m.match_coverage >= 90.0 {
+            if m.matcher != MatcherKind::Seq || m.match_coverage >= 90.0 {
                 return true;
             }
 
             !matches.iter().any(|other| {
-                other.matcher == "2-aho"
+                other.matcher == MatcherKind::Aho
                     && other.match_coverage >= 100.0
                     && other.license_expression == m.license_expression
                     && other.qoverlap(m) > 0
@@ -359,7 +361,7 @@ mod tests {
             end_line,
             start_token: start_line,
             end_token: end_line + 1,
-            matcher: "2-aho".to_string(),
+            matcher: crate::license_detection::models::MatcherKind::Aho,
             score,
             matched_length: matched_len,
             rule_length: rule_len,
@@ -461,14 +463,14 @@ mod tests {
 
         let mut exact = create_test_match("#1", 140, 140, 100.0, 100.0, 100);
         exact.license_expression = "bsd-new".to_string();
-        exact.matcher = "2-aho".to_string();
+        exact.matcher = MatcherKind::Aho;
         exact.start_token = 10;
         exact.end_token = 16;
         exact.matched_length = 6;
 
         let mut seq = create_test_match("#2", 140, 141, 10.0, 52.9, 100);
         seq.license_expression = "bsd-new".to_string();
-        seq.matcher = "3-seq".to_string();
+        seq.matcher = MatcherKind::Seq;
         seq.start_token = 10;
         seq.end_token = 18;
         seq.matched_length = 7;
@@ -556,7 +558,7 @@ mod tests {
     fn test_split_weak_matches_has_unknown() {
         let mut m = LicenseMatch {
             license_expression: "unknown".to_string(),
-            matcher: "1-hash".to_string(),
+            matcher: crate::license_detection::models::MatcherKind::Hash,
             matched_length: 100,
             match_coverage: 100.0,
             ..LicenseMatch::default()
@@ -574,7 +576,7 @@ mod tests {
     fn test_split_weak_matches_short_seq_low_coverage() {
         let mut m = LicenseMatch {
             license_expression: "mit".to_string(),
-            matcher: "3-seq".to_string(),
+            matcher: crate::license_detection::models::MatcherKind::Seq,
             matched_length: 10,
             match_coverage: 20.0,
             ..LicenseMatch::default()
@@ -593,7 +595,7 @@ mod tests {
         let m = LicenseMatch {
             rid: 42,
             license_expression: "unknown".to_string(),
-            matcher: "2-aho".to_string(),
+            matcher: crate::license_detection::models::MatcherKind::Aho,
             matched_length: 3,
             rule_length: 3,
             match_coverage: 100.0,
@@ -612,7 +614,7 @@ mod tests {
     fn test_split_weak_matches_short_seq_high_coverage() {
         let mut m = LicenseMatch {
             license_expression: "mit".to_string(),
-            matcher: "3-seq".to_string(),
+            matcher: crate::license_detection::models::MatcherKind::Seq,
             matched_length: 10,
             match_coverage: 80.0,
             ..LicenseMatch::default()
@@ -630,7 +632,7 @@ mod tests {
     fn test_split_weak_matches_non_seq_short() {
         let mut m = LicenseMatch {
             license_expression: "mit".to_string(),
-            matcher: "1-hash".to_string(),
+            matcher: crate::license_detection::models::MatcherKind::Hash,
             matched_length: 10,
             match_coverage: 20.0,
             ..LicenseMatch::default()
@@ -648,7 +650,7 @@ mod tests {
     fn test_split_weak_matches_mixed() {
         let mut good_match = LicenseMatch {
             license_expression: "mit".to_string(),
-            matcher: "1-hash".to_string(),
+            matcher: crate::license_detection::models::MatcherKind::Hash,
             matched_length: 50,
             match_coverage: 95.0,
             ..LicenseMatch::default()
@@ -658,7 +660,7 @@ mod tests {
 
         let mut weak_unknown = LicenseMatch {
             license_expression: "unknown".to_string(),
-            matcher: "6-unknown".to_string(),
+            matcher: crate::license_detection::models::MatcherKind::Unknown,
             matched_length: 30,
             match_coverage: 50.0,
             ..LicenseMatch::default()
@@ -668,7 +670,7 @@ mod tests {
 
         let mut weak_seq = LicenseMatch {
             license_expression: "apache-2.0".to_string(),
-            matcher: "3-seq".to_string(),
+            matcher: crate::license_detection::models::MatcherKind::Seq,
             matched_length: 10,
             match_coverage: 20.0,
             ..LicenseMatch::default()

@@ -2,6 +2,7 @@
 
 #[cfg(test)]
 mod tests {
+    use crate::license_detection::models::MatcherKind;
     use crate::license_detection::LicenseDetectionEngine;
     use std::path::PathBuf;
 
@@ -38,7 +39,7 @@ license is included in the section entitled "GNU Free Documentation License"."#;
         let primary_match = det
             .matches
             .iter()
-            .find(|m| m.matcher == "3-seq")
+            .find(|m| m.matcher == MatcherKind::Seq)
             .expect("Should have a sequence match");
 
         assert!(

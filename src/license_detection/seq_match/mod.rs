@@ -22,8 +22,9 @@ mod matching;
 pub use candidates::{Candidate, compute_candidates_with_msets};
 pub use matching::seq_match_with_candidates;
 
-pub const MATCH_SEQ: &str = "3-seq";
-pub const MATCH_SEQ_ORDER: u8 = 3;
+use crate::license_detection::models::MatcherKind;
+
+pub const MATCH_SEQ: MatcherKind = MatcherKind::Seq;
 
 /// Default threshold for high resemblance (0.8 = 80% similarity).
 pub const HIGH_RESEMBLANCE_THRESHOLD: f32 = 0.8;
@@ -186,8 +187,8 @@ mod tests {
 
     #[test]
     fn test_seq_match_constants() {
-        assert_eq!(MATCH_SEQ, "3-seq");
-        assert_eq!(MATCH_SEQ_ORDER, 3);
+        assert_eq!(MATCH_SEQ.as_str(), "3-seq");
+        assert_eq!(MATCH_SEQ.precedence(), 3);
     }
 
     #[test]

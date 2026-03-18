@@ -50,7 +50,7 @@ fn summarize_raw_matches(matches: &[LicenseMatch]) -> Vec<(String, String, usize
         .map(|m| {
             (
                 m.rule_identifier.clone(),
-                m.matcher.clone(),
+                m.matcher.to_string(),
                 m.start_line,
                 m.end_line,
             )
@@ -76,7 +76,12 @@ fn sorted_raw_matches_with_normalized_unknown_ids(
                 m.rule_identifier.clone()
             };
 
-            (rule_identifier, m.matcher.clone(), m.start_line, m.end_line)
+            (
+                rule_identifier,
+                m.matcher.to_string(),
+                m.start_line,
+                m.end_line,
+            )
         })
         .collect();
     summary.sort();
@@ -86,14 +91,15 @@ fn sorted_raw_matches_with_normalized_unknown_ids(
 fn assert_raw_match_present(
     matches: &[LicenseMatch],
     rule_identifier: &str,
-    matcher: &str,
+    matcher: impl ToString,
     start_line: usize,
     end_line: usize,
 ) {
+    let matcher = matcher.to_string();
     assert!(
         matches.iter().any(|m| {
             m.rule_identifier == rule_identifier
-                && m.matcher == matcher
+                && m.matcher.as_str() == matcher
                 && m.start_line == start_line
                 && m.end_line == end_line
         }),
@@ -103,13 +109,14 @@ fn assert_raw_match_present(
 }
 
 fn make_test_match(
-    matcher: &str,
+    matcher: impl ToString,
     expression: &str,
     rule_identifier: &str,
     start_token: usize,
     end_token: usize,
     qspan_positions: Option<Vec<usize>>,
 ) -> LicenseMatch {
+    let matcher = matcher.to_string();
     let matched_length = qspan_positions
         .as_ref()
         .map(|positions| positions.len())
@@ -117,7 +124,7 @@ fn make_test_match(
 
     LicenseMatch {
         license_expression: expression.to_string(),
-        matcher: matcher.to_string(),
+        matcher: matcher.parse().expect("invalid test matcher"),
         rule_identifier: rule_identifier.to_string(),
         start_token,
         end_token,
@@ -1388,12 +1395,12 @@ fn test_faq_doctree_detect_matches_preserve_two_bsd_new_hits() {
         vec![
             (
                 "bsd-new_242.RULE",
-                crate::license_detection::aho_match::MATCH_AHO,
+                crate::license_detection::aho_match::MATCH_AHO.as_str(),
                 "bsd-new"
             ),
             (
                 "bsd-new_242.RULE",
-                crate::license_detection::aho_match::MATCH_AHO,
+                crate::license_detection::aho_match::MATCH_AHO.as_str(),
                 "bsd-new"
             ),
         ],
@@ -2337,7 +2344,7 @@ fn test_spdx_complex_readme_detect_matches_match_python_raw_signature() {
         assert!(
             matches.iter().any(|m| {
                 m.license_expression == expression
-                    && m.matcher == matcher
+                    && m.matcher.to_string() == matcher.to_string()
                     && m.start_line == start_line
                     && m.end_line == end_line
             }),
@@ -2390,7 +2397,7 @@ fn test_eclipse_openj9_detect_matches_match_python_raw_signature() {
 
     let mut signature: Vec<_> = matches
         .iter()
-        .map(|m| (m.rule_identifier.clone(), m.matcher.clone()))
+        .map(|m| (m.rule_identifier.clone(), m.matcher.to_string()))
         .collect();
     signature.sort();
 

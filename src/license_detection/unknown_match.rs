@@ -6,11 +6,11 @@ use regex::Regex;
 use sha1::{Digest, Sha1};
 
 use crate::license_detection::index::LicenseIndex;
-use crate::license_detection::models::LicenseMatch;
+use crate::license_detection::models::{LicenseMatch, MatcherKind};
 use crate::license_detection::query::Query;
 use crate::license_detection::tokenize::STOPWORDS;
 
-pub const MATCH_UNKNOWN: &str = "6-unknown";
+pub const MATCH_UNKNOWN: MatcherKind = MatcherKind::Unknown;
 
 const UNKNOWN_NGRAM_LENGTH: usize = 6;
 
@@ -270,7 +270,7 @@ fn create_unknown_match_from_qspan(
         end_line,
         start_token: start,
         end_token: end,
-        matcher: MATCH_UNKNOWN.to_string(),
+        matcher: MATCH_UNKNOWN,
         score,
         matched_length: match_len,
         rule_length: match_len,
@@ -772,7 +772,7 @@ mod tests {
             end_line: 1,
             start_token: 0,
             end_token: 10,
-            matcher: "test".to_string(),
+            matcher: MatcherKind::Aho,
             score: 1.0,
             matched_length: 6,
             rule_length: 6,
@@ -826,7 +826,7 @@ mod tests {
             end_line: 1,
             start_token: 5,
             end_token: 10,
-            matcher: "test".to_string(),
+            matcher: MatcherKind::Aho,
             score: 1.0,
             matched_length: 5,
             rule_length: 5,
@@ -881,7 +881,7 @@ mod tests {
             end_line: 1,
             start_token: 0,
             end_token: 15,
-            matcher: "test".to_string(),
+            matcher: MatcherKind::Aho,
             score: 1.0,
             matched_length: 8,
             rule_length: 8,
@@ -970,7 +970,7 @@ mod tests {
             end_line: 1,
             start_token: 0,
             end_token: 5,
-            matcher: "test".to_string(),
+            matcher: MatcherKind::Aho,
             score: 1.0,
             matched_length: 5,
             rule_length: 5,

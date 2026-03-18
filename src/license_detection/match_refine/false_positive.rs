@@ -3,7 +3,7 @@
 //! This module contains functions for detecting and filtering false positive
 //! license matches, particularly those that appear in license lists.
 
-use crate::license_detection::models::LicenseMatch;
+use crate::license_detection::models::{LicenseMatch, MatcherKind};
 
 const MIN_SHORT_FP_LIST_LENGTH: usize = 15;
 const MIN_LONG_FP_LIST_LENGTH: usize = 150;
@@ -16,7 +16,7 @@ pub(super) fn is_candidate_false_positive(m: &LicenseMatch) -> bool {
     let is_tag_or_ref =
         m.is_license_reference || m.is_license_tag || m.is_license_intro || m.is_license_clue;
 
-    let is_not_spdx_id = m.matcher != "1-spdx-id";
+    let is_not_spdx_id = m.matcher != MatcherKind::SpdxId;
     let is_exact_match = (m.match_coverage - 100.0).abs() < f32::EPSILON;
     let is_short = m.len() <= MAX_CANDIDATE_LENGTH;
 
@@ -193,7 +193,7 @@ mod tests {
             end_line,
             start_token: 0,
             end_token: 0,
-            matcher: matcher.to_string(),
+            matcher: matcher.parse().expect("invalid test matcher"),
             score: 1.0,
             matched_length,
             rule_length,
@@ -459,7 +459,7 @@ mod tests {
             .map(|i| {
                 let mut m = LicenseMatch {
                     license_expression: format!("license-{}", i % 4),
-                    matcher: "2-aho".to_string(),
+                    matcher: crate::license_detection::models::MatcherKind::Aho,
                     matched_length: 10,
                     match_coverage: 100.0,
                     rule_relevance: 100,
