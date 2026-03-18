@@ -30,16 +30,12 @@
   "dependencies": [
     {
       "purl": "pkg:nuget/Newtonsoft.Json",
-      "extracted_requirement": "14.0.1",
+      "extracted_requirement": "13.0.3",
       "scope": null,
       "is_runtime": true,
       "is_optional": false,
       "is_pinned": false,
       "is_direct": true,
-      "extra_data": {
-        "version_override": "14.0.1",
-        "version_override_resolved": "14.0.1"
-      },
       "dependency_uid": "pkg:nuget/Newtonsoft.Json?uuid=fixed-uid-done-for-testing-5642512d1758",
       "for_package_uid": "pkg:nuget/Contoso.Utility@1.0.0?uuid=fixed-uid-done-for-testing-5642512d1758",
       "datafile_path": "src/app/Contoso.Utility.csproj",
