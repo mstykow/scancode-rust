@@ -1,0 +1,108 @@
+[
+  {
+    "type": "pixi",
+    "name": "pixi-demo",
+    "version": "1.2.3",
+    "primary_language": "TOML",
+    "description": "Example Pixi workspace",
+    "parties": [
+      {
+        "role": "author",
+        "name": "Jane Doe",
+        "email": "jane@example.com"
+      }
+    ],
+    "homepage_url": "https://example.com/pixi-demo",
+    "vcs_url": "https://github.com/example/pixi-demo",
+    "extracted_license_statement": "MIT",
+    "extra_data": {
+      "environments": {
+        "default": ["docs"],
+        "test": {
+          "features": ["test"],
+          "solve-group": "default"
+        }
+      },
+      "pypi_options": {
+        "index-url": "https://pypi.org/simple"
+      },
+      "documentation": "https://docs.example.com/pixi-demo",
+      "tasks": {
+        "test": "pytest"
+      },
+      "exclude_newer": "2025-01-01",
+      "requires_pixi": ">=0.40",
+      "platforms": ["linux-64", "osx-arm64"],
+      "channels": ["conda-forge", "https://repo.prefix.dev/example"],
+      "features": ["docs", "test"]
+    },
+    "dependencies": [
+      {
+        "purl": "pkg:conda/numpy@2.1.0",
+        "extracted_requirement": "2.1.0",
+        "scope": null,
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": true,
+        "extra_data": {
+          "channel": "conda-forge"
+        }
+      },
+      {
+        "purl": "pkg:conda/python",
+        "extracted_requirement": "3.12.*",
+        "scope": null,
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:pypi/localpkg",
+        "extracted_requirement": ".",
+        "scope": null,
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true,
+        "extra_data": {
+          "path": ".",
+          "editable": true
+        }
+      },
+      {
+        "purl": "pkg:pypi/requests",
+        "extracted_requirement": ">=2.32,<3",
+        "scope": null,
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:conda/sphinx@8.2.3",
+        "extracted_requirement": "8.2.3",
+        "scope": "docs",
+        "is_runtime": true,
+        "is_optional": true,
+        "is_pinned": true,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:pypi/pytest@8.4.0",
+        "extracted_requirement": "8.4.0",
+        "scope": "test",
+        "is_runtime": true,
+        "is_optional": true,
+        "is_pinned": true,
+        "is_direct": true,
+        "extra_data": {
+          "extras": ["dev"]
+        }
+      }
+    ],
+    "datasource_id": "pixi_toml",
+    "purl": "pkg:pixi/pixi-demo@1.2.3"
+  }
+]
