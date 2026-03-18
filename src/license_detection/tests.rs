@@ -2088,6 +2088,43 @@ fn test_filter_redundant_same_expression_seq_containers_keeps_small_one_sided_bo
 }
 
 #[test]
+fn test_filter_redundant_low_coverage_composite_seq_wrappers_drops_tiny_composite_wrapper() {
+    let seq_container = make_test_match(
+        crate::license_detection::seq_match::MATCH_SEQ,
+        "composite-wrapper",
+        "epl-2.0_or_apache-2.0_or_gpl-2.0_with_openjdk-exception_and_others4.RULE",
+        55,
+        60,
+        Some(vec![55, 56, 57, 58, 59]),
+    );
+    let mut seq_container = seq_container;
+    seq_container.match_coverage = 21.3;
+
+    let aho_first = make_test_match(
+        crate::license_detection::aho_match::MATCH_AHO,
+        "gpl-3.0 WITH autoconf-simple-exception-2.0",
+        "gpl-3.0_with_autoconf-simple-exception-2.0_1.RULE",
+        55,
+        56,
+        None,
+    );
+    let aho_second = make_test_match(
+        crate::license_detection::aho_match::MATCH_AHO,
+        "epl-2.0 OR apache-2.0",
+        "epl-2.0_or_apache-2.0_3.RULE",
+        57,
+        60,
+        None,
+    );
+
+    let filtered = filter_redundant_low_coverage_composite_seq_wrappers(
+        vec![seq_container],
+        &[aho_first, aho_second],
+    );
+    assert!(filtered.is_empty());
+}
+
+#[test]
 fn test_spdx_complex_short_html_keeps_exact_unicode_matches_and_drops_seq_container() {
     let Some(engine) = create_engine_from_reference() else {
         eprintln!("Skipping test: reference directory not found");
@@ -2125,6 +2162,22 @@ fn test_spdx_complex_short_html_keeps_exact_unicode_matches_and_drops_seq_contai
     assert!(
         !rule_ids.contains(&"unicode_3.RULE"),
         "expected redundant unicode_3.RULE seq container to be absent: {:?}",
+        rule_ids
+    );
+    assert!(
+        rule_ids.contains(&"gpl-3.0_with_autoconf-simple-exception-2.0_1.RULE"),
+        "expected GPL/autoconf exact child to remain present: {:?}",
+        rule_ids
+    );
+    assert!(
+        rule_ids.contains(&"epl-2.0_or_apache-2.0_3.RULE"),
+        "expected EPL/Apache exact child to remain present: {:?}",
+        rule_ids
+    );
+    assert!(
+        !rule_ids
+            .contains(&"epl-2.0_or_apache-2.0_or_gpl-2.0_with_openjdk-exception_and_others4.RULE"),
+        "expected tiny composite seq wrapper to be absent: {:?}",
         rule_ids
     );
 }

@@ -190,6 +190,73 @@ fn filter_redundant_same_expression_seq_containers(
         .collect()
 }
 
+fn is_redundant_low_coverage_composite_seq_wrapper(
+    container: &LicenseMatch,
+    candidate_contained_matches: &[LicenseMatch],
+) -> bool {
+    if container.matcher != seq_match::MATCH_SEQ || container.match_coverage >= 30.0 {
+        return false;
+    }
+
+    let children: Vec<&LicenseMatch> = candidate_contained_matches
+        .iter()
+        .filter(|m| {
+            m.matcher == aho_match::MATCH_AHO
+                && has_full_match_coverage(m)
+                && m.license_expression != container.license_expression
+                && (container.qcontains(m) || container.qoverlap(m) > 0)
+        })
+        .collect();
+
+    if children.len() < 2 {
+        return false;
+    }
+
+    let unique_expressions: HashSet<&str> = children.iter().map(|m| m.license_expression.as_str()).collect();
+    if unique_expressions.len() < 2 {
+        return false;
+    }
+
+    let container_qspan: HashSet<usize> = container.qspan().into_iter().collect();
+    let mut child_union = HashSet::new();
+    for child in &children {
+        child_union.extend(child.qspan());
+    }
+
+    let container_only_positions: HashSet<usize> =
+        container_qspan.difference(&child_union).copied().collect();
+    let child_only_positions: HashSet<usize> =
+        child_union.difference(&container_qspan).copied().collect();
+
+    let mut sorted_children = children;
+    sorted_children.sort_by_key(|m| m.qspan_bounds());
+
+    let mut bridge_positions = HashSet::new();
+    for pair in sorted_children.windows(2) {
+        let (_, previous_end) = pair[0].qspan_bounds();
+        let (next_start, _) = pair[1].qspan_bounds();
+        bridge_positions.extend(previous_end..next_start);
+    }
+
+    let container_only_boundary_positions = container_only_positions
+        .difference(&bridge_positions)
+        .count();
+
+    child_only_positions.is_empty()
+        && container_only_positions.len() <= MAX_REDUNDANT_SEQ_CONTAINER_BOUNDARY_GAP
+        && container_only_boundary_positions <= MAX_REDUNDANT_SEQ_CONTAINER_BOUNDARY_GAP
+}
+
+fn filter_redundant_low_coverage_composite_seq_wrappers(
+    seq_matches: Vec<LicenseMatch>,
+    candidate_contained_matches: &[LicenseMatch],
+) -> Vec<LicenseMatch> {
+    seq_matches
+        .into_iter()
+        .filter(|m| !is_redundant_low_coverage_composite_seq_wrapper(m, candidate_contained_matches))
+        .collect()
+}
+
 fn subtract_spdx_match_qspans(
     query: &mut Query<'_>,
     matched_qspans: &mut Vec<query::PositionSpan>,
@@ -296,7 +363,12 @@ fn collect_regular_seq_matches(
     }
 
     let merged_seq = merge_overlapping_matches(&seq_all_matches);
-    filter_redundant_same_expression_seq_containers(merged_seq, candidate_contained_matches)
+    let filtered_same_expression =
+        filter_redundant_same_expression_seq_containers(merged_seq, candidate_contained_matches);
+    filter_redundant_low_coverage_composite_seq_wrappers(
+        filtered_same_expression,
+        candidate_contained_matches,
+    )
 }
 
 impl LicenseDetectionEngine {
