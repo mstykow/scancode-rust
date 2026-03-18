@@ -327,12 +327,68 @@ mod tests {
     }
 
     #[test]
+    fn test_unreadable_meta_json_preserves_fallback_identity() {
+        use tempfile::tempdir;
+
+        let temp_dir = tempdir().unwrap();
+        let meta_json_dir = temp_dir.path().join("META.json");
+        std::fs::create_dir(&meta_json_dir).unwrap();
+
+        let package = CpanMetaJsonParser::extract_first_package(&meta_json_dir);
+
+        assert_cpan_fallback_identity(&package, DatasourceId::CpanMetaJson);
+    }
+
+    #[test]
+    fn test_non_object_json_root_preserves_fallback_identity() {
+        use std::io::Write;
+        use tempfile::NamedTempFile;
+
+        let mut temp_file = NamedTempFile::new().unwrap();
+        writeln!(temp_file, r#"["not", "an", "object"]"#).unwrap();
+        temp_file.flush().unwrap();
+
+        let package = CpanMetaJsonParser::extract_first_package(temp_file.path());
+
+        assert_cpan_fallback_identity(&package, DatasourceId::CpanMetaJson);
+    }
+
+    #[test]
     fn test_malformed_yaml() {
         use std::io::Write;
         use tempfile::NamedTempFile;
 
         let mut temp_file = NamedTempFile::new().unwrap();
         writeln!(temp_file, "invalid: yaml: structure: [[[").unwrap();
+        temp_file.flush().unwrap();
+
+        let package = CpanMetaYmlParser::extract_first_package(temp_file.path());
+
+        assert_cpan_fallback_identity(&package, DatasourceId::CpanMetaYml);
+    }
+
+    #[test]
+    fn test_unreadable_meta_yml_preserves_fallback_identity() {
+        use tempfile::tempdir;
+
+        let temp_dir = tempdir().unwrap();
+        let meta_yml_dir = temp_dir.path().join("META.yml");
+        std::fs::create_dir(&meta_yml_dir).unwrap();
+
+        let package = CpanMetaYmlParser::extract_first_package(&meta_yml_dir);
+
+        assert_cpan_fallback_identity(&package, DatasourceId::CpanMetaYml);
+    }
+
+    #[test]
+    fn test_non_mapping_yaml_root_preserves_fallback_identity() {
+        use std::io::Write;
+        use tempfile::NamedTempFile;
+
+        let mut temp_file = NamedTempFile::new().unwrap();
+        writeln!(temp_file, "- not").unwrap();
+        writeln!(temp_file, "- a").unwrap();
+        writeln!(temp_file, "- mapping").unwrap();
         temp_file.flush().unwrap();
 
         let package = CpanMetaYmlParser::extract_first_package(temp_file.path());
