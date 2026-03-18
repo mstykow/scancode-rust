@@ -198,6 +198,12 @@ pub static ASSEMBLERS: &[AssemblerConfig] = &[
         sibling_file_patterns: &["pubspec.yaml", "pubspec.lock"],
         mode: AssemblyMode::SiblingMerge,
     },
+    // Helm chart ecosystem
+    AssemblerConfig {
+        datasource_ids: &[DatasourceId::HelmChartYaml, DatasourceId::HelmChartLock],
+        sibling_file_patterns: &["Chart.yaml", "Chart.lock"],
+        mode: AssemblyMode::SiblingMerge,
+    },
     AssemblerConfig {
         datasource_ids: &[
             DatasourceId::HackageCabal,

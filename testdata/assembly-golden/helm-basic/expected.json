@@ -1,0 +1,110 @@
+{
+  "packages": [
+    {
+      "type": "helm",
+      "name": "nginx",
+      "version": "22.1.1",
+      "primary_language": "YAML",
+      "description": "Example Helm chart",
+      "parties": [
+        {
+          "type": "person",
+          "role": "maintainer",
+          "name": "Jane Doe",
+          "email": "jane@example.com"
+        }
+      ],
+      "keywords": ["nginx", "reverse-proxy"],
+      "homepage_url": "https://example.com/nginx",
+      "extra_data": {
+        "api_version": "v2",
+        "app_version": "1.29.1",
+        "generated": "2025-08-13T19:31:58.340987883Z",
+        "chart_type": "application",
+        "digest": "sha256:1234abcd"
+      },
+      "purl": "pkg:helm/nginx@22.1.1",
+      "package_uid": "pkg:helm/nginx@22.1.1?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "datafile_paths": ["Chart.lock", "Chart.yaml"],
+      "datasource_ids": ["helm_chart_lock", "helm_chart_yaml"]
+    }
+  ],
+  "dependencies": [
+    {
+      "purl": "pkg:helm/common",
+      "extracted_requirement": "2.x.x",
+      "scope": "dependencies",
+      "is_runtime": true,
+      "is_optional": true,
+      "is_pinned": false,
+      "is_direct": true,
+      "extra_data": {
+        "repository": "oci://registry-1.docker.io/bitnamicharts",
+        "tags": ["common"]
+      },
+      "dependency_uid": "pkg:helm/common?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "for_package_uid": "pkg:helm/nginx@22.1.1?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "datafile_path": "Chart.yaml",
+      "datasource_id": "helm_chart_yaml"
+    },
+    {
+      "purl": "pkg:helm/common@2.31.4",
+      "extracted_requirement": "2.31.4",
+      "scope": "dependencies",
+      "is_runtime": true,
+      "is_optional": false,
+      "is_pinned": true,
+      "is_direct": true,
+      "extra_data": {
+        "repository": "oci://registry-1.docker.io/bitnamicharts"
+      },
+      "dependency_uid": "pkg:helm/common@2.31.4?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "for_package_uid": "pkg:helm/nginx@22.1.1?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "datafile_path": "Chart.lock",
+      "datasource_id": "helm_chart_lock"
+    },
+    {
+      "purl": "pkg:helm/metrics@1.2.3",
+      "extracted_requirement": "1.2.3",
+      "scope": "dependencies",
+      "is_runtime": true,
+      "is_optional": false,
+      "is_pinned": true,
+      "is_direct": true,
+      "extra_data": {
+        "repository": "https://charts.example.test"
+      },
+      "dependency_uid": "pkg:helm/metrics@1.2.3?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "for_package_uid": "pkg:helm/nginx@22.1.1?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "datafile_path": "Chart.lock",
+      "datasource_id": "helm_chart_lock"
+    },
+    {
+      "purl": "pkg:helm/metrics@1.2.3",
+      "extracted_requirement": "1.2.3",
+      "scope": "dependencies",
+      "is_runtime": true,
+      "is_optional": true,
+      "is_pinned": true,
+      "is_direct": true,
+      "extra_data": {
+        "condition": "metrics.enabled",
+        "repository": "https://charts.example.test"
+      },
+      "dependency_uid": "pkg:helm/metrics@1.2.3?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "for_package_uid": "pkg:helm/nginx@22.1.1?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "datafile_path": "Chart.yaml",
+      "datasource_id": "helm_chart_yaml"
+    }
+  ],
+  "files_with_packages": [
+    {
+      "path": "Chart.lock",
+      "for_packages": ["pkg:helm/nginx@22.1.1?uuid=fixed-uid-done-for-testing-5642512d1758"]
+    },
+    {
+      "path": "Chart.yaml",
+      "for_packages": ["pkg:helm/nginx@22.1.1?uuid=fixed-uid-done-for-testing-5642512d1758"]
+    }
+  ]
+}
