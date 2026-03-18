@@ -588,6 +588,14 @@ mod tests {
     }
 
     #[test]
+    fn test_assembly_pixi_basic() {
+        match run_assembly_golden_test("pixi-basic") {
+            Ok(_) => (),
+            Err(e) => panic!("Assembly golden test failed for pixi-basic: {}", e),
+        }
+    }
+
+    #[test]
     fn test_assembly_alpine_file_refs() {
         match run_assembly_golden_test("alpine-file-refs") {
             Ok(_) => (),

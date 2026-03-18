@@ -198,6 +198,12 @@ pub static ASSEMBLERS: &[AssemblerConfig] = &[
         sibling_file_patterns: &["pubspec.yaml", "pubspec.lock"],
         mode: AssemblyMode::SiblingMerge,
     },
+    // Pixi ecosystem
+    AssemblerConfig {
+        datasource_ids: &[DatasourceId::PixiToml, DatasourceId::PixiLock],
+        sibling_file_patterns: &["pixi.toml", "pixi.lock"],
+        mode: AssemblyMode::SiblingMerge,
+    },
     // Helm chart ecosystem
     AssemblerConfig {
         datasource_ids: &[DatasourceId::HelmChartYaml, DatasourceId::HelmChartLock],
