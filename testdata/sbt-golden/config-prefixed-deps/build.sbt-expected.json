@@ -56,8 +56,21 @@
         "is_pinned": true,
         "is_direct": true,
         "extra_data": {
-          "sbt_cross_version": true,
-          "sbt_operator": "%%"
+          "sbt_operator": "%%",
+          "sbt_cross_version": true
+        }
+      },
+      {
+        "purl": "pkg:maven/org.nested/ignored@9.9.9",
+        "extracted_requirement": "9.9.9",
+        "scope": "test",
+        "is_runtime": false,
+        "is_optional": true,
+        "is_pinned": true,
+        "is_direct": true,
+        "extra_data": {
+          "sbt_operator": "%%",
+          "sbt_cross_version": true
         }
       }
     ],
