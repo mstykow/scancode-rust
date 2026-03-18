@@ -420,6 +420,206 @@ mod tests {
     }
 
     #[test]
+    fn test_assemble_nuget_cpm_uses_directory_build_props_for_central_versions() {
+        let mut build_props = create_test_file_info(
+            "repo/src/Directory.Build.props",
+            DatasourceId::NugetDirectoryBuildProps,
+            None,
+            None,
+            None,
+            vec![],
+        );
+        build_props.package_data[0].extra_data = Some(HashMap::from([(
+            "property_values".to_string(),
+            json!({
+                "ManageVersions": "true",
+                "NewtonsoftJsonVersion": "13.0.3"
+            }),
+        )]));
+
+        let mut props_file = create_test_file_info(
+            "repo/src/Directory.Packages.props",
+            DatasourceId::NugetDirectoryPackagesProps,
+            None,
+            None,
+            None,
+            vec![],
+        );
+        props_file.package_data[0].extra_data = Some(HashMap::from([
+            (
+                "property_values".to_string(),
+                json!({
+                    "ManagePackageVersionsCentrally": "$(ManageVersions)"
+                }),
+            ),
+            (
+                "package_versions".to_string(),
+                json!([
+                    {
+                        "name": "Newtonsoft.Json",
+                        "version": "$(NewtonsoftJsonVersion)",
+                        "condition": null
+                    }
+                ]),
+            ),
+        ]));
+
+        let mut files = vec![
+            create_test_file_info(
+                "repo/src/app/Contoso.Utility.csproj",
+                DatasourceId::NugetCsproj,
+                Some("pkg:nuget/Contoso.Utility@1.0.0"),
+                Some("Contoso.Utility"),
+                Some("1.0.0"),
+                vec![create_test_dependency(
+                    "pkg:nuget/Newtonsoft.Json",
+                    None,
+                    None,
+                )],
+            ),
+            build_props,
+            props_file,
+        ];
+
+        let result = assemble(&mut files);
+        assert_eq!(
+            result.dependencies[0].extracted_requirement.as_deref(),
+            Some("13.0.3")
+        );
+    }
+
+    #[test]
+    fn test_assemble_nuget_cpm_uses_directory_build_props_for_version_override() {
+        let mut build_props = create_test_file_info(
+            "repo/src/Directory.Build.props",
+            DatasourceId::NugetDirectoryBuildProps,
+            None,
+            None,
+            None,
+            vec![],
+        );
+        build_props.package_data[0].extra_data = Some(HashMap::from([(
+            "property_values".to_string(),
+            json!({
+                "CentralOverridesEnabled": "true",
+                "NewtonsoftJsonVersion": "14.0.1"
+            }),
+        )]));
+
+        let mut props_file = create_test_file_info(
+            "repo/src/Directory.Packages.props",
+            DatasourceId::NugetDirectoryPackagesProps,
+            None,
+            None,
+            None,
+            vec![create_test_central_dependency(
+                "pkg:nuget/Newtonsoft.Json",
+                Some("13.0.3"),
+                None,
+            )],
+        );
+        props_file.package_data[0].extra_data = Some(HashMap::from([(
+            "manage_package_versions_centrally".to_string(),
+            json!(true),
+        )]));
+
+        let mut project_file = create_test_file_info(
+            "repo/src/app/Contoso.Utility.csproj",
+            DatasourceId::NugetCsproj,
+            Some("pkg:nuget/Contoso.Utility@1.0.0"),
+            Some("Contoso.Utility"),
+            Some("1.0.0"),
+            vec![create_test_dependency(
+                "pkg:nuget/Newtonsoft.Json",
+                None,
+                Some(HashMap::from([(
+                    "version_override".to_string(),
+                    json!("$(NewtonsoftJsonVersion)"),
+                )])),
+            )],
+        );
+        project_file.package_data[0].extra_data = Some(HashMap::from([(
+            "central_package_version_override_enabled_raw".to_string(),
+            json!("$(CentralOverridesEnabled)"),
+        )]));
+
+        let mut files = vec![project_file, build_props, props_file];
+        let result = assemble(&mut files);
+        assert_eq!(
+            result.dependencies[0].extracted_requirement.as_deref(),
+            Some("14.0.1")
+        );
+    }
+
+    #[test]
+    fn test_assemble_nuget_cpm_ignores_conditioned_directory_build_props_data() {
+        let mut build_props = create_test_file_info(
+            "repo/src/Directory.Build.props",
+            DatasourceId::NugetDirectoryBuildProps,
+            None,
+            None,
+            None,
+            vec![],
+        );
+        build_props.package_data[0].extra_data = Some(HashMap::from([
+            (
+                "property_values".to_string(),
+                json!({
+                    "ManageVersions": "true"
+                }),
+            ),
+            ("import_projects".to_string(), json!([])),
+        ]));
+
+        let mut props_file = create_test_file_info(
+            "repo/src/Directory.Packages.props",
+            DatasourceId::NugetDirectoryPackagesProps,
+            None,
+            None,
+            None,
+            vec![],
+        );
+        props_file.package_data[0].extra_data = Some(HashMap::from([
+            (
+                "property_values".to_string(),
+                json!({
+                    "ManagePackageVersionsCentrally": "$(ManageVersions)"
+                }),
+            ),
+            (
+                "package_versions".to_string(),
+                json!([
+                    {
+                        "name": "Newtonsoft.Json",
+                        "version": "$(NewtonsoftJsonVersion)",
+                        "condition": null
+                    }
+                ]),
+            ),
+        ]));
+
+        let mut files = vec![
+            create_test_file_info(
+                "repo/src/app/Contoso.Utility.csproj",
+                DatasourceId::NugetCsproj,
+                Some("pkg:nuget/Contoso.Utility@1.0.0"),
+                Some("Contoso.Utility"),
+                Some("1.0.0"),
+                vec![create_test_dependency(
+                    "pkg:nuget/Newtonsoft.Json",
+                    None,
+                    None,
+                )],
+            ),
+            build_props,
+            props_file,
+        ];
+
+        let result = assemble(&mut files);
+        assert!(result.dependencies[0].extracted_requirement.is_none());
+    }
+
+    #[test]
     fn test_assemble_nuget_cpm_does_not_override_explicit_project_version() {
         let mut props_file = create_test_file_info(
             "repo/Directory.Packages.props",
