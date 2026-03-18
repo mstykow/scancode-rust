@@ -22,9 +22,10 @@
 //! - Graceful error handling with warn!()
 //! - No unwrap/expect in library code
 
+use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::{BufReader, Read};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use log::warn;
 use packageurl::PackageUrl;
@@ -941,6 +942,16 @@ struct ProjectReferenceData {
     condition: Option<String>,
 }
 
+#[derive(Default)]
+struct CentralPackagePropsData {
+    dependencies: Vec<Dependency>,
+    properties: HashMap<String, String>,
+    import_projects: Vec<String>,
+    manage_package_versions_centrally: Option<bool>,
+    central_package_transitive_pinning_enabled: Option<bool>,
+    central_package_version_override_enabled: Option<bool>,
+}
+
 pub struct ProjectJsonParser;
 
 impl PackageParser for ProjectJsonParser {
@@ -1055,7 +1066,8 @@ impl PackageParser for PackageReferenceProjectParser {
         let mut copyright = None;
         let mut readme_file = None;
         let mut icon_file = None;
-        let mut dependencies = Vec::new();
+        let mut package_references = Vec::new();
+        let mut project_properties = HashMap::new();
 
         let mut buf = Vec::new();
         let mut current_element = String::new();
@@ -1137,14 +1149,12 @@ impl PackageParser for PackageReferenceProjectParser {
                             .and_then(|attr| String::from_utf8(attr.value.to_vec()).ok())
                             .or_else(|| current_item_group_condition.clone());
 
-                        if let Some(dependency) = build_project_file_dependency(
+                        package_references.push(ProjectReferenceData {
                             name,
                             version,
                             version_override,
                             condition,
-                        ) {
-                            dependencies.push(dependency);
-                        }
+                        });
                     }
                 }
                 Ok(Event::Text(e)) => {
@@ -1165,6 +1175,7 @@ impl PackageParser for PackageReferenceProjectParser {
                             reference.version_override = Some(text);
                         }
                     } else if in_property_group {
+                        project_properties.insert(current_element.clone(), text.clone());
                         match current_element.as_str() {
                             "PackageId" => name = Some(text),
                             "AssemblyName" if fallback_name.is_none() => fallback_name = Some(text),
@@ -1199,15 +1210,8 @@ impl PackageParser for PackageReferenceProjectParser {
                         "PropertyGroup" => in_property_group = false,
                         "ItemGroup" => current_item_group_condition = None,
                         "PackageReference" => {
-                            if let Some(reference) = current_package_reference.take()
-                                && let Some(dependency) = build_project_file_dependency(
-                                    reference.name,
-                                    reference.version,
-                                    reference.version_override,
-                                    reference.condition,
-                                )
-                            {
-                                dependencies.push(dependency);
+                            if let Some(reference) = current_package_reference.take() {
+                                package_references.push(reference);
                             }
                         }
                         _ => {}
@@ -1231,6 +1235,18 @@ impl PackageParser for PackageReferenceProjectParser {
             Some(repo_type) if !repo_type.trim().is_empty() => format!("{}+{}", repo_type, url),
             _ => url,
         });
+        let dependencies = package_references
+            .into_iter()
+            .filter_map(|reference| {
+                build_project_file_dependency(
+                    reference.name,
+                    reference.version,
+                    reference.version_override,
+                    reference.condition,
+                    &project_properties,
+                )
+            })
+            .collect::<Vec<_>>();
         let (repository_homepage_url, repository_download_url, api_data_url) =
             build_nuget_urls(name.as_deref(), version.as_deref());
 
@@ -1252,6 +1268,17 @@ impl PackageParser for PackageReferenceProjectParser {
         insert_extra_string(&mut extra_data, "repository_commit", repository_commit);
         insert_extra_string(&mut extra_data, "readme_file", readme_file);
         insert_extra_string(&mut extra_data, "icon_file", icon_file);
+        if let Some(value) = resolve_bool_property_reference(
+            project_properties
+                .get("CentralPackageVersionOverrideEnabled")
+                .map(String::as_str),
+            &project_properties,
+        ) {
+            extra_data.insert(
+                "central_package_version_override_enabled".to_string(),
+                serde_json::Value::Bool(value),
+            );
+        }
 
         vec![PackageData {
             datasource_id: Some(datasource_id),
@@ -1497,6 +1524,7 @@ fn build_project_file_dependency(
     version: Option<String>,
     version_override: Option<String>,
     condition: Option<String>,
+    project_properties: &HashMap<String, String>,
 ) -> Option<Dependency> {
     let name = name?.trim().to_string();
     if name.is_empty() {
@@ -1505,7 +1533,18 @@ fn build_project_file_dependency(
 
     let mut extra_data = serde_json::Map::new();
     insert_extra_string(&mut extra_data, "condition", condition);
-    insert_extra_string(&mut extra_data, "version_override", version_override);
+    insert_extra_string(
+        &mut extra_data,
+        "version_override",
+        version_override.clone(),
+    );
+    insert_extra_string(
+        &mut extra_data,
+        "version_override_resolved",
+        version_override
+            .as_deref()
+            .and_then(|value| resolve_string_property_reference(value, project_properties)),
+    );
 
     Some(Dependency {
         purl: build_nuget_purl(Some(&name), None),
@@ -1531,6 +1570,16 @@ struct CentralPackageVersionData {
     condition: Option<String>,
 }
 
+#[derive(Default)]
+struct RawCentralPackagePropsData {
+    package_versions: Vec<CentralPackageVersionData>,
+    property_values: HashMap<String, String>,
+    import_projects: Vec<String>,
+    manage_package_versions_centrally: Option<String>,
+    central_package_transitive_pinning_enabled: Option<String>,
+    central_package_version_override_enabled: Option<String>,
+}
+
 fn build_directory_packages_dependency(
     name: Option<String>,
     version: Option<String>,
@@ -1540,13 +1589,16 @@ fn build_directory_packages_dependency(
     if name.is_empty() {
         return None;
     }
+    let version = version
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())?;
 
     let mut extra_data = serde_json::Map::new();
     insert_extra_string(&mut extra_data, "condition", condition);
 
     Some(Dependency {
         purl: build_nuget_purl(Some(&name), None),
-        extracted_requirement: version,
+        extracted_requirement: Some(version),
         scope: Some("package_version".to_string()),
         is_runtime: Some(true),
         is_optional: Some(false),
@@ -1561,86 +1613,100 @@ fn build_directory_packages_dependency(
     })
 }
 
-pub struct CentralPackageManagementPropsParser;
-
-impl PackageParser for CentralPackageManagementPropsParser {
-    const PACKAGE_TYPE: PackageType = PackageType::Nuget;
-
-    fn is_match(path: &Path) -> bool {
-        path.file_name().and_then(|name| name.to_str()) == Some("Directory.Packages.props")
+fn resolve_directory_packages_props(
+    path: &Path,
+    visited: &mut HashSet<PathBuf>,
+) -> Result<CentralPackagePropsData, String> {
+    let canonical = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
+    if !visited.insert(canonical.clone()) {
+        return Ok(CentralPackagePropsData::default());
     }
 
-    fn extract_packages(path: &Path) -> Vec<PackageData> {
-        let file = match File::open(path) {
-            Ok(file) => file,
-            Err(e) => {
-                warn!(
-                    "Failed to open Directory.Packages.props at {:?}: {}",
-                    path, e
-                );
-                return vec![default_package_data(Some(
-                    DatasourceId::NugetDirectoryPackagesProps,
-                ))];
-            }
+    let raw = parse_directory_packages_props_file(path)?;
+    let mut merged = CentralPackagePropsData::default();
+
+    for import_project in &raw.import_projects {
+        let Some(import_path) =
+            resolve_import_project_for_directory_packages(path, import_project, &HashMap::new())
+        else {
+            continue;
         };
+        let imported = resolve_directory_packages_props(&import_path, visited)?;
+        merge_central_package_props(&mut merged, imported);
+    }
 
-        let reader = BufReader::new(file);
-        let mut xml_reader = Reader::from_reader(reader);
-        xml_reader.config_mut().trim_text(true);
+    merged.import_projects.extend(raw.import_projects.clone());
+    merged.properties.extend(raw.property_values.clone());
 
-        let mut dependencies = Vec::new();
-        let mut buf = Vec::new();
-        let mut current_element = String::new();
-        let mut current_item_group_condition = None;
-        let mut current_package_version: Option<CentralPackageVersionData> = None;
-        let mut manage_package_versions_centrally = None;
-        let mut central_package_transitive_pinning_enabled = None;
-        let mut central_package_version_override_enabled = None;
+    if let Some(value) = resolve_bool_property_reference(
+        raw.manage_package_versions_centrally.as_deref(),
+        &merged.properties,
+    ) {
+        merged.manage_package_versions_centrally = Some(value);
+    }
+    if let Some(value) = resolve_bool_property_reference(
+        raw.central_package_transitive_pinning_enabled.as_deref(),
+        &merged.properties,
+    ) {
+        merged.central_package_transitive_pinning_enabled = Some(value);
+    }
+    if let Some(value) = resolve_bool_property_reference(
+        raw.central_package_version_override_enabled.as_deref(),
+        &merged.properties,
+    ) {
+        merged.central_package_version_override_enabled = Some(value);
+    }
 
-        loop {
-            match xml_reader.read_event_into(&mut buf) {
-                Ok(Event::Start(e)) => {
-                    let tag_name = String::from_utf8_lossy(e.name().as_ref()).to_string();
-                    current_element = tag_name.clone();
+    for entry in raw.package_versions {
+        let resolved_version =
+            resolve_optional_property_value(entry.version.as_deref(), &merged.properties);
+        if let Some(dependency) =
+            build_directory_packages_dependency(entry.name, resolved_version, entry.condition)
+        {
+            replace_matching_dependency_group(
+                &mut merged.dependencies,
+                std::slice::from_ref(&dependency),
+            );
+            merged.dependencies.push(dependency);
+        }
+    }
 
-                    match tag_name.as_str() {
-                        "ItemGroup" => {
-                            current_item_group_condition = e
-                                .attributes()
-                                .filter_map(|a| a.ok())
-                                .find(|attr| attr.key.as_ref() == b"Condition")
-                                .and_then(|attr| String::from_utf8(attr.value.to_vec()).ok());
-                        }
-                        "PackageVersion" => {
-                            let name = e
-                                .attributes()
-                                .filter_map(|a| a.ok())
-                                .find(|attr| matches!(attr.key.as_ref(), b"Include" | b"Update"))
-                                .and_then(|attr| String::from_utf8(attr.value.to_vec()).ok());
-                            let version = e
-                                .attributes()
-                                .filter_map(|a| a.ok())
-                                .find(|attr| attr.key.as_ref() == b"Version")
-                                .and_then(|attr| String::from_utf8(attr.value.to_vec()).ok());
-                            let condition = e
-                                .attributes()
-                                .filter_map(|a| a.ok())
-                                .find(|attr| attr.key.as_ref() == b"Condition")
-                                .and_then(|attr| String::from_utf8(attr.value.to_vec()).ok())
-                                .or_else(|| current_item_group_condition.clone());
+    Ok(merged)
+}
 
-                            current_package_version = Some(CentralPackageVersionData {
-                                name,
-                                version,
-                                condition,
-                            });
-                        }
-                        _ => {}
+fn parse_directory_packages_props_file(path: &Path) -> Result<RawCentralPackagePropsData, String> {
+    let file = File::open(path).map_err(|e| {
+        format!(
+            "Failed to open Directory.Packages.props at {:?}: {}",
+            path, e
+        )
+    })?;
+
+    let reader = BufReader::new(file);
+    let mut xml_reader = Reader::from_reader(reader);
+    xml_reader.config_mut().trim_text(true);
+
+    let mut raw = RawCentralPackagePropsData::default();
+    let mut buf = Vec::new();
+    let mut current_element = String::new();
+    let mut current_item_group_condition = None;
+    let mut current_package_version: Option<CentralPackageVersionData> = None;
+
+    loop {
+        match xml_reader.read_event_into(&mut buf) {
+            Ok(Event::Start(e)) => {
+                let tag_name = String::from_utf8_lossy(e.name().as_ref()).to_string();
+                current_element = tag_name.clone();
+
+                match tag_name.as_str() {
+                    "ItemGroup" => {
+                        current_item_group_condition = e
+                            .attributes()
+                            .filter_map(|a| a.ok())
+                            .find(|attr| attr.key.as_ref() == b"Condition")
+                            .and_then(|attr| String::from_utf8(attr.value.to_vec()).ok());
                     }
-                }
-                Ok(Event::Empty(e)) => {
-                    let tag_name = String::from_utf8_lossy(e.name().as_ref()).to_string();
-                    if tag_name == "PackageVersion" {
+                    "PackageVersion" => {
                         let name = e
                             .attributes()
                             .filter_map(|a| a.ok())
@@ -1658,112 +1724,331 @@ impl PackageParser for CentralPackageManagementPropsParser {
                             .and_then(|attr| String::from_utf8(attr.value.to_vec()).ok())
                             .or_else(|| current_item_group_condition.clone());
 
-                        if let Some(dependency) =
-                            build_directory_packages_dependency(name, version, condition)
-                        {
-                            dependencies.push(dependency);
-                        }
+                        current_package_version = Some(CentralPackageVersionData {
+                            name,
+                            version,
+                            condition,
+                        });
                     }
+                    _ => {}
                 }
-                Ok(Event::Text(e)) => {
-                    let text = e.decode().ok().map(|s| s.trim().to_string());
-                    let Some(text) = text.filter(|value| !value.is_empty()) else {
-                        buf.clear();
-                        continue;
-                    };
+            }
+            Ok(Event::Empty(e)) => {
+                let tag_name = String::from_utf8_lossy(e.name().as_ref()).to_string();
+                if tag_name == "PackageVersion" {
+                    let name = e
+                        .attributes()
+                        .filter_map(|a| a.ok())
+                        .find(|attr| matches!(attr.key.as_ref(), b"Include" | b"Update"))
+                        .and_then(|attr| String::from_utf8(attr.value.to_vec()).ok());
+                    let version = e
+                        .attributes()
+                        .filter_map(|a| a.ok())
+                        .find(|attr| attr.key.as_ref() == b"Version")
+                        .and_then(|attr| String::from_utf8(attr.value.to_vec()).ok());
+                    let condition = e
+                        .attributes()
+                        .filter_map(|a| a.ok())
+                        .find(|attr| attr.key.as_ref() == b"Condition")
+                        .and_then(|attr| String::from_utf8(attr.value.to_vec()).ok())
+                        .or_else(|| current_item_group_condition.clone());
 
-                    if current_package_version.is_some() {
-                        if current_element.as_str() == "Version"
-                            && let Some(entry) = &mut current_package_version
-                        {
-                            entry.version = Some(text);
-                        }
-                    } else {
-                        match current_element.as_str() {
-                            "ManagePackageVersionsCentrally" => {
-                                manage_package_versions_centrally =
-                                    Some(text.eq_ignore_ascii_case("true"))
-                            }
-                            "CentralPackageTransitivePinningEnabled" => {
-                                central_package_transitive_pinning_enabled =
-                                    Some(text.eq_ignore_ascii_case("true"))
-                            }
-                            "CentralPackageVersionOverrideEnabled" => {
-                                central_package_version_override_enabled =
-                                    Some(text.eq_ignore_ascii_case("true"))
-                            }
-                            _ => {}
-                        }
+                    raw.package_versions.push(CentralPackageVersionData {
+                        name,
+                        version,
+                        condition,
+                    });
+                } else if tag_name == "Import"
+                    && let Some(project) = e
+                        .attributes()
+                        .filter_map(|a| a.ok())
+                        .find(|attr| attr.key.as_ref() == b"Project")
+                        .and_then(|attr| String::from_utf8(attr.value.to_vec()).ok())
+                    && is_supported_directory_packages_import(&project)
+                {
+                    raw.import_projects.push(project.trim().to_string());
+                }
+            }
+            Ok(Event::Text(e)) => {
+                let text = e.decode().ok().map(|s| s.trim().to_string());
+                let Some(text) = text.filter(|value| !value.is_empty()) else {
+                    buf.clear();
+                    continue;
+                };
+
+                if current_package_version.is_some() {
+                    if current_element.as_str() == "Version"
+                        && let Some(entry) = &mut current_package_version
+                    {
+                        entry.version = Some(text);
                     }
-                }
-                Ok(Event::End(e)) => {
-                    let tag_name = String::from_utf8_lossy(e.name().as_ref()).to_string();
-
-                    match tag_name.as_str() {
-                        "ItemGroup" => current_item_group_condition = None,
-                        "PackageVersion" => {
-                            if let Some(entry) = current_package_version.take()
-                                && let Some(dependency) = build_directory_packages_dependency(
-                                    entry.name,
-                                    entry.version,
-                                    entry.condition,
-                                )
-                            {
-                                dependencies.push(dependency);
-                            }
+                } else {
+                    raw.property_values
+                        .insert(current_element.clone(), text.clone());
+                    match current_element.as_str() {
+                        "ManagePackageVersionsCentrally" => {
+                            raw.manage_package_versions_centrally = Some(text)
+                        }
+                        "CentralPackageTransitivePinningEnabled" => {
+                            raw.central_package_transitive_pinning_enabled = Some(text)
+                        }
+                        "CentralPackageVersionOverrideEnabled" => {
+                            raw.central_package_version_override_enabled = Some(text)
                         }
                         _ => {}
                     }
-
-                    current_element.clear();
                 }
-                Ok(Event::Eof) => break,
+            }
+            Ok(Event::End(e)) => {
+                let tag_name = String::from_utf8_lossy(e.name().as_ref()).to_string();
+
+                match tag_name.as_str() {
+                    "ItemGroup" => current_item_group_condition = None,
+                    "PackageVersion" => {
+                        if let Some(entry) = current_package_version.take() {
+                            raw.package_versions.push(entry);
+                        }
+                    }
+                    _ => {}
+                }
+
+                current_element.clear();
+            }
+            Ok(Event::Eof) => break,
+            Err(e) => {
+                return Err(format!(
+                    "Error parsing Directory.Packages.props at {:?}: {}",
+                    path, e
+                ));
+            }
+            _ => {}
+        }
+
+        buf.clear();
+    }
+
+    Ok(raw)
+}
+
+fn build_directory_packages_package_data(data: CentralPackagePropsData) -> PackageData {
+    let mut extra_data = serde_json::Map::new();
+    if let Some(value) = data.manage_package_versions_centrally {
+        extra_data.insert(
+            "manage_package_versions_centrally".to_string(),
+            serde_json::Value::Bool(value),
+        );
+    }
+    if let Some(value) = data.central_package_transitive_pinning_enabled {
+        extra_data.insert(
+            "central_package_transitive_pinning_enabled".to_string(),
+            serde_json::Value::Bool(value),
+        );
+    }
+    if let Some(value) = data.central_package_version_override_enabled {
+        extra_data.insert(
+            "central_package_version_override_enabled".to_string(),
+            serde_json::Value::Bool(value),
+        );
+    }
+    if !data.import_projects.is_empty() {
+        extra_data.insert(
+            "import_projects".to_string(),
+            serde_json::Value::Array(
+                data.import_projects
+                    .into_iter()
+                    .map(serde_json::Value::String)
+                    .collect(),
+            ),
+        );
+    }
+
+    PackageData {
+        datasource_id: Some(DatasourceId::NugetDirectoryPackagesProps),
+        package_type: Some(PackageType::Nuget),
+        dependencies: data.dependencies,
+        extra_data: if extra_data.is_empty() {
+            None
+        } else {
+            Some(extra_data.into_iter().collect())
+        },
+        ..default_package_data(Some(DatasourceId::NugetDirectoryPackagesProps))
+    }
+}
+
+fn merge_central_package_props(
+    target: &mut CentralPackagePropsData,
+    source: CentralPackagePropsData,
+) {
+    target.import_projects.extend(source.import_projects);
+    target.properties.extend(source.properties);
+    if target.manage_package_versions_centrally.is_none() {
+        target.manage_package_versions_centrally = source.manage_package_versions_centrally;
+    }
+    if target.central_package_transitive_pinning_enabled.is_none() {
+        target.central_package_transitive_pinning_enabled =
+            source.central_package_transitive_pinning_enabled;
+    }
+    if target.central_package_version_override_enabled.is_none() {
+        target.central_package_version_override_enabled =
+            source.central_package_version_override_enabled;
+    }
+    replace_matching_dependency_group(&mut target.dependencies, &source.dependencies);
+    target.dependencies.extend(source.dependencies);
+}
+
+fn replace_matching_dependency_group(target: &mut Vec<Dependency>, source: &[Dependency]) {
+    if source.is_empty() {
+        return;
+    }
+
+    let source_keys = source.iter().map(dependency_key).collect::<Vec<_>>();
+    target.retain(|candidate| {
+        !source_keys
+            .iter()
+            .any(|key| *key == dependency_key(candidate))
+    });
+}
+
+fn dependency_key(dependency: &Dependency) -> (Option<String>, Option<String>, Option<String>) {
+    (
+        dependency.purl.clone(),
+        dependency.scope.clone(),
+        dependency
+            .extra_data
+            .as_ref()
+            .and_then(|data| data.get("condition"))
+            .and_then(|value| value.as_str())
+            .map(ToOwned::to_owned),
+    )
+}
+
+fn is_supported_directory_packages_import(project: &str) -> bool {
+    let trimmed = project.trim();
+    if trimmed.is_empty() {
+        return false;
+    }
+
+    if is_get_path_of_file_above_import(trimmed) {
+        return true;
+    }
+
+    let candidate = PathBuf::from(trimmed);
+    candidate.file_name().and_then(|name| name.to_str()) == Some("Directory.Packages.props")
+}
+
+fn is_get_path_of_file_above_import(project: &str) -> bool {
+    let normalized = project.replace(' ', "");
+    normalized
+        == "$([MSBuild]::GetPathOfFileAbove(Directory.Packages.props,$(MSBuildThisFileDirectory)..))"
+}
+
+fn resolve_import_project_for_directory_packages(
+    current_path: &Path,
+    project: &str,
+    known_props_paths: &HashMap<PathBuf, &PackageData>,
+) -> Option<PathBuf> {
+    let trimmed = project.trim();
+    if is_get_path_of_file_above_import(trimmed) {
+        let start_dir = current_path.parent()?.parent()?;
+        for ancestor in start_dir.ancestors() {
+            let candidate = ancestor.join("Directory.Packages.props");
+            if known_props_paths.is_empty() {
+                if candidate.exists() {
+                    return Some(candidate);
+                }
+            } else if known_props_paths.contains_key(&candidate) {
+                return Some(candidate);
+            }
+        }
+        return None;
+    }
+
+    if !is_supported_directory_packages_import(trimmed) {
+        return None;
+    }
+
+    let candidate = PathBuf::from(trimmed);
+    if candidate.is_absolute() {
+        if known_props_paths.is_empty() {
+            candidate.exists().then_some(candidate)
+        } else {
+            known_props_paths
+                .contains_key(&candidate)
+                .then_some(candidate)
+        }
+    } else {
+        let resolved = current_path.parent()?.join(candidate);
+        if known_props_paths.is_empty() {
+            resolved.exists().then_some(resolved)
+        } else {
+            known_props_paths
+                .contains_key(&resolved)
+                .then_some(resolved)
+        }
+    }
+}
+
+fn resolve_string_property_reference(
+    value: &str,
+    properties: &HashMap<String, String>,
+) -> Option<String> {
+    let trimmed = value.trim();
+    if let Some(property_name) = trimmed
+        .strip_prefix("$(")
+        .and_then(|value| value.strip_suffix(')'))
+    {
+        properties.get(property_name).cloned()
+    } else {
+        Some(trimmed.to_string())
+    }
+}
+
+fn resolve_bool_property_reference(
+    value: Option<&str>,
+    properties: &HashMap<String, String>,
+) -> Option<bool> {
+    let resolved = resolve_string_property_reference(value?, properties)?;
+    Some(resolved.eq_ignore_ascii_case("true"))
+}
+
+fn resolve_optional_property_value(
+    value: Option<&str>,
+    properties: &HashMap<String, String>,
+) -> Option<String> {
+    let value = value?.trim();
+    if value.is_empty() {
+        return None;
+    }
+
+    if value.starts_with("$(") && value.ends_with(')') {
+        resolve_string_property_reference(value, properties)
+    } else {
+        Some(value.to_string())
+    }
+}
+
+pub struct CentralPackageManagementPropsParser;
+
+impl PackageParser for CentralPackageManagementPropsParser {
+    const PACKAGE_TYPE: PackageType = PackageType::Nuget;
+
+    fn is_match(path: &Path) -> bool {
+        path.file_name().and_then(|name| name.to_str()) == Some("Directory.Packages.props")
+    }
+
+    fn extract_packages(path: &Path) -> Vec<PackageData> {
+        vec![
+            match resolve_directory_packages_props(path, &mut HashSet::new()) {
+                Ok(data) => build_directory_packages_package_data(data),
                 Err(e) => {
                     warn!(
                         "Error parsing Directory.Packages.props at {:?}: {}",
                         path, e
                     );
-                    return vec![default_package_data(Some(
-                        DatasourceId::NugetDirectoryPackagesProps,
-                    ))];
+                    default_package_data(Some(DatasourceId::NugetDirectoryPackagesProps))
                 }
-                _ => {}
-            }
-
-            buf.clear();
-        }
-
-        let mut extra_data = serde_json::Map::new();
-        if let Some(value) = manage_package_versions_centrally {
-            extra_data.insert(
-                "manage_package_versions_centrally".to_string(),
-                serde_json::Value::Bool(value),
-            );
-        }
-        if let Some(value) = central_package_transitive_pinning_enabled {
-            extra_data.insert(
-                "central_package_transitive_pinning_enabled".to_string(),
-                serde_json::Value::Bool(value),
-            );
-        }
-        if let Some(value) = central_package_version_override_enabled {
-            extra_data.insert(
-                "central_package_version_override_enabled".to_string(),
-                serde_json::Value::Bool(value),
-            );
-        }
-
-        vec![PackageData {
-            datasource_id: Some(DatasourceId::NugetDirectoryPackagesProps),
-            package_type: Some(Self::PACKAGE_TYPE),
-            dependencies,
-            extra_data: if extra_data.is_empty() {
-                None
-            } else {
-                Some(extra_data.into_iter().collect())
             },
-            ..default_package_data(Some(DatasourceId::NugetDirectoryPackagesProps))
-        }]
+        ]
     }
 }
 
