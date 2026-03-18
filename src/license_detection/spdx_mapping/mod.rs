@@ -11,7 +11,7 @@
 use std::collections::HashMap;
 
 use crate::license_detection::expression::{
-    LicenseExpression, expression_to_string, parse_expression,
+    expression_to_string, parse_expression, LicenseExpression,
 };
 use crate::license_detection::models::License;
 
@@ -31,7 +31,6 @@ pub struct SpdxMapping {
     ///
     /// Keys are SPDX license identifiers (case-sensitive). Values are lowercase ScanCode keys.
     /// When multiple ScanCode keys map to the same SPDX key, the first one encountered is used.
-    #[allow(dead_code)]
     spdx_to_scancode: HashMap<String, String>,
 }
 
@@ -130,7 +129,6 @@ impl SpdxMapping {
     /// let scancode = SpdxMapping::spdx_to_scancode(&mapping, "MIT");
     /// assert_eq!(scancode, Some("mit".to_string()));
     /// ```
-    #[allow(dead_code)]
     pub fn spdx_to_scancode(&self, spdx_key: &str) -> Option<String> {
         self.spdx_to_scancode.get(spdx_key).cloned()
     }
@@ -196,13 +194,11 @@ impl SpdxMapping {
     }
 
     /// Get the number of ScanCode keys in the mapping.
-    #[allow(dead_code)]
     pub fn scancode_count(&self) -> usize {
         self.scancode_to_spdx.len()
     }
 
     /// Get the number of SPDX keys in the mapping.
-    #[allow(dead_code)]
     pub fn spdx_count(&self) -> usize {
         self.spdx_to_scancode.len()
     }
@@ -231,7 +227,6 @@ pub fn build_spdx_mapping(licenses: &[License]) -> SpdxMapping {
 ///
 /// # Returns
 /// Option containing SPDX license identifier, or None if key not found
-#[allow(dead_code)]
 pub fn scancode_to_spdx(mapping: &SpdxMapping, scancode_key: &str) -> Option<String> {
     mapping.scancode_to_spdx(scancode_key)
 }
@@ -246,7 +241,6 @@ pub fn scancode_to_spdx(mapping: &SpdxMapping, scancode_key: &str) -> Option<Str
 ///
 /// # Returns
 /// Option containing lowercase ScanCode license key, or None if key not found
-#[allow(dead_code)]
 pub fn spdx_to_scancode(mapping: &SpdxMapping, spdx_key: &str) -> Option<String> {
     mapping.spdx_to_scancode(spdx_key)
 }
@@ -261,7 +255,6 @@ pub fn spdx_to_scancode(mapping: &SpdxMapping, spdx_key: &str) -> Option<String>
 ///
 /// # Returns
 /// String containing the expression with SPDX keys, or error string
-#[allow(dead_code)]
 pub fn expression_scancode_to_spdx(
     mapping: &SpdxMapping,
     scancode_expr: &str,

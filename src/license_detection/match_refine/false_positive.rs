@@ -67,26 +67,6 @@ pub(super) fn is_list_of_false_positives(
     is_long_enough_sequence && has_enough_licenses && has_enough_candidates
 }
 
-#[allow(dead_code)]
-fn match_distance(a: &LicenseMatch, b: &LicenseMatch) -> usize {
-    if a.start_line <= b.end_line && b.start_line <= a.end_line {
-        return 0;
-    }
-
-    let a_end = a.end_line + 1;
-    let b_end = b.end_line + 1;
-
-    if a_end == b.start_line || b_end == a.start_line {
-        return 1;
-    }
-
-    if a_end < b.start_line {
-        b.start_line - a_end
-    } else {
-        a.start_line - b_end
-    }
-}
-
 /// Filter matches that are likely false positive license lists.
 ///
 /// A false positive license list is a sequence of many short, exact matches
@@ -444,39 +424,6 @@ mod tests {
 
         assert_eq!(kept.len(), 1);
         assert_eq!(discarded.len(), 30);
-    }
-
-    #[test]
-    fn test_match_distance_overlapping() {
-        let a = create_test_match_with_flags(
-            "#1", 1, 10, false, false, false, false, "2-aho", 100.0, 10, 10, "mit",
-        );
-        let b = create_test_match_with_flags(
-            "#2", 5, 15, false, false, false, false, "2-aho", 100.0, 10, 10, "mit",
-        );
-        assert_eq!(match_distance(&a, &b), 0);
-    }
-
-    #[test]
-    fn test_match_distance_touching() {
-        let a = create_test_match_with_flags(
-            "#1", 1, 10, false, false, false, false, "2-aho", 100.0, 10, 10, "mit",
-        );
-        let b = create_test_match_with_flags(
-            "#2", 11, 20, false, false, false, false, "2-aho", 100.0, 10, 10, "mit",
-        );
-        assert_eq!(match_distance(&a, &b), 1);
-    }
-
-    #[test]
-    fn test_match_distance_gap() {
-        let a = create_test_match_with_flags(
-            "#1", 1, 10, false, false, false, false, "2-aho", 100.0, 10, 10, "mit",
-        );
-        let b = create_test_match_with_flags(
-            "#2", 15, 25, false, false, false, false, "2-aho", 100.0, 10, 10, "mit",
-        );
-        assert_eq!(match_distance(&a, &b), 4);
     }
 
     #[test]

@@ -213,7 +213,7 @@ pub(super) fn parse_primary(tokens: &[Token]) -> Result<(LicenseExpression, &[To
 
 #[cfg(test)]
 mod tests {
-    use super::super::{LicenseExpression, expression_to_string};
+    use super::super::{expression_to_string, LicenseExpression};
     use super::*;
 
     #[test]

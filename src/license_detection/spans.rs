@@ -96,24 +96,20 @@ impl Span {
     }
 
     /// Check if this span is empty.
-    #[allow(dead_code)]
     pub fn is_empty(&self) -> bool {
         self.ranges.is_empty()
     }
 
     /// Get the number of ranges in this span.
-    #[allow(dead_code)]
     pub fn len(&self) -> usize {
         self.ranges.len()
     }
 
     /// Get the total length covered by all ranges.
-    #[allow(dead_code)]
     pub fn total_length(&self) -> usize {
         self.ranges.iter().map(|r| r.end - r.start).sum()
     }
 
-    #[allow(dead_code)]
     pub fn overlap(&self, other: &Span) -> usize {
         let mut count = 0;
         for self_range in &self.ranges {
@@ -128,7 +124,6 @@ impl Span {
         count
     }
 
-    #[allow(dead_code)]
     pub fn overlap_ratio(&self, other: &Span) -> f64 {
         let overlap = self.overlap(other);
         let max_len = self.total_length().max(other.total_length());

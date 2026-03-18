@@ -206,6 +206,7 @@ mod tests {
     }
 }
 
+#[cfg(test)]
 mod integration_tests {
     use super::super::super::index::token_sets::*;
     use super::super::super::models::Rule;
@@ -213,7 +214,6 @@ mod integration_tests {
     use std::collections::HashMap;
 
     /// Helper function to create a rule with mock tokens and compute thresholds.
-    #[allow(dead_code)]
     fn create_rule_with_thresholds(
         text: String,
         tokens: Vec<u16>,

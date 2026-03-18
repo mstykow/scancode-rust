@@ -5,10 +5,10 @@
 
 use std::collections::{HashMap, HashSet};
 
-use crate::license_detection::index::LicenseIndex;
 use crate::license_detection::index::dictionary::TokenDictionary;
+use crate::license_detection::index::LicenseIndex;
 use crate::license_detection::models::Rule;
-use crate::license_detection::query::{Query, QueryRun};
+use crate::license_detection::query::Query;
 
 /// Creates a test index with customizable legalese tokens.
 ///
@@ -179,21 +179,4 @@ pub fn create_mock_query_with_tokens<'a>(tokens: &[u16], index: &'a LicenseIndex
         spdx_lines: Vec::new(),
         index,
     }
-}
-
-/// Creates a mock QueryRun from a mock Query.
-///
-/// # Arguments
-/// * `query` - The query reference
-///
-/// # Returns
-/// A `QueryRun` spanning the entire token range
-#[allow(dead_code)]
-pub fn create_mock_query_run_from_query<'a>(query: &'a Query<'a>) -> QueryRun<'a> {
-    let end = if query.tokens.is_empty() {
-        None
-    } else {
-        Some(query.tokens.len() - 1)
-    };
-    QueryRun::new(query, 0, end)
 }

@@ -24,3 +24,37 @@ Why skipped:
   this file.
 - We prefer to defer this until we can implement a reliable PDF extraction fix
   without destabilizing the remaining matcher parity work.
+
+## License and Rule Metadata Parity
+
+- Known gap.
+- Rust currently parses some Python-compatible license/rule frontmatter fields
+  in `src/license_detection/rules/loader.rs` but does not carry them through to
+  the Rust models or any downstream behavior yet.
+
+Currently parsed-but-unused license metadata:
+
+- `owner`
+- `osi_license_key`
+- `is_exception`
+- `standard_notice`
+
+Currently parsed-but-unused rule metadata:
+
+- `skip_for_required_phrase_generation`
+- `replaced_by`
+
+Why deferred:
+
+- These are real Python metadata fields, so we want to keep parsing them for
+  schema compatibility with upstream rule/license data.
+- Rust does not yet implement the corresponding parity features that justify
+  using them.
+
+Missing follow-up work:
+
+- extend Rust license/rule models to carry the missing metadata,
+- implement Python-style required-phrase generation behavior that uses
+  `skip_for_required_phrase_generation`,
+- decide how deprecated rule replacements should be modeled and surfaced,
+- decide which license metadata fields belong in Rust output or internal APIs.

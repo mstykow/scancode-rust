@@ -136,7 +136,6 @@ pub struct LicenseIndex {
     /// matching and sequence matching.
     ///
     /// Corresponds to Python: `self.regular_rids = set()` (line 228)
-    #[allow(dead_code)]
     pub regular_rids: HashSet<usize>,
 
     /// Set of rule IDs for false positive rules.
@@ -200,7 +199,6 @@ impl LicenseIndex {
     ///
     /// # Returns
     /// Option containing the rule ID, or None if hash not found
-    #[allow(dead_code)]
     pub fn get_rid_by_hash(&self, hash: &[u8; 20]) -> Option<&usize> {
         self.rid_by_hash.get(hash)
     }
@@ -212,7 +210,6 @@ impl LicenseIndex {
     ///
     /// # Returns
     /// Option containing the License, or None if not found
-    #[allow(dead_code)]
     pub fn get_license(&self, key: &str) -> Option<&License> {
         self.licenses_by_key.get(key)
     }
@@ -221,7 +218,6 @@ impl LicenseIndex {
     ///
     /// # Arguments
     /// * `license` - License to add
-    #[allow(dead_code)]
     pub fn add_license(&mut self, license: License) {
         self.licenses_by_key.insert(license.key.clone(), license);
     }
@@ -230,7 +226,6 @@ impl LicenseIndex {
     ///
     /// # Arguments
     /// * `licenses` - Slice of licenses to add
-    #[allow(dead_code)]
     pub fn add_licenses(&mut self, licenses: &[License]) {
         for license in licenses {
             self.add_license(license.clone());
@@ -241,7 +236,6 @@ impl LicenseIndex {
     ///
     /// # Returns
     /// Iterator over all ScanCode license keys
-    #[allow(dead_code)]
     pub fn license_keys(&self) -> impl Iterator<Item = &String> {
         self.licenses_by_key.keys()
     }
@@ -250,7 +244,6 @@ impl LicenseIndex {
     ///
     /// # Returns
     /// Count of licenses
-    #[allow(dead_code)]
     pub fn license_count(&self) -> usize {
         self.licenses_by_key.len()
     }

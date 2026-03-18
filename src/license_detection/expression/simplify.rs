@@ -315,7 +315,6 @@ pub fn licensing_contains(container: &str, contained: &str) -> bool {
 ///
 /// # Returns
 /// ValidationResult indicating if expression is valid
-#[allow(dead_code)]
 pub fn validate_expression(
     expr: &LicenseExpression,
     known_keys: &HashSet<String>,

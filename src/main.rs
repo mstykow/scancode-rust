@@ -21,7 +21,7 @@ use crate::scanner::{TextDetectionOptions, count_with_size, process, process_wit
 mod assembly;
 mod cache;
 mod cli;
-#[allow(dead_code, unused_imports)]
+#[allow(unused_imports)]
 mod copyright;
 mod finder;
 mod license_detection;

@@ -23,7 +23,6 @@ pub use candidates::{Candidate, compute_candidates_with_msets};
 pub use matching::seq_match_with_candidates;
 
 pub const MATCH_SEQ: &str = "3-seq";
-#[allow(dead_code)]
 pub const MATCH_SEQ_ORDER: u8 = 3;
 
 /// Default threshold for high resemblance (0.8 = 80% similarity).

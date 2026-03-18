@@ -965,7 +965,8 @@ SOFTWARE."#;
         let index = build_index(rules, licenses);
 
         let text = std::fs::read_to_string(test_file).unwrap();
-        let query = Query::from_extracted_text(&text, &index, false).expect("Query creation failed");
+        let query =
+            Query::from_extracted_text(&text, &index, false).expect("Query creation failed");
 
         eprintln!("Query token count: {}", query.tokens.len());
 
@@ -1090,7 +1091,9 @@ SOFTWARE."#;
         let engine = LicenseDetectionEngine::new(rules_path).expect("Engine creation failed");
         let text = std::fs::read_to_string(test_file).unwrap();
 
-        let detections = engine.detect(&text, false).expect("Detection failed");
+        let detections = engine
+            .detect_with_kind(&text, false, false)
+            .expect("Detection failed");
 
         eprintln!("\nDetection results:");
         for d in &detections {

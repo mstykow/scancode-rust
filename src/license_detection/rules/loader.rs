@@ -66,7 +66,6 @@ impl ParseNumber for serde_yaml::Number {
 }
 
 #[derive(Debug, Deserialize)]
-#[allow(dead_code)]
 struct LicenseFrontmatter {
     #[serde(default)]
     key: Option<String>,
@@ -81,6 +80,8 @@ struct LicenseFrontmatter {
     category: Option<String>,
 
     #[serde(default)]
+    // Parsed for compatibility with Python license metadata; Rust does not model/use this yet.
+    #[allow(dead_code)]
     owner: Option<String>,
 
     #[serde(default)]
@@ -96,6 +97,8 @@ struct LicenseFrontmatter {
     other_spdx_license_keys: Option<Vec<String>>,
 
     #[serde(default)]
+    // Parsed for compatibility with Python license metadata; Rust does not model/use this yet.
+    #[allow(dead_code)]
     osi_license_key: Option<String>,
 
     #[serde(default)]
@@ -117,6 +120,8 @@ struct LicenseFrontmatter {
     replaced_by: Option<Vec<String>>,
 
     #[serde(default, deserialize_with = "deserialize_yes_no_bool")]
+    // Parsed for compatibility with Python license metadata; Rust does not model/use this yet.
+    #[allow(dead_code)]
     is_exception: Option<bool>,
 
     #[serde(default, deserialize_with = "deserialize_yes_no_bool")]
@@ -129,6 +134,8 @@ struct LicenseFrontmatter {
     minimum_coverage: Option<serde_yaml::Number>,
 
     #[serde(default)]
+    // Parsed for compatibility with Python license metadata; Rust does not model/use this yet.
+    #[allow(dead_code)]
     standard_notice: Option<String>,
 
     #[serde(default)]
@@ -148,7 +155,6 @@ struct LicenseFrontmatter {
 }
 
 #[derive(Debug, Deserialize)]
-#[allow(dead_code)]
 struct RuleFrontmatter {
     #[serde(default)]
     license_expression: Option<String>,
@@ -178,6 +184,8 @@ struct RuleFrontmatter {
     is_required_phrase: Option<bool>,
 
     #[serde(default, deserialize_with = "deserialize_yes_no_bool")]
+    // Parsed for compatibility with Python rule metadata; required-phrase generation parity is not implemented yet.
+    #[allow(dead_code)]
     skip_for_required_phrase_generation: Option<bool>,
 
     #[serde(default)]
@@ -196,6 +204,8 @@ struct RuleFrontmatter {
     referenced_filenames: Option<Vec<String>>,
 
     #[serde(default)]
+    // Parsed for compatibility with Python rule metadata; Rust does not model deprecated rule replacements yet.
+    #[allow(dead_code)]
     replaced_by: Option<Vec<String>>,
 
     #[serde(default)]

@@ -9,7 +9,7 @@ mod tests {
     fn test_gfdl_1_1_selection() {
         let rules_path = PathBuf::from("reference/scancode-toolkit/src/licensedcode/data");
         let engine = LicenseDetectionEngine::new(&rules_path).unwrap();
-        
+
         let text = r#"Copyright (c) 2020 Go Gopher.
 Permission is granted to copy, distribute and/or
 modify this document under the terms of the GNU Free Documentation License,
@@ -18,28 +18,32 @@ with the Invariant Sections being GCD(x, y) = GCD(a, b),
 with the Front-Cover Texts being My Front Cover,
 and with the Back-Cover Texts being My Back Cover. A copy of the
 license is included in the section entitled "GNU Free Documentation License"."#;
-        
-        let detections = engine.detect(text, false).unwrap();
-        
+
+        let detections = engine.detect_with_kind(text, false, false).unwrap();
+
         // Should detect gfdl-1.1, NOT gfdl-1.1-plus
         // The input says "Version 1.1" without "or later version"
         assert!(!detections.is_empty(), "Should have detections");
-        
+
         let det = &detections[0];
         eprintln!("Detection: {}", det.license_expression);
         for m in &det.matches {
-            eprintln!("  Rule: {}, score: {:.2}, coverage: {:.2}%", 
-                m.rule_identifier, m.score, m.match_coverage);
+            eprintln!(
+                "  Rule: {}, score: {:.2}, coverage: {:.2}%",
+                m.rule_identifier, m.score, m.match_coverage
+            );
         }
-        
+
         // The primary match should be gfdl-1.1, not gfdl-1.1-plus
-        let primary_match = det.matches.iter()
+        let primary_match = det
+            .matches
+            .iter()
             .find(|m| m.matcher == "3-seq")
             .expect("Should have a sequence match");
-        
+
         assert!(
-            primary_match.license_expression.contains("gfdl-1.1") 
-            && !primary_match.license_expression.contains("plus"),
+            primary_match.license_expression.contains("gfdl-1.1")
+                && !primary_match.license_expression.contains("plus"),
             "Expected gfdl-1.1, got {}",
             primary_match.license_expression
         );

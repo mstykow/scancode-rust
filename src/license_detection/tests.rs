@@ -40,7 +40,7 @@ fn detect_fixture_matches_with_unknown_licenses(
         .unwrap_or_else(|e| panic!("Failed to read fixture {fixture_path}: {e}"));
 
     engine
-        .detect_matches(&text, unknown_licenses)
+        .detect_matches_with_kind(&text, unknown_licenses, false)
         .expect("Detection should succeed")
 }
 
@@ -184,7 +184,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE."#;
 
     let detections = engine
-        .detect(mit_text, false)
+        .detect_with_kind(mit_text, false, false)
         .expect("Detection should succeed");
 
     assert!(
@@ -215,14 +215,16 @@ fn test_engine_detect_empty_text() {
         return;
     };
 
-    let detections = engine.detect("", false).expect("Detection should succeed");
+    let detections = engine
+        .detect_with_kind("", false, false)
+        .expect("Detection should succeed");
     assert!(
         detections.is_empty() || !detections.is_empty(),
         "Detection completes"
     );
 
     let detections = engine
-        .detect("   \n\n   ", false)
+        .detect_with_kind("   \n\n   ", false, false)
         .expect("Detection should succeed");
     assert!(
         detections.is_empty() || !detections.is_empty(),
@@ -239,7 +241,7 @@ fn test_engine_detect_spdx_identifier() {
 
     let text = "SPDX-License-Identifier: MIT";
     let detections = engine
-        .detect(text, false)
+        .detect_with_kind(text, false, false)
         .expect("Detection should succeed");
 
     assert!(
@@ -344,7 +346,7 @@ fn test_engine_detect_no_license() {
 
     let text = "This is just some random text without any license information.";
     let detections = engine
-        .detect(text, false)
+        .detect_with_kind(text, false, false)
         .expect("Detection should succeed");
     assert!(
         !detections.is_empty() || detections.is_empty(),
@@ -361,7 +363,7 @@ fn test_engine_detect_gpl_notice() {
 
     let text = "This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation.";
     let detections = engine
-        .detect(text, false)
+        .detect_with_kind(text, false, false)
         .expect("Detection should succeed");
 
     assert!(!detections.is_empty(), "Should detect GPL notice");
@@ -376,7 +378,7 @@ fn test_engine_detect_apache_notice() {
 
     let text = "Licensed under the Apache License, Version 2.0";
     let detections = engine
-        .detect(text, false)
+        .detect_with_kind(text, false, false)
         .expect("Detection should succeed");
 
     assert!(!detections.is_empty(), "Should detect Apache notice");
@@ -454,7 +456,7 @@ fn test_engine_matched_text_populated() {
 
     let text = "SPDX-License-Identifier: MIT";
     let detections = engine
-        .detect(text, false)
+        .detect_with_kind(text, false, false)
         .expect("Detection should succeed");
 
     assert!(!detections.is_empty(), "Should detect license");
@@ -502,7 +504,7 @@ Projects Agency (DARPA)."#;
     let combined_text = format!("{}\n\n{}", isc_text, darpa_text);
 
     let detections = engine
-        .detect(&combined_text, false)
+        .detect_with_kind(&combined_text, false, false)
         .expect("Detection should succeed");
 
     assert!(!detections.is_empty(), "Should detect at least one license");
@@ -575,7 +577,7 @@ fn test_spdx_simple() {
 
     let text = "SPDX-License-Identifier: MIT\nSome code here";
     let detections = engine
-        .detect(text, false)
+        .detect_with_kind(text, false, false)
         .expect("Detection should succeed");
 
     assert!(
@@ -601,7 +603,7 @@ fn test_spdx_with_or() {
 
     let text = "SPDX-License-Identifier: MIT OR Apache-2.0";
     let detections = engine
-        .detect(text, false)
+        .detect_with_kind(text, false, false)
         .expect("Detection should succeed");
 
     assert!(
@@ -619,7 +621,7 @@ fn test_spdx_with_plus() {
 
     let text = "SPDX-License-Identifier: GPL-2.0+";
     let detections = engine
-        .detect(text, false)
+        .detect_with_kind(text, false, false)
         .expect("Detection should succeed");
 
     assert!(
@@ -637,7 +639,7 @@ fn test_spdx_in_comment() {
 
     let text = "// SPDX-License-Identifier: MIT\n/* some code */";
     let detections = engine
-        .detect(text, false)
+        .detect_with_kind(text, false, false)
         .expect("Detection should succeed");
 
     assert!(
@@ -657,7 +659,7 @@ fn test_spdx_lines_do_not_get_rediscovered_as_seq_false_positives() {
         .expect("Failed to read uboot.c SPDX fixture");
 
     let matches = engine
-        .detect_matches(&text, false)
+        .detect_matches_with_kind(&text, false, false)
         .expect("Detection should succeed");
     let match_exprs: Vec<&str> = matches
         .iter()
@@ -676,7 +678,7 @@ fn test_spdx_lines_do_not_get_rediscovered_as_seq_false_positives() {
     );
 
     let detections = engine
-        .detect(&text, false)
+        .detect_with_kind(&text, false, false)
         .expect("Detection should succeed");
     let detection_exprs: Vec<&str> = detections
         .iter()
@@ -707,7 +709,7 @@ fn test_spdx_complex2_html_matches_expected_expression() {
             .expect("Failed to read complex2.html SPDX fixture");
 
     let composite_matches: Vec<_> = engine
-        .detect_matches(&text, false)
+        .detect_matches_with_kind(&text, false, false)
         .expect("Detection should succeed")
         .into_iter()
         .filter(|m| {
@@ -2446,7 +2448,7 @@ to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 copies of the Software."#;
 
     let detections = engine
-        .detect(mit_text, false)
+        .detect_with_kind(mit_text, false, false)
         .expect("Detection should succeed");
 
     assert!(!detections.is_empty(), "Should detect partial MIT license");
@@ -2489,7 +2491,7 @@ fn debug_duplicate_mit_licenses() {
 
     // Now get refined matches
     let matches = engine
-        .detect_matches(&mit25_text, false)
+        .detect_matches_with_kind(&mit25_text, false, false)
         .expect("Detection failed");
 
     println!("\n=== FINAL MATCHES ===");
@@ -2509,7 +2511,9 @@ fn debug_duplicate_mit_licenses() {
     }
 
     // Check if the issue is in the merge step
-    let detections = engine.detect(&mit25_text, false).expect("Detection failed");
+    let detections = engine
+        .detect_with_kind(&mit25_text, false, false)
+        .expect("Detection failed");
     println!("\nDetections: {} groups", detections.len());
     for d in &detections {
         println!(
@@ -2540,7 +2544,7 @@ to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 copies of the Software."#;
 
     let detections = engine
-        .detect(partial_mit, false)
+        .detect_with_kind(partial_mit, false, false)
         .expect("Detection should succeed");
 
     assert!(!detections.is_empty(), "Should detect partial MIT license");
@@ -2555,7 +2559,7 @@ fn test_unknown_proprietary() {
 
     let text = "This software is proprietary and confidential. All rights reserved.";
     let detections = engine
-        .detect(text, false)
+        .detect_with_kind(text, false, false)
         .expect("Detection should succeed");
 
     assert!(
@@ -2587,7 +2591,9 @@ fn test_debug_camellia_bsd_detection() {
     println!("Text length: {} bytes", text.len());
     println!();
 
-    let detections = engine.detect(&text, false).expect("Detection failed");
+    let detections = engine
+        .detect_with_kind(&text, false, false)
+        .expect("Detection failed");
 
     println!("Number of detections: {}", detections.len());
     println!();
@@ -2685,7 +2691,7 @@ fn test_no_token_boundary_false_positives() {
     };
 
     let detections = engine
-        .detect(&text, false)
+        .detect_with_kind(&text, false, false)
         .expect("Detection should succeed");
 
     for detection in &detections {
@@ -2728,7 +2734,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.";
 
     let detections = engine
-        .detect(mit_with_bom, false)
+        .detect_with_kind(mit_with_bom, false, false)
         .expect("Detection should succeed");
 
     assert!(
@@ -2761,7 +2767,7 @@ fn test_detect_spdx_identifier_with_utf8_bom() {
 
     let text = "\u{FEFF}SPDX-License-Identifier: MIT";
     let detections = engine
-        .detect(text, false)
+        .detect_with_kind(text, false, false)
         .expect("Detection should succeed");
 
     assert!(
@@ -2783,7 +2789,7 @@ fn debug_libevent_licenses() {
             .expect("Failed to read libevent.LICENSE");
 
     let matches = engine
-        .detect_matches(&libevent_text, false)
+        .detect_matches_with_kind(&libevent_text, false, false)
         .expect("Detection failed");
 
     println!("\n=== libevent.LICENSE ===");
@@ -2811,7 +2817,7 @@ fn debug_unicode_licenses() {
     .expect("Failed to read unicode.txt");
 
     let matches = engine
-        .detect_matches(&unicode_text, false)
+        .detect_matches_with_kind(&unicode_text, false, false)
         .expect("Detection failed");
 
     println!("\n=== unicode.txt ===");
@@ -2839,7 +2845,7 @@ fn debug_ace_licenses() {
     .expect("Failed to read ACE-copying.html");
 
     let matches = engine
-        .detect_matches(&ace_text, false)
+        .detect_matches_with_kind(&ace_text, false, false)
         .expect("Detection failed");
 
     println!("\n=== ACE-copying.html ===");

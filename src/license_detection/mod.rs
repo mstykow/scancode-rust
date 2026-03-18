@@ -404,28 +404,6 @@ impl LicenseDetectionEngine {
         })
     }
 
-    /// Detect licenses in the given text.
-    ///
-    /// This runs the full detection pipeline:
-    /// 1. Create a Query from the text
-    /// 2. Run matchers in priority order (hash, SPDX-LID, Aho-Corasick)
-    /// 3. Phase 2: Near-duplicate detection (ALWAYS runs, even with exact matches)
-    /// 4. Phase 3: Query run matching (per-run with high_resemblance=False)
-    /// 5. Unknown matching (only if `unknown_licenses` is true)
-    /// 6. Refine matches
-    /// 7. Group matches by region
-    /// 8. Create LicenseDetection objects
-    ///
-    /// # Arguments
-    /// * `text` - The text to analyze
-    /// * `unknown_licenses` - Whether to detect unknown licenses (default: false)
-    ///
-    /// # Returns
-    /// A Result containing a vector of LicenseDetection objects
-    pub fn detect(&self, text: &str, unknown_licenses: bool) -> Result<Vec<LicenseDetection>> {
-        self.detect_with_kind(text, unknown_licenses, false)
-    }
-
     pub fn detect_with_kind(
         &self,
         text: &str,
@@ -584,20 +562,8 @@ impl LicenseDetectionEngine {
 
     /// Detect licenses and return raw matches (like Python's idx.match()).
     ///
-    /// This method returns matches after refinement, WITHOUT grouping into detections.
-    /// Use this for testing and comparison with Python's idx.match() output.
-    /// For production use, prefer detect() which returns grouped detections.
-    ///
-    /// # Arguments
-    /// * `text` - The text to analyze
-    /// * `unknown_licenses` - Whether to detect unknown licenses (default: false)
-    ///
-    /// # Returns
-    /// A Result containing a vector of LicenseMatch objects (ungrouped)
-    pub fn detect_matches(&self, text: &str, unknown_licenses: bool) -> Result<Vec<LicenseMatch>> {
-        self.detect_matches_with_kind(text, unknown_licenses, false)
-    }
-
+    /// This method is only used by unit/golden tests for parity checks.
+    #[cfg(test)]
     pub fn detect_matches_with_kind(
         &self,
         text: &str,
@@ -721,7 +687,8 @@ impl LicenseDetectionEngine {
         &self.index
     }
 
-    /// Get a reference to the SPDX mapping.<
+    /// Get a reference to the SPDX mapping.
+    #[cfg(test)]
     pub fn spdx_mapping(&self) -> &SpdxMapping {
         &self.spdx_mapping
     }

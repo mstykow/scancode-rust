@@ -52,7 +52,6 @@ pub const MATCH_SPDX_ID: &str = "1-spdx-id";
 /// SPDX-LID matching runs after hash matching and Aho-Corasick matching.
 ///
 /// Corresponds to Python: `MATCH_SPDX_ID_ORDER = 2` (line 62)
-#[allow(dead_code)]
 pub const MATCH_SPDX_ID_ORDER: u8 = 2;
 
 lazy_static::lazy_static! {
@@ -112,7 +111,6 @@ pub fn clean_spdx_text(text: &str) -> String {
     text
 }
 
-#[allow(dead_code)]
 pub fn extract_spdx_expressions(text: &str) -> Vec<String> {
     text.lines()
         .filter_map(|line| {

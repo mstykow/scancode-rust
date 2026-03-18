@@ -85,8 +85,6 @@ impl PackageParser for GitmodulesParser {
 }
 
 struct Submodule {
-    #[allow(dead_code)]
-    name: String,
     path: String,
     url: String,
     purl: Option<String>,
@@ -136,7 +134,7 @@ fn parse_gitmodules(content: &str) -> Vec<Submodule> {
     submodules
 }
 
-fn build_submodule(name: String, section: HashMap<String, String>) -> Option<Submodule> {
+fn build_submodule(_name: String, section: HashMap<String, String>) -> Option<Submodule> {
     let path = section.get("path").cloned().unwrap_or_default();
     let url = section.get("url").cloned().unwrap_or_default();
 
@@ -147,7 +145,6 @@ fn build_submodule(name: String, section: HashMap<String, String>) -> Option<Sub
     let purl = build_purl_from_url(&url);
 
     Some(Submodule {
-        name,
         path,
         url,
         purl,

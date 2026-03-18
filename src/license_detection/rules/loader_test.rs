@@ -82,12 +82,10 @@ name: Test License
         result.is_err(),
         "Empty text should fail for non-deprecated license"
     );
-    assert!(
-        result
-            .unwrap_err()
-            .to_string()
-            .contains("empty text content")
-    );
+    assert!(result
+        .unwrap_err()
+        .to_string()
+        .contains("empty text content"));
 }
 
 #[test]
@@ -138,12 +136,10 @@ license_expression: mit
 
     let result = parse_rule_from_str(content, "empty-text.RULE");
     assert!(result.is_err(), "Rule with empty text should fail");
-    assert!(
-        result
-            .unwrap_err()
-            .to_string()
-            .contains("empty text content")
-    );
+    assert!(result
+        .unwrap_err()
+        .to_string()
+        .contains("empty text content"));
 }
 
 #[test]
@@ -766,7 +762,9 @@ fn test_ibmpl_detection() {
 
     // Test with exact rule text
     let exact_text = "distributed under the IBM Public License (IPL).";
-    let detections = engine.detect(exact_text, false).expect("Detection failed");
+    let detections = engine
+        .detect_with_kind(exact_text, false, false)
+        .expect("Detection failed");
 
     eprintln!("Exact text match:");
     for d in &detections {
@@ -777,7 +775,9 @@ fn test_ibmpl_detection() {
 
     // Test with the actual test file text (split across lines)
     let test_text = "Version 0.7.0 and above will be distributed under the IBM Public\nLicense (IPL). The IPL is an approved open source license";
-    let detections = engine.detect(test_text, false).expect("Detection failed");
+    let detections = engine
+        .detect_with_kind(test_text, false, false)
+        .expect("Detection failed");
 
     eprintln!("\nTest file text match:");
     for d in &detections {
