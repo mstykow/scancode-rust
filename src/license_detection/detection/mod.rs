@@ -9,7 +9,7 @@ pub mod identifier;
 mod types;
 
 pub use grouping::{group_matches_by_region, sort_matches_by_line};
-pub use types::{DetectionGroup, FileRegion, LicenseDetection};
+pub use types::{DetectionGroup, LicenseDetection};
 
 use crate::license_detection::spdx_mapping::SpdxMapping;
 
@@ -98,13 +98,6 @@ pub fn populate_detection_from_group(detection: &mut LicenseDetection, group: &D
         detection.identifier = None;
     }
 
-    if group.start_line > 0 {
-        detection.file_region = Some(FileRegion {
-            path: String::new(),
-            start_line: group.start_line,
-            end_line: group.end_line,
-        });
-    }
 }
 
 /// Populate LicenseDetection from a DetectionGroup with SPDX mapping.
@@ -154,7 +147,6 @@ pub fn create_detection_from_group(group: &DetectionGroup) -> LicenseDetection {
         matches: Vec::new(),
         detection_log: Vec::new(),
         identifier: None,
-        file_region: None,
     };
 
     if group.matches.is_empty() {
@@ -197,14 +189,6 @@ pub fn create_detection_from_group(group: &DetectionGroup) -> LicenseDetection {
         detection.identifier = None;
     }
 
-    if group.start_line > 0 {
-        detection.file_region = Some(FileRegion {
-            path: String::new(),
-            start_line: group.start_line,
-            end_line: group.end_line,
-        });
-    }
-
     detection
 }
 
@@ -230,9 +214,9 @@ pub fn filter_detections_by_score(
 /// location. Detections with the same expression but different identifiers
 /// represent the same license at DIFFERENT locations and should be kept separate.
 ///
-/// NOTE: This function is currently unused. It will be renamed to `get_unique_detections`
-/// and reimplemented to return `UniqueDetection` with aggregated `file_regions`.
-/// See: docs/license-detection/PLAN-019-unique-detection.md
+/// NOTE: This function is currently unused. Python aggregates detections into
+/// unique detections with per-file region metadata, but Rust does not implement
+/// that feature yet. See: `docs/license-detection/PLAN-019-file-region-and-unique-detection.md`.
 ///
 /// Based on Python get_detections_by_id behavior in detection.py.
 #[cfg(test)]
@@ -450,7 +434,6 @@ mod tests {
             matches: Vec::new(),
             detection_log: Vec::new(),
             identifier: None,
-            file_region: None,
         };
         populate_detection_from_group(&mut detection, &group);
         assert_eq!(detection.matches.len(), 1);
@@ -470,7 +453,6 @@ mod tests {
             matches: Vec::new(),
             detection_log: Vec::new(),
             identifier: None,
-            file_region: None,
         };
         populate_detection_from_group(&mut detection, &group);
         assert!(detection.matches.is_empty());
@@ -491,7 +473,6 @@ mod tests {
             matches: Vec::new(),
             detection_log: Vec::new(),
             identifier: None,
-            file_region: None,
         };
         populate_detection_from_group(&mut detection, &group);
         assert!(
@@ -515,7 +496,6 @@ mod tests {
             matches: Vec::new(),
             detection_log: Vec::new(),
             identifier: None,
-            file_region: None,
         };
         populate_detection_from_group_with_spdx(&mut detection, &group, &spdx_mapping);
         assert!(detection.license_expression_spdx.is_some());
@@ -532,7 +512,6 @@ mod tests {
             matches: Vec::new(),
             detection_log: Vec::new(),
             identifier: None,
-            file_region: None,
         };
         populate_detection_from_group_with_spdx(&mut detection, &group, &spdx_mapping);
         assert!(detection.matches.is_empty());
@@ -546,7 +525,6 @@ mod tests {
             matches: vec![create_perfect_match(1, 10)],
             detection_log: vec!["perfect-detection".to_string()],
             identifier: None,
-            file_region: None,
         };
         detection.identifier = Some(compute_detection_identifier(&detection));
         let filtered = filter_detections_by_score(vec![detection], 0.0);
@@ -561,7 +539,6 @@ mod tests {
             matches: vec![create_perfect_match(1, 10)],
             detection_log: vec!["perfect-detection".to_string()],
             identifier: None,
-            file_region: None,
         };
         d1.identifier = Some(compute_detection_identifier(&d1));
 
@@ -575,7 +552,6 @@ mod tests {
             matches: vec![m],
             detection_log: vec![],
             identifier: None,
-            file_region: None,
         };
         d2.identifier = Some(compute_detection_identifier(&d2));
 
@@ -595,7 +571,6 @@ mod tests {
             matches: vec![m],
             detection_log: vec![],
             identifier: None,
-            file_region: None,
         };
         detection.identifier = Some(compute_detection_identifier(&detection));
         let filtered = filter_detections_by_score(vec![detection], 50.0);
@@ -616,7 +591,6 @@ mod tests {
             matches: vec![create_perfect_match(1, 10)],
             detection_log: vec![],
             identifier: Some("mit-abc123".to_string()),
-            file_region: None,
         };
         let d2 = LicenseDetection {
             license_expression: Some("apache-2.0".to_string()),
@@ -624,7 +598,6 @@ mod tests {
             matches: vec![create_perfect_match(20, 30)],
             detection_log: vec![],
             identifier: Some("apache-abc123".to_string()),
-            file_region: None,
         };
         let result = remove_duplicate_detections(vec![d1, d2]);
         assert_eq!(result.len(), 2);
@@ -638,7 +611,6 @@ mod tests {
             matches: vec![create_perfect_match(1, 10)],
             detection_log: vec![],
             identifier: Some("mit-abc123".to_string()),
-            file_region: None,
         };
         let d2 = LicenseDetection {
             license_expression: Some("mit".to_string()),
@@ -646,7 +618,6 @@ mod tests {
             matches: vec![create_perfect_match(20, 30)],
             detection_log: vec![],
             identifier: Some("mit-def456".to_string()),
-            file_region: None,
         };
         let result = remove_duplicate_detections(vec![d1, d2]);
         assert_eq!(
@@ -670,7 +641,6 @@ mod tests {
             matches: vec![create_perfect_match(1, 10)],
             detection_log: vec![],
             identifier: None,
-            file_region: None,
         };
         let mut d2 = LicenseDetection {
             license_expression: Some("apache-2.0".to_string()),
@@ -682,7 +652,6 @@ mod tests {
             }],
             detection_log: vec![],
             identifier: None,
-            file_region: None,
         };
         d1.identifier = Some(compute_detection_identifier(&d1));
         d2.identifier = Some(compute_detection_identifier(&d2));
@@ -701,7 +670,6 @@ mod tests {
             matches: vec![m1],
             detection_log: vec![],
             identifier: None,
-            file_region: None,
         };
         let mut m2 = create_test_match(20, 30, "1-hash", "apache.LICENSE");
         m2.score = 90.0;
@@ -712,7 +680,6 @@ mod tests {
             matches: vec![m2],
             detection_log: vec![],
             identifier: None,
-            file_region: None,
         };
         d1.identifier = Some(compute_detection_identifier(&d1));
         d2.identifier = Some(compute_detection_identifier(&d2));
@@ -739,7 +706,6 @@ mod tests {
             matches: vec![m.clone()],
             detection_log: vec![],
             identifier: None,
-            file_region: None,
         };
         let d2 = LicenseDetection {
             license_expression: Some("mit".to_string()),
@@ -747,7 +713,6 @@ mod tests {
             matches: vec![m],
             detection_log: vec![],
             identifier: None,
-            file_region: None,
         };
         let id1 = compute_detection_identifier(&d1);
         let id2 = compute_detection_identifier(&d2);
@@ -764,7 +729,6 @@ mod tests {
             matches: vec![m1],
             detection_log: vec![],
             identifier: None,
-            file_region: None,
         };
         let d2 = LicenseDetection {
             license_expression: Some("apache-2.0".to_string()),
@@ -772,7 +736,6 @@ mod tests {
             matches: vec![m2],
             detection_log: vec![],
             identifier: None,
-            file_region: None,
         };
         let id1 = compute_detection_identifier(&d1);
         let id2 = compute_detection_identifier(&d2);
@@ -790,7 +753,6 @@ mod tests {
             matches: vec![create_perfect_match(1, 10)],
             detection_log: vec![],
             identifier: Some("mit-abc123".to_string()),
-            file_region: None,
         };
         let d2 = LicenseDetection {
             license_expression: Some("mit".to_string()),
@@ -798,7 +760,6 @@ mod tests {
             matches: vec![create_perfect_match(20, 30)],
             detection_log: vec![],
             identifier: Some("mit-def456".to_string()),
-            file_region: None,
         };
         let result = apply_detection_preferences(vec![d1, d2]);
         assert_eq!(
@@ -816,7 +777,6 @@ mod tests {
             matches: vec![create_perfect_match(1, 10)],
             detection_log: vec![],
             identifier: Some("mit-abc123".to_string()),
-            file_region: None,
         };
         let d2 = LicenseDetection {
             license_expression: Some("apache-2.0".to_string()),
@@ -824,7 +784,6 @@ mod tests {
             matches: vec![create_perfect_match(20, 30)],
             detection_log: vec![],
             identifier: Some("apache-abc123".to_string()),
-            file_region: None,
         };
         let result = apply_detection_preferences(vec![d1, d2]);
         assert_eq!(result.len(), 2);
@@ -845,7 +804,6 @@ mod tests {
             matches: vec![m],
             detection_log: vec!["perfect-detection".to_string()],
             identifier: None,
-            file_region: None,
         };
         d.identifier = Some(compute_detection_identifier(&d));
         let result = post_process_detections(vec![d], 0.0);
@@ -864,7 +822,6 @@ mod tests {
             matches: vec![m],
             detection_log: vec![],
             identifier: None,
-            file_region: None,
         };
         d.identifier = Some(compute_detection_identifier(&d));
         let result = post_process_detections(vec![d], 50.0);
@@ -885,11 +842,6 @@ mod tests {
             matches: vec![create_perfect_match(20, 30)],
             detection_log: vec![],
             identifier: Some("mit-1".to_string()),
-            file_region: Some(FileRegion {
-                path: "test.txt".to_string(),
-                start_line: 20,
-                end_line: 30,
-            }),
         };
         let d2 = LicenseDetection {
             license_expression: Some("apache-2.0".to_string()),
@@ -897,15 +849,10 @@ mod tests {
             matches: vec![create_perfect_match(1, 10)],
             detection_log: vec![],
             identifier: Some("apache-1".to_string()),
-            file_region: Some(FileRegion {
-                path: "test.txt".to_string(),
-                start_line: 1,
-                end_line: 10,
-            }),
         };
         let sorted = sort_detections_by_line(vec![d1, d2]);
-        assert_eq!(sorted[0].file_region.as_ref().unwrap().start_line, 1);
-        assert_eq!(sorted[1].file_region.as_ref().unwrap().start_line, 20);
+        assert_eq!(sorted[0].matches[0].start_line, 1);
+        assert_eq!(sorted[1].matches[0].start_line, 20);
     }
 
     #[test]
@@ -955,7 +902,6 @@ mod tests {
             matches: Vec::new(),
             detection_log: Vec::new(),
             identifier: None,
-            file_region: None,
         };
         populate_detection_from_group_with_spdx(&mut detection, &group, &spdx_mapping);
         assert!(detection.license_expression_spdx.is_some());
@@ -977,7 +923,6 @@ mod tests {
             matches: Vec::new(),
             detection_log: Vec::new(),
             identifier: None,
-            file_region: None,
         };
         populate_detection_from_group_with_spdx(&mut detection, &group, &spdx_mapping);
         assert!(detection.license_expression.is_some());
@@ -997,7 +942,6 @@ mod tests {
             matches: Vec::new(),
             detection_log: Vec::new(),
             identifier: None,
-            file_region: None,
         };
         populate_detection_from_group_with_spdx(&mut detection, &group, &spdx_mapping);
         assert!(detection.license_expression.is_some());

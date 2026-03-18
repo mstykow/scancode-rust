@@ -5,30 +5,11 @@ use crate::license_detection::models::LicenseMatch;
 pub struct DetectionGroup {
     /// The matches in this group
     pub matches: Vec<LicenseMatch>,
-    /// Start line of the group (1-indexed)
-    pub start_line: usize,
-    /// End line of the group (1-indexed)
-    pub end_line: usize,
 }
 
 impl DetectionGroup {
     pub fn new(matches: Vec<LicenseMatch>) -> Self {
-        if matches.is_empty() {
-            return Self {
-                matches,
-                start_line: 0,
-                end_line: 0,
-            };
-        }
-
-        let start_line = matches.iter().map(|m| m.start_line).min().unwrap_or(0);
-        let end_line = matches.iter().map(|m| m.end_line).max().unwrap_or(0);
-
-        Self {
-            matches,
-            start_line,
-            end_line,
-        }
+        Self { matches }
     }
 }
 
@@ -52,21 +33,6 @@ pub struct LicenseDetection {
     /// An identifier unique for a license detection, containing the license
     /// expression and a UUID crafted from the match contents.
     pub identifier: Option<String>,
-
-    /// File path and start/end lines to locate the detection.
-    pub file_region: Option<FileRegion>,
-}
-
-/// A file has one or more file-regions, which are separate regions of the file
-/// containing some license information.
-#[derive(Debug, Clone)]
-pub struct FileRegion {
-    /// File path
-    pub path: String,
-    /// Start line number (1-indexed)
-    pub start_line: usize,
-    /// End line number (1-indexed)
-    pub end_line: usize,
 }
 
 #[cfg(test)]
@@ -114,8 +80,6 @@ mod tests {
     fn test_detection_group_new_empty() {
         let group = DetectionGroup::new(Vec::new());
         assert_eq!(group.matches.len(), 0);
-        assert_eq!(group.start_line, 0);
-        assert_eq!(group.end_line, 0);
     }
 
     #[test]
@@ -125,7 +89,5 @@ mod tests {
         let group = DetectionGroup::new(vec![match1, match2]);
 
         assert_eq!(group.matches.len(), 2);
-        assert_eq!(group.start_line, 1);
-        assert_eq!(group.end_line, 15);
     }
 }
