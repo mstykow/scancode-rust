@@ -52,6 +52,11 @@ You **cannot** and **should not** follow the reference Python implementation lin
 
 **Use the reference to understand WHAT to build, not HOW to build it.** Implement features using clean, idiomatic Rust that leverages the language's strengths while maintaining complete functional compatibility with the original.
 
+Note: there is a copy of the reference available that can be executed to generate reference data. It is at `reference/scancode-playground` and you can run Python files like:
+```
+cd reference/scancode-playground && venv/bin/python src/scancode/cli.py
+```
+
 ## Quick Start
 
 ```bash

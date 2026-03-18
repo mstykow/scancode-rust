@@ -55,3 +55,4 @@ testdata/**/*.sqlite-wal
 
 # copy of the reference used for extracting debug information
 reference/scancode-playground
+**/.scancode-cache

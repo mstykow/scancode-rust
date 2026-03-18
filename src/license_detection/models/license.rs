@@ -1,6 +1,5 @@
 //! License metadata loaded from .LICENSE files.
 
-
 /// License metadata loaded from .LICENSE files.
 #[derive(Debug, Clone, PartialEq)]
 pub struct License {

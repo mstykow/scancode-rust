@@ -269,7 +269,9 @@ pub(super) fn filter_license_intros(matches: &[LicenseMatch]) -> Vec<LicenseMatc
 ///
 /// Based on Python: is_license_reference_local_file() at detection.py:1368-1377
 pub(super) fn is_license_reference_local_file(m: &LicenseMatch) -> bool {
-    m.referenced_filenames.as_ref().is_some_and(|v| !v.is_empty())
+    m.referenced_filenames
+        .as_ref()
+        .is_some_and(|v| !v.is_empty())
 }
 
 /// Filter out license reference matches that point to local files.
@@ -1386,7 +1388,10 @@ mod tests {
     #[test]
     fn test_analyze_detection_unknown_match() {
         let matches = vec![create_test_match(95.0, "unknown.LICENSE")];
-        assert_eq!(analyze_detection(&matches, false), DETECTION_LOG_UNKNOWN_MATCH);
+        assert_eq!(
+            analyze_detection(&matches, false),
+            DETECTION_LOG_UNKNOWN_MATCH
+        );
     }
 
     #[test]

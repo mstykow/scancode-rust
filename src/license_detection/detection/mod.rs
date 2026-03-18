@@ -18,12 +18,9 @@ use analysis::{
     determine_spdx_expression, determine_spdx_expression_from_scancode, filter_license_intros,
     filter_license_intros_and_references,
 };
-use identifier::{
-    compute_content_identifier, compute_detection_coverage,
-    python_safe_name,
-};
 #[cfg(test)]
 use identifier::compute_detection_identifier;
+use identifier::{compute_content_identifier, compute_detection_coverage, python_safe_name};
 
 /// Matches with line gap > this are considered separate groups.
 /// Corresponds to Python's LINES_THRESHOLD = 4 (query.py:108)
@@ -349,8 +346,8 @@ pub fn post_process_detections(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::identifier::compute_detection_identifier;
+    use super::*;
     use crate::license_detection::models::License;
     use crate::license_detection::models::LicenseMatch;
     use crate::license_detection::spdx_mapping::build_spdx_mapping;

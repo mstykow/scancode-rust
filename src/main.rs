@@ -23,8 +23,8 @@ mod cache;
 mod cli;
 #[allow(dead_code, unused_imports)]
 mod copyright;
-mod license_detection;
 mod finder;
+mod license_detection;
 mod models;
 mod output;
 mod parsers;
@@ -126,9 +126,8 @@ fn run() -> Result<()> {
 
         let cache_config = prepare_cache_for_scan(scan_path, &cli)?;
 
-        
         let (total_files, total_dirs, excluded_count, total_size) =
-        count_with_size(scan_path, cli.max_depth, &exclude_patterns)?;
+            count_with_size(scan_path, cli.max_depth, &exclude_patterns)?;
         progress.finish_discovery(total_files, total_dirs, total_size, excluded_count);
         if !cli.quiet {
             progress.output_written(&format!(
@@ -136,7 +135,7 @@ fn run() -> Result<()> {
                 total_files, total_dirs, excluded_count
             ));
         }
-        
+
         progress.start_license_detection_engine_creation();
         let license_engine = init_license_engine(&cli.license_rules_path);
         progress.finish_license_detection_engine_creation();
@@ -650,7 +649,6 @@ fn apply_mark_source(files: &mut [crate::models::FileInfo]) {
     }
 }
 
-
 fn init_license_engine(rules_path: &Option<String>) -> Option<Arc<LicenseDetectionEngine>> {
     let path = match rules_path {
         Some(p) => PathBuf::from(p),
@@ -677,7 +675,6 @@ fn init_license_engine(rules_path: &Option<String>) -> Option<Arc<LicenseDetecti
         }
     }
 }
-
 
 fn create_output(
     start_time: chrono::DateTime<Utc>,

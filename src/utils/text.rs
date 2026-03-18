@@ -27,7 +27,6 @@ pub fn remove_verbatim_escape_sequences(s: &str) -> String {
         .replace("\\t", " ")
 }
 
-
 pub fn strip_utf8_bom_str(s: &str) -> &str {
     s.strip_prefix(UTF8_BOM_CHAR).unwrap_or(s)
 }
