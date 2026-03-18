@@ -228,6 +228,7 @@ pub enum DatasourceId {
     // ── NuGet ──
     NugetCsproj,
     NugetDepsJson,
+    NugetDirectoryBuildProps,
     NugetDirectoryPackagesProps,
     NugetNupkg,
     NugetProjectJson,
@@ -487,6 +488,7 @@ impl DatasourceId {
             // NuGet
             Self::NugetCsproj => "nuget_csproj",
             Self::NugetDepsJson => "nuget_deps_json",
+            Self::NugetDirectoryBuildProps => "nuget_directory_build_props",
             Self::NugetDirectoryPackagesProps => "nuget_directory_packages_props",
             Self::NugetNupkg => "nuget_nupkg",
             Self::NugetProjectJson => "nuget_project_json",

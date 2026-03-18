@@ -605,6 +605,7 @@ pub static UNASSEMBLED_DATASOURCE_IDS: &[DatasourceId] = &[
     DatasourceId::JavaWarWebXml,
     DatasourceId::JbossServiceXml,
     DatasourceId::MesonBuild,
+    DatasourceId::NugetDirectoryBuildProps,
     DatasourceId::NugetDirectoryPackagesProps,
     DatasourceId::RpmPackageLicenses,
     DatasourceId::SbtBuildSbt,
