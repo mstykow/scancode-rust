@@ -36,4 +36,12 @@ mod golden_tests {
             "testdata/sbt-golden/config-prefixed-deps/build.sbt-expected.json",
         );
     }
+
+    #[test]
+    fn test_golden_settings_and_shared_bundles() {
+        run_golden(
+            "testdata/sbt-golden/settings-and-shared-bundles/build.sbt",
+            "testdata/sbt-golden/settings-and-shared-bundles/build.sbt-expected.json",
+        );
+    }
 }
