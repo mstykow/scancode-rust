@@ -1,9 +1,16 @@
 #[cfg(test)]
 mod tests {
     use super::super::{CpanManifestParser, CpanMetaJsonParser, CpanMetaYmlParser, PackageParser};
-    use crate::models::DatasourceId;
-    use crate::models::PackageType;
+    use crate::models::{DatasourceId, PackageData, PackageType};
     use std::path::PathBuf;
+
+    fn assert_cpan_fallback_identity(package: &PackageData, datasource_id: DatasourceId) {
+        assert_eq!(package.package_type, Some(PackageType::Cpan));
+        assert_eq!(package.primary_language, Some("Perl".to_string()));
+        assert_eq!(package.datasource_id, Some(datasource_id));
+        assert_eq!(package.name, None);
+        assert_eq!(package.version, None);
+    }
 
     #[test]
     fn test_is_match_meta_json() {
@@ -316,10 +323,7 @@ mod tests {
 
         let package = CpanMetaJsonParser::extract_first_package(temp_file.path());
 
-        // Should return default package data on parse error
-        assert_eq!(package.package_type, Some(PackageType::Cpan));
-        assert_eq!(package.name, None);
-        assert_eq!(package.version, None);
+        assert_cpan_fallback_identity(&package, DatasourceId::CpanMetaJson);
     }
 
     #[test]
@@ -333,10 +337,21 @@ mod tests {
 
         let package = CpanMetaYmlParser::extract_first_package(temp_file.path());
 
-        // Should return default package data on parse error
-        assert_eq!(package.package_type, Some(PackageType::Cpan));
-        assert_eq!(package.name, None);
-        assert_eq!(package.version, None);
+        assert_cpan_fallback_identity(&package, DatasourceId::CpanMetaYml);
+    }
+
+    #[test]
+    fn test_unreadable_manifest_preserves_fallback_identity() {
+        use tempfile::tempdir;
+
+        let temp_dir = tempdir().unwrap();
+        let manifest_dir = temp_dir.path().join("MANIFEST");
+        std::fs::create_dir(&manifest_dir).unwrap();
+
+        let package = CpanManifestParser::extract_first_package(&manifest_dir);
+
+        assert_cpan_fallback_identity(&package, DatasourceId::CpanManifest);
+        assert!(package.file_references.is_empty());
     }
 
     #[test]
