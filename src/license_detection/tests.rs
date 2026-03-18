@@ -160,8 +160,8 @@ fn test_engine_new_with_reference_rules() {
         "Should have hash mappings"
     );
     assert!(
-        !engine.index().regular_rids.is_empty(),
-        "Should have regular rules"
+        !engine.index().rid_by_hash.is_empty(),
+        "Should have regular rule hashes"
     );
 }
 
@@ -284,7 +284,7 @@ fn test_engine_index_populated() {
     assert!(has_false_positives, "Should have false positive rules");
 
     let mut rules_with_tokens = 0;
-    for &rid in index.regular_rids.iter().take(10) {
+    for &rid in index.rid_by_hash.values().take(10) {
         let rule = &index.rules_by_rid[rid];
         if !rule.tokens.is_empty() {
             rules_with_tokens += 1;
@@ -399,7 +399,7 @@ fn test_engine_index_sets_by_rid() {
     };
     let index = engine.index();
 
-    for &rid in index.regular_rids.iter().take(5) {
+    for &rid in index.rid_by_hash.values().take(5) {
         assert!(
             index.sets_by_rid.contains_key(&rid),
             "Rule {} should have token set",
@@ -422,7 +422,7 @@ fn test_engine_index_msets_by_rid() {
     };
     let index = engine.index();
 
-    for &rid in index.regular_rids.iter().take(5) {
+    for &rid in index.rid_by_hash.values().take(5) {
         assert!(
             index.msets_by_rid.contains_key(&rid),
             "Rule {} should have token multiset",

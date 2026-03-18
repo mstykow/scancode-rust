@@ -7,7 +7,6 @@ pub mod token_sets;
 pub use builder::build_index;
 
 use crate::license_detection::index::dictionary::TokenDictionary;
-use crate::license_detection::models::License;
 use aho_corasick::AhoCorasick;
 use std::collections::{HashMap, HashSet};
 
@@ -37,7 +36,7 @@ pub type Automaton = AhoCorasick;
 /// - **Automaton matching**: `rules_automaton` and `unknown_automaton` for pattern matching
 /// - **Candidate selection**: `sets_by_rid` and `msets_by_rid` for set-based ranking
 /// - **Sequence matching**: `high_postings_by_rid` for high-value token position tracking
-/// - **Rule classification**: `regular_rids`, `false_positive_rids`, `approx_matchable_rids`
+/// - **Rule classification**: `false_positive_rids`, `approx_matchable_rids`
 #[derive(Debug, Clone)]
 pub struct LicenseIndex {
     /// Token dictionary mapping token strings to integer IDs.
@@ -130,14 +129,6 @@ pub struct LicenseIndex {
     /// In Python: `postings = {tid: array('h', [positions, ...])}`
     pub high_postings_by_rid: HashMap<usize, HashMap<u16, Vec<usize>>>,
 
-    /// Set of rule IDs for regular (non-false-positive) rules.
-    ///
-    /// Regular rules participate in all matching strategies including set
-    /// matching and sequence matching.
-    ///
-    /// Corresponds to Python: `self.regular_rids = set()` (line 228)
-    pub regular_rids: HashSet<usize>,
-
     /// Set of rule IDs for false positive rules.
     ///
     /// False positive rules are used for exact matching and post-matching
@@ -191,63 +182,7 @@ pub struct LicenseIndex {
     pub unknown_spdx_rid: Option<usize>,
 }
 
-impl LicenseIndex {
-    /// Get the rule ID for a hash, if it exists.
-    ///
-    /// # Arguments
-    /// * `hash` - The 20-byte SHA1 hash
-    ///
-    /// # Returns
-    /// Option containing the rule ID, or None if hash not found
-    pub fn get_rid_by_hash(&self, hash: &[u8; 20]) -> Option<&usize> {
-        self.rid_by_hash.get(hash)
-    }
-
-    /// Get a license by its key.
-    ///
-    /// # Arguments
-    /// * `key` - ScanCode license key (lowercase)
-    ///
-    /// # Returns
-    /// Option containing the License, or None if not found
-    pub fn get_license(&self, key: &str) -> Option<&License> {
-        self.licenses_by_key.get(key)
-    }
-
-    /// Add a license to the index.
-    ///
-    /// # Arguments
-    /// * `license` - License to add
-    pub fn add_license(&mut self, license: License) {
-        self.licenses_by_key.insert(license.key.clone(), license);
-    }
-
-    /// Add multiple licenses to the index.
-    ///
-    /// # Arguments
-    /// * `licenses` - Slice of licenses to add
-    pub fn add_licenses(&mut self, licenses: &[License]) {
-        for license in licenses {
-            self.add_license(license.clone());
-        }
-    }
-
-    /// Get all ScanCode license keys.
-    ///
-    /// # Returns
-    /// Iterator over all ScanCode license keys
-    pub fn license_keys(&self) -> impl Iterator<Item = &String> {
-        self.licenses_by_key.keys()
-    }
-
-    /// Get the number of licenses in the index.
-    ///
-    /// # Returns
-    /// Count of licenses
-    pub fn license_count(&self) -> usize {
-        self.licenses_by_key.len()
-    }
-}
+impl LicenseIndex {}
 
 impl LicenseIndex {
     /// Create a new empty license index.
@@ -274,7 +209,6 @@ impl LicenseIndex {
             sets_by_rid: HashMap::new(),
             msets_by_rid: HashMap::new(),
             high_postings_by_rid: HashMap::new(),
-            regular_rids: HashSet::new(),
             false_positive_rids: HashSet::new(),
             approx_matchable_rids: HashSet::new(),
             licenses_by_key: HashMap::new(),
@@ -308,6 +242,7 @@ impl Default for LicenseIndex {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::license_detection::models::License;
 
     #[test]
     fn test_license_index_new() {
@@ -319,7 +254,6 @@ mod tests {
         assert!(index.sets_by_rid.is_empty());
         assert!(index.msets_by_rid.is_empty());
         assert!(index.high_postings_by_rid.is_empty());
-        assert!(index.regular_rids.is_empty());
         assert!(index.false_positive_rids.is_empty());
         assert!(index.approx_matchable_rids.is_empty());
         assert!(index.licenses_by_key.is_empty());
@@ -380,10 +314,10 @@ mod tests {
             ignorable_emails: None,
         };
 
-        index.add_license(license);
+        index.licenses_by_key.insert(license.key.clone(), license);
 
-        assert_eq!(index.license_count(), 1);
-        assert!(index.get_license("test-license").is_some());
+        assert_eq!(index.licenses_by_key.len(), 1);
+        assert!(index.licenses_by_key.get("test-license").is_some());
     }
 
     #[test]
@@ -429,11 +363,13 @@ mod tests {
             },
         ];
 
-        index.add_licenses(&licenses);
+        for license in licenses {
+            index.licenses_by_key.insert(license.key.clone(), license);
+        }
 
-        assert_eq!(index.license_count(), 2);
-        assert!(index.get_license("license-1").is_some());
-        assert!(index.get_license("license-2").is_some());
+        assert_eq!(index.licenses_by_key.len(), 2);
+        assert!(index.licenses_by_key.get("license-1").is_some());
+        assert!(index.licenses_by_key.get("license-2").is_some());
     }
 
     #[test]
@@ -459,20 +395,20 @@ mod tests {
             ignorable_emails: None,
         };
 
-        index.add_license(license);
+        index.licenses_by_key.insert(license.key.clone(), license);
 
-        let retrieved = index.get_license("mit");
+        let retrieved = index.licenses_by_key.get("mit");
         assert!(retrieved.is_some());
         assert_eq!(retrieved.unwrap().name, "MIT License");
 
-        assert!(index.get_license("unknown").is_none());
+        assert!(index.licenses_by_key.get("unknown").is_none());
     }
 
     #[test]
     fn test_license_index_license_count() {
         let mut index = LicenseIndex::default();
 
-        assert_eq!(index.license_count(), 0);
+        assert_eq!(index.licenses_by_key.len(), 0);
 
         let license = License {
             key: "test".to_string(),
@@ -493,8 +429,8 @@ mod tests {
             ignorable_emails: None,
         };
 
-        index.add_license(license);
+        index.licenses_by_key.insert(license.key.clone(), license);
 
-        assert_eq!(index.license_count(), 1);
+        assert_eq!(index.licenses_by_key.len(), 1);
     }
 }

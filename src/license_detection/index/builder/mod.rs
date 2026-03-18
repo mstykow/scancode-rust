@@ -321,7 +321,6 @@ pub fn build_index(rules: Vec<Rule>, licenses: Vec<License>) -> LicenseIndex {
     let mut sets_by_rid: HashMap<usize, HashSet<u16>> = HashMap::new();
     let mut msets_by_rid: HashMap<usize, HashMap<u16, usize>> = HashMap::new();
     let mut high_postings_by_rid: HashMap<usize, HashMap<u16, Vec<usize>>> = HashMap::new();
-    let mut regular_rids: HashSet<usize> = HashSet::new();
     let mut false_positive_rids: HashSet<usize> = HashSet::new();
     let mut approx_matchable_rids: HashSet<usize> = HashSet::new();
 
@@ -387,8 +386,6 @@ pub fn build_index(rules: Vec<Rule>, licenses: Vec<License>) -> LicenseIndex {
         }
 
         rid_by_hash.insert(rule_hash, rid);
-
-        regular_rids.insert(rid);
 
         // Match Python indexing order: approx-matchable membership is decided
         // before compute_thresholds() later derives final is_small/is_tiny flags.
@@ -502,7 +499,6 @@ pub fn build_index(rules: Vec<Rule>, licenses: Vec<License>) -> LicenseIndex {
         sets_by_rid,
         msets_by_rid,
         high_postings_by_rid,
-        regular_rids,
         false_positive_rids,
         approx_matchable_rids,
         licenses_by_key,

@@ -110,7 +110,6 @@ mod test_cases {
         assert!(index.rules_by_rid.is_empty());
         assert!(index.tids_by_rid.is_empty());
         assert!(index.rid_by_hash.is_empty());
-        assert!(index.regular_rids.is_empty());
         assert!(index.false_positive_rids.is_empty());
         assert!(index.approx_matchable_rids.is_empty());
     }
@@ -129,7 +128,10 @@ mod test_cases {
         assert_eq!(index.tids_by_rid.len(), 2);
 
         let rid = find_rid_by_identifier(&index, "test.RULE").expect("rule should exist");
-        assert!(index.regular_rids.contains(&rid));
+        assert!(index
+            .rid_by_hash
+            .values()
+            .any(|&stored_rid| stored_rid == rid));
         assert!(!index.false_positive_rids.contains(&rid));
         assert!(index.licenses_by_key.contains_key("mit"));
     }
@@ -146,7 +148,6 @@ mod test_cases {
 
         let rid = find_rid_by_identifier(&index, "fp.RULE").expect("rule should exist");
         assert!(index.false_positive_rids.contains(&rid));
-        assert!(!index.regular_rids.contains(&rid));
         assert!(index.rid_by_hash.is_empty());
     }
 
@@ -322,8 +323,8 @@ mod test_cases {
 
         assert_eq!(index.rules_by_rid.len(), 3);
         assert_eq!(index.tids_by_rid.len(), 3);
-        assert_eq!(index.regular_rids.len(), 2);
         assert_eq!(index.false_positive_rids.len(), 1);
+        assert_eq!(index.rid_by_hash.len(), 2);
 
         let gpl_rid = find_rid_by_identifier(&index, "gpl.RULE").expect("gpl rule should exist");
         assert!(index.false_positive_rids.contains(&gpl_rid));
@@ -341,9 +342,9 @@ mod test_cases {
         ];
         let index = build_index(rules, licenses);
 
-        assert_eq!(index.license_count(), 2);
-        assert!(index.get_license("mit").is_some());
-        assert!(index.get_license("apache-2.0").is_some());
+        assert_eq!(index.licenses_by_key.len(), 2);
+        assert!(index.licenses_by_key.get("mit").is_some());
+        assert!(index.licenses_by_key.get("apache-2.0").is_some());
 
         let mit_license_rid = find_rid_by_identifier(&index, "mit.LICENSE");
         assert!(
@@ -394,8 +395,8 @@ mod test_cases {
             "Should have hash mappings for regular rules"
         );
         assert!(
-            !index.regular_rids.is_empty(),
-            "Should have regular rule IDs"
+            !index.rid_by_hash.is_empty(),
+            "Should have regular rule hashes"
         );
         assert!(!index.sets_by_rid.is_empty(), "Should have token sets");
         assert!(
@@ -414,7 +415,7 @@ mod test_cases {
         );
 
         let mut rules_with_empty_tokens = 0;
-        for &rid in &index.regular_rids {
+        for &rid in index.rid_by_hash.values() {
             let rule = &index.rules_by_rid[rid];
             if rule.tokens.is_empty() {
                 rules_with_empty_tokens += 1;
@@ -462,7 +463,7 @@ mod test_cases {
         let index = build_index(rules, vec![]);
 
         assert_eq!(index.rules_by_rid.len(), 3, "Should have 3 rules indexed");
-        assert_eq!(index.regular_rids.len(), 3);
+        assert_eq!(index.rid_by_hash.len(), 3);
 
         let rid = find_rid_by_identifier(&index, "auto1.RULE").expect("rule should exist");
         let rule_tokens = &index.tids_by_rid[rid];
@@ -537,16 +538,16 @@ mod test_cases {
         let fp_rid = find_rid_by_identifier(&index, "false_positive.RULE").expect("fp rule");
 
         assert!(
-            index.regular_rids.contains(&regular_rid),
-            "Regular rule should be in regular_rids"
+            index.rid_by_hash.values().any(|&rid| rid == regular_rid),
+            "Regular rule should participate in exact matching"
         );
         assert!(
-            index.regular_rids.contains(&tiny_rid),
-            "Tiny rule should be in regular_rids"
+            index.rid_by_hash.values().any(|&rid| rid == tiny_rid),
+            "Tiny rule should participate in exact matching"
         );
         assert!(
-            !index.regular_rids.contains(&fp_rid),
-            "False positive should not be in regular_rids"
+            !index.rid_by_hash.values().any(|&rid| rid == fp_rid),
+            "False positive should not participate in exact matching"
         );
         assert!(
             index.false_positive_rids.contains(&fp_rid),
@@ -668,12 +669,18 @@ SOFTWARE."#;
         let mit_custom_rid = find_rid_by_identifier(&index, "mit-custom.RULE");
 
         if let Some(rid) = mit_license_rid {
-            assert!(index.regular_rids.contains(&rid));
+            assert!(index
+                .rid_by_hash
+                .values()
+                .any(|&stored_rid| stored_rid == rid));
             assert!(!index.false_positive_rids.contains(&rid));
         }
 
         if let Some(rid) = mit_custom_rid {
-            assert!(index.regular_rids.contains(&rid));
+            assert!(index
+                .rid_by_hash
+                .values()
+                .any(|&stored_rid| stored_rid == rid));
             assert!(!index.false_positive_rids.contains(&rid));
         }
     }
@@ -733,12 +740,12 @@ SOFTWARE."#;
         let index = build_index(vec![], licenses);
 
         assert_eq!(
-            index.license_count(),
+            index.licenses_by_key.len(),
             1,
             "Duplicate keys should be overwritten"
         );
         assert_eq!(
-            index.get_license("mit").unwrap().name,
+            index.licenses_by_key.get("mit").unwrap().name,
             "MIT License 2",
             "Later license should win"
         );
