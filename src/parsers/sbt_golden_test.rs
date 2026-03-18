@@ -28,4 +28,12 @@ mod golden_tests {
             "testdata/sbt-golden/fallback-and-skips/build.sbt-expected.json",
         );
     }
+
+    #[test]
+    fn test_golden_config_prefixed_dependencies() {
+        run_golden(
+            "testdata/sbt-golden/config-prefixed-deps/build.sbt",
+            "testdata/sbt-golden/config-prefixed-deps/build.sbt-expected.json",
+        );
+    }
 }
