@@ -22,7 +22,7 @@ use strum::{EnumCount, EnumIter};
 /// # Examples
 ///
 /// ```ignore
-/// use scancode_rust::models::DatasourceId;
+/// use provenant::models::DatasourceId;
 ///
 /// let id = DatasourceId::NpmPackageJson;
 /// assert_eq!(id.as_ref(), "npm_package_json");

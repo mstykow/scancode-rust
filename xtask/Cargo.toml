@@ -1,5 +1,5 @@
 [package]
-name = "scancode-rust-xtask"
+name = "provenant-xtask"
 version = "0.0.0"
 edition = "2024"
 publish = false
@@ -12,7 +12,7 @@ inventory = "0.3.22"
 lazy_static = "1.5.0"
 rayon = "1.11.0"
 regex = "1.12.3"
-scancode-rust = { path = ".." }
+provenant = { path = "..", package = "provenant-cli" }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = { version = "1.0.149", features = ["preserve_order"] }
 serde_yaml = "0.9.34"

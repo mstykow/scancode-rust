@@ -1,6 +1,6 @@
-//! # scancode-rust
+//! # Provenant
 //!
-//! `scancode-rust` is the library crate behind the `scancode-rust` CLI. It
+//! `provenant` is the library crate behind the `provenant` CLI. It
 //! provides ScanCode-compatible scanning, package parsing, and output-writing
 //! building blocks for Rust applications.
 //!

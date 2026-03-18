@@ -2,7 +2,7 @@
 
 ## Summary
 
-The Alpine parser in scancode-rust now combines existing beyond-parity improvements with the current Alpine enhancement batch:
+The Alpine parser in Provenant now combines existing beyond-parity improvements with the current Alpine enhancement batch:
 
 1. **🐛 Bug Fix**: SHA1 checksums correctly decoded (Python always returns `null`)
 2. **✨ New Feature**: Provider field extraction (Python explicitly ignores this field)

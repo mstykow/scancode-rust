@@ -4,7 +4,7 @@
 
 ## Why This Exists
 
-Python ScanCode currently has only an open attempt at `MODULE.bazel` support. scancode-rust now parses Bazel Bzlmod module manifests directly.
+Python ScanCode currently has only an open attempt at `MODULE.bazel` support. Provenant now parses Bazel Bzlmod module manifests directly.
 
 ## What We Extract
 

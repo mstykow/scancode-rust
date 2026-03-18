@@ -1977,6 +1977,63 @@ dependencies = [
 ]
 
 [[package]]
+name = "provenant-cli"
+version = "0.0.5"
+dependencies = [
+ "anyhow",
+ "ar",
+ "base64",
+ "blake3",
+ "chrono",
+ "clap",
+ "content_inspector",
+ "csv",
+ "derive_builder",
+ "env_logger",
+ "flate2",
+ "glob",
+ "image",
+ "include_dir",
+ "indicatif",
+ "indicatif-log-bridge",
+ "inventory",
+ "json5",
+ "kamadak-exif",
+ "lazy_static",
+ "liblzma",
+ "log",
+ "md-5",
+ "mime_guess",
+ "packageurl",
+ "pdf-extract",
+ "pep508_rs",
+ "quick-xml",
+ "rayon",
+ "regex",
+ "rmp-serde",
+ "rpm",
+ "rpmdb",
+ "rustc_version_runtime",
+ "rustpython-parser",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "sha1",
+ "sha2",
+ "strum",
+ "sys-info",
+ "tar",
+ "tempfile",
+ "tera",
+ "toml",
+ "unicode-normalization",
+ "url",
+ "uuid",
+ "zip",
+ "zstd",
+]
+
+[[package]]
 name = "pxfm"
 version = "0.1.28"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2332,63 +2389,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "93fc1dc3aaa9bfed95e02e6eadabb4baf7e3078b0bd1b4d7b6b0b68378900502"
 dependencies = [
  "winapi-util",
-]
-
-[[package]]
-name = "scancode-rust"
-version = "0.0.5"
-dependencies = [
- "anyhow",
- "ar",
- "base64",
- "blake3",
- "chrono",
- "clap",
- "content_inspector",
- "csv",
- "derive_builder",
- "env_logger",
- "flate2",
- "glob",
- "image",
- "include_dir",
- "indicatif",
- "indicatif-log-bridge",
- "inventory",
- "json5",
- "kamadak-exif",
- "lazy_static",
- "liblzma",
- "log",
- "md-5",
- "mime_guess",
- "packageurl",
- "pdf-extract",
- "pep508_rs",
- "quick-xml",
- "rayon",
- "regex",
- "rmp-serde",
- "rpm",
- "rpmdb",
- "rustc_version_runtime",
- "rustpython-parser",
- "serde",
- "serde_json",
- "serde_yaml",
- "sha1",
- "sha2",
- "strum",
- "sys-info",
- "tar",
- "tempfile",
- "tera",
- "toml",
- "unicode-normalization",
- "url",
- "uuid",
- "zip",
- "zstd",
 ]
 
 [[package]]

@@ -1,8 +1,8 @@
 {
-  "name": "scancode-rust",
+  "name": "provenant",
   "version": "0.1.0",
   "private": true,
-  "description": "High-performance Rust tool for detecting licenses, copyrights, and package metadata",
+  "description": "Documentation tooling for Provenant",
   "scripts": {
     "format": "prettier --write \"**/*.{yml,yaml,json,md}\"",
     "format:check": "prettier --check \"**/*.{yml,yaml,json,md}\"",

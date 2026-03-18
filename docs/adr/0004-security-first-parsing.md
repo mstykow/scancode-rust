@@ -1,7 +1,7 @@
 # ADR 0004: Security-First Parsing
 
 **Status**: Accepted  
-**Authors**: scancode-rust team  
+**Authors**: Provenant team
 **Supersedes**: None
 
 ## Context

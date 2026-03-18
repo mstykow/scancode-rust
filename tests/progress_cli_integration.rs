@@ -5,7 +5,7 @@ use std::process::Command;
 use tempfile::TempDir;
 
 fn binary_path() -> String {
-    if let Ok(path) = std::env::var("CARGO_BIN_EXE_scancode-rust") {
+    if let Ok(path) = std::env::var("CARGO_BIN_EXE_provenant") {
         return path;
     }
 
@@ -13,9 +13,9 @@ fn binary_path() -> String {
     path.push("target");
     path.push("debug");
     path.push(if cfg!(windows) {
-        "scancode-rust.exe"
+        "provenant.exe"
     } else {
-        "scancode-rust"
+        "provenant"
     });
     path.to_string_lossy().to_string()
 }
@@ -41,7 +41,7 @@ fn quiet_mode_suppresses_stderr_output() {
             &scan_dir,
         ])
         .output()
-        .expect("failed to run scancode-rust");
+        .expect("failed to run provenant");
 
     assert!(output.status.success());
     assert!(
@@ -62,7 +62,7 @@ fn default_mode_emits_summary_to_stderr() {
             &scan_dir,
         ])
         .output()
-        .expect("failed to run scancode-rust");
+        .expect("failed to run provenant");
 
     assert!(output.status.success());
     let stderr = String::from_utf8_lossy(&output.stderr);
@@ -82,7 +82,7 @@ fn verbose_mode_emits_file_by_file_paths() {
             &scan_dir,
         ])
         .output()
-        .expect("failed to run scancode-rust");
+        .expect("failed to run provenant");
 
     assert!(output.status.success());
     let stderr = String::from_utf8_lossy(&output.stderr);

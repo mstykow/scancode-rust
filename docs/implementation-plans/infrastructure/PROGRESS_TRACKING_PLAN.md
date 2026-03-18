@@ -245,7 +245,7 @@ pub verbose: bool,
 
 **Decision**: Move `env_logger` from dev-dependencies to dependencies. It's lightweight and needed for `RUST_LOG` support in production.
 
-**Rationale**: Enables `RUST_LOG=debug scancode-rust ...` for troubleshooting without recompilation. The bridge requires a concrete logger implementation at runtime.
+**Rationale**: Enables `RUST_LOG=debug provenant ...` for troubleshooting without recompilation. The bridge requires a concrete logger implementation at runtime.
 
 ### Data Structures
 
@@ -487,7 +487,7 @@ Python only shows the error count in the final summary.
   - Default mode emits scan summary to stderr.
   - Verbose mode emits file-by-file paths to stderr.
 - `cargo test --test scanner_integration` validates scanner behavior after progress-manager wiring.
-- `cargo test --bin scancode-rust main_test::` validates CLI-mode mapping and main-path helpers.
+- `cargo test --bin provenant main_test::` validates CLI-mode mapping and main-path helpers.
 - `cargo clippy --all-targets --all-features -- -D warnings` and `cargo build` pass with progress changes.
 
 ### Manual Spot Checks Performed

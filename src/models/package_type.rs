@@ -28,7 +28,7 @@ use std::str::FromStr;
 /// # Examples
 ///
 /// ```ignore
-/// use scancode_rust::models::PackageType;
+/// use provenant::models::PackageType;
 ///
 /// let pt = PackageType::Npm;
 /// assert_eq!(pt.as_ref(), "npm");

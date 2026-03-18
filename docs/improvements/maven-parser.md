@@ -6,7 +6,7 @@
 
 ## Summary
 
-The Maven POM parser in scancode-rust now improves on the Python reference in nine important areas:
+The Maven POM parser in Provenant now improves on the Python reference in nine important areas:
 
 1. **🔍 Enhanced Extraction**: description handling now matches Maven `name` + `description` semantics without duplicating identical values
 2. **✨ New Feature**: `dependencyManagement` entries are surfaced as dependency records instead of being preserved only as opaque metadata

@@ -1532,7 +1532,7 @@ fn normalize_debian_license_name(license_name: &str) -> (String, String) {
         "BSD-4-clause" => ("bsd-original-uc".to_string(), "BSD-4-Clause-UC".to_string()),
         "public-domain" => (
             "public-domain".to_string(),
-            "LicenseRef-scancode-public-domain".to_string(),
+            "LicenseRef-provenant-public-domain".to_string(),
         ),
         other => (other.to_ascii_lowercase(), other.to_string()),
     }

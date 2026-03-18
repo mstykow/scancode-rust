@@ -1,7 +1,7 @@
 use super::{FileInfo, Package, TopLevelDependency};
 use serde::{Deserialize, Serialize};
 
-pub const SCANCODE_OUTPUT_FORMAT_VERSION: &str = "4.0.0";
+pub const OUTPUT_FORMAT_VERSION: &str = "4.0.0";
 
 #[derive(Serialize, Deserialize, Debug)]
 /// Top-level ScanCode-compatible JSON payload.

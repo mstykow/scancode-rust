@@ -53,7 +53,7 @@ use crate::parsers::PackageParser;
 ///
 /// # Example
 /// ```no_run
-/// use scancode_rust::parsers::{GradleParser, PackageParser};
+/// use provenant::parsers::{GradleParser, PackageParser};
 /// use std::path::Path;
 ///
 /// let path = Path::new("testdata/gradle-golden/groovy1/build.gradle");

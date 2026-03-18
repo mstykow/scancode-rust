@@ -70,7 +70,7 @@ Rust now goes beyond the current Python ScanCode Ruby handling in several concre
 - `cargo test ruby --lib`
 - `cargo test --features golden-tests ruby_golden --lib`
 - `cargo test --features golden-tests test_assembly_ruby_extracted_basic --lib`
-- `cargo test --bin scancode-rust`
+- `cargo test --bin provenant`
 - `cargo test --test output_format_golden`
 
 ## Related Issues

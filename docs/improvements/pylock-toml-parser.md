@@ -4,7 +4,7 @@
 
 ## Why This Exists
 
-Python ScanCode currently has no `pylock.toml` support. scancode-rust now parses the standardized lockfile format defined by PEP 751 and the PyPA `pylock.toml` specification.
+Python ScanCode currently has no `pylock.toml` support. Provenant now parses the standardized lockfile format defined by PEP 751 and the PyPA `pylock.toml` specification.
 
 ## What We Extract
 

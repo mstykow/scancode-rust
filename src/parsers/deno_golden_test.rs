@@ -12,7 +12,7 @@ mod golden_tests {
 
         let package_data = DenoParser::extract_first_package(&test_file);
 
-        assert_eq!(package_data.namespace.as_deref(), Some("@scancode"));
+        assert_eq!(package_data.namespace.as_deref(), Some("@provenant"));
         assert_eq!(package_data.name.as_deref(), Some("deno-sample"));
         assert_eq!(package_data.dependencies.len(), 3);
 

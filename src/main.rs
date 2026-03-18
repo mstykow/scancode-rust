@@ -13,11 +13,11 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use crate::askalono::{Store, TextData};
-use crate::cache::CacheConfig;
+use crate::cache::{CACHE_DIR_ENV_VAR, CacheConfig};
 use crate::cli::Cli;
 use crate::models::{
-    ExtraData, FileInfo, FileType, Header, LicenseClarityScore, Output, Package,
-    SCANCODE_OUTPUT_FORMAT_VERSION, Summary, SystemEnvironment, TallyEntry,
+    ExtraData, FileInfo, FileType, Header, LicenseClarityScore, OUTPUT_FORMAT_VERSION, Output,
+    Package, Summary, SystemEnvironment, TallyEntry,
 };
 use crate::output::{OutputWriteConfig, write_output_file};
 use crate::progress::{ProgressMode, ScanProgress};
@@ -313,7 +313,7 @@ fn validate_scan_option_compatibility(cli: &Cli) -> Result<()> {
 }
 
 fn prepare_cache_for_scan(scan_path: &str, cli: &Cli) -> Result<CacheConfig> {
-    let env_cache_dir = env::var_os("SCANCODE_RUST_CACHE").map(PathBuf::from);
+    let env_cache_dir = env::var_os(CACHE_DIR_ENV_VAR).map(PathBuf::from);
     let config = CacheConfig::from_overrides(
         Path::new(scan_path),
         cli.cache_dir.as_deref().map(Path::new),
@@ -752,7 +752,7 @@ fn create_output(
             duration,
             extra_data,
             errors,
-            output_format_version: SCANCODE_OUTPUT_FORMAT_VERSION.to_string(),
+            output_format_version: OUTPUT_FORMAT_VERSION.to_string(),
         }],
         packages,
         dependencies: assembly_result.dependencies,

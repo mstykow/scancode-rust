@@ -1,12 +1,12 @@
 # ADR 0003: Golden Test Strategy
 
 **Status**: Accepted  
-**Authors**: scancode-rust team  
+**Authors**: Provenant team
 **Supersedes**: None
 
 ## Context
 
-We need a reliable way to verify that scancode-rust produces output functionally equivalent to the Python ScanCode Toolkit reference implementation. Key challenges:
+We need a reliable way to verify that Provenant produces output functionally equivalent to the Python ScanCode Toolkit reference implementation. Key challenges:
 
 1. **Feature Parity Verification** - How do we prove our parsers extract the same data?
 2. **Regression Prevention** - How do we catch unintended behavior changes?
@@ -32,7 +32,7 @@ We use **golden testing** where parsers are validated against reference outputs 
          │                         │
          ▼                         ▼
 ┌──────────────────┐      ┌──────────────────┐
-│ Python ScanCode  │      │ scancode-rust    │
+│ Python ScanCode  │      │ Provenant        │
 │                  │      │                  │
 │ scancode -p ...  │      │ NpmParser::      │
 │                  │      │ extract_package  │
@@ -262,7 +262,7 @@ proptest! {
 
 ### 4. Integration Testing via CLI
 
-**Approach**: Run full scancode-rust CLI, compare JSON output.
+**Approach**: Run full Provenant CLI, compare JSON output.
 
 ```bash
 cargo run -- --json-pp actual.json testdata/npm/

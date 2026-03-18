@@ -1,9 +1,9 @@
-use regex::Regex;
-use scancode_rust::models::{
+use provenant::models::{
     Copyright, DatasourceId, ExtraData, FileInfo, FileType, Header, Holder, Output, Package,
     PackageData, PackageType, Party, ResolvedPackage, SystemEnvironment, TopLevelDependency,
 };
-use scancode_rust::{OutputFormat, OutputWriteConfig, OutputWriter, writer_for_format};
+use provenant::{OutputFormat, OutputWriteConfig, OutputWriter, writer_for_format};
+use regex::Regex;
 use serde_json::Value;
 use std::collections::BTreeMap;
 use std::fs;
@@ -522,10 +522,7 @@ fn test_cyclonedx_rich_output_contains_enriched_fields_json_and_xml() {
             .as_str()
             .is_some_and(|s| s.starts_with("urn:uuid:"))
     );
-    assert_eq!(
-        json_value["metadata"]["tools"][0]["name"],
-        "scancode-toolkit"
-    );
+    assert_eq!(json_value["metadata"]["tools"][0]["name"], "Provenant");
     let component = &json_value["components"][0];
     assert_eq!(component["name"], "npm");
     assert_eq!(component["description"], "a package manager for JavaScript");

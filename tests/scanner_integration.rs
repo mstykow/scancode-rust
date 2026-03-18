@@ -1,11 +1,11 @@
 use glob::Pattern;
-use scancode_rust::askalono::{ScanStrategy, Store};
-use scancode_rust::models::PackageType;
-use scancode_rust::parsers::list_parser_types;
-use scancode_rust::progress::{ProgressMode, ScanProgress};
-use scancode_rust::utils::file::{ExtractedTextKind, extract_text_for_detection};
-use scancode_rust::utils::hash::calculate_sha256;
-use scancode_rust::{FileType, TextDetectionOptions, process, process_with_options};
+use provenant::askalono::{ScanStrategy, Store};
+use provenant::models::PackageType;
+use provenant::parsers::list_parser_types;
+use provenant::progress::{ProgressMode, ScanProgress};
+use provenant::utils::file::{ExtractedTextKind, extract_text_for_detection};
+use provenant::utils::hash::calculate_sha256;
+use provenant::{FileType, TextDetectionOptions, process, process_with_options};
 use std::fs;
 use std::path::Path;
 use std::sync::Arc;
@@ -666,7 +666,7 @@ fn test_scanner_detects_emails_and_urls_in_pdf_text() {
     let content_path = test_path.join("contacts.pdf");
     let pdf = build_text_pdf(&["Reach us at legal@acme.org", "https://acme.org/support"]);
     let (extracted_text, _) =
-        scancode_rust::utils::file::extract_text_for_detection(&content_path, &pdf);
+        provenant::utils::file::extract_text_for_detection(&content_path, &pdf);
     fs::write(&content_path, pdf).expect("Failed to write PDF fixture");
 
     assert!(

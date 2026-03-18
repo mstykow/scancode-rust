@@ -528,7 +528,7 @@ fn normalize_paths_strip_root_removes_scan_root_prefix() {
 
 #[test]
 fn load_scan_from_json_reads_files_and_metadata_sections() {
-    let temp_path = std::env::temp_dir().join("scancode-rust-from-json-test.json");
+    let temp_path = std::env::temp_dir().join("provenant-from-json-test.json");
     let content = json!({
         "files": [
             {
@@ -1269,7 +1269,7 @@ fn resolve_thread_count_supports_reference_compat_values() {
 #[test]
 fn validate_scan_option_compatibility_rejects_scan_flags_with_from_json() {
     let cli = crate::cli::Cli::try_parse_from([
-        "scancode-rust",
+        "provenant",
         "--json-pp",
         "scan.json",
         "--from-json",
@@ -1285,7 +1285,7 @@ fn validate_scan_option_compatibility_rejects_scan_flags_with_from_json() {
 #[test]
 fn validate_scan_option_compatibility_allows_scan_flags_without_from_json() {
     let cli = crate::cli::Cli::try_parse_from([
-        "scancode-rust",
+        "provenant",
         "--json-pp",
         "scan.json",
         "--copyright",
@@ -1300,7 +1300,7 @@ fn validate_scan_option_compatibility_allows_scan_flags_without_from_json() {
 #[test]
 fn validate_scan_option_compatibility_allows_multiple_inputs_with_from_json() {
     let cli = crate::cli::Cli::try_parse_from([
-        "scancode-rust",
+        "provenant",
         "--json-pp",
         "scan.json",
         "--from-json",
@@ -1315,14 +1315,9 @@ fn validate_scan_option_compatibility_allows_multiple_inputs_with_from_json() {
 
 #[test]
 fn validate_scan_option_compatibility_rejects_multiple_paths_without_from_json() {
-    let cli = crate::cli::Cli::try_parse_from([
-        "scancode-rust",
-        "--json-pp",
-        "scan.json",
-        "dir-a",
-        "dir-b",
-    ])
-    .expect("cli parse should succeed");
+    let cli =
+        crate::cli::Cli::try_parse_from(["provenant", "--json-pp", "scan.json", "dir-a", "dir-b"])
+            .expect("cli parse should succeed");
 
     let result = validate_scan_option_compatibility(&cli);
     assert!(result.is_err());
@@ -1331,7 +1326,7 @@ fn validate_scan_option_compatibility_rejects_multiple_paths_without_from_json()
 #[test]
 fn progress_mode_from_cli_maps_quiet_verbose_default() {
     let default_cli =
-        crate::cli::Cli::try_parse_from(["scancode-rust", "--json-pp", "scan.json", "sample-dir"])
+        crate::cli::Cli::try_parse_from(["provenant", "--json-pp", "scan.json", "sample-dir"])
             .expect("cli parse should succeed");
     assert_eq!(
         progress_mode_from_cli(&default_cli),
@@ -1339,7 +1334,7 @@ fn progress_mode_from_cli_maps_quiet_verbose_default() {
     );
 
     let quiet_cli = crate::cli::Cli::try_parse_from([
-        "scancode-rust",
+        "provenant",
         "--json-pp",
         "scan.json",
         "--quiet",
@@ -1352,7 +1347,7 @@ fn progress_mode_from_cli_maps_quiet_verbose_default() {
     );
 
     let cli = crate::cli::Cli::try_parse_from([
-        "scancode-rust",
+        "provenant",
         "--json-pp",
         "scan.json",
         "--verbose",
@@ -1373,13 +1368,13 @@ fn prepare_cache_for_scan_defaults_to_scan_root_cache_directory() {
     fs::create_dir_all(&scan_root).expect("create scan root");
 
     let cli =
-        crate::cli::Cli::try_parse_from(["scancode-rust", "--json-pp", "scan.json", "sample-dir"])
+        crate::cli::Cli::try_parse_from(["provenant", "--json-pp", "scan.json", "sample-dir"])
             .expect("cli parse should succeed");
 
     let config = prepare_cache_for_scan(scan_root.to_str().expect("utf-8 path"), &cli)
         .expect("cache preparation should succeed");
 
-    assert_eq!(config.root_dir(), scan_root.join(".scancode-cache"));
+    assert_eq!(config.root_dir(), scan_root.join(".provenant-cache"));
     assert!(config.index_dir().exists());
     assert!(config.scan_results_dir().exists());
 }
@@ -1396,7 +1391,7 @@ fn prepare_cache_for_scan_respects_cache_dir_and_cache_clear() {
     fs::write(&stale_file, "old").expect("write stale file");
 
     let cli = crate::cli::Cli::try_parse_from([
-        "scancode-rust",
+        "provenant",
         "--json-pp",
         "scan.json",
         "--cache-dir",

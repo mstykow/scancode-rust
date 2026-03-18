@@ -28,7 +28,7 @@ pub(crate) struct LicenseEntry {
 /// ```rust,should_panic
 /// # use std::fs::File;
 /// # use std::error::Error;
-/// use scancode_rust::askalono::{Store, TextData};
+/// use provenant::askalono::{Store, TextData};
 ///
 /// # fn main() -> Result<(), Box<dyn Error>> {
 /// let store = Store::from_cache(File::open("askalono-cache.bin.zstd")?)?;

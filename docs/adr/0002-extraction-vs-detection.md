@@ -1,7 +1,7 @@
 # ADR 0002: Extraction vs Detection Separation
 
 **Status**: Accepted  
-**Authors**: scancode-rust team  
+**Authors**: Provenant team
 **Supersedes**: None
 
 ## Context

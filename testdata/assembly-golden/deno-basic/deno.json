@@ -1,5 +1,5 @@
 {
-  "name": "@scancode/deno-sample",
+  "name": "@provenant/deno-sample",
   "version": "1.0.0",
   "exports": "./mod.ts",
   "imports": {

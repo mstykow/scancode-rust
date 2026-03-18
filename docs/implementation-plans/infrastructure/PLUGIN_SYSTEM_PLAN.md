@@ -7,7 +7,7 @@
 
 ## Overview
 
-Extensible plugin architecture allowing third-party plugins for custom parsers, output formats, and post-processing logic. Enables users to extend scancode-rust without modifying core code.
+Extensible plugin architecture allowing third-party plugins for custom parsers, output formats, and post-processing logic. Enables users to extend Provenant without modifying core code.
 
 ## Scope
 

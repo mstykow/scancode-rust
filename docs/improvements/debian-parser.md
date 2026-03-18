@@ -2,7 +2,7 @@
 
 ## Summary
 
-The Debian `.deb` parser in scancode-rust implements missing direct-archive behavior beyond the Python reference implementation:
+The Debian `.deb` parser in Provenant implements missing direct-archive behavior beyond the Python reference implementation:
 
 - **✨ New Feature**: direct `.deb` archive introspection from `control.tar.gz` and `control.tar.xz`
 - **🔍 Enhanced Extraction**: direct `.deb` scans now also read package-matching `/usr/share/doc/<pkg>/copyright` metadata from `data.tar.gz` and `data.tar.xz`

@@ -6,7 +6,7 @@ use sha1::{Digest, Sha1};
 use crate::models::{FileInfo, FileType, Output};
 
 use super::shared::{sorted_files, xml_escape};
-use super::{EMPTY_SHA1, OutputWriteConfig, SCANCODE_NOTICE};
+use super::{EMPTY_SHA1, OutputWriteConfig, SPDX_DOCUMENT_NOTICE};
 
 pub(crate) fn write_spdx_tag_value(
     output: &Output,
@@ -28,12 +28,13 @@ pub(crate) fn write_spdx_tag_value(
     writeln!(writer, "SPDXVersion: SPDX-2.2")?;
     writeln!(writer, "DataLicense: CC0-1.0")?;
     writeln!(writer, "SPDXID: SPDXRef-DOCUMENT")?;
+    writeln!(writer, "DocumentName: SPDX Document created by Provenant")?;
+    writeln!(writer, "DocumentNamespace: {}", document_namespace)?;
     writeln!(
         writer,
-        "DocumentName: SPDX Document created by ScanCode Toolkit"
+        "DocumentComment: <text>{}</text>",
+        SPDX_DOCUMENT_NOTICE
     )?;
-    writeln!(writer, "DocumentNamespace: {}", document_namespace)?;
-    writeln!(writer, "DocumentComment: <text>{}</text>", SCANCODE_NOTICE)?;
     writeln!(writer, "## Creation Information")?;
     writeln!(writer, "## Package Information")?;
 
@@ -183,9 +184,9 @@ pub(crate) fn write_spdx_rdf_xml(
     xml.push_str("  <spdx:SpdxDocument rdf:about=\"#SPDXRef-DOCUMENT\">\n");
     xml.push_str("    <spdx:dataLicense rdf:resource=\"http://spdx.org/licenses/CC0-1.0\"/>\n");
     xml.push_str("    <rdfs:comment>");
-    xml.push_str(&xml_escape(SCANCODE_NOTICE));
+    xml.push_str(&xml_escape(SPDX_DOCUMENT_NOTICE));
     xml.push_str("</rdfs:comment>\n");
-    xml.push_str("    <spdx:name>SPDX Document created by ScanCode Toolkit</spdx:name>\n");
+    xml.push_str("    <spdx:name>SPDX Document created by Provenant</spdx:name>\n");
     xml.push_str("    <spdx:specVersion>SPDX-2.2</spdx:specVersion>\n");
     xml.push_str("    <spdx:creationInfo><spdx:CreationInfo><spdx:created>");
     xml.push_str(&created);
@@ -211,7 +212,7 @@ fn primary_package_name(output: &Output, config: &OutputWriteConfig) -> String {
         .first()
         .and_then(|p| p.name.clone())
         .map(|name| sanitize_spdx_package_name(&name))
-        .unwrap_or_else(|| "scancode-toolkit-analyzed-package".to_string())
+        .unwrap_or_else(|| "provenant-analyzed-package".to_string())
 }
 
 fn sanitize_spdx_package_name(name: &str) -> String {
@@ -224,7 +225,7 @@ fn sanitize_spdx_package_name(name: &str) -> String {
         }
     }
     if out.is_empty() {
-        "scancode-toolkit-analyzed-package".to_string()
+        "provenant-analyzed-package".to_string()
     } else {
         out
     }

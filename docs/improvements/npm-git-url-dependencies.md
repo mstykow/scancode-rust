@@ -2,7 +2,7 @@
 
 ## Summary
 
-The npm parser in scancode-rust **fixes a bug** present in the Python reference implementation:
+The npm parser in Provenant **fixes a bug** present in the Python reference implementation:
 
 - **🐛 Bug Fix**: Dependencies with Git URLs, GitHub shortcuts, and local paths were incorrectly treated as pinned versions, producing malformed PURLs
 

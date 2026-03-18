@@ -1,5 +1,6 @@
 use std::path::{Path, PathBuf};
 
+use crate::cache::DEFAULT_CACHE_DIR_NAME;
 use crate::models::{FileInfo, Package, PackageType};
 
 pub fn assign_composer_package_resources(files: &mut [FileInfo], packages: &[Package]) {
@@ -33,7 +34,7 @@ pub fn assign_composer_package_resources(files: &mut [FileInfo], packages: &[Pac
         for (root, package_uid) in &composer_roots {
             if !path.starts_with(root)
                 || is_vendor_path(path, root)
-                || is_scancode_cache_path(path, root)
+                || is_internal_cache_path(path, root)
             {
                 continue;
             }
@@ -64,9 +65,9 @@ fn is_composer_manifest_filename(name: &str) -> bool {
         || (name.starts_with("composer.") && name.ends_with(".json"))
 }
 
-fn is_scancode_cache_path(path: &Path, root: &Path) -> bool {
+fn is_internal_cache_path(path: &Path, root: &Path) -> bool {
     path.strip_prefix(root)
         .ok()
         .and_then(|relative| relative.components().next())
-        .is_some_and(|component| component.as_os_str() == ".scancode-cache")
+        .is_some_and(|component| component.as_os_str() == DEFAULT_CACHE_DIR_NAME)
 }

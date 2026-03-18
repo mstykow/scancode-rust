@@ -1,10 +1,10 @@
-# scancode-rust
+# Provenant
 
 A high-performance Rust rewrite of [ScanCode Toolkit](https://github.com/aboutcode-org/scancode-toolkit) for scanning codebases for licenses, package metadata, file metadata, and related provenance data.
 
 ## Overview
 
-`scancode-rust` is built as a ScanCode-compatible replacement project with a strong focus on correctness, feature parity, safety, and performance.
+`Provenant` is built as a ScanCode-compatible replacement project with a strong focus on correctness, feature parity, safety, and performance.
 
 Today the repository covers high-level scanning workflows for:
 
@@ -30,45 +30,49 @@ For architecture, supported formats, testing, and contributor guidance, start wi
 
 ## Installation
 
-### From Crates.io (Recommended)
+### From Crates.io
+
+Install the Provenant package from crates.io under the crate name `provenant-cli`:
 
 ```sh
-cargo install scancode-rust
+cargo install provenant-cli
 ```
 
-### Download Precompiled Binary
+This installs the `provenant` binary.
 
-Download the appropriate binary for your platform from the [GitHub Releases](https://github.com/mstykow/scancode-rust/releases) page:
+### Download Precompiled Binary (Recommended)
 
-- **Linux (x64)**: `scancode-rust-x86_64-unknown-linux-gnu.tar.gz`
-- **Linux (ARM64)**: `scancode-rust-aarch64-unknown-linux-gnu.tar.gz`
-- **macOS (Apple Silicon)**: `scancode-rust-aarch64-apple-darwin.tar.gz`
+Download the appropriate binary for your platform from the [GitHub Releases](https://github.com/mstykow/provenant/releases) page:
+
+- **Linux (x64)**: `provenant-x86_64-unknown-linux-gnu.tar.gz`
+- **Linux (ARM64)**: `provenant-aarch64-unknown-linux-gnu.tar.gz`
+- **macOS (Apple Silicon)**: `provenant-aarch64-apple-darwin.tar.gz`
   - Intel Macs can use the ARM build via Rosetta 2
-- **Windows**: `scancode-rust-x86_64-pc-windows-msvc.zip`
+- **Windows**: `provenant-x86_64-pc-windows-msvc.zip`
 
 Extract and place the binary in your system's PATH:
 
 ```sh
 # Example for Linux/macOS
-tar xzf scancode-rust-*.tar.gz
-sudo mv scancode-rust /usr/local/bin/
+tar xzf provenant-*.tar.gz
+sudo mv provenant /usr/local/bin/
 ```
 
 ### Build from Source
 
 ```sh
-git clone https://github.com/mstykow/scancode-rust.git
-cd scancode-rust
+git clone https://github.com/mstykow/provenant.git
+cd provenant
 ./setup.sh  # Initialize submodules and configure sparse checkout for project inputs
 cargo build --release
 ```
 
-The compiled binary will be available at `target/release/scancode-rust`.
+The compiled binary will be available at `target/release/provenant`.
 
 ## Usage
 
 ```sh
-scancode-rust --json-pp <FILE> [OPTIONS] <DIR_PATH>...
+provenant --json-pp <FILE> [OPTIONS] <DIR_PATH>...
 ```
 
 At least one output option is required.
@@ -76,7 +80,7 @@ At least one output option is required.
 For the complete CLI surface, run:
 
 ```sh
-scancode-rust --help
+provenant --help
 ```
 
 Commonly used options include:
@@ -92,19 +96,19 @@ Commonly used options include:
 ### Example
 
 ```sh
-scancode-rust --json-pp scan-results.json ~/projects/my-codebase --ignore "*.git*" --ignore "target/*" --ignore "node_modules/*"
+provenant --json-pp scan-results.json ~/projects/my-codebase --ignore "*.git*" --ignore "target/*" --ignore "node_modules/*"
 ```
 
 Use `-` as FILE to write an output stream to stdout (for example: `--json-pp -`).
 Multiple output flags can be used in a single run, matching ScanCode CLI behavior.
 When using `--from-json`, you can pass multiple JSON inputs; directory scan mode currently supports one input path.
-Cache location can also be controlled with the `SCANCODE_RUST_CACHE` environment variable.
+Cache location can also be controlled with the `PROVENANT_CACHE` environment variable.
 
 For the generated package-format support matrix, see [Supported Formats](docs/SUPPORTED_FORMATS.md).
 
 ## Performance
 
-`scancode-rust` is designed to be significantly faster than the Python-based ScanCode Toolkit, especially for large codebases, thanks to native Rust performance and parallel processing. See [Architecture: Performance Characteristics](docs/ARCHITECTURE.md#performance-characteristics) for details.
+`Provenant` is designed to be significantly faster than the Python-based ScanCode Toolkit, especially for large codebases, thanks to native Rust performance and parallel processing. See [Architecture: Performance Characteristics](docs/ARCHITECTURE.md#performance-characteristics) for details.
 
 ## Output Formats
 
@@ -142,7 +146,7 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ### Setting Up for Local Development
 
-To contribute to `scancode-rust`, follow these steps to set up the repository for local development:
+To contribute to `Provenant`, follow these steps to set up the repository for local development:
 
 1. **Install Rust**  
    Ensure you have Rust installed on your system. You can install it using [rustup](https://rustup.rs/):
@@ -152,11 +156,11 @@ To contribute to `scancode-rust`, follow these steps to set up the repository fo
    ```
 
 2. **Clone the Repository**  
-   Clone the `scancode-rust` repository to your local machine:
+   Clone the `Provenant` repository to your local machine:
 
    ```sh
-   git clone https://github.com/mstykow/scancode-rust.git
-   cd scancode-rust
+   git clone https://github.com/mstykow/provenant.git
+   cd provenant
    ```
 
 3. **Initialize and Update Project Submodules**  
@@ -205,10 +209,10 @@ To contribute to `scancode-rust`, follow these steps to set up the repository fo
    ```
 
 7. **Start Developing**  
-   You can now make changes and test them locally. Use `cargo run --bin scancode-rust` to execute the tool:
+   You can now make changes and test them locally. Use `cargo run --bin provenant` to execute the tool:
 
    ```sh
-   cargo run --bin scancode-rust -- [OPTIONS] <DIR_PATH>
+   cargo run --bin provenant -- [OPTIONS] <DIR_PATH>
    ```
 
 ## Publishing a Release (Maintainers Only)
@@ -251,6 +255,8 @@ Available release types:
 - `minor`: Increments `X.Y.Z` to `X.(Y+1).0`
 - `major`: Increments `X.Y.Z` to `(X+1).0.0`
 
+> **Registry note**: the published crate name is `provenant-cli`, while the installed binary and product name remain `provenant` / Provenant.
+
 **What happens automatically:**
 
 1. **Updates SPDX license data** to the latest version from upstream
@@ -258,7 +264,7 @@ Available release types:
 3. `cargo-release` updates the version in `Cargo.toml` and `Cargo.lock`
 4. Creates a git commit: `chore: release vX.Y.Z`
 5. Creates a GPG-signed git tag: `vX.Y.Z`
-6. Publishes to crates.io
+6. Publishes the `provenant-cli` crate to crates.io
 7. Pushes commits and tag to GitHub
 8. GitHub Actions workflow is triggered by the tag
 9. Builds binaries for all published targets:
@@ -270,12 +276,12 @@ Available release types:
 
 > **Note**: The release script ensures every release ships with the latest SPDX license definitions. It also handles a sparse checkout workaround for `cargo-release`.
 
-Monitor the [GitHub Actions workflow](https://github.com/mstykow/scancode-rust/actions) to verify completion.
+Monitor the [GitHub Actions workflow](https://github.com/mstykow/provenant/actions) to verify completion.
 
 ## Credits
 
-`scancode-rust` is an independent Rust rewrite of [ScanCode Toolkit](https://github.com/aboutcode-org/scancode-toolkit). It uses the upstream ScanCode Toolkit project by nexB Inc. and the AboutCode community as a reference for compatibility, behavior, and parity validation. We are grateful to nexB Inc. and the AboutCode community for the reference implementation and the extensive license and copyright research behind it. See [`NOTICE`](NOTICE) for preserved upstream attribution notices applicable to materials included in this repository and to distributions that include ScanCode-derived data.
+`Provenant` is an independent Rust rewrite of [ScanCode Toolkit](https://github.com/aboutcode-org/scancode-toolkit). It uses the upstream ScanCode Toolkit project by nexB Inc. and the AboutCode community as a reference for compatibility, behavior, and parity validation. We are grateful to nexB Inc. and the AboutCode community for the reference implementation and the extensive license and copyright research behind it. See [`NOTICE`](NOTICE) for preserved upstream attribution notices applicable to materials included in this repository and to distributions that include ScanCode-derived data.
 
 ## License
 
-The scancode-rust project code is licensed under the [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0). See [`NOTICE`](NOTICE) for preserved upstream attribution notices for included ScanCode Toolkit materials.
+The Provenant project code is licensed under the [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0). See [`NOTICE`](NOTICE) for preserved upstream attribution notices for included ScanCode Toolkit materials.

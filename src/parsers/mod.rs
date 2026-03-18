@@ -324,8 +324,8 @@ use crate::models::{PackageData, PackageType};
 /// # Example
 ///
 /// ```ignore
-/// use scancode_rust::parsers::PackageParser;
-/// use scancode_rust::models::{PackageData, PackageType};
+/// use provenant::models::{PackageData, PackageType};
+/// use provenant::parsers::PackageParser;
 /// use std::path::Path;
 ///
 /// pub struct MyParser;

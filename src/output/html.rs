@@ -213,7 +213,7 @@ const HTML_REPORT_TEMPLATE: &str = r#"<!doctype html>
     </style>
   </head>
   <body>
-    <p>Scanned with ScanCode</p>
+    <p>Scanned with Provenant</p>
 
     <table>
       <caption>Copyrights and Licenses Information</caption>
@@ -399,14 +399,11 @@ const HTML_REPORT_TEMPLATE: &str = r#"<!doctype html>
   </body>
   <footer>
     <p>
-      Generated with ScanCode and provided on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF
-      ANY KIND, either express or implied. No content created from ScanCode should be considered or
-      used as legal advice. Consult an Attorney for any legal advice. ScanCode is a free software
-      code scanning tool from nexB Inc. and others. Visit
-      <a href="http://www.nexb.com/">http://www.nexb.com</a> and
-      <a href="https://github.com/nexB/scancode-toolkit/"
-        >https://github.com/nexB/scancode-toolkit/</a
-      >
+      Generated with Provenant and provided on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF
+      ANY KIND, either express or implied. No content created from Provenant should be considered or
+      used as legal advice. Consult an attorney for legal advice. Provenant is a free software code
+      scanning tool. Visit
+      <a href="https://github.com/mstykow/provenant/">https://github.com/mstykow/provenant/</a>
       for support and download.
     </p>
   </footer>

@@ -1,6 +1,6 @@
 # Architectural Decision Records (ADRs)
 
-This directory contains records of architectural decisions made during the development of scancode-rust.
+This directory contains records of architectural decisions made during the development of Provenant.
 
 ## What is an ADR?
 

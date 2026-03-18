@@ -4,7 +4,7 @@
 
 ## Why This Exists
 
-Python ScanCode currently has only an open attempt at `go.work` support. scancode-rust now parses Go workspace files directly using the official `go.work` grammar.
+Python ScanCode currently has only an open attempt at `go.work` support. Provenant now parses Go workspace files directly using the official `go.work` grammar.
 
 ## What We Extract
 

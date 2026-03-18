@@ -2,6 +2,9 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
+pub const DEFAULT_CACHE_DIR_NAME: &str = ".provenant-cache";
+pub const CACHE_DIR_ENV_VAR: &str = "PROVENANT_CACHE";
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CacheConfig {
     root_dir: PathBuf,
@@ -13,7 +16,7 @@ impl CacheConfig {
     }
 
     pub fn from_scan_root(scan_root: &Path) -> Self {
-        Self::new(scan_root.join(".scancode-cache"))
+        Self::new(scan_root.join(DEFAULT_CACHE_DIR_NAME))
     }
 
     pub fn resolve_root_dir(
@@ -29,7 +32,7 @@ impl CacheConfig {
             return path.to_path_buf();
         }
 
-        scan_root.join(".scancode-cache")
+        scan_root.join(DEFAULT_CACHE_DIR_NAME)
     }
 
     pub fn from_overrides(
@@ -84,7 +87,10 @@ mod tests {
     fn test_from_scan_root_uses_expected_directory_name() {
         let temp_dir = TempDir::new().expect("Failed to create temp dir");
         let config = CacheConfig::from_scan_root(temp_dir.path());
-        assert_eq!(config.root_dir(), temp_dir.path().join(".scancode-cache"));
+        assert_eq!(
+            config.root_dir(),
+            temp_dir.path().join(DEFAULT_CACHE_DIR_NAME)
+        );
     }
 
     #[test]
@@ -117,7 +123,7 @@ mod tests {
         );
         assert_eq!(
             CacheConfig::resolve_root_dir(scan_root, None, None),
-            PathBuf::from("/scan-root/.scancode-cache")
+            PathBuf::from(format!("/scan-root/{DEFAULT_CACHE_DIR_NAME}"))
         );
     }
 

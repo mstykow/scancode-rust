@@ -2,7 +2,7 @@
 
 ## Summary
 
-The Dart parser in scancode-rust **fixes scope handling errors** and **preserves YAML metadata** more accurately than the Python reference implementation:
+The Dart parser in Provenant **fixes scope handling errors** and **preserves YAML metadata** more accurately than the Python reference implementation:
 
 1. **🔍 Enhanced Extraction**: Dependency scope correctly mapped (`None` → `"dependencies"`)
 2. **🔍 Enhanced Extraction**: YAML trailing newlines preserved (semantic correctness)
