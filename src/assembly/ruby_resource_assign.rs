@@ -1,5 +1,6 @@
 use std::path::{Path, PathBuf};
 
+use crate::cache::DEFAULT_CACHE_DIR_NAME;
 use crate::models::{FileInfo, Package, PackageType};
 
 pub fn assign_ruby_package_resources(files: &mut [FileInfo], packages: &[Package]) {
@@ -19,7 +20,7 @@ pub fn assign_ruby_package_resources(files: &mut [FileInfo], packages: &[Package
         let path = Path::new(&file.path);
 
         for (root, package_uid) in &ruby_roots {
-            if !path.starts_with(root) || is_scancode_cache_path(path, root) {
+            if !path.starts_with(root) || is_internal_cache_path(path, root) {
                 continue;
             }
 
@@ -65,9 +66,9 @@ fn ruby_package_root(package: &Package) -> Option<PathBuf> {
     None
 }
 
-fn is_scancode_cache_path(path: &Path, root: &Path) -> bool {
+fn is_internal_cache_path(path: &Path, root: &Path) -> bool {
     path.strip_prefix(root)
         .ok()
         .and_then(|relative| relative.components().next())
-        .is_some_and(|component| component.as_os_str() == ".scancode-cache")
+        .is_some_and(|component| component.as_os_str() == DEFAULT_CACHE_DIR_NAME)
 }

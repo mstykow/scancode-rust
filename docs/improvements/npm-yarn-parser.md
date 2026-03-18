@@ -2,7 +2,7 @@
 
 ## Summary
 
-The current npm and Yarn enhancement pass in scancode-rust improves several behaviors that are missing, incomplete, or buggy in the Python reference:
+The current npm and Yarn enhancement pass in Provenant improves several behaviors that are missing, incomplete, or buggy in the Python reference:
 
 - `package.json` now preserves npm `overrides` metadata.
 - Empty npm `name` and `version` values no longer generate synthetic registry URLs or dummy PURLs.

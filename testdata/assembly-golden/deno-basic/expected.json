@@ -2,7 +2,7 @@
   "packages": [
     {
       "type": "deno",
-      "namespace": "@scancode",
+      "namespace": "@provenant",
       "name": "deno-sample",
       "version": "1.0.0",
       "primary_language": "TypeScript",
@@ -24,8 +24,8 @@
         "version": "5",
         "workspace_dependencies": ["jsr:@std/assert@1", "npm:chalk@5"]
       },
-      "purl": "pkg:generic/%40scancode/deno-sample@1.0.0",
-      "package_uid": "pkg:generic/%40scancode/deno-sample@1.0.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "purl": "pkg:generic/%40provenant/deno-sample@1.0.0",
+      "package_uid": "pkg:generic/%40provenant/deno-sample@1.0.0?uuid=fixed-uid-done-for-testing-5642512d1758",
       "datafile_paths": ["deno.json", "deno.lock"],
       "datasource_ids": ["deno_json", "deno_lock"]
     }
@@ -55,7 +55,7 @@
         "purl": "pkg:generic/deno.land/x/oak%40v17.2.0/mod.ts"
       },
       "dependency_uid": "pkg:generic/deno.land/x/oak%40v17.2.0/mod.ts?uuid=fixed-uid-done-for-testing-5642512d1758",
-      "for_package_uid": "pkg:generic/%40scancode/deno-sample@1.0.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "for_package_uid": "pkg:generic/%40provenant/deno-sample@1.0.0?uuid=fixed-uid-done-for-testing-5642512d1758",
       "datafile_path": "deno.lock",
       "datasource_id": "deno_lock"
     },
@@ -71,7 +71,7 @@
         "import_alias": "oak"
       },
       "dependency_uid": "pkg:generic/deno.land/x/oak/mod.ts?uuid=fixed-uid-done-for-testing-5642512d1758",
-      "for_package_uid": "pkg:generic/%40scancode/deno-sample@1.0.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "for_package_uid": "pkg:generic/%40provenant/deno-sample@1.0.0?uuid=fixed-uid-done-for-testing-5642512d1758",
       "datafile_path": "deno.json",
       "datasource_id": "deno_json"
     },
@@ -87,7 +87,7 @@
         "import_alias": "@std/assert"
       },
       "dependency_uid": "pkg:generic/jsr.io/%40std/assert?uuid=fixed-uid-done-for-testing-5642512d1758",
-      "for_package_uid": "pkg:generic/%40scancode/deno-sample@1.0.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "for_package_uid": "pkg:generic/%40provenant/deno-sample@1.0.0?uuid=fixed-uid-done-for-testing-5642512d1758",
       "datafile_path": "deno.json",
       "datasource_id": "deno_json"
     },
@@ -122,7 +122,7 @@
         "purl": "pkg:generic/jsr.io/%40std/assert@1.0.19"
       },
       "dependency_uid": "pkg:generic/jsr.io/%40std/assert@1.0.19?uuid=fixed-uid-done-for-testing-5642512d1758",
-      "for_package_uid": "pkg:generic/%40scancode/deno-sample@1.0.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "for_package_uid": "pkg:generic/%40provenant/deno-sample@1.0.0?uuid=fixed-uid-done-for-testing-5642512d1758",
       "datafile_path": "deno.lock",
       "datasource_id": "deno_lock"
     },
@@ -146,7 +146,7 @@
         "purl": "pkg:generic/jsr.io/%40std/internal@1.0.12"
       },
       "dependency_uid": "pkg:generic/jsr.io/%40std/internal@1.0.12?uuid=fixed-uid-done-for-testing-5642512d1758",
-      "for_package_uid": "pkg:generic/%40scancode/deno-sample@1.0.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "for_package_uid": "pkg:generic/%40provenant/deno-sample@1.0.0?uuid=fixed-uid-done-for-testing-5642512d1758",
       "datafile_path": "deno.lock",
       "datasource_id": "deno_lock"
     },
@@ -162,7 +162,7 @@
         "import_alias": "chalk"
       },
       "dependency_uid": "pkg:npm/chalk?uuid=fixed-uid-done-for-testing-5642512d1758",
-      "for_package_uid": "pkg:generic/%40scancode/deno-sample@1.0.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "for_package_uid": "pkg:generic/%40provenant/deno-sample@1.0.0?uuid=fixed-uid-done-for-testing-5642512d1758",
       "datafile_path": "deno.json",
       "datasource_id": "deno_json"
     },
@@ -186,7 +186,7 @@
         "purl": "pkg:npm/chalk@5.6.2"
       },
       "dependency_uid": "pkg:npm/chalk@5.6.2?uuid=fixed-uid-done-for-testing-5642512d1758",
-      "for_package_uid": "pkg:generic/%40scancode/deno-sample@1.0.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "for_package_uid": "pkg:generic/%40provenant/deno-sample@1.0.0?uuid=fixed-uid-done-for-testing-5642512d1758",
       "datafile_path": "deno.lock",
       "datasource_id": "deno_lock"
     }
@@ -195,13 +195,13 @@
     {
       "path": "deno.json",
       "for_packages": [
-        "pkg:generic/%40scancode/deno-sample@1.0.0?uuid=fixed-uid-done-for-testing-5642512d1758"
+        "pkg:generic/%40provenant/deno-sample@1.0.0?uuid=fixed-uid-done-for-testing-5642512d1758"
       ]
     },
     {
       "path": "deno.lock",
       "for_packages": [
-        "pkg:generic/%40scancode/deno-sample@1.0.0?uuid=fixed-uid-done-for-testing-5642512d1758"
+        "pkg:generic/%40provenant/deno-sample@1.0.0?uuid=fixed-uid-done-for-testing-5642512d1758"
       ]
     }
   ]

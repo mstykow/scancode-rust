@@ -1,6 +1,6 @@
 # Beyond-Parity Improvements
 
-This directory documents features where scancode-rust **exceeds** the Python ScanCode Toolkit reference implementation.
+This directory documents features where Provenant **exceeds** the Python ScanCode Toolkit reference implementation.
 It includes parser improvements and text-detection subsystem improvements.
 
 ## Philosophy

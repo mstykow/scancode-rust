@@ -4,7 +4,7 @@
 
 ## Why This Exists
 
-Python ScanCode currently has multiple open attempts at parsing Gradle `.module` metadata, but no merged handler. scancode-rust now parses published Gradle module metadata directly.
+Python ScanCode currently has multiple open attempts at parsing Gradle `.module` metadata, but no merged handler. Provenant now parses published Gradle module metadata directly.
 
 ## What We Extract
 

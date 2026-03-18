@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Setup script for scancode-rust development
+# Setup script for Provenant development
 #
 # This script initializes/updates the SPDX License List Data submodule to the latest version.
 # The license data in resources/licenses/json/details/ is embedded into the binary

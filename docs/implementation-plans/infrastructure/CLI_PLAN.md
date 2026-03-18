@@ -111,7 +111,7 @@ This plan tracks progress toward a **drop-in replacement CLI surface**.
 
 - No plugin runtime architecture (compile-time wiring instead)
 - Thread pool via rayon instead of multiprocessing
-- JSON output structure matches Python (`SCANCODE_OUTPUT_FORMAT_VERSION`)
+- JSON output structure matches Python (`OUTPUT_FORMAT_VERSION`)
 - `--no-cache` is not a parity requirement (upstream removed it); if retained, it is Rust-specific
 
 ## References

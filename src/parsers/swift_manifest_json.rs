@@ -67,7 +67,7 @@ use super::PackageParser;
 ///
 /// # Example
 /// ```no_run
-/// use scancode_rust::parsers::{SwiftManifestJsonParser, PackageParser};
+/// use provenant::parsers::{PackageParser, SwiftManifestJsonParser};
 /// use std::path::Path;
 ///
 /// // Works with pre-generated JSON
@@ -492,7 +492,7 @@ pub fn invoke_swift_dump_package(package_dir: &Path) -> Result<String, String> {
 /// 1. **Cache Key**: BLAKE3 hash of Package.swift content (not file path)
 /// 2. **Cache Hit**: Returns cached JSON (<1ms)
 /// 3. **Cache Miss**: Executes `swift package dump-package`, validates JSON, caches result
-/// 4. **Cache Location**: System cache directory (e.g., ~/.cache/scancode-rust/swift/)
+/// 4. **Cache Location**: System cache directory (e.g., ~/.cache/provenant/swift/)
 ///
 /// # Performance
 /// - **Cache hit**: <1ms (single file read)
@@ -572,7 +572,7 @@ pub fn dump_package_cached(package_swift_path: &Path) -> Result<String, String> 
 
 fn get_cache_dir() -> Result<std::path::PathBuf, String> {
     let base = dirs_cache_dir().ok_or("Cannot determine cache directory")?;
-    let cache_dir = base.join("scancode-rust").join("swift");
+    let cache_dir = base.join("provenant").join("swift");
 
     fs::create_dir_all(&cache_dir)
         .map_err(|e| format!("Failed to create cache directory {:?}: {}", cache_dir, e))?;

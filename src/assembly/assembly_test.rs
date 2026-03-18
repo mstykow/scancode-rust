@@ -2165,8 +2165,8 @@ mod tests {
             create_test_file_info(
                 "project/deno.json",
                 DatasourceId::DenoJson,
-                Some("pkg:generic/%40scancode/deno-sample@1.0.0"),
-                Some("@scancode/deno-sample"),
+                Some("pkg:generic/%40provenant/deno-sample@1.0.0"),
+                Some("@provenant/deno-sample"),
                 Some("1.0.0"),
                 vec![Dependency {
                     purl: Some("pkg:npm/chalk".to_string()),
@@ -2208,7 +2208,7 @@ mod tests {
             "Expected exactly one merged Deno package"
         );
         let package = &result.packages[0];
-        assert_eq!(package.name, Some("@scancode/deno-sample".to_string()));
+        assert_eq!(package.name, Some("@provenant/deno-sample".to_string()));
         assert!(
             package
                 .datafile_paths

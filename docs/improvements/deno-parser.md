@@ -4,7 +4,7 @@
 
 ## Why This Exists
 
-Python ScanCode currently has no `deno.json`, `deno.jsonc`, or `deno.lock` support. scancode-rust now parses Deno configuration manifests and current v5 lockfiles directly.
+Python ScanCode currently has no `deno.json`, `deno.jsonc`, or `deno.lock` support. Provenant now parses Deno configuration manifests and current v5 lockfiles directly.
 
 ## What We Extract
 

@@ -1,14 +1,14 @@
-scancode-rust Notices
+Provenant Notices
 =====================
 
-scancode-rust is an independent Rust rewrite of ScanCode Toolkit.
+Provenant is an independent Rust rewrite of ScanCode Toolkit.
 
 This file preserves attribution notices for upstream ScanCode Toolkit material
 that is present in this repository, including the `reference/scancode-toolkit`
 submodule, and for any ScanCode-derived data files included in a given
-scancode-rust distribution.
+Provenant distribution.
 
-scancode-rust project code is licensed under the Apache License, Version 2.0.
+Provenant project code is licensed under the Apache License, Version 2.0.
 See `LICENSE` for the license text.
 
 

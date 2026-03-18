@@ -1,6 +1,6 @@
 # How To Add A Parser
 
-This guide walks you through adding a new package parser to scancode-rust.
+This guide walks you through adding a new package parser to Provenant.
 
 ## Prerequisites
 
@@ -972,7 +972,7 @@ Before submitting your parser:
 
 ## Conclusion
 
-You now have a complete parser integrated into scancode-rust! Your contribution helps achieve feature parity with ScanCode Toolkit while leveraging Rust's safety and performance advantages.
+You now have a complete parser integrated into Provenant! Your contribution helps achieve feature parity with ScanCode Toolkit while leveraging Rust's safety and performance advantages.
 
 **Next Steps**:
 
@@ -981,4 +981,4 @@ You now have a complete parser integrated into scancode-rust! Your contribution 
 3. Document any intentional differences
 4. Submit pull request
 
-Welcome to the scancode-rust project! 🦀
+Welcome to the Provenant project! 🦀

@@ -20,7 +20,7 @@ mod tests {
         let temp_dir = tempdir().unwrap();
         let file_path = temp_dir.path().join("deno.json");
         let content = r#"{
-  "name": "@scancode/deno-sample",
+  "name": "@provenant/deno-sample",
   "version": "1.0.0",
   "exports": "./mod.ts",
   "imports": {
@@ -44,12 +44,12 @@ mod tests {
         assert_eq!(package_data.package_type, Some(PackageType::Deno));
         assert_eq!(package_data.primary_language.as_deref(), Some("TypeScript"));
         assert_eq!(package_data.datasource_id, Some(DatasourceId::DenoJson));
-        assert_eq!(package_data.namespace.as_deref(), Some("@scancode"));
+        assert_eq!(package_data.namespace.as_deref(), Some("@provenant"));
         assert_eq!(package_data.name.as_deref(), Some("deno-sample"));
         assert_eq!(package_data.version.as_deref(), Some("1.0.0"));
         assert_eq!(
             package_data.purl.as_deref(),
-            Some("pkg:generic/%40scancode/deno-sample@1.0.0")
+            Some("pkg:generic/%40provenant/deno-sample@1.0.0")
         );
         assert_eq!(package_data.dependencies.len(), 3);
 

@@ -87,7 +87,7 @@ jobs:
                 test_binary="$candidate"
                 break
               fi
-            done < <(ls -t target/debug/deps/scancode_rust-* 2>/dev/null)
+            done < <(ls -t target/debug/deps/provenant-* 2>/dev/null)
 
             if [[ -z "$test_binary" ]]; then
               echo "Could not determine parser golden test binary path" >&2

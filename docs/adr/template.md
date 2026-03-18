@@ -1,7 +1,7 @@
 # ADR 000N: Short Decision Title
 
 **Status**: Proposed  
-**Authors**: scancode-rust team  
+**Authors**: Provenant team
 **Supersedes**: None
 
 ## Context

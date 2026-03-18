@@ -1,7 +1,7 @@
 [
   {
     "type": "deno",
-    "namespace": "@scancode",
+    "namespace": "@provenant",
     "name": "deno-sample",
     "version": "1.0.0",
     "primary_language": "TypeScript",
@@ -66,6 +66,6 @@
       }
     ],
     "datasource_id": "deno_json",
-    "purl": "pkg:generic/%40scancode/deno-sample@1.0.0"
+    "purl": "pkg:generic/%40provenant/deno-sample@1.0.0"
   }
 ]

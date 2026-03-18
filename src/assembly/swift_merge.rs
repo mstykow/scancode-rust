@@ -5,6 +5,7 @@ use std::str::FromStr;
 use packageurl::PackageUrl;
 use uuid::Uuid;
 
+use crate::cache::DEFAULT_CACHE_DIR_NAME;
 use crate::models::{
     DatasourceId, Dependency, FileInfo, Package, PackageData, PackageType, TopLevelDependency,
 };
@@ -351,7 +352,7 @@ fn assign_swift_resources(
             continue;
         }
 
-        if is_scancode_cache_path(path, root) {
+        if is_internal_cache_path(path, root) {
             continue;
         }
 
@@ -376,11 +377,11 @@ fn is_swift_resolved_filename(file_name: &str) -> bool {
     matches!(file_name, "Package.resolved" | ".package.resolved")
 }
 
-fn is_scancode_cache_path(path: &Path, root: &Path) -> bool {
+fn is_internal_cache_path(path: &Path, root: &Path) -> bool {
     path.strip_prefix(root)
         .ok()
         .and_then(|relative| relative.components().next())
-        .is_some_and(|component| component.as_os_str() == ".scancode-cache")
+        .is_some_and(|component| component.as_os_str() == DEFAULT_CACHE_DIR_NAME)
 }
 
 fn build_package_uid(purl: &str) -> String {

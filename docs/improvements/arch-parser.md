@@ -20,7 +20,7 @@ That upstream work:
 - extracts basic metadata and dependency fields
 - handles architecture-suffixed dependency keys
 
-But it still leaves important gaps for scancode-rust users:
+But it still leaves important gaps for Provenant users:
 
 - no `.PKGINFO` parser
 - no legacy `.AURINFO` compatibility

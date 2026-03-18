@@ -25,7 +25,7 @@ use packageurl::PackageUrl;
 ///
 /// ```no_run
 /// use std::path::Path;
-/// use scancode_rust::parsers::utils::read_file_to_string;
+/// use provenant::parsers::utils::read_file_to_string;
 ///
 /// let content = read_file_to_string(Path::new("path/to/file.txt"))?;
 /// # Ok::<(), anyhow::Error>(())
@@ -108,7 +108,7 @@ pub fn parse_sri(integrity: &str) -> Option<(String, String)> {
 /// # Examples
 ///
 /// ```
-/// use scancode_rust::parsers::utils::split_name_email;
+/// use provenant::parsers::utils::split_name_email;
 ///
 /// // Full format
 /// let (name, email) = split_name_email("John Doe <john@example.com>");

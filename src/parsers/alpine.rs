@@ -503,7 +503,7 @@ fn build_apkbuild_license_data(
     let (declared, declared_spdx) = if extracted == "custom:multiple" {
         (
             Some("unknown-license-reference".to_string()),
-            Some("LicenseRef-scancode-unknown-license-reference".to_string()),
+            Some("LicenseRef-provenant-unknown-license-reference".to_string()),
         )
     } else {
         let parts: Vec<&str> = extracted
@@ -1181,7 +1181,7 @@ p:so:libtest.so.1
         );
         assert_eq!(
             pkg.declared_license_expression_spdx.as_deref(),
-            Some("LicenseRef-scancode-unknown-license-reference")
+            Some("LicenseRef-provenant-unknown-license-reference")
         );
         let matched = pkg.license_detections[0].matches[0].matched_text.as_deref();
         assert_eq!(matched, Some("custom:multiple"));

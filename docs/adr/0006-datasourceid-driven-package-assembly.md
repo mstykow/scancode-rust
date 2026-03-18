@@ -1,12 +1,12 @@
 # ADR 0006: DatasourceId-Driven Multi-Pass Package Assembly
 
 **Status**: Accepted  
-**Authors**: scancode-rust team  
+**Authors**: Provenant team
 **Supersedes**: None
 
 ## Context
 
-scancode-rust scans many ecosystems where one logical package is described by multiple files rather than a single manifest. Common examples include:
+Provenant scans many ecosystems where one logical package is described by multiple files rather than a single manifest. Common examples include:
 
 - manifest + lockfile pairs such as `package.json` + `package-lock.json` or `Cargo.toml` + `Cargo.lock`
 - nested metadata layouts such as Maven `pom.xml` + `META-INF/MANIFEST.MF`

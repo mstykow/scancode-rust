@@ -684,7 +684,7 @@ fn is_year_only_copy_marker_line(prepared: &str) -> bool {
 ///
 /// # Examples
 /// ```
-/// use scancode_rust::copyright::strip_balanced_edge_parens;
+/// use provenant::copyright::strip_balanced_edge_parens;
 /// assert_eq!(strip_balanced_edge_parens("(Hello World)"), "Hello World");
 /// assert_eq!(strip_balanced_edge_parens("(Hello (World)"), "(Hello (World)");
 /// ```

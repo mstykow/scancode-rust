@@ -2,7 +2,7 @@
 
 ## Philosophy
 
-scancode-rust uses a **behavior-focused, multi-layered testing approach** that prioritizes intelligent coverage over arbitrary test quotas.
+Provenant uses a **behavior-focused, multi-layered testing approach** that prioritizes intelligent coverage over arbitrary test quotas.
 
 ### Core Principles
 
@@ -56,8 +56,8 @@ scancode-rust uses a **behavior-focused, multi-layered testing approach** that p
 /// # Examples
 ///
 /// ```rust
-/// use scancode_rust::scanner::process;
-/// use scancode_rust::progress::{ProgressMode, ScanProgress};
+/// use provenant::scanner::process;
+/// use provenant::progress::{ProgressMode, ScanProgress};
 /// use std::path::PathBuf;
 /// use std::sync::Arc;
 ///
@@ -218,7 +218,7 @@ fn test_scanner_discovers_all_registered_parsers() {
 - ❌ Large JSON diffs are difficult to interpret
 - ❌ Slower execution (file I/O, JSON serialization)
 
-### scancode-rust Approach
+### Provenant Approach
 
 **Structure**:
 

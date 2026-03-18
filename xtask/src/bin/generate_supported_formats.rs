@@ -2,8 +2,8 @@ use std::fs;
 use std::path::Path;
 
 use anyhow::Result;
-use scancode_rust::golden_maintenance::run_prettier;
-use scancode_rust::parsers::metadata::ParserMetadata;
+use provenant::golden_maintenance::run_prettier;
+use provenant::parsers::metadata::ParserMetadata;
 
 fn main() -> Result<()> {
     let args: Vec<String> = std::env::args().collect();
@@ -66,7 +66,7 @@ fn generate_markdown() -> String {
     output.push_str(
         "> To update, run: `cargo run --manifest-path xtask/Cargo.toml --bin generate-supported-formats`\n\n",
     );
-    output.push_str("scancode-rust supports package formats across multiple ecosystems.\n\n");
+    output.push_str("Provenant supports package formats across multiple ecosystems.\n\n");
 
     output.push_str("| Description | File Patterns | Package Type | Language | Documentation |\n");
     output.push_str("|-------------|---------------|--------------|----------|---------------|\n");

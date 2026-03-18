@@ -4,8 +4,8 @@ use std::path::PathBuf;
 use anyhow::{Context, Result};
 use clap::Parser;
 
-use scancode_rust::golden_maintenance::run_prettier;
-use scancode_rust::parsers;
+use provenant::golden_maintenance::run_prettier;
+use provenant::parsers;
 
 #[derive(Parser, Debug)]
 #[command(

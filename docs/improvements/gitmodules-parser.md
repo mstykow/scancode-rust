@@ -2,7 +2,7 @@
 
 ## Summary
 
-The `.gitmodules` parser in scancode-rust is a **new feature** not present in the Python reference implementation:
+The `.gitmodules` parser in Provenant is a **new feature** not present in the Python reference implementation:
 
 - **✨ New Feature**: Parse `.gitmodules` files to treat git submodules as dependencies
 

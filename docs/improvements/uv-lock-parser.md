@@ -4,7 +4,7 @@
 
 ## Why This Exists
 
-Python ScanCode currently has no `uv.lock` support. scancode-rust now parses uv lockfiles directly, which closes a modern Python packaging gap without waiting for upstream reference support.
+Python ScanCode currently has no `uv.lock` support. Provenant now parses uv lockfiles directly, which closes a modern Python packaging gap without waiting for upstream reference support.
 
 ## What We Extract
 

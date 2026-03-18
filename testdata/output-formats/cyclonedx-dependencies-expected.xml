@@ -4,9 +4,9 @@
     <timestamp>2023-03-31T10:36:22Z</timestamp>
     <tools>
       <tool>
-        <vendor>AboutCode.org</vendor>
-        <name>scancode-toolkit</name>
-        <version>32.0.0rc3</version>
+        <vendor>Provenant</vendor>
+        <name>Provenant</name>
+        <version>0.0.5</version>
       </tool>
     </tools>
   </metadata>

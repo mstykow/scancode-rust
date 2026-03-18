@@ -78,7 +78,7 @@ Still open:
 
 ## Validation
 
-- `cargo test --bin scancode-rust`
+- `cargo test --bin provenant`
 - `cargo test --test output_format_golden`
 - `cargo fmt --all -- --check`
 - `cargo clippy --all-targets --all-features -- -D warnings`

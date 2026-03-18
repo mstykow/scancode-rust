@@ -7,8 +7,8 @@ use clap::{Parser, ValueEnum};
 use serde::Deserialize;
 use serde_yaml::Value;
 
-use scancode_rust::copyright::golden_utils::{canonicalize_golden_value, read_input_content};
-use scancode_rust::golden_maintenance::{find_files_with_extension, run_prettier};
+use provenant::copyright::golden_utils::{canonicalize_golden_value, read_input_content};
+use provenant::golden_maintenance::{find_files_with_extension, run_prettier};
 
 const EXPECTED_FAILURES_KEY: &str = "expected_failures";
 
@@ -148,7 +148,7 @@ fn update_yaml_to_actual(ours_yaml: &Path, content: &str, write: bool) -> Result
         return Ok(true);
     }
 
-    let (c, h, a) = scancode_rust::copyright::detect_copyrights(content);
+    let (c, h, a) = provenant::copyright::detect_copyrights(content);
     let actual_c = stable_unique_sorted(c.into_iter().map(|d| d.copyright).collect());
     let actual_h = stable_unique_sorted(h.into_iter().map(|d| d.holder).collect());
     let actual_a = stable_unique_sorted(a.into_iter().map(|d| d.author).collect());
@@ -257,7 +257,7 @@ fn main() -> Result<()> {
         let expected_h = expected_ref.holders.unwrap_or_default();
         let expected_a = expected_ref.authors.unwrap_or_default();
 
-        let (c, h, a) = scancode_rust::copyright::detect_copyrights(&content);
+        let (c, h, a) = provenant::copyright::detect_copyrights(&content);
         let actual_c: Vec<String> = c.into_iter().map(|d| d.copyright).collect();
         let actual_h: Vec<String> = h.into_iter().map(|d| d.holder).collect();
         let actual_a: Vec<String> = a.into_iter().map(|d| d.author).collect();

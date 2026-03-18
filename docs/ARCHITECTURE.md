@@ -1,8 +1,8 @@
-# scancode-rust Architecture
+# Provenant Architecture
 
 ## Overview
 
-scancode-rust is a complete rewrite of [ScanCode Toolkit](https://github.com/aboutcode-org/scancode-toolkit) in Rust, designed as a **drop-in replacement** with all features of the original, but with:
+Provenant is a complete rewrite of [ScanCode Toolkit](https://github.com/aboutcode-org/scancode-toolkit) in Rust, designed as a **drop-in replacement** with all features of the original, but with:
 
 - **Zero bugs**: Leveraging Rust's type system and ownership model
 - **Better performance**: Native code, parallel processing, zero-copy parsing
@@ -49,7 +49,7 @@ See [ADR 0002: Extraction vs Detection Separation](adr/0002-extraction-vs-detect
 
 ### Complete Processing Pipeline
 
-scancode-rust implements a multi-phase processing pipeline based on Python ScanCode's architecture:
+Provenant implements a multi-phase processing pipeline based on Python ScanCode's architecture:
 
 ```text
 ┌─────────────────────────────────────────────────────────────────┐
@@ -278,7 +278,7 @@ pub struct PackageData {
 
 ```text
 ┌────────────────────────────────────────────────────────────┐
-│                     scancode-rust                          │
+│                      Provenant                            │
 ├────────────────────────────────────────────────────────────┤
 │                                                            │
 │  1. File Discovery           2. Parser Selection          │
@@ -691,7 +691,7 @@ Runtime wiring is now active for scan-result caching in scanner/main:
 
 1. scanner read-before-scan and write-after-scan integration in `src/scanner/process.rs`
 2. startup cache bootstrap and clear wiring in `src/main.rs`
-3. cache CLI controls `--cache-dir` and `--cache-clear`, plus `SCANCODE_RUST_CACHE` override
+3. cache CLI controls `--cache-dir` and `--cache-clear`, plus `PROVENANT_CACHE` override
 
 Remaining follow-up work is focused on index snapshot integration for the new license engine, lock-managed multi-process coordination, incremental scanning, and unified XDG-default cache ownership.
 

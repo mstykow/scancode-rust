@@ -1,6 +1,6 @@
-# Agent Guidelines for scancode-rust
+# Agent Guidelines for Provenant
 
-This guide provides essential information for AI coding agents working on the `scancode-rust` codebase - a high-performance Rust tool for detecting licenses, copyrights, and package metadata in source code.
+This guide provides essential information for AI coding agents working on the `Provenant` codebase - a high-performance Rust tool for detecting licenses, copyrights, and package metadata in source code.
 
 ## Documentation Map
 
@@ -16,7 +16,7 @@ This guide provides essential information for AI coding agents working on the `s
 
 ## Project Context
 
-**scancode-rust** is a complete rewrite of [ScanCode Toolkit](https://github.com/aboutcode-org/scancode-toolkit) in Rust, designed to be a **drop-in replacement** with all features and requirements of the original, but with less complexity, zero bugs, and Rust-specific optimizations. The original Python codebase is available as a reference submodule at `reference/scancode-toolkit/`.
+**Provenant** is a complete rewrite of [ScanCode Toolkit](https://github.com/aboutcode-org/scancode-toolkit) in Rust, designed to be a **drop-in replacement** with all features and requirements of the original, but with less complexity, zero bugs, and Rust-specific optimizations. The original Python codebase is available as a reference submodule at `reference/scancode-toolkit/`.
 
 ### Core Philosophy: Correctness and Feature Parity Above All
 
@@ -235,7 +235,7 @@ pub fn extract_package_data(path: &Path) -> PackageData {
 
 ## Testing Strategy
 
-scancode-rust uses a **four-layer testing approach** for comprehensive quality assurance:
+Provenant uses a **four-layer testing approach** for comprehensive quality assurance:
 
 1. **Doctests** - API documentation examples that run as tests (verifies public API examples work)
 2. **Unit Tests** - Component-level tests for individual functions and edge cases
@@ -642,7 +642,7 @@ The assembler:
 ## Additional Notes
 
 - **Rust toolchain**: Version pinned in `rust-toolchain.toml` (currently 1.93.0)
-- **Output format**: ScanCode Toolkit-compatible JSON with `SCANCODE_OUTPUT_FORMAT_VERSION`
+- **Output format**: ScanCode Toolkit-compatible JSON with `OUTPUT_FORMAT_VERSION`
 - **License detection**: Uses SPDX license data, threshold of 0.9 confidence
 - **Exclusion patterns**: Supports glob patterns (e.g., `*.git*`, `node_modules/*`)
 - **Git submodules**: Two submodules - `resources/licenses/` (SPDX data) and `reference/scancode-toolkit/` (original Python codebase for reference)

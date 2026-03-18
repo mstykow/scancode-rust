@@ -13,7 +13,7 @@ mod spdx;
 mod template;
 
 pub(crate) const EMPTY_SHA1: &str = "da39a3ee5e6b4b0d3255bfef95601890afd80709";
-pub(crate) const SCANCODE_NOTICE: &str = "Generated with ScanCode and provided on an \"AS IS\" BASIS, WITHOUT WARRANTIES\nOR CONDITIONS OF ANY KIND, either express or implied. No content created from\nScanCode should be considered or used as legal advice. Consult an Attorney\nfor any legal advice.\nScanCode is a free software code scanning tool from nexB Inc. and others.\nVisit https://github.com/nexB/scancode-toolkit/ for support and download.\nSPDX License List: 3.27";
+pub(crate) const SPDX_DOCUMENT_NOTICE: &str = "Generated with Provenant and provided on an \"AS IS\" BASIS, WITHOUT WARRANTIES\nOR CONDITIONS OF ANY KIND, either express or implied. No content created from\nProvenant should be considered or used as legal advice. Consult an attorney\nfor legal advice.\nProvenant is a free software code scanning tool.\nVisit https://github.com/mstykow/provenant/ for support and download.\nSPDX License List: 3.27";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum OutputFormat {

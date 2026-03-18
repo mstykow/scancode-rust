@@ -55,8 +55,8 @@ Rust now goes beyond the current Python ScanCode ABOUT handling in four concrete
 
 - `cargo test about --lib`
 - `cargo test --features golden-tests about --lib`
-- `cargo test about_scan_promotes_packages_and_assigns_referenced_files --bin scancode-rust`
-- `cargo test about_scan_tracks_missing_file_references --bin scancode-rust`
+- `cargo test about_scan_promotes_packages_and_assigns_referenced_files --bin provenant`
+- `cargo test about_scan_tracks_missing_file_references --bin provenant`
 
 ## Related Issues
 

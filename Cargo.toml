@@ -1,11 +1,12 @@
 [package]
-name = "scancode-rust"
+name = "provenant-cli"
 version = "0.0.5"
 edition = "2024"
-repository = "https://github.com/mstykow/scancode-rust"
-description = "A Rust-based tool for scanning and analyzing code."
+repository = "https://github.com/mstykow/provenant"
+homepage = "https://github.com/mstykow/provenant"
+description = "Provenant is a high-performance Rust scanner for licenses, packages, and source provenance."
 license = "Apache-2.0"
-keywords = ["scancode", "license", "analysis", "rust"]
+keywords = ["provenance", "license", "analysis", "rust"]
 categories = ["command-line-utilities", "development-tools"]
 readme = "README.md"
 authors = ["Maxim Stykow", "Adrian Braemer"]
@@ -109,8 +110,12 @@ opt-level = 3
 # Strip debug symbols to reduce binary size
 strip = true
 
+[lib]
+name = "provenant"
+path = "src/lib.rs"
+
 [[bin]]
-name = "scancode-rust"
+name = "provenant"
 path = "src/main.rs"
 
 [features]
