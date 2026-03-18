@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <PackageId>Contoso.Utility</PackageId>
+    <Version>1.0.0</Version>
+    <CentralPackageVersionOverrideEnabled>$(CentralOverridesEnabled)</CentralPackageVersionOverrideEnabled>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" VersionOverride="$(NewtonsoftJsonVersion)" />
+  </ItemGroup>
+</Project>
