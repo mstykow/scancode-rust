@@ -104,6 +104,18 @@ struct ParsedSbtData {
     dependencies: Vec<Dependency>,
 }
 
+#[derive(Default)]
+struct SbtParseAccumulator {
+    organization: Option<ScopedValue>,
+    name: Option<ScopedValue>,
+    version: Option<ScopedValue>,
+    description: Option<ScopedValue>,
+    homepage: Option<ScopedValue>,
+    organization_homepage: Option<ScopedValue>,
+    licenses: Vec<LicenseEntry>,
+    dependencies: Vec<Dependency>,
+}
+
 fn strip_comments(input: &str) -> String {
     let chars: Vec<char> = input.chars().collect();
     let mut output = String::with_capacity(input.len());
@@ -438,68 +450,124 @@ fn resolve_alias_value(
     value
 }
 
-fn parse_statements(statements: &[String], aliases: &HashMap<String, String>) -> ParsedSbtData {
-    let mut organization: Option<ScopedValue> = None;
-    let mut name: Option<ScopedValue> = None;
-    let mut version: Option<ScopedValue> = None;
-    let mut description: Option<ScopedValue> = None;
-    let mut homepage: Option<ScopedValue> = None;
-    let mut organization_homepage: Option<ScopedValue> = None;
-    let mut licenses = Vec::new();
-    let mut dependencies = Vec::new();
+fn resolve_seq_aliases(statements: &[String]) -> HashMap<String, Vec<Vec<Token>>> {
+    let mut aliases = HashMap::new();
 
     for statement in statements {
         let tokens = tokenize(statement);
-
-        if let Some((precedence, value)) = parse_string_setting(&tokens, aliases, "organization") {
-            set_scoped_value(&mut organization, precedence, value);
-            continue;
-        }
-
-        if let Some((precedence, value)) = parse_string_setting(&tokens, aliases, "name") {
-            set_scoped_value(&mut name, precedence, value);
-            continue;
-        }
-
-        if let Some((precedence, value)) = parse_string_setting(&tokens, aliases, "version") {
-            set_scoped_value(&mut version, precedence, value);
-            continue;
-        }
-
-        if let Some((precedence, value)) = parse_string_setting(&tokens, aliases, "description") {
-            set_scoped_value(&mut description, precedence, value);
-            continue;
-        }
-
-        if let Some((precedence, value)) = parse_url_setting(&tokens, "homepage") {
-            set_scoped_value(&mut homepage, precedence, value);
-            continue;
-        }
-
-        if let Some((precedence, value)) = parse_url_setting(&tokens, "organizationHomepage") {
-            set_scoped_value(&mut organization_homepage, precedence, value);
-            continue;
-        }
-
-        if let Some(license_entry) = parse_license_append(&tokens) {
-            licenses.push(license_entry);
-            continue;
-        }
-
-        if let Some(new_dependencies) = parse_library_dependencies(&tokens, aliases) {
-            dependencies.extend(new_dependencies);
+        if let Some((name, items)) = parse_seq_alias_declaration(&tokens) {
+            aliases.insert(name, items);
         }
     }
 
+    aliases
+}
+
+fn parse_seq_alias_declaration(tokens: &[Token]) -> Option<(String, Vec<Vec<Token>>)> {
+    match tokens {
+        [
+            Token::Ident(keyword),
+            Token::Ident(name),
+            Token::Symbol("="),
+            expr @ ..,
+        ] if keyword == "val" => parse_seq_items(expr).map(|items| (name.clone(), items)),
+        _ => None,
+    }
+}
+
+fn parse_seq_items(tokens: &[Token]) -> Option<Vec<Vec<Token>>> {
+    let [
+        Token::Ident(seq),
+        Token::Symbol("("),
+        inner @ ..,
+        Token::Symbol(")"),
+    ] = tokens
+    else {
+        return None;
+    };
+    if seq != "Seq" {
+        return None;
+    }
+
+    Some(
+        split_by_top_level_commas(inner)
+            .into_iter()
+            .map(|item| item.to_vec())
+            .collect(),
+    )
+}
+
+fn parse_statements(statements: &[String], aliases: &HashMap<String, String>) -> ParsedSbtData {
+    let bundle_aliases = resolve_seq_aliases(statements);
+    let mut state = SbtParseAccumulator::default();
+
+    for statement in statements {
+        let tokens = tokenize(statement);
+        process_statement_tokens(&tokens, aliases, &bundle_aliases, &mut state);
+    }
+
     ParsedSbtData {
-        organization: organization.map(|value| value.value),
-        name: name.map(|value| value.value),
-        version: version.map(|value| value.value),
-        description: description.map(|value| value.value),
-        homepage: homepage.map(|value| value.value),
-        organization_homepage: organization_homepage.map(|value| value.value),
-        licenses,
-        dependencies,
+        organization: state.organization.map(|value| value.value),
+        name: state.name.map(|value| value.value),
+        version: state.version.map(|value| value.value),
+        description: state.description.map(|value| value.value),
+        homepage: state.homepage.map(|value| value.value),
+        organization_homepage: state.organization_homepage.map(|value| value.value),
+        licenses: state.licenses,
+        dependencies: state.dependencies,
+    }
+}
+
+fn process_statement_tokens(
+    tokens: &[Token],
+    aliases: &HashMap<String, String>,
+    bundle_aliases: &HashMap<String, Vec<Vec<Token>>>,
+    state: &mut SbtParseAccumulator,
+) {
+    if let Some(inner_items) = extract_root_settings_items(tokens, bundle_aliases) {
+        for item in inner_items {
+            process_statement_tokens(&item, aliases, bundle_aliases, state);
+        }
+        return;
+    }
+
+    if let Some((precedence, value)) = parse_string_setting(tokens, aliases, "organization") {
+        set_scoped_value(&mut state.organization, precedence, value);
+        return;
+    }
+
+    if let Some((precedence, value)) = parse_string_setting(tokens, aliases, "name") {
+        set_scoped_value(&mut state.name, precedence, value);
+        return;
+    }
+
+    if let Some((precedence, value)) = parse_string_setting(tokens, aliases, "version") {
+        set_scoped_value(&mut state.version, precedence, value);
+        return;
+    }
+
+    if let Some((precedence, value)) = parse_string_setting(tokens, aliases, "description") {
+        set_scoped_value(&mut state.description, precedence, value);
+        return;
+    }
+
+    if let Some((precedence, value)) = parse_url_setting(tokens, "homepage") {
+        set_scoped_value(&mut state.homepage, precedence, value);
+        return;
+    }
+
+    if let Some((precedence, value)) = parse_url_setting(tokens, "organizationHomepage") {
+        set_scoped_value(&mut state.organization_homepage, precedence, value);
+        return;
+    }
+
+    if let Some(license_entry) = parse_license_append(tokens) {
+        state.licenses.push(license_entry);
+        return;
+    }
+
+    if let Some(new_dependencies) = parse_library_dependencies(tokens, aliases, bundle_aliases) {
+        state.dependencies.extend(new_dependencies);
     }
 }
 
@@ -592,6 +660,7 @@ fn parse_license_append(tokens: &[Token]) -> Option<LicenseEntry> {
 fn parse_library_dependencies(
     tokens: &[Token],
     aliases: &HashMap<String, String>,
+    bundle_aliases: &HashMap<String, Vec<Vec<Token>>>,
 ) -> Option<Vec<Dependency>> {
     let (inherited_scope, tokens) = parse_dependency_setting_prefix(tokens)?;
 
@@ -601,7 +670,7 @@ fn parse_library_dependencies(
                 .map(|dependency| vec![dependency])
         }
         [Token::Ident(name), Token::Symbol("++="), expr @ ..] if name == "libraryDependencies" => {
-            parse_dependency_seq(expr, aliases, inherited_scope.as_deref())
+            parse_dependency_seq(expr, aliases, bundle_aliases, inherited_scope.as_deref())
         }
         _ => None,
     }
@@ -628,24 +697,18 @@ fn is_supported_config_scope(scope: &str) -> bool {
 fn parse_dependency_seq(
     tokens: &[Token],
     aliases: &HashMap<String, String>,
+    bundle_aliases: &HashMap<String, Vec<Vec<Token>>>,
     inherited_scope: Option<&str>,
 ) -> Option<Vec<Dependency>> {
-    let [
-        Token::Ident(seq),
-        Token::Symbol("("),
-        inner @ ..,
-        Token::Symbol(")"),
-    ] = tokens
-    else {
-        return None;
+    let items = if let [Token::Ident(alias_name)] = tokens {
+        bundle_aliases.get(alias_name)?.clone()
+    } else {
+        parse_seq_items(tokens)?
     };
-    if seq != "Seq" {
-        return None;
-    }
 
     let mut dependencies = Vec::new();
-    for item in split_by_top_level_commas(inner) {
-        if let Some(dependency) = parse_dependency_expr(item, aliases, inherited_scope) {
+    for item in items {
+        if let Some(dependency) = parse_dependency_expr(&item, aliases, inherited_scope) {
             dependencies.push(dependency);
         }
     }
@@ -683,6 +746,85 @@ fn split_by_top_level_commas(tokens: &[Token]) -> Vec<&[Token]> {
     }
 
     items
+}
+
+fn extract_root_settings_items(
+    tokens: &[Token],
+    bundle_aliases: &HashMap<String, Vec<Vec<Token>>>,
+) -> Option<Vec<Vec<Token>>> {
+    let [
+        Token::Ident(lazy),
+        Token::Ident(val_kw),
+        Token::Ident(root),
+        Token::Symbol("="),
+        rest @ ..,
+    ] = tokens
+    else {
+        return None;
+    };
+    if lazy != "lazy" || val_kw != "val" || root != "root" {
+        return None;
+    }
+
+    let inner = if let [
+        Token::Ident(call),
+        Token::Symbol("("),
+        inner @ ..,
+        Token::Symbol(")"),
+    ] = rest
+    {
+        if call != "project.settings" {
+            return None;
+        }
+        inner
+    } else if let Some(settings_index) = rest
+        .iter()
+        .position(|token| matches!(token, Token::Ident(name) if name == "settings"))
+    {
+        if !is_root_project_wrapper(&rest[..settings_index]) {
+            return None;
+        }
+        match &rest[settings_index..] {
+            [
+                Token::Ident(name),
+                Token::Symbol("("),
+                inner @ ..,
+                Token::Symbol(")"),
+            ] if name == "settings" => inner,
+            _ => return None,
+        }
+    } else {
+        return None;
+    };
+
+    let mut expanded = Vec::new();
+    for item in split_by_top_level_commas(inner) {
+        if let [Token::Ident(alias_name)] = item
+            && let Some(bundle_items) = bundle_aliases.get(alias_name)
+        {
+            expanded.extend(bundle_items.clone());
+        } else {
+            expanded.push(item.to_vec());
+        }
+    }
+
+    Some(expanded)
+}
+
+fn is_root_project_wrapper(tokens: &[Token]) -> bool {
+    matches!(
+        tokens,
+        [
+            Token::Symbol("("),
+            Token::Ident(project),
+            Token::Ident(in_kw),
+            Token::Ident(file),
+            Token::Symbol("("),
+            Token::Str(path),
+            Token::Symbol(")"),
+            Token::Symbol(")")
+        ] if project == "project" && in_kw == "in" && file == "file" && path == "."
+    )
 }
 
 fn strip_outer_parens(tokens: &[Token]) -> &[Token] {

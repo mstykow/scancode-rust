@@ -173,10 +173,18 @@ libraryDependencies += "org.valid" % "artifact" % depVersion
             Some("https://fallback.example.com/org")
         );
         assert!(package_data.extracted_license_statement.is_none());
-        assert_eq!(package_data.dependencies.len(), 1);
-        assert_eq!(
-            package_data.dependencies[0].purl.as_deref(),
-            Some("pkg:maven/org.valid/artifact@1.0.0")
+        assert_eq!(package_data.dependencies.len(), 2);
+        assert!(
+            package_data
+                .dependencies
+                .iter()
+                .any(|dep| dep.purl.as_deref() == Some("pkg:maven/com.nested/ignored@9.9.9"))
+        );
+        assert!(
+            package_data
+                .dependencies
+                .iter()
+                .any(|dep| dep.purl.as_deref() == Some("pkg:maven/org.valid/artifact@1.0.0"))
         );
     }
 
@@ -268,12 +276,19 @@ Test / libraryDependencies += "org.valid" %% "valid-dep" % "1.0.0"
         let (_temp_dir, path) = create_temp_build_sbt(content);
         let package_data = SbtParser::extract_first_package(&path);
 
-        assert_eq!(package_data.dependencies.len(), 1);
-        assert_eq!(
-            package_data.dependencies[0].purl.as_deref(),
-            Some("pkg:maven/org.valid/valid-dep@1.0.0")
+        assert_eq!(package_data.dependencies.len(), 2);
+        assert!(
+            package_data
+                .dependencies
+                .iter()
+                .any(|dep| dep.purl.as_deref() == Some("pkg:maven/org.scalatest/scalatest@3.2.18"))
         );
-        assert_eq!(package_data.dependencies[0].scope.as_deref(), Some("test"));
+        assert!(
+            package_data
+                .dependencies
+                .iter()
+                .any(|dep| dep.purl.as_deref() == Some("pkg:maven/org.valid/valid-dep@1.0.0"))
+        );
     }
 
     #[test]
@@ -300,6 +315,136 @@ Test / libraryDependencies += "org.scalatest" %% "scalatest" % "3.2.18"
         assert_eq!(
             package_data.extracted_license_statement.as_deref(),
             Some("- license:\n    name: 许可证\n    url: https://example.com/license\n")
+        );
+    }
+
+    #[test]
+    fn test_extract_dependency_bundle_aliases_and_root_project_settings() {
+        let content = r#"
+val commonDeps = Seq(
+  "org.typelevel" %% "cats-core" % "2.10.0",
+  "com.lihaoyi" %% "os-lib" % "0.10.0"
+)
+val testDeps = Seq(
+  "org.scalatest" %% "scalatest" % "3.2.18" % Test
+)
+
+lazy val root = project.settings(
+  organization := "com.example",
+  name := "root-app",
+  version := "1.2.3",
+  description := "Bundle-based build",
+  homepage := Some(url("https://example.com/root-app")),
+  licenses += "Apache-2.0" -> url("https://www.apache.org/licenses/LICENSE-2.0.txt"),
+  libraryDependencies ++= commonDeps,
+  Test / libraryDependencies ++= testDeps,
+  libraryDependencies += "ch.qos.logback" % "logback-classic" % "1.5.18"
+)
+        "#;
+
+        let (_temp_dir, path) = create_temp_build_sbt(content);
+        let package_data = SbtParser::extract_first_package(&path);
+
+        assert_eq!(package_data.namespace.as_deref(), Some("com.example"));
+        assert_eq!(package_data.name.as_deref(), Some("root-app"));
+        assert_eq!(package_data.version.as_deref(), Some("1.2.3"));
+        assert_eq!(
+            package_data.description.as_deref(),
+            Some("Bundle-based build")
+        );
+        assert_eq!(
+            package_data.homepage_url.as_deref(),
+            Some("https://example.com/root-app")
+        );
+        assert_eq!(package_data.dependencies.len(), 4);
+        assert!(
+            package_data
+                .dependencies
+                .iter()
+                .any(|dep| dep.purl.as_deref() == Some("pkg:maven/org.typelevel/cats-core@2.10.0"))
+        );
+        assert!(
+            package_data
+                .dependencies
+                .iter()
+                .any(|dep| dep.purl.as_deref() == Some("pkg:maven/com.lihaoyi/os-lib@0.10.0"))
+        );
+        let scalatest = package_data
+            .dependencies
+            .iter()
+            .find(|dep| dep.purl.as_deref() == Some("pkg:maven/org.scalatest/scalatest@3.2.18"))
+            .expect("scalatest dependency missing");
+        assert_eq!(scalatest.scope.as_deref(), Some("test"));
+        assert_eq!(scalatest.is_runtime, Some(false));
+        assert_eq!(scalatest.is_optional, Some(true));
+    }
+
+    #[test]
+    fn test_inline_settings_override_bundle_settings() {
+        let content = r#"
+val commonSettings = Seq(
+  organization := "com.example.bundle",
+  version := "0.1.0",
+  libraryDependencies += "org.scalatest" %% "scalatest" % "3.2.18" % Test
+)
+
+lazy val root = (project in file(".")).settings(
+  commonSettings,
+  name := "override-app",
+  version := "2.0.0",
+  organization := "com.example.root",
+  libraryDependencies += "org.typelevel" %% "cats-core" % "2.10.0"
+)
+        "#;
+
+        let (_temp_dir, path) = create_temp_build_sbt(content);
+        let package_data = SbtParser::extract_first_package(&path);
+
+        assert_eq!(package_data.namespace.as_deref(), Some("com.example.root"));
+        assert_eq!(package_data.name.as_deref(), Some("override-app"));
+        assert_eq!(package_data.version.as_deref(), Some("2.0.0"));
+        assert_eq!(package_data.dependencies.len(), 2);
+        assert!(
+            package_data
+                .dependencies
+                .iter()
+                .any(|dep| dep.purl.as_deref() == Some("pkg:maven/org.scalatest/scalatest@3.2.18"))
+        );
+        assert!(
+            package_data
+                .dependencies
+                .iter()
+                .any(|dep| dep.purl.as_deref() == Some("pkg:maven/org.typelevel/cats-core@2.10.0"))
+        );
+    }
+
+    #[test]
+    fn test_non_root_project_settings_and_dynamic_bundles_stay_skipped() {
+        let content = r#"
+val dynamicDeps = Seq(makeDependency())
+
+lazy val core = project.settings(
+  name := "core-module",
+  libraryDependencies += "org.example" %% "core-lib" % "1.0.0"
+)
+
+lazy val root = project.settings(
+  name := "root-app",
+  version := "1.0.0",
+  libraryDependencies ++= dynamicDeps,
+  libraryDependencies += "org.valid" %% "valid-lib" % "2.0.0"
+)
+        "#;
+
+        let (_temp_dir, path) = create_temp_build_sbt(content);
+        let package_data = SbtParser::extract_first_package(&path);
+
+        assert_eq!(package_data.name.as_deref(), Some("root-app"));
+        assert_eq!(package_data.version.as_deref(), Some("1.0.0"));
+        assert_eq!(package_data.dependencies.len(), 1);
+        assert_eq!(
+            package_data.dependencies[0].purl.as_deref(),
+            Some("pkg:maven/org.valid/valid-lib@2.0.0")
         );
     }
 }
