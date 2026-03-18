@@ -34,11 +34,17 @@ This first slice is intentionally narrow: it extracts only top-level literal met
 - Rust resolves simple same-file string `val` aliases when they are used in supported top-level string settings or supported dependency coordinates/versions.
 - Alias handling stays intentionally narrow and does not widen into general Scala constant folding or expression evaluation.
 
+### Root-safe `.settings(...)` and shared bundle support
+
+- Rust now descends into top-level root-safe `.settings(...)` wrappers such as `lazy val root = project.settings(...)` and `lazy val root = (project in file(".")).settings(...)`.
+- The parser also supports same-file literal `Seq(...)` bundles reused as shared dependency or settings groups when they are referenced from supported positions.
+- Inline settings inside a root-safe `.settings(...)` wrapper override earlier bundle-provided values using the same bounded precedence rules as the rest of the parser.
+
 ### Explicit guardrails
 
 - Unsupported constructs are skipped instead of guessed.
 - Rust does **not** execute Scala, invoke `sbt`, parse arbitrary `*.sbt`, parse `plugins.sbt`, parse `project/*.scala`, or attempt multi-project graph semantics.
-- Rust still does **not** descend into `project.settings(...)` or broader multi-project setting graphs in this slice.
+- Rust only descends into top-level root-safe `.settings(...)` wrappers; broader nested or non-root project setting graphs are still skipped.
 
 ## Validation
 
