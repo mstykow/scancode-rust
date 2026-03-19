@@ -41,8 +41,15 @@ static RE_QUOTED_STRING: LazyLock<Regex> =
 static RE_DEP_PAIR: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r#"['"]([^'"]+)['"]\s*=>\s*(?:'([^']*)'|"([^"]*)"|(\d+))"#).unwrap()
 });
+static RE_VERSION_ASSIGNMENT: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(
+        r#"(?m)^\s*(?:our\s+)?\$(?:[A-Za-z_][\w:]*::)?VERSION\s*=\s*(?:'([^']+)'|"([^"]+)")"#,
+    )
+    .unwrap()
+});
 
 const PACKAGE_TYPE: PackageType = PackageType::Cpan;
+const MAX_METADATA_FILE_SIZE: u64 = 1024 * 1024;
 
 pub struct CpanMakefilePlParser;
 
@@ -67,11 +74,16 @@ impl PackageParser for CpanMakefilePlParser {
             }
         };
 
-        vec![parse_makefile_pl(&content)]
+        vec![parse_makefile_pl_with_base(&content, path.parent())]
     }
 }
 
+#[cfg(test)]
 pub(crate) fn parse_makefile_pl(content: &str) -> PackageData {
+    parse_makefile_pl_with_base(content, None)
+}
+
+pub(crate) fn parse_makefile_pl_with_base(content: &str, base_dir: Option<&Path>) -> PackageData {
     // Find WriteMakefile or WriteMakefile1 call
     let makefile_block = extract_writemakefile_block(content);
     if makefile_block.is_empty() {
@@ -81,8 +93,16 @@ pub(crate) fn parse_makefile_pl(content: &str) -> PackageData {
     let fields = parse_hash_fields(&makefile_block);
 
     let name = fields.get("NAME").map(|n| n.to_string());
-    let version = fields.get("VERSION").map(|v| v.to_string());
-    let description = fields.get("ABSTRACT").map(|d| d.to_string());
+    let resolved_metadata = resolve_referenced_metadata(&fields, base_dir);
+
+    let version = fields
+        .get("VERSION")
+        .map(|v| v.to_string())
+        .or_else(|| resolved_metadata.version.clone());
+    let description = fields
+        .get("ABSTRACT")
+        .map(|d| d.to_string())
+        .or_else(|| resolved_metadata.abstract_text.clone());
     let extracted_license_statement = fields.get("LICENSE").map(|l| l.to_string());
 
     let parties = parse_author(&fields);
@@ -131,6 +151,12 @@ pub(crate) fn parse_makefile_pl(content: &str) -> PackageData {
     }
 }
 
+#[derive(Default)]
+struct ResolvedMetadata {
+    version: Option<String>,
+    abstract_text: Option<String>,
+}
+
 fn default_package_data() -> PackageData {
     PackageData {
         package_type: Some(PACKAGE_TYPE),
@@ -138,6 +164,102 @@ fn default_package_data() -> PackageData {
         datasource_id: Some(DatasourceId::CpanMakefile),
         ..Default::default()
     }
+}
+
+fn resolve_referenced_metadata(
+    fields: &HashMap<String, String>,
+    base_dir: Option<&Path>,
+) -> ResolvedMetadata {
+    let Some(base_dir) = base_dir else {
+        return ResolvedMetadata::default();
+    };
+
+    let mut resolved = ResolvedMetadata::default();
+    let mut cache: HashMap<String, Option<String>> = HashMap::new();
+
+    if let Some(version_from) = fields.get("VERSION_FROM")
+        && let Some(content) = load_referenced_metadata_file(base_dir, version_from, &mut cache)
+    {
+        resolved.version = extract_version_from_module_content(content);
+    }
+
+    if let Some(abstract_from) = fields.get("ABSTRACT_FROM")
+        && let Some(content) = load_referenced_metadata_file(base_dir, abstract_from, &mut cache)
+    {
+        resolved.abstract_text = extract_abstract_from_module_content(content);
+    }
+
+    resolved
+}
+
+fn load_referenced_metadata_file<'a>(
+    base_dir: &Path,
+    relative_path: &str,
+    cache: &'a mut HashMap<String, Option<String>>,
+) -> Option<&'a String> {
+    let entry = cache
+        .entry(relative_path.to_string())
+        .or_insert_with(|| read_safe_metadata_file(base_dir, relative_path));
+    entry.as_ref()
+}
+
+fn read_safe_metadata_file(base_dir: &Path, relative_path: &str) -> Option<String> {
+    let ref_path = Path::new(relative_path);
+    if ref_path.is_absolute() {
+        return None;
+    }
+
+    let base_dir = base_dir.canonicalize().ok()?;
+    let candidate = base_dir.join(ref_path);
+    let canonical_candidate = candidate.canonicalize().ok()?;
+    if !canonical_candidate.starts_with(&base_dir) {
+        return None;
+    }
+
+    let metadata = fs::metadata(&canonical_candidate).ok()?;
+    if !metadata.is_file() || metadata.len() > MAX_METADATA_FILE_SIZE {
+        return None;
+    }
+
+    fs::read_to_string(canonical_candidate).ok()
+}
+
+fn extract_version_from_module_content(content: &str) -> Option<String> {
+    RE_VERSION_ASSIGNMENT
+        .captures(content)
+        .and_then(|caps| caps.get(1).or_else(|| caps.get(2)))
+        .map(|m| m.as_str().trim().to_string())
+        .filter(|value| !value.is_empty())
+}
+
+fn extract_abstract_from_module_content(content: &str) -> Option<String> {
+    let mut in_name_section = false;
+
+    for line in content.lines() {
+        let trimmed = line.trim();
+        if trimmed == "=head1 NAME" {
+            in_name_section = true;
+            continue;
+        }
+
+        if in_name_section {
+            if trimmed.starts_with('=') {
+                break;
+            }
+            if trimmed.is_empty() {
+                continue;
+            }
+
+            if let Some((_, abstract_text)) = trimmed.split_once(" - ") {
+                let abstract_text = abstract_text.trim();
+                if !abstract_text.is_empty() {
+                    return Some(abstract_text.to_string());
+                }
+            }
+        }
+    }
+
+    None
 }
 
 fn extract_writemakefile_block(content: &str) -> String {
