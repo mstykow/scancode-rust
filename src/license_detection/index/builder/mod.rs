@@ -10,7 +10,9 @@ use aho_corasick::AhoCorasickBuilder;
 use std::collections::{HashMap, HashSet};
 
 use crate::license_detection::hash_match::compute_hash;
-use crate::license_detection::index::dictionary::TokenDictionary;
+use crate::license_detection::index::dictionary::{
+    KnownToken, TokenDictionary, TokenId, TokenKind,
+};
 use crate::license_detection::index::token_sets::{
     build_set_and_mset, high_multiset_subset, high_tids_set_subset, multiset_counter,
     tids_set_counter,
@@ -223,11 +225,7 @@ const MARKERS: &[&str] = &[
     "www",
 ];
 
-pub fn is_good_tokens_ngram(
-    tokens_ngram: &[String],
-    tids_ngram: &[u16],
-    len_legalese: usize,
-) -> bool {
+pub fn is_good_tokens_ngram(tokens_ngram: &[String], known_tokens_ngram: &[KnownToken]) -> bool {
     const MIN_GOOD: usize = 3;
 
     let digit_count = tokens_ngram
@@ -251,12 +249,14 @@ pub fn is_good_tokens_ngram(
         return false;
     }
 
-    let unique_tids: HashSet<u16> = tids_ngram.iter().copied().collect();
+    let unique_tids: HashSet<TokenId> = known_tokens_ngram.iter().map(|token| token.id).collect();
     if unique_tids.len() <= 2 {
         return false;
     }
 
-    let has_high_token = tids_ngram.iter().any(|&tid| (tid as usize) < len_legalese);
+    let has_high_token = known_tokens_ngram
+        .iter()
+        .any(|token| token.kind == TokenKind::Legalese);
     if !has_high_token {
         return false;
     }
@@ -277,7 +277,7 @@ pub fn compute_is_approx_matchable(rule: &Rule) -> bool {
         || (rule.is_small && (rule.is_license_reference || rule.is_license_tag)))
 }
 
-pub fn tokens_to_bytes(tokens: &[u16]) -> Vec<u8> {
+pub fn tokens_to_bytes(tokens: &[TokenId]) -> Vec<u8> {
     tokens.iter().flat_map(|t| t.to_le_bytes()).collect()
 }
 
@@ -303,24 +303,23 @@ pub fn build_index(rules: Vec<Rule>, licenses: Vec<License>) -> LicenseIndex {
         let mut sorted_tokens: Vec<&String> = spdx_tokens.iter().collect();
         sorted_tokens.sort();
         for token in sorted_tokens {
-            if dictionary.get(token).is_none() {
-                dictionary.get_or_assign(token);
+            if dictionary.lookup(token).is_none() {
+                let _ = dictionary.intern(token);
             }
         }
     }
 
-    let license_token_ids: HashSet<u16> = LICENSE_TOKEN_STRINGS
+    let license_token_ids: HashSet<TokenId> = LICENSE_TOKEN_STRINGS
         .iter()
-        .filter_map(|&token| dictionary.get(token))
+        .filter_map(|&token| dictionary.lookup(token).map(|token| token.id))
         .collect();
 
-    let mut digit_only_tids = HashSet::new();
     let mut rid_by_hash: HashMap<[u8; 20], usize> = HashMap::new();
     let mut rules_by_rid: Vec<Rule> = Vec::with_capacity(rules.len());
-    let mut tids_by_rid: Vec<Vec<u16>> = Vec::with_capacity(rules.len());
-    let mut sets_by_rid: HashMap<usize, HashSet<u16>> = HashMap::new();
-    let mut msets_by_rid: HashMap<usize, HashMap<u16, usize>> = HashMap::new();
-    let mut high_postings_by_rid: HashMap<usize, HashMap<u16, Vec<usize>>> = HashMap::new();
+    let mut tids_by_rid: Vec<Vec<TokenId>> = Vec::with_capacity(rules.len());
+    let mut sets_by_rid: HashMap<usize, HashSet<TokenId>> = HashMap::new();
+    let mut msets_by_rid: HashMap<usize, HashMap<TokenId, usize>> = HashMap::new();
+    let mut high_postings_by_rid: HashMap<usize, HashMap<TokenId, Vec<usize>>> = HashMap::new();
     let mut false_positive_rids: HashSet<usize> = HashSet::new();
     let mut approx_matchable_rids: HashSet<usize> = HashSet::new();
 
@@ -346,15 +345,17 @@ pub fn build_index(rules: Vec<Rule>, licenses: Vec<License>) -> LicenseIndex {
         rule.required_phrase_spans = parse_required_phrase_spans(&rule.text);
         let (rule_tokens, stopwords_by_pos) = tokenize_with_stopwords(&rule.text);
         rule.stopwords_by_pos = stopwords_by_pos;
-        let mut rule_token_ids: Vec<u16> = Vec::with_capacity(rule_tokens.len());
+        let mut known_rule_tokens: Vec<KnownToken> = Vec::with_capacity(rule_tokens.len());
+        let mut rule_token_ids: Vec<TokenId> = Vec::with_capacity(rule_tokens.len());
 
         let mut is_weak = true;
         for rts in &rule_tokens {
-            let rtid = dictionary.get_or_assign(rts);
-            if is_weak && (rtid as usize) < len_legalese {
+            let known_token = dictionary.intern(rts);
+            if is_weak && known_token.kind == TokenKind::Legalese {
                 is_weak = false;
             }
-            rule_token_ids.push(rtid);
+            known_rule_tokens.push(known_token);
+            rule_token_ids.push(known_token.id);
         }
 
         let rule_length = rule_token_ids.len();
@@ -392,11 +393,13 @@ pub fn build_index(rules: Vec<Rule>, licenses: Vec<License>) -> LicenseIndex {
         let is_approx_matchable = compute_is_approx_matchable(&rule);
 
         if rule_length >= UNKNOWN_NGRAM_LENGTH {
-            let tids_ngrams = ngrams(&rule_token_ids, UNKNOWN_NGRAM_LENGTH);
+            let known_ngrams = ngrams(&known_rule_tokens, UNKNOWN_NGRAM_LENGTH);
             let toks_ngrams = ngrams(&rule_tokens, UNKNOWN_NGRAM_LENGTH);
-            for (tids_ngram, toks_ngram) in tids_ngrams.iter().zip(toks_ngrams.iter()) {
-                if is_good_tokens_ngram(toks_ngram, tids_ngram, len_legalese) {
-                    unknown_automaton_patterns.push(tokens_to_bytes(tids_ngram));
+            for (known_ngram, toks_ngram) in known_ngrams.iter().zip(toks_ngrams.iter()) {
+                if is_good_tokens_ngram(toks_ngram, known_ngram) {
+                    let token_ids: Vec<TokenId> =
+                        known_ngram.iter().map(|token| token.id).collect();
+                    unknown_automaton_patterns.push(tokens_to_bytes(&token_ids));
                 }
             }
         }
@@ -404,10 +407,10 @@ pub fn build_index(rules: Vec<Rule>, licenses: Vec<License>) -> LicenseIndex {
         if is_approx_matchable && !is_weak {
             approx_matchable_rids.insert(rid);
 
-            let mut postings: HashMap<u16, Vec<usize>> = HashMap::new();
-            for (pos, &tid) in rule_token_ids.iter().enumerate() {
-                if (tid as usize) < len_legalese {
-                    postings.entry(tid).or_default().push(pos);
+            let mut postings: HashMap<TokenId, Vec<usize>> = HashMap::new();
+            for (pos, token) in known_rule_tokens.iter().enumerate() {
+                if token.kind == TokenKind::Legalese {
+                    postings.entry(token.id).or_default().push(pos);
                 }
             }
             if !postings.is_empty() {
@@ -420,8 +423,8 @@ pub fn build_index(rules: Vec<Rule>, licenses: Vec<License>) -> LicenseIndex {
         sets_by_rid.insert(rid, tids_set.clone());
         msets_by_rid.insert(rid, mset.clone());
 
-        let tids_set_high = high_tids_set_subset(&tids_set, len_legalese);
-        let mset_high = high_multiset_subset(&mset, len_legalese);
+        let tids_set_high = high_tids_set_subset(&tids_set, &dictionary);
+        let mset_high = high_multiset_subset(&mset, &dictionary);
 
         rule.length_unique = tids_set_counter(&tids_set);
         rule.high_length_unique = tids_set_counter(&tids_set_high);
@@ -461,12 +464,6 @@ pub fn build_index(rules: Vec<Rule>, licenses: Vec<License>) -> LicenseIndex {
         tids_by_rid.push(rule_token_ids);
     }
 
-    for (token, &tid) in dictionary.tokens_to_ids() {
-        if token.chars().all(|c| c.is_ascii_digit()) {
-            digit_only_tids.insert(tid);
-        }
-    }
-
     add_deprecated_spdx_aliases(&mut rid_by_spdx_key);
 
     let rules_automaton = AhoCorasickBuilder::new()
@@ -490,7 +487,6 @@ pub fn build_index(rules: Vec<Rule>, licenses: Vec<License>) -> LicenseIndex {
     LicenseIndex {
         dictionary,
         len_legalese,
-        digit_only_tids,
         rid_by_hash,
         rules_by_rid,
         tids_by_rid,

@@ -1,6 +1,7 @@
 //! Sequence matching algorithms for finding matching blocks.
 
 use crate::license_detection::index::LicenseIndex;
+use crate::license_detection::index::dictionary::TokenId;
 use crate::license_detection::models::LicenseMatch;
 use crate::license_detection::query::QueryRun;
 use std::collections::{HashMap, HashSet};
@@ -30,13 +31,13 @@ use super::{Candidate, MATCH_SEQ};
 /// Tuple of (query_start, rule_start, match_length)
 #[allow(clippy::too_many_arguments, clippy::needless_range_loop)]
 pub(super) fn find_longest_match(
-    query_tokens: &[u16],
-    rule_tokens: &[u16],
+    query_tokens: &[TokenId],
+    rule_tokens: &[TokenId],
     query_lo: usize,
     query_hi: usize,
     rule_lo: usize,
     rule_hi: usize,
-    high_postings: &HashMap<u16, Vec<usize>>,
+    high_postings: &HashMap<TokenId, Vec<usize>>,
     len_legalese: usize,
     matchables: &HashSet<usize>,
 ) -> (usize, usize, usize) {
@@ -50,7 +51,7 @@ pub(super) fn find_longest_match(
         let mut new_j2len: HashMap<usize, usize> = HashMap::new();
         let cur_a = query_tokens[i];
 
-        if (cur_a as usize) < len_legalese
+        if cur_a.as_usize() < len_legalese
             && matchables.contains(&i)
             && let Some(positions) = high_postings.get(&cur_a)
         {
@@ -124,11 +125,11 @@ pub(super) fn find_longest_match(
 ///
 /// Vector of matching blocks as (query_pos, rule_pos, length)
 pub(super) fn match_blocks(
-    query_tokens: &[u16],
-    rule_tokens: &[u16],
+    query_tokens: &[TokenId],
+    rule_tokens: &[TokenId],
     query_start: usize,
     query_end: usize,
-    high_postings: &HashMap<u16, Vec<usize>>,
+    high_postings: &HashMap<TokenId, Vec<usize>>,
     len_legalese: usize,
     matchables: &HashSet<usize>,
 ) -> Vec<(usize, usize, usize)> {
@@ -216,7 +217,7 @@ pub fn seq_match_with_candidates(
     for candidate in candidates {
         let rid = candidate.rid;
         let rule_tokens = index.tids_by_rid.get(rid);
-        let high_postings: HashMap<u16, Vec<usize>> = index
+        let high_postings: HashMap<TokenId, Vec<usize>> = index
             .high_postings_by_rid
             .get(&rid)
             .map(|hp| {
@@ -271,7 +272,7 @@ pub fn seq_match_with_candidates(
                     let qspan_end = qpos + mlen;
                     max_qend = max_qend.max(qspan_end);
 
-                    if mlen == 1 && query_tokens[qpos] >= len_legalese as u16 {
+                    if mlen == 1 && query_tokens[qpos].as_usize() >= len_legalese {
                         continue;
                     }
 
@@ -285,7 +286,11 @@ pub fn seq_match_with_candidates(
                         .collect();
                     let ispan_positions: Vec<usize> = (ipos..ipos + mlen).collect();
                     let hispan_positions: Vec<usize> = (ipos..ipos + mlen)
-                        .filter(|&p| rule_tokens.get(p).is_some_and(|t| *t < len_legalese as u16))
+                        .filter(|&p| {
+                            rule_tokens
+                                .get(p)
+                                .is_some_and(|t| t.as_usize() < len_legalese)
+                        })
                         .collect();
                     let hispan_count = hispan_positions.len();
 
@@ -351,16 +356,21 @@ pub fn seq_match_with_candidates(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::license_detection::index::dictionary::{TokenId, tid};
+
+    fn tids(values: &[u16]) -> Vec<TokenId> {
+        values.iter().copied().map(tid).collect()
+    }
 
     #[test]
     fn test_find_longest_match_basic() {
-        let query_tokens = vec![0, 1, 2, 3];
-        let rule_tokens = vec![0, 1, 2, 3];
-        let mut high_postings: HashMap<u16, Vec<usize>> = HashMap::new();
-        high_postings.insert(0, vec![0]);
-        high_postings.insert(1, vec![1]);
-        high_postings.insert(2, vec![2]);
-        high_postings.insert(3, vec![3]);
+        let query_tokens = tids(&[0, 1, 2, 3]);
+        let rule_tokens = tids(&[0, 1, 2, 3]);
+        let mut high_postings: HashMap<TokenId, Vec<usize>> = HashMap::new();
+        high_postings.insert(tid(0), vec![0]);
+        high_postings.insert(tid(1), vec![1]);
+        high_postings.insert(tid(2), vec![2]);
+        high_postings.insert(tid(3), vec![3]);
 
         let matchables: HashSet<usize> = (0..query_tokens.len()).collect();
 
@@ -381,13 +391,13 @@ mod tests {
 
     #[test]
     fn test_find_longest_match_with_gap() {
-        let query_tokens = vec![0, 1, 99, 2, 3];
-        let rule_tokens = vec![0, 1, 2, 3];
-        let mut high_postings: HashMap<u16, Vec<usize>> = HashMap::new();
-        high_postings.insert(0, vec![0]);
-        high_postings.insert(1, vec![1]);
-        high_postings.insert(2, vec![2]);
-        high_postings.insert(3, vec![3]);
+        let query_tokens = tids(&[0, 1, 99, 2, 3]);
+        let rule_tokens = tids(&[0, 1, 2, 3]);
+        let mut high_postings: HashMap<TokenId, Vec<usize>> = HashMap::new();
+        high_postings.insert(tid(0), vec![0]);
+        high_postings.insert(tid(1), vec![1]);
+        high_postings.insert(tid(2), vec![2]);
+        high_postings.insert(tid(3), vec![3]);
 
         let matchables: HashSet<usize> = (0..query_tokens.len()).collect();
 
@@ -416,11 +426,11 @@ mod tests {
 
     #[test]
     fn test_find_longest_match_uses_high_postings() {
-        let query_tokens = vec![0, 10, 2];
-        let rule_tokens = vec![0, 1, 2];
-        let mut high_postings: HashMap<u16, Vec<usize>> = HashMap::new();
-        high_postings.insert(0, vec![0]);
-        high_postings.insert(2, vec![2]);
+        let query_tokens = tids(&[0, 10, 2]);
+        let rule_tokens = tids(&[0, 1, 2]);
+        let mut high_postings: HashMap<TokenId, Vec<usize>> = HashMap::new();
+        high_postings.insert(tid(0), vec![0]);
+        high_postings.insert(tid(2), vec![2]);
 
         let matchables: HashSet<usize> = (0..query_tokens.len()).collect();
 
@@ -444,9 +454,9 @@ mod tests {
 
     #[test]
     fn test_find_longest_match_no_match() {
-        let query_tokens = vec![10, 11, 12];
-        let rule_tokens = vec![0, 1, 2];
-        let high_postings: HashMap<u16, Vec<usize>> = HashMap::new();
+        let query_tokens = tids(&[10, 11, 12]);
+        let rule_tokens = tids(&[0, 1, 2]);
+        let high_postings: HashMap<TokenId, Vec<usize>> = HashMap::new();
 
         let matchables: HashSet<usize> = (0..query_tokens.len()).collect();
 
@@ -471,12 +481,12 @@ mod tests {
 
     #[test]
     fn test_find_longest_match_respects_bounds() {
-        let query_tokens = vec![0, 1, 2, 0, 1, 2, 0, 1, 2];
-        let rule_tokens = vec![0, 1, 2];
-        let mut high_postings: HashMap<u16, Vec<usize>> = HashMap::new();
-        high_postings.insert(0, vec![0]);
-        high_postings.insert(1, vec![1]);
-        high_postings.insert(2, vec![2]);
+        let query_tokens = tids(&[0, 1, 2, 0, 1, 2, 0, 1, 2]);
+        let rule_tokens = tids(&[0, 1, 2]);
+        let mut high_postings: HashMap<TokenId, Vec<usize>> = HashMap::new();
+        high_postings.insert(tid(0), vec![0]);
+        high_postings.insert(tid(1), vec![1]);
+        high_postings.insert(tid(2), vec![2]);
 
         let matchables: HashSet<usize> = (0..query_tokens.len()).collect();
 
@@ -501,12 +511,12 @@ mod tests {
 
     #[test]
     fn test_find_longest_match_non_matchable_position() {
-        let query_tokens = vec![0, 1, 2];
-        let rule_tokens = vec![0, 1, 2];
-        let mut high_postings: HashMap<u16, Vec<usize>> = HashMap::new();
-        high_postings.insert(0, vec![0]);
-        high_postings.insert(1, vec![1]);
-        high_postings.insert(2, vec![2]);
+        let query_tokens = tids(&[0, 1, 2]);
+        let rule_tokens = tids(&[0, 1, 2]);
+        let mut high_postings: HashMap<TokenId, Vec<usize>> = HashMap::new();
+        high_postings.insert(tid(0), vec![0]);
+        high_postings.insert(tid(1), vec![1]);
+        high_postings.insert(tid(2), vec![2]);
 
         let matchables: HashSet<usize> = [0, 2].into_iter().collect();
 
@@ -530,13 +540,13 @@ mod tests {
 
     #[test]
     fn test_match_blocks_divide_conquer() {
-        let query_tokens = vec![0, 1, 2, 3];
-        let rule_tokens = vec![0, 1, 2, 3];
-        let mut high_postings: HashMap<u16, Vec<usize>> = HashMap::new();
-        high_postings.insert(0, vec![0]);
-        high_postings.insert(1, vec![1]);
-        high_postings.insert(2, vec![2]);
-        high_postings.insert(3, vec![3]);
+        let query_tokens = tids(&[0, 1, 2, 3]);
+        let rule_tokens = tids(&[0, 1, 2, 3]);
+        let mut high_postings: HashMap<TokenId, Vec<usize>> = HashMap::new();
+        high_postings.insert(tid(0), vec![0]);
+        high_postings.insert(tid(1), vec![1]);
+        high_postings.insert(tid(2), vec![2]);
+        high_postings.insert(tid(3), vec![3]);
 
         let matchables: HashSet<usize> = (0..query_tokens.len()).collect();
 
@@ -556,9 +566,9 @@ mod tests {
 
     #[test]
     fn test_match_blocks_collapse_adjacent() {
-        let query_tokens = vec![0, 1, 2, 3, 4];
-        let rule_tokens = vec![0, 1, 2, 3, 4];
-        let mut high_postings: HashMap<u16, Vec<usize>> = HashMap::new();
+        let query_tokens = tids(&[0, 1, 2, 3, 4]);
+        let rule_tokens = tids(&[0, 1, 2, 3, 4]);
+        let mut high_postings: HashMap<TokenId, Vec<usize>> = HashMap::new();
         for (i, &tid) in query_tokens.iter().enumerate() {
             high_postings.entry(tid).or_default().push(i);
         }
@@ -585,9 +595,9 @@ mod tests {
 
     #[test]
     fn test_match_blocks_no_match() {
-        let query_tokens = vec![10, 11, 12];
-        let rule_tokens = vec![0, 1, 2];
-        let high_postings: HashMap<u16, Vec<usize>> = HashMap::new();
+        let query_tokens = tids(&[10, 11, 12]);
+        let rule_tokens = tids(&[0, 1, 2]);
+        let high_postings: HashMap<TokenId, Vec<usize>> = HashMap::new();
 
         let matchables: HashSet<usize> = (0..query_tokens.len()).collect();
 
@@ -606,9 +616,9 @@ mod tests {
 
     #[test]
     fn test_match_blocks_empty_query() {
-        let query_tokens: Vec<u16> = vec![];
-        let rule_tokens = vec![0, 1, 2];
-        let high_postings: HashMap<u16, Vec<usize>> = HashMap::new();
+        let query_tokens = tids(&[]);
+        let rule_tokens = tids(&[0, 1, 2]);
+        let high_postings: HashMap<TokenId, Vec<usize>> = HashMap::new();
         let matchables: HashSet<usize> = HashSet::new();
 
         let blocks = match_blocks(
@@ -626,13 +636,13 @@ mod tests {
 
     #[test]
     fn test_match_blocks_with_gap() {
-        let query_tokens = vec![0, 1, 99, 2, 3];
-        let rule_tokens = vec![0, 1, 2, 3];
-        let mut high_postings: HashMap<u16, Vec<usize>> = HashMap::new();
-        high_postings.insert(0, vec![0]);
-        high_postings.insert(1, vec![1]);
-        high_postings.insert(2, vec![2]);
-        high_postings.insert(3, vec![3]);
+        let query_tokens = tids(&[0, 1, 99, 2, 3]);
+        let rule_tokens = tids(&[0, 1, 2, 3]);
+        let mut high_postings: HashMap<TokenId, Vec<usize>> = HashMap::new();
+        high_postings.insert(tid(0), vec![0]);
+        high_postings.insert(tid(1), vec![1]);
+        high_postings.insert(tid(2), vec![2]);
+        high_postings.insert(tid(3), vec![3]);
 
         let matchables: HashSet<usize> = (0..query_tokens.len()).collect();
 
@@ -655,9 +665,9 @@ mod tests {
 
     #[test]
     fn test_match_blocks_empty_rule() {
-        let query_tokens = vec![0, 1, 2];
-        let rule_tokens: Vec<u16> = vec![];
-        let high_postings: HashMap<u16, Vec<usize>> = HashMap::new();
+        let query_tokens = tids(&[0, 1, 2]);
+        let rule_tokens = tids(&[]);
+        let high_postings: HashMap<TokenId, Vec<usize>> = HashMap::new();
         let matchables: HashSet<usize> = (0..query_tokens.len()).collect();
 
         let blocks = match_blocks(
@@ -675,13 +685,13 @@ mod tests {
 
     #[test]
     fn test_match_blocks_multiple_regions() {
-        let query_tokens = vec![0, 1, 99, 2, 3, 88, 0, 1];
-        let rule_tokens = vec![0, 1, 2, 3];
-        let mut high_postings: HashMap<u16, Vec<usize>> = HashMap::new();
-        high_postings.insert(0, vec![0]);
-        high_postings.insert(1, vec![1]);
-        high_postings.insert(2, vec![2]);
-        high_postings.insert(3, vec![3]);
+        let query_tokens = tids(&[0, 1, 99, 2, 3, 88, 0, 1]);
+        let rule_tokens = tids(&[0, 1, 2, 3]);
+        let mut high_postings: HashMap<TokenId, Vec<usize>> = HashMap::new();
+        high_postings.insert(tid(0), vec![0]);
+        high_postings.insert(tid(1), vec![1]);
+        high_postings.insert(tid(2), vec![2]);
+        high_postings.insert(tid(3), vec![3]);
 
         let matchables: HashSet<usize> = (0..query_tokens.len()).collect();
 
@@ -704,12 +714,12 @@ mod tests {
 
     #[test]
     fn test_match_blocks_with_range() {
-        let query_tokens = vec![0, 1, 2, 99, 0, 1, 2];
-        let rule_tokens = vec![0, 1, 2];
-        let mut high_postings: HashMap<u16, Vec<usize>> = HashMap::new();
-        high_postings.insert(0, vec![0]);
-        high_postings.insert(1, vec![1]);
-        high_postings.insert(2, vec![2]);
+        let query_tokens = tids(&[0, 1, 2, 99, 0, 1, 2]);
+        let rule_tokens = tids(&[0, 1, 2]);
+        let mut high_postings: HashMap<TokenId, Vec<usize>> = HashMap::new();
+        high_postings.insert(tid(0), vec![0]);
+        high_postings.insert(tid(1), vec![1]);
+        high_postings.insert(tid(2), vec![2]);
 
         let matchables: HashSet<usize> = (0..query_tokens.len()).collect();
 
@@ -745,12 +755,12 @@ mod tests {
 
     #[test]
     fn test_extend_match_into_low_tokens() {
-        let query_tokens = vec![0, 1, 2, 10, 11];
-        let rule_tokens = vec![0, 1, 2, 10, 11];
-        let mut high_postings: HashMap<u16, Vec<usize>> = HashMap::new();
-        high_postings.insert(0, vec![0]);
-        high_postings.insert(1, vec![1]);
-        high_postings.insert(2, vec![2]);
+        let query_tokens = tids(&[0, 1, 2, 10, 11]);
+        let rule_tokens = tids(&[0, 1, 2, 10, 11]);
+        let mut high_postings: HashMap<TokenId, Vec<usize>> = HashMap::new();
+        high_postings.insert(tid(0), vec![0]);
+        high_postings.insert(tid(1), vec![1]);
+        high_postings.insert(tid(2), vec![2]);
 
         let matchables: HashSet<usize> = (0..query_tokens.len()).collect();
 
@@ -773,12 +783,12 @@ mod tests {
 
     #[test]
     fn test_extend_match_blocked_by_non_matchable() {
-        let query_tokens = vec![0, 1, 2, 10, 11];
-        let rule_tokens = vec![0, 1, 2, 10, 11];
-        let mut high_postings: HashMap<u16, Vec<usize>> = HashMap::new();
-        high_postings.insert(0, vec![0]);
-        high_postings.insert(1, vec![1]);
-        high_postings.insert(2, vec![2]);
+        let query_tokens = tids(&[0, 1, 2, 10, 11]);
+        let rule_tokens = tids(&[0, 1, 2, 10, 11]);
+        let mut high_postings: HashMap<TokenId, Vec<usize>> = HashMap::new();
+        high_postings.insert(tid(0), vec![0]);
+        high_postings.insert(tid(1), vec![1]);
+        high_postings.insert(tid(2), vec![2]);
 
         let matchables: HashSet<usize> = [0, 1, 2].into_iter().collect();
 

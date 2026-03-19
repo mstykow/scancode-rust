@@ -1,6 +1,7 @@
 //! Candidate selection using set and multiset similarity.
 
 use crate::license_detection::index::LicenseIndex;
+use crate::license_detection::index::dictionary::TokenId;
 use crate::license_detection::index::token_sets::{
     build_set_and_mset, high_multiset_subset, high_tids_set_subset, tids_set_counter,
 };
@@ -79,7 +80,7 @@ pub struct Candidate {
     /// Reference to the rule
     pub rule: Rule,
     /// Set of high-value (legalese) tokens in the intersection
-    pub high_set_intersection: HashSet<u16>,
+    pub high_set_intersection: HashSet<TokenId>,
 }
 
 impl PartialOrd for Candidate {
@@ -252,9 +253,9 @@ pub(super) fn filter_dupes(candidates: Vec<Candidate>) -> Vec<Candidate> {
 ///
 /// Corresponds to Python: `multisets_intersector()` in match_set.py (line 119)
 pub fn multisets_intersector(
-    qmset: &HashMap<u16, usize>,
-    imset: &HashMap<u16, usize>,
-) -> HashMap<u16, usize> {
+    qmset: &HashMap<TokenId, usize>,
+    imset: &HashMap<TokenId, usize>,
+) -> HashMap<TokenId, usize> {
     let (set1, set2) = if qmset.len() < imset.len() {
         (qmset, imset)
     } else {
@@ -282,9 +283,10 @@ pub fn compute_candidates_with_msets(
         return Vec::new();
     }
 
-    let query_token_ids: Vec<u16> = query_tokens
+    let query_token_ids: Vec<TokenId> = query_tokens
         .iter()
-        .filter_map(|&tid| if tid >= 0 { Some(tid as u16) } else { None })
+        .filter(|&&tid| tid >= 0)
+        .map(|&tid| TokenId::new(tid as u16))
         .collect();
 
     if query_token_ids.is_empty() {
@@ -292,9 +294,7 @@ pub fn compute_candidates_with_msets(
     }
 
     let (query_set, query_mset) = build_set_and_mset(&query_token_ids);
-    let len_legalese = index.len_legalese;
-
-    let mut step1_candidates: Vec<(ScoresVector, ScoresVector, usize, Rule, HashSet<u16>)> =
+    let mut step1_candidates: Vec<(ScoresVector, ScoresVector, usize, Rule, HashSet<TokenId>)> =
         Vec::new();
 
     for (rid, rule) in index.rules_by_rid.iter().enumerate() {
@@ -309,12 +309,12 @@ pub fn compute_candidates_with_msets(
             continue;
         };
 
-        let intersection: HashSet<u16> = query_set.intersection(rule_set).copied().collect();
+        let intersection: HashSet<TokenId> = query_set.intersection(rule_set).copied().collect();
         if intersection.is_empty() {
             continue;
         }
 
-        let high_set_intersection = high_tids_set_subset(&intersection, len_legalese);
+        let high_set_intersection = high_tids_set_subset(&intersection, &index.dictionary);
         if high_set_intersection.is_empty() {
             continue;
         }
@@ -378,8 +378,8 @@ pub fn compute_candidates_with_msets(
         };
 
         // Filter using HIGH multisets (Python: high_intersection check)
-        let query_high_mset = high_multiset_subset(&query_mset, len_legalese);
-        let rule_high_mset = high_multiset_subset(rule_mset, len_legalese);
+        let query_high_mset = high_multiset_subset(&query_mset, &index.dictionary);
+        let rule_high_mset = high_multiset_subset(rule_mset, &index.dictionary);
         let high_intersection_mset = multisets_intersector(&query_high_mset, &rule_high_mset);
         if high_intersection_mset.is_empty() {
             continue;
@@ -445,6 +445,7 @@ pub fn compute_candidates_with_msets(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::license_detection::index::dictionary::tid;
 
     #[test]
     fn test_scores_vector_comparison() {
@@ -615,7 +616,7 @@ mod tests {
             identifier: "x11-dec1.RULE".to_string(),
             license_expression: "x11-dec1".to_string(),
             text: String::new(),
-            tokens: vec![0; 138],
+            tokens: vec![tid(0); 138],
             is_license_text: true,
             is_license_notice: false,
             is_license_reference: false,
@@ -659,7 +660,7 @@ mod tests {
             identifier: "cmu-uc.RULE".to_string(),
             license_expression: "cmu-uc".to_string(),
             text: String::new(),
-            tokens: vec![0; 133],
+            tokens: vec![tid(0); 133],
             ..rule1.clone()
         };
 
@@ -719,7 +720,7 @@ mod tests {
             identifier: "mit.RULE".to_string(),
             license_expression: "mit".to_string(),
             text: String::new(),
-            tokens: vec![0; 100],
+            tokens: vec![tid(0); 100],
             is_license_text: true,
             is_license_notice: false,
             is_license_reference: false,
@@ -763,7 +764,7 @@ mod tests {
             identifier: "mit_2.RULE".to_string(),
             license_expression: "mit".to_string(),
             text: String::new(),
-            tokens: vec![0; 100],
+            tokens: vec![tid(0); 100],
             ..rule1.clone()
         };
 
@@ -823,7 +824,7 @@ mod tests {
             identifier: "cc-by-sa-1.0.RULE".to_string(),
             license_expression: "cc-by-sa-1.0".to_string(),
             text: String::new(),
-            tokens: vec![0; 1960],
+            tokens: vec![tid(0); 1960],
             is_license_text: true,
             is_license_notice: false,
             is_license_reference: false,
@@ -867,7 +868,7 @@ mod tests {
             identifier: "cc-by-nc-sa-1.0.RULE".to_string(),
             license_expression: "cc-by-nc-sa-1.0".to_string(),
             text: String::new(),
-            tokens: vec![0; 1829],
+            tokens: vec![tid(0); 1829],
             is_license_text: true,
             is_license_notice: false,
             is_license_reference: false,
@@ -959,7 +960,7 @@ mod tests {
         let mut same_group_candidates = vec![filtered[0].clone(), filtered[1].clone()];
         for candidate in &mut same_group_candidates {
             candidate.rule.license_expression = "same".to_string();
-            candidate.rule.tokens = vec![0; 100];
+            candidate.rule.tokens = vec![tid(0); 100];
         }
 
         let deduped = filter_dupes(same_group_candidates);
@@ -973,7 +974,7 @@ mod tests {
             identifier: "a.RULE".to_string(),
             license_expression: "a".to_string(),
             text: String::new(),
-            tokens: vec![0; 10],
+            tokens: vec![tid(0); 10],
             is_license_text: true,
             is_license_notice: false,
             is_license_reference: false,

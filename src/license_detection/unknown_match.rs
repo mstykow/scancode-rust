@@ -6,6 +6,7 @@ use regex::Regex;
 use sha1::{Digest, Sha1};
 
 use crate::license_detection::index::LicenseIndex;
+use crate::license_detection::index::dictionary::{TokenId, TokenKind};
 use crate::license_detection::models::{LicenseMatch, MatcherKind};
 use crate::license_detection::query::Query;
 use crate::license_detection::tokenize::STOPWORDS;
@@ -95,7 +96,7 @@ pub fn unknown_match(
             continue;
         }
 
-        let hispan = compute_hispan_from_qspan(&query.tokens, &qspan, index.len_legalese);
+        let hispan = compute_hispan_from_qspan(&query.tokens, &qspan, index);
 
         #[cfg(debug_assertions)]
         {
@@ -160,7 +161,7 @@ fn find_unmatched_regions(
 }
 
 fn get_matched_ngrams(
-    tokens: &[u16],
+    tokens: &[TokenId],
     start: usize,
     end: usize,
     automaton: &AhoCorasick,
@@ -214,9 +215,9 @@ fn compute_qspan_union(positions: &[(usize, usize)]) -> Vec<(usize, usize)> {
 }
 
 fn compute_hispan_from_qspan(
-    tokens: &[u16],
+    tokens: &[TokenId],
     qspan: &[(usize, usize)],
-    len_legalese: usize,
+    index: &LicenseIndex,
 ) -> usize {
     qspan
         .iter()
@@ -224,7 +225,7 @@ fn compute_hispan_from_qspan(
         .filter(|&pos| {
             tokens
                 .get(pos)
-                .is_some_and(|&tid| (tid as usize) < len_legalese)
+                .is_some_and(|&tid| index.dictionary.token_kind(tid) == TokenKind::Legalese)
         })
         .count()
 }
@@ -571,8 +572,13 @@ fn calculate_score(ngram_count: usize, match_len: usize) -> f32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::license_detection::index::dictionary::{TokenId, tid};
     use crate::license_detection::index::LicenseIndex;
     use crate::license_detection::query::Query;
+
+    fn tids(values: &[u16]) -> Vec<TokenId> {
+        values.iter().copied().map(tid).collect()
+    }
 
     #[test]
     fn test_unknown_match_empty_query() {
@@ -669,15 +675,16 @@ mod tests {
 
     #[test]
     fn test_compute_hispan_from_qspan() {
-        let tokens: Vec<u16> = (0..30).collect();
+        let tokens: Vec<TokenId> = (0..30).map(tid).collect();
         let qspan = vec![(0, 10), (20, 25)];
-        let hispan = compute_hispan_from_qspan(&tokens, &qspan, 15);
+        let index = LicenseIndex::with_legalese_count(15);
+        let hispan = compute_hispan_from_qspan(&tokens, &qspan, &index);
         assert_eq!(hispan, 10);
     }
 
     #[test]
     fn test_get_matched_ngrams_empty_automaton() {
-        let tokens = vec![1u16, 2, 3, 4, 5, 6, 7, 8];
+        let tokens = tids(&[1, 2, 3, 4, 5, 6, 7, 8]);
         let automaton =
             AhoCorasick::new(std::iter::empty::<&[u8]>()).expect("Failed to create automaton");
 
@@ -688,7 +695,7 @@ mod tests {
 
     #[test]
     fn test_get_matched_ngrams_with_matches() {
-        let tokens: Vec<u16> = (0..30).collect();
+        let tokens: Vec<TokenId> = (0..30).map(tid).collect();
         let ngram: Vec<u8> = vec![0, 0, 1, 0, 2, 0, 3, 0, 4, 0, 5, 0];
         let automaton = AhoCorasick::new(std::iter::once(ngram.as_slice()))
             .expect("Failed to create automaton");
@@ -704,7 +711,7 @@ mod tests {
 
     #[test]
     fn test_get_matched_ngrams_keeps_overlapping_matches() {
-        let tokens = vec![1u16, 2, 3, 1, 2, 3, 1, 2, 3];
+        let tokens = tids(&[1, 2, 3, 1, 2, 3, 1, 2, 3]);
         let overlapping_ngram: Vec<u8> = tokens[..UNKNOWN_NGRAM_LENGTH]
             .iter()
             .flat_map(|tid| tid.to_le_bytes())
@@ -1021,7 +1028,7 @@ mod tests {
 
     #[test]
     fn test_get_matched_ngrams_out_of_bounds() {
-        let tokens = vec![1u16, 2, 3];
+        let tokens = tids(&[1, 2, 3]);
         let automaton =
             AhoCorasick::new(std::iter::empty::<&[u8]>()).expect("Failed to create automaton");
 

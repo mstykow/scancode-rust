@@ -6,7 +6,7 @@ pub mod token_sets;
 
 pub use builder::build_index;
 
-use crate::license_detection::index::dictionary::TokenDictionary;
+use crate::license_detection::index::dictionary::{TokenDictionary, TokenId};
 use aho_corasick::AhoCorasick;
 use std::collections::{HashMap, HashSet};
 
@@ -53,13 +53,6 @@ pub struct LicenseIndex {
     /// Corresponds to Python: `self.len_legalese = 0` (line 185)
     pub len_legalese: usize,
 
-    /// Set of token IDs made entirely of digits.
-    ///
-    /// These tokens can create worst-case behavior when there are long runs of them.
-    ///
-    /// Corresponds to Python: `self.digit_only_tids = set()` (line 191)
-    pub digit_only_tids: HashSet<u16>,
-
     /// Mapping from rule hash to rule ID for hash-based exact matching.
     ///
     /// This enables fast exact matches using a hash of the rule\'s token IDs.
@@ -83,7 +76,7 @@ pub struct LicenseIndex {
     /// Maps rule IDs to their token ID sequences.
     ///
     /// Corresponds to Python: `self.tids_by_rid = []` (line 204)
-    pub tids_by_rid: Vec<Vec<u16>>,
+    pub tids_by_rid: Vec<Vec<TokenId>>,
 
     /// Aho-Corasick automaton built from all rule token sequences.
     ///
@@ -107,7 +100,7 @@ pub struct LicenseIndex {
     /// Used for efficient candidate selection based on token overlap.
     ///
     /// Corresponds to Python: `self.sets_by_rid = []` (line 212)
-    pub sets_by_rid: HashMap<usize, HashSet<u16>>,
+    pub sets_by_rid: HashMap<usize, HashSet<TokenId>>,
 
     /// Token ID multisets per rule for candidate ranking.
     ///
@@ -115,7 +108,7 @@ pub struct LicenseIndex {
     /// Used for ranking candidates by token frequency overlap.
     ///
     /// Corresponds to Python: `self.msets_by_rid = []` (line 213)
-    pub msets_by_rid: HashMap<usize, HashMap<u16, usize>>,
+    pub msets_by_rid: HashMap<usize, HashMap<TokenId, usize>>,
 
     /// Inverted index of high-value token positions per rule.
     ///
@@ -127,7 +120,7 @@ pub struct LicenseIndex {
     ///
     /// Corresponds to Python: `self.high_postings_by_rid = []` (line 209)
     /// In Python: `postings = {tid: array('h', [positions, ...])}`
-    pub high_postings_by_rid: HashMap<usize, HashMap<u16, Vec<usize>>>,
+    pub high_postings_by_rid: HashMap<usize, HashMap<TokenId, Vec<usize>>>,
 
     /// Set of rule IDs for false positive rules.
     ///
@@ -198,7 +191,6 @@ impl LicenseIndex {
         Self {
             dictionary,
             len_legalese,
-            digit_only_tids: HashSet::new(),
             rid_by_hash: HashMap::new(),
             rules_by_rid: Vec::new(),
             tids_by_rid: Vec::new(),
@@ -317,7 +309,7 @@ mod tests {
         index.licenses_by_key.insert(license.key.clone(), license);
 
         assert_eq!(index.licenses_by_key.len(), 1);
-        assert!(index.licenses_by_key.get("test-license").is_some());
+        assert!(index.licenses_by_key.contains_key("test-license"));
     }
 
     #[test]
@@ -368,8 +360,8 @@ mod tests {
         }
 
         assert_eq!(index.licenses_by_key.len(), 2);
-        assert!(index.licenses_by_key.get("license-1").is_some());
-        assert!(index.licenses_by_key.get("license-2").is_some());
+        assert!(index.licenses_by_key.contains_key("license-1"));
+        assert!(index.licenses_by_key.contains_key("license-2"));
     }
 
     #[test]
@@ -401,7 +393,7 @@ mod tests {
         assert!(retrieved.is_some());
         assert_eq!(retrieved.unwrap().name, "MIT License");
 
-        assert!(index.licenses_by_key.get("unknown").is_none());
+        assert!(!index.licenses_by_key.contains_key("unknown"));
     }
 
     #[test]

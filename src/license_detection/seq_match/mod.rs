@@ -35,6 +35,7 @@ pub const MAX_NEAR_DUPE_CANDIDATES: usize = 10;
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::license_detection::index::dictionary::{TokenId, TokenKind};
     use crate::license_detection::index::LicenseIndex;
     use crate::license_detection::index::token_sets::build_set_and_mset;
     use crate::license_detection::models::Rule;
@@ -57,7 +58,7 @@ mod tests {
 
     pub(super) fn add_test_rule(index: &mut LicenseIndex, text: &str, expression: &str) -> usize {
         let rid = index.rules_by_rid.len();
-        let tokens: Vec<u16> = text
+        let tokens: Vec<TokenId> = text
             .split_whitespace()
             .filter_map(|word| index.dictionary.get(word))
             .collect();
@@ -66,9 +67,9 @@ mod tests {
         let _ = index.sets_by_rid.insert(rid, set);
         let _ = index.msets_by_rid.insert(rid, mset);
 
-        let mut high_postings: HashMap<u16, Vec<usize>> = HashMap::new();
+        let mut high_postings: HashMap<TokenId, Vec<usize>> = HashMap::new();
         for (pos, &tid) in tokens.iter().enumerate() {
-            if (tid as usize) < index.len_legalese {
+            if index.dictionary.token_kind(tid) == TokenKind::Legalese {
                 high_postings.entry(tid).or_default().push(pos);
             }
         }
@@ -103,7 +104,7 @@ mod tests {
             length_unique: tokens.len(),
             high_length_unique: tokens
                 .iter()
-                .filter(|&&t| (t as usize) < index.len_legalese)
+                .filter(|&&t| index.dictionary.token_kind(t) == TokenKind::Legalese)
                 .count(),
             high_length: tokens.len(),
             min_matched_length: 1,

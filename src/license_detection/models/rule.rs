@@ -3,6 +3,8 @@
 use std::collections::HashMap;
 use std::ops::Range;
 
+use crate::license_detection::index::dictionary::TokenId;
+
 /// Rule metadata loaded from .LICENSE and .RULE files.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Rule {
@@ -18,7 +20,7 @@ pub struct Rule {
     pub text: String,
 
     /// Token IDs for the text (assigned during indexing)
-    pub tokens: Vec<u16>,
+    pub tokens: Vec<TokenId>,
 
     /// True if this is a full license text (highest confidence)
     pub is_license_text: bool,

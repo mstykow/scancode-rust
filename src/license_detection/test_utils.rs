@@ -5,7 +5,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use crate::license_detection::index::dictionary::TokenDictionary;
+use crate::license_detection::index::dictionary::{TokenDictionary, TokenId};
 use crate::license_detection::index::LicenseIndex;
 use crate::license_detection::models::Rule;
 use crate::license_detection::query::Query;
@@ -52,6 +52,7 @@ pub fn create_mock_rule(
     is_small: bool,
     is_tiny: bool,
 ) -> Rule {
+    let tokens: Vec<TokenId> = tokens.into_iter().map(TokenId::new).collect();
     let length_unique = tokens.len();
     Rule {
         identifier: format!("{}.LICENSE", license_expression),
@@ -163,16 +164,18 @@ pub fn create_mock_rule_simple(license_expression: &str, relevance: u8) -> Rule 
 /// # Returns
 /// A `Query` spanning the entire token range
 pub fn create_mock_query_with_tokens<'a>(tokens: &[u16], index: &'a LicenseIndex) -> Query<'a> {
-    let line_by_pos = vec![1; tokens.len()];
+    let tokens: Vec<TokenId> = tokens.iter().copied().map(TokenId::new).collect();
+    let token_count = tokens.len();
+    let line_by_pos = vec![1; token_count];
 
     Query {
         text: String::new(),
-        tokens: tokens.to_vec(),
+        tokens,
         line_by_pos,
         unknowns_by_pos: HashMap::new(),
         stopwords_by_pos: HashMap::new(),
         shorts_and_digits_pos: HashSet::new(),
-        high_matchables: (0..tokens.len()).collect(),
+        high_matchables: (0..token_count).collect(),
         low_matchables: HashSet::new(),
         is_binary: false,
         query_run_ranges: Vec::new(),

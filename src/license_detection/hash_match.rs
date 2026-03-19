@@ -5,6 +5,7 @@
 
 use sha1::{Digest, Sha1};
 
+use crate::license_detection::index::dictionary::{TokenId, TokenKind};
 use crate::license_detection::index::LicenseIndex;
 use crate::license_detection::models::{LicenseMatch, MatcherKind};
 use crate::license_detection::query::QueryRun;
@@ -24,11 +25,11 @@ pub const MATCH_HASH: MatcherKind = MatcherKind::Hash;
 /// 20-byte SHA1 digest
 ///
 /// Corresponds to Python: `tokens_hash()` (lines 44-49)
-pub fn compute_hash(tokens: &[u16]) -> [u8; 20] {
+pub fn compute_hash(tokens: &[TokenId]) -> [u8; 20] {
     let mut hasher = Sha1::new();
 
     for token in tokens {
-        let signed = *token as i16;
+        let signed = token.raw() as i16;
         hasher.update(signed.to_le_bytes());
     }
 
@@ -65,7 +66,7 @@ pub fn hash_match(index: &LicenseIndex, query_run: &QueryRun) -> Vec<LicenseMatc
         let qspan_positions: Vec<usize> = (query_run.start..=end).collect();
         let ispan_positions: Vec<usize> = (0..rule_length).collect();
         let hispan_positions: Vec<usize> = (0..rule_length)
-            .filter(|&p| itokens[p] < index.len_legalese as u16)
+            .filter(|&p| index.dictionary.token_kind(itokens[p]) == TokenKind::Legalese)
             .collect();
 
         let matched_length = query_run.tokens().len();
@@ -124,8 +125,13 @@ pub fn hash_match(index: &LicenseIndex, query_run: &QueryRun) -> Vec<LicenseMatc
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::license_detection::index::dictionary::TokenId;
     use crate::license_detection::models::Rule;
     use crate::license_detection::test_utils::{create_mock_query_with_tokens, create_test_index};
+
+    fn tids(values: &[u16]) -> Vec<TokenId> {
+        values.iter().copied().map(TokenId::new).collect()
+    }
 
     fn create_test_rules_by_rid() -> Vec<Rule> {
         vec![
@@ -133,7 +139,7 @@ mod tests {
                 identifier: "mit.LICENSE".to_string(),
                 license_expression: "mit".to_string(),
                 text: "MIT License".to_string(),
-                tokens: vec![0, 1],
+                tokens: tids(&[0, 1]),
                 is_license_text: true,
                 is_license_notice: false,
                 is_license_reference: false,
@@ -176,7 +182,7 @@ mod tests {
                 identifier: "apache-2.0.LICENSE".to_string(),
                 license_expression: "apache-2.0".to_string(),
                 text: "Apache License 2.0".to_string(),
-                tokens: vec![2, 3, 4],
+                tokens: tids(&[2, 3, 4]),
                 is_license_text: true,
                 is_license_notice: false,
                 is_license_reference: false,
@@ -220,12 +226,12 @@ mod tests {
 
     #[test]
     fn test_compute_hash() {
-        let tokens = vec![1u16, 2, 3, 4, 5];
+        let tokens = tids(&[1, 2, 3, 4, 5]);
         let hash = compute_hash(&tokens);
 
         assert_eq!(hash.len(), 20);
 
-        let tokens2 = vec![1u16, 2, 3, 4, 5];
+        let tokens2 = tids(&[1, 2, 3, 4, 5]);
         let hash2 = compute_hash(&tokens2);
 
         assert_eq!(hash, hash2, "Same tokens should produce same hash");
@@ -239,10 +245,10 @@ mod tests {
 
     #[test]
     fn test_compute_hash_different_tokens() {
-        let tokens1 = vec![1u16, 2, 3];
+        let tokens1 = tids(&[1, 2, 3]);
         let hash1 = compute_hash(&tokens1);
 
-        let tokens2 = vec![1u16, 2, 4];
+        let tokens2 = tids(&[1, 2, 4]);
         let hash2 = compute_hash(&tokens2);
 
         assert_ne!(
@@ -253,7 +259,7 @@ mod tests {
 
     #[test]
     fn test_index_hash() {
-        let rule_tokens = vec![10u16, 20, 30];
+        let rule_tokens = tids(&[10, 20, 30]);
         let hash1 = compute_hash(&rule_tokens);
         let hash2 = compute_hash(&rule_tokens);
 
@@ -269,9 +275,9 @@ mod tests {
             create_test_index(&[("mit", 0), ("license", 1), ("apache", 2), ("2.0", 3)], 2);
 
         let rules_by_rid = create_test_rules_by_rid();
-        let tids_by_rid: Vec<Vec<u16>> = vec![vec![0, 1], vec![2, 3, 4]];
+        let tids_by_rid = vec![tids(&[0, 1]), tids(&[2, 3, 4])];
 
-        index.rid_by_hash.insert(compute_hash(&[5, 6, 7]), 0);
+        index.rid_by_hash.insert(compute_hash(&tids(&[5, 6, 7])), 0);
         index.rules_by_rid = rules_by_rid;
         index.tids_by_rid = tids_by_rid;
 
@@ -291,9 +297,9 @@ mod tests {
             create_test_index(&[("mit", 0), ("license", 1), ("apache", 2), ("2.0", 3)], 2);
 
         let rules_by_rid = create_test_rules_by_rid();
-        let tids_by_rid: Vec<Vec<u16>> = vec![vec![0, 1], vec![2, 3, 4]];
+        let tids_by_rid = vec![tids(&[0, 1]), tids(&[2, 3, 4])];
 
-        index.rid_by_hash.insert(compute_hash(&[0, 1]), 0);
+        index.rid_by_hash.insert(compute_hash(&tids(&[0, 1])), 0);
         index.rules_by_rid = rules_by_rid;
         index.tids_by_rid = tids_by_rid;
 
@@ -313,9 +319,9 @@ mod tests {
             create_test_index(&[("mit", 0), ("license", 1), ("apache", 2), ("2.0", 3)], 2);
 
         let rules_by_rid = create_test_rules_by_rid();
-        let tids_by_rid: Vec<Vec<u16>> = vec![vec![0, 1], vec![2, 3, 4]];
+        let tids_by_rid = vec![tids(&[0, 1]), tids(&[2, 3, 4])];
 
-        index.rid_by_hash.insert(compute_hash(&[0, 1]), 0);
+        index.rid_by_hash.insert(compute_hash(&tids(&[0, 1])), 0);
         index.rules_by_rid = rules_by_rid;
         index.tids_by_rid = tids_by_rid;
 
@@ -328,7 +334,7 @@ mod tests {
 
     #[test]
     fn test_match_hash_empty_tokens() {
-        let tokens: Vec<u16> = vec![];
+        let tokens = tids(&[]);
         let hash = compute_hash(&tokens);
 
         assert_eq!(hash.len(), 20);
@@ -336,7 +342,7 @@ mod tests {
 
     #[test]
     fn test_match_hash_large_tokens() {
-        let tokens: Vec<u16> = (0..1000).collect();
+        let tokens: Vec<TokenId> = (0..1000).map(TokenId::new).collect();
         let hash = compute_hash(&tokens);
 
         assert_eq!(hash.len(), 20);
@@ -347,7 +353,7 @@ mod tests {
 
     #[test]
     fn test_match_hash_single_token() {
-        let tokens = vec![42u16];
+        let tokens = tids(&[42]);
         let hash = compute_hash(&tokens);
 
         assert_eq!(hash.len(), 20);
@@ -358,12 +364,12 @@ mod tests {
 
     #[test]
     fn test_match_hash_max_token_values() {
-        let tokens = vec![u16::MAX, u16::MAX - 1, 0];
+        let tokens = tids(&[u16::MAX, u16::MAX - 1, 0]);
         let hash = compute_hash(&tokens);
 
         assert_eq!(hash.len(), 20);
 
-        let tokens2 = vec![u16::MAX, u16::MAX - 1, 0];
+        let tokens2 = tids(&[u16::MAX, u16::MAX - 1, 0]);
         let hash2 = compute_hash(&tokens2);
 
         assert_eq!(
@@ -378,10 +384,10 @@ mod tests {
             create_test_index(&[("mit", 0), ("license", 1), ("apache", 2), ("2.0", 3)], 2);
 
         let rules_by_rid = create_test_rules_by_rid();
-        let tids_by_rid: Vec<Vec<u16>> = vec![vec![0, 1], vec![2, 3, 4]];
+        let tids_by_rid = vec![tids(&[0, 1]), tids(&[2, 3, 4])];
 
-        index.rid_by_hash.insert(compute_hash(&[0, 1]), 0);
-        index.rid_by_hash.insert(compute_hash(&[0, 1]), 1);
+        index.rid_by_hash.insert(compute_hash(&tids(&[0, 1])), 0);
+        index.rid_by_hash.insert(compute_hash(&tids(&[0, 1])), 1);
         index.rules_by_rid = rules_by_rid;
         index.tids_by_rid = tids_by_rid;
 
@@ -401,9 +407,9 @@ mod tests {
         let mut index = create_test_index(&[("mit", 0), ("license", 1)], 2);
 
         let rules_by_rid = create_test_rules_by_rid();
-        let tids_by_rid: Vec<Vec<u16>> = vec![vec![0, 1]];
+        let tids_by_rid = vec![tids(&[0, 1])];
 
-        index.rid_by_hash.insert(compute_hash(&[0, 1]), 0);
+        index.rid_by_hash.insert(compute_hash(&tids(&[0, 1])), 0);
         index.rules_by_rid = rules_by_rid;
         index.tids_by_rid = tids_by_rid;
 

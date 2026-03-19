@@ -1,6 +1,7 @@
 //! Query processing - tokenized input for license matching.
 
 use crate::license_detection::index::LicenseIndex;
+use crate::license_detection::index::dictionary::{KnownToken, QueryToken, TokenId, TokenKind};
 use crate::license_detection::tokenize::{tokenize_without_stopwords, STOPWORDS};
 use std::collections::{HashMap, HashSet};
 
@@ -57,7 +58,7 @@ pub struct Query<'a> {
     /// Token IDs for known tokens (tokens found in the index dictionary)
     ///
     /// Corresponds to Python: `self.tokens = []` (line 228)
-    pub tokens: Vec<u16>,
+    pub tokens: Vec<TokenId>,
 
     /// Mapping from token position to line number (1-based)
     ///
@@ -212,50 +213,53 @@ impl<'a> Query<'a> {
         let mut shorts_and_digits_pos = HashSet::new();
         let mut spdx_lines: Vec<(String, usize, usize)> = Vec::new();
 
-        let len_legalese = index.len_legalese;
-
         let mut known_pos = -1i32;
         let mut started = false;
         let mut current_line = 1usize;
 
-        let mut tokens_by_line: Vec<Vec<Option<u16>>> = Vec::new();
+        let mut tokens_by_line: Vec<Vec<Option<KnownToken>>> = Vec::new();
 
         for line in text.lines() {
             let line_trimmed = line.trim();
-            let mut line_tokens: Vec<Option<u16>> = Vec::new();
+            let mut line_tokens: Vec<Option<KnownToken>> = Vec::new();
 
             let mut line_first_known_pos = None;
 
             for token in tokenize_without_stopwords(line_trimmed) {
-                let is_stopword = stopwords_set.contains(token.as_str());
-                let tid_opt = index.dictionary.get(&token);
-
-                if !is_stopword {
-                    if let Some(tid) = tid_opt {
+                match if stopwords_set.contains(token.as_str()) {
+                    QueryToken::Stopword
+                } else {
+                    index.dictionary.classify_query_token(&token)
+                } {
+                    QueryToken::Known(known_token) => {
                         known_pos += 1;
                         started = true;
-                        tokens.push(tid);
+                        tokens.push(known_token.id);
                         line_by_pos.push(current_line);
-                        line_tokens.push(Some(tid));
+                        line_tokens.push(Some(known_token));
 
                         if line_first_known_pos.is_none() {
                             line_first_known_pos = Some(known_pos);
                         }
 
-                        if token.len() == 1 || token.chars().all(|c| c.is_ascii_digit()) {
+                        if known_token.is_short_or_digit {
                             let _ = shorts_and_digits_pos.insert(known_pos as usize);
                         }
-                    } else if !started {
+                    }
+                    QueryToken::Unknown if !started => {
                         *unknowns_by_pos.entry(None).or_insert(0) += 1;
                         line_tokens.push(None);
-                    } else {
+                    }
+                    QueryToken::Unknown => {
                         *unknowns_by_pos.entry(Some(known_pos)).or_insert(0) += 1;
                         line_tokens.push(None);
                     }
-                } else if !started {
-                    *stopwords_by_pos.entry(None).or_insert(0) += 1;
-                } else {
-                    *stopwords_by_pos.entry(Some(known_pos)).or_insert(0) += 1;
+                    QueryToken::Stopword if !started => {
+                        *stopwords_by_pos.entry(None).or_insert(0) += 1;
+                    }
+                    QueryToken::Stopword => {
+                        *stopwords_by_pos.entry(Some(known_pos)).or_insert(0) += 1;
+                    }
                 }
             }
 
@@ -329,25 +333,18 @@ impl<'a> Query<'a> {
         let high_matchables: HashSet<usize> = tokens
             .iter()
             .enumerate()
-            .filter(|(_pos, tid)| (**tid as usize) < len_legalese)
+            .filter(|(_pos, tid)| index.dictionary.token_kind(**tid) == TokenKind::Legalese)
             .map(|(pos, _tid)| pos)
             .collect();
 
         let low_matchables: HashSet<usize> = tokens
             .iter()
             .enumerate()
-            .filter(|(_pos, tid)| (**tid as usize) >= len_legalese)
+            .filter(|(_pos, tid)| index.dictionary.token_kind(**tid) == TokenKind::Regular)
             .map(|(pos, _tid)| pos)
             .collect();
 
-        let query_runs = Self::compute_query_runs(
-            &tokens,
-            &tokens_by_line,
-            line_threshold,
-            len_legalese,
-            &index.digit_only_tids,
-            has_long_lines,
-        );
+        let query_runs = Self::compute_query_runs(&tokens_by_line, line_threshold, has_long_lines);
 
         Ok(Query {
             text: text.to_string(),
@@ -410,7 +407,7 @@ impl<'a> Query<'a> {
             .any(|line| tokenize_without_stopwords(line).len() > 25)
     }
 
-    fn break_long_lines(lines: &[Vec<Option<u16>>]) -> Vec<Vec<Option<u16>>> {
+    fn break_long_lines(lines: &[Vec<Option<KnownToken>>]) -> Vec<Vec<Option<KnownToken>>> {
         lines
             .iter()
             .flat_map(|line| {
@@ -430,11 +427,8 @@ impl<'a> Query<'a> {
     }
 
     fn compute_query_runs(
-        tokens: &[u16],
-        tokens_by_line: &[Vec<Option<u16>>],
+        tokens_by_line: &[Vec<Option<KnownToken>>],
         line_threshold: usize,
-        len_legalese: usize,
-        digit_only_tids: &HashSet<u16>,
         has_long_lines: bool,
     ) -> Vec<(usize, Option<usize>)> {
         let processed_lines = if has_long_lines {
@@ -448,13 +442,17 @@ impl<'a> Query<'a> {
         let mut query_run_end = None;
         let mut empty_lines = 0usize;
         let mut pos = 0usize;
+        let mut query_run_is_all_digit = true;
 
         for line_tokens in processed_lines {
             if query_run_end.is_some() && empty_lines >= line_threshold {
-                query_runs.push((query_run_start, query_run_end));
+                if !query_run_is_all_digit {
+                    query_runs.push((query_run_start, query_run_end));
+                }
                 query_run_start = pos;
                 query_run_end = None;
                 empty_lines = 0;
+                query_run_is_all_digit = true;
             }
 
             if query_run_end.is_none() {
@@ -467,17 +465,18 @@ impl<'a> Query<'a> {
             }
 
             let line_is_all_digit = line_tokens.iter().all(|token_id| {
-                token_id
-                    .map(|tid| digit_only_tids.contains(&tid))
-                    .unwrap_or(true)
+                token_id.map(|known| known.is_digit_only).unwrap_or(true)
             });
             let mut line_has_known_tokens = false;
             let mut line_has_good_tokens = false;
 
-            for tid in line_tokens.into_iter().flatten() {
+            for known in line_tokens.into_iter().flatten() {
                 line_has_known_tokens = true;
-                if (tid as usize) < len_legalese {
+                if known.kind == TokenKind::Legalese {
                     line_has_good_tokens = true;
+                }
+                if !known.is_digit_only {
+                    query_run_is_all_digit = false;
                 }
                 query_run_end = Some(pos);
                 pos += 1;
@@ -495,13 +494,10 @@ impl<'a> Query<'a> {
             }
         }
 
-        if let Some(end) = query_run_end {
-            let is_digits_only = tokens.get(query_run_start..=end).is_some_and(|run_tokens| {
-                run_tokens.iter().all(|tid| digit_only_tids.contains(tid))
-            });
-            if !is_digits_only {
-                query_runs.push((query_run_start, Some(end)));
-            }
+        if let Some(end) = query_run_end
+            && !query_run_is_all_digit
+        {
+            query_runs.push((query_run_start, Some(end)));
         }
 
         query_runs
@@ -578,7 +574,7 @@ impl<'a> Query<'a> {
 struct WholeQueryRunSnapshot<'a> {
     index: &'a LicenseIndex,
     text: String,
-    tokens: Vec<u16>,
+    tokens: Vec<TokenId>,
     line_by_pos: Vec<usize>,
     high_matchables: HashSet<usize>,
     low_matchables: HashSet<usize>,
@@ -639,7 +635,7 @@ impl<'a> QueryRun<'a> {
         }
     }
 
-    fn source_tokens(&self) -> &[u16] {
+    fn source_tokens(&self) -> &[TokenId] {
         if let Some(query) = self.query {
             &query.tokens
         } else {
@@ -727,7 +723,7 @@ impl<'a> QueryRun<'a> {
     /// Returns empty slice if end is None.
     ///
     /// Corresponds to Python: `tokens` property (lines 779-786)
-    pub fn tokens(&self) -> &[u16] {
+    pub fn tokens(&self) -> &[TokenId] {
         match self.end {
             Some(end) => &self.source_tokens()[self.start..=end],
             None => &[],
@@ -737,7 +733,7 @@ impl<'a> QueryRun<'a> {
     /// Iterate over token IDs with their absolute positions.
     ///
     /// Corresponds to Python: `tokens_with_pos()` method (lines 788-789)
-    pub fn tokens_with_pos(&self) -> impl Iterator<Item = (usize, u16)> + '_ {
+    pub fn tokens_with_pos(&self) -> impl Iterator<Item = (usize, TokenId)> + '_ {
         self.tokens()
             .iter()
             .copied()
@@ -751,7 +747,7 @@ impl<'a> QueryRun<'a> {
     pub fn is_digits_only(&self) -> bool {
         self.tokens()
             .iter()
-            .all(|tid| self.get_index().digit_only_tids.contains(tid))
+            .all(|&tid| self.get_index().dictionary.is_digit_only_token(tid))
     }
 
     /// Check if this query run has matchable tokens.
@@ -820,7 +816,7 @@ impl<'a> QueryRun<'a> {
         self.tokens_with_pos()
             .map(|(pos, tid)| {
                 if matchables.contains(&pos) {
-                    tid as i32
+                    tid.raw() as i32
                 } else {
                     -1
                 }

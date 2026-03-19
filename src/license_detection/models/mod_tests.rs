@@ -1,5 +1,6 @@
 #[cfg(test)]
 mod tests {
+    use crate::license_detection::index::dictionary::tid;
     use crate::license_detection::index::LicenseIndex;
     use crate::license_detection::models::{License, LicenseMatch, MatcherKind, Rule};
     use std::collections::HashMap;
@@ -369,7 +370,7 @@ mod tests {
             identifier: "test.RULE".to_string(),
             license_expression: "test".to_string(),
             text: "test text".to_string(),
-            tokens: vec![1, 2, 3, 4, 5],
+            tokens: vec![tid(1), tid(2), tid(3), tid(4), tid(5)],
             is_license_text: false,
             is_license_notice: true,
             is_license_reference: false,

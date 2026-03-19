@@ -208,6 +208,7 @@ mod tests {
 
 #[cfg(test)]
 mod integration_tests {
+    use super::super::super::index::dictionary::{TokenDictionary, TokenId};
     use super::super::super::index::token_sets::*;
     use super::super::super::models::Rule;
     use super::*;
@@ -220,6 +221,7 @@ mod integration_tests {
         minimum_coverage: Option<u8>,
         len_legalese: usize,
     ) -> Rule {
+        let tokens: Vec<TokenId> = tokens.into_iter().map(TokenId::new).collect();
         let mut rule = Rule {
             identifier: "test.RULE".to_string(),
             license_expression: "mit".to_string(),
@@ -265,9 +267,18 @@ mod integration_tests {
         };
 
         // Build token sets and multisets
+        let legalese_entries: Vec<(String, u16)> = (0..len_legalese)
+            .map(|i| (format!("legalese-{i}"), i as u16))
+            .collect();
+        let dictionary = TokenDictionary::new_with_legalese(
+            &legalese_entries
+                .iter()
+                .map(|(token, id)| (token.as_str(), *id))
+                .collect::<Vec<_>>(),
+        );
         let (tids_set, tids_mset) = build_set_and_mset(&tokens);
-        let tids_set_high = high_tids_set_subset(&tids_set, len_legalese);
-        let tids_mset_high = high_multiset_subset(&tids_mset, len_legalese);
+        let tids_set_high = high_tids_set_subset(&tids_set, &dictionary);
+        let tids_mset_high = high_multiset_subset(&tids_mset, &dictionary);
 
         // Compute token counts
         rule.length_unique = tids_set_counter(&tids_set);

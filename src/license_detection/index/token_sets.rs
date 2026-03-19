@@ -2,6 +2,8 @@
 
 use std::collections::{HashMap, HashSet};
 
+use crate::license_detection::index::dictionary::{TokenDictionary, TokenId, TokenKind};
+
 /// Build a token ID set and multiset from a sequence of token IDs.
 ///
 /// The set contains unique token IDs, while the multiset (bag) contains
@@ -16,14 +18,14 @@ use std::collections::{HashMap, HashSet};
 /// # Returns
 ///
 /// A tuple of (set of unique token IDs, multiset as HashMap of token ID -> count)
-pub fn build_set_and_mset(token_ids: &[u16]) -> (HashSet<u16>, HashMap<u16, usize>) {
+pub fn build_set_and_mset(token_ids: &[TokenId]) -> (HashSet<TokenId>, HashMap<TokenId, usize>) {
     let mut tids_mset = HashMap::new();
 
     for &tid in token_ids {
         *tids_mset.entry(tid).or_insert(0) += 1;
     }
 
-    let tids_set: HashSet<u16> = tids_mset.keys().copied().collect();
+    let tids_set: HashSet<TokenId> = tids_mset.keys().copied().collect();
 
     (tids_set, tids_mset)
 }
@@ -39,7 +41,7 @@ pub fn build_set_and_mset(token_ids: &[u16]) -> (HashSet<u16>, HashMap<u16, usiz
 /// # Returns
 ///
 /// Number of unique tokens in the set
-pub fn tids_set_counter(tids_set: &HashSet<u16>) -> usize {
+pub fn tids_set_counter(tids_set: &HashSet<TokenId>) -> usize {
     tids_set.len()
 }
 
@@ -54,7 +56,7 @@ pub fn tids_set_counter(tids_set: &HashSet<u16>) -> usize {
 /// # Returns
 ///
 /// Sum of all occurrence counts in the multiset
-pub fn multiset_counter(mset: &HashMap<u16, usize>) -> usize {
+pub fn multiset_counter(mset: &HashMap<TokenId, usize>) -> usize {
     mset.values().sum()
 }
 
@@ -72,10 +74,13 @@ pub fn multiset_counter(mset: &HashMap<u16, usize>) -> usize {
 /// # Returns
 ///
 /// Subset of tids_set containing only token IDs < len_legalese
-pub fn high_tids_set_subset(tids_set: &HashSet<u16>, len_legalese: usize) -> HashSet<u16> {
+pub fn high_tids_set_subset(
+    tids_set: &HashSet<TokenId>,
+    dictionary: &TokenDictionary,
+) -> HashSet<TokenId> {
     tids_set
         .iter()
-        .filter(|&&tid| (tid as usize) < len_legalese)
+        .filter(|&&tid| dictionary.token_kind(tid) == TokenKind::Legalese)
         .copied()
         .collect()
 }
@@ -93,11 +98,11 @@ pub fn high_tids_set_subset(tids_set: &HashSet<u16>, len_legalese: usize) -> Has
 ///
 /// Subset of mset containing only token IDs < len_legalese
 pub fn high_multiset_subset(
-    mset: &HashMap<u16, usize>,
-    len_legalese: usize,
-) -> HashMap<u16, usize> {
+    mset: &HashMap<TokenId, usize>,
+    dictionary: &TokenDictionary,
+) -> HashMap<TokenId, usize> {
     mset.iter()
-        .filter(|(tid, _)| (**tid as usize) < len_legalese)
+        .filter(|(tid, _)| dictionary.token_kind(**tid) == TokenKind::Legalese)
         .map(|(&tid, &count)| (tid, count))
         .collect()
 }
@@ -105,27 +110,28 @@ pub fn high_multiset_subset(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::license_detection::index::dictionary::{tid, TokenDictionary, TokenId};
 
     #[test]
     fn test_build_set_and_mset() {
-        let token_ids = vec![1, 2, 3, 2, 4, 1, 1];
+        let token_ids = vec![tid(1), tid(2), tid(3), tid(2), tid(4), tid(1), tid(1)];
         let (tids_set, tids_mset) = build_set_and_mset(&token_ids);
 
         assert_eq!(tids_set.len(), 4);
-        assert!(tids_set.contains(&1));
-        assert!(tids_set.contains(&2));
-        assert!(tids_set.contains(&3));
-        assert!(tids_set.contains(&4));
+        assert!(tids_set.contains(&tid(1)));
+        assert!(tids_set.contains(&tid(2)));
+        assert!(tids_set.contains(&tid(3)));
+        assert!(tids_set.contains(&tid(4)));
 
-        assert_eq!(tids_mset.get(&1), Some(&3));
-        assert_eq!(tids_mset.get(&2), Some(&2));
-        assert_eq!(tids_mset.get(&3), Some(&1));
-        assert_eq!(tids_mset.get(&4), Some(&1));
+        assert_eq!(tids_mset.get(&tid(1)), Some(&3));
+        assert_eq!(tids_mset.get(&tid(2)), Some(&2));
+        assert_eq!(tids_mset.get(&tid(3)), Some(&1));
+        assert_eq!(tids_mset.get(&tid(4)), Some(&1));
     }
 
     #[test]
     fn test_build_set_and_mset_empty() {
-        let token_ids: Vec<u16> = vec![];
+        let token_ids: Vec<TokenId> = vec![];
         let (tids_set, tids_mset) = build_set_and_mset(&token_ids);
 
         assert_eq!(tids_set.len(), 0);
@@ -135,50 +141,54 @@ mod tests {
     #[test]
     fn test_tids_set_counter() {
         let mut set = HashSet::new();
-        set.insert(1);
-        set.insert(2);
-        set.insert(3);
+        set.insert(tid(1));
+        set.insert(tid(2));
+        set.insert(tid(3));
         assert_eq!(tids_set_counter(&set), 3);
     }
 
     #[test]
     fn test_multiset_counter() {
         let mut mset = HashMap::new();
-        mset.insert(1, 3);
-        mset.insert(2, 2);
-        mset.insert(3, 1);
+        mset.insert(tid(1), 3);
+        mset.insert(tid(2), 2);
+        mset.insert(tid(3), 1);
         assert_eq!(multiset_counter(&mset), 6);
     }
 
     #[test]
     fn test_high_tids_set_subset() {
         let mut set = HashSet::new();
-        set.insert(1);
-        set.insert(2);
-        set.insert(5);
-        set.insert(10);
+        set.insert(tid(1));
+        set.insert(tid(2));
+        set.insert(tid(5));
+        set.insert(tid(10));
 
-        let high_set = high_tids_set_subset(&set, 5);
+        let dict = TokenDictionary::new_with_legalese(&[("one", 1), ("two", 2)]);
+
+        let high_set = high_tids_set_subset(&set, &dict);
         assert_eq!(high_set.len(), 2);
-        assert!(high_set.contains(&1));
-        assert!(high_set.contains(&2));
-        assert!(!high_set.contains(&5));
-        assert!(!high_set.contains(&10));
+        assert!(high_set.contains(&tid(1)));
+        assert!(high_set.contains(&tid(2)));
+        assert!(!high_set.contains(&tid(5)));
+        assert!(!high_set.contains(&tid(10)));
     }
 
     #[test]
     fn test_high_multiset_subset() {
         let mut mset = HashMap::new();
-        mset.insert(1, 3);
-        mset.insert(2, 2);
-        mset.insert(5, 1);
-        mset.insert(10, 1);
+        mset.insert(tid(1), 3);
+        mset.insert(tid(2), 2);
+        mset.insert(tid(5), 1);
+        mset.insert(tid(10), 1);
 
-        let high_mset = high_multiset_subset(&mset, 5);
+        let dict = TokenDictionary::new_with_legalese(&[("one", 1), ("two", 2)]);
+
+        let high_mset = high_multiset_subset(&mset, &dict);
         assert_eq!(high_mset.len(), 2);
-        assert_eq!(high_mset.get(&1), Some(&3));
-        assert_eq!(high_mset.get(&2), Some(&2));
-        assert!(!high_mset.contains_key(&5));
-        assert!(!high_mset.contains_key(&10));
+        assert_eq!(high_mset.get(&tid(1)), Some(&3));
+        assert_eq!(high_mset.get(&tid(2)), Some(&2));
+        assert!(!high_mset.contains_key(&tid(5)));
+        assert!(!high_mset.contains_key(&tid(10)));
     }
 }

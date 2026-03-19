@@ -4,8 +4,21 @@ mod test_cases {
         build_index, compute_is_approx_matchable, generate_url_variants, is_good_tokens_ngram,
         ngrams, tokens_to_bytes,
     };
+    use crate::license_detection::index::dictionary::{tid, KnownToken, TokenId, TokenKind};
     use crate::license_detection::index::LicenseIndex;
     use crate::license_detection::models::{License, Rule};
+
+    fn known_tokens(entries: &[(u16, TokenKind)]) -> Vec<KnownToken> {
+        entries
+            .iter()
+            .map(|(id, kind)| KnownToken {
+                id: tid(*id),
+                kind: *kind,
+                is_digit_only: false,
+                is_short_or_digit: false,
+            })
+            .collect()
+    }
 
     fn find_rid_by_identifier(index: &LicenseIndex, identifier: &str) -> Option<usize> {
         index
@@ -208,11 +221,15 @@ mod test_cases {
 
     #[test]
     #[ignore = "Rust-specific enhancement: URL variant hash generation for http/https ignorable URLs. Python does not generate separate hashes for URL variants, so this test is not applicable for Python parity verification."]
-    fn test_build_index_digit_only_tids() {
+    fn test_build_index_digit_only_tokens() {
         let rules = vec![create_test_rule("version 123 456 789 test", false)];
         let index = build_index(rules, vec![]);
 
-        assert!(!index.digit_only_tids.is_empty() || !index.dictionary.is_empty());
+        let token_123 = index
+            .dictionary
+            .lookup("123")
+            .expect("123 should be interned");
+        assert!(token_123.is_digit_only);
     }
 
     #[test]
@@ -257,30 +274,34 @@ mod test_cases {
             "world".to_string(),
             "license".to_string(),
         ];
-        let tids = vec![100, 101, 0];
-        assert!(is_good_tokens_ngram(&tokens, &tids, 10));
+        let tids = known_tokens(&[
+            (100, TokenKind::Regular),
+            (101, TokenKind::Regular),
+            (0, TokenKind::Legalese),
+        ]);
+        assert!(is_good_tokens_ngram(&tokens, &tids));
 
         let tokens_with_year = vec!["2023".to_string(), "license".to_string(), "mit".to_string()];
-        let tids_with_year = vec![500, 0, 1];
-        assert!(!is_good_tokens_ngram(
-            &tokens_with_year,
-            &tids_with_year,
-            10
-        ));
+        let tids_with_year = known_tokens(&[
+            (500, TokenKind::Regular),
+            (0, TokenKind::Legalese),
+            (1, TokenKind::Legalese),
+        ]);
+        assert!(!is_good_tokens_ngram(&tokens_with_year, &tids_with_year));
 
         let tokens_all_digits = vec!["1".to_string(), "2".to_string(), "3".to_string()];
-        let tids_all_digits = vec![100, 101, 102];
-        assert!(!is_good_tokens_ngram(
-            &tokens_all_digits,
-            &tids_all_digits,
-            10
-        ));
+        let tids_all_digits = known_tokens(&[
+            (100, TokenKind::Regular),
+            (101, TokenKind::Regular),
+            (102, TokenKind::Regular),
+        ]);
+        assert!(!is_good_tokens_ngram(&tokens_all_digits, &tids_all_digits));
     }
 
     #[test]
     #[ignore = "Rust-specific enhancement: URL variant hash generation for http/https ignorable URLs. Python does not generate separate hashes for URL variants, so this test is not applicable for Python parity verification."]
     fn test_tokens_to_bytes() {
-        let tokens = vec![1u16, 2, 3];
+        let tokens = vec![tid(1), tid(2), tid(3)];
         let bytes = tokens_to_bytes(&tokens);
         assert_eq!(bytes.len(), 6);
         assert_eq!(bytes[0], 1);
@@ -343,8 +364,8 @@ mod test_cases {
         let index = build_index(rules, licenses);
 
         assert_eq!(index.licenses_by_key.len(), 2);
-        assert!(index.licenses_by_key.get("mit").is_some());
-        assert!(index.licenses_by_key.get("apache-2.0").is_some());
+        assert!(index.licenses_by_key.contains_key("mit"));
+        assert!(index.licenses_by_key.contains_key("apache-2.0"));
 
         let mit_license_rid = find_rid_by_identifier(&index, "mit.LICENSE");
         assert!(
@@ -410,7 +431,7 @@ mod test_cases {
 
         assert!(index.len_legalese > 0, "Should have legalese tokens");
         assert!(
-            index.dictionary.len() >= index.len_legalese,
+            index.dictionary.tokens_to_ids().count() >= index.len_legalese,
             "Dictionary should have at least legalese tokens"
         );
 
@@ -1057,14 +1078,14 @@ SOFTWARE."#;
             );
 
             // Check if query meets thresholds
-            let high_intersection: std::collections::HashSet<u16> = indexed_set
+            let high_intersection: std::collections::HashSet<TokenId> = indexed_set
                 .iter()
-                .filter(|&&t| (t as usize) < index.len_legalese)
+                .filter(|&&t| index.dictionary.token_kind(t) == TokenKind::Legalese)
                 .copied()
                 .collect();
-            let query_high: std::collections::HashSet<u16> = query_set
+            let query_high: std::collections::HashSet<TokenId> = query_set
                 .iter()
-                .filter(|&&t| (t as usize) < index.len_legalese)
+                .filter(|&&t| index.dictionary.token_kind(t) == TokenKind::Legalese)
                 .copied()
                 .collect();
             let high_intersection_count = high_intersection.intersection(&query_high).count();

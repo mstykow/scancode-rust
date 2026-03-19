@@ -4,6 +4,7 @@
 mod tests {
     use std::collections::HashSet;
 
+    use crate::license_detection::index::dictionary::{tid, TokenId};
     use crate::license_detection::index::LicenseIndex;
     use crate::license_detection::query::{PositionSpan, Query, QueryRun};
     use crate::license_detection::test_utils::create_test_index;
@@ -29,6 +30,10 @@ mod tests {
         line_threshold: usize,
     ) -> anyhow::Result<Query<'a>> {
         Query::with_source_options(text, index, line_threshold, None)
+    }
+
+    fn tids(values: &[u16]) -> Vec<TokenId> {
+        values.iter().copied().map(tid).collect()
     }
 
     fn query_tokens_length(query: &Query<'_>, with_unknown: bool) -> usize {
@@ -89,9 +94,9 @@ mod tests {
         let query = build_query(text, &index).unwrap();
 
         assert_eq!(query.tokens.len(), 3);
-        assert_eq!(query.tokens.first().copied(), Some(0));
-        assert_eq!(query.tokens.get(1).copied(), Some(1));
-        assert_eq!(query.tokens.get(2).copied(), Some(2));
+        assert_eq!(query.tokens.first().copied(), Some(tid(0)));
+        assert_eq!(query.tokens.get(1).copied(), Some(tid(1)));
+        assert_eq!(query.tokens.get(2).copied(), Some(tid(2)));
         assert_eq!(query.line_for_pos(0), Some(1));
         assert_eq!(query.line_for_pos(1), Some(1));
         assert_eq!(query.line_for_pos(2), Some(1));
@@ -104,8 +109,8 @@ mod tests {
         let query = build_query(text, &index).unwrap();
 
         assert_eq!(query.tokens.len(), 2);
-        assert_eq!(query.tokens.first().copied(), Some(0));
-        assert_eq!(query.tokens.get(1).copied(), Some(1));
+        assert_eq!(query.tokens.first().copied(), Some(tid(0)));
+        assert_eq!(query.tokens.get(1).copied(), Some(tid(1)));
 
         assert_eq!(query_unknown_count_after(&query, Some(0)), 1);
         assert_eq!(query_unknown_count_after(&query, Some(1)), 0);
@@ -265,7 +270,7 @@ mod tests {
         let query = build_query("license copyright permission", &index).unwrap();
         let run = QueryRun::new(&query, 0, Some(1));
 
-        assert_eq!(run.tokens(), vec![0, 1]);
+        assert_eq!(run.tokens(), tids(&[0, 1]));
     }
 
     #[test]
@@ -274,8 +279,8 @@ mod tests {
         let query = build_query("license copyright permission", &index).unwrap();
         let run = QueryRun::new(&query, 0, Some(1));
 
-        let tokens_with_pos: Vec<(usize, u16)> = run.tokens_with_pos().collect();
-        assert_eq!(tokens_with_pos, vec![(0, 0), (1, 1)]);
+        let tokens_with_pos: Vec<(usize, TokenId)> = run.tokens_with_pos().collect();
+        assert_eq!(tokens_with_pos, vec![(0, tid(0)), (1, tid(1))]);
     }
 
     #[test]
@@ -351,10 +356,8 @@ mod tests {
     #[test]
     fn test_query_run_is_not_matchable_digits_only() {
         let mut index = create_query_test_index();
-        let tid_123 = index.dictionary.get_or_assign("123");
-        let tid_456 = index.dictionary.get_or_assign("456");
-        let _ = index.digit_only_tids.insert(tid_123);
-        let _ = index.digit_only_tids.insert(tid_456);
+        let _tid_123 = index.dictionary.get_or_assign("123");
+        let _tid_456 = index.dictionary.get_or_assign("456");
 
         let query = build_query("123 456", &index).unwrap();
         let run = QueryRun::new(&query, 0, Some(1));
@@ -405,9 +408,9 @@ mod tests {
         let query = build_query(text, &index).unwrap();
 
         assert_eq!(query.tokens.len(), 3);
-        assert_eq!(query.tokens.first().copied(), Some(0));
-        assert_eq!(query.tokens.get(1).copied(), Some(1));
-        assert_eq!(query.tokens.get(2).copied(), Some(2));
+        assert_eq!(query.tokens.first().copied(), Some(tid(0)));
+        assert_eq!(query.tokens.get(1).copied(), Some(tid(1)));
+        assert_eq!(query.tokens.get(2).copied(), Some(tid(2)));
     }
 
     #[test]
@@ -536,7 +539,7 @@ mod tests {
         let query = build_query(text, &index).unwrap();
 
         assert_eq!(query.tokens.len(), 1);
-        assert_eq!(query.tokens.first().copied(), Some(1));
+        assert_eq!(query.tokens.first().copied(), Some(tid(1)));
     }
 
     #[test]
@@ -616,8 +619,7 @@ mod tests {
     #[test]
     fn test_query_run_is_digits_only_mixed() {
         let mut index = create_query_test_index();
-        let tid_123 = index.dictionary.get_or_assign("123");
-        let _ = index.digit_only_tids.insert(tid_123);
+        let _tid_123 = index.dictionary.get_or_assign("123");
         let _ = index.dictionary.get_or_assign("license");
 
         let query = build_query("123 license", &index).unwrap();
@@ -788,10 +790,8 @@ mod tests {
     #[test]
     fn test_query_run_splitting_digits_only_lines_do_not_emit_final_digits_only_run() {
         let mut index = create_query_test_index();
-        let tid_123 = index.dictionary.get_or_assign("123");
-        let tid_456 = index.dictionary.get_or_assign("456");
-        let _ = index.digit_only_tids.insert(tid_123);
-        let _ = index.digit_only_tids.insert(tid_456);
+        let _tid_123 = index.dictionary.get_or_assign("123");
+        let _tid_456 = index.dictionary.get_or_assign("456");
 
         let text = "license\n123\n456";
         let query = build_query_with_threshold(text, &index, 1).unwrap();
