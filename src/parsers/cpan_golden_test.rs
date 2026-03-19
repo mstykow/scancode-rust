@@ -68,4 +68,13 @@ mod golden_tests {
             "testdata/cpan/makefile-pl/basic/Makefile.PL.expected.json",
         );
     }
+
+    #[test]
+    fn test_golden_cpan_makefile_pl_version_abstract_from() {
+        run_golden(
+            "makefile",
+            "testdata/cpan/makefile-pl/version-abstract-from/Makefile.PL",
+            "testdata/cpan/makefile-pl/version-abstract-from/Makefile.PL.expected.json",
+        );
+    }
 }
