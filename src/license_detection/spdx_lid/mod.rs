@@ -101,21 +101,6 @@ pub fn clean_spdx_text(text: &str) -> String {
     text
 }
 
-pub fn extract_spdx_expressions(text: &str) -> Vec<String> {
-    text.lines()
-        .filter_map(|line| {
-            let (prefix, expression) = split_spdx_lid(line.trim());
-            prefix.as_ref()?;
-            let cleaned = clean_spdx_text(&expression);
-            if cleaned.is_empty() {
-                None
-            } else {
-                Some(cleaned)
-            }
-        })
-        .collect()
-}
-
 fn normalize_spaces(text: &mut String) {
     let normalized = text.split_whitespace().collect::<Vec<_>>().join(" ");
     *text = normalized;

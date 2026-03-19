@@ -6,6 +6,21 @@ mod tests {
     use crate::license_detection::spdx_lid::*;
     use crate::license_detection::test_utils::{create_mock_rule_simple, create_test_index};
 
+    fn extract_cleaned_spdx_expressions(text: &str) -> Vec<String> {
+        text.lines()
+            .filter_map(|line| {
+                let (prefix, expression) = split_spdx_lid(line.trim());
+                prefix.as_ref()?;
+                let cleaned = clean_spdx_text(&expression);
+                if cleaned.is_empty() {
+                    None
+                } else {
+                    Some(cleaned)
+                }
+            })
+            .collect()
+    }
+
     fn create_spdx_lookup_index(
         entries: &[(&str, &str)],
     ) -> crate::license_detection::index::LicenseIndex {
@@ -145,14 +160,14 @@ mod tests {
     #[test]
     fn test_extract_spdx_expressions_single() {
         let text = "# SPDX-License-Identifier: MIT";
-        let exprs = extract_spdx_expressions(text);
+        let exprs = extract_cleaned_spdx_expressions(text);
         assert_eq!(exprs, vec!["MIT"]);
     }
 
     #[test]
     fn test_extract_spdx_expressions_multiple() {
         let text = "# SPDX-License-Identifier: MIT\n# SPDX-License-Identifier: Apache-2.0";
-        let exprs = extract_spdx_expressions(text);
+        let exprs = extract_cleaned_spdx_expressions(text);
         assert_eq!(exprs.len(), 2);
         assert!(exprs.contains(&"MIT".to_string()));
         assert!(exprs.contains(&"Apache-2.0".to_string()));
@@ -161,49 +176,49 @@ mod tests {
     #[test]
     fn test_extract_spdx_expressions_complex() {
         let text = "// SPDX-License-Identifier: GPL-2.0-or-later WITH Classpath-exception-2.0";
-        let exprs = extract_spdx_expressions(text);
+        let exprs = extract_cleaned_spdx_expressions(text);
         assert_eq!(exprs, vec!["GPL-2.0-or-later WITH Classpath-exception-2.0"]);
     }
 
     #[test]
     fn test_extract_spdx_expressions_spaces_hyphens() {
         let text = "* SPDX license identifier: BSD-3-Clause";
-        let exprs = extract_spdx_expressions(text);
+        let exprs = extract_cleaned_spdx_expressions(text);
         assert_eq!(exprs, vec!["BSD-3-Clause"]);
     }
 
     #[test]
     fn test_extract_spdx_expressions_html_comment() {
         let text = "<!-- SPDX-License-Identifier: MIT -->";
-        let exprs = extract_spdx_expressions(text);
+        let exprs = extract_cleaned_spdx_expressions(text);
         assert_eq!(exprs, vec!["MIT"]);
     }
 
     #[test]
     fn test_extract_spdx_expressions_python_comment() {
         let text = "# SPDX-License-Identifier: (MIT OR Apache-2.0)";
-        let exprs = extract_spdx_expressions(text);
+        let exprs = extract_cleaned_spdx_expressions(text);
         assert_eq!(exprs, vec!["(MIT OR Apache-2.0)"]);
     }
 
     #[test]
     fn test_extract_spdx_expressions_with_whitespace() {
         let text = "  //  SPDX-License-Identifier:   MIT  ";
-        let exprs = extract_spdx_expressions(text);
+        let exprs = extract_cleaned_spdx_expressions(text);
         assert_eq!(exprs, vec!["MIT"]);
     }
 
     #[test]
     fn test_extract_spdx_expressions_no_match() {
         let text = "/* This is a regular comment */";
-        let exprs = extract_spdx_expressions(text);
+        let exprs = extract_cleaned_spdx_expressions(text);
         assert!(exprs.is_empty());
     }
 
     #[test]
     fn test_extract_spdx_expressions_nuget_url() {
         let text = "<licenseUrl>https://licenses.nuget.org/MIT</licenseUrl>";
-        let exprs = extract_spdx_expressions(text);
+        let exprs = extract_cleaned_spdx_expressions(text);
         assert_eq!(exprs, vec!["MIT"]);
     }
 
@@ -232,7 +247,7 @@ mod tests {
     #[test]
     fn test_extract_spdx_expressions_preserves_complex_expressions() {
         let text = "SPDX-License-Identifier: (EPL-2.0 OR Apache-2.0 OR GPL-2.0 WITH Classpath-exception-2.0)";
-        let exprs = extract_spdx_expressions(text);
+        let exprs = extract_cleaned_spdx_expressions(text);
         assert_eq!(
             exprs,
             vec!["(EPL-2.0 OR Apache-2.0 OR GPL-2.0 WITH Classpath-exception-2.0)"]
@@ -401,14 +416,14 @@ mod tests {
     #[test]
     fn test_extract_spdx_expressions_with_plus() {
         let text = "SPDX-License-Identifier: GPL-2.0+";
-        let exprs = extract_spdx_expressions(text);
+        let exprs = extract_cleaned_spdx_expressions(text);
         assert_eq!(exprs, vec!["GPL-2.0+"]);
     }
 
     #[test]
     fn test_extract_spdx_expressions_with_with_operator() {
         let text = "SPDX-License-Identifier: GPL-2.0 WITH Classpath-exception-2.0";
-        let exprs = extract_spdx_expressions(text);
+        let exprs = extract_cleaned_spdx_expressions(text);
         assert_eq!(exprs, vec!["GPL-2.0 WITH Classpath-exception-2.0"]);
     }
 
@@ -444,7 +459,7 @@ mod tests {
     #[test]
     fn test_extract_spdx_expressions_multiple_on_same_line() {
         let text = "SPDX-License-Identifier: MIT  SPDX-License-Identifier: Apache-2.0";
-        let exprs = extract_spdx_expressions(text);
+        let exprs = extract_cleaned_spdx_expressions(text);
 
         assert!(!exprs.is_empty(), "Should extract at least one expression");
     }

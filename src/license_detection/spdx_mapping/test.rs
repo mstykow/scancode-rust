@@ -103,39 +103,11 @@ mod tests {
     }
 
     #[test]
-    fn test_spdx_to_scancode() {
-        let licenses = create_test_licenses();
-        let mapping = build_spdx_mapping(&licenses);
-
-        assert_eq!(mapping.spdx_to_scancode("MIT"), Some("mit".to_string()));
-        assert_eq!(
-            mapping.spdx_to_scancode("GPL-2.0-or-later"),
-            Some("gpl-2.0-plus".to_string())
-        );
-        assert_eq!(
-            mapping.spdx_to_scancode("Apache-2.0"),
-            Some("apache-2.0".to_string())
-        );
-        assert_eq!(
-            mapping.spdx_to_scancode("LicenseRef-scancode-custom-1"),
-            Some("custom-1".to_string())
-        );
-    }
-
-    #[test]
     fn test_scancode_to_spdx_unknown_key() {
         let licenses = create_test_licenses();
         let mapping = build_spdx_mapping(&licenses);
 
         assert_eq!(mapping.scancode_to_spdx("unknown-key"), None);
-    }
-
-    #[test]
-    fn test_spdx_to_scancode_unknown_key() {
-        let licenses = create_test_licenses();
-        let mapping = build_spdx_mapping(&licenses);
-
-        assert_eq!(mapping.spdx_to_scancode("UNKNOWN-KEY"), None);
     }
 
     #[test]
@@ -241,26 +213,6 @@ mod tests {
     }
 
     #[test]
-    fn test_mapping_counts() {
-        let licenses = create_test_licenses();
-        let mapping = build_spdx_mapping(&licenses);
-
-        assert_eq!(mapping.scancode_count(), 4);
-    }
-
-    #[test]
-    fn test_convenience_functions() {
-        let licenses = create_test_licenses();
-        let mapping = build_spdx_mapping(&licenses);
-
-        assert_eq!(scancode_to_spdx(&mapping, "mit"), Some("MIT".to_string()));
-        assert_eq!(spdx_to_scancode(&mapping, "MIT"), Some("mit".to_string()));
-
-        let expr_result = expression_scancode_to_spdx(&mapping, "mit OR apache-2.0");
-        assert_eq!(expr_result.unwrap(), "MIT OR Apache-2.0");
-    }
-
-    #[test]
     fn test_expression_scancode_to_spdx_parse_error() {
         let licenses = create_test_licenses();
         let mapping = build_spdx_mapping(&licenses);
@@ -283,19 +235,7 @@ mod tests {
         let licenses: Vec<License> = vec![];
         let mapping = build_spdx_mapping(&licenses);
 
-        assert_eq!(mapping.scancode_count(), 0);
-        assert_eq!(mapping.spdx_count(), 0);
         assert!(mapping.scancode_to_spdx("mit").is_none());
-        assert!(mapping.spdx_to_scancode("MIT").is_none());
-    }
-
-    #[test]
-    fn test_spdx_to_scancode_with_licenseref() {
-        let licenses = create_test_licenses();
-        let mapping = build_spdx_mapping(&licenses);
-
-        let result = mapping.spdx_to_scancode("LicenseRef-scancode-custom-1");
-        assert_eq!(result, Some("custom-1".to_string()));
     }
 
     #[test]
@@ -367,7 +307,6 @@ mod tests {
 
         assert_eq!(mapping.scancode_to_spdx("mit"), Some("MIT".to_string()));
         assert_eq!(mapping.scancode_to_spdx("mit-x11"), Some("MIT".to_string()));
-        assert_eq!(mapping.spdx_to_scancode("MIT"), Some("mit".to_string()));
     }
 
     #[test]

@@ -95,45 +95,6 @@ impl Span {
         r1.start.min(r2.start)..r1.end.max(r2.end)
     }
 
-    /// Check if this span is empty.
-    pub fn is_empty(&self) -> bool {
-        self.ranges.is_empty()
-    }
-
-    /// Get the number of ranges in this span.
-    pub fn len(&self) -> usize {
-        self.ranges.len()
-    }
-
-    /// Get the total length covered by all ranges.
-    pub fn total_length(&self) -> usize {
-        self.ranges.iter().map(|r| r.end - r.start).sum()
-    }
-
-    pub fn overlap(&self, other: &Span) -> usize {
-        let mut count = 0;
-        for self_range in &self.ranges {
-            for other_range in &other.ranges {
-                let overlap_start = self_range.start.max(other_range.start);
-                let overlap_end = self_range.end.min(other_range.end);
-                if overlap_start < overlap_end {
-                    count += overlap_end - overlap_start;
-                }
-            }
-        }
-        count
-    }
-
-    pub fn overlap_ratio(&self, other: &Span) -> f64 {
-        let overlap = self.overlap(other);
-        let max_len = self.total_length().max(other.total_length());
-        if max_len == 0 {
-            0.0
-        } else {
-            overlap as f64 / max_len as f64
-        }
-    }
-
     pub fn union_span(&self, other: &Span) -> Span {
         let mut result = self.clone();
         for range in &other.ranges {
@@ -167,17 +128,13 @@ mod tests {
     #[test]
     fn test_span_new() {
         let span = Span::new();
-        assert!(span.is_empty());
-        assert_eq!(span.len(), 0);
-        assert_eq!(span.total_length(), 0);
+        assert!(span.ranges.is_empty());
     }
 
     #[test]
     fn test_span_from_range() {
         let span = Span::from_range(5..10);
-        assert!(!span.is_empty());
-        assert_eq!(span.len(), 1);
-        assert_eq!(span.total_length(), 5);
+        assert_eq!(span.ranges, vec![5..10]);
     }
 
     #[test]
@@ -186,8 +143,7 @@ mod tests {
         span.add(5..10);
         span.add(20..25);
 
-        assert_eq!(span.len(), 2);
-        assert_eq!(span.total_length(), 10);
+        assert_eq!(span.ranges, vec![5..10, 20..25]);
     }
 
     #[test]
@@ -197,8 +153,7 @@ mod tests {
         span.add(8..15);
 
         // Should merge into a single range
-        assert_eq!(span.len(), 1);
-        assert_eq!(span.total_length(), 10);
+        assert_eq!(span.ranges, vec![5..15]);
     }
 
     #[test]
@@ -208,7 +163,7 @@ mod tests {
         span.add(10..15);
 
         // Adjacent ranges don't overlap, so should remain separate
-        assert_eq!(span.len(), 2);
+        assert_eq!(span.ranges, vec![5..10, 10..15]);
     }
 
     #[test]
@@ -219,56 +174,49 @@ mod tests {
         span.add(12..20);
 
         // Should all merge into one range
-        assert_eq!(span.len(), 1);
-        assert_eq!(span.total_length(), 15);
+        assert_eq!(span.ranges, vec![5..20]);
     }
 
     #[test]
     fn test_span_default() {
         let span = Span::default();
-        assert!(span.is_empty());
+        assert!(span.ranges.is_empty());
     }
 
     #[test]
     fn test_span_from_iterator_contiguous() {
         let span = Span::from_iterator(vec![1, 2, 3, 4, 5]);
-        assert_eq!(span.len(), 1);
-        assert_eq!(span.total_length(), 5);
+        assert_eq!(span.ranges, vec![1..6]);
     }
 
     #[test]
     fn test_span_from_iterator_non_contiguous() {
         let span = Span::from_iterator(vec![1, 2, 3, 10, 11, 12]);
-        assert_eq!(span.len(), 2);
-        assert_eq!(span.total_length(), 6);
+        assert_eq!(span.ranges, vec![1..4, 10..13]);
     }
 
     #[test]
     fn test_span_from_iterator_unsorted() {
         let span = Span::from_iterator(vec![5, 1, 3, 2, 4]);
-        assert_eq!(span.len(), 1);
-        assert_eq!(span.total_length(), 5);
+        assert_eq!(span.ranges, vec![1..6]);
     }
 
     #[test]
     fn test_span_from_iterator_with_duplicates() {
         let span = Span::from_iterator(vec![1, 2, 2, 3, 3, 3, 4]);
-        assert_eq!(span.len(), 1);
-        assert_eq!(span.total_length(), 4);
+        assert_eq!(span.ranges, vec![1..5]);
     }
 
     #[test]
     fn test_span_from_iterator_empty() {
         let span: Span = Span::from_iterator(vec![]);
-        assert!(span.is_empty());
-        assert_eq!(span.total_length(), 0);
+        assert!(span.ranges.is_empty());
     }
 
     #[test]
     fn test_span_from_iterator_single_element() {
         let span = Span::from_iterator(vec![42]);
-        assert_eq!(span.len(), 1);
-        assert_eq!(span.total_length(), 1);
+        assert_eq!(span.ranges, vec![42..43]);
     }
 
     #[test]
@@ -276,8 +224,7 @@ mod tests {
         let mut span = Span::new();
         span.add(5..10);
 
-        assert_eq!(span.len(), 1);
-        assert_eq!(span.total_length(), 5);
+        assert_eq!(span.ranges, vec![5..10]);
     }
 
     #[test]
@@ -286,8 +233,7 @@ mod tests {
         span.add(1..20);
         span.add(5..10);
 
-        assert_eq!(span.len(), 1);
-        assert_eq!(span.total_length(), 19);
+        assert_eq!(span.ranges, vec![1..20]);
     }
 
     #[test]
@@ -296,8 +242,7 @@ mod tests {
         span.add(5..10);
         span.add(1..20);
 
-        assert_eq!(span.len(), 1);
-        assert_eq!(span.total_length(), 19);
+        assert_eq!(span.ranges, vec![1..20]);
     }
 
     #[test]
@@ -308,8 +253,7 @@ mod tests {
         span.add(7..12);
         span.add(11..15);
 
-        assert_eq!(span.len(), 1);
-        assert_eq!(span.total_length(), 14);
+        assert_eq!(span.ranges, vec![1..15]);
     }
 
     #[test]
@@ -319,8 +263,7 @@ mod tests {
         span.add(10..15);
         span.add(20..25);
 
-        assert_eq!(span.len(), 3);
-        assert_eq!(span.total_length(), 14);
+        assert_eq!(span.ranges, vec![1..5, 10..15, 20..25]);
     }
 
     #[test]
@@ -354,118 +297,11 @@ mod tests {
     }
 
     #[test]
-    fn test_overlap_identical_spans() {
-        let span1 = Span::from_range(5..10);
-        let span2 = Span::from_range(5..10);
-        assert_eq!(span1.overlap(&span2), 5);
-        assert_eq!(span2.overlap(&span1), 5);
-    }
-
-    #[test]
-    fn test_overlap_no_overlap() {
-        let span1 = Span::from_range(1..5);
-        let span2 = Span::from_range(10..15);
-        assert_eq!(span1.overlap(&span2), 0);
-        assert_eq!(span2.overlap(&span1), 0);
-    }
-
-    #[test]
-    fn test_overlap_adjacent_no_overlap() {
-        let span1 = Span::from_range(1..5);
-        let span2 = Span::from_range(5..10);
-        assert_eq!(span1.overlap(&span2), 0);
-        assert_eq!(span2.overlap(&span1), 0);
-    }
-
-    #[test]
-    fn test_overlap_partial_overlap() {
-        let span1 = Span::from_range(1..5);
-        let span2 = Span::from_range(3..8);
-        assert_eq!(span1.overlap(&span2), 2);
-        assert_eq!(span2.overlap(&span1), 2);
-    }
-
-    #[test]
-    fn test_overlap_contained() {
-        let span1 = Span::from_range(1..20);
-        let span2 = Span::from_range(5..10);
-        assert_eq!(span1.overlap(&span2), 5);
-        assert_eq!(span2.overlap(&span1), 5);
-    }
-
-    #[test]
-    fn test_overlap_empty_spans() {
-        let span1 = Span::new();
-        let span2 = Span::from_range(5..10);
-        assert_eq!(span1.overlap(&span2), 0);
-        assert_eq!(span2.overlap(&span1), 0);
-    }
-
-    #[test]
-    fn test_overlap_both_empty() {
-        let span1 = Span::new();
-        let span2 = Span::new();
-        assert_eq!(span1.overlap(&span2), 0);
-    }
-
-    #[test]
-    fn test_overlap_multi_range_spans() {
-        let mut span1 = Span::new();
-        span1.add(1..5);
-        span1.add(10..15);
-        let mut span2 = Span::new();
-        span2.add(3..8);
-        span2.add(12..20);
-        assert_eq!(span1.overlap(&span2), 5);
-    }
-
-    #[test]
-    fn test_overlap_ratio_identical() {
-        let span1 = Span::from_range(5..10);
-        let span2 = Span::from_range(5..10);
-        let ratio = span1.overlap_ratio(&span2);
-        assert!((ratio - 1.0).abs() < f64::EPSILON);
-    }
-
-    #[test]
-    fn test_overlap_ratio_no_overlap() {
-        let span1 = Span::from_range(1..5);
-        let span2 = Span::from_range(10..15);
-        let ratio = span1.overlap_ratio(&span2);
-        assert!((ratio - 0.0).abs() < f64::EPSILON);
-    }
-
-    #[test]
-    fn test_overlap_ratio_partial() {
-        let span1 = Span::from_range(1..5);
-        let span2 = Span::from_range(3..8);
-        let ratio = span1.overlap_ratio(&span2);
-        assert!((ratio - 2.0 / 5.0).abs() < f64::EPSILON);
-    }
-
-    #[test]
-    fn test_overlap_ratio_different_lengths() {
-        let span1 = Span::from_range(1..10);
-        let span2 = Span::from_range(5..15);
-        let ratio = span1.overlap_ratio(&span2);
-        assert!((ratio - 5.0 / 10.0).abs() < f64::EPSILON);
-    }
-
-    #[test]
-    fn test_overlap_ratio_empty() {
-        let span1 = Span::new();
-        let span2 = Span::from_range(5..10);
-        let ratio = span1.overlap_ratio(&span2);
-        assert!((ratio - 0.0).abs() < f64::EPSILON);
-    }
-
-    #[test]
     fn test_union_span_non_overlapping() {
         let span1 = Span::from_range(1..5);
         let span2 = Span::from_range(10..15);
         let union = span1.union_span(&span2);
-        assert_eq!(union.len(), 2);
-        assert_eq!(union.total_length(), 9);
+        assert_eq!(union.ranges, vec![1..5, 10..15]);
     }
 
     #[test]
@@ -473,8 +309,7 @@ mod tests {
         let span1 = Span::from_range(1..10);
         let span2 = Span::from_range(5..15);
         let union = span1.union_span(&span2);
-        assert_eq!(union.len(), 1);
-        assert_eq!(union.total_length(), 14);
+        assert_eq!(union.ranges, vec![1..15]);
     }
 
     #[test]
@@ -482,8 +317,7 @@ mod tests {
         let span1 = Span::from_range(5..10);
         let span2 = Span::from_range(5..10);
         let union = span1.union_span(&span2);
-        assert_eq!(union.len(), 1);
-        assert_eq!(union.total_length(), 5);
+        assert_eq!(union.ranges, vec![5..10]);
     }
 
     #[test]
@@ -491,8 +325,7 @@ mod tests {
         let span1 = Span::from_range(5..10);
         let span2 = Span::new();
         let union = span1.union_span(&span2);
-        assert_eq!(union.len(), 1);
-        assert_eq!(union.total_length(), 5);
+        assert_eq!(union.ranges, vec![5..10]);
     }
 
     #[test]
@@ -500,8 +333,7 @@ mod tests {
         let span1 = Span::from_range(1..5);
         let span2 = Span::from_range(5..10);
         let union = span1.union_span(&span2);
-        assert_eq!(union.len(), 2);
-        assert_eq!(union.total_length(), 9);
+        assert_eq!(union.ranges, vec![1..5, 5..10]);
     }
 
     #[test]

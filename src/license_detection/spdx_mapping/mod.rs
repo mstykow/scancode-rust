@@ -1,8 +1,8 @@
 //! SPDX license key mapping for license expressions.
 //!
-//! This module provides bidirectional mapping between ScanCode license keys and
-//! SPDX license identifiers. It loads the mapping data from License objects and
-//! provides functions to convert license expressions from ScanCode keys to SPDX keys.
+//! This module provides mapping between ScanCode license keys and SPDX license
+//! identifiers. It loads the mapping data from License objects and provides
+//! functions to convert license expressions from ScanCode keys to SPDX keys.
 //!
 //! Based on the Python ScanCode Toolkit implementation:
 //! - `build_spdx_license_expression()` in `reference/scancode-toolkit/src/licensedcode/cache.py`
@@ -15,7 +15,7 @@ use crate::license_detection::expression::{
 };
 use crate::license_detection::models::License;
 
-/// Bidirectional mapping between ScanCode and SPDX license keys.
+/// Mapping between ScanCode and SPDX license keys.
 ///
 /// This structure enables conversion of license expressions from ScanCode-specific
 /// license keys (lowercase, e.g., "mit", "gpl-2.0-plus") to SPDX license identifiers
@@ -26,16 +26,10 @@ pub struct SpdxMapping {
     ///
     /// Keys are lowercase ScanCode license keys. Values are SPDX license identifiers.
     scancode_to_spdx: HashMap<String, String>,
-
-    /// Mapping from SPDX license key to ScanCode license key.
-    ///
-    /// Keys are SPDX license identifiers (case-sensitive). Values are lowercase ScanCode keys.
-    /// When multiple ScanCode keys map to the same SPDX key, the first one encountered is used.
-    spdx_to_scancode: HashMap<String, String>,
 }
 
 impl SpdxMapping {
-    /// Build a bidirectional SPDX mapping from a slice of License objects.
+    /// Build an SPDX mapping from a slice of License objects.
     ///
     /// This function extracts the `spdx_license_key` field from each License
     /// and builds the two-way mapping. For licenses without an SPDX equivalent,
@@ -45,7 +39,7 @@ impl SpdxMapping {
     /// * `licenses` - Slice of License objects to build mapping from
     ///
     /// # Returns
-    /// A SpdxMapping with populated bidirectional mappings
+    /// A SpdxMapping with populated mappings
     ///
     /// # Example
     /// ```
@@ -68,31 +62,19 @@ impl SpdxMapping {
     /// ```
     pub fn build_from_licenses(licenses: &[License]) -> Self {
         let mut scancode_to_spdx = HashMap::new();
-        let mut spdx_to_scancode = HashMap::new();
 
         for license in licenses {
             let scancode_key = &license.key;
 
             if let Some(spdx_key) = &license.spdx_license_key {
                 scancode_to_spdx.insert(scancode_key.clone(), spdx_key.clone());
-
-                spdx_to_scancode
-                    .entry(spdx_key.clone())
-                    .or_insert_with(|| scancode_key.clone());
             } else {
                 let licenseref_key = format!("LicenseRef-scancode-{}", scancode_key);
                 scancode_to_spdx.insert(scancode_key.clone(), licenseref_key.clone());
-
-                spdx_to_scancode
-                    .entry(licenseref_key)
-                    .or_insert_with(|| scancode_key.clone());
             }
         }
 
-        Self {
-            scancode_to_spdx,
-            spdx_to_scancode,
-        }
+        Self { scancode_to_spdx }
     }
 
     /// Convert a ScanCode license key to its SPDX equivalent.
@@ -107,30 +89,11 @@ impl SpdxMapping {
     /// ```
     /// use scancode_rust::license_detection::spdx_mapping::SpdxMapping;
     ///
-    /// let spdx = SpdxMapping::scancode_to_spdx(&mapping, "mit");
+    /// let spdx = mapping.scancode_to_spdx("mit");
     /// assert_eq!(spdx, Some("MIT".to_string()));
     /// ```
     pub fn scancode_to_spdx(&self, scancode_key: &str) -> Option<String> {
         self.scancode_to_spdx.get(scancode_key).cloned()
-    }
-
-    /// Convert an SPDX license key to its ScanCode equivalent.
-    ///
-    /// # Arguments
-    /// * `spdx_key` - SPDX license identifier (e.g., "MIT", "GPL-2.0-or-later")
-    ///
-    /// # Returns
-    /// Option containing lowercase ScanCode license key, or None if key not found
-    ///
-    /// # Example
-    /// ```
-    /// use scancode_rust::license_detection::spdx_mapping::SpdxMapping;
-    ///
-    /// let scancode = SpdxMapping::spdx_to_scancode(&mapping, "MIT");
-    /// assert_eq!(scancode, Some("mit".to_string()));
-    /// ```
-    pub fn spdx_to_scancode(&self, spdx_key: &str) -> Option<String> {
-        self.spdx_to_scancode.get(spdx_key).cloned()
     }
 
     /// Convert a license expression from ScanCode keys to SPDX keys.
@@ -192,19 +155,9 @@ impl SpdxMapping {
             },
         }
     }
-
-    /// Get the number of ScanCode keys in the mapping.
-    pub fn scancode_count(&self) -> usize {
-        self.scancode_to_spdx.len()
-    }
-
-    /// Get the number of SPDX keys in the mapping.
-    pub fn spdx_count(&self) -> usize {
-        self.spdx_to_scancode.len()
-    }
 }
 
-/// Build a bidirectional SPDX mapping from a slice of License objects.
+/// Build an SPDX mapping from a slice of License objects.
 ///
 /// Convenience function that creates a new SpdxMapping instance.
 ///
@@ -212,54 +165,9 @@ impl SpdxMapping {
 /// * `licenses` - Slice of License objects to build mapping from
 ///
 /// # Returns
-/// A SpdxMapping with populated bidirectional mappings
+/// A SpdxMapping with populated mappings
 pub fn build_spdx_mapping(licenses: &[License]) -> SpdxMapping {
     SpdxMapping::build_from_licenses(licenses)
-}
-
-/// Convert a ScanCode license key to its SPDX equivalent.
-///
-/// Convenience function for key-level conversion.
-///
-/// # Arguments
-/// * `mapping` - The SpdxMapping to use for conversion
-/// * `scancode_key` - Lowercase ScanCode license key
-///
-/// # Returns
-/// Option containing SPDX license identifier, or None if key not found
-pub fn scancode_to_spdx(mapping: &SpdxMapping, scancode_key: &str) -> Option<String> {
-    mapping.scancode_to_spdx(scancode_key)
-}
-
-/// Convert an SPDX license key to its ScanCode equivalent.
-///
-/// Convenience function for key-level conversion.
-///
-/// # Arguments
-/// * `mapping` - The SpdxMapping to use for conversion
-/// * `spdx_key` - SPDX license identifier
-///
-/// # Returns
-/// Option containing lowercase ScanCode license key, or None if key not found
-pub fn spdx_to_scancode(mapping: &SpdxMapping, spdx_key: &str) -> Option<String> {
-    mapping.spdx_to_scancode(spdx_key)
-}
-
-/// Convert a license expression from ScanCode keys to SPDX keys.
-///
-/// Convenience function for expression-level conversion.
-///
-/// # Arguments
-/// * `mapping` - The SpdxMapping to use for conversion
-/// * `scancode_expr` - License expression string with ScanCode keys
-///
-/// # Returns
-/// String containing the expression with SPDX keys, or error string
-pub fn expression_scancode_to_spdx(
-    mapping: &SpdxMapping,
-    scancode_expr: &str,
-) -> Result<String, String> {
-    mapping.expression_scancode_to_spdx(scancode_expr)
 }
 
 #[cfg(test)]
