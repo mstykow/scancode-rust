@@ -39,7 +39,7 @@ The goal is to make the default binary self-contained by embedding a build-time 
 
 ## Phase 2: Loader-Stage Models
 
-**Status**: Pending
+**Status**: Complete
 
 ### Objectives
 
