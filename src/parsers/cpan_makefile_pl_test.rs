@@ -4,7 +4,9 @@ mod tests {
     use super::super::cpan_makefile_pl::*;
     use crate::models::DatasourceId;
     use crate::models::PackageType;
+    use std::fs;
     use std::path::PathBuf;
+    use tempfile::TempDir;
 
     #[test]
     fn test_is_match() {
@@ -157,17 +159,30 @@ WriteMakefile(NAME => 'Minimal');
 
     #[test]
     fn test_parse_version_from() {
-        let content = r#"
+        let temp_dir = TempDir::new().expect("temp dir");
+        let lib_dir = temp_dir.path().join("lib/My");
+        fs::create_dir_all(&lib_dir).expect("create module dir");
+        fs::write(
+            temp_dir.path().join("Makefile.PL"),
+            r#"
 use ExtUtils::MakeMaker;
 WriteMakefile(
     NAME         => 'My::Module',
     VERSION_FROM => 'lib/My/Module.pm',
 );
-"#;
-        let pkg = parse_makefile_pl(content);
+"#,
+        )
+        .expect("write Makefile.PL");
+        fs::write(
+            lib_dir.join("Module.pm"),
+            "package My::Module;\nour $VERSION = '1.23';\n1;\n",
+        )
+        .expect("write module file");
+
+        let pkg = CpanMakefilePlParser::extract_first_package(&temp_dir.path().join("Makefile.PL"));
 
         assert_eq!(pkg.name.as_deref(), Some("My::Module"));
-        assert_eq!(pkg.version, None);
+        assert_eq!(pkg.version.as_deref(), Some("1.23"));
         let extra = pkg.extra_data.as_ref().expect("extra_data should exist");
         assert_eq!(
             extra.get("VERSION_FROM").and_then(|v| v.as_str()),
@@ -177,22 +192,193 @@ WriteMakefile(
 
     #[test]
     fn test_parse_abstract_from() {
-        let content = r#"
+        let temp_dir = TempDir::new().expect("temp dir");
+        let lib_dir = temp_dir.path().join("lib/My");
+        fs::create_dir_all(&lib_dir).expect("create module dir");
+        fs::write(
+            temp_dir.path().join("Makefile.PL"),
+            r#"
 use ExtUtils::MakeMaker;
 WriteMakefile(
     NAME          => 'My::Module',
     VERSION       => '1.0',
     ABSTRACT_FROM => 'lib/My/Module.pm',
 );
-"#;
-        let pkg = parse_makefile_pl(content);
+"#,
+        )
+        .expect("write Makefile.PL");
+        fs::write(
+            lib_dir.join("Module.pm"),
+            "package My::Module;\n\n=head1 NAME\n\nMy::Module - Example abstract from POD\n\n=cut\n\n1;\n",
+        )
+        .expect("write module file");
 
-        assert_eq!(pkg.description, None);
+        let pkg = CpanMakefilePlParser::extract_first_package(&temp_dir.path().join("Makefile.PL"));
+
+        assert_eq!(
+            pkg.description.as_deref(),
+            Some("Example abstract from POD")
+        );
         let extra = pkg.extra_data.as_ref().expect("extra_data should exist");
         assert_eq!(
             extra.get("ABSTRACT_FROM").and_then(|v| v.as_str()),
             Some("lib/My/Module.pm")
         );
+    }
+
+    #[test]
+    fn test_parse_version_and_abstract_from_same_module() {
+        let temp_dir = TempDir::new().expect("temp dir");
+        let lib_dir = temp_dir.path().join("lib/Acme");
+        fs::create_dir_all(&lib_dir).expect("create module dir");
+        fs::write(
+            temp_dir.path().join("Makefile.PL"),
+            r#"
+use ExtUtils::MakeMaker;
+WriteMakefile(
+    NAME          => 'Acme::Combined',
+    VERSION_FROM  => 'lib/Acme/Combined.pm',
+    ABSTRACT_FROM => 'lib/Acme/Combined.pm',
+);
+"#,
+        )
+        .expect("write Makefile.PL");
+        fs::write(
+            lib_dir.join("Combined.pm"),
+            "package Acme::Combined;\nour $VERSION = \"0.42\";\n\n=head1 NAME\n\nAcme::Combined - Combined metadata from module\n\n=cut\n\n1;\n",
+        )
+        .expect("write module file");
+
+        let pkg = CpanMakefilePlParser::extract_first_package(&temp_dir.path().join("Makefile.PL"));
+
+        assert_eq!(pkg.version.as_deref(), Some("0.42"));
+        assert_eq!(
+            pkg.description.as_deref(),
+            Some("Combined metadata from module")
+        );
+    }
+
+    #[test]
+    fn test_parse_inline_version_takes_precedence_over_version_from() {
+        let temp_dir = TempDir::new().expect("temp dir");
+        let lib_dir = temp_dir.path().join("lib/My");
+        fs::create_dir_all(&lib_dir).expect("create module dir");
+        fs::write(
+            temp_dir.path().join("Makefile.PL"),
+            r#"
+use ExtUtils::MakeMaker;
+WriteMakefile(
+    NAME         => 'My::Module',
+    VERSION      => '9.99',
+    VERSION_FROM => 'lib/My/Module.pm',
+);
+"#,
+        )
+        .expect("write Makefile.PL");
+        fs::write(
+            lib_dir.join("Module.pm"),
+            "package My::Module;\nour $VERSION = '1.23';\n1;\n",
+        )
+        .expect("write module file");
+
+        let pkg = CpanMakefilePlParser::extract_first_package(&temp_dir.path().join("Makefile.PL"));
+        assert_eq!(pkg.version.as_deref(), Some("9.99"));
+    }
+
+    #[test]
+    fn test_parse_inline_abstract_takes_precedence_over_abstract_from() {
+        let temp_dir = TempDir::new().expect("temp dir");
+        let lib_dir = temp_dir.path().join("lib/My");
+        fs::create_dir_all(&lib_dir).expect("create module dir");
+        fs::write(
+            temp_dir.path().join("Makefile.PL"),
+            r#"
+use ExtUtils::MakeMaker;
+WriteMakefile(
+    NAME          => 'My::Module',
+    VERSION       => '1.0',
+    ABSTRACT      => 'Inline abstract wins',
+    ABSTRACT_FROM => 'lib/My/Module.pm',
+);
+"#,
+        )
+        .expect("write Makefile.PL");
+        fs::write(
+            lib_dir.join("Module.pm"),
+            "package My::Module;\n\n=head1 NAME\n\nMy::Module - Example abstract from POD\n\n=cut\n\n1;\n",
+        )
+        .expect("write module file");
+
+        let pkg = CpanMakefilePlParser::extract_first_package(&temp_dir.path().join("Makefile.PL"));
+        assert_eq!(pkg.description.as_deref(), Some("Inline abstract wins"));
+    }
+
+    #[test]
+    fn test_parse_version_from_rejects_absolute_paths() {
+        let temp_dir = TempDir::new().expect("temp dir");
+        let absolute_module = temp_dir.path().join("outside.pm");
+        fs::write(
+            temp_dir.path().join("Makefile.PL"),
+            format!(
+                "use ExtUtils::MakeMaker;\nWriteMakefile(NAME => 'My::Module', VERSION_FROM => '{}');\n",
+                absolute_module.display()
+            ),
+        )
+        .expect("write Makefile.PL");
+        fs::write(
+            &absolute_module,
+            "package My::Module;\nour $VERSION = '1.23';\n1;\n",
+        )
+        .expect("write outside module file");
+
+        let pkg = CpanMakefilePlParser::extract_first_package(&temp_dir.path().join("Makefile.PL"));
+        assert_eq!(pkg.version, None);
+    }
+
+    #[test]
+    fn test_parse_version_from_rejects_parent_traversal() {
+        let parent_dir = TempDir::new().expect("parent dir");
+        let project_dir = parent_dir.path().join("project");
+        fs::create_dir_all(&project_dir).expect("create project dir");
+        fs::write(
+            project_dir.join("Makefile.PL"),
+            "use ExtUtils::MakeMaker;\nWriteMakefile(NAME => 'My::Module', VERSION_FROM => '../escape.pm');\n",
+        )
+        .expect("write Makefile.PL");
+        fs::write(
+            parent_dir.path().join("escape.pm"),
+            "package My::Module;\nour $VERSION = '1.23';\n1;\n",
+        )
+        .expect("write outside file");
+
+        let pkg = CpanMakefilePlParser::extract_first_package(&project_dir.join("Makefile.PL"));
+        assert_eq!(pkg.version, None);
+    }
+
+    #[test]
+    fn test_parse_version_from_ignores_commented_version_assignment() {
+        let temp_dir = TempDir::new().expect("temp dir");
+        let lib_dir = temp_dir.path().join("lib/My");
+        fs::create_dir_all(&lib_dir).expect("create module dir");
+        fs::write(
+            temp_dir.path().join("Makefile.PL"),
+            r#"
+use ExtUtils::MakeMaker;
+WriteMakefile(
+    NAME         => 'My::Module',
+    VERSION_FROM => 'lib/My/Module.pm',
+);
+"#,
+        )
+        .expect("write Makefile.PL");
+        fs::write(
+            lib_dir.join("Module.pm"),
+            "package My::Module;\n# our $VERSION = '9.99';\n# example: $VERSION = '8.88';\n1;\n",
+        )
+        .expect("write module file");
+
+        let pkg = CpanMakefilePlParser::extract_first_package(&temp_dir.path().join("Makefile.PL"));
+        assert_eq!(pkg.version, None);
     }
 
     #[test]
