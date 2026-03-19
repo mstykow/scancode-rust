@@ -188,6 +188,8 @@ fn parse_alpine_package_paragraph(
     }
 
     let extracted_license_statement = get_first(headers, "L");
+    let (declared_license_expression, declared_license_expression_spdx, license_detections) =
+        build_alpine_license_data(extracted_license_statement.as_deref());
 
     let source_packages = if let Some(origin) = get_first(headers, "o") {
         vec![format!("pkg:alpine/{}", origin)]
@@ -263,6 +265,9 @@ fn parse_alpine_package_paragraph(
         homepage_url,
         vcs_url,
         parties,
+        declared_license_expression,
+        declared_license_expression_spdx,
+        license_detections,
         extracted_license_statement,
         source_packages,
         dependencies,
@@ -292,7 +297,9 @@ fn parse_apkbuild(content: &str) -> PackageData {
     let homepage_url = variables.get("url").cloned();
     let extracted_license_statement = variables.get("license").cloned();
     let (declared_license_expression, declared_license_expression_spdx, license_detections) =
-        build_apkbuild_license_data(extracted_license_statement.as_deref());
+        build_alpine_license_data(extracted_license_statement.as_deref());
+
+    let dependencies = parse_apkbuild_dependencies(&variables);
 
     let mut extra_data = HashMap::new();
     if let Some(source) = variables.get("source") {
@@ -343,6 +350,7 @@ fn parse_apkbuild(content: &str) -> PackageData {
         declared_license_expression,
         declared_license_expression_spdx,
         license_detections,
+        dependencies,
         purl: name
             .as_deref()
             .and_then(|n| build_alpine_purl(n, version.as_deref(), None)),
@@ -396,6 +404,12 @@ fn parse_apkbuild_variables(content: &str) -> HashMap<String, String> {
         "url",
         "license",
         "source",
+        "depends",
+        "depends_dev",
+        "makedepends",
+        "makedepends_build",
+        "makedepends_host",
+        "checkdepends",
         "sha512sums",
         "sha256sums",
         "md5sums",
@@ -493,7 +507,7 @@ fn parse_apkbuild_checksums(value: &str) -> Vec<(String, String)> {
         .collect()
 }
 
-fn build_apkbuild_license_data(
+fn build_alpine_license_data(
     extracted: Option<&str>,
 ) -> (Option<String>, Option<String>, Vec<LicenseDetection>) {
     let Some(extracted) = extracted.map(str::trim).filter(|s| !s.is_empty()) else {
@@ -558,6 +572,53 @@ fn build_apkbuild_license_data(
     };
 
     (declared, declared_spdx, vec![detection])
+}
+
+fn parse_apkbuild_dependencies(variables: &HashMap<String, String>) -> Vec<Dependency> {
+    let mut dependencies = Vec::new();
+
+    for (field, scope, is_runtime, is_optional) in [
+        ("depends", "depends", true, false),
+        ("depends_dev", "depends_dev", false, true),
+        ("makedepends", "makedepends", false, true),
+        ("makedepends_build", "makedepends_build", false, true),
+        ("makedepends_host", "makedepends_host", false, true),
+        ("checkdepends", "checkdepends", false, true),
+    ] {
+        let Some(value) = variables.get(field) else {
+            continue;
+        };
+
+        for dep_str in value.split_whitespace() {
+            let dep_str = dep_str.trim();
+            if dep_str.is_empty() {
+                continue;
+            }
+
+            let dep_name = dep_str
+                .split(['<', '>', '=', '!', '~'])
+                .next()
+                .unwrap_or(dep_str)
+                .trim();
+            if dep_name.is_empty() {
+                continue;
+            }
+
+            dependencies.push(Dependency {
+                purl: build_alpine_purl(dep_name, None, None),
+                extracted_requirement: Some(dep_str.to_string()),
+                scope: Some(scope.to_string()),
+                is_runtime: Some(is_runtime),
+                is_optional: Some(is_optional),
+                is_pinned: Some(dep_str.contains('=')),
+                is_direct: Some(true),
+                resolved_package: None,
+                extra_data: None,
+            });
+        }
+    }
+
+    dependencies
 }
 
 fn combine_license_expressions_in_order(expressions: Vec<String>) -> Option<String> {
@@ -768,6 +829,8 @@ fn parse_pkginfo(content: &str) -> PackageData {
         .get("license")
         .and_then(|v| v.first())
         .map(|s| s.to_string());
+    let (declared_license_expression, declared_license_expression_spdx, license_detections) =
+        build_alpine_license_data(license.as_deref());
     let description = fields
         .get("pkgdesc")
         .and_then(|v| v.first())
@@ -827,6 +890,9 @@ fn parse_pkginfo(content: &str) -> PackageData {
         version,
         description,
         homepage_url: homepage,
+        declared_license_expression,
+        declared_license_expression_spdx,
+        license_detections,
         extracted_license_statement: license,
         parties,
         dependencies,
@@ -1157,6 +1223,24 @@ p:so:libtest.so.1
             pkg.declared_license_expression_spdx.as_deref(),
             Some("MIT AND ICU AND Unicode-TOU")
         );
+        assert_eq!(pkg.dependencies.len(), 3);
+        let depends_dev = pkg
+            .dependencies
+            .iter()
+            .find(|dep| dep.scope.as_deref() == Some("depends_dev"))
+            .expect("depends_dev dependency missing");
+        assert_eq!(depends_dev.purl.as_deref(), Some("pkg:alpine/icu"));
+        assert_eq!(depends_dev.is_runtime, Some(false));
+        assert_eq!(depends_dev.is_optional, Some(true));
+
+        let check_dep_names: Vec<_> = pkg
+            .dependencies
+            .iter()
+            .filter(|dep| dep.scope.as_deref() == Some("checkdepends"))
+            .filter_map(|dep| dep.purl.as_deref())
+            .collect();
+        assert!(check_dep_names.contains(&"pkg:alpine/diffutils"));
+        assert!(check_dep_names.contains(&"pkg:alpine/python3"));
         let extra = pkg.extra_data.as_ref().unwrap();
         assert!(extra.contains_key("sources"));
         assert!(extra.contains_key("checksums"));
@@ -1250,6 +1334,29 @@ D:json-c geos gdal proj protobuf-c libstdc++
         assert_eq!(pkg.dependencies.len(), 6);
         assert!(pkg.homepage_url.is_none());
         assert!(pkg.extracted_license_statement.is_none());
+    }
+
+    #[test]
+    fn test_installed_db_license_normalization() {
+        let content = "P:test-package\nV:1.0-r0\nA:x86_64\nL:MIT\n\n";
+        let (_dir, path) = create_temp_installed_db(content);
+        let pkg = AlpineInstalledParser::extract_first_package(&path);
+
+        assert_eq!(pkg.extracted_license_statement.as_deref(), Some("MIT"));
+        assert_eq!(pkg.declared_license_expression.as_deref(), Some("mit"));
+        assert_eq!(pkg.declared_license_expression_spdx.as_deref(), Some("MIT"));
+        assert_eq!(pkg.license_detections.len(), 1);
+    }
+
+    #[test]
+    fn test_apk_archive_license_normalization() {
+        let path = PathBuf::from("testdata/alpine/apk/basic/test-package-1.0-r0.apk");
+        let pkg = AlpineApkParser::extract_first_package(&path);
+
+        assert_eq!(pkg.extracted_license_statement.as_deref(), Some("MIT"));
+        assert_eq!(pkg.declared_license_expression.as_deref(), Some("mit"));
+        assert_eq!(pkg.declared_license_expression_spdx.as_deref(), Some("MIT"));
+        assert_eq!(pkg.license_detections.len(), 1);
     }
 }
 

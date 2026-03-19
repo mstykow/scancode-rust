@@ -9,6 +9,7 @@ The Alpine parser in Provenant now combines existing beyond-parity improvements 
 3. **✨ New Feature**: Static APKBUILD recipe parsing with real local fixture coverage
 4. **🐛 Bug Fix**: Alpine commit metadata now produces `git+https://...` VCS URLs
 5. **🐛 Bug Fix / Proof**: Packages with no files are still detected and retained
+6. **🔍 Enhanced**: APKBUILD dependency families and non-APKBUILD license normalization now match Alpine package semantics more closely
 
 ## Improvement 1: SHA1 Checksum Decoding (Bug Fix)
 
@@ -158,6 +159,7 @@ Implemented coverage includes:
 - `pkgdesc`
 - `url`
 - `license`
+- `depends`, `depends_dev`, `makedepends`, `makedepends_build`, `makedepends_host`, `checkdepends`
 - `source`
 - `sha512sums`, `sha256sums`, `md5sums`
 - variable expansion for the upstream fixture forms we need now:
@@ -168,6 +170,13 @@ Implemented coverage includes:
 ### Why This Matters
 
 This closes the most visible Alpine parser gap in Rust without violating the security-first parsing rule: we still do **not** execute shell or evaluate arbitrary shell functions.
+
+Rust now also emits APKBUILD dependency families as structured dependencies:
+
+- `depends` → runtime package dependencies
+- `makedepends`, `makedepends_build`, `makedepends_host` → build-time dependencies
+- `checkdepends` → test/check dependencies
+- `depends_dev` → development-subpackage runtime dependencies, preserved under their own native scope
 
 ## Improvement 4: HTTPS VCS URL Generation
 
@@ -187,6 +196,16 @@ Python `develop` already emits Alpine commit URLs as `git+https://...`, and Rust
 The Alpine batch now explicitly proves that packages with no file references are still preserved as packages rather than being dropped.
 
 This matters for packages like `libc-utils` and for APKBUILD “dummy package” patterns such as `linux-firmware`’s `none()` subpackage.
+
+## Improvement 6: Dependency and license parity across Alpine surfaces
+
+Rust now keeps Alpine package metadata more consistent across all supported Alpine inputs:
+
+- `APKBUILD` recipes emit declared dependency families instead of only source/checksum metadata
+- installed-db records now normalize trustworthy license statements into declared license fields, not just raw text
+- `.apk` archives now normalize the same trustworthy license statements into declared license fields too
+
+This removes an odd asymmetry where only APKBUILD enjoyed normalized license metadata even though package archives and installed-db records carry the same package-declared license values.
 
 ## Implementation Notes
 
@@ -215,7 +234,7 @@ for line in content.lines() {
 
 ## Coverage
 
-Coverage includes SHA1 decoding, provider extraction, APKBUILD metadata parsing, raw matched-text preservation for `custom:multiple`, fileless package detection, HTTPS VCS URL synthesis, and golden coverage for both installed-database and APKBUILD inputs.
+Coverage includes SHA1 decoding, provider extraction, APKBUILD metadata parsing, APKBUILD dependency families, raw matched-text preservation for `custom:multiple`, fileless package detection, HTTPS VCS URL synthesis, non-APKBUILD license normalization, and golden coverage for installed-db, `.apk`, and APKBUILD inputs.
 
 ## References
 
