@@ -13,7 +13,7 @@ mod parse;
 mod simplify;
 
 pub use parse::parse_expression;
-pub use simplify::{combine_expressions, expression_to_string, licensing_contains};
+pub use simplify::{combine_expressions_and, expression_to_string, licensing_contains};
 
 /// Error type for license expression parsing.
 #[derive(Debug, Clone, PartialEq)]
@@ -139,15 +139,6 @@ impl LicenseExpression {
             Some(result)
         }
     }
-}
-
-/// Relation for combining license expressions.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum CombineRelation {
-    /// Combine with AND operation
-    And,
-    /// Combine with OR operation
-    Or,
 }
 
 #[cfg(test)]

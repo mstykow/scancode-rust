@@ -2,7 +2,7 @@
 
 use super::types::LicenseDetection;
 use super::*;
-use crate::license_detection::expression::{combine_expressions, CombineRelation};
+use crate::license_detection::expression::combine_expressions_and;
 use crate::license_detection::models::{LicenseMatch, MatcherKind};
 
 /// Coverage value below which detections are not perfect.
@@ -411,7 +411,7 @@ pub fn determine_license_expression(matches: &[LicenseMatch]) -> Result<String, 
         .map(|m| m.license_expression.as_str())
         .collect();
 
-    combine_expressions(&expressions, CombineRelation::And, false)
+    combine_expressions_and(&expressions, false)
         .map_err(|e| format!("Failed to combine expressions: {}", e))
 }
 
@@ -433,7 +433,7 @@ pub fn determine_spdx_expression(matches: &[LicenseMatch]) -> Result<String, Str
     let expressions = expressions
         .ok_or_else(|| "Missing SPDX expressions for one or more matches".to_string())?;
 
-    combine_expressions(&expressions, CombineRelation::And, false)
+    combine_expressions_and(&expressions, false)
         .map_err(|e| format!("Failed to combine SPDX expressions: {}", e))
 }
 

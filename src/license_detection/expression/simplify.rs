@@ -2,7 +2,7 @@
 
 use std::collections::HashSet;
 
-use super::{CombineRelation, LicenseExpression, ParseError};
+use super::{LicenseExpression, ParseError};
 
 /// Simplify a license expression by deduplicating license keys.
 ///
@@ -357,34 +357,10 @@ fn expression_to_string_maybe_parens(expr: &LicenseExpression, parent_is_and_or:
     }
 }
 
-/// Combine multiple license expressions into a single expression.
-///
-/// This function parses each expression string, combines them using the specified
-/// relation, and optionally deduplicates license keys.
-///
-/// # Arguments
-/// * `expressions` - Slice of expression strings to combine
-/// * `relation` - How to combine (AND or OR)
-/// * `unique` - If true, deduplicate license keys
-///
-/// # Returns
-/// Ok with combined expression string, or Err with parse error
-///
-/// # Examples
-/// ```
-/// use scancode_rust::license_detection::expression::{combine_expressions, CombineRelation};
-///
-/// let combined = combine_expressions(
-///     &["mit", "gpl-2.0-plus"],
-///     CombineRelation::And,
-///     true
-/// ).unwrap();
-/// assert_eq!(combined, "mit AND gpl-2.0-plus");
-/// ```
-pub fn combine_expressions(
+fn combine_expressions_with(
     expressions: &[&str],
-    relation: CombineRelation,
     unique: bool,
+    combiner: fn(Vec<LicenseExpression>) -> Option<LicenseExpression>,
 ) -> Result<String, ParseError> {
     if expressions.is_empty() {
         return Ok(String::new());
@@ -403,10 +379,7 @@ pub fn combine_expressions(
         .map(|e| super::parse::parse_expression(e))
         .collect::<Result<Vec<_>, _>>()?;
 
-    let combined = match relation {
-        CombineRelation::And => LicenseExpression::and(parsed_exprs),
-        CombineRelation::Or => LicenseExpression::or(parsed_exprs),
-    };
+    let combined = combiner(parsed_exprs);
 
     match combined {
         Some(expr) => {
@@ -419,6 +392,34 @@ pub fn combine_expressions(
         }
         None => Ok(String::new()),
     }
+}
+
+/// Combine multiple license expressions with `AND`.
+///
+/// This function parses each expression string, combines them with `AND`, and
+/// optionally deduplicates license keys.
+///
+/// # Examples
+/// ```
+/// use scancode_rust::license_detection::expression::combine_expressions_and;
+///
+/// let combined = combine_expressions_and(&["mit", "gpl-2.0-plus"], true).unwrap();
+/// assert_eq!(combined, "mit AND gpl-2.0-plus");
+/// ```
+pub fn combine_expressions_and(expressions: &[&str], unique: bool) -> Result<String, ParseError> {
+    combine_expressions_with(expressions, unique, LicenseExpression::and)
+}
+
+/// Combine multiple license expressions with `OR`.
+///
+/// This function parses each expression string, combines them with `OR`, and
+/// optionally deduplicates license keys.
+// Kept for future parity work where production code needs to combine
+// expressions with OR, especially beyond the current license-detection path.
+// See docs/license-detection/GAPS.md#expression-key-set-features.
+#[allow(dead_code)]
+pub fn combine_expressions_or(expressions: &[&str], unique: bool) -> Result<String, ParseError> {
+    combine_expressions_with(expressions, unique, LicenseExpression::or)
 }
 
 #[cfg(test)]
@@ -684,38 +685,31 @@ mod tests {
 
     #[test]
     fn test_combine_expressions_empty() {
-        let result = combine_expressions(&[], CombineRelation::And, true).unwrap();
+        let result = combine_expressions_and(&[], true).unwrap();
         assert_eq!(result, "");
     }
 
     #[test]
     fn test_combine_expressions_single() {
-        let result = combine_expressions(&["mit"], CombineRelation::And, true).unwrap();
+        let result = combine_expressions_and(&["mit"], true).unwrap();
         assert_eq!(result, "mit");
     }
 
     #[test]
     fn test_combine_expressions_two_and() {
-        let result =
-            combine_expressions(&["mit", "gpl-2.0-plus"], CombineRelation::And, true).unwrap();
+        let result = combine_expressions_and(&["mit", "gpl-2.0-plus"], true).unwrap();
         assert_eq!(result, "mit AND gpl-2.0-plus");
     }
 
     #[test]
     fn test_combine_expressions_two_or() {
-        let result =
-            combine_expressions(&["mit", "apache-2.0"], CombineRelation::Or, true).unwrap();
+        let result = combine_expressions_or(&["mit", "apache-2.0"], true).unwrap();
         assert_eq!(result, "mit OR apache-2.0");
     }
 
     #[test]
     fn test_combine_expressions_multiple_and() {
-        let result = combine_expressions(
-            &["mit", "apache-2.0", "gpl-2.0-plus"],
-            CombineRelation::And,
-            true,
-        )
-        .unwrap();
+        let result = combine_expressions_and(&["mit", "apache-2.0", "gpl-2.0-plus"], true).unwrap();
         assert!(result.contains("mit"));
         assert!(result.contains("apache-2.0"));
         assert!(result.contains("gpl-2.0-plus"));
@@ -724,8 +718,7 @@ mod tests {
 
     #[test]
     fn test_combine_expressions_with_duplicates_unique() {
-        let result =
-            combine_expressions(&["mit", "mit", "apache-2.0"], CombineRelation::Or, true).unwrap();
+        let result = combine_expressions_or(&["mit", "mit", "apache-2.0"], true).unwrap();
         let expr = super::super::parse::parse_expression(&result).unwrap();
         let keys = expr.license_keys();
         assert_eq!(keys.len(), 2);
@@ -735,8 +728,7 @@ mod tests {
 
     #[test]
     fn test_combine_expressions_with_duplicates_not_unique() {
-        let result =
-            combine_expressions(&["mit", "mit", "apache-2.0"], CombineRelation::Or, false).unwrap();
+        let result = combine_expressions_or(&["mit", "mit", "apache-2.0"], false).unwrap();
         let expr = super::super::parse::parse_expression(&result).unwrap();
         // combine_expressions creates nested structure, so we get parens
         assert_eq!(result, "(mit OR mit) OR apache-2.0");
@@ -746,12 +738,7 @@ mod tests {
 
     #[test]
     fn test_combine_expressions_complex_with_simplification() {
-        let result = combine_expressions(
-            &["mit OR apache-2.0", "gpl-2.0-plus"],
-            CombineRelation::And,
-            true,
-        )
-        .unwrap();
+        let result = combine_expressions_and(&["mit OR apache-2.0", "gpl-2.0-plus"], true).unwrap();
         assert_eq!(result, "(mit OR apache-2.0) AND gpl-2.0-plus");
         let expr = super::super::parse::parse_expression(&result).unwrap();
         assert!(matches!(expr, LicenseExpression::And { .. }));
@@ -761,18 +748,13 @@ mod tests {
 
     #[test]
     fn test_combine_expressions_parse_error() {
-        let result = combine_expressions(&["mit", "@invalid@"], CombineRelation::And, true);
+        let result = combine_expressions_and(&["mit", "@invalid@"], true);
         assert!(result.is_err());
     }
 
     #[test]
     fn test_combine_expressions_with_existing_and() {
-        let result = combine_expressions(
-            &["mit AND apache-2.0", "gpl-2.0"],
-            CombineRelation::And,
-            true,
-        )
-        .unwrap();
+        let result = combine_expressions_and(&["mit AND apache-2.0", "gpl-2.0"], true).unwrap();
         assert!(result.contains("mit"));
         assert!(result.contains("apache-2.0"));
         assert!(result.contains("gpl-2.0"));
@@ -780,9 +762,7 @@ mod tests {
 
     #[test]
     fn test_combine_expressions_with_existing_or() {
-        let result =
-            combine_expressions(&["mit OR apache-2.0", "gpl-2.0"], CombineRelation::Or, true)
-                .unwrap();
+        let result = combine_expressions_or(&["mit OR apache-2.0", "gpl-2.0"], true).unwrap();
         assert!(result.contains("mit"));
         assert!(result.contains("apache-2.0"));
         assert!(result.contains("gpl-2.0"));
