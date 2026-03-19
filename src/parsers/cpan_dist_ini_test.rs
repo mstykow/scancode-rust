@@ -105,6 +105,41 @@ Test::Exception = 0
     }
 
     #[test]
+    fn test_parse_configure_requires_scope() {
+        let content = r#"
+name = Example-Dist
+version = 1.0
+
+[Prereq / ConfigureRequires]
+ExtUtils::MakeMaker = 7.70
+
+[Prereqs / RuntimeRequires]
+Moose = 2.2200
+"#;
+        let pkg = parse_dist_ini(content);
+
+        assert_eq!(pkg.dependencies.len(), 2);
+
+        let configure_dep = pkg
+            .dependencies
+            .iter()
+            .find(|dep| dep.purl.as_deref() == Some("pkg:cpan/ExtUtils::MakeMaker"))
+            .expect("configure dependency missing");
+        assert_eq!(configure_dep.scope.as_deref(), Some("configure"));
+        assert_eq!(configure_dep.extracted_requirement.as_deref(), Some("7.70"));
+        assert_eq!(configure_dep.is_runtime, Some(false));
+        assert_eq!(configure_dep.is_optional, Some(false));
+
+        let runtime_dep = pkg
+            .dependencies
+            .iter()
+            .find(|dep| dep.purl.as_deref() == Some("pkg:cpan/Moose"))
+            .expect("runtime dependency missing");
+        assert_eq!(runtime_dep.scope.as_deref(), Some("runtime"));
+        assert_eq!(runtime_dep.is_runtime, Some(true));
+    }
+
+    #[test]
     fn test_parse_minimal() {
         let content = r#"
 name = Simple-Module
