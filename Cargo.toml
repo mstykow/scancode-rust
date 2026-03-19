@@ -39,6 +39,7 @@ publish = true
 [dependencies]
 # askalono
 anyhow = "1.0.102"
+bzip2 = "0.6.1"
 flate2 = "1.1.9"
 lazy_static = "1.5.0"
 liblzma = "0.4.6"

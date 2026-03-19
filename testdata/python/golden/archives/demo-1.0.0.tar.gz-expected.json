@@ -1,0 +1,36 @@
+[
+  {
+    "type": "pypi",
+    "name": "demo",
+    "version": "1.0.0",
+    "primary_language": "Python",
+    "description": "Egg metadata",
+    "parties": [],
+    "size": 313,
+    "sha256": "3bec04c69dab395304b5b4afa049e92e8349c4e4c4457d0a2f9415c666bd6585",
+    "file_references": [
+      {
+        "path": "README.md"
+      },
+      {
+        "path": "demo/__init__.py"
+      }
+    ],
+    "dependencies": [
+      {
+        "purl": "pkg:pypi/click",
+        "extracted_requirement": ">=8",
+        "scope": "install",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true
+      }
+    ],
+    "repository_homepage_url": "https://pypi.org/project/demo",
+    "repository_download_url": "https://pypi.org/packages/source/d/demo/demo-1.0.0.tar.gz",
+    "api_data_url": "https://pypi.org/pypi/demo/1.0.0/json",
+    "datasource_id": "pypi_sdist_pkginfo",
+    "purl": "pkg:pypi/demo@1.0.0"
+  }
+]

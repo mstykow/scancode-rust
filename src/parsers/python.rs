@@ -35,7 +35,10 @@ use crate::models::{DatasourceId, Dependency, FileReference, PackageData, Packag
 use crate::parsers::utils::{read_file_to_string, split_name_email};
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+use bzip2::read::BzDecoder;
 use csv::ReaderBuilder;
+use flate2::read::GzDecoder;
+use liblzma::read::XzDecoder;
 use log::warn;
 use packageurl::PackageUrl;
 use regex::Regex;
@@ -46,6 +49,7 @@ use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::Read;
 use std::path::{Path, PathBuf};
+use tar::Archive;
 use toml::Value as TomlValue;
 use toml::map::Map as TomlMap;
 use zip::ZipArchive;
@@ -84,6 +88,15 @@ const MAX_COMPRESSION_RATIO: f64 = 100.0; // 100:1 ratio
 /// arbitrary code execution during scanning. See `extract_from_setup_py_ast` for details.
 pub struct PythonParser;
 
+#[derive(Clone, Copy, Debug)]
+enum PythonSdistArchiveFormat {
+    TarGz,
+    Tgz,
+    TarBz2,
+    TarXz,
+    Zip,
+}
+
 impl PackageParser for PythonParser {
     const PACKAGE_TYPE: PackageType = PackageType::Pypi;
 
@@ -105,6 +118,8 @@ impl PackageParser for PythonParser {
                 extract_from_pypi_json(path)
             } else if path.file_name().unwrap_or_default() == "pip-inspect.deplock" {
                 extract_from_pip_inspect(path)
+            } else if is_python_sdist_archive_path(path) {
+                extract_from_sdist_archive(path)
             } else if path
                 .extension()
                 .is_some_and(|ext| ext.eq_ignore_ascii_case("whl"))
@@ -137,7 +152,7 @@ impl PackageParser for PythonParser {
 
         if let Some(extension) = path.extension() {
             let ext = extension.to_string_lossy().to_lowercase();
-            if ext == "whl" || ext == "egg" {
+            if ext == "whl" || ext == "egg" || is_python_sdist_archive_path(path) {
                 return true;
             }
         }
@@ -587,6 +602,476 @@ fn validate_zip_archive<R: Read + std::io::Seek>(
     }
 
     Ok(total_extracted)
+}
+
+fn is_python_sdist_archive_path(path: &Path) -> bool {
+    detect_python_sdist_archive_format(path).is_some()
+}
+
+fn detect_python_sdist_archive_format(path: &Path) -> Option<PythonSdistArchiveFormat> {
+    let file_name = path.file_name()?.to_str()?.to_ascii_lowercase();
+
+    if !is_likely_python_sdist_filename(&file_name) {
+        return None;
+    }
+
+    if file_name.ends_with(".tar.gz") {
+        Some(PythonSdistArchiveFormat::TarGz)
+    } else if file_name.ends_with(".tgz") {
+        Some(PythonSdistArchiveFormat::Tgz)
+    } else if file_name.ends_with(".tar.bz2") {
+        Some(PythonSdistArchiveFormat::TarBz2)
+    } else if file_name.ends_with(".tar.xz") {
+        Some(PythonSdistArchiveFormat::TarXz)
+    } else if file_name.ends_with(".zip") {
+        Some(PythonSdistArchiveFormat::Zip)
+    } else {
+        None
+    }
+}
+
+fn is_likely_python_sdist_filename(file_name: &str) -> bool {
+    let Some(stem) = strip_python_archive_extension(file_name) else {
+        return false;
+    };
+
+    let Some((name, version)) = stem.rsplit_once('-') else {
+        return false;
+    };
+
+    !name.is_empty()
+        && !version.is_empty()
+        && version.chars().any(|ch| ch.is_ascii_digit())
+        && name
+            .chars()
+            .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '-' | '_' | '.'))
+}
+
+fn extract_from_sdist_archive(path: &Path) -> PackageData {
+    let metadata = match std::fs::metadata(path) {
+        Ok(m) => m,
+        Err(e) => {
+            warn!(
+                "Failed to read metadata for sdist archive {:?}: {}",
+                path, e
+            );
+            return default_package_data();
+        }
+    };
+
+    if metadata.len() > MAX_ARCHIVE_SIZE {
+        warn!(
+            "sdist archive too large: {} bytes (limit: {} bytes)",
+            metadata.len(),
+            MAX_ARCHIVE_SIZE
+        );
+        return default_package_data();
+    }
+
+    let Some(format) = detect_python_sdist_archive_format(path) else {
+        return default_package_data();
+    };
+
+    let mut package_data = match format {
+        PythonSdistArchiveFormat::TarGz | PythonSdistArchiveFormat::Tgz => {
+            let file = match File::open(path) {
+                Ok(file) => file,
+                Err(e) => {
+                    warn!("Failed to open sdist archive {:?}: {}", path, e);
+                    return default_package_data();
+                }
+            };
+            let decoder = GzDecoder::new(file);
+            extract_from_tar_sdist_archive(path, decoder, "tar.gz", metadata.len())
+        }
+        PythonSdistArchiveFormat::TarBz2 => {
+            let file = match File::open(path) {
+                Ok(file) => file,
+                Err(e) => {
+                    warn!("Failed to open sdist archive {:?}: {}", path, e);
+                    return default_package_data();
+                }
+            };
+            let decoder = BzDecoder::new(file);
+            extract_from_tar_sdist_archive(path, decoder, "tar.bz2", metadata.len())
+        }
+        PythonSdistArchiveFormat::TarXz => {
+            let file = match File::open(path) {
+                Ok(file) => file,
+                Err(e) => {
+                    warn!("Failed to open sdist archive {:?}: {}", path, e);
+                    return default_package_data();
+                }
+            };
+            let decoder = XzDecoder::new(file);
+            extract_from_tar_sdist_archive(path, decoder, "tar.xz", metadata.len())
+        }
+        PythonSdistArchiveFormat::Zip => extract_from_zip_sdist_archive(path),
+    };
+
+    if package_data.package_type.is_some() {
+        let (size, sha256) = calculate_file_checksums(path);
+        package_data.size = size;
+        package_data.sha256 = sha256;
+    }
+
+    package_data
+}
+
+fn extract_from_tar_sdist_archive<R: Read>(
+    path: &Path,
+    reader: R,
+    archive_type: &str,
+    compressed_size: u64,
+) -> PackageData {
+    let mut archive = Archive::new(reader);
+    let archive_entries = match archive.entries() {
+        Ok(entries) => entries,
+        Err(e) => {
+            warn!(
+                "Failed to read {} sdist archive {:?}: {}",
+                archive_type, path, e
+            );
+            return default_package_data();
+        }
+    };
+
+    let mut total_extracted = 0u64;
+    let mut entries = Vec::new();
+
+    for entry_result in archive_entries {
+        let mut entry = match entry_result {
+            Ok(entry) => entry,
+            Err(e) => {
+                warn!(
+                    "Failed to read {} sdist entry from {:?}: {}",
+                    archive_type, path, e
+                );
+                continue;
+            }
+        };
+
+        let entry_size = entry.size();
+        if entry_size > MAX_FILE_SIZE {
+            warn!(
+                "File too large in {} sdist {:?}: {} bytes (limit: {} bytes)",
+                archive_type, path, entry_size, MAX_FILE_SIZE
+            );
+            continue;
+        }
+
+        total_extracted += entry_size;
+        if total_extracted > MAX_ARCHIVE_SIZE {
+            warn!(
+                "Total extracted size exceeds limit for {} sdist {:?}",
+                archive_type, path
+            );
+            return default_package_data();
+        }
+
+        let entry_path = match entry.path() {
+            Ok(path) => path.to_string_lossy().replace('\\', "/"),
+            Err(e) => {
+                warn!(
+                    "Failed to get {} sdist entry path from {:?}: {}",
+                    archive_type, path, e
+                );
+                continue;
+            }
+        };
+
+        if !is_relevant_sdist_text_entry(&entry_path) {
+            continue;
+        }
+
+        let mut content = String::new();
+        if entry.read_to_string(&mut content).is_ok() {
+            entries.push((entry_path, content));
+        }
+    }
+
+    if compressed_size > 0 {
+        let ratio = total_extracted as f64 / compressed_size as f64;
+        if ratio > MAX_COMPRESSION_RATIO {
+            warn!(
+                "Suspicious compression ratio in {} sdist {:?}: {:.2}:1",
+                archive_type, path, ratio
+            );
+            return default_package_data();
+        }
+    }
+
+    build_sdist_package_data(path, entries)
+}
+
+fn extract_from_zip_sdist_archive(path: &Path) -> PackageData {
+    let file = match File::open(path) {
+        Ok(file) => file,
+        Err(e) => {
+            warn!("Failed to open zip sdist archive {:?}: {}", path, e);
+            return default_package_data();
+        }
+    };
+
+    let mut archive = match ZipArchive::new(file) {
+        Ok(archive) => archive,
+        Err(e) => {
+            warn!("Failed to read zip sdist archive {:?}: {}", path, e);
+            return default_package_data();
+        }
+    };
+
+    if validate_zip_archive(&mut archive, path, "sdist zip").is_err() {
+        return default_package_data();
+    }
+
+    let mut entries = Vec::new();
+    for i in 0..archive.len() {
+        let entry_path = {
+            let Ok(file) = archive.by_index_raw(i) else {
+                continue;
+            };
+            file.name().replace('\\', "/")
+        };
+
+        if !is_relevant_sdist_text_entry(&entry_path) {
+            continue;
+        }
+
+        if let Ok(content) = read_zip_entry(&mut archive, &entry_path) {
+            entries.push((entry_path, content));
+        }
+    }
+
+    build_sdist_package_data(path, entries)
+}
+
+fn is_relevant_sdist_text_entry(entry_path: &str) -> bool {
+    entry_path.ends_with("/PKG-INFO")
+        || entry_path.ends_with("/requires.txt")
+        || entry_path.ends_with("/SOURCES.txt")
+}
+
+fn build_sdist_package_data(path: &Path, entries: Vec<(String, String)>) -> PackageData {
+    let Some((metadata_path, metadata_content)) = select_sdist_pkginfo_entry(path, &entries) else {
+        warn!("No PKG-INFO file found in sdist archive {:?}", path);
+        return default_package_data();
+    };
+
+    let mut package_data =
+        python_parse_rfc822_content(&metadata_content, DatasourceId::PypiSdistPkginfo);
+    merge_sdist_archive_dependencies(&entries, &metadata_path, &mut package_data);
+    merge_sdist_archive_file_references(&entries, &metadata_path, &mut package_data);
+    apply_sdist_name_version_fallback(path, &mut package_data);
+    package_data
+}
+
+fn select_sdist_pkginfo_entry(
+    archive_path: &Path,
+    entries: &[(String, String)],
+) -> Option<(String, String)> {
+    let expected_name = archive_path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .and_then(strip_python_archive_extension)
+        .and_then(|stem| {
+            stem.rsplit_once('-')
+                .map(|(name, _)| normalize_python_package_name(name))
+        });
+
+    entries
+        .iter()
+        .filter(|(entry_path, _)| entry_path.ends_with("/PKG-INFO"))
+        .min_by_key(|(entry_path, content)| {
+            let components: Vec<_> = entry_path
+                .split('/')
+                .filter(|part| !part.is_empty())
+                .collect();
+            let metadata = super::rfc822::parse_rfc822_content(content);
+            let candidate_name = super::rfc822::get_header_first(&metadata.headers, "name")
+                .map(|name| normalize_python_package_name(&name));
+            let name_rank = if candidate_name == expected_name {
+                0
+            } else {
+                1
+            };
+            let kind_rank = if components.len() == 3
+                && components[1].ends_with(".egg-info")
+                && components[2] == "PKG-INFO"
+            {
+                0
+            } else if components.len() == 2 && components[1] == "PKG-INFO" {
+                1
+            } else if entry_path.ends_with(".egg-info/PKG-INFO") {
+                2
+            } else {
+                3
+            };
+
+            (name_rank, kind_rank, components.len(), entry_path.clone())
+        })
+        .map(|(entry_path, content)| (entry_path.clone(), content.clone()))
+}
+
+fn merge_sdist_archive_dependencies(
+    entries: &[(String, String)],
+    metadata_path: &str,
+    package_data: &mut PackageData,
+) {
+    let metadata_dir = metadata_path
+        .rsplit_once('/')
+        .map(|(dir, _)| dir)
+        .unwrap_or("");
+    let archive_root = metadata_path.split('/').next().unwrap_or("");
+    let matched_egg_info_dir =
+        select_matching_sdist_egg_info_dir(entries, archive_root, package_data.name.as_deref());
+    let mut extra_dependencies = Vec::new();
+
+    for (entry_path, content) in entries {
+        let is_direct_requires =
+            !metadata_dir.is_empty() && entry_path == &format!("{metadata_dir}/requires.txt");
+        let is_egg_info_requires = matched_egg_info_dir.as_ref().is_some_and(|egg_info_dir| {
+            entry_path == &format!("{archive_root}/{egg_info_dir}/requires.txt")
+        });
+
+        if is_direct_requires || is_egg_info_requires {
+            extra_dependencies.extend(parse_requires_txt(content));
+        }
+    }
+
+    for dependency in extra_dependencies {
+        if !package_data.dependencies.iter().any(|existing| {
+            existing.purl == dependency.purl
+                && existing.scope == dependency.scope
+                && existing.extracted_requirement == dependency.extracted_requirement
+                && existing.extra_data == dependency.extra_data
+        }) {
+            package_data.dependencies.push(dependency);
+        }
+    }
+}
+
+fn merge_sdist_archive_file_references(
+    entries: &[(String, String)],
+    metadata_path: &str,
+    package_data: &mut PackageData,
+) {
+    let metadata_dir = metadata_path
+        .rsplit_once('/')
+        .map(|(dir, _)| dir)
+        .unwrap_or("");
+    let archive_root = metadata_path.split('/').next().unwrap_or("");
+    let matched_egg_info_dir =
+        select_matching_sdist_egg_info_dir(entries, archive_root, package_data.name.as_deref());
+    let mut extra_refs = Vec::new();
+
+    for (entry_path, content) in entries {
+        let is_direct_sources =
+            !metadata_dir.is_empty() && entry_path == &format!("{metadata_dir}/SOURCES.txt");
+        let is_egg_info_sources = matched_egg_info_dir.as_ref().is_some_and(|egg_info_dir| {
+            entry_path == &format!("{archive_root}/{egg_info_dir}/SOURCES.txt")
+        });
+
+        if is_direct_sources || is_egg_info_sources {
+            extra_refs.extend(parse_sources_txt(content));
+        }
+    }
+
+    for file_ref in extra_refs {
+        if !package_data
+            .file_references
+            .iter()
+            .any(|existing| existing.path == file_ref.path)
+        {
+            package_data.file_references.push(file_ref);
+        }
+    }
+}
+
+fn select_matching_sdist_egg_info_dir(
+    entries: &[(String, String)],
+    archive_root: &str,
+    package_name: Option<&str>,
+) -> Option<String> {
+    let normalized_package_name = package_name.map(normalize_python_package_name);
+
+    entries
+        .iter()
+        .filter_map(|(entry_path, _)| {
+            let components: Vec<_> = entry_path
+                .split('/')
+                .filter(|part| !part.is_empty())
+                .collect();
+            if components.len() == 3
+                && components[0] == archive_root
+                && components[1].ends_with(".egg-info")
+            {
+                Some(components[1].to_string())
+            } else {
+                None
+            }
+        })
+        .min_by_key(|egg_info_dir| {
+            let normalized_dir_name =
+                normalize_python_package_name(egg_info_dir.trim_end_matches(".egg-info"));
+            let name_rank = if Some(normalized_dir_name.clone()) == normalized_package_name {
+                0
+            } else {
+                1
+            };
+
+            (name_rank, egg_info_dir.clone())
+        })
+}
+
+fn normalize_python_package_name(name: &str) -> String {
+    name.to_ascii_lowercase().replace('_', "-")
+}
+
+fn apply_sdist_name_version_fallback(path: &Path, package_data: &mut PackageData) {
+    let Some(file_name) = path.file_name().and_then(|name| name.to_str()) else {
+        return;
+    };
+
+    let Some(stem) = strip_python_archive_extension(file_name) else {
+        return;
+    };
+
+    let Some((name, version)) = stem.rsplit_once('-') else {
+        return;
+    };
+
+    if package_data.name.is_none() {
+        package_data.name = Some(name.replace('_', "-"));
+    }
+    if package_data.version.is_none() {
+        package_data.version = Some(version.to_string());
+    }
+
+    if package_data.purl.is_none()
+        || package_data.repository_homepage_url.is_none()
+        || package_data.repository_download_url.is_none()
+        || package_data.api_data_url.is_none()
+    {
+        let (repository_homepage_url, repository_download_url, api_data_url, purl) =
+            build_pypi_urls(
+                package_data.name.as_deref(),
+                package_data.version.as_deref(),
+            );
+
+        if package_data.repository_homepage_url.is_none() {
+            package_data.repository_homepage_url = repository_homepage_url;
+        }
+        if package_data.repository_download_url.is_none() {
+            package_data.repository_download_url = repository_download_url;
+        }
+        if package_data.api_data_url.is_none() {
+            package_data.api_data_url = api_data_url;
+        }
+        if package_data.purl.is_none() {
+            package_data.purl = purl;
+        }
+    }
 }
 
 fn extract_from_wheel_archive(path: &Path) -> PackageData {
@@ -4017,7 +4502,7 @@ fn default_package_data() -> PackageData {
 }
 
 crate::register_parser!(
-    "Python package manifests (pyproject.toml, setup.py, setup.cfg, pypi.json, PKG-INFO, METADATA, pip cache origin.json, .whl, .egg)",
+    "Python package manifests (pyproject.toml, setup.py, setup.cfg, pypi.json, PKG-INFO, METADATA, pip cache origin.json, sdist archives, .whl, .egg)",
     &[
         "**/pyproject.toml",
         "**/setup.py",
@@ -4026,6 +4511,11 @@ crate::register_parser!(
         "**/PKG-INFO",
         "**/METADATA",
         "**/origin.json",
+        "**/*.tar.gz",
+        "**/*.tgz",
+        "**/*.tar.bz2",
+        "**/*.tar.xz",
+        "**/*.zip",
         "**/*.whl",
         "**/*.egg"
     ],
