@@ -62,13 +62,21 @@ Rust now parses Python source distribution archives directly instead of requirin
 - embedded `.egg-info/requires.txt` and `SOURCES.txt` sidecars can still recover dependency and file-reference data from archive-only scans
 - direct archive parsing intentionally reuses the existing `pypi_sdist_pkginfo` datasource because `PKG-INFO` remains the authoritative metadata surface inside the sdist
 
+### 9. Archive hardening for sdist / wheel / egg inputs
+
+- Zip-based Python archives now bind validation to the actual read path instead of validating first and then reopening suspicious metadata entries by name later.
+- Relevant zip entries are validated and then read by index with an explicit byte cap, which closes the gap where a suspicious `PKG-INFO` / `METADATA` entry could still be decompressed after preflight validation.
+- Tar-based sdist parsing now checks suspicious expansion while walking the archive stream instead of waiting until the end of iteration to reject a high-ratio archive.
+- Archive entry paths are normalized and unsafe absolute / parent-traversal paths are ignored for metadata selection.
+
 ## Why this matters
 
 - **Better manifest fidelity**: more of the metadata already present in Python manifests becomes visible to downstream tooling
 - **Safer metadata recovery**: narrow static fallbacks recover real values without broadening into execution-heavy parsing
 - **Richer installed-package provenance**: wheel, cache, and sidecar metadata all contribute to a clearer package story
 - **Broader input coverage**: saved API payloads, RFC822 metadata files, and direct sdist archives now produce useful package data instead of partial results
+- **Safer archive ingestion**: sdist, wheel, and egg parsing now enforce their archive safety policy where bytes are actually read, reducing exposure to suspicious metadata entries
 
 ## Coverage
 
-Coverage focuses on the user-visible behaviors above, including richer `setup.cfg` extraction, `OrderedDict` project URLs, imported sibling dunder fallback, private-package classification, installed and source sidecar handling, direct sdist archive parsing, `WHEEL` and `origin.json` provenance, saved `pypi.json` parsing, and RFC822 dependency recovery.
+Coverage focuses on the user-visible behaviors above, including richer `setup.cfg` extraction, `OrderedDict` project URLs, imported sibling dunder fallback, private-package classification, installed and source sidecar handling, direct sdist archive parsing, archive hardening for suspicious zip metadata entries, `WHEEL` and `origin.json` provenance, saved `pypi.json` parsing, and RFC822 dependency recovery.
