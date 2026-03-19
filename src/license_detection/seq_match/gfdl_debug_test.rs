@@ -9,7 +9,7 @@ mod tests {
     #[test]
     fn test_gfdl_1_1_selection() {
         let rules_path = PathBuf::from("reference/scancode-toolkit/src/licensedcode/data");
-        let engine = LicenseDetectionEngine::new(&rules_path).unwrap();
+        let engine = LicenseDetectionEngine::from_directory(&rules_path).unwrap();
 
         let text = r#"Copyright (c) 2020 Go Gopher.
 Permission is granted to copy, distribute and/or

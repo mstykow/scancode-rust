@@ -82,12 +82,10 @@ name: Test License
         result.is_err(),
         "Empty text should fail for non-deprecated license"
     );
-    assert!(
-        result
-            .unwrap_err()
-            .to_string()
-            .contains("empty text content")
-    );
+    assert!(result
+        .unwrap_err()
+        .to_string()
+        .contains("empty text content"));
 }
 
 #[test]
@@ -138,12 +136,10 @@ license_expression: mit
 
     let result = parse_rule_from_str(content, "empty-text.RULE");
     assert!(result.is_err(), "Rule with empty text should fail");
-    assert!(
-        result
-            .unwrap_err()
-            .to_string()
-            .contains("empty text content")
-    );
+    assert!(result
+        .unwrap_err()
+        .to_string()
+        .contains("empty text content"));
 }
 
 #[test]
@@ -762,7 +758,8 @@ fn test_ibmpl_detection() {
         return;
     }
 
-    let engine = LicenseDetectionEngine::new(&data_path).expect("Failed to create engine");
+    let engine =
+        LicenseDetectionEngine::from_directory(&data_path).expect("Failed to create engine");
 
     // Test with exact rule text
     let exact_text = "distributed under the IBM Public License (IPL).";

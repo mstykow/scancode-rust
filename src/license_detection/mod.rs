@@ -2,6 +2,7 @@
 
 pub mod aho_match;
 mod detection;
+pub mod embedded;
 
 pub mod expression;
 #[cfg(test)]
@@ -378,6 +379,36 @@ fn collect_regular_seq_matches(
 }
 
 impl LicenseDetectionEngine {
+    /// Create a new license detection engine from a pre-built license index.
+    ///
+    /// This is an internal constructor used by `from_directory()` and `from_embedded()`.
+    /// It builds the SPDX mapping from the licenses in the index.
+    fn from_index(index: index::LicenseIndex) -> Result<Self> {
+        let mut license_vec: Vec<_> = index.licenses_by_key.values().cloned().collect();
+        license_vec.sort_by(|a, b| a.key.cmp(&b.key));
+        let spdx_mapping = build_spdx_mapping(&license_vec);
+
+        Ok(Self {
+            index: Arc::new(index),
+            spdx_mapping,
+        })
+    }
+
+    /// Create a new license detection engine from the embedded license index.
+    ///
+    /// This method loads the build-time embedded license artifact and constructs
+    /// the runtime license index. This eliminates the runtime dependency on the
+    /// ScanCode rules directory.
+    ///
+    /// # Returns
+    /// A Result containing the engine or an error
+    pub fn from_embedded() -> Result<Self> {
+        anyhow::bail!(
+            "Embedded license index loading is not yet implemented. \
+             Use from_directory() for now."
+        )
+    }
+
     /// Create a new license detection engine from a directory of license rules.
     ///
     /// # Arguments
@@ -385,7 +416,7 @@ impl LicenseDetectionEngine {
     ///
     /// # Returns
     /// A Result containing the engine or an error
-    pub fn new(rules_path: &Path) -> Result<Self> {
+    pub fn from_directory(rules_path: &Path) -> Result<Self> {
         let (rules_dir, licenses_dir) = if rules_path.ends_with("data") {
             (rules_path.join("rules"), rules_path.join("licenses"))
         } else if rules_path.ends_with("rules") {
@@ -400,14 +431,8 @@ impl LicenseDetectionEngine {
         let rules = load_rules_from_directory(&rules_dir, false)?;
         let licenses = load_licenses_from_directory(&licenses_dir, false)?;
         let index = build_index(rules, licenses);
-        let mut license_vec: Vec<_> = index.licenses_by_key.values().cloned().collect();
-        license_vec.sort_by(|a, b| a.key.cmp(&b.key));
-        let spdx_mapping = build_spdx_mapping(&license_vec);
 
-        Ok(Self {
-            index: Arc::new(index),
-            spdx_mapping,
-        })
+        Self::from_index(index)
     }
 
     pub fn detect_with_kind(

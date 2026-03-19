@@ -199,7 +199,7 @@
 //! let progress = Arc::new(ScanProgress::new(ProgressMode::Quiet));
 //! let patterns: Vec<Pattern> = vec![];
 //! let data_path = PathBuf::from("reference/scancode-toolkit/src/licensedcode/data");
-//! let engine = Arc::new(LicenseDetectionEngine::new(&data_path));
+//! let engine = Arc::new(LicenseDetectionEngine::from_directory(&data_path)?);
 //! let result = process(&PathBuf::from("."), 50, progress, &patterns, engine, false)?;
 //!
 //! for file in result.files {

@@ -3,9 +3,9 @@ use scancode_rust::license_detection::LicenseDetectionEngine;
 use scancode_rust::models::PackageType;
 use scancode_rust::parsers::list_parser_types;
 use scancode_rust::progress::{ProgressMode, ScanProgress};
-use scancode_rust::utils::file::{ExtractedTextKind, extract_text_for_detection};
+use scancode_rust::utils::file::{extract_text_for_detection, ExtractedTextKind};
 use scancode_rust::utils::hash::calculate_sha256;
-use scancode_rust::{FileType, TextDetectionOptions, process, process_with_options};
+use scancode_rust::{process, process_with_options, FileType, TextDetectionOptions};
 use std::fs;
 use std::path::Path;
 use std::sync::Arc;
@@ -16,7 +16,7 @@ fn create_license_detection_engine() -> Option<Arc<LicenseDetectionEngine>> {
         eprintln!("Reference data not available at {:?}", data_path);
         return None;
     }
-    match LicenseDetectionEngine::new(data_path) {
+    match LicenseDetectionEngine::from_directory(data_path) {
         Ok(engine) => {
             eprintln!("License detection engine initialized for tests");
             Some(Arc::new(engine))

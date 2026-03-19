@@ -660,7 +660,7 @@ fn init_license_engine(rules_path: &Option<String>) -> Option<Arc<LicenseDetecti
         return None;
     }
 
-    match LicenseDetectionEngine::new(&path) {
+    match LicenseDetectionEngine::from_directory(&path) {
         Ok(engine) => {
             println!(
                 "License detection engine initialized with {} rules from {:?}",

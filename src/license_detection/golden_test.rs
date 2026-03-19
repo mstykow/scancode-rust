@@ -42,7 +42,7 @@ mod golden_tests {
             eprintln!("Reference data not available at {:?}", data_path);
             return None;
         }
-        match LicenseDetectionEngine::new(&data_path) {
+        match LicenseDetectionEngine::from_directory(&data_path) {
             Ok(engine) => {
                 eprintln!("License detection engine initialized for tests");
                 Some(engine)

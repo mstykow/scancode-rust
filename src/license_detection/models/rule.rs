@@ -3,9 +3,13 @@
 use std::collections::HashMap;
 use std::ops::Range;
 
+use serde::{Deserialize, Serialize};
+
 use crate::license_detection::index::dictionary::TokenId;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Default)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Default, Serialize, Deserialize,
+)]
 pub enum RuleKind {
     #[default]
     None,
