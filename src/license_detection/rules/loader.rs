@@ -1,7 +1,15 @@
 //! Parse .LICENSE and .RULE files.
+//!
+//! This module provides two-stage loading:
+//! 1. Loader-stage: Parse files into `LoadedRule` and `LoadedLicense`
+//! 2. Build-stage: Convert to runtime `Rule` and `License` (deprecated filtering, etc.)
+//!
+//! The loader-stage functions (`parse_rule_to_loaded`, `parse_license_to_loaded`,
+//! `load_loaded_rules_from_directory`, `load_loaded_licenses_from_directory`) return
+//! all entries including deprecated ones. Deprecated filtering is a build-stage concern.
 
-use crate::license_detection::models::{License, Rule, RuleKind};
-use anyhow::{Context, Result, anyhow};
+use crate::license_detection::models::{License, LoadedLicense, LoadedRule, Rule};
+use anyhow::{anyhow, Context, Result};
 use log::warn;
 use once_cell::sync::Lazy;
 use regex::Regex;
@@ -80,8 +88,6 @@ struct LicenseFrontmatter {
     category: Option<String>,
 
     #[serde(default)]
-    // Parsed for compatibility with Python license metadata; Rust does not model/use this yet.
-    #[allow(dead_code)]
     owner: Option<String>,
 
     #[serde(default)]
@@ -97,8 +103,6 @@ struct LicenseFrontmatter {
     other_spdx_license_keys: Option<Vec<String>>,
 
     #[serde(default)]
-    // Parsed for compatibility with Python license metadata; Rust does not model/use this yet.
-    #[allow(dead_code)]
     osi_license_key: Option<String>,
 
     #[serde(default)]
@@ -120,8 +124,6 @@ struct LicenseFrontmatter {
     replaced_by: Option<Vec<String>>,
 
     #[serde(default, deserialize_with = "deserialize_yes_no_bool")]
-    // Parsed for compatibility with Python license metadata; Rust does not model/use this yet.
-    #[allow(dead_code)]
     is_exception: Option<bool>,
 
     #[serde(default, deserialize_with = "deserialize_yes_no_bool")]
@@ -134,8 +136,6 @@ struct LicenseFrontmatter {
     minimum_coverage: Option<serde_yaml::Number>,
 
     #[serde(default)]
-    // Parsed for compatibility with Python license metadata; Rust does not model/use this yet.
-    #[allow(dead_code)]
     standard_notice: Option<String>,
 
     #[serde(default)]
@@ -152,6 +152,78 @@ struct LicenseFrontmatter {
 
     #[serde(default)]
     ignorable_emails: Option<Vec<String>>,
+}
+
+/// Parsed rule file content, split into frontmatter and text.
+struct ParsedRuleFile {
+    yaml_content: String,
+    text_content: String,
+    has_stored_minimum_coverage: bool,
+}
+
+/// Parsed license file content, split into frontmatter and text.
+struct ParsedLicenseFile {
+    yaml_content: String,
+    text_content: String,
+}
+
+/// Parse file content into frontmatter and text sections.
+///
+/// Returns `ParsedRuleFile` with yaml_content, text_content, and metadata.
+/// The `path` parameter is used for error messages only.
+fn parse_file_content(content: &str, path: &Path) -> Result<ParsedRuleFile> {
+    if content.len() < 6 {
+        return Err(anyhow!("File content too short: {}", path.display()));
+    }
+
+    let parts: Vec<&str> = FM_BOUNDARY.splitn(content, 3).collect();
+
+    if parts.len() < 3 {
+        let trimmed = content.trim();
+        if trimmed.is_empty() {
+            return Err(anyhow!(
+                "File is empty or has no content: {}",
+                path.display()
+            ));
+        }
+        return Err(anyhow!("File missing delimiter '---': {}", path.display()));
+    }
+
+    let yaml_content = parts
+        .get(1)
+        .ok_or_else(|| anyhow!("Missing YAML frontmatter in {}", path.display()))?
+        .to_string();
+    let text_content = parts
+        .get(2)
+        .ok_or_else(|| {
+            anyhow!(
+                "Missing text content after frontmatter in {}",
+                path.display()
+            )
+        })?
+        .trim_start_matches('\n')
+        .trim()
+        .to_string();
+
+    let frontmatter_value: serde_yaml::Value =
+        serde_yaml::from_str(&yaml_content).map_err(|e| {
+            anyhow!(
+                "Failed to parse frontmatter YAML in {}: {}\nContent was:\n{}",
+                path.display(),
+                e,
+                yaml_content
+            )
+        })?;
+
+    let has_stored_minimum_coverage = frontmatter_value.as_mapping().is_some_and(|mapping| {
+        mapping.contains_key(serde_yaml::Value::String("minimum_coverage".to_string()))
+    });
+
+    Ok(ParsedRuleFile {
+        yaml_content,
+        text_content,
+        has_stored_minimum_coverage,
+    })
 }
 
 #[derive(Debug, Deserialize)]
@@ -184,8 +256,6 @@ struct RuleFrontmatter {
     is_required_phrase: Option<bool>,
 
     #[serde(default, deserialize_with = "deserialize_yes_no_bool")]
-    // Parsed for compatibility with Python rule metadata; required-phrase generation parity is not implemented yet.
-    #[allow(dead_code)]
     skip_for_required_phrase_generation: Option<bool>,
 
     #[serde(default)]
@@ -204,8 +274,6 @@ struct RuleFrontmatter {
     referenced_filenames: Option<Vec<String>>,
 
     #[serde(default)]
-    // Parsed for compatibility with Python rule metadata; Rust does not model deprecated rule replacements yet.
-    #[allow(dead_code)]
     replaced_by: Option<Vec<String>>,
 
     #[serde(default)]
@@ -230,103 +298,48 @@ struct RuleFrontmatter {
     language: Option<String>,
 }
 
-pub fn parse_rule_file(path: &Path) -> Result<Rule> {
+/// Parse a .RULE file into a `LoadedRule` (loader-stage).
+///
+/// This function parses the file and returns a `LoadedRule` with normalized data.
+/// Deprecated entries are included - filtering is a build-stage concern.
+///
+/// # Arguments
+/// * `path` - Path to the .RULE file
+///
+/// # Returns
+/// * `Ok(LoadedRule)` - Successfully parsed rule
+/// * `Err(...)` - Parse error with context
+pub fn parse_rule_to_loaded(path: &Path) -> Result<LoadedRule> {
     let content = fs::read_to_string(path)
         .with_context(|| format!("Failed to read rule file: {}", path.display()))?;
 
-    if content.len() < 6 {
-        return Err(anyhow!("Rule file content too short: {}", path.display()));
-    }
+    let identifier = LoadedRule::derive_identifier(
+        path.file_name()
+            .and_then(|s| s.to_str())
+            .unwrap_or("unknown.RULE"),
+    );
 
-    let identifier = path
-        .file_name()
-        .and_then(|s| s.to_str())
-        .unwrap_or("unknown.RULE")
-        .to_string();
+    let parsed = parse_file_content(&content, path)?;
 
-    let parts: Vec<&str> = FM_BOUNDARY.splitn(&content, 3).collect();
-
-    if parts.len() < 3 {
-        let trimmed = content.trim();
-        if trimmed.is_empty() {
-            return Err(anyhow!(
-                "Rule file is empty or has no content: {}",
-                path.display()
-            ));
-        }
-        return Err(anyhow!(
-            "Rule file missing delimiter '---': {}",
-            path.display()
-        ));
-    }
-
-    let yaml_content = parts
-        .get(1)
-        .ok_or_else(|| anyhow!("Missing YAML frontmatter in {}", path.display()))?;
-    let text_content = parts.get(2).ok_or_else(|| {
-        anyhow!(
-            "Missing text content after frontmatter in {}",
-            path.display()
-        )
-    })?;
-
-    let trimmed_text = text_content.trim_start_matches('\n').trim();
-
-    if trimmed_text.is_empty() {
+    if parsed.text_content.is_empty() {
         return Err(anyhow!(
             "Rule file has empty text content: {}",
             path.display()
         ));
     }
 
-    let frontmatter_value: serde_yaml::Value = match serde_yaml::from_str(yaml_content) {
-        Ok(value) => value,
-        Err(e) => {
-            return Err(anyhow!(
-                "Failed to parse rule frontmatter YAML in {}: {}\nContent was:\n{}",
-                path.display(),
-                e,
-                yaml_content
-            ));
-        }
-    };
-
-    let has_stored_minimum_coverage = frontmatter_value.as_mapping().is_some_and(|mapping| {
-        mapping.contains_key(serde_yaml::Value::String("minimum_coverage".to_string()))
-    });
-
-    let fm: RuleFrontmatter = match serde_yaml::from_value(frontmatter_value) {
-        Ok(fm) => fm,
-        Err(e) => {
-            return Err(anyhow!(
-                "Failed to parse rule frontmatter YAML in {}: {}\nContent was:\n{}",
-                path.display(),
-                e,
-                yaml_content
-            ));
-        }
-    };
+    let fm: RuleFrontmatter = serde_yaml::from_str(&parsed.yaml_content).map_err(|e| {
+        anyhow!(
+            "Failed to parse rule frontmatter YAML in {}: {}\nContent was:\n{}",
+            path.display(),
+            e,
+            parsed.yaml_content
+        )
+    })?;
 
     let is_false_positive = fm.is_false_positive.unwrap_or(false);
 
-    let license_expression = match fm.license_expression {
-        Some(expr) => normalize_trivial_outer_parens(&expr),
-        None if is_false_positive => "unknown".to_string(),
-        None => {
-            return Err(anyhow!(
-                "Rule file missing required field 'license_expression': {}",
-                path.display()
-            ));
-        }
-    };
-
-    let relevance = match fm.relevance {
-        Some(num) => num.as_u8().unwrap_or(100),
-        None => 100,
-    };
-
-    let minimum_coverage = fm.minimum_coverage.and_then(|n| n.as_u8());
-    let rule_kind = RuleKind::from_rule_flags(
+    let rule_kind = LoadedRule::derive_rule_kind(
         fm.is_license_text.unwrap_or(false),
         fm.is_license_notice.unwrap_or(false),
         fm.is_license_reference.unwrap_or(false),
@@ -334,50 +347,97 @@ pub fn parse_rule_file(path: &Path) -> Result<Rule> {
         fm.is_license_intro.unwrap_or(false),
         fm.is_license_clue.unwrap_or(false),
     )
-    .map_err(|_| {
+    .map_err(|e| {
         anyhow!(
-            "Rule file has multiple is_license_* flags: {}",
-            path.display()
+            "Rule file has invalid rule-kind flags: {}: {}",
+            path.display(),
+            e
         )
     })?;
 
-    if !is_false_positive && rule_kind == RuleKind::None {
-        return Err(anyhow!(
-            "Rule file must set exactly one is_license_* flag unless it is false_positive: {}",
-            path.display()
-        ));
-    }
+    LoadedRule::validate_rule_kind_flags(rule_kind, is_false_positive)
+        .map_err(|e| anyhow!("Rule file has invalid flags: {}: {}", path.display(), e))?;
 
-    if is_false_positive && rule_kind != RuleKind::None {
-        return Err(anyhow!(
-            "Rule file cannot combine is_false_positive with is_license_* flags: {}",
-            path.display()
-        ));
-    }
+    let license_expression = LoadedRule::normalize_license_expression(
+        fm.license_expression.as_deref(),
+        is_false_positive,
+    )
+    .map_err(|e| {
+        anyhow!(
+            "Rule file has invalid license_expression: {}: {}",
+            path.display(),
+            e
+        )
+    })?;
 
-    Ok(Rule {
+    let relevance = fm.relevance.and_then(|n| n.as_u8());
+
+    let minimum_coverage = fm.minimum_coverage.and_then(|n| n.as_u8());
+
+    Ok(LoadedRule {
         identifier,
         license_expression,
-        text: trimmed_text.to_string(),
-        tokens: vec![],
+        text: parsed.text_content,
         rule_kind,
-        is_false_positive: fm.is_false_positive.unwrap_or(false),
+        is_false_positive,
         is_required_phrase: fm.is_required_phrase.unwrap_or(false),
-        is_from_license: false,
         relevance,
         minimum_coverage,
-        has_stored_minimum_coverage,
+        has_stored_minimum_coverage: parsed.has_stored_minimum_coverage,
         is_continuous: fm.is_continuous.unwrap_or(false),
+        referenced_filenames: LoadedRule::normalize_optional_list(
+            fm.referenced_filenames.as_deref(),
+        ),
+        ignorable_urls: LoadedRule::normalize_optional_list(fm.ignorable_urls.as_deref()),
+        ignorable_emails: LoadedRule::normalize_optional_list(fm.ignorable_emails.as_deref()),
+        ignorable_copyrights: LoadedRule::normalize_optional_list(
+            fm.ignorable_copyrights.as_deref(),
+        ),
+        ignorable_holders: LoadedRule::normalize_optional_list(fm.ignorable_holders.as_deref()),
+        ignorable_authors: LoadedRule::normalize_optional_list(fm.ignorable_authors.as_deref()),
+        language: LoadedRule::normalize_optional_string(fm.language.as_deref()),
+        notes: LoadedRule::normalize_optional_string(fm.notes.as_deref()),
+        is_deprecated: fm.is_deprecated.unwrap_or(false),
+    })
+}
+
+/// Parse a .RULE file into a `Rule` (backward-compatible).
+///
+/// This function parses the file and returns a runtime `Rule`.
+/// Deprecated entries are included - filtering is a build-stage concern.
+pub fn parse_rule_file(path: &Path) -> Result<Rule> {
+    let loaded = parse_rule_to_loaded(path)?;
+    Ok(loaded_rule_to_rule(loaded))
+}
+
+/// Convert a `LoadedRule` to a runtime `Rule`.
+///
+/// This is a build-stage operation that creates the initial runtime `Rule`
+/// with default values for runtime-computed fields.
+fn loaded_rule_to_rule(loaded: LoadedRule) -> Rule {
+    Rule {
+        identifier: loaded.identifier,
+        license_expression: loaded.license_expression,
+        text: loaded.text,
+        tokens: vec![],
+        rule_kind: loaded.rule_kind,
+        is_false_positive: loaded.is_false_positive,
+        is_required_phrase: loaded.is_required_phrase,
+        is_from_license: false,
+        relevance: loaded.relevance.unwrap_or(100),
+        minimum_coverage: loaded.minimum_coverage,
+        has_stored_minimum_coverage: loaded.has_stored_minimum_coverage,
+        is_continuous: loaded.is_continuous,
         required_phrase_spans: vec![],
         stopwords_by_pos: HashMap::new(),
-        referenced_filenames: fm.referenced_filenames.filter(|v| !v.is_empty()),
-        ignorable_urls: fm.ignorable_urls.filter(|v| !v.is_empty()),
-        ignorable_emails: fm.ignorable_emails.filter(|v| !v.is_empty()),
-        ignorable_copyrights: fm.ignorable_copyrights.filter(|v| !v.is_empty()),
-        ignorable_holders: fm.ignorable_holders.filter(|v| !v.is_empty()),
-        ignorable_authors: fm.ignorable_authors.filter(|v| !v.is_empty()),
-        language: fm.language,
-        notes: fm.notes.filter(|s| !s.trim().is_empty()),
+        referenced_filenames: loaded.referenced_filenames,
+        ignorable_urls: loaded.ignorable_urls,
+        ignorable_emails: loaded.ignorable_emails,
+        ignorable_copyrights: loaded.ignorable_copyrights,
+        ignorable_holders: loaded.ignorable_holders,
+        ignorable_authors: loaded.ignorable_authors,
+        language: loaded.language,
+        notes: loaded.notes,
         length_unique: 0,
         high_length_unique: 0,
         high_length: 0,
@@ -389,16 +449,99 @@ pub fn parse_rule_file(path: &Path) -> Result<Rule> {
         is_tiny: false,
         starts_with_license: false,
         ends_with_license: false,
-        is_deprecated: fm.is_deprecated.unwrap_or(false),
+        is_deprecated: loaded.is_deprecated,
         spdx_license_key: None,
         other_spdx_license_keys: vec![],
-    })
+    }
 }
 
-pub fn parse_license_file(path: &Path) -> Result<License> {
+/// Parse a .LICENSE file into a `LoadedLicense` (loader-stage).
+///
+/// This function parses the file and returns a `LoadedLicense` with normalized data.
+/// Deprecated entries are included - filtering is a build-stage concern.
+///
+/// # Arguments
+/// * `path` - Path to the .LICENSE file
+///
+/// # Returns
+/// * `Ok(LoadedLicense)` - Successfully parsed license
+/// * `Err(...)` - Parse error with context
+pub fn parse_license_to_loaded(path: &Path) -> Result<LoadedLicense> {
     let content = fs::read_to_string(path)
         .with_context(|| format!("Failed to read license file: {}", path.display()))?;
 
+    let key = LoadedLicense::derive_key(path)?;
+
+    let parsed = parse_license_file_content(&content, path)?;
+
+    let fm: LicenseFrontmatter = serde_yaml::from_str(&parsed.yaml_content).map_err(|e| {
+        anyhow!(
+            "Failed to parse license frontmatter YAML in {}: {}\nContent was:\n{}",
+            path.display(),
+            e,
+            parsed.yaml_content
+        )
+    })?;
+
+    LoadedLicense::validate_key_match(&key, fm.key.as_deref())
+        .map_err(|e| anyhow!("License file has key mismatch: {}: {}", path.display(), e))?;
+
+    let is_deprecated = fm.is_deprecated.unwrap_or(false);
+    let is_unknown = fm.is_unknown.unwrap_or(false);
+    let is_generic = fm.is_generic.unwrap_or(false);
+
+    LoadedLicense::validate_text_content(
+        &parsed.text_content,
+        is_deprecated,
+        is_unknown,
+        is_generic,
+    )
+    .map_err(|e| {
+        anyhow!(
+            "License file has invalid content: {}: {}",
+            path.display(),
+            e
+        )
+    })?;
+
+    let name = LoadedLicense::derive_name(fm.name.as_deref(), fm.short_name.as_deref(), &key);
+
+    let reference_urls = LoadedLicense::merge_reference_urls(
+        fm.text_urls.as_deref(),
+        fm.other_urls.as_deref(),
+        fm.osi_url.as_deref(),
+        fm.faq_url.as_deref(),
+        fm.homepage_url.as_deref(),
+    );
+
+    let minimum_coverage = fm.minimum_coverage.and_then(|n| n.as_u8());
+
+    Ok(LoadedLicense {
+        key,
+        name,
+        spdx_license_key: LoadedLicense::normalize_optional_string(fm.spdx_license_key.as_deref()),
+        other_spdx_license_keys: fm.other_spdx_license_keys.unwrap_or_default(),
+        category: LoadedLicense::normalize_optional_string(fm.category.as_deref()),
+        text: parsed.text_content,
+        reference_urls,
+        notes: LoadedLicense::normalize_optional_string(fm.notes.as_deref()),
+        is_deprecated,
+        replaced_by: fm.replaced_by.unwrap_or_default(),
+        minimum_coverage,
+        ignorable_copyrights: LoadedLicense::normalize_optional_list(
+            fm.ignorable_copyrights.as_deref(),
+        ),
+        ignorable_holders: LoadedLicense::normalize_optional_list(fm.ignorable_holders.as_deref()),
+        ignorable_authors: LoadedLicense::normalize_optional_list(fm.ignorable_authors.as_deref()),
+        ignorable_urls: LoadedLicense::normalize_optional_list(fm.ignorable_urls.as_deref()),
+        ignorable_emails: LoadedLicense::normalize_optional_list(fm.ignorable_emails.as_deref()),
+    })
+}
+
+/// Parse license file content into frontmatter and text sections.
+///
+/// The `path` parameter is used for error messages only.
+fn parse_license_file_content(content: &str, path: &Path) -> Result<ParsedLicenseFile> {
     if content.len() < 6 {
         return Err(anyhow!(
             "License file content too short: {}",
@@ -406,7 +549,7 @@ pub fn parse_license_file(path: &Path) -> Result<License> {
         ));
     }
 
-    let parts: Vec<&str> = FM_BOUNDARY.splitn(&content, 3).collect();
+    let parts: Vec<&str> = FM_BOUNDARY.splitn(content, 3).collect();
 
     if parts.len() < 3 {
         let trimmed = content.trim();
@@ -424,96 +567,135 @@ pub fn parse_license_file(path: &Path) -> Result<License> {
 
     let yaml_content = parts
         .get(1)
-        .ok_or_else(|| anyhow!("Missing YAML frontmatter in {}", path.display()))?;
-    let text_content = parts.get(2).ok_or_else(|| {
-        anyhow!(
-            "Missing text content after frontmatter in {}",
-            path.display()
-        )
-    })?;
+        .ok_or_else(|| anyhow!("Missing YAML frontmatter in {}", path.display()))?
+        .to_string();
+    let text_content = parts
+        .get(2)
+        .ok_or_else(|| {
+            anyhow!(
+                "Missing text content after frontmatter in {}",
+                path.display()
+            )
+        })?
+        .trim_start_matches('\n')
+        .trim()
+        .to_string();
 
-    let trimmed_text = text_content.trim_start_matches('\n').trim();
-
-    let fm: LicenseFrontmatter = match serde_yaml::from_str(yaml_content) {
-        Ok(fm) => fm,
-        Err(e) => {
-            return Err(anyhow!(
-                "Failed to parse license frontmatter YAML in {}: {}\nContent was:\n{}",
-                path.display(),
-                e,
-                yaml_content
-            ));
-        }
-    };
-
-    let key = path.file_stem().and_then(|s| s.to_str()).ok_or_else(|| {
-        anyhow!(
-            "Cannot extract key from license file path: {}",
-            path.display()
-        )
-    })?;
-
-    if let Some(fm_key) = fm.key
-        && fm_key != key
-    {
-        return Err(anyhow!(
-            "License key mismatch: filename '{}' vs frontmatter key '{}' in file: {}",
-            key,
-            fm_key,
-            path.display()
-        ));
-    }
-
-    let is_deprecated = fm.is_deprecated.unwrap_or(false);
-
-    if trimmed_text.is_empty()
-        && !is_deprecated
-        && !fm.is_unknown.unwrap_or(false)
-        && !fm.is_generic.unwrap_or(false)
-    {
-        return Err(anyhow!(
-            "License file has empty text content and is not deprecated/unknown/generic: {}",
-            path.display()
-        ));
-    }
-
-    let mut urls = vec![];
-    if let Some(mut u) = fm.text_urls {
-        urls.append(&mut u);
-    }
-    if let Some(u) = fm.other_urls {
-        urls.extend(u);
-    }
-    if let Some(u) = fm.osi_url {
-        urls.push(u);
-    }
-    if let Some(u) = fm.faq_url {
-        urls.push(u);
-    }
-    if let Some(u) = fm.homepage_url {
-        urls.push(u);
-    }
-
-    Ok(License {
-        key: key.to_string(),
-        name: fm
-            .name
-            .unwrap_or_else(|| fm.short_name.clone().unwrap_or_else(|| key.to_string())),
-        spdx_license_key: fm.spdx_license_key,
-        other_spdx_license_keys: fm.other_spdx_license_keys.unwrap_or_default(),
-        category: fm.category,
-        text: trimmed_text.to_string(),
-        reference_urls: urls,
-        notes: fm.notes.filter(|s| !s.trim().is_empty()),
-        is_deprecated,
-        replaced_by: fm.replaced_by.unwrap_or_default(),
-        minimum_coverage: fm.minimum_coverage.and_then(|n| n.as_u8()),
-        ignorable_copyrights: fm.ignorable_copyrights.filter(|v| !v.is_empty()),
-        ignorable_holders: fm.ignorable_holders.filter(|v| !v.is_empty()),
-        ignorable_authors: fm.ignorable_authors.filter(|v| !v.is_empty()),
-        ignorable_urls: fm.ignorable_urls.filter(|v| !v.is_empty()),
-        ignorable_emails: fm.ignorable_emails.filter(|v| !v.is_empty()),
+    Ok(ParsedLicenseFile {
+        yaml_content,
+        text_content,
     })
+}
+
+/// Parse a .LICENSE file into a `License` (backward-compatible).
+///
+/// This function parses the file and returns a runtime `License`.
+/// Deprecated entries are included - filtering is a build-stage concern.
+pub fn parse_license_file(path: &Path) -> Result<License> {
+    let loaded = parse_license_to_loaded(path)?;
+    Ok(loaded_license_to_license(loaded))
+}
+
+/// Convert a `LoadedLicense` to a runtime `License`.
+///
+/// This is a build-stage operation that creates the runtime `License`.
+fn loaded_license_to_license(loaded: LoadedLicense) -> License {
+    License {
+        key: loaded.key,
+        name: loaded.name,
+        spdx_license_key: loaded.spdx_license_key,
+        other_spdx_license_keys: loaded.other_spdx_license_keys,
+        category: loaded.category,
+        text: loaded.text,
+        reference_urls: loaded.reference_urls,
+        notes: loaded.notes,
+        is_deprecated: loaded.is_deprecated,
+        replaced_by: loaded.replaced_by,
+        minimum_coverage: loaded.minimum_coverage,
+        ignorable_copyrights: loaded.ignorable_copyrights,
+        ignorable_holders: loaded.ignorable_holders,
+        ignorable_authors: loaded.ignorable_authors,
+        ignorable_urls: loaded.ignorable_urls,
+        ignorable_emails: loaded.ignorable_emails,
+    }
+}
+
+/// Load all .RULE files from a directory into `LoadedRule` values (loader-stage).
+///
+/// This function loads ALL rules, including deprecated ones.
+/// Deprecated filtering is a build-stage concern.
+///
+/// # Arguments
+/// * `dir` - Directory containing .RULE files
+///
+/// # Returns
+/// * `Ok(Vec<LoadedRule>)` - All loaded rules (including deprecated)
+/// * `Err(...)` - Directory read error
+pub fn load_loaded_rules_from_directory(dir: &Path) -> Result<Vec<LoadedRule>> {
+    let mut rules = Vec::new();
+
+    let entries = fs::read_dir(dir)
+        .with_context(|| format!("Failed to read rules directory: {}", dir.display()))?;
+
+    for entry in entries {
+        let entry = entry
+            .with_context(|| format!("Failed to read directory entry in: {}", dir.display()))?;
+        let path = entry.path();
+
+        if path.is_file() && path.extension().and_then(|s| s.to_str()) == Some("RULE") {
+            match parse_rule_to_loaded(&path) {
+                Ok(rule) => rules.push(rule),
+                Err(e) => {
+                    eprintln!(
+                        "Warning: Failed to parse rule file {}: {}",
+                        path.display(),
+                        e
+                    );
+                }
+            }
+        }
+    }
+
+    Ok(rules)
+}
+
+/// Load all .LICENSE files from a directory into `LoadedLicense` values (loader-stage).
+///
+/// This function loads ALL licenses, including deprecated ones.
+/// Deprecated filtering is a build-stage concern.
+///
+/// # Arguments
+/// * `dir` - Directory containing .LICENSE files
+///
+/// # Returns
+/// * `Ok(Vec<LoadedLicense>)` - All loaded licenses (including deprecated)
+/// * `Err(...)` - Directory read error
+pub fn load_loaded_licenses_from_directory(dir: &Path) -> Result<Vec<LoadedLicense>> {
+    let mut licenses = Vec::new();
+
+    let entries = fs::read_dir(dir)
+        .with_context(|| format!("Failed to read licenses directory: {}", dir.display()))?;
+
+    for entry in entries {
+        let entry = entry
+            .with_context(|| format!("Failed to read directory entry in: {}", dir.display()))?;
+        let path = entry.path();
+
+        if path.is_file() && path.extension().and_then(|s| s.to_str()) == Some("LICENSE") {
+            match parse_license_to_loaded(&path) {
+                Ok(license) => licenses.push(license),
+                Err(e) => {
+                    eprintln!(
+                        "Warning: Failed to parse license file {}: {}",
+                        path.display(),
+                        e
+                    );
+                }
+            }
+        }
+    }
+
+    Ok(licenses)
 }
 
 fn load_rules_from_dir(dir: &Path, pattern: &str, with_deprecated: bool) -> Result<Vec<Rule>> {
@@ -530,10 +712,10 @@ fn load_rules_from_dir(dir: &Path, pattern: &str, with_deprecated: bool) -> Resu
         if path.is_file()
             && path.extension().and_then(|s| s.to_str()) == Some(pattern.trim_start_matches('.'))
         {
-            match parse_rule_file(&path) {
-                Ok(rule) => {
-                    if with_deprecated || !rule.is_deprecated {
-                        rules.push(rule);
+            match parse_rule_to_loaded(&path) {
+                Ok(loaded) => {
+                    if with_deprecated || !loaded.is_deprecated {
+                        rules.push(loaded_rule_to_rule(loaded));
                     }
                 }
                 Err(e) => {
@@ -568,10 +750,10 @@ fn load_licenses_from_dir(
         if path.is_file()
             && path.extension().and_then(|s| s.to_str()) == Some(pattern.trim_start_matches('.'))
         {
-            match parse_license_file(&path) {
-                Ok(license) => {
-                    if with_deprecated || !license.is_deprecated {
-                        licenses.push(license);
+            match parse_license_to_loaded(&path) {
+                Ok(loaded) => {
+                    if with_deprecated || !loaded.is_deprecated {
+                        licenses.push(loaded_license_to_license(loaded));
                     }
                 }
                 Err(e) => {
@@ -630,36 +812,6 @@ fn validate_rules(rules: &[Rule]) {
             "Found {} duplicate rule text(s) during rule validation",
             duplicate_count
         );
-    }
-}
-
-fn has_trivial_outer_parens(s: &str) -> bool {
-    let trimmed = s.trim();
-    if !trimmed.starts_with('(') || !trimmed.ends_with(')') {
-        return false;
-    }
-    let mut depth = 0;
-    let chars: Vec<char> = trimmed.chars().collect();
-    for (i, c) in chars.iter().enumerate() {
-        if *c == '(' {
-            depth += 1;
-        } else if *c == ')' {
-            depth -= 1;
-            if depth == 0 && i < chars.len() - 1 {
-                return false;
-            }
-        }
-    }
-    depth == 0
-}
-
-fn normalize_trivial_outer_parens(expr: &str) -> String {
-    let trimmed = expr.trim();
-    if has_trivial_outer_parens(trimmed) {
-        let inner = &trimmed[1..trimmed.len() - 1];
-        normalize_trivial_outer_parens(inner)
-    } else {
-        expr.to_string()
     }
 }
 
@@ -1041,6 +1193,7 @@ Deprecated license text"#,
             dir.path().join("active.RULE"),
             r#"---
 license_expression: active
+is_license_notice: yes
 ---
 Active rule text"#,
         )
@@ -1050,6 +1203,7 @@ Active rule text"#,
             dir.path().join("deprecated.RULE"),
             r#"---
 license_expression: deprecated
+is_license_notice: yes
 is_deprecated: yes
 ---
 Deprecated rule text"#,
@@ -1062,5 +1216,141 @@ Deprecated rule text"#,
 
         let rules_with = load_rules_from_directory(dir.path(), true).unwrap();
         assert_eq!(rules_with.len(), 2);
+    }
+
+    #[test]
+    fn test_parse_rule_to_loaded() {
+        let dir = tempdir().unwrap();
+        let rule_path = dir.path().join("mit_1.RULE");
+        fs::write(
+            &rule_path,
+            r#"---
+license_expression: mit
+is_license_reference: yes
+relevance: 90
+referenced_filenames:
+    - MIT.txt
+---
+MIT.txt"#,
+        )
+        .unwrap();
+
+        let loaded = parse_rule_to_loaded(&rule_path).unwrap();
+        assert_eq!(loaded.identifier, "mit_1.RULE");
+        assert_eq!(loaded.license_expression, "mit");
+        assert_eq!(loaded.text, "MIT.txt");
+        assert_eq!(
+            loaded.rule_kind,
+            crate::license_detection::models::RuleKind::Reference
+        );
+        assert_eq!(loaded.relevance, Some(90));
+        assert_eq!(
+            loaded.referenced_filenames,
+            Some(vec!["MIT.txt".to_string()])
+        );
+        assert!(!loaded.is_deprecated);
+    }
+
+    #[test]
+    fn test_parse_license_to_loaded() {
+        let dir = tempdir().unwrap();
+        let license_path = dir.path().join("mit.LICENSE");
+        fs::write(
+            &license_path,
+            r#"---
+key: mit
+short_name: MIT License
+name: MIT License
+category: Permissive
+spdx_license_key: MIT
+---
+MIT License text here"#,
+        )
+        .unwrap();
+
+        let loaded = parse_license_to_loaded(&license_path).unwrap();
+        assert_eq!(loaded.key, "mit");
+        assert_eq!(loaded.name, "MIT License");
+        assert!(loaded.text.contains("MIT License text"));
+        assert_eq!(loaded.spdx_license_key, Some("MIT".to_string()));
+    }
+
+    #[test]
+    fn test_load_loaded_rules_from_directory_includes_deprecated() {
+        let dir = tempdir().unwrap();
+
+        fs::write(
+            dir.path().join("active.RULE"),
+            r#"---
+license_expression: active
+is_license_notice: yes
+---
+Active rule text"#,
+        )
+        .unwrap();
+
+        fs::write(
+            dir.path().join("deprecated.RULE"),
+            r#"---
+license_expression: deprecated
+is_license_notice: yes
+is_deprecated: yes
+---
+Deprecated rule text"#,
+        )
+        .unwrap();
+
+        let loaded_rules = load_loaded_rules_from_directory(dir.path()).unwrap();
+        assert_eq!(loaded_rules.len(), 2);
+
+        let active = loaded_rules
+            .iter()
+            .find(|r| r.license_expression == "active")
+            .unwrap();
+        assert!(!active.is_deprecated);
+
+        let deprecated = loaded_rules
+            .iter()
+            .find(|r| r.license_expression == "deprecated")
+            .unwrap();
+        assert!(deprecated.is_deprecated);
+    }
+
+    #[test]
+    fn test_load_loaded_licenses_from_directory_includes_deprecated() {
+        let dir = tempdir().unwrap();
+
+        fs::write(
+            dir.path().join("active.LICENSE"),
+            r#"---
+key: active
+name: Active License
+---
+Active license text"#,
+        )
+        .unwrap();
+
+        fs::write(
+            dir.path().join("deprecated.LICENSE"),
+            r#"---
+key: deprecated
+name: Deprecated License
+is_deprecated: yes
+---
+Deprecated license text"#,
+        )
+        .unwrap();
+
+        let loaded_licenses = load_loaded_licenses_from_directory(dir.path()).unwrap();
+        assert_eq!(loaded_licenses.len(), 2);
+
+        let active = loaded_licenses.iter().find(|l| l.key == "active").unwrap();
+        assert!(!active.is_deprecated);
+
+        let deprecated = loaded_licenses
+            .iter()
+            .find(|l| l.key == "deprecated")
+            .unwrap();
+        assert!(deprecated.is_deprecated);
     }
 }

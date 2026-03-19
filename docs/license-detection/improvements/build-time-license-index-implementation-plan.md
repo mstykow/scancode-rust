@@ -70,7 +70,7 @@ The goal is to make the default binary self-contained by embedding a build-time 
 
 ## Phase 3: Loader Refactoring
 
-**Status**: Pending
+**Status**: Complete
 
 ### Objectives
 
