@@ -2214,13 +2214,14 @@ pub(crate) fn parse_osgi_package_list(package_list: &str, scope: &str) -> Vec<De
 
         // Extract version directive if present
         let version_requirement = extract_osgi_version(package_entry);
+        let is_optional = package_entry.contains("resolution:=optional");
 
         dependencies.push(Dependency {
             purl: Some(format!("pkg:osgi/{}", package_name)),
             extracted_requirement: version_requirement,
             scope: Some(scope.to_string()),
             is_runtime: Some(true),
-            is_optional: Some(false),
+            is_optional: Some(is_optional),
             is_pinned: None,
             is_direct: Some(true),
             resolved_package: None,
