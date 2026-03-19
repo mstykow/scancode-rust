@@ -48,7 +48,7 @@ use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::Read;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 use tar::Archive;
 use toml::Value as TomlValue;
 use toml::map::Map as TomlMap;
@@ -95,6 +95,12 @@ enum PythonSdistArchiveFormat {
     TarBz2,
     TarXz,
     Zip,
+}
+
+#[derive(Clone, Debug)]
+struct ValidatedZipEntry {
+    index: usize,
+    name: String,
 }
 
 impl PackageParser for PythonParser {
@@ -558,17 +564,27 @@ fn merge_sibling_metadata_file_references(path: &Path, package_data: &mut Packag
     }
 }
 
-fn validate_zip_archive<R: Read + std::io::Seek>(
+fn collect_validated_zip_entries<R: Read + std::io::Seek>(
     archive: &mut ZipArchive<R>,
     path: &Path,
     archive_type: &str,
-) -> Result<u64, String> {
+) -> Result<Vec<ValidatedZipEntry>, String> {
     let mut total_extracted = 0u64;
+    let mut entries = Vec::new();
 
     for i in 0..archive.len() {
-        if let Ok(file) = archive.by_index(i) {
+        if let Ok(file) = archive.by_index_raw(i) {
             let compressed_size = file.compressed_size();
             let uncompressed_size = file.size();
+            let Some(entry_name) = normalize_archive_entry_path(file.name()) else {
+                warn!(
+                    "Skipping unsafe path in {} {:?}: {}",
+                    archive_type,
+                    path,
+                    file.name()
+                );
+                continue;
+            };
 
             if compressed_size > 0 {
                 let ratio = uncompressed_size as f64 / compressed_size as f64;
@@ -598,10 +614,15 @@ fn validate_zip_archive<R: Read + std::io::Seek>(
                 warn!("{}", msg);
                 return Err(msg);
             }
+
+            entries.push(ValidatedZipEntry {
+                index: i,
+                name: entry_name,
+            });
         }
     }
 
-    Ok(total_extracted)
+    Ok(entries)
 }
 
 fn is_python_sdist_archive_path(path: &Path) -> bool {
@@ -769,6 +790,17 @@ fn extract_from_tar_sdist_archive<R: Read>(
             return default_package_data();
         }
 
+        if compressed_size > 0 {
+            let ratio = total_extracted as f64 / compressed_size as f64;
+            if ratio > MAX_COMPRESSION_RATIO {
+                warn!(
+                    "Suspicious compression ratio in {} sdist {:?}: {:.2}:1",
+                    archive_type, path, ratio
+                );
+                return default_package_data();
+            }
+        }
+
         let entry_path = match entry.path() {
             Ok(path) => path.to_string_lossy().replace('\\', "/"),
             Err(e) => {
@@ -780,24 +812,21 @@ fn extract_from_tar_sdist_archive<R: Read>(
             }
         };
 
+        let Some(entry_path) = normalize_archive_entry_path(&entry_path) else {
+            warn!("Skipping unsafe {} sdist path in {:?}", archive_type, path);
+            continue;
+        };
+
         if !is_relevant_sdist_text_entry(&entry_path) {
             continue;
         }
 
-        let mut content = String::new();
-        if entry.read_to_string(&mut content).is_ok() {
+        if let Ok(content) = read_limited_utf8(
+            &mut entry,
+            MAX_FILE_SIZE,
+            &format!("{} entry {}", archive_type, entry_path),
+        ) {
             entries.push((entry_path, content));
-        }
-    }
-
-    if compressed_size > 0 {
-        let ratio = total_extracted as f64 / compressed_size as f64;
-        if ratio > MAX_COMPRESSION_RATIO {
-            warn!(
-                "Suspicious compression ratio in {} sdist {:?}: {:.2}:1",
-                archive_type, path, ratio
-            );
-            return default_package_data();
         }
     }
 
@@ -821,25 +850,19 @@ fn extract_from_zip_sdist_archive(path: &Path) -> PackageData {
         }
     };
 
-    if validate_zip_archive(&mut archive, path, "sdist zip").is_err() {
-        return default_package_data();
-    }
+    let validated_entries = match collect_validated_zip_entries(&mut archive, path, "sdist zip") {
+        Ok(entries) => entries,
+        Err(_) => return default_package_data(),
+    };
 
     let mut entries = Vec::new();
-    for i in 0..archive.len() {
-        let entry_path = {
-            let Ok(file) = archive.by_index_raw(i) else {
-                continue;
-            };
-            file.name().replace('\\', "/")
-        };
-
-        if !is_relevant_sdist_text_entry(&entry_path) {
+    for entry in validated_entries.iter() {
+        if !is_relevant_sdist_text_entry(&entry.name) {
             continue;
         }
 
-        if let Ok(content) = read_zip_entry(&mut archive, &entry_path) {
-            entries.push((entry_path, content));
+        if let Ok(content) = read_validated_zip_entry(&mut archive, entry, path, "sdist zip") {
+            entries.push((entry.name.clone(), content));
         }
     }
 
@@ -1111,20 +1134,21 @@ fn extract_from_wheel_archive(path: &Path) -> PackageData {
         }
     };
 
-    if validate_zip_archive(&mut archive, path, "wheel").is_err() {
-        return default_package_data();
-    }
-
-    let metadata_path = find_wheel_metadata_path(&mut archive);
-    let metadata_path = match metadata_path {
-        Some(p) => p,
-        None => {
-            warn!("No METADATA file found in wheel archive {:?}", path);
-            return default_package_data();
-        }
+    let validated_entries = match collect_validated_zip_entries(&mut archive, path, "wheel") {
+        Ok(entries) => entries,
+        Err(_) => return default_package_data(),
     };
 
-    let content = match read_zip_entry(&mut archive, &metadata_path) {
+    let metadata_entry =
+        match find_validated_zip_entry_by_suffix(&validated_entries, ".dist-info/METADATA") {
+            Some(entry) => entry,
+            None => {
+                warn!("No METADATA file found in wheel archive {:?}", path);
+                return default_package_data();
+            }
+        };
+
+    let content = match read_validated_zip_entry(&mut archive, metadata_entry, path, "wheel") {
         Ok(c) => c,
         Err(e) => {
             warn!("Failed to read METADATA from {:?}: {}", path, e);
@@ -1138,8 +1162,10 @@ fn extract_from_wheel_archive(path: &Path) -> PackageData {
     package_data.size = size;
     package_data.sha256 = sha256;
 
-    if let Some(record_path) = find_wheel_record_path(&mut archive)
-        && let Ok(record_content) = read_zip_entry(&mut archive, &record_path)
+    if let Some(record_entry) =
+        find_validated_zip_entry_by_suffix(&validated_entries, ".dist-info/RECORD")
+        && let Ok(record_content) =
+            read_validated_zip_entry(&mut archive, record_entry, path, "wheel")
     {
         package_data.file_references = parse_record_csv(&record_content);
     }
@@ -1211,20 +1237,23 @@ fn extract_from_egg_archive(path: &Path) -> PackageData {
         }
     };
 
-    if validate_zip_archive(&mut archive, path, "egg").is_err() {
-        return default_package_data();
-    }
+    let validated_entries = match collect_validated_zip_entries(&mut archive, path, "egg") {
+        Ok(entries) => entries,
+        Err(_) => return default_package_data(),
+    };
 
-    let pkginfo_path = find_egg_pkginfo_path(&mut archive);
-    let pkginfo_path = match pkginfo_path {
-        Some(p) => p,
+    let pkginfo_entry = match find_validated_zip_entry_by_any_suffix(
+        &validated_entries,
+        &["EGG-INFO/PKG-INFO", ".egg-info/PKG-INFO"],
+    ) {
+        Some(entry) => entry,
         None => {
             warn!("No PKG-INFO file found in egg archive {:?}", path);
             return default_package_data();
         }
     };
 
-    let content = match read_zip_entry(&mut archive, &pkginfo_path) {
+    let content = match read_validated_zip_entry(&mut archive, pkginfo_entry, path, "egg") {
         Ok(c) => c,
         Err(e) => {
             warn!("Failed to read PKG-INFO from {:?}: {}", path, e);
@@ -1238,8 +1267,14 @@ fn extract_from_egg_archive(path: &Path) -> PackageData {
     package_data.size = size;
     package_data.sha256 = sha256;
 
-    if let Some(installed_files_path) = find_egg_installed_files_path(&mut archive)
-        && let Ok(installed_files_content) = read_zip_entry(&mut archive, &installed_files_path)
+    if let Some(installed_files_entry) = find_validated_zip_entry_by_any_suffix(
+        &validated_entries,
+        &[
+            "EGG-INFO/installed-files.txt",
+            ".egg-info/installed-files.txt",
+        ],
+    ) && let Ok(installed_files_content) =
+        read_validated_zip_entry(&mut archive, installed_files_entry, path, "egg")
     {
         package_data.file_references = parse_installed_files_txt(&installed_files_content);
     }
@@ -1270,71 +1305,100 @@ fn extract_from_egg_archive(path: &Path) -> PackageData {
     package_data
 }
 
-fn find_wheel_metadata_path<R: Read + std::io::Seek>(
-    archive: &mut ZipArchive<R>,
-) -> Option<String> {
-    for i in 0..archive.len() {
-        if let Ok(file) = archive.by_index_raw(i) {
-            let name = file.name();
-            if name.ends_with(".dist-info/METADATA") {
-                return Some(name.to_string());
-            }
-        }
-    }
-    None
+fn find_validated_zip_entry_by_suffix<'a>(
+    entries: &'a [ValidatedZipEntry],
+    suffix: &str,
+) -> Option<&'a ValidatedZipEntry> {
+    entries.iter().find(|entry| entry.name.ends_with(suffix))
 }
 
-fn find_egg_pkginfo_path<R: Read + std::io::Seek>(archive: &mut ZipArchive<R>) -> Option<String> {
-    for i in 0..archive.len() {
-        if let Ok(file) = archive.by_index_raw(i) {
-            let name = file.name();
-            if name.ends_with("EGG-INFO/PKG-INFO") || name.ends_with(".egg-info/PKG-INFO") {
-                return Some(name.to_string());
-            }
-        }
-    }
-    None
+fn find_validated_zip_entry_by_any_suffix<'a>(
+    entries: &'a [ValidatedZipEntry],
+    suffixes: &[&str],
+) -> Option<&'a ValidatedZipEntry> {
+    entries
+        .iter()
+        .find(|entry| suffixes.iter().any(|suffix| entry.name.ends_with(suffix)))
 }
 
-fn read_zip_entry<R: Read + std::io::Seek>(
+fn read_validated_zip_entry<R: Read + std::io::Seek>(
     archive: &mut ZipArchive<R>,
-    path: &str,
+    entry: &ValidatedZipEntry,
+    path: &Path,
+    archive_type: &str,
 ) -> Result<String, String> {
     let mut file = archive
-        .by_name(path)
-        .map_err(|e| format!("Failed to find entry {}: {}", path, e))?;
-    let mut content = String::new();
-    file.read_to_string(&mut content)
-        .map_err(|e| format!("Failed to read {}: {}", path, e))?;
-    Ok(content)
-}
+        .by_index(entry.index)
+        .map_err(|e| format!("Failed to find entry {}: {}", entry.name, e))?;
 
-fn find_wheel_record_path<R: Read + std::io::Seek>(archive: &mut ZipArchive<R>) -> Option<String> {
-    for i in 0..archive.len() {
-        if let Ok(file) = archive.by_index_raw(i) {
-            let name = file.name();
-            if name.ends_with(".dist-info/RECORD") {
-                return Some(name.to_string());
-            }
+    let compressed_size = file.compressed_size();
+    let uncompressed_size = file.size();
+
+    if compressed_size > 0 {
+        let ratio = uncompressed_size as f64 / compressed_size as f64;
+        if ratio > MAX_COMPRESSION_RATIO {
+            return Err(format!(
+                "Rejected suspicious compression ratio in {} {:?}: {:.2}:1",
+                archive_type, path, ratio
+            ));
         }
     }
-    None
+
+    if uncompressed_size > MAX_FILE_SIZE {
+        return Err(format!(
+            "Rejected oversized entry in {} {:?}: {} bytes",
+            archive_type, path, uncompressed_size
+        ));
+    }
+
+    read_limited_utf8(
+        &mut file,
+        MAX_FILE_SIZE,
+        &format!("{} entry {}", archive_type, entry.name),
+    )
 }
 
-fn find_egg_installed_files_path<R: Read + std::io::Seek>(
-    archive: &mut ZipArchive<R>,
-) -> Option<String> {
-    for i in 0..archive.len() {
-        if let Ok(file) = archive.by_index_raw(i) {
-            let name = file.name();
-            if name.ends_with("EGG-INFO/installed-files.txt")
-                || name.ends_with(".egg-info/installed-files.txt")
-            {
-                return Some(name.to_string());
-            }
+fn read_limited_utf8<R: Read>(
+    reader: &mut R,
+    max_bytes: u64,
+    context: &str,
+) -> Result<String, String> {
+    let mut limited = reader.take(max_bytes + 1);
+    let mut bytes = Vec::new();
+    limited
+        .read_to_end(&mut bytes)
+        .map_err(|e| format!("Failed to read {}: {}", context, e))?;
+
+    if bytes.len() as u64 > max_bytes {
+        return Err(format!(
+            "{} exceeded {} byte limit while reading",
+            context, max_bytes
+        ));
+    }
+
+    String::from_utf8(bytes).map_err(|e| format!("{} is not valid UTF-8: {}", context, e))
+}
+
+fn normalize_archive_entry_path(entry_path: &str) -> Option<String> {
+    let normalized = entry_path.replace('\\', "/");
+    if normalized.len() >= 3 {
+        let bytes = normalized.as_bytes();
+        if bytes[1] == b':' && bytes[2] == b'/' && bytes[0].is_ascii_alphabetic() {
+            return None;
         }
     }
-    None
+    let path = Path::new(&normalized);
+    let mut components = Vec::new();
+
+    for component in path.components() {
+        match component {
+            Component::Normal(segment) => components.push(segment.to_string_lossy().to_string()),
+            Component::CurDir => {}
+            Component::RootDir | Component::ParentDir | Component::Prefix(_) => return None,
+        }
+    }
+
+    (!components.is_empty()).then_some(components.join("/"))
 }
 
 /// Parses RECORD CSV format from wheel archives (PEP 427).

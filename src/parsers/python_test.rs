@@ -85,7 +85,8 @@ mod tests {
         let file_path = temp_dir.path().join(filename);
         let file = fs::File::create(&file_path).expect("Failed to create zip file");
         let mut zip = zip::ZipWriter::new(file);
-        let options = zip::write::SimpleFileOptions::default();
+        let options = zip::write::SimpleFileOptions::default()
+            .compression_method(zip::CompressionMethod::Deflated);
 
         for (path, content) in entries {
             zip.start_file(*path, options)
@@ -97,6 +98,12 @@ mod tests {
         zip.finish().expect("Failed to finalize zip archive");
 
         (temp_dir, file_path)
+    }
+
+    fn make_high_ratio_metadata(prefix: &str) -> String {
+        let mut content = prefix.to_string();
+        content.push_str(&"A".repeat(300_000));
+        content
     }
 
     #[test]
@@ -1325,6 +1332,56 @@ Test package description.
     }
 
     #[test]
+    fn test_extract_from_sdist_zip_archive_rejects_suspicious_metadata_entry() {
+        let (_temp_dir, zip_path) = create_temp_zip(
+            &[(
+                "demo-1.0.0/PKG-INFO",
+                &make_high_ratio_metadata(
+                    "Metadata-Version: 2.1\nName: demo\nVersion: 1.0.0\nSummary: suspicious\n",
+                ),
+            )],
+            "demo-1.0.0.zip",
+        );
+
+        let package_data = PythonParser::extract_first_package(&zip_path);
+
+        assert!(package_data.name.is_none());
+        assert!(package_data.version.is_none());
+    }
+
+    #[test]
+    fn test_extract_from_sdist_zip_archive_rejects_unsafe_absolute_metadata_path() {
+        let (_temp_dir, zip_path) = create_temp_zip(
+            &[(
+                "C:/demo-1.0.0/PKG-INFO",
+                "Metadata-Version: 2.1\nName: demo\nVersion: 1.0.0\nSummary: unsafe path\n",
+            )],
+            "demo-1.0.0.zip",
+        );
+
+        let package_data = PythonParser::extract_first_package(&zip_path);
+
+        assert!(package_data.name.is_none());
+        assert!(package_data.version.is_none());
+    }
+
+    #[test]
+    fn test_extract_from_sdist_zip_archive_rejects_parent_traversal_metadata_path() {
+        let (_temp_dir, zip_path) = create_temp_zip(
+            &[(
+                "../demo-1.0.0/PKG-INFO",
+                "Metadata-Version: 2.1\nName: demo\nVersion: 1.0.0\nSummary: traversal path\n",
+            )],
+            "demo-1.0.0.zip",
+        );
+
+        let package_data = PythonParser::extract_first_package(&zip_path);
+
+        assert!(package_data.name.is_none());
+        assert!(package_data.version.is_none());
+    }
+
+    #[test]
     fn test_extract_from_sdist_tar_bz2_archive() {
         let (_temp_dir, archive_path) = create_temp_tar_bz2(
             &[(
@@ -1400,6 +1457,42 @@ Test package description.
     fn test_corrupt_wheel_archive_no_panic() {
         let (_temp_dir, corrupt_path) = create_temp_file("this is not a valid zip file", "bad.whl");
         let package_data = PythonParser::extract_first_package(&corrupt_path);
+
+        assert!(package_data.name.is_none());
+        assert!(package_data.version.is_none());
+    }
+
+    #[test]
+    fn test_extract_from_wheel_archive_rejects_suspicious_metadata_entry() {
+        let (_temp_dir, wheel_path) = create_temp_zip(
+            &[(
+                "demo-1.0.0.dist-info/METADATA",
+                &make_high_ratio_metadata(
+                    "Metadata-Version: 2.1\nName: demo\nVersion: 1.0.0\nSummary: suspicious wheel\n",
+                ),
+            )],
+            "demo-1.0.0-py3-none-any.whl",
+        );
+
+        let package_data = PythonParser::extract_first_package(&wheel_path);
+
+        assert!(package_data.name.is_none());
+        assert!(package_data.version.is_none());
+    }
+
+    #[test]
+    fn test_extract_from_egg_archive_rejects_suspicious_metadata_entry() {
+        let (_temp_dir, egg_path) = create_temp_zip(
+            &[(
+                "demo-1.0.0.egg-info/PKG-INFO",
+                &make_high_ratio_metadata(
+                    "Metadata-Version: 2.1\nName: demo\nVersion: 1.0.0\nSummary: suspicious egg\n",
+                ),
+            )],
+            "demo-1.0.0-py3.11.egg",
+        );
+
+        let package_data = PythonParser::extract_first_package(&egg_path);
 
         assert!(package_data.name.is_none());
         assert!(package_data.version.is_none());
