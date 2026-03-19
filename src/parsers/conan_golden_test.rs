@@ -6,7 +6,9 @@ mod golden_tests {
 
     use crate::models::PackageData;
     use crate::parsers::PackageParser;
+    use crate::parsers::conan::{ConanFilePyParser, ConanLockParser, ConanfileTxtParser};
     use crate::parsers::conan_data::ConanDataParser;
+    use crate::test_utils::compare_package_data_parser_only;
 
     fn sort_packages_by_version(packages: &mut [PackageData]) {
         packages.sort_by(|left, right| left.version.cmp(&right.version));
@@ -127,6 +129,21 @@ mod golden_tests {
         }
     }
 
+    fn run_single_golden(parser_type: &str, test_file: &str, expected_file: &str) {
+        let test_path = PathBuf::from(test_file);
+        let package_data = match parser_type {
+            "conanfile-py" => ConanFilePyParser::extract_first_package(&test_path),
+            "conanfile-txt" => ConanfileTxtParser::extract_first_package(&test_path),
+            "conan-lock" => ConanLockParser::extract_first_package(&test_path),
+            _ => panic!("Unknown Conan parser type: {}", parser_type),
+        };
+
+        match compare_package_data_parser_only(&package_data, &PathBuf::from(expected_file)) {
+            Ok(()) => {}
+            Err(error) => panic!("Conan golden test failed for {}: {}", test_file, error),
+        }
+    }
+
     #[test]
     fn test_golden_conandata_boost() {
         run_conandata_golden(
@@ -148,6 +165,33 @@ mod golden_tests {
         run_conandata_golden(
             "testdata/conan/recipes/libzip/manifest/conandata.yml",
             "testdata/conan/recipes/libzip/conandata.yml-expected.json",
+        );
+    }
+
+    #[test]
+    fn test_golden_conanfile_py() {
+        run_single_golden(
+            "conanfile-py",
+            "testdata/conan/recipes/libgettext/manifest/conanfile.py",
+            "testdata/conan/recipes/libgettext/manifest/conanfile.py-expected.json",
+        );
+    }
+
+    #[test]
+    fn test_golden_conanfile_txt() {
+        run_single_golden(
+            "conanfile-txt",
+            "testdata/conan/conanfile.txt",
+            "testdata/conan/conanfile.txt-expected.json",
+        );
+    }
+
+    #[test]
+    fn test_golden_conan_lock() {
+        run_single_golden(
+            "conan-lock",
+            "testdata/conan/conan.lock",
+            "testdata/conan/conan.lock-expected.json",
         );
     }
 }

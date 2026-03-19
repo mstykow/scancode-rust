@@ -1,0 +1,27 @@
+[
+  {
+    "type": "nuget",
+    "parties": [],
+    "dependencies": [
+      {
+        "purl": "pkg:nuget/Newtonsoft.Json",
+        "extracted_requirement": ">= 13.0.1",
+        "scope": null,
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:nuget/Microsoft.NETCore.App",
+        "extracted_requirement": ">= 1.0.0",
+        "scope": ".NETCoreApp,Version=v1.0",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true
+      }
+    ],
+    "datasource_id": "nuget_project_lock_json"
+  }
+]

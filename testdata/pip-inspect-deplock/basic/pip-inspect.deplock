@@ -1,0 +1,27 @@
+{
+  "version": "1",
+  "pip_version": "23.0.1",
+  "installed": [
+    {
+      "metadata": {
+        "name": "requests",
+        "version": "2.31.0",
+        "license": "Apache 2.0",
+        "description": "Python HTTP for Humans.",
+        "keywords": "http,requests"
+      },
+      "requested": true,
+      "direct_url": {
+        "url": "file:///path/to/requests"
+      }
+    },
+    {
+      "metadata": {
+        "name": "urllib3",
+        "version": "2.0.0",
+        "license": "MIT"
+      },
+      "requested": false
+    }
+  ]
+}

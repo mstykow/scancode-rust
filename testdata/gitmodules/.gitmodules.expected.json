@@ -1,0 +1,45 @@
+[
+  {
+    "type": "github",
+    "parties": [],
+    "dependencies": [
+      {
+        "purl": "pkg:github/example/dep1",
+        "extracted_requirement": "lib/deps/dep1 at https://github.com/example/dep1.git",
+        "scope": "runtime",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:github/org/lib2",
+        "extracted_requirement": "vendor/lib2 at git@github.com:org/lib2.git",
+        "scope": "runtime",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:gitlab/company/project",
+        "extracted_requirement": "external/gitlab-lib at https://gitlab.com/company/project.git",
+        "scope": "runtime",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true
+      },
+      {
+        "purl": null,
+        "extracted_requirement": "custom at https://custom.example.com/repo.git",
+        "scope": "runtime",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true
+      }
+    ],
+    "datasource_id": "gitmodules"
+  }
+]

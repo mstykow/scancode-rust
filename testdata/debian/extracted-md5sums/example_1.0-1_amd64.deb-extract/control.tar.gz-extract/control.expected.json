@@ -1,0 +1,47 @@
+[
+  {
+    "type": "deb",
+    "namespace": "debian",
+    "name": "example",
+    "version": "1.0-1",
+    "qualifiers": {
+      "arch": "amd64"
+    },
+    "description": "An example package\n This is a longer description of the example package\n that spans multiple lines.",
+    "parties": [
+      {
+        "type": "person",
+        "role": "maintainer",
+        "name": "Example Developer",
+        "email": "dev@example.com"
+      }
+    ],
+    "keywords": ["utils"],
+    "homepage_url": "https://example.com",
+    "extra_data": {
+      "installed_size": 256
+    },
+    "dependencies": [
+      {
+        "purl": "pkg:deb/debian/libc6",
+        "extracted_requirement": ">= 2.17",
+        "scope": "depends",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:deb/debian/libssl1.1",
+        "extracted_requirement": ">= 1.1.0",
+        "scope": "depends",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true
+      }
+    ],
+    "datasource_id": "debian_control_extracted_deb",
+    "purl": "pkg:deb/debian/example@1.0-1?arch=amd64"
+  }
+]

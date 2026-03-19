@@ -1,0 +1,22 @@
+[
+  {
+    "type": "nuget",
+    "parties": [],
+    "dependencies": [
+      {
+        "purl": "pkg:nuget/Newtonsoft.Json@13.0.1",
+        "extracted_requirement": "[13.0.1, )",
+        "scope": "net5.0",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": true,
+        "extra_data": {
+          "target_framework": "net5.0",
+          "content_hash": "sha512-ppPFpBcvxdsfUonNcvITKqLl3bqxWbDCZIzDWHzjpdAHRFfZe0Dw9HmA0+za13IdyrgJwpkDTDA9fHaxOrt20A=="
+        }
+      }
+    ],
+    "datasource_id": "nuget_packages_lock"
+  }
+]

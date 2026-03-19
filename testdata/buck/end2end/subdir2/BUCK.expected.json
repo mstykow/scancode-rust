@@ -1,0 +1,9 @@
+[
+  {
+    "type": "buck",
+    "name": "bin",
+    "parties": [],
+    "extracted_license_statement": "LICENSE",
+    "datasource_id": "buck_file"
+  }
+]

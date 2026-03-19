@@ -1,0 +1,7 @@
+[
+  {
+    "type": "rpm",
+    "parties": [],
+    "datasource_id": "rpm_installed_database_bdb"
+  }
+]

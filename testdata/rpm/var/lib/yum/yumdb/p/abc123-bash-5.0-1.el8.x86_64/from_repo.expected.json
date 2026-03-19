@@ -1,0 +1,19 @@
+[
+  {
+    "type": "rpm",
+    "name": "bash",
+    "version": "5.0-1.el8",
+    "qualifiers": {
+      "arch": "x86_64"
+    },
+    "parties": [],
+    "is_virtual": true,
+    "extra_data": {
+      "reason": "dep",
+      "releasever": "8",
+      "from_repo": "baseos"
+    },
+    "datasource_id": "rpm_yumdb",
+    "purl": "pkg:rpm/bash@5.0-1.el8?arch=x86_64"
+  }
+]

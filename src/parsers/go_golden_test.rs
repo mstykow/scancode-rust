@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod golden_tests {
     use crate::parsers::PackageParser;
-    use crate::parsers::go::{GoModParser, GoSumParser, GoWorkParser};
+    use crate::parsers::go::{GoModParser, GoSumParser, GoWorkParser, GodepsParser};
     use crate::parsers::go_mod_graph::GoModGraphParser;
     use crate::test_utils::compare_package_data_parser_only;
     use std::path::PathBuf;
@@ -105,6 +105,19 @@ mod golden_tests {
             PathBuf::from("testdata/go-golden/gowork-sample2/go.work.expected.json");
 
         let package_data = GoWorkParser::extract_first_package(&test_file);
+
+        match compare_package_data_parser_only(&package_data, &expected_file) {
+            Ok(_) => (),
+            Err(e) => panic!("Golden test failed: {}", e),
+        }
+    }
+
+    #[test]
+    fn test_golden_godeps() {
+        let test_file = PathBuf::from("testdata/go/full-godeps.json");
+        let expected_file = PathBuf::from("testdata/go/full-godeps.json.expected.json");
+
+        let package_data = GodepsParser::extract_first_package(&test_file);
 
         match compare_package_data_parser_only(&package_data, &expected_file) {
             Ok(_) => (),

@@ -1,17 +1,4 @@
 //! Golden tests for Swift Package Manager parsers.
-//!
-//! These tests are currently ignored due to format incompatibility between
-//! Python reference expected files and Rust implementation:
-//!
-//! - Python: Extracts each dependency as a separate package in `{"packages": [...]}`
-//! - Rust: Extracts single PackageData with dependencies in `dependencies` array
-//!
-//! Both approaches are valid. Python's approach better matches ScanCode's multi-package
-//! model, while Rust's approach better matches manifest file structure (one package file
-//! declares multiple dependencies).
-//!
-//! Comprehensive unit tests in `swift_resolved_test.rs` and `swift_manifest_json_test.rs`
-//! already verify correct parsing for all Swift formats.
 
 #[cfg(test)]
 mod golden_tests {

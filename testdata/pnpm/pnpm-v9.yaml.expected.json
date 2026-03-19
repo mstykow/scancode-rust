@@ -1,0 +1,821 @@
+[
+  {
+    "type": "pnpm-lock",
+    "parties": [],
+    "extra_data": {},
+    "dependencies": [
+      {
+        "purl": "pkg:npm/%40babel/helper-string-parser@7.24.8",
+        "extracted_requirement": "7.24.8",
+        "scope": "dev",
+        "is_runtime": false,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": false,
+        "resolved_package": {
+          "type": "npm",
+          "namespace": "babel",
+          "name": "helper-string-parser",
+          "version": "7.24.8",
+          "primary_language": "JavaScript",
+          "sha512": "pO9KhhRcuUyGnJWwyEgnRJTSIZHiT+vMD0kPeD+so0l7mxkMT19g3pjY9GTnHySck/hDzq+dtW/4VgnMkippsQ==",
+          "is_virtual": true,
+          "dependencies": [],
+          "datasource_id": "pnpm_lock_yaml"
+        },
+        "extra_data": {
+          "dev": true
+        }
+      },
+      {
+        "purl": "pkg:npm/%40babel/helper-validator-identifier@7.24.7",
+        "extracted_requirement": "7.24.7",
+        "scope": "dev",
+        "is_runtime": false,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": false,
+        "resolved_package": {
+          "type": "npm",
+          "namespace": "babel",
+          "name": "helper-validator-identifier",
+          "version": "7.24.7",
+          "primary_language": "JavaScript",
+          "sha512": "rR+PBcQ1SMQDDyF6X0wxtG8QyLCgUB0eRAGguqRLfkCA87l7yAP7ehq8SNj96OOGTO8OBV70KhuFYcIkHXOg0w==",
+          "is_virtual": true,
+          "dependencies": [],
+          "datasource_id": "pnpm_lock_yaml"
+        },
+        "extra_data": {
+          "dev": true
+        }
+      },
+      {
+        "purl": "pkg:npm/%40babel/parser@7.25.6",
+        "extracted_requirement": "7.25.6",
+        "scope": "dev",
+        "is_runtime": false,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": false,
+        "resolved_package": {
+          "type": "npm",
+          "namespace": "babel",
+          "name": "parser",
+          "version": "7.25.6",
+          "primary_language": "JavaScript",
+          "sha512": "trGdfBdbD0l1ZPmcJ83eNxB9rbEax4ALFTF7fN386TMYbeCQbyme5cOEXQhbGXKebwGaB/J52w1mrklMcbgy6Q==",
+          "is_virtual": true,
+          "dependencies": [],
+          "datasource_id": "pnpm_lock_yaml"
+        },
+        "extra_data": {
+          "hasBin": true,
+          "dev": true
+        }
+      },
+      {
+        "purl": "pkg:npm/%40babel/types@7.25.6",
+        "extracted_requirement": "7.25.6",
+        "scope": "dev",
+        "is_runtime": false,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": false,
+        "resolved_package": {
+          "type": "npm",
+          "namespace": "babel",
+          "name": "types",
+          "version": "7.25.6",
+          "primary_language": "JavaScript",
+          "sha512": "/l42B1qxpG6RdfYf343Uw1vmDjeNhneUXtzhojE7pDgfpEypmRhI6j1kr17XCVv4Cgl9HdAiQY2x0GwKm7rWCw==",
+          "is_virtual": true,
+          "dependencies": [],
+          "datasource_id": "pnpm_lock_yaml"
+        },
+        "extra_data": {
+          "dev": true
+        }
+      },
+      {
+        "purl": "pkg:npm/%40vue/compiler-sfc@2.7.16",
+        "extracted_requirement": "2.7.16",
+        "scope": "dev",
+        "is_runtime": false,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": false,
+        "resolved_package": {
+          "type": "npm",
+          "namespace": "vue",
+          "name": "compiler-sfc",
+          "version": "2.7.16",
+          "primary_language": "JavaScript",
+          "sha512": "KWhJ9k5nXuNtygPU7+t1rX6baZeqOYLEforUPjgNDBnLicfHCoi48H87Q8XyLZOrNNsmhuwKqtpDQWjEFe6Ekg==",
+          "is_virtual": true,
+          "dependencies": [],
+          "datasource_id": "pnpm_lock_yaml"
+        },
+        "extra_data": {
+          "dev": true
+        }
+      },
+      {
+        "purl": "pkg:npm/ansi-regex@2.1.1",
+        "extracted_requirement": "2.1.1",
+        "scope": null,
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": false,
+        "resolved_package": {
+          "type": "npm",
+          "name": "ansi-regex",
+          "version": "2.1.1",
+          "primary_language": "JavaScript",
+          "sha512": "TIGnTpdo+E3+pCyAluZvtED5p5wCqLdezCyhPZzKPcxvFplEt4i+W7OONCKgeZFT3+y5NZZfOOS/Bdcanm1MYA==",
+          "is_virtual": true,
+          "dependencies": [],
+          "datasource_id": "pnpm_lock_yaml"
+        }
+      },
+      {
+        "purl": "pkg:npm/anve-upload-upyun@1.0.8",
+        "extracted_requirement": "1.0.8",
+        "scope": null,
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": false,
+        "resolved_package": {
+          "type": "npm",
+          "name": "anve-upload-upyun",
+          "version": "1.0.8",
+          "primary_language": "JavaScript",
+          "sha512": "9/3TfOZOvSG92WWIvxIy+kzjD/K07uOtsMbgPEH4ZMq98j/RaroKRS48yCmfokLcnZLLzNnylYPPcRd6hoN0bw==",
+          "is_virtual": true,
+          "dependencies": [],
+          "datasource_id": "pnpm_lock_yaml"
+        }
+      },
+      {
+        "purl": "pkg:npm/asynckit@0.4.0",
+        "extracted_requirement": "0.4.0",
+        "scope": null,
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": false,
+        "resolved_package": {
+          "type": "npm",
+          "name": "asynckit",
+          "version": "0.4.0",
+          "primary_language": "JavaScript",
+          "sha512": "Oei9OH4tRh0YqU3GxhX79dM/mwVgvbZJaSNaRk+bshkj0S5cfHcgYakreBjrHwatXKbz+IoIdYLxrKim2MjW0Q==",
+          "is_virtual": true,
+          "dependencies": [],
+          "datasource_id": "pnpm_lock_yaml"
+        }
+      },
+      {
+        "purl": "pkg:npm/axios@0.26.1",
+        "extracted_requirement": "0.26.1",
+        "scope": null,
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": false,
+        "resolved_package": {
+          "type": "npm",
+          "name": "axios",
+          "version": "0.26.1",
+          "primary_language": "JavaScript",
+          "sha512": "fPwcX4EvnSHuInCMItEhAGnaSEXRBjtzh9fOtsE6E1G6p7vl7edEeZe11QHf18+6+9gR5PbKV/sGKNaD8YaMeA==",
+          "is_virtual": true,
+          "dependencies": [],
+          "datasource_id": "pnpm_lock_yaml"
+        }
+      },
+      {
+        "purl": "pkg:npm/base-64@1.0.0",
+        "extracted_requirement": "1.0.0",
+        "scope": null,
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": false,
+        "resolved_package": {
+          "type": "npm",
+          "name": "base-64",
+          "version": "1.0.0",
+          "primary_language": "JavaScript",
+          "sha512": "kwDPIFCGx0NZHog36dj+tHiwP4QMzsZ3AgMViUBKI0+V5n4U0ufTCUMhnQ04diaRI8EX/QcPfql7zlhZ7j4zgg==",
+          "is_virtual": true,
+          "dependencies": [],
+          "datasource_id": "pnpm_lock_yaml"
+        }
+      },
+      {
+        "purl": "pkg:npm/charenc@0.0.2",
+        "extracted_requirement": "0.0.2",
+        "scope": null,
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": false,
+        "resolved_package": {
+          "type": "npm",
+          "name": "charenc",
+          "version": "0.0.2",
+          "primary_language": "JavaScript",
+          "sha512": "yrLQ/yVUFXkzg7EDQsPieE/53+0RlaWTs+wBrvW36cyilJ2SaDWfl4Yj7MtLTXleV9uEKefbAGUPv2/iWSooRA==",
+          "is_virtual": true,
+          "dependencies": [],
+          "datasource_id": "pnpm_lock_yaml"
+        }
+      },
+      {
+        "purl": "pkg:npm/code-point-at@1.1.0",
+        "extracted_requirement": "1.1.0",
+        "scope": null,
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": false,
+        "resolved_package": {
+          "type": "npm",
+          "name": "code-point-at",
+          "version": "1.1.0",
+          "primary_language": "JavaScript",
+          "sha512": "RpAVKQA5T63xEj6/giIbUEtZwJ4UFIc3ZtvEkiaUERylqe8xb5IvqcgOurZLahv93CLKfxcw5YI+DZcUBRyLXA==",
+          "is_virtual": true,
+          "dependencies": [],
+          "datasource_id": "pnpm_lock_yaml"
+        }
+      },
+      {
+        "purl": "pkg:npm/combined-stream@1.0.8",
+        "extracted_requirement": "1.0.8",
+        "scope": null,
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": false,
+        "resolved_package": {
+          "type": "npm",
+          "name": "combined-stream",
+          "version": "1.0.8",
+          "primary_language": "JavaScript",
+          "sha512": "FQN4MRfuJeHf7cBbBMJFXhKSDq+2kAArBlmRBvcvFE5BB1HZKXtSFASDhdlz9zOYwxh8lDdnvmMOe/+5cdoEdg==",
+          "is_virtual": true,
+          "dependencies": [],
+          "datasource_id": "pnpm_lock_yaml"
+        }
+      },
+      {
+        "purl": "pkg:npm/crypt@0.0.2",
+        "extracted_requirement": "0.0.2",
+        "scope": null,
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": false,
+        "resolved_package": {
+          "type": "npm",
+          "name": "crypt",
+          "version": "0.0.2",
+          "primary_language": "JavaScript",
+          "sha512": "mCxBlsHFYh9C+HVpiEacem8FEBnMXgU9gy4zmNC+SXAZNB/1idgp/aulFJ4FgCi7GPEVbfyng092GqL2k2rmow==",
+          "is_virtual": true,
+          "dependencies": [],
+          "datasource_id": "pnpm_lock_yaml"
+        }
+      },
+      {
+        "purl": "pkg:npm/csstype@3.1.3",
+        "extracted_requirement": "3.1.3",
+        "scope": "dev",
+        "is_runtime": false,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": false,
+        "resolved_package": {
+          "type": "npm",
+          "name": "csstype",
+          "version": "3.1.3",
+          "primary_language": "JavaScript",
+          "sha512": "M1uQkMl8rQK/szD0LNhtqxIPLpimGm8sOBwU7lLnCpSbTyY3yeU1Vc7l4KT5zT4s/yOxHH5O7tIuuLOCnLADRw==",
+          "is_virtual": true,
+          "dependencies": [],
+          "datasource_id": "pnpm_lock_yaml"
+        },
+        "extra_data": {
+          "dev": true
+        }
+      },
+      {
+        "purl": "pkg:npm/delayed-stream@1.0.0",
+        "extracted_requirement": "1.0.0",
+        "scope": null,
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": false,
+        "resolved_package": {
+          "type": "npm",
+          "name": "delayed-stream",
+          "version": "1.0.0",
+          "primary_language": "JavaScript",
+          "sha512": "ZySD7Nf91aLB0RxL4KGrKHBXl7Eds1DAmEdcoVawXnLD7SDhpNgtuII2aAkg7a7QS41jxPSZ17p4VdGnMHk3MQ==",
+          "is_virtual": true,
+          "dependencies": [],
+          "datasource_id": "pnpm_lock_yaml"
+        }
+      },
+      {
+        "purl": "pkg:npm/follow-redirects@1.15.9",
+        "extracted_requirement": "1.15.9",
+        "scope": null,
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": false,
+        "resolved_package": {
+          "type": "npm",
+          "name": "follow-redirects",
+          "version": "1.15.9",
+          "primary_language": "JavaScript",
+          "sha512": "gew4GsXizNgdoRyqmyfMHyAmXsZDk6mHkSxZFCzW9gwlbtOW44CDtYavM+y+72qD/Vq2l550kMF52DT8fOLJqQ==",
+          "is_virtual": true,
+          "dependencies": [
+            {
+              "purl": "pkg:npm/debug@*",
+              "extracted_requirement": "*",
+              "scope": "peer",
+              "is_runtime": true,
+              "is_optional": false,
+              "is_pinned": true,
+              "is_direct": false
+            }
+          ],
+          "datasource_id": "pnpm_lock_yaml"
+        }
+      },
+      {
+        "purl": "pkg:npm/form-data@4.0.0",
+        "extracted_requirement": "4.0.0",
+        "scope": null,
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": false,
+        "resolved_package": {
+          "type": "npm",
+          "name": "form-data",
+          "version": "4.0.0",
+          "primary_language": "JavaScript",
+          "sha512": "ETEklSGi5t0QMZuiXoA/Q6vcnxcLQP5vdugSpuAyi6SVGi2clPPp+xgEhuMaHC+zGgn31Kd235W35f7Hykkaww==",
+          "is_virtual": true,
+          "dependencies": [],
+          "datasource_id": "pnpm_lock_yaml"
+        }
+      },
+      {
+        "purl": "pkg:npm/hmacsha1@1.0.0",
+        "extracted_requirement": "1.0.0",
+        "scope": null,
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": false,
+        "resolved_package": {
+          "type": "npm",
+          "name": "hmacsha1",
+          "version": "1.0.0",
+          "primary_language": "JavaScript",
+          "sha512": "4FP6J0oI8jqb6gLLl9tSwVdosWJ/AKSGJ+HwYf6Ixe4MUcEkst4uWzpVQrNOCin0fzTRQbXV8ePheU8WiiDYBw==",
+          "is_virtual": true,
+          "dependencies": [],
+          "datasource_id": "pnpm_lock_yaml"
+        }
+      },
+      {
+        "purl": "pkg:npm/is-buffer@1.1.6",
+        "extracted_requirement": "1.1.6",
+        "scope": null,
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": false,
+        "resolved_package": {
+          "type": "npm",
+          "name": "is-buffer",
+          "version": "1.1.6",
+          "primary_language": "JavaScript",
+          "sha512": "NcdALwpXkTm5Zvvbk7owOUSvVvBKDgKP5/ewfXEznmQFfs4ZRmanOeKBTjRVjka3QFoN6XJ+9F3USqfHqTaU5w==",
+          "is_virtual": true,
+          "dependencies": [],
+          "datasource_id": "pnpm_lock_yaml"
+        }
+      },
+      {
+        "purl": "pkg:npm/is-fullwidth-code-point@1.0.0",
+        "extracted_requirement": "1.0.0",
+        "scope": null,
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": false,
+        "resolved_package": {
+          "type": "npm",
+          "name": "is-fullwidth-code-point",
+          "version": "1.0.0",
+          "primary_language": "JavaScript",
+          "sha512": "1pqUqRjkhPJ9miNq9SwMfdvi6lBJcd6eFxvfaivQhaH3SgisfiuudvFntdKOmxuee/77l+FPjKrQjWvmPjWrRw==",
+          "is_virtual": true,
+          "dependencies": [],
+          "datasource_id": "pnpm_lock_yaml"
+        }
+      },
+      {
+        "purl": "pkg:npm/is-promise@4.0.0",
+        "extracted_requirement": "4.0.0",
+        "scope": null,
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": false,
+        "resolved_package": {
+          "type": "npm",
+          "name": "is-promise",
+          "version": "4.0.0",
+          "primary_language": "JavaScript",
+          "sha512": "hvpoI6korhJMnej285dSg6nu1+e6uxs7zG3BYAm5byqDsgJNWwxzM6z6iZiAgQR4TJ30JmBTOwqZUw3WlyH3AQ==",
+          "is_virtual": true,
+          "dependencies": [],
+          "datasource_id": "pnpm_lock_yaml"
+        }
+      },
+      {
+        "purl": "pkg:npm/md5@2.3.0",
+        "extracted_requirement": "2.3.0",
+        "scope": null,
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": false,
+        "resolved_package": {
+          "type": "npm",
+          "name": "md5",
+          "version": "2.3.0",
+          "primary_language": "JavaScript",
+          "sha512": "T1GITYmFaKuO91vxyoQMFETst+O71VUPEU3ze5GNzDm0OWdP8v1ziTaAEPUr/3kLsY3Sftgz242A1SetQiDL7g==",
+          "is_virtual": true,
+          "dependencies": [],
+          "datasource_id": "pnpm_lock_yaml"
+        }
+      },
+      {
+        "purl": "pkg:npm/mime-db@1.52.0",
+        "extracted_requirement": "1.52.0",
+        "scope": null,
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": false,
+        "resolved_package": {
+          "type": "npm",
+          "name": "mime-db",
+          "version": "1.52.0",
+          "primary_language": "JavaScript",
+          "sha512": "sPU4uV7dYlvtWJxwwxHD0PuihVNiE7TyAbQ5SWxDCB9mUYvOgroQOwYQQOKPJ8CIbE+1ETVlOoK1UC2nU3gYvg==",
+          "is_virtual": true,
+          "dependencies": [],
+          "datasource_id": "pnpm_lock_yaml"
+        }
+      },
+      {
+        "purl": "pkg:npm/mime-types@2.1.35",
+        "extracted_requirement": "2.1.35",
+        "scope": null,
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": false,
+        "resolved_package": {
+          "type": "npm",
+          "name": "mime-types",
+          "version": "2.1.35",
+          "primary_language": "JavaScript",
+          "sha512": "ZDY+bPm5zTTF+YpCrAU9nK0UgICYPT0QtT1NZWFv4s++TNkcgVaT0g6+4R2uI4MjQjzysHB1zxuWL50hzaeXiw==",
+          "is_virtual": true,
+          "dependencies": [],
+          "datasource_id": "pnpm_lock_yaml"
+        }
+      },
+      {
+        "purl": "pkg:npm/nanoid@3.3.7",
+        "extracted_requirement": "3.3.7",
+        "scope": "dev",
+        "is_runtime": false,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": false,
+        "resolved_package": {
+          "type": "npm",
+          "name": "nanoid",
+          "version": "3.3.7",
+          "primary_language": "JavaScript",
+          "sha512": "eSRppjcPIatRIMC1U6UngP8XFcz8MQWGQdt1MTBQ7NaAmvXDfvNxbvWV3x2y6CdEUciCSsDHDQZbhYaB8QEo2g==",
+          "is_virtual": true,
+          "dependencies": [],
+          "datasource_id": "pnpm_lock_yaml"
+        },
+        "extra_data": {
+          "hasBin": true,
+          "dev": true
+        }
+      },
+      {
+        "purl": "pkg:npm/number-is-nan@1.0.1",
+        "extracted_requirement": "1.0.1",
+        "scope": null,
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": false,
+        "resolved_package": {
+          "type": "npm",
+          "name": "number-is-nan",
+          "version": "1.0.1",
+          "primary_language": "JavaScript",
+          "sha512": "4jbtZXNAsfZbAHiiqjLPBiCl16dES1zI4Hpzzxw61Tk+loF+sBDBKx1ICKKKwIqQ7M0mFn1TmkN7euSncWgHiQ==",
+          "is_virtual": true,
+          "dependencies": [],
+          "datasource_id": "pnpm_lock_yaml"
+        }
+      },
+      {
+        "purl": "pkg:npm/picocolors@1.1.0",
+        "extracted_requirement": "1.1.0",
+        "scope": "dev",
+        "is_runtime": false,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": false,
+        "resolved_package": {
+          "type": "npm",
+          "name": "picocolors",
+          "version": "1.1.0",
+          "primary_language": "JavaScript",
+          "sha512": "TQ92mBOW0l3LeMeyLV6mzy/kWr8lkd/hp3mTg7wYK7zJhuBStmGMBG0BdeDZS/dZx1IukaX6Bk11zcln25o1Aw==",
+          "is_virtual": true,
+          "dependencies": [],
+          "datasource_id": "pnpm_lock_yaml"
+        },
+        "extra_data": {
+          "dev": true
+        }
+      },
+      {
+        "purl": "pkg:npm/postcss@8.4.47",
+        "extracted_requirement": "8.4.47",
+        "scope": "dev",
+        "is_runtime": false,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": false,
+        "resolved_package": {
+          "type": "npm",
+          "name": "postcss",
+          "version": "8.4.47",
+          "primary_language": "JavaScript",
+          "sha512": "56rxCq7G/XfB4EkXq9Egn5GCqugWvDFjafDOThIdMBsI15iqPqR5r15TfSr1YPYeEI19YeaXMCbY6u88Y76GLQ==",
+          "is_virtual": true,
+          "dependencies": [],
+          "datasource_id": "pnpm_lock_yaml"
+        },
+        "extra_data": {
+          "dev": true
+        }
+      },
+      {
+        "purl": "pkg:npm/prettier@2.8.8",
+        "extracted_requirement": "2.8.8",
+        "scope": "dev",
+        "is_runtime": false,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": false,
+        "resolved_package": {
+          "type": "npm",
+          "name": "prettier",
+          "version": "2.8.8",
+          "primary_language": "JavaScript",
+          "sha512": "tdN8qQGvNjw4CHbY+XXk0JgCXn9QiF21a55rBe5LJAU+kDyC4WQn4+awm2Xfk2lQMk5fKup9XgzTZtGkjBdP9Q==",
+          "is_virtual": true,
+          "dependencies": [],
+          "datasource_id": "pnpm_lock_yaml"
+        },
+        "extra_data": {
+          "hasBin": true,
+          "dev": true
+        }
+      },
+      {
+        "purl": "pkg:npm/single-line-log@1.1.2",
+        "extracted_requirement": "1.1.2",
+        "scope": null,
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": false,
+        "resolved_package": {
+          "type": "npm",
+          "name": "single-line-log",
+          "version": "1.1.2",
+          "primary_language": "JavaScript",
+          "sha512": "awzaaIPtYFdexLr6TBpcZSGPB6D1RInNO/qNetgaJloPDF/D0GkVtLvGEp8InfmLV7CyLyQ5fIRP+tVN/JmWQA==",
+          "is_virtual": true,
+          "dependencies": [],
+          "datasource_id": "pnpm_lock_yaml"
+        }
+      },
+      {
+        "purl": "pkg:npm/source-map-js@1.2.1",
+        "extracted_requirement": "1.2.1",
+        "scope": "dev",
+        "is_runtime": false,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": false,
+        "resolved_package": {
+          "type": "npm",
+          "name": "source-map-js",
+          "version": "1.2.1",
+          "primary_language": "JavaScript",
+          "sha512": "UXWMKhLOwVKb728IUtQPXxfYU+usdybtUrK/8uGE8CQMvrhOpwvzDBwj0QhSL7MQc7vIsISBG8VQ8+IDQxpfQA==",
+          "is_virtual": true,
+          "dependencies": [],
+          "datasource_id": "pnpm_lock_yaml"
+        },
+        "extra_data": {
+          "dev": true
+        }
+      },
+      {
+        "purl": "pkg:npm/source-map@0.6.1",
+        "extracted_requirement": "0.6.1",
+        "scope": "dev",
+        "is_runtime": false,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": false,
+        "resolved_package": {
+          "type": "npm",
+          "name": "source-map",
+          "version": "0.6.1",
+          "primary_language": "JavaScript",
+          "sha512": "UjgapumWlbMhkBgzT7Ykc5YXUT46F0iKu8SGXq0bcwP5dz/h0Plj6enJqjz1Zbq2l5WaqYnrVbwWOWMyF3F47g==",
+          "is_virtual": true,
+          "dependencies": [],
+          "datasource_id": "pnpm_lock_yaml"
+        },
+        "extra_data": {
+          "dev": true
+        }
+      },
+      {
+        "purl": "pkg:npm/string-width@1.0.2",
+        "extracted_requirement": "1.0.2",
+        "scope": null,
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": false,
+        "resolved_package": {
+          "type": "npm",
+          "name": "string-width",
+          "version": "1.0.2",
+          "primary_language": "JavaScript",
+          "sha512": "0XsVpQLnVCXHJfyEs8tC0zpTVIr5PKKsQtkT29IwupnPTjtPmQ3xT/4yCREF9hYkV/3M3kzcUTSAZT6a6h81tw==",
+          "is_virtual": true,
+          "dependencies": [],
+          "datasource_id": "pnpm_lock_yaml"
+        }
+      },
+      {
+        "purl": "pkg:npm/strip-ansi@3.0.1",
+        "extracted_requirement": "3.0.1",
+        "scope": null,
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": false,
+        "resolved_package": {
+          "type": "npm",
+          "name": "strip-ansi",
+          "version": "3.0.1",
+          "primary_language": "JavaScript",
+          "sha512": "VhumSSbBqDTP8p2ZLKj40UjBCV4+v8bUSEpUb4KjRgWk9pbqGF4REFj6KEagidb2f/M6AzC0EmFyDNGaw9OCzg==",
+          "is_virtual": true,
+          "dependencies": [],
+          "datasource_id": "pnpm_lock_yaml"
+        }
+      },
+      {
+        "purl": "pkg:npm/to-fast-properties@2.0.0",
+        "extracted_requirement": "2.0.0",
+        "scope": "dev",
+        "is_runtime": false,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": false,
+        "resolved_package": {
+          "type": "npm",
+          "name": "to-fast-properties",
+          "version": "2.0.0",
+          "primary_language": "JavaScript",
+          "sha512": "/OaKK0xYrs3DmxRYqL/yDc+FxFUVYhDlXMhRmv3z915w2HF1tnN1omB354j8VUGO/hbRzyD6Y3sA7v7GS/ceog==",
+          "is_virtual": true,
+          "dependencies": [],
+          "datasource_id": "pnpm_lock_yaml"
+        },
+        "extra_data": {
+          "dev": true
+        }
+      },
+      {
+        "purl": "pkg:npm/upyun@3.4.6",
+        "extracted_requirement": "3.4.6",
+        "scope": null,
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": false,
+        "resolved_package": {
+          "type": "npm",
+          "name": "upyun",
+          "version": "3.4.6",
+          "primary_language": "JavaScript",
+          "sha512": "ThAI7woGkVE2lsOq8MFYb0Oeg8avOQQbY3XmXmaq1aZVjzcglcMuI/RImBrq+KJw7nX39iNKCJKYs65xiAF53Q==",
+          "is_virtual": true,
+          "dependencies": [],
+          "datasource_id": "pnpm_lock_yaml"
+        }
+      },
+      {
+        "purl": "pkg:npm/vue-i18n@8.28.2",
+        "extracted_requirement": "8.28.2",
+        "scope": null,
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": false,
+        "resolved_package": {
+          "type": "npm",
+          "name": "vue-i18n",
+          "version": "8.28.2",
+          "primary_language": "JavaScript",
+          "sha512": "C5GZjs1tYlAqjwymaaCPDjCyGo10ajUphiwA922jKt9n7KPpqR7oM1PCwYzhB/E7+nT3wfdG3oRre5raIT1rKA==",
+          "is_virtual": true,
+          "dependencies": [
+            {
+              "purl": "pkg:npm/vue@%5E2",
+              "extracted_requirement": "^2",
+              "scope": "peer",
+              "is_runtime": true,
+              "is_optional": false,
+              "is_pinned": true,
+              "is_direct": false
+            }
+          ],
+          "datasource_id": "pnpm_lock_yaml"
+        }
+      },
+      {
+        "purl": "pkg:npm/vue@2.7.16",
+        "extracted_requirement": "2.7.16",
+        "scope": "dev",
+        "is_runtime": false,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": false,
+        "resolved_package": {
+          "type": "npm",
+          "name": "vue",
+          "version": "2.7.16",
+          "primary_language": "JavaScript",
+          "sha512": "4gCtFXaAA3zYZdTp5s4Hl2sozuySsgz4jy1EnpBHNfpMa9dK1ZCG7viqBPCwXtmgc8nHqUsAu3G4gtmXkkY3Sw==",
+          "is_virtual": true,
+          "dependencies": [],
+          "datasource_id": "pnpm_lock_yaml"
+        },
+        "extra_data": {
+          "dev": true
+        }
+      }
+    ],
+    "datasource_id": "pnpm_lock_yaml"
+  }
+]

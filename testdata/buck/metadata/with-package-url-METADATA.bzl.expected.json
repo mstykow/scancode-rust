@@ -1,0 +1,18 @@
+[
+  {
+    "type": "maven",
+    "namespace": "androidx.compose.animation",
+    "name": "animation",
+    "version": "0.0.1",
+    "parties": [
+      {
+        "type": "organization",
+        "role": "maintainer",
+        "name": "oss_foundation"
+      }
+    ],
+    "homepage_url": "https://developer.android.com/jetpack/androidx/releases/compose-animation#0.0.1",
+    "extracted_license_statement": "BSD-3-Clause",
+    "datasource_id": "buck_metadata"
+  }
+]

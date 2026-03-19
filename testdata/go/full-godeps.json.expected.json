@@ -1,0 +1,42 @@
+[
+  {
+    "type": "golang",
+    "namespace": "github.com/cloudfoundry-incubator",
+    "name": "etcd-metrics-server",
+    "primary_language": "Go",
+    "parties": [],
+    "homepage_url": "https://pkg.go.dev/github.com/cloudfoundry-incubator/etcd-metrics-server",
+    "vcs_url": "https://github.com/cloudfoundry-incubator/etcd-metrics-server.git",
+    "extra_data": {
+      "go_version": "go1.2.1"
+    },
+    "dependencies": [
+      {
+        "purl": "pkg:golang/github.com/cloudfoundry-incubator/metricz",
+        "extracted_requirement": "d9bdb1b78384f05faa694175782055d5ba3966b5",
+        "scope": "Deps",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": false
+      },
+      {
+        "purl": "pkg:golang/github.com/cloudfoundry/gosteno",
+        "extracted_requirement": "5eb8c6e554f0dfc39d6468813b8ac19ec28fe74f",
+        "scope": "Deps",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": false
+      },
+      {
+        "purl": "pkg:golang/github.com/coreos/go-etcd/etcd",
+        "extracted_requirement": "1e26d8ee84cf9b1000d2af8acfb45b2521f49be5",
+        "scope": "Deps",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": false
+      }
+    ],
+    "datasource_id": "godeps",
+    "purl": "pkg:golang/github.com/cloudfoundry-incubator/etcd-metrics-server"
+  }
+]

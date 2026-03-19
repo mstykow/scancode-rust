@@ -1,0 +1,28 @@
+[
+  {
+    "type": "deb",
+    "namespace": "debian",
+    "name": "example",
+    "parties": [],
+    "file_references": [
+      {
+        "path": "usr/bin/example",
+        "md5": "d41d8cd98f00b204e9800998ecf8427e"
+      },
+      {
+        "path": "usr/share/doc/example/README",
+        "md5": "7d865e959b2466918c9863afca942d0e"
+      },
+      {
+        "path": "usr/share/doc/example/copyright",
+        "md5": "4a8a08f09d37b73795649038408b5f33"
+      },
+      {
+        "path": "usr/share/man/man1/example.1.gz",
+        "md5": "9e107d9d372bb6826bd81d3542a419d6"
+      }
+    ],
+    "datasource_id": "debian_md5sums_in_extracted_deb",
+    "purl": "pkg:deb/debian/example"
+  }
+]

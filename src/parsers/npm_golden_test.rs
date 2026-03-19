@@ -2,6 +2,9 @@
 mod golden_tests {
     use crate::parsers::PackageParser;
     use crate::parsers::npm::NpmParser;
+    use crate::parsers::npm_lock::NpmLockParser;
+    use crate::parsers::npm_workspace::NpmWorkspaceParser;
+    use crate::parsers::yarn_lock::YarnLockParser;
     use crate::test_utils::compare_package_data_parser_only;
     use std::path::PathBuf;
 
@@ -145,6 +148,58 @@ mod golden_tests {
         let expected_file = PathBuf::from("testdata/npm-golden/electron/package.json.expected");
 
         let package_data = NpmParser::extract_first_package(&test_file);
+
+        match compare_package_data_parser_only(&package_data, &expected_file) {
+            Ok(_) => (),
+            Err(e) => panic!("Golden test failed: {}", e),
+        }
+    }
+
+    #[test]
+    fn test_golden_npm_lock_v2() {
+        let test_file = PathBuf::from("testdata/npm/package-lock-v2.json");
+        let expected_file = PathBuf::from("testdata/npm/package-lock-v2.json.expected.json");
+
+        let package_data = NpmLockParser::extract_first_package(&test_file);
+
+        match compare_package_data_parser_only(&package_data, &expected_file) {
+            Ok(_) => (),
+            Err(e) => panic!("Golden test failed: {}", e),
+        }
+    }
+
+    #[test]
+    fn test_golden_npm_workspace() {
+        let test_file = PathBuf::from("testdata/npm-workspace/basic.yaml");
+        let expected_file = PathBuf::from("testdata/npm-workspace/basic.yaml.expected.json");
+
+        let package_data = NpmWorkspaceParser::extract_first_package(&test_file);
+
+        match compare_package_data_parser_only(&package_data, &expected_file) {
+            Ok(_) => (),
+            Err(e) => panic!("Golden test failed: {}", e),
+        }
+    }
+
+    #[test]
+    fn test_golden_yarn_lock_v1() {
+        let test_file = PathBuf::from("testdata/npm/yarn-v1.lock");
+        let expected_file = PathBuf::from("testdata/npm/yarn-v1.lock.expected.json");
+
+        let package_data = YarnLockParser::extract_first_package(&test_file);
+
+        match compare_package_data_parser_only(&package_data, &expected_file) {
+            Ok(_) => (),
+            Err(e) => panic!("Golden test failed: {}", e),
+        }
+    }
+
+    #[test]
+    fn test_golden_yarn_lock_v2() {
+        let test_file = PathBuf::from("testdata/npm/yarn-v2.lock");
+        let expected_file = PathBuf::from("testdata/npm/yarn-v2.lock.expected.json");
+
+        let package_data = YarnLockParser::extract_first_package(&test_file);
 
         match compare_package_data_parser_only(&package_data, &expected_file) {
             Ok(_) => (),

@@ -1,0 +1,40 @@
+[
+  {
+    "type": "deb",
+    "namespace": "debian",
+    "name": "samplepkg",
+    "qualifiers": {
+      "arch": "amd64"
+    },
+    "description": "sample Debian package\n A sample package for golden testing.",
+    "parties": [
+      {
+        "type": "person",
+        "role": "maintainer",
+        "name": "Example Maintainer",
+        "email": "maintainer@example.com"
+      }
+    ],
+    "homepage_url": "https://example.test/samplepkg",
+    "dependencies": [
+      {
+        "purl": "pkg:deb/debian/libc6",
+        "extracted_requirement": ">= 2.31",
+        "scope": "depends",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:deb/debian/adduser",
+        "scope": "depends",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_direct": true
+      }
+    ],
+    "datasource_id": "debian_control_in_source",
+    "purl": "pkg:deb/debian/samplepkg?arch=amd64"
+  }
+]
