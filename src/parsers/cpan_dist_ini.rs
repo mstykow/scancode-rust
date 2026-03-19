@@ -180,15 +180,7 @@ fn parse_dependencies(sections: &HashMap<String, HashMap<String, String>>) -> Ve
     sorted_sections.sort_by(|(left_name, _), (right_name, _)| left_name.cmp(right_name));
 
     for (section_name, fields) in sorted_sections {
-        let scope = if section_name.starts_with("Prereq") {
-            if section_name.contains("TestRequires") || section_name.contains("Test") {
-                Some("test".to_string())
-            } else if section_name.contains("BuildRequires") || section_name.contains("Build") {
-                Some("build".to_string())
-            } else {
-                Some("runtime".to_string())
-            }
-        } else {
+        let Some(scope) = classify_prereq_scope(section_name) else {
             continue;
         };
 
@@ -205,9 +197,9 @@ fn parse_dependencies(sections: &HashMap<String, HashMap<String, String>>) -> Ve
 
             dependencies.push(Dependency {
                 purl: Some(purl),
-                scope: scope.clone(),
+                scope: Some(scope.clone()),
                 extracted_requirement,
-                is_runtime: Some(scope.as_deref() == Some("runtime")),
+                is_runtime: Some(scope == "runtime"),
                 is_optional: Some(false),
                 is_pinned: None,
                 is_direct: None,
@@ -218,6 +210,22 @@ fn parse_dependencies(sections: &HashMap<String, HashMap<String, String>>) -> Ve
     }
 
     dependencies
+}
+
+fn classify_prereq_scope(section_name: &str) -> Option<String> {
+    if !section_name.starts_with("Prereq") {
+        return None;
+    }
+
+    if section_name.contains("TestRequires") || section_name.contains("Test") {
+        Some("test".to_string())
+    } else if section_name.contains("BuildRequires") || section_name.contains("Build") {
+        Some("build".to_string())
+    } else if section_name.contains("ConfigureRequires") || section_name.contains("Configure") {
+        Some("configure".to_string())
+    } else {
+        Some("runtime".to_string())
+    }
 }
 
 crate::register_parser!(
