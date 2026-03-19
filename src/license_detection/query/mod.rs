@@ -2,7 +2,7 @@
 
 use crate::license_detection::index::LicenseIndex;
 use crate::license_detection::index::dictionary::{KnownToken, QueryToken, TokenId, TokenKind};
-use crate::license_detection::tokenize::{tokenize_without_stopwords, STOPWORDS};
+use crate::license_detection::tokenize::{STOPWORDS, tokenize_without_stopwords};
 use std::collections::{HashMap, HashSet};
 
 /// A span representing a range of token positions.
@@ -300,11 +300,7 @@ impl<'a> Query<'a> {
                         let is_spdx_third = third_three == ["spdx", "license", "identifier"]
                             || third_three == ["spdx", "licence", "identifier"]
                             || third_three == ["licenses", "nuget", "org"];
-                        if is_spdx_third {
-                            Some(2)
-                        } else {
-                            None
-                        }
+                        if is_spdx_third { Some(2) } else { None }
                     } else {
                         None
                     }
@@ -464,9 +460,9 @@ impl<'a> Query<'a> {
                 continue;
             }
 
-            let line_is_all_digit = line_tokens.iter().all(|token_id| {
-                token_id.map(|known| known.is_digit_only).unwrap_or(true)
-            });
+            let line_is_all_digit = line_tokens
+                .iter()
+                .all(|token_id| token_id.map(|known| known.is_digit_only).unwrap_or(true));
             let mut line_has_known_tokens = false;
             let mut line_has_good_tokens = false;
 

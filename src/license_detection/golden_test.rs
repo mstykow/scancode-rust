@@ -112,7 +112,7 @@ mod golden_tests {
             let bytes = fs::read(&self.test_file)
                 .map_err(|e| format!("Failed to read {}: {}", self.test_file.display(), e))?;
             let (text, text_kind) = extract_text_for_detection(&self.test_file, &bytes);
-            
+
             if text.is_empty() {
                 return Ok(None);
             }

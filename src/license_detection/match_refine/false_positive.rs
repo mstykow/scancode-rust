@@ -13,8 +13,10 @@ const MAX_CANDIDATE_LENGTH: usize = 20;
 const MAX_DISTANCE_BETWEEN_CANDIDATES: usize = 10;
 
 pub(super) fn is_candidate_false_positive(m: &LicenseMatch) -> bool {
-    let is_tag_or_ref =
-        m.is_license_reference || m.is_license_tag || m.is_license_intro || m.is_license_clue;
+    let is_tag_or_ref = m.is_license_reference()
+        || m.is_license_tag()
+        || m.is_license_intro()
+        || m.is_license_clue();
 
     let is_not_spdx_id = m.matcher != MatcherKind::SpdxId;
     let is_exact_match = (m.match_coverage - 100.0).abs() < f32::EPSILON;
@@ -203,11 +205,14 @@ mod tests {
             rule_url: String::new(),
             matched_text: None,
             referenced_filenames: None,
-            is_license_intro,
-            is_license_clue,
-            is_license_reference,
-            is_license_tag,
-            is_license_text: false,
+            rule_kind: crate::license_detection::models::RuleKind::from_match_flags(
+                false,
+                is_license_reference,
+                is_license_tag,
+                is_license_intro,
+                is_license_clue,
+            )
+            .unwrap(),
             is_from_license: false,
             matched_token_positions: None,
             hilen: matched_length / 2,
@@ -466,7 +471,7 @@ mod tests {
                     rule_identifier: "#1".to_string(),
                     ..LicenseMatch::default()
                 };
-                m.is_license_reference = true;
+                m.rule_kind = crate::license_detection::models::RuleKind::Reference;
                 m
             })
             .collect();

@@ -35,8 +35,8 @@ pub const MAX_NEAR_DUPE_CANDIDATES: usize = 10;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::license_detection::index::dictionary::{TokenId, TokenKind};
     use crate::license_detection::index::LicenseIndex;
+    use crate::license_detection::index::dictionary::{TokenId, TokenKind};
     use crate::license_detection::index::token_sets::build_set_and_mset;
     use crate::license_detection::models::Rule;
     use crate::license_detection::query::Query;
@@ -80,12 +80,7 @@ mod tests {
             license_expression: expression.to_string(),
             text: text.to_string(),
             tokens: tokens.clone(),
-            is_license_text: true,
-            is_license_notice: false,
-            is_license_reference: false,
-            is_license_tag: false,
-            is_license_intro: false,
-            is_license_clue: false,
+            rule_kind: crate::license_detection::models::RuleKind::Text,
             is_false_positive: false,
             is_required_phrase: false,
             is_from_license: false,

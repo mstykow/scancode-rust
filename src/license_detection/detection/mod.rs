@@ -97,7 +97,6 @@ pub fn populate_detection_from_group(detection: &mut LicenseDetection, group: &D
     } else {
         detection.identifier = None;
     }
-
 }
 
 /// Populate LicenseDetection from a DetectionGroup with SPDX mapping.
@@ -123,8 +122,10 @@ pub fn populate_detection_from_group_with_spdx(
 
     for match_item in &mut detection.matches {
         if match_item.license_expression_spdx.is_none()
-            && let Ok(spdx_expr) =
-                determine_spdx_expression_from_scancode(&match_item.license_expression, spdx_mapping)
+            && let Ok(spdx_expr) = determine_spdx_expression_from_scancode(
+                &match_item.license_expression,
+                spdx_mapping,
+            )
         {
             match_item.license_expression_spdx = Some(spdx_expr);
         }
@@ -369,11 +370,7 @@ mod tests {
             rule_url: "https://example.com".to_string(),
             matched_text: Some("MIT License".to_string()),
             referenced_filenames: None,
-            is_license_intro: false,
-            is_license_clue: false,
-            is_license_reference: false,
-            is_license_tag: false,
-            is_license_text: false,
+            rule_kind: crate::license_detection::models::RuleKind::None,
             is_from_license: false,
             rule_length: 100,
             matched_token_positions: None,
@@ -959,7 +956,7 @@ mod tests {
     #[test]
     fn test_create_detection_from_group_unknown_reference_filters() {
         let mut m = create_test_match(1, 10, "2-aho", "mit.LICENSE");
-        m.is_license_reference = true;
+        m.rule_kind = crate::license_detection::models::RuleKind::Reference;
         let group = DetectionGroup::new(vec![m]);
         let detection = create_detection_from_group(&group);
         assert_eq!(detection.matches.len(), 1);

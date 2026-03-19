@@ -110,7 +110,7 @@ pub fn high_multiset_subset(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::license_detection::index::dictionary::{tid, TokenDictionary, TokenId};
+    use crate::license_detection::index::dictionary::{TokenDictionary, TokenId, tid};
 
     #[test]
     fn test_build_set_and_mset() {

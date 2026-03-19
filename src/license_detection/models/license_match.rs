@@ -1,9 +1,13 @@
 //! License match result from a matching strategy.
 
+use serde::de::Error as _;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::fmt;
 use std::str::FromStr;
+
+use crate::license_detection::index::LicenseIndex;
+use crate::license_detection::models::{Rule, RuleKind};
 
 fn default_rule_length() -> usize {
     0
@@ -76,18 +80,16 @@ impl FromStr for MatcherKind {
 }
 
 /// License match result from a matching strategy.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct LicenseMatch {
     /// Internal rule ID for fast lookups (index into rules_by_rid).
     /// Not serialized to JSON output.
-    #[serde(skip)]
     pub rid: usize,
 
     /// License expression string using ScanCode license keys
     pub license_expression: String,
 
     /// SPDX rendering of the license expression when it is known.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub license_expression_spdx: Option<String>,
 
     /// File where match was found (if applicable)
@@ -101,12 +103,10 @@ pub struct LicenseMatch {
 
     /// Start token position (0-indexed in query token stream)
     /// Used for dual-criteria match grouping with token gap threshold.
-    #[serde(default)]
     pub start_token: usize,
 
     /// End token position (0-indexed, exclusive)
     /// Used for dual-criteria match grouping with token gap threshold.
-    #[serde(default)]
     pub end_token: usize,
 
     /// Matching strategy used to create this match.
@@ -120,7 +120,6 @@ pub struct LicenseMatch {
 
     /// Token count of the matched rule (from rule.tokens.len())
     /// Used for false positive detection instead of matched_length.
-    #[serde(default = "default_rule_length")]
     pub rule_length: usize,
 
     /// Match coverage as percentage 0.0-100.0
@@ -142,27 +141,11 @@ pub struct LicenseMatch {
     /// Populated from rule.referenced_filenames when rule matches
     pub referenced_filenames: Option<Vec<String>>,
 
-    /// True if this match is from a license intro rule
-    pub is_license_intro: bool,
-
-    /// True if this match is from a license clue rule
-    pub is_license_clue: bool,
-
-    /// True if this match is from a license reference rule
-    #[serde(default)]
-    pub is_license_reference: bool,
-
-    /// True if this match is from a license tag rule
-    #[serde(default)]
-    pub is_license_tag: bool,
-
-    /// True if this match is from a license text rule (full license text, not notice)
-    #[serde(default)]
-    pub is_license_text: bool,
+    /// Classification of the rule that produced this match.
+    pub rule_kind: RuleKind,
 
     /// True if this match is from a rule created from a license file (not a .RULE file)
     /// Rules from LICENSE files have relevance=100 and should take priority over decomposed expressions.
-    #[serde(default)]
     pub is_from_license: bool,
 
     /// Token positions matched by this license (for span subtraction).
@@ -170,14 +153,12 @@ pub struct LicenseMatch {
     /// Populated during matching to enable double-match prevention.
     /// None means contiguous range [start_token, end_token).
     /// Some(positions) contains the exact positions for non-contiguous matches.
-    #[serde(skip)]
     pub matched_token_positions: Option<Vec<usize>>,
 
     /// Count of matched high-value legalese tokens (token IDs < len_legalese).
     ///
     /// Corresponds to Python's `len(self.hispan)` - the number of matched positions
     /// where the token ID is a high-value legalese token.
-    #[serde(default)]
     pub hilen: usize,
 
     /// Rule-side start position (where in the rule text the match starts).
@@ -187,38 +168,201 @@ pub struct LicenseMatch {
     ///
     /// For exact matches (hash, aho), this is always 0.
     /// For approximate matches (seq), this is the position in the rule where alignment begins.
-    #[serde(default)]
     pub rule_start_token: usize,
 
     /// Token positions matched in the query text.
     /// None means contiguous range [start_token, end_token).
     /// Some(positions) contains exact positions for non-contiguous matches (after merge).
-    #[serde(skip)]
     pub qspan_positions: Option<Vec<usize>>,
 
     /// Token positions matched in the rule text.
     /// None means contiguous range [rule_start_token, rule_start_token + matched_length).
     /// Some(positions) contains exact positions for non-contiguous matches (after merge).
-    #[serde(skip)]
     pub ispan_positions: Option<Vec<usize>>,
 
     /// Token positions in the rule that are high-value legalese tokens.
     /// None means hispan can be computed from rule_start_token (contiguous case).
     /// Some(positions) contains exact positions for non-contiguous hispans (after merge).
-    #[serde(skip)]
     pub hispan_positions: Option<Vec<usize>>,
 
     /// Candidate resemblance score from set similarity.
     /// Used for cross-license tie-breaking when matches overlap.
     /// Higher resemblance means better candidate quality.
-    #[serde(default)]
     pub candidate_resemblance: f32,
 
     /// Candidate containment score from set similarity.
     /// Used for cross-license tie-breaking when matches overlap.
     /// Higher containment means more of the rule is matched.
-    #[serde(default)]
     pub candidate_containment: f32,
+}
+
+#[derive(Serialize)]
+struct SerializableLicenseMatch<'a> {
+    license_expression: &'a str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    license_expression_spdx: &'a Option<String>,
+    from_file: &'a Option<String>,
+    start_line: usize,
+    end_line: usize,
+    start_token: usize,
+    end_token: usize,
+    matcher: MatcherKind,
+    score: f32,
+    matched_length: usize,
+    rule_length: usize,
+    match_coverage: f32,
+    rule_relevance: u8,
+    rule_identifier: &'a str,
+    rule_url: &'a str,
+    matched_text: &'a Option<String>,
+    referenced_filenames: &'a Option<Vec<String>>,
+    is_license_intro: bool,
+    is_license_clue: bool,
+    is_license_reference: bool,
+    is_license_tag: bool,
+    is_license_text: bool,
+    is_from_license: bool,
+    hilen: usize,
+    rule_start_token: usize,
+    candidate_resemblance: f32,
+    candidate_containment: f32,
+}
+
+#[derive(Deserialize)]
+struct DeserializableLicenseMatch {
+    #[serde(default)]
+    license_expression: String,
+    #[serde(default)]
+    license_expression_spdx: Option<String>,
+    #[serde(default)]
+    from_file: Option<String>,
+    start_line: usize,
+    end_line: usize,
+    #[serde(default)]
+    start_token: usize,
+    #[serde(default)]
+    end_token: usize,
+    matcher: MatcherKind,
+    score: f32,
+    matched_length: usize,
+    #[serde(default = "default_rule_length")]
+    rule_length: usize,
+    match_coverage: f32,
+    rule_relevance: u8,
+    #[serde(default)]
+    rule_identifier: String,
+    #[serde(default)]
+    rule_url: String,
+    #[serde(default)]
+    matched_text: Option<String>,
+    #[serde(default)]
+    referenced_filenames: Option<Vec<String>>,
+    #[serde(default)]
+    is_license_intro: bool,
+    #[serde(default)]
+    is_license_clue: bool,
+    #[serde(default)]
+    is_license_reference: bool,
+    #[serde(default)]
+    is_license_tag: bool,
+    #[serde(default)]
+    is_license_text: bool,
+    #[serde(default)]
+    is_from_license: bool,
+    #[serde(default)]
+    hilen: usize,
+    #[serde(default)]
+    rule_start_token: usize,
+    #[serde(default)]
+    candidate_resemblance: f32,
+    #[serde(default)]
+    candidate_containment: f32,
+}
+
+impl Serialize for LicenseMatch {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        SerializableLicenseMatch {
+            license_expression: &self.license_expression,
+            license_expression_spdx: &self.license_expression_spdx,
+            from_file: &self.from_file,
+            start_line: self.start_line,
+            end_line: self.end_line,
+            start_token: self.start_token,
+            end_token: self.end_token,
+            matcher: self.matcher,
+            score: self.score,
+            matched_length: self.matched_length,
+            rule_length: self.rule_length,
+            match_coverage: self.match_coverage,
+            rule_relevance: self.rule_relevance,
+            rule_identifier: &self.rule_identifier,
+            rule_url: &self.rule_url,
+            matched_text: &self.matched_text,
+            referenced_filenames: &self.referenced_filenames,
+            is_license_intro: self.is_license_intro(),
+            is_license_clue: self.is_license_clue(),
+            is_license_reference: self.is_license_reference(),
+            is_license_tag: self.is_license_tag(),
+            is_license_text: self.is_license_text(),
+            is_from_license: self.is_from_license,
+            hilen: self.hilen,
+            rule_start_token: self.rule_start_token,
+            candidate_resemblance: self.candidate_resemblance,
+            candidate_containment: self.candidate_containment,
+        }
+        .serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for LicenseMatch {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = DeserializableLicenseMatch::deserialize(deserializer)?;
+        let rule_kind = RuleKind::from_match_flags(
+            value.is_license_text,
+            value.is_license_reference,
+            value.is_license_tag,
+            value.is_license_intro,
+            value.is_license_clue,
+        )
+        .map_err(D::Error::custom)?;
+
+        Ok(Self {
+            rid: 0,
+            license_expression: value.license_expression,
+            license_expression_spdx: value.license_expression_spdx,
+            from_file: value.from_file,
+            start_line: value.start_line,
+            end_line: value.end_line,
+            start_token: value.start_token,
+            end_token: value.end_token,
+            matcher: value.matcher,
+            score: value.score,
+            matched_length: value.matched_length,
+            rule_length: value.rule_length,
+            match_coverage: value.match_coverage,
+            rule_relevance: value.rule_relevance,
+            rule_identifier: value.rule_identifier,
+            rule_url: value.rule_url,
+            matched_text: value.matched_text,
+            referenced_filenames: value.referenced_filenames,
+            rule_kind,
+            is_from_license: value.is_from_license,
+            matched_token_positions: None,
+            hilen: value.hilen,
+            rule_start_token: value.rule_start_token,
+            qspan_positions: None,
+            ispan_positions: None,
+            hispan_positions: None,
+            candidate_resemblance: value.candidate_resemblance,
+            candidate_containment: value.candidate_containment,
+        })
+    }
 }
 
 impl Default for LicenseMatch {
@@ -242,11 +386,7 @@ impl Default for LicenseMatch {
             rule_url: String::new(),
             matched_text: None,
             referenced_filenames: None,
-            is_license_intro: false,
-            is_license_clue: false,
-            is_license_reference: false,
-            is_license_tag: false,
-            is_license_text: false,
+            rule_kind: RuleKind::None,
             is_from_license: false,
             matched_token_positions: None,
             hilen: 0,
@@ -261,8 +401,39 @@ impl Default for LicenseMatch {
 }
 
 impl LicenseMatch {
+    pub fn rule<'a>(&self, index: &'a LicenseIndex) -> Option<&'a Rule> {
+        let rule = index.rules_by_rid.get(self.rid)?;
+        (rule.identifier == self.rule_identifier
+            && rule.license_expression == self.license_expression)
+            .then_some(rule)
+    }
+
     pub fn matcher_order(&self) -> u8 {
         self.matcher.precedence()
+    }
+
+    pub const fn is_license_text(&self) -> bool {
+        self.rule_kind.is_license_text()
+    }
+
+    pub const fn is_license_notice(&self) -> bool {
+        self.rule_kind.is_license_notice()
+    }
+
+    pub const fn is_license_reference(&self) -> bool {
+        self.rule_kind.is_license_reference()
+    }
+
+    pub const fn is_license_tag(&self) -> bool {
+        self.rule_kind.is_license_tag()
+    }
+
+    pub const fn is_license_intro(&self) -> bool {
+        self.rule_kind.is_license_intro()
+    }
+
+    pub const fn is_license_clue(&self) -> bool {
+        self.rule_kind.is_license_clue()
     }
 
     pub fn hilen(&self) -> usize {

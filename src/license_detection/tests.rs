@@ -765,9 +765,11 @@ fn test_png_h_detect_matches_match_python_raw_rules() {
             && m.end_line == 401
     }));
     assert!(!matches.iter().any(|m| m.rule_identifier == "libpng_4.RULE"));
-    assert!(!matches
-        .iter()
-        .any(|m| m.rule_identifier == "unknown-license-reference_301.RULE"));
+    assert!(
+        !matches
+            .iter()
+            .any(|m| m.rule_identifier == "unknown-license-reference_301.RULE")
+    );
 }
 
 #[test]
@@ -805,9 +807,11 @@ fn test_standard_ml_nj_and_x11_and_x11_opengroup_detect_matches_match_python_raw
             ),
         ]
     );
-    assert!(!matches
-        .iter()
-        .any(|m| m.rule_identifier == "x11-bitstream_4.RULE"));
+    assert!(
+        !matches
+            .iter()
+            .any(|m| m.rule_identifier == "x11-bitstream_4.RULE")
+    );
 }
 
 #[test]
@@ -845,9 +849,11 @@ fn test_standard_ml_nj_and_x11_and_x11_opengroup_1_detect_matches_match_python_r
             ),
         ]
     );
-    assert!(!matches
-        .iter()
-        .any(|m| m.rule_identifier == "x11-bitstream_4.RULE"));
+    assert!(
+        !matches
+            .iter()
+            .any(|m| m.rule_identifier == "x11-bitstream_4.RULE")
+    );
 }
 
 #[test]
@@ -2498,7 +2504,6 @@ fn test_unknown_proprietary() {
         "Should detect unknown license or return empty"
     );
 }
-
 
 #[test]
 fn test_no_token_boundary_false_positives() {

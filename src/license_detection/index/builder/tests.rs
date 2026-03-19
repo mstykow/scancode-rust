@@ -1,12 +1,12 @@
 #[cfg(test)]
 mod test_cases {
+    use crate::license_detection::index::LicenseIndex;
     use crate::license_detection::index::builder::{
         build_index, compute_is_approx_matchable, generate_url_variants, is_good_tokens_ngram,
         ngrams, tokens_to_bytes,
     };
-    use crate::license_detection::index::dictionary::{tid, KnownToken, TokenId, TokenKind};
-    use crate::license_detection::index::LicenseIndex;
-    use crate::license_detection::models::{License, Rule};
+    use crate::license_detection::index::dictionary::{KnownToken, TokenId, TokenKind, tid};
+    use crate::license_detection::models::{License, Rule, RuleKind};
 
     fn known_tokens(entries: &[(u16, TokenKind)]) -> Vec<KnownToken> {
         entries
@@ -48,12 +48,7 @@ mod test_cases {
             license_expression: "mit".to_string(),
             text: text.to_string(),
             tokens: vec![],
-            is_license_text: false,
-            is_license_notice: false,
-            is_license_reference: false,
-            is_license_tag: false,
-            is_license_intro: false,
-            is_license_clue: false,
+            rule_kind: crate::license_detection::models::RuleKind::None,
             is_false_positive,
             is_required_phrase: false,
             is_from_license: false,
@@ -141,10 +136,12 @@ mod test_cases {
         assert_eq!(index.tids_by_rid.len(), 2);
 
         let rid = find_rid_by_identifier(&index, "test.RULE").expect("rule should exist");
-        assert!(index
-            .rid_by_hash
-            .values()
-            .any(|&stored_rid| stored_rid == rid));
+        assert!(
+            index
+                .rid_by_hash
+                .values()
+                .any(|&stored_rid| stored_rid == rid)
+        );
         assert!(!index.false_positive_rids.contains(&rid));
         assert!(index.licenses_by_key.contains_key("mit"));
     }
@@ -241,8 +238,7 @@ mod test_cases {
         rule.is_continuous = false;
         rule.is_required_phrase = false;
         rule.is_false_positive = false;
-        rule.is_license_reference = false;
-        rule.is_license_tag = false;
+        rule.rule_kind = RuleKind::None;
         assert!(compute_is_approx_matchable(&rule));
 
         rule.is_false_positive = true;
@@ -262,7 +258,7 @@ mod test_cases {
         rule.is_continuous = false;
 
         rule.is_small = true;
-        rule.is_license_reference = true;
+        rule.rule_kind = RuleKind::Reference;
         assert!(!compute_is_approx_matchable(&rule));
     }
 
@@ -526,18 +522,18 @@ mod test_cases {
             false,
         );
         regular_rule.identifier = "regular.RULE".to_string();
-        regular_rule.is_license_text = true;
+        regular_rule.rule_kind = RuleKind::Text;
 
         let mut tiny_rule = create_test_rule("MIT", false);
         tiny_rule.identifier = "tiny.RULE".to_string();
-        tiny_rule.is_license_text = false;
+        tiny_rule.rule_kind = RuleKind::None;
 
         let mut false_positive_rule = create_test_rule("Some text", true);
         false_positive_rule.identifier = "false_positive.RULE".to_string();
 
         let mut reference_rule = create_test_rule("MIT License", false);
         reference_rule.identifier = "reference.RULE".to_string();
-        reference_rule.is_license_reference = true;
+        reference_rule.rule_kind = RuleKind::Reference;
 
         let rules = vec![
             regular_rule.clone(),
@@ -622,7 +618,7 @@ mod test_cases {
             false,
         );
         reference_rule.identifier = "small-reference.RULE".to_string();
-        reference_rule.is_license_reference = true;
+        reference_rule.rule_kind = RuleKind::Reference;
 
         let index = build_index(vec![reference_rule], vec![]);
         let rid = find_rid_by_identifier(&index, "small-reference.RULE").expect("reference rule");
@@ -671,7 +667,7 @@ SOFTWARE."#;
 
         let mut mit_rule = create_test_rule(mit_text, false);
         mit_rule.identifier = "mit-custom.RULE".to_string();
-        mit_rule.is_license_text = true;
+        mit_rule.rule_kind = RuleKind::Text;
         mit_rule.license_expression = "mit".to_string();
 
         let rules = vec![mit_rule];
@@ -690,18 +686,22 @@ SOFTWARE."#;
         let mit_custom_rid = find_rid_by_identifier(&index, "mit-custom.RULE");
 
         if let Some(rid) = mit_license_rid {
-            assert!(index
-                .rid_by_hash
-                .values()
-                .any(|&stored_rid| stored_rid == rid));
+            assert!(
+                index
+                    .rid_by_hash
+                    .values()
+                    .any(|&stored_rid| stored_rid == rid)
+            );
             assert!(!index.false_positive_rids.contains(&rid));
         }
 
         if let Some(rid) = mit_custom_rid {
-            assert!(index
-                .rid_by_hash
-                .values()
-                .any(|&stored_rid| stored_rid == rid));
+            assert!(
+                index
+                    .rid_by_hash
+                    .values()
+                    .any(|&stored_rid| stored_rid == rid)
+            );
             assert!(!index.false_positive_rids.contains(&rid));
         }
     }

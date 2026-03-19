@@ -56,7 +56,7 @@ Permission is hereby granted, free of charge."#;
     let rule = result.unwrap();
     assert_eq!(rule.license_expression, "mit");
     assert!(rule.text.contains("Permission"));
-    assert!(rule.is_license_text);
+    assert!(rule.is_license_text());
 }
 
 #[test]
@@ -82,10 +82,12 @@ name: Test License
         result.is_err(),
         "Empty text should fail for non-deprecated license"
     );
-    assert!(result
-        .unwrap_err()
-        .to_string()
-        .contains("empty text content"));
+    assert!(
+        result
+            .unwrap_err()
+            .to_string()
+            .contains("empty text content")
+    );
 }
 
 #[test]
@@ -136,10 +138,12 @@ license_expression: mit
 
     let result = parse_rule_from_str(content, "empty-text.RULE");
     assert!(result.is_err(), "Rule with empty text should fail");
-    assert!(result
-        .unwrap_err()
-        .to_string()
-        .contains("empty text content"));
+    assert!(
+        result
+            .unwrap_err()
+            .to_string()
+            .contains("empty text content")
+    );
 }
 
 #[test]
@@ -225,6 +229,7 @@ This is the license text."#;
 fn test_parse_rule_with_pgp_signature() {
     let content = r#"---
 license_expression: test-rule
+is_license_text: yes
 ---
 -----BEGIN PGP SIGNED MESSAGE-----
 
@@ -277,6 +282,7 @@ License text here."#;
 fn test_parse_rule_minimum_coverage() {
     let content = r#"---
 license_expression: test
+is_license_notice: yes
 minimum_coverage: 99
 ---
 Rule text."#;
@@ -292,6 +298,7 @@ Rule text."#;
 fn test_parse_rule_without_minimum_coverage_has_no_stored_provenance() {
     let content = r#"---
 license_expression: test
+is_license_notice: yes
 ---
 Rule text."#;
 
@@ -331,16 +338,7 @@ is_continuous: yes
 Text."#;
 
     let result = parse_rule_from_str(content, "flags.RULE");
-    assert!(result.is_ok());
-    let rule = result.unwrap();
-    assert!(rule.is_license_text);
-    assert!(rule.is_license_notice);
-    assert!(rule.is_license_reference);
-    assert!(rule.is_license_tag);
-    assert!(rule.is_license_intro);
-    assert!(rule.is_license_clue);
-    assert!(rule.is_false_positive);
-    assert!(rule.is_continuous);
+    assert!(result.is_err());
 }
 
 #[test]
@@ -509,6 +507,7 @@ License text."#;
 fn test_parse_rule_with_ignorable_fields() {
     let content = r#"---
 license_expression: test
+is_license_notice: yes
 ignorable_urls:
     - http://example.com
 ignorable_emails:
@@ -536,6 +535,7 @@ Rule text."#;
 fn test_parse_rule_with_referenced_filenames() {
     let content = r#"---
 license_expression: mit
+is_license_reference: yes
 referenced_filenames:
     - MIT.txt
     - LICENSE
@@ -555,6 +555,7 @@ MIT License"#;
 fn test_parse_rule_relevance_field() {
     let content = r#"---
 license_expression: mit
+is_license_notice: yes
 relevance: 85
 ---
 MIT License"#;
@@ -569,6 +570,7 @@ MIT License"#;
 fn test_parse_rule_relevance_default() {
     let content = r#"---
 license_expression: mit
+is_license_notice: yes
 ---
 MIT License"#;
 
@@ -622,6 +624,7 @@ replaced_by:
 fn test_parse_rule_notes_field() {
     let content = r#"---
 license_expression: test
+is_license_notice: yes
 notes: This is a test note.
 ---
 Rule text."#;
@@ -637,6 +640,7 @@ Rule text."#;
 fn test_parse_rule_language_field() {
     let content = r#"---
 license_expression: test
+is_license_notice: yes
 language: en
 ---
 Rule text."#;
@@ -678,9 +682,9 @@ License text."#;
 fn test_parse_bool_variants() {
     let content = r#"---
 license_expression: test
-is_license_text: true
-is_license_notice: "yes"
 is_license_reference: "1"
+is_license_notice: "no"
+is_license_text: false
 is_license_tag: false
 is_license_intro: "no"
 is_license_clue: "0"
@@ -690,12 +694,12 @@ Text."#;
     let result = parse_rule_from_str(content, "bool-variants.RULE");
     assert!(result.is_ok());
     let rule = result.unwrap();
-    assert!(rule.is_license_text);
-    assert!(rule.is_license_notice);
-    assert!(rule.is_license_reference);
-    assert!(!rule.is_license_tag);
-    assert!(!rule.is_license_intro);
-    assert!(!rule.is_license_clue);
+    assert!(rule.is_license_reference());
+    assert!(!rule.is_license_notice());
+    assert!(!rule.is_license_text());
+    assert!(!rule.is_license_tag());
+    assert!(!rule.is_license_intro());
+    assert!(!rule.is_license_clue());
 }
 
 #[test]
@@ -713,7 +717,7 @@ fn test_ibmpl_rule_loaded() {
 
     let rule = ibmpl_1.unwrap();
     assert_eq!(rule.license_expression, "ibmpl-1.0");
-    assert!(rule.is_license_reference);
+    assert!(rule.is_license_reference());
     assert_eq!(rule.relevance, 100);
 
     let expected_text = "distributed under the IBM Public License (IPL).";

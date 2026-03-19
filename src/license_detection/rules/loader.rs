@@ -1,6 +1,6 @@
 //! Parse .LICENSE and .RULE files.
 
-use crate::license_detection::models::{License, Rule};
+use crate::license_detection::models::{License, Rule, RuleKind};
 use anyhow::{Context, Result, anyhow};
 use log::warn;
 use once_cell::sync::Lazy;
@@ -326,18 +326,41 @@ pub fn parse_rule_file(path: &Path) -> Result<Rule> {
     };
 
     let minimum_coverage = fm.minimum_coverage.and_then(|n| n.as_u8());
+    let rule_kind = RuleKind::from_rule_flags(
+        fm.is_license_text.unwrap_or(false),
+        fm.is_license_notice.unwrap_or(false),
+        fm.is_license_reference.unwrap_or(false),
+        fm.is_license_tag.unwrap_or(false),
+        fm.is_license_intro.unwrap_or(false),
+        fm.is_license_clue.unwrap_or(false),
+    )
+    .map_err(|_| {
+        anyhow!(
+            "Rule file has multiple is_license_* flags: {}",
+            path.display()
+        )
+    })?;
+
+    if !is_false_positive && rule_kind == RuleKind::None {
+        return Err(anyhow!(
+            "Rule file must set exactly one is_license_* flag unless it is false_positive: {}",
+            path.display()
+        ));
+    }
+
+    if is_false_positive && rule_kind != RuleKind::None {
+        return Err(anyhow!(
+            "Rule file cannot combine is_false_positive with is_license_* flags: {}",
+            path.display()
+        ));
+    }
 
     Ok(Rule {
         identifier,
         license_expression,
         text: trimmed_text.to_string(),
         tokens: vec![],
-        is_license_text: fm.is_license_text.unwrap_or(false),
-        is_license_notice: fm.is_license_notice.unwrap_or(false),
-        is_license_reference: fm.is_license_reference.unwrap_or(false),
-        is_license_tag: fm.is_license_tag.unwrap_or(false),
-        is_license_intro: fm.is_license_intro.unwrap_or(false),
-        is_license_clue: fm.is_license_clue.unwrap_or(false),
+        rule_kind,
         is_false_positive: fm.is_false_positive.unwrap_or(false),
         is_required_phrase: fm.is_required_phrase.unwrap_or(false),
         is_from_license: false,
@@ -701,7 +724,7 @@ MIT.txt"#,
         let rule = parse_rule_file(&rule_path).unwrap();
         assert_eq!(rule.license_expression, "mit");
         assert_eq!(rule.text, "MIT.txt");
-        assert!(rule.is_license_reference);
+        assert!(rule.is_license_reference());
         assert_eq!(rule.relevance, 90);
     }
 
@@ -722,8 +745,8 @@ MIT License"#,
         .unwrap();
 
         let rule = parse_rule_file(&rule_path).unwrap();
-        assert!(rule.is_license_notice);
-        assert!(!rule.is_license_tag);
+        assert!(rule.is_license_notice());
+        assert!(!rule.is_license_tag());
     }
 
     #[test]
@@ -761,7 +784,7 @@ MIT License"#,
             .find(|r| r.license_expression == "mit" && r.text.contains("MIT.txt"));
         assert!(mit_rule.is_some(), "MIT reference rule should be loaded");
         let mit_rule = mit_rule.unwrap();
-        assert!(mit_rule.is_license_reference);
+        assert!(mit_rule.is_license_reference());
         assert_eq!(mit_rule.relevance, 90);
     }
 
@@ -773,12 +796,7 @@ MIT License"#,
                 license_expression: "mit".to_string(),
                 text: "MIT License".to_string(),
                 tokens: vec![],
-                is_license_text: true,
-                is_license_notice: false,
-                is_license_reference: false,
-                is_license_tag: false,
-                is_license_intro: false,
-                is_license_clue: false,
+                rule_kind: crate::license_detection::models::RuleKind::Text,
                 is_false_positive: false,
                 is_required_phrase: false,
                 is_from_license: false,
@@ -816,12 +834,7 @@ MIT License"#,
                 license_expression: "apache-2.0".to_string(),
                 text: "MIT License".to_string(),
                 tokens: vec![],
-                is_license_text: true,
-                is_license_notice: false,
-                is_license_reference: false,
-                is_license_tag: false,
-                is_license_intro: false,
-                is_license_clue: false,
+                rule_kind: crate::license_detection::models::RuleKind::Text,
                 is_false_positive: false,
                 is_required_phrase: false,
                 is_from_license: false,
@@ -866,12 +879,7 @@ MIT License"#,
             license_expression: "".to_string(),
             text: "Some text".to_string(),
             tokens: vec![],
-            is_license_text: false,
-            is_license_notice: false,
-            is_license_reference: false,
-            is_license_tag: false,
-            is_license_intro: false,
-            is_license_clue: false,
+            rule_kind: crate::license_detection::models::RuleKind::None,
             is_false_positive: true,
             is_required_phrase: false,
             is_from_license: false,
@@ -916,12 +924,7 @@ MIT License"#,
                 license_expression: "mit".to_string(),
                 text: "MIT License".to_string(),
                 tokens: vec![],
-                is_license_text: true,
-                is_license_notice: false,
-                is_license_reference: false,
-                is_license_tag: false,
-                is_license_intro: false,
-                is_license_clue: false,
+                rule_kind: crate::license_detection::models::RuleKind::Text,
                 is_false_positive: false,
                 is_required_phrase: false,
                 is_from_license: false,
@@ -959,12 +962,7 @@ MIT License"#,
                 license_expression: "apache-2.0".to_string(),
                 text: "Apache License".to_string(),
                 tokens: vec![],
-                is_license_text: true,
-                is_license_notice: false,
-                is_license_reference: false,
-                is_license_tag: false,
-                is_license_intro: false,
-                is_license_clue: false,
+                rule_kind: crate::license_detection::models::RuleKind::Text,
                 is_false_positive: false,
                 is_required_phrase: false,
                 is_from_license: false,

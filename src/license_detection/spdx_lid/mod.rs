@@ -16,7 +16,7 @@
 use regex::Regex;
 
 use crate::license_detection::expression::{
-    expression_to_string, parse_expression, LicenseExpression,
+    LicenseExpression, expression_to_string, parse_expression,
 };
 use crate::license_detection::index::LicenseIndex;
 use crate::license_detection::models::{LicenseMatch, MatcherKind};
@@ -337,11 +337,7 @@ pub fn spdx_lid_match(index: &LicenseIndex, query: &Query) -> Vec<LicenseMatch> 
                 rule_url: String::new(),
                 matched_text: Some(matched_text),
                 referenced_filenames,
-                is_license_intro: false,
-                is_license_clue: false,
-                is_license_reference: false,
-                is_license_tag: true,
-                is_license_text: false,
+                rule_kind: crate::license_detection::models::RuleKind::Tag,
                 is_from_license: false,
                 matched_token_positions: None,
                 hilen: 0,

@@ -281,11 +281,7 @@ fn create_unknown_match_from_qspan(
         rule_url: String::new(),
         matched_text: Some(matched_text),
         referenced_filenames: None,
-        is_license_intro: false,
-        is_license_clue: false,
-        is_license_reference: false,
-        is_license_tag: false,
-        is_license_text: false,
+        rule_kind: crate::license_detection::models::RuleKind::None,
         is_from_license: false,
         matched_token_positions: None,
         hilen: hispan,
@@ -572,8 +568,8 @@ fn calculate_score(ngram_count: usize, match_len: usize) -> f32 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::license_detection::index::dictionary::{TokenId, tid};
     use crate::license_detection::index::LicenseIndex;
+    use crate::license_detection::index::dictionary::{TokenId, tid};
     use crate::license_detection::query::Query;
 
     fn tids(values: &[u16]) -> Vec<TokenId> {
@@ -679,15 +675,21 @@ mod tests {
         let legalese_entries: Vec<(String, u16)> = (0..15)
             .map(|i| (format!("legalese-{i}"), i as u16))
             .collect();
-        index.dictionary = crate::license_detection::index::dictionary::TokenDictionary::new_with_legalese(
-            &legalese_entries
-                .iter()
-                .map(|(token, id)| (token.as_str(), *id))
-                .collect::<Vec<_>>(),
-        );
+        index.dictionary =
+            crate::license_detection::index::dictionary::TokenDictionary::new_with_legalese(
+                &legalese_entries
+                    .iter()
+                    .map(|(token, id)| (token.as_str(), *id))
+                    .collect::<Vec<_>>(),
+            );
 
         let mut tokens: Vec<TokenId> = (0..15)
-            .map(|i| index.dictionary.get_token_id(&format!("legalese-{i}")).unwrap())
+            .map(|i| {
+                index
+                    .dictionary
+                    .get_token_id(&format!("legalese-{i}"))
+                    .unwrap()
+            })
             .collect();
         for i in 15..30 {
             tokens.push(index.dictionary.get_or_assign(&format!("regular-{i}")));
@@ -783,7 +785,8 @@ mod tests {
     #[test]
     fn test_compute_covered_positions_gapped_qspan() {
         let index = LicenseIndex::with_legalese_count(10);
-        let query = Query::from_extracted_text("some license text here", &index, false).expect("Failed to create query");
+        let query = Query::from_extracted_text("some license text here", &index, false)
+            .expect("Failed to create query");
 
         let known_matches = vec![LicenseMatch {
             rid: 0,
@@ -805,11 +808,7 @@ mod tests {
             rule_url: String::new(),
             matched_text: Some("matched text".to_string()),
             referenced_filenames: None,
-            is_license_intro: false,
-            is_license_clue: false,
-            is_license_reference: false,
-            is_license_tag: false,
-            is_license_text: false,
+            rule_kind: crate::license_detection::models::RuleKind::None,
             is_from_license: false,
             hilen: 1,
             rule_start_token: 0,
@@ -837,7 +836,8 @@ mod tests {
     #[test]
     fn test_compute_covered_positions_fallback_contiguous() {
         let index = LicenseIndex::with_legalese_count(10);
-        let query = Query::from_extracted_text("some license text here", &index, false).expect("Failed to create query");
+        let query = Query::from_extracted_text("some license text here", &index, false)
+            .expect("Failed to create query");
 
         let known_matches = vec![LicenseMatch {
             rid: 0,
@@ -859,11 +859,7 @@ mod tests {
             rule_url: String::new(),
             matched_text: Some("matched text".to_string()),
             referenced_filenames: None,
-            is_license_intro: false,
-            is_license_clue: false,
-            is_license_reference: false,
-            is_license_tag: false,
-            is_license_text: false,
+            rule_kind: crate::license_detection::models::RuleKind::None,
             is_from_license: false,
             hilen: 1,
             rule_start_token: 0,
@@ -892,7 +888,8 @@ mod tests {
     #[test]
     fn test_compute_covered_positions_qspan_creates_extra_unmatched_region() {
         let index = LicenseIndex::with_legalese_count(10);
-        let query = Query::from_extracted_text("some license text here", &index, false).expect("Failed to create query");
+        let query = Query::from_extracted_text("some license text here", &index, false)
+            .expect("Failed to create query");
 
         let known_matches = vec![LicenseMatch {
             rid: 0,
@@ -914,11 +911,7 @@ mod tests {
             rule_url: String::new(),
             matched_text: Some("matched text".to_string()),
             referenced_filenames: None,
-            is_license_intro: false,
-            is_license_clue: false,
-            is_license_reference: false,
-            is_license_tag: false,
-            is_license_text: false,
+            rule_kind: crate::license_detection::models::RuleKind::None,
             is_from_license: false,
             hilen: 1,
             rule_start_token: 0,
@@ -981,7 +974,8 @@ mod tests {
     fn test_unknown_match_with_known_matches() {
         let index = LicenseIndex::with_legalese_count(10);
         let text = "some text that is license related and should be detected";
-        let query = Query::from_extracted_text(text, &index, false).expect("Failed to create query");
+        let query =
+            Query::from_extracted_text(text, &index, false).expect("Failed to create query");
 
         let known_matches = vec![LicenseMatch {
             rid: 0,
@@ -1003,11 +997,7 @@ mod tests {
             rule_url: String::new(),
             matched_text: Some("some text".to_string()),
             referenced_filenames: None,
-            is_license_intro: false,
-            is_license_clue: false,
-            is_license_reference: false,
-            is_license_tag: false,
-            is_license_text: false,
+            rule_kind: crate::license_detection::models::RuleKind::None,
             is_from_license: false,
             hilen: 2,
             rule_start_token: 0,

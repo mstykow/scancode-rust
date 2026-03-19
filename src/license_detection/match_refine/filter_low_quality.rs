@@ -118,7 +118,7 @@ pub(crate) fn filter_short_matches_scattered_on_too_many_lines(
                 let matched_len = m.len();
                 let line_span = m.end_line.saturating_sub(m.start_line) + 1;
 
-                let effective_matched_len = if rule.is_license_tag {
+                let effective_matched_len = if rule.is_license_tag() {
                     matched_len + 2
                 } else {
                     matched_len
@@ -499,7 +499,7 @@ pub(crate) fn filter_invalid_matches_to_single_word_gibberish(
             let rid = m.rid;
             if let Some(rule) = index.rules_by_rid.get(rid)
                 && rule.length_unique == 1
-                && (rule.is_license_reference || rule.is_license_clue)
+                && (rule.is_license_reference() || rule.is_license_clue())
                 && let Some(matched_text) = &m.matched_text
             {
                 let max_diff = if rule.relevance >= 80 { 1 } else { 0 };
@@ -586,11 +586,7 @@ mod tests {
             rule_url: "https://example.com".to_string(),
             matched_text: None,
             referenced_filenames: None,
-            is_license_intro: false,
-            is_license_clue: false,
-            is_license_reference: false,
-            is_license_tag: false,
-            is_license_text: false,
+            rule_kind: crate::license_detection::models::RuleKind::None,
             is_from_license: false,
             hilen: 50,
             rule_start_token: 0,
@@ -628,11 +624,7 @@ mod tests {
             rule_url: "https://example.com".to_string(),
             matched_text: None,
             referenced_filenames: None,
-            is_license_intro: false,
-            is_license_clue: false,
-            is_license_reference: false,
-            is_license_tag: false,
-            is_license_text: false,
+            rule_kind: crate::license_detection::models::RuleKind::None,
             is_from_license: false,
             matched_token_positions: None,
             hilen: matched_length / 2,
@@ -832,12 +824,7 @@ mod tests {
             license_expression: "mit".to_string(),
             text: "test".to_string(),
             tokens: vec![],
-            is_license_text: false,
-            is_license_notice: false,
-            is_license_reference: false,
-            is_license_tag: false,
-            is_license_intro: false,
-            is_license_clue: false,
+            rule_kind: crate::license_detection::models::RuleKind::None,
             is_false_positive: false,
             is_required_phrase: false,
             is_from_license: false,
@@ -890,12 +877,7 @@ mod tests {
             license_expression: "mit".to_string(),
             text: "test".to_string(),
             tokens: vec![],
-            is_license_text: false,
-            is_license_notice: false,
-            is_license_reference: false,
-            is_license_tag: false,
-            is_license_intro: false,
-            is_license_clue: false,
+            rule_kind: crate::license_detection::models::RuleKind::None,
             is_false_positive: false,
             is_required_phrase: false,
             is_from_license: false,
@@ -960,12 +942,7 @@ mod tests {
             license_expression: "mit".to_string(),
             text: "test".to_string(),
             tokens: vec![],
-            is_license_text: false,
-            is_license_notice: false,
-            is_license_reference: false,
-            is_license_tag: false,
-            is_license_intro: false,
-            is_license_clue: false,
+            rule_kind: crate::license_detection::models::RuleKind::None,
             is_false_positive: false,
             is_required_phrase: false,
             is_from_license: false,
@@ -1016,12 +993,7 @@ mod tests {
             license_expression: "mit".to_string(),
             text: "test".to_string(),
             tokens: vec![],
-            is_license_text: false,
-            is_license_notice: false,
-            is_license_reference: false,
-            is_license_tag: false,
-            is_license_intro: false,
-            is_license_clue: false,
+            rule_kind: crate::license_detection::models::RuleKind::None,
             is_false_positive: false,
             is_required_phrase: false,
             is_from_license: false,
@@ -1072,12 +1044,7 @@ mod tests {
             license_expression: "mit".to_string(),
             text: "test".to_string(),
             tokens: vec![],
-            is_license_text: false,
-            is_license_notice: false,
-            is_license_reference: false,
-            is_license_tag: false,
-            is_license_intro: false,
-            is_license_clue: false,
+            rule_kind: crate::license_detection::models::RuleKind::None,
             is_false_positive: false,
             is_required_phrase: false,
             is_from_license: false,

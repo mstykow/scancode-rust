@@ -5,8 +5,8 @@
 
 use sha1::{Digest, Sha1};
 
-use crate::license_detection::index::dictionary::{TokenId, TokenKind};
 use crate::license_detection::index::LicenseIndex;
+use crate::license_detection::index::dictionary::{TokenId, TokenKind};
 use crate::license_detection::models::{LicenseMatch, MatcherKind};
 use crate::license_detection::query::QueryRun;
 use crate::license_detection::spans::Span;
@@ -100,11 +100,7 @@ pub fn hash_match(index: &LicenseIndex, query_run: &QueryRun) -> Vec<LicenseMatc
             rule_url: String::new(),
             matched_text: Some(matched_text),
             referenced_filenames: rule.referenced_filenames.clone(),
-            is_license_intro: rule.is_license_intro,
-            is_license_clue: rule.is_license_clue,
-            is_license_reference: rule.is_license_reference,
-            is_license_tag: rule.is_license_tag,
-            is_license_text: rule.is_license_text,
+            rule_kind: rule.kind(),
             is_from_license: rule.is_from_license,
             matched_token_positions: None,
             hilen: hispan_positions.len(),
@@ -140,12 +136,7 @@ mod tests {
                 license_expression: "mit".to_string(),
                 text: "MIT License".to_string(),
                 tokens: tids(&[0, 1]),
-                is_license_text: true,
-                is_license_notice: false,
-                is_license_reference: false,
-                is_license_tag: false,
-                is_license_intro: false,
-                is_license_clue: false,
+                rule_kind: crate::license_detection::models::RuleKind::Text,
                 is_false_positive: false,
                 is_required_phrase: false,
                 is_from_license: false,
@@ -183,12 +174,7 @@ mod tests {
                 license_expression: "apache-2.0".to_string(),
                 text: "Apache License 2.0".to_string(),
                 tokens: tids(&[2, 3, 4]),
-                is_license_text: true,
-                is_license_notice: false,
-                is_license_reference: false,
-                is_license_tag: false,
-                is_license_intro: false,
-                is_license_clue: false,
+                rule_kind: crate::license_detection::models::RuleKind::Text,
                 is_false_positive: false,
                 is_required_phrase: false,
                 is_from_license: false,

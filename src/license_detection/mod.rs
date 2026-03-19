@@ -213,7 +213,10 @@ fn is_redundant_low_coverage_composite_seq_wrapper(
         return false;
     }
 
-    let unique_expressions: HashSet<&str> = children.iter().map(|m| m.license_expression.as_str()).collect();
+    let unique_expressions: HashSet<&str> = children
+        .iter()
+        .map(|m| m.license_expression.as_str())
+        .collect();
     if unique_expressions.len() < 2 {
         return false;
     }
@@ -254,7 +257,9 @@ fn filter_redundant_low_coverage_composite_seq_wrappers(
 ) -> Vec<LicenseMatch> {
     seq_matches
         .into_iter()
-        .filter(|m| !is_redundant_low_coverage_composite_seq_wrapper(m, candidate_contained_matches))
+        .filter(|m| {
+            !is_redundant_low_coverage_composite_seq_wrapper(m, candidate_contained_matches)
+        })
         .collect()
 }
 
@@ -299,7 +304,7 @@ fn merge_and_prepare_aho_matches(
         if index
             .rules_by_rid
             .get(m.rid)
-            .is_some_and(|rule| rule.is_license_text)
+            .is_some_and(|rule| rule.is_license_text())
             && m.rule_length > 120
             && m.match_coverage > 98.0
         {

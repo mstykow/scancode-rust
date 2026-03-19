@@ -94,9 +94,7 @@ pub fn split_weak_matches(
     for m in matches {
         let is_false_positive = index.false_positive_rids.contains(&m.rid);
         let is_weak = (!is_false_positive && m.has_unknown())
-            || (m.matcher == MatcherKind::Seq
-                && m.len() <= SMALL_RULE
-                && m.match_coverage <= 25.0);
+            || (m.matcher == MatcherKind::Seq && m.len() <= SMALL_RULE && m.match_coverage <= 25.0);
 
         if is_weak {
             weak.push(m.clone());
@@ -372,11 +370,7 @@ mod tests {
             rule_url: "https://example.com".to_string(),
             matched_text: None,
             referenced_filenames: None,
-            is_license_intro: false,
-            is_license_clue: false,
-            is_license_reference: false,
-            is_license_tag: false,
-            is_license_text: false,
+            rule_kind: crate::license_detection::models::RuleKind::None,
             is_from_license: false,
             hilen: 50,
             rule_start_token: 0,

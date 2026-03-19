@@ -10,6 +10,7 @@ use aho_corasick::AhoCorasickBuilder;
 use std::collections::{HashMap, HashSet};
 
 use crate::license_detection::hash_match::compute_hash;
+use crate::license_detection::index::LicenseIndex;
 use crate::license_detection::index::dictionary::{
     KnownToken, TokenDictionary, TokenId, TokenKind,
 };
@@ -17,11 +18,10 @@ use crate::license_detection::index::token_sets::{
     build_set_and_mset, high_multiset_subset, high_tids_set_subset, multiset_counter,
     tids_set_counter,
 };
-use crate::license_detection::index::LicenseIndex;
 use crate::license_detection::models::{License, Rule};
 use crate::license_detection::rules::legalese;
 use crate::license_detection::rules::thresholds::{
-    compute_thresholds_occurrences, compute_thresholds_unique, SMALL_RULE, TINY_RULE,
+    SMALL_RULE, TINY_RULE, compute_thresholds_occurrences, compute_thresholds_unique,
 };
 use crate::license_detection::tokenize::{
     parse_required_phrase_spans, tokenize, tokenize_with_stopwords,
@@ -127,12 +127,7 @@ fn build_rule_from_license(license: &License) -> Option<Rule> {
         license_expression: license.key.clone(),
         text,
         tokens: vec![],
-        is_license_text: true,
-        is_license_notice: false,
-        is_license_reference: false,
-        is_license_tag: false,
-        is_license_intro: false,
-        is_license_clue: false,
+        rule_kind: crate::license_detection::models::RuleKind::Text,
         is_false_positive: false,
         is_required_phrase: false,
         is_from_license: true,
@@ -274,7 +269,7 @@ pub fn compute_is_approx_matchable(rule: &Rule) -> bool {
         || rule.is_required_phrase
         || rule.is_tiny
         || rule.is_continuous
-        || (rule.is_small && (rule.is_license_reference || rule.is_license_tag)))
+        || (rule.is_small && (rule.is_license_reference() || rule.is_license_tag())))
 }
 
 pub fn tokens_to_bytes(tokens: &[TokenId]) -> Vec<u8> {

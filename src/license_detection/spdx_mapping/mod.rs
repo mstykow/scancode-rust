@@ -11,7 +11,7 @@
 use std::collections::HashMap;
 
 use crate::license_detection::expression::{
-    expression_to_string, parse_expression, LicenseExpression,
+    LicenseExpression, expression_to_string, parse_expression,
 };
 use crate::license_detection::models::License;
 

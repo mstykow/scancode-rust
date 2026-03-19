@@ -5,6 +5,92 @@ use std::ops::Range;
 
 use crate::license_detection::index::dictionary::TokenId;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Default)]
+pub enum RuleKind {
+    #[default]
+    None,
+    Text,
+    Notice,
+    Reference,
+    Tag,
+    Intro,
+    Clue,
+}
+
+impl RuleKind {
+    pub fn from_rule_flags(
+        is_license_text: bool,
+        is_license_notice: bool,
+        is_license_reference: bool,
+        is_license_tag: bool,
+        is_license_intro: bool,
+        is_license_clue: bool,
+    ) -> Result<Self, &'static str> {
+        let mut active = None;
+
+        for (enabled, kind) in [
+            (is_license_text, Self::Text),
+            (is_license_notice, Self::Notice),
+            (is_license_reference, Self::Reference),
+            (is_license_tag, Self::Tag),
+            (is_license_intro, Self::Intro),
+            (is_license_clue, Self::Clue),
+        ] {
+            if !enabled {
+                continue;
+            }
+
+            if active.replace(kind).is_some() {
+                return Err("rule has multiple rule kinds set");
+            }
+        }
+
+        Ok(active.unwrap_or(Self::None))
+    }
+
+    pub fn from_match_flags(
+        is_license_text: bool,
+        is_license_reference: bool,
+        is_license_tag: bool,
+        is_license_intro: bool,
+        is_license_clue: bool,
+    ) -> Result<Self, &'static str> {
+        Self::from_rule_flags(
+            is_license_text,
+            false,
+            is_license_reference,
+            is_license_tag,
+            is_license_intro,
+            is_license_clue,
+        )
+        .map_err(|_| "license match has multiple rule kinds set")
+    }
+
+    pub const fn is_license_text(self) -> bool {
+        matches!(self, Self::Text)
+    }
+
+    pub const fn is_license_notice(self) -> bool {
+        matches!(self, Self::Notice)
+    }
+
+    pub const fn is_license_reference(self) -> bool {
+        matches!(self, Self::Reference)
+    }
+
+    pub const fn is_license_tag(self) -> bool {
+        matches!(self, Self::Tag)
+    }
+
+    pub const fn is_license_intro(self) -> bool {
+        matches!(self, Self::Intro)
+    }
+
+    pub const fn is_license_clue(self) -> bool {
+        matches!(self, Self::Clue)
+    }
+}
+
 /// Rule metadata loaded from .LICENSE and .RULE files.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Rule {
@@ -22,23 +108,8 @@ pub struct Rule {
     /// Token IDs for the text (assigned during indexing)
     pub tokens: Vec<TokenId>,
 
-    /// True if this is a full license text (highest confidence)
-    pub is_license_text: bool,
-
-    /// True if this is an explicit notice like "Licensed under the MIT license"
-    pub is_license_notice: bool,
-
-    /// True if this is a reference like a bare name or URL
-    pub is_license_reference: bool,
-
-    /// True if this is a structured licensing tag (e.g., SPDX identifier in package manifest)
-    pub is_license_tag: bool,
-
-    /// True if this is an introductory statement before actual license text
-    pub is_license_intro: bool,
-
-    /// True if this is a clue but not a proper license detection
-    pub is_license_clue: bool,
+    /// Classification of this rule.
+    pub rule_kind: RuleKind,
 
     /// True if exact matches to this rule are false positives
     pub is_false_positive: bool,
@@ -147,5 +218,35 @@ impl PartialOrd for Rule {
 impl Ord for Rule {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.identifier.cmp(&other.identifier)
+    }
+}
+
+impl Rule {
+    pub const fn kind(&self) -> RuleKind {
+        self.rule_kind
+    }
+
+    pub const fn is_license_text(&self) -> bool {
+        self.rule_kind.is_license_text()
+    }
+
+    pub const fn is_license_notice(&self) -> bool {
+        self.rule_kind.is_license_notice()
+    }
+
+    pub const fn is_license_reference(&self) -> bool {
+        self.rule_kind.is_license_reference()
+    }
+
+    pub const fn is_license_tag(&self) -> bool {
+        self.rule_kind.is_license_tag()
+    }
+
+    pub const fn is_license_intro(&self) -> bool {
+        self.rule_kind.is_license_intro()
+    }
+
+    pub const fn is_license_clue(&self) -> bool {
+        self.rule_kind.is_license_clue()
     }
 }

@@ -1,8 +1,8 @@
 #[cfg(test)]
 mod tests {
-    use crate::license_detection::index::dictionary::tid;
     use crate::license_detection::index::LicenseIndex;
-    use crate::license_detection::models::{License, LicenseMatch, MatcherKind, Rule};
+    use crate::license_detection::index::dictionary::tid;
+    use crate::license_detection::models::{License, LicenseMatch, MatcherKind, Rule, RuleKind};
     use std::collections::HashMap;
 
     fn create_test_index() -> LicenseIndex {
@@ -36,12 +36,7 @@ mod tests {
             license_expression: "mit".to_string(),
             text: "MIT License".to_string(),
             tokens: vec![],
-            is_license_text: false,
-            is_license_notice: true,
-            is_license_reference: false,
-            is_license_tag: false,
-            is_license_intro: false,
-            is_license_clue: false,
+            rule_kind: RuleKind::Notice,
             is_false_positive: false,
             is_required_phrase: false,
             is_from_license: false,
@@ -97,11 +92,7 @@ mod tests {
             rule_url: "https://scancode-licensedb.aboutcode.org/mit".to_string(),
             matched_text: Some("MIT License text...".to_string()),
             referenced_filenames: None,
-            is_license_intro: false,
-            is_license_clue: false,
-            is_license_reference: false,
-            is_license_tag: false,
-            is_license_text: false,
+            rule_kind: RuleKind::None,
             is_from_license: false,
             hilen: 50,
             rule_start_token: 0,
@@ -215,10 +206,10 @@ mod tests {
 
         assert_eq!(rule.identifier, "mit.LICENSE");
         assert_eq!(rule.license_expression, "mit");
-        assert!(rule.is_license_notice);
-        assert!(!rule.is_license_text);
-        assert!(!rule.is_license_reference);
-        assert!(!rule.is_license_tag);
+        assert!(rule.is_license_notice());
+        assert!(!rule.is_license_text());
+        assert!(!rule.is_license_reference());
+        assert!(!rule.is_license_tag());
         assert_eq!(rule.relevance, 90);
     }
 
@@ -229,12 +220,7 @@ mod tests {
             license_expression: String::new(),
             text: String::new(),
             tokens: vec![],
-            is_license_text: false,
-            is_license_notice: false,
-            is_license_reference: false,
-            is_license_tag: false,
-            is_license_intro: false,
-            is_license_clue: false,
+            rule_kind: RuleKind::None,
             is_false_positive: false,
             is_required_phrase: false,
             is_from_license: false,
@@ -276,20 +262,19 @@ mod tests {
     #[test]
     fn test_rule_license_flags_mutually_exclusive() {
         let mut rule = create_rule();
-        assert!(rule.is_license_notice);
+        assert!(rule.is_license_notice());
 
-        rule.is_license_notice = false;
-        rule.is_license_text = true;
-        assert!(rule.is_license_text);
-        assert!(!rule.is_license_notice);
+        rule.rule_kind = RuleKind::Text;
+        assert!(rule.is_license_text());
+        assert!(!rule.is_license_notice());
 
         let flag_count = [
-            rule.is_license_text,
-            rule.is_license_notice,
-            rule.is_license_reference,
-            rule.is_license_tag,
-            rule.is_license_intro,
-            rule.is_license_clue,
+            rule.is_license_text(),
+            rule.is_license_notice(),
+            rule.is_license_reference(),
+            rule.is_license_tag(),
+            rule.is_license_intro(),
+            rule.is_license_clue(),
         ]
         .iter()
         .filter(|&&f| f)
@@ -304,12 +289,7 @@ mod tests {
             license_expression: "test".to_string(),
             text: "test text".to_string(),
             tokens: vec![tid(1), tid(2), tid(3), tid(4), tid(5)],
-            is_license_text: false,
-            is_license_notice: true,
-            is_license_reference: false,
-            is_license_tag: false,
-            is_license_intro: false,
-            is_license_clue: false,
+            rule_kind: RuleKind::Notice,
             is_false_positive: false,
             is_required_phrase: false,
             is_from_license: false,
@@ -368,12 +348,7 @@ mod tests {
             license_expression: "complex".to_string(),
             text: "complex text".to_string(),
             tokens: vec![],
-            is_license_text: false,
-            is_license_notice: true,
-            is_license_reference: false,
-            is_license_tag: false,
-            is_license_intro: false,
-            is_license_clue: false,
+            rule_kind: crate::license_detection::models::RuleKind::Notice,
             is_false_positive: false,
             is_required_phrase: false,
             is_from_license: false,
@@ -451,11 +426,7 @@ mod tests {
             rule_url: String::new(),
             matched_text: None,
             referenced_filenames: None,
-            is_license_intro: false,
-            is_license_clue: false,
-            is_license_reference: false,
-            is_license_tag: false,
-            is_license_text: false,
+            rule_kind: crate::license_detection::models::RuleKind::None,
             is_from_license: false,
             matched_token_positions: None,
             hilen: 0,
@@ -575,11 +546,7 @@ mod tests {
             rule_url: "https://scancode-licensedb.aboutcode.org/mit".to_string(),
             matched_text: Some("MIT License text...".to_string()),
             referenced_filenames: Some(vec!["LICENSE".to_string(), "COPYING".to_string()]),
-            is_license_intro: false,
-            is_license_clue: false,
-            is_license_reference: false,
-            is_license_tag: false,
-            is_license_text: false,
+            rule_kind: crate::license_detection::models::RuleKind::None,
             is_from_license: false,
             hilen: 50,
             rule_start_token: 0,
@@ -595,7 +562,6 @@ mod tests {
             Some(vec!["LICENSE".to_string(), "COPYING".to_string()])
         );
     }
-
 
     #[test]
     fn test_len_contiguous() {

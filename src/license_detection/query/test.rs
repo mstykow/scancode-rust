@@ -4,8 +4,8 @@
 mod tests {
     use std::collections::HashSet;
 
-    use crate::license_detection::index::dictionary::{tid, TokenId};
     use crate::license_detection::index::LicenseIndex;
+    use crate::license_detection::index::dictionary::{TokenId, tid};
     use crate::license_detection::query::{PositionSpan, Query, QueryRun};
     use crate::license_detection::test_utils::create_test_index;
 

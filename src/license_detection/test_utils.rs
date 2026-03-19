@@ -5,8 +5,8 @@
 
 use std::collections::{HashMap, HashSet};
 
-use crate::license_detection::index::dictionary::{TokenDictionary, TokenId};
 use crate::license_detection::index::LicenseIndex;
+use crate::license_detection::index::dictionary::{TokenDictionary, TokenId};
 use crate::license_detection::models::Rule;
 use crate::license_detection::query::Query;
 
@@ -59,12 +59,7 @@ pub fn create_mock_rule(
         license_expression: license_expression.to_string(),
         text: String::new(),
         tokens,
-        is_license_text: true,
-        is_license_notice: false,
-        is_license_reference: false,
-        is_license_tag: false,
-        is_license_intro: false,
-        is_license_clue: false,
+        rule_kind: crate::license_detection::models::RuleKind::Text,
         is_false_positive: false,
         is_required_phrase: false,
         is_from_license: false,
@@ -115,12 +110,7 @@ pub fn create_mock_rule_simple(license_expression: &str, relevance: u8) -> Rule 
         license_expression: license_expression.to_string(),
         text: String::new(),
         tokens: Vec::new(),
-        is_license_text: false,
-        is_license_notice: false,
-        is_license_reference: false,
-        is_license_tag: false,
-        is_license_intro: false,
-        is_license_clue: false,
+        rule_kind: crate::license_detection::models::RuleKind::None,
         is_false_positive: false,
         is_required_phrase: false,
         is_from_license: false,

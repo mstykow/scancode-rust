@@ -129,10 +129,7 @@ fn python_round_tenths(value: f64) -> f32 {
 
     let whole_part: i64 = whole.parse().unwrap_or(0);
     let mut frac_chars = frac.chars();
-    let tenths = frac_chars
-        .next()
-        .and_then(|c| c.to_digit(10))
-        .unwrap_or(0) as i64;
+    let tenths = frac_chars.next().and_then(|c| c.to_digit(10)).unwrap_or(0) as i64;
     let rest: String = frac_chars.collect();
 
     let threshold = format!("5{}", "0".repeat(rest.len().saturating_sub(1)));
@@ -364,9 +361,7 @@ pub fn compute_candidates_with_msets(
         return Vec::new();
     }
 
-    step1_candidates.sort_by(|a, b| {
-        compare_candidate_rank(&b.0, &b.1, b.2, &a.0, &a.1, a.2)
-    });
+    step1_candidates.sort_by(|a, b| compare_candidate_rank(&b.0, &b.1, b.2, &a.0, &a.1, a.2));
 
     step1_candidates.truncate(top_n * 10);
 
@@ -501,12 +496,7 @@ mod tests {
                 license_expression: "mit".to_string(),
                 text: String::new(),
                 tokens: vec![],
-                is_license_text: true,
-                is_license_notice: false,
-                is_license_reference: false,
-                is_license_tag: false,
-                is_license_intro: false,
-                is_license_clue: false,
+                rule_kind: crate::license_detection::models::RuleKind::Text,
                 is_false_positive: false,
                 is_required_phrase: false,
                 is_from_license: false,
@@ -563,12 +553,7 @@ mod tests {
                 license_expression: "apache".to_string(),
                 text: String::new(),
                 tokens: vec![],
-                is_license_text: true,
-                is_license_notice: false,
-                is_license_reference: false,
-                is_license_tag: false,
-                is_license_intro: false,
-                is_license_clue: false,
+                rule_kind: crate::license_detection::models::RuleKind::Text,
                 is_false_positive: false,
                 is_required_phrase: false,
                 is_from_license: false,
@@ -617,12 +602,7 @@ mod tests {
             license_expression: "x11-dec1".to_string(),
             text: String::new(),
             tokens: vec![tid(0); 138],
-            is_license_text: true,
-            is_license_notice: false,
-            is_license_reference: false,
-            is_license_tag: false,
-            is_license_intro: false,
-            is_license_clue: false,
+            rule_kind: crate::license_detection::models::RuleKind::Text,
             is_false_positive: false,
             is_required_phrase: false,
             is_from_license: false,
@@ -721,12 +701,7 @@ mod tests {
             license_expression: "mit".to_string(),
             text: String::new(),
             tokens: vec![tid(0); 100],
-            is_license_text: true,
-            is_license_notice: false,
-            is_license_reference: false,
-            is_license_tag: false,
-            is_license_intro: false,
-            is_license_clue: false,
+            rule_kind: crate::license_detection::models::RuleKind::Text,
             is_false_positive: false,
             is_required_phrase: false,
             is_from_license: false,
@@ -825,12 +800,7 @@ mod tests {
             license_expression: "cc-by-sa-1.0".to_string(),
             text: String::new(),
             tokens: vec![tid(0); 1960],
-            is_license_text: true,
-            is_license_notice: false,
-            is_license_reference: false,
-            is_license_tag: false,
-            is_license_intro: false,
-            is_license_clue: false,
+            rule_kind: crate::license_detection::models::RuleKind::Text,
             is_false_positive: false,
             is_required_phrase: false,
             is_from_license: false,
@@ -869,12 +839,7 @@ mod tests {
             license_expression: "cc-by-nc-sa-1.0".to_string(),
             text: String::new(),
             tokens: vec![tid(0); 1829],
-            is_license_text: true,
-            is_license_notice: false,
-            is_license_reference: false,
-            is_license_tag: false,
-            is_license_intro: false,
-            is_license_clue: false,
+            rule_kind: crate::license_detection::models::RuleKind::Text,
             is_false_positive: false,
             is_required_phrase: false,
             is_from_license: false,
@@ -975,12 +940,7 @@ mod tests {
             license_expression: "a".to_string(),
             text: String::new(),
             tokens: vec![tid(0); 10],
-            is_license_text: true,
-            is_license_notice: false,
-            is_license_reference: false,
-            is_license_tag: false,
-            is_license_intro: false,
-            is_license_clue: false,
+            rule_kind: crate::license_detection::models::RuleKind::Text,
             is_false_positive: false,
             is_required_phrase: false,
             is_from_license: false,

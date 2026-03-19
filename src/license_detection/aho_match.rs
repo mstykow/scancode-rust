@@ -9,8 +9,8 @@
 
 use std::collections::HashSet;
 
-use crate::license_detection::index::dictionary::{TokenId, TokenKind};
 use crate::license_detection::index::LicenseIndex;
+use crate::license_detection::index::dictionary::{TokenId, TokenKind};
 use crate::license_detection::models::{LicenseMatch, MatcherKind};
 use crate::license_detection::query::QueryRun;
 
@@ -191,11 +191,7 @@ pub fn aho_match_with_extra_matchables(
             rule_url: String::new(),
             matched_text: Some(matched_text),
             referenced_filenames: rule.referenced_filenames.clone(),
-            is_license_intro: rule.is_license_intro,
-            is_license_clue: rule.is_license_clue,
-            is_license_reference: rule.is_license_reference,
-            is_license_tag: rule.is_license_tag,
-            is_license_text: rule.is_license_text,
+            rule_kind: rule.kind(),
             is_from_license: rule.is_from_license,
             matched_token_positions: None,
             hilen: hispan_count,
@@ -216,7 +212,7 @@ pub fn aho_match_with_extra_matchables(
             .iter()
             .enumerate()
             .filter(|(i, m)| {
-                if !m.is_license_reference {
+                if !m.is_license_reference() {
                     return true;
                 }
 
@@ -231,7 +227,7 @@ pub fn aho_match_with_extra_matchables(
 
                 !matches.iter().enumerate().any(|(j, inner)| {
                     j != *i
-                        && inner.is_license_reference
+                        && inner.is_license_reference()
                         && inner.rule_identifier.starts_with("spdx_license_id_")
                         && inner.license_expression == m.license_expression
                         && inner.start_token >= m.start_token
@@ -250,7 +246,7 @@ pub fn aho_match_with_extra_matchables(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::license_detection::index::dictionary::{tid, TokenId};
+    use crate::license_detection::index::dictionary::{TokenId, tid};
     use crate::license_detection::test_utils::{
         create_mock_query_with_tokens, create_mock_rule, create_test_index_default,
     };
@@ -548,14 +544,14 @@ mod tests {
 
         let mut short_rule = create_mock_rule("cecill-c", vec![0, 1], false, false);
         short_rule.identifier = "spdx_license_id_cecill-c_for_cecill-c.RULE".to_string();
-        short_rule.is_license_reference = true;
+        short_rule.rule_kind = crate::license_detection::models::RuleKind::Reference;
         index.rules_by_rid.push(short_rule);
         index.tids_by_rid.push(tids(&[0, 1]));
         index.pattern_id_to_rid.push(0);
 
         let mut long_rule = create_mock_rule("cecill-c", vec![0, 1, 2], false, false);
         long_rule.identifier = "cecill-c_3.RULE".to_string();
-        long_rule.is_license_reference = true;
+        long_rule.rule_kind = crate::license_detection::models::RuleKind::Reference;
         index.rules_by_rid.push(long_rule);
         index.tids_by_rid.push(tids(&[0, 1, 2]));
         index.pattern_id_to_rid.push(1);

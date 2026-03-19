@@ -291,8 +291,8 @@ pub(super) fn filter_license_references_with_text_match(
             let other = &matches[j];
 
             if current.license_expression == other.license_expression {
-                let current_is_ref = current.is_license_reference && !current.is_license_text;
-                let other_is_text = other.is_license_text && !other.is_license_reference;
+                let current_is_ref = current.is_license_reference() && !current.is_license_text();
+                let other_is_text = other.is_license_text() && !other.is_license_reference();
 
                 if current_is_ref
                     && other_is_text
@@ -362,11 +362,7 @@ mod tests {
             rule_url: "https://example.com".to_string(),
             matched_text: None,
             referenced_filenames: None,
-            is_license_intro: false,
-            is_license_clue: false,
-            is_license_reference: false,
-            is_license_tag: false,
-            is_license_text: false,
+            rule_kind: crate::license_detection::models::RuleKind::None,
             is_from_license: false,
             hilen: 50,
             rule_start_token: 0,
@@ -404,11 +400,7 @@ mod tests {
             rule_url: "https://example.com".to_string(),
             matched_text: None,
             referenced_filenames: None,
-            is_license_intro: false,
-            is_license_clue: false,
-            is_license_reference: false,
-            is_license_tag: false,
-            is_license_text: false,
+            rule_kind: crate::license_detection::models::RuleKind::None,
             is_from_license: false,
             matched_token_positions: None,
             hilen: matched_length / 2,

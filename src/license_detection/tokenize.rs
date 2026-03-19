@@ -438,7 +438,9 @@ mod tests {
         let result = tokenize("{{Hi}}some {{}}Text with{{noth+-_!@ing}}   {{junk}}spAces!");
         assert_eq!(
             result,
-            vec!["hi", "some", "text", "with", "noth+", "ing", "junk", "spaces"]
+            vec![
+                "hi", "some", "text", "with", "noth+", "ing", "junk", "spaces"
+            ]
         );
     }
 

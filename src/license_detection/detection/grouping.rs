@@ -1,7 +1,7 @@
 //! Match grouping functions.
 
-use super::types::DetectionGroup;
 use super::LINES_THRESHOLD;
+use super::types::DetectionGroup;
 use crate::license_detection::models::LicenseMatch;
 
 pub fn group_matches_by_region(matches: &[LicenseMatch]) -> Vec<DetectionGroup> {
@@ -33,14 +33,14 @@ pub(super) fn group_matches_by_region_with_threshold(
 
         let previous_match = current_group.last().unwrap();
 
-        if previous_match.is_license_intro {
+        if previous_match.is_license_intro() {
             current_group.push(match_item.clone());
-        } else if match_item.is_license_intro {
+        } else if match_item.is_license_intro() {
             if !current_group.is_empty() {
                 groups.push(DetectionGroup::new(current_group.clone()));
             }
             current_group = vec![match_item.clone()];
-        } else if match_item.is_license_clue {
+        } else if match_item.is_license_clue() {
             if !current_group.is_empty() {
                 groups.push(DetectionGroup::new(current_group.clone()));
             }
@@ -157,11 +157,7 @@ mod tests {
             rule_url: "https://example.com".to_string(),
             matched_text: Some("MIT License".to_string()),
             referenced_filenames: None,
-            is_license_intro: false,
-            is_license_clue: false,
-            is_license_reference: false,
-            is_license_tag: false,
-            is_license_text: false,
+            rule_kind: crate::license_detection::models::RuleKind::None,
             is_from_license: false,
             rule_length: 100,
             matched_token_positions: None,
@@ -199,11 +195,7 @@ mod tests {
             rule_url: "https://example.com".to_string(),
             matched_text: Some("MIT License".to_string()),
             referenced_filenames: None,
-            is_license_intro: false,
-            is_license_clue: false,
-            is_license_reference: false,
-            is_license_tag: false,
-            is_license_text: false,
+            rule_kind: crate::license_detection::models::RuleKind::None,
             is_from_license: false,
             rule_length: 100,
             matched_token_positions: None,
