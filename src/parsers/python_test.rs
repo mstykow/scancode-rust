@@ -16,6 +16,89 @@ mod tests {
         (temp_dir, file_path)
     }
 
+    fn create_temp_tar_gz(entries: &[(&str, &str)], filename: &str) -> (TempDir, PathBuf) {
+        use flate2::Compression;
+        use flate2::write::GzEncoder;
+        use tar::{Builder, Header};
+
+        let temp_dir = TempDir::new().expect("Failed to create temp dir");
+        let file_path = temp_dir.path().join(filename);
+        let file = fs::File::create(&file_path).expect("Failed to create tar.gz file");
+        let encoder = GzEncoder::new(file, Compression::default());
+        let mut builder = Builder::new(encoder);
+
+        for (path, content) in entries {
+            let bytes = content.as_bytes();
+            let mut header = Header::new_gnu();
+            header.set_size(bytes.len() as u64);
+            header.set_mode(0o644);
+            header.set_cksum();
+            builder
+                .append_data(&mut header, *path, bytes)
+                .expect("Failed to add tar.gz entry");
+        }
+
+        let encoder = builder
+            .into_inner()
+            .expect("Failed to finish tar.gz archive");
+        encoder.finish().expect("Failed to finalize tar.gz archive");
+
+        (temp_dir, file_path)
+    }
+
+    fn create_temp_tar_bz2(entries: &[(&str, &str)], filename: &str) -> (TempDir, PathBuf) {
+        use bzip2::Compression;
+        use bzip2::write::BzEncoder;
+        use tar::{Builder, Header};
+
+        let temp_dir = TempDir::new().expect("Failed to create temp dir");
+        let file_path = temp_dir.path().join(filename);
+        let file = fs::File::create(&file_path).expect("Failed to create tar.bz2 file");
+        let encoder = BzEncoder::new(file, Compression::default());
+        let mut builder = Builder::new(encoder);
+
+        for (path, content) in entries {
+            let bytes = content.as_bytes();
+            let mut header = Header::new_gnu();
+            header.set_size(bytes.len() as u64);
+            header.set_mode(0o644);
+            header.set_cksum();
+            builder
+                .append_data(&mut header, *path, bytes)
+                .expect("Failed to add tar.bz2 entry");
+        }
+
+        let encoder = builder
+            .into_inner()
+            .expect("Failed to finish tar.bz2 archive");
+        encoder
+            .finish()
+            .expect("Failed to finalize tar.bz2 archive");
+
+        (temp_dir, file_path)
+    }
+
+    fn create_temp_zip(entries: &[(&str, &str)], filename: &str) -> (TempDir, PathBuf) {
+        use std::io::Write;
+
+        let temp_dir = TempDir::new().expect("Failed to create temp dir");
+        let file_path = temp_dir.path().join(filename);
+        let file = fs::File::create(&file_path).expect("Failed to create zip file");
+        let mut zip = zip::ZipWriter::new(file);
+        let options = zip::write::SimpleFileOptions::default();
+
+        for (path, content) in entries {
+            zip.start_file(*path, options)
+                .expect("Failed to start zip entry");
+            zip.write_all(content.as_bytes())
+                .expect("Failed to write zip entry");
+        }
+
+        zip.finish().expect("Failed to finalize zip archive");
+
+        (temp_dir, file_path)
+    }
+
     #[test]
     fn test_is_match() {
         let pyproject_path = PathBuf::from("/some/path/pyproject.toml");
@@ -1104,6 +1187,21 @@ Test package description.
     }
 
     #[test]
+    fn test_is_match_sdist_archive_extensions() {
+        let tar_gz_path = PathBuf::from("/some/path/package-1.0.0.tar.gz");
+        let tar_bz2_path = PathBuf::from("/some/path/package-1.0.0.tar.bz2");
+        let zip_path = PathBuf::from("/some/path/package-1.0.0.zip");
+        let plain_zip_path = PathBuf::from("/some/path/archive.zip");
+        let plain_tar_path = PathBuf::from("/some/path/archive.tar.gz");
+
+        assert!(PythonParser::is_match(&tar_gz_path));
+        assert!(PythonParser::is_match(&tar_bz2_path));
+        assert!(PythonParser::is_match(&zip_path));
+        assert!(!PythonParser::is_match(&plain_zip_path));
+        assert!(!PythonParser::is_match(&plain_tar_path));
+    }
+
+    #[test]
     fn test_extract_from_wheel_archive() {
         let wheel_path = PathBuf::from(
             "testdata/python/golden/archives/atomicwrites-1.2.1-py2.py3-none-any.whl",
@@ -1177,6 +1275,125 @@ Test package description.
         assert!(package_data.size.is_some(), "size should be calculated");
         assert_eq!(package_data.size.unwrap(), 1756);
         assert!(package_data.sha256.is_some(), "sha256 should be calculated");
+    }
+
+    #[test]
+    fn test_extract_from_sdist_archive() {
+        let sdist_path = PathBuf::from("testdata/python/pip-22.0.4.tar.gz");
+
+        let package_data = PythonParser::extract_first_package(&sdist_path);
+
+        assert_eq!(package_data.package_type, Some(PackageType::Pypi));
+        assert_eq!(package_data.name.as_deref(), Some("pip"));
+        assert_eq!(package_data.version.as_deref(), Some("22.0.4"));
+        assert_eq!(
+            package_data.datasource_id,
+            Some(DatasourceId::PypiSdistPkginfo)
+        );
+        assert_eq!(package_data.primary_language.as_deref(), Some("Python"));
+        assert_eq!(
+            package_data.homepage_url.as_deref(),
+            Some("https://pip.pypa.io/")
+        );
+        assert_eq!(
+            package_data.repository_download_url.as_deref(),
+            Some("https://pypi.org/packages/source/p/pip/pip-22.0.4.tar.gz")
+        );
+        assert_eq!(package_data.purl.as_deref(), Some("pkg:pypi/pip@22.0.4"));
+        assert!(package_data.size.is_some(), "size should be calculated");
+        assert!(package_data.sha256.is_some(), "sha256 should be calculated");
+    }
+
+    #[test]
+    fn test_extract_from_sdist_zip_archive() {
+        let (_temp_dir, zip_path) = create_temp_zip(
+            &[(
+                "demo-1.0.0/PKG-INFO",
+                "Metadata-Version: 2.1\nName: demo\nVersion: 1.0.0\nSummary: Zip demo\n",
+            )],
+            "demo-1.0.0.zip",
+        );
+
+        let package_data = PythonParser::extract_first_package(&zip_path);
+
+        assert_eq!(package_data.name.as_deref(), Some("demo"));
+        assert_eq!(package_data.version.as_deref(), Some("1.0.0"));
+        assert_eq!(
+            package_data.datasource_id,
+            Some(DatasourceId::PypiSdistPkginfo)
+        );
+    }
+
+    #[test]
+    fn test_extract_from_sdist_tar_bz2_archive() {
+        let (_temp_dir, archive_path) = create_temp_tar_bz2(
+            &[(
+                "demo-1.0.0/PKG-INFO",
+                "Metadata-Version: 2.1\nName: demo\nVersion: 1.0.0\nSummary: Tar bz2 demo\n",
+            )],
+            "demo-1.0.0.tar.bz2",
+        );
+
+        let package_data = PythonParser::extract_first_package(&archive_path);
+
+        assert_eq!(package_data.name.as_deref(), Some("demo"));
+        assert_eq!(package_data.version.as_deref(), Some("1.0.0"));
+        assert_eq!(
+            package_data.datasource_id,
+            Some(DatasourceId::PypiSdistPkginfo)
+        );
+    }
+
+    #[test]
+    fn test_extract_from_sdist_archive_prefers_egg_info_metadata_and_sidecars() {
+        let (_temp_dir, archive_path) = create_temp_tar_gz(
+            &[
+                (
+                    "demo-1.0.0/PKG-INFO",
+                    "Metadata-Version: 2.1\nName: demo\nVersion: 1.0.0\nSummary: Root metadata\n",
+                ),
+                (
+                    "demo-1.0.0/demo.egg-info/PKG-INFO",
+                    "Metadata-Version: 2.1\nName: demo\nVersion: 1.0.0\nSummary: Egg metadata\nRequires-Dist: click>=8\n",
+                ),
+                ("demo-1.0.0/demo.egg-info/requires.txt", "click>=8\n"),
+                (
+                    "demo-1.0.0/demo.egg-info/SOURCES.txt",
+                    "README.md\ndemo/__init__.py\n",
+                ),
+                (
+                    "demo-1.0.0/vendor/other.egg-info/PKG-INFO",
+                    "Metadata-Version: 2.1\nName: other\nVersion: 9.9.9\nSummary: Nested metadata\nRequires-Dist: evil>=1\n",
+                ),
+                ("demo-1.0.0/vendor/other.egg-info/requires.txt", "evil>=1\n"),
+            ],
+            "demo-1.0.0.tar.gz",
+        );
+
+        let package_data = PythonParser::extract_first_package(&archive_path);
+
+        assert_eq!(package_data.name.as_deref(), Some("demo"));
+        assert_eq!(package_data.version.as_deref(), Some("1.0.0"));
+        assert_eq!(package_data.description.as_deref(), Some("Egg metadata"));
+
+        assert!(package_data.dependencies.iter().any(|dependency| {
+            dependency.purl.as_deref() == Some("pkg:pypi/click")
+                && dependency.extracted_requirement.as_deref() == Some(">=8")
+        }));
+        assert!(
+            !package_data
+                .dependencies
+                .iter()
+                .any(|dependency| dependency.purl.as_deref() == Some("pkg:pypi/evil"))
+        );
+
+        let file_refs: Vec<_> = package_data
+            .file_references
+            .iter()
+            .map(|file_ref| file_ref.path.as_str())
+            .collect();
+        assert!(file_refs.contains(&"README.md"));
+        assert!(file_refs.contains(&"demo/__init__.py"));
     }
 
     #[test]

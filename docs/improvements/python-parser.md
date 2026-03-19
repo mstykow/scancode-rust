@@ -2,7 +2,7 @@
 
 ## Summary
 
-**🐛 Bug Fix + ✨ New Feature + 🔍 Enhanced Extraction**: Rust now extracts richer Python manifest metadata, resolves a narrow class of imported sibling dunder values for `setup.py`, preserves more installed and source-package provenance, supports saved `pypi.json` payloads, and recovers RFC822 dependency metadata that was previously missing.
+**🐛 Bug Fix + ✨ New Feature + 🔍 Enhanced Extraction**: Rust now extracts richer Python manifest metadata, resolves a narrow class of imported sibling dunder values for `setup.py`, preserves more installed and source-package provenance, supports saved `pypi.json` payloads, recovers RFC822 dependency metadata that was previously missing, and can parse Python source distribution archives directly.
 
 ## What changed
 
@@ -52,13 +52,23 @@ Rust now extracts dependency information from RFC822-style Python metadata files
 
 That closes the wheel versus source-package gap for common Python metadata layouts. Extra scopes, simple markers, and pinned requirements are preserved structurally instead of being dropped.
 
+### 8. Direct source distribution archive support
+
+Rust now parses Python source distribution archives directly instead of requiring an unpacked `PKG-INFO` file to already exist on disk.
+
+- common archive formats such as `.tar.gz`, `.tgz`, `.tar.bz2`, `.tar.xz`, and `.zip` are recognized directly
+- embedded `PKG-INFO` is parsed inside the archive without extracting or executing project code
+- `.egg-info/PKG-INFO` is preferred over a root `PKG-INFO` when both exist, matching the richer dependency-bearing metadata layout
+- embedded `.egg-info/requires.txt` and `SOURCES.txt` sidecars can still recover dependency and file-reference data from archive-only scans
+- direct archive parsing intentionally reuses the existing `pypi_sdist_pkginfo` datasource because `PKG-INFO` remains the authoritative metadata surface inside the sdist
+
 ## Why this matters
 
 - **Better manifest fidelity**: more of the metadata already present in Python manifests becomes visible to downstream tooling
 - **Safer metadata recovery**: narrow static fallbacks recover real values without broadening into execution-heavy parsing
 - **Richer installed-package provenance**: wheel, cache, and sidecar metadata all contribute to a clearer package story
-- **Broader input coverage**: saved API payloads and RFC822 metadata files now produce useful package data instead of partial results
+- **Broader input coverage**: saved API payloads, RFC822 metadata files, and direct sdist archives now produce useful package data instead of partial results
 
 ## Coverage
 
-Coverage focuses on the user-visible behaviors above, including richer `setup.cfg` extraction, `OrderedDict` project URLs, imported sibling dunder fallback, private-package classification, installed and source sidecar handling, `WHEEL` and `origin.json` provenance, saved `pypi.json` parsing, and RFC822 dependency recovery.
+Coverage focuses on the user-visible behaviors above, including richer `setup.cfg` extraction, `OrderedDict` project URLs, imported sibling dunder fallback, private-package classification, installed and source sidecar handling, direct sdist archive parsing, `WHEEL` and `origin.json` provenance, saved `pypi.json` parsing, and RFC822 dependency recovery.

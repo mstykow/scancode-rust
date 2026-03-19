@@ -1990,6 +1990,7 @@ dependencies = [
  "ar",
  "base64",
  "blake3",
+ "bzip2",
  "chrono",
  "clap",
  "content_inspector",
