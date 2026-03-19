@@ -6,11 +6,20 @@
 # The license data in resources/licenses/json/details/ is embedded into the binary
 # at compile time using the include_dir! macro.
 #
+# NOTE: This script is OPTIONAL for most users. The binary already ships with a
+# built-in license index embedded from the checked-in artifact at:
+#   resources/license_detection/license_index_loader.msgpack.zst
+#
+# You only need to run this script if you:
+# - Are updating the SPDX license definitions
+# - Need to regenerate the embedded license loader artifact
+# - Want to use custom license rules with --license-rules-path
+#
 # Sparse checkout is used to only fetch the json/details directory (~693 license files),
 # reducing disk usage by ~90% compared to cloning the entire repository.
 #
 # Run this script:
-# - Before building from source for the first time
+# - Before building from source for the first time (optional)
 # - Anytime you want to update to the latest SPDX license definitions
 
 set -e
@@ -52,4 +61,9 @@ else
 fi
 
 echo ""
-echo "Setup complete. Run 'cargo build --release' to embed license data into the binary."
+echo "Setup complete."
+echo ""
+echo "To build: cargo build --release"
+echo ""
+echo "If you need to regenerate the embedded license loader artifact:"
+echo "   ./scripts/update-license-loader-artifact.sh"

@@ -723,54 +723,98 @@ Ongoing quality improvements:
 
 ## License Data Architecture
 
-### How License Detection Works
+### Self-Contained Binary
 
-The project is in a transition period between legacy askalono startup on `main` and the target ScanCode-compatible runtime rule-loading model in `feat-add-license-parsing`.
+The binary ships with a built-in license index embedded at compile time. This eliminates the need for external files during normal usage:
 
-**Current mainline behavior (`main`):**
+- **Embedded artifact**: `resources/license_detection/license_index_loader.msgpack.zst`
+- **Format**: MessagePack-serialized, zstd-compressed loader data
+- **Contents**: Parsed and normalized `LoadedRule` and `LoadedLicense` values from the ScanCode rules dataset
 
-1. License detection startup still initializes askalono from embedded SPDX JSON details.
-2. `setup.sh` updates the SPDX data submodule used by current embedded-license workflows.
+### Loader/Build Stage Separation
 
-**Target model (post-merge of `feat-add-license-parsing`):**
+The license detection system uses a two-stage loading process:
 
-1. **Source of truth**: ScanCode `.LICENSE` and `.RULE` datasets from the `reference/scancode-toolkit` submodule.
-2. **Load mode**: Rules are loaded at runtime by `LicenseDetectionEngine` and compiled into `LicenseIndex` structures.
-3. **Performance path**: Rebuild on cold start; load from validated index snapshot cache on warm start.
-
-Target-model implications:
-
-- **For users**: license detection correctness aligns with ScanCode rule data and can be updated by refreshing rule datasets.
-- **For developers**: rule data availability and fingerprinting are first-class runtime concerns.
-- **For packaging**: cache snapshots are rebuildable artifacts; rules remain the canonical source.
-
-### Updating the License Data
-
-**For Releases:** Keep the active rule/license dataset in sync with upstream data for the currently shipped engine path, and ensure snapshot cache invalidation fingerprints update with dataset/version changes.
-
-**For Development:**
-
-To initialize or update the latest reference license/rule definitions in the submodule:
-
-```sh
-./setup.sh                  # Initialize/update license data to latest
-cargo build --release       # Rebuild with updated data
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    License Index Loading                         │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  Loader Stage (Embedded Artifact)                               │
+│  ┌────────────────────────────────────────────────────────┐    │
+│  │ • Deserialize LoadedRule and LoadedLicense values      │    │
+│  │ • Already normalized (text trimmed, defaults applied)  │    │
+│  │ • Single-file transformations complete                 │    │
+│  │ • No filesystem access needed                          │    │
+│  └────────────────────────────────────────────────────────┘    │
+│                           │                                      │
+│                           ▼                                      │
+│  Build Stage (Runtime)                                          │
+│  ┌────────────────────────────────────────────────────────┐    │
+│  │ • Convert LoadedRule → runtime Rule                    │    │
+│  │ • Convert LoadedLicense → runtime License              │    │
+│  │ • Apply deprecated filtering policy                    │    │
+│  │ • Synthesize license-derived rules                     │    │
+│  │ • Build LicenseIndex (token dict, automatons, maps)    │    │
+│  │ • Build SpdxMapping                                    │    │
+│  └────────────────────────────────────────────────────────┘    │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-The script will show if the license data was updated. If so, commit the change:
+**Loader-stage responsibilities** (file-local transformations):
 
-```sh
-git add resources/licenses
-git commit -m "chore: update SPDX license data"
+- Text trimming and normalization
+- Derive `identifier` from filename
+- Derive `rule_kind` from source booleans
+- URL merging for licenses
+- Fallback/default handling
+
+**Build-stage responsibilities** (cross-file policies):
+
+- Deprecated filtering (`with_deprecated: bool`)
+- License-derived rule synthesis
+- Tokenization and dictionary building
+- Aho-Corasick automaton construction
+- SPDX key mapping
+
+### Engine Initialization
+
+```rust
+// Default: Use embedded artifact
+let engine = LicenseDetectionEngine::from_embedded()?;
+
+// Custom rules: Load from directory
+let engine = LicenseDetectionEngine::from_directory(&rules_path)?;
 ```
 
-The `setup.sh` script currently:
+The CLI uses `from_embedded()` by default. Use `--license-rules-path` to load from a custom directory instead.
 
-- Initializes the submodule with shallow clone (`--depth=1`)
-- Configures sparse checkout to only include `json/details/` (saves ~90% disk space)
-- Updates to the latest upstream version
+### Regenerating the Embedded Artifact
 
-Longer-term (target runtime-rule-loading model), rule data remains the canonical source and index snapshots are rebuildable cache artifacts.
+Maintainers can regenerate the embedded license artifact when the ScanCode rules dataset is updated:
+
+```sh
+# Initialize the reference submodule (if not already)
+./setup.sh
+
+# Regenerate the artifact
+./scripts/update-license-loader-artifact.sh
+
+# Commit the updated artifact
+git add resources/license_detection/license_index_loader.msgpack.zst
+git commit -m "chore: update embedded license data"
+```
+
+### Reference Dataset (Optional)
+
+The `reference/scancode-toolkit/` submodule is **optional for end users**. It's only needed for:
+
+1. **Developers updating embedded data**: Regenerating the license loader artifact
+2. **Custom license rules**: Using `--license-rules-path` to load custom rule sets
+3. **Parity testing**: Comparing Rust behavior against Python reference
+
+Normal builds work without the submodule because the embedded artifact is checked into the repository.
 
 ## Related Documentation
 

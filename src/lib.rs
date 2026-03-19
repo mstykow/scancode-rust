@@ -184,22 +184,24 @@
 //! # }
 //! ```
 //!
-//! NOTE: License detection is currently under reimplementation. The scanner will
-//! compile and run but produces no license detection output in this version.
+//! NOTE: License detection uses a built-in embedded license index by default.
+//! No external files are required.
 //!
-//! ## Comparison with Original ScanCode Toolkit
+//! ## License Detection Example
 //! ```rust,no_run
 //! use scancode_rust::scanner::process;
 //! use scancode_rust::progress::{ProgressMode, ScanProgress};
+//! use scancode_rust::license_detection::LicenseDetectionEngine;
 //! use std::path::PathBuf;
 //! use std::sync::Arc;
 //! use glob::Pattern;
 //!
 //! # fn main() -> anyhow::Result<()> {
+//! // Initialize engine from embedded index (default, no external files needed)
+//! let engine = Arc::new(LicenseDetectionEngine::from_embedded()?);
+//!
 //! let progress = Arc::new(ScanProgress::new(ProgressMode::Quiet));
 //! let patterns: Vec<Pattern> = vec![];
-//! let data_path = PathBuf::from("reference/scancode-toolkit/src/licensedcode/data");
-//! let engine = Arc::new(LicenseDetectionEngine::from_directory(&data_path)?);
 //! let result = process(&PathBuf::from("."), 50, progress, &patterns, engine, false)?;
 //!
 //! for file in result.files {
@@ -212,6 +214,18 @@
 //!         }
 //!     }
 //! }
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! To use custom license rules:
+//! ```rust,no_run
+//! use scancode_rust::license_detection::LicenseDetectionEngine;
+//! use std::path::PathBuf;
+//!
+//! # fn main() -> anyhow::Result<()> {
+//! // Load from a custom rules directory
+//! let engine = LicenseDetectionEngine::from_directory(&PathBuf::from("/path/to/rules"))?;
 //! # Ok(())
 //! # }
 //! ```

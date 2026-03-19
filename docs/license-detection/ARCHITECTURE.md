@@ -10,25 +10,95 @@ The license detection system is a multi-phase, multi-strategy detection engine t
 
 ### CLI Flags
 
-| Flag | Purpose |
-|------|---------|
-| `--license-rules-path` | Path to license/rules data directory |
-| `--include-text` | Include matched text in output |
+| Flag                   | Purpose                                                |
+| ---------------------- | ------------------------------------------------------ |
+| `--license-rules-path` | Override to load custom license/rules from a directory |
+| `--include-text`       | Include matched text in output                         |
 
-Default rules path: `reference/scancode-toolkit/src/licensedcode/data`
+**Default behavior**: Uses the built-in embedded license index. No external files required.
+
+**Custom rules**: Use `--license-rules-path /path/to/rules` to load from a custom directory containing `.LICENSE` and `.RULE` files.
 
 ### Initialization Flow
 
 ```
 main.rs::init_license_engine()
-    ↓
-LicenseDetectionEngine::new(rules_path)
-    ↓
-Load .LICENSE and .RULE files
-    ↓
-Build LicenseIndex
-    ↓
-Arc<LicenseDetectionEngine> shared across scanner threads
+    │
+    ├── No --license-rules-path specified (default)
+    │       ↓
+    │   LicenseDetectionEngine::from_embedded()
+    │       ↓
+    │   Decompress embedded artifact (zstd)
+    │       ↓
+    │   Deserialize LoadedRule/LoadedLicense (MessagePack)
+    │       ↓
+    │   Build LicenseIndex
+    │
+    └── --license-rules-path specified
+            ↓
+        LicenseDetectionEngine::from_directory(rules_path)
+            ↓
+        Load .LICENSE and .RULE files from directory
+            ↓
+        Parse into LoadedRule/LoadedLicense
+            ↓
+        Build LicenseIndex
+            ↓
+    Arc<LicenseDetectionEngine> shared across scanner threads
+```
+
+---
+
+## Embedded License Index
+
+The binary includes a pre-built license index embedded at compile time:
+
+- **Location**: `resources/license_detection/license_index_loader.msgpack.zst`
+- **Format**: MessagePack serialization, zstd compression
+- **Contents**: `LoadedRule` and `LoadedLicense` values parsed from the ScanCode rules dataset
+
+### Loader/Build Stage Separation
+
+The loading process is split into two distinct stages:
+
+**Loader Stage** (embedded in artifact):
+
+- Parse `.RULE` and `.LICENSE` files
+- Normalize text and apply file-local transformations
+- Derive `identifier` from filename
+- Derive `rule_kind` from source booleans
+- Merge URLs for licenses
+- Serialize to `LoadedRule` / `LoadedLicense`
+
+**Build Stage** (runtime):
+
+- Convert `LoadedRule` → runtime `Rule`
+- Convert `LoadedLicense` → runtime `License`
+- Apply deprecated filtering policy
+- Synthesize license-derived rules
+- Build token dictionary and automatons
+- Create `LicenseIndex` and `SpdxMapping`
+
+This separation enables:
+
+- Self-contained binaries with no external dependencies
+- Faster startup (no YAML/frontmatter parsing at runtime)
+- Consistent rule loading across all installations
+
+### Regenerating the Embedded Artifact
+
+When the ScanCode rules dataset is updated, regenerate the embedded artifact:
+
+```sh
+# Initialize the reference submodule (contains the rules dataset)
+./setup.sh
+
+# Regenerate the artifact
+./scripts/update-license-loader-artifact.sh
+
+# Commit the updated artifact
+git add resources/license_detection/license_index_loader.msgpack.zst
+git commit -m "chore: update embedded license data"
 ```
 
 ---
@@ -54,26 +124,26 @@ pub struct LicenseDetectionEngine {
 
 Pre-computed data structures for efficient matching:
 
-| Field | Purpose |
-|-------|---------|
-| `dictionary` | Token → ID mapping |
-| `len_legalese` | Count of high-value legalese tokens |
-| `digit_only_tids` | Set of digit-only token IDs |
-| `rules_by_rid` | Rules indexed by ID |
-| `tids_by_rid` | Token ID sequences per rule |
-| `rid_by_hash` | SHA1 hash → rule ID (exact match) |
-| `rules_automaton` | Aho-Corasick automaton for all rules |
-| `unknown_automaton` | Automaton for unknown license detection |
-| `sets_by_rid` | Unique token sets per rule |
-| `msets_by_rid` | Token frequency maps per rule |
-| `high_postings_by_rid` | Inverted index for candidate selection |
-| `regular_rids` | Set of regular (non-false-positive) rule IDs |
-| `false_positive_rids` | Set of false-positive rule IDs |
-| `approx_matchable_rids` | Set of approx-matchable rule IDs |
-| `licenses_by_key` | ScanCode key → License mapping |
-| `pattern_id_to_rid` | AhoCorasick pattern ID → rule ID |
-| `rid_by_spdx_key` | SPDX license key → rule ID |
-| `unknown_spdx_rid` | Rule ID for unknown-spdx fallback |
+| Field                   | Purpose                                      |
+| ----------------------- | -------------------------------------------- |
+| `dictionary`            | Token → ID mapping                           |
+| `len_legalese`          | Count of high-value legalese tokens          |
+| `digit_only_tids`       | Set of digit-only token IDs                  |
+| `rules_by_rid`          | Rules indexed by ID                          |
+| `tids_by_rid`           | Token ID sequences per rule                  |
+| `rid_by_hash`           | SHA1 hash → rule ID (exact match)            |
+| `rules_automaton`       | Aho-Corasick automaton for all rules         |
+| `unknown_automaton`     | Automaton for unknown license detection      |
+| `sets_by_rid`           | Unique token sets per rule                   |
+| `msets_by_rid`          | Token frequency maps per rule                |
+| `high_postings_by_rid`  | Inverted index for candidate selection       |
+| `regular_rids`          | Set of regular (non-false-positive) rule IDs |
+| `false_positive_rids`   | Set of false-positive rule IDs               |
+| `approx_matchable_rids` | Set of approx-matchable rule IDs             |
+| `licenses_by_key`       | ScanCode key → License mapping               |
+| `pattern_id_to_rid`     | AhoCorasick pattern ID → rule ID             |
+| `rid_by_spdx_key`       | SPDX license key → rule ID                   |
+| `unknown_spdx_rid`      | Rule ID for unknown-spdx fallback            |
 
 ### Query
 
@@ -105,11 +175,11 @@ Also includes `QueryRun` struct for processing segmented regions.
 
 **File**: `src/license_detection/models.rs`
 
-| Struct | Purpose |
-|--------|---------|
-| `License` | License metadata from .LICENSE files |
-| `Rule` | Matchable pattern with flags (is_license_text, is_license_notice, etc.) |
-| `LicenseMatch` | Single match result with score, position, matcher type |
+| Struct         | Purpose                                                                 |
+| -------------- | ----------------------------------------------------------------------- |
+| `License`      | License metadata from .LICENSE files                                    |
+| `Rule`         | Matchable pattern with flags (is_license_text, is_license_notice, etc.) |
+| `LicenseMatch` | Single match result with score, position, matcher type                  |
 
 ---
 
@@ -248,14 +318,16 @@ pub struct ScoresVector {
 
 ## License Data Loading
 
-### Source Files
+### Source Files (for custom rules / regeneration)
 
 **Location**: `reference/scancode-toolkit/src/licensedcode/data/`
 
-| Directory | Contents |
-|-----------|----------|
-| `licenses/` | `.LICENSE` files (full license texts) |
-| `rules/` | `.RULE` files (patterns, notices, references) |
+| Directory   | Contents                                      |
+| ----------- | --------------------------------------------- |
+| `licenses/` | `.LICENSE` files (full license texts)         |
+| `rules/`    | `.RULE` files (patterns, notices, references) |
+
+> **Note**: The reference submodule is optional for end users. The default embedded license index is already included in the binary.
 
 ### File Format
 
@@ -299,29 +371,29 @@ Token ID assignment order:
 
 ## Key Files Reference
 
-| File | Role |
-|------|------|
-| `mod.rs` | Engine orchestration, pipeline coordination |
-| `detection.rs` | Detection grouping, classification |
-| `models.rs` | Core data structures (License, Rule, LicenseMatch) |
-| `query.rs` | Input tokenization, position tracking |
-| `tokenize.rs` | Text → token conversion |
-| `index/mod.rs` | Index data structures |
-| `index/builder.rs` | Index construction |
-| `index/dictionary.rs` | Token → ID mapping |
+| File                  | Role                                                  |
+| --------------------- | ----------------------------------------------------- |
+| `mod.rs`              | Engine orchestration, pipeline coordination           |
+| `detection.rs`        | Detection grouping, classification                    |
+| `models.rs`           | Core data structures (License, Rule, LicenseMatch)    |
+| `query.rs`            | Input tokenization, position tracking                 |
+| `tokenize.rs`         | Text → token conversion                               |
+| `index/mod.rs`        | Index data structures                                 |
+| `index/builder.rs`    | Index construction                                    |
+| `index/dictionary.rs` | Token → ID mapping                                    |
 | `index/token_sets.rs` | Token set/multiset operations for candidate selection |
-| `hash_match.rs` | Exact hash matching |
-| `spdx_lid.rs` | SPDX-License-Identifier detection |
-| `aho_match.rs` | Aho-Corasick matching |
-| `seq_match.rs` | Approximate sequence matching |
-| `unknown_match.rs` | Unknown license detection |
-| `match_refine.rs` | Match merging, filtering |
-| `rules/loader.rs` | .LICENSE and .RULE file parsing |
-| `rules/legalese.rs` | High-value token definitions |
-| `rules/thresholds.rs` | Match threshold calculations |
-| `spdx_mapping.rs` | ScanCode ↔ SPDX key conversion |
-| `expression.rs` | License expression parsing |
-| `spans.rs` | Position span management |
+| `hash_match.rs`       | Exact hash matching                                   |
+| `spdx_lid.rs`         | SPDX-License-Identifier detection                     |
+| `aho_match.rs`        | Aho-Corasick matching                                 |
+| `seq_match.rs`        | Approximate sequence matching                         |
+| `unknown_match.rs`    | Unknown license detection                             |
+| `match_refine.rs`     | Match merging, filtering                              |
+| `rules/loader.rs`     | .LICENSE and .RULE file parsing                       |
+| `rules/legalese.rs`   | High-value token definitions                          |
+| `rules/thresholds.rs` | Match threshold calculations                          |
+| `spdx_mapping.rs`     | ScanCode ↔ SPDX key conversion                        |
+| `expression.rs`       | License expression parsing                            |
+| `spans.rs`            | Position span management                              |
 
 ---
 
@@ -364,14 +436,16 @@ pub struct LicenseDetection {
 {
   "license_expression": "mit",
   "license_expression_spdx": "MIT",
-  "matches": [{
-    "license_expression": "mit",
-    "matcher": "2-aho",
-    "score": 1.0,
-    "match_coverage": 100.0,
-    "start_line": 1,
-    "end_line": 20
-  }],
+  "matches": [
+    {
+      "license_expression": "mit",
+      "matcher": "2-aho",
+      "score": 1.0,
+      "match_coverage": 100.0,
+      "start_line": 1,
+      "end_line": 20
+    }
+  ],
   "detection_log": ["perfect-detection"]
 }
 ```

@@ -10,6 +10,8 @@ A high-performance code scanning tool written in Rust that detects licenses, cop
 - File metadata
 - System information
 
+**Self-contained binary**: The binary ships with a built-in license index embedded at compile time. No external files or submodules are required for normal usage.
+
 For design details and implementation guidance, see the documentation in `docs/`.
 
 ## Features
@@ -51,11 +53,12 @@ sudo mv scancode-rust /usr/local/bin/
 ```sh
 git clone https://github.com/yourusername/scancode-rust.git
 cd scancode-rust
-./setup.sh  # Initialize the submodule and configure sparse checkout
 cargo build --release
 ```
 
 The compiled binary will be available at `target/release/scancode-rust`.
+
+> **Note**: The binary includes a built-in license index. The `reference/scancode-toolkit/` submodule is only needed for developers updating the embedded license data or using custom license rules.
 
 ## Usage
 
@@ -172,31 +175,28 @@ To contribute to `scancode-rust`, follow these steps to set up the repository fo
    cd scancode-rust
    ```
 
-3. **Initialize the License Submodule**  
-   Use the following script to initialize the submodule and configure sparse checkout.  
-   If `pre-commit` is installed, this script also installs Git pre-commit hooks automatically:
+3. **Build and Test**  
+   Build and run tests (no external dependencies required):
+
+   ```sh
+   cargo build
+   cargo test
+   ```
+
+4. **Optional: Initialize Reference Submodule**  
+   The `reference/scancode-toolkit/` submodule is only needed if you:
+   - Want to update the embedded license data
+   - Need to use custom license rules with `--license-rules-path`
+   - Are doing parity testing against the Python reference
+
+   To initialize it:
 
    ```sh
    ./setup.sh
    ```
 
-4. **Install Dependencies**  
-   Install the required Rust dependencies using `cargo`:
-
-   ```sh
-   cargo build
-   ```
-
-5. **Run Tests**  
-   Run the test suite to ensure everything is working correctly:
-
-   ```sh
-   cargo test
-   ```
-
-6. **Install Pre-commit (if needed)**  
-   This repository uses [pre-commit](https://pre-commit.com/) to run checks before each commit.  
-   If you install `pre-commit` after running `./setup.sh`, run `pre-commit install` once:
+5. **Install Pre-commit (if needed)**  
+   This repository uses [pre-commit](https://pre-commit.com/) to run checks before each commit.
 
    ```sh
    # Using pip
@@ -216,7 +216,7 @@ To contribute to `scancode-rust`, follow these steps to set up the repository fo
    npm run fix:docs    # markdownlint auto-fix + prettier write
    ```
 
-7. **Start Developing**  
+6. **Start Developing**  
    You can now make changes and test them locally. Use `cargo run` to execute the tool:
 
    ```sh
