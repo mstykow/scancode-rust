@@ -19,6 +19,8 @@ pub mod spdx_lid;
 pub mod spdx_mapping;
 #[cfg(test)]
 mod test_utils;
+#[cfg(test)]
+mod embedded_test;
 mod tokenize;
 pub mod unknown_match;
 
