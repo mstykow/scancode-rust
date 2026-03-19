@@ -47,6 +47,39 @@
         "is_direct": true,
         "resolved_package": {},
         "extra_data": {}
+      },
+      {
+        "purl": "pkg:maven/detekt-rules",
+        "extracted_requirement": "",
+        "scope": "project",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true,
+        "resolved_package": {},
+        "extra_data": {}
+      },
+      {
+        "purl": "pkg:maven/utils/test-utils",
+        "extracted_requirement": "",
+        "scope": "project",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true,
+        "resolved_package": {},
+        "extra_data": {}
+      },
+      {
+        "purl": "pkg:maven/org.jetbrains.kotlin/kotlin-stdlib-jdk8@%24kotlinPluginVersion",
+        "extracted_requirement": "$kotlinPluginVersion",
+        "scope": "implementation",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": true,
+        "resolved_package": {},
+        "extra_data": {}
       }
     ],
     "repository_homepage_url": null,
