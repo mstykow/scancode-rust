@@ -8,6 +8,11 @@
     "homepage_url": "https://crates.io/crates/private-crate",
     "vcs_url": "https://github.com/example/private-crate",
     "extracted_license_statement": "MIT",
+    "file_references": [
+      {
+        "path": "README.md"
+      }
+    ],
     "extra_data": {
       "readme_file": "README.md",
       "publish": false
