@@ -8,13 +8,14 @@
 //! `load_loaded_rules_from_directory`, `load_loaded_licenses_from_directory`) return
 //! all entries including deprecated ones. Deprecated filtering is a build-stage concern.
 
+use crate::license_detection::index::{loaded_license_to_license, loaded_rule_to_rule};
 use crate::license_detection::models::{License, LoadedLicense, LoadedRule, Rule};
 use anyhow::{anyhow, Context, Result};
 use log::warn;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use serde::{Deserialize, Deserializer, Serialize};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::fs;
 use std::path::Path;
 
@@ -74,6 +75,7 @@ impl ParseNumber for serde_yaml::Number {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct LicenseFrontmatter {
     #[serde(default)]
     key: Option<String>,
@@ -227,6 +229,7 @@ fn parse_file_content(content: &str, path: &Path) -> Result<ParsedRuleFile> {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct RuleFrontmatter {
     #[serde(default)]
     license_expression: Option<String>,
@@ -405,54 +408,13 @@ pub fn parse_rule_to_loaded(path: &Path) -> Result<LoadedRule> {
 ///
 /// This function parses the file and returns a runtime `Rule`.
 /// Deprecated entries are included - filtering is a build-stage concern.
+///
+/// Kept for backward compatibility and testing despite not being used in production code.
+/// The new pipeline uses `parse_rule_to_loaded` + `loaded_rule_to_rule` instead.
+#[allow(dead_code)]
 pub fn parse_rule_file(path: &Path) -> Result<Rule> {
     let loaded = parse_rule_to_loaded(path)?;
     Ok(loaded_rule_to_rule(loaded))
-}
-
-/// Convert a `LoadedRule` to a runtime `Rule`.
-///
-/// This is a build-stage operation that creates the initial runtime `Rule`
-/// with default values for runtime-computed fields.
-fn loaded_rule_to_rule(loaded: LoadedRule) -> Rule {
-    Rule {
-        identifier: loaded.identifier,
-        license_expression: loaded.license_expression,
-        text: loaded.text,
-        tokens: vec![],
-        rule_kind: loaded.rule_kind,
-        is_false_positive: loaded.is_false_positive,
-        is_required_phrase: loaded.is_required_phrase,
-        is_from_license: false,
-        relevance: loaded.relevance.unwrap_or(100),
-        minimum_coverage: loaded.minimum_coverage,
-        has_stored_minimum_coverage: loaded.has_stored_minimum_coverage,
-        is_continuous: loaded.is_continuous,
-        required_phrase_spans: vec![],
-        stopwords_by_pos: HashMap::new(),
-        referenced_filenames: loaded.referenced_filenames,
-        ignorable_urls: loaded.ignorable_urls,
-        ignorable_emails: loaded.ignorable_emails,
-        ignorable_copyrights: loaded.ignorable_copyrights,
-        ignorable_holders: loaded.ignorable_holders,
-        ignorable_authors: loaded.ignorable_authors,
-        language: loaded.language,
-        notes: loaded.notes,
-        length_unique: 0,
-        high_length_unique: 0,
-        high_length: 0,
-        min_matched_length: 0,
-        min_high_matched_length: 0,
-        min_matched_length_unique: 0,
-        min_high_matched_length_unique: 0,
-        is_small: false,
-        is_tiny: false,
-        starts_with_license: false,
-        ends_with_license: false,
-        is_deprecated: loaded.is_deprecated,
-        spdx_license_key: None,
-        other_spdx_license_keys: vec![],
-    }
 }
 
 /// Parse a .LICENSE file into a `LoadedLicense` (loader-stage).
@@ -538,6 +500,19 @@ pub fn parse_license_to_loaded(path: &Path) -> Result<LoadedLicense> {
     })
 }
 
+/// Parse a .LICENSE file into a `License` (backward-compatible).
+///
+/// This function parses the file and returns a runtime `License`.
+/// Deprecated entries are included - filtering is a build-stage concern.
+///
+/// Kept for backward compatibility and testing despite not being used in production code.
+/// The new pipeline uses `parse_license_to_loaded` + `loaded_license_to_license` instead.
+#[allow(dead_code)]
+pub fn parse_license_file(path: &Path) -> Result<License> {
+    let loaded = parse_license_to_loaded(path)?;
+    Ok(loaded_license_to_license(loaded))
+}
+
 /// Parse license file content into frontmatter and text sections.
 ///
 /// The `path` parameter is used for error messages only.
@@ -585,39 +560,6 @@ fn parse_license_file_content(content: &str, path: &Path) -> Result<ParsedLicens
         yaml_content,
         text_content,
     })
-}
-
-/// Parse a .LICENSE file into a `License` (backward-compatible).
-///
-/// This function parses the file and returns a runtime `License`.
-/// Deprecated entries are included - filtering is a build-stage concern.
-pub fn parse_license_file(path: &Path) -> Result<License> {
-    let loaded = parse_license_to_loaded(path)?;
-    Ok(loaded_license_to_license(loaded))
-}
-
-/// Convert a `LoadedLicense` to a runtime `License`.
-///
-/// This is a build-stage operation that creates the runtime `License`.
-fn loaded_license_to_license(loaded: LoadedLicense) -> License {
-    License {
-        key: loaded.key,
-        name: loaded.name,
-        spdx_license_key: loaded.spdx_license_key,
-        other_spdx_license_keys: loaded.other_spdx_license_keys,
-        category: loaded.category,
-        text: loaded.text,
-        reference_urls: loaded.reference_urls,
-        notes: loaded.notes,
-        is_deprecated: loaded.is_deprecated,
-        replaced_by: loaded.replaced_by,
-        minimum_coverage: loaded.minimum_coverage,
-        ignorable_copyrights: loaded.ignorable_copyrights,
-        ignorable_holders: loaded.ignorable_holders,
-        ignorable_authors: loaded.ignorable_authors,
-        ignorable_urls: loaded.ignorable_urls,
-        ignorable_emails: loaded.ignorable_emails,
-    }
 }
 
 /// Load all .RULE files from a directory into `LoadedRule` values (loader-stage).
@@ -698,88 +640,6 @@ pub fn load_loaded_licenses_from_directory(dir: &Path) -> Result<Vec<LoadedLicen
     Ok(licenses)
 }
 
-fn load_rules_from_dir(dir: &Path, pattern: &str, with_deprecated: bool) -> Result<Vec<Rule>> {
-    let mut rules = Vec::new();
-
-    let entries = fs::read_dir(dir)
-        .with_context(|| format!("Failed to read rules directory: {}", dir.display()))?;
-
-    for entry in entries {
-        let entry = entry
-            .with_context(|| format!("Failed to read directory entry in: {}", dir.display()))?;
-        let path = entry.path();
-
-        if path.is_file()
-            && path.extension().and_then(|s| s.to_str()) == Some(pattern.trim_start_matches('.'))
-        {
-            match parse_rule_to_loaded(&path) {
-                Ok(loaded) => {
-                    if with_deprecated || !loaded.is_deprecated {
-                        rules.push(loaded_rule_to_rule(loaded));
-                    }
-                }
-                Err(e) => {
-                    eprintln!(
-                        "Warning: Failed to parse rule file {}: {}",
-                        path.display(),
-                        e
-                    );
-                }
-            }
-        }
-    }
-
-    Ok(rules)
-}
-
-fn load_licenses_from_dir(
-    dir: &Path,
-    pattern: &str,
-    with_deprecated: bool,
-) -> Result<Vec<License>> {
-    let mut licenses = Vec::new();
-
-    let entries = fs::read_dir(dir)
-        .with_context(|| format!("Failed to read licenses directory: {}", dir.display()))?;
-
-    for entry in entries {
-        let entry = entry
-            .with_context(|| format!("Failed to read directory entry in: {}", dir.display()))?;
-        let path = entry.path();
-
-        if path.is_file()
-            && path.extension().and_then(|s| s.to_str()) == Some(pattern.trim_start_matches('.'))
-        {
-            match parse_license_to_loaded(&path) {
-                Ok(loaded) => {
-                    if with_deprecated || !loaded.is_deprecated {
-                        licenses.push(loaded_license_to_license(loaded));
-                    }
-                }
-                Err(e) => {
-                    eprintln!(
-                        "Warning: Failed to parse license file {}: {}",
-                        path.display(),
-                        e
-                    );
-                }
-            }
-        }
-    }
-
-    Ok(licenses)
-}
-
-pub fn load_rules_from_directory(dir: &Path, with_deprecated: bool) -> Result<Vec<Rule>> {
-    let rules = load_rules_from_dir(dir, ".RULE", with_deprecated)?;
-    validate_rules(&rules);
-    Ok(rules)
-}
-
-pub fn load_licenses_from_directory(dir: &Path, with_deprecated: bool) -> Result<Vec<License>> {
-    load_licenses_from_dir(dir, ".LICENSE", with_deprecated)
-}
-
 /// Validate loaded rules for common issues.
 ///
 /// Checks for:
@@ -789,6 +649,9 @@ pub fn load_licenses_from_directory(dir: &Path, with_deprecated: bool) -> Result
 /// Corresponds to Python:
 /// - `models.py:validate()` for license expression validation
 /// - `index.py:_add_rules()` for duplicate detection via hash
+///
+/// Kept for backward compatibility with `load_rules_from_directory`.
+#[allow(dead_code)]
 fn validate_rules(rules: &[Rule]) {
     let mut seen_texts: HashSet<&str> = HashSet::new();
     let mut duplicate_count = 0;
@@ -815,9 +678,49 @@ fn validate_rules(rules: &[Rule]) {
     }
 }
 
+/// Load all .RULE files from a directory into `Rule` values (backward-compatible).
+///
+/// This function loads rules and applies deprecated filtering during loading.
+/// For the two-stage pipeline, prefer `load_loaded_rules_from_directory` and
+/// `build_index_from_loaded`.
+///
+/// Kept for backward compatibility and testing despite not being used in production code.
+/// The new pipeline uses the two-stage loading process instead.
+#[allow(dead_code)]
+pub fn load_rules_from_directory(dir: &Path, with_deprecated: bool) -> Result<Vec<Rule>> {
+    let loaded = load_loaded_rules_from_directory(dir)?;
+    let rules: Vec<Rule> = loaded
+        .into_iter()
+        .filter(|r| with_deprecated || !r.is_deprecated)
+        .map(loaded_rule_to_rule)
+        .collect();
+    validate_rules(&rules);
+    Ok(rules)
+}
+
+/// Load all .LICENSE files from a directory into `License` values (backward-compatible).
+///
+/// This function loads licenses and applies deprecated filtering during loading.
+/// For the two-stage pipeline, prefer `load_loaded_licenses_from_directory` and
+/// `build_index_from_loaded`.
+///
+/// Kept for backward compatibility and testing despite not being used in production code.
+/// The new pipeline uses the two-stage loading process instead.
+#[allow(dead_code)]
+pub fn load_licenses_from_directory(dir: &Path, with_deprecated: bool) -> Result<Vec<License>> {
+    let loaded = load_loaded_licenses_from_directory(dir)?;
+    let licenses: Vec<License> = loaded
+        .into_iter()
+        .filter(|l| with_deprecated || !l.is_deprecated)
+        .map(loaded_license_to_license)
+        .collect();
+    Ok(licenses)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashMap;
     use std::fs;
     use tempfile::tempdir;
 

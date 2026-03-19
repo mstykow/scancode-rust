@@ -1147,4 +1147,154 @@ SOFTWARE."#;
             eprintln!("\nmit_or_boost-1.0_1.RULE found at rid {}", rid);
         }
     }
+
+    #[test]
+    fn test_build_index_from_loaded_filters_deprecated() {
+        use crate::license_detection::index::build_index_from_loaded;
+        use crate::license_detection::models::{LoadedLicense, LoadedRule};
+
+        let active_rule = LoadedRule {
+            identifier: "active.RULE".to_string(),
+            license_expression: "mit".to_string(),
+            text: "MIT License".to_string(),
+            rule_kind: RuleKind::Text,
+            is_false_positive: false,
+            is_required_phrase: false,
+            relevance: Some(100),
+            minimum_coverage: None,
+            has_stored_minimum_coverage: false,
+            is_continuous: false,
+            referenced_filenames: None,
+            ignorable_urls: None,
+            ignorable_emails: None,
+            ignorable_copyrights: None,
+            ignorable_holders: None,
+            ignorable_authors: None,
+            language: None,
+            notes: None,
+            is_deprecated: false,
+        };
+
+        let deprecated_rule = LoadedRule {
+            identifier: "deprecated.RULE".to_string(),
+            license_expression: "old-license".to_string(),
+            text: "Old License".to_string(),
+            rule_kind: RuleKind::Text,
+            is_false_positive: false,
+            is_required_phrase: false,
+            relevance: Some(100),
+            minimum_coverage: None,
+            has_stored_minimum_coverage: false,
+            is_continuous: false,
+            referenced_filenames: None,
+            ignorable_urls: None,
+            ignorable_emails: None,
+            ignorable_copyrights: None,
+            ignorable_holders: None,
+            ignorable_authors: None,
+            language: None,
+            notes: None,
+            is_deprecated: true,
+        };
+
+        let active_license = LoadedLicense {
+            key: "mit".to_string(),
+            name: "MIT License".to_string(),
+            spdx_license_key: Some("MIT".to_string()),
+            other_spdx_license_keys: vec![],
+            category: Some("Permissive".to_string()),
+            text: "MIT License text".to_string(),
+            reference_urls: vec![],
+            notes: None,
+            is_deprecated: false,
+            replaced_by: vec![],
+            minimum_coverage: None,
+            ignorable_copyrights: None,
+            ignorable_holders: None,
+            ignorable_authors: None,
+            ignorable_urls: None,
+            ignorable_emails: None,
+        };
+
+        let deprecated_license = LoadedLicense {
+            key: "old-license".to_string(),
+            name: "Old License".to_string(),
+            spdx_license_key: None,
+            other_spdx_license_keys: vec![],
+            category: None,
+            text: "Old License text".to_string(),
+            reference_urls: vec![],
+            notes: None,
+            is_deprecated: true,
+            replaced_by: vec!["mit".to_string()],
+            minimum_coverage: None,
+            ignorable_copyrights: None,
+            ignorable_holders: None,
+            ignorable_authors: None,
+            ignorable_urls: None,
+            ignorable_emails: None,
+        };
+
+        let index_without_deprecated = build_index_from_loaded(
+            vec![active_rule.clone(), deprecated_rule.clone()],
+            vec![active_license.clone(), deprecated_license.clone()],
+            false,
+        );
+
+        assert!(
+            index_without_deprecated
+                .rules_by_rid
+                .iter()
+                .any(|r| r.identifier == "active.RULE"),
+            "Should include active rule"
+        );
+        assert!(
+            !index_without_deprecated
+                .rules_by_rid
+                .iter()
+                .any(|r| r.identifier == "deprecated.RULE"),
+            "Should NOT include deprecated rule"
+        );
+        assert!(
+            index_without_deprecated.licenses_by_key.contains_key("mit"),
+            "Should include active license"
+        );
+        assert!(
+            !index_without_deprecated
+                .licenses_by_key
+                .contains_key("old-license"),
+            "Should NOT include deprecated license"
+        );
+
+        let index_with_deprecated = build_index_from_loaded(
+            vec![active_rule, deprecated_rule],
+            vec![active_license, deprecated_license],
+            true,
+        );
+
+        assert!(
+            index_with_deprecated
+                .rules_by_rid
+                .iter()
+                .any(|r| r.identifier == "active.RULE"),
+            "Should include active rule"
+        );
+        assert!(
+            index_with_deprecated
+                .rules_by_rid
+                .iter()
+                .any(|r| r.identifier == "deprecated.RULE"),
+            "Should include deprecated rule when with_deprecated=true"
+        );
+        assert!(
+            index_with_deprecated.licenses_by_key.contains_key("mit"),
+            "Should include active license"
+        );
+        assert!(
+            index_with_deprecated
+                .licenses_by_key
+                .contains_key("old-license"),
+            "Should include deprecated license when with_deprecated=true"
+        );
+    }
 }

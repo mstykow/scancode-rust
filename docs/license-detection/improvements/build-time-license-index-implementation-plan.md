@@ -96,7 +96,7 @@ The goal is to make the default binary self-contained by embedding a build-time 
 
 ## Phase 4: Build-Stage Refactoring
 
-**Status**: Pending
+**Status**: Complete
 
 ### Objectives
 
@@ -106,12 +106,12 @@ The goal is to make the default binary self-contained by embedding a build-time 
 
 ### Deliverables
 
-- [ ] Add `build_index(loaded_rules, loaded_licenses, with_deprecated) -> LicenseIndex`
-- [ ] Implement `LoadedRule -> Rule` conversion
-- [ ] Implement `LoadedLicense -> License` conversion
-- [ ] Move deprecated filtering to build stage with `with_deprecated: bool` parameter
-- [ ] Ensure license-derived rule synthesis happens after deprecated filtering
-- [ ] Update `LicenseDetectionEngine::from_directory()` to use new pipeline
+- [x] Add `build_index(loaded_rules, loaded_licenses, with_deprecated) -> LicenseIndex`
+- [x] Implement `LoadedRule -> Rule` conversion
+- [x] Implement `LoadedLicense -> License` conversion
+- [x] Move deprecated filtering to build stage with `with_deprecated: bool` parameter
+- [x] Ensure license-derived rule synthesis happens after deprecated filtering
+- [x] Update `LicenseDetectionEngine::from_directory()` to use new pipeline
 
 ### Validation
 
@@ -123,7 +123,7 @@ The goal is to make the default binary self-contained by embedding a build-time 
 
 ## Phase 5: Embedded Artifact Generation
 
-**Status**: Pending
+**Status**: Complete
 
 ### Objectives
 
@@ -132,16 +132,16 @@ The goal is to make the default binary self-contained by embedding a build-time 
 
 ### Deliverables
 
-- [ ] Add `rmp-serde` and `zstd` dependencies
-- [ ] Create generator binary: `src/bin/generate-license-loader-artifact.rs`
-- [ ] Implement artifact generation:
-  - [ ] Load rules and licenses from directory
-  - [ ] Sort deterministically
-  - [ ] Serialize with MessagePack
-  - [ ] Compress with zstd
-  - [ ] Write to output path
-- [ ] Create maintainer script: `scripts/update-license-index-loader-artifact.sh`
-- [ ] Generate initial artifact at `resources/license_detection/license_index_loader.msgpack.zst`
+- [x] Add `rmp-serde` and `zstd` dependencies
+- [x] Create generator binary: `src/bin/generate-license-loader-artifact.rs`
+- [x] Implement artifact generation:
+  - [x] Load rules and licenses from directory
+  - [x] Sort deterministically
+  - [x] Serialize with MessagePack
+  - [x] Compress with zstd
+  - [x] Write to output path
+- [x] Create maintainer script: `scripts/update-license-loader-artifact.sh`
+- [x] Generate initial artifact at `resources/license_detection/license_index_loader.msgpack.zst`
 
 ### Validation
 
@@ -153,7 +153,7 @@ The goal is to make the default binary self-contained by embedding a build-time 
 
 ## Phase 6: Runtime Embedded Loading
 
-**Status**: Pending
+**Status**: Complete
 
 ### Objectives
 
@@ -162,13 +162,13 @@ The goal is to make the default binary self-contained by embedding a build-time 
 
 ### Deliverables
 
-- [ ] Add embedded artifact bytes via `include_bytes!`
-- [ ] Implement decompression (zstd)
-- [ ] Implement deserialization (MessagePack)
-- [ ] Validate `schema_version`
-- [ ] Feed loaded data to build stage
-- [ ] Complete `LicenseDetectionEngine::from_embedded()` implementation
-- [ ] Update `Cargo.toml` to include artifact in package
+- [x] Add embedded artifact bytes via `include_bytes!`
+- [x] Implement decompression (zstd)
+- [x] Implement deserialization (MessagePack)
+- [x] Validate `schema_version`
+- [x] Feed loaded data to build stage
+- [x] Complete `LicenseDetectionEngine::from_embedded()` implementation
+- [x] Update `Cargo.toml` to include artifact in package
 
 ### Validation
 
@@ -180,7 +180,7 @@ The goal is to make the default binary self-contained by embedding a build-time 
 
 ## Phase 7: CLI Integration
 
-**Status**: Pending
+**Status**: Complete
 
 ### Objectives
 
@@ -189,15 +189,15 @@ The goal is to make the default binary self-contained by embedding a build-time 
 
 ### Deliverables
 
-- [ ] Update `src/cli.rs`:
-  - [ ] Default `license_rules_path` to `None`
-  - [ ] `None` means use embedded index
-  - [ ] `Some(path)` means use custom directory
-- [ ] Update `src/main.rs`:
-  - [ ] Use `from_embedded()` by default
-  - [ ] Use `from_directory()` when path specified
-  - [ ] Fail scan on initialization error (no silent skip)
-- [ ] Remove default path to `reference/scancode-toolkit/src/licensedcode/data`
+- [x] Update `src/cli.rs`:
+  - [x] Default `license_rules_path` to `None`
+  - [x] `None` means use embedded index
+  - [x] `Some(path)` means use custom directory
+- [x] Update `src/main.rs`:
+  - [x] Use `from_embedded()` by default
+  - [x] Use `from_directory()` when path specified
+  - [x] Fail scan on initialization error (no silent skip)
+- [x] Remove default path to `reference/scancode-toolkit/src/licensedcode/data`
 
 ### Validation
 

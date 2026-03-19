@@ -28,9 +28,11 @@ use std::sync::Arc;
 
 use anyhow::Result;
 
-use crate::license_detection::index::build_index;
+use crate::license_detection::index::build_index_from_loaded;
 use crate::license_detection::query::Query;
-use crate::license_detection::rules::{load_licenses_from_directory, load_rules_from_directory};
+use crate::license_detection::rules::{
+    load_loaded_licenses_from_directory, load_loaded_rules_from_directory,
+};
 use crate::license_detection::spdx_mapping::{SpdxMapping, build_spdx_mapping};
 use crate::utils::text::strip_utf8_bom_str;
 
@@ -403,10 +405,22 @@ impl LicenseDetectionEngine {
     /// # Returns
     /// A Result containing the engine or an error
     pub fn from_embedded() -> Result<Self> {
-        anyhow::bail!(
-            "Embedded license index loading is not yet implemented. \
-             Use from_directory() for now."
-        )
+        let artifact_bytes = include_bytes!("../../resources/license_detection/license_index_loader.msgpack.zst");
+        let decompressed = zstd::decode_all(&artifact_bytes[..])
+            .map_err(|e| anyhow::anyhow!("Failed to decompress embedded artifact: {}", e))?;
+        let snapshot: embedded::schema::EmbeddedLoaderSnapshot = rmp_serde::from_slice(&decompressed)
+            .map_err(|e| anyhow::anyhow!("Failed to deserialize embedded artifact: {}", e))?;
+
+        if snapshot.schema_version != embedded::schema::SCHEMA_VERSION {
+            anyhow::bail!(
+                "Embedded artifact schema version mismatch: expected {}, got {}",
+                embedded::schema::SCHEMA_VERSION,
+                snapshot.schema_version
+            );
+        }
+
+        let index = build_index_from_loaded(snapshot.rules, snapshot.licenses, false);
+        Self::from_index(index)
     }
 
     /// Create a new license detection engine from a directory of license rules.
@@ -428,9 +442,9 @@ impl LicenseDetectionEngine {
             (rules_path.to_path_buf(), rules_path.to_path_buf())
         };
 
-        let rules = load_rules_from_directory(&rules_dir, false)?;
-        let licenses = load_licenses_from_directory(&licenses_dir, false)?;
-        let index = build_index(rules, licenses);
+        let loaded_rules = load_loaded_rules_from_directory(&rules_dir)?;
+        let loaded_licenses = load_loaded_licenses_from_directory(&licenses_dir)?;
+        let index = build_index_from_loaded(loaded_rules, loaded_licenses, false);
 
         Self::from_index(index)
     }

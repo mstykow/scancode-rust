@@ -1,7 +1,7 @@
 //! License index builder.
 //!
-//! This module implements the `build_index()` function that constructs all
-//! index data structures from rules and licenses.
+//! This module implements the `build_index()` and `build_index_from_loaded()`
+//! functions that construct all index data structures from rules and licenses.
 //!
 //! Based on the Python ScanCode Toolkit implementation at:
 //! reference/scancode-toolkit/src/licensedcode/index.py (lines 381-577)
@@ -10,7 +10,6 @@ use aho_corasick::AhoCorasickBuilder;
 use std::collections::{HashMap, HashSet};
 
 use crate::license_detection::hash_match::compute_hash;
-use crate::license_detection::index::LicenseIndex;
 use crate::license_detection::index::dictionary::{
     KnownToken, TokenDictionary, TokenId, TokenKind,
 };
@@ -18,10 +17,11 @@ use crate::license_detection::index::token_sets::{
     build_set_and_mset, high_multiset_subset, high_tids_set_subset, multiset_counter,
     tids_set_counter,
 };
-use crate::license_detection::models::{License, Rule};
+use crate::license_detection::index::LicenseIndex;
+use crate::license_detection::models::{License, LoadedLicense, LoadedRule, Rule};
 use crate::license_detection::rules::legalese;
 use crate::license_detection::rules::thresholds::{
-    SMALL_RULE, TINY_RULE, compute_thresholds_occurrences, compute_thresholds_unique,
+    compute_thresholds_occurrences, compute_thresholds_unique, SMALL_RULE, TINY_RULE,
 };
 use crate::license_detection::tokenize::{
     parse_required_phrase_spans, tokenize, tokenize_with_stopwords,
@@ -497,6 +497,111 @@ pub fn build_index(rules: Vec<Rule>, licenses: Vec<License>) -> LicenseIndex {
         rid_by_spdx_key,
         unknown_spdx_rid,
     }
+}
+
+/// Convert a `LoadedRule` to a runtime `Rule`.
+///
+/// This is a build-stage operation that creates the initial runtime `Rule`
+/// with default values for runtime-computed fields.
+pub fn loaded_rule_to_rule(loaded: LoadedRule) -> Rule {
+    Rule {
+        identifier: loaded.identifier,
+        license_expression: loaded.license_expression,
+        text: loaded.text,
+        tokens: vec![],
+        rule_kind: loaded.rule_kind,
+        is_false_positive: loaded.is_false_positive,
+        is_required_phrase: loaded.is_required_phrase,
+        is_from_license: false,
+        relevance: loaded.relevance.unwrap_or(100),
+        minimum_coverage: loaded.minimum_coverage,
+        has_stored_minimum_coverage: loaded.has_stored_minimum_coverage,
+        is_continuous: loaded.is_continuous,
+        required_phrase_spans: vec![],
+        stopwords_by_pos: HashMap::new(),
+        referenced_filenames: loaded.referenced_filenames,
+        ignorable_urls: loaded.ignorable_urls,
+        ignorable_emails: loaded.ignorable_emails,
+        ignorable_copyrights: loaded.ignorable_copyrights,
+        ignorable_holders: loaded.ignorable_holders,
+        ignorable_authors: loaded.ignorable_authors,
+        language: loaded.language,
+        notes: loaded.notes,
+        length_unique: 0,
+        high_length_unique: 0,
+        high_length: 0,
+        min_matched_length: 0,
+        min_high_matched_length: 0,
+        min_matched_length_unique: 0,
+        min_high_matched_length_unique: 0,
+        is_small: false,
+        is_tiny: false,
+        starts_with_license: false,
+        ends_with_license: false,
+        is_deprecated: loaded.is_deprecated,
+        spdx_license_key: None,
+        other_spdx_license_keys: vec![],
+    }
+}
+
+/// Convert a `LoadedLicense` to a runtime `License`.
+///
+/// This is a build-stage operation that creates the runtime `License`.
+pub fn loaded_license_to_license(loaded: LoadedLicense) -> License {
+    License {
+        key: loaded.key,
+        name: loaded.name,
+        spdx_license_key: loaded.spdx_license_key,
+        other_spdx_license_keys: loaded.other_spdx_license_keys,
+        category: loaded.category,
+        text: loaded.text,
+        reference_urls: loaded.reference_urls,
+        notes: loaded.notes,
+        is_deprecated: loaded.is_deprecated,
+        replaced_by: loaded.replaced_by,
+        minimum_coverage: loaded.minimum_coverage,
+        ignorable_copyrights: loaded.ignorable_copyrights,
+        ignorable_holders: loaded.ignorable_holders,
+        ignorable_authors: loaded.ignorable_authors,
+        ignorable_urls: loaded.ignorable_urls,
+        ignorable_emails: loaded.ignorable_emails,
+    }
+}
+
+/// Build a `LicenseIndex` from loaded rules and licenses.
+///
+/// This is the primary build-stage entry point that:
+/// 1. Filters deprecated entries if `with_deprecated` is false
+/// 2. Converts `LoadedRule` to `Rule`
+/// 3. Converts `LoadedLicense` to `License`
+/// 4. Synthesizes license-derived rules from the filtered license set
+/// 5. Calls `build_index()` to construct the final index
+///
+/// # Arguments
+/// * `loaded_rules` - Rules loaded from the loader stage
+/// * `loaded_licenses` - Licenses loaded from the loader stage
+/// * `with_deprecated` - If false, filter out deprecated entries before building
+///
+/// # Returns
+/// A fully constructed `LicenseIndex`
+pub fn build_index_from_loaded(
+    loaded_rules: Vec<LoadedRule>,
+    loaded_licenses: Vec<LoadedLicense>,
+    with_deprecated: bool,
+) -> LicenseIndex {
+    let rules: Vec<Rule> = loaded_rules
+        .into_iter()
+        .filter(|r| with_deprecated || !r.is_deprecated)
+        .map(loaded_rule_to_rule)
+        .collect();
+
+    let licenses: Vec<License> = loaded_licenses
+        .into_iter()
+        .filter(|l| with_deprecated || !l.is_deprecated)
+        .map(loaded_license_to_license)
+        .collect();
+
+    build_index(rules, licenses)
 }
 
 #[cfg(test)]

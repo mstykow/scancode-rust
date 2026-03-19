@@ -2,7 +2,6 @@ use anyhow::{Result, anyhow};
 use chrono::Utc;
 use clap::Parser;
 use glob::Pattern;
-use log::warn;
 use serde::Deserialize;
 use std::collections::{HashMap, HashSet};
 use std::env;
@@ -137,7 +136,7 @@ fn run() -> Result<()> {
         }
 
         progress.start_license_detection_engine_creation();
-        let license_engine = init_license_engine(&cli.license_rules_path);
+        let license_engine = init_license_engine(&cli.license_rules_path)?;
         progress.finish_license_detection_engine_creation();
 
         let text_options = TextDetectionOptions {
@@ -164,7 +163,7 @@ fn run() -> Result<()> {
                     cli.max_depth,
                     Arc::clone(&progress),
                     &exclude_patterns,
-                    license_engine.clone(),
+                    Some(license_engine.clone()),
                     cli.include_text,
                 )
             })?
@@ -175,7 +174,7 @@ fn run() -> Result<()> {
                     cli.max_depth,
                     Arc::clone(&progress),
                     &exclude_patterns,
-                    license_engine.clone(),
+                    Some(license_engine.clone()),
                     cli.include_text,
                     &text_options,
                 )
@@ -649,29 +648,28 @@ fn apply_mark_source(files: &mut [crate::models::FileInfo]) {
     }
 }
 
-fn init_license_engine(rules_path: &Option<String>) -> Option<Arc<LicenseDetectionEngine>> {
-    let path = match rules_path {
-        Some(p) => PathBuf::from(p),
-        None => return None,
-    };
-
-    if !path.exists() {
-        warn!("License rules path does not exist: {:?}", path);
-        return None;
-    }
-
-    match LicenseDetectionEngine::from_directory(&path) {
-        Ok(engine) => {
+fn init_license_engine(rules_path: &Option<String>) -> Result<Arc<LicenseDetectionEngine>> {
+    match rules_path {
+        Some(p) => {
+            let path = PathBuf::from(p);
+            if !path.exists() {
+                return Err(anyhow!("License rules path does not exist: {:?}", path));
+            }
+            let engine = LicenseDetectionEngine::from_directory(&path)?;
             println!(
                 "License detection engine initialized with {} rules from {:?}",
                 engine.index().rules_by_rid.len(),
                 path
             );
-            Some(Arc::new(engine))
+            Ok(Arc::new(engine))
         }
-        Err(e) => {
-            warn!("Failed to initialize license detection engine: {}", e);
-            None
+        None => {
+            let engine = LicenseDetectionEngine::from_embedded()?;
+            println!(
+                "License detection engine initialized with {} rules from embedded artifact",
+                engine.index().rules_by_rid.len()
+            );
+            Ok(Arc::new(engine))
         }
     }
 }

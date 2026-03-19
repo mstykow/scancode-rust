@@ -4,7 +4,12 @@ pub mod builder;
 pub mod dictionary;
 pub mod token_sets;
 
-pub use builder::build_index;
+// build_index is used by library tests (see spdx_lid/test.rs, index/builder/tests.rs)
+// even though the binary doesn't use it directly.
+#[allow(unused_imports)]
+pub use builder::{
+    build_index, build_index_from_loaded, loaded_license_to_license, loaded_rule_to_rule,
+};
 
 use crate::license_detection::index::dictionary::{TokenDictionary, TokenId};
 use aho_corasick::AhoCorasick;

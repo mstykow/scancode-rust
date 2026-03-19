@@ -13,9 +13,9 @@ fn get_reference_data_paths() -> Option<(PathBuf, PathBuf)> {
 
 fn create_engine_from_reference() -> Option<LicenseDetectionEngine> {
     let (rules_path, licenses_path) = get_reference_data_paths()?;
-    let rules = load_rules_from_directory(&rules_path, false).ok()?;
-    let licenses = load_licenses_from_directory(&licenses_path, false).ok()?;
-    let index = build_index(rules, licenses);
+    let loaded_rules = rules::load_loaded_rules_from_directory(&rules_path).ok()?;
+    let loaded_licenses = rules::load_loaded_licenses_from_directory(&licenses_path).ok()?;
+    let index = index::build_index_from_loaded(loaded_rules, loaded_licenses, false);
     let spdx_mapping =
         build_spdx_mapping(&index.licenses_by_key.values().cloned().collect::<Vec<_>>());
     Some(LicenseDetectionEngine {
@@ -134,6 +134,51 @@ fn make_test_match(
         qspan_positions,
         ..Default::default()
     }
+}
+
+#[test]
+fn test_engine_from_embedded_initializes() {
+    let engine =
+        LicenseDetectionEngine::from_embedded().expect("Should initialize from embedded artifact");
+
+    assert!(
+        !engine.index().rules_by_rid.is_empty(),
+        "Should have rules loaded from embedded artifact"
+    );
+    assert!(
+        !engine.index().licenses_by_key.is_empty(),
+        "Should have licenses loaded from embedded artifact"
+    );
+    assert!(
+        engine.index().len_legalese > 0,
+        "Should have legalese tokens"
+    );
+    assert!(
+        !engine.index().rid_by_hash.is_empty(),
+        "Should have hash mappings"
+    );
+}
+
+#[test]
+fn test_engine_from_embedded_matches_from_directory() {
+    let Some(engine_from_dir) = create_engine_from_reference() else {
+        eprintln!("Skipping test: reference directory not found");
+        return;
+    };
+
+    let engine_from_embedded =
+        LicenseDetectionEngine::from_embedded().expect("Should initialize from embedded artifact");
+
+    assert_eq!(
+        engine_from_dir.index().rules_by_rid.len(),
+        engine_from_embedded.index().rules_by_rid.len(),
+        "Should have same number of rules"
+    );
+    assert_eq!(
+        engine_from_dir.index().licenses_by_key.len(),
+        engine_from_embedded.index().licenses_by_key.len(),
+        "Should have same number of licenses"
+    );
 }
 
 #[test]
@@ -765,11 +810,9 @@ fn test_png_h_detect_matches_match_python_raw_rules() {
             && m.end_line == 401
     }));
     assert!(!matches.iter().any(|m| m.rule_identifier == "libpng_4.RULE"));
-    assert!(
-        !matches
-            .iter()
-            .any(|m| m.rule_identifier == "unknown-license-reference_301.RULE")
-    );
+    assert!(!matches
+        .iter()
+        .any(|m| m.rule_identifier == "unknown-license-reference_301.RULE"));
 }
 
 #[test]
@@ -807,11 +850,9 @@ fn test_standard_ml_nj_and_x11_and_x11_opengroup_detect_matches_match_python_raw
             ),
         ]
     );
-    assert!(
-        !matches
-            .iter()
-            .any(|m| m.rule_identifier == "x11-bitstream_4.RULE")
-    );
+    assert!(!matches
+        .iter()
+        .any(|m| m.rule_identifier == "x11-bitstream_4.RULE"));
 }
 
 #[test]
@@ -849,11 +890,9 @@ fn test_standard_ml_nj_and_x11_and_x11_opengroup_1_detect_matches_match_python_r
             ),
         ]
     );
-    assert!(
-        !matches
-            .iter()
-            .any(|m| m.rule_identifier == "x11-bitstream_4.RULE")
-    );
+    assert!(!matches
+        .iter()
+        .any(|m| m.rule_identifier == "x11-bitstream_4.RULE"));
 }
 
 #[test]

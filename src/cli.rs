@@ -147,11 +147,9 @@ pub struct Cli {
     #[arg(long)]
     pub no_assemble: bool,
 
-    /// Path to license rules directory containing .LICENSE and .RULE files
-    #[arg(
-        long,
-        default_value = "reference/scancode-toolkit/src/licensedcode/data"
-    )]
+    /// Path to license rules directory containing .LICENSE and .RULE files.
+    /// If not specified, uses the built-in embedded license index.
+    #[arg(long, value_name = "PATH")]
     pub license_rules_path: Option<String>,
 
     /// Include matched text in license detection output
@@ -189,7 +187,11 @@ pub struct Cli {
 
 fn default_processes() -> i32 {
     let cpus = std::thread::available_parallelism().map_or(1, |n| n.get());
-    if cpus > 1 { (cpus - 1) as i32 } else { 1 }
+    if cpus > 1 {
+        (cpus - 1) as i32
+    } else {
+        1
+    }
 }
 
 #[derive(Debug, Clone)]

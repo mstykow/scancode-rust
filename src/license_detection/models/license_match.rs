@@ -216,11 +216,12 @@ struct SerializableLicenseMatch<'a> {
     rule_url: &'a str,
     matched_text: &'a Option<String>,
     referenced_filenames: &'a Option<Vec<String>>,
+    is_license_text: bool,
+    is_license_notice: bool,
     is_license_intro: bool,
     is_license_clue: bool,
     is_license_reference: bool,
     is_license_tag: bool,
-    is_license_text: bool,
     is_from_license: bool,
     hilen: usize,
     rule_start_token: usize,
@@ -228,7 +229,13 @@ struct SerializableLicenseMatch<'a> {
     candidate_containment: f32,
 }
 
+/// Deserializable form of LicenseMatch for JSON parsing.
+///
+/// Note: `is_license_notice` is included for deserialization completeness but
+/// is not passed to `from_match_flags` because match objects cannot have this
+/// flag (only rule objects can). This is correct behavior matching Python.
 #[derive(Deserialize)]
+#[allow(dead_code)]
 struct DeserializableLicenseMatch {
     #[serde(default)]
     license_expression: String,
@@ -258,6 +265,10 @@ struct DeserializableLicenseMatch {
     #[serde(default)]
     referenced_filenames: Option<Vec<String>>,
     #[serde(default)]
+    is_license_text: bool,
+    #[serde(default)]
+    is_license_notice: bool,
+    #[serde(default)]
     is_license_intro: bool,
     #[serde(default)]
     is_license_clue: bool,
@@ -265,8 +276,6 @@ struct DeserializableLicenseMatch {
     is_license_reference: bool,
     #[serde(default)]
     is_license_tag: bool,
-    #[serde(default)]
-    is_license_text: bool,
     #[serde(default)]
     is_from_license: bool,
     #[serde(default)]
@@ -302,11 +311,12 @@ impl Serialize for LicenseMatch {
             rule_url: &self.rule_url,
             matched_text: &self.matched_text,
             referenced_filenames: &self.referenced_filenames,
+            is_license_text: self.is_license_text(),
+            is_license_notice: self.is_license_notice(),
             is_license_intro: self.is_license_intro(),
             is_license_clue: self.is_license_clue(),
             is_license_reference: self.is_license_reference(),
             is_license_tag: self.is_license_tag(),
-            is_license_text: self.is_license_text(),
             is_from_license: self.is_from_license,
             hilen: self.hilen,
             rule_start_token: self.rule_start_token,
@@ -401,6 +411,11 @@ impl Default for LicenseMatch {
 }
 
 impl LicenseMatch {
+    /// Returns the Rule object for this match from the index.
+    ///
+    /// Note: This method is kept for debugging and potential future use.
+    /// The match already contains all needed rule information as fields.
+    #[allow(dead_code)]
     pub fn rule<'a>(&self, index: &'a LicenseIndex) -> Option<&'a Rule> {
         let rule = index.rules_by_rid.get(self.rid)?;
         (rule.identifier == self.rule_identifier

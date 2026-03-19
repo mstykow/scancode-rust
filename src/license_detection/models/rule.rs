@@ -74,6 +74,11 @@ impl RuleKind {
         matches!(self, Self::Text)
     }
 
+    /// Returns true if this rule kind is Notice.
+    ///
+    /// Note: This method is kept for API completeness. License matches cannot
+    /// have Notice kind - only rules can.
+    #[allow(dead_code)]
     pub const fn is_license_notice(self) -> bool {
         matches!(self, Self::Notice)
     }
@@ -86,6 +91,11 @@ impl RuleKind {
         matches!(self, Self::Tag)
     }
 
+    /// Returns true if this rule kind is Intro.
+    ///
+    /// Note: This method is kept for API completeness. Used internally for
+    /// match filtering but not called on Rule objects directly in the binary.
+    #[allow(dead_code)]
     pub const fn is_license_intro(self) -> bool {
         matches!(self, Self::Intro)
     }
@@ -234,6 +244,11 @@ impl Rule {
         self.rule_kind.is_license_text()
     }
 
+    /// Returns true if this rule is a license notice pattern.
+    ///
+    /// Note: This method is kept for API completeness and potential future use.
+    /// License matches cannot have `is_license_notice` - only rules can.
+    #[allow(dead_code)]
     pub const fn is_license_notice(&self) -> bool {
         self.rule_kind.is_license_notice()
     }
@@ -246,6 +261,10 @@ impl Rule {
         self.rule_kind.is_license_tag()
     }
 
+    /// Returns true if this rule is a license introduction pattern.
+    ///
+    /// Note: This method is kept for API completeness and potential future use.
+    #[allow(dead_code)]
     pub const fn is_license_intro(&self) -> bool {
         self.rule_kind.is_license_intro()
     }
