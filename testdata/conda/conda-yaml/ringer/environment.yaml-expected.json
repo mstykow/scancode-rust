@@ -73,7 +73,7 @@
         "extra_data": {}
       },
       {
-        "purl": "pkg:pypi/numpy",
+        "purl": "pkg:conda/conda-forge/numpy",
         "extracted_requirement": "",
         "scope": "dependencies",
         "is_runtime": true,
@@ -84,7 +84,7 @@
         "extra_data": {}
       },
       {
-        "purl": "pkg:pypi/scipy",
+        "purl": "pkg:conda/conda-forge/scipy",
         "extracted_requirement": "",
         "scope": "dependencies",
         "is_runtime": true,
@@ -95,7 +95,7 @@
         "extra_data": {}
       },
       {
-        "purl": "pkg:pypi/pandas",
+        "purl": "pkg:conda/conda-forge/pandas",
         "extracted_requirement": "",
         "scope": "dependencies",
         "is_runtime": true,
@@ -106,7 +106,7 @@
         "extra_data": {}
       },
       {
-        "purl": "pkg:pypi/matplotlib",
+        "purl": "pkg:conda/conda-forge/matplotlib",
         "extracted_requirement": "",
         "scope": "dependencies",
         "is_runtime": true,
@@ -117,7 +117,7 @@
         "extra_data": {}
       },
       {
-        "purl": "pkg:pypi/seaborn",
+        "purl": "pkg:conda/conda-forge/seaborn",
         "extracted_requirement": "",
         "scope": "dependencies",
         "is_runtime": true,
@@ -128,7 +128,7 @@
         "extra_data": {}
       },
       {
-        "purl": "pkg:pypi/astropy",
+        "purl": "pkg:conda/conda-forge/astropy",
         "extracted_requirement": "",
         "scope": "dependencies",
         "is_runtime": true,
@@ -139,7 +139,7 @@
         "extra_data": {}
       },
       {
-        "purl": "pkg:pypi/rdkit",
+        "purl": "pkg:conda/conda-forge/rdkit",
         "extracted_requirement": ">=2022.09.5",
         "scope": "dependencies",
         "is_runtime": true,
@@ -150,7 +150,7 @@
         "extra_data": {}
       },
       {
-        "purl": "pkg:pypi/pre-commit",
+        "purl": "pkg:conda/conda-forge/pre-commit",
         "extracted_requirement": "",
         "scope": "dependencies",
         "is_runtime": true,
@@ -161,7 +161,7 @@
         "extra_data": {}
       },
       {
-        "purl": "pkg:pypi/pytest",
+        "purl": "pkg:conda/conda-forge/pytest",
         "extracted_requirement": "",
         "scope": "dependencies",
         "is_runtime": true,
@@ -172,7 +172,7 @@
         "extra_data": {}
       },
       {
-        "purl": "pkg:pypi/rich",
+        "purl": "pkg:conda/conda-forge/rich",
         "extracted_requirement": "",
         "scope": "dependencies",
         "is_runtime": true,
@@ -183,7 +183,7 @@
         "extra_data": {}
       },
       {
-        "purl": "pkg:pypi/shellingham",
+        "purl": "pkg:conda/conda-forge/shellingham",
         "extracted_requirement": "",
         "scope": "dependencies",
         "is_runtime": true,
@@ -194,7 +194,7 @@
         "extra_data": {}
       },
       {
-        "purl": "pkg:pypi/typer",
+        "purl": "pkg:conda/conda-forge/typer",
         "extracted_requirement": "",
         "scope": "dependencies",
         "is_runtime": true,
@@ -205,7 +205,7 @@
         "extra_data": {}
       },
       {
-        "purl": "pkg:pypi/wandb",
+        "purl": "pkg:conda/conda-forge/wandb",
         "extracted_requirement": "",
         "scope": "dependencies",
         "is_runtime": true,
