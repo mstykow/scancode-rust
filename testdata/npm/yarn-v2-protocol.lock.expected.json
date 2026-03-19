@@ -1,0 +1,28 @@
+[
+  {
+    "type": "npm",
+    "parties": [],
+    "dependencies": [
+      {
+        "purl": "pkg:npm/lodash@patch:lodash%40npm%253A4.17.21%23~builtin%3Ccompat/lodash%3E",
+        "extracted_requirement": "patch:lodash@npm%3A4.17.21#~builtin<compat/lodash>",
+        "scope": "dependencies",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": true,
+        "resolved_package": {
+          "type": "npm",
+          "name": "lodash",
+          "version": "patch:lodash@npm%3A4.17.21#~builtin<compat/lodash>",
+          "primary_language": "JavaScript",
+          "sha512": "test",
+          "is_virtual": true,
+          "dependencies": [],
+          "datasource_id": "yarn_lock"
+        }
+      }
+    ],
+    "datasource_id": "yarn_lock"
+  }
+]

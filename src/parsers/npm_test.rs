@@ -760,6 +760,69 @@ mod tests {
     }
 
     #[test]
+    fn test_extract_platform_metadata() {
+        let content = r#"
+{
+  "name": "platform-aware-package",
+  "version": "1.0.0",
+  "os": ["darwin", "linux", "!win32"],
+  "cpu": ["x64", "arm64"],
+  "libc": ["glibc", "musl"],
+  "deprecated": "Use platform-aware-package-next instead",
+  "hasBin": true,
+  "engines": {
+    "node": ">=18"
+  }
+}
+"#;
+
+        let (_temp_dir, package_path) = create_temp_package_json(content);
+        let package_data = NpmParser::extract_first_package(&package_path);
+
+        let extra_data = package_data
+            .extra_data
+            .expect("extra_data should be present with platform metadata");
+
+        assert_eq!(
+            extra_data.get("deprecated"),
+            Some(&Value::String(
+                "Use platform-aware-package-next instead".to_string()
+            ))
+        );
+        assert_eq!(extra_data.get("hasBin"), Some(&Value::Bool(true)));
+
+        let os = extra_data.get("os").expect("expected os metadata");
+        assert_eq!(
+            os,
+            &Value::Array(vec![
+                Value::String("darwin".to_string()),
+                Value::String("linux".to_string()),
+                Value::String("!win32".to_string()),
+            ])
+        );
+
+        let cpu = extra_data.get("cpu").expect("expected cpu metadata");
+        assert_eq!(
+            cpu,
+            &Value::Array(vec![
+                Value::String("x64".to_string()),
+                Value::String("arm64".to_string()),
+            ])
+        );
+
+        let libc = extra_data.get("libc").expect("expected libc metadata");
+        assert_eq!(
+            libc,
+            &Value::Array(vec![
+                Value::String("glibc".to_string()),
+                Value::String("musl".to_string()),
+            ])
+        );
+
+        assert!(extra_data.contains_key("engines"));
+    }
+
+    #[test]
     fn test_extract_package_manager() {
         let package_data = NpmParser::extract_first_package(
             PathBuf::from("testdata/npm/package-manager.json").as_path(),
