@@ -23,11 +23,16 @@ When a bundle is recognized, Rust can extract:
 
 OSGi version ranges are preserved in the extracted dependency requirements instead of being flattened into looser text.
 
+Optional OSGi dependencies are now treated more truthfully too:
+
+- `Require-Bundle` already preserved `resolution:=optional`
+- `Import-Package` now also honors `resolution:=optional`, marking those dependencies as optional instead of emitting them as required runtime imports while still preserving that they are runtime package-wiring dependencies
+
 ## Why this matters
 
 - **Automatic detection**: OSGi bundles are no longer invisible during regular scans
 - **Better bundle metadata**: vendor, license, and homepage data can flow straight from the manifest into package output
-- **Richer dependency visibility**: imported packages and required bundles show up as structured dependency edges
+- **Richer dependency visibility**: imported packages and required bundles show up as structured dependency edges, including truthful optional import semantics
 
 ## Reference
 
