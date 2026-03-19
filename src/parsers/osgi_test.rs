@@ -2,7 +2,9 @@ use super::PackageParser;
 use super::maven::*;
 use crate::models::DatasourceId;
 use crate::models::PackageType;
+use std::fs;
 use std::path::PathBuf;
+use tempfile::TempDir;
 
 #[test]
 fn test_osgi_basic_bundle_detection() {
@@ -220,6 +222,19 @@ fn test_parse_osgi_package_list() {
 }
 
 #[test]
+fn test_parse_osgi_package_list_with_optional() {
+    let list = "org.osgi.framework;version=\"[1.6,2)\",javax.servlet;resolution:=optional";
+    let deps = parse_osgi_package_list(list, "import");
+
+    assert_eq!(deps.len(), 2);
+    assert_eq!(deps[0].is_optional, Some(false));
+    assert_eq!(deps[0].is_runtime, Some(true));
+    assert_eq!(deps[1].purl, Some("pkg:osgi/javax.servlet".to_string()));
+    assert_eq!(deps[1].is_optional, Some(true));
+    assert_eq!(deps[1].is_runtime, Some(true));
+}
+
+#[test]
 fn test_parse_osgi_bundle_list_with_optional() {
     let list =
         "org.eclipse.core.runtime;bundle-version=\"3.7.0\",org.eclipse.ui;resolution:=optional";
@@ -238,4 +253,34 @@ fn test_parse_osgi_bundle_list_with_optional() {
     assert_eq!(deps[1].purl, Some("pkg:osgi/org.eclipse.ui".to_string()));
     assert_eq!(deps[1].is_optional, Some(true));
     assert_eq!(deps[1].is_runtime, Some(false));
+}
+
+#[test]
+fn test_osgi_manifest_optional_import_package_dependency() {
+    let temp_dir = TempDir::new().expect("temp dir");
+    let manifest_dir = temp_dir.path().join("META-INF");
+    fs::create_dir_all(&manifest_dir).expect("create manifest dir");
+    let manifest_path = manifest_dir.join("MANIFEST.MF");
+
+    fs::write(
+        &manifest_path,
+        "Manifest-Version: 1.0\nBundle-ManifestVersion: 2\nBundle-SymbolicName: com.example.optional\nBundle-Version: 1.0.0\nImport-Package: org.osgi.framework;version=\"[1.6,2)\",javax.servlet;resolution:=optional\n",
+    )
+    .expect("write manifest");
+
+    let package = MavenParser::extract_first_package(&manifest_path);
+
+    let import_deps: Vec<_> = package
+        .dependencies
+        .iter()
+        .filter(|dep| dep.scope.as_deref() == Some("import"))
+        .collect();
+    assert_eq!(import_deps.len(), 2);
+
+    let optional_dep = import_deps
+        .iter()
+        .find(|dep| dep.purl.as_deref() == Some("pkg:osgi/javax.servlet"))
+        .expect("optional import missing");
+    assert_eq!(optional_dep.is_optional, Some(true));
+    assert_eq!(optional_dep.is_runtime, Some(true));
 }
