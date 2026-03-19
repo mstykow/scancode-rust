@@ -12,7 +12,7 @@ This adds Hackage package detection, project-level dependency visibility, and si
 
 ## Upstream / Reference Context
 
-The current Rust roadmap tracked Haskell / Hackage support as issue `#344`, with the reference-side demand captured in `aboutcode-org/scancode-toolkit#4817`.
+The reference side did not provide packagedcode parsers for these Haskell surfaces when this work was implemented.
 
 At implementation time there was no packagedcode parser in the reference tree for these three surfaces, and only minimal ecosystem classification for `.cabal` files.
 
@@ -75,7 +75,7 @@ It intentionally does **not** add:
 - Stack command execution
 - runtime interpretation of conditional/package code
 
-## Verification
+## Coverage
 
 This improvement is covered by:
 

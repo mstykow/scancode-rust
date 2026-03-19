@@ -16,10 +16,13 @@ Python ScanCode currently has no `deno.json`, `deno.jsonc`, or `deno.lock` suppo
 - direct remote module entries from `redirects` plus their locked remote hashes,
 - sibling assembly between `deno.json(c)` and `deno.lock`.
 
-## Why It Is Beyond Parity
+## Reference limitation
 
-- **Python status**: no Deno parser
-- **Rust status**: dedicated manifest and lockfile parsers, tests, generated supported-format docs, datasource IDs, and sibling assembly support
+The Python reference does not currently support Deno manifests or lockfiles, so modern Deno dependency data is easy to miss during scans.
+
+## Rust behavior
+
+Rust parses Deno configuration and lockfile inputs directly, recovers publishable package identity, keeps import and remote-module metadata, and assembles manifest plus lockfile evidence when both are present.
 
 ## Impact
 

@@ -8,7 +8,7 @@ This first slice focuses on the highest-value metadata surface from Meson’s ow
 ## Python Status
 
 - Python ScanCode does not currently ship a production Meson parser.
-- Upstream demand exists in `aboutcode-org/scancode-toolkit#2586`, but there is no packagedcode implementation or test suite to port directly.
+- Upstream interest exists, but there is no packagedcode implementation or test suite to port directly.
 - That makes this parser a net-new Rust improvement rather than parity work.
 
 ## Rust Improvements
@@ -32,18 +32,9 @@ This first slice focuses on the highest-value metadata surface from Meson’s ow
 - Rust does **not** execute Meson, run `meson introspect`, follow `fallback` resolution, evaluate feature options, resolve variable indirection, or honor control-flow-dependent dependency declarations.
 - Non-literal `project()` values and non-literal dependency names are intentionally ignored rather than guessed.
 
-## Validation
+## Coverage
 
-- `cargo test meson --lib`
-- `cargo test --features golden-tests meson_golden --lib`
-- `cargo test test_all_parsers_are_registered_and_exported --test scanner_integration`
-- `cargo run --manifest-path xtask/Cargo.toml --bin generate-supported-formats`
-- `cargo build`
-
-## Related Issues
-
-- #73
-- `aboutcode-org/scancode-toolkit#2586`
+Coverage spans literal `project()` metadata, dependency extraction, official metadata fields, and the explicit non-evaluating guardrails.
 
 ## References
 

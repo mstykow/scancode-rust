@@ -53,13 +53,6 @@ Rust now goes beyond the current Python ScanCode Composer handling in several co
   - `download_url` from manifest `dist`
   - `Party.type = person` for authors and vendor parties
 
-## Validation
+## Coverage
 
-- `cargo test composer --lib`
-- `cargo test --features golden-tests composer_golden --lib`
-- `cargo test --features golden-tests test_assembly_composer_basic --lib`
-- `cargo test --features golden-tests test_assembly_composer_nested --lib`
-
-## Related Issues
-
-- #187, #188, #190
+Coverage spans alternate Composer filenames, nested file assignment, lockfile handling, and richer manifest provenance behavior.

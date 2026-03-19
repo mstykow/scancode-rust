@@ -9,10 +9,9 @@ Rust now goes beyond the released Python ScanCode Go handling in several concret
 3. adds a dedicated `go.mod graph` parser so direct vs transitive module relationships are modeled separately from `go.sum`
 4. categorizes `_test.go` and `//go:build test` files as non-production source for source-directory heuristics
 
-## Python Status
+## Reference limitation
 
-- Python Go support is centered on `go.mod` and `go.sum` with documented upstream gaps for directives, dependency granularity, build-constraint categorization, and module graph support.
-- Upstream explicitly tracks `replace`/directive support, `go.sum`/`go.mod` granularity, build-constraint categorization, and module graph support as open issues.
+The Python reference covers `go.mod` and `go.sum`, but module-graph data, directive fidelity, and test-only source categorization remain thinner than modern Go workflows need.
 
 ## Rust Improvements
 
@@ -38,13 +37,8 @@ Rust now goes beyond the released Python ScanCode Go handling in several concret
   - files with `// +build test`
 - This prevents ordinary Go package directories from being penalized in source-count heuristics just because they contain test-only files.
 
-## Validation
+## Why this matters
 
-- `cargo test go --lib`
-- `cargo test --features golden-tests go_golden --lib`
-- `cargo test --features golden-tests test_assembly_go_basic --lib`
-- `cargo test --features golden-tests test_assembly_go_graph_basic --lib`
-
-## Related Issues
-
-- #152, #153, #155, #218
+- **Better module graph fidelity**: checked-in `go mod graph` outputs become usable dependency evidence
+- **Safer assembly accounting**: fallback parser identity stays intact across Go metadata surfaces
+- **More accurate source heuristics**: test-only Go files no longer distort production-source classification

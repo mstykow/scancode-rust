@@ -12,8 +12,6 @@ The Dart parser in Provenant **fixes scope handling errors** and **preserves YAM
 
 ### Python Implementation (Broken)
 
-**Location**: `reference/scancode-toolkit/src/packagedcode/dart.py`
-
 **Current Python Behavior**: Extracts dependencies but scope is always `None`:
 
 ```json
@@ -31,8 +29,6 @@ The Dart parser in Provenant **fixes scope handling errors** and **preserves YAM
 **Problem**: The scope field is critical for understanding dependency categories (runtime vs dev), but Python always returns `null`.
 
 ### Our Rust Implementation (Fixed)
-
-**Location**: `src/parsers/dart.rs`
 
 **Code**:
 
@@ -343,26 +339,9 @@ Following dependency scope conventions documented in [AGENTS.md](../../AGENTS.md
 | `dependencies`     | `"dependencies"`     | `true`       |
 | `dev_dependencies` | `"dev_dependencies"` | `false`      |
 
-## Testing
+## Coverage
 
-### Unit Tests
-
-- `test_extract_runtime_dependencies()` - Verifies scope = "dependencies"
-- `test_extract_dev_dependencies()` - Verifies scope = "dev_dependencies"
-- `test_preserve_yaml_newlines()` - Validates description formatting
-- `test_lockfile_is_direct()` - Confirms all entries marked direct
-
-### Golden Tests
-
-**Status**: 4/4 passing (100% pass rate)
-
-All official test cases pass, demonstrating full feature parity plus enhancements.
-
-### Test Data
-
-- Real pubspec.yaml files: `testdata/dart/`
-- Real pubspec.lock files: `testdata/dart/`
-- Covers: Flutter, Shelf, Mockito packages
+Coverage includes runtime and development scope extraction, YAML formatting preservation, lockfile directness, and golden regression coverage for representative Dart manifest and lockfile inputs.
 
 ## Verification Against Python
 
@@ -421,11 +400,4 @@ All official test cases pass, demonstrating full feature parity plus enhancement
 - [Pub Package Manager](https://pub.dev/)
 - [Version Constraints](https://dart.dev/tools/pub/pubspec#version-constraints)
 
-### Our Implementation
-
-## Status
-
-- ✅ **Scope extraction**: Complete, fixed from null to proper values
-- ✅ **YAML preservation**: Complete, trailing newlines preserved
-- ✅ **Lockfile is_direct**: Complete, all entries correctly marked
-- ✅ **Documentation**: Complete
+The scope extraction, YAML preservation, and lockfile directness behaviors above describe the durable differences that matter to users.

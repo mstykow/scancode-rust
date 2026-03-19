@@ -15,10 +15,13 @@ Python ScanCode currently has no `uv.lock` support. Provenant now parses uv lock
 - artifact provenance from `sdist` / `wheels` entries,
 - lockfile metadata such as format version, revision, and `requires-python`.
 
-## Why It Is Beyond Parity
+## Reference limitation
 
-- **Python status**: no `uv.lock` handler
-- **Rust status**: dedicated parser, tests, golden fixture, datasource ID, and PyPI sibling assembly support
+The Python reference does not currently support `uv.lock`, which leaves a gap for uv-managed Python environments.
+
+## Rust behavior
+
+Rust parses `uv.lock` directly, recovers root-package identity and locked dependency data, and combines that lockfile evidence with sibling Python package metadata during scans.
 
 ## Impact
 

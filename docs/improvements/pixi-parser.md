@@ -8,7 +8,7 @@ This slice focuses on the highest-value official Pixi surfaces: workspace identi
 ## Python Status
 
 - Python ScanCode does not currently ship a Pixi packagedcode parser.
-- Upstream demand exists in `aboutcode-org/scancode-toolkit#4819`, but there is no packagedcode implementation or test suite to port directly.
+- Upstream interest exists, but there is no packagedcode implementation or test suite to port directly.
 - That makes this parser a net-new Rust improvement rather than parity work.
 
 ## Rust Improvements
@@ -42,22 +42,9 @@ This slice focuses on the highest-value official Pixi surfaces: workspace identi
 - Unsupported or newer lockfile versions fall back safely with datasource metadata preserved instead of being guessed.
 - This slice does not parse `pyproject.toml` Pixi embedding yet; it is intentionally focused on native `pixi.toml` plus `pixi.lock`.
 
-## Validation
+## Coverage
 
-- `cargo test pixi --lib`
-- `cargo test --features golden-tests pixi_golden --lib`
-- `cargo test test_assembly_pixi_basic --lib`
-- `cargo test test_every_datasource_id_is_accounted_for --lib`
-- `cargo test test_all_parsers_are_registered_and_exported --test scanner_integration`
-- `cargo run --manifest-path xtask/Cargo.toml --bin generate-supported-formats`
-- `npm run check:docs`
-- `cargo build`
-- `cargo clippy --all-targets --all-features -- -D warnings`
-
-## Related Issues
-
-- #345
-- `aboutcode-org/scancode-toolkit#4819`
+Coverage spans `pixi.toml`, supported `pixi.lock` variants, mixed Conda and PyPI dependency extraction, and sibling assembly behavior.
 
 ## References
 

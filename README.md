@@ -1,10 +1,10 @@
 # Provenant
 
-A high-performance Rust rewrite of [ScanCode Toolkit](https://github.com/aboutcode-org/scancode-toolkit) for scanning codebases for licenses, package metadata, file metadata, and related provenance data.
+A Rust rewrite of [ScanCode Toolkit](https://github.com/aboutcode-org/scancode-toolkit) for scanning codebases for licenses, package metadata, file metadata, and related provenance data.
 
 ## Overview
 
-`Provenant` is built as a ScanCode-compatible alternative with a strong focus on correctness, feature parity, safety, and performance.
+`Provenant` is built as a ScanCode-compatible alternative with a strong focus on correctness, feature parity, and safe static parsing.
 
 Today the repository covers high-level scanning workflows for:
 
@@ -20,11 +20,11 @@ For architecture, supported formats, testing, and contributor guidance, start wi
 
 ## Features
 
-- Parallel scanning with Rust-native performance
+- Parallel scanning with native concurrency
 - ScanCode-compatible JSON output and broad output-format support
 - Broad package-manifest and lockfile coverage across many ecosystems
 - Package assembly for sibling, nested, and workspace-style inputs
-- Include/exclude filtering, path normalization, and scan-result filtering
+- Include and exclude filtering, path normalization, and scan-result filtering
 - Persistent scan-cache controls for repeated runs
 - Security-first parsing with explicit safeguards and compatibility-focused tradeoffs where needed
 
@@ -40,20 +40,13 @@ cargo install provenant-cli
 
 This installs the `provenant` binary.
 
-### Download Precompiled Binary (Recommended)
+### Download Precompiled Binary
 
-Download the appropriate binary for your platform from the [GitHub Releases](https://github.com/mstykow/provenant/releases) page:
+Download the release archive for your platform from the [GitHub Releases](https://github.com/mstykow/provenant/releases) page.
 
-- **Linux (x64)**: `provenant-x86_64-unknown-linux-gnu.tar.gz`
-- **Linux (ARM64)**: `provenant-aarch64-unknown-linux-gnu.tar.gz`
-- **macOS (Apple Silicon)**: `provenant-aarch64-apple-darwin.tar.gz`
-  - Intel Macs can use the ARM build via Rosetta 2
-- **Windows**: `provenant-x86_64-pc-windows-msvc.zip`
-
-Extract and place the binary in your system's PATH:
+Extract the archive and place the `provenant` binary somewhere on your `PATH`:
 
 ```sh
-# Example for Linux/macOS
 tar xzf provenant-*.tar.gz
 sudo mv provenant /usr/local/bin/
 ```
@@ -63,11 +56,11 @@ sudo mv provenant /usr/local/bin/
 ```sh
 git clone https://github.com/mstykow/provenant.git
 cd provenant
-./setup.sh  # Initialize submodules and configure sparse checkout for project inputs
+./setup.sh
 cargo build --release
 ```
 
-The compiled binary will be available at `target/release/provenant`.
+Cargo places the compiled binary under `target/release/`.
 
 ## Usage
 
@@ -99,31 +92,31 @@ Commonly used options include:
 provenant --json-pp scan-results.json ~/projects/my-codebase --ignore "*.git*" --ignore "target/*" --ignore "node_modules/*"
 ```
 
-Use `-` as FILE to write an output stream to stdout (for example: `--json-pp -`).
+Use `-` as `FILE` to write an output stream to stdout, for example `--json-pp -`.
 Multiple output flags can be used in a single run, matching ScanCode CLI behavior.
-When using `--from-json`, you can pass multiple JSON inputs; directory scan mode currently supports one input path.
+When using `--from-json`, you can pass multiple JSON inputs. Directory scan mode currently supports one input path.
 Cache location can also be controlled with the `PROVENANT_CACHE` environment variable.
 
 For the generated package-format support matrix, see [Supported Formats](docs/SUPPORTED_FORMATS.md).
 
 ## Performance
 
-`Provenant` is designed to be significantly faster than the Python-based ScanCode Toolkit, especially for large codebases, thanks to native Rust performance and parallel processing. See [Architecture: Performance Characteristics](docs/ARCHITECTURE.md#performance-characteristics) for details.
+`Provenant` is designed for efficient native scanning and parallel processing. See [Architecture: Performance Characteristics](docs/ARCHITECTURE.md#performance-characteristics) for implementation details.
 
 ## Output Formats
 
-Implemented output formats:
+Implemented output formats include:
 
-- JSON (ScanCode-compatible baseline)
+- JSON, including ScanCode-compatible output
 - YAML
 - JSON Lines
 - CSV
-- SPDX (Tag-Value, RDF/XML)
-- CycloneDX (JSON, XML)
+- SPDX, Tag-Value and RDF/XML
+- CycloneDX, JSON and XML
 - HTML report
 - Custom template rendering
 
-Additional parity-oriented outputs such as the HTML app surface are present in the codebase, but the README focuses on the primary user-facing formats above.
+Additional parity-oriented outputs exist in the codebase, but this README focuses on the primary user-facing formats above.
 
 Output architecture and compatibility approach are documented in:
 
@@ -142,141 +135,27 @@ Output architecture and compatibility approach are documented in:
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+Contributions are welcome. Please feel free to submit a pull request.
 
-### Setting Up for Local Development
+For contributor guidance, start with the [Documentation Index](docs/DOCUMENTATION_INDEX.md), [How to Add a Parser](docs/HOW_TO_ADD_A_PARSER.md), and [Testing Strategy](docs/TESTING_STRATEGY.md).
 
-To contribute to `Provenant`, follow these steps to set up the repository for local development:
-
-1. **Install Rust**  
-   Ensure you have Rust installed on your system. You can install it using [rustup](https://rustup.rs/):
-
-   ```sh
-   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-   ```
-
-2. **Clone the Repository**  
-   Clone the `Provenant` repository to your local machine:
-
-   ```sh
-   git clone https://github.com/mstykow/provenant.git
-   cd provenant
-   ```
-
-3. **Initialize and Update Project Submodules**  
-   Use the following script to initialize submodules, configure sparse checkout, and update the SPDX license-data submodule to the latest upstream state.  
-   If `pre-commit` is installed, this script also installs Git pre-commit hooks automatically:
-
-   ```sh
-   ./setup.sh
-   ```
-
-4. **Build the Project**  
-   Build the project with Cargo:
-
-   ```sh
-   cargo build
-   ```
-
-5. **Run Tests**  
-   Run the test suite to ensure everything is working correctly:
-
-   ```sh
-   cargo test
-   ```
-
-6. **Install Pre-commit (if needed)**  
-   This repository uses [pre-commit](https://pre-commit.com/) to run checks before each commit.  
-   For documentation hooks and commands, install Node.js and npm first (`package.json` currently requires Node `>=24`).
-   If you install `pre-commit` after running `./setup.sh`, run `pre-commit install` once:
-
-   ```sh
-   # Using pip
-   pip install pre-commit
-
-   # Or using brew on macOS
-   brew install pre-commit
-
-   # Install the hooks
-   pre-commit install
-   ```
-
-   Common documentation quality commands:
-
-   ```sh
-   npm run check:docs  # markdownlint + prettier check
-   npm run fix:docs    # markdownlint auto-fix + prettier write
-   ```
-
-7. **Start Developing**  
-   You can now make changes and test them locally. Use `cargo run --bin provenant` to execute the tool:
-
-   ```sh
-   cargo run --bin provenant -- [OPTIONS] <DIR_PATH>
-   ```
-
-## Publishing a Release (Maintainers Only)
-
-Releases are automated using [`cargo-release`](https://github.com/crate-ci/cargo-release) and GitHub Actions.
-
-### Prerequisites
-
-**One-time setup:**
-
-1. Install `cargo-release` CLI tool:
-
-   ```sh
-   cargo install cargo-release
-   ```
-
-2. Authenticate with crates.io (one-time only):
-
-   ```sh
-   cargo login
-   ```
-
-   Enter your [crates.io API token](https://crates.io/me) when prompted. This is stored in `~/.cargo/credentials.toml` and persists across sessions.
-
-### Release Process
-
-Use the `release.sh` script:
+A typical local setup is:
 
 ```sh
-# Dry-run first (recommended)
-./release.sh patch
-
-# Then execute the actual release
-./release.sh patch --execute
+git clone https://github.com/mstykow/provenant.git
+cd provenant
+./setup.sh
+cargo build
+cargo test
 ```
 
-Available release types:
+If you use the repository's documentation and hook tooling, install the versions required by `package.json` and the project's pre-commit configuration.
 
-- `patch`: Increments `X.Y.Z` to `X.Y.(Z+1)`
-- `minor`: Increments `X.Y.Z` to `X.(Y+1).0`
-- `major`: Increments `X.Y.Z` to `(X+1).0.0`
+## Publishing a Release, Maintainers Only
+
+Maintainers should use the repository release tooling in the project root and monitor the [GitHub Actions workflow](https://github.com/mstykow/provenant/actions) for completion.
 
 > **Registry note**: the published crate name is `provenant-cli`, while the installed binary and product name remain `provenant` / Provenant.
-
-**What happens automatically:**
-
-1. **Updates SPDX license data** to the latest version from upstream
-2. Commits the license data update (if changes detected)
-3. `cargo-release` updates the version in `Cargo.toml` and `Cargo.lock`
-4. Creates a git commit: `chore: release vX.Y.Z`
-5. Creates a GPG-signed git tag: `vX.Y.Z`
-6. Publishes the `provenant-cli` crate to crates.io
-7. Pushes commits and tag to GitHub
-8. GitHub Actions workflow is triggered by the tag
-9. Builds binaries for all published targets:
-   - Linux: x64 and ARM64
-   - macOS: ARM64 (Apple Silicon; Intel Macs can use Rosetta 2 with the ARM build)
-   - Windows: x64
-10. Creates archives (.tar.gz/.zip) and SHA256 checksums
-11. Creates a GitHub Release with all artifacts and auto-generated release notes
-
-> **Note**: The release script ensures every release ships with the latest SPDX license definitions. It also handles a sparse checkout workaround for `cargo-release`.
-
-Monitor the [GitHub Actions workflow](https://github.com/mstykow/provenant/actions) to verify completion.
 
 ## Credits
 

@@ -14,8 +14,6 @@ The Alpine parser in Provenant now combines existing beyond-parity improvements 
 
 ### Python Implementation (Broken)
 
-**Location**: `reference/scancode-toolkit/src/packagedcode/alpine.py`
-
 **Code** (line 211):
 
 ```python
@@ -35,8 +33,6 @@ def get_checksums(checksum_field):
 **Problem**: The checksum is Q1-prefixed base64-encoded data that Python never decodes, always returning `null`.
 
 ### Our Rust Implementation (Fixed)
-
-**Location**: `src/parsers/alpine.rs`
 
 **Code**:
 
@@ -110,8 +106,6 @@ fn test_parse_alpine_file_references() {
 
 ### Python Implementation (TODO)
 
-**Location**: `reference/scancode-toolkit/src/packagedcode/alpine.py`
-
 **Code** (line 87-90):
 
 ```python
@@ -123,8 +117,6 @@ fn test_parse_alpine_file_references() {
 **Comment**: Python explicitly documents but ignores the `p:` provider field.
 
 ### Our Rust Implementation (Complete)
-
-**Location**: `src/parsers/alpine.rs`
 
 **Code**:
 
@@ -271,46 +263,15 @@ for line in content.lines() {
 }
 ```
 
-## Testing
+## Coverage
 
-### Unit Tests
-
-- `test_parse_alpine_file_references()` - Verifies SHA1 decoding (14 references)
-- `test_parse_alpine_provider_field()` - Verifies provider extraction
-- `test_parse_apkbuild_icu_reference()` - Verifies APKBUILD package/source/checksum parsing
-- `test_parse_apkbuild_custom_multiple_license_uses_raw_matched_text()` - Verifies `custom:multiple` keeps raw matched text while normalizing declared license fields
-- `test_parse_alpine_no_files_package_still_detected()` - Verifies fileless package detection is preserved
-- `test_parse_alpine_commit_generates_https_vcs_url()` - Verifies HTTPS VCS URL synthesis from commit metadata
-
-### Golden Tests
-
-- Golden test coverage is maintained in the parser suite and CI.
-- For current pass/ignore status, rely on test runs rather than static counts in this document.
-- APKBUILD parser goldens now exist for:
-  - `icu/APKBUILD`
-  - `linux-firmware/APKBUILD`
-
-### Test Data
-
-- Real Alpine installed database: `testdata/alpine/alpine-installed-database`
-- Covers: busybox, musl, alpine-baselayout packages
+Coverage includes SHA1 decoding, provider extraction, APKBUILD metadata parsing, raw matched-text preservation for `custom:multiple`, fileless package detection, HTTPS VCS URL synthesis, and golden coverage for both installed-database and APKBUILD inputs.
 
 ## References
-
-### Python Reference Issues
-
-- Bug: SHA1 checksum always returns `null`
-- TODO: Provider field marked as "not used yet"
 
 ### Alpine Documentation
 
 - [Alpine Package Format](https://wiki.alpinelinux.org/wiki/Apk_spec)
 - [Installed Database Format](https://wiki.alpinelinux.org/wiki/Apk_spec#Installed_Database_V2)
 
-### Our Implementation
-
-## Status
-
-- ✅ **SHA1 decoding**: Complete, validated, production-ready
-- ✅ **Provider extraction**: Complete, validated, production-ready
-- ✅ **Documentation**: Complete
+SHA1 decoding and provider extraction are both part of the parser behavior described above.

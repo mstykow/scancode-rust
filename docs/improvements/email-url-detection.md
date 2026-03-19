@@ -12,12 +12,12 @@
 
 ## Rust Implementation Status
 
-- `src/finder/emails.rs` uses modern regex + threshold/uniqueness controls.
-- `src/finder/urls.rs` applies ordered URL cleaning/filtering and credential stripping.
-- `src/finder/host.rs` and `src/finder/junk_data.rs` implement host/IP and junk filtering.
-- Scanner/CLI integration is implemented (`--email`, `--max-email`, `--url`, `--max-url`).
-- Supported images can feed EXIF/XMP metadata text into the existing finder pipeline.
-- Golden fixtures are local to this repo (`testdata/plugin_email_url/`) to avoid submodule coupling.
+- Rust uses modern regex handling plus threshold and uniqueness controls for email extraction.
+- URL extraction applies ordered cleaning and filtering, including credential stripping.
+- Host and IP filtering remove more junk and private-address noise.
+- Scanner and CLI integration expose the feature through the existing email and URL flags.
+- Supported images can feed EXIF and XMP metadata text into the existing finder pipeline.
+- Golden fixtures are owned locally in this repository so the behavior does not depend on external submodule state.
 
 ## Impact
 

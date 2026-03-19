@@ -66,18 +66,6 @@ That keeps the implementation truthful: it improves real CPM dependency recovery
 - When a `.nupkg` nuspec declares `<license type="file">LICENSE.txt</license>`, Rust now reads that packaged file and stores its contents as the extracted license statement.
 - This gives downstream license analysis a real license text source instead of only the placeholder filename.
 
-## Validation
+## Coverage
 
-- `cargo test nuget --lib`
-- `cargo test --features golden-tests nuget_golden --lib`
-- `cargo test --features golden-tests test_assembly_nuget_basic --lib`
-- `cargo test --features golden-tests test_assembly_nuget_cpm_version_override --lib`
-- `cargo test --features golden-tests test_assembly_nuget_cpm_imported_parent --lib`
-- `cargo test --features golden-tests test_assembly_nuget_cpm_directory_build_nearest_ancestor --lib`
-- `cargo test --features golden-tests test_assembly_nuget_cpm_directory_build_imported_parent --lib`
-- `cargo test --lib test_assemble_nuget_cpm`
-
-## Related Issues
-
-- #157, #159, #162, #163, #165, #215, #216
-- #340 remaining dynamic NuGet CPM / MSBuild follow-up semantics
+Coverage spans modern and legacy NuGet manifests, CPM backfill and import bounds, build-props participation, version overrides, archive-backed license extraction, and assembly behavior for the supported inputs.

@@ -1,9 +1,5 @@
 # ConanDataParser: Patch and Mirror URL Extraction
 
-**Parser**: `ConanDataParser`  
-**File**: `src/parsers/conan_data.rs`  
-**Python Reference**: `src/packagedcode/conan.py` (ConanDataHandler)
-
 ## Summary
 
 **🔍 Enhanced Extraction**: Python only extracts source URLs and checksums. Rust also extracts patch metadata and preserves all source URLs in `extra_data.mirror_urls`.
@@ -134,7 +130,7 @@ patches:
 - **Compliance**: Document source modifications for license compliance
 - **Security**: Track patches that fix vulnerabilities
 
-## Test Coverage
+## Coverage
 
 Coverage includes:
 
@@ -152,7 +148,5 @@ Coverage includes:
 
 ## References
 
-- Python implementation: `reference/scancode-toolkit/src/packagedcode/conan.py`
-- Rust implementation: `src/parsers/conan_data.rs`
 - conandata.yml spec: <https://docs.conan.io/2/tutorial/creating_packages/handle_sources_in_packages.html>
 - Conan Center format: <https://github.com/conan-io/conan-center-index/blob/master/docs/adding_packages/conandata_yml_format.md>

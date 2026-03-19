@@ -9,11 +9,9 @@ Rust now goes beyond the current Python ScanCode Ruby handling in several concre
 3. merges extracted gem metadata layouts without duplicate package/dependency emission and assigns nested extracted files to the assembled gem package
 4. tags nested Ruby legal/readme/manifest files as `key_file`, promotes package metadata from them, and computes a top-level `license_clarity_score`
 
-## Python Status
+## Reference limitation
 
-- Python already strips many literal `.freeze` suffixes and parses Gemfile.lock source sections, but several upstream Ruby issues remain open around constant resolution, extracted-gem duplication, false dependency parsing, and key-file tagging.
-- Upstream still leaves external constant references unresolved in gemspec output and does not have extracted-gem assembly regression coverage.
-- Upstream issue `#3881` specifically tracks nested Ruby `LICENSE` files not being tagged as `key_file`, which in turn keeps package-level attribution and the codebase `license_clarity_score` at 0.
+The Python reference already handles some Bundler and gemspec data, but constant resolution, extracted-gem deduplication, false-dependency protection, and nested key-file attribution remain incomplete.
 
 ## Rust Improvements
 
@@ -28,9 +26,9 @@ Rust now goes beyond the current Python ScanCode Ruby handling in several concre
   - `ProviderDSL::GemDescription::PAGE`
 - The resolver stays intentionally narrow: it only looks at local required Ruby files adjacent to the gemspec, not arbitrary Ruby load paths.
 
-### Gemfile.lock source metadata proof
+### Gemfile.lock source metadata
 
-- Bundler `GIT` and `PATH` metadata is now pinned with parser goldens for:
+- Bundler `GIT` and `PATH` metadata is now preserved for:
   - git `remote`
   - `revision`
   - `branch`
@@ -65,15 +63,8 @@ Rust now goes beyond the current Python ScanCode Ruby handling in several concre
   - `holder`
 - Output now includes a top-level `summary.license_clarity_score` block derived from key files, plus the combined summary declared license expression.
 
-## Validation
+## Why this matters
 
-- `cargo test ruby --lib`
-- `cargo test --features golden-tests ruby_golden --lib`
-- `cargo test --features golden-tests test_assembly_ruby_extracted_basic --lib`
-- `cargo test --bin provenant`
-- `cargo test --test output_format_golden`
-
-## Related Issues
-
-- Ruby batch: #151, #154, #156, #158, #160
-- Follow-up resolved here: #161
+- **Better gemspec fidelity**: narrow constant resolution recovers real package metadata without widening into arbitrary Ruby loading
+- **Cleaner extracted-gem results**: nested metadata layouts merge without duplicate package noise
+- **Better attribution**: nested legal and manifest files can contribute to package metadata and summary-level license clarity

@@ -1,176 +1,64 @@
 # Python Parser: Manifest Metadata, Installed Provenance, Dunder Fallbacks, and PyPI JSON
 
-**Area**: Python package metadata extraction  
-**Files**: `src/parsers/python.rs`, `src/parsers/python_test.rs`, `src/parsers/python_golden_test.rs`  
-**Upstream Context**: `aboutcode-org/scancode-toolkit#2912`, `#2263`, `#2267`, `#2599`, `#3918`, `#3968`, `#1545`
-
 ## Summary
 
-**🐛 Bug Fix + ✨ New Feature + 🔍 Enhanced Extraction**: Rust now extracts richer Python manifest metadata, resolves imported sibling dunder metadata for setup.py, preserves PKG-INFO license-file references, enriches installed wheel metadata and pip cache provenance, supports saved `pypi.json` API payloads, and extracts RFC822 dependency metadata from wheels and source-package metadata.
+**🐛 Bug Fix + ✨ New Feature + 🔍 Enhanced Extraction**: Rust now extracts richer Python manifest metadata, resolves a narrow class of imported sibling dunder values for `setup.py`, preserves more installed and source-package provenance, supports saved `pypi.json` payloads, and recovers RFC822 dependency metadata that was previously missing.
 
 ## What changed
 
 ### 1. Richer `setup.cfg` metadata
 
-Rust `setup.cfg` parsing now extracts more of the metadata already present in real package manifests:
+Rust now extracts more of the metadata that real `setup.cfg` files already carry, including descriptions, maintainer details, keywords, `python_requires`, and project URLs.
 
-- `description`
-- maintainer name/email
-- keyword lists
-- `python_requires`
-- `project_urls`
-- mapped issue-tracker URLs
+### 2. `setup.py` `project_urls` from `OrderedDict`
 
-### 2. setup.py `project_urls` from `OrderedDict`
+Rust now handles `project_urls=OrderedDict([...])` in addition to plain dict literals, which closes a common gap in static `setup.py` parsing.
 
-Rust setup.py parsing now understands `project_urls=OrderedDict([...])` in addition to plain dict literals.
+### 3. Imported sibling dunder fallback for `setup.py`
 
-### 3. Imported sibling dunder metadata fallback for setup.py
+When AST parsing leaves plain dunder metadata unresolved, Rust can perform a narrow fallback against imported sibling Python modules for values such as `__version__`, `__author__`, and `__license__`.
 
-When setup.py leaves values unresolved after AST parsing, Rust now performs a narrow fallback against imported sibling Python modules for plain:
-
-- `__version__`
-- `__author__`
-- `__license__`
+The fallback stays intentionally tight. It does not broaden into general code execution or whole-tree harvesting.
 
 ### 4. Private package classifier support
 
-Rust now recognizes the classifier `Private :: Do Not Upload` and maps it to `is_private = true`.
+Rust recognizes the classifier `Private :: Do Not Upload` and maps it to `is_private = true`.
 
-### 5. PKG-INFO / METADATA license file references
+### 5. Installed and source metadata sidecars
 
-Rust already preserved `License-File` headers in `extra_data.license_files`.
-It now also exposes them as structured `file_references`.
+Rust now treats several adjacent metadata files as part of the same Python package evidence surface:
 
-### 5a. Installed metadata sidecar collection and assignment
+- `License-File` headers are exposed as structured `file_references`
+- sibling `RECORD` and `installed-files.txt` files can feed scan-time file assignment for installed layouts
+- sibling `SOURCES.txt` can recover explicit file references for source layouts
+- sibling `WHEEL` data enriches installed wheel metadata without creating duplicate package rows
+- pip wheel-cache `origin.json` files can preserve source archive provenance and merge with sibling cached wheels when the identities agree
 
-Rust now also uses sibling installed metadata sidecars in the narrow installed-layout cases that matter for scan-time package/file assignment:
-
-- sibling `RECORD` next to `METADATA`
-- sibling `installed-files.txt` next to `PKG-INFO`
-
-And when those metadata files live under `site-packages/` or `dist-packages/`, Rust now resolves the referenced paths back onto scanned files and assigns those files to the assembled Python package.
-
-This stays intentionally narrow:
-
-- it is driven by explicit file references,
-- it supports installed Python metadata layouts,
-- and it does **not** broaden into generic whole-tree Python file harvesting.
-
-### 5b. Source-package `SOURCES.txt` ancillary file collection
-
-Rust now also reads sibling `SOURCES.txt` next to source-layout `.egg-info/PKG-INFO` files.
-
-That lets source-package metadata carry explicit ancillary file references such as:
-
-- `setup.py`
-- `.egg-info/*` sidecars
-- package source files listed in `SOURCES.txt`
-
-When those source-layout refs are present, Rust can assign the referenced files back to the assembled Python package during scans without falling back to broad root-tree harvesting.
-
-### 5c. Installed `WHEEL` metadata and pip cache `origin.json` provenance
-
-Rust now also captures two high-value installed-wheel metadata surfaces that were still missing from the Python family:
-
-- sibling `.dist-info/WHEEL` next to installed `METADATA`
-- pip wheel-cache `origin.json` provenance under cache `wheels/` layouts
-
-For installed `.dist-info` metadata, Rust now:
-
-- preserves `wheel_tags`
-- preserves `wheel_version`
-- preserves `wheel_generator`
-- preserves `root_is_purelib`
-- upgrades the package PURL with an `extension=` qualifier when wheel tags can be losslessly compressed (for example `py2.py3-none-any`)
-
-For pip wheel-cache provenance, Rust now:
-
-- extracts the cached package name/version from the source archive URL (with sibling wheel fallback)
-- preserves the source `download_url`
-- preserves `sha256` provenance from `archive_info`
-- emits a PyPI package row for cache provenance
-- merges `origin.json` with a sibling cached `.whl` when their identities match
-
-This keeps the behavior intentionally narrow:
-
-- installed `WHEEL` data enriches the sibling `METADATA` package rather than creating duplicate standalone package rows
-- `origin.json` is only matched in pip wheel-cache style paths
-- cache provenance only merges onto sibling wheels when package identity agrees
+This improves package attribution while staying grounded in explicit metadata rather than generic filesystem guessing.
 
 ### 6. Saved PyPI JSON support
 
-Rust now supports parsing saved `pypi.json` payloads and extracts core package metadata, project URLs, artifact download data, and private-package classifier state.
+Rust can parse saved `pypi.json` payloads and recover core package metadata, project URLs, artifact download information, and private-package classifier state.
 
-This support is intentionally scoped to the exact local filename `pypi.json`.
+The behavior is intentionally scoped to the exact local filename `pypi.json`.
 
 ### 7. RFC822 dependency extraction for wheel and source metadata
 
-Rust now extracts dependency metadata from RFC822-style Python metadata files:
+Rust now extracts dependency information from RFC822-style Python metadata files, including:
 
 - `Requires-Dist`
 - extra-scoped requirements expressed through `extra == ...` markers
-- sibling `.egg-info/requires.txt` when source-package metadata needs the extra dependency evidence
+- sibling `.egg-info/requires.txt` when source-package metadata needs additional dependency evidence
 
-This now covers the concrete wheel-vs-sdist gap left under `#149`:
+That closes the wheel versus source-package gap for common Python metadata layouts. Extra scopes, simple markers, and pinned requirements are preserved structurally instead of being dropped.
 
-- wheel `METADATA` dependencies are no longer dropped,
-- extra-scoped dependencies are mapped to the extra name as scope,
-- simple marker data like `python_version == '2.7'` is preserved structurally,
-- pinned `==` / `===` requirements are marked pinned and embedded in the dependency PURL,
-- and source-package `.egg-info/requires.txt` can recover dependency evidence that plain `PKG-INFO` alone does not carry.
+## Why this matters
 
-## Verified issue relevance
-
-### Implemented as real remaining gaps
-
-- `#136` richer `setup.cfg` metadata
-- `#138` unresolved computed-version style setup.py cases (narrow sibling-dunder fallback)
-- `#139` dunder metadata from sibling Python source files
-- `#140` setup.py `project_urls` with non-plain-dict forms like `OrderedDict`
-- `#143` qualified/mapped setup.cfg project URLs
-- `#147` PKG-INFO / METADATA license-file signal preservation via `file_references`
-- `#148` private-package classifier support
-- `#209` PyPI JSON parse support
-- `#144` narrow source-package ancillary file collection via `SOURCES.txt`
-- `#150` installed Python metadata file-to-package assignment in scans
-- `#111` installed wheel metadata via sibling `WHEEL`
-- `#112` pip cache provenance via `origin.json`
-- `#149` RFC822 wheel/source dependency metadata parity
-
-### Verified as already covered locally or audited as nonblocking
-
-- `#141`
-- `#142`
-- `#145`
-- `#146`
-- `#210`
-- `#212`
-- `#213`
+- **Better manifest fidelity**: more of the metadata already present in Python manifests becomes visible to downstream tooling
+- **Safer metadata recovery**: narrow static fallbacks recover real values without broadening into execution-heavy parsing
+- **Richer installed-package provenance**: wheel, cache, and sidecar metadata all contribute to a clearer package story
+- **Broader input coverage**: saved API payloads and RFC822 metadata files now produce useful package data instead of partial results
 
 ## Coverage
 
-Coverage includes:
-
-- focused red-to-green unit tests for richer `setup.cfg` extraction
-- setup.py `OrderedDict` URL regression coverage
-- imported-module dunder metadata fallback coverage
-- private classifier coverage
-- PKG-INFO / METADATA license-file reference coverage
-- standalone metadata sibling `RECORD` / `installed-files.txt` coverage
-- installed metadata sibling `WHEEL` coverage, including multi-tag wheel compression into detailed PURLs
-- scan-level installed Python file assignment coverage for `.dist-info` and `.egg-info`
-- pip cache `origin.json` extraction coverage
-- pip cache wheel+origin assembly coverage, including mismatched-wheel guard coverage
-- sibling `SOURCES.txt` extraction from source-package `.egg-info/PKG-INFO`
-- scan-level source-layout assignment coverage for `SOURCES.txt`-listed files
-- wheel/source RFC822 dependency extraction coverage for bare, extra-scoped, marker-bearing, pinned, and source-package `.egg-info/requires.txt` cases
-- a new pyproject parser golden
-- the existing metadata and setup.cfg parser goldens
-- the broader Python parser test suite
-
-## References
-
-- Local issues: `#136`, `#138`, `#139`, `#140`, `#143`, `#147`, `#148`, `#209`
-- Reference implementation: `reference/scancode-toolkit/src/packagedcode/pypi.py`
-- Current local golden surface: `src/parsers/python_golden_test.rs`
+Coverage focuses on the user-visible behaviors above, including richer `setup.cfg` extraction, `OrderedDict` project URLs, imported sibling dunder fallback, private-package classification, installed and source sidecar handling, `WHEEL` and `origin.json` provenance, saved `pypi.json` parsing, and RFC822 dependency recovery.

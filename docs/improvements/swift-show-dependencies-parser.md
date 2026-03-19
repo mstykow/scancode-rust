@@ -1,9 +1,5 @@
 # SwiftShowDependenciesParser: Full Dependency Graph Extraction
 
-**Parser**: `SwiftShowDependenciesParser`  
-**File**: `src/parsers/swift_show_dependencies.rs`  
-**Python Reference**: `src/packagedcode/swift.py` (SwiftShowDependenciesDepLockHandler)
-
 > For the broader Swift ecosystem assembly and top-level package improvements added later,
 > see [swift-parser.md](swift-parser.md).
 
@@ -187,7 +183,7 @@ The parser uses breadth-first traversal to flatten the nested dependency tree:
 - **Build reproducibility**: Complete dependency graph with versions
 - **Supply chain security**: Distinguish direct from transitive dependencies
 
-## Test Coverage
+## Coverage
 
 Coverage includes:
 
@@ -200,7 +196,5 @@ Coverage includes:
 
 ## References
 
-- Python implementation: `reference/scancode-toolkit/src/packagedcode/swift.py`
-- Rust implementation: `src/parsers/swift_show_dependencies.rs`
 - Swift Package Manager: <https://docs.swift.org/swiftpm/documentation/packagemanagerdocs/packageshowdependencies/>
 - Discussion: <https://forums.swift.org/t/swiftpm-show-dependencies-without-fetching-dependencies/51154>

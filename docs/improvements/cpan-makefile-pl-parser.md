@@ -1,9 +1,5 @@
 # CpanMakefilePlParser: WriteMakefile Metadata Extraction
 
-**Parser**: `CpanMakefilePlParser`  
-**File**: `src/parsers/cpan_makefile_pl.rs`  
-**Python Reference**: `src/packagedcode/misc.py` (CpanMakefilePlHandler)
-
 ## Summary
 
 **✨ New Feature**: Python implementation is a stub with no parse method. Rust implementation provides WriteMakefile function parsing with metadata extraction.
@@ -197,7 +193,7 @@ PREREQ_PM => {
 
 These features would require a full Perl parser or code execution, which poses security risks. The current regex-based approach handles 95% of real-world Makefile.PL files.
 
-## Test Coverage
+## Coverage
 
 Coverage includes:
 
@@ -211,6 +207,4 @@ Coverage includes:
 
 ## References
 
-- Python implementation: `reference/scancode-toolkit/src/packagedcode/misc.py`
-- Rust implementation: `src/parsers/cpan_makefile_pl.rs`
 - ExtUtils::MakeMaker spec: <https://metacpan.org/pod/ExtUtils::MakeMaker>

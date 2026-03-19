@@ -31,12 +31,6 @@ Rust now goes beyond the current Python ScanCode Conda handling in two concrete 
 - URL-like channel prefixes such as `https://...::flask=1.0.2` are no longer treated as namespace.
 - Instead, URL-like prefixes are preserved in dependency `extra_data.channel_url`, while symbolic prefixes are preserved in `extra_data.channel`.
 
-## Validation
+## Coverage
 
-- `cargo test conda --lib`
-- `cargo test --features golden-tests conda_golden --lib`
-- `cargo test test_assembly_conda_rootfs_assigns_meta_json_files --lib`
-
-## Related Issues
-
-- #195, #196
+Coverage spans installed-package file assignment, `conda-meta` parsing, and the distinction between symbolic channel names and URL-like channel prefixes.

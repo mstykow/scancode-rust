@@ -51,13 +51,6 @@ Rust now goes beyond the current Python ScanCode ABOUT handling in four concrete
 - Missing references are recorded in `extra_data.missing_file_references` rather than causing crashes or silent loss.
 - This also resolves the underlying ABOUT `get_package_root()` problem in a Rust-native way: resolution is path-based and does not depend on reopening described resources.
 
-## Validation
+## Coverage
 
-- `cargo test about --lib`
-- `cargo test --features golden-tests about --lib`
-- `cargo test about_scan_promotes_packages_and_assigns_referenced_files --bin provenant`
-- `cargo test about_scan_tracks_missing_file_references --bin provenant`
-
-## Related Issues
-
-- #201, #202, #203, #204
+Coverage spans ABOUT package promotion, path-based referenced-file resolution, and preservation of missing referenced files in structured metadata.

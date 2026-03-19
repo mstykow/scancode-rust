@@ -94,7 +94,7 @@ Those are tracked separately as narrower follow-up work after the main manifest 
 - direct dependency extraction for modern vcpkg manifests
 - manifest metadata preservation for baselines, overrides, and configuration
 
-## Verification
+## Coverage
 
 This improvement is covered by:
 

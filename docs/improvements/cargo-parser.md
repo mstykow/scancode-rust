@@ -10,13 +10,9 @@ Rust now goes beyond the released Python ScanCode Cargo handling in several conc
 4. links manifest-declared files such as `readme` and `license-file` through explicit Cargo `file_references`
 5. preserves per-dependency Cargo.lock provenance such as `source` and checksums
 
-## Python Status
+## Reference limitation
 
-- Upstream Cargo support exists, but the open issue set still tracks crate-wide file assignment, workspace member file assignment, and broader Cargo manifest/lockfile completeness.
-- Upstream issues explicitly document missing `for_packages` ownership for both plain Cargo crates and workspace member files.
-- Python reference tests already accept lowercase `cargo.toml` / `cargo.lock`, but the current Rust direct parser matching did not.
-- The Python Cargo manifest parser still carries a TODO to turn `readme`/`include`/`exclude` style paths into file references.
-- The Python Cargo.lock handler also still carries a TODO to preserve dependency `source` and checksum provenance.
+The Python reference covers the main Cargo surfaces, but package-wide file ownership, manifest-declared file references, and finer lockfile provenance remain incomplete.
 
 ## Rust Improvements
 
@@ -51,14 +47,8 @@ Rust now goes beyond the released Python ScanCode Cargo handling in several conc
 - Annotated lockfile dependency strings such as `serde 1.0.228 (registry+...)` now normalize correctly to the pinned package version while still retaining provenance.
 - Assembly goldens now prove that the hoisted Cargo.lock dependencies keep this provenance when manifest and lockfile data are merged.
 
-## Validation
+## Why this matters
 
-- `cargo test cargo --lib`
-- `cargo test --features golden-tests cargo_golden --lib`
-- `cargo fmt --all`
-- `cargo clippy --all-targets --all-features -- -D warnings`
-- `cargo build`
-
-## Related Issues
-
-- #184, #189, #217, #400
+- **Better crate ownership**: Cargo packages can claim the files users expect, not just manifest files
+- **Richer manifest provenance**: declared readme and license files become explicit package references
+- **Better lockfile fidelity**: dependency source and checksum data remain available for downstream analysis

@@ -1,9 +1,5 @@
 # RpmSpecfileParser: Full Preamble Parsing Implementation
 
-**Parser**: `RpmSpecfileParser`  
-**File**: `src/parsers/rpm_specfile.rs`  
-**Python Reference**: `src/packagedcode/rpm.py` (RpmSpecfileHandler)
-
 ## Summary
 
 **✨ New Feature**: Python implementation is a stub with `# TODO: implement me!!@` comment. Rust implementation provides full RPM spec preamble parsing with metadata extraction.
@@ -191,7 +187,7 @@ Requires: package_name [operator version]
 
 These are complex features that Python also doesn't implement. The focus is on extracting metadata from the preamble, which is sufficient for most SBOM use cases.
 
-## Test Coverage
+## Coverage
 
 Coverage includes:
 
@@ -204,6 +200,4 @@ Coverage includes:
 
 ## References
 
-- Python implementation: `reference/scancode-toolkit/src/packagedcode/rpm.py` (line 449: "TODO: implement me!!@")
-- Rust implementation: `src/parsers/rpm_specfile.rs`
 - RPM spec format: <https://rpm-software-management.github.io/rpm/manual/spec.html>

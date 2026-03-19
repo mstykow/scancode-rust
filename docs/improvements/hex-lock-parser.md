@@ -18,7 +18,7 @@ But those files are very different in risk and parseability:
 - `mix.lock` is structured lock data
 - `mix.exs` is executable Elixir and commonly contains computed values, helper calls, module attributes, and environment-dependent logic
 
-That makes `mix.lock` the safest and highest-value first PR slice.
+That makes `mix.lock` the safest and highest-value first slice.
 
 ## Rust Improvements
 
@@ -69,7 +69,7 @@ This makes the lockfile useful not just for package inventory but for dependency
 
 Rust intentionally ignores non-`:hex` lock entries in this first slice instead of pretending broader Mix parity.
 
-Rust also intentionally does **not** attempt `mix.exs` parsing in this PR.
+Rust also intentionally does **not** attempt `mix.exs` parsing in this first slice.
 
 That keeps the implementation honest:
 
@@ -97,7 +97,7 @@ Those remain follow-up work under the Hex umbrella issue.
 - nested dependency graph recovery for Elixir projects
 - safe parsing of Elixir-term lockfile syntax
 
-## Verification
+## Coverage
 
 This improvement is covered by:
 

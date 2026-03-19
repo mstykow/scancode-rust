@@ -46,13 +46,6 @@ This first slice is intentionally narrow: it extracts only top-level literal met
 - Rust does **not** execute Scala, invoke `sbt`, parse arbitrary `*.sbt`, parse `plugins.sbt`, parse `project/*.scala`, or attempt multi-project graph semantics.
 - Rust only descends into top-level root-safe `.settings(...)` wrappers; broader nested or non-root project setting graphs are still skipped.
 
-## Validation
+## Coverage
 
-- `cargo test sbt --lib`
-- `cargo test --features golden-tests sbt_golden --lib`
-- `cargo run --manifest-path xtask/Cargo.toml --bin generate-supported-formats`
-- `cargo build`
-
-## Related Issues
-
-- #69
+Coverage spans literal metadata extraction, `libraryDependencies` handling, limited string-alias reuse, and the non-evaluating parser guardrails.

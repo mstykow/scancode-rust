@@ -47,15 +47,8 @@ Rust now goes beyond the current Python ScanCode Gradle handling in several conc
 
 ### Template POM guardrail
 
-- Because local issue `#130` is grouped in the Gradle batch even though its upstream reference is Maven-specific, Rust now also skips placeholder-only Maven coordinates like `${groupId}` / `${artifactId}` / `${version}` instead of emitting junk package identifiers.
+- Rust also skips placeholder-only Maven coordinates like `${groupId}` / `${artifactId}` / `${version}` instead of emitting junk package identifiers.
 
-## Validation
+## Coverage
 
-- `cargo test gradle --lib`
-- `cargo test --features golden-tests gradle_golden --lib`
-- `cargo test test_cyclonedx_json_includes_component_license_expression --lib`
-- `cargo test test_skip_template_placeholder_pom_coordinates --lib`
-
-## Related Issues
-
-- #130, #132, #134, #137
+Coverage spans scope classification, version-catalog alias resolution, Gradle POM license extraction, and placeholder-coordinate guardrails.

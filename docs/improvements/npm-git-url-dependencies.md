@@ -8,9 +8,7 @@ The npm parser in Provenant **fixes a bug** present in the Python reference impl
 
 ## Bug Description
 
-### Python Implementation (BROKEN)
-
-**Location**: `reference/scancode-toolkit/src/packagedcode/npm.py`
+### Python Implementation
 
 **Problem**: Python treats all dependency values as potential versions, including Git URLs and local paths:
 
@@ -43,9 +41,7 @@ This is wrong because:
 2. `is_pinned` should be `false` for non-version dependencies
 3. The dependency cannot be resolved to a specific version without network access
 
-### Our Rust Implementation (FIXED)
-
-**Location**: `src/parsers/npm.rs`
+### Rust Implementation
 
 **Approach**: Detect and properly handle non-version dependency values:
 
@@ -134,12 +130,9 @@ fn is_non_version_dependency(version: &str) -> bool {
 | is_pinned for non-version | ❌ Incorrectly `true`     | ✅ Correctly `false`         |
 | PURL for non-version deps | ❌ Invalid (includes URL) | ✅ Valid (package name only) |
 
-## Test Coverage
+## Coverage
 
-- `test_git_url_dependencies()` - Git URLs, GitHub shortcuts
-- `test_url_dependencies()` - HTTP/HTTPS tarball URLs
-- `test_local_path_dependencies()` - `file:` and `link:` protocols
-- `test_mixed_dependencies()` - Mix of regular versions and non-version deps
+Coverage spans Git URLs, GitHub shortcuts, tarball URLs, local `file:` and `link:` dependencies, and mixed manifests that combine regular versions with non-version dependency forms.
 
 ## Impact
 
@@ -152,5 +145,4 @@ This fix ensures:
 
 ## Reference
 
-- **Issue**: ScanCode #2509 - npm weird dependency versions
-- **Location**: `src/parsers/npm.rs` - `is_non_version_dependency()` function
+- Package URL specification: <https://github.com/package-url/purl-spec>

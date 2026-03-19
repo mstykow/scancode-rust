@@ -16,10 +16,13 @@ Python ScanCode currently has multiple open attempts at parsing Gradle `.module`
 - producer metadata such as `formatVersion` and `createdBy.gradle.version`
 - preserved variant metadata for `dependencyConstraints` and `available-at`
 
-## Why It Is Beyond Parity
+## Reference limitation
 
-- **Python status**: no merged `.module` handler
-- **Rust status**: dedicated parser, real-world golden fixtures, and documented support
+The Python reference does not currently provide merged Gradle `.module` support, so publication metadata is thinner than modern Gradle-native projects expect.
+
+## Rust behavior
+
+Rust parses published Gradle module metadata directly and preserves artifact, dependency, constraint, and variant information that build-script parsing alone cannot recover reliably.
 
 ## Impact
 

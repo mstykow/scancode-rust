@@ -16,10 +16,13 @@ Python ScanCode currently has only an open attempt at `MODULE.bazel` support. Pr
 - common override declarations such as `archive_override`, `git_override`, and `local_path_override`
 - parser goldens and a standalone assembly golden for `MODULE.bazel`
 
-## Why It Is Beyond Parity
+## Reference limitation
 
-- **Python status**: no merged `MODULE.bazel` handler
-- **Rust status**: dedicated parser, parser goldens, and standalone assembly coverage
+The Python reference does not currently provide merged `MODULE.bazel` support, so Bazel module metadata is easy to miss as package evidence.
+
+## Rust behavior
+
+Rust parses Bzlmod manifests directly and preserves module identity, dependency declarations, override metadata, and dev-scope information as structured package data.
 
 ## Impact
 

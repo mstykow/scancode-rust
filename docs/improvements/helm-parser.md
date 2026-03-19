@@ -8,7 +8,7 @@ This slice focuses on the high-value official metadata surface from Helm itself:
 ## Python Status
 
 - Python ScanCode does not currently ship a Helm packagedcode parser.
-- Upstream demand exists in `aboutcode-org/scancode-toolkit#4816`, but there is no packagedcode implementation or test suite to port directly.
+- Upstream interest exists, but there is no packagedcode implementation or test suite to port directly.
 - That makes this parser a net-new Rust improvement rather than parity work.
 
 ## Rust Improvements
@@ -37,22 +37,9 @@ This slice focuses on the high-value official metadata surface from Helm itself:
 - Legacy `apiVersion: v1` charts still have their core chart metadata parsed from `Chart.yaml`, but this slice does not implement `requirements.yaml` / `requirements.lock`.
 - Malformed dependency entries are skipped instead of causing the whole chart parse to fail.
 
-## Validation
+## Coverage
 
-- `cargo test helm --lib`
-- `cargo test --features golden-tests helm_golden --lib`
-- `cargo test test_assembly_helm_basic --lib`
-- `cargo test test_every_datasource_id_is_accounted_for --lib`
-- `cargo test test_all_parsers_are_registered_and_exported --test scanner_integration`
-- `cargo run --manifest-path xtask/Cargo.toml --bin generate-supported-formats`
-- `npm run check:docs`
-- `cargo build`
-- `cargo clippy --all-targets --all-features -- -D warnings`
-
-## Related Issues
-
-- #343
-- `aboutcode-org/scancode-toolkit#4816`
+Coverage spans chart metadata extraction, declared and locked dependency handling, sibling assembly, malformed dependency tolerance, and the documented non-evaluating guardrails.
 
 ## References
 

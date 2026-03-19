@@ -8,7 +8,7 @@ This slice focuses on the most useful static surfaces from the official docs: di
 ## Python Status
 
 - Python ScanCode does not currently ship packagedcode support for `deps.edn` or `project.clj`.
-- Upstream demand exists in `aboutcode-org/scancode-toolkit#4820`, but the only current upstream behavior is summary/classification recognition for `project.clj` rather than package extraction.
+- Upstream interest exists, but the current upstream behavior is limited to summary and classification recognition for `project.clj` rather than package extraction.
 - That makes this parser a net-new Rust improvement rather than parity work.
 
 ## Rust Improvements
@@ -37,21 +37,9 @@ This slice focuses on the most useful static surfaces from the official docs: di
 - `deps.edn` is treated as dependency/config data, not as a source of invented package identity when the file does not declare one.
 - `deps.edn` and `project.clj` are intentionally treated as standalone unassembled manifests in this first slice.
 
-## Validation
+## Coverage
 
-- `cargo test clojure --lib`
-- `cargo test --features golden-tests clojure_golden --lib`
-- `cargo test test_every_datasource_id_is_accounted_for --lib`
-- `cargo test test_all_parsers_are_registered_and_exported --test scanner_integration`
-- `cargo run --manifest-path xtask/Cargo.toml --bin generate-supported-formats`
-- `npm run check:docs`
-- `cargo build`
-- `cargo clippy --all-targets --all-features -- -D warnings`
-
-## Related Issues
-
-- #346
-- `aboutcode-org/scancode-toolkit#4820`
+Coverage spans `deps.edn` and `project.clj` parsing, alias and profile support, and the documented literal-only guardrails.
 
 ## References
 

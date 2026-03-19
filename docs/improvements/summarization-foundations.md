@@ -76,12 +76,9 @@ Still open:
 - generated code detection
 - broader summary output parity
 
-## Validation
+## Coverage
 
-- `cargo test --bin provenant`
-- `cargo test --test output_format_golden`
-- `cargo fmt --all -- --check`
-- `cargo clippy --all-targets --all-features -- -D warnings`
+Coverage spans package-to-summary promotion, key-file tagging, and the top-level summary fields described above.
 
 ## Related Plans
 

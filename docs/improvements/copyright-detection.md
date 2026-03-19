@@ -142,8 +142,6 @@ Uses `LazyLock<Vec<(Regex, PosTag)>>` — patterns compiled once at startup, the
 └──────────────┘    └──────────────┘    └──────────────┘    └──────────────┘
 ```
 
-**Module location**: `src/copyright/`
-
 ## Improvement 7: Long-Line Skip for Minified Code (Performance)
 
 ### Problem
@@ -193,36 +191,22 @@ Two upstream HTML fixtures (`url_in_html-detail_9_html.html` and `html_incorrect
   - copyright: `(c) 2004-2009 pudn.com`
   - holder: `pudn.com`
 - Drop `upload_log.asp?e=...` link-only false positives as metadata noise, not copyright statements.
-- Add deterministic regression tests asserting both fixtures produce the same result.
-- Use `./scripts/update_copyright_golden.sh <authors|ics|copyrights> --sync-actual --write` to keep local Rust-owned YAML fixtures aligned with canonical output.
+- Keep deterministic regression coverage so both fixtures produce the same result.
+- Keep the local Rust-owned golden fixtures aligned with that canonical output.
 
 **Impact**: Higher semantic quality, deterministic behavior, and simpler maintenance than fixture-name-dependent parity hacks.
 
-## Testing
+## Coverage
 
-- Comprehensive unit tests across all modules
-- Golden tests across 4 suites (copyrights, holders, authors, ICS where ICS = Android Ice Cream Sandwich (Android 4.0) fixtures)
-- Known divergences from Python reference are documented in the implementation plan for follow-up work
-- Deterministic Rust-owned fixture workflow for golden updates
+Coverage includes unit-level detector behavior, golden regression coverage for the major copyright, holder, and author outputs, and deterministic local fixture maintenance for intentional divergences.
 
 ## What Users Should Expect
 
 - **Default behavior**: Results are designed to closely match Python ScanCode for common copyright patterns.
 - **Intentional differences**: Some outputs are intentionally improved (for example Unicode name preservation and bug-fix correctness changes).
 - **Determinism guarantee**: Identical input bytes produce identical output; fixture names do not influence detection.
-- **Edge-case differences**: Remaining differences are either intentional divergences or optional quality-tuning opportunities, and these are documented in `COPYRIGHT_DETECTION_PLAN.md`.
+- **Edge-case differences**: Remaining differences are either intentional divergences or optional quality-tuning opportunities, and these are documented in the repository's copyright-planning docs.
 - **Media metadata bonus**: Supported images can surface copyright clues from EXIF/XMP metadata even though Python's text-analysis parity baseline does not scan generic media metadata.
 - **Golden source of truth**: Repository fixtures are Rust-owned expectations, while Python fixtures remain a comparison baseline.
 
-## Status
-
-- ✅ All Python bug fixes implemented and tested
-- ✅ Pipeline integrated into the scanner through a shared path-aware text-ingestion helper covering UTF-8 text, decoded non-UTF text, PDFs with extractable text, binary printable strings, and supported-image EXIF/XMP metadata. PEM certificate skipping remains a separate intentional divergence.
-- ✨ Unicode name preservation in output (Python outputs ASCII-only via `toascii`)
-- ✅ Thread-safe for parallel file processing
-- ✅ All library tests passing, golden tests stable in CI
-- ⚡ Performance optimizations for minified code and encoded data
-- ✅ Optional detection runtime deadline support (`max_runtime`) wired into parser-aware detection flow
-- ✅ Public include-filter API via `CopyrightDetectionOptions`
-- ✅ Deterministic canonical output for byte-identical conflicting HTML fixtures
-- 🟢 CI remains stable with intentional divergences and optional quality follow-up work documented
+The sections above describe the stable behavior changes: bug fixes, Unicode preservation, deterministic output, parallel-safe execution, optional runtime limits, and explicit documented divergences where Rust intentionally differs from the Python baseline.

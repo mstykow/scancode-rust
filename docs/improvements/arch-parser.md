@@ -12,7 +12,7 @@ This goes beyond the current Python reference state, where upstream work is focu
 
 ## Python Reference Status
 
-The current upstream Arch work is an open `.SRCINFO` parser PR only.
+Current upstream Arch work is still centered on `.SRCINFO` parsing only.
 
 That upstream work:
 
@@ -90,7 +90,7 @@ This gives Arch package metadata parity on the installed/binary side that upstre
 - Arch dependency scope fidelity
 - `alpm` purl generation
 
-## Verification
+## Coverage
 
 This improvement is covered by:
 

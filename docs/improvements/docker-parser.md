@@ -1,65 +1,32 @@
 # Docker Parser: Containerfile and OCI Label Support
 
-**Area**: Dockerfile / Containerfile package detection  
-**Files**: `src/parsers/docker.rs`, `src/main_test.rs`, `src/utils/language.rs`  
-**Upstream Context**: `aboutcode-org/scancode-toolkit#3471`, `aboutcode-org/scancode-toolkit#3561`
-
 ## Summary
 
-**✨ New Feature + 🔍 Enhanced Extraction**: Rust now recognizes both `Dockerfile` and `Containerfile` as package data files and extracts OCI image labels from them while intentionally leaving them non-assembled.
+**✨ New Feature + 🔍 Enhanced Extraction**: Rust recognizes both `Dockerfile` and `Containerfile` as package data files, extracts OCI image labels from them, and keeps those results attached to the file itself instead of forcing sibling assembly.
 
-## Upstream Context
+## Reference limitation
 
-The current Python reference does not expose a normal packagedcode Docker parser to port directly, but the upstream issue set defines the desired behavior:
+The Python reference does not provide a normal packagedcode Docker parser that covers this behavior directly. As a result, Dockerfile-like files are easier to miss as package metadata sources.
 
-- support `Containerfile` as an alternative Dockerfile name, and
-- treat Dockerfile-like files as package data that can yield OCI image metadata.
+## Rust improvement
 
-This made Docker a greenfield parser family in Rust rather than a line-by-line parity port.
-
-## Rust Improvement
-
-Rust now implements a dedicated Docker parser with three stable behaviors:
+Rust implements three durable behaviors:
 
 1. **Dockerfile and Containerfile recognition**
-   - matches `Dockerfile`
-   - matches `Dockerfile.*`
-   - matches `Containerfile`
-   - matches `Containerfile.*`
+   Alternative Dockerfile names such as `Containerfile` are treated as package data instead of being ignored.
 
 2. **OCI label extraction**
-
-   Rust reads `LABEL org.opencontainers.image.*=...` instructions and maps key fields into normal package metadata:
-   - `org.opencontainers.image.title` → `name`
-   - `org.opencontainers.image.description` → `description`
-   - `org.opencontainers.image.url` → `homepage_url`
-   - `org.opencontainers.image.source` → `vcs_url`
-   - `org.opencontainers.image.version` → `version`
-   - `org.opencontainers.image.licenses` → `extracted_license_statement`
-
-   All collected OCI labels are also preserved in `extra_data.oci_labels` so data is not lost when a label does not map neatly to an existing top-level field.
+   `LABEL org.opencontainers.image.*=...` instructions are mapped into normal package metadata when they fit existing fields, and the full label set is preserved in `extra_data.oci_labels` so label data is not lost.
 
 3. **Non-assembled package data behavior**
-
-   Dockerfile and Containerfile results are intentionally treated as package data on the file itself rather than as sibling-merged top-level assembled packages.
+   Dockerfile and Containerfile results stay attached to the file that declared them. That keeps the behavior predictable and avoids introducing unnecessary sibling-merge semantics.
 
 ## Why this matters
 
-- **Alternative naming support**: projects using `Containerfile` are no longer invisible to package detection.
-- **Container metadata visibility**: OCI image labels now produce structured package metadata instead of being ignored as plain text.
-- **Safe scope control**: Docker files participate in scan output without introducing unnecessary assembly semantics.
+- **Alternative naming support**: `Containerfile` projects are no longer invisible to package detection
+- **Container metadata visibility**: OCI labels produce structured package metadata instead of disappearing into plain text
+- **Safer scope control**: scan output can include container metadata without inventing unrelated assembly rules
 
-## Coverage
+## Reference
 
-Coverage includes:
-
-- parser matching for both Dockerfile and Containerfile naming patterns,
-- unit coverage for OCI label extraction and raw `oci_labels` preservation,
-- parser goldens for a real Dockerfile fixture and a real Containerfile fixture, and
-- scan-level coverage proving Containerfile package data remains non-assembled.
-
-## References
-
-- Local issues: `#199`, `#200`
-- Upstream issues: `aboutcode-org/scancode-toolkit#3471`, `aboutcode-org/scancode-toolkit#3561`
-- OCI annotations spec: <https://github.com/opencontainers/image-spec/blob/main/annotations.md>
+- [OCI image annotations specification](https://github.com/opencontainers/image-spec/blob/main/annotations.md)

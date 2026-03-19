@@ -15,10 +15,13 @@ Python ScanCode currently has no `pylock.toml` support. Provenant now parses the
 - artifact hashes and download locations,
 - group/extra-aware runtime and optional classification for package roots and their transitive dependencies.
 
-## Why It Is Beyond Parity
+## Reference limitation
 
-- **Python status**: no `pylock.toml` handler
-- **Rust status**: dedicated parser, tests, golden fixture, datasource ID, and sibling assembly support with `pyproject.toml`
+The Python reference does not currently support `pylock.toml`, which leaves a gap for standards-based Python lockfile workflows.
+
+## Rust behavior
+
+Rust parses `pylock.toml` directly, preserves lockfile and artifact provenance, and assembles the lockfile with sibling Python project metadata when both inputs are available.
 
 ## Impact
 

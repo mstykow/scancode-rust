@@ -6,11 +6,9 @@ Rust now parses Bun's text-based `bun.lock` format, and it also adds a first sta
 
 This adds Bun lockfile dependency visibility that the Python reference does not currently provide, while keeping the still-unverified current binary format and any deeper Bun-specific binary sections as explicit follow-up work.
 
-## Python Reference Status
+## Reference limitation
 
-- The Python reference does not have Bun lockfile parser coverage today.
-- The local parser roadmap previously tracked Bun lockfiles as the highest-value remaining JavaScript-family gap.
-- Upstream ScanCode now has a tracking issue for Bun lockfiles, but no reference implementation PR was available when this parser work started.
+The Python reference does not currently parse Bun lockfiles, so Bun-managed dependency state is easy to miss during scans.
 
 ## Rust Improvements
 
@@ -93,23 +91,6 @@ Remaining Bun binary follow-up work is intentionally narrower than before becaus
 - optional tagged binary sections and current-format parity still need source-coupled validation before they should be claimed as fully supported
 - the migration path from `bun.lockb` to `bun.lock` remains the official Bun direction of travel
 
-## Primary Areas Affected
+## Coverage
 
-- Bun lockfile parsing
-- legacy Bun binary compatibility parsing
-- npm-family sibling assembly
-- npm-family workspace dependency hoisting
-- parser and assembly regression coverage for Bun lockfiles
-
-## Verification
-
-This improvement is covered by:
-
-- Bun parser-focused unit tests
-- Bun parser golden coverage
-- legacy `bun.lockb` parser-focused unit tests
-- legacy `bun.lockb` parser golden coverage
-- Bun sibling assembly golden coverage
-- legacy `bun.lockb` mismatch/workspace assembly regression coverage
-- Bun workspace assembly regression coverage
-- Bun lockfile mismatch assembly coverage
+Coverage spans Bun text lockfile parsing, legacy `bun.lockb` compatibility boundaries, npm-family sibling assembly, and workspace dependency hoisting.

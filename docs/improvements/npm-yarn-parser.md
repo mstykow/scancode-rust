@@ -78,7 +78,7 @@ The assembly phase also sorts `datafile_paths`, `datasource_ids`, and `for_packa
 - npm/Yarn assembly behavior for sibling manifests, workspaces, deterministic ordering, and nested package ownership
 - Parser and assembly regression coverage for the affected behaviors
 
-## Verification
+## Coverage
 
 This enhancement set is covered by:
 
