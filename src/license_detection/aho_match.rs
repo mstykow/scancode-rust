@@ -174,7 +174,7 @@ pub fn aho_match_with_extra_matchables(
 
         let license_match = LicenseMatch {
             license_expression: rule.license_expression.clone(),
-            license_expression_spdx: rule.license_expression.clone(),
+            license_expression_spdx: None,
             from_file: None,
             start_line,
             end_line,

@@ -80,7 +80,7 @@ mod tests {
         LicenseMatch {
             rid: 0,
             license_expression: "mit".to_string(),
-            license_expression_spdx: "MIT".to_string(),
+            license_expression_spdx: Some("MIT".to_string()),
             from_file: Some("README.md".to_string()),
             start_line: 1,
             end_line: 5,
@@ -486,7 +486,10 @@ mod tests {
         let match_result = create_license_match();
 
         assert_eq!(match_result.license_expression, "mit");
-        assert_eq!(match_result.license_expression_spdx, "MIT");
+        assert_eq!(
+            match_result.license_expression_spdx,
+            Some("MIT".to_string())
+        );
         assert_eq!(match_result.from_file, Some("README.md".to_string()));
         assert_eq!(match_result.start_line, 1);
         assert_eq!(match_result.end_line, 5);
@@ -499,7 +502,7 @@ mod tests {
         let match_result = LicenseMatch {
             rid: 0,
             license_expression: "mit".to_string(),
-            license_expression_spdx: "MIT".to_string(),
+            license_expression_spdx: Some("MIT".to_string()),
             from_file: None,
             start_line: 0,
             end_line: 0,
@@ -650,7 +653,7 @@ mod tests {
         let match_result = LicenseMatch {
             rid: 0,
             license_expression: "mit".to_string(),
-            license_expression_spdx: "MIT".to_string(),
+            license_expression_spdx: Some("MIT".to_string()),
             from_file: Some("README.md".to_string()),
             start_line: 1,
             end_line: 5,

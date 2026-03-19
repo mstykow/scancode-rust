@@ -424,7 +424,7 @@ mod tests {
         LicenseMatch {
             rid,
             license_expression: "mit".to_string(),
-            license_expression_spdx: "MIT".to_string(),
+            license_expression_spdx: Some("MIT".to_string()),
             from_file: None,
             start_line,
             end_line,
@@ -467,7 +467,7 @@ mod tests {
         LicenseMatch {
             rid,
             license_expression: "mit".to_string(),
-            license_expression_spdx: "MIT".to_string(),
+            license_expression_spdx: Some("MIT".to_string()),
             from_file: None,
             start_line: start_token,
             end_line: end_token.saturating_sub(1),

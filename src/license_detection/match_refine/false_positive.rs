@@ -187,7 +187,7 @@ mod tests {
         LicenseMatch {
             rid,
             license_expression: license_expression.to_string(),
-            license_expression_spdx: license_expression.to_string(),
+            license_expression_spdx: Some(license_expression.to_string()),
             from_file: None,
             start_line,
             end_line,

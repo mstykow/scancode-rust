@@ -265,7 +265,7 @@ fn create_unknown_match_from_qspan(
     LicenseMatch {
         rid: 0,
         license_expression: "unknown".to_string(),
-        license_expression_spdx: "unknown".to_string(),
+        license_expression_spdx: None,
         from_file: None,
         start_line,
         end_line,
@@ -675,9 +675,24 @@ mod tests {
 
     #[test]
     fn test_compute_hispan_from_qspan() {
-        let tokens: Vec<TokenId> = (0..30).map(tid).collect();
+        let mut index = LicenseIndex::with_legalese_count(0);
+        let legalese_entries: Vec<(String, u16)> = (0..15)
+            .map(|i| (format!("legalese-{i}"), i as u16))
+            .collect();
+        index.dictionary = crate::license_detection::index::dictionary::TokenDictionary::new_with_legalese(
+            &legalese_entries
+                .iter()
+                .map(|(token, id)| (token.as_str(), *id))
+                .collect::<Vec<_>>(),
+        );
+
+        let mut tokens: Vec<TokenId> = (0..15)
+            .map(|i| index.dictionary.get_token_id(&format!("legalese-{i}")).unwrap())
+            .collect();
+        for i in 15..30 {
+            tokens.push(index.dictionary.get_or_assign(&format!("regular-{i}")));
+        }
         let qspan = vec![(0, 10), (20, 25)];
-        let index = LicenseIndex::with_legalese_count(15);
         let hispan = compute_hispan_from_qspan(&tokens, &qspan, &index);
         assert_eq!(hispan, 10);
     }
@@ -773,7 +788,7 @@ mod tests {
         let known_matches = vec![LicenseMatch {
             rid: 0,
             license_expression: "test".to_string(),
-            license_expression_spdx: "TEST".to_string(),
+            license_expression_spdx: Some("TEST".to_string()),
             from_file: None,
             start_line: 1,
             end_line: 1,
@@ -827,7 +842,7 @@ mod tests {
         let known_matches = vec![LicenseMatch {
             rid: 0,
             license_expression: "test".to_string(),
-            license_expression_spdx: "TEST".to_string(),
+            license_expression_spdx: Some("TEST".to_string()),
             from_file: None,
             start_line: 1,
             end_line: 1,
@@ -882,7 +897,7 @@ mod tests {
         let known_matches = vec![LicenseMatch {
             rid: 0,
             license_expression: "test".to_string(),
-            license_expression_spdx: "TEST".to_string(),
+            license_expression_spdx: Some("TEST".to_string()),
             from_file: None,
             start_line: 1,
             end_line: 1,
@@ -971,7 +986,7 @@ mod tests {
         let known_matches = vec![LicenseMatch {
             rid: 0,
             license_expression: "mit".to_string(),
-            license_expression_spdx: "MIT".to_string(),
+            license_expression_spdx: Some("MIT".to_string()),
             from_file: None,
             start_line: 1,
             end_line: 1,

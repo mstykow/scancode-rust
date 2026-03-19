@@ -664,7 +664,7 @@ fn convert_detection_to_model(
         .into_iter()
             .map(|m| Match {
                 license_expression: m.license_expression,
-                license_expression_spdx: m.license_expression_spdx,
+                license_expression_spdx: m.license_expression_spdx.unwrap_or_default(),
                 from_file: m.from_file,
                 start_line: m.start_line,
                 end_line: m.end_line,

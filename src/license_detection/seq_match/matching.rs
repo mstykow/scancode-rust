@@ -309,7 +309,7 @@ pub fn seq_match_with_candidates(
 
                     let license_match = LicenseMatch {
                         license_expression: candidate.rule.license_expression.clone(),
-                        license_expression_spdx: candidate.rule.license_expression.clone(),
+                        license_expression_spdx: None,
                         from_file: None,
                         start_line,
                         end_line,

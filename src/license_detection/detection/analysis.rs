@@ -425,10 +425,13 @@ pub fn determine_spdx_expression(matches: &[LicenseMatch]) -> Result<String, Str
         return Err("No matches to determine SPDX expression from".to_string());
     }
 
-    let expressions: Vec<&str> = matches
+    let expressions: Option<Vec<&str>> = matches
         .iter()
-        .map(|m| m.license_expression_spdx.as_str())
+        .map(|m| m.license_expression_spdx.as_deref())
         .collect();
+
+    let expressions = expressions
+        .ok_or_else(|| "Missing SPDX expressions for one or more matches".to_string())?;
 
     combine_expressions(&expressions, CombineRelation::And, false)
         .map_err(|e| format!("Failed to combine SPDX expressions: {}", e))
@@ -480,7 +483,7 @@ mod tests {
         LicenseMatch {
             rid: 0,
             license_expression: "mit".to_string(),
-            license_expression_spdx: "MIT".to_string(),
+            license_expression_spdx: Some("MIT".to_string()),
             from_file: Some("test.txt".to_string()),
             start_line: 1,
             end_line: 10,
@@ -529,7 +532,7 @@ mod tests {
         LicenseMatch {
             rid: 0,
             license_expression: license_expression.to_string(),
-            license_expression_spdx: license_expression.to_string(),
+            license_expression_spdx: Some(license_expression.to_string()),
             from_file: Some("test.txt".to_string()),
             start_line,
             end_line,
@@ -1290,7 +1293,7 @@ mod tests {
             100,
             "apache.LICENSE",
         );
-        m2.license_expression_spdx = "Apache-2.0".to_string();
+        m2.license_expression_spdx = Some("Apache-2.0".to_string());
         let matches = vec![m1, m2];
         let result = determine_spdx_expression(&matches);
         assert!(result.is_ok());

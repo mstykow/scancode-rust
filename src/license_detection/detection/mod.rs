@@ -121,6 +121,15 @@ pub fn populate_detection_from_group_with_spdx(
 ) {
     populate_detection_from_group(detection, group);
 
+    for match_item in &mut detection.matches {
+        if match_item.license_expression_spdx.is_none()
+            && let Ok(spdx_expr) =
+                determine_spdx_expression_from_scancode(&match_item.license_expression, spdx_mapping)
+        {
+            match_item.license_expression_spdx = Some(spdx_expr);
+        }
+    }
+
     if let Some(ref scancode_expr) = detection.license_expression
         && let Ok(spdx_expr) = determine_spdx_expression_from_scancode(scancode_expr, spdx_mapping)
     {
@@ -345,7 +354,7 @@ mod tests {
         LicenseMatch {
             rid: 0,
             license_expression: "mit".to_string(),
-            license_expression_spdx: "MIT".to_string(),
+            license_expression_spdx: Some("MIT".to_string()),
             from_file: Some("test.txt".to_string()),
             start_line,
             end_line,
@@ -486,7 +495,7 @@ mod tests {
     fn test_populate_detection_from_group_with_spdx_perfect() {
         let mut m = create_perfect_match(1, 10);
         m.license_expression = "mit".to_string();
-        m.license_expression_spdx = "MIT".to_string();
+        m.license_expression_spdx = Some("MIT".to_string());
         let group = DetectionGroup::new(vec![m]);
         let licenses = vec![create_test_license()];
         let spdx_mapping = build_spdx_mapping(&licenses);
@@ -892,7 +901,7 @@ mod tests {
     fn test_populate_detection_from_group_generates_spdx_expression() {
         let mut m = create_perfect_match(1, 10);
         m.license_expression = "mit".to_string();
-        m.license_expression_spdx = "MIT".to_string();
+        m.license_expression_spdx = Some("MIT".to_string());
         let group = DetectionGroup::new(vec![m]);
         let licenses = vec![create_test_license()];
         let spdx_mapping = build_spdx_mapping(&licenses);
@@ -913,7 +922,7 @@ mod tests {
         m1.license_expression = "mit".to_string();
         let mut m2 = create_perfect_match(11, 20);
         m2.license_expression = "apache-2.0".to_string();
-        m2.license_expression_spdx = "Apache-2.0".to_string();
+        m2.license_expression_spdx = Some("Apache-2.0".to_string());
         let group = DetectionGroup::new(vec![m1, m2]);
         let licenses = vec![create_test_license()];
         let spdx_mapping = build_spdx_mapping(&licenses);
@@ -932,7 +941,7 @@ mod tests {
     fn test_populate_detection_from_group_with_spdx_custom_license() {
         let mut m = create_perfect_match(1, 10);
         m.license_expression = "custom-license".to_string();
-        m.license_expression_spdx = "custom-license".to_string();
+        m.license_expression_spdx = Some("custom-license".to_string());
         let group = DetectionGroup::new(vec![m]);
         let licenses = vec![create_test_license()];
         let spdx_mapping = build_spdx_mapping(&licenses);

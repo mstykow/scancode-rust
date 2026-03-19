@@ -43,7 +43,7 @@ mod tests {
         LicenseMatch {
             rid: 0,
             license_expression: "mit".to_string(),
-            license_expression_spdx: "MIT".to_string(),
+            license_expression_spdx: Some("MIT".to_string()),
             from_file: Some("test.txt".to_string()),
             start_line,
             end_line,

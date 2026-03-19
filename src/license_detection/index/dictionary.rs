@@ -348,9 +348,9 @@ mod tests {
         assert_eq!(dict.get_token_id("license"), Some(tid(0)));
         assert_eq!(dict.get_token_id("permission"), Some(tid(10)));
 
-        // Next ID should be the count, not max + 1
+        // Next ID should advance past the highest explicit legalese token ID.
         let test_id = dict.get_or_assign("test");
-        assert_eq!(test_id, 3);
+        assert_eq!(test_id, tid(11));
     }
 
     #[test]

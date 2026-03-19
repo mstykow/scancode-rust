@@ -319,7 +319,7 @@ mod tests {
 
         assert_eq!(matches.len(), 1);
         assert_eq!(matches[0].license_expression, "mit");
-        assert_eq!(matches[0].license_expression_spdx, "MIT");
+        assert_eq!(matches[0].license_expression_spdx, Some("MIT".to_string()));
         assert_eq!(matches[0].start_line, 1);
         assert_eq!(matches[0].end_line, 1);
         assert_eq!(matches[0].matcher, MATCH_SPDX_ID);

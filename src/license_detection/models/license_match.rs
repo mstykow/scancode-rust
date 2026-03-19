@@ -86,8 +86,9 @@ pub struct LicenseMatch {
     /// License expression string using ScanCode license keys
     pub license_expression: String,
 
-    /// License expression with SPDX-only keys
-    pub license_expression_spdx: String,
+    /// SPDX rendering of the license expression when it is known.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub license_expression_spdx: Option<String>,
 
     /// File where match was found (if applicable)
     pub from_file: Option<String>,
@@ -225,7 +226,7 @@ impl Default for LicenseMatch {
         LicenseMatch {
             rid: 0,
             license_expression: String::new(),
-            license_expression_spdx: String::new(),
+            license_expression_spdx: None,
             from_file: None,
             start_line: 0,
             end_line: 0,
