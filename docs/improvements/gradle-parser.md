@@ -8,6 +8,7 @@ Rust now goes beyond the current Python ScanCode Gradle handling in several conc
 2. extracts Gradle POM license metadata into package license fields so CycloneDX output can carry component license expressions
 3. resolves TOML-backed `libs.versions.toml` version-catalog aliases such as `libs.androidx.appcompat` to real Maven package identifiers
 4. preserves parent path segments for local project dependencies like `project(":libs:download")`
+5. merges all discovered `dependencies {}` blocks in a build file instead of only parsing the first one
 
 ## Python Status
 
@@ -16,6 +17,7 @@ Rust now goes beyond the current Python ScanCode Gradle handling in several conc
   - incorrect runtime classification for `compileOnly`
   - missing Gradle SBOM component licenses
   - incorrect package identifiers for Android/version-catalog dependency aliases
+- Repeated `dependencies {}` blocks are semantically additive in Gradle, so stopping after the first block loses declared dependencies from real-world Groovy and Kotlin builds.
 - The misbucketed template-POM issue grouped with this batch is upstream-confirmed, but it is actually a Maven placeholder-detection problem rather than a Gradle parser problem.
 
 ## Rust Improvements
@@ -45,10 +47,15 @@ Rust now goes beyond the current Python ScanCode Gradle handling in several conc
 
 - Local project references such as `project(":libs:download")` now preserve their parent path segments as namespace data (`pkg:maven/libs/download`) instead of collapsing to only the last segment.
 
+### All dependencies blocks in one build file
+
+- Rust now parses every discovered `dependencies {}` block in a single `build.gradle` / `build.gradle.kts` file instead of stopping after the first block.
+- This includes repeated top-level blocks and later nested blocks that the current token parser already recognizes lexically.
+
 ### Template POM guardrail
 
 - Rust also skips placeholder-only Maven coordinates like `${groupId}` / `${artifactId}` / `${version}` instead of emitting junk package identifiers.
 
 ## Coverage
 
-Coverage spans scope classification, version-catalog alias resolution, Gradle POM license extraction, and placeholder-coordinate guardrails.
+Coverage spans scope classification, all discovered dependency-block parsing, version-catalog alias resolution, Gradle POM license extraction, and placeholder-coordinate guardrails.

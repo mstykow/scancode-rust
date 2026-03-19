@@ -350,8 +350,8 @@ fn extract_dependencies(tokens: &[Tok]) -> Vec<Dependency> {
     let blocks = find_dependency_blocks(tokens);
     let mut dependencies = Vec::new();
 
-    if let Some(block) = blocks.first() {
-        for rd in parse_block(block) {
+    for block in blocks {
+        for rd in parse_block(&block) {
             if rd.name.is_empty() {
                 continue;
             }
@@ -382,6 +382,27 @@ fn parse_block(tokens: &[Tok]) -> Vec<RawDep> {
                 i += 1;
             }
             continue;
+        }
+
+        if let Tok::Str(_) = &tokens[i]
+            && i + 1 < tokens.len()
+            && tokens[i + 1] == Tok::OpenParen
+            && let Some(end) = find_matching_paren(tokens, i + 1)
+        {
+            let inner = &tokens[i + 2..end];
+            if let Some(Tok::Ident(inner_fn)) = inner.first()
+                && inner_fn == "project"
+                && inner.len() > 1
+                && inner[1] == Tok::OpenParen
+                && let Some(project_end) = find_matching_paren(inner, 1)
+            {
+                let project_tokens = &inner[2..project_end];
+                if let Some(rd) = parse_project_ref(project_tokens) {
+                    deps.push(rd);
+                }
+                i = end + 1;
+                continue;
+            }
         }
 
         let scope_name = match &tokens[i] {
@@ -1257,7 +1278,7 @@ dependencies {
     }
 
     #[test]
-    fn test_multiple_dependency_blocks_first_only() {
+    fn test_multiple_dependency_blocks_all_parsed() {
         let content = r#"
 dependencies {
     implementation 'org.scala-lang:scala-library:2.11.12'
@@ -1270,7 +1291,51 @@ dependencies {
 "#;
         let tokens = lex(content);
         let deps = extract_dependencies(&tokens);
-        assert_eq!(deps.len(), 1);
+        assert_eq!(deps.len(), 3);
+        assert_eq!(
+            deps[0].purl,
+            Some("pkg:maven/org.scala-lang/scala-library@2.11.12".to_string())
+        );
+        assert_eq!(
+            deps[1].purl,
+            Some("pkg:maven/commons-collections/commons-collections@3.2.2".to_string())
+        );
+        assert_eq!(deps[2].purl, Some("pkg:maven/junit/junit@4.13".to_string()));
+        assert_eq!(deps[2].scope, Some("testImplementation".to_string()));
+    }
+
+    #[test]
+    fn test_nested_dependency_blocks_all_parsed() {
+        let content = r#"
+buildscript {
+    dependencies {
+        classpath("org.eclipse.jgit:org.eclipse.jgit:$jgitVersion")
+    }
+}
+
+subprojects {
+    dependencies {
+        implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlinPluginVersion")
+    }
+}
+"#;
+        let tokens = lex(content);
+        let deps = extract_dependencies(&tokens);
+
+        assert_eq!(deps.len(), 2);
+        assert_eq!(
+            deps[0].purl,
+            Some("pkg:maven/org.eclipse.jgit/org.eclipse.jgit@%24jgitVersion".to_string())
+        );
+        assert_eq!(deps[0].scope, Some("classpath".to_string()));
+        assert_eq!(
+            deps[1].purl,
+            Some(
+                "pkg:maven/org.jetbrains.kotlin/kotlin-stdlib-jdk8@%24kotlinPluginVersion"
+                    .to_string()
+            )
+        );
+        assert_eq!(deps[1].scope, Some("implementation".to_string()));
     }
 
     #[test]
@@ -1592,6 +1657,22 @@ dependencies {
         let tokens = lex(content);
         let deps = extract_dependencies(&tokens);
         assert_eq!(deps.len(), 0);
+    }
+
+    #[test]
+    fn test_kotlin_quoted_scope_project_reference_extracted() {
+        let content = r#"
+subprojects {
+    dependencies {
+        "testImplementation"(project(":utils:test-utils"))
+    }
+}
+"#;
+        let tokens = lex(content);
+        let deps = extract_dependencies(&tokens);
+        assert_eq!(deps.len(), 1);
+        assert_eq!(deps[0].scope, Some("project".to_string()));
+        assert_eq!(deps[0].purl, Some("pkg:maven/utils/test-utils".to_string()));
     }
 
     #[test]
