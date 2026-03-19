@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod golden_tests {
     use crate::parsers::PackageParser;
-    use crate::parsers::ruby::{GemfileLockParser, GemspecParser};
+    use crate::parsers::ruby::{GemfileLockParser, GemfileParser, GemspecParser};
     use crate::test_utils::compare_package_data_parser_only;
     use std::path::PathBuf;
 
@@ -96,6 +96,20 @@ mod golden_tests {
             PathBuf::from("testdata/ruby-golden/gemfile-lock-path/Gemfile.lock.expected");
 
         let package_data = GemfileLockParser::extract_first_package(&test_file);
+
+        match compare_package_data_parser_only(&package_data, &expected_file) {
+            Ok(_) => (),
+            Err(e) => panic!("Golden test failed: {}", e),
+        }
+    }
+
+    #[test]
+    fn test_golden_gemfile_source_options() {
+        let test_file = PathBuf::from("testdata/ruby-golden/gemfile-source-options/Gemfile");
+        let expected_file =
+            PathBuf::from("testdata/ruby-golden/gemfile-source-options/Gemfile.expected");
+
+        let package_data = GemfileParser::extract_first_package(&test_file);
 
         match compare_package_data_parser_only(&package_data, &expected_file) {
             Ok(_) => (),

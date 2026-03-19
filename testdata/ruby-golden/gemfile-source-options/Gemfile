@@ -1,0 +1,6 @@
+source "https://rubygems.org"
+
+gem "my-git-gem", git: "https://github.com/example/my-git-gem.git", branch: "main", ref: "abc123def456", tag: "v1.2.3"
+gem "my-local-gem", path: "../vendor/my-local-gem"
+gem "private-gem", "~> 2.0", source: "https://gems.example.com"
+gem "rake", "~> 13.0"

@@ -1,0 +1,61 @@
+[
+  {
+    "type": "gem",
+    "primary_language": "Ruby",
+    "parties": [],
+    "extra_data": {
+      "sources": ["https://rubygems.org"]
+    },
+    "dependencies": [
+      {
+        "purl": "pkg:gem/my-git-gem",
+        "scope": null,
+        "is_runtime": true,
+        "is_optional": false,
+        "is_direct": true,
+        "extra_data": {
+          "source_type": "GIT",
+          "git": "https://github.com/example/my-git-gem.git",
+          "remote": "https://github.com/example/my-git-gem.git",
+          "branch": "main",
+          "ref": "abc123def456",
+          "tag": "v1.2.3"
+        }
+      },
+      {
+        "purl": "pkg:gem/my-local-gem",
+        "scope": null,
+        "is_runtime": true,
+        "is_optional": false,
+        "is_direct": true,
+        "extra_data": {
+          "source_type": "PATH",
+          "path": "../vendor/my-local-gem"
+        }
+      },
+      {
+        "purl": "pkg:gem/private-gem",
+        "extracted_requirement": "~> 2.0",
+        "scope": null,
+        "is_runtime": true,
+        "is_optional": false,
+        "is_direct": true,
+        "extra_data": {
+          "source": "https://gems.example.com"
+        }
+      },
+      {
+        "purl": "pkg:gem/rake",
+        "extracted_requirement": "~> 13.0",
+        "scope": null,
+        "is_runtime": true,
+        "is_optional": false,
+        "is_direct": true,
+        "extra_data": {
+          "source": "https://rubygems.org"
+        }
+      }
+    ],
+    "datasource_id": "gemfile"
+  }
+]
