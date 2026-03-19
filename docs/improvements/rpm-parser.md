@@ -8,6 +8,7 @@ Rust now goes beyond the released Python ScanCode RPM handling in several concre
 2. recognizes hash-named source RPM files by RPM magic bytes, not only by filename extension
 3. preserves richer archive metadata such as packager parties, keywords, build metadata, source URLs, and VCS hints
 4. collects YumDB sidecar metadata from installed RPM rootfs scans and merges it back onto the matching installed package
+5. preserves archive `Provides` and `Obsoletes` as structured relationship metadata instead of dropping them entirely
 
 ## Python Status
 
@@ -26,6 +27,7 @@ Rust now goes beyond the released Python ScanCode RPM handling in several concre
   - build host/time in `extra_data`
   - source URLs in `extra_data`
   - VCS URLs from `Vcs` tags or git-like source URLs
+  - `provides` and `obsoletes` arrays in `extra_data`, preserving RPM relationship metadata without misclassifying them as install dependencies
 - Source RPMs now add a `source=true` qualifier in both `qualifiers` and `purl`.
 - Hash-named source RPM files are now recognized by RPM magic bytes instead of extension-only matching.
 
@@ -43,4 +45,4 @@ Rust now goes beyond the released Python ScanCode RPM handling in several concre
 
 ## Coverage
 
-Coverage spans EVR preservation, source RPM recognition, YumDB enrichment, and archive metadata behavior.
+Coverage spans EVR preservation, source RPM recognition, YumDB enrichment, archive relationship metadata, and archive metadata behavior.
