@@ -89,6 +89,10 @@ fn parse_specfile(content: &str) -> PackageData {
 
         // Stop at first section marker (%, but not %define/%global)
         if line.starts_with('%') && !line.starts_with("%define") && !line.starts_with("%global") {
+            if is_conditional_preamble_directive(line) {
+                i += 1;
+                continue;
+            }
             break;
         }
 
@@ -261,6 +265,7 @@ fn parse_specfile(content: &str) -> PackageData {
     let mut dependencies = Vec::new();
 
     for dep_str in build_requires {
+        let dep_str = expand_macros(&dep_str, &macros);
         let dep_name = extract_dep_name(&dep_str);
         let purl = build_rpm_purl(&dep_name, None);
 
@@ -278,6 +283,7 @@ fn parse_specfile(content: &str) -> PackageData {
     }
 
     for (dep_str, scope) in requires {
+        let dep_str = expand_macros(&dep_str, &macros);
         let dep_name = extract_dep_name(&dep_str);
         let purl = build_rpm_purl(&dep_name, None);
 
@@ -313,7 +319,7 @@ fn parse_specfile(content: &str) -> PackageData {
     if !provides.is_empty() {
         let provides_json: Vec<serde_json::Value> = provides
             .into_iter()
-            .map(serde_json::Value::String)
+            .map(|prov| serde_json::Value::String(expand_macros(&prov, &macros)))
             .collect();
         extra_data.insert(
             "provides".to_string(),
@@ -348,6 +354,14 @@ fn parse_specfile(content: &str) -> PackageData {
     }
 }
 
+fn is_conditional_preamble_directive(line: &str) -> bool {
+    [
+        "%if", "%ifarch", "%ifnarch", "%ifos", "%ifnos", "%elif", "%else", "%endif",
+    ]
+    .iter()
+    .any(|directive| line.starts_with(directive))
+}
+
 /// Expands simple macros in a string (%{name}, %{version}, %{release}, %{?dist})
 fn expand_macros(s: &str, macros: &HashMap<String, String>) -> String {
     let mut result = s.to_string();
@@ -359,6 +373,8 @@ fn expand_macros(s: &str, macros: &HashMap<String, String>) -> String {
         let pattern = format!("%{{{}}}", key);
         result = result.replace(&pattern, value);
     }
+
+    result = RE_CONDITIONAL_MACRO.replace_all(&result, "").to_string();
 
     result
 }
