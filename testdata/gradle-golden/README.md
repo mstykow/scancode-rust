@@ -53,6 +53,18 @@ The current Rust implementation uses a custom token-based parser and supports th
    implementation "com.fasterxml.jackson:jackson-bom:2.12.2'
    ```
 
+8. **Multiple `dependencies {}` blocks in one build file**:
+
+   ```groovy
+   dependencies {
+       implementation 'org.scala-lang:scala-library:2.11.12'
+   }
+
+   dependencies {
+       testImplementation 'junit:junit:4.13'
+   }
+   ```
+
 ### ⚠️ **Still Partial / Unsupported**
 
 The Python ScanCode Toolkit implementation uses **pygmars** (a token-based parser with grammar) and still handles some richer cases that our parser does not fully resolve yet:
