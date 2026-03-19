@@ -50,6 +50,7 @@ Full RPM spec preamble parsing with comprehensive metadata extraction:
    - `Requires` → runtime dependencies (`scope: "dependencies"`)
    - `BuildRequires` → build dependencies (`scope: "build-dependencies"`)
    - Extracts version requirements with operators (`>=`, `<=`, `=`, `>`, `<`)
+   - Expands simple `%{name}` / `%{version}` / `%{release}` macros inside dependency and provides entries
    - Creates PURLs: `pkg:rpm/{package_name}`
 
 ### Implementation Approach
@@ -61,6 +62,7 @@ The parser:
 3. Handles multi-line fields like `%description`
 4. Parses dependency lines with version constraints
 5. Converts Packager field to structured Party model
+6. Continues through bounded conditional preamble directives like `%if` / `%else` / `%endif` instead of treating them as an immediate end-of-preamble marker
 
 ### Real-World Example
 
@@ -178,14 +180,14 @@ Requires: package_name [operator version]
 
 ## Limitations
 
-**Not implemented** (matching Python's scope):
+Still intentionally not implemented:
 
-- Macro expansion (e.g., `%{version}`, `%{_libdir}`)
-- Conditional directives (e.g., `%if`, `%ifdef`)
+- Full spec conditional evaluation (branch selection based on `%if` expressions)
+- General macro evaluation beyond bounded static substitution (e.g., `%{_libdir}`, shell/backtick helpers, Lua)
 - Scriptlets (e.g., `%prep`, `%build`, `%install`)
 - File lists (e.g., `%files`)
 
-These are complex features that Python also doesn't implement. The focus is on extracting metadata from the preamble, which is sufficient for most SBOM use cases.
+The parser now handles simple preamble conditionals and dependency-tag macro substitution without crossing into spec execution. More dynamic macro logic and true conditional evaluation remain intentionally out of scope.
 
 ## Coverage
 
@@ -193,6 +195,8 @@ Coverage includes:
 
 - Basic preamble parsing
 - Dependency extraction with version constraints
+- Dependency macro expansion for `BuildRequires`, `Requires`, and `Provides`
+- Conditional preamble parsing that keeps later tags and dependencies visible
 - Multi-line %description handling
 - Packager field parsing
 - Minimal spec file handling

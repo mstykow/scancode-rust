@@ -1,5 +1,7 @@
 use crate::models::PackageType;
+use std::fs;
 use std::path::PathBuf;
+use tempfile::TempDir;
 
 use super::PackageParser;
 use super::rpm_specfile::RpmSpecfileParser;
@@ -262,4 +264,91 @@ fn test_description_overrides_summary() {
     // Description is multi-line from %description section
     assert!(desc.len() > 50); // More than just the summary
     assert!(desc.contains("GNU cpio copies files"));
+}
+
+#[test]
+fn test_conditional_preamble_keeps_parsing_later_tags_and_deps() {
+    let temp_dir = TempDir::new().unwrap();
+    let spec_path = temp_dir.path().join("conditional.spec");
+
+    let spec = r#"
+Name: conditional-pkg
+Version: 1.0
+Release: 1%{?dist}
+
+%if 0%{?fedora}
+Summary: Fedora summary
+BuildRequires: gcc
+%endif
+
+License: MIT
+Requires: bash
+
+%description
+Example package
+"#;
+
+    fs::write(&spec_path, spec).unwrap();
+    let pkg = RpmSpecfileParser::extract_first_package(&spec_path);
+
+    assert_eq!(pkg.name.as_deref(), Some("conditional-pkg"));
+    assert_eq!(pkg.version.as_deref(), Some("1.0"));
+    assert_eq!(pkg.extracted_license_statement.as_deref(), Some("MIT"));
+    assert!(
+        pkg.dependencies
+            .iter()
+            .any(|dep| dep.extracted_requirement.as_deref() == Some("bash"))
+    );
+}
+
+#[test]
+fn test_dependency_macros_are_expanded_in_requires_and_provides() {
+    let temp_dir = TempDir::new().unwrap();
+    let spec_path = temp_dir.path().join("macros.spec");
+
+    let spec = r#"
+Name: macro-pkg
+Version: 2.4
+Release: 3%{?dist}
+Summary: Macro package
+License: MIT
+Requires: %{name} = %{version}-%{release}
+BuildRequires: pkgconfig(%{name})
+Provides: %{name}-libs = %{version}
+
+%description
+Macro package
+"#;
+
+    fs::write(&spec_path, spec).unwrap();
+    let pkg = RpmSpecfileParser::extract_first_package(&spec_path);
+
+    let req = pkg
+        .dependencies
+        .iter()
+        .find(|dep| dep.scope.as_deref() == Some("runtime"))
+        .unwrap();
+    assert_eq!(
+        req.extracted_requirement.as_deref(),
+        Some("macro-pkg = 2.4-3")
+    );
+    assert_eq!(req.purl.as_deref(), Some("pkg:rpm/macro-pkg"));
+
+    let build = pkg
+        .dependencies
+        .iter()
+        .find(|dep| dep.scope.as_deref() == Some("build"))
+        .unwrap();
+    assert_eq!(
+        build.extracted_requirement.as_deref(),
+        Some("pkgconfig(macro-pkg)")
+    );
+
+    let provides = pkg
+        .extra_data
+        .as_ref()
+        .and_then(|extra| extra.get("provides"))
+        .and_then(|value| value.as_array())
+        .unwrap();
+    assert_eq!(provides[0].as_str(), Some("macro-pkg-libs = 2.4"));
 }
