@@ -58,6 +58,11 @@ pub fn strip_freeze_suffix(s: &str) -> &str {
     s.trim_end_matches(".freeze")
 }
 
+enum GemfileBlock {
+    Group(Vec<String>),
+    Source(String),
+}
+
 // =============================================================================
 // Gemfile Parser (Ruby DSL)
 // =============================================================================
@@ -96,7 +101,9 @@ impl PackageParser for GemfileParser {
 /// Parses Gemfile content and extracts dependencies with groups.
 fn parse_gemfile(content: &str) -> PackageData {
     let mut dependencies = Vec::new();
-    let mut current_groups: Vec<String> = Vec::new();
+    let mut block_stack = Vec::new();
+    let mut default_source = None;
+    let mut sources = Vec::new();
 
     // Regex patterns for Gemfile parsing
     // gem "name", "version", options...
@@ -127,6 +134,22 @@ fn parse_gemfile(content: &str) -> PackageData {
         }
     };
 
+    let source_block_start_regex = match Regex::new(r#"^\s*source\s+["']([^"']+)["']\s+do\s*$"#) {
+        Ok(r) => r,
+        Err(e) => {
+            warn!("Failed to compile source block regex: {}", e);
+            return default_package_data_with_datasource(DatasourceId::Gemfile);
+        }
+    };
+
+    let source_regex = match Regex::new(r#"^\s*source\s+["']([^"']+)["']\s*$"#) {
+        Ok(r) => r,
+        Err(e) => {
+            warn!("Failed to compile source regex: {}", e);
+            return default_package_data_with_datasource(DatasourceId::Gemfile);
+        }
+    };
+
     // Parse symbols like :development, :test
     let symbol_regex = match Regex::new(r":(\w+)") {
         Ok(r) => r,
@@ -147,18 +170,39 @@ fn parse_gemfile(content: &str) -> PackageData {
         // Check for group start
         if let Some(caps) = group_start_regex.captures(trimmed) {
             let groups_str = caps.get(1).map(|m| m.as_str()).unwrap_or("");
-            current_groups.clear();
+            let mut current_groups = Vec::new();
             for cap in symbol_regex.captures_iter(groups_str) {
                 if let Some(group_name) = cap.get(1) {
                     current_groups.push(group_name.as_str().to_string());
                 }
+            }
+            block_stack.push(GemfileBlock::Group(current_groups));
+            continue;
+        }
+
+        if let Some(caps) = source_block_start_regex.captures(trimmed) {
+            let source = caps
+                .get(1)
+                .map(|m| m.as_str().to_string())
+                .unwrap_or_default();
+            if !source.is_empty() {
+                push_unique_string(&mut sources, source.clone());
+                block_stack.push(GemfileBlock::Source(source));
+            }
+            continue;
+        }
+
+        if let Some(caps) = source_regex.captures(trimmed) {
+            if let Some(source) = caps.get(1).map(|m| m.as_str().to_string()) {
+                push_unique_string(&mut sources, source.clone());
+                default_source = Some(source);
             }
             continue;
         }
 
         // Check for group end
         if group_end_regex.is_match(trimmed) {
-            current_groups.clear();
+            block_stack.pop();
             continue;
         }
 
@@ -188,6 +232,8 @@ fn parse_gemfile(content: &str) -> PackageData {
                 Some(version_parts.join(", "))
             };
 
+            let current_groups = current_group_names(&block_stack);
+
             // Determine scope based on current group
             // Bug Fix #4: :runtime → None, :development → "development"
             let (scope, is_runtime, is_optional) = if current_groups.is_empty() {
@@ -205,6 +251,11 @@ fn parse_gemfile(content: &str) -> PackageData {
 
             // Create PURL
             let purl = create_gem_purl(name, None);
+            let inherited_source = current_source(&block_stack, default_source.as_deref());
+            let extra_data = build_gemfile_dependency_extra_data(
+                caps.get(4).map(|m| m.as_str()),
+                inherited_source.as_deref(),
+            );
 
             dependencies.push(Dependency {
                 purl,
@@ -215,18 +266,113 @@ fn parse_gemfile(content: &str) -> PackageData {
                 is_pinned: None,
                 is_direct: Some(true),
                 resolved_package: None,
-                extra_data: None,
+                extra_data,
             });
         }
     }
+
+    let extra_data = if sources.is_empty() {
+        None
+    } else {
+        Some(HashMap::from([(
+            "sources".to_string(),
+            serde_json::Value::Array(sources.into_iter().map(serde_json::Value::String).collect()),
+        )]))
+    };
 
     PackageData {
         package_type: Some(PACKAGE_TYPE),
         primary_language: Some("Ruby".to_string()),
         dependencies,
+        extra_data,
         datasource_id: Some(DatasourceId::Gemfile),
         ..default_package_data()
     }
+}
+
+fn current_group_names(block_stack: &[GemfileBlock]) -> Vec<String> {
+    block_stack
+        .iter()
+        .rev()
+        .find_map(|block| match block {
+            GemfileBlock::Group(groups) => Some(groups.clone()),
+            GemfileBlock::Source(_) => None,
+        })
+        .unwrap_or_default()
+}
+
+fn current_source(block_stack: &[GemfileBlock], default_source: Option<&str>) -> Option<String> {
+    block_stack
+        .iter()
+        .rev()
+        .find_map(|block| match block {
+            GemfileBlock::Source(source) => Some(source.clone()),
+            GemfileBlock::Group(_) => None,
+        })
+        .or_else(|| default_source.map(str::to_string))
+}
+
+fn push_unique_string(values: &mut Vec<String>, value: String) {
+    if !values.contains(&value) {
+        values.push(value);
+    }
+}
+
+fn build_gemfile_dependency_extra_data(
+    options: Option<&str>,
+    inherited_source: Option<&str>,
+) -> Option<HashMap<String, serde_json::Value>> {
+    let mut extra = HashMap::new();
+    let options = options.unwrap_or("");
+
+    if let Some(git) = extract_gemfile_quoted_option(options, "git") {
+        extra.insert(
+            "source_type".to_string(),
+            serde_json::Value::String("GIT".to_string()),
+        );
+        extra.insert("git".to_string(), serde_json::Value::String(git.clone()));
+        extra.insert("remote".to_string(), serde_json::Value::String(git));
+    }
+
+    if let Some(path) = extract_gemfile_quoted_option(options, "path") {
+        extra.insert(
+            "source_type".to_string(),
+            serde_json::Value::String("PATH".to_string()),
+        );
+        extra.insert("path".to_string(), serde_json::Value::String(path));
+    }
+
+    for key in ["branch", "ref", "tag"] {
+        if let Some(value) = extract_gemfile_quoted_option(options, key) {
+            extra.insert(key.to_string(), serde_json::Value::String(value));
+        }
+    }
+
+    let direct_source = extract_gemfile_quoted_option(options, "source");
+    if let Some(source) = direct_source {
+        extra.insert("source".to_string(), serde_json::Value::String(source));
+    } else if !extra.contains_key("source_type")
+        && let Some(source) = inherited_source
+    {
+        extra.insert(
+            "source".to_string(),
+            serde_json::Value::String(source.to_string()),
+        );
+    }
+
+    (!extra.is_empty()).then_some(extra)
+}
+
+fn extract_gemfile_quoted_option(options: &str, key: &str) -> Option<String> {
+    if options.is_empty() {
+        return None;
+    }
+
+    let pattern = format!(r#"(?:^|,\s*){}\s*:\s*["']([^"']+)["']"#, regex::escape(key));
+    Regex::new(&pattern)
+        .ok()
+        .and_then(|regex| regex.captures(options))
+        .and_then(|captures| captures.get(1).map(|m| m.as_str().to_string()))
 }
 
 /// Checks if a string looks like a version constraint.

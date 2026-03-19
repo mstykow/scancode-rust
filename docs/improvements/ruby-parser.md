@@ -5,13 +5,13 @@
 Rust now goes beyond the current Python ScanCode Ruby handling in several concrete ways:
 
 1. resolves gemspec constants from required local Ruby files instead of leaving all external constants unresolved
-2. preserves Bundler `GIT` / `PATH` source metadata at parser level and proves it with parser goldens
+2. preserves Bundler `Gemfile` and `Gemfile.lock` source metadata at parser level and proves it with parser goldens
 3. merges extracted gem metadata layouts without duplicate package/dependency emission and assigns nested extracted files to the assembled gem package
 4. tags nested Ruby legal/readme/manifest files as `key_file`, promotes package metadata from them, and computes a top-level `license_clarity_score`
 
 ## Reference limitation
 
-The Python reference already handles some Bundler and gemspec data, but constant resolution, extracted-gem deduplication, false-dependency protection, and nested key-file attribution remain incomplete.
+The Python reference already handles some Bundler and gemspec data, but constant resolution, direct `Gemfile` provenance retention, extracted-gem deduplication, false-dependency protection, and nested key-file attribution remain incomplete.
 
 ## Rust Improvements
 
@@ -35,6 +35,19 @@ The Python reference already handles some Bundler and gemspec data, but constant
   - `ref`
   - source-type tagging
   - PATH primary-package identity behavior
+
+### Gemfile manifest provenance metadata
+
+- Direct `Gemfile` dependencies now preserve declared manifest provenance in dependency `extra_data` instead of dropping it on parse.
+- Preserved metadata includes:
+  - `git`
+  - `path`
+  - `branch`
+  - `ref`
+  - `tag`
+  - per-dependency `source`
+  - inherited top-level `source` URLs for plain registry dependencies
+- The parser also records top-level Gemfile `source` declarations in package `extra_data.sources`, so manifest-only scans keep registry provenance even without a lockfile.
 
 ### False-dependency protection
 
@@ -66,5 +79,6 @@ The Python reference already handles some Bundler and gemspec data, but constant
 ## Why this matters
 
 - **Better gemspec fidelity**: narrow constant resolution recovers real package metadata without widening into arbitrary Ruby loading
+- **Stronger Gemfile-only provenance**: manifest scans retain where dependencies came from even before a `Gemfile.lock` is available
 - **Cleaner extracted-gem results**: nested metadata layouts merge without duplicate package noise
 - **Better attribution**: nested legal and manifest files can contribute to package metadata and summary-level license clarity

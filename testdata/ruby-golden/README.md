@@ -6,11 +6,12 @@ Golden tests compare parser output against expected results from the original Sc
 
 ## Test Status
 
-**Current state:** 5/7 Ruby parser goldens are active; the remaining 2 are still intentionally ignored because they require license detection engine integration.
+**Current state:** 6/8 Ruby parser goldens are active; the remaining 2 are still intentionally ignored because they require license detection engine integration.
 
 - ✅ **cat-gemspec** - Passing with improvements
 - ✅ **arel-gemspec** - Active after parser parity fixes for `%q{}` cleanup and conditional dependency extraction
 - ✅ **with-variables** - Active with required-file constant resolution for gemspec metadata
+- ✅ **Gemfile (source options)** - Active with manifest-level `git`/`path`/`source` provenance preservation
 - ✅ **Gemfile.lock (git)** - Active with Bundler GIT source metadata preserved in dependency extra data
 - ✅ **Gemfile.lock (path)** - Active with PATH primary-package behavior and lockfile metadata preserved
 - ⏸️ **oj-gemspec** - License detection engine required
@@ -47,9 +48,11 @@ Python's approach fragments related data and loses the association between names
 ### Dependency Scope (Explicit vs Implicit)
 
 **Python:** Runtime dependencies have `scope: null`  
-**Ours:** Runtime dependencies have `scope: "runtime"`
+**Ours:** Runtime dependencies also keep `scope: null`
 
 **Rationale:** Explicit is better than implicit. All dependency scopes should be clearly labeled.
+
+Ruby now follows the ecosystem-native convention documented in this repository: plain runtime Gemfile dependencies keep a null scope, while install-time context such as group membership and source provenance is preserved in dedicated fields.
 
 ### Extracted Gem Assembly (Improved Deduplication)
 

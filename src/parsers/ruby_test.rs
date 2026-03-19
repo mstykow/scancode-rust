@@ -409,6 +409,179 @@ gem "debug", platforms: [:mri, :mingw, :x64_mingw]
         assert!(debug_dep.is_some());
     }
 
+    #[test]
+    fn test_extract_gemfile_dependency_source_provenance() {
+        let content = r#"
+source "https://rubygems.org"
+
+gem "my-git-gem", git: "https://github.com/example/my-git-gem.git", branch: "main", ref: "abc123def456", tag: "v1.2.3"
+gem "my-local-gem", path: "../vendor/my-local-gem"
+gem "private-gem", "~> 2.0", source: "https://gems.example.com"
+"#;
+        let (_temp_dir, gemfile_path) = create_temp_gemfile(content);
+        let package_data = GemfileParser::extract_first_package(&gemfile_path);
+
+        let git_dep = package_data
+            .dependencies
+            .iter()
+            .find(|d| d.purl.as_ref().is_some_and(|p| p.contains("my-git-gem")));
+        assert!(git_dep.is_some(), "Should find git-sourced dependency");
+        let git_extra = git_dep.unwrap().extra_data.as_ref();
+        assert!(
+            git_extra.is_some(),
+            "Git dependency should preserve extra_data"
+        );
+        let git_extra = git_extra.unwrap();
+        assert_eq!(
+            git_extra.get("source_type").and_then(|v| v.as_str()),
+            Some("GIT")
+        );
+        assert_eq!(
+            git_extra.get("git").and_then(|v| v.as_str()),
+            Some("https://github.com/example/my-git-gem.git")
+        );
+        assert_eq!(
+            git_extra.get("remote").and_then(|v| v.as_str()),
+            Some("https://github.com/example/my-git-gem.git")
+        );
+        assert_eq!(
+            git_extra.get("branch").and_then(|v| v.as_str()),
+            Some("main")
+        );
+        assert_eq!(
+            git_extra.get("ref").and_then(|v| v.as_str()),
+            Some("abc123def456")
+        );
+        assert_eq!(
+            git_extra.get("tag").and_then(|v| v.as_str()),
+            Some("v1.2.3")
+        );
+
+        let path_dep = package_data
+            .dependencies
+            .iter()
+            .find(|d| d.purl.as_ref().is_some_and(|p| p.contains("my-local-gem")));
+        assert!(path_dep.is_some(), "Should find path-sourced dependency");
+        let path_extra = path_dep.unwrap().extra_data.as_ref();
+        assert!(
+            path_extra.is_some(),
+            "Path dependency should preserve extra_data"
+        );
+        let path_extra = path_extra.unwrap();
+        assert_eq!(
+            path_extra.get("source_type").and_then(|v| v.as_str()),
+            Some("PATH")
+        );
+        assert_eq!(
+            path_extra.get("path").and_then(|v| v.as_str()),
+            Some("../vendor/my-local-gem")
+        );
+
+        let registry_dep = package_data
+            .dependencies
+            .iter()
+            .find(|d| d.purl.as_ref().is_some_and(|p| p.contains("private-gem")));
+        assert!(registry_dep.is_some(), "Should find registry dependency");
+        let registry_extra = registry_dep.unwrap().extra_data.as_ref();
+        assert!(
+            registry_extra.is_some(),
+            "Source-qualified registry dependency should preserve extra_data"
+        );
+        assert_eq!(
+            registry_extra
+                .unwrap()
+                .get("source")
+                .and_then(|v| v.as_str()),
+            Some("https://gems.example.com")
+        );
+    }
+
+    #[test]
+    fn test_extract_gemfile_inherits_global_source() {
+        let content = r#"
+source "https://rubygems.org"
+
+gem "rake", "~> 13.0"
+"#;
+        let (_temp_dir, gemfile_path) = create_temp_gemfile(content);
+        let package_data = GemfileParser::extract_first_package(&gemfile_path);
+
+        let rake_dep = package_data
+            .dependencies
+            .iter()
+            .find(|d| d.purl.as_ref().is_some_and(|p| p.contains("rake")));
+        assert!(rake_dep.is_some(), "Should find rake dependency");
+        let rake_extra = rake_dep.unwrap().extra_data.as_ref();
+        assert!(
+            rake_extra.is_some(),
+            "Dependencies should inherit the Gemfile source when no per-gem source is set"
+        );
+        assert_eq!(
+            rake_extra.unwrap().get("source").and_then(|v| v.as_str()),
+            Some("https://rubygems.org")
+        );
+
+        let package_extra = package_data.extra_data.as_ref();
+        assert!(
+            package_extra.is_some(),
+            "Gemfile should keep top-level sources in package extra_data"
+        );
+        let sources = package_extra
+            .unwrap()
+            .get("sources")
+            .and_then(|v| v.as_array());
+        assert!(
+            sources.is_some(),
+            "Package extra_data should include sources array"
+        );
+        assert_eq!(sources.unwrap().len(), 1);
+        assert_eq!(sources.unwrap()[0].as_str(), Some("https://rubygems.org"));
+    }
+
+    #[test]
+    fn test_extract_gemfile_source_block_inheritance() {
+        let content = r#"
+source "https://rubygems.org"
+
+source "https://gems.example.com" do
+  gem "private-gem", "~> 2.0"
+end
+
+gem "rake", "~> 13.0"
+"#;
+        let (_temp_dir, gemfile_path) = create_temp_gemfile(content);
+        let package_data = GemfileParser::extract_first_package(&gemfile_path);
+
+        let private_gem = package_data
+            .dependencies
+            .iter()
+            .find(|d| d.purl.as_ref().is_some_and(|p| p.contains("private-gem")));
+        assert!(private_gem.is_some(), "Should find source-block dependency");
+        assert_eq!(
+            private_gem
+                .unwrap()
+                .extra_data
+                .as_ref()
+                .and_then(|extra| extra.get("source"))
+                .and_then(|value| value.as_str()),
+            Some("https://gems.example.com")
+        );
+
+        let rake = package_data
+            .dependencies
+            .iter()
+            .find(|d| d.purl.as_ref().is_some_and(|p| p.contains("rake")));
+        assert!(rake.is_some(), "Should find default-source dependency");
+        assert_eq!(
+            rake.unwrap()
+                .extra_data
+                .as_ref()
+                .and_then(|extra| extra.get("source"))
+                .and_then(|value| value.as_str()),
+            Some("https://rubygems.org")
+        );
+    }
+
     // ==========================================================================
     // Test: Multiple version constraints
     // ==========================================================================
