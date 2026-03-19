@@ -46,6 +46,11 @@ const FIELD_RESOLUTIONS: &str = "resolutions";
 const FIELD_DESCRIPTION: &str = "description";
 const FIELD_KEYWORDS: &str = "keywords";
 const FIELD_ENGINES: &str = "engines";
+const FIELD_OS: &str = "os";
+const FIELD_CPU: &str = "cpu";
+const FIELD_LIBC: &str = "libc";
+const FIELD_DEPRECATED: &str = "deprecated";
+const FIELD_HAS_BIN: &str = "hasBin";
 const FIELD_PACKAGE_MANAGER: &str = "packageManager";
 const FIELD_WORKSPACES: &str = "workspaces";
 const FIELD_PRIVATE: &str = "private";
@@ -101,6 +106,18 @@ impl PackageParser for NpmParser {
 
         if let Some(engines) = extract_engines(&json) {
             extra_data_map.insert("engines".to_string(), engines);
+        }
+
+        for field in [
+            FIELD_OS,
+            FIELD_CPU,
+            FIELD_LIBC,
+            FIELD_DEPRECATED,
+            FIELD_HAS_BIN,
+        ] {
+            if let Some(value) = extract_raw_extra_data_field(&json, field) {
+                extra_data_map.insert(field.to_string(), value);
+            }
         }
 
         if let Some(package_manager) = extract_package_manager(&json) {
@@ -912,6 +929,10 @@ fn extract_keywords_as_vec(json: &Value) -> Vec<String> {
 
 fn extract_engines(json: &Value) -> Option<serde_json::Value> {
     json.get(FIELD_ENGINES).cloned()
+}
+
+fn extract_raw_extra_data_field(json: &Value, field: &str) -> Option<serde_json::Value> {
+    json.get(field).cloned()
 }
 
 fn extract_package_manager(json: &Value) -> Option<String> {

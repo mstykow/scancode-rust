@@ -100,6 +100,7 @@ fn parse_yarn_v2(
     };
 
     let mut dependencies = Vec::new();
+    let package_extra_data = extract_yarn_v2_package_extra_data(yaml_map);
 
     for (spec, details) in yaml_map {
         if spec.as_str().map(|s| s == "__metadata").unwrap_or(false) {
@@ -128,6 +129,7 @@ fn parse_yarn_v2(
 
         let deps_yaml = details_map.get("dependencies");
         let peer_deps_yaml = details_map.get("peerDependencies");
+        let resolved_extra_data = extract_yarn_v2_resolved_extra_data(details_map, &resolution);
 
         let nested_deps = parse_yaml_dependencies(deps_yaml);
         let peer_deps = parse_yaml_dependencies(peer_deps_yaml);
@@ -157,7 +159,7 @@ fn parse_yarn_v2(
             sha512: checksum,
             md5: None,
             is_virtual: true,
-            extra_data: None,
+            extra_data: resolved_extra_data,
             dependencies: all_deps,
             repository_homepage_url: None,
             repository_download_url: None,
@@ -186,14 +188,17 @@ fn parse_yarn_v2(
 
         let dependency = Dependency {
             purl,
-            extracted_requirement: Some(resolved_version),
+            extracted_requirement: Some(resolved_version.clone()),
             scope: Some(scope),
             is_runtime: Some(is_runtime),
             is_optional: Some(is_optional),
             is_pinned: Some(true),
             is_direct: Some(is_direct),
             resolved_package: Some(Box::new(resolved_package)),
-            extra_data: None,
+            extra_data: Some(HashMap::from([(
+                "resolution".to_string(),
+                JsonValue::String(resolution),
+            )])),
         };
 
         dependencies.push(dependency);
@@ -235,7 +240,7 @@ fn parse_yarn_v2(
         file_references: Vec::new(),
         is_private: false,
         is_virtual: false,
-        extra_data: None,
+        extra_data: package_extra_data,
         dependencies,
         repository_homepage_url: None,
         repository_download_url: None,
@@ -666,6 +671,16 @@ pub fn parse_yarn_v2_resolution(resolution: &str) -> (Option<String>, String, St
         }
     }
 
+    if let Some((ident, reference)) = split_yarn_locator(resolution) {
+        let (namespace, name) = extract_namespace_and_name(ident);
+        let namespace_opt = if namespace.is_empty() {
+            None
+        } else {
+            Some(namespace)
+        };
+        return (namespace_opt, name, reference.to_string());
+    }
+
     let (namespace, name) = extract_namespace_and_name(resolution);
     let namespace_opt = if namespace.is_empty() {
         None
@@ -673,6 +688,68 @@ pub fn parse_yarn_v2_resolution(resolution: &str) -> (Option<String>, String, St
         Some(namespace)
     };
     (namespace_opt, name, "*".to_string())
+}
+
+fn split_yarn_locator(resolution: &str) -> Option<(&str, &str)> {
+    if resolution.is_empty() {
+        return None;
+    }
+
+    let separator_index = if resolution.starts_with('@') {
+        let slash_index = resolution.find('/')?;
+        let rest = &resolution[slash_index + 1..];
+        let at_index = rest.find('@')?;
+        slash_index + 1 + at_index
+    } else {
+        resolution.find('@')?
+    };
+
+    let ident = &resolution[..separator_index];
+    let reference = &resolution[separator_index + 1..];
+
+    if ident.is_empty() || reference.is_empty() {
+        None
+    } else {
+        Some((ident, reference))
+    }
+}
+
+fn extract_yarn_v2_package_extra_data(
+    yaml_map: &serde_yaml::Mapping,
+) -> Option<HashMap<String, JsonValue>> {
+    let metadata = yaml_map.get("__metadata")?.as_mapping()?;
+    let mut extra_data = HashMap::new();
+
+    for field in ["version", "cacheKey"] {
+        if let Some(value) = metadata.get(field).and_then(yaml_value_to_json) {
+            extra_data.insert(field.to_string(), value);
+        }
+    }
+
+    (!extra_data.is_empty()).then_some(extra_data)
+}
+
+fn extract_yarn_v2_resolved_extra_data(
+    details_map: &serde_yaml::Mapping,
+    resolution: &str,
+) -> Option<HashMap<String, JsonValue>> {
+    let mut extra_data = HashMap::new();
+    extra_data.insert(
+        "resolution".to_string(),
+        JsonValue::String(resolution.to_string()),
+    );
+
+    for field in ["languageName", "linkType", "bin", "dependenciesMeta"] {
+        if let Some(value) = details_map.get(field).and_then(yaml_value_to_json) {
+            extra_data.insert(field.to_string(), value);
+        }
+    }
+
+    Some(extra_data)
+}
+
+fn yaml_value_to_json(value: &Value) -> Option<JsonValue> {
+    serde_json::to_value(value).ok()
 }
 
 /// Extract string value from YAML mapping
