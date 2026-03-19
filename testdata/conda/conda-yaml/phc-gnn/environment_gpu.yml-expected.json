@@ -62,7 +62,7 @@
         "extra_data": {}
       },
       {
-        "purl": "pkg:pypi/magma-cuda101",
+        "purl": "pkg:conda/magma-cuda101",
         "extracted_requirement": "",
         "scope": "dependencies",
         "is_runtime": true,
