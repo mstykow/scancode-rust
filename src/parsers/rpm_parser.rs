@@ -340,6 +340,32 @@ fn parse_rpm_package(pkg: &Package, path: &Path) -> PackageData {
             ),
         );
     }
+    if let Some(provides) = extract_rpm_relationships(pkg, RpmRelationshipKind::Provides)
+        && !provides.is_empty()
+    {
+        extra_data.insert(
+            "provides".to_string(),
+            serde_json::Value::Array(
+                provides
+                    .into_iter()
+                    .map(serde_json::Value::String)
+                    .collect(),
+            ),
+        );
+    }
+    if let Some(obsoletes) = extract_rpm_relationships(pkg, RpmRelationshipKind::Obsoletes)
+        && !obsoletes.is_empty()
+    {
+        extra_data.insert(
+            "obsoletes".to_string(),
+            serde_json::Value::Array(
+                obsoletes
+                    .into_iter()
+                    .map(serde_json::Value::String)
+                    .collect(),
+            ),
+        );
+    }
     let vcs_url = infer_vcs_url(metadata, &source_urls);
 
     PackageData {
@@ -411,6 +437,26 @@ fn extract_rpm_dependencies(pkg: &Package, namespace: Option<&str>) -> Vec<Depen
     }
 
     dependencies
+}
+
+enum RpmRelationshipKind {
+    Provides,
+    Obsoletes,
+}
+
+fn extract_rpm_relationships(pkg: &Package, kind: RpmRelationshipKind) -> Option<Vec<String>> {
+    let relationships = match kind {
+        RpmRelationshipKind::Provides => pkg.metadata.get_provides().ok()?,
+        RpmRelationshipKind::Obsoletes => pkg.metadata.get_obsoletes().ok()?,
+    };
+
+    let values: Vec<String> = relationships
+        .into_iter()
+        .map(|dep| format_rpm_requirement(&dep))
+        .filter(|value| !value.is_empty() && value != "(none)")
+        .collect();
+
+    (!values.is_empty()).then_some(values)
 }
 
 fn format_rpm_requirement(dep: &rpm::Dependency) -> String {
@@ -735,6 +781,58 @@ mod tests {
                 .is_some_and(|extra| extra.contains_key("build_time"))
         );
         assert!(!pkg.keywords.is_empty());
+    }
+
+    #[test]
+    fn test_rpm_archive_preserves_provides_and_obsoletes_relationships() {
+        use rpm::{Dependency as RpmDependency, DependencyFlags};
+
+        let package = rpm::PackageBuilder::new(
+            "demo-rpm",
+            "1.0.0",
+            "MIT",
+            "noarch",
+            "RPM relationship metadata fixture",
+        )
+        .release("1")
+        .provides(RpmDependency {
+            name: "demo-rpm-virtual".to_string(),
+            flags: DependencyFlags::GREATER | DependencyFlags::EQUAL,
+            version: "1.0.0".to_string(),
+        })
+        .obsoletes(RpmDependency {
+            name: "old-demo-rpm".to_string(),
+            flags: DependencyFlags::LESS,
+            version: "0.9.0".to_string(),
+        })
+        .build()
+        .unwrap();
+
+        let temp_file = NamedTempFile::new().unwrap();
+        package.write_file(temp_file.path()).unwrap();
+
+        let pkg = RpmParser::extract_first_package(temp_file.path());
+        let extra = pkg.extra_data.as_ref().expect("extra_data should exist");
+
+        let provides = extra
+            .get("provides")
+            .and_then(|value| value.as_array())
+            .expect("provides should be present");
+        assert!(
+            provides
+                .iter()
+                .any(|value| value.as_str() == Some("demo-rpm-virtual >= 1.0.0"))
+        );
+
+        let obsoletes = extra
+            .get("obsoletes")
+            .and_then(|value| value.as_array())
+            .expect("obsoletes should be present");
+        assert!(
+            obsoletes
+                .iter()
+                .any(|value| value.as_str() == Some("old-demo-rpm < 0.9.0"))
+        );
     }
 }
 
