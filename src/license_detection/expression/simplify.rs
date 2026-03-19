@@ -2,7 +2,7 @@
 
 use std::collections::HashSet;
 
-use super::{CombineRelation, LicenseExpression, ParseError, ValidationResult};
+use super::{CombineRelation, LicenseExpression, ParseError};
 
 /// Simplify a license expression by deduplicating license keys.
 ///
@@ -307,33 +307,6 @@ pub fn licensing_contains(container: &str, contained: &str) -> bool {
     }
 }
 
-/// Validate a license expression against known license keys.
-///
-/// # Arguments
-/// * `expr` - The expression to validate
-/// * `known_keys` - Set of known valid license keys
-///
-/// # Returns
-/// ValidationResult indicating if expression is valid
-pub fn validate_expression(
-    expr: &LicenseExpression,
-    known_keys: &HashSet<String>,
-) -> ValidationResult {
-    let mut unknown = Vec::new();
-
-    for key in expr.license_keys() {
-        if !known_keys.contains(&key) {
-            unknown.push(key);
-        }
-    }
-
-    if unknown.is_empty() {
-        ValidationResult::Valid
-    } else {
-        ValidationResult::UnknownKeys { unknown }
-    }
-}
-///
 /// # Returns
 /// String representation of the expression
 ///

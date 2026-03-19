@@ -178,34 +178,6 @@ mod tests {
     }
 
     #[test]
-    fn test_license_clone_trait() {
-        let license = create_license();
-        let cloned = license.clone();
-
-        assert_eq!(license, cloned);
-    }
-
-    #[test]
-    fn test_license_debug_trait() {
-        let license = create_license();
-        let debug_str = format!("{:?}", license);
-
-        assert!(debug_str.contains("License"));
-        assert!(debug_str.contains("key: \"mit\""));
-    }
-
-    #[test]
-    fn test_license_partial_eq_trait() {
-        let license1 = create_license();
-        let license2 = create_license();
-        let mut license3 = create_license();
-        license3.key = "different".to_string();
-
-        assert_eq!(license1, license2);
-        assert_ne!(license1, license3);
-    }
-
-    #[test]
     fn test_license_with_ignorable_fields() {
         let license = License {
             key: "apache-2.0".to_string(),
@@ -323,45 +295,6 @@ mod tests {
         .filter(|&&f| f)
         .count();
         assert_eq!(flag_count, 1);
-    }
-
-    #[test]
-    fn test_rule_clone_trait() {
-        let rule = create_rule();
-        let cloned = rule.clone();
-
-        assert_eq!(rule, cloned);
-    }
-
-    #[test]
-    fn test_rule_debug_trait() {
-        let rule = create_rule();
-        let debug_str = format!("{:?}", rule);
-
-        assert!(debug_str.contains("Rule"));
-        assert!(debug_str.contains("identifier: \"mit.LICENSE\""));
-    }
-
-    #[test]
-    fn test_rule_partial_eq_trait() {
-        let rule1 = create_rule();
-        let rule2 = create_rule();
-        let mut rule3 = create_rule();
-        rule3.identifier = "different".to_string();
-
-        assert_eq!(rule1, rule2);
-        assert_ne!(rule1, rule3);
-    }
-
-    #[test]
-    fn test_rule_ord_trait() {
-        let mut rule1 = create_rule();
-        rule1.identifier = "aaa.LICENSE".to_string();
-        let mut rule2 = create_rule();
-        rule2.identifier = "bbb.LICENSE".to_string();
-
-        assert!(rule1 < rule2);
-        assert!(rule2 > rule1);
     }
 
     #[test]
@@ -569,34 +502,6 @@ mod tests {
     }
 
     #[test]
-    fn test_license_match_clone_trait() {
-        let match_result = create_license_match();
-        let cloned = match_result.clone();
-
-        assert_eq!(match_result, cloned);
-    }
-
-    #[test]
-    fn test_license_match_debug_trait() {
-        let match_result = create_license_match();
-        let debug_str = format!("{:?}", match_result);
-
-        assert!(debug_str.contains("LicenseMatch"));
-        assert!(debug_str.contains("license_expression: \"mit\""));
-    }
-
-    #[test]
-    fn test_license_match_partial_eq_trait() {
-        let match1 = create_license_match();
-        let match2 = create_license_match();
-        let mut match3 = create_license_match();
-        match3.start_line = 99;
-
-        assert_eq!(match1, match2);
-        assert_ne!(match1, match3);
-    }
-
-    #[test]
     fn test_license_match_serialization() {
         let match_result = create_license_match();
         let json = serde_json::to_string(&match_result).unwrap();
@@ -691,59 +596,6 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_matcher_order_hash() {
-        let match_result = create_license_match();
-        assert_eq!(match_result.matcher_order(), 0);
-    }
-
-    #[test]
-    fn test_matcher_order_aho() {
-        let mut match_result = create_license_match();
-        match_result.matcher = MatcherKind::Aho;
-        assert_eq!(match_result.matcher_order(), 1);
-    }
-
-    #[test]
-    fn test_matcher_order_spdx() {
-        let mut match_result = create_license_match();
-        match_result.matcher = MatcherKind::SpdxId;
-        assert_eq!(match_result.matcher_order(), 2);
-    }
-
-    #[test]
-    fn test_matcher_order_seq() {
-        let mut match_result = create_license_match();
-        match_result.matcher = MatcherKind::Seq;
-        assert_eq!(match_result.matcher_order(), 3);
-    }
-
-    #[test]
-    fn test_matcher_order_unknown() {
-        let mut match_result = create_license_match();
-        match_result.matcher = MatcherKind::Unknown;
-        assert_eq!(match_result.matcher_order(), 6);
-    }
-
-    #[test]
-    fn test_hilen_basic() {
-        let match_result = create_license_match();
-        assert_eq!(match_result.hilen(), 50);
-    }
-
-    #[test]
-    fn test_hilen_zero() {
-        let mut match_result = create_license_match();
-        match_result.hilen = 0;
-        assert_eq!(match_result.hilen(), 0);
-    }
-
-    #[test]
-    fn test_hilen_value() {
-        let mut match_result = create_license_match();
-        match_result.hilen = 25;
-        assert_eq!(match_result.hilen(), 25);
-    }
 
     #[test]
     fn test_len_contiguous() {

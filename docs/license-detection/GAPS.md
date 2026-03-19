@@ -58,3 +58,31 @@ Missing follow-up work:
   `skip_for_required_phrase_generation`,
 - decide how deprecated rule replacements should be modeled and surfaced,
 - decide which license metadata fields belong in Rust output or internal APIs.
+
+## Expression Key-Set Features
+
+- Known gap.
+- Rust has internal expression key extraction helpers in
+  `src/license_detection/expression/mod.rs`:
+  - `LicenseExpression::license_keys()`
+  - `LicenseExpression::collect_keys()`
+- These currently exist mostly for tests, but they correspond to real Python
+  production behavior that Rust has not implemented yet.
+
+Python uses license-key-set extraction for:
+
+- reference-handling logic that compares referenced-file expressions,
+- required-phrase generation tooling,
+- expression/rule/license validation tooling.
+
+Why deferred:
+
+- The surrounding parity features are not implemented in Rust yet.
+- The key-extraction helpers are kept so we do not lose the building blocks for
+  those future ports.
+
+Missing follow-up work:
+
+- implement Python-style reference-following / referenced-license handling,
+- implement required-phrase generation tooling parity,
+- implement fuller rule/license/expression validation parity.

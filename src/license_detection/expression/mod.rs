@@ -28,12 +28,6 @@ pub enum ParseError {
     /// Mismatched parentheses
     MismatchedParentheses,
 
-    /// Invalid license key format
-    InvalidLicenseKey { key: String },
-
-    /// Invalid operator
-    InvalidOperator { operator: String },
-
     /// Generic parse error with message
     ParseError(String),
 }
@@ -46,27 +40,12 @@ impl std::fmt::Display for ParseError {
                 write!(f, "Unexpected token '{}' at position {}", token, position)
             }
             Self::MismatchedParentheses => write!(f, "Mismatched parentheses"),
-            Self::InvalidLicenseKey { key } => write!(f, "Invalid license key: {}", key),
-            Self::InvalidOperator { operator } => write!(f, "Invalid operator: {}", operator),
             Self::ParseError(msg) => write!(f, "Parse error: {}", msg),
         }
     }
 }
 
 impl std::error::Error for ParseError {}
-
-/// Result of license expression validation.
-#[derive(Debug, Clone, PartialEq)]
-pub enum ValidationResult {
-    /// Expression is valid
-    Valid,
-
-    /// Expression has unknown license keys
-    UnknownKeys { unknown: Vec<String> },
-
-    /// Expression has other validation errors
-    Invalid { errors: Vec<String> },
-}
 
 /// A parsed license expression represented as an AST.
 #[derive(Debug, Clone, PartialEq)]
@@ -98,6 +77,9 @@ pub enum LicenseExpression {
 
 impl LicenseExpression {
     /// Extract all license keys from the expression.
+    // Kept for future parity work around reference-following and validation.
+    // See docs/license-detection/GAPS.md#expression-key-set-features.
+    #[allow(dead_code)]
     pub fn license_keys(&self) -> Vec<String> {
         let mut keys = Vec::new();
         self.collect_keys(&mut keys);
@@ -106,6 +88,9 @@ impl LicenseExpression {
         keys
     }
 
+    // Kept for future parity work around reference-following and validation.
+    // See docs/license-detection/GAPS.md#expression-key-set-features.
+    #[allow(dead_code)]
     fn collect_keys(&self, keys: &mut Vec<String>) {
         match self {
             Self::License(key) => keys.push(key.clone()),
@@ -168,7 +153,6 @@ pub enum CombineRelation {
 #[cfg(test)]
 mod tests {
     use super::*;
-    pub use simplify::validate_expression;
     use std::collections::HashSet;
 
     #[test]
@@ -224,8 +208,12 @@ mod tests {
         known.insert("mit".to_string());
         known.insert("apache-2.0".to_string());
 
-        let result = validate_expression(&expr, &known);
-        assert_eq!(result, ValidationResult::Valid);
+        let unknown: Vec<_> = expr
+            .license_keys()
+            .into_iter()
+            .filter(|key| !known.contains(key))
+            .collect();
+        assert!(unknown.is_empty());
     }
 
     #[test]
@@ -234,23 +222,24 @@ mod tests {
         let mut known = HashSet::new();
         known.insert("mit".to_string());
 
-        let result = validate_expression(&expr, &known);
-        assert!(matches!(result, ValidationResult::UnknownKeys { .. }));
-        if let ValidationResult::UnknownKeys { unknown } = result {
-            assert_eq!(unknown.len(), 1);
-            assert_eq!(unknown[0], "unknownkey");
-        }
+        let unknown: Vec<_> = expr
+            .license_keys()
+            .into_iter()
+            .filter(|key| !known.contains(key))
+            .collect();
+        assert_eq!(unknown, vec!["unknownkey".to_string()]);
     }
 
     #[test]
     fn test_validate_expression_empty_known_keys() {
         let expr = parse_expression("MIT AND Apache-2.0").unwrap();
-        let known = HashSet::new();
+        let known: HashSet<String> = HashSet::new();
 
-        let result = validate_expression(&expr, &known);
-        assert!(matches!(result, ValidationResult::UnknownKeys { .. }));
-        if let ValidationResult::UnknownKeys { unknown } = result {
-            assert_eq!(unknown.len(), 2);
-        }
+        let unknown: Vec<_> = expr
+            .license_keys()
+            .into_iter()
+            .filter(|key| !known.contains(key))
+            .collect();
+        assert_eq!(unknown.len(), 2);
     }
 }
