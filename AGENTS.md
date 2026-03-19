@@ -70,10 +70,18 @@ cargo test --features golden-tests  # Include golden tests (slower, compares aga
 cargo fmt                     # Format code
 cargo clippy                  # Lint and catch mistakes
 cargo clippy --fix            # Auto-fix clippy suggestions
+npm run check:docs            # Markdown lint + formatting check
+npm run validate:urls         # Validate documentation/docstring URLs (can take a few minutes)
 
 # Run Tool
 cargo run -- --json-pp output.json <dir> --exclude "*.git*" "target/*"
 ```
+
+## Documentation Tooling
+
+- **Markdown checks**: `npm run check:docs`
+- **Markdown autofix**: `npm run fix:docs`
+- **URL validation**: `npm run validate:urls`
 
 ## Running Single Tests
 

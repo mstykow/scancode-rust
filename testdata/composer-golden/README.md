@@ -4,12 +4,9 @@
 
 Golden tests compare parser output against expected results from the original ScanCode Toolkit to ensure compatibility.
 
-## Test Status
+## Coverage Summary
 
-**Currently Passing:** 2/2 tests
-
-- ✅ `test_golden_composer_lock` - Passing with enhancements
-- ✅ `test_golden_composer_json_a_timer` - Passing with manifest metadata coverage
+This fixture set covers both lockfile extraction and manifest metadata recovery for representative Composer inputs.
 
 ## Enhancements Over Python ScanCode
 

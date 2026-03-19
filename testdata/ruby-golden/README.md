@@ -4,18 +4,9 @@
 
 Golden tests compare parser output against expected results from the original ScanCode Toolkit to ensure compatibility.
 
-## Test Status
+## Coverage Summary
 
-**Current state:** 6/8 Ruby parser goldens are active; the remaining 2 are still intentionally ignored because they require license detection engine integration.
-
-- ✅ **cat-gemspec** - Passing with improvements
-- ✅ **arel-gemspec** - Active after parser parity fixes for `%q{}` cleanup and conditional dependency extraction
-- ✅ **with-variables** - Active with required-file constant resolution for gemspec metadata
-- ✅ **Gemfile (source options)** - Active with manifest-level `git`/`path`/`source` provenance preservation
-- ✅ **Gemfile.lock (git)** - Active with Bundler GIT source metadata preserved in dependency extra data
-- ✅ **Gemfile.lock (path)** - Active with PATH primary-package behavior and lockfile metadata preserved
-- ⏸️ **oj-gemspec** - License detection engine required
-- ⏸️ **rubocop-gemspec** - License detection engine required
+This fixture set covers representative gemspec metadata, required-file constant resolution, Gemfile source provenance, Gemfile.lock Git and path metadata, and the current parser-only boundary where some cases still depend on license-detection integration.
 
 ## Intentional Improvements Over Python ScanCode
 

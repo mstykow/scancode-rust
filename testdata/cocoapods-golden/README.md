@@ -215,19 +215,12 @@ Each test file should have a corresponding `-expected.json` file for golden test
 ## Running Tests
 
 ```bash
-# Run all CocoaPods golden tests
 cargo test --lib cocoapods
-
-# Run specific format tests
-cargo test --lib podspec_json
-cargo test --lib podfile_lock
-cargo test --lib podspec
-cargo test --lib podfile
 ```
 
 ## Expected Test Results
 
-- **JSON/YAML formats**: 100% pass rate expected
-- **Ruby DSL formats**: 90%+ pass rate expected (some complex Ruby expressions may differ)
+- **JSON/YAML formats**: stable parser-only parity coverage is expected
+- **Ruby DSL formats**: the common static patterns described above should remain stable, while highly dynamic Ruby expressions may still differ
 
 Any failures on standard files indicate a regression and should be investigated.

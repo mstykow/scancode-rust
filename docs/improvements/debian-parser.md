@@ -64,5 +64,5 @@ The important part for users is behavioral stability. The parser keeps the same 
 
 ## References
 
-- [Debian Binary Package Format](https://wiki.debian.org/Packaging)
+- [Debian Binary Packages](https://www.debian.org/doc/debian-policy/ch-binary.html)
 - [Debian control file fields](https://www.debian.org/doc/debian-policy/ch-controlfields.html)

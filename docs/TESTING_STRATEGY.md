@@ -74,7 +74,7 @@ pub fn process(...) -> Result<ScanResult> {
 
 **Location**: Inline in source code as `///` or `//!` doc comments
 
-**Current Status**: 14 doctests covering main API entry points (all passing)
+**Current Status**: Doctests cover the main API entry points.
 
 ---
 
@@ -209,7 +209,7 @@ fn test_scanner_discovers_all_registered_parsers() {
 
 - Primarily golden tests (parse file → compare to `.expected.json`)
 - Tests entire pipeline at once
-- Typically 10-15 test files per ecosystem
+- Often relies on a compact set of fixture-backed tests per ecosystem
 
 **Trade-offs**:
 

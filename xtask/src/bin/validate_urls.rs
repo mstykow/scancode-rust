@@ -27,7 +27,7 @@ struct Args {
     )]
     timeout_secs: u64,
 
-    #[arg(long, default_value_t = 10, help = "Parallel workers for URL checks")]
+    #[arg(long, default_value_t = 20, help = "Parallel workers for URL checks")]
     workers: usize,
 }
 

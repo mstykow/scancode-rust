@@ -40,7 +40,7 @@ testdata/assembly-golden/
 └── README.md                # This file
 ```
 
-**Current test cases**: Run `ls testdata/assembly-golden/` to see all available test directories.
+For the current fixture set, inspect the directories under `testdata/assembly-golden/`.
 
 ## Test Execution Flow
 
@@ -117,13 +117,7 @@ Additional ecosystems can be added by:
 ## Running Tests
 
 ```bash
-# Run all assembly golden tests
 cargo test --lib assembly_golden
-
-# Run specific test
-cargo test --lib test_assembly_npm_basic
-
-# Run with output
 cargo test --lib assembly_golden -- --nocapture
 ```
 

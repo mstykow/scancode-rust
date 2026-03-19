@@ -4,24 +4,13 @@
 
 Golden tests compare parser output against expected results from the original ScanCode Toolkit to ensure compatibility.
 
-## Test Status
+## Coverage Status
 
-**Currently Passing:** 0/4 tests (4 tests require license detection engine integration)
-
-- 🔄 All 4 tests ignored - Require license detection engine
-
-## Test Coverage
-
-### Ignored Tests
-
-1. **mini-lock** - Minimal pubspec.lock
-2. **stock-lock** - Stock pubspec.lock with multiple dependencies
-3. **simple-yaml** - Simple pubspec.yaml
-4. **many-deps-yaml** - pubspec.yaml with many dependencies
+This fixture set covers representative `pubspec.lock` and `pubspec.yaml` inputs, but parser-only golden activation still depends on the surrounding license-detection integration boundary.
 
 ## When to Unignore Tests
 
-Tests should be re-enabled once:
+These fixtures can move back into active parser-only golden use once:
 
 1. License detection engine is integrated
 2. `declared_license_expression` and `declared_license_expression_spdx` are populated

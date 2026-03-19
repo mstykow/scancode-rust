@@ -53,34 +53,9 @@ fn decode_checksum(checksum: &str) -> Option<String> {
 }
 ```
 
-### Verification
+### Coverage
 
-**Test Case**: Alpine installed database with 14 file references
-
-```rust
-#[test]
-fn test_parse_alpine_file_references() {
-    let result = AlpineInstalledParser::extract_package_data(
-        Path::new("testdata/alpine/alpine-installed-database")
-    );
-
-    let file_refs = result.file_references.unwrap();
-    assert_eq!(file_refs.len(), 14, "Should extract all 14 file references");
-
-    // Verify SHA1 checksums are correctly decoded
-    let sbin_apk = file_refs.iter()
-        .find(|fr| fr.path == Some("sbin/apk".to_string()))
-        .expect("Should find sbin/apk reference");
-
-    assert_eq!(
-        sbin_apk.sha1,
-        Some("435ff1cd6dc5e112df66d3f1ce2bcfb965984eddc0".to_string()),
-        "SHA1 should be decoded from Q1/xzW3F4RLfZtPxzivPuWWYTt3A="
-    );
-}
-```
-
-**Result**: ✅ All 14 file references extracted with correct SHA1 checksums
+Coverage verifies that installed-database file references retain decoded SHA1 checksums instead of collapsing to missing hash data.
 
 ### Impact
 
@@ -146,34 +121,9 @@ fn extract_providers(line: &str) -> Vec<String> {
 }
 ```
 
-### Verification
+### Coverage
 
-**Test Case**: Alpine package with provider field
-
-```rust
-#[test]
-fn test_parse_alpine_provider_field() {
-    let result = AlpineInstalledParser::extract_package_data(
-        Path::new("testdata/alpine/alpine-installed-database")
-    );
-
-    let providers = result.extra_data["providers"]
-        .as_array()
-        .expect("Should have providers array");
-
-    assert!(providers.len() > 0, "Should extract providers");
-
-    // Verify specific providers
-    let provider_strings: Vec<String> = providers.iter()
-        .map(|v| v.as_str().unwrap().to_string())
-        .collect();
-
-    assert!(provider_strings.contains(&"cmd:busybox".to_string()));
-    assert!(provider_strings.contains(&"/bin/sh".to_string()));
-}
-```
-
-**Result**: ✅ All provider fields extracted and stored
+Coverage verifies that provider metadata is preserved as structured package data rather than being silently ignored.
 
 ### Impact
 

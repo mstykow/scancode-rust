@@ -215,7 +215,7 @@ register_package_handlers! {
    - Returns all registered parser type names
    - Used by integration tests to verify registration
 
-**Critical:** If a parser is implemented but not listed in this macro, it will **never be called** by the scanner, even if fully implemented and tested. The integration test `test_all_parsers_are_registered_and_exported` verifies this.
+**Critical:** If a parser is implemented but not listed in this macro, it will **never be called** by the scanner, even if fully implemented and tested. Integration coverage verifies that parser registration stays aligned with the scanner entry points.
 
 ### Unified Data Model
 
@@ -608,8 +608,7 @@ The email/URL detection engine is the simplest text detection feature — regex-
 
 Both support configurable thresholds (`--max-email N`, `--max-url N`, default 50).
 
-Golden regression coverage for this module uses local, repo-owned fixtures in
-`testdata/plugin_email_url/` and test execution in `src/finder/golden_test.rs`.
+Golden regression coverage for this module uses local, repo-owned fixtures and a dedicated finder golden-test harness.
 
 Key design decisions vs Python reference:
 

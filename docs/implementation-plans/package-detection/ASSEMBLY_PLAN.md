@@ -227,7 +227,7 @@ File Enumeration → Parser Selection → Package Extraction → Assembly Phase 
 | `src/assembly/workspace_merge.rs`       | npm/pnpm workspace assembly (859 lines)               |
 | `src/assembly/cargo_workspace_merge.rs` | Cargo workspace assembly (524 lines)                  |
 | `src/assembly/file_ref_resolve.rs`      | File reference resolution for DB packages (750 lines) |
-| `src/assembly/assembly_golden_test.rs`  | 9 golden tests                                        |
+| `src/assembly/assembly_golden_test.rs`  | Assembly golden-test coverage                         |
 
 ---
 

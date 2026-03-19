@@ -4,20 +4,9 @@
 
 Golden tests compare parser output against expected results from the original ScanCode Toolkit to ensure compatibility. These tests validate that our npm parser extracts metadata in the same format as the reference implementation.
 
-## Test Status
+## Coverage Summary
 
-**Currently Passing:** 11/11 tests
-
-- ✅ `test_golden_basic` - Basic package.json parsing
-- ✅ `test_golden_bundled_deps` - Bundled dependencies handling
-- ✅ `test_golden_authors_list_strings` - Author array extraction
-- ✅ `test_golden_authors_list_dicts` - Author dictionary arrays and raw license statement extraction
-- ✅ `test_golden_double_license` - Multiple declared-license forms preserved at parser level
-- ✅ `test_golden_express_jwt` - Manifest dependency PURLs match parser-only reference semantics
-- ✅ `test_golden_from_npmjs` - Registry metadata parity, including dist hashes and VCS revision handling
-- ✅ `test_golden_chartist` - Manifest dependencies remain unversioned and unpinned
-- ✅ `test_golden_dist` - Dependency ordering and scoped PURLs match expected output
-- ✅ `test_golden_electron` - Fixture-backed parser-only golden coverage restored
+This fixture set covers baseline `package.json` extraction, bundled dependencies, author-array forms, multiple declared-license representations, manifest dependency semantics, registry metadata, scoped dependency ordering, and parser-only Electron metadata behavior.
 
 ## Parser vs License Engine Responsibilities
 
@@ -46,20 +35,9 @@ These fields come from ScanCode's license detection engine:
 
 These fields are intentionally skipped by the parser-only comparison helper.
 
-## Test Suite Coverage
+## Fixture Coverage
 
-### Passing Tests (Parser-Level Validation)
-
-1. **basic** - Minimal package.json, validates core field extraction
-2. **bundledDeps** - Bundled dependencies handling
-3. **authors_list_strings** - Author array extraction and party information
-4. **authors_list_dicts** - Author object arrays and placeholder metadata normalization
-5. **double_license** - Multiple declared-license forms preserved without scanner output
-6. **express_jwt** - Alias and requirement parity for manifest dependencies
-7. **from_npmjs** - Registry tarball/VCS metadata and installed-manifest parity
-8. **chartist** - Scoped dependency ordering and unversioned dependency PURLs
-9. **dist** - Dist metadata, dependency order preservation, and scoped PURL encoding
-10. **electron** - Parser-only fixture coverage for Electron metadata
+The fixtures exercise parser-level validation for core package metadata, party extraction, declared-license preservation, manifest dependency requirements, registry tarball and VCS metadata, and ordering-sensitive npm output details.
 
 ## Ignore Policy
 
