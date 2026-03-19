@@ -8,6 +8,7 @@ Rust now goes beyond the current Python ScanCode Composer handling in several co
 2. assigns ordinary files under Composer package roots to the correct package, including nested Composer packages
 3. keeps lockfile extraction lightweight by emitting one synthetic lock package plus dependency objects, while avoiding unnecessary array cloning on large `composer.lock` files
 4. enriches manifest-level provenance and party typing beyond the earlier lock-only focus
+5. normalizes safe `composer.json` license values into declared license fields instead of preserving them only as raw text
 
 ## Python Status
 
@@ -17,6 +18,7 @@ Rust now goes beyond the current Python ScanCode Composer handling in several co
   - nested Composer package/file assignment gaps
   - missing support for alternate Composer file names
 - Python also maps manifest `source` and `dist` metadata but Rust previously left those fields empty for `composer.json`.
+- Python Composer handling also populates license fields from manifest values, while Rust previously kept Composer license metadata only in `extracted_license_statement`.
 
 ## Rust Improvements
 
@@ -53,6 +55,19 @@ Rust now goes beyond the current Python ScanCode Composer handling in several co
   - `download_url` from manifest `dist`
   - `Party.type = person` for authors and vendor parties
 
+### Safe Composer license normalization
+
+- Composer manifest parsing now normalizes safe `license` values into:
+  - `declared_license_expression`
+  - `declared_license_expression_spdx`
+  - a parser-level `license_detection` when the value is statically trustworthy
+- Safe normalization currently covers:
+  - exact SPDX license IDs
+  - SPDX-style license expressions in string form
+  - arrays of SPDX IDs, which Composer defines as disjunctive (`OR`) choices
+  - exact `proprietary` as a non-SPDX sentinel
+- Raw/custom values still remain in `extracted_license_statement` without forced normalization.
+
 ## Coverage
 
-Coverage spans alternate Composer filenames, nested file assignment, lockfile handling, and richer manifest provenance behavior.
+Coverage spans alternate Composer filenames, nested file assignment, lockfile handling, richer manifest provenance behavior, and safe license normalization for Composer manifests.
