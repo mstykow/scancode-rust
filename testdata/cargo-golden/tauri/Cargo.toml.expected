@@ -7,6 +7,11 @@
     "description": "Runtime for Tauri applications",
     "parties": [],
     "homepage_url": "https://crates.io/crates/tauri-runtime",
+    "file_references": [
+      {
+        "path": "README.md"
+      }
+    ],
     "dependencies": [
       {
         "purl": "pkg:cargo/http",

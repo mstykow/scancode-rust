@@ -21,6 +21,11 @@
     "homepage_url": "https://github.com/rust-lang/rustup.rs",
     "vcs_url": "https://github.com/rust-lang/rustup.rs",
     "extracted_license_statement": "MIT OR Apache-2.0",
+    "file_references": [
+      {
+        "path": "README.md"
+      }
+    ],
     "extra_data": {
       "rust_edition": "2018",
       "documentation_url": "http://rust-lang.github.io/rustup.rs/rustup/index.html",

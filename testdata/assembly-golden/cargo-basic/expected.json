@@ -17,6 +17,10 @@
       "datafile_path": "Cargo.lock",
       "datasource_id": "cargo_lock",
       "dependency_uid": "pkg:cargo/serde@1.0.195?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "extra_data": {
+        "checksum": "xyz123",
+        "source": "registry+https://github.com/rust-lang/crates.io-index"
+      },
       "extracted_requirement": "1.0.195",
       "for_package_uid": "pkg:cargo/test-crate@0.1.0?uuid=fixed-uid-done-for-testing-5642512d1758",
       "is_direct": true,
@@ -47,6 +51,10 @@
       "datafile_path": "Cargo.lock",
       "datasource_id": "cargo_lock",
       "dependency_uid": "pkg:cargo/tokio@1.35.1?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "extra_data": {
+        "checksum": "abc456",
+        "source": "registry+https://github.com/rust-lang/crates.io-index"
+      },
       "extracted_requirement": "1.35.1",
       "for_package_uid": "pkg:cargo/test-crate@0.1.0?uuid=fixed-uid-done-for-testing-5642512d1758",
       "is_direct": true,

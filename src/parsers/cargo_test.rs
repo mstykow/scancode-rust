@@ -334,6 +334,52 @@ publish = false
     }
 
     #[test]
+    fn test_extract_manifest_file_references() {
+        let content = r#"
+[package]
+name = "test-package"
+version = "0.1.0"
+license = "MIT"
+license-file = "LICENSE.txt"
+readme = "README.md"
+"#;
+
+        let (_temp_file, cargo_path) = create_temp_cargo_toml(content);
+        let package_data = CargoParser::extract_first_package(&cargo_path);
+
+        let file_reference_paths: Vec<_> = package_data
+            .file_references
+            .iter()
+            .map(|reference| reference.path.as_str())
+            .collect();
+
+        assert_eq!(file_reference_paths, vec!["LICENSE.txt", "README.md"]);
+    }
+
+    #[test]
+    fn test_extract_manifest_file_references_dedupes_same_path() {
+        let content = r#"
+[package]
+name = "test-package"
+version = "0.1.0"
+license = "MIT"
+license-file = "README.md"
+readme = "README.md"
+"#;
+
+        let (_temp_file, cargo_path) = create_temp_cargo_toml(content);
+        let package_data = CargoParser::extract_first_package(&cargo_path);
+
+        let file_reference_paths: Vec<_> = package_data
+            .file_references
+            .iter()
+            .map(|reference| reference.path.as_str())
+            .collect();
+
+        assert_eq!(file_reference_paths, vec!["README.md"]);
+    }
+
+    #[test]
     fn test_extract_build_dependencies() {
         let content = r#"
 [package]
