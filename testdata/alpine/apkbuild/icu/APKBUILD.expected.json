@@ -29,6 +29,35 @@
       }
     ],
     "extracted_license_statement": "MIT ICU Unicode-TOU",
+    "dependencies": [
+      {
+        "purl": "pkg:alpine/icu",
+        "extracted_requirement": "icu=67.1-r2",
+        "scope": "depends_dev",
+        "is_runtime": false,
+        "is_optional": true,
+        "is_pinned": true,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:alpine/diffutils",
+        "extracted_requirement": "diffutils",
+        "scope": "checkdepends",
+        "is_runtime": false,
+        "is_optional": true,
+        "is_pinned": false,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:alpine/python3",
+        "extracted_requirement": "python3",
+        "scope": "checkdepends",
+        "is_runtime": false,
+        "is_optional": true,
+        "is_pinned": false,
+        "is_direct": true
+      }
+    ],
     "extra_data": {
       "sources": [
         {
