@@ -7,7 +7,9 @@ mod tests {
     };
     use crate::models::PackageType;
     use std::collections::HashMap;
+    use std::fs;
     use std::path::PathBuf;
+    use tempfile::TempDir;
 
     // ==================== is_match() Tests ====================
 
@@ -238,6 +240,49 @@ package:
         assert_eq!(dep.is_optional, Some(true));
     }
 
+    #[test]
+    fn test_environment_top_level_dependencies_are_conda_unless_explicitly_pip() {
+        let temp_dir = TempDir::new().unwrap();
+        let env_path = temp_dir.path().join("environment.yml");
+        fs::write(
+            &env_path,
+            r#"
+name: test-env
+channels:
+  - conda-forge
+dependencies:
+  - conda-forge::numpy
+  - pandas>=2
+  - pip:
+      - ray
+"#,
+        )
+        .unwrap();
+
+        let package_data = CondaEnvironmentYmlParser::extract_first_package(&env_path);
+
+        let numpy = package_data
+            .dependencies
+            .iter()
+            .find(|dep| dep.purl.as_deref() == Some("pkg:conda/conda-forge/numpy"))
+            .expect("conda numpy dependency missing");
+        assert_eq!(numpy.scope.as_deref(), Some("dependencies"));
+
+        let pandas = package_data
+            .dependencies
+            .iter()
+            .find(|dep| dep.purl.as_deref() == Some("pkg:conda/pandas"))
+            .expect("conda pandas dependency missing");
+        assert_eq!(pandas.extracted_requirement.as_deref(), Some(">=2"));
+
+        let ray = package_data
+            .dependencies
+            .iter()
+            .find(|dep| dep.purl.as_deref() == Some("pkg:pypi/ray"))
+            .expect("pip ray dependency missing");
+        assert_eq!(ray.scope.as_deref(), Some("dependencies"));
+    }
+
     // ==================== extract_first_package() Tests ====================
 
     #[test]
@@ -426,7 +471,7 @@ package:
             .find(|d| d.purl.as_deref().is_some_and(|p| p.contains("numpy")));
         assert!(numpy.is_some());
         let numpy = numpy.unwrap();
-        assert_eq!(numpy.purl, Some("pkg:pypi/numpy".to_string()));
+        assert_eq!(numpy.purl, Some("pkg:conda/conda-forge/numpy".to_string()));
 
         // Check ray (pip dependency)
         let ray = deps
