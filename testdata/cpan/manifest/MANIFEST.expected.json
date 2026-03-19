@@ -1,0 +1,58 @@
+[
+  {
+    "type": "cpan",
+    "primary_language": "Perl",
+    "parties": [],
+    "file_references": [
+      {
+        "path": ".gitignore"
+      },
+      {
+        "path": "Changes"
+      },
+      {
+        "path": "MANIFEST"
+      },
+      {
+        "path": "README"
+      },
+      {
+        "path": "README.md"
+      },
+      {
+        "path": "lib/Example/Module.pm"
+      },
+      {
+        "path": "lib/Example/Module/Helper.pm"
+      },
+      {
+        "path": "t/00-load.t"
+      },
+      {
+        "path": "t/01-basic.t"
+      },
+      {
+        "path": "t/02-advanced.t"
+      },
+      {
+        "path": "t/manifest.t"
+      },
+      {
+        "path": "t/pod.t"
+      },
+      {
+        "path": "cpanfile"
+      },
+      {
+        "path": "Makefile.PL"
+      },
+      {
+        "path": "META.yml"
+      },
+      {
+        "path": "META.json"
+      }
+    ],
+    "datasource_id": "cpan_manifest"
+  }
+]

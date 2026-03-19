@@ -51,4 +51,18 @@ mod golden_tests {
             ),
         }
     }
+
+    #[test]
+    fn test_golden_alpine_apk_archive() {
+        let test_file = PathBuf::from("testdata/alpine/apk/basic/test-package-1.0-r0.apk");
+        let expected_file =
+            PathBuf::from("testdata/alpine/apk/basic/test-package-1.0-r0.apk.expected.json");
+
+        let package_data = AlpineApkParser::extract_first_package(&test_file);
+
+        match compare_package_data_parser_only(&package_data, &expected_file) {
+            Ok(_) => (),
+            Err(e) => panic!("Golden test failed for Alpine APK archive: {}", e),
+        }
+    }
 }

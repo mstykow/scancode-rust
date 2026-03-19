@@ -1,7 +1,10 @@
 #[cfg(test)]
 mod golden_tests {
     use crate::parsers::PackageParser;
-    use crate::parsers::ruby::{GemfileLockParser, GemfileParser, GemspecParser};
+    use crate::parsers::ruby::{
+        GemArchiveParser, GemMetadataExtractedParser, GemfileLockParser, GemfileParser,
+        GemspecParser,
+    };
     use crate::test_utils::compare_package_data_parser_only;
     use std::path::PathBuf;
 
@@ -110,6 +113,33 @@ mod golden_tests {
             PathBuf::from("testdata/ruby-golden/gemfile-source-options/Gemfile.expected");
 
         let package_data = GemfileParser::extract_first_package(&test_file);
+
+        match compare_package_data_parser_only(&package_data, &expected_file) {
+            Ok(_) => (),
+            Err(e) => panic!("Golden test failed: {}", e),
+        }
+    }
+
+    #[test]
+    fn test_golden_gem_archive() {
+        let test_file = PathBuf::from("testdata/ruby/example-gem-1.2.3.gem");
+        let expected_file = PathBuf::from("testdata/ruby/example-gem-1.2.3.gem.expected.json");
+
+        let package_data = GemArchiveParser::extract_first_package(&test_file);
+
+        match compare_package_data_parser_only(&package_data, &expected_file) {
+            Ok(_) => (),
+            Err(e) => panic!("Golden test failed: {}", e),
+        }
+    }
+
+    #[test]
+    fn test_golden_gem_metadata_extracted() {
+        let test_file = PathBuf::from("testdata/gem/extracted/metadata.gz-extract");
+        let expected_file =
+            PathBuf::from("testdata/gem/extracted/metadata.gz-extract.expected.json");
+
+        let package_data = GemMetadataExtractedParser::extract_first_package(&test_file);
 
         match compare_package_data_parser_only(&package_data, &expected_file) {
             Ok(_) => (),

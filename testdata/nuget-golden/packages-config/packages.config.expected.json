@@ -1,0 +1,27 @@
+[
+  {
+    "type": "nuget",
+    "parties": [],
+    "dependencies": [
+      {
+        "purl": "pkg:nuget/Newtonsoft.Json",
+        "extracted_requirement": "13.0.1",
+        "scope": "net472",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:nuget/NUnit",
+        "extracted_requirement": "3.13.2",
+        "scope": "net472",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": true
+      }
+    ],
+    "datasource_id": "nuget_packages_config"
+  }
+]

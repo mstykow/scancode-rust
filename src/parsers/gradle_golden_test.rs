@@ -2,6 +2,7 @@
 mod golden_tests {
     use crate::parsers::PackageParser;
     use crate::parsers::gradle::GradleParser;
+    use crate::parsers::gradle_lock::GradleLockfileParser;
     use crate::test_utils::compare_package_data_parser_only;
     use std::path::PathBuf;
 
@@ -10,6 +11,14 @@ mod golden_tests {
         match compare_package_data_parser_only(&package_data, &PathBuf::from(expected_file)) {
             Ok(_) => (),
             Err(e) => panic!("Golden test failed: {}", e),
+        }
+    }
+
+    fn run_lock_golden(test_file: &str, expected_file: &str) {
+        let package_data = GradleLockfileParser::extract_first_package(&PathBuf::from(test_file));
+        match compare_package_data_parser_only(&package_data, &PathBuf::from(expected_file)) {
+            Ok(_) => (),
+            Err(e) => panic!("Golden lockfile test failed: {}", e),
         }
     }
 
@@ -190,6 +199,14 @@ mod golden_tests {
         run_golden(
             "testdata/gradle-golden/end2end/build.gradle",
             "testdata/gradle-golden/end2end/build.gradle-package-only-expected.json",
+        );
+    }
+
+    #[test]
+    fn test_golden_gradle_lockfile() {
+        run_lock_golden(
+            "testdata/gradle-lock/basic/gradle.lockfile",
+            "testdata/gradle-lock/basic/gradle.lockfile.expected.json",
         );
     }
 }

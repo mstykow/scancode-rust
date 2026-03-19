@@ -1,0 +1,16 @@
+[
+  {
+    "type": "rpm",
+    "namespace": "mariner",
+    "name": "bash",
+    "version": "5.0.17",
+    "qualifiers": {
+      "arch": "x86_64"
+    },
+    "parties": [],
+    "extra_data": {
+      "filename": "bash-5.0.17-1.cm2.x86_64.rpm"
+    },
+    "datasource_id": "rpm_mariner_manifest"
+  }
+]

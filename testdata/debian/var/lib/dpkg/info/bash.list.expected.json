@@ -1,0 +1,129 @@
+[
+  {
+    "type": "deb",
+    "namespace": "debian",
+    "name": "bash",
+    "parties": [],
+    "file_references": [
+      {
+        "path": "/bin/bash"
+      },
+      {
+        "path": "/etc/bash.bashrc"
+      },
+      {
+        "path": "/etc/skel"
+      },
+      {
+        "path": "/etc/skel/.bash_logout"
+      },
+      {
+        "path": "/etc/skel/.bashrc"
+      },
+      {
+        "path": "/etc/skel/.profile"
+      },
+      {
+        "path": "/usr/bin"
+      },
+      {
+        "path": "/usr/bin/bashbug"
+      },
+      {
+        "path": "/usr/bin/clear_console"
+      },
+      {
+        "path": "/usr/share"
+      },
+      {
+        "path": "/usr/share/doc"
+      },
+      {
+        "path": "/usr/share/doc/bash"
+      },
+      {
+        "path": "/usr/share/doc/bash/COMPAT.gz"
+      },
+      {
+        "path": "/usr/share/doc/bash/INTRO.gz"
+      },
+      {
+        "path": "/usr/share/doc/bash/NEWS.gz"
+      },
+      {
+        "path": "/usr/share/doc/bash/POSIX.gz"
+      },
+      {
+        "path": "/usr/share/doc/bash/RBASH"
+      },
+      {
+        "path": "/usr/share/doc/bash/README.Debian.gz"
+      },
+      {
+        "path": "/usr/share/doc/bash/README.abs-guide"
+      },
+      {
+        "path": "/usr/share/doc/bash/README.commands.gz"
+      },
+      {
+        "path": "/usr/share/doc/bash/README.gz"
+      },
+      {
+        "path": "/usr/share/doc/bash/changelog.Debian.gz"
+      },
+      {
+        "path": "/usr/share/doc/bash/copyright"
+      },
+      {
+        "path": "/usr/share/doc/bash/inputrc.arrows"
+      },
+      {
+        "path": "/usr/share/info"
+      },
+      {
+        "path": "/usr/share/lintian"
+      },
+      {
+        "path": "/usr/share/lintian/overrides"
+      },
+      {
+        "path": "/usr/share/lintian/overrides/bash"
+      },
+      {
+        "path": "/usr/share/man"
+      },
+      {
+        "path": "/usr/share/man/man1"
+      },
+      {
+        "path": "/usr/share/man/man1/bash.1.gz"
+      },
+      {
+        "path": "/usr/share/man/man1/bashbug.1.gz"
+      },
+      {
+        "path": "/usr/share/man/man1/clear_console.1.gz"
+      },
+      {
+        "path": "/usr/share/man/man1/rbash.1.gz"
+      },
+      {
+        "path": "/usr/share/man/man7"
+      },
+      {
+        "path": "/usr/share/man/man7/bash-builtins.7.gz"
+      },
+      {
+        "path": "/usr/share/menu"
+      },
+      {
+        "path": "/usr/share/menu/bash"
+      },
+      {
+        "path": "/bin/rbash"
+      }
+    ],
+    "datasource_id": "debian_installed_files_list",
+    "purl": "pkg:deb/debian/bash"
+  }
+]

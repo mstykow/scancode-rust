@@ -1,0 +1,8 @@
+[
+  {
+    "type": "bazel",
+    "name": "hello-greet",
+    "parties": [],
+    "datasource_id": "bazel_build"
+  }
+]

@@ -1,0 +1,52 @@
+[
+  {
+    "type": "rpm",
+    "namespace": "fedora",
+    "name": "libgcc",
+    "version": "13.1.1-2.fc38",
+    "qualifiers": {
+      "arch": "x86_64"
+    },
+    "parties": [],
+    "size": 235748,
+    "extracted_license_statement": "GPLv3+ and GPLv3+ with exceptions and GPLv2+ with exceptions and LGPLv2+ and BSD",
+    "source_packages": ["gcc-13.1.1-2.fc38.src.rpm"],
+    "file_references": [
+      {
+        "path": "/lib64/libgcc_s-13-20230511.so.1"
+      },
+      {
+        "path": "/lib64/libgcc_s.so.1"
+      },
+      {
+        "path": "/usr/lib/.build-id"
+      },
+      {
+        "path": "/usr/lib/.build-id/d8"
+      },
+      {
+        "path": "/usr/lib/.build-id/d8/b84f24cd65c389cb4c8346e2118daef1dccfee"
+      },
+      {
+        "path": "/usr/share/licenses/libgcc"
+      },
+      {
+        "path": "/usr/share/licenses/libgcc/COPYING"
+      },
+      {
+        "path": "/usr/share/licenses/libgcc/COPYING.LIB"
+      },
+      {
+        "path": "/usr/share/licenses/libgcc/COPYING.RUNTIME"
+      },
+      {
+        "path": "/usr/share/licenses/libgcc/COPYING3"
+      },
+      {
+        "path": "/usr/share/licenses/libgcc/COPYING3.LIB"
+      }
+    ],
+    "datasource_id": "rpm_installed_database_sqlite",
+    "purl": "pkg:rpm/fedora/libgcc@13.1.1-2.fc38?arch=x86_64"
+  }
+]

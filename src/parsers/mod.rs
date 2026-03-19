@@ -12,9 +12,13 @@ mod arch_golden_test;
 #[cfg(test)]
 mod arch_test;
 mod autotools;
+#[cfg(all(test, feature = "golden-tests"))]
+mod autotools_golden_test;
 #[cfg(test)]
 mod autotools_test;
 mod bazel;
+#[cfg(all(test, feature = "golden-tests"))]
+mod bazel_golden_test;
 #[cfg(all(test, feature = "golden-tests"))]
 mod bazel_module_golden_test;
 #[cfg(test)]
@@ -22,9 +26,13 @@ mod bazel_module_test;
 #[cfg(test)]
 mod bazel_test;
 mod bower;
+#[cfg(all(test, feature = "golden-tests"))]
+mod bower_golden_test;
 #[cfg(test)]
 mod bower_test;
 mod buck;
+#[cfg(all(test, feature = "golden-tests"))]
+mod buck_golden_test;
 #[cfg(test)]
 mod buck_test;
 mod bun_lock;
@@ -46,6 +54,8 @@ mod cargo_lock_test;
 #[cfg(test)]
 mod cargo_test;
 mod chef;
+#[cfg(all(test, feature = "golden-tests"))]
+mod chef_golden_test;
 #[cfg(test)]
 mod chef_test;
 mod clojure;
@@ -80,6 +90,8 @@ mod cpan;
 mod cpan_dist_ini;
 #[cfg(test)]
 mod cpan_dist_ini_test;
+#[cfg(all(test, feature = "golden-tests"))]
+mod cpan_golden_test;
 mod cpan_makefile_pl;
 #[cfg(test)]
 mod cpan_makefile_pl_test;
@@ -114,9 +126,13 @@ mod docker_golden_test;
 #[cfg(test)]
 mod docker_test;
 mod freebsd;
+#[cfg(all(test, feature = "golden-tests"))]
+mod freebsd_golden_test;
 #[cfg(test)]
 mod freebsd_test;
 mod gitmodules;
+#[cfg(all(test, feature = "golden-tests"))]
+mod gitmodules_golden_test;
 mod go;
 #[cfg(all(test, feature = "golden-tests"))]
 mod go_golden_test;
@@ -168,6 +184,8 @@ mod meson_golden_test;
 mod meson_test;
 pub mod metadata;
 mod microsoft_update_manifest;
+#[cfg(all(test, feature = "golden-tests"))]
+mod microsoft_update_manifest_golden_test;
 #[cfg(test)]
 mod microsoft_update_manifest_test;
 mod misc;
@@ -193,12 +211,16 @@ mod opam;
 #[cfg(all(test, feature = "golden-tests"))]
 mod opam_golden_test;
 mod os_release;
+#[cfg(all(test, feature = "golden-tests"))]
+mod os_release_golden_test;
 #[cfg(test)]
 mod os_release_test;
 #[cfg(test)]
 mod osgi_test;
 mod pep508;
 mod pip_inspect_deplock;
+#[cfg(all(test, feature = "golden-tests"))]
+mod pip_inspect_deplock_golden_test;
 #[cfg(test)]
 mod pip_inspect_deplock_test;
 mod pipfile_lock;
@@ -212,6 +234,8 @@ mod pixi_golden_test;
 #[cfg(test)]
 mod pixi_test;
 mod pnpm_lock;
+#[cfg(all(test, feature = "golden-tests"))]
+mod pnpm_lock_golden_test;
 #[cfg(test)]
 mod pnpm_lock_test;
 mod podfile;

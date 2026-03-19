@@ -1,0 +1,46 @@
+[
+  {
+    "type": "cpan",
+    "namespace": "cpan",
+    "name": "Dancer2::Plugin::Minion",
+    "version": "1.0.0",
+    "primary_language": "Perl",
+    "description": "Dancer2 plugin for Minion job queue",
+    "parties": [
+      {
+        "role": "author",
+        "name": "Jason A. Crome",
+        "email": "jason@example.com"
+      }
+    ],
+    "declared_license_expression": "Perl_5",
+    "extra_data": {
+      "copyright_holder": "Jason A. Crome",
+      "copyright_year": "2024"
+    },
+    "dependencies": [
+      {
+        "purl": "pkg:cpan/Moose",
+        "extracted_requirement": "0.92",
+        "scope": "runtime",
+        "is_runtime": true,
+        "is_optional": false
+      },
+      {
+        "purl": "pkg:cpan/namespace::autoclean",
+        "extracted_requirement": "0.09",
+        "scope": "runtime",
+        "is_runtime": true,
+        "is_optional": false
+      },
+      {
+        "purl": "pkg:cpan/Test::More",
+        "extracted_requirement": "0.88",
+        "scope": "test",
+        "is_runtime": false,
+        "is_optional": false
+      }
+    ],
+    "datasource_id": "cpan_dist_ini"
+  }
+]

@@ -1,0 +1,11 @@
+[
+  {
+    "type": "npm",
+    "parties": [],
+    "extra_data": {
+      "workspaces": ["packages/*"],
+      "datasource_id": "pnpm_workspace_yaml"
+    },
+    "datasource_id": "pnpm_workspace_yaml"
+  }
+]
