@@ -505,7 +505,9 @@ mod tests {
 
     #[test]
     fn test_extract_text_for_detection_skips_jar_archives() {
-        let path = Path::new("testdata/license-golden/datadriven/lic1/do-not_detect-licenses-in-archive.jar");
+        let path = Path::new(
+            "testdata/license-golden/datadriven/lic1/do-not_detect-licenses-in-archive.jar",
+        );
         let bytes = std::fs::read(path).expect("failed to read jar fixture");
 
         let (text, kind) = extract_text_for_detection(path, &bytes);
@@ -513,5 +515,4 @@ mod tests {
         assert!(text.is_empty());
         assert_eq!(kind, ExtractedTextKind::None);
     }
-
 }

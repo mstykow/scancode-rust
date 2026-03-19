@@ -144,11 +144,7 @@ fn build_submodule(_name: String, section: HashMap<String, String>) -> Option<Su
 
     let purl = build_purl_from_url(&url);
 
-    Some(Submodule {
-        path,
-        url,
-        purl,
-    })
+    Some(Submodule { path, url, purl })
 }
 
 fn build_purl_from_url(url: &str) -> Option<String> {
