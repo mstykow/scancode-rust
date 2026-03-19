@@ -29,6 +29,17 @@
       }
     ],
     "extracted_license_statement": "custom:multiple",
+    "dependencies": [
+      {
+        "purl": "pkg:alpine/libarchive-tools",
+        "extracted_requirement": "libarchive-tools",
+        "scope": "makedepends",
+        "is_runtime": false,
+        "is_optional": true,
+        "is_pinned": false,
+        "is_direct": true
+      }
+    ],
     "extra_data": {
       "checksums": [
         {
