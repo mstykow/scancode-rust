@@ -47,6 +47,39 @@
         "is_direct": true,
         "resolved_package": {},
         "extra_data": {}
+      },
+      {
+        "purl": "pkg:maven/commons-collections/commons-collections@3.2.2",
+        "extracted_requirement": "3.2.2",
+        "scope": "implementation",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": true,
+        "resolved_package": {},
+        "extra_data": {}
+      },
+      {
+        "purl": "pkg:maven/org.scalatest/scalatest_2.11@3.0.0",
+        "extracted_requirement": "3.0.0",
+        "scope": "testImplementation",
+        "is_runtime": false,
+        "is_optional": true,
+        "is_pinned": true,
+        "is_direct": true,
+        "resolved_package": {},
+        "extra_data": {}
+      },
+      {
+        "purl": "pkg:maven/junit/junit@4.13",
+        "extracted_requirement": "4.13",
+        "scope": "testImplementation",
+        "is_runtime": false,
+        "is_optional": true,
+        "is_pinned": true,
+        "is_direct": true,
+        "resolved_package": {},
+        "extra_data": {}
       }
     ],
     "repository_homepage_url": null,
