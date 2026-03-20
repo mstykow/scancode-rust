@@ -672,6 +672,4 @@ The assembler:
 - **Output format**: ScanCode Toolkit-compatible JSON with `OUTPUT_FORMAT_VERSION`
 - **License detection**: Uses SPDX license data, threshold of 0.9 confidence
 - **Exclusion patterns**: Supports glob patterns (e.g., `*.git*`, `node_modules/*`)
-- **Git submodules**: Two submodules:
-  - `reference/scancode-toolkit/` - Full Python codebase for reference
-  - `resources/scancode-licenses/` - Sparse checkout of license rules/licenses only
+- **Git submodules**: `reference/scancode-toolkit/` - Full Python codebase for reference (includes license rules/licenses)

@@ -104,6 +104,39 @@ Useful examples:
 ./scripts/update_copyright_golden.sh copyrights --filter essential_smoke --write
 ```
 
+### License Golden YAML Fixtures
+
+`update_license_golden.sh` syncs license golden YAML fixtures from the Python reference by invoking the `update-license-golden` binary from the unpublished `xtask/` helper crate.
+
+**Why this exists**: it keeps license detection golden YAMLs in sync with the Python reference when the reference submodule is updated.
+
+Show CLI help:
+
+```bash
+cargo run --manifest-path xtask/Cargo.toml --bin update-license-golden -- --help
+./scripts/update_license_golden.sh --help
+```
+
+CLI arguments:
+
+- `--list-diffs`: print files where our expected values differ from Python reference
+- `--show-diff`: print detailed diff for differing files
+- `--filter PATTERN`: limit processing to paths containing `PATTERN`
+- `--suite SUITE`: process only one suite (lic1, lic2, lic3, lic4, external, unknown)
+- `--write`: apply file updates (without it, command is dry-run)
+
+```bash
+./scripts/update_license_golden.sh [--list-diffs] [--show-diff] [--filter PATTERN] [--suite SUITE] [--write]
+```
+
+Useful examples:
+
+```bash
+./scripts/update_license_golden.sh --list-diffs
+./scripts/update_license_golden.sh --suite lic1 --list-diffs --show-diff
+./scripts/update_license_golden.sh --filter bsd --write
+```
+
 ## URL Validation Tool
 
 ### Purpose
@@ -121,7 +154,6 @@ Useful examples:
 **Excluded** (not our responsibility):
 
 - `reference/` - Python ScanCode Toolkit submodule (upstream)
-- `resources/scancode-licenses/` - License rules/licenses submodule (upstream)
 - `testdata/` - Test fixtures and sample data
 - `target/` - Build artifacts
 - `.sisyphus/` - Session data

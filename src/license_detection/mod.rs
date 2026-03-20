@@ -41,22 +41,22 @@ use crate::utils::text::strip_utf8_bom_str;
 use crate::license_detection::detection::populate_detection_from_group_with_spdx;
 use crate::license_detection::models::MatcherKind;
 
-/// Path to the license rules directory in the scancode-licenses submodule.
+/// Path to the license rules directory in the reference scancode-toolkit submodule.
 /// Used by test code and the xtask generate-license-loader-artifact binary.
 #[allow(dead_code)]
 pub const SCANCODE_LICENSES_RULES_PATH: &str =
-    "resources/scancode-licenses/src/licensedcode/data/rules";
+    "reference/scancode-toolkit/src/licensedcode/data/rules";
 
-/// Path to the licenses directory in the scancode-licenses submodule.
+/// Path to the licenses directory in the reference scancode-toolkit submodule.
 /// Used by test code and the xtask generate-license-loader-artifact binary.
 #[allow(dead_code)]
 pub const SCANCODE_LICENSES_LICENSES_PATH: &str =
-    "resources/scancode-licenses/src/licensedcode/data/licenses";
+    "reference/scancode-toolkit/src/licensedcode/data/licenses";
 
-/// Path to the license data directory in the scancode-licenses submodule.
+/// Path to the license data directory in the reference scancode-toolkit submodule.
 /// Used by test code and the xtask generate-license-loader-artifact binary.
 #[allow(dead_code)]
-pub const SCANCODE_LICENSES_DATA_PATH: &str = "resources/scancode-licenses/src/licensedcode/data";
+pub const SCANCODE_LICENSES_DATA_PATH: &str = "reference/scancode-toolkit/src/licensedcode/data";
 
 pub use detection::{
     LicenseDetection, create_detection_from_group, group_matches_by_region,

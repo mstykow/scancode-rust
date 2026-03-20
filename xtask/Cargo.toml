@@ -42,3 +42,7 @@ path = "src/bin/generate_supported_formats.rs"
 [[bin]]
 name = "generate-license-loader-artifact"
 path = "src/bin/generate_license_loader_artifact.rs"
+
+[[bin]]
+name = "update-license-golden"
+path = "src/bin/update_license_golden.rs"
