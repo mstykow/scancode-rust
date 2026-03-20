@@ -217,7 +217,26 @@ packages:
         let package_data = PubspecYamlParser::extract_first_package(&pubspec_path);
 
         assert_eq!(package_data.package_type, Some(PackageType::Dart));
+        assert_eq!(
+            package_data.datasource_id,
+            Some(crate::models::DatasourceId::PubspecYaml)
+        );
         assert!(package_data.name.is_none());
+        assert!(package_data.dependencies.is_empty());
+    }
+
+    #[test]
+    fn test_pubspec_lock_error_keeps_lock_identity() {
+        let content = "[invalid_yaml";
+
+        let (_temp_dir, lock_path) = create_temp_file("pubspec.lock", content);
+        let package_data = PubspecLockParser::extract_first_package(&lock_path);
+
+        assert_eq!(package_data.package_type, Some(PackageType::Pubspec));
+        assert_eq!(
+            package_data.datasource_id,
+            Some(crate::models::DatasourceId::PubspecLock)
+        );
         assert!(package_data.dependencies.is_empty());
     }
 
@@ -365,6 +384,216 @@ executables:
         assert_eq!(
             executables.get("tool").and_then(|v| v.as_str()),
             Some("bin/tool")
+        );
+    }
+
+    #[test]
+    fn test_publish_to_none_marks_package_private_and_surfaces_metadata_fields() {
+        let content = r#"
+name: example
+version: 1.0.0
+publish_to: none
+platforms:
+  android:
+  ios:
+funding:
+  - https://example.com/sponsor
+topics:
+  - widgets
+  - ui
+screenshots:
+  - description: home screen
+    path: screenshots/home.png
+false_secrets:
+  - test/fixtures/**
+ignored_advisories:
+  - GHSA-1234-5678-90ab
+archive_url: https://mirror.example.com/example-1.0.0.tar.gz
+"#;
+
+        let (_temp_dir, pubspec_path) = create_temp_file("pubspec.yaml", content);
+        let package_data = PubspecYamlParser::extract_first_package(&pubspec_path);
+
+        assert!(package_data.is_private);
+        assert_eq!(
+            package_data.download_url.as_deref(),
+            Some("https://mirror.example.com/example-1.0.0.tar.gz")
+        );
+        assert_eq!(package_data.keywords, vec!["widgets", "ui"]);
+
+        let extra_data = package_data
+            .extra_data
+            .as_ref()
+            .expect("extra_data should exist");
+        assert!(extra_data.contains_key("platforms"));
+        assert!(extra_data.contains_key("funding"));
+        assert!(extra_data.contains_key("topics"));
+        assert!(extra_data.contains_key("screenshots"));
+        assert!(extra_data.contains_key("false_secrets"));
+        assert!(extra_data.contains_key("ignored_advisories"));
+    }
+
+    #[test]
+    fn test_manifest_dependency_descriptors_are_preserved() {
+        let content = r#"
+name: example
+dependencies:
+  my_hosted:
+    hosted:
+      name: actual_pkg
+      url: https://pub.example.com
+    version: ^1.2.0
+  my_git:
+    git:
+      url: https://github.com/example/repo.git
+      ref: main
+      path: pkgs/example
+  flutter:
+    sdk: flutter
+"#;
+
+        let (_temp_dir, pubspec_path) = create_temp_file("pubspec.yaml", content);
+        let package_data = PubspecYamlParser::extract_first_package(&pubspec_path);
+
+        let hosted = find_dependency(&package_data.dependencies, "my_hosted")
+            .expect("hosted dependency should exist");
+        assert_eq!(
+            hosted.extracted_requirement.as_deref(),
+            Some("hosted: name: actual_pkg, url: https://pub.example.com, version: ^1.2.0")
+        );
+        assert!(
+            hosted
+                .extra_data
+                .as_ref()
+                .and_then(|extra| extra.get("hosted"))
+                .is_some()
+        );
+
+        let git = find_dependency(&package_data.dependencies, "my_git")
+            .expect("git dependency should exist");
+        assert!(
+            git.extra_data
+                .as_ref()
+                .and_then(|extra| extra.get("git"))
+                .is_some()
+        );
+
+        let flutter = find_dependency(&package_data.dependencies, "flutter")
+            .expect("sdk dependency should exist");
+        assert!(
+            flutter
+                .extra_data
+                .as_ref()
+                .and_then(|extra| extra.get("sdk"))
+                .is_some()
+        );
+    }
+
+    #[test]
+    fn test_pubspec_lock_classifies_direct_dev_and_dev_only_transitives() {
+        let content = r#"
+sdks:
+  dart: ">=3.0.0 <4.0.0"
+packages:
+  build_runner:
+    dependency: "direct dev"
+    description:
+      name: build_runner
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.4.0"
+    dependencies:
+      watcher: "1.0.0"
+  http:
+    dependency: "direct main"
+    description:
+      name: http
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.1.0"
+    dependencies:
+      async: "2.11.0"
+  watcher:
+    dependency: transitive
+    description:
+      name: watcher
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.0.0"
+  async:
+    dependency: transitive
+    description:
+      name: async
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.11.0"
+"#;
+
+        let (_temp_dir, lock_path) = create_temp_file("pubspec.lock", content);
+        let package_data = PubspecLockParser::extract_first_package(&lock_path);
+
+        let build_runner = find_dependency(&package_data.dependencies, "build_runner")
+            .expect("direct dev dep missing");
+        assert_eq!(build_runner.is_direct, Some(true));
+        assert_eq!(build_runner.is_runtime, Some(false));
+        assert_eq!(build_runner.is_optional, Some(true));
+
+        let watcher = find_dependency(&package_data.dependencies, "watcher")
+            .expect("dev-only transitive dep missing");
+        assert_eq!(watcher.is_direct, Some(false));
+        assert_eq!(watcher.is_runtime, Some(false));
+        assert_eq!(watcher.is_optional, Some(true));
+
+        let async_dep = find_dependency(&package_data.dependencies, "async")
+            .expect("runtime transitive dep missing");
+        assert_eq!(async_dep.is_direct, Some(false));
+        assert_eq!(async_dep.is_runtime, Some(true));
+        assert_eq!(async_dep.is_optional, Some(false));
+    }
+
+    #[test]
+    fn test_pubspec_lock_preserves_path_source_and_legacy_sdk() {
+        let content = r#"
+sdk: ">=2.12.0 <3.0.0"
+packages:
+  pub_dartdoc_data:
+    dependency: "direct main"
+    description:
+      path: "../pub_dartdoc_data"
+      relative: true
+    source: path
+    version: "0.0.0"
+"#;
+
+        let (_temp_dir, lock_path) = create_temp_file("pubspec.lock", content);
+        let package_data = PubspecLockParser::extract_first_package(&lock_path);
+
+        let sdk_dep =
+            find_dependency(&package_data.dependencies, "dart").expect("legacy sdk dep missing");
+        assert_eq!(sdk_dep.scope.as_deref(), Some("sdk"));
+        assert_eq!(
+            sdk_dep.extracted_requirement.as_deref(),
+            Some(">=2.12.0 <3.0.0")
+        );
+
+        let path_dep = find_dependency(&package_data.dependencies, "pub_dartdoc_data")
+            .expect("path dependency missing");
+        let extra = path_dep
+            .extra_data
+            .as_ref()
+            .expect("path extra_data should exist");
+        assert_eq!(extra.get("source").and_then(|v| v.as_str()), Some("path"));
+        assert!(extra.get("description").is_some());
+        let resolved = path_dep
+            .resolved_package
+            .as_ref()
+            .expect("resolved package missing");
+        assert!(
+            resolved
+                .extra_data
+                .as_ref()
+                .and_then(|v| v.get("description"))
+                .is_some()
         );
     }
 
