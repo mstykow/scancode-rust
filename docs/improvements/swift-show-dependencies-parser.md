@@ -54,7 +54,7 @@ Extracts complete dependency graph with full metadata:
    - `is_direct` - `true` for direct deps, `false` for transitive
    - `is_pinned` - `true` if version is not "unspecified"
    - `scope` - Always "dependencies"
-   - `is_runtime` - Set to `false` for these dependency edges in the current Swift scan contract
+   - `is_runtime` - Left unset when `swift-show-dependencies` cannot prove test-only vs non-test usage
 
 ### Implementation Approach
 
@@ -173,7 +173,7 @@ The parser uses breadth-first traversal to flatten the nested dependency tree:
 2. **Direct vs Transitive**: `is_direct` flag distinguishes dependency levels
 3. **GitHub-Aware PURLs**: Proper package URLs with GitHub namespace
 4. **Package Metadata**: Root package version and URL
-5. **Pinned Detection**: Identifies locked vs floating versions
+5. **Pinned Detection**: Identifies locked vs floating versions without over-asserting runtime intent
 
 ## Value
 
