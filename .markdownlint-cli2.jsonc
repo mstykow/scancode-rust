@@ -33,8 +33,7 @@
     "testdata/**",
     "target/**",
     ".sisyphus/**",
-    "resources/licenses/**",
     "docs/archived/**",
-    "docs/license-detection"
-  ]
+    "docs/license-detection",
+  ],
 }

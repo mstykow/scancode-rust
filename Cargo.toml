@@ -13,7 +13,6 @@ authors = ["Maxim Stykow", "Adrian Braemer"]
 # Include only files needed to build from source
 include = [
     "src/**/*",
-    "/resources/licenses/json/details/**/*.json",
     "/resources/license_detection/license_index_loader.msgpack.zst",
     "/Cargo.toml",
     "/Cargo.lock",

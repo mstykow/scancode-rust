@@ -121,7 +121,6 @@ Useful examples:
 **Excluded** (not our responsibility):
 
 - `reference/` - Python ScanCode Toolkit submodule (upstream)
-- `resources/licenses/` - SPDX license data submodule (upstream)
 - `testdata/` - Test fixtures and sample data
 - `target/` - Build artifacts
 - `.sisyphus/` - Session data

@@ -7,7 +7,6 @@ node_modules/
 
 # Submodules (external code, do not format)
 reference/
-resources/licenses/
 testdata/
 
 # Generated files (if any)
