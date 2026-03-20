@@ -47,6 +47,12 @@ fn main() -> std::io::Result<()> {
 
 fn run() -> Result<()> {
     let cli = Cli::parse();
+
+    if cli.show_attribution {
+        print!("{}", include_str!("../NOTICE"));
+        return Ok(());
+    }
+
     let start_time = Utc::now();
     let progress = Arc::new(ScanProgress::new(progress_mode_from_cli(&cli)));
     progress.set_processes(resolve_thread_count(cli.processes));
@@ -294,6 +300,10 @@ fn validate_scan_option_compatibility(cli: &Cli) -> Result<()> {
         return Err(anyhow!(
             "When using --from-json, file scan options like --copyright/--email/--url are not allowed"
         ));
+    }
+
+    if !cli.from_json && cli.dir_path.is_empty() {
+        return Err(anyhow!("Directory path is required for scan operations"));
     }
 
     if !cli.from_json && cli.dir_path.len() != 1 {

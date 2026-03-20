@@ -9,7 +9,7 @@ use crate::output::OutputFormat;
     long_version = concat!(
         env!("CARGO_PKG_VERSION"),
         "\n",
-        "License detection uses data from ScanCode Toolkit (CC-BY-4.0). See NOTICE."
+        "License detection uses data from ScanCode Toolkit (CC-BY-4.0). See NOTICE or --show_attribution."
     ),
     about,
     long_about = None,
@@ -28,13 +28,14 @@ use crate::output::OutputFormat;
                 "output_spdx_rdf",
                 "output_cyclonedx",
                 "output_cyclonedx_xml",
-                "custom_output"
+                "custom_output",
+                "show_attribution"
             ])
     )
 )]
 pub struct Cli {
     /// Directory path to scan
-    #[arg(required = true)]
+    #[arg(required = false)]
     pub dir_path: Vec<String>,
 
     /// Write scan output as compact JSON to FILE
@@ -188,6 +189,10 @@ pub struct Cli {
     /// Report only up to INT URLs found in a file. Use 0 for no limit.
     #[arg(long, default_value_t = 50, requires = "url")]
     pub max_url: usize,
+
+    /// Show attribution notices for embedded license detection data
+    #[arg(long)]
+    pub show_attribution: bool,
 }
 
 fn default_processes() -> i32 {
