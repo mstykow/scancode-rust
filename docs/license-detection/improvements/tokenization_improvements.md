@@ -198,15 +198,15 @@ pub fn tokenize_with_positions(text: &str) -> Vec<Token> {
 
 ## Summary
 
-| Enhancement | Priority | Complexity | Impact | Status |
-|------------|----------|------------|--------|--------|
-| Unicode normalization | Low | Low | Potential | Deferred |
-| Whitespace collapsing | Low | Very Low | Minimal | Not Needed |
-| Compile-time regex | Low | Low | Minimal | Deferred |
-| Bloom filter stopwords | Very Low | Medium | Negative | Not Recommended |
-| Unicode character set | Medium | Low | High | To Investigate |
-| Memory optimization | Very Low | Medium | Moderate | Not Needed |
-| Position tracking | Medium | Low | High | Phase 3/4 |
+| Enhancement            | Priority | Complexity | Impact    | Status          |
+| ---------------------- | -------- | ---------- | --------- | --------------- |
+| Unicode normalization  | Low      | Low        | Potential | Deferred        |
+| Whitespace collapsing  | Low      | Very Low   | Minimal   | Not Needed      |
+| Compile-time regex     | Low      | Low        | Minimal   | Deferred        |
+| Bloom filter stopwords | Very Low | Medium     | Negative  | Not Recommended |
+| Unicode character set  | Medium   | Low        | High      | To Investigate  |
+| Memory optimization    | Very Low | Medium     | Moderate  | Not Needed      |
+| Position tracking      | Medium   | Low        | High      | Phase 3/4       |
 
 ## Recommendation
 
