@@ -1,41 +1,8 @@
 [
   {
     "type": "pubspec",
-    "namespace": null,
-    "name": null,
-    "version": null,
-    "qualifiers": {},
-    "subpath": null,
     "primary_language": "dart",
-    "description": null,
-    "release_date": null,
     "parties": [],
-    "keywords": [],
-    "homepage_url": null,
-    "download_url": null,
-    "size": null,
-    "sha1": null,
-    "md5": null,
-    "sha256": null,
-    "sha512": null,
-    "bug_tracking_url": null,
-    "code_view_url": null,
-    "vcs_url": null,
-    "copyright": null,
-    "holder": null,
-    "declared_license_expression": null,
-    "declared_license_expression_spdx": null,
-    "license_detections": [],
-    "other_license_expression": null,
-    "other_license_expression_spdx": null,
-    "other_license_detections": [],
-    "extracted_license_statement": null,
-    "notice_text": null,
-    "source_packages": [],
-    "file_references": [],
-    "is_private": false,
-    "is_virtual": false,
-    "extra_data": {},
     "dependencies": [
       {
         "purl": "pkg:pubspec/dart",
@@ -44,9 +11,7 @@
         "is_runtime": true,
         "is_optional": false,
         "is_pinned": false,
-        "is_direct": true,
-        "resolved_package": {},
-        "extra_data": {}
+        "is_direct": true
       },
       {
         "purl": "pkg:pubspec/flutter",
@@ -55,9 +20,7 @@
         "is_runtime": true,
         "is_optional": false,
         "is_pinned": false,
-        "is_direct": true,
-        "resolved_package": {},
-        "extra_data": {}
+        "is_direct": true
       },
       {
         "purl": "pkg:pubspec/async@2.6.1",
@@ -66,9 +29,31 @@
         "is_runtime": true,
         "is_optional": false,
         "is_pinned": true,
-        "is_direct": true,
-        "resolved_package": {},
-        "extra_data": {}
+        "is_direct": false,
+        "resolved_package": {
+          "type": "pubspec",
+          "name": "async",
+          "version": "2.6.1",
+          "primary_language": "dart",
+          "is_virtual": true,
+          "extra_data": {
+            "dependency": "transitive",
+            "source": "hosted",
+            "description": {
+              "name": "async",
+              "url": "https://pub.dartlang.org"
+            }
+          },
+          "dependencies": []
+        },
+        "extra_data": {
+          "dependency": "transitive",
+          "source": "hosted",
+          "description": {
+            "name": "async",
+            "url": "https://pub.dartlang.org"
+          }
+        }
       },
       {
         "purl": "pkg:pubspec/boolean_selector@2.1.0",
@@ -77,9 +62,31 @@
         "is_runtime": true,
         "is_optional": false,
         "is_pinned": true,
-        "is_direct": true,
-        "resolved_package": {},
-        "extra_data": {}
+        "is_direct": false,
+        "resolved_package": {
+          "type": "pubspec",
+          "name": "boolean_selector",
+          "version": "2.1.0",
+          "primary_language": "dart",
+          "is_virtual": true,
+          "extra_data": {
+            "source": "hosted",
+            "description": {
+              "name": "boolean_selector",
+              "url": "https://pub.dartlang.org"
+            },
+            "dependency": "transitive"
+          },
+          "dependencies": []
+        },
+        "extra_data": {
+          "description": {
+            "name": "boolean_selector",
+            "url": "https://pub.dartlang.org"
+          },
+          "dependency": "transitive",
+          "source": "hosted"
+        }
       },
       {
         "purl": "pkg:pubspec/characters@1.1.0",
@@ -88,9 +95,31 @@
         "is_runtime": true,
         "is_optional": false,
         "is_pinned": true,
-        "is_direct": true,
-        "resolved_package": {},
-        "extra_data": {}
+        "is_direct": false,
+        "resolved_package": {
+          "type": "pubspec",
+          "name": "characters",
+          "version": "1.1.0",
+          "primary_language": "dart",
+          "is_virtual": true,
+          "extra_data": {
+            "source": "hosted",
+            "description": {
+              "name": "characters",
+              "url": "https://pub.dartlang.org"
+            },
+            "dependency": "transitive"
+          },
+          "dependencies": []
+        },
+        "extra_data": {
+          "description": {
+            "name": "characters",
+            "url": "https://pub.dartlang.org"
+          },
+          "dependency": "transitive",
+          "source": "hosted"
+        }
       },
       {
         "purl": "pkg:pubspec/charcode@1.2.0",
@@ -99,9 +128,31 @@
         "is_runtime": true,
         "is_optional": false,
         "is_pinned": true,
-        "is_direct": true,
-        "resolved_package": {},
-        "extra_data": {}
+        "is_direct": false,
+        "resolved_package": {
+          "type": "pubspec",
+          "name": "charcode",
+          "version": "1.2.0",
+          "primary_language": "dart",
+          "is_virtual": true,
+          "extra_data": {
+            "dependency": "transitive",
+            "source": "hosted",
+            "description": {
+              "name": "charcode",
+              "url": "https://pub.dartlang.org"
+            }
+          },
+          "dependencies": []
+        },
+        "extra_data": {
+          "dependency": "transitive",
+          "source": "hosted",
+          "description": {
+            "name": "charcode",
+            "url": "https://pub.dartlang.org"
+          }
+        }
       },
       {
         "purl": "pkg:pubspec/clock@1.1.0",
@@ -110,9 +161,31 @@
         "is_runtime": true,
         "is_optional": false,
         "is_pinned": true,
-        "is_direct": true,
-        "resolved_package": {},
-        "extra_data": {}
+        "is_direct": false,
+        "resolved_package": {
+          "type": "pubspec",
+          "name": "clock",
+          "version": "1.1.0",
+          "primary_language": "dart",
+          "is_virtual": true,
+          "extra_data": {
+            "dependency": "transitive",
+            "source": "hosted",
+            "description": {
+              "name": "clock",
+              "url": "https://pub.dartlang.org"
+            }
+          },
+          "dependencies": []
+        },
+        "extra_data": {
+          "dependency": "transitive",
+          "source": "hosted",
+          "description": {
+            "name": "clock",
+            "url": "https://pub.dartlang.org"
+          }
+        }
       },
       {
         "purl": "pkg:pubspec/collection@1.15.0",
@@ -121,9 +194,31 @@
         "is_runtime": true,
         "is_optional": false,
         "is_pinned": true,
-        "is_direct": true,
-        "resolved_package": {},
-        "extra_data": {}
+        "is_direct": false,
+        "resolved_package": {
+          "type": "pubspec",
+          "name": "collection",
+          "version": "1.15.0",
+          "primary_language": "dart",
+          "is_virtual": true,
+          "extra_data": {
+            "dependency": "transitive",
+            "description": {
+              "name": "collection",
+              "url": "https://pub.dartlang.org"
+            },
+            "source": "hosted"
+          },
+          "dependencies": []
+        },
+        "extra_data": {
+          "source": "hosted",
+          "description": {
+            "name": "collection",
+            "url": "https://pub.dartlang.org"
+          },
+          "dependency": "transitive"
+        }
       },
       {
         "purl": "pkg:pubspec/cupertino_icons@1.0.3",
@@ -133,8 +228,30 @@
         "is_optional": false,
         "is_pinned": true,
         "is_direct": true,
-        "resolved_package": {},
-        "extra_data": {}
+        "resolved_package": {
+          "type": "pubspec",
+          "name": "cupertino_icons",
+          "version": "1.0.3",
+          "primary_language": "dart",
+          "is_virtual": true,
+          "extra_data": {
+            "dependency": "direct main",
+            "description": {
+              "name": "cupertino_icons",
+              "url": "https://pub.dartlang.org"
+            },
+            "source": "hosted"
+          },
+          "dependencies": []
+        },
+        "extra_data": {
+          "source": "hosted",
+          "dependency": "direct main",
+          "description": {
+            "name": "cupertino_icons",
+            "url": "https://pub.dartlang.org"
+          }
+        }
       },
       {
         "purl": "pkg:pubspec/equatable@2.0.3",
@@ -143,9 +260,31 @@
         "is_runtime": true,
         "is_optional": false,
         "is_pinned": true,
-        "is_direct": true,
-        "resolved_package": {},
-        "extra_data": {}
+        "is_direct": false,
+        "resolved_package": {
+          "type": "pubspec",
+          "name": "equatable",
+          "version": "2.0.3",
+          "primary_language": "dart",
+          "is_virtual": true,
+          "extra_data": {
+            "source": "hosted",
+            "description": {
+              "name": "equatable",
+              "url": "https://pub.dartlang.org"
+            },
+            "dependency": "transitive"
+          },
+          "dependencies": []
+        },
+        "extra_data": {
+          "description": {
+            "name": "equatable",
+            "url": "https://pub.dartlang.org"
+          },
+          "dependency": "transitive",
+          "source": "hosted"
+        }
       },
       {
         "purl": "pkg:pubspec/fake_async@1.2.0",
@@ -154,9 +293,31 @@
         "is_runtime": true,
         "is_optional": false,
         "is_pinned": true,
-        "is_direct": true,
-        "resolved_package": {},
-        "extra_data": {}
+        "is_direct": false,
+        "resolved_package": {
+          "type": "pubspec",
+          "name": "fake_async",
+          "version": "1.2.0",
+          "primary_language": "dart",
+          "is_virtual": true,
+          "extra_data": {
+            "description": {
+              "name": "fake_async",
+              "url": "https://pub.dartlang.org"
+            },
+            "source": "hosted",
+            "dependency": "transitive"
+          },
+          "dependencies": []
+        },
+        "extra_data": {
+          "description": {
+            "name": "fake_async",
+            "url": "https://pub.dartlang.org"
+          },
+          "dependency": "transitive",
+          "source": "hosted"
+        }
       },
       {
         "purl": "pkg:pubspec/firebase_auth@2.0.0",
@@ -166,8 +327,30 @@
         "is_optional": false,
         "is_pinned": true,
         "is_direct": true,
-        "resolved_package": {},
-        "extra_data": {}
+        "resolved_package": {
+          "type": "pubspec",
+          "name": "firebase_auth",
+          "version": "2.0.0",
+          "primary_language": "dart",
+          "is_virtual": true,
+          "extra_data": {
+            "description": {
+              "name": "firebase_auth",
+              "url": "https://pub.dartlang.org"
+            },
+            "source": "hosted",
+            "dependency": "direct main"
+          },
+          "dependencies": []
+        },
+        "extra_data": {
+          "dependency": "direct main",
+          "source": "hosted",
+          "description": {
+            "name": "firebase_auth",
+            "url": "https://pub.dartlang.org"
+          }
+        }
       },
       {
         "purl": "pkg:pubspec/firebase_auth_platform_interface@5.0.0",
@@ -176,9 +359,31 @@
         "is_runtime": true,
         "is_optional": false,
         "is_pinned": true,
-        "is_direct": true,
-        "resolved_package": {},
-        "extra_data": {}
+        "is_direct": false,
+        "resolved_package": {
+          "type": "pubspec",
+          "name": "firebase_auth_platform_interface",
+          "version": "5.0.0",
+          "primary_language": "dart",
+          "is_virtual": true,
+          "extra_data": {
+            "source": "hosted",
+            "description": {
+              "name": "firebase_auth_platform_interface",
+              "url": "https://pub.dartlang.org"
+            },
+            "dependency": "transitive"
+          },
+          "dependencies": []
+        },
+        "extra_data": {
+          "source": "hosted",
+          "dependency": "transitive",
+          "description": {
+            "name": "firebase_auth_platform_interface",
+            "url": "https://pub.dartlang.org"
+          }
+        }
       },
       {
         "purl": "pkg:pubspec/firebase_auth_web@2.0.0",
@@ -187,9 +392,31 @@
         "is_runtime": true,
         "is_optional": false,
         "is_pinned": true,
-        "is_direct": true,
-        "resolved_package": {},
-        "extra_data": {}
+        "is_direct": false,
+        "resolved_package": {
+          "type": "pubspec",
+          "name": "firebase_auth_web",
+          "version": "2.0.0",
+          "primary_language": "dart",
+          "is_virtual": true,
+          "extra_data": {
+            "description": {
+              "name": "firebase_auth_web",
+              "url": "https://pub.dartlang.org"
+            },
+            "dependency": "transitive",
+            "source": "hosted"
+          },
+          "dependencies": []
+        },
+        "extra_data": {
+          "description": {
+            "name": "firebase_auth_web",
+            "url": "https://pub.dartlang.org"
+          },
+          "dependency": "transitive",
+          "source": "hosted"
+        }
       },
       {
         "purl": "pkg:pubspec/firebase_core@1.3.0",
@@ -199,8 +426,30 @@
         "is_optional": false,
         "is_pinned": true,
         "is_direct": true,
-        "resolved_package": {},
-        "extra_data": {}
+        "resolved_package": {
+          "type": "pubspec",
+          "name": "firebase_core",
+          "version": "1.3.0",
+          "primary_language": "dart",
+          "is_virtual": true,
+          "extra_data": {
+            "description": {
+              "name": "firebase_core",
+              "url": "https://pub.dartlang.org"
+            },
+            "source": "hosted",
+            "dependency": "direct main"
+          },
+          "dependencies": []
+        },
+        "extra_data": {
+          "description": {
+            "name": "firebase_core",
+            "url": "https://pub.dartlang.org"
+          },
+          "source": "hosted",
+          "dependency": "direct main"
+        }
       },
       {
         "purl": "pkg:pubspec/firebase_core_platform_interface@4.0.1",
@@ -209,9 +458,31 @@
         "is_runtime": true,
         "is_optional": false,
         "is_pinned": true,
-        "is_direct": true,
-        "resolved_package": {},
-        "extra_data": {}
+        "is_direct": false,
+        "resolved_package": {
+          "type": "pubspec",
+          "name": "firebase_core_platform_interface",
+          "version": "4.0.1",
+          "primary_language": "dart",
+          "is_virtual": true,
+          "extra_data": {
+            "source": "hosted",
+            "description": {
+              "name": "firebase_core_platform_interface",
+              "url": "https://pub.dartlang.org"
+            },
+            "dependency": "transitive"
+          },
+          "dependencies": []
+        },
+        "extra_data": {
+          "dependency": "transitive",
+          "source": "hosted",
+          "description": {
+            "name": "firebase_core_platform_interface",
+            "url": "https://pub.dartlang.org"
+          }
+        }
       },
       {
         "purl": "pkg:pubspec/firebase_core_web@1.1.0",
@@ -220,9 +491,31 @@
         "is_runtime": true,
         "is_optional": false,
         "is_pinned": true,
-        "is_direct": true,
-        "resolved_package": {},
-        "extra_data": {}
+        "is_direct": false,
+        "resolved_package": {
+          "type": "pubspec",
+          "name": "firebase_core_web",
+          "version": "1.1.0",
+          "primary_language": "dart",
+          "is_virtual": true,
+          "extra_data": {
+            "source": "hosted",
+            "dependency": "transitive",
+            "description": {
+              "name": "firebase_core_web",
+              "url": "https://pub.dartlang.org"
+            }
+          },
+          "dependencies": []
+        },
+        "extra_data": {
+          "source": "hosted",
+          "description": {
+            "name": "firebase_core_web",
+            "url": "https://pub.dartlang.org"
+          },
+          "dependency": "transitive"
+        }
       },
       {
         "purl": "pkg:pubspec/fl_chart@0.36.2",
@@ -232,8 +525,30 @@
         "is_optional": false,
         "is_pinned": true,
         "is_direct": true,
-        "resolved_package": {},
-        "extra_data": {}
+        "resolved_package": {
+          "type": "pubspec",
+          "name": "fl_chart",
+          "version": "0.36.2",
+          "primary_language": "dart",
+          "is_virtual": true,
+          "extra_data": {
+            "dependency": "direct main",
+            "description": {
+              "name": "fl_chart",
+              "url": "https://pub.dartlang.org"
+            },
+            "source": "hosted"
+          },
+          "dependencies": []
+        },
+        "extra_data": {
+          "source": "hosted",
+          "dependency": "direct main",
+          "description": {
+            "name": "fl_chart",
+            "url": "https://pub.dartlang.org"
+          }
+        }
       },
       {
         "purl": "pkg:pubspec/flutter@0.0.0",
@@ -243,8 +558,24 @@
         "is_optional": false,
         "is_pinned": true,
         "is_direct": true,
-        "resolved_package": {},
-        "extra_data": {}
+        "resolved_package": {
+          "type": "pubspec",
+          "name": "flutter",
+          "version": "0.0.0",
+          "primary_language": "dart",
+          "is_virtual": true,
+          "extra_data": {
+            "dependency": "direct main",
+            "source": "sdk",
+            "description": "flutter"
+          },
+          "dependencies": []
+        },
+        "extra_data": {
+          "dependency": "direct main",
+          "source": "sdk",
+          "description": "flutter"
+        }
       },
       {
         "purl": "pkg:pubspec/flutter_svg@0.22.0",
@@ -254,19 +585,57 @@
         "is_optional": false,
         "is_pinned": true,
         "is_direct": true,
-        "resolved_package": {},
-        "extra_data": {}
+        "resolved_package": {
+          "type": "pubspec",
+          "name": "flutter_svg",
+          "version": "0.22.0",
+          "primary_language": "dart",
+          "is_virtual": true,
+          "extra_data": {
+            "dependency": "direct main",
+            "source": "hosted",
+            "description": {
+              "name": "flutter_svg",
+              "url": "https://pub.dartlang.org"
+            }
+          },
+          "dependencies": []
+        },
+        "extra_data": {
+          "description": {
+            "name": "flutter_svg",
+            "url": "https://pub.dartlang.org"
+          },
+          "dependency": "direct main",
+          "source": "hosted"
+        }
       },
       {
         "purl": "pkg:pubspec/flutter_test@0.0.0",
         "extracted_requirement": "0.0.0",
         "scope": "direct dev",
         "is_runtime": false,
-        "is_optional": false,
+        "is_optional": true,
         "is_pinned": true,
         "is_direct": true,
-        "resolved_package": {},
-        "extra_data": {}
+        "resolved_package": {
+          "type": "pubspec",
+          "name": "flutter_test",
+          "version": "0.0.0",
+          "primary_language": "dart",
+          "is_virtual": true,
+          "extra_data": {
+            "description": "flutter",
+            "source": "sdk",
+            "dependency": "direct dev"
+          },
+          "dependencies": []
+        },
+        "extra_data": {
+          "description": "flutter",
+          "dependency": "direct dev",
+          "source": "sdk"
+        }
       },
       {
         "purl": "pkg:pubspec/flutter_web_plugins@0.0.0",
@@ -275,9 +644,25 @@
         "is_runtime": true,
         "is_optional": false,
         "is_pinned": true,
-        "is_direct": true,
-        "resolved_package": {},
-        "extra_data": {}
+        "is_direct": false,
+        "resolved_package": {
+          "type": "pubspec",
+          "name": "flutter_web_plugins",
+          "version": "0.0.0",
+          "primary_language": "dart",
+          "is_virtual": true,
+          "extra_data": {
+            "source": "sdk",
+            "dependency": "transitive",
+            "description": "flutter"
+          },
+          "dependencies": []
+        },
+        "extra_data": {
+          "description": "flutter",
+          "source": "sdk",
+          "dependency": "transitive"
+        }
       },
       {
         "purl": "pkg:pubspec/http_parser@4.0.0",
@@ -286,9 +671,31 @@
         "is_runtime": true,
         "is_optional": false,
         "is_pinned": true,
-        "is_direct": true,
-        "resolved_package": {},
-        "extra_data": {}
+        "is_direct": false,
+        "resolved_package": {
+          "type": "pubspec",
+          "name": "http_parser",
+          "version": "4.0.0",
+          "primary_language": "dart",
+          "is_virtual": true,
+          "extra_data": {
+            "dependency": "transitive",
+            "description": {
+              "name": "http_parser",
+              "url": "https://pub.dartlang.org"
+            },
+            "source": "hosted"
+          },
+          "dependencies": []
+        },
+        "extra_data": {
+          "source": "hosted",
+          "description": {
+            "name": "http_parser",
+            "url": "https://pub.dartlang.org"
+          },
+          "dependency": "transitive"
+        }
       },
       {
         "purl": "pkg:pubspec/intl@0.17.0",
@@ -297,9 +704,31 @@
         "is_runtime": true,
         "is_optional": false,
         "is_pinned": true,
-        "is_direct": true,
-        "resolved_package": {},
-        "extra_data": {}
+        "is_direct": false,
+        "resolved_package": {
+          "type": "pubspec",
+          "name": "intl",
+          "version": "0.17.0",
+          "primary_language": "dart",
+          "is_virtual": true,
+          "extra_data": {
+            "source": "hosted",
+            "description": {
+              "name": "intl",
+              "url": "https://pub.dartlang.org"
+            },
+            "dependency": "transitive"
+          },
+          "dependencies": []
+        },
+        "extra_data": {
+          "description": {
+            "name": "intl",
+            "url": "https://pub.dartlang.org"
+          },
+          "dependency": "transitive",
+          "source": "hosted"
+        }
       },
       {
         "purl": "pkg:pubspec/js@0.6.3",
@@ -308,9 +737,31 @@
         "is_runtime": true,
         "is_optional": false,
         "is_pinned": true,
-        "is_direct": true,
-        "resolved_package": {},
-        "extra_data": {}
+        "is_direct": false,
+        "resolved_package": {
+          "type": "pubspec",
+          "name": "js",
+          "version": "0.6.3",
+          "primary_language": "dart",
+          "is_virtual": true,
+          "extra_data": {
+            "source": "hosted",
+            "description": {
+              "name": "js",
+              "url": "https://pub.dartlang.org"
+            },
+            "dependency": "transitive"
+          },
+          "dependencies": []
+        },
+        "extra_data": {
+          "dependency": "transitive",
+          "description": {
+            "name": "js",
+            "url": "https://pub.dartlang.org"
+          },
+          "source": "hosted"
+        }
       },
       {
         "purl": "pkg:pubspec/matcher@0.12.10",
@@ -319,9 +770,31 @@
         "is_runtime": true,
         "is_optional": false,
         "is_pinned": true,
-        "is_direct": true,
-        "resolved_package": {},
-        "extra_data": {}
+        "is_direct": false,
+        "resolved_package": {
+          "type": "pubspec",
+          "name": "matcher",
+          "version": "0.12.10",
+          "primary_language": "dart",
+          "is_virtual": true,
+          "extra_data": {
+            "source": "hosted",
+            "description": {
+              "name": "matcher",
+              "url": "https://pub.dartlang.org"
+            },
+            "dependency": "transitive"
+          },
+          "dependencies": []
+        },
+        "extra_data": {
+          "source": "hosted",
+          "description": {
+            "name": "matcher",
+            "url": "https://pub.dartlang.org"
+          },
+          "dependency": "transitive"
+        }
       },
       {
         "purl": "pkg:pubspec/meta@1.3.0",
@@ -330,9 +803,31 @@
         "is_runtime": true,
         "is_optional": false,
         "is_pinned": true,
-        "is_direct": true,
-        "resolved_package": {},
-        "extra_data": {}
+        "is_direct": false,
+        "resolved_package": {
+          "type": "pubspec",
+          "name": "meta",
+          "version": "1.3.0",
+          "primary_language": "dart",
+          "is_virtual": true,
+          "extra_data": {
+            "source": "hosted",
+            "dependency": "transitive",
+            "description": {
+              "name": "meta",
+              "url": "https://pub.dartlang.org"
+            }
+          },
+          "dependencies": []
+        },
+        "extra_data": {
+          "description": {
+            "name": "meta",
+            "url": "https://pub.dartlang.org"
+          },
+          "source": "hosted",
+          "dependency": "transitive"
+        }
       },
       {
         "purl": "pkg:pubspec/path@1.8.0",
@@ -341,9 +836,31 @@
         "is_runtime": true,
         "is_optional": false,
         "is_pinned": true,
-        "is_direct": true,
-        "resolved_package": {},
-        "extra_data": {}
+        "is_direct": false,
+        "resolved_package": {
+          "type": "pubspec",
+          "name": "path",
+          "version": "1.8.0",
+          "primary_language": "dart",
+          "is_virtual": true,
+          "extra_data": {
+            "description": {
+              "name": "path",
+              "url": "https://pub.dartlang.org"
+            },
+            "dependency": "transitive",
+            "source": "hosted"
+          },
+          "dependencies": []
+        },
+        "extra_data": {
+          "dependency": "transitive",
+          "source": "hosted",
+          "description": {
+            "name": "path",
+            "url": "https://pub.dartlang.org"
+          }
+        }
       },
       {
         "purl": "pkg:pubspec/path_drawing@0.5.1",
@@ -352,9 +869,31 @@
         "is_runtime": true,
         "is_optional": false,
         "is_pinned": true,
-        "is_direct": true,
-        "resolved_package": {},
-        "extra_data": {}
+        "is_direct": false,
+        "resolved_package": {
+          "type": "pubspec",
+          "name": "path_drawing",
+          "version": "0.5.1",
+          "primary_language": "dart",
+          "is_virtual": true,
+          "extra_data": {
+            "source": "hosted",
+            "description": {
+              "name": "path_drawing",
+              "url": "https://pub.dartlang.org"
+            },
+            "dependency": "transitive"
+          },
+          "dependencies": []
+        },
+        "extra_data": {
+          "description": {
+            "name": "path_drawing",
+            "url": "https://pub.dartlang.org"
+          },
+          "dependency": "transitive",
+          "source": "hosted"
+        }
       },
       {
         "purl": "pkg:pubspec/path_parsing@0.2.1",
@@ -363,9 +902,31 @@
         "is_runtime": true,
         "is_optional": false,
         "is_pinned": true,
-        "is_direct": true,
-        "resolved_package": {},
-        "extra_data": {}
+        "is_direct": false,
+        "resolved_package": {
+          "type": "pubspec",
+          "name": "path_parsing",
+          "version": "0.2.1",
+          "primary_language": "dart",
+          "is_virtual": true,
+          "extra_data": {
+            "description": {
+              "name": "path_parsing",
+              "url": "https://pub.dartlang.org"
+            },
+            "dependency": "transitive",
+            "source": "hosted"
+          },
+          "dependencies": []
+        },
+        "extra_data": {
+          "description": {
+            "name": "path_parsing",
+            "url": "https://pub.dartlang.org"
+          },
+          "source": "hosted",
+          "dependency": "transitive"
+        }
       },
       {
         "purl": "pkg:pubspec/pedantic@1.11.1",
@@ -374,9 +935,31 @@
         "is_runtime": true,
         "is_optional": false,
         "is_pinned": true,
-        "is_direct": true,
-        "resolved_package": {},
-        "extra_data": {}
+        "is_direct": false,
+        "resolved_package": {
+          "type": "pubspec",
+          "name": "pedantic",
+          "version": "1.11.1",
+          "primary_language": "dart",
+          "is_virtual": true,
+          "extra_data": {
+            "source": "hosted",
+            "description": {
+              "name": "pedantic",
+              "url": "https://pub.dartlang.org"
+            },
+            "dependency": "transitive"
+          },
+          "dependencies": []
+        },
+        "extra_data": {
+          "dependency": "transitive",
+          "description": {
+            "name": "pedantic",
+            "url": "https://pub.dartlang.org"
+          },
+          "source": "hosted"
+        }
       },
       {
         "purl": "pkg:pubspec/petitparser@4.1.0",
@@ -385,9 +968,31 @@
         "is_runtime": true,
         "is_optional": false,
         "is_pinned": true,
-        "is_direct": true,
-        "resolved_package": {},
-        "extra_data": {}
+        "is_direct": false,
+        "resolved_package": {
+          "type": "pubspec",
+          "name": "petitparser",
+          "version": "4.1.0",
+          "primary_language": "dart",
+          "is_virtual": true,
+          "extra_data": {
+            "description": {
+              "name": "petitparser",
+              "url": "https://pub.dartlang.org"
+            },
+            "dependency": "transitive",
+            "source": "hosted"
+          },
+          "dependencies": []
+        },
+        "extra_data": {
+          "dependency": "transitive",
+          "description": {
+            "name": "petitparser",
+            "url": "https://pub.dartlang.org"
+          },
+          "source": "hosted"
+        }
       },
       {
         "purl": "pkg:pubspec/plugin_platform_interface@2.0.1",
@@ -396,9 +1001,31 @@
         "is_runtime": true,
         "is_optional": false,
         "is_pinned": true,
-        "is_direct": true,
-        "resolved_package": {},
-        "extra_data": {}
+        "is_direct": false,
+        "resolved_package": {
+          "type": "pubspec",
+          "name": "plugin_platform_interface",
+          "version": "2.0.1",
+          "primary_language": "dart",
+          "is_virtual": true,
+          "extra_data": {
+            "description": {
+              "name": "plugin_platform_interface",
+              "url": "https://pub.dartlang.org"
+            },
+            "source": "hosted",
+            "dependency": "transitive"
+          },
+          "dependencies": []
+        },
+        "extra_data": {
+          "dependency": "transitive",
+          "source": "hosted",
+          "description": {
+            "name": "plugin_platform_interface",
+            "url": "https://pub.dartlang.org"
+          }
+        }
       },
       {
         "purl": "pkg:pubspec/sky_engine@0.0.99",
@@ -407,9 +1034,25 @@
         "is_runtime": true,
         "is_optional": false,
         "is_pinned": true,
-        "is_direct": true,
-        "resolved_package": {},
-        "extra_data": {}
+        "is_direct": false,
+        "resolved_package": {
+          "type": "pubspec",
+          "name": "sky_engine",
+          "version": "0.0.99",
+          "primary_language": "dart",
+          "is_virtual": true,
+          "extra_data": {
+            "description": "flutter",
+            "source": "sdk",
+            "dependency": "transitive"
+          },
+          "dependencies": []
+        },
+        "extra_data": {
+          "source": "sdk",
+          "description": "flutter",
+          "dependency": "transitive"
+        }
       },
       {
         "purl": "pkg:pubspec/source_span@1.8.1",
@@ -418,9 +1061,31 @@
         "is_runtime": true,
         "is_optional": false,
         "is_pinned": true,
-        "is_direct": true,
-        "resolved_package": {},
-        "extra_data": {}
+        "is_direct": false,
+        "resolved_package": {
+          "type": "pubspec",
+          "name": "source_span",
+          "version": "1.8.1",
+          "primary_language": "dart",
+          "is_virtual": true,
+          "extra_data": {
+            "source": "hosted",
+            "dependency": "transitive",
+            "description": {
+              "name": "source_span",
+              "url": "https://pub.dartlang.org"
+            }
+          },
+          "dependencies": []
+        },
+        "extra_data": {
+          "dependency": "transitive",
+          "source": "hosted",
+          "description": {
+            "name": "source_span",
+            "url": "https://pub.dartlang.org"
+          }
+        }
       },
       {
         "purl": "pkg:pubspec/stack_trace@1.10.0",
@@ -429,9 +1094,31 @@
         "is_runtime": true,
         "is_optional": false,
         "is_pinned": true,
-        "is_direct": true,
-        "resolved_package": {},
-        "extra_data": {}
+        "is_direct": false,
+        "resolved_package": {
+          "type": "pubspec",
+          "name": "stack_trace",
+          "version": "1.10.0",
+          "primary_language": "dart",
+          "is_virtual": true,
+          "extra_data": {
+            "source": "hosted",
+            "dependency": "transitive",
+            "description": {
+              "name": "stack_trace",
+              "url": "https://pub.dartlang.org"
+            }
+          },
+          "dependencies": []
+        },
+        "extra_data": {
+          "source": "hosted",
+          "description": {
+            "name": "stack_trace",
+            "url": "https://pub.dartlang.org"
+          },
+          "dependency": "transitive"
+        }
       },
       {
         "purl": "pkg:pubspec/stream_channel@2.1.0",
@@ -440,9 +1127,31 @@
         "is_runtime": true,
         "is_optional": false,
         "is_pinned": true,
-        "is_direct": true,
-        "resolved_package": {},
-        "extra_data": {}
+        "is_direct": false,
+        "resolved_package": {
+          "type": "pubspec",
+          "name": "stream_channel",
+          "version": "2.1.0",
+          "primary_language": "dart",
+          "is_virtual": true,
+          "extra_data": {
+            "description": {
+              "name": "stream_channel",
+              "url": "https://pub.dartlang.org"
+            },
+            "dependency": "transitive",
+            "source": "hosted"
+          },
+          "dependencies": []
+        },
+        "extra_data": {
+          "dependency": "transitive",
+          "description": {
+            "name": "stream_channel",
+            "url": "https://pub.dartlang.org"
+          },
+          "source": "hosted"
+        }
       },
       {
         "purl": "pkg:pubspec/string_scanner@1.1.0",
@@ -451,9 +1160,31 @@
         "is_runtime": true,
         "is_optional": false,
         "is_pinned": true,
-        "is_direct": true,
-        "resolved_package": {},
-        "extra_data": {}
+        "is_direct": false,
+        "resolved_package": {
+          "type": "pubspec",
+          "name": "string_scanner",
+          "version": "1.1.0",
+          "primary_language": "dart",
+          "is_virtual": true,
+          "extra_data": {
+            "description": {
+              "name": "string_scanner",
+              "url": "https://pub.dartlang.org"
+            },
+            "source": "hosted",
+            "dependency": "transitive"
+          },
+          "dependencies": []
+        },
+        "extra_data": {
+          "source": "hosted",
+          "description": {
+            "name": "string_scanner",
+            "url": "https://pub.dartlang.org"
+          },
+          "dependency": "transitive"
+        }
       },
       {
         "purl": "pkg:pubspec/term_glyph@1.2.0",
@@ -462,9 +1193,31 @@
         "is_runtime": true,
         "is_optional": false,
         "is_pinned": true,
-        "is_direct": true,
-        "resolved_package": {},
-        "extra_data": {}
+        "is_direct": false,
+        "resolved_package": {
+          "type": "pubspec",
+          "name": "term_glyph",
+          "version": "1.2.0",
+          "primary_language": "dart",
+          "is_virtual": true,
+          "extra_data": {
+            "dependency": "transitive",
+            "source": "hosted",
+            "description": {
+              "name": "term_glyph",
+              "url": "https://pub.dartlang.org"
+            }
+          },
+          "dependencies": []
+        },
+        "extra_data": {
+          "dependency": "transitive",
+          "description": {
+            "name": "term_glyph",
+            "url": "https://pub.dartlang.org"
+          },
+          "source": "hosted"
+        }
       },
       {
         "purl": "pkg:pubspec/test_api@0.3.0",
@@ -473,9 +1226,31 @@
         "is_runtime": true,
         "is_optional": false,
         "is_pinned": true,
-        "is_direct": true,
-        "resolved_package": {},
-        "extra_data": {}
+        "is_direct": false,
+        "resolved_package": {
+          "type": "pubspec",
+          "name": "test_api",
+          "version": "0.3.0",
+          "primary_language": "dart",
+          "is_virtual": true,
+          "extra_data": {
+            "dependency": "transitive",
+            "source": "hosted",
+            "description": {
+              "name": "test_api",
+              "url": "https://pub.dartlang.org"
+            }
+          },
+          "dependencies": []
+        },
+        "extra_data": {
+          "source": "hosted",
+          "dependency": "transitive",
+          "description": {
+            "name": "test_api",
+            "url": "https://pub.dartlang.org"
+          }
+        }
       },
       {
         "purl": "pkg:pubspec/typed_data@1.3.0",
@@ -484,9 +1259,31 @@
         "is_runtime": true,
         "is_optional": false,
         "is_pinned": true,
-        "is_direct": true,
-        "resolved_package": {},
-        "extra_data": {}
+        "is_direct": false,
+        "resolved_package": {
+          "type": "pubspec",
+          "name": "typed_data",
+          "version": "1.3.0",
+          "primary_language": "dart",
+          "is_virtual": true,
+          "extra_data": {
+            "description": {
+              "name": "typed_data",
+              "url": "https://pub.dartlang.org"
+            },
+            "dependency": "transitive",
+            "source": "hosted"
+          },
+          "dependencies": []
+        },
+        "extra_data": {
+          "source": "hosted",
+          "description": {
+            "name": "typed_data",
+            "url": "https://pub.dartlang.org"
+          },
+          "dependency": "transitive"
+        }
       },
       {
         "purl": "pkg:pubspec/vector_math@2.1.0",
@@ -495,9 +1292,31 @@
         "is_runtime": true,
         "is_optional": false,
         "is_pinned": true,
-        "is_direct": true,
-        "resolved_package": {},
-        "extra_data": {}
+        "is_direct": false,
+        "resolved_package": {
+          "type": "pubspec",
+          "name": "vector_math",
+          "version": "2.1.0",
+          "primary_language": "dart",
+          "is_virtual": true,
+          "extra_data": {
+            "dependency": "transitive",
+            "source": "hosted",
+            "description": {
+              "name": "vector_math",
+              "url": "https://pub.dartlang.org"
+            }
+          },
+          "dependencies": []
+        },
+        "extra_data": {
+          "source": "hosted",
+          "description": {
+            "name": "vector_math",
+            "url": "https://pub.dartlang.org"
+          },
+          "dependency": "transitive"
+        }
       },
       {
         "purl": "pkg:pubspec/xml@5.1.2",
@@ -506,15 +1325,33 @@
         "is_runtime": true,
         "is_optional": false,
         "is_pinned": true,
-        "is_direct": true,
-        "resolved_package": {},
-        "extra_data": {}
+        "is_direct": false,
+        "resolved_package": {
+          "type": "pubspec",
+          "name": "xml",
+          "version": "5.1.2",
+          "primary_language": "dart",
+          "is_virtual": true,
+          "extra_data": {
+            "description": {
+              "name": "xml",
+              "url": "https://pub.dartlang.org"
+            },
+            "source": "hosted",
+            "dependency": "transitive"
+          },
+          "dependencies": []
+        },
+        "extra_data": {
+          "description": {
+            "name": "xml",
+            "url": "https://pub.dartlang.org"
+          },
+          "dependency": "transitive",
+          "source": "hosted"
+        }
       }
     ],
-    "repository_homepage_url": null,
-    "repository_download_url": null,
-    "api_data_url": null,
-    "datasource_id": "pubspec_lock",
-    "purl": null
+    "datasource_id": "pubspec_lock"
   }
 ]

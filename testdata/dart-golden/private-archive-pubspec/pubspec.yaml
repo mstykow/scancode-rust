@@ -1,0 +1,14 @@
+name: private_archive_pkg
+version: 0.1.0
+publish_to: none
+archive_url: https://mirror.example.com/private_archive_pkg-0.1.0.tar.gz
+
+topics:
+  - cli
+  - tooling
+
+funding:
+  - https://example.com/sponsor
+
+dependencies:
+  http: ^1.0.0
