@@ -20,36 +20,14 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
-use std::sync::LazyLock;
 
 use log::warn;
 use packageurl::PackageUrl;
 use serde_json::Value;
 
-use crate::models::{
-    DatasourceId, Dependency, LicenseDetection, Match, PackageData, PackageType, Party,
-    ResolvedPackage,
-};
+use crate::models::{DatasourceId, Dependency, PackageData, PackageType, Party, ResolvedPackage};
 
 use super::PackageParser;
-
-static SPDX_LICENSE_IDS: LazyLock<std::collections::HashSet<String>> = LazyLock::new(|| {
-    serde_json::from_str::<Value>(include_str!("../../resources/licenses/json/licenses.json"))
-        .ok()
-        .and_then(|json| {
-            json.get("licenses")
-                .and_then(|value| value.as_array().cloned())
-        })
-        .unwrap_or_default()
-        .into_iter()
-        .filter_map(|license| {
-            license
-                .get("licenseId")
-                .and_then(|value| value.as_str())
-                .map(|license_id| license_id.to_string())
-        })
-        .collect()
-});
 
 const FIELD_NAME: &str = "name";
 const FIELD_VERSION: &str = "version";
@@ -119,8 +97,11 @@ impl PackageParser for ComposerJsonParser {
         let keywords = extract_keywords(&json_content);
 
         let extracted_license_statement = extract_license_statement(&json_content);
-        let (declared_license_expression, declared_license_expression_spdx, license_detections) =
-            normalize_composer_license(&json_content, extracted_license_statement.as_deref());
+
+        // Extract license statement only - detection happens in separate engine
+        let declared_license_expression = None;
+        let declared_license_expression_spdx = None;
+        let license_detections = Vec::new();
 
         let dependencies =
             extract_dependencies(&json_content, FIELD_REQUIRE, "require", true, false);
@@ -555,243 +536,6 @@ fn extract_license_statement(json_content: &Value) -> Option<String> {
     } else {
         Some(licenses.join(" OR "))
     }
-}
-
-fn normalize_composer_license(
-    json_content: &Value,
-    extracted_license_statement: Option<&str>,
-) -> (Option<String>, Option<String>, Vec<LicenseDetection>) {
-    let Some(license_value) = json_content.get(FIELD_LICENSE) else {
-        return (None, None, Vec::new());
-    };
-
-    let normalized = match license_value {
-        Value::String(value) => normalize_composer_license_string(value.trim()),
-        Value::Array(values) => normalize_composer_license_array(values),
-        _ => None,
-    };
-
-    let Some((declared, declared_spdx)) = normalized else {
-        return (None, None, Vec::new());
-    };
-
-    let Some(declared_expr) = declared.clone() else {
-        return (None, declared_spdx, Vec::new());
-    };
-    let Some(declared_spdx_expr) = declared_spdx.clone() else {
-        return (declared, None, Vec::new());
-    };
-
-    let matched_text = extracted_license_statement
-        .map(str::to_string)
-        .or_else(|| match license_value {
-            Value::String(value) => Some(value.trim().to_string()),
-            Value::Array(values) => Some(
-                values
-                    .iter()
-                    .filter_map(|value| value.as_str().map(str::trim))
-                    .filter(|value| !value.is_empty())
-                    .collect::<Vec<_>>()
-                    .join(" OR "),
-            ),
-            _ => None,
-        })
-        .filter(|value| !value.is_empty())
-        .unwrap_or_else(|| declared_spdx_expr.clone());
-
-    let detection = LicenseDetection {
-        license_expression: declared_expr.clone(),
-        license_expression_spdx: declared_spdx_expr.clone(),
-        matches: vec![Match {
-            license_expression: declared_expr,
-            license_expression_spdx: declared_spdx_expr,
-            from_file: None,
-            start_line: 1,
-            end_line: 1,
-            matcher: Some("1-spdx-id".to_string()),
-            score: 100.0,
-            matched_length: Some(matched_text.split_whitespace().count()),
-            match_coverage: Some(100.0),
-            rule_relevance: Some(100),
-            rule_identifier: None,
-            rule_url: None,
-            matched_text: Some(matched_text),
-        }],
-        identifier: None,
-    };
-
-    (declared, declared_spdx, vec![detection])
-}
-
-fn normalize_composer_license_array(values: &[Value]) -> Option<(Option<String>, Option<String>)> {
-    let mut spdx_values = Vec::new();
-    let mut declared_values = Vec::new();
-
-    for value in values {
-        let license = value.as_str()?.trim();
-        if !is_simple_spdx_license_id(license) {
-            return None;
-        }
-        spdx_values.push(license.to_string());
-        declared_values.push(license.to_ascii_lowercase());
-    }
-
-    if spdx_values.is_empty() {
-        None
-    } else {
-        Some((
-            Some(declared_values.join(" OR ")),
-            Some(spdx_values.join(" OR ")),
-        ))
-    }
-}
-
-fn normalize_composer_license_string(value: &str) -> Option<(Option<String>, Option<String>)> {
-    if value.is_empty() {
-        return None;
-    }
-
-    if value == "proprietary" {
-        return Some((
-            Some("proprietary-license".to_string()),
-            Some("LicenseRef-provenant-proprietary-license".to_string()),
-        ));
-    }
-
-    if is_simple_spdx_license_id(value) {
-        return Some((Some(value.to_ascii_lowercase()), Some(value.to_string())));
-    }
-
-    normalize_spdx_like_expression(value)
-        .map(|(declared, declared_spdx)| (Some(declared), Some(declared_spdx)))
-}
-
-fn normalize_spdx_like_expression(value: &str) -> Option<(String, String)> {
-    let mut declared_tokens = Vec::new();
-    let mut spdx_tokens = Vec::new();
-    let mut token = String::new();
-
-    let push_token = |token: &mut String,
-                      declared_tokens: &mut Vec<String>,
-                      spdx_tokens: &mut Vec<String>|
-     -> Option<()> {
-        if token.is_empty() {
-            return Some(());
-        }
-
-        let current = std::mem::take(token);
-        match current.as_str() {
-            "and" | "AND" => {
-                declared_tokens.push("AND".to_string());
-                spdx_tokens.push("AND".to_string());
-            }
-            "or" | "OR" => {
-                declared_tokens.push("OR".to_string());
-                spdx_tokens.push("OR".to_string());
-            }
-            _ if is_simple_spdx_license_id(&current) => {
-                declared_tokens.push(current.to_ascii_lowercase());
-                spdx_tokens.push(current);
-            }
-            _ => return None,
-        }
-
-        Some(())
-    };
-
-    for ch in value.chars() {
-        match ch {
-            '(' | ')' => {
-                push_token(&mut token, &mut declared_tokens, &mut spdx_tokens)?;
-                declared_tokens.push(ch.to_string());
-                spdx_tokens.push(ch.to_string());
-            }
-            ' ' | '\t' | '\n' | '\r' => {
-                push_token(&mut token, &mut declared_tokens, &mut spdx_tokens)?;
-            }
-            _ => token.push(ch),
-        }
-    }
-    push_token(&mut token, &mut declared_tokens, &mut spdx_tokens)?;
-
-    if !is_valid_license_token_sequence(&spdx_tokens) {
-        return None;
-    }
-
-    let declared = join_license_tokens(&declared_tokens)?;
-    let spdx = join_license_tokens(&spdx_tokens)?;
-    Some((declared, spdx))
-}
-
-fn is_valid_license_token_sequence(tokens: &[String]) -> bool {
-    #[derive(Clone, Copy, PartialEq, Eq)]
-    enum Expected {
-        Operand,
-        Operator,
-    }
-
-    let mut expected = Expected::Operand;
-    let mut paren_depth = 0usize;
-    let mut saw_operand = false;
-
-    for token in tokens {
-        match token.as_str() {
-            "(" => {
-                if expected != Expected::Operand {
-                    return false;
-                }
-                paren_depth += 1;
-            }
-            ")" => {
-                if expected != Expected::Operator || paren_depth == 0 {
-                    return false;
-                }
-                paren_depth -= 1;
-            }
-            "AND" | "OR" => {
-                if expected != Expected::Operator {
-                    return false;
-                }
-                expected = Expected::Operand;
-            }
-            _ => {
-                if expected != Expected::Operand {
-                    return false;
-                }
-                saw_operand = true;
-                expected = Expected::Operator;
-            }
-        }
-    }
-
-    saw_operand && expected == Expected::Operator && paren_depth == 0
-}
-
-fn join_license_tokens(tokens: &[String]) -> Option<String> {
-    if tokens.is_empty() {
-        return None;
-    }
-
-    let mut result = String::new();
-    for token in tokens {
-        match token.as_str() {
-            "(" => result.push('('),
-            ")" => result.push(')'),
-            _ => {
-                let needs_space = !result.is_empty() && !result.ends_with('(');
-                if needs_space {
-                    result.push(' ');
-                }
-                result.push_str(token);
-            }
-        }
-    }
-
-    Some(result)
-}
-
-fn is_simple_spdx_license_id(value: &str) -> bool {
-    SPDX_LICENSE_IDS.contains(value)
 }
 
 fn extract_keywords(json_content: &Value) -> Vec<String> {

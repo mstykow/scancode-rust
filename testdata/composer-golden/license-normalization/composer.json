@@ -1,8 +1,0 @@
-{
-  "name": "acme/license-demo",
-  "description": "Composer license normalization fixture",
-  "license": [
-    "MIT",
-    "Apache-2.0"
-  ]
-}
