@@ -1,41 +1,8 @@
 [
   {
     "type": "pubspec",
-    "namespace": null,
-    "name": null,
-    "version": null,
-    "qualifiers": {},
-    "subpath": null,
     "primary_language": "dart",
-    "description": null,
-    "release_date": null,
     "parties": [],
-    "keywords": [],
-    "homepage_url": null,
-    "download_url": null,
-    "size": null,
-    "sha1": null,
-    "md5": null,
-    "sha256": null,
-    "sha512": null,
-    "bug_tracking_url": null,
-    "code_view_url": null,
-    "vcs_url": null,
-    "copyright": null,
-    "holder": null,
-    "declared_license_expression": null,
-    "declared_license_expression_spdx": null,
-    "license_detections": [],
-    "other_license_expression": null,
-    "other_license_expression_spdx": null,
-    "other_license_detections": [],
-    "extracted_license_statement": null,
-    "notice_text": null,
-    "source_packages": [],
-    "file_references": [],
-    "is_private": false,
-    "is_virtual": false,
-    "extra_data": {},
     "dependencies": [
       {
         "purl": "pkg:pubspec/dart",
@@ -44,9 +11,7 @@
         "is_runtime": true,
         "is_optional": false,
         "is_pinned": false,
-        "is_direct": true,
-        "resolved_package": {},
-        "extra_data": {}
+        "is_direct": true
       },
       {
         "purl": "pkg:pubspec/flutter",
@@ -55,9 +20,7 @@
         "is_runtime": true,
         "is_optional": false,
         "is_pinned": false,
-        "is_direct": true,
-        "resolved_package": {},
-        "extra_data": {}
+        "is_direct": true
       },
       {
         "purl": "pkg:pubspec/async@2.6.1",
@@ -66,9 +29,31 @@
         "is_runtime": true,
         "is_optional": false,
         "is_pinned": true,
-        "is_direct": true,
-        "resolved_package": {},
-        "extra_data": {}
+        "is_direct": false,
+        "resolved_package": {
+          "type": "pubspec",
+          "name": "async",
+          "version": "2.6.1",
+          "primary_language": "dart",
+          "is_virtual": true,
+          "extra_data": {
+            "description": {
+              "name": "async",
+              "url": "https://pub.dartlang.org"
+            },
+            "dependency": "transitive",
+            "source": "hosted"
+          },
+          "dependencies": []
+        },
+        "extra_data": {
+          "source": "hosted",
+          "description": {
+            "name": "async",
+            "url": "https://pub.dartlang.org"
+          },
+          "dependency": "transitive"
+        }
       },
       {
         "purl": "pkg:pubspec/cupertino_icons@1.0.3",
@@ -78,8 +63,30 @@
         "is_optional": false,
         "is_pinned": true,
         "is_direct": true,
-        "resolved_package": {},
-        "extra_data": {}
+        "resolved_package": {
+          "type": "pubspec",
+          "name": "cupertino_icons",
+          "version": "1.0.3",
+          "primary_language": "dart",
+          "is_virtual": true,
+          "extra_data": {
+            "description": {
+              "name": "cupertino_icons",
+              "url": "https://pub.dartlang.org"
+            },
+            "source": "hosted",
+            "dependency": "direct main"
+          },
+          "dependencies": []
+        },
+        "extra_data": {
+          "source": "hosted",
+          "description": {
+            "name": "cupertino_icons",
+            "url": "https://pub.dartlang.org"
+          },
+          "dependency": "direct main"
+        }
       },
       {
         "purl": "pkg:pubspec/equatable@2.0.3",
@@ -88,9 +95,31 @@
         "is_runtime": true,
         "is_optional": false,
         "is_pinned": true,
-        "is_direct": true,
-        "resolved_package": {},
-        "extra_data": {}
+        "is_direct": false,
+        "resolved_package": {
+          "type": "pubspec",
+          "name": "equatable",
+          "version": "2.0.3",
+          "primary_language": "dart",
+          "is_virtual": true,
+          "extra_data": {
+            "dependency": "transitive",
+            "source": "hosted",
+            "description": {
+              "name": "equatable",
+              "url": "https://pub.dartlang.org"
+            }
+          },
+          "dependencies": []
+        },
+        "extra_data": {
+          "dependency": "transitive",
+          "source": "hosted",
+          "description": {
+            "name": "equatable",
+            "url": "https://pub.dartlang.org"
+          }
+        }
       },
       {
         "purl": "pkg:pubspec/fake_async@1.2.0",
@@ -99,9 +128,31 @@
         "is_runtime": true,
         "is_optional": false,
         "is_pinned": true,
-        "is_direct": true,
-        "resolved_package": {},
-        "extra_data": {}
+        "is_direct": false,
+        "resolved_package": {
+          "type": "pubspec",
+          "name": "fake_async",
+          "version": "1.2.0",
+          "primary_language": "dart",
+          "is_virtual": true,
+          "extra_data": {
+            "dependency": "transitive",
+            "description": {
+              "name": "fake_async",
+              "url": "https://pub.dartlang.org"
+            },
+            "source": "hosted"
+          },
+          "dependencies": []
+        },
+        "extra_data": {
+          "dependency": "transitive",
+          "source": "hosted",
+          "description": {
+            "name": "fake_async",
+            "url": "https://pub.dartlang.org"
+          }
+        }
       },
       {
         "purl": "pkg:pubspec/firebase_auth@2.0.0",
@@ -111,14 +162,32 @@
         "is_optional": false,
         "is_pinned": true,
         "is_direct": true,
-        "resolved_package": {},
-        "extra_data": {}
+        "resolved_package": {
+          "type": "pubspec",
+          "name": "firebase_auth",
+          "version": "2.0.0",
+          "primary_language": "dart",
+          "is_virtual": true,
+          "extra_data": {
+            "source": "hosted",
+            "dependency": "direct main",
+            "description": {
+              "name": "firebase_auth",
+              "url": "https://pub.dartlang.org"
+            }
+          },
+          "dependencies": []
+        },
+        "extra_data": {
+          "dependency": "direct main",
+          "source": "hosted",
+          "description": {
+            "name": "firebase_auth",
+            "url": "https://pub.dartlang.org"
+          }
+        }
       }
     ],
-    "repository_homepage_url": null,
-    "repository_download_url": null,
-    "api_data_url": null,
-    "datasource_id": "pubspec_lock",
-    "purl": null
+    "datasource_id": "pubspec_lock"
   }
 ]
