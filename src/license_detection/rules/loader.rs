@@ -786,42 +786,55 @@ MIT License"#,
     }
 
     #[test]
-    fn test_load_licenses_from_reference() {
-        let path = Path::new(crate::license_detection::SCANCODE_LICENSES_LICENSES_PATH);
-        if !path.exists() {
-            eprintln!("Skipping test: reference directory not found");
-            return;
-        }
+    fn test_load_licenses_from_directory() {
+        let dir = tempdir().unwrap();
 
-        let licenses = load_licenses_from_directory(path, false).unwrap();
-        assert!(!licenses.is_empty());
+        fs::write(
+            dir.path().join("test.LICENSE"),
+            r#"---
+key: test
+name: Test License
+spdx_license_key: TEST
+category: Permissive
+---
+Test license text here"#,
+        )
+        .unwrap();
 
-        let mit = licenses.iter().find(|l| l.key == "mit");
-        assert!(mit.is_some(), "MIT license should be loaded");
-        let mit = mit.unwrap();
-        assert_eq!(mit.name, "MIT License");
-        assert_eq!(mit.spdx_license_key, Some("MIT".to_string()));
-        assert!(!mit.text.is_empty());
+        let licenses = load_licenses_from_directory(dir.path(), false).unwrap();
+        assert_eq!(licenses.len(), 1);
+
+        let license = &licenses[0];
+        assert_eq!(license.key, "test");
+        assert_eq!(license.name, "Test License");
+        assert_eq!(license.spdx_license_key, Some("TEST".to_string()));
+        assert!(!license.text.is_empty());
     }
 
     #[test]
-    fn test_load_rules_from_reference() {
-        let path = Path::new(crate::license_detection::SCANCODE_LICENSES_RULES_PATH);
-        if !path.exists() {
-            eprintln!("Skipping test: reference directory not found");
-            return;
-        }
+    fn test_load_rules_from_directory() {
+        let dir = tempdir().unwrap();
 
-        let rules = load_rules_from_directory(path, false).unwrap();
-        assert!(!rules.is_empty());
+        fs::write(
+            dir.path().join("test_1.RULE"),
+            r#"---
+license_expression: test
+is_license_reference: yes
+relevance: 85
+referenced_filenames:
+    - TEST.txt
+---
+TEST.txt"#,
+        )
+        .unwrap();
 
-        let mit_rule = rules
-            .iter()
-            .find(|r| r.license_expression == "mit" && r.text.contains("MIT.txt"));
-        assert!(mit_rule.is_some(), "MIT reference rule should be loaded");
-        let mit_rule = mit_rule.unwrap();
-        assert!(mit_rule.is_license_reference());
-        assert_eq!(mit_rule.relevance, 90);
+        let rules = load_rules_from_directory(dir.path(), false).unwrap();
+        assert_eq!(rules.len(), 1);
+
+        let rule = &rules[0];
+        assert_eq!(rule.license_expression, "test");
+        assert!(rule.is_license_reference());
+        assert_eq!(rule.relevance, 85);
     }
 
     #[test]
