@@ -14,9 +14,9 @@ When scanning files that should match CDDL 1.0 rules, the Rust implementation in
 
 ### Manifestation in Golden Tests
 
-| Test File | Expected Expression | Actual Expression |
-|-----------|---------------------|-------------------|
-| `cddl-1.0_or_gpl-2.0-glassfish.txt` | `cddl-1.0 OR gpl-2.0` | `cddl-1.1 OR gpl-2.0 WITH classpath-exception-2.0` |
+| Test File                                                      | Expected Expression                                                 | Actual Expression                                                   |
+| -------------------------------------------------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| `cddl-1.0_or_gpl-2.0-glassfish.txt`                            | `cddl-1.0 OR gpl-2.0`                                               | `cddl-1.1 OR gpl-2.0 WITH classpath-exception-2.0`                  |
 | `cddl-1.0_or_gpl-2.0-classpath_and_apache-2.0-glassfish_2.txt` | `(cddl-1.0 OR gpl-2.0 WITH classpath-exception-2.0) AND apache-2.0` | `(cddl-1.1 OR gpl-2.0 WITH classpath-exception-2.0) AND apache-2.0` |
 
 ---
@@ -33,6 +33,7 @@ The issue is in the handling of `qspan_positions` when comparing matches with di
 ### Key Metrics from Investigation
 
 **CDDL 1.0 (correct match)**:
+
 - Coverage: 96.2%
 - matched_length: 252 tokens
 - hilen: 51
@@ -40,17 +41,19 @@ The issue is in the handling of `qspan_positions` when comparing matches with di
 - qspan_positions: None (contiguous)
 
 **CDDL 1.1 (incorrect match)**:
+
 - Coverage: 59.0%
 - matched_length: 174 tokens
 - hilen: 35
 - start_token: 0, end_token: 270
 - qspan_positions: Some(174 positions)
 
-### Bug in `qoverlap()` 
+### Bug in `qoverlap()`
 
 **Before fix**: Computed range overlap (252 tokens), treating all positions in [start, end) as matching.
 
 **After fix**: Computes actual position overlap (164 tokens) by:
+
 - Using set intersection when both have `qspan_positions`
 - Checking each position against range when one has `qspan_positions` and the other doesn't
 
@@ -59,6 +62,7 @@ The issue is in the handling of `qspan_positions` when comparing matches with di
 **Before fix**: Used simple range containment (`start <= other.start && end >= other.end`), which incorrectly said CDDL 1.1 "contains" CDDL 1.0 because 0 <= 18 and 270 >= 270.
 
 **After fix**: Uses set containment semantics matching Python's `Span.__contains__`:
+
 - When one has positions and other has range, checks all positions against the range
 - When both have positions, uses set intersection
 - When both have ranges, uses range containment
@@ -72,6 +76,7 @@ The issue is in the handling of `qspan_positions` when comparing matches with di
 After fixing `qcontains()` and `qoverlap()`, CDDL 1.0 was still being lost. The final bug was in `merge_overlapping_matches()` at lines 251-257:
 
 **Problem**: The `surround()` check only verified that bounds surrounded, not that positions actually overlapped. CDDL 1.1 had two matches:
+
 - m1: start=0, end=270, 174 scattered positions
 - m2: start=18, end=143, 81 scattered positions
 
@@ -113,11 +118,11 @@ Python has a known bug/limitation where `surround()` doesn't verify actual posit
 
 ## Files to Modify
 
-1. `src/license_detection/models.rs`:
+1. `src/license_detection/models/license_match.rs`:
    - Fixed `qcontains()` to handle mixed `qspan_positions` cases ✓ (already done)
    - Fixed `qoverlap()` to compute actual position overlap ✓ (already done)
 
-2. `src/license_detection/match_refine.rs`:
+2. `src/license_detection/match_refine/merge.rs`:
    - Add `qoverlap > 0` check in `surround()` merge condition (NOT YET APPLIED)
 
 ---
@@ -128,7 +133,8 @@ Python has a known bug/limitation where `surround()` doesn't verify actual posit
 
 **The surround merge overlap check is NOT applied.**
 
-Current state of `src/license_detection/match_refine.rs` at lines 251-258:
+Current state of `src/license_detection/match_refine/merge.rs`:
+
 ```rust
 if current.surround(&next) {
     let combined = combine_matches(&current, &next);

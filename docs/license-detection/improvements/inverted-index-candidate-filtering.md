@@ -30,7 +30,7 @@ Python iterates ALL matchable rules and computes set intersection for each one. 
 
 ### Rust Implementation
 
-**File**: `src/license_detection/seq_match.rs`, lines 251-277
+**File**: `src/license_detection/seq_match/candidates.rs`
 
 ```rust
 for (rid, rule) in index.rules_by_rid.iter().enumerate() {
@@ -66,9 +66,9 @@ pub rids_by_high_tid: HashMap<u16, HashSet<usize>>,
 ### Modified Candidate Selection
 
 ```rust
-// In seq_match.rs
+// In seq_match/candidates.rs
 fn compute_candidates(query: &Query, index: &LicenseIndex, top_n: usize) -> Vec<Candidate> {
-    let query_high_tids: HashSet<u16> = query.token_ids
+    let query_high_tids: HashSet<u16> = query.tokens
         .iter()
         .filter(|&&tid| tid < index.len_legalese)
         .copied()
@@ -91,7 +91,7 @@ fn compute_candidates(query: &Query, index: &LicenseIndex, top_n: usize) -> Vec<
 
 ### Index Construction
 
-Build during index creation in `src/license_detection/index/builder.rs`:
+Build during index creation in `src/license_detection/index/builder/mod.rs`:
 
 ```rust
 let mut rids_by_high_tid: HashMap<u16, HashSet<usize>> = HashMap::new();
@@ -109,11 +109,11 @@ for (rid, rule_tokens) in rules_token_ids.iter().enumerate() {
 
 ## Expected Benefits
 
-| Metric | Current | After Improvement |
-|--------|---------|-------------------|
-| Rules checked per file | O(n_rules) ~1000+ | O(matching_rules) ~10-100 |
-| Set intersections computed | All rules | Only candidate rules |
-| Memory overhead | None | HashMap<u16, HashSet<usize>> |
+| Metric                     | Current           | After Improvement            |
+| -------------------------- | ----------------- | ---------------------------- |
+| Rules checked per file     | O(n_rules) ~1000+ | O(matching_rules) ~10-100    |
+| Set intersections computed | All rules         | Only candidate rules         |
+| Memory overhead            | None              | HashMap<u16, HashSet<usize>> |
 
 For a typical source file with few/no license matches, the inverted index could skip 90%+ of rules without any intersection computation.
 
@@ -142,12 +142,12 @@ For a typical source file with few/no license matches, the inverted index could 
 
 ## Relevant Files
 
-| File | Purpose |
-|------|---------|
-| `src/license_detection/seq_match.rs:251-318` | Candidate selection loop |
-| `src/license_detection/index/mod.rs` | LicenseIndex struct |
-| `src/license_detection/index/builder.rs` | Index construction |
-| `reference/scancode-toolkit/src/licensedcode/match_set.py` | Python reference |
+| File                                                       | Purpose                  |
+| ---------------------------------------------------------- | ------------------------ |
+| `src/license_detection/seq_match/candidates.rs`            | Candidate selection loop |
+| `src/license_detection/index/mod.rs`                       | LicenseIndex struct      |
+| `src/license_detection/index/builder/mod.rs`               | Index construction       |
+| `reference/scancode-toolkit/src/licensedcode/match_set.py` | Python reference         |
 
 ---
 

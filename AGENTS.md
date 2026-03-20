@@ -10,7 +10,7 @@ This guide provides essential information for AI coding agents working on the `s
 - **How-To Guides**: [`docs/HOW_TO_ADD_A_PARSER.md`](docs/HOW_TO_ADD_A_PARSER.md) - Step-by-step guide for adding new parsers
 - **Architectural Decision Records**: [`docs/adr/`](docs/adr/) - Why key decisions were made (5 ADRs)
 - **Beyond-Parity Features**: [`docs/improvements/`](docs/improvements/) - Where Rust exceeds Python (7 parsers documented)
-- **License Detection Debugging**: [`docs/DEBUG-LICENSE-DETECTION.md`](docs/DEBUG-LICENSE-DETECTION.md) - Debug Python and Rust license detection pipelines
+- **License Detection Architecture**: [`docs/license-detection/ARCHITECTURE.md`](docs/license-detection/ARCHITECTURE.md) - Current license detection architecture, embedded index flow, and maintainer workflow
 - **Supported Formats**: [`docs/SUPPORTED_FORMATS.md`](docs/SUPPORTED_FORMATS.md) - Auto-generated list of all supported package formats
 - **API Reference**: Run `cargo doc --open` - Complete API documentation
 - **This File**: Quick start, code style, common pitfalls
@@ -53,6 +53,7 @@ You **cannot** and **should not** follow the reference Python implementation lin
 **Use the reference to understand WHAT to build, not HOW to build it.** Implement features using clean, idiomatic Rust that leverages the language's strengths while maintaining complete functional compatibility with the original.
 
 Note: there is a copy of the reference available that can be executed to generate reference data. It is at `reference/scancode-playground` and you can run Python files like:
+
 ```
 cd reference/scancode-playground && venv/bin/python src/scancode/cli.py
 ```

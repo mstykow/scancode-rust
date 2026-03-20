@@ -1,8 +1,10 @@
 # SPDX-LID Matcher Deduplication Fix
 
 **Date**: 2026-02-12
-**Component**: `src/license_detection/spdx_lid.rs`
+**Component**: `src/license_detection/spdx_lid/mod.rs`
 **Type**: Bug Fix
+
+**Status**: Implemented
 
 ## Problem
 
@@ -10,65 +12,34 @@ The SPDX-LID matcher was creating thousands of duplicate matches for a single SP
 
 When detecting `SPDX-License-Identifier: MIT`, the original implementation returned one match for **every rule** in the index with `license_expression: "mit"` — resulting in thousands of identical matches, each with a different `rule_identifier`.
 
-## Root Cause
+## Historical Root Cause
 
-The `find_matching_rules()` function returned `Vec<usize>` containing ALL rules matching the SPDX key:
+The original implementation effectively fanned out one SPDX identifier to every
+rule carrying the same normalized license expression, so a single SPDX line
+could explode into many duplicate matches.
 
-```rust
-fn find_matching_rules(index: &LicenseIndex, spdx_key: &str) -> Vec<usize> {
-    let normalized_spdx = normalize_spdx_key(spdx_key);
-    index.rules_by_rid
-        .iter()
-        .enumerate()
-        .filter(|(_, rule)| normalize_spdx_key(&rule.license_expression) == normalized_spdx)
-        .map(|(rid, _)| rid)
-        .collect()
-}
-```
+This was incorrect because the ScanCode Python implementation returns one SPDX
+match per identifier occurrence, not one per matching rule.
 
-This was incorrect because the ScanCode Python implementation only returns **one match per SPDX identifier**, selecting the rule with the highest relevance.
+## Current Implementation
 
-## Solution
+The current implementation avoids duplicate fan-out in two places:
 
-Changed `find_matching_rules()` to `find_best_matching_rule()`:
+1. `src/license_detection/index/builder/mod.rs` builds `rid_by_spdx_key`, a
+   single SPDX-key-to-rule mapping used for SPDX lookup.
+2. `src/license_detection/spdx_lid/mod.rs` resolves SPDX expressions through
+   that map and creates one `LicenseMatch` per SPDX identifier occurrence.
 
-```rust
-fn find_best_matching_rule(index: &LicenseIndex, spdx_key: &str) -> Option<usize> {
-    let normalized_spdx = normalize_spdx_key(spdx_key);
-
-    let mut best_rid: Option<usize> = None;
-    let mut best_relevance: u8 = 0;
-
-    for (rid, rule) in index.rules_by_rid.iter().enumerate() {
-        let license_expr = normalize_spdx_key(&rule.license_expression);
-
-        if license_expr == normalized_spdx && rule.relevance > best_relevance {
-            best_relevance = rule.relevance;
-            best_rid = Some(rid);
-        }
-    }
-
-    // Fallback to first match if no high-relevance rule found
-    best_rid.or_else(|| {
-        for (rid, rule) in index.rules_by_rid.iter().enumerate() {
-            let license_expr = normalize_spdx_key(&rule.license_expression);
-            if license_expr == normalized_spdx {
-                return Some(rid);
-            }
-        }
-        None
-    })
-}
-```
-
-This returns a single rule ID (the best match by relevance) instead of all matching rules.
+This keeps SPDX matching deterministic and avoids creating duplicate matches for
+every rule sharing the same ScanCode expression.
 
 ## Impact
 
 **Before**: `SPDX-License-Identifier: MIT` → ~1000+ matches
 **After**: `SPDX-License-Identifier: MIT` → 1 match with `matcher: "1-spdx-id"`
 
-The other matches in the output (Aho-Corasick, hash) are expected behavior from the multi-strategy matching pipeline.
+The other matches in the output (Aho-Corasick, hash) are expected behavior from
+the multi-strategy matching pipeline.
 
 ## Python Reference
 

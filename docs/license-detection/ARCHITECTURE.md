@@ -147,7 +147,7 @@ Pre-computed data structures for efficient matching:
 
 ### Query
 
-**File**: `src/license_detection/query.rs`
+**File**: `src/license_detection/query/mod.rs`
 
 Tokenized input text ready for matching:
 
@@ -161,7 +161,6 @@ pub struct Query<'a> {
     pub shorts_and_digits_pos: HashSet<usize>, // Short/digit token positions
     pub high_matchables: HashSet<usize>,       // Legalese token positions
     pub low_matchables: HashSet<usize>,        // Non-legalese token positions
-    pub has_long_lines: bool,                  // Minified content flag
     pub is_binary: bool,                       // Binary content flag
     pub query_run_ranges: Vec<(usize, Option<usize>)>, // Query run boundaries
     pub spdx_lines: Vec<(String, usize, usize)>, // SPDX identifier lines
@@ -169,11 +168,11 @@ pub struct Query<'a> {
 }
 ```
 
-Also includes `QueryRun` struct for processing segmented regions.
+Also includes `QueryRun` values created on demand from stored run ranges.
 
 ### Key Data Models
 
-**File**: `src/license_detection/models.rs`
+**File**: `src/license_detection/models/mod.rs`
 
 | Struct         | Purpose                                                                 |
 | -------------- | ----------------------------------------------------------------------- |
@@ -274,7 +273,7 @@ OUTPUT: Vec<LicenseDetection>
 
 ### 2. SPDX-LID Match (1-spdx-id)
 
-**File**: `src/license_detection/spdx_lid.rs`
+**File**: `src/license_detection/spdx_lid/mod.rs`
 
 - **Purpose**: Detect `SPDX-License-Identifier:` tags
 - **Handles**: Simple identifiers, expressions (AND, OR, WITH), WITH exceptions
@@ -289,7 +288,7 @@ OUTPUT: Vec<LicenseDetection>
 
 ### 4. Sequence Match (3-seq)
 
-**File**: `src/license_detection/seq_match.rs`
+**File**: `src/license_detection/seq_match/mod.rs`
 
 - **Purpose**: Approximate/fuzzy matching for modified licenses
 - **Phases**:
@@ -307,7 +306,7 @@ pub struct ScoresVector {
 }
 ```
 
-### 5. Unknown Match (5-undetected)
+### 5. Unknown Match (6-unknown)
 
 **File**: `src/license_detection/unknown_match.rs`
 
@@ -346,7 +345,7 @@ MIT License text here...
 
 ### Index Building
 
-**File**: `src/license_detection/index/builder.rs`
+**File**: `src/license_detection/index/builder/mod.rs`
 
 Steps:
 

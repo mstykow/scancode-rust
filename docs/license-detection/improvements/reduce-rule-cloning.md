@@ -8,13 +8,14 @@ Eliminate unnecessary cloning of `Rule` structs during candidate selection in se
 
 ## Problem
 
-**File**: `src/license_detection/seq_match.rs`, lines 317, 444
+**File**: `src/license_detection/seq_match/candidates.rs`
 
 ```rust
 step1_candidates.push((svr, svf, rid, rule.clone(), high_set_intersection));
 ```
 
 The `Rule` struct contains 30+ fields including:
+
 - `identifier: String`
 - `license_expression: String`
 - `text: String` (can be several KB for full license texts)
@@ -27,34 +28,36 @@ Each candidate selection clones the entire rule, creating significant memory pre
 
 ## Clone Locations Analysis
 
-| File | Line | Context |
-|------|------|---------|
-| `seq_match.rs` | 317 | `compute_candidates_with_msets()` - step1 candidates |
-| `seq_match.rs` | 444 | `select_candidates()` - Candidate struct |
-| `seq_match.rs` | 1013 | Test helper `add_test_rule()` - intentional |
-| `index/builder.rs` | 943-945 | Test code - intentional |
-| `models.rs` | 1072 | Test verifying Clone trait - intentional |
+| File                      | Line      | Context                                              |
+| ------------------------- | --------- | ---------------------------------------------------- |
+| `seq_match/candidates.rs` | 357       | `compute_candidates_with_msets()` - step1 candidates |
+| `seq_match/candidates.rs` | 423       | `select_candidates()` - Candidate struct             |
+| `seq_match/mod.rs`        | 120       | Test helper `add_test_rule()` - intentional          |
+| `index/builder/tests.rs`  | test code | Intentional test-only cloning                        |
+| `models/*`                | test code | Intentional test-only cloning                        |
 
-**Only lines 317 and 444 need fixing** - the others are test code where cloning is acceptable.
+The two production clones in `src/license_detection/seq_match/candidates.rs` are
+the ones worth fixing. The others are test-only cloning and are acceptable.
 
 ---
 
 ## Rule Fields Actually Used in Candidates
 
-| Field | Used For |
-|-------|----------|
-| `relevance` | Score calculation |
-| `license_expression` | LicenseMatch.license_expression |
-| `identifier` | LicenseMatch.rule_identifier |
+| Field                  | Used For                          |
+| ---------------------- | --------------------------------- |
+| `relevance`            | Score calculation                 |
+| `license_expression`   | LicenseMatch.license_expression   |
+| `identifier`           | LicenseMatch.rule_identifier      |
 | `referenced_filenames` | LicenseMatch.referenced_filenames |
-| `is_license_intro` | LicenseMatch flag |
-| `is_license_clue` | LicenseMatch flag |
-| `is_license_reference` | LicenseMatch flag |
-| `is_license_tag` | LicenseMatch flag |
-| `is_license_text` | LicenseMatch flag |
-| `is_from_license` | LicenseMatch flag |
+| `is_license_intro`     | LicenseMatch flag                 |
+| `is_license_clue`      | LicenseMatch flag                 |
+| `is_license_reference` | LicenseMatch flag                 |
+| `is_license_tag`       | LicenseMatch flag                 |
+| `is_license_text`      | LicenseMatch flag                 |
+| `is_from_license`      | LicenseMatch flag                 |
 
 **Fields NOT used from cloned Rule:**
+
 - `text` (large String - several KB)
 - `tokens` (large Vec<u16> - hundreds/thousands of elements)
 - Many other fields...
@@ -82,11 +85,12 @@ The `rule` is a **reference** to the rule object in `idx.rules_by_rid`. Python o
 Wrap rules in `Arc<Rule>` at index construction. Clone only the `Arc` pointer (O(1)).
 
 **Files requiring changes:**
-- `models.rs` - Rule struct
+
+- `models/mod.rs` - Rule struct
 - `index/mod.rs` - `rules_by_rid: Vec<Arc<Rule>>`
-- `index/builder.rs` - wrap in Arc
-- `seq_match.rs` - Candidate struct
-- `hash_match.rs`, `aho_match.rs`, `spdx_lid.rs`, `match_refine.rs` - all accessors
+- `index/builder/mod.rs` - wrap in Arc
+- `seq_match/candidates.rs` - Candidate struct
+- `hash_match.rs`, `aho_match.rs`, `spdx_lid/mod.rs`, `match_refine/*` - all accessors
 
 **Pros:** Thread-safe, enables future parallelization
 **Cons:** High invasiveness (7+ files), Arc overhead on every access
@@ -96,12 +100,13 @@ Wrap rules in `Arc<Rule>` at index construction. Clone only the `Arc` pointer (O
 Remove `rule: Rule` from `Candidate` struct. Look up rule from index when needed via `rid`.
 
 **Files requiring changes:**
-- `seq_match.rs` only
+
+- `seq_match/candidates.rs` plus any call sites that currently expect embedded `Rule` values
 
 **Changes:**
 
-1. Remove `rule: Rule` from `Candidate` struct (line 88)
-2. Remove `rule.clone()` at lines 317, 444
+1. Remove `rule: Rule` from `Candidate` struct
+2. Remove `rule.clone()` from candidate construction
 3. In `seq_match_with_candidates()`, add lookup:
    ```rust
    let rule = &index.rules_by_rid[candidate.rid];
@@ -114,19 +119,20 @@ Remove `rule: Rule` from `Candidate` struct. Look up rule from index when needed
 
 ## Comparison
 
-| Criteria | Option A (Arc) | Option B (rid only) |
-|----------|----------------|---------------------|
-| Invasiveness | High (7+ files) | Low (1 file) |
-| Risk | Higher | Lower |
-| Performance gain | Good | Same or better |
-| Memory overhead | Small (Arc metadata) | None |
-| Python parity | Similar | Closer (explicit lookup) |
+| Criteria         | Option A (Arc)       | Option B (rid only)      |
+| ---------------- | -------------------- | ------------------------ |
+| Invasiveness     | High (7+ files)      | Low (1 file)             |
+| Risk             | Higher               | Lower                    |
+| Performance gain | Good                 | Same or better           |
+| Memory overhead  | Small (Arc metadata) | None                     |
+| Python parity    | Similar              | Closer (explicit lookup) |
 
 ---
 
 ## Recommended Approach
 
 **Implement Option B first** because:
+
 1. Changes localized to `seq_match.rs` only
 2. No changes to core index structure
 3. Lower risk, easier to validate
@@ -140,7 +146,7 @@ Remove `rule: Rule` from `Candidate` struct. Look up rule from index when needed
 ### Before Implementation
 
 ```rust
-// Add temporarily to seq_match.rs
+// Add temporarily to seq_match/candidates.rs
 static CLONE_COUNT: std::sync::atomic::AtomicUsize = AtomicUsize::new(0);
 
 // At line 317
@@ -167,10 +173,10 @@ valgrind --tool=dhat target/release/scancode-rust testdata/ -o /dev/null
 
 ### Benchmark Cases
 
-| Test Case | Why |
-|-----------|-----|
-| Small MIT file | Baseline |
-| Large file with multiple licenses | Many candidates |
+| Test Case                                     | Why                             |
+| --------------------------------------------- | ------------------------------- |
+| Small MIT file                                | Baseline                        |
+| Large file with multiple licenses             | Many candidates                 |
 | GPL family files (GPL-2.0, GPL-2.0+, GPL-3.0) | Similar rules = more candidates |
 
 ---
@@ -192,24 +198,25 @@ cargo run --release -- testdata/ -o output.json
 
 ## Risk Assessment
 
-| Risk | Assessment |
-|------|------------|
-| Thread safety | No impact (single-threaded currently) |
-| Test isolation | No impact (tests have own index instances) |
-| Intentional clones | Only in test code, not affected |
+| Risk               | Assessment                                 |
+| ------------------ | ------------------------------------------ |
+| Thread safety      | No impact (single-threaded currently)      |
+| Test isolation     | No impact (tests have own index instances) |
+| Intentional clones | Only in test code, not affected            |
 
 ---
 
 ## Files Affected
 
-| File | Changes |
-|------|---------|
-| `src/license_detection/seq_match.rs` | Remove `rule` from Candidate, add lookup logic |
+| File                                            | Changes                                        |
+| ----------------------------------------------- | ---------------------------------------------- |
+| `src/license_detection/seq_match/candidates.rs` | Remove `rule` from Candidate, add lookup logic |
 
 No changes needed to:
-- `models.rs`
+
+- `models/mod.rs`
 - `index/mod.rs`
-- `index/builder.rs`
+- `index/builder/mod.rs`
 - Other matchers
 
 ---
