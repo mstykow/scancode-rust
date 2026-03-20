@@ -13,9 +13,9 @@ fi
 # [package.metadata.cargo-machete] ignored list in Cargo.toml.
 output=$(cargo machete 2>&1 || true)
 
-if echo "$output" | grep -q "^scancode-rust -- ./Cargo.toml:"; then
+if echo "$output" | grep -q "^provenant -- ./Cargo.toml:"; then
     echo "Unused dependencies found in Cargo.toml:"
-    echo "$output" | sed -n '/^scancode-rust/,/^$/p'
+    echo "$output" | sed -n '/^provenant/,/^$/p'
     exit 1
 fi
 

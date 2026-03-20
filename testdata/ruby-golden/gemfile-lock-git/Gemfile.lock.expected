@@ -1,0 +1,39 @@
+[
+  {
+    "type": "gem",
+    "primary_language": "Ruby",
+    "parties": [],
+    "extra_data": {
+      "bundler_version": "2.4.1",
+      "platforms": ["ruby"]
+    },
+    "dependencies": [
+      {
+        "purl": "pkg:gem/json@2.6.3",
+        "extracted_requirement": "~> 2.0",
+        "scope": "dependencies",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:gem/my-git-gem@1.2.0",
+        "extracted_requirement": "1.2.0",
+        "scope": "dependencies",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": true,
+        "extra_data": {
+          "ref": "v1.0.0",
+          "branch": "main",
+          "revision": "abc123def456789",
+          "source_type": "GIT",
+          "remote": "https://github.com/example/my-git-gem.git"
+        }
+      }
+    ],
+    "datasource_id": "gemfile_lock"
+  }
+]

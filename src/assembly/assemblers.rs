@@ -1,6 +1,121 @@
-use crate::models::DatasourceId;
+use crate::models::{DatasourceId, FileInfo, Package, TopLevelDependency};
+use strum::EnumIter;
 
-use super::{AssemblerConfig, AssemblyMode};
+use super::{
+    AssemblerConfig, AssemblyMode, DirectoryMergeOutput, cargo_resource_assign,
+    cargo_workspace_merge, composer_resource_assign, conda_rootfs_merge, file_ref_resolve,
+    hackage_merge, npm_resource_assign, npm_workspace_merge, nuget_cpm_resolve,
+    ruby_resource_assign, swift_merge,
+};
+
+#[derive(Clone, Copy)]
+pub(super) enum SpecialDirectoryMergerKind {
+    Skip,
+    Hackage,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, EnumIter)]
+pub(super) enum PostAssemblyPassKind {
+    SwiftMerge,
+    CondaRootfsMerge,
+    NpmResourceAssign,
+    FileReferenceResolve,
+    RpmYumdbMerge,
+    NpmWorkspaceMerge,
+    CargoWorkspaceMerge,
+    NugetCpmResolve,
+    CargoResourceAssign,
+    ComposerResourceAssign,
+    RubyResourceAssign,
+}
+
+pub(super) fn special_directory_merger_for(
+    config_key: DatasourceId,
+) -> Option<SpecialDirectoryMergerKind> {
+    match config_key {
+        DatasourceId::HackageCabal => Some(SpecialDirectoryMergerKind::Hackage),
+        DatasourceId::SwiftPackageManifestJson => Some(SpecialDirectoryMergerKind::Skip),
+        _ => None,
+    }
+}
+
+pub(super) static POST_ASSEMBLY_PASSES: &[PostAssemblyPassKind] = &[
+    PostAssemblyPassKind::SwiftMerge,
+    PostAssemblyPassKind::CondaRootfsMerge,
+    PostAssemblyPassKind::NpmResourceAssign,
+    PostAssemblyPassKind::FileReferenceResolve,
+    PostAssemblyPassKind::RpmYumdbMerge,
+    PostAssemblyPassKind::NpmWorkspaceMerge,
+    PostAssemblyPassKind::CargoWorkspaceMerge,
+    PostAssemblyPassKind::NugetCpmResolve,
+    PostAssemblyPassKind::CargoResourceAssign,
+    PostAssemblyPassKind::ComposerResourceAssign,
+    PostAssemblyPassKind::RubyResourceAssign,
+];
+
+pub(super) fn run_post_assembly_passes(
+    files: &mut [FileInfo],
+    packages: &mut Vec<Package>,
+    dependencies: &mut Vec<TopLevelDependency>,
+) {
+    for pass in POST_ASSEMBLY_PASSES {
+        pass.run(files, packages, dependencies);
+    }
+}
+
+impl SpecialDirectoryMergerKind {
+    pub(super) fn run(
+        self,
+        files: &[FileInfo],
+        file_indices: &[usize],
+    ) -> Vec<DirectoryMergeOutput> {
+        match self {
+            Self::Skip => Vec::new(),
+            Self::Hackage => hackage_merge::assemble_hackage_packages(files, file_indices),
+        }
+    }
+}
+
+impl PostAssemblyPassKind {
+    fn run(
+        self,
+        files: &mut [FileInfo],
+        packages: &mut Vec<Package>,
+        dependencies: &mut Vec<TopLevelDependency>,
+    ) {
+        match self {
+            Self::SwiftMerge => swift_merge::assemble_swift_packages(files, packages, dependencies),
+            Self::CondaRootfsMerge => {
+                conda_rootfs_merge::merge_conda_rootfs_metadata(files, packages, dependencies)
+            }
+            Self::NpmResourceAssign => {
+                npm_resource_assign::assign_npm_package_resources(files, packages)
+            }
+            Self::FileReferenceResolve => {
+                file_ref_resolve::resolve_file_references(files, packages, dependencies)
+            }
+            Self::RpmYumdbMerge => file_ref_resolve::merge_rpm_yumdb_metadata(files, packages),
+            Self::NpmWorkspaceMerge => {
+                npm_workspace_merge::assemble_npm_workspaces(files, packages, dependencies)
+            }
+            Self::CargoWorkspaceMerge => {
+                cargo_workspace_merge::assemble_cargo_workspaces(files, packages, dependencies)
+            }
+            Self::NugetCpmResolve => {
+                nuget_cpm_resolve::resolve_nuget_cpm_versions(files, dependencies)
+            }
+            Self::CargoResourceAssign => {
+                cargo_resource_assign::assign_cargo_package_resources(files, packages)
+            }
+            Self::ComposerResourceAssign => {
+                composer_resource_assign::assign_composer_package_resources(files, packages)
+            }
+            Self::RubyResourceAssign => {
+                ruby_resource_assign::assign_ruby_package_resources(files, packages)
+            }
+        }
+    }
+}
 
 pub static ASSEMBLERS: &[AssemblerConfig] = &[
     // ── Sibling-merge assemblers ──
@@ -10,6 +125,8 @@ pub static ASSEMBLERS: &[AssemblerConfig] = &[
     // so "npm_shrinkwrap_json" is NOT a real datasource_id.
     AssemblerConfig {
         datasource_ids: &[
+            DatasourceId::BunLock,
+            DatasourceId::BunLockb,
             DatasourceId::NpmPackageJson,
             DatasourceId::NpmPackageLockJson,
             DatasourceId::YarnLock,
@@ -18,6 +135,8 @@ pub static ASSEMBLERS: &[AssemblerConfig] = &[
         ],
         sibling_file_patterns: &[
             "package.json",
+            "bun.lock",
+            "bun.lockb",
             "package-lock.json",
             "npm-shrinkwrap.json",
             "yarn.lock",
@@ -46,23 +165,58 @@ pub static ASSEMBLERS: &[AssemblerConfig] = &[
     // PHP Composer ecosystem
     AssemblerConfig {
         datasource_ids: &[DatasourceId::PhpComposerJson, DatasourceId::PhpComposerLock],
-        sibling_file_patterns: &["composer.json", "composer.lock"],
+        sibling_file_patterns: &[
+            "*composer.json",
+            "composer.*.json",
+            "*composer.lock",
+            "composer.*.lock",
+        ],
         mode: AssemblyMode::SiblingMerge,
     },
     // Go ecosystem (includes legacy Godeps)
     AssemblerConfig {
         datasource_ids: &[
             DatasourceId::GoMod,
+            DatasourceId::GoModGraph,
             DatasourceId::GoSum,
+            DatasourceId::GoWork,
             DatasourceId::Godeps,
         ],
-        sibling_file_patterns: &["go.mod", "go.sum", "Godeps.json"],
+        sibling_file_patterns: &[
+            "go.mod",
+            "go.work",
+            "go.mod.graph",
+            "go.modgraph",
+            "go.sum",
+            "Godeps.json",
+        ],
         mode: AssemblyMode::SiblingMerge,
     },
     // Dart/Flutter ecosystem
     AssemblerConfig {
         datasource_ids: &[DatasourceId::PubspecYaml, DatasourceId::PubspecLock],
         sibling_file_patterns: &["pubspec.yaml", "pubspec.lock"],
+        mode: AssemblyMode::SiblingMerge,
+    },
+    // Pixi ecosystem
+    AssemblerConfig {
+        datasource_ids: &[DatasourceId::PixiToml, DatasourceId::PixiLock],
+        sibling_file_patterns: &["pixi.toml", "pixi.lock"],
+        mode: AssemblyMode::SiblingMerge,
+    },
+    // Helm chart ecosystem
+    AssemblerConfig {
+        datasource_ids: &[DatasourceId::HelmChartYaml, DatasourceId::HelmChartLock],
+        sibling_file_patterns: &["Chart.yaml", "Chart.lock"],
+        mode: AssemblyMode::SiblingMerge,
+    },
+    AssemblerConfig {
+        datasource_ids: &[
+            DatasourceId::HackageCabal,
+            DatasourceId::HackageCabalProject,
+            DatasourceId::HackageStackYaml,
+        ],
+        sibling_file_patterns: &["*.cabal", "cabal.project", "stack.yaml"],
         mode: AssemblyMode::SiblingMerge,
     },
     // Chef ecosystem
@@ -101,6 +255,11 @@ pub static ASSEMBLERS: &[AssemblerConfig] = &[
         sibling_file_patterns: &["pom.xml", "pom.properties", "**/META-INF/MANIFEST.MF"],
         mode: AssemblyMode::SiblingMerge,
     },
+    AssemblerConfig {
+        datasource_ids: &[DatasourceId::PypiWheel, DatasourceId::PypiPipOriginJson],
+        sibling_file_patterns: &["*.whl", "origin.json"],
+        mode: AssemblyMode::SiblingMerge,
+    },
     // Python/PyPI ecosystem
     AssemblerConfig {
         datasource_ids: &[
@@ -110,10 +269,13 @@ pub static ASSEMBLERS: &[AssemblerConfig] = &[
             DatasourceId::PypiWheel,
             DatasourceId::PypiWheelMetadata,
             DatasourceId::PypiEgg,
+            DatasourceId::PypiJson,
             DatasourceId::PypiSdistPkginfo,
             DatasourceId::PypiInspectDeplock,
             DatasourceId::PipRequirements,
             DatasourceId::PypiPoetryLock,
+            DatasourceId::PypiPylockToml,
+            DatasourceId::PypiUvLock,
             DatasourceId::Pipfile,
             DatasourceId::PipfileLock,
         ],
@@ -121,22 +283,42 @@ pub static ASSEMBLERS: &[AssemblerConfig] = &[
             "pyproject.toml",
             "setup.py",
             "setup.cfg",
+            "PKG-INFO",
+            "METADATA",
+            "pypi.json",
             "requirements*.txt",
             "Pipfile",
             "Pipfile.lock",
             "poetry.lock",
+            "pylock.toml",
+            "pylock.*.toml",
+            "uv.lock",
         ],
+        mode: AssemblyMode::SiblingMerge,
+    },
+    AssemblerConfig {
+        datasource_ids: &[DatasourceId::DenoJson, DatasourceId::DenoLock],
+        sibling_file_patterns: &["deno.json", "deno.jsonc", "deno.lock"],
         mode: AssemblyMode::SiblingMerge,
     },
     // Ruby/RubyGems ecosystem
     AssemblerConfig {
         datasource_ids: &[
+            DatasourceId::GemArchiveExtracted,
             DatasourceId::Gemspec,
             DatasourceId::Gemfile,
             DatasourceId::GemfileLock,
             DatasourceId::GemArchive,
         ],
-        sibling_file_patterns: &["*.gemspec", "Gemfile", "Gemfile.lock"],
+        sibling_file_patterns: &[
+            "metadata.gz-extract",
+            "**/data.gz-extract/*.gemspec",
+            "**/data.gz-extract/Gemfile",
+            "**/data.gz-extract/Gemfile.lock",
+            "*.gemspec",
+            "Gemfile",
+            "Gemfile.lock",
+        ],
         mode: AssemblyMode::SiblingMerge,
     },
     // Conda ecosystem
@@ -146,7 +328,15 @@ pub static ASSEMBLERS: &[AssemblerConfig] = &[
             DatasourceId::CondaYaml,
             DatasourceId::CondaMetaJson,
         ],
-        sibling_file_patterns: &["meta.yaml", "environment.yml"],
+        sibling_file_patterns: &[
+            "meta.yaml",
+            "meta.yml",
+            "environment.yml",
+            "environment.yaml",
+            "conda.yaml",
+            "env.yaml",
+            "*.json",
+        ],
         mode: AssemblyMode::SiblingMerge,
     },
     // RPM specfile (source packages)
@@ -169,6 +359,11 @@ pub static ASSEMBLERS: &[AssemblerConfig] = &[
         datasource_ids: &[DatasourceId::BuildGradle, DatasourceId::GradleLockfile],
         sibling_file_patterns: &["build.gradle", "build.gradle.kts", "gradle.lockfile"],
         mode: AssemblyMode::SiblingMerge,
+    },
+    AssemblerConfig {
+        datasource_ids: &[DatasourceId::GradleModule],
+        sibling_file_patterns: &["*.module"],
+        mode: AssemblyMode::OnePerPackageData,
     },
     // CPAN/Perl ecosystem
     AssemblerConfig {
@@ -213,6 +408,11 @@ pub static ASSEMBLERS: &[AssemblerConfig] = &[
             "*.vbproj",
         ],
         mode: AssemblyMode::SiblingMerge,
+    },
+    AssemblerConfig {
+        datasource_ids: &[DatasourceId::NugetDepsJson],
+        sibling_file_patterns: &["*.deps.json"],
+        mode: AssemblyMode::OnePerPackageData,
     },
     // Swift/SPM ecosystem
     AssemblerConfig {
@@ -288,6 +488,11 @@ pub static ASSEMBLERS: &[AssemblerConfig] = &[
         sibling_file_patterns: &["BUILD"],
         mode: AssemblyMode::SiblingMerge,
     },
+    AssemblerConfig {
+        datasource_ids: &[DatasourceId::BazelModule],
+        sibling_file_patterns: &["MODULE.bazel"],
+        mode: AssemblyMode::OnePerPackageData,
+    },
     // Buck (build system)
     AssemblerConfig {
         datasource_ids: &[DatasourceId::BuckFile, DatasourceId::BuckMetadata],
@@ -314,6 +519,11 @@ pub static ASSEMBLERS: &[AssemblerConfig] = &[
         sibling_file_patterns: &["installed"],
         mode: AssemblyMode::OnePerPackageData,
     },
+    AssemblerConfig {
+        datasource_ids: &[DatasourceId::AlpineApkbuild],
+        sibling_file_patterns: &["APKBUILD"],
+        mode: AssemblyMode::SiblingMerge,
+    },
     // RPM installed package databases (BDB, NDB, SQLite)
     AssemblerConfig {
         datasource_ids: &[
@@ -333,6 +543,11 @@ pub static ASSEMBLERS: &[AssemblerConfig] = &[
         sibling_file_patterns: &["status"],
         mode: AssemblyMode::OnePerPackageData,
     },
+    AssemblerConfig {
+        datasource_ids: &[DatasourceId::AboutFile],
+        sibling_file_patterns: &["*.ABOUT"],
+        mode: AssemblyMode::OnePerPackageData,
+    },
 ];
 
 /// Datasource IDs that are intentionally NOT assembled.
@@ -347,7 +562,6 @@ pub static ASSEMBLERS: &[AssemblerConfig] = &[
 pub static UNASSEMBLED_DATASOURCE_IDS: &[DatasourceId] = &[
     // Non-package metadata
     DatasourceId::Readme,
-    DatasourceId::AboutFile,
     DatasourceId::EtcOsRelease,
     DatasourceId::Gitmodules,
     // Binary archives (require external extraction via ExtractCode before scanning)
@@ -374,17 +588,28 @@ pub static UNASSEMBLED_DATASOURCE_IDS: &[DatasourceId] = &[
     DatasourceId::SharShellArchive,
     DatasourceId::SquashfsDiskImage,
     // Supplementary metadata (not primary package definitions)
+    DatasourceId::ArchAurinfo,
+    DatasourceId::ArchPkginfo,
+    DatasourceId::ArchSrcinfo,
     DatasourceId::Axis2ModuleXml,
+    DatasourceId::ClojureDepsEdn,
+    DatasourceId::ClojureProjectClj,
     DatasourceId::DebianControlExtractedDeb,
     DatasourceId::DebianInstalledFilesList,
     DatasourceId::DebianInstalledMd5Sums,
     DatasourceId::DebianMd5SumsInExtractedDeb,
     DatasourceId::DebianSourceControlDsc,
-    DatasourceId::GemArchiveExtracted,
+    DatasourceId::Dockerfile,
+    DatasourceId::HexMixLock,
     DatasourceId::JavaEarApplicationXml,
     DatasourceId::JavaWarWebXml,
     DatasourceId::JbossServiceXml,
+    DatasourceId::MesonBuild,
+    DatasourceId::NugetDirectoryBuildProps,
+    DatasourceId::NugetDirectoryPackagesProps,
     DatasourceId::RpmPackageLicenses,
+    DatasourceId::SbtBuildSbt,
+    DatasourceId::VcpkgJson,
 ];
 
 #[cfg(test)]
@@ -420,5 +645,42 @@ mod tests {
             "Datasource IDs in NEITHER ASSEMBLERS nor UNASSEMBLED: {missing:?}\n\
              Add each to an AssemblerConfig in ASSEMBLERS, or to UNASSEMBLED_DATASOURCE_IDS."
         );
+    }
+
+    #[test]
+    fn test_post_assembly_passes_are_unique() {
+        let unique: HashSet<PostAssemblyPassKind> = POST_ASSEMBLY_PASSES.iter().copied().collect();
+
+        assert_eq!(
+            unique.len(),
+            POST_ASSEMBLY_PASSES.len(),
+            "POST_ASSEMBLY_PASSES contains duplicate entries"
+        );
+    }
+
+    #[test]
+    fn test_every_post_assembly_pass_kind_is_registered_once() {
+        let registered: HashSet<PostAssemblyPassKind> =
+            POST_ASSEMBLY_PASSES.iter().copied().collect();
+
+        let missing: Vec<_> = PostAssemblyPassKind::iter()
+            .filter(|pass| !registered.contains(pass))
+            .collect();
+
+        assert!(
+            missing.is_empty(),
+            "Post-assembly pass variants not registered in POST_ASSEMBLY_PASSES: {missing:?}"
+        );
+
+        for pass in PostAssemblyPassKind::iter() {
+            let count = POST_ASSEMBLY_PASSES
+                .iter()
+                .filter(|registered| **registered == pass)
+                .count();
+            assert_eq!(
+                count, 1,
+                "Post-assembly pass {pass:?} should be registered exactly once"
+            );
+        }
     }
 }

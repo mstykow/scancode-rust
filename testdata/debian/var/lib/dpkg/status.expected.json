@@ -1,0 +1,46 @@
+[
+  {
+    "type": "deb",
+    "namespace": "ubuntu",
+    "name": "bash",
+    "version": "5.2.15-2ubuntu1",
+    "qualifiers": {
+      "arch": "amd64"
+    },
+    "description": "GNU Bourne Again SHell\n Bash is an sh-compatible command language interpreter.",
+    "parties": [
+      {
+        "type": "person",
+        "role": "maintainer",
+        "name": "Ubuntu Developers",
+        "email": "ubuntu-devel-discuss@lists.ubuntu.com"
+      }
+    ],
+    "keywords": ["shells"],
+    "extra_data": {
+      "installed_size": 7164
+    },
+    "dependencies": [
+      {
+        "purl": "pkg:deb/ubuntu/base-files",
+        "extracted_requirement": ">= 2.1.12",
+        "scope": "depends",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:deb/ubuntu/debianutils",
+        "extracted_requirement": ">= 5.6-0.1",
+        "scope": "depends",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true
+      }
+    ],
+    "datasource_id": "debian_installed_status_db",
+    "purl": "pkg:deb/ubuntu/bash@5.2.15-2ubuntu1?arch=amd64"
+  }
+]

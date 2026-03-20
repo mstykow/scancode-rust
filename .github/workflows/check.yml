@@ -23,7 +23,7 @@ jobs:
           submodules: recursive
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@1.93.1
+        uses: dtolnay/rust-toolchain@1.94.0
         with:
           components: rustfmt, clippy
 
@@ -39,7 +39,7 @@ jobs:
       - name: Check compilation
         run: cargo check --all --verbose
 
-      - name: Run unit/integration/e2e/doc tests
+      - name: Run unit/integration/doc tests
         run: cargo test --all --verbose
 
       - name: Check for unused dependencies
@@ -67,7 +67,7 @@ jobs:
           submodules: recursive
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@1.93.1
+        uses: dtolnay/rust-toolchain@1.94.0
 
       - name: Set up Rust cache
         uses: Swatinem/rust-cache@v2
@@ -79,6 +79,21 @@ jobs:
         run: |
           set -euo pipefail
           if [[ "${{ matrix.shard }}" == "parsers" ]]; then
+            cargo test --lib --verbose --features golden-tests --no-run
+
+            test_binary=""
+            while IFS= read -r candidate; do
+              if [[ -f "$candidate" && -x "$candidate" ]]; then
+                test_binary="$candidate"
+                break
+              fi
+            done < <(ls -t target/debug/deps/provenant-* 2>/dev/null)
+
+            if [[ -z "$test_binary" ]]; then
+              echo "Could not determine parser golden test binary path" >&2
+              exit 1
+            fi
+
             shopt -s nullglob
             parser_files=(src/parsers/*_golden_test.rs)
             if (( ${#parser_files[@]} == 0 )); then
@@ -91,7 +106,7 @@ jobs:
               module_name="${module_name%.rs}"
               filter="parsers::${module_name}::"
               echo "Running golden filter: $filter"
-              cargo test --lib --verbose --features golden-tests "$filter"
+              "$test_binary" "$filter"
             done
           else
             echo "Running golden filter: ${{ matrix.filter }}"
@@ -120,10 +135,10 @@ jobs:
         run: npm run format:check
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@1.93.1
+        uses: dtolnay/rust-toolchain@1.94.0
 
       - name: Validate URLs
-        run: cargo run --quiet --bin validate-urls -- --root .
+        run: npm run validate:urls
         continue-on-error: true
 
       - name: Lint Markdown

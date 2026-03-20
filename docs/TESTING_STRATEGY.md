@@ -2,7 +2,7 @@
 
 ## Philosophy
 
-scancode-rust uses a **behavior-focused, multi-layered testing approach** that prioritizes intelligent coverage over arbitrary test quotas.
+Provenant uses a **behavior-focused, multi-layered testing approach** that prioritizes intelligent coverage over arbitrary test quotas.
 
 ### Core Principles
 
@@ -56,8 +56,8 @@ scancode-rust uses a **behavior-focused, multi-layered testing approach** that p
 /// # Examples
 ///
 /// ```rust
-/// use scancode_rust::scanner::process;
-/// use scancode_rust::progress::{ProgressMode, ScanProgress};
+/// use provenant::scanner::process;
+/// use provenant::progress::{ProgressMode, ScanProgress};
 /// use std::path::PathBuf;
 /// use std::sync::Arc;
 ///
@@ -74,7 +74,7 @@ pub fn process(...) -> Result<ScanResult> {
 
 **Location**: Inline in source code as `///` or `//!` doc comments
 
-**Current Status**: 14 doctests covering main API entry points (all passing)
+**Current Status**: Doctests cover the main API entry points.
 
 ---
 
@@ -209,7 +209,7 @@ fn test_scanner_discovers_all_registered_parsers() {
 
 - Primarily golden tests (parse file → compare to `.expected.json`)
 - Tests entire pipeline at once
-- Typically 10-15 test files per ecosystem
+- Often relies on a compact set of fixture-backed tests per ecosystem
 
 **Trade-offs**:
 
@@ -218,7 +218,7 @@ fn test_scanner_discovers_all_registered_parsers() {
 - ❌ Large JSON diffs are difficult to interpret
 - ❌ Slower execution (file I/O, JSON serialization)
 
-### scancode-rust Approach
+### Provenant Approach
 
 **Structure**:
 
@@ -353,15 +353,15 @@ Use distinct commands for the two golden fixture domains:
 
 ```bash
 # Parser golden snapshots (.expected.json)
-cargo run --bin update-parser-golden -- --list
-cargo run --bin update-parser-golden -- <ParserType> <input_file> <output_file>
+cargo run --manifest-path xtask/Cargo.toml --bin update-parser-golden -- --list
+cargo run --manifest-path xtask/Cargo.toml --bin update-parser-golden -- <ParserType> <input_file> <output_file>
 ./scripts/update_parser_golden.sh <ParserType> <input_file> <output_file>
 
 # Copyright golden YAML fixtures (authors / ics / copyrights)
 # Note: "ics" here means Android Ice Cream Sandwich (Android 4.0) fixture corpus from
 # the ScanCode reference test data.
-cargo run --bin update-copyright-golden -- copyrights --list-mismatches --show-diff
-cargo run --bin update-copyright-golden -- copyrights --filter <pattern> --write
+cargo run --manifest-path xtask/Cargo.toml --bin update-copyright-golden -- copyrights --list-mismatches --show-diff
+cargo run --manifest-path xtask/Cargo.toml --bin update-copyright-golden -- copyrights --filter <pattern> --write
 ./scripts/update_copyright_golden.sh copyrights --list-mismatches --show-diff
 ```
 

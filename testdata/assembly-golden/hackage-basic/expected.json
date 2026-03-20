@@ -1,0 +1,122 @@
+{
+  "packages": [
+    {
+      "type": "hackage",
+      "name": "aaa-example-hackage",
+      "version": "0.1.0.0",
+      "primary_language": "Haskell",
+      "description": "Assembly Hackage package\n\nAssembly Hackage package.",
+      "parties": [
+        {
+          "type": "person",
+          "role": "author",
+          "name": "Alice Example",
+          "email": "alice@example.com"
+        },
+        {
+          "type": "person",
+          "role": "maintainer",
+          "name": "Carol Maintainer",
+          "email": "carol@example.com"
+        }
+      ],
+      "keywords": ["Web"],
+      "homepage_url": "https://example.com/aaa-example-hackage",
+      "bug_tracking_url": "https://example.com/aaa-example-hackage/issues",
+      "vcs_url": "https://github.com/example/aaa-example-hackage.git",
+      "extracted_license_statement": "BSD-3-Clause",
+      "extra_data": {
+        "resolver": "lts-22.10",
+        "allow_newer": "true",
+        "flags": {
+          "wai": {
+            "warp": true
+          }
+        }
+      },
+      "repository_homepage_url": "https://hackage.haskell.org/package/aaa-example-hackage-0.1.0.0",
+      "purl": "pkg:hackage/aaa-example-hackage@0.1.0.0",
+      "package_uid": "pkg:hackage/aaa-example-hackage@0.1.0.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "datafile_paths": ["aaa-example-hackage.cabal", "cabal.project", "stack.yaml"],
+      "datasource_ids": ["hackage_cabal", "hackage_cabal_project", "hackage_stack_yaml"]
+    }
+  ],
+  "dependencies": [
+    {
+      "purl": "pkg:hackage/aeson@2.2.1.0",
+      "extracted_requirement": "2.2.1.0",
+      "scope": "extra-deps",
+      "is_optional": false,
+      "is_pinned": true,
+      "is_direct": true,
+      "dependency_uid": "pkg:hackage/aeson@2.2.1.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "for_package_uid": "pkg:hackage/aaa-example-hackage@0.1.0.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "datafile_path": "stack.yaml",
+      "datasource_id": "hackage_stack_yaml"
+    },
+    {
+      "purl": "pkg:hackage/base",
+      "extracted_requirement": ">=4.14 && <5",
+      "scope": "build-depends",
+      "is_runtime": true,
+      "is_optional": false,
+      "is_pinned": false,
+      "is_direct": true,
+      "extra_data": {
+        "component_type": "library"
+      },
+      "dependency_uid": "pkg:hackage/base?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "for_package_uid": "pkg:hackage/aaa-example-hackage@0.1.0.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "datafile_path": "aaa-example-hackage.cabal",
+      "datasource_id": "hackage_cabal"
+    },
+    {
+      "purl": "pkg:hackage/lens@5.2.1",
+      "extracted_requirement": "5.2.1",
+      "scope": "extra-packages",
+      "is_optional": false,
+      "is_pinned": true,
+      "is_direct": true,
+      "dependency_uid": "pkg:hackage/lens@5.2.1?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "for_package_uid": "pkg:hackage/aaa-example-hackage@0.1.0.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "datafile_path": "cabal.project",
+      "datasource_id": "hackage_cabal_project"
+    },
+    {
+      "purl": "pkg:hackage/text@1.2.5.0",
+      "extracted_requirement": "==1.2.5.0",
+      "scope": "build-depends",
+      "is_runtime": true,
+      "is_optional": false,
+      "is_pinned": true,
+      "is_direct": true,
+      "extra_data": {
+        "component_type": "library"
+      },
+      "dependency_uid": "pkg:hackage/text@1.2.5.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "for_package_uid": "pkg:hackage/aaa-example-hackage@0.1.0.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "datafile_path": "aaa-example-hackage.cabal",
+      "datasource_id": "hackage_cabal"
+    }
+  ],
+  "files_with_packages": [
+    {
+      "path": "aaa-example-hackage.cabal",
+      "for_packages": [
+        "pkg:hackage/aaa-example-hackage@0.1.0.0?uuid=fixed-uid-done-for-testing-5642512d1758"
+      ]
+    },
+    {
+      "path": "cabal.project",
+      "for_packages": [
+        "pkg:hackage/aaa-example-hackage@0.1.0.0?uuid=fixed-uid-done-for-testing-5642512d1758"
+      ]
+    },
+    {
+      "path": "stack.yaml",
+      "for_packages": [
+        "pkg:hackage/aaa-example-hackage@0.1.0.0?uuid=fixed-uid-done-for-testing-5642512d1758"
+      ]
+    }
+  ]
+}

@@ -70,7 +70,7 @@ The parser handles all pnpm workspace glob patterns:
 
 ### What Python Does
 
-Python's `BaseNpmHandler.assemble()` in `packagedcode/npm.py` handles workspace assembly:
+The Python reference handles workspace assembly by:
 
 - Reads `workspaces` from package.json
 - Reads `pnpm-workspace.yaml` if present
@@ -80,7 +80,7 @@ Python's `BaseNpmHandler.assemble()` in `packagedcode/npm.py` handles workspace 
 
 ### What Rust Improves
 
-Our workspace assembly (`src/assembly/workspace_merge.rs`) achieves full feature parity with Python and adds several improvements:
+Rust achieves feature parity with that assembly behavior and adds several improvements:
 
 | Feature                                  | Python | Rust | Improvement                                                |
 | ---------------------------------------- | ------ | ---- | ---------------------------------------------------------- |
@@ -112,18 +112,8 @@ Our workspace assembly (`src/assembly/workspace_merge.rs`) achieves full feature
 
 ## References
 
-### Python Reference
-
-- `reference/scancode-toolkit/src/packagedcode/npm.py` — `PnpmWorkspaceYamlHandler` (NonAssemblable, no extraction)
-- `reference/scancode-toolkit/src/packagedcode/npm.py` — `BaseNpmHandler.assemble()` (workspace assembly logic)
-
 ### pnpm Documentation
 
 - [pnpm-workspace.yaml](https://pnpm.io/pnpm-workspace_yaml)
 
-## Status
-
-- ✅ **Parser**: Complete, validated, production-ready
-- ✅ **Assembly**: Complete with full feature parity + improvements
-- ✅ **Testing**: Unit tests + 2 golden tests (npm-workspace, pnpm-workspace)
-- ✅ **Documentation**: Complete
+The parser and assembly behavior above describe the stable workspace improvements that matter to users.

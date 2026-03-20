@@ -40,7 +40,7 @@ testdata/assembly-golden/
 └── README.md                # This file
 ```
 
-**Current test cases**: Run `ls testdata/assembly-golden/` to see all available test directories.
+For the current fixture set, inspect the directories under `testdata/assembly-golden/`.
 
 ## Test Execution Flow
 
@@ -105,6 +105,8 @@ Currently tested ecosystems:
 - **Cargo** - `Cargo.toml` + `Cargo.lock`
 - **Go** - `go.mod` + `go.sum`
 - **Composer** - `composer.json` + `composer.lock`
+- **NuGet CPM** - `Directory.Packages.props` + PackageReference project files
+- **NuGet CPM + Directory.Build.props** - bounded build-props-backed central version and VersionOverride resolution
 
 Additional ecosystems can be added by:
 
@@ -115,13 +117,7 @@ Additional ecosystems can be added by:
 ## Running Tests
 
 ```bash
-# Run all assembly golden tests
 cargo test --lib assembly_golden
-
-# Run specific test
-cargo test --lib test_assembly_npm_basic
-
-# Run with output
 cargo test --lib assembly_golden -- --nocapture
 ```
 

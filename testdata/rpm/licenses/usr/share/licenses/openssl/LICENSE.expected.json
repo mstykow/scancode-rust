@@ -1,0 +1,10 @@
+[
+  {
+    "type": "rpm",
+    "namespace": "mariner",
+    "name": "openssl",
+    "parties": [],
+    "datasource_id": "rpm_package_licenses",
+    "purl": "pkg:rpm/mariner/openssl"
+  }
+]

@@ -1,0 +1,8 @@
+{
+  "name": "root/package",
+  "version": "1.0.0",
+  "description": "Root package",
+  "require": {
+    "symfony/console": "^6.0"
+  }
+}

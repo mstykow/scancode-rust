@@ -176,7 +176,10 @@ fn parse_author_string(s: &str) -> Option<(String, String)> {
 fn parse_dependencies(sections: &HashMap<String, HashMap<String, String>>) -> Vec<Dependency> {
     let mut dependencies = Vec::new();
 
-    for (section_name, fields) in sections {
+    let mut sorted_sections: Vec<_> = sections.iter().collect();
+    sorted_sections.sort_by(|(left_name, _), (right_name, _)| left_name.cmp(right_name));
+
+    for (section_name, fields) in sorted_sections {
         let scope = if section_name.starts_with("Prereq") {
             if section_name.contains("TestRequires") || section_name.contains("Test") {
                 Some("test".to_string())
@@ -189,7 +192,10 @@ fn parse_dependencies(sections: &HashMap<String, HashMap<String, String>>) -> Ve
             continue;
         };
 
-        for (module_name, version_req) in fields {
+        let mut sorted_fields: Vec<_> = fields.iter().collect();
+        sorted_fields.sort_by(|(left_name, _), (right_name, _)| left_name.cmp(right_name));
+
+        for (module_name, version_req) in sorted_fields {
             let purl = format!("pkg:cpan/{}", module_name);
             let extracted_requirement = if version_req == "0" || version_req.is_empty() {
                 None

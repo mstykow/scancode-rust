@@ -1,527 +1,61 @@
-# Gradle Parser: Beyond-Parity Improvements
+# Gradle Parser Improvements
 
 ## Summary
 
-The Gradle parser in scancode-rust **eliminates a critical security vulnerability** present in the Python reference implementation:
+Rust now goes beyond the current Python ScanCode Gradle handling in several concrete ways:
 
-- **🛡️ Security Improvement**: No arbitrary code execution (Python uses Groovy engine; we use safe token-based lexer)
+1. classifies `compileOnly`-style Gradle scopes as non-runtime instead of treating everything except `test*` as runtime
+2. extracts Gradle POM license metadata into package license fields so CycloneDX output can carry component license expressions
+3. resolves TOML-backed `libs.versions.toml` version-catalog aliases such as `libs.androidx.appcompat` to real Maven package identifiers
+4. preserves parent path segments for local project dependencies like `project(":libs:download")`
+5. merges all discovered `dependencies {}` blocks in a build file instead of only parsing the first one
 
-## Critical Security Issue: Code Execution Vulnerability
+## Python Status
 
-### Python Implementation (DANGEROUS)
+- Current Python Gradle handling is token-based and safe, but still shallow in the areas tracked by upstream issues.
+- Upstream explicitly tracks:
+  - incorrect runtime classification for `compileOnly`
+  - missing Gradle SBOM component licenses
+  - incorrect package identifiers for Android/version-catalog dependency aliases
+- Repeated `dependencies {}` blocks are semantically additive in Gradle, so stopping after the first block loses declared dependencies from real-world Groovy and Kotlin builds.
+- The misbucketed template-POM issue grouped with this batch is upstream-confirmed, but it is actually a Maven placeholder-detection problem rather than a Gradle parser problem.
 
-**Location**: `reference/scancode-toolkit/src/packagedcode/gradle.py`
+## Rust Improvements
 
-**Problem**: Python uses Groovy engine to parse `build.gradle` files, which **executes arbitrary code**:
+### Runtime scope classification
 
-```python
-import groovy.lang.GroovyShell
+- `compileOnly`, `compileOnlyApi`, `annotationProcessor`, `kapt`, and `ksp` are now treated as non-runtime dependencies.
+- `test*` scopes remain non-runtime and optional.
+- This fixes the upstream `compileOnly` misclassification bug instead of reproducing it.
 
-def extract_gradle_dependencies(build_gradle_path):
-    # WARNING: This executes arbitrary code from build.gradle!
-    shell = GroovyShell()
-    script = open(build_gradle_path).read()
-    shell.evaluate(script)  # 🚨 DANGEROUS: Executes user code
-```
+### License propagation for SBOM output
 
-**Attack Vector Example** (`build.gradle`):
+- Rust now extracts Gradle `pom { licenses { ... } }` metadata from both Groovy and Kotlin DSL fixtures.
+- Recognizable SPDX-like Gradle license declarations are promoted into:
+  - `declared_license_expression`
+  - `declared_license_expression_spdx`
+  - `extracted_license_statement`
+- CycloneDX output already consumes `declared_license_expression_spdx`, so this closes the local package-to-SBOM license gap for Gradle metadata that is present in the build file.
 
-```groovy
-// Innocent-looking build file with malicious code
-dependencies {
-    implementation 'org.example:lib:1.0.0'
-}
+### Version catalog alias resolution
 
-// But what if someone adds this?
-Runtime.getRuntime().exec("rm -rf /")  // Arbitrary command execution
-```
+- Rust now resolves TOML-backed `libs.versions.toml` aliases from nearby version catalogs.
+- Example: `implementation libs.androidx.appcompat` now resolves to `pkg:maven/androidx.appcompat/appcompat@1.7.0` instead of a truncated identifier.
+- This is intentionally limited to static TOML-backed catalogs and does not attempt full semantic evaluation of arbitrary Gradle settings/build logic.
 
-**Real-World Risk**:
+### Local project identifiers
 
-1. **Downloaded Package Scanning**: User scans a codebase with malicious `build.gradle` files
-2. **CI/CD Pipeline**: ScanCode runs as part of supply chain security check
-3. **Code Execution**: Attacker gains full system access in CI/CD environment
-4. **Data Breach**: Access to secrets, credentials, source code repositories
+- Local project references such as `project(":libs:download")` now preserve their parent path segments as namespace data (`pkg:maven/libs/download`) instead of collapsing to only the last segment.
 
-### Our Rust Implementation (SAFE)
+### All dependencies blocks in one build file
 
-**Location**: `src/parsers/gradle.rs`
+- Rust now parses every discovered `dependencies {}` block in a single `build.gradle` / `build.gradle.kts` file instead of stopping after the first block.
+- This includes repeated top-level blocks and later nested blocks that the current token parser already recognizes lexically.
 
-**Approach**: Custom token-based lexer that **parses WITHOUT executing**:
+### Template POM guardrail
 
-```rust
-pub struct GradleTokenizer {
-    input: String,
-    position: usize,
-    current_char: Option<char>,
-}
+- Rust also skips placeholder-only Maven coordinates like `${groupId}` / `${artifactId}` / `${version}` instead of emitting junk package identifiers.
 
-impl GradleTokenizer {
-    pub fn tokenize(&mut self) -> Result<Vec<Token>> {
-        let mut tokens = Vec::new();
+## Coverage
 
-        while let Some(token) = self.next_token()? {
-            tokens.push(token);
-        }
-
-        Ok(tokens)
-    }
-
-    fn next_token(&mut self) -> Result<Option<Token>> {
-        // Consume whitespace
-        while self.current_char.map_or(false, |c| c.is_whitespace()) {
-            self.advance();
-        }
-
-        match self.current_char {
-            None => Ok(None),
-            Some('{') => {
-                self.advance();
-                Ok(Some(Token::LeftBrace))
-            }
-            Some('}') => {
-                self.advance();
-                Ok(Some(Token::RightBrace))
-            }
-            Some('(') => {
-                self.advance();
-                Ok(Some(Token::LeftParen))
-            }
-            Some(')') => {
-                self.advance();
-                Ok(Some(Token::RightParen))
-            }
-            Some('=') => {
-                self.advance();
-                Ok(Some(Token::Equals))
-            }
-            Some('"') | Some('\'') => {
-                self.read_string()
-            }
-            Some(c) if c.is_alphabetic() || c == '_' => {
-                self.read_identifier()
-            }
-            _ => {
-                self.advance();
-                self.next_token()
-            }
-        }
-    }
-}
-
-pub fn extract_dependencies(tokens: &[Token]) -> Vec<Dependency> {
-    let mut dependencies = Vec::new();
-    let mut i = 0;
-
-    while i < tokens.len() {
-        // Match patterns:
-        // 1. implementation 'group:artifact:version'
-        // 2. implementation group: 'group', name: 'artifact', version: 'version'
-        // 3. compile 'group:artifact:version'
-        // etc.
-
-        match (&tokens[i], tokens.get(i+1), tokens.get(i+2)) {
-            (Token::Id(dep_type), Some(Token::String(spec)), _)
-                if is_dependency_type(dep_type) => {
-                // Pattern: implementation 'group:artifact:version'
-                if let Some(dep) = parse_dependency_spec(dep_type, spec) {
-                    dependencies.push(dep);
-                }
-                i += 2;
-            }
-            (Token::Id(dep_type), Some(Token::LeftParen), _)
-                if is_dependency_type(dep_type) => {
-                // Pattern: implementation(...)
-                let (dep, skip) = parse_map_dependency(dep_type, &tokens[i..]);
-                if let Some(d) = dep {
-                    dependencies.push(d);
-                }
-                i += skip;
-            }
-            _ => i += 1,
-        }
-    }
-
-    dependencies
-}
-
-fn parse_dependency_spec(dep_type: &str, spec: &str) -> Option<Dependency> {
-    // Parse "group:artifact:version" notation
-    // Example: "org.example:mylib:1.0.0"
-
-    let parts: Vec<&str> = spec.split(':').collect();
-    if parts.len() < 2 {
-        return None;
-    }
-
-    let group = parts[0].to_string();
-    let artifact = parts[1].to_string();
-    let version = parts.get(2).map(|v| v.to_string());
-
-    Some(Dependency {
-        purl: Some(format!("pkg:maven/{}/{}", group, artifact)),
-        extracted_requirement: version,
-        scope: Some(map_dependency_type(dep_type)),
-        is_runtime: Some(is_runtime_dependency(dep_type)),
-        is_optional: Some(false),
-        is_resolved: Some(false),
-    })
-}
-```
-
-## Key Security Properties
-
-### 1. **No Code Execution**
-
-| Operation             | Python          | Rust              | Risk    |
-| --------------------- | --------------- | ----------------- | ------- |
-| Parse build.gradle    | Groovy engine   | Token lexer       | ✅ Safe |
-| Evaluate expressions  | Full Groovy DSL | String matching   | ✅ Safe |
-| Execute methods       | Yes (arbitrary) | No (static parse) | ✅ Safe |
-| Handle malicious code | Vulnerable      | Protected         | ✅ Safe |
-
-### 2. **Input Validation**
-
-**Proof of Safety**:
-
-```rust
-// Token-based parser never evaluates expressions
-const MAX_FILE_SIZE: usize = 100 * 1024 * 1024;  // 100 MB limit
-const MAX_TOKENS: usize = 100_000;                // Token limit
-const MAX_RECURSION: usize = 50;                  // Nesting limit
-
-// Can't execute code, so no risk of:
-// - Arbitrary file writes
-// - Network access
-// - Command execution
-// - Resource exhaustion attacks
-```
-
-### 3. **Fail-Safe Degradation**
-
-If parsing encounters malicious or complex code:
-
-```rust
-pub fn extract_package_data(path: &Path) -> PackageData {
-    match parse_gradle_file(path) {
-        Ok(deps) => PackageData {
-            dependencies: deps,
-            // ... other fields
-        },
-        Err(e) => {
-            // Fail safe: return empty with warning
-            // Never attempt code execution as fallback
-            warn!("Failed to parse {}: {}", path.display(), e);
-            PackageData {
-                dependencies: vec![],
-                // ... other fields with defaults
-            }
-        }
-    }
-}
-```
-
-## Gradle Syntax Coverage
-
-Our token-based parser supports all official Gradle dependency syntax:
-
-### Pattern 1: String Notation
-
-```groovy
-dependencies {
-    implementation 'org.example:mylib:1.0.0'
-    testImplementation 'junit:junit:4.12'
-}
-```
-
-**Parser Output**:
-
-```json
-{
-  "dependencies": [
-    {
-      "purl": "pkg:maven/org.example/mylib",
-      "extracted_requirement": "1.0.0",
-      "scope": "implementation"
-    },
-    {
-      "purl": "pkg:maven/junit/junit",
-      "extracted_requirement": "4.12",
-      "scope": "testImplementation"
-    }
-  ]
-}
-```
-
-### Pattern 2: Map Notation
-
-```groovy
-dependencies {
-    implementation group: 'org.example', name: 'mylib', version: '1.0.0'
-    testImplementation group: 'junit', name: 'junit', version: '4.12'
-}
-```
-
-**Parser Output** (same as Pattern 1):
-
-```json
-{
-  "dependencies": [
-    {
-      "purl": "pkg:maven/org.example/mylib",
-      "extracted_requirement": "1.0.0",
-      "scope": "implementation"
-    },
-    {
-      "purl": "pkg:maven/junit/junit",
-      "extracted_requirement": "4.12",
-      "scope": "testImplementation"
-    }
-  ]
-}
-```
-
-### Pattern 3: Named Parameters (Kotlin DSL)
-
-```kotlin
-dependencies {
-    implementation(group = "org.example", name = "mylib", version = "1.0.0")
-    testImplementation(group = "junit", name = "junit", version = "4.12")
-}
-```
-
-**Parser Output** (same):
-
-```json
-{
-  "dependencies": [
-    {
-      "purl": "pkg:maven/org.example/mylib",
-      "extracted_requirement": "1.0.0",
-      "scope": "implementation"
-    },
-    {
-      "purl": "pkg:maven/junit/junit",
-      "extracted_requirement": "4.12",
-      "scope": "testImplementation"
-    }
-  ]
-}
-```
-
-### Pattern 4: Project References
-
-```groovy
-dependencies {
-    implementation project(':core')
-    implementation project(':utils')
-}
-```
-
-**Parser Output**:
-
-```json
-{
-  "dependencies": [
-    { "purl": "pkg:gradle/core", "scope": "implementation" },
-    { "purl": "pkg:gradle/utils", "scope": "implementation" }
-  ]
-}
-```
-
-### Pattern 5: Variable Interpolation (Preserved)
-
-```groovy
-def version = '1.0.0'
-dependencies {
-    implementation "org.example:mylib:$version"
-}
-```
-
-**Parser Output** (preserves interpolation):
-
-```json
-{
-  "dependencies": [
-    {
-      "purl": "pkg:maven/org.example/mylib",
-      "extracted_requirement": "$version",
-      "scope": "implementation"
-    }
-  ]
-}
-```
-
-Note: We preserve `$version` notation without attempting to resolve it (safe by default).
-
-## Comparison with Python Approach
-
-### Python's Risk Assessment
-
-| Aspect                  | Risk Level      | Impact                            |
-| ----------------------- | --------------- | --------------------------------- |
-| Groovy engine execution | 🔴 **CRITICAL** | Arbitrary code execution          |
-| No input validation     | 🟠 **HIGH**     | DoS via complex expressions       |
-| Exception handling      | 🟠 **HIGH**     | Crash instead of graceful failure |
-| Malware detection       | ❌ **NONE**     | No security scanning              |
-
-### Rust's Safety Model
-
-| Aspect                 | Risk Level | Mitigation                 |
-| ---------------------- | ---------- | -------------------------- |
-| Token-based parsing    | 🟢 **LOW** | No execution possible      |
-| File size limits       | 🟢 **LOW** | Prevents memory exhaustion |
-| Recursion depth limits | 🟢 **LOW** | Prevents stack overflow    |
-| Safe error handling    | 🟢 **LOW** | Explicit error types       |
-
-## Architectural Decision
-
-This improvement follows **ADR 0004: Security-First Parsing**:
-
-> "All parsers MUST follow security-first principles: No code execution, explicit resource limits, robust input validation."
-
-**Reference**: [ADR 0004: Security-First Parsing](../adr/0004-security-first-parsing.md)
-
-## Implementation Quality
-
-### Test Coverage
-
-- **14 unit tests** for tokenizer and parser logic
-- **19 golden tests** against real-world build.gradle files
-- **684 total tests passing** (Gradle + dependency ecosystem)
-- **Zero clippy warnings** (production-ready Rust)
-
-### Real-World Validation
-
-Tested against:
-
-- Official Android Gradle build files
-- Gradle 6.x, 7.x, 8.x syntax
-- Kotlin DSL (build.gradle.kts)
-- Spring Framework gradle files
-- Various community packages
-
-## Why This Matters
-
-### Security Risk Severity
-
-**CVSS Score**: 9.8 (Critical)
-
-- Attack Vector: Network (scan public repository)
-- Privileges Required: None
-- User Interaction: None
-- Scope: Unchanged
-- Confidentiality Impact: High
-- Integrity Impact: High
-- Availability Impact: High
-
-### Real-World Impact
-
-In CI/CD environments where ScanCode runs:
-
-1. **Credential Theft**: Groovy engine accesses environment variables with secrets
-2. **Lateral Movement**: Execute commands to pivot to other systems
-3. **Supply Chain Compromise**: Inject malware into build artifacts
-4. **Data Exfiltration**: Read and send sensitive source code
-
-### Our Protection
-
-By eliminating code execution:
-
-- ✅ Malicious code cannot run
-- ✅ Secrets cannot be accessed
-- ✅ System cannot be compromised
-- ✅ ScanCode remains a trustworthy tool
-
-## Performance Comparison
-
-| Aspect | Python (Groovy)        | Rust (Lexer)    | Improvement        |
-| ------ | ---------------------- | --------------- | ------------------ |
-| Speed  | Slow (interpreter)     | Fast (native)   | 10-100x faster     |
-| Memory | High (engine overhead) | Low (streaming) | 5-10x less         |
-| Safety | Unsafe (execution)     | Safe (parsing)  | ✅ Eliminates risk |
-
-## Testing
-
-### Unit Tests
-
-- `test_tokenize_string_notation()` - Validates "group:artifact:version" parsing
-- `test_tokenize_map_notation()` - Validates named parameter parsing
-- `test_handle_string_interpolation()` - Validates $variable preservation
-- `test_project_references()` - Validates project(':name') syntax
-- `test_malicious_code_rejection()` - Validates safe failure on dangerous code
-
-### Golden Tests
-
-**Status**: 19 Gradle golden tests are now active in the suite, with no parser-only ignores remaining
-
-- ✅ All 5 common patterns fully supported
-- ✅ String notation parsing
-- ✅ Map notation parsing
-- ✅ Kotlin DSL parsing
-- ✅ Project references
-- ✅ `groovy4`, `groovy-no-parens`, `kotlin2`, and `end2end` are exercised directly instead of being masked by parser-only ignores
-
-### Test Data
-
-- Real build.gradle files: `testdata/gradle/`
-- Real build.gradle.kts files: `testdata/gradle/`
-- Covers: Android, Spring, Gradle plugins
-
-## Migration from Python
-
-For users migrating from Python ScanCode to scancode-rust:
-
-### What's the Same
-
-- Dependency extraction works identically
-- PURL generation matches
-- Scope classification matches
-- Version constraints captured
-
-### What's Different
-
-- **SAFER**: No code execution risk
-- **FASTER**: Lexer-based parsing
-- **MORE RELIABLE**: Graceful failure instead of crashes
-
-### Breaking Changes
-
-- None! Full feature parity maintained
-
-## References
-
-### Python Source
-
-- Groovy engine: Uses standard Groovy library
-- Risk assessment: Not documented in code
-
-### Security Resources
-
-- [CWE-95: Improper Neutralization of Directives in Dynamically Evaluated Code](https://cwe.mitre.org/data/definitions/95.html)
-- [OWASP: Code Injection](https://owasp.org/www-community/attacks/Code_Injection)
-- [ADR 0004: Security-First Parsing](../adr/0004-security-first-parsing.md)
-
-### Our Implementation
-
-## Status
-
-- ✅ **Safe tokenizer**: Complete, no code execution
-- ✅ **Broad syntax support**: Common Gradle dependency patterns are exercised without parser-only ignored goldens
-- ✅ **Security validation**: Proven safe against attack vectors
-- ✅ **Documentation**: Complete with security analysis
-
----
-
-## Security Audit Checklist
-
-- [x] No code execution paths
-- [x] No subprocess calls
-- [x] No dynamic evaluation
-- [x] File size limits enforced
-- [x] Recursion depth limits
-- [x] Safe error handling
-- [x] Input validation
-- [x] DoS protection
-- [x] Tested with malicious inputs
-- [x] Production-ready
+Coverage spans scope classification, all discovered dependency-block parsing, version-catalog alias resolution, Gradle POM license extraction, and placeholder-coordinate guardrails.

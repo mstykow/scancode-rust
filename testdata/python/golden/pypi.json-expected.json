@@ -1,0 +1,60 @@
+[
+  {
+    "type": "pypi",
+    "namespace": null,
+    "name": "attrs",
+    "version": "24.1.0",
+    "qualifiers": {},
+    "subpath": null,
+    "primary_language": null,
+    "description": "Longer attrs description",
+    "release_date": null,
+    "parties": [
+      {
+        "type": "person",
+        "role": "author",
+        "name": "Hynek Schlawack",
+        "email": "hs@example.com",
+        "url": null
+      }
+    ],
+    "keywords": ["attrs", "dataclasses"],
+    "homepage_url": "https://www.attrs.org/",
+    "download_url": "https://files.pythonhosted.org/packages/source/a/attrs/attrs-24.1.0.tar.gz",
+    "size": 67890,
+    "sha1": null,
+    "md5": null,
+    "sha256": "sdisthash",
+    "sha512": null,
+    "bug_tracking_url": "https://github.com/python-attrs/attrs/issues",
+    "code_view_url": "https://github.com/python-attrs/attrs",
+    "vcs_url": null,
+    "copyright": null,
+    "holder": null,
+    "declared_license_expression": null,
+    "declared_license_expression_spdx": null,
+    "license_detections": [],
+    "other_license_expression": null,
+    "other_license_expression_spdx": null,
+    "other_license_detections": [],
+    "extracted_license_statement": "MIT",
+    "notice_text": null,
+    "source_packages": [],
+    "file_references": [],
+    "is_private": true,
+    "is_virtual": false,
+    "extra_data": {
+      "project_urls": {
+        "Documentation": "https://www.attrs.org/",
+        "Issues": "https://github.com/python-attrs/attrs/issues",
+        "Source": "https://github.com/python-attrs/attrs"
+      }
+    },
+    "dependencies": [],
+    "repository_homepage_url": "https://pypi.org/project/attrs",
+    "repository_download_url": "https://pypi.org/packages/source/a/attrs/attrs-24.1.0.tar.gz",
+    "api_data_url": "https://pypi.org/pypi/attrs/24.1.0/json",
+    "datasource_id": "pypi_json",
+    "purl": "pkg:pypi/attrs@24.1.0"
+  }
+]

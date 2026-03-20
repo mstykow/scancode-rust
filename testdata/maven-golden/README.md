@@ -4,13 +4,9 @@
 
 Golden tests compare parser output against expected results from the original ScanCode Toolkit to ensure compatibility.
 
-## Test Status
+## Coverage Status
 
-**Currently Passing:** 0/0 tests (no tests yet)
-
-## Test Coverage
-
-No golden tests have been created yet for Maven parser. This directory exists for future test addition.
+This directory is reserved for Maven golden fixtures and does not currently describe an active parser-fixture inventory.
 
 ## Test Data
 

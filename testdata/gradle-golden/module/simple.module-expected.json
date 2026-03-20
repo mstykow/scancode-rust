@@ -1,0 +1,15 @@
+[
+  {
+    "type": "maven",
+    "namespace": "com.example",
+    "name": "mylib",
+    "version": "1.0.0",
+    "primary_language": "Java",
+    "parties": [],
+    "extra_data": {
+      "format_version": "1.1"
+    },
+    "datasource_id": "gradle_module",
+    "purl": "pkg:maven/com.example/mylib@1.0.0"
+  }
+]

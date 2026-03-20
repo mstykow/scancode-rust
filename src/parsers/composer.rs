@@ -117,6 +117,8 @@ impl PackageParser for ComposerJsonParser {
             extract_dependencies(&json_content, FIELD_SUGGEST, "suggest", true, true);
 
         let (bug_tracking_url, code_view_url) = extract_support(&json_content);
+        let vcs_url = extract_source_vcs_url(&json_content);
+        let download_url = extract_dist_download_url(&json_content);
         let extra_data = build_extra_data(&json_content);
         let parties = extract_parties(&json_content, &namespace);
 
@@ -133,7 +135,7 @@ impl PackageParser for ComposerJsonParser {
             parties,
             keywords,
             homepage_url,
-            download_url: None,
+            download_url,
             size: None,
             sha1: None,
             md5: None,
@@ -141,7 +143,7 @@ impl PackageParser for ComposerJsonParser {
             sha512: None,
             bug_tracking_url,
             code_view_url,
-            vcs_url: None,
+            vcs_url,
             copyright: None,
             holder: None,
             declared_license_expression,
@@ -175,7 +177,9 @@ impl PackageParser for ComposerJsonParser {
     }
 
     fn is_match(path: &Path) -> bool {
-        path.file_name().is_some_and(|name| name == "composer.json")
+        path.file_name()
+            .and_then(|name| name.to_str())
+            .is_some_and(is_composer_manifest_filename)
     }
 }
 
@@ -202,8 +206,22 @@ impl PackageParser for ComposerLockParser {
     }
 
     fn is_match(path: &Path) -> bool {
-        path.file_name().is_some_and(|name| name == "composer.lock")
+        path.file_name()
+            .and_then(|name| name.to_str())
+            .is_some_and(is_composer_lock_filename)
     }
+}
+
+fn is_composer_manifest_filename(name: &str) -> bool {
+    name == "composer.json"
+        || name.ends_with(".composer.json")
+        || (name.starts_with("composer.") && name.ends_with(".json"))
+}
+
+fn is_composer_lock_filename(name: &str) -> bool {
+    name == "composer.lock"
+        || name.ends_with(".composer.lock")
+        || (name.starts_with("composer.") && name.ends_with(".lock"))
 }
 
 fn read_json_file(path: &Path) -> Result<Value, String> {
@@ -264,17 +282,18 @@ fn extract_lock_dependencies(json_content: &Value) -> Vec<Dependency> {
     let packages = json_content
         .get(FIELD_PACKAGES)
         .and_then(|value| value.as_array())
-        .cloned()
-        .unwrap_or_default();
+        .map(|packages| packages.as_slice())
+        .unwrap_or(&[]);
     let packages_dev = json_content
         .get(FIELD_PACKAGES_DEV)
         .and_then(|value| value.as_array())
-        .cloned()
-        .unwrap_or_default();
+        .map(|packages| packages.as_slice())
+        .unwrap_or(&[]);
 
-    dependencies.extend(extract_lock_package_list(&packages, "require", true, false));
+    dependencies.reserve(packages.len() + packages_dev.len());
+    dependencies.extend(extract_lock_package_list(packages, "require", true, false));
     dependencies.extend(extract_lock_package_list(
-        &packages_dev,
+        packages_dev,
         "require-dev",
         false,
         true,
@@ -561,7 +580,7 @@ fn extract_parties(json_content: &Value, namespace: &Option<String>) -> Vec<Part
 
                 if name.is_some() || email.is_some() || url.is_some() {
                     parties.push(Party {
-                        r#type: None,
+                        r#type: Some("person".to_string()),
                         role,
                         name,
                         email,
@@ -581,7 +600,7 @@ fn extract_parties(json_content: &Value, namespace: &Option<String>) -> Vec<Part
         .filter(|value| !value.is_empty())
     {
         parties.push(Party {
-            r#type: None,
+            r#type: Some("person".to_string()),
             role: Some("vendor".to_string()),
             name: Some(vendor.to_string()),
             email: None,
@@ -642,6 +661,36 @@ fn build_extra_data(json_content: &Value) -> Option<HashMap<String, Value>> {
     } else {
         Some(extra_data)
     }
+}
+
+fn extract_source_vcs_url(json_content: &Value) -> Option<String> {
+    let source = json_content.get(FIELD_SOURCE)?.as_object()?;
+    let source_type = source.get("type")?.as_str()?.trim();
+    let source_url = source.get("url")?.as_str()?.trim();
+    let source_reference = source
+        .get("reference")
+        .and_then(|value| value.as_str())
+        .map(str::trim)
+        .filter(|value| !value.is_empty());
+
+    if source_type.is_empty() || source_url.is_empty() {
+        return None;
+    }
+
+    Some(match source_reference {
+        Some(reference) => format!("{}+{}@{}", source_type, source_url, reference),
+        None => format!("{}+{}", source_type, source_url),
+    })
+}
+
+fn extract_dist_download_url(json_content: &Value) -> Option<String> {
+    json_content
+        .get(FIELD_DIST)
+        .and_then(|value| value.as_object())
+        .and_then(|dist| dist.get("url"))
+        .and_then(|value| value.as_str())
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
 }
 
 fn build_repository_homepage_url(
@@ -826,7 +875,7 @@ fn default_package_data(datasource_id: Option<DatasourceId>) -> PackageData {
 
 crate::register_parser!(
     "PHP composer manifest",
-    &["**/composer.json"],
+    &["**/*composer.json", "**/composer.*.json"],
     "composer",
     "PHP",
     Some("https://getcomposer.org/doc/04-schema.md"),
@@ -834,7 +883,7 @@ crate::register_parser!(
 
 crate::register_parser!(
     "PHP composer lockfile",
-    &["**/composer.lock"],
+    &["**/*composer.lock", "**/composer.*.lock"],
     "composer",
     "PHP",
     Some("https://getcomposer.org/doc/01-basic-usage.md#composer-lock-the-lock-file"),

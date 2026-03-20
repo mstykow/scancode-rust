@@ -1,0 +1,60 @@
+[
+  {
+    "type": "gem",
+    "name": "example-gem",
+    "version": "1.2.3",
+    "primary_language": "Ruby",
+    "description": "A longer description of the example gem for testing purposes",
+    "release_date": "2024-01-15",
+    "parties": [
+      {
+        "type": "person",
+        "role": "author",
+        "name": "John Doe",
+        "email": "john@example.com"
+      },
+      {
+        "type": "person",
+        "role": "author",
+        "name": "Jane Smith",
+        "email": "jane@example.com"
+      }
+    ],
+    "homepage_url": "https://example.com/example-gem",
+    "download_url": "https://rubygems.org/downloads/example-gem-1.2.3.gem",
+    "code_view_url": "https://github.com/example/example-gem",
+    "vcs_url": "https://github.com/example/example-gem",
+    "extracted_license_statement": "MIT",
+    "dependencies": [
+      {
+        "purl": "pkg:gem/rails",
+        "extracted_requirement": "~> 5.0",
+        "scope": "runtime",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:gem/nokogiri",
+        "extracted_requirement": ">= 1.6",
+        "scope": "runtime",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:gem/rspec",
+        "extracted_requirement": "~> 3.0",
+        "scope": "development",
+        "is_runtime": false,
+        "is_optional": true,
+        "is_direct": true
+      }
+    ],
+    "repository_homepage_url": "https://rubygems.org/gems/example-gem/versions/1.2.3",
+    "repository_download_url": "https://rubygems.org/downloads/example-gem-1.2.3.gem",
+    "api_data_url": "https://rubygems.org/api/v2/rubygems/example-gem/versions/1.2.3.json",
+    "datasource_id": "gem_archive_extracted",
+    "purl": "pkg:gem/example-gem@1.2.3"
+  }
+]

@@ -2,7 +2,7 @@
 
 ## Summary
 
-The Dart parser in scancode-rust **fixes scope handling errors** and **preserves YAML metadata** more accurately than the Python reference implementation:
+The Dart parser in Provenant **fixes scope handling errors** and **preserves YAML metadata** more accurately than the Python reference implementation:
 
 1. **🔍 Enhanced Extraction**: Dependency scope correctly mapped (`None` → `"dependencies"`)
 2. **🔍 Enhanced Extraction**: YAML trailing newlines preserved (semantic correctness)
@@ -11,8 +11,6 @@ The Dart parser in scancode-rust **fixes scope handling errors** and **preserves
 ## Improvement 1: Dependency Scope Correction (Extraction Fix)
 
 ### Python Implementation (Broken)
-
-**Location**: `reference/scancode-toolkit/src/packagedcode/dart.py`
 
 **Current Python Behavior**: Extracts dependencies but scope is always `None`:
 
@@ -31,8 +29,6 @@ The Dart parser in scancode-rust **fixes scope handling errors** and **preserves
 **Problem**: The scope field is critical for understanding dependency categories (runtime vs dev), but Python always returns `null`.
 
 ### Our Rust Implementation (Fixed)
-
-**Location**: `src/parsers/dart.rs`
 
 **Code**:
 
@@ -343,26 +339,9 @@ Following dependency scope conventions documented in [AGENTS.md](../../AGENTS.md
 | `dependencies`     | `"dependencies"`     | `true`       |
 | `dev_dependencies` | `"dev_dependencies"` | `false`      |
 
-## Testing
+## Coverage
 
-### Unit Tests
-
-- `test_extract_runtime_dependencies()` - Verifies scope = "dependencies"
-- `test_extract_dev_dependencies()` - Verifies scope = "dev_dependencies"
-- `test_preserve_yaml_newlines()` - Validates description formatting
-- `test_lockfile_is_direct()` - Confirms all entries marked direct
-
-### Golden Tests
-
-**Status**: 4/4 passing (100% pass rate)
-
-All official test cases pass, demonstrating full feature parity plus enhancements.
-
-### Test Data
-
-- Real pubspec.yaml files: `testdata/dart/`
-- Real pubspec.lock files: `testdata/dart/`
-- Covers: Flutter, Shelf, Mockito packages
+Coverage includes runtime and development scope extraction, YAML formatting preservation, lockfile directness, and golden regression coverage for representative Dart manifest and lockfile inputs.
 
 ## Verification Against Python
 
@@ -421,11 +400,4 @@ All official test cases pass, demonstrating full feature parity plus enhancement
 - [Pub Package Manager](https://pub.dev/)
 - [Version Constraints](https://dart.dev/tools/pub/pubspec#version-constraints)
 
-### Our Implementation
-
-## Status
-
-- ✅ **Scope extraction**: Complete, fixed from null to proper values
-- ✅ **YAML preservation**: Complete, trailing newlines preserved
-- ✅ **Lockfile is_direct**: Complete, all entries correctly marked
-- ✅ **Documentation**: Complete
+The scope extraction, YAML preservation, and lockfile directness behaviors above describe the durable differences that matter to users.

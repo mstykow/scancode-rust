@@ -1,8 +1,16 @@
 use std::path::Path;
 
+use glob::Pattern;
+
 use crate::models::{DatasourceId, FileInfo, Package, PackageData, TopLevelDependency};
 
 use super::AssemblerConfig;
+
+struct PendingDependency {
+    dependency: crate::models::Dependency,
+    datafile_path: String,
+    datasource_id: DatasourceId,
+}
 
 /// Assemble a single package from sibling files in a directory.
 ///
@@ -17,7 +25,7 @@ pub fn assemble_siblings(
     file_indices: &[usize],
 ) -> Option<(Option<Package>, Vec<TopLevelDependency>, Vec<usize>)> {
     let mut package: Option<Package> = None;
-    let mut dependencies = Vec::new();
+    let mut pending_dependencies = Vec::new();
     let mut affected_indices = Vec::new();
     let mut saw_unpackageable_npm_manifest = false;
 
@@ -50,7 +58,7 @@ pub fn assemble_siblings(
                     saw_unpackageable_npm_manifest = true;
                 }
 
-                if should_skip_npm_lock_merge(package.as_ref(), pkg_data) {
+                if should_skip_lock_merge(package.as_ref(), pkg_data) {
                     continue;
                 }
 
@@ -77,16 +85,13 @@ pub fn assemble_siblings(
                     }
                 }
 
-                let for_package_uid = package.as_ref().map(|p| p.package_uid.clone());
-
                 for dep in &pkg_data.dependencies {
                     if dep.purl.is_some() {
-                        dependencies.push(TopLevelDependency::from_dependency(
-                            dep,
-                            datafile_path.clone(),
+                        pending_dependencies.push(PendingDependency {
+                            dependency: dep.clone(),
+                            datafile_path: datafile_path.clone(),
                             datasource_id,
-                            for_package_uid.clone(),
-                        ));
+                        });
                     }
                 }
             }
@@ -96,6 +101,19 @@ pub fn assemble_siblings(
             }
         }
     }
+
+    let for_package_uid = package.as_ref().map(|p| p.package_uid.clone());
+    let dependencies: Vec<TopLevelDependency> = pending_dependencies
+        .into_iter()
+        .map(|pending| {
+            TopLevelDependency::from_dependency(
+                &pending.dependency,
+                pending.datafile_path,
+                pending.datasource_id,
+                for_package_uid.clone(),
+            )
+        })
+        .collect();
 
     if package.is_some() || !dependencies.is_empty() {
         Some((package, dependencies, affected_indices))
@@ -109,11 +127,20 @@ pub fn assemble_siblings(
 /// - Case-insensitive match (e.g., "Cargo.toml" vs "cargo.toml")
 /// - Glob-style prefix wildcard (e.g., "*.podspec" matches "MyLib.podspec")
 pub(crate) fn matches_pattern(file_name: &str, pattern: &str) -> bool {
-    if let Some(suffix) = pattern.strip_prefix('*') {
-        file_name.ends_with(suffix)
-            || file_name
-                .to_ascii_lowercase()
-                .ends_with(&suffix.to_ascii_lowercase())
+    if pattern.contains('*') {
+        if let Ok(glob_pattern) = Pattern::new(pattern)
+            && glob_pattern.matches(file_name)
+        {
+            return true;
+        }
+
+        let lower_name = file_name.to_ascii_lowercase();
+        let lower_pattern = pattern.to_ascii_lowercase();
+        if let Ok(glob_pattern) = Pattern::new(&lower_pattern) {
+            return glob_pattern.matches(&lower_name);
+        }
+
+        false
     } else {
         file_name == pattern || file_name.eq_ignore_ascii_case(pattern)
     }
@@ -126,16 +153,27 @@ fn is_handled_by(pkg_data: &PackageData, config: &AssemblerConfig) -> bool {
         .is_some_and(|dsid| config.datasource_ids.contains(&dsid))
 }
 
-fn should_skip_npm_lock_merge(package: Option<&Package>, pkg_data: &PackageData) -> bool {
+fn should_skip_lock_merge(package: Option<&Package>, pkg_data: &PackageData) -> bool {
     let Some(existing_package) = package else {
         return false;
     };
 
-    if pkg_data.datasource_id != Some(DatasourceId::NpmPackageLockJson) {
-        return false;
-    }
+    should_skip_npm_lock_merge(existing_package, pkg_data)
+        || should_skip_bun_lock_merge(existing_package, pkg_data)
+        || should_skip_python_uv_lock_merge(existing_package, pkg_data)
+        || should_skip_python_pip_cache_merge(existing_package, pkg_data)
+}
 
-    !npm_package_identity_matches(existing_package, pkg_data)
+fn should_skip_npm_lock_merge(package: &Package, pkg_data: &PackageData) -> bool {
+    pkg_data.datasource_id == Some(DatasourceId::NpmPackageLockJson)
+        && !npm_package_identity_matches(package, pkg_data)
+}
+
+fn should_skip_bun_lock_merge(package: &Package, pkg_data: &PackageData) -> bool {
+    pkg_data
+        .datasource_id
+        .is_some_and(|id| matches!(id, DatasourceId::BunLock | DatasourceId::BunLockb))
+        && !npm_package_identity_matches(package, pkg_data)
 }
 
 fn npm_package_identity_matches(package: &Package, pkg_data: &PackageData) -> bool {
@@ -157,6 +195,48 @@ fn npm_package_identity_matches(package: &Package, pkg_data: &PackageData) -> bo
 
 fn normalized_identity_value(value: Option<&str>) -> Option<&str> {
     value.map(str::trim).filter(|value| !value.is_empty())
+}
+
+fn should_skip_python_uv_lock_merge(package: &Package, pkg_data: &PackageData) -> bool {
+    pkg_data.datasource_id == Some(DatasourceId::PypiUvLock)
+        && package
+            .datasource_ids
+            .contains(&DatasourceId::PypiPyprojectToml)
+        && !python_uv_identity_matches(package, pkg_data)
+}
+
+fn should_skip_python_pip_cache_merge(package: &Package, pkg_data: &PackageData) -> bool {
+    pkg_data.datasource_id.is_some_and(|dsid| {
+        matches!(
+            dsid,
+            DatasourceId::PypiWheel | DatasourceId::PypiPipOriginJson
+        )
+    }) && package.datasource_ids.iter().any(|dsid| {
+        matches!(
+            dsid,
+            DatasourceId::PypiWheel | DatasourceId::PypiPipOriginJson
+        )
+    }) && !python_uv_identity_matches(package, pkg_data)
+}
+
+fn python_uv_identity_matches(package: &Package, pkg_data: &PackageData) -> bool {
+    if let (Some(package_name), Some(candidate_name)) = (
+        normalized_identity_value(package.name.as_deref()),
+        normalized_identity_value(pkg_data.name.as_deref()),
+    ) && package_name != candidate_name
+    {
+        return false;
+    }
+
+    if let (Some(package_version), Some(candidate_version)) = (
+        normalized_identity_value(package.version.as_deref()),
+        normalized_identity_value(pkg_data.version.as_deref()),
+    ) && package_version != candidate_version
+    {
+        return false;
+    }
+
+    true
 }
 
 fn should_skip_npm_lock_package_creation(

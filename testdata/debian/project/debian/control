@@ -1,0 +1,12 @@
+Source: samplepkg
+Section: utils
+Priority: optional
+Maintainer: Example Maintainer <maintainer@example.com>
+Standards-Version: 4.6.2
+Homepage: https://example.test/samplepkg
+
+Package: samplepkg
+Architecture: amd64
+Depends: libc6 (>= 2.31), adduser
+Description: sample Debian package
+ A sample package for golden testing.

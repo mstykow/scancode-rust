@@ -1,0 +1,60 @@
+[
+  {
+    "type": "rpm",
+    "name": "cpio",
+    "version": "2.9",
+    "description": "GNU cpio copies files into or out of a cpio or tar archive.  Archives\nare files which contain a collection of other files plus information\nabout them, such as their file name, owner, timestamps, and access\npermissions.  The archive can be another file on the disk, a magnetic\ntape, or a pipe.  GNU cpio supports the following archive formats:  binary,\nold ASCII, new ASCII, crc, HPUX binary, HPUX old ASCII, old tar and POSIX.1\ntar.  By default, cpio creates binary format archives, so that they are\ncompatible with older cpio programs.  When it is extracting files from\narchives, cpio automatically recognizes which kind of archive it is reading\nand can read archives created on machines with a different byte-order.\n\nInstall cpio if you need a program to manage file archives.",
+    "parties": [],
+    "homepage_url": "http://www.gnu.org/software/cpio/",
+    "download_url": "ftp://ftp.gnu.org/gnu/cpio/cpio-2.9.tar.gz",
+    "extracted_license_statement": "GPLv3+",
+    "extra_data": {
+      "release": "4",
+      "group": "Applications/Archiving"
+    },
+    "dependencies": [
+      {
+        "purl": "pkg:rpm/texinfo",
+        "extracted_requirement": "texinfo",
+        "scope": "build",
+        "is_runtime": false,
+        "is_optional": false,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:rpm/autoconf",
+        "extracted_requirement": "autoconf",
+        "scope": "build",
+        "is_runtime": false,
+        "is_optional": false,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:rpm/gettext",
+        "extracted_requirement": "gettext",
+        "scope": "build",
+        "is_runtime": false,
+        "is_optional": false,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:rpm/%2Fsbin%2Finstall-info",
+        "extracted_requirement": "/sbin/install-info",
+        "scope": "post",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:rpm/%2Fsbin%2Finstall-info",
+        "extracted_requirement": "/sbin/install-info",
+        "scope": "preun",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_direct": true
+      }
+    ],
+    "datasource_id": "rpm_spefile",
+    "purl": "pkg:rpm/cpio@2.9"
+  }
+]

@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Setup script for scancode-rust development
+# Setup script for Provenant development
 #
 # This script initializes/updates the SPDX License List Data submodule to the latest version.
 # The license data in resources/licenses/json/details/ is embedded into the binary
@@ -43,7 +43,8 @@ cd ../..
 
 if [ "$CURRENT_COMMIT" != "$NEW_COMMIT" ]; then
     echo "✅ License data updated: ${CURRENT_COMMIT:0:7} → ${NEW_COMMIT:0:7}"
-    echo "⚠️  Remember to commit the submodule update:"
+    echo "⚠️  Remember to update the embedded license loader artifact and commit the submodule update:"
+    echo "   ./scripts/update-license-loader-artifact.sh"
     echo "   git add resources/licenses"
     echo "   git commit -m 'chore: update SPDX license data'"
 else
@@ -65,5 +66,3 @@ echo "Setup complete."
 echo ""
 echo "To build: cargo build --release"
 echo ""
-echo "If you need to regenerate the embedded license loader artifact:"
-echo "   ./scripts/update-license-loader-artifact.sh"

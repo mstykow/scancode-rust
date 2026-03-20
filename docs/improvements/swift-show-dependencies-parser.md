@@ -1,8 +1,7 @@
 # SwiftShowDependenciesParser: Full Dependency Graph Extraction
 
-**Parser**: `SwiftShowDependenciesParser`  
-**File**: `src/parsers/swift_show_dependencies.rs`  
-**Python Reference**: `src/packagedcode/swift.py` (SwiftShowDependenciesDepLockHandler)
+> For the broader Swift ecosystem assembly and top-level package improvements added later,
+> see [swift-parser.md](swift-parser.md).
 
 ## Summary
 
@@ -55,7 +54,7 @@ Extracts complete dependency graph with full metadata:
    - `is_direct` - `true` for direct deps, `false` for transitive
    - `is_pinned` - `true` if version is not "unspecified"
    - `scope` - Always "dependencies"
-   - `is_runtime` - Always `true`
+   - `is_runtime` - Set to `false` for these dependency edges in the current Swift scan contract
 
 ### Implementation Approach
 
@@ -141,7 +140,7 @@ The parser uses breadth-first traversal to flatten the nested dependency tree:
       "purl": "pkg:swift/github.com/swift-cloud/Vercel",
       "extracted_requirement": "1.15.2",
       "scope": "dependencies",
-      "is_runtime": true,
+      "is_runtime": false,
       "is_optional": false,
       "is_pinned": true,
       "is_direct": true
@@ -150,7 +149,7 @@ The parser uses breadth-first traversal to flatten the nested dependency tree:
       "purl": "pkg:swift/github.com/vapor/vapor",
       "extracted_requirement": "4.79.0",
       "scope": "dependencies",
-      "is_runtime": true,
+      "is_runtime": false,
       "is_optional": false,
       "is_pinned": true,
       "is_direct": false
@@ -159,7 +158,7 @@ The parser uses breadth-first traversal to flatten the nested dependency tree:
       "purl": "pkg:swift/github.com/apple/swift-nio",
       "extracted_requirement": "2.58.0",
       "scope": "dependencies",
-      "is_runtime": true,
+      "is_runtime": false,
       "is_optional": false,
       "is_pinned": true,
       "is_direct": true
@@ -184,9 +183,9 @@ The parser uses breadth-first traversal to flatten the nested dependency tree:
 - **Build reproducibility**: Complete dependency graph with versions
 - **Supply chain security**: Distinguish direct from transitive dependencies
 
-## Test Coverage
+## Coverage
 
-5 comprehensive test cases:
+Coverage includes:
 
 - Basic package name extraction
 - Full dependency graph with nesting
@@ -197,7 +196,5 @@ The parser uses breadth-first traversal to flatten the nested dependency tree:
 
 ## References
 
-- Python implementation: `reference/scancode-toolkit/src/packagedcode/swift.py`
-- Rust implementation: `src/parsers/swift_show_dependencies.rs`
 - Swift Package Manager: <https://docs.swift.org/swiftpm/documentation/packagemanagerdocs/packageshowdependencies/>
 - Discussion: <https://forums.swift.org/t/swiftpm-show-dependencies-without-fetching-dependencies/51154>

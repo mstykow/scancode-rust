@@ -44,7 +44,7 @@ fn find_workspace_roots(files: &[FileInfo]) -> Vec<WorkspaceRoot> {
             continue;
         };
 
-        if file_name != "Cargo.toml" {
+        if !file_name.eq_ignore_ascii_case("cargo.toml") {
             continue;
         }
 
@@ -165,7 +165,11 @@ fn discover_members(files: &[FileInfo], workspace_root: &WorkspaceRoot) -> Vec<u
     for (idx, file) in files.iter().enumerate() {
         let path = Path::new(&file.path);
 
-        if path.file_name().and_then(|n| n.to_str()) != Some("Cargo.toml") {
+        if !path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .is_some_and(|name| name.eq_ignore_ascii_case("cargo.toml"))
+        {
             continue;
         }
 
@@ -208,15 +212,17 @@ fn discover_members(files: &[FileInfo], workspace_root: &WorkspaceRoot) -> Vec<u
 }
 
 fn matches_member_pattern(path: &Path, pattern: &str) -> bool {
-    let path_str = path.to_str().unwrap_or("");
+    let parent_str = path
+        .parent()
+        .and_then(|parent| parent.to_str())
+        .unwrap_or("");
 
     if !pattern.contains('*') {
-        let expected = format!("{}/Cargo.toml", pattern);
-        return path_str == expected;
+        return parent_str == pattern;
     }
 
-    if let Ok(glob_pattern) = glob::Pattern::new(&format!("{}/Cargo.toml", pattern)) {
-        return glob_pattern.matches(path_str);
+    if let Ok(glob_pattern) = glob::Pattern::new(pattern) {
+        return glob_pattern.matches(parent_str);
     }
 
     false
@@ -428,6 +434,14 @@ fn apply_workspace_inheritance(pkg_data: &mut PackageData, workspace_data: &Work
             .collect();
         pkg_data.parties = parties;
         extra_data.remove("authors");
+    }
+
+    if extra_data.get("readme").and_then(|v| v.as_str()) == Some("workspace")
+        && let Some(readme_value) = workspace_data.package.get("readme")
+        && let Some(readme_str) = readme_value.as_str()
+    {
+        extra_data.insert("readme_file".to_string(), serde_json::json!(readme_str));
+        extra_data.remove("readme");
     }
 
     if let (Some(name), Some(version)) = (&pkg_data.name, &pkg_data.version)

@@ -1,0 +1,25 @@
+[
+  {
+    "type": "freebsd",
+    "name": "py27-idna",
+    "version": "2.6",
+    "qualifiers": {
+      "arch": "freebsd:10:*",
+      "origin": "dns/py-idna"
+    },
+    "description": "A library to support the Internationalised Domain Names in Applications\n(IDNA) protocol as specified in RFC 5891. This version of the protocol\nis often referred to as \"IDNA2008\" and can produce different res\nlts from the earlier standard from 2003.\n\nThe library is also intended to act as a suitable drop-in replacement\nfor the \"encodings.idna\" module that comes with the Python standard\nlibrary but currently only supports the older 2003 specification.\n\nWWW: https://github.com/kjd/idna",
+    "parties": [
+      {
+        "type": "person",
+        "role": "maintainer",
+        "email": "koobs@FreeBSD.org"
+      }
+    ],
+    "keywords": ["python", "dns"],
+    "homepage_url": "https://github.com/kjd/idna",
+    "download_url": "https://pkg.freebsd.org/freebsd:10:*/latest/All/py27-idna-2.6.txz",
+    "code_view_url": "https://svnweb.freebsd.org/ports/head/dns/py-idna",
+    "extracted_license_statement": "PSFL AND BSD3CLAUSE",
+    "datasource_id": "freebsd_compact_manifest"
+  }
+]

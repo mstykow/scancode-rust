@@ -1,0 +1,18 @@
+[
+  {
+    "type": "nuget",
+    "parties": [],
+    "extra_data": {
+      "manage_package_versions_centrally": true,
+      "import_projects": [
+        "$([MSBuild]::GetPathOfFileAbove(Directory.Build.props, $(MSBuildThisFileDirectory)..))"
+      ],
+      "property_values": {
+        "NewtonsoftJsonVersion": "13.0.3",
+        "ManagePackageVersionsCentrally": "$(ManageVersions)",
+        "ManageVersions": "true"
+      }
+    },
+    "datasource_id": "nuget_directory_build_props"
+  }
+]

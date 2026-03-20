@@ -1,8 +1,15 @@
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
-use crate::models::{FileInfo, Package, PackageData, TopLevelDependency};
+use crate::models::{DatasourceId, Dependency, FileInfo, Package, PackageData, TopLevelDependency};
 
 use super::AssemblerConfig;
+
+struct PendingDependency {
+    dependency: Dependency,
+    datafile_path: String,
+    datasource_id: DatasourceId,
+}
 
 pub fn assemble_nested_patterns(
     files: &[FileInfo],
@@ -54,7 +61,7 @@ fn find_matching_files(files: &[FileInfo], config: &AssemblerConfig) -> Vec<usiz
         .collect()
 }
 
-const NESTED_ANCHOR_DIRS: &[&str] = &["META-INF", "debian"];
+const NESTED_ANCHOR_DIRS: &[&str] = &["META-INF", "debian", "data.gz-extract"];
 
 fn find_package_root(matching_indices: &[usize], files: &[FileInfo]) -> Option<PathBuf> {
     for &idx in matching_indices {
@@ -74,6 +81,10 @@ fn find_package_root(matching_indices: &[usize], files: &[FileInfo]) -> Option<P
                     current = parent;
                 }
             }
+        }
+
+        if file_path.file_name().and_then(|n| n.to_str()) == Some("metadata.gz-extract") {
+            return file_path.parent().map(|p| p.to_path_buf());
         }
 
         if file_path.file_name().and_then(|n| n.to_str()) == Some("pom.xml") {
@@ -137,6 +148,22 @@ fn should_skip_nested_merge(
     nested_pom_count > 1
 }
 
+fn should_dedupe_ruby_extracted_dependencies(config: &AssemblerConfig) -> bool {
+    config
+        .datasource_ids
+        .contains(&crate::models::DatasourceId::GemArchiveExtracted)
+}
+
+fn dependency_identity(
+    dep: &TopLevelDependency,
+) -> (Option<String>, Option<String>, Option<String>) {
+    (
+        dep.purl.clone(),
+        dep.extracted_requirement.clone(),
+        dep.scope.clone(),
+    )
+}
+
 fn matches_nested_pattern(file_path: &str, pattern: &str) -> bool {
     let pattern_without_prefix = pattern.strip_prefix("**/").unwrap_or(pattern);
 
@@ -160,7 +187,7 @@ fn assemble_from_indices(
     indices: &[usize],
 ) -> Option<(Package, Vec<TopLevelDependency>, Vec<usize>)> {
     let mut package: Option<Package> = None;
-    let mut dependencies = Vec::new();
+    let mut pending_dependencies = Vec::new();
     let mut affected_indices = Vec::new();
 
     for &pattern in config.sibling_file_patterns {
@@ -207,23 +234,45 @@ fn assemble_from_indices(
                     }
                 }
 
-                let for_package_uid = package.as_ref().map(|p| p.package_uid.clone());
-
                 for dep in &pkg_data.dependencies {
                     if dep.purl.is_some() {
-                        dependencies.push(TopLevelDependency::from_dependency(
-                            dep,
-                            datafile_path.clone(),
+                        pending_dependencies.push(PendingDependency {
+                            dependency: dep.clone(),
+                            datafile_path: datafile_path.clone(),
                             datasource_id,
-                            for_package_uid.clone(),
-                        ));
+                        });
                     }
                 }
             }
         }
     }
 
-    package.map(|pkg| (pkg, dependencies, affected_indices))
+    package.map(|pkg| {
+        let for_package_uid = Some(pkg.package_uid.clone());
+        let mut dependencies = Vec::new();
+        let mut seen_dependency_keys: HashSet<(Option<String>, Option<String>, Option<String>)> =
+            HashSet::new();
+
+        for pending in pending_dependencies {
+            let candidate = TopLevelDependency::from_dependency(
+                &pending.dependency,
+                pending.datafile_path,
+                pending.datasource_id,
+                for_package_uid.clone(),
+            );
+
+            if should_dedupe_ruby_extracted_dependencies(config) {
+                let key = dependency_identity(&candidate);
+                if seen_dependency_keys.insert(key) {
+                    dependencies.push(candidate);
+                }
+            } else {
+                dependencies.push(candidate);
+            }
+        }
+
+        (pkg, dependencies, affected_indices)
+    })
 }
 
 fn is_handled_by(pkg_data: &PackageData, config: &AssemblerConfig) -> bool {

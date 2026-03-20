@@ -1,21 +1,17 @@
 # Maven Parser: Beyond-Parity Improvements
 
-**Parser**: `MavenParser`  
-**File**: `src/parsers/maven.rs`  
-**Python Reference**: `reference/scancode-toolkit/src/packagedcode/maven.py`
-
 ## Summary
 
-The Maven POM parser in scancode-rust now improves on the Python reference in nine important areas:
+The Maven POM parser in Provenant now improves on the Python reference in nine important areas:
 
 1. **🔍 Enhanced Extraction**: description handling now matches Maven `name` + `description` semantics without duplicating identical values
 2. **✨ New Feature**: `dependencyManagement` entries are surfaced as dependency records instead of being preserved only as opaque metadata
 3. **✨ New Feature**: package qualifiers, source package PURLs, and packaging-aware download URLs are emitted for Maven packages
 4. **✨ New Feature**: relocation metadata from `distributionManagement.relocation` is extracted and preserved
 5. **🐛 Bug Fix**: extracted license statements are rendered as structured Maven license records and can include top-level XML license comments
-6. **🐛 Bug Fix**: organization parties use the correct `owner` role and developer parties are regression-tested for the `developer` spelling tracked by issue #211
-7. **✨ New Feature**: nested `META-INF/maven/**` extracted-JAR cases are validated, including the multi-POM safety case
-8. **✨ New Feature**: Maven 4.1.0 POMs are accepted and tested
+6. **🐛 Bug Fix**: organization parties use the correct `owner` role and developer parties keep the expected `developer` spelling
+7. **✨ New Feature**: nested `META-INF/maven/**` extracted-JAR cases now follow the intended single-POM versus multi-POM safety behavior
+8. **✨ New Feature**: Maven 4.1.0 POMs are accepted
 9. **🔍 Enhanced Extraction**: packaging aliases and property-resolved dependency scope/optional values are normalized after property resolution
 
 ## Improvement 1: Description De-duplication
@@ -91,7 +87,7 @@ The issue backlog documents a typo/problem around party role handling for Maven 
 
 ### Rust Behavior
 
-Rust now emits organization ownership parties with the correct `owner` role, preserving organization name and URL as structured party data. The parser also carries explicit regression coverage that Maven developer parties remain spelled `developer`, matching the current Python reference and guarding against the typo reported in issue #211.
+Rust now emits organization ownership parties with the correct `owner` role, preserving organization name and URL as structured party data. Developer parties also retain the expected `developer` spelling.
 
 ## Improvement 7: Nested META-INF Maven Validation
 
@@ -137,7 +133,5 @@ Rust now resolves dependency scope, optional flags, classifier, and type after p
 
 ## References
 
-- Python implementation: `reference/scancode-toolkit/src/packagedcode/maven.py`
-- Rust implementation: `src/parsers/maven.rs`
 - Maven POM reference: <https://maven.apache.org/pom.html>
 - Maven dependency mechanism: <https://maven.apache.org/guides/introduction/introduction-to-dependency-mechanism.html>

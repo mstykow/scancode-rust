@@ -1,0 +1,13 @@
+[
+  {
+    "type": "linux-distro",
+    "namespace": "debian",
+    "name": "debian",
+    "version": "11",
+    "parties": [],
+    "homepage_url": "https://www.debian.org/",
+    "bug_tracking_url": "https://bugs.debian.org/",
+    "code_view_url": "https://www.debian.org/support",
+    "datasource_id": "etc_os_release"
+  }
+]

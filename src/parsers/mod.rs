@@ -1,21 +1,50 @@
 mod about;
+#[cfg(all(test, feature = "golden-tests"))]
+mod about_golden_test;
 #[cfg(test)]
 mod about_test;
 mod alpine;
 #[cfg(all(test, feature = "golden-tests"))]
 mod alpine_golden_test;
+mod arch;
+#[cfg(all(test, feature = "golden-tests"))]
+mod arch_golden_test;
+#[cfg(test)]
+mod arch_test;
 mod autotools;
+#[cfg(all(test, feature = "golden-tests"))]
+mod autotools_golden_test;
 #[cfg(test)]
 mod autotools_test;
 mod bazel;
+#[cfg(all(test, feature = "golden-tests"))]
+mod bazel_golden_test;
+#[cfg(all(test, feature = "golden-tests"))]
+mod bazel_module_golden_test;
+#[cfg(test)]
+mod bazel_module_test;
 #[cfg(test)]
 mod bazel_test;
 mod bower;
+#[cfg(all(test, feature = "golden-tests"))]
+mod bower_golden_test;
 #[cfg(test)]
 mod bower_test;
 mod buck;
+#[cfg(all(test, feature = "golden-tests"))]
+mod buck_golden_test;
 #[cfg(test)]
 mod buck_test;
+mod bun_lock;
+#[cfg(all(test, feature = "golden-tests"))]
+mod bun_lock_golden_test;
+#[cfg(test)]
+mod bun_lock_test;
+mod bun_lockb;
+#[cfg(all(test, feature = "golden-tests"))]
+mod bun_lockb_golden_test;
+#[cfg(test)]
+mod bun_lockb_test;
 mod cargo;
 #[cfg(all(test, feature = "golden-tests"))]
 mod cargo_golden_test;
@@ -25,8 +54,15 @@ mod cargo_lock_test;
 #[cfg(test)]
 mod cargo_test;
 mod chef;
+#[cfg(all(test, feature = "golden-tests"))]
+mod chef_golden_test;
 #[cfg(test)]
 mod chef_test;
+mod clojure;
+#[cfg(all(test, feature = "golden-tests"))]
+mod clojure_golden_test;
+#[cfg(test)]
+mod clojure_test;
 #[cfg(all(test, feature = "golden-tests"))]
 mod cocoapods_golden_test;
 mod composer;
@@ -38,6 +74,8 @@ mod conan;
 mod conan_data;
 #[cfg(test)]
 mod conan_data_test;
+#[cfg(all(test, feature = "golden-tests"))]
+mod conan_golden_test;
 #[cfg(test)]
 mod conan_test;
 mod conda;
@@ -52,6 +90,8 @@ mod cpan;
 mod cpan_dist_ini;
 #[cfg(test)]
 mod cpan_dist_ini_test;
+#[cfg(all(test, feature = "golden-tests"))]
+mod cpan_golden_test;
 mod cpan_makefile_pl;
 #[cfg(test)]
 mod cpan_makefile_pl_test;
@@ -72,33 +112,80 @@ mod debian;
 mod debian_golden_test;
 #[cfg(test)]
 mod debian_test;
+mod deno;
+#[cfg(all(test, feature = "golden-tests"))]
+mod deno_golden_test;
+mod deno_lock;
+#[cfg(test)]
+mod deno_lock_test;
+#[cfg(test)]
+mod deno_test;
+mod docker;
+#[cfg(all(test, feature = "golden-tests"))]
+mod docker_golden_test;
+#[cfg(test)]
+mod docker_test;
 mod freebsd;
+#[cfg(all(test, feature = "golden-tests"))]
+mod freebsd_golden_test;
 #[cfg(test)]
 mod freebsd_test;
 mod gitmodules;
+#[cfg(all(test, feature = "golden-tests"))]
+mod gitmodules_golden_test;
 mod go;
 #[cfg(all(test, feature = "golden-tests"))]
 mod go_golden_test;
+mod go_mod_graph;
 #[cfg(test)]
 mod go_test;
+#[cfg(test)]
+mod go_work_test;
 mod gradle;
 #[cfg(all(test, feature = "golden-tests"))]
 mod gradle_golden_test;
 mod gradle_lock;
 #[cfg(test)]
 mod gradle_lock_test;
+mod gradle_module;
+#[cfg(all(test, feature = "golden-tests"))]
+mod gradle_module_golden_test;
+#[cfg(test)]
+mod gradle_module_test;
+mod hackage;
+#[cfg(all(test, feature = "golden-tests"))]
+mod hackage_golden_test;
+#[cfg(test)]
+mod hackage_test;
 mod haxe;
 #[cfg(all(test, feature = "golden-tests"))]
 mod haxe_golden_test;
 #[cfg(test)]
 mod haxe_test;
+mod helm;
+#[cfg(all(test, feature = "golden-tests"))]
+mod helm_golden_test;
+#[cfg(test)]
+mod helm_test;
+mod hex_lock;
+#[cfg(all(test, feature = "golden-tests"))]
+mod hex_lock_golden_test;
+#[cfg(test)]
+mod hex_lock_test;
 mod maven;
 #[cfg(all(test, feature = "golden-tests"))]
 mod maven_golden_test;
 #[cfg(test)]
 mod maven_test;
+mod meson;
+#[cfg(all(test, feature = "golden-tests"))]
+mod meson_golden_test;
+#[cfg(test)]
+mod meson_test;
 pub mod metadata;
 mod microsoft_update_manifest;
+#[cfg(all(test, feature = "golden-tests"))]
+mod microsoft_update_manifest_golden_test;
 #[cfg(test)]
 mod microsoft_update_manifest_test;
 mod misc;
@@ -124,12 +211,16 @@ mod opam;
 #[cfg(all(test, feature = "golden-tests"))]
 mod opam_golden_test;
 mod os_release;
+#[cfg(all(test, feature = "golden-tests"))]
+mod os_release_golden_test;
 #[cfg(test)]
 mod os_release_test;
 #[cfg(test)]
 mod osgi_test;
 mod pep508;
 mod pip_inspect_deplock;
+#[cfg(all(test, feature = "golden-tests"))]
+mod pip_inspect_deplock_golden_test;
 #[cfg(test)]
 mod pip_inspect_deplock_test;
 mod pipfile_lock;
@@ -137,7 +228,14 @@ mod pipfile_lock;
 mod pipfile_lock_golden_test;
 #[cfg(test)]
 mod pipfile_lock_test;
+mod pixi;
+#[cfg(all(test, feature = "golden-tests"))]
+mod pixi_golden_test;
+#[cfg(test)]
+mod pixi_test;
 mod pnpm_lock;
+#[cfg(all(test, feature = "golden-tests"))]
+mod pnpm_lock_golden_test;
 #[cfg(test)]
 mod pnpm_lock_test;
 mod podfile;
@@ -153,6 +251,11 @@ mod poetry_lock;
 mod poetry_lock_golden_test;
 #[cfg(test)]
 mod poetry_lock_test;
+mod pylock_toml;
+#[cfg(all(test, feature = "golden-tests"))]
+mod pylock_toml_golden_test;
+#[cfg(test)]
+mod pylock_toml_test;
 mod python;
 #[cfg(all(test, feature = "golden-tests"))]
 mod python_golden_test;
@@ -188,6 +291,11 @@ mod ruby;
 mod ruby_golden_test;
 #[cfg(test)]
 mod ruby_test;
+mod sbt;
+#[cfg(all(test, feature = "golden-tests"))]
+mod sbt_golden_test;
+#[cfg(test)]
+mod sbt_test;
 #[cfg(all(test, feature = "golden-tests"))]
 mod swift_golden_test;
 mod swift_manifest_json;
@@ -200,6 +308,16 @@ mod swift_show_dependencies;
 #[cfg(test)]
 mod swift_show_dependencies_test;
 pub mod utils;
+mod uv_lock;
+#[cfg(all(test, feature = "golden-tests"))]
+mod uv_lock_golden_test;
+#[cfg(test)]
+mod uv_lock_test;
+mod vcpkg;
+#[cfg(all(test, feature = "golden-tests"))]
+mod vcpkg_golden_test;
+#[cfg(test)]
+mod vcpkg_test;
 mod yarn_lock;
 #[cfg(test)]
 mod yarn_lock_test;
@@ -230,8 +348,8 @@ use crate::models::{PackageData, PackageType};
 /// # Example
 ///
 /// ```ignore
-/// use scancode_rust::parsers::PackageParser;
-/// use scancode_rust::models::{PackageData, PackageType};
+/// use provenant::models::{PackageData, PackageType};
+/// use provenant::parsers::PackageParser;
 /// use std::path::Path;
 ///
 /// pub struct MyParser;
@@ -282,15 +400,19 @@ pub trait PackageParser {
 }
 
 pub use self::about::AboutFileParser;
-pub use self::alpine::{AlpineApkParser, AlpineInstalledParser};
+pub use self::alpine::{AlpineApkParser, AlpineApkbuildParser, AlpineInstalledParser};
+pub use self::arch::{ArchPkginfoParser, ArchSrcinfoParser};
 pub use self::autotools::AutotoolsConfigureParser;
-pub use self::bazel::BazelBuildParser;
+pub use self::bazel::{BazelBuildParser, BazelModuleParser};
 pub use self::bower::BowerJsonParser;
 pub use self::buck::{BuckBuildParser, BuckMetadataBzlParser};
+pub use self::bun_lock::BunLockParser;
+pub use self::bun_lockb::BunLockbParser;
 pub use self::cargo::CargoParser;
 #[cfg_attr(not(test), allow(unused_imports))]
 pub use self::cargo_lock::CargoLockParser;
 pub use self::chef::{ChefMetadataJsonParser, ChefMetadataRbParser};
+pub use self::clojure::{ClojureDepsEdnParser, ClojureProjectCljParser};
 pub use self::composer::{ComposerJsonParser, ComposerLockParser};
 pub use self::conan::{ConanFilePyParser, ConanLockParser, ConanfileTxtParser};
 pub use self::conan_data::ConanDataParser;
@@ -307,13 +429,22 @@ pub use self::debian::{
     DebianInstalledListParser, DebianInstalledMd5sumsParser, DebianInstalledParser,
     DebianMd5sumInPackageParser, DebianOrigTarParser,
 };
+pub use self::deno::DenoParser;
+pub use self::deno_lock::DenoLockParser;
+pub use self::docker::DockerfileParser;
 pub use self::freebsd::FreebsdCompactManifestParser;
 pub use self::gitmodules::GitmodulesParser;
-pub use self::go::{GoModParser, GoSumParser, GodepsParser};
+pub use self::go::{GoModParser, GoSumParser, GoWorkParser, GodepsParser};
+pub use self::go_mod_graph::GoModGraphParser;
 pub use self::gradle::GradleParser;
 pub use self::gradle_lock::GradleLockfileParser;
+pub use self::gradle_module::GradleModuleParser;
+pub use self::hackage::{HackageCabalParser, HackageCabalProjectParser, HackageStackYamlParser};
 pub use self::haxe::HaxeParser;
+pub use self::helm::{HelmChartLockParser, HelmChartYamlParser};
+pub use self::hex_lock::HexLockParser;
 pub use self::maven::MavenParser;
+pub use self::meson::MesonParser;
 pub use self::microsoft_update_manifest::MicrosoftUpdateManifestParser;
 pub use self::misc::{
     AndroidApkRecognizer, AndroidLibraryRecognizer, AppleDmgRecognizer, Axis2MarRecognizer,
@@ -327,6 +458,7 @@ pub use self::npm::NpmParser;
 pub use self::npm_lock::NpmLockParser;
 pub use self::npm_workspace::NpmWorkspaceParser;
 pub use self::nuget::{
+    CentralPackageManagementPropsParser, DirectoryBuildPropsParser, DotNetDepsJsonParser,
     NupkgParser, NuspecParser, PackageReferenceProjectParser, PackagesConfigParser,
     PackagesLockParser, ProjectJsonParser, ProjectLockJsonParser,
 };
@@ -334,12 +466,14 @@ pub use self::opam::OpamParser;
 pub use self::os_release::OsReleaseParser;
 pub use self::pip_inspect_deplock::PipInspectDeplockParser;
 pub use self::pipfile_lock::PipfileLockParser;
+pub use self::pixi::{PixiLockParser, PixiTomlParser};
 pub use self::pnpm_lock::PnpmLockParser;
 pub use self::podfile::PodfileParser;
 pub use self::podfile_lock::PodfileLockParser;
 pub use self::podspec::PodspecParser;
 pub use self::podspec_json::PodspecJsonParser;
 pub use self::poetry_lock::PoetryLockParser;
+pub use self::pylock_toml::PylockTomlParser;
 pub use self::python::PythonParser;
 pub use self::readme::ReadmeParser;
 pub use self::requirements_txt::RequirementsTxtParser;
@@ -352,9 +486,12 @@ pub use self::rpm_yumdb::RpmYumdbParser;
 pub use self::ruby::{
     GemArchiveParser, GemMetadataExtractedParser, GemfileLockParser, GemfileParser, GemspecParser,
 };
+pub use self::sbt::SbtParser;
 pub use self::swift_manifest_json::SwiftManifestJsonParser;
 pub use self::swift_resolved::SwiftPackageResolvedParser;
 pub use self::swift_show_dependencies::SwiftShowDependenciesParser;
+pub use self::uv_lock::UvLockParser;
+pub use self::vcpkg::VcpkgManifestParser;
 pub use self::yarn_lock::YarnLockParser;
 
 /// Registers all parsers and recognizers, generating dispatch functions.
@@ -381,7 +518,9 @@ macro_rules! register_package_handlers {
             None
         }
 
-        #[allow(dead_code)] // Used by bin/update_parser_golden.rs, not library code
+        // Used by the parser-golden maintenance tool in `xtask`.
+        // Scanner runtime dispatch goes through `try_parse_file()` instead.
+        #[allow(dead_code)]
         pub fn parse_by_type_name(type_name: &str, path: &Path) -> Option<PackageData> {
             match type_name {
                 $(
@@ -394,7 +533,9 @@ macro_rules! register_package_handlers {
             }
         }
 
-        #[allow(dead_code)] // Used by bin/update_parser_golden.rs and tests/scanner_integration.rs
+        // Used by the parser-golden maintenance tool in `xtask` and by
+        // `tests/scanner_integration.rs` to verify parser registration.
+        #[allow(dead_code)]
         pub fn list_parser_types() -> Vec<&'static str> {
             vec![
                 $(
@@ -412,16 +553,24 @@ register_package_handlers! {
     parsers: [
         AboutFileParser,
         AlpineApkParser,
+        AlpineApkbuildParser,
         AlpineInstalledParser,
+        ArchPkginfoParser,
+        ArchSrcinfoParser,
         AutotoolsConfigureParser,
         BazelBuildParser,
+        BazelModuleParser,
         BowerJsonParser,
+        BunLockParser,
+        BunLockbParser,
         BuckBuildParser,
         BuckMetadataBzlParser,
         CargoLockParser,
         CargoParser,
         ChefMetadataJsonParser,
         ChefMetadataRbParser,
+        ClojureDepsEdnParser,
+        ClojureProjectCljParser,
         ComposerJsonParser,
         ComposerLockParser,
         ConanDataParser,
@@ -449,6 +598,9 @@ register_package_handlers! {
         DebianInstalledParser,
         DebianMd5sumInPackageParser,
         DebianOrigTarParser,
+        DenoParser,
+        DenoLockParser,
+        DockerfileParser,
         FreebsdCompactManifestParser,
         GemArchiveParser,
         GemfileLockParser,
@@ -458,15 +610,28 @@ register_package_handlers! {
         GitmodulesParser,
         GodepsParser,
         GoModParser,
+        GoModGraphParser,
         GoSumParser,
+        GoWorkParser,
         GradleLockfileParser,
         GradleParser,
+        GradleModuleParser,
+        HackageCabalParser,
+        HackageCabalProjectParser,
+        HackageStackYamlParser,
+        HelmChartYamlParser,
+        HelmChartLockParser,
         HaxeParser,
+        HexLockParser,
         MavenParser,
+        MesonParser,
         MicrosoftUpdateManifestParser,
         NpmLockParser,
         NpmParser,
         NpmWorkspaceParser,
+        DotNetDepsJsonParser,
+        CentralPackageManagementPropsParser,
+        DirectoryBuildPropsParser,
         NupkgParser,
         NuspecParser,
         PackageReferenceProjectParser,
@@ -478,15 +643,20 @@ register_package_handlers! {
         ProjectLockJsonParser,
         PipfileLockParser,
         PipInspectDeplockParser,
+        PixiTomlParser,
+        PixiLockParser,
         PnpmLockParser,
         PodfileLockParser,
         PodfileParser,
         PodspecJsonParser,
         PodspecParser,
         PoetryLockParser,
+        PylockTomlParser,
         PubspecLockParser,
         PubspecYamlParser,
         PythonParser,
+        UvLockParser,
+        VcpkgManifestParser,
         ReadmeParser,
         RequirementsTxtParser,
         RpmBdbDatabaseParser,
@@ -497,6 +667,7 @@ register_package_handlers! {
         RpmSpecfileParser,
         RpmSqliteDatabaseParser,
         RpmYumdbParser,
+        SbtParser,
         SwiftManifestJsonParser,
         SwiftPackageResolvedParser,
         SwiftShowDependenciesParser,

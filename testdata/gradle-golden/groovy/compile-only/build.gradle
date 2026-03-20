@@ -1,0 +1,5 @@
+dependencies {
+    compileOnly 'org.antlr:antlr:2.7.7'
+    compileOnlyApi 'com.example:annotations:1.0.0'
+    testCompileOnly 'junit:junit:4.13'
+}

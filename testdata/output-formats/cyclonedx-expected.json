@@ -7,8 +7,8 @@
     "timestamp": "2023-03-31T10:36:22Z",
     "tools": [
       {
-        "name": "scancode-toolkit",
-        "version": "32.0.0rc3"
+        "name": "Provenant",
+        "version": "0.0.5"
       }
     ]
   },

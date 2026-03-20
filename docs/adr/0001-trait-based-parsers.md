@@ -1,12 +1,12 @@
 # ADR 0001: Trait-Based Parser Architecture
 
 **Status**: Accepted  
-**Authors**: scancode-rust team  
+**Authors**: Provenant team
 **Supersedes**: None
 
 ## Context
 
-scancode-rust needs a unified, type-safe way to handle multiple package ecosystems and file formats while maintaining:
+Provenant needs a unified, type-safe way to handle multiple package ecosystems and file formats while maintaining:
 
 1. **Compile-time guarantees** - Catch errors before runtime
 2. **Easy extensibility** - Adding new parsers should be straightforward

@@ -1,0 +1,20 @@
+[
+  {
+    "type": "github",
+    "name": "example",
+    "version": "0.0.1",
+    "parties": [
+      {
+        "type": "organization",
+        "role": "maintainer",
+        "name": "oss_foundation"
+      }
+    ],
+    "homepage_url": "https://github.com/example/example",
+    "extracted_license_statement": "BSD-3-Clause",
+    "extra_data": {
+      "upstream_hash": "deadbeef"
+    },
+    "datasource_id": "buck_metadata"
+  }
+]

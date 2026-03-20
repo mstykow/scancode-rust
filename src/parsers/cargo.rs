@@ -18,7 +18,7 @@
 //! - Graceful error handling with `warn!()` logs
 //! - Direct dependencies: all in manifest are direct (no lockfile)
 
-use crate::models::{DatasourceId, Dependency, PackageData, PackageType, Party};
+use crate::models::{DatasourceId, Dependency, FileReference, PackageData, PackageType, Party};
 use crate::parsers::utils::split_name_email;
 use log::warn;
 use packageurl::PackageUrl;
@@ -45,6 +45,8 @@ const FIELD_KEYWORDS: &str = "keywords";
 const FIELD_CATEGORIES: &str = "categories";
 const FIELD_RUST_VERSION: &str = "rust-version";
 const FIELD_EDITION: &str = "edition";
+const FIELD_README: &str = "readme";
+const FIELD_PUBLISH: &str = "publish";
 
 /// Rust Cargo.toml manifest parser.
 ///
@@ -130,6 +132,7 @@ impl PackageParser for CargoParser {
         let keywords = extract_keywords_and_categories(&toml_content);
 
         let extra_data = extract_extra_data(&toml_content);
+        let file_references = extract_file_references(&toml_content);
 
         vec![PackageData {
             package_type: Some(Self::PACKAGE_TYPE),
@@ -164,7 +167,7 @@ impl PackageParser for CargoParser {
             extracted_license_statement,
             notice_text: None,
             source_packages: Vec::new(),
-            file_references: Vec::new(),
+            file_references,
             is_private: false,
             is_virtual: false,
             extra_data,
@@ -178,7 +181,9 @@ impl PackageParser for CargoParser {
     }
 
     fn is_match(path: &Path) -> bool {
-        path.file_name().is_some_and(|name| name == "Cargo.toml")
+        path.file_name()
+            .and_then(|name| name.to_str())
+            .is_some_and(|name| name.eq_ignore_ascii_case("cargo.toml"))
     }
 }
 
@@ -424,6 +429,44 @@ fn extract_keywords_and_categories(toml_content: &Value) -> Vec<String> {
     keywords
 }
 
+fn extract_file_references(toml_content: &Value) -> Vec<FileReference> {
+    let mut file_references = Vec::new();
+
+    if let Some(package) = toml_content
+        .get(FIELD_PACKAGE)
+        .and_then(|value| value.as_table())
+    {
+        for path in [
+            package
+                .get(FIELD_LICENSE_FILE)
+                .and_then(|value| value.as_str()),
+            package.get(FIELD_README).and_then(|value| value.as_str()),
+        ]
+        .into_iter()
+        .flatten()
+        {
+            if file_references
+                .iter()
+                .any(|reference: &FileReference| reference.path == path)
+            {
+                continue;
+            }
+
+            file_references.push(FileReference {
+                path: path.to_string(),
+                size: None,
+                sha1: None,
+                md5: None,
+                sha256: None,
+                sha512: None,
+                extra_data: None,
+            });
+        }
+    }
+
+    file_references
+}
+
 /// Converts toml::Value to serde_json::Value recursively
 fn toml_to_json(value: &toml::Value) -> serde_json::Value {
     match value {
@@ -483,6 +526,23 @@ fn extract_extra_data(
         // Extract license-file path
         if let Some(license_file) = package.get(FIELD_LICENSE_FILE).and_then(|v| v.as_str()) {
             extra_data.insert("license_file".to_string(), json!(license_file));
+        }
+
+        if let Some(readme_value) = package.get(FIELD_README) {
+            if let Some(readme_file) = readme_value.as_str() {
+                extra_data.insert("readme_file".to_string(), json!(readme_file));
+            } else if let Some(readme_enabled) = readme_value.as_bool() {
+                extra_data.insert("readme".to_string(), json!(readme_enabled));
+            } else if readme_value
+                .as_table()
+                .is_some_and(|t| t.get("workspace") == Some(&toml::Value::Boolean(true)))
+            {
+                extra_data.insert("readme".to_string(), json!("workspace"));
+            }
+        }
+
+        if let Some(publish_value) = package.get(FIELD_PUBLISH) {
+            extra_data.insert("publish".to_string(), toml_to_json(publish_value));
         }
 
         // Check for workspace inheritance markers for other fields
@@ -554,7 +614,11 @@ fn extract_extra_data(
 }
 
 fn default_package_data() -> PackageData {
-    PackageData::default()
+    PackageData {
+        package_type: Some(CargoParser::PACKAGE_TYPE),
+        datasource_id: Some(DatasourceId::CargoToml),
+        ..Default::default()
+    }
 }
 
 crate::register_parser!(

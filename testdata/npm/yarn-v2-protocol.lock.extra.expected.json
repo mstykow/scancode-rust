@@ -1,0 +1,22 @@
+{
+  "package_extra_data": {
+    "version": 6,
+    "cacheKey": "8c0"
+  },
+  "dependency_extra_data": {
+    "resolution": "lodash@patch:lodash@npm%3A4.17.21#~builtin<compat/lodash>"
+  },
+  "resolved_package_extra_data": {
+    "resolution": "lodash@patch:lodash@npm%3A4.17.21#~builtin<compat/lodash>",
+    "languageName": "node",
+    "linkType": "hard",
+    "bin": {
+      "lodash": "bin/lodash.js"
+    },
+    "dependenciesMeta": {
+      "fsevents": {
+        "optional": true
+      }
+    }
+  }
+}

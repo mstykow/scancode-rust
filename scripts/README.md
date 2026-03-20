@@ -4,14 +4,15 @@
 
 ### Parser Golden Snapshots
 
-`update_parser_golden.sh` updates parser `.expected.json` golden snapshots by invoking the `update-parser-golden` binary.
+`update_parser_golden.sh` updates parser `.expected.json` golden snapshots by invoking the `update-parser-golden` binary from the unpublished `xtask/` helper crate.
 
 **Why this exists**: it regenerates parser golden expectations directly from parser output so fixture updates stay deterministic and aligned with parser behavior.
 
 Show CLI help:
 
 ```bash
-cargo run --bin update-parser-golden -- --help
+cargo run --manifest-path xtask/Cargo.toml --bin update-parser-golden -- --help
+./scripts/update_parser_golden.sh --help
 ```
 
 CLI arguments:
@@ -27,14 +28,15 @@ CLI arguments:
 
 ### Copyright Golden YAML Fixtures
 
-`update_copyright_golden.sh` syncs and updates copyright golden YAML fixtures (authors / ics / copyrights).
+`update_copyright_golden.sh` syncs and updates copyright golden YAML fixtures (authors / ics / copyrights) by invoking the `update-copyright-golden` binary from the unpublished `xtask/` helper crate.
 
 **Why this exists**: it keeps copyright golden YAMLs in sync with the Rust detector and with Rust-owned fixture policy while preserving reviewable mismatch workflows.
 
 Show CLI help:
 
 ```bash
-cargo run --bin update-copyright-golden -- --help
+cargo run --manifest-path xtask/Cargo.toml --bin update-copyright-golden -- --help
+./scripts/update_copyright_golden.sh --help
 ```
 
 CLI arguments:
@@ -106,7 +108,7 @@ Useful examples:
 
 ### Purpose
 
-`validate-urls` systematically validates all URLs in production documentation and Rust docstrings to catch broken links before they reach users.
+`validate-urls` systematically validates all URLs in production documentation and Rust docstrings to catch broken links before they reach users. The binary lives in the unpublished `xtask/` helper crate so it stays out of the published crate package.
 
 ### What It Validates
 
@@ -129,7 +131,7 @@ Useful examples:
 
 ```bash
 # Manual run
-cargo run --quiet --bin validate-urls -- --root .
+cargo run --quiet --manifest-path xtask/Cargo.toml --bin validate-urls -- --root .
 
 # Exit codes:
 #   0 = All URLs valid
@@ -163,14 +165,11 @@ Example output:
 
 ```yaml
 - name: Validate Documentation URLs
-  run: cargo run --quiet --bin validate-urls -- --root .
+  run: cargo run --quiet --manifest-path xtask/Cargo.toml --bin validate-urls -- --root .
   continue-on-error: true # Informational only - doesn't block PRs
 ```
 
-Runs on:
-
-- Every push to `main` (when docs or scripts change)
-- Every pull request (when docs change)
+Runs on every push to `main` and every pull request.
 
 **Note**: URL validation is informational only and does not block PRs. This prevents contributors from being blocked by:
 

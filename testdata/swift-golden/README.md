@@ -109,16 +109,12 @@ Each test file should have a corresponding `-expected.json` file for golden test
 ## Running Tests
 
 ```bash
-# Run all Swift golden tests
 cargo test --lib swift_golden
-
-# Run specific test
-cargo test --lib test_golden_swift_package_resolved_v2
 ```
 
-## Expected Test Results
+## Expected Coverage
 
-All Swift golden tests should pass with 100% accuracy for:
+Swift golden coverage should preserve behavior for:
 
 - Package identity extraction
 - Dependency PURL generation

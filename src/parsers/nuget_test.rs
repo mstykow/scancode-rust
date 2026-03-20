@@ -2,6 +2,7 @@
 mod tests {
     use super::super::PackageParser;
     use super::super::nuget::{
+        CentralPackageManagementPropsParser, DirectoryBuildPropsParser, DotNetDepsJsonParser,
         NupkgParser, NuspecParser, PackageReferenceProjectParser, PackagesConfigParser,
         PackagesLockParser, ProjectJsonParser, ProjectLockJsonParser,
     };
@@ -9,7 +10,21 @@ mod tests {
     use crate::models::PackageType;
     use std::io::Write;
     use std::path::PathBuf;
-    use tempfile::{Builder, NamedTempFile};
+    use tempfile::{Builder, NamedTempFile, TempDir};
+
+    fn write_directory_packages_props(contents: &str) -> (TempDir, PathBuf) {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let path = temp_dir.path().join("Directory.Packages.props");
+        std::fs::write(&path, contents).unwrap();
+        (temp_dir, path)
+    }
+
+    fn write_directory_build_props(contents: &str) -> (TempDir, PathBuf) {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let path = temp_dir.path().join("Directory.Build.props");
+        std::fs::write(&path, contents).unwrap();
+        (temp_dir, path)
+    }
 
     #[test]
     fn test_packages_config_is_match() {
@@ -625,6 +640,245 @@ mod tests {
     }
 
     #[test]
+    fn test_dotnet_deps_json_is_match() {
+        assert!(DotNetDepsJsonParser::is_match(&PathBuf::from(
+            "ExampleApp.deps.json"
+        )));
+        assert!(!DotNetDepsJsonParser::is_match(&PathBuf::from(
+            "ExampleApp.runtimeconfig.json"
+        )));
+    }
+
+    #[test]
+    fn test_dotnet_deps_json_extracts_root_and_dependencies() {
+        let package_data = DotNetDepsJsonParser::extract_first_package(&PathBuf::from(
+            "testdata/nuget-golden/deps-json/ExampleApp.deps.json",
+        ));
+
+        assert_eq!(
+            package_data.datasource_id,
+            Some(DatasourceId::NugetDepsJson)
+        );
+        assert_eq!(package_data.package_type, Some(PackageType::Nuget));
+        assert_eq!(package_data.name.as_deref(), Some("ExampleApp"));
+        assert_eq!(package_data.version.as_deref(), Some("1.0.0"));
+        assert_eq!(
+            package_data.purl.as_deref(),
+            Some("pkg:nuget/ExampleApp@1.0.0")
+        );
+
+        let extra = package_data
+            .extra_data
+            .as_ref()
+            .expect("extra_data should exist");
+        assert_eq!(
+            extra
+                .get("runtime_target_name")
+                .and_then(|value| value.as_str()),
+            Some(".NETCoreApp,Version=v8.0/win-x64")
+        );
+        assert_eq!(
+            extra
+                .get("target_framework")
+                .and_then(|value| value.as_str()),
+            Some(".NETCoreApp,Version=v8.0")
+        );
+        assert_eq!(
+            extra
+                .get("runtime_identifier")
+                .and_then(|value| value.as_str()),
+            Some("win-x64")
+        );
+        assert_eq!(
+            extra
+                .get("runtime_signature")
+                .and_then(|value| value.as_str()),
+            Some("signature-value")
+        );
+
+        assert_eq!(package_data.dependencies.len(), 4);
+
+        let newtonsoft = package_data
+            .dependencies
+            .iter()
+            .find(|dep| dep.purl.as_deref() == Some("pkg:nuget/Newtonsoft.Json@13.0.1"))
+            .expect("Newtonsoft.Json dependency missing");
+        assert_eq!(newtonsoft.is_direct, Some(true));
+        let newtonsoft_extra = newtonsoft.extra_data.as_ref().expect("extra_data missing");
+        assert_eq!(newtonsoft_extra["type"], "package");
+        assert_eq!(newtonsoft_extra["sha512"], "newton-hash");
+
+        let transitive = package_data
+            .dependencies
+            .iter()
+            .find(|dep| dep.purl.as_deref() == Some("pkg:nuget/System.Text.Json@8.0.0"))
+            .expect("System.Text.Json dependency missing");
+        assert_eq!(transitive.is_direct, Some(false));
+        assert_eq!(transitive.is_runtime, Some(false));
+        assert_eq!(transitive.is_optional, Some(true));
+
+        let project_ref = package_data
+            .dependencies
+            .iter()
+            .find(|dep| dep.purl.as_deref() == Some("pkg:nuget/Project.Ref@1.0.0"))
+            .expect("Project.Ref dependency missing");
+        let project_ref_extra = project_ref.extra_data.as_ref().expect("extra_data missing");
+        assert_eq!(project_ref_extra["type"], "project");
+    }
+
+    #[test]
+    fn test_dotnet_deps_json_fallback_target_selection() {
+        let json = r#"{
+  "targets": {
+    ".NETCoreApp,Version=v9.0": {
+      "FallbackApp/2.0.0": {
+        "dependencies": {
+          "NUnit": "3.14.0"
+        }
+      },
+      "NUnit/3.14.0": {}
+    }
+  },
+  "libraries": {
+    "FallbackApp/2.0.0": { "type": "project" },
+    "NUnit/3.14.0": { "type": "package" }
+  }
+}"#;
+
+        let mut temp_file = NamedTempFile::new().unwrap();
+        temp_file.write_all(json.as_bytes()).unwrap();
+
+        let package_data = DotNetDepsJsonParser::extract_first_package(temp_file.path());
+        assert_eq!(package_data.name.as_deref(), Some("FallbackApp"));
+        assert_eq!(package_data.dependencies.len(), 1);
+        assert_eq!(
+            package_data.dependencies[0].scope.as_deref(),
+            Some(".NETCoreApp,Version=v9.0")
+        );
+    }
+
+    #[test]
+    fn test_dotnet_deps_json_without_project_root_returns_dependency_only_package() {
+        let json = r#"{
+  "runtimeTarget": {
+    "name": ".NETCoreApp,Version=v8.0/linux-x64"
+  },
+  "targets": {
+    ".NETCoreApp,Version=v8.0/linux-x64": {
+      "Newtonsoft.Json/13.0.1": {},
+      "Serilog/2.12.0": {}
+    }
+  },
+  "libraries": {
+    "Newtonsoft.Json/13.0.1": { "type": "package" },
+    "Serilog/2.12.0": { "type": "package" }
+  }
+}"#;
+
+        let temp_dir = tempfile::tempdir().unwrap();
+        let file_path = temp_dir.path().join("ExampleApp.deps.json");
+        std::fs::write(&file_path, json).unwrap();
+
+        let package_data = DotNetDepsJsonParser::extract_first_package(&file_path);
+        assert_eq!(package_data.name.as_deref(), Some("ExampleApp"));
+        assert_eq!(package_data.purl.as_deref(), Some("pkg:nuget/ExampleApp"));
+        assert_eq!(package_data.dependencies.len(), 2);
+        assert!(
+            package_data
+                .dependencies
+                .iter()
+                .all(|dep| dep.is_direct.is_none())
+        );
+    }
+
+    #[test]
+    fn test_dotnet_deps_json_without_project_root_and_without_named_path_stays_anonymous() {
+        let json = r#"{
+  "targets": {
+    ".NETCoreApp,Version=v8.0": {
+      "Newtonsoft.Json/13.0.1": {},
+      "Serilog/2.12.0": {}
+    }
+  },
+  "libraries": {
+    "Newtonsoft.Json/13.0.1": { "type": "package" },
+    "Serilog/2.12.0": { "type": "package" }
+  }
+}"#;
+
+        let mut temp_file = NamedTempFile::new().unwrap();
+        temp_file.write_all(json.as_bytes()).unwrap();
+
+        let package_data = DotNetDepsJsonParser::extract_first_package(temp_file.path());
+        assert!(package_data.name.is_none());
+        assert!(package_data.purl.is_none());
+        assert_eq!(package_data.dependencies.len(), 2);
+    }
+
+    #[test]
+    fn test_dotnet_deps_json_prefers_project_root_matching_filename() {
+        let json = r#"{
+  "runtimeTarget": {
+    "name": ".NETCoreApp,Version=v8.0/win-x64"
+  },
+  "targets": {
+    ".NETCoreApp,Version=v8.0/win-x64": {
+      "ExampleApp/1.0.0": {
+        "dependencies": {
+          "Newtonsoft.Json": "13.0.1"
+        }
+      },
+      "SupportProject/1.1.0": {
+        "dependencies": {
+          "Serilog": "2.12.0"
+        }
+      },
+      "Newtonsoft.Json/13.0.1": {},
+      "Serilog/2.12.0": {}
+    }
+  },
+  "libraries": {
+    "ExampleApp/1.0.0": { "type": "project" },
+    "SupportProject/1.1.0": { "type": "project" },
+    "Newtonsoft.Json/13.0.1": { "type": "package" },
+    "Serilog/2.12.0": { "type": "package" }
+  }
+}"#;
+
+        let temp_dir = tempfile::tempdir().unwrap();
+        let file_path = temp_dir.path().join("ExampleApp.deps.json");
+        std::fs::write(&file_path, json).unwrap();
+
+        let package_data = DotNetDepsJsonParser::extract_first_package(&file_path);
+
+        assert_eq!(package_data.name.as_deref(), Some("ExampleApp"));
+        let direct_names: Vec<_> = package_data
+            .dependencies
+            .iter()
+            .filter(|dep| dep.is_direct == Some(true))
+            .filter_map(|dep| dep.purl.as_deref())
+            .collect();
+        assert!(direct_names.contains(&"pkg:nuget/Newtonsoft.Json@13.0.1"));
+        assert!(!direct_names.contains(&"pkg:nuget/Serilog@2.12.0"));
+    }
+
+    #[test]
+    fn test_dotnet_deps_json_malformed_returns_default() {
+        let json = r#"{"runtimeTarget": "broken""#;
+
+        let mut temp_file = NamedTempFile::new().unwrap();
+        temp_file.write_all(json.as_bytes()).unwrap();
+
+        let package_data = DotNetDepsJsonParser::extract_first_package(temp_file.path());
+        assert_eq!(package_data.package_type, Some(PackageType::Nuget));
+        assert_eq!(
+            package_data.datasource_id,
+            Some(DatasourceId::NugetDepsJson)
+        );
+        assert!(package_data.dependencies.is_empty());
+    }
+
+    #[test]
     fn test_package_reference_project_is_match() {
         assert!(PackageReferenceProjectParser::is_match(&PathBuf::from(
             "example.csproj"
@@ -638,6 +892,506 @@ mod tests {
         assert!(!PackageReferenceProjectParser::is_match(&PathBuf::from(
             "example.sln"
         )));
+    }
+
+    #[test]
+    fn test_directory_packages_props_is_match() {
+        assert!(CentralPackageManagementPropsParser::is_match(
+            &PathBuf::from("Directory.Packages.props")
+        ));
+        assert!(!CentralPackageManagementPropsParser::is_match(
+            &PathBuf::from("Directory.Build.props")
+        ));
+        assert!(!CentralPackageManagementPropsParser::is_match(
+            &PathBuf::from("packages.props")
+        ));
+    }
+
+    #[test]
+    fn test_directory_build_props_is_match() {
+        assert!(DirectoryBuildPropsParser::is_match(&PathBuf::from(
+            "Directory.Build.props"
+        )));
+        assert!(!DirectoryBuildPropsParser::is_match(&PathBuf::from(
+            "Directory.Packages.props"
+        )));
+        assert!(!DirectoryBuildPropsParser::is_match(&PathBuf::from(
+            "Directory.Build.targets"
+        )));
+    }
+
+    #[test]
+    fn test_directory_packages_props_extracts_package_versions() {
+        let xml = r#"<Project>
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageVersion Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageVersion Include="Serilog" Version="3.1.1" Condition="'$(TargetFramework)' == 'net8.0'" />
+  </ItemGroup>
+</Project>"#;
+
+        let (_temp_dir, path) = write_directory_packages_props(xml);
+
+        let package_data = CentralPackageManagementPropsParser::extract_first_package(&path);
+        assert_eq!(package_data.package_type, Some(PackageType::Nuget));
+        assert_eq!(
+            package_data.datasource_id,
+            Some(DatasourceId::NugetDirectoryPackagesProps)
+        );
+        assert!(package_data.name.is_none());
+        assert!(package_data.version.is_none());
+        assert_eq!(package_data.dependencies.len(), 2);
+
+        let dep1 = &package_data.dependencies[0];
+        assert_eq!(dep1.purl.as_deref(), Some("pkg:nuget/Newtonsoft.Json"));
+        assert_eq!(dep1.extracted_requirement.as_deref(), Some("13.0.3"));
+        assert_eq!(dep1.scope.as_deref(), Some("package_version"));
+        assert_eq!(dep1.is_direct, Some(true));
+
+        let dep2 = &package_data.dependencies[1];
+        assert_eq!(dep2.purl.as_deref(), Some("pkg:nuget/Serilog"));
+        assert_eq!(dep2.extracted_requirement.as_deref(), Some("3.1.1"));
+        let extra = dep2.extra_data.as_ref().unwrap();
+        assert_eq!(
+            extra.get("condition").and_then(|v| v.as_str()),
+            Some("'$(TargetFramework)' == 'net8.0'")
+        );
+
+        let package_extra = package_data.extra_data.as_ref().unwrap();
+        assert_eq!(
+            package_extra
+                .get("manage_package_versions_centrally")
+                .and_then(|v| v.as_bool()),
+            Some(true)
+        );
+        assert_eq!(
+            package_extra
+                .get("central_package_transitive_pinning_enabled")
+                .and_then(|v| v.as_bool()),
+            Some(true)
+        );
+    }
+
+    #[test]
+    fn test_directory_packages_props_extracts_update_entries() {
+        let xml = r#"<Project>
+  <ItemGroup Condition="'$(TargetFramework)' == 'net472'">
+    <PackageVersion Update="NUnit" Version="4.0.1" />
+  </ItemGroup>
+</Project>"#;
+
+        let (_temp_dir, path) = write_directory_packages_props(xml);
+
+        let package_data = CentralPackageManagementPropsParser::extract_first_package(&path);
+        assert_eq!(package_data.dependencies.len(), 1);
+        let dep = &package_data.dependencies[0];
+        assert_eq!(dep.purl.as_deref(), Some("pkg:nuget/NUnit"));
+        assert_eq!(dep.extracted_requirement.as_deref(), Some("4.0.1"));
+        let extra = dep.extra_data.as_ref().unwrap();
+        assert_eq!(
+            extra.get("condition").and_then(|v| v.as_str()),
+            Some("'$(TargetFramework)' == 'net472'")
+        );
+    }
+
+    #[test]
+    fn test_directory_packages_props_extracts_imported_parent_metadata_and_property_backed_versions()
+     {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let root_props = temp_dir.path().join("Directory.Packages.props");
+        std::fs::write(
+            &root_props,
+            r#"<Project>
+  <PropertyGroup>
+    <ManageVersions>true</ManageVersions>
+    <NewtonsoftJsonVersion>13.0.3</NewtonsoftJsonVersion>
+  </PropertyGroup>
+</Project>"#,
+        )
+        .unwrap();
+
+        let child_dir = temp_dir.path().join("src");
+        std::fs::create_dir_all(&child_dir).unwrap();
+        let child_props = child_dir.join("Directory.Packages.props");
+        std::fs::write(
+            &child_props,
+            r#"<Project>
+  <Import Project="$([MSBuild]::GetPathOfFileAbove(Directory.Packages.props, $(MSBuildThisFileDirectory)..))" />
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>$(ManageVersions)</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageVersion Include="Newtonsoft.Json" Version="$(NewtonsoftJsonVersion)" />
+  </ItemGroup>
+</Project>"#,
+        )
+        .unwrap();
+
+        let package_data = CentralPackageManagementPropsParser::extract_first_package(&child_props);
+        assert_eq!(package_data.dependencies.len(), 1);
+        assert_eq!(
+            package_data.dependencies[0]
+                .extracted_requirement
+                .as_deref(),
+            Some("13.0.3")
+        );
+        let package_extra = package_data.extra_data.as_ref().unwrap();
+        assert_eq!(
+            package_extra
+                .get("manage_package_versions_centrally")
+                .and_then(|v| v.as_bool()),
+            Some(true)
+        );
+        assert_eq!(
+            package_extra
+                .get("import_projects")
+                .and_then(|v| v.as_array())
+                .and_then(|v| v.first())
+                .and_then(|v| v.as_str()),
+            Some(
+                "$([MSBuild]::GetPathOfFileAbove(Directory.Packages.props, $(MSBuildThisFileDirectory)..))"
+            )
+        );
+    }
+
+    #[test]
+    fn test_directory_build_props_extracts_properties_and_imported_parent_values() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let root_props = temp_dir.path().join("Directory.Build.props");
+        std::fs::write(
+            &root_props,
+            r#"<Project>
+  <PropertyGroup>
+    <ManageVersions>true</ManageVersions>
+    <NewtonsoftJsonVersion>13.0.3</NewtonsoftJsonVersion>
+  </PropertyGroup>
+</Project>"#,
+        )
+        .unwrap();
+
+        let child_dir = temp_dir.path().join("src");
+        std::fs::create_dir_all(&child_dir).unwrap();
+        let child_props = child_dir.join("Directory.Build.props");
+        std::fs::write(
+            &child_props,
+            r#"<Project>
+  <Import Project="$([MSBuild]::GetPathOfFileAbove(Directory.Build.props, $(MSBuildThisFileDirectory)..))" />
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>$(ManageVersions)</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+</Project>"#,
+        )
+        .unwrap();
+
+        let package_data = DirectoryBuildPropsParser::extract_first_package(&child_props);
+        assert_eq!(package_data.package_type, Some(PackageType::Nuget));
+        assert_eq!(
+            package_data.datasource_id,
+            Some(DatasourceId::NugetDirectoryBuildProps)
+        );
+        let extra_data = package_data
+            .extra_data
+            .as_ref()
+            .expect("missing extra_data");
+        assert_eq!(
+            extra_data
+                .get("manage_package_versions_centrally")
+                .and_then(|v| v.as_bool()),
+            Some(true)
+        );
+        assert_eq!(
+            extra_data
+                .get("property_values")
+                .and_then(|v| v.get("NewtonsoftJsonVersion"))
+                .and_then(|v| v.as_str()),
+            Some("13.0.3")
+        );
+        assert_eq!(
+            extra_data
+                .get("import_projects")
+                .and_then(|v| v.as_array())
+                .and_then(|v| v.first())
+                .and_then(|v| v.as_str()),
+            Some(
+                "$([MSBuild]::GetPathOfFileAbove(Directory.Build.props, $(MSBuildThisFileDirectory)..))"
+            )
+        );
+    }
+
+    #[test]
+    fn test_directory_build_props_ignores_unsupported_import_targets() {
+        let xml = r#"<Project>
+  <Import Project="../Directory.Build.targets" />
+  <PropertyGroup>
+    <NewtonsoftJsonVersion>13.0.3</NewtonsoftJsonVersion>
+  </PropertyGroup>
+</Project>"#;
+
+        let (_temp_dir, path) = write_directory_build_props(xml);
+        let package_data = DirectoryBuildPropsParser::extract_first_package(&path);
+        let extra_data = package_data
+            .extra_data
+            .as_ref()
+            .expect("missing extra_data");
+        assert!(
+            extra_data
+                .get("import_projects")
+                .and_then(|value| value.as_array())
+                .is_none_or(|values| values.is_empty())
+        );
+        assert_eq!(
+            extra_data
+                .get("property_values")
+                .and_then(|v| v.get("NewtonsoftJsonVersion"))
+                .and_then(|v| v.as_str()),
+            Some("13.0.3")
+        );
+    }
+
+    #[test]
+    fn test_directory_build_props_ignores_conditioned_imports_and_property_groups() {
+        let xml = r#"<Project>
+  <Import Project="$([MSBuild]::GetPathOfFileAbove(Directory.Build.props, $(MSBuildThisFileDirectory)..))" Condition="'$(TargetFramework)' == 'net8.0'" />
+  <PropertyGroup Condition="'$(TargetFramework)' == 'net8.0'">
+    <NewtonsoftJsonVersion>13.0.3</NewtonsoftJsonVersion>
+  </PropertyGroup>
+  <PropertyGroup>
+    <ManageVersions>true</ManageVersions>
+  </PropertyGroup>
+</Project>"#;
+
+        let (_temp_dir, path) = write_directory_build_props(xml);
+        let package_data = DirectoryBuildPropsParser::extract_first_package(&path);
+        let extra_data = package_data
+            .extra_data
+            .as_ref()
+            .expect("missing extra_data");
+        assert!(
+            extra_data
+                .get("import_projects")
+                .and_then(|value| value.as_array())
+                .is_none_or(|values| values.is_empty())
+        );
+        assert!(
+            extra_data
+                .get("property_values")
+                .and_then(|v| v.get("NewtonsoftJsonVersion"))
+                .is_none()
+        );
+        assert_eq!(
+            extra_data
+                .get("property_values")
+                .and_then(|v| v.get("ManageVersions"))
+                .and_then(|v| v.as_str()),
+            Some("true")
+        );
+    }
+
+    #[test]
+    fn test_directory_packages_props_ignores_non_cpm_import_targets() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let build_props = temp_dir.path().join("Directory.Build.props");
+        std::fs::write(
+            &build_props,
+            r#"<Project>
+  <PropertyGroup>
+    <NewtonsoftJsonVersion>13.0.3</NewtonsoftJsonVersion>
+  </PropertyGroup>
+</Project>"#,
+        )
+        .unwrap();
+
+        let child_dir = temp_dir.path().join("src");
+        std::fs::create_dir_all(&child_dir).unwrap();
+        let child_props = child_dir.join("Directory.Packages.props");
+        std::fs::write(
+            &child_props,
+            r#"<Project>
+  <Import Project="../Directory.Build.props" />
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageVersion Include="Newtonsoft.Json" Version="$(NewtonsoftJsonVersion)" />
+  </ItemGroup>
+</Project>"#,
+        )
+        .unwrap();
+
+        let package_data = CentralPackageManagementPropsParser::extract_first_package(&child_props);
+        assert_eq!(package_data.dependencies.len(), 0);
+        assert!(
+            package_data
+                .extra_data
+                .as_ref()
+                .and_then(|data| data.get("import_projects"))
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn test_csproj_versionless_package_reference_remains_unresolved_in_this_slice() {
+        let xml = r#"<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <PackageId>Contoso.Utility</PackageId>
+    <Version>1.0.0</Version>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" />
+    <PackageReference Include="Serilog">
+      <Version>2.10.0</Version>
+    </PackageReference>
+  </ItemGroup>
+</Project>"#;
+
+        let mut temp_file = Builder::new().suffix(".csproj").tempfile().unwrap();
+        temp_file.write_all(xml.as_bytes()).unwrap();
+
+        let package_data = PackageReferenceProjectParser::extract_first_package(temp_file.path());
+        assert_eq!(package_data.dependencies.len(), 2);
+        assert_eq!(
+            package_data.dependencies[0].purl.as_deref(),
+            Some("pkg:nuget/Newtonsoft.Json")
+        );
+        assert!(package_data.dependencies[0].extracted_requirement.is_none());
+        assert_eq!(
+            package_data.dependencies[1]
+                .extracted_requirement
+                .as_deref(),
+            Some("2.10.0")
+        );
+    }
+
+    #[test]
+    fn test_csproj_package_reference_preserves_literal_version_override_metadata() {
+        let xml = r#"<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" VersionOverride="13.0.3" />
+    <PackageReference Include="Serilog">
+      <VersionOverride>2.12.0</VersionOverride>
+    </PackageReference>
+  </ItemGroup>
+</Project>"#;
+
+        let mut temp_file = Builder::new().suffix(".csproj").tempfile().unwrap();
+        temp_file.write_all(xml.as_bytes()).unwrap();
+
+        let package_data = PackageReferenceProjectParser::extract_first_package(temp_file.path());
+        assert_eq!(package_data.dependencies.len(), 2);
+
+        let first_extra = package_data.dependencies[0]
+            .extra_data
+            .as_ref()
+            .expect("first PackageReference extra_data missing");
+        assert_eq!(
+            first_extra
+                .get("version_override")
+                .and_then(|value| value.as_str()),
+            Some("13.0.3")
+        );
+        assert!(package_data.dependencies[0].extracted_requirement.is_none());
+
+        let second_extra = package_data.dependencies[1]
+            .extra_data
+            .as_ref()
+            .expect("second PackageReference extra_data missing");
+        assert_eq!(
+            second_extra
+                .get("version_override")
+                .and_then(|value| value.as_str()),
+            Some("2.12.0")
+        );
+        assert!(package_data.dependencies[1].extracted_requirement.is_none());
+    }
+
+    #[test]
+    fn test_csproj_package_reference_preserves_property_backed_version_override_metadata() {
+        let xml = r#"<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <CentralOverridesEnabled>true</CentralOverridesEnabled>
+    <NewtonsoftJsonVersion>13.0.3</NewtonsoftJsonVersion>
+    <CentralPackageVersionOverrideEnabled>$(CentralOverridesEnabled)</CentralPackageVersionOverrideEnabled>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" VersionOverride="$(NewtonsoftJsonVersion)" />
+  </ItemGroup>
+</Project>"#;
+
+        let mut temp_file = Builder::new().suffix(".csproj").tempfile().unwrap();
+        temp_file.write_all(xml.as_bytes()).unwrap();
+
+        let package_data = PackageReferenceProjectParser::extract_first_package(temp_file.path());
+        let dep_extra = package_data.dependencies[0].extra_data.as_ref().unwrap();
+        assert_eq!(
+            dep_extra
+                .get("version_override")
+                .and_then(|value| value.as_str()),
+            Some("$(NewtonsoftJsonVersion)")
+        );
+        assert_eq!(
+            dep_extra
+                .get("version_override_resolved")
+                .and_then(|value| value.as_str()),
+            Some("13.0.3")
+        );
+        let package_extra = package_data.extra_data.as_ref().unwrap();
+        assert_eq!(
+            package_extra
+                .get("central_package_version_override_enabled")
+                .and_then(|value| value.as_bool()),
+            Some(true)
+        );
+    }
+
+    #[test]
+    fn test_csproj_conditioned_property_group_does_not_enable_version_override() {
+        let xml = r#"<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup Condition="'$(TargetFramework)' == 'net8.0'">
+    <CentralPackageVersionOverrideEnabled>true</CentralPackageVersionOverrideEnabled>
+    <NewtonsoftJsonVersion>13.0.3</NewtonsoftJsonVersion>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" VersionOverride="$(NewtonsoftJsonVersion)" />
+  </ItemGroup>
+</Project>"#;
+
+        let mut temp_file = Builder::new().suffix(".csproj").tempfile().unwrap();
+        temp_file.write_all(xml.as_bytes()).unwrap();
+
+        let package_data = PackageReferenceProjectParser::extract_first_package(temp_file.path());
+        assert!(
+            package_data
+                .extra_data
+                .as_ref()
+                .and_then(|value| value.get("central_package_version_override_enabled"))
+                .is_none()
+        );
+        let dep_extra = package_data.dependencies[0].extra_data.as_ref().unwrap();
+        assert_eq!(
+            dep_extra
+                .get("version_override")
+                .and_then(|value| value.as_str()),
+            Some("$(NewtonsoftJsonVersion)")
+        );
+        assert!(dep_extra.get("version_override_resolved").is_none());
+    }
+
+    #[test]
+    fn test_directory_packages_props_malformed_returns_default() {
+        let xml = r#"<Project><ItemGroup><PackageVersion Include="Newtonsoft.Json""#;
+
+        let (_temp_dir, path) = write_directory_packages_props(xml);
+
+        let package_data = CentralPackageManagementPropsParser::extract_first_package(&path);
+        assert_eq!(package_data.package_type, Some(PackageType::Nuget));
+        assert_eq!(
+            package_data.datasource_id,
+            Some(DatasourceId::NugetDirectoryPackagesProps)
+        );
+        assert!(package_data.dependencies.is_empty());
     }
 
     #[test]

@@ -1,6 +1,6 @@
 use glob::Pattern;
-use scancode_rust::progress::{ProgressMode, ScanProgress};
-use scancode_rust::{FileType, TextDetectionOptions, process_with_options};
+use provenant::progress::{ProgressMode, ScanProgress};
+use provenant::{FileType, TextDetectionOptions, process_with_options};
 use serde::Deserialize;
 use std::fs;
 use std::path::PathBuf;

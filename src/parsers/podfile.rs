@@ -168,9 +168,9 @@ fn create_dependency(
     Some(Dependency {
         purl: Some(purl.to_string()),
         extracted_requirement: version_req,
-        scope: Some("runtime".to_string()),
-        is_runtime: Some(true),
-        is_optional: Some(false),
+        scope: Some("dependencies".to_string()),
+        is_runtime: None,
+        is_optional: None,
         is_pinned: Some(is_pinned),
         is_direct: Some(true),
         resolved_package: None,
@@ -225,6 +225,9 @@ end
         assert_eq!(deps[0].purl, Some("pkg:cocoapods/AFNetworking".to_string()));
         assert_eq!(deps[0].extracted_requirement, Some("~> 4.0".to_string()));
         assert_eq!(deps[0].is_pinned, Some(false));
+        assert_eq!(deps[0].scope, Some("dependencies".to_string()));
+        assert_eq!(deps[0].is_runtime, None);
+        assert_eq!(deps[0].is_optional, None);
 
         assert_eq!(deps[1].purl, Some("pkg:cocoapods/Alamofire".to_string()));
         assert_eq!(deps[1].extracted_requirement, None);

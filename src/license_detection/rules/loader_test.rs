@@ -82,10 +82,12 @@ name: Test License
         result.is_err(),
         "Empty text should fail for non-deprecated license"
     );
-    assert!(result
-        .unwrap_err()
-        .to_string()
-        .contains("empty text content"));
+    assert!(
+        result
+            .unwrap_err()
+            .to_string()
+            .contains("empty text content")
+    );
 }
 
 #[test]
@@ -136,10 +138,12 @@ license_expression: mit
 
     let result = parse_rule_from_str(content, "empty-text.RULE");
     assert!(result.is_err(), "Rule with empty text should fail");
-    assert!(result
-        .unwrap_err()
-        .to_string()
-        .contains("empty text content"));
+    assert!(
+        result
+            .unwrap_err()
+            .to_string()
+            .contains("empty text content")
+    );
 }
 
 #[test]

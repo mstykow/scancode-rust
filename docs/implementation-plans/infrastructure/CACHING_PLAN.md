@@ -57,13 +57,13 @@ Persistent caching of scan results and compiled data structures to speed up repe
 - ✅ Rule-driven detection pipeline architecture documented and integrated on story branch
 - ✅ SHA256 hash computation per file in `process_file()` (already available as cache key)
 - ✅ `FileInfo` struct with all scannable fields (package_data, license_detections, copyrights, etc.)
-- ✅ `src/cache/config.rs`: foundational cache directory helpers (`.scancode-cache`, index/scan-results dirs)
+- ✅ `src/cache/config.rs`: foundational cache directory helpers (`.provenant-cache`, index/scan-results dirs)
 - ✅ `src/cache/metadata.rs`: snapshot metadata + deterministic invalidation key compatibility checks
 - ✅ `src/cache/paths.rs`: SHA256 validation and deterministic sharded scan cache pathing (`.msgpack.zst`)
 - ✅ `src/cache/io.rs`: versioned snapshot envelope read/write with zstd + MessagePack and atomic temp-file rename
 - ✅ `src/cache/scan_cache.rs`: scan-result cache payload model + read/write helpers with metadata-key invalidation
 - ✅ `src/scanner/process.rs`: cache read-before-scan and write-after-scan integration
-- ✅ `src/main.rs`: cache bootstrap wiring with `SCANCODE_RUST_CACHE` + CLI overrides
+- ✅ `src/main.rs`: cache bootstrap wiring with `PROVENANT_CACHE` + CLI overrides
 - ✅ CLI flags parsed and wired: `--cache-dir`, `--cache-clear`, `--max-in-memory` (placeholder semantics documented)
 
 **Missing:**
@@ -262,7 +262,7 @@ Python's invalidation is **minimal**:
 ### Cache Directory Layout
 
 ```text
-<scan-root>/.scancode-cache/               # Current groundwork default (XDG/env/CLI override planned)
+<scan-root>/.provenant-cache/               # Current groundwork default (XDG/env/CLI override planned)
 ├── metadata.json                          # Planned cache-manager metadata file
 ├── license-index/
 │   ├── snapshot.bin.zst                   # Cached engine index snapshot envelope (msgpack + zstd)
@@ -290,7 +290,7 @@ use serde::{Serialize, Deserialize};
 /// Top-level cache metadata (stored as JSON for human readability)
 #[derive(Serialize, Deserialize, Debug)]
 pub struct CacheMetadata {
-    /// scancode-rust version that created this cache
+/// Provenant version that created this cache
     pub tool_version: String,
     /// SPDX license data version
     pub spdx_version: String,
@@ -355,10 +355,10 @@ pub struct CacheManager {
 
 **Rationale**:
 
-- Linux: `~/.cache/scancode-rust/`
-- macOS: `~/Library/Caches/scancode-rust/`
-- Windows: `{FOLDERID_LocalAppData}/scancode-rust/`
-- Overridable via `SCANCODE_RUST_CACHE` env var and `--cache-dir` CLI flag
+- Linux: `~/.cache/provenant/`
+- macOS: `~/Library/Caches/provenant/`
+- Windows: `{FOLDERID_LocalAppData}/provenant/`
+- Overridable via `PROVENANT_CACHE` env var and `--cache-dir` CLI flag
 
 #### 3. Cache Key: SHA256 Content Hash (Already Computed)
 
@@ -616,7 +616,7 @@ Cache load/decode/validation failures should degrade to cache miss + rebuild, no
 - [x] `--cache-dir` and `--cache-clear` CLI flags are wired in runtime startup
 - [ ] `--max-in-memory` parity-equivalent behavior is fully implemented (currently CLI placeholder wiring)
 - [ ] If implemented, `--no-cache` is clearly documented as Rust-specific and scoped to persistent cache read/write only
-- [x] `SCANCODE_RUST_CACHE` environment variable overrides cache location
+- [x] `PROVENANT_CACHE` environment variable overrides cache location
 - [ ] Cross-project cache sharing works (same file content → same cache entry)
 - [ ] Cache directory follows XDG standard (Linux: `~/.cache/`, macOS: `~/Library/Caches/`)
 - [x] Atomic writes prevent corrupt cache files on crash

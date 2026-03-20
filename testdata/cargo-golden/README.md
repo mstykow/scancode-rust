@@ -4,17 +4,9 @@
 
 Golden tests compare parser output against expected results from the original ScanCode Toolkit to ensure compatibility.
 
-## Test Status
+## Coverage Summary
 
-**Currently Passing:** 1/1 tests
-
-- ✅ `test_cargo_golden_clap` - Passes
-
-## Test Coverage
-
-### Passing Tests
-
-1. **clap** - Cargo.toml from clap project (command-line argument parser)
+This fixture set covers Cargo manifest metadata, readme and documentation extraction, workspace-marker handling, `publish = false`, and Cargo.lock root-package, checksum, and pinned-dependency behavior.
 
 ## Test Data
 

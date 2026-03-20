@@ -109,9 +109,21 @@
     },
     {
       "for_packages": [
+        "pkg:cargo/myproject-cli@0.5.0?uuid=fixed-uid-done-for-testing-5642512d1758"
+      ],
+      "path": "crates/cli/LICENSE"
+    },
+    {
+      "for_packages": [
         "pkg:cargo/myproject-core@0.5.0?uuid=fixed-uid-done-for-testing-5642512d1758"
       ],
       "path": "crates/core/Cargo.toml"
+    },
+    {
+      "for_packages": [
+        "pkg:cargo/myproject-core@0.5.0?uuid=fixed-uid-done-for-testing-5642512d1758"
+      ],
+      "path": "crates/core/README.md"
     }
   ],
   "packages": [

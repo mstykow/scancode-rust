@@ -4,6 +4,8 @@ pub mod aho_match;
 mod detection;
 pub mod embedded;
 
+#[cfg(test)]
+mod embedded_test;
 pub mod expression;
 #[cfg(test)]
 mod golden_test;
@@ -19,8 +21,6 @@ pub mod spdx_lid;
 pub mod spdx_mapping;
 #[cfg(test)]
 mod test_utils;
-#[cfg(test)]
-mod embedded_test;
 mod tokenize;
 pub mod unknown_match;
 
@@ -407,11 +407,13 @@ impl LicenseDetectionEngine {
     /// # Returns
     /// A Result containing the engine or an error
     pub fn from_embedded() -> Result<Self> {
-        let artifact_bytes = include_bytes!("../../resources/license_detection/license_index_loader.msgpack.zst");
+        let artifact_bytes =
+            include_bytes!("../../resources/license_detection/license_index_loader.msgpack.zst");
         let decompressed = zstd::decode_all(&artifact_bytes[..])
             .map_err(|e| anyhow::anyhow!("Failed to decompress embedded artifact: {}", e))?;
-        let snapshot: embedded::schema::EmbeddedLoaderSnapshot = rmp_serde::from_slice(&decompressed)
-            .map_err(|e| anyhow::anyhow!("Failed to deserialize embedded artifact: {}", e))?;
+        let snapshot: embedded::schema::EmbeddedLoaderSnapshot =
+            rmp_serde::from_slice(&decompressed)
+                .map_err(|e| anyhow::anyhow!("Failed to deserialize embedded artifact: {}", e))?;
 
         if snapshot.schema_version != embedded::schema::SCHEMA_VERSION {
             anyhow::bail!(

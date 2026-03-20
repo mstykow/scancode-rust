@@ -382,8 +382,7 @@ src/
 │   ├── junk_data.rs        # Junk classification data (const/static)
 │   ├── host.rs             # Host/domain validation, IP classification
 │   └── types.rs            # EmailDetection, UrlDetection, DetectionConfig
-├── finder_test.rs          # Unit tests
-└── finder_golden_test.rs   # Golden tests against Python reference
+└── golden_test.rs          # Fixture-backed golden tests and related coverage
 ```
 
 ---
@@ -545,7 +544,7 @@ src/
 
 ## Testing Strategy
 
-### Unit Tests (`finder_test.rs`)
+### Unit Tests
 
 Test each component in isolation:
 
@@ -558,7 +557,7 @@ Test each component in isolation:
 7. **Threshold**: Verify `max_email`/`max_url` limiting
 8. **IP address handling**: IPv4 private ranges, IPv6 private/reserved, edge cases
 
-### Golden Tests (`finder_golden_test.rs`)
+### Golden Tests
 
 Compare output against Python ScanCode reference:
 

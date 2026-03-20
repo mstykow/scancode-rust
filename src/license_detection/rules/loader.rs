@@ -10,7 +10,7 @@
 
 use crate::license_detection::index::{loaded_license_to_license, loaded_rule_to_rule};
 use crate::license_detection::models::{License, LoadedLicense, LoadedRule, Rule};
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use log::warn;
 use once_cell::sync::Lazy;
 use regex::Regex;

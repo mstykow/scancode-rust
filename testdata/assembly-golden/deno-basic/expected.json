@@ -1,0 +1,208 @@
+{
+  "packages": [
+    {
+      "type": "deno",
+      "namespace": "@provenant",
+      "name": "deno-sample",
+      "version": "1.0.0",
+      "primary_language": "TypeScript",
+      "parties": [],
+      "extra_data": {
+        "exports": "./mod.ts",
+        "imports": {
+          "@std/assert": "jsr:@std/assert@^1.0.0",
+          "chalk": "npm:chalk@5",
+          "oak": "https://deno.land/x/oak/mod.ts"
+        },
+        "tasks": {
+          "test": "deno test"
+        },
+        "lock": {
+          "path": "./deno.lock",
+          "frozen": false
+        },
+        "version": "5",
+        "workspace_dependencies": ["jsr:@std/assert@1", "npm:chalk@5"]
+      },
+      "purl": "pkg:generic/%40provenant/deno-sample@1.0.0",
+      "package_uid": "pkg:generic/%40provenant/deno-sample@1.0.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "datafile_paths": ["deno.json", "deno.lock"],
+      "datasource_ids": ["deno_json", "deno_lock"]
+    }
+  ],
+  "dependencies": [
+    {
+      "purl": "pkg:generic/deno.land/x/oak%40v17.2.0/mod.ts",
+      "extracted_requirement": "https://deno.land/x/oak/mod.ts",
+      "scope": "imports",
+      "is_runtime": true,
+      "is_optional": false,
+      "is_pinned": true,
+      "is_direct": true,
+      "resolved_package": {
+        "type": "deno",
+        "name": "mod.ts",
+        "version": "",
+        "primary_language": "TypeScript",
+        "download_url": "https://deno.land/x/oak@v17.2.0/mod.ts",
+        "sha256": "oakmodhash",
+        "is_virtual": true,
+        "extra_data": {
+          "redirect_source": "https://deno.land/x/oak/mod.ts"
+        },
+        "dependencies": [],
+        "datasource_id": "deno_lock",
+        "purl": "pkg:generic/deno.land/x/oak%40v17.2.0/mod.ts"
+      },
+      "dependency_uid": "pkg:generic/deno.land/x/oak%40v17.2.0/mod.ts?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "for_package_uid": "pkg:generic/%40provenant/deno-sample@1.0.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "datafile_path": "deno.lock",
+      "datasource_id": "deno_lock"
+    },
+    {
+      "purl": "pkg:generic/deno.land/x/oak/mod.ts",
+      "extracted_requirement": "https://deno.land/x/oak/mod.ts",
+      "scope": "imports",
+      "is_runtime": true,
+      "is_optional": false,
+      "is_pinned": false,
+      "is_direct": true,
+      "extra_data": {
+        "import_alias": "oak"
+      },
+      "dependency_uid": "pkg:generic/deno.land/x/oak/mod.ts?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "for_package_uid": "pkg:generic/%40provenant/deno-sample@1.0.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "datafile_path": "deno.json",
+      "datasource_id": "deno_json"
+    },
+    {
+      "purl": "pkg:generic/jsr.io/%40std/assert",
+      "extracted_requirement": "jsr:@std/assert@^1.0.0",
+      "scope": "imports",
+      "is_runtime": true,
+      "is_optional": false,
+      "is_pinned": false,
+      "is_direct": true,
+      "extra_data": {
+        "import_alias": "@std/assert"
+      },
+      "dependency_uid": "pkg:generic/jsr.io/%40std/assert?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "for_package_uid": "pkg:generic/%40provenant/deno-sample@1.0.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "datafile_path": "deno.json",
+      "datasource_id": "deno_json"
+    },
+    {
+      "purl": "pkg:generic/jsr.io/%40std/assert@1.0.19",
+      "extracted_requirement": "jsr:@std/assert@1",
+      "scope": "imports",
+      "is_runtime": true,
+      "is_optional": false,
+      "is_pinned": true,
+      "is_direct": true,
+      "resolved_package": {
+        "type": "deno",
+        "namespace": "@std",
+        "name": "assert",
+        "version": "1.0.19",
+        "primary_language": "TypeScript",
+        "sha256": "asserthash",
+        "is_virtual": true,
+        "dependencies": [
+          {
+            "purl": "pkg:generic/jsr.io/%40std/internal",
+            "extracted_requirement": "jsr:@std/internal",
+            "scope": "dependencies",
+            "is_runtime": true,
+            "is_optional": false,
+            "is_pinned": false,
+            "is_direct": true
+          }
+        ],
+        "datasource_id": "deno_lock",
+        "purl": "pkg:generic/jsr.io/%40std/assert@1.0.19"
+      },
+      "dependency_uid": "pkg:generic/jsr.io/%40std/assert@1.0.19?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "for_package_uid": "pkg:generic/%40provenant/deno-sample@1.0.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "datafile_path": "deno.lock",
+      "datasource_id": "deno_lock"
+    },
+    {
+      "purl": "pkg:generic/jsr.io/%40std/internal@1.0.12",
+      "scope": "imports",
+      "is_runtime": true,
+      "is_optional": false,
+      "is_pinned": true,
+      "is_direct": false,
+      "resolved_package": {
+        "type": "deno",
+        "namespace": "@std",
+        "name": "internal",
+        "version": "1.0.12",
+        "primary_language": "TypeScript",
+        "sha256": "internalhash",
+        "is_virtual": true,
+        "dependencies": [],
+        "datasource_id": "deno_lock",
+        "purl": "pkg:generic/jsr.io/%40std/internal@1.0.12"
+      },
+      "dependency_uid": "pkg:generic/jsr.io/%40std/internal@1.0.12?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "for_package_uid": "pkg:generic/%40provenant/deno-sample@1.0.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "datafile_path": "deno.lock",
+      "datasource_id": "deno_lock"
+    },
+    {
+      "purl": "pkg:npm/chalk",
+      "extracted_requirement": "npm:chalk@5",
+      "scope": "imports",
+      "is_runtime": true,
+      "is_optional": false,
+      "is_pinned": true,
+      "is_direct": true,
+      "extra_data": {
+        "import_alias": "chalk"
+      },
+      "dependency_uid": "pkg:npm/chalk?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "for_package_uid": "pkg:generic/%40provenant/deno-sample@1.0.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "datafile_path": "deno.json",
+      "datasource_id": "deno_json"
+    },
+    {
+      "purl": "pkg:npm/chalk@5.6.2",
+      "extracted_requirement": "npm:chalk@5",
+      "scope": "imports",
+      "is_runtime": true,
+      "is_optional": false,
+      "is_pinned": true,
+      "is_direct": true,
+      "resolved_package": {
+        "type": "npm",
+        "name": "chalk",
+        "version": "5.6.2",
+        "primary_language": "JavaScript",
+        "sha512": "sha512-chalkhash",
+        "is_virtual": true,
+        "dependencies": [],
+        "datasource_id": "deno_lock",
+        "purl": "pkg:npm/chalk@5.6.2"
+      },
+      "dependency_uid": "pkg:npm/chalk@5.6.2?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "for_package_uid": "pkg:generic/%40provenant/deno-sample@1.0.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "datafile_path": "deno.lock",
+      "datasource_id": "deno_lock"
+    }
+  ],
+  "files_with_packages": [
+    {
+      "path": "deno.json",
+      "for_packages": [
+        "pkg:generic/%40provenant/deno-sample@1.0.0?uuid=fixed-uid-done-for-testing-5642512d1758"
+      ]
+    },
+    {
+      "path": "deno.lock",
+      "for_packages": [
+        "pkg:generic/%40provenant/deno-sample@1.0.0?uuid=fixed-uid-done-for-testing-5642512d1758"
+      ]
+    }
+  ]
+}

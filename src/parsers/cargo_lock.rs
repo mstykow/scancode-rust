@@ -21,6 +21,8 @@
 use crate::models::{DatasourceId, Dependency, PackageData, PackageType};
 use log::warn;
 use packageurl::PackageUrl;
+use serde_json::json;
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
@@ -39,7 +41,7 @@ impl PackageParser for CargoLockParser {
     fn is_match(path: &Path) -> bool {
         path.file_name()
             .and_then(|name| name.to_str())
-            .is_some_and(|name| name == "Cargo.lock")
+            .is_some_and(|name| name.eq_ignore_ascii_case("cargo.lock"))
     }
 
     fn extract_packages(path: &Path) -> Vec<PackageData> {
@@ -59,7 +61,7 @@ impl PackageParser for CargoLockParser {
             }
         };
 
-        let root_package = packages.first().and_then(|v| v.as_table());
+        let root_package = select_root_package(packages);
 
         let name = root_package
             .and_then(|p| p.get("name"))
@@ -76,7 +78,7 @@ impl PackageParser for CargoLockParser {
             .and_then(|v| v.as_str())
             .map(String::from);
 
-        let dependencies = extract_all_dependencies(packages);
+        let dependencies = extract_all_dependencies(packages, root_package);
 
         let purl = match (&name, &version) {
             (Some(n), Some(v)) => PackageUrl::new("cargo", n).ok().and_then(|mut p| {
@@ -147,46 +149,67 @@ fn read_cargo_lock(path: &Path) -> Result<Value, String> {
     toml::from_str(&content).map_err(|e| format!("Failed to parse TOML: {}", e))
 }
 
-fn extract_all_dependencies(packages: &[Value]) -> Vec<Dependency> {
+fn select_root_package(packages: &[Value]) -> Option<&toml::map::Map<String, Value>> {
+    packages
+        .iter()
+        .filter_map(|package| package.as_table())
+        .find(|table| table.get("source").is_none())
+        .or_else(|| packages.first().and_then(|package| package.as_table()))
+}
+
+fn extract_all_dependencies(
+    packages: &[Value],
+    root_package: Option<&toml::map::Map<String, Value>>,
+) -> Vec<Dependency> {
     let mut all_dependencies = Vec::new();
 
-    let root_package_name = packages
-        .first()
-        .and_then(|p| p.as_table())
-        .and_then(|t| t.get("name"))
-        .and_then(|v| v.as_str())
-        .unwrap_or("");
+    let package_versions = build_package_versions(packages);
+    let package_provenance = build_package_provenance(packages);
+    let root_package_key = root_package.and_then(package_key_from_table);
 
-    for (index, package) in packages.iter().enumerate() {
+    for package in packages {
         if let Some(pkg_table) = package.as_table() {
-            let pkg_name = pkg_table.get("name").and_then(|v| v.as_str()).unwrap_or("");
-            let _pkg_version = pkg_table
-                .get("version")
-                .and_then(|v| v.as_str())
-                .unwrap_or("");
-
-            let is_root_package = index == 0 && pkg_name == root_package_name;
+            let is_root_package = package_key_from_table(pkg_table)
+                .zip(root_package_key)
+                .is_some_and(|(package_key, root_key)| package_key == root_key);
 
             if let Some(deps) = pkg_table.get("dependencies").and_then(|v| v.as_array()) {
                 for dep in deps {
                     if let Some(dep_str) = dep.as_str() {
-                        let (name, version) = parse_dependency_string(dep_str);
+                        let parsed_dependency = parse_dependency_string(dep_str);
+                        let name = parsed_dependency.name;
+                        let resolved_version = if parsed_dependency.version.is_empty() {
+                            package_versions
+                                .get(name)
+                                .and_then(|versions| (versions.len() == 1).then_some(versions[0]))
+                                .unwrap_or("")
+                        } else {
+                            parsed_dependency.version
+                        };
+
                         if !name.is_empty() {
-                            let purl = if version.is_empty() {
+                            let purl = if resolved_version.is_empty() {
                                 PackageUrl::new("cargo", name).ok().map(|p| p.to_string())
                             } else {
                                 PackageUrl::new("cargo", name).ok().and_then(|mut p| {
-                                    p.with_version(version).ok()?;
+                                    p.with_version(resolved_version).ok()?;
                                     Some(p.to_string())
                                 })
                             };
 
+                            let extra_data = build_dependency_extra_data(
+                                name,
+                                resolved_version,
+                                parsed_dependency.source,
+                                &package_provenance,
+                            );
+
                             all_dependencies.push(Dependency {
                                 purl,
-                                extracted_requirement: if version.is_empty() {
+                                extracted_requirement: if resolved_version.is_empty() {
                                     None
                                 } else {
-                                    Some(version.to_string())
+                                    Some(resolved_version.to_string())
                                 },
                                 scope: Some("dependencies".to_string()),
                                 is_runtime: Some(true),
@@ -194,7 +217,7 @@ fn extract_all_dependencies(packages: &[Value]) -> Vec<Dependency> {
                                 is_pinned: Some(true),
                                 is_direct: Some(is_root_package),
                                 resolved_package: None,
-                                extra_data: None,
+                                extra_data,
                             });
                         }
                     }
@@ -206,19 +229,139 @@ fn extract_all_dependencies(packages: &[Value]) -> Vec<Dependency> {
     all_dependencies
 }
 
-fn parse_dependency_string(dep_str: &str) -> (&str, &str) {
-    if let Some(space_idx) = dep_str.find(' ') {
-        let name = &dep_str[..space_idx];
-        let version = &dep_str[space_idx + 1..];
-        (name, version)
-    } else {
-        (dep_str, "")
+fn build_package_versions(packages: &[Value]) -> HashMap<&str, Vec<&str>> {
+    packages
+        .iter()
+        .filter_map(|package| package.as_table())
+        .filter_map(|table| {
+            Some((
+                table.get("name")?.as_str()?,
+                table.get("version")?.as_str()?,
+            ))
+        })
+        .fold(HashMap::new(), |mut acc, (name, version)| {
+            acc.entry(name).or_default().push(version);
+            acc
+        })
+}
+
+fn build_package_provenance<'a>(
+    packages: &'a [Value],
+) -> HashMap<(&'a str, &'a str), Vec<DependencyProvenance<'a>>> {
+    packages
+        .iter()
+        .filter_map(|package| package.as_table())
+        .filter_map(|table| {
+            Some((
+                (
+                    table.get("name")?.as_str()?,
+                    table.get("version")?.as_str()?,
+                ),
+                DependencyProvenance {
+                    source: table.get("source").and_then(|value| value.as_str()),
+                    checksum: table.get("checksum").and_then(|value| value.as_str()),
+                },
+            ))
+        })
+        .fold(HashMap::new(), |mut acc, (key, provenance)| {
+            acc.entry(key).or_default().push(provenance);
+            acc
+        })
+}
+
+fn build_dependency_extra_data(
+    name: &str,
+    resolved_version: &str,
+    source_hint: Option<&str>,
+    package_provenance: &HashMap<(&str, &str), Vec<DependencyProvenance<'_>>>,
+) -> Option<HashMap<String, serde_json::Value>> {
+    let mut extra_data = HashMap::new();
+
+    if !resolved_version.is_empty()
+        && let Some(provenance) = package_provenance
+            .get(&(name, resolved_version))
+            .and_then(|candidates| select_dependency_provenance(candidates, source_hint))
+    {
+        if let Some(source) = provenance.source {
+            extra_data.insert("source".to_string(), json!(source));
+        }
+        if let Some(checksum) = provenance.checksum {
+            extra_data.insert("checksum".to_string(), json!(checksum));
+        }
     }
+
+    if !extra_data.contains_key("source")
+        && let Some(source) = source_hint
+    {
+        extra_data.insert("source".to_string(), json!(source));
+    }
+
+    if extra_data.is_empty() {
+        None
+    } else {
+        Some(extra_data)
+    }
+}
+
+fn select_dependency_provenance<'a>(
+    candidates: &'a [DependencyProvenance<'a>],
+    source_hint: Option<&str>,
+) -> Option<DependencyProvenance<'a>> {
+    if let Some(source_hint) = source_hint {
+        return candidates
+            .iter()
+            .copied()
+            .find(|candidate| candidate.source == Some(source_hint));
+    }
+
+    (candidates.len() == 1).then_some(candidates[0])
+}
+
+fn package_key_from_table(table: &toml::map::Map<String, Value>) -> Option<(&str, &str)> {
+    Some((
+        table.get("name")?.as_str()?,
+        table.get("version")?.as_str()?,
+    ))
+}
+
+fn parse_dependency_string(dep_str: &str) -> ParsedDependency<'_> {
+    let trimmed = dep_str.trim();
+    let source = trimmed
+        .find(" (")
+        .and_then(|source_start| trimmed[source_start + 2..].strip_suffix(')'));
+    let without_source = trimmed
+        .find(" (")
+        .map(|source_start| &trimmed[..source_start])
+        .unwrap_or(trimmed);
+
+    let mut parts = without_source.split_whitespace();
+    let name = parts.next().unwrap_or("");
+    let version = parts.next().unwrap_or("");
+
+    ParsedDependency {
+        name,
+        version,
+        source,
+    }
+}
+
+#[derive(Clone, Copy)]
+struct ParsedDependency<'a> {
+    name: &'a str,
+    version: &'a str,
+    source: Option<&'a str>,
+}
+
+#[derive(Clone, Copy)]
+struct DependencyProvenance<'a> {
+    source: Option<&'a str>,
+    checksum: Option<&'a str>,
 }
 
 fn default_package_data() -> PackageData {
     PackageData {
         package_type: Some(CargoLockParser::PACKAGE_TYPE),
+        datasource_id: Some(DatasourceId::CargoLock),
         ..Default::default()
     }
 }

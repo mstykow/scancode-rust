@@ -34,7 +34,7 @@ pub(crate) fn write_html_app(
     let js_path = assets_dir.join("app.js");
 
     let mut data_js = File::create(data_js_path)?;
-    data_js.write_all(b"window.SCANCODE_DATA=")?;
+    data_js.write_all(b"window.PROVENANT_DATA=")?;
     serde_json::to_writer(&mut data_js, output).map_err(io_other)?;
     data_js.write_all(b";\n")?;
 
@@ -61,12 +61,12 @@ const HTML_APP_TEMPLATE: &str = r#"<!doctype html>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>scancode-rust HTML app</title>
+    <title>Provenant HTML app</title>
     <link rel="stylesheet" href="{{ assets_dir }}/app.css" />
   </head>
   <body>
     <header>
-      <h1>scancode-rust HTML app</h1>
+      <h1>Provenant HTML app</h1>
       <p>Scanned path: {{ scanned_path }}</p>
       <p>Version: {{ version }}</p>
     </header>
@@ -87,7 +87,7 @@ th { background: #f5f5f5; }
 const HTML_APP_JS: &str = r#"
 (function () {
   const root = document.getElementById('app');
-  const data = window.SCANCODE_DATA || {};
+  const data = window.PROVENANT_DATA || {};
   const files = data.files || [];
   const rows = files
     .map((f) => `<tr><td>${f.path || ''}</td><td>${f.type || ''}</td><td>${f.size || ''}</td></tr>`)

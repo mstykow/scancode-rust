@@ -130,6 +130,11 @@ mod tests {
                 scan_errors: vec![],
                 is_source: None,
                 source_count: None,
+                is_legal: false,
+                is_manifest: false,
+                is_readme: false,
+                is_top_level: false,
+                is_key_file: false,
             };
 
             file_infos.push(file_info);
@@ -355,6 +360,14 @@ mod tests {
     }
 
     #[test]
+    fn test_assembly_bun_basic() {
+        match run_assembly_golden_test("bun-basic") {
+            Ok(_) => (),
+            Err(e) => panic!("Assembly golden test failed for bun-basic: {}", e),
+        }
+    }
+
+    #[test]
     fn test_assembly_cargo_basic() {
         match run_assembly_golden_test("cargo-basic") {
             Ok(_) => (),
@@ -371,10 +384,90 @@ mod tests {
     }
 
     #[test]
+    fn test_assembly_go_graph_basic() {
+        match run_assembly_golden_test("go-graph-basic") {
+            Ok(_) => (),
+            Err(e) => panic!("Assembly golden test failed for go-graph-basic: {}", e),
+        }
+    }
+
+    #[test]
+    fn test_assembly_ruby_extracted_basic() {
+        match run_assembly_golden_test("ruby-extracted-basic") {
+            Ok(_) => (),
+            Err(e) => panic!(
+                "Assembly golden test failed for ruby-extracted-basic: {}",
+                e
+            ),
+        }
+    }
+
+    #[test]
     fn test_assembly_composer_basic() {
         match run_assembly_golden_test("composer-basic") {
             Ok(_) => (),
             Err(e) => panic!("Assembly golden test failed for composer-basic: {}", e),
+        }
+    }
+
+    #[test]
+    fn test_assembly_composer_nested() {
+        match run_assembly_golden_test("composer-nested") {
+            Ok(_) => (),
+            Err(e) => panic!("Assembly golden test failed for composer-nested: {}", e),
+        }
+    }
+
+    #[test]
+    fn test_assembly_conda_rootfs_assigns_meta_json_files() {
+        let test_dir = PathBuf::from("testdata/conda/assembly/opt/conda");
+        let mut file_infos = build_file_infos_from_directory(&test_dir)
+            .expect("should build file infos from Conda rootfs fixture");
+        let result = assemble(&mut file_infos);
+
+        let conda_pkg = result
+            .packages
+            .iter()
+            .find(|pkg| pkg.package_type == Some(crate::models::PackageType::Conda))
+            .expect("expected assembled conda package");
+
+        assert_eq!(conda_pkg.name.as_deref(), Some("requests"));
+        assert!(
+            conda_pkg
+                .datasource_ids
+                .contains(&crate::models::DatasourceId::CondaMetaJson)
+        );
+        assert!(
+            conda_pkg
+                .datasource_ids
+                .contains(&crate::models::DatasourceId::CondaMetaYaml)
+        );
+        assert!(
+            conda_pkg
+                .datafile_paths
+                .iter()
+                .any(|path| path.contains("conda-meta/requests-2.32.3-py312h06a4308_1.json"))
+        );
+        assert!(conda_pkg.datafile_paths.iter().any(|path| {
+            path.contains("pkgs/requests-2.32.3-py312h06a4308_1/info/recipe/meta.yaml")
+        }));
+
+        let assigned_paths = [
+            "lib/python3.12/site-packages/requests/__init__.py",
+            "lib/python3.12/site-packages/requests-2.32.3.dist-info/METADATA",
+            "lib/python3.12/site-packages/requests-2.32.3.dist-info/LICENSE",
+        ];
+
+        for expected_path in assigned_paths {
+            let file = file_infos
+                .iter()
+                .find(|file| file.path == expected_path)
+                .unwrap_or_else(|| panic!("missing file fixture: {expected_path}"));
+            assert!(
+                file.for_packages.contains(&conda_pkg.package_uid),
+                "expected {expected_path} to be assigned to {}",
+                conda_pkg.package_uid
+            );
         }
     }
 
@@ -398,10 +491,108 @@ mod tests {
     }
 
     #[test]
+    fn test_assembly_deno_basic() {
+        match run_assembly_golden_test("deno-basic") {
+            Ok(_) => (),
+            Err(e) => panic!("Assembly golden test failed for deno-basic: {}", e),
+        }
+    }
+
+    #[test]
+    fn test_assembly_go_workspace_basic() {
+        match run_assembly_golden_test("go-workspace-basic") {
+            Ok(_) => (),
+            Err(e) => panic!("Assembly golden test failed for go-workspace-basic: {}", e),
+        }
+    }
+
+    #[test]
+    fn test_assembly_hackage_basic() {
+        match run_assembly_golden_test("hackage-basic") {
+            Ok(_) => (),
+            Err(e) => panic!("Assembly golden test failed for hackage-basic: {}", e),
+        }
+    }
+
+    #[test]
+    fn test_assembly_helm_basic() {
+        match run_assembly_golden_test("helm-basic") {
+            Ok(_) => (),
+            Err(e) => panic!("Assembly golden test failed for helm-basic: {}", e),
+        }
+    }
+
+    #[test]
     fn test_assembly_nuget_basic() {
         match run_assembly_golden_test("nuget-basic") {
             Ok(_) => (),
             Err(e) => panic!("Assembly golden test failed for nuget-basic: {}", e),
+        }
+    }
+
+    #[test]
+    fn test_assembly_nuget_deps_json_basic() {
+        match run_assembly_golden_test("nuget-deps-json-basic") {
+            Ok(_) => (),
+            Err(e) => panic!(
+                "Assembly golden test failed for nuget-deps-json-basic: {}",
+                e
+            ),
+        }
+    }
+
+    #[test]
+    fn test_assembly_nuget_cpm_nearest_ancestor() {
+        match run_assembly_golden_test("nuget-cpm-nearest-ancestor") {
+            Ok(_) => (),
+            Err(e) => panic!(
+                "Assembly golden test failed for nuget-cpm-nearest-ancestor: {}",
+                e
+            ),
+        }
+    }
+
+    #[test]
+    fn test_assembly_nuget_cpm_version_override() {
+        match run_assembly_golden_test("nuget-cpm-version-override") {
+            Ok(_) => (),
+            Err(e) => panic!(
+                "Assembly golden test failed for nuget-cpm-version-override: {}",
+                e
+            ),
+        }
+    }
+
+    #[test]
+    fn test_assembly_nuget_cpm_imported_parent() {
+        match run_assembly_golden_test("nuget-cpm-imported-parent") {
+            Ok(_) => (),
+            Err(e) => panic!(
+                "Assembly golden test failed for nuget-cpm-imported-parent: {}",
+                e
+            ),
+        }
+    }
+
+    #[test]
+    fn test_assembly_nuget_cpm_directory_build_nearest_ancestor() {
+        match run_assembly_golden_test("nuget-cpm-directory-build-nearest-ancestor") {
+            Ok(_) => (),
+            Err(e) => panic!(
+                "Assembly golden test failed for nuget-cpm-directory-build-nearest-ancestor: {}",
+                e
+            ),
+        }
+    }
+
+    #[test]
+    fn test_assembly_nuget_cpm_directory_build_imported_parent() {
+        match run_assembly_golden_test("nuget-cpm-directory-build-imported-parent") {
+            Ok(_) => (),
+            Err(e) => panic!(
+                "Assembly golden test failed for nuget-cpm-directory-build-imported-parent: {}",
+                e
+            ),
         }
     }
 
@@ -430,6 +621,14 @@ mod tests {
     }
 
     #[test]
+    fn test_assembly_pixi_basic() {
+        match run_assembly_golden_test("pixi-basic") {
+            Ok(_) => (),
+            Err(e) => panic!("Assembly golden test failed for pixi-basic: {}", e),
+        }
+    }
+
+    #[test]
     fn test_assembly_alpine_file_refs() {
         match run_assembly_golden_test("alpine-file-refs") {
             Ok(_) => (),
@@ -438,10 +637,29 @@ mod tests {
     }
 
     #[test]
+    fn test_assembly_bazel_module_basic() {
+        match run_assembly_golden_test("bazel-module-basic") {
+            Ok(_) => (),
+            Err(e) => panic!("Assembly golden test failed for bazel-module-basic: {}", e),
+        }
+    }
+
+    #[test]
     fn test_assembly_cargo_workspace() {
         match run_assembly_golden_test("cargo-workspace") {
             Ok(_) => (),
             Err(e) => panic!("Assembly golden test failed for cargo-workspace: {}", e),
+        }
+    }
+
+    #[test]
+    fn test_assembly_cargo_workspace_lowercase() {
+        match run_assembly_golden_test("cargo-workspace-lowercase") {
+            Ok(_) => (),
+            Err(e) => panic!(
+                "Assembly golden test failed for cargo-workspace-lowercase: {}",
+                e
+            ),
         }
     }
 

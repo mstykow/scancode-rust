@@ -1,0 +1,33 @@
+{
+  "version": "5",
+  "specifiers": {
+    "jsr:@std/assert@1": "1.0.19",
+    "npm:chalk@5": "5.6.2"
+  },
+  "jsr": {
+    "@std/assert@1.0.19": {
+      "integrity": "asserthash",
+      "dependencies": ["jsr:@std/internal"]
+    },
+    "@std/internal@1.0.12": {
+      "integrity": "internalhash"
+    }
+  },
+  "npm": {
+    "chalk@5.6.2": {
+      "integrity": "sha512-chalkhash"
+    }
+  },
+  "redirects": {
+    "https://deno.land/x/oak/mod.ts": "https://deno.land/x/oak@v17.2.0/mod.ts"
+  },
+  "remote": {
+    "https://deno.land/x/oak@v17.2.0/mod.ts": "oakmodhash"
+  },
+  "workspace": {
+    "dependencies": [
+      "jsr:@std/assert@1",
+      "npm:chalk@5"
+    ]
+  }
+}

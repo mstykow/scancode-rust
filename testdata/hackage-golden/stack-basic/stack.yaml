@@ -1,0 +1,23 @@
+resolver: lts-22.10
+snapshot: nightly-2024-02-01
+packages:
+  - .
+  - subdir/package-a
+  - location: https://github.com/commercialhaskell/pantry.git
+    extra-dep: true
+    subdirs:
+      - pantry
+extra-deps:
+  - aeson-2.2.1.0
+  - text-2.0.2@sha256:abcdef,1234
+  - git: https://github.com/haskell/wai.git
+    commit: deadbeefcafebabe
+    subdirs:
+      - wai
+flags:
+  wai:
+    warp: true
+drop-packages:
+  - old-package
+ghc-options:
+  "$locals": -Wall

@@ -1,0 +1,6 @@
+%{
+  "ecto": {:hex, :ecto, "3.12.4", "db6f7a5fbe8be838aa3f5c2de0b5794309bb2f21e0a0a4b2544b1d210d1fb6d2", [:mix], [{:decimal, ">= 2.0.0", [hex: :decimal, repo: "hexpm", optional: false]}], "hexpm", "56da6d340d7ad5b6ac4b9d4ec95bf2c98b5eb2d6468d4bcee66216c0daade824"},
+  "decimal": {:hex, :decimal, "2.3.0", "a4b6a0dd2df3c808ef5f1ec8f2d56f90a55354883b081e0b6626900b8f58bd2d", [:mix], [], "hexpm", "1f1c2ce5db2637f444f1f9666ffac8784d236304681140f64f56819794b2074b"},
+  "postgrex": {:hex, :postgrex, "0.20.0", "fcb4c1d4e0c2c28cbdd0f31ef74d4af5fd3902c6915ebf7835f56f8ab9dfd1fb", [:mix], [{:db_connection, "~> 2.7", [hex: :db_connection, repo: "hexpm", optional: false]}, {:decimal, ">= 1.0.0", [hex: :decimal, repo: "hexpm", optional: false]}], "hexpm", "f5d8e54a42e99c29245ffb391d4b2666ebadc177a64e124593d5e6f27bb1e693"},
+  "db_connection": {:hex, :db_connection, "2.7.0", "5b5f0f1204f8f2a6df2c6c15f32c9100ea93a0217f4de50d1ed7f6a9a9b89fcb", [:mix], [], "hexpm", "70ef2db279b9da8696510c2eec2a3f8b80b9dcd51cb07cdbcdaadbca9e5078e1"}
+}

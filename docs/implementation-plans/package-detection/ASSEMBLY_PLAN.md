@@ -129,15 +129,15 @@ All package assembly features are implemented. The assembly pipeline is feature-
 
 ### ✅ Archive Extraction Assembly — OUT OF SCOPE
 
-Archive extraction is **permanently out of scope** for scancode-rust. The Python ScanCode ecosystem uses a separate tool called [ExtractCode](https://github.com/aboutcode-org/extractcode) that users run as a preprocessing step before scanning. ScanCode's core pipeline never extracts archives — it only scans pre-existing files on disk.
+Archive extraction is **permanently out of scope** for Provenant. The Python ScanCode ecosystem uses a separate tool called [ExtractCode](https://github.com/aboutcode-org/extractcode) that users run as a preprocessing step before scanning. ScanCode's core pipeline never extracts archives — it only scans pre-existing files on disk.
 
-Users of scancode-rust can use ExtractCode before scanning, just like with Python ScanCode. A future `extractcode-rust` tool could be created as a separate project, but that is entirely outside the scope of scancode-rust.
+Users of Provenant can use ExtractCode before scanning, just like with Python ScanCode. A future `extractcode-provenant` tool could be created as a separate project, but that is entirely outside the scope of Provenant.
 
 **Note**: Our `.deb` and `.apk` parsers can read metadata directly from archive files without extraction, which is an improvement over Python (documented in `docs/improvements/debian-parser.md` and `docs/improvements/alpine-parser.md`). This means users get package metadata from these archives without needing ExtractCode at all.
 
 ### ExtractCode Naming Convention Compatibility
 
-When ExtractCode extracts archives, it creates directories with a `-extract` suffix (e.g., `control.tar.gz-extract/`, `data.gz-extract/`, `metadata.gz-extract/`). For scancode-rust to be a drop-in replacement, parsers must also match these `-extract` paths.
+When ExtractCode extracts archives, it creates directories with a `-extract` suffix (e.g., `control.tar.gz-extract/`, `data.gz-extract/`, `metadata.gz-extract/`). For Provenant to be a drop-in replacement, parsers must also match these `-extract` paths.
 
 **Current coverage**:
 
@@ -227,7 +227,7 @@ File Enumeration → Parser Selection → Package Extraction → Assembly Phase 
 | `src/assembly/workspace_merge.rs`       | npm/pnpm workspace assembly (859 lines)               |
 | `src/assembly/cargo_workspace_merge.rs` | Cargo workspace assembly (524 lines)                  |
 | `src/assembly/file_ref_resolve.rs`      | File reference resolution for DB packages (750 lines) |
-| `src/assembly/assembly_golden_test.rs`  | 9 golden tests                                        |
+| `src/assembly/assembly_golden_test.rs`  | Assembly golden-test coverage                         |
 
 ---
 

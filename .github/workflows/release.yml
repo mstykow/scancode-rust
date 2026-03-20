@@ -48,7 +48,7 @@ jobs:
           submodules: recursive
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@1.93.1
+        uses: dtolnay/rust-toolchain@1.94.0
         with:
           targets: ${{ matrix.target }}
 
@@ -74,11 +74,11 @@ jobs:
         if: matrix.archive_format == 'tar.gz'
         run: |
           cd target/${{ matrix.target }}/release
-          tar czf scancode-rust-${{ matrix.target }}.tar.gz scancode-rust${{ matrix.ext }}
+          tar czf provenant-${{ matrix.target }}.tar.gz provenant${{ matrix.ext }}
           if command -v sha256sum > /dev/null; then
-            sha256sum scancode-rust-${{ matrix.target }}.tar.gz > scancode-rust-${{ matrix.target }}.tar.gz.sha256
+            sha256sum provenant-${{ matrix.target }}.tar.gz > provenant-${{ matrix.target }}.tar.gz.sha256
           else
-            shasum -a 256 scancode-rust-${{ matrix.target }}.tar.gz > scancode-rust-${{ matrix.target }}.tar.gz.sha256
+            shasum -a 256 provenant-${{ matrix.target }}.tar.gz > provenant-${{ matrix.target }}.tar.gz.sha256
           fi
         shell: bash
 
@@ -86,17 +86,17 @@ jobs:
         if: matrix.archive_format == 'zip'
         run: |
           cd target/${{ matrix.target }}/release
-          7z a scancode-rust-${{ matrix.target }}.zip scancode-rust${{ matrix.ext }}
-          certutil -hashfile scancode-rust-${{ matrix.target }}.zip SHA256 > scancode-rust-${{ matrix.target }}.zip.sha256
+          7z a provenant-${{ matrix.target }}.zip provenant${{ matrix.ext }}
+          certutil -hashfile provenant-${{ matrix.target }}.zip SHA256 > provenant-${{ matrix.target }}.zip.sha256
         shell: pwsh
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
         with:
-          name: scancode-rust-${{ matrix.target }}
+          name: provenant-${{ matrix.target }}
           path: |
-            target/${{ matrix.target }}/release/scancode-rust-${{ matrix.target }}.${{ matrix.archive_format }}
-            target/${{ matrix.target }}/release/scancode-rust-${{ matrix.target }}.${{ matrix.archive_format }}.sha256
+            target/${{ matrix.target }}/release/provenant-${{ matrix.target }}.${{ matrix.archive_format }}
+            target/${{ matrix.target }}/release/provenant-${{ matrix.target }}.${{ matrix.archive_format }}.sha256
           if-no-files-found: error
 
   create-release:

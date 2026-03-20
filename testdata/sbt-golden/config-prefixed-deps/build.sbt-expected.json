@@ -1,0 +1,80 @@
+[
+  {
+    "type": "maven",
+    "namespace": "com.example",
+    "name": "scoped-demo",
+    "version": "1.0.0",
+    "primary_language": "Scala",
+    "parties": [],
+    "dependencies": [
+      {
+        "purl": "pkg:maven/org.scalatest/scalatest@3.2.18",
+        "extracted_requirement": "3.2.18",
+        "scope": "test",
+        "is_runtime": false,
+        "is_optional": true,
+        "is_pinned": true,
+        "is_direct": true,
+        "extra_data": {
+          "sbt_cross_version": true,
+          "sbt_operator": "%%"
+        }
+      },
+      {
+        "purl": "pkg:maven/javax.servlet/javax.servlet-api@4.0.1",
+        "extracted_requirement": "4.0.1",
+        "scope": "provided",
+        "is_runtime": false,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:maven/com.example/provided-helper@2.0.0",
+        "extracted_requirement": "2.0.0",
+        "scope": "test",
+        "is_runtime": false,
+        "is_optional": true,
+        "is_pinned": true,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:maven/ch.qos.logback/logback-classic@1.5.18",
+        "extracted_requirement": "1.5.18",
+        "scope": "runtime",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:maven/org.typelevel/cats-core@2.10.0",
+        "extracted_requirement": "2.10.0",
+        "scope": "compile",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": true,
+        "extra_data": {
+          "sbt_operator": "%%",
+          "sbt_cross_version": true
+        }
+      },
+      {
+        "purl": "pkg:maven/org.nested/ignored@9.9.9",
+        "extracted_requirement": "9.9.9",
+        "scope": "test",
+        "is_runtime": false,
+        "is_optional": true,
+        "is_pinned": true,
+        "is_direct": true,
+        "extra_data": {
+          "sbt_operator": "%%",
+          "sbt_cross_version": true
+        }
+      }
+    ],
+    "datasource_id": "sbt_build_sbt",
+    "purl": "pkg:maven/com.example/scoped-demo@1.0.0"
+  }
+]

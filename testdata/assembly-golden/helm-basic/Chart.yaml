@@ -1,0 +1,23 @@
+apiVersion: v2
+name: nginx
+version: 22.1.1
+appVersion: 1.29.1
+description: Example Helm chart
+type: application
+home: https://example.com/nginx
+keywords:
+  - nginx
+  - reverse-proxy
+maintainers:
+  - name: Jane Doe
+    email: jane@example.com
+dependencies:
+  - name: common
+    version: 2.x.x
+    repository: oci://registry-1.docker.io/bitnamicharts
+    tags:
+      - common
+  - name: metrics
+    version: 1.2.3
+    repository: https://charts.example.test
+    condition: metrics.enabled

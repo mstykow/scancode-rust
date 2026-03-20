@@ -95,15 +95,15 @@ Ruby DSL format for declaring CocoaPods dependencies.
 
 ## Current Implementation Status
 
-### ✅ What Works (95%+ Feature Parity)
+### ✅ What Works (Focused Parity for Current Batch)
 
 1. **JSON/YAML Formats** (100% Parity):
    - ✅ `.podspec.json` - Complete parsing
    - ✅ `Podfile.lock` - Full data aggregation
 
-2. **Ruby DSL Formats** (90%+ Coverage):
-   - ✅ `.podspec` - Core fields and dependencies
-   - ✅ `Podfile` - Standard pod declarations
+2. **Ruby DSL Formats**:
+   - ✅ `.podspec` - Core fields and refined runtime/development dependency scopes
+   - ✅ `Podfile` - Standard pod declarations with less misleading scope/runtime inference
 
 ### 🔬 Rust-Specific Improvements
 
@@ -170,7 +170,7 @@ For 100% feature parity on Ruby DSL files:
 ### Option 2: Accept Current Coverage
 
 - **Reality**: Python reference also uses regex for most podspec parsing
-- **Coverage**: 90%+ of real-world files work correctly
+- **Coverage**: current batch now covers the upstream scope-handling gap and guards against RxDataSources duplication regressions
 - **Pragmatic**: JSON formats (.podspec.json, Podfile.lock) are canonical
 
 ## Python Reference Implementation
@@ -194,6 +194,11 @@ Key insights:
 
 The test comparator (`compare_package_data_parser_only`) automatically skips license detection fields.
 
+## Current Batch-Specific Notes
+
+- `Podfile.lock` and `Podfile` scope handling has been intentionally refined away from the older `requires` / forced-runtime contract.
+- `RxDataSources.podspec` now has an explicit regression test proving non-duplicated package output.
+
 ## Test Data Structure
 
 ```
@@ -210,19 +215,12 @@ Each test file should have a corresponding `-expected.json` file for golden test
 ## Running Tests
 
 ```bash
-# Run all CocoaPods golden tests
 cargo test --lib cocoapods
-
-# Run specific format tests
-cargo test --lib podspec_json
-cargo test --lib podfile_lock
-cargo test --lib podspec
-cargo test --lib podfile
 ```
 
 ## Expected Test Results
 
-- **JSON/YAML formats**: 100% pass rate expected
-- **Ruby DSL formats**: 90%+ pass rate expected (some complex Ruby expressions may differ)
+- **JSON/YAML formats**: stable parser-only parity coverage is expected
+- **Ruby DSL formats**: the common static patterns described above should remain stable, while highly dynamic Ruby expressions may still differ
 
 Any failures on standard files indicate a regression and should be investigated.

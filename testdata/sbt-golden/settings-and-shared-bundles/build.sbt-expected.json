@@ -1,0 +1,65 @@
+[
+  {
+    "type": "maven",
+    "namespace": "com.example.root",
+    "name": "settings-demo",
+    "version": "2.0.0",
+    "primary_language": "Scala",
+    "description": "Bundle and settings demo",
+    "parties": [],
+    "homepage_url": "https://example.com/settings-demo",
+    "extracted_license_statement": "- license:\n    name: Apache-2.0\n    url: https://www.apache.org/licenses/LICENSE-2.0.txt\n",
+    "dependencies": [
+      {
+        "purl": "pkg:maven/org.typelevel/cats-core@2.10.0",
+        "extracted_requirement": "2.10.0",
+        "scope": null,
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": true,
+        "extra_data": {
+          "sbt_operator": "%%",
+          "sbt_cross_version": true
+        }
+      },
+      {
+        "purl": "pkg:maven/com.lihaoyi/os-lib@0.10.0",
+        "extracted_requirement": "0.10.0",
+        "scope": null,
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": true,
+        "extra_data": {
+          "sbt_operator": "%%",
+          "sbt_cross_version": true
+        }
+      },
+      {
+        "purl": "pkg:maven/org.scalatest/scalatest@3.2.18",
+        "extracted_requirement": "3.2.18",
+        "scope": "test",
+        "is_runtime": false,
+        "is_optional": true,
+        "is_pinned": true,
+        "is_direct": true,
+        "extra_data": {
+          "sbt_cross_version": true,
+          "sbt_operator": "%%"
+        }
+      },
+      {
+        "purl": "pkg:maven/ch.qos.logback/logback-classic@1.5.18",
+        "extracted_requirement": "1.5.18",
+        "scope": null,
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": true
+      }
+    ],
+    "datasource_id": "sbt_build_sbt",
+    "purl": "pkg:maven/com.example.root/settings-demo@2.0.0"
+  }
+]

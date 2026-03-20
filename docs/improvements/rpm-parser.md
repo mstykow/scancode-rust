@@ -41,13 +41,6 @@ Rust now goes beyond the released Python ScanCode RPM handling in several concre
 - The parser reads sibling YumDB keys from the same package directory.
 - Post-assembly merge logic attaches these YumDB keys under `extra_data.yumdb` on the matching installed RPM package and removes the standalone YumDB fragment.
 
-## Validation
+## Coverage
 
-- `cargo test rpm --lib`
-- `cargo test --features golden-tests rpm_golden --lib`
-- `cargo test test_resolve_rpm_namespace --lib`
-- `cargo test test_merge_rpm_yumdb_metadata --lib`
-
-## Related Issues
-
-- #164, #166, #167, #168, #169, #170, #171
+Coverage spans EVR preservation, source RPM recognition, YumDB enrichment, and archive metadata behavior.

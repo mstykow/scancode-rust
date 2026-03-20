@@ -14,15 +14,14 @@ This index helps you find the right documentation for your needs.
 - **[ARCHITECTURE.md](ARCHITECTURE.md)** - System design and components
 - **[HOW_TO_ADD_A_PARSER.md](HOW_TO_ADD_A_PARSER.md)** - Step-by-step parser implementation guide
 - **[TESTING_STRATEGY.md](TESTING_STRATEGY.md)** - Four-layer testing approach
-- **[implementation-plans/package-detection/PARSER_ENHANCEMENT_PLAN.md](implementation-plans/package-detection/PARSER_ENHANCEMENT_PLAN.md)** - Active parser enhancement backlog and execution order
 
 ### Design Decisions
 
-- **[adr/](adr/)** - Architectural Decision Records
+- **[adr/README.md](adr/README.md)** - Architectural Decision Records index and guidance
 
 ### Beyond-Parity Features
 
-- **[improvements/](improvements/)** - Features where Rust exceeds Python
+- **[improvements/README.md](improvements/README.md)** - Beyond-parity improvements index and per-area links
 
 ## For Maintainers
 
@@ -58,22 +57,13 @@ docs/
 → [SUPPORTED_FORMATS.md](SUPPORTED_FORMATS.md)
 
 **...understand a design decision**
-→ [adr/](adr/)
+→ [adr/README.md](adr/README.md)
 
 **...see where Rust exceeds Python**
-→ [improvements/](improvements/)
+→ [improvements/README.md](improvements/README.md)
 
 **...track implementation quality and behavior**
 → [TESTING_STRATEGY.md](TESTING_STRATEGY.md)
-
-**...configure cache behavior and controls**
-→ [README.md](../README.md) and [implementation-plans/infrastructure/CACHING_PLAN.md](implementation-plans/infrastructure/CACHING_PLAN.md)
-
-**...implement a specific feature**
-→ [ARCHITECTURE.md](ARCHITECTURE.md) and [HOW_TO_ADD_A_PARSER.md](HOW_TO_ADD_A_PARSER.md)
-
-**...resume the ecosystem-by-ecosystem parser enhancement effort**
-→ [implementation-plans/package-detection/PARSER_ENHANCEMENT_PLAN.md](implementation-plans/package-detection/PARSER_ENHANCEMENT_PLAN.md)
 
 ## Document Lifecycle
 
@@ -83,8 +73,8 @@ docs/
 - **HOW_TO_ADD_A_PARSER.md** - Updated as parser patterns change
 - **TESTING_STRATEGY.md** - Updated as testing approach evolves
 - **SUPPORTED_FORMATS.md** - Auto-generated, always current
-- **adr/** - Immutable once written (new ADRs added as needed)
-- **improvements/** - Documents added as beyond-parity features are implemented
+- **adr/README.md** - ADR index; individual ADRs are immutable once written
+- **improvements/README.md** - Landing page for beyond-parity improvement documents
 
 ## Contributing
 
@@ -97,6 +87,6 @@ When adding documentation:
 
 ## Maintenance
 
-- **SUPPORTED_FORMATS.md**: Regenerate with `cargo run --bin generate-supported-formats`
+- **SUPPORTED_FORMATS.md**: Regenerate with `cargo run --manifest-path xtask/Cargo.toml --bin generate-supported-formats`
 - **ADRs**: Add new ADRs for significant design decisions
 - **Improvements**: Document beyond-parity features as they're implemented

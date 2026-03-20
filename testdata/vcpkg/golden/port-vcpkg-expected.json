@@ -1,0 +1,56 @@
+[
+  {
+    "type": "vcpkg",
+    "name": "fmt",
+    "version": "10.1.1#7",
+    "primary_language": "C++",
+    "description": "Formatting library for C++.",
+    "parties": [
+      {
+        "type": "person",
+        "role": "maintainer",
+        "name": "fmt maintainers",
+        "email": "fmt@example.com"
+      }
+    ],
+    "homepage_url": "https://github.com/fmtlib/fmt",
+    "extracted_license_statement": "MIT",
+    "extra_data": {
+      "default-features": ["unicode"],
+      "features": {
+        "unicode": {
+          "description": "Unicode support",
+          "dependencies": ["icu"]
+        }
+      }
+    },
+    "dependencies": [
+      {
+        "purl": "pkg:generic/vcpkg/vcpkg-cmake",
+        "extracted_requirement": "vcpkg-cmake",
+        "scope": "dependencies",
+        "is_runtime": false,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true,
+        "extra_data": {
+          "host": true
+        }
+      },
+      {
+        "purl": "pkg:generic/vcpkg/vcpkg-cmake-config",
+        "extracted_requirement": "vcpkg-cmake-config",
+        "scope": "dependencies",
+        "is_runtime": false,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true,
+        "extra_data": {
+          "host": true
+        }
+      }
+    ],
+    "datasource_id": "vcpkg_json",
+    "purl": "pkg:generic/vcpkg/fmt@10.1.1%237"
+  }
+]

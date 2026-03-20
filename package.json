@@ -1,13 +1,14 @@
 {
-  "name": "scancode-rust",
+  "name": "provenant",
   "version": "0.1.0",
   "private": true,
-  "description": "High-performance Rust tool for detecting licenses, copyrights, and package metadata",
+  "description": "Documentation tooling for Provenant",
   "scripts": {
     "format": "prettier --write \"**/*.{yml,yaml,json,md}\"",
     "format:check": "prettier --check \"**/*.{yml,yaml,json,md}\"",
     "lint:md": "markdownlint-cli2",
     "lint:md:fix": "markdownlint-cli2 --fix \"**/*.md\"",
+    "validate:urls": "cargo run --quiet --manifest-path xtask/Cargo.toml --bin validate-urls -- --root .",
     "lint:docs": "npm run lint:md && npm run format:check",
     "fix:docs": "npm run lint:md:fix && npm run format",
     "check:docs": "npm run lint:docs"

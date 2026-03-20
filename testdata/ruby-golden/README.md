@@ -4,14 +4,9 @@
 
 Golden tests compare parser output against expected results from the original ScanCode Toolkit to ensure compatibility.
 
-## Test Status
+## Coverage Summary
 
-**Current state:** 2/4 Ruby parser goldens are active; the remaining 2 are still intentionally ignored because they require license detection engine integration.
-
-- ✅ **cat-gemspec** - Passing with improvements
-- ✅ **arel-gemspec** - Active after parser parity fixes for `%q{}` cleanup and conditional dependency extraction
-- ⏸️ **oj-gemspec** - License detection engine required
-- ⏸️ **rubocop-gemspec** - License detection engine required
+This fixture set covers representative gemspec metadata, required-file constant resolution, Gemfile source provenance, Gemfile.lock Git and path metadata, and the current parser-only boundary where some cases still depend on license-detection integration.
 
 ## Intentional Improvements Over Python ScanCode
 
@@ -44,9 +39,15 @@ Python's approach fragments related data and loses the association between names
 ### Dependency Scope (Explicit vs Implicit)
 
 **Python:** Runtime dependencies have `scope: null`  
-**Ours:** Runtime dependencies have `scope: "runtime"`
+**Ours:** Runtime dependencies also keep `scope: null`
 
 **Rationale:** Explicit is better than implicit. All dependency scopes should be clearly labeled.
+
+Ruby now follows the ecosystem-native convention documented in this repository: plain runtime Gemfile dependencies keep a null scope, while install-time context such as group membership and source provenance is preserved in dedicated fields.
+
+### Extracted Gem Assembly (Improved Deduplication)
+
+Rust now assembles `metadata.gz-extract` together with sibling `data.gz-extract/*.gemspec` content and deduplicates the overlapping package/dependency results, while also assigning nested files like `data.gz-extract/LICENSE.txt` and `data.gz-extract/lib/example-gem.rb` to the assembled gem package.
 
 ## Test Data
 

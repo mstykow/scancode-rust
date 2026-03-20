@@ -1,6 +1,6 @@
-# Agent Guidelines for scancode-rust
+# Agent Guidelines for Provenant
 
-This guide provides essential information for AI coding agents working on the `scancode-rust` codebase - a high-performance Rust tool for detecting licenses, copyrights, and package metadata in source code.
+This guide provides essential information for AI coding agents working on the `Provenant` codebase - a high-performance Rust tool for detecting licenses, copyrights, and package metadata in source code.
 
 ## Documentation Map
 
@@ -17,7 +17,7 @@ This guide provides essential information for AI coding agents working on the `s
 
 ## Project Context
 
-**scancode-rust** is a complete rewrite of [ScanCode Toolkit](https://github.com/aboutcode-org/scancode-toolkit) in Rust, designed to be a **drop-in replacement** with all features and requirements of the original, but with less complexity, zero bugs, and Rust-specific optimizations. The original Python codebase is available as a reference submodule at `reference/scancode-toolkit/`.
+**Provenant** is a complete rewrite of [ScanCode Toolkit](https://github.com/aboutcode-org/scancode-toolkit) in Rust, designed to be a **drop-in replacement** with all features and requirements of the original, but with less complexity, zero bugs, and Rust-specific optimizations. The original Python codebase is available as a reference submodule at `reference/scancode-toolkit/`.
 
 ### Core Philosophy: Correctness and Feature Parity Above All
 
@@ -52,12 +52,6 @@ You **cannot** and **should not** follow the reference Python implementation lin
 
 **Use the reference to understand WHAT to build, not HOW to build it.** Implement features using clean, idiomatic Rust that leverages the language's strengths while maintaining complete functional compatibility with the original.
 
-Note: there is a copy of the reference available that can be executed to generate reference data. It is at `reference/scancode-playground` and you can run Python files like:
-
-```
-cd reference/scancode-playground && venv/bin/python src/scancode/cli.py
-```
-
 ## Quick Start
 
 ```bash
@@ -77,10 +71,18 @@ cargo test --release --features golden-tests  # Local golden tests: always use -
 cargo fmt                     # Format code
 cargo clippy                  # Lint and catch mistakes
 cargo clippy --fix            # Auto-fix clippy suggestions
+npm run check:docs            # Markdown lint + formatting check
+npm run validate:urls         # Validate documentation/docstring URLs (can take a few minutes)
 
 # Run Tool
 cargo run -- --json-pp output.json <dir> --exclude "*.git*" "target/*"
 ```
+
+## Documentation Tooling
+
+- **Markdown checks**: `npm run check:docs`
+- **Markdown autofix**: `npm run fix:docs`
+- **URL validation**: `npm run validate:urls`
 
 ## Running Single Tests
 
@@ -260,7 +262,7 @@ pub fn extract_package_data(path: &Path) -> PackageData {
 
 ## Testing Strategy
 
-scancode-rust uses a **four-layer testing approach** for comprehensive quality assurance:
+Provenant uses a **four-layer testing approach** for comprehensive quality assurance:
 
 1. **Doctests** - API documentation examples that run as tests (verifies public API examples work)
 2. **Unit Tests** - Component-level tests for individual functions and edge cases
@@ -301,7 +303,7 @@ mod tests {
 
 - `cargo fmt --all` - Format code and stage changes
 - `cargo clippy --all-targets --all-features -- -D warnings` - Lint with warnings as errors
-- `cargo run --quiet --bin generate-supported-formats` - Regenerate `docs/SUPPORTED_FORMATS.md` when parser files change
+- `cargo run --quiet --manifest-path xtask/Cargo.toml --bin generate-supported-formats` - Regenerate `docs/SUPPORTED_FORMATS.md` when parser files change
 - `npm run lint:md:fix` - Lint and auto-fix Markdown
 - `npm run format` - Format YAML, JSON, and Markdown with Prettier
 
@@ -667,7 +669,7 @@ The assembler:
 ## Additional Notes
 
 - **Rust toolchain**: Version pinned in `rust-toolchain.toml` (currently 1.93.0)
-- **Output format**: ScanCode Toolkit-compatible JSON with `SCANCODE_OUTPUT_FORMAT_VERSION`
+- **Output format**: ScanCode Toolkit-compatible JSON with `OUTPUT_FORMAT_VERSION`
 - **License detection**: Uses SPDX license data, threshold of 0.9 confidence
 - **Exclusion patterns**: Supports glob patterns (e.g., `*.git*`, `node_modules/*`)
 - **Git submodules**: Two submodules - `resources/licenses/` (SPDX data) and `reference/scancode-toolkit/` (original Python codebase for reference)

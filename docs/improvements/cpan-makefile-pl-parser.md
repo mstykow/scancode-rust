@@ -1,12 +1,8 @@
 # CpanMakefilePlParser: WriteMakefile Metadata Extraction
 
-**Parser**: `CpanMakefilePlParser`  
-**File**: `src/parsers/cpan_makefile_pl.rs`  
-**Python Reference**: `src/packagedcode/misc.py` (CpanMakefilePlHandler)
-
 ## Summary
 
-**✨ New Feature**: Python implementation is a stub with no parse method. Rust implementation provides WriteMakefile function parsing with metadata extraction.
+**✨ New Feature + 🔍 Enhanced**: Python implementation is a stub with no parse method. Rust implementation provides WriteMakefile function parsing with metadata extraction, including bounded static resolution of `VERSION_FROM` and `ABSTRACT_FROM`.
 
 ## Python Limitation
 
@@ -33,9 +29,9 @@ Regex-based extraction of WriteMakefile function parameters with metadata parsin
 
 1. **Basic Metadata**:
    - `NAME` → `name`
-   - `VERSION` or `VERSION_FROM` → `version`
-   - `ABSTRACT` or `ABSTRACT_FROM` → `description`
-   - `LICENSE` → `declared_license_expression`
+   - `VERSION` or resolved `VERSION_FROM` → `version`
+   - `ABSTRACT` or resolved `ABSTRACT_FROM` → `description`
+   - `LICENSE` → `extracted_license_statement`
 
 2. **Author Information**:
    - `AUTHOR` field → `parties` with role="author"
@@ -58,6 +54,7 @@ The parser uses regex patterns to extract WriteMakefile parameters:
 3. Parses key-value pairs with proper quote handling
 4. Extracts nested dependency hashes (`PREREQ_PM`, `BUILD_REQUIRES`, etc.)
 5. Handles both quoted and unquoted values
+6. Optionally reads bounded sibling module files referenced by `VERSION_FROM` / `ABSTRACT_FROM` and extracts literal `$VERSION` plus POD `=head1 NAME` abstract text without executing Perl
 
 ### Real-World Example
 
@@ -97,7 +94,7 @@ WriteMakefile(
   "name": "My::Module",
   "version": "1.0.0",
   "description": "A sample Perl module",
-  "declared_license_expression": "perl_5",
+  "extracted_license_statement": "perl_5",
   "parties": [
     {
       "role": "author",
@@ -144,18 +141,18 @@ WriteMakefile(
 
 ### WriteMakefile Parameters Supported
 
-| Parameter        | PackageData Field                | Notes                               |
-| ---------------- | -------------------------------- | ----------------------------------- |
-| `NAME`           | `name`                           | Module name                         |
-| `VERSION`        | `version`                        | Version string                      |
-| `VERSION_FROM`   | `version`                        | Extract from file (not implemented) |
-| `ABSTRACT`       | `description`                    | Short description                   |
-| `ABSTRACT_FROM`  | `description`                    | Extract from file (not implemented) |
-| `AUTHOR`         | `parties` (role=`author`)        | Author info                         |
-| `LICENSE`        | `declared_license_expression`    | License identifier                  |
-| `PREREQ_PM`      | `dependencies` (scope=`runtime`) | Runtime deps                        |
-| `BUILD_REQUIRES` | `dependencies` (scope=`build`)   | Build deps                          |
-| `TEST_REQUIRES`  | `dependencies` (scope=`test`)    | Test deps                           |
+| Parameter        | PackageData Field                | Notes                                                |
+| ---------------- | -------------------------------- | ---------------------------------------------------- |
+| `NAME`           | `name`                           | Module name                                          |
+| `VERSION`        | `version`                        | Version string                                       |
+| `VERSION_FROM`   | `version`                        | Resolve literal `$VERSION` from sibling module file  |
+| `ABSTRACT`       | `description`                    | Short description                                    |
+| `ABSTRACT_FROM`  | `description`                    | Resolve POD `NAME` abstract from sibling module file |
+| `AUTHOR`         | `parties` (role=`author`)        | Author info                                          |
+| `LICENSE`        | `extracted_license_statement`    | License identifier                                   |
+| `PREREQ_PM`      | `dependencies` (scope=`runtime`) | Runtime deps                                         |
+| `BUILD_REQUIRES` | `dependencies` (scope=`build`)   | Build deps                                           |
+| `TEST_REQUIRES`  | `dependencies` (scope=`test`)    | Test deps                                            |
 
 ### Dependency Hash Format
 
@@ -178,39 +175,42 @@ PREREQ_PM => {
 
 **No code execution**: Unlike Python's potential approach using `eval`, our Rust implementation uses **regex-based parsing only**. This is secure and doesn't execute arbitrary Perl code.
 
+For `VERSION_FROM` and `ABSTRACT_FROM`, Rust only reads local referenced files within the `Makefile.PL` directory tree, caps file size, and extracts conservative literal patterns rather than evaluating Perl.
+
 ## Value
 
 - **Legacy CPAN support**: Many older CPAN modules use Makefile.PL instead of META files
 - **Complete dependency graph**: Extract build, test, and runtime dependencies
 - **Author attribution**: Structured author information
 - **License compliance**: License information for compliance tracking
+- **Better package identity**: Real version and abstract text can now be recovered from the referenced module file when MakeMaker keeps them out of the `WriteMakefile(...)` call
 - **Secure parsing**: No code execution risk
 
 ## Limitations
 
-**Not implemented** (complexity vs. value trade-off):
+Still intentionally not implemented:
 
-- `VERSION_FROM` file reading (would require parsing separate .pm files)
-- `ABSTRACT_FROM` file reading (same reason)
 - Dynamic version computation (e.g., `VERSION => do { ... }`)
 - Complex Perl expressions in parameter values
+- Non-literal or generated `$VERSION` patterns in referenced module files
+- Non-standard abstract extraction outside the documented POD `=head1 NAME` / `Package - abstract` form
 
-These features would require a full Perl parser or code execution, which poses security risks. The current regex-based approach handles 95% of real-world Makefile.PL files.
+These remaining cases would require a fuller Perl parser or code execution, which poses security risks. The current bounded static approach covers the common CPAN MakeMaker patterns without expanding evaluation scope.
 
-## Test Coverage
+## Coverage
 
-7 comprehensive test cases:
+Coverage includes:
 
 - Basic WriteMakefile parsing
 - Dependency extraction with all scopes
 - Author email parsing
 - Author without email
 - Minimal Makefile.PL handling
+- `VERSION_FROM` recovery from a sibling `.pm` file
+- `ABSTRACT_FROM` recovery from POD in a sibling `.pm` file
 - Empty content handling
 - Malformed WriteMakefile handling
 
 ## References
 
-- Python implementation: `reference/scancode-toolkit/src/packagedcode/misc.py`
-- Rust implementation: `src/parsers/cpan_makefile_pl.rs`
 - ExtUtils::MakeMaker spec: <https://metacpan.org/pod/ExtUtils::MakeMaker>

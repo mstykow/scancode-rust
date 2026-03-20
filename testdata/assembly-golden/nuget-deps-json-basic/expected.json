@@ -1,0 +1,65 @@
+{
+  "packages": [
+    {
+      "type": "nuget",
+      "name": "ExampleApp",
+      "version": "1.0.0",
+      "parties": [],
+      "extra_data": {
+        "target_framework": ".NETCoreApp,Version=v8.0",
+        "runtime_identifier": "win-x64",
+        "runtime_target_name": ".NETCoreApp,Version=v8.0/win-x64",
+        "runtime_signature": "signature-value"
+      },
+      "repository_homepage_url": "https://www.nuget.org/packages/ExampleApp/1.0.0",
+      "repository_download_url": "https://www.nuget.org/api/v2/package/ExampleApp/1.0.0",
+      "api_data_url": "https://api.nuget.org/v3/registration3/exampleapp/1.0.0.json",
+      "purl": "pkg:nuget/ExampleApp@1.0.0",
+      "package_uid": "pkg:nuget/ExampleApp@1.0.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "datafile_paths": ["ExampleApp.deps.json"],
+      "datasource_ids": ["nuget_deps_json"]
+    }
+  ],
+  "dependencies": [
+    {
+      "purl": "pkg:nuget/Newtonsoft.Json@13.0.1",
+      "extracted_requirement": "13.0.1",
+      "scope": ".NETCoreApp,Version=v8.0/win-x64",
+      "is_runtime": true,
+      "is_optional": false,
+      "is_pinned": true,
+      "is_direct": true,
+      "extra_data": {
+        "type": "package",
+        "target_name": ".NETCoreApp,Version=v8.0/win-x64"
+      },
+      "dependency_uid": "pkg:nuget/Newtonsoft.Json@13.0.1?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "for_package_uid": "pkg:nuget/ExampleApp@1.0.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "datafile_path": "ExampleApp.deps.json",
+      "datasource_id": "nuget_deps_json"
+    },
+    {
+      "purl": "pkg:nuget/Serilog@2.12.0",
+      "extracted_requirement": "2.12.0",
+      "scope": ".NETCoreApp,Version=v8.0/win-x64",
+      "is_runtime": true,
+      "is_optional": false,
+      "is_pinned": true,
+      "is_direct": true,
+      "extra_data": {
+        "type": "package",
+        "target_name": ".NETCoreApp,Version=v8.0/win-x64"
+      },
+      "dependency_uid": "pkg:nuget/Serilog@2.12.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "for_package_uid": "pkg:nuget/ExampleApp@1.0.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "datafile_path": "ExampleApp.deps.json",
+      "datasource_id": "nuget_deps_json"
+    }
+  ],
+  "files_with_packages": [
+    {
+      "path": "ExampleApp.deps.json",
+      "for_packages": ["pkg:nuget/ExampleApp@1.0.0?uuid=fixed-uid-done-for-testing-5642512d1758"]
+    }
+  ]
+}

@@ -1,7 +1,11 @@
 #[cfg(test)]
 mod golden_tests {
     use crate::parsers::PackageParser;
-    use crate::parsers::nuget::{NuspecParser, PackageReferenceProjectParser, ProjectJsonParser};
+    use crate::parsers::nuget::{
+        CentralPackageManagementPropsParser, DirectoryBuildPropsParser, DotNetDepsJsonParser,
+        NupkgParser, NuspecParser, PackageReferenceProjectParser, PackagesConfigParser,
+        PackagesLockParser, ProjectJsonParser, ProjectLockJsonParser,
+    };
     use crate::test_utils::compare_package_data_parser_only;
     use std::path::PathBuf;
 
@@ -127,6 +131,109 @@ mod golden_tests {
         );
 
         let package_data = PackageReferenceProjectParser::extract_first_package(&test_file);
+
+        match compare_package_data_parser_only(&package_data, &expected_file) {
+            Ok(_) => (),
+            Err(e) => panic!("Golden test failed: {}", e),
+        }
+    }
+
+    #[test]
+    fn test_golden_dotnet_deps_json() {
+        let test_file = PathBuf::from("testdata/nuget-golden/deps-json/ExampleApp.deps.json");
+        let expected_file =
+            PathBuf::from("testdata/nuget-golden/deps-json/ExampleApp.deps.json.expected.json");
+
+        let package_data = DotNetDepsJsonParser::extract_first_package(&test_file);
+
+        match compare_package_data_parser_only(&package_data, &expected_file) {
+            Ok(_) => (),
+            Err(e) => panic!("Golden test failed: {}", e),
+        }
+    }
+
+    #[test]
+    fn test_golden_nupkg() {
+        let test_file = PathBuf::from("testdata/nuget-golden/nupkg/Fizzler.1.3.0.nupkg");
+        let expected_file =
+            PathBuf::from("testdata/nuget-golden/nupkg/Fizzler.1.3.0.nupkg.expected.json");
+
+        let package_data = NupkgParser::extract_first_package(&test_file);
+
+        match compare_package_data_parser_only(&package_data, &expected_file) {
+            Ok(_) => (),
+            Err(e) => panic!("Golden test failed: {}", e),
+        }
+    }
+
+    #[test]
+    fn test_golden_packages_config() {
+        let test_file = PathBuf::from("testdata/nuget-golden/packages-config/packages.config");
+        let expected_file =
+            PathBuf::from("testdata/nuget-golden/packages-config/packages.config.expected.json");
+
+        let package_data = PackagesConfigParser::extract_first_package(&test_file);
+
+        match compare_package_data_parser_only(&package_data, &expected_file) {
+            Ok(_) => (),
+            Err(e) => panic!("Golden test failed: {}", e),
+        }
+    }
+
+    #[test]
+    fn test_golden_packages_lock() {
+        let test_file = PathBuf::from("testdata/nuget-golden/packages-lock/packages.lock.json");
+        let expected_file =
+            PathBuf::from("testdata/nuget-golden/packages-lock/packages.lock.json.expected.json");
+
+        let package_data = PackagesLockParser::extract_first_package(&test_file);
+
+        match compare_package_data_parser_only(&package_data, &expected_file) {
+            Ok(_) => (),
+            Err(e) => panic!("Golden test failed: {}", e),
+        }
+    }
+
+    #[test]
+    fn test_golden_project_lock_json() {
+        let test_file = PathBuf::from("testdata/nuget-golden/project-lock/project.lock.json");
+        let expected_file =
+            PathBuf::from("testdata/nuget-golden/project-lock/project.lock.json.expected.json");
+
+        let package_data = ProjectLockJsonParser::extract_first_package(&test_file);
+
+        match compare_package_data_parser_only(&package_data, &expected_file) {
+            Ok(_) => (),
+            Err(e) => panic!("Golden test failed: {}", e),
+        }
+    }
+
+    #[test]
+    fn test_golden_directory_packages_props() {
+        let test_file = PathBuf::from(
+            "testdata/nuget-golden/central-package-management/Directory.Packages.props",
+        );
+        let expected_file = PathBuf::from(
+            "testdata/nuget-golden/central-package-management/Directory.Packages.props.expected.json",
+        );
+
+        let package_data = CentralPackageManagementPropsParser::extract_first_package(&test_file);
+
+        match compare_package_data_parser_only(&package_data, &expected_file) {
+            Ok(_) => (),
+            Err(e) => panic!("Golden test failed: {}", e),
+        }
+    }
+
+    #[test]
+    fn test_golden_directory_build_props() {
+        let test_file =
+            PathBuf::from("testdata/nuget-golden/directory-build-props/src/Directory.Build.props");
+        let expected_file = PathBuf::from(
+            "testdata/nuget-golden/directory-build-props/src/Directory.Build.props.expected.json",
+        );
+
+        let package_data = DirectoryBuildPropsParser::extract_first_package(&test_file);
 
         match compare_package_data_parser_only(&package_data, &expected_file) {
             Ok(_) => (),

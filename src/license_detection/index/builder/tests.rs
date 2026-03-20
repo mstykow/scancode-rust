@@ -1,11 +1,11 @@
 #[cfg(test)]
 mod test_cases {
+    use crate::license_detection::index::LicenseIndex;
     use crate::license_detection::index::builder::{
         build_index, compute_is_approx_matchable, generate_url_variants, is_good_tokens_ngram,
         ngrams, tokens_to_bytes,
     };
-    use crate::license_detection::index::dictionary::{tid, KnownToken, TokenId, TokenKind};
-    use crate::license_detection::index::LicenseIndex;
+    use crate::license_detection::index::dictionary::{KnownToken, TokenId, TokenKind, tid};
     use crate::license_detection::models::{License, Rule, RuleKind};
 
     fn known_tokens(entries: &[(u16, TokenKind)]) -> Vec<KnownToken> {
@@ -136,10 +136,12 @@ mod test_cases {
         assert_eq!(index.tids_by_rid.len(), 2);
 
         let rid = find_rid_by_identifier(&index, "test.RULE").expect("rule should exist");
-        assert!(index
-            .rid_by_hash
-            .values()
-            .any(|&stored_rid| stored_rid == rid));
+        assert!(
+            index
+                .rid_by_hash
+                .values()
+                .any(|&stored_rid| stored_rid == rid)
+        );
         assert!(!index.false_positive_rids.contains(&rid));
         assert!(index.licenses_by_key.contains_key("mit"));
     }
@@ -684,18 +686,22 @@ SOFTWARE."#;
         let mit_custom_rid = find_rid_by_identifier(&index, "mit-custom.RULE");
 
         if let Some(rid) = mit_license_rid {
-            assert!(index
-                .rid_by_hash
-                .values()
-                .any(|&stored_rid| stored_rid == rid));
+            assert!(
+                index
+                    .rid_by_hash
+                    .values()
+                    .any(|&stored_rid| stored_rid == rid)
+            );
             assert!(!index.false_positive_rids.contains(&rid));
         }
 
         if let Some(rid) = mit_custom_rid {
-            assert!(index
-                .rid_by_hash
-                .values()
-                .any(|&stored_rid| stored_rid == rid));
+            assert!(
+                index
+                    .rid_by_hash
+                    .values()
+                    .any(|&stored_rid| stored_rid == rid)
+            );
             assert!(!index.false_positive_rids.contains(&rid));
         }
     }

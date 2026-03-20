@@ -33,7 +33,7 @@ use crate::parsers::PackageParser;
 ///
 /// # Example
 /// ```no_run
-/// use scancode_rust::parsers::{SwiftPackageResolvedParser, PackageParser};
+/// use provenant::parsers::{PackageParser, SwiftPackageResolvedParser};
 /// use std::path::Path;
 ///
 /// let path = Path::new("Package.resolved");

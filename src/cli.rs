@@ -187,11 +187,7 @@ pub struct Cli {
 
 fn default_processes() -> i32 {
     let cpus = std::thread::available_parallelism().map_or(1, |n| n.get());
-    if cpus > 1 {
-        (cpus - 1) as i32
-    } else {
-        1
-    }
+    if cpus > 1 { (cpus - 1) as i32 } else { 1 }
 }
 
 #[derive(Debug, Clone)]
@@ -311,13 +307,13 @@ mod tests {
 
     #[test]
     fn test_requires_at_least_one_output_option() {
-        let parsed = Cli::try_parse_from(["scancode-rust", "samples"]);
+        let parsed = Cli::try_parse_from(["provenant", "samples"]);
         assert!(parsed.is_err());
     }
 
     #[test]
     fn test_parses_json_pretty_output_option() {
-        let parsed = Cli::try_parse_from(["scancode-rust", "--json-pp", "scan.json", "samples"])
+        let parsed = Cli::try_parse_from(["provenant", "--json-pp", "scan.json", "samples"])
             .expect("cli parse should succeed");
 
         assert_eq!(parsed.output_json_pp.as_deref(), Some("scan.json"));
@@ -327,7 +323,7 @@ mod tests {
 
     #[test]
     fn test_allows_stdout_dash_as_output_target() {
-        let parsed = Cli::try_parse_from(["scancode-rust", "--json-pp", "-", "samples"])
+        let parsed = Cli::try_parse_from(["provenant", "--json-pp", "-", "samples"])
             .expect("cli parse should allow stdout dash output target");
 
         assert_eq!(parsed.output_json_pp.as_deref(), Some("-"));
@@ -336,18 +332,18 @@ mod tests {
     #[test]
     fn test_custom_template_and_output_must_be_paired() {
         let missing_template =
-            Cli::try_parse_from(["scancode-rust", "--custom-output", "result.txt", "samples"]);
+            Cli::try_parse_from(["provenant", "--custom-output", "result.txt", "samples"]);
         assert!(missing_template.is_err());
 
         let missing_output =
-            Cli::try_parse_from(["scancode-rust", "--custom-template", "tpl.tera", "samples"]);
+            Cli::try_parse_from(["provenant", "--custom-template", "tpl.tera", "samples"]);
         assert!(missing_output.is_err());
     }
 
     #[test]
     fn test_parses_processes_and_timeout_options() {
         let parsed = Cli::try_parse_from([
-            "scancode-rust",
+            "provenant",
             "--json-pp",
             "scan.json",
             "-n",
@@ -365,7 +361,7 @@ mod tests {
     #[test]
     fn test_strip_root_conflicts_with_full_root() {
         let parsed = Cli::try_parse_from([
-            "scancode-rust",
+            "provenant",
             "--json-pp",
             "scan.json",
             "--strip-root",
@@ -378,7 +374,7 @@ mod tests {
     #[test]
     fn test_parses_include_and_only_findings_and_filter_clues() {
         let parsed = Cli::try_parse_from([
-            "scancode-rust",
+            "provenant",
             "--json-pp",
             "scan.json",
             "--include",
@@ -397,7 +393,7 @@ mod tests {
     #[test]
     fn test_parses_ignore_alias_for_exclude_patterns() {
         let parsed = Cli::try_parse_from([
-            "scancode-rust",
+            "provenant",
             "--json-pp",
             "scan.json",
             "--ignore",
@@ -412,7 +408,7 @@ mod tests {
     #[test]
     fn test_quiet_conflicts_with_verbose() {
         let parsed = Cli::try_parse_from([
-            "scancode-rust",
+            "provenant",
             "--json-pp",
             "scan.json",
             "--quiet",
@@ -425,7 +421,7 @@ mod tests {
     #[test]
     fn test_parses_from_json_and_mark_source() {
         let parsed = Cli::try_parse_from([
-            "scancode-rust",
+            "provenant",
             "--json-pp",
             "scan.json",
             "--from-json",
@@ -442,7 +438,7 @@ mod tests {
     #[test]
     fn test_parses_copyright_flag() {
         let parsed = Cli::try_parse_from([
-            "scancode-rust",
+            "provenant",
             "--json-pp",
             "scan.json",
             "--copyright",
@@ -456,7 +452,7 @@ mod tests {
     #[test]
     fn test_parses_short_scan_flags() {
         let parsed = Cli::try_parse_from([
-            "scancode-rust",
+            "provenant",
             "--json-pp",
             "scan.json",
             "-c",
@@ -473,33 +469,21 @@ mod tests {
 
     #[test]
     fn test_parses_processes_compat_values_zero_and_minus_one() {
-        let zero = Cli::try_parse_from([
-            "scancode-rust",
-            "--json-pp",
-            "scan.json",
-            "-n",
-            "0",
-            "samples",
-        ])
-        .expect("cli parse should accept processes=0");
+        let zero =
+            Cli::try_parse_from(["provenant", "--json-pp", "scan.json", "-n", "0", "samples"])
+                .expect("cli parse should accept processes=0");
         assert_eq!(zero.processes, 0);
 
-        let parsed = Cli::try_parse_from([
-            "scancode-rust",
-            "--json-pp",
-            "scan.json",
-            "-n",
-            "-1",
-            "samples",
-        ])
-        .expect("cli parse should accept processes=-1");
+        let parsed =
+            Cli::try_parse_from(["provenant", "--json-pp", "scan.json", "-n", "-1", "samples"])
+                .expect("cli parse should accept processes=-1");
         assert_eq!(parsed.processes, -1);
     }
 
     #[test]
     fn test_parses_cache_flags() {
         let parsed = Cli::try_parse_from([
-            "scancode-rust",
+            "provenant",
             "--json-pp",
             "scan.json",
             "--cache-dir",
@@ -518,7 +502,7 @@ mod tests {
 
     #[test]
     fn test_max_depth_default_matches_reference_behavior() {
-        let parsed = Cli::try_parse_from(["scancode-rust", "--json-pp", "scan.json", "samples"])
+        let parsed = Cli::try_parse_from(["provenant", "--json-pp", "scan.json", "samples"])
             .expect("cli parse should succeed");
 
         assert_eq!(parsed.max_depth, 0);

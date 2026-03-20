@@ -1,18 +1,6 @@
 {
   "dependencies": [
     {
-      "datafile_path": "Cargo.lock",
-      "datasource_id": "cargo_lock",
-      "dependency_uid": "pkg:cargo/serde?uuid=fixed-uid-done-for-testing-5642512d1758",
-      "for_package_uid": "pkg:cargo/test-crate@0.1.0?uuid=fixed-uid-done-for-testing-5642512d1758",
-      "is_direct": true,
-      "is_optional": false,
-      "is_pinned": true,
-      "is_runtime": true,
-      "purl": "pkg:cargo/serde",
-      "scope": "dependencies"
-    },
-    {
       "datafile_path": "Cargo.toml",
       "datasource_id": "cargo_toml",
       "dependency_uid": "pkg:cargo/serde?uuid=fixed-uid-done-for-testing-5642512d1758",
@@ -28,13 +16,18 @@
     {
       "datafile_path": "Cargo.lock",
       "datasource_id": "cargo_lock",
-      "dependency_uid": "pkg:cargo/tokio?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "dependency_uid": "pkg:cargo/serde@1.0.195?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "extra_data": {
+        "checksum": "xyz123",
+        "source": "registry+https://github.com/rust-lang/crates.io-index"
+      },
+      "extracted_requirement": "1.0.195",
       "for_package_uid": "pkg:cargo/test-crate@0.1.0?uuid=fixed-uid-done-for-testing-5642512d1758",
       "is_direct": true,
       "is_optional": false,
       "is_pinned": true,
       "is_runtime": true,
-      "purl": "pkg:cargo/tokio",
+      "purl": "pkg:cargo/serde@1.0.195",
       "scope": "dependencies"
     },
     {
@@ -53,6 +46,23 @@
       "is_runtime": false,
       "purl": "pkg:cargo/tokio",
       "scope": "dev-dependencies"
+    },
+    {
+      "datafile_path": "Cargo.lock",
+      "datasource_id": "cargo_lock",
+      "dependency_uid": "pkg:cargo/tokio@1.35.1?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "extra_data": {
+        "checksum": "abc456",
+        "source": "registry+https://github.com/rust-lang/crates.io-index"
+      },
+      "extracted_requirement": "1.35.1",
+      "for_package_uid": "pkg:cargo/test-crate@0.1.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "is_direct": true,
+      "is_optional": false,
+      "is_pinned": true,
+      "is_runtime": true,
+      "purl": "pkg:cargo/tokio@1.35.1",
+      "scope": "dependencies"
     }
   ],
   "files_with_packages": [
@@ -63,6 +73,14 @@
     {
       "for_packages": ["pkg:cargo/test-crate@0.1.0?uuid=fixed-uid-done-for-testing-5642512d1758"],
       "path": "Cargo.toml"
+    },
+    {
+      "for_packages": ["pkg:cargo/test-crate@0.1.0?uuid=fixed-uid-done-for-testing-5642512d1758"],
+      "path": "README.md"
+    },
+    {
+      "for_packages": ["pkg:cargo/test-crate@0.1.0?uuid=fixed-uid-done-for-testing-5642512d1758"],
+      "path": "src/lib.rs"
     }
   ],
   "packages": [

@@ -1,8 +1,8 @@
-# scancode-rust Architecture
+# Provenant Architecture
 
 ## Overview
 
-scancode-rust is a complete rewrite of [ScanCode Toolkit](https://github.com/aboutcode-org/scancode-toolkit) in Rust, designed as a **drop-in replacement** with all features of the original, but with:
+Provenant is a complete rewrite of [ScanCode Toolkit](https://github.com/aboutcode-org/scancode-toolkit) in Rust, designed as a **drop-in replacement** with all features of the original, but with:
 
 - **Zero bugs**: Leveraging Rust's type system and ownership model
 - **Better performance**: Native code, parallel processing, zero-copy parsing
@@ -49,7 +49,7 @@ See [ADR 0002: Extraction vs Detection Separation](adr/0002-extraction-vs-detect
 
 ### Complete Processing Pipeline
 
-scancode-rust implements a multi-phase processing pipeline based on Python ScanCode's architecture:
+Provenant implements a multi-phase processing pipeline based on Python ScanCode's architecture:
 
 ```text
 ┌─────────────────────────────────────────────────────────────────┐
@@ -215,7 +215,7 @@ register_package_handlers! {
    - Returns all registered parser type names
    - Used by integration tests to verify registration
 
-**Critical:** If a parser is implemented but not listed in this macro, it will **never be called** by the scanner, even if fully implemented and tested. The integration test `test_all_parsers_are_registered_and_exported` verifies this.
+**Critical:** If a parser is implemented but not listed in this macro, it will **never be called** by the scanner, even if fully implemented and tested. Integration coverage verifies that parser registration stays aligned with the scanner entry points.
 
 ### Unified Data Model
 
@@ -278,7 +278,7 @@ pub struct PackageData {
 
 ```text
 ┌────────────────────────────────────────────────────────────┐
-│                     scancode-rust                          │
+│                      Provenant                            │
 ├────────────────────────────────────────────────────────────┤
 │                                                            │
 │  1. File Discovery           2. Parser Selection          │
@@ -608,8 +608,7 @@ The email/URL detection engine is the simplest text detection feature — regex-
 
 Both support configurable thresholds (`--max-email N`, `--max-url N`, default 50).
 
-Golden regression coverage for this module uses local, repo-owned fixtures in
-`testdata/plugin_email_url/` and test execution in `src/finder/golden_test.rs`.
+Golden regression coverage for this module uses local, repo-owned fixtures and a dedicated finder golden-test harness.
 
 Key design decisions vs Python reference:
 
@@ -691,7 +690,7 @@ Runtime wiring is now active for scan-result caching in scanner/main:
 
 1. scanner read-before-scan and write-after-scan integration in `src/scanner/process.rs`
 2. startup cache bootstrap and clear wiring in `src/main.rs`
-3. cache CLI controls `--cache-dir` and `--cache-clear`, plus `SCANCODE_RUST_CACHE` override
+3. cache CLI controls `--cache-dir` and `--cache-clear`, plus `PROVENANT_CACHE` override
 
 Remaining follow-up work is focused on index snapshot integration for the new license engine, lock-managed multi-process coordination, incremental scanning, and unified XDG-default cache ownership.
 
@@ -735,30 +734,30 @@ The binary ships with a built-in license index embedded at compile time. This el
 
 The license detection system uses a two-stage loading process:
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────────┐
-│                    License Index Loading                         │
+│                    License Index Loading                        │
 ├─────────────────────────────────────────────────────────────────┤
-│                                                                  │
+│                                                                 │
 │  Loader Stage (Embedded Artifact)                               │
-│  ┌────────────────────────────────────────────────────────┐    │
-│  │ • Deserialize LoadedRule and LoadedLicense values      │    │
-│  │ • Already normalized (text trimmed, defaults applied)  │    │
-│  │ • Single-file transformations complete                 │    │
-│  │ • No filesystem access needed                          │    │
-│  └────────────────────────────────────────────────────────┘    │
-│                           │                                      │
-│                           ▼                                      │
+│  ┌────────────────────────────────────────────────────────┐     │
+│  │ • Deserialize LoadedRule and LoadedLicense values      │     │
+│  │ • Already normalized (text trimmed, defaults applied)  │     │
+│  │ • Single-file transformations complete                 │     │
+│  │ • No filesystem access needed                          │     │
+│  └────────────────────────────────────────────────────────┘     │
+│                           │                                     │
+│                           ▼                                     │
 │  Build Stage (Runtime)                                          │
-│  ┌────────────────────────────────────────────────────────┐    │
-│  │ • Convert LoadedRule → runtime Rule                    │    │
-│  │ • Convert LoadedLicense → runtime License              │    │
-│  │ • Apply deprecated filtering policy                    │    │
-│  │ • Synthesize license-derived rules                     │    │
-│  │ • Build LicenseIndex (token dict, automatons, maps)    │    │
-│  │ • Build SpdxMapping                                    │    │
-│  └────────────────────────────────────────────────────────┘    │
-│                                                                  │
+│  ┌────────────────────────────────────────────────────────┐     │
+│  │ • Convert LoadedRule → runtime Rule                    │     │
+│  │ • Convert LoadedLicense → runtime License              │     │
+│  │ • Apply deprecated filtering policy                    │     │
+│  │ • Synthesize license-derived rules                     │     │
+│  │ • Build LicenseIndex (token dict, automatons, maps)    │     │
+│  │ • Build SpdxMapping                                    │     │
+│  └────────────────────────────────────────────────────────┘     │
+│                                                                 │
 └─────────────────────────────────────────────────────────────────┘
 ```
 

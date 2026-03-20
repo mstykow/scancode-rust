@@ -1,12 +1,12 @@
 # ADR 0003: Golden Test Strategy
 
 **Status**: Accepted  
-**Authors**: scancode-rust team  
+**Authors**: Provenant team
 **Supersedes**: None
 
 ## Context
 
-We need a reliable way to verify that scancode-rust produces output functionally equivalent to the Python ScanCode Toolkit reference implementation. Key challenges:
+We need a reliable way to verify that Provenant produces output functionally equivalent to the Python ScanCode Toolkit reference implementation. Key challenges:
 
 1. **Feature Parity Verification** - How do we prove our parsers extract the same data?
 2. **Regression Prevention** - How do we catch unintended behavior changes?
@@ -32,7 +32,7 @@ We use **golden testing** where parsers are validated against reference outputs 
          │                         │
          ▼                         ▼
 ┌──────────────────┐      ┌──────────────────┐
-│ Python ScanCode  │      │ scancode-rust    │
+│ Python ScanCode  │      │ Provenant        │
 │                  │      │                  │
 │ scancode -p ...  │      │ NpmParser::      │
 │                  │      │ extract_package  │
@@ -154,7 +154,7 @@ testdata/
 
 ### Documented Architectural Differences
 
-#### 1. CocoaPods & Swift: Package Structure
+#### 1. Swift: Package Structure
 
 **Python Approach**:
 
@@ -181,7 +181,11 @@ testdata/
 
 **Rationale**: Both are valid representations. Rust uses normalized `PackageData` struct for consistency. Validated via comprehensive unit tests.
 
-**Decision**: Document difference, ignore golden tests, rely on unit tests.
+**Decision**: Document the difference and rely on the appropriate test layer.
+
+For Swift, parser-only goldens may still need special handling because the Rust implementation intentionally models a graph differently from older Python expectations.
+
+For CocoaPods, parser-only goldens are active again because the current Rust fixtures and expectations now pin the parser contract directly rather than relying on the older “ignored goldens” workaround.
 
 #### 2. Alpine: Provider Field (Beyond Parity)
 
@@ -258,7 +262,7 @@ proptest! {
 
 ### 4. Integration Testing via CLI
 
-**Approach**: Run full scancode-rust CLI, compare JSON output.
+**Approach**: Run full Provenant CLI, compare JSON output.
 
 ```bash
 cargo run -- --json-pp actual.json testdata/npm/

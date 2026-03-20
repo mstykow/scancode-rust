@@ -1,0 +1,10 @@
+go 1.21
+
+toolchain go1.21.5
+
+use (
+	./mymodule
+	./tools/formatter
+)
+
+replace golang.org/x/net => ../forks/net

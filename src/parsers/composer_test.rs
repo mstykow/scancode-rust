@@ -57,18 +57,26 @@ mod tests {
     #[test]
     fn test_composer_json_is_match() {
         let valid_path = PathBuf::from("/some/path/composer.json");
+        let alternate_prefix = PathBuf::from("/some/path/symfony.composer.json");
+        let alternate_suffix = PathBuf::from("/some/path/composer.symfony.json");
         let invalid_path = PathBuf::from("/some/path/composer.lock");
 
         assert!(ComposerJsonParser::is_match(&valid_path));
+        assert!(ComposerJsonParser::is_match(&alternate_prefix));
+        assert!(ComposerJsonParser::is_match(&alternate_suffix));
         assert!(!ComposerJsonParser::is_match(&invalid_path));
     }
 
     #[test]
     fn test_composer_lock_is_match() {
         let valid_path = PathBuf::from("/some/path/composer.lock");
+        let alternate_prefix = PathBuf::from("/some/path/php.composer.lock");
+        let alternate_suffix = PathBuf::from("/some/path/composer.symfony.lock");
         let invalid_path = PathBuf::from("/some/path/composer.json");
 
         assert!(ComposerLockParser::is_match(&valid_path));
+        assert!(ComposerLockParser::is_match(&alternate_prefix));
+        assert!(ComposerLockParser::is_match(&alternate_suffix));
         assert!(!ComposerLockParser::is_match(&invalid_path));
     }
 
@@ -232,6 +240,80 @@ mod tests {
         assert_eq!(
             repos[0].get("url").and_then(|v: &Value| v.as_str()),
             Some("https://github.com/acme/demo")
+        );
+    }
+
+    #[test]
+    fn test_extract_manifest_source_dist_and_party_types() {
+        let content = r#"
+{
+  "name": "acme/demo",
+  "authors": [
+    { "name": "Jane Doe", "email": "jane@example.com", "homepage": "https://example.com/jane" }
+  ],
+  "source": {
+    "type": "git",
+    "url": "https://github.com/acme/demo.git",
+    "reference": "abc123"
+  },
+  "dist": {
+    "type": "zip",
+    "url": "https://example.com/demo.zip"
+  }
+}
+"#;
+
+        let (_temp_dir, composer_path) = create_temp_file("composer.json", content);
+        let package_data = ComposerJsonParser::extract_first_package(&composer_path);
+
+        assert_eq!(
+            package_data.download_url.as_deref(),
+            Some("https://example.com/demo.zip")
+        );
+        assert_eq!(
+            package_data.vcs_url.as_deref(),
+            Some("git+https://github.com/acme/demo.git@abc123")
+        );
+        assert_eq!(package_data.parties.len(), 2);
+        assert_eq!(package_data.parties[0].r#type.as_deref(), Some("person"));
+        assert_eq!(package_data.parties[1].r#type.as_deref(), Some("person"));
+    }
+
+    #[test]
+    fn test_extract_large_composer_lock() {
+        let mut packages = String::new();
+        let mut packages_dev = String::new();
+
+        for i in 0..400 {
+            if i > 0 {
+                packages.push(',');
+                packages_dev.push(',');
+            }
+            packages.push_str(&format!(
+                r#"{{"name":"vendor/runtime-{i}","version":"1.{i}.0","type":"library"}}"#
+            ));
+            packages_dev.push_str(&format!(
+                r#"{{"name":"vendor/dev-{i}","version":"2.{i}.0","type":"library"}}"#
+            ));
+        }
+
+        let content = format!(r#"{{"packages":[{packages}],"packages-dev":[{packages_dev}]}}"#);
+
+        let (_temp_dir, composer_path) = create_temp_file("composer.lock", &content);
+        let package_data = ComposerLockParser::extract_first_package(&composer_path);
+
+        assert_eq!(package_data.dependencies.len(), 800);
+        assert!(
+            package_data
+                .dependencies
+                .iter()
+                .any(|dep| dep.purl.as_deref() == Some("pkg:composer/vendor/runtime-0@1.0.0"))
+        );
+        assert!(
+            package_data
+                .dependencies
+                .iter()
+                .any(|dep| dep.purl.as_deref() == Some("pkg:composer/vendor/dev-399@2.399.0"))
         );
     }
 

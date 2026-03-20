@@ -35,16 +35,21 @@ use crate::models::{DatasourceId, Dependency, FileReference, PackageData, Packag
 use crate::parsers::utils::{read_file_to_string, split_name_email};
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+use bzip2::read::BzDecoder;
 use csv::ReaderBuilder;
+use flate2::read::GzDecoder;
+use liblzma::read::XzDecoder;
 use log::warn;
 use packageurl::PackageUrl;
 use regex::Regex;
 use rustpython_parser::{Parse, ast};
+use serde_json::{Map as JsonMap, Value as JsonValue};
 use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::Read;
-use std::path::Path;
+use std::path::{Component, Path, PathBuf};
+use tar::Archive;
 use toml::Value as TomlValue;
 use toml::map::Map as TomlMap;
 use zip::ZipArchive;
@@ -63,6 +68,8 @@ const FIELD_HOMEPAGE: &str = "homepage";
 const FIELD_REPOSITORY: &str = "repository";
 const FIELD_DEPENDENCIES: &str = "dependencies";
 const FIELD_OPTIONAL_DEPENDENCIES: &str = "optional-dependencies";
+const FIELD_DEPENDENCY_GROUPS: &str = "dependency-groups";
+const FIELD_DEV_DEPENDENCIES: &str = "dev-dependencies";
 const MAX_SETUP_PY_BYTES: usize = 1_048_576;
 const MAX_SETUP_PY_AST_NODES: usize = 10_000;
 const MAX_SETUP_PY_AST_DEPTH: usize = 50;
@@ -81,6 +88,21 @@ const MAX_COMPRESSION_RATIO: f64 = 100.0; // 100:1 ratio
 /// arbitrary code execution during scanning. See `extract_from_setup_py_ast` for details.
 pub struct PythonParser;
 
+#[derive(Clone, Copy, Debug)]
+enum PythonSdistArchiveFormat {
+    TarGz,
+    Tgz,
+    TarBz2,
+    TarXz,
+    Zip,
+}
+
+#[derive(Clone, Debug)]
+struct ValidatedZipEntry {
+    index: usize,
+    name: String,
+}
+
 impl PackageParser for PythonParser {
     const PACKAGE_TYPE: PackageType = PackageType::Pypi;
 
@@ -96,8 +118,14 @@ impl PackageParser for PythonParser {
                 extract_from_rfc822_metadata(path, DatasourceId::PypiSdistPkginfo)
             } else if path.file_name().unwrap_or_default() == "METADATA" {
                 extract_from_rfc822_metadata(path, DatasourceId::PypiWheelMetadata)
+            } else if is_pip_cache_origin_json(path) {
+                extract_from_pip_origin_json(path)
+            } else if path.file_name().unwrap_or_default() == "pypi.json" {
+                extract_from_pypi_json(path)
             } else if path.file_name().unwrap_or_default() == "pip-inspect.deplock" {
                 extract_from_pip_inspect(path)
+            } else if is_python_sdist_archive_path(path) {
+                extract_from_sdist_archive(path)
             } else if path
                 .extension()
                 .is_some_and(|ext| ext.eq_ignore_ascii_case("whl"))
@@ -121,20 +149,312 @@ impl PackageParser for PythonParser {
                 || filename == "setup.py"
                 || filename == "PKG-INFO"
                 || filename == "METADATA"
-                || filename == "pip-inspect.deplock")
+                || filename == "pypi.json"
+                || filename == "pip-inspect.deplock"
+                || is_pip_cache_origin_json(path))
         {
             return true;
         }
 
         if let Some(extension) = path.extension() {
             let ext = extension.to_string_lossy().to_lowercase();
-            if ext == "whl" || ext == "egg" {
+            if ext == "whl" || ext == "egg" || is_python_sdist_archive_path(path) {
                 return true;
             }
         }
 
         false
     }
+}
+
+#[derive(Debug, Clone)]
+struct InstalledWheelMetadata {
+    wheel_tags: Vec<String>,
+    wheel_version: Option<String>,
+    wheel_generator: Option<String>,
+    root_is_purelib: Option<bool>,
+    compressed_tag: Option<String>,
+}
+
+fn merge_sibling_wheel_metadata(path: &Path, package_data: &mut PackageData) {
+    let Some(parent) = path.parent() else {
+        return;
+    };
+
+    if !parent
+        .file_name()
+        .and_then(|name| name.to_str())
+        .is_some_and(|name| name.ends_with(".dist-info"))
+    {
+        return;
+    }
+
+    let wheel_path = parent.join("WHEEL");
+    if !wheel_path.exists() {
+        return;
+    }
+
+    let Ok(content) = read_file_to_string(&wheel_path) else {
+        warn!("Failed to read sibling WHEEL file at {:?}", wheel_path);
+        return;
+    };
+
+    let Some(wheel_metadata) = parse_installed_wheel_metadata(&content) else {
+        return;
+    };
+
+    apply_installed_wheel_metadata(package_data, &wheel_metadata);
+}
+
+fn parse_installed_wheel_metadata(content: &str) -> Option<InstalledWheelMetadata> {
+    use super::rfc822::{get_header_all, get_header_first};
+
+    let metadata = super::rfc822::parse_rfc822_content(content);
+    let wheel_tags = get_header_all(&metadata.headers, "tag");
+    if wheel_tags.is_empty() {
+        return None;
+    }
+
+    let wheel_version = get_header_first(&metadata.headers, "wheel-version");
+    let wheel_generator = get_header_first(&metadata.headers, "generator");
+    let root_is_purelib =
+        get_header_first(&metadata.headers, "root-is-purelib").and_then(|value| {
+            match value.to_ascii_lowercase().as_str() {
+                "true" => Some(true),
+                "false" => Some(false),
+                _ => None,
+            }
+        });
+
+    let compressed_tag = compress_wheel_tags(&wheel_tags);
+
+    Some(InstalledWheelMetadata {
+        wheel_tags,
+        wheel_version,
+        wheel_generator,
+        root_is_purelib,
+        compressed_tag,
+    })
+}
+
+fn compress_wheel_tags(tags: &[String]) -> Option<String> {
+    if tags.is_empty() {
+        return None;
+    }
+
+    if tags.len() == 1 {
+        return Some(tags[0].clone());
+    }
+
+    let mut python_tags = Vec::new();
+    let mut abi_tag: Option<&str> = None;
+    let mut platform_tag: Option<&str> = None;
+
+    for tag in tags {
+        let mut parts = tag.splitn(3, '-');
+        let python = parts.next()?;
+        let abi = parts.next()?;
+        let platform = parts.next()?;
+
+        if abi_tag.is_some_and(|existing| existing != abi)
+            || platform_tag.is_some_and(|existing| existing != platform)
+        {
+            return None;
+        }
+
+        abi_tag = Some(abi);
+        platform_tag = Some(platform);
+        python_tags.push(python.to_string());
+    }
+
+    Some(format!(
+        "{}-{}-{}",
+        python_tags.join("."),
+        abi_tag?,
+        platform_tag?
+    ))
+}
+
+fn apply_installed_wheel_metadata(
+    package_data: &mut PackageData,
+    wheel_metadata: &InstalledWheelMetadata,
+) {
+    let extra_data = package_data.extra_data.get_or_insert_with(HashMap::new);
+    extra_data.insert(
+        "wheel_tags".to_string(),
+        JsonValue::Array(
+            wheel_metadata
+                .wheel_tags
+                .iter()
+                .cloned()
+                .map(JsonValue::String)
+                .collect(),
+        ),
+    );
+
+    if let Some(wheel_version) = &wheel_metadata.wheel_version {
+        extra_data.insert(
+            "wheel_version".to_string(),
+            JsonValue::String(wheel_version.clone()),
+        );
+    }
+
+    if let Some(wheel_generator) = &wheel_metadata.wheel_generator {
+        extra_data.insert(
+            "wheel_generator".to_string(),
+            JsonValue::String(wheel_generator.clone()),
+        );
+    }
+
+    if let Some(root_is_purelib) = wheel_metadata.root_is_purelib {
+        extra_data.insert(
+            "root_is_purelib".to_string(),
+            JsonValue::Bool(root_is_purelib),
+        );
+    }
+
+    if let (Some(name), Some(version), Some(extension)) = (
+        package_data.name.as_deref(),
+        package_data.version.as_deref(),
+        wheel_metadata.compressed_tag.as_deref(),
+    ) {
+        package_data.purl = build_pypi_purl_with_extension(name, Some(version), extension);
+    }
+}
+
+fn is_pip_cache_origin_json(path: &Path) -> bool {
+    path.file_name().and_then(|name| name.to_str()) == Some("origin.json")
+        && path.ancestors().skip(1).any(|ancestor| {
+            ancestor
+                .file_name()
+                .and_then(|name| name.to_str())
+                .is_some_and(|name| name.eq_ignore_ascii_case("wheels"))
+        })
+}
+
+fn extract_from_pip_origin_json(path: &Path) -> PackageData {
+    let content = match read_file_to_string(path) {
+        Ok(content) => content,
+        Err(e) => {
+            warn!("Failed to read pip cache origin.json at {:?}: {}", path, e);
+            return default_package_data();
+        }
+    };
+
+    let root: JsonValue = match serde_json::from_str(&content) {
+        Ok(root) => root,
+        Err(e) => {
+            warn!("Failed to parse pip cache origin.json at {:?}: {}", path, e);
+            return default_package_data();
+        }
+    };
+
+    let Some(download_url) = root.get("url").and_then(|value| value.as_str()) else {
+        warn!("No url found in pip cache origin.json at {:?}", path);
+        return default_package_data();
+    };
+
+    let sibling_wheel = find_sibling_cached_wheel(path);
+    let name_version = parse_name_version_from_origin_url(download_url).or_else(|| {
+        sibling_wheel
+            .as_ref()
+            .map(|wheel_info| (wheel_info.name.clone(), wheel_info.version.clone()))
+    });
+
+    let Some((name, version)) = name_version else {
+        warn!(
+            "Failed to infer package name/version from pip cache origin.json at {:?}",
+            path
+        );
+        return default_package_data();
+    };
+
+    let (repository_homepage_url, repository_download_url, api_data_url, plain_purl) =
+        build_pypi_urls(Some(&name), Some(&version));
+    let purl = sibling_wheel
+        .as_ref()
+        .and_then(|wheel_info| build_wheel_purl(Some(&name), Some(&version), wheel_info))
+        .or(plain_purl);
+
+    PackageData {
+        package_type: Some(PythonParser::PACKAGE_TYPE),
+        primary_language: Some("Python".to_string()),
+        name: Some(name),
+        version: Some(version),
+        datasource_id: Some(DatasourceId::PypiPipOriginJson),
+        download_url: Some(download_url.to_string()),
+        sha256: extract_sha256_from_origin_json(&root),
+        repository_homepage_url,
+        repository_download_url,
+        api_data_url,
+        purl,
+        ..Default::default()
+    }
+}
+
+fn find_sibling_cached_wheel(path: &Path) -> Option<WheelInfo> {
+    let parent = path.parent()?;
+    let entries = parent.read_dir().ok()?;
+
+    for entry in entries.flatten() {
+        let sibling_path = entry.path();
+        if sibling_path
+            .extension()
+            .is_some_and(|ext| ext.eq_ignore_ascii_case("whl"))
+            && let Some(wheel_info) = parse_wheel_filename(&sibling_path)
+        {
+            return Some(wheel_info);
+        }
+    }
+
+    None
+}
+
+fn parse_name_version_from_origin_url(url: &str) -> Option<(String, String)> {
+    let file_name = url.rsplit('/').next()?;
+
+    if file_name.ends_with(".whl") {
+        return parse_wheel_filename(Path::new(file_name))
+            .map(|wheel_info| (wheel_info.name, wheel_info.version));
+    }
+
+    let stem = strip_python_archive_extension(file_name)?;
+    let (name, version) = stem.rsplit_once('-')?;
+    if name.is_empty() || version.is_empty() {
+        return None;
+    }
+
+    Some((name.replace('_', "-"), version.to_string()))
+}
+
+fn strip_python_archive_extension(file_name: &str) -> Option<&str> {
+    [".tar.gz", ".tar.bz2", ".tar.xz", ".tgz", ".zip", ".whl"]
+        .iter()
+        .find_map(|suffix| file_name.strip_suffix(suffix))
+}
+
+fn extract_sha256_from_origin_json(root: &JsonValue) -> Option<String> {
+    root.pointer("/archive_info/hashes/sha256")
+        .and_then(|value| value.as_str())
+        .map(ToOwned::to_owned)
+        .or_else(|| {
+            root.pointer("/archive_info/hash")
+                .and_then(|value| value.as_str())
+                .and_then(normalize_origin_hash)
+        })
+}
+
+fn normalize_origin_hash(hash: &str) -> Option<String> {
+    if let Some(value) = hash.strip_prefix("sha256=") {
+        return Some(value.to_string());
+    }
+    if let Some(value) = hash.strip_prefix("sha256:") {
+        return Some(value.to_string());
+    }
+    if hash.len() == 64 && hash.chars().all(|ch| ch.is_ascii_hexdigit()) {
+        return Some(hash.to_string());
+    }
+    None
 }
 
 fn extract_from_rfc822_metadata(path: &Path, datasource_id: DatasourceId) -> PackageData {
@@ -147,20 +467,124 @@ fn extract_from_rfc822_metadata(path: &Path, datasource_id: DatasourceId) -> Pac
     };
 
     let metadata = super::rfc822::parse_rfc822_content(&content);
-    build_package_data_from_rfc822(&metadata, datasource_id)
+    let mut package_data = build_package_data_from_rfc822(&metadata, datasource_id);
+    merge_sibling_metadata_dependencies(path, &mut package_data);
+    merge_sibling_metadata_file_references(path, &mut package_data);
+    if datasource_id == DatasourceId::PypiWheelMetadata {
+        merge_sibling_wheel_metadata(path, &mut package_data);
+    }
+    package_data
 }
 
-fn validate_zip_archive<R: Read + std::io::Seek>(
+fn merge_sibling_metadata_dependencies(path: &Path, package_data: &mut PackageData) {
+    let mut extra_dependencies = Vec::new();
+
+    if let Some(parent) = path.parent() {
+        let direct_requires = parent.join("requires.txt");
+        if direct_requires.exists()
+            && let Ok(content) = read_file_to_string(&direct_requires)
+        {
+            extra_dependencies.extend(parse_requires_txt(&content));
+        }
+
+        let sibling_egg_info_requires = parent
+            .read_dir()
+            .ok()
+            .into_iter()
+            .flatten()
+            .flatten()
+            .find_map(|entry| {
+                let child_path = entry.path();
+                if child_path.is_dir()
+                    && child_path
+                        .file_name()
+                        .and_then(|name| name.to_str())
+                        .is_some_and(|name| name.ends_with(".egg-info"))
+                {
+                    let requires = child_path.join("requires.txt");
+                    requires.exists().then_some(requires)
+                } else {
+                    None
+                }
+            });
+
+        if let Some(requires_path) = sibling_egg_info_requires
+            && let Ok(content) = read_file_to_string(&requires_path)
+        {
+            extra_dependencies.extend(parse_requires_txt(&content));
+        }
+    }
+
+    for dependency in extra_dependencies {
+        if !package_data.dependencies.iter().any(|existing| {
+            existing.purl == dependency.purl
+                && existing.scope == dependency.scope
+                && existing.extracted_requirement == dependency.extracted_requirement
+                && existing.extra_data == dependency.extra_data
+        }) {
+            package_data.dependencies.push(dependency);
+        }
+    }
+}
+
+fn merge_sibling_metadata_file_references(path: &Path, package_data: &mut PackageData) {
+    let mut extra_refs = Vec::new();
+
+    if let Some(parent) = path.parent() {
+        let record_path = parent.join("RECORD");
+        if record_path.exists()
+            && let Ok(content) = read_file_to_string(&record_path)
+        {
+            extra_refs.extend(parse_record_csv(&content));
+        }
+
+        let installed_files_path = parent.join("installed-files.txt");
+        if installed_files_path.exists()
+            && let Ok(content) = read_file_to_string(&installed_files_path)
+        {
+            extra_refs.extend(parse_installed_files_txt(&content));
+        }
+
+        let sources_path = parent.join("SOURCES.txt");
+        if sources_path.exists()
+            && let Ok(content) = read_file_to_string(&sources_path)
+        {
+            extra_refs.extend(parse_sources_txt(&content));
+        }
+    }
+
+    for file_ref in extra_refs {
+        if !package_data
+            .file_references
+            .iter()
+            .any(|existing| existing.path == file_ref.path)
+        {
+            package_data.file_references.push(file_ref);
+        }
+    }
+}
+
+fn collect_validated_zip_entries<R: Read + std::io::Seek>(
     archive: &mut ZipArchive<R>,
     path: &Path,
     archive_type: &str,
-) -> Result<u64, String> {
+) -> Result<Vec<ValidatedZipEntry>, String> {
     let mut total_extracted = 0u64;
+    let mut entries = Vec::new();
 
     for i in 0..archive.len() {
-        if let Ok(file) = archive.by_index(i) {
+        if let Ok(file) = archive.by_index_raw(i) {
             let compressed_size = file.compressed_size();
             let uncompressed_size = file.size();
+            let Some(entry_name) = normalize_archive_entry_path(file.name()) else {
+                warn!(
+                    "Skipping unsafe path in {} {:?}: {}",
+                    archive_type,
+                    path,
+                    file.name()
+                );
+                continue;
+            };
 
             if compressed_size > 0 {
                 let ratio = uncompressed_size as f64 / compressed_size as f64;
@@ -190,10 +614,487 @@ fn validate_zip_archive<R: Read + std::io::Seek>(
                 warn!("{}", msg);
                 return Err(msg);
             }
+
+            entries.push(ValidatedZipEntry {
+                index: i,
+                name: entry_name,
+            });
         }
     }
 
-    Ok(total_extracted)
+    Ok(entries)
+}
+
+fn is_python_sdist_archive_path(path: &Path) -> bool {
+    detect_python_sdist_archive_format(path).is_some()
+}
+
+fn detect_python_sdist_archive_format(path: &Path) -> Option<PythonSdistArchiveFormat> {
+    let file_name = path.file_name()?.to_str()?.to_ascii_lowercase();
+
+    if !is_likely_python_sdist_filename(&file_name) {
+        return None;
+    }
+
+    if file_name.ends_with(".tar.gz") {
+        Some(PythonSdistArchiveFormat::TarGz)
+    } else if file_name.ends_with(".tgz") {
+        Some(PythonSdistArchiveFormat::Tgz)
+    } else if file_name.ends_with(".tar.bz2") {
+        Some(PythonSdistArchiveFormat::TarBz2)
+    } else if file_name.ends_with(".tar.xz") {
+        Some(PythonSdistArchiveFormat::TarXz)
+    } else if file_name.ends_with(".zip") {
+        Some(PythonSdistArchiveFormat::Zip)
+    } else {
+        None
+    }
+}
+
+fn is_likely_python_sdist_filename(file_name: &str) -> bool {
+    let Some(stem) = strip_python_archive_extension(file_name) else {
+        return false;
+    };
+
+    let Some((name, version)) = stem.rsplit_once('-') else {
+        return false;
+    };
+
+    !name.is_empty()
+        && !version.is_empty()
+        && version.chars().any(|ch| ch.is_ascii_digit())
+        && name
+            .chars()
+            .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '-' | '_' | '.'))
+}
+
+fn extract_from_sdist_archive(path: &Path) -> PackageData {
+    let metadata = match std::fs::metadata(path) {
+        Ok(m) => m,
+        Err(e) => {
+            warn!(
+                "Failed to read metadata for sdist archive {:?}: {}",
+                path, e
+            );
+            return default_package_data();
+        }
+    };
+
+    if metadata.len() > MAX_ARCHIVE_SIZE {
+        warn!(
+            "sdist archive too large: {} bytes (limit: {} bytes)",
+            metadata.len(),
+            MAX_ARCHIVE_SIZE
+        );
+        return default_package_data();
+    }
+
+    let Some(format) = detect_python_sdist_archive_format(path) else {
+        return default_package_data();
+    };
+
+    let mut package_data = match format {
+        PythonSdistArchiveFormat::TarGz | PythonSdistArchiveFormat::Tgz => {
+            let file = match File::open(path) {
+                Ok(file) => file,
+                Err(e) => {
+                    warn!("Failed to open sdist archive {:?}: {}", path, e);
+                    return default_package_data();
+                }
+            };
+            let decoder = GzDecoder::new(file);
+            extract_from_tar_sdist_archive(path, decoder, "tar.gz", metadata.len())
+        }
+        PythonSdistArchiveFormat::TarBz2 => {
+            let file = match File::open(path) {
+                Ok(file) => file,
+                Err(e) => {
+                    warn!("Failed to open sdist archive {:?}: {}", path, e);
+                    return default_package_data();
+                }
+            };
+            let decoder = BzDecoder::new(file);
+            extract_from_tar_sdist_archive(path, decoder, "tar.bz2", metadata.len())
+        }
+        PythonSdistArchiveFormat::TarXz => {
+            let file = match File::open(path) {
+                Ok(file) => file,
+                Err(e) => {
+                    warn!("Failed to open sdist archive {:?}: {}", path, e);
+                    return default_package_data();
+                }
+            };
+            let decoder = XzDecoder::new(file);
+            extract_from_tar_sdist_archive(path, decoder, "tar.xz", metadata.len())
+        }
+        PythonSdistArchiveFormat::Zip => extract_from_zip_sdist_archive(path),
+    };
+
+    if package_data.package_type.is_some() {
+        let (size, sha256) = calculate_file_checksums(path);
+        package_data.size = size;
+        package_data.sha256 = sha256;
+    }
+
+    package_data
+}
+
+fn extract_from_tar_sdist_archive<R: Read>(
+    path: &Path,
+    reader: R,
+    archive_type: &str,
+    compressed_size: u64,
+) -> PackageData {
+    let mut archive = Archive::new(reader);
+    let archive_entries = match archive.entries() {
+        Ok(entries) => entries,
+        Err(e) => {
+            warn!(
+                "Failed to read {} sdist archive {:?}: {}",
+                archive_type, path, e
+            );
+            return default_package_data();
+        }
+    };
+
+    let mut total_extracted = 0u64;
+    let mut entries = Vec::new();
+
+    for entry_result in archive_entries {
+        let mut entry = match entry_result {
+            Ok(entry) => entry,
+            Err(e) => {
+                warn!(
+                    "Failed to read {} sdist entry from {:?}: {}",
+                    archive_type, path, e
+                );
+                continue;
+            }
+        };
+
+        let entry_size = entry.size();
+        if entry_size > MAX_FILE_SIZE {
+            warn!(
+                "File too large in {} sdist {:?}: {} bytes (limit: {} bytes)",
+                archive_type, path, entry_size, MAX_FILE_SIZE
+            );
+            continue;
+        }
+
+        total_extracted += entry_size;
+        if total_extracted > MAX_ARCHIVE_SIZE {
+            warn!(
+                "Total extracted size exceeds limit for {} sdist {:?}",
+                archive_type, path
+            );
+            return default_package_data();
+        }
+
+        if compressed_size > 0 {
+            let ratio = total_extracted as f64 / compressed_size as f64;
+            if ratio > MAX_COMPRESSION_RATIO {
+                warn!(
+                    "Suspicious compression ratio in {} sdist {:?}: {:.2}:1",
+                    archive_type, path, ratio
+                );
+                return default_package_data();
+            }
+        }
+
+        let entry_path = match entry.path() {
+            Ok(path) => path.to_string_lossy().replace('\\', "/"),
+            Err(e) => {
+                warn!(
+                    "Failed to get {} sdist entry path from {:?}: {}",
+                    archive_type, path, e
+                );
+                continue;
+            }
+        };
+
+        let Some(entry_path) = normalize_archive_entry_path(&entry_path) else {
+            warn!("Skipping unsafe {} sdist path in {:?}", archive_type, path);
+            continue;
+        };
+
+        if !is_relevant_sdist_text_entry(&entry_path) {
+            continue;
+        }
+
+        if let Ok(content) = read_limited_utf8(
+            &mut entry,
+            MAX_FILE_SIZE,
+            &format!("{} entry {}", archive_type, entry_path),
+        ) {
+            entries.push((entry_path, content));
+        }
+    }
+
+    build_sdist_package_data(path, entries)
+}
+
+fn extract_from_zip_sdist_archive(path: &Path) -> PackageData {
+    let file = match File::open(path) {
+        Ok(file) => file,
+        Err(e) => {
+            warn!("Failed to open zip sdist archive {:?}: {}", path, e);
+            return default_package_data();
+        }
+    };
+
+    let mut archive = match ZipArchive::new(file) {
+        Ok(archive) => archive,
+        Err(e) => {
+            warn!("Failed to read zip sdist archive {:?}: {}", path, e);
+            return default_package_data();
+        }
+    };
+
+    let validated_entries = match collect_validated_zip_entries(&mut archive, path, "sdist zip") {
+        Ok(entries) => entries,
+        Err(_) => return default_package_data(),
+    };
+
+    let mut entries = Vec::new();
+    for entry in validated_entries.iter() {
+        if !is_relevant_sdist_text_entry(&entry.name) {
+            continue;
+        }
+
+        if let Ok(content) = read_validated_zip_entry(&mut archive, entry, path, "sdist zip") {
+            entries.push((entry.name.clone(), content));
+        }
+    }
+
+    build_sdist_package_data(path, entries)
+}
+
+fn is_relevant_sdist_text_entry(entry_path: &str) -> bool {
+    entry_path.ends_with("/PKG-INFO")
+        || entry_path.ends_with("/requires.txt")
+        || entry_path.ends_with("/SOURCES.txt")
+}
+
+fn build_sdist_package_data(path: &Path, entries: Vec<(String, String)>) -> PackageData {
+    let Some((metadata_path, metadata_content)) = select_sdist_pkginfo_entry(path, &entries) else {
+        warn!("No PKG-INFO file found in sdist archive {:?}", path);
+        return default_package_data();
+    };
+
+    let mut package_data =
+        python_parse_rfc822_content(&metadata_content, DatasourceId::PypiSdistPkginfo);
+    merge_sdist_archive_dependencies(&entries, &metadata_path, &mut package_data);
+    merge_sdist_archive_file_references(&entries, &metadata_path, &mut package_data);
+    apply_sdist_name_version_fallback(path, &mut package_data);
+    package_data
+}
+
+fn select_sdist_pkginfo_entry(
+    archive_path: &Path,
+    entries: &[(String, String)],
+) -> Option<(String, String)> {
+    let expected_name = archive_path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .and_then(strip_python_archive_extension)
+        .and_then(|stem| {
+            stem.rsplit_once('-')
+                .map(|(name, _)| normalize_python_package_name(name))
+        });
+
+    entries
+        .iter()
+        .filter(|(entry_path, _)| entry_path.ends_with("/PKG-INFO"))
+        .min_by_key(|(entry_path, content)| {
+            let components: Vec<_> = entry_path
+                .split('/')
+                .filter(|part| !part.is_empty())
+                .collect();
+            let metadata = super::rfc822::parse_rfc822_content(content);
+            let candidate_name = super::rfc822::get_header_first(&metadata.headers, "name")
+                .map(|name| normalize_python_package_name(&name));
+            let name_rank = if candidate_name == expected_name {
+                0
+            } else {
+                1
+            };
+            let kind_rank = if components.len() == 3
+                && components[1].ends_with(".egg-info")
+                && components[2] == "PKG-INFO"
+            {
+                0
+            } else if components.len() == 2 && components[1] == "PKG-INFO" {
+                1
+            } else if entry_path.ends_with(".egg-info/PKG-INFO") {
+                2
+            } else {
+                3
+            };
+
+            (name_rank, kind_rank, components.len(), entry_path.clone())
+        })
+        .map(|(entry_path, content)| (entry_path.clone(), content.clone()))
+}
+
+fn merge_sdist_archive_dependencies(
+    entries: &[(String, String)],
+    metadata_path: &str,
+    package_data: &mut PackageData,
+) {
+    let metadata_dir = metadata_path
+        .rsplit_once('/')
+        .map(|(dir, _)| dir)
+        .unwrap_or("");
+    let archive_root = metadata_path.split('/').next().unwrap_or("");
+    let matched_egg_info_dir =
+        select_matching_sdist_egg_info_dir(entries, archive_root, package_data.name.as_deref());
+    let mut extra_dependencies = Vec::new();
+
+    for (entry_path, content) in entries {
+        let is_direct_requires =
+            !metadata_dir.is_empty() && entry_path == &format!("{metadata_dir}/requires.txt");
+        let is_egg_info_requires = matched_egg_info_dir.as_ref().is_some_and(|egg_info_dir| {
+            entry_path == &format!("{archive_root}/{egg_info_dir}/requires.txt")
+        });
+
+        if is_direct_requires || is_egg_info_requires {
+            extra_dependencies.extend(parse_requires_txt(content));
+        }
+    }
+
+    for dependency in extra_dependencies {
+        if !package_data.dependencies.iter().any(|existing| {
+            existing.purl == dependency.purl
+                && existing.scope == dependency.scope
+                && existing.extracted_requirement == dependency.extracted_requirement
+                && existing.extra_data == dependency.extra_data
+        }) {
+            package_data.dependencies.push(dependency);
+        }
+    }
+}
+
+fn merge_sdist_archive_file_references(
+    entries: &[(String, String)],
+    metadata_path: &str,
+    package_data: &mut PackageData,
+) {
+    let metadata_dir = metadata_path
+        .rsplit_once('/')
+        .map(|(dir, _)| dir)
+        .unwrap_or("");
+    let archive_root = metadata_path.split('/').next().unwrap_or("");
+    let matched_egg_info_dir =
+        select_matching_sdist_egg_info_dir(entries, archive_root, package_data.name.as_deref());
+    let mut extra_refs = Vec::new();
+
+    for (entry_path, content) in entries {
+        let is_direct_sources =
+            !metadata_dir.is_empty() && entry_path == &format!("{metadata_dir}/SOURCES.txt");
+        let is_egg_info_sources = matched_egg_info_dir.as_ref().is_some_and(|egg_info_dir| {
+            entry_path == &format!("{archive_root}/{egg_info_dir}/SOURCES.txt")
+        });
+
+        if is_direct_sources || is_egg_info_sources {
+            extra_refs.extend(parse_sources_txt(content));
+        }
+    }
+
+    for file_ref in extra_refs {
+        if !package_data
+            .file_references
+            .iter()
+            .any(|existing| existing.path == file_ref.path)
+        {
+            package_data.file_references.push(file_ref);
+        }
+    }
+}
+
+fn select_matching_sdist_egg_info_dir(
+    entries: &[(String, String)],
+    archive_root: &str,
+    package_name: Option<&str>,
+) -> Option<String> {
+    let normalized_package_name = package_name.map(normalize_python_package_name);
+
+    entries
+        .iter()
+        .filter_map(|(entry_path, _)| {
+            let components: Vec<_> = entry_path
+                .split('/')
+                .filter(|part| !part.is_empty())
+                .collect();
+            if components.len() == 3
+                && components[0] == archive_root
+                && components[1].ends_with(".egg-info")
+            {
+                Some(components[1].to_string())
+            } else {
+                None
+            }
+        })
+        .min_by_key(|egg_info_dir| {
+            let normalized_dir_name =
+                normalize_python_package_name(egg_info_dir.trim_end_matches(".egg-info"));
+            let name_rank = if Some(normalized_dir_name.clone()) == normalized_package_name {
+                0
+            } else {
+                1
+            };
+
+            (name_rank, egg_info_dir.clone())
+        })
+}
+
+fn normalize_python_package_name(name: &str) -> String {
+    name.to_ascii_lowercase().replace('_', "-")
+}
+
+fn apply_sdist_name_version_fallback(path: &Path, package_data: &mut PackageData) {
+    let Some(file_name) = path.file_name().and_then(|name| name.to_str()) else {
+        return;
+    };
+
+    let Some(stem) = strip_python_archive_extension(file_name) else {
+        return;
+    };
+
+    let Some((name, version)) = stem.rsplit_once('-') else {
+        return;
+    };
+
+    if package_data.name.is_none() {
+        package_data.name = Some(name.replace('_', "-"));
+    }
+    if package_data.version.is_none() {
+        package_data.version = Some(version.to_string());
+    }
+
+    if package_data.purl.is_none()
+        || package_data.repository_homepage_url.is_none()
+        || package_data.repository_download_url.is_none()
+        || package_data.api_data_url.is_none()
+    {
+        let (repository_homepage_url, repository_download_url, api_data_url, purl) =
+            build_pypi_urls(
+                package_data.name.as_deref(),
+                package_data.version.as_deref(),
+            );
+
+        if package_data.repository_homepage_url.is_none() {
+            package_data.repository_homepage_url = repository_homepage_url;
+        }
+        if package_data.repository_download_url.is_none() {
+            package_data.repository_download_url = repository_download_url;
+        }
+        if package_data.api_data_url.is_none() {
+            package_data.api_data_url = api_data_url;
+        }
+        if package_data.purl.is_none() {
+            package_data.purl = purl;
+        }
+    }
 }
 
 fn extract_from_wheel_archive(path: &Path) -> PackageData {
@@ -233,20 +1134,21 @@ fn extract_from_wheel_archive(path: &Path) -> PackageData {
         }
     };
 
-    if validate_zip_archive(&mut archive, path, "wheel").is_err() {
-        return default_package_data();
-    }
-
-    let metadata_path = find_wheel_metadata_path(&mut archive);
-    let metadata_path = match metadata_path {
-        Some(p) => p,
-        None => {
-            warn!("No METADATA file found in wheel archive {:?}", path);
-            return default_package_data();
-        }
+    let validated_entries = match collect_validated_zip_entries(&mut archive, path, "wheel") {
+        Ok(entries) => entries,
+        Err(_) => return default_package_data(),
     };
 
-    let content = match read_zip_entry(&mut archive, &metadata_path) {
+    let metadata_entry =
+        match find_validated_zip_entry_by_suffix(&validated_entries, ".dist-info/METADATA") {
+            Some(entry) => entry,
+            None => {
+                warn!("No METADATA file found in wheel archive {:?}", path);
+                return default_package_data();
+            }
+        };
+
+    let content = match read_validated_zip_entry(&mut archive, metadata_entry, path, "wheel") {
         Ok(c) => c,
         Err(e) => {
             warn!("Failed to read METADATA from {:?}: {}", path, e);
@@ -260,8 +1162,10 @@ fn extract_from_wheel_archive(path: &Path) -> PackageData {
     package_data.size = size;
     package_data.sha256 = sha256;
 
-    if let Some(record_path) = find_wheel_record_path(&mut archive)
-        && let Ok(record_content) = read_zip_entry(&mut archive, &record_path)
+    if let Some(record_entry) =
+        find_validated_zip_entry_by_suffix(&validated_entries, ".dist-info/RECORD")
+        && let Ok(record_content) =
+            read_validated_zip_entry(&mut archive, record_entry, path, "wheel")
     {
         package_data.file_references = parse_record_csv(&record_content);
     }
@@ -333,20 +1237,23 @@ fn extract_from_egg_archive(path: &Path) -> PackageData {
         }
     };
 
-    if validate_zip_archive(&mut archive, path, "egg").is_err() {
-        return default_package_data();
-    }
+    let validated_entries = match collect_validated_zip_entries(&mut archive, path, "egg") {
+        Ok(entries) => entries,
+        Err(_) => return default_package_data(),
+    };
 
-    let pkginfo_path = find_egg_pkginfo_path(&mut archive);
-    let pkginfo_path = match pkginfo_path {
-        Some(p) => p,
+    let pkginfo_entry = match find_validated_zip_entry_by_any_suffix(
+        &validated_entries,
+        &["EGG-INFO/PKG-INFO", ".egg-info/PKG-INFO"],
+    ) {
+        Some(entry) => entry,
         None => {
             warn!("No PKG-INFO file found in egg archive {:?}", path);
             return default_package_data();
         }
     };
 
-    let content = match read_zip_entry(&mut archive, &pkginfo_path) {
+    let content = match read_validated_zip_entry(&mut archive, pkginfo_entry, path, "egg") {
         Ok(c) => c,
         Err(e) => {
             warn!("Failed to read PKG-INFO from {:?}: {}", path, e);
@@ -360,8 +1267,14 @@ fn extract_from_egg_archive(path: &Path) -> PackageData {
     package_data.size = size;
     package_data.sha256 = sha256;
 
-    if let Some(installed_files_path) = find_egg_installed_files_path(&mut archive)
-        && let Ok(installed_files_content) = read_zip_entry(&mut archive, &installed_files_path)
+    if let Some(installed_files_entry) = find_validated_zip_entry_by_any_suffix(
+        &validated_entries,
+        &[
+            "EGG-INFO/installed-files.txt",
+            ".egg-info/installed-files.txt",
+        ],
+    ) && let Ok(installed_files_content) =
+        read_validated_zip_entry(&mut archive, installed_files_entry, path, "egg")
     {
         package_data.file_references = parse_installed_files_txt(&installed_files_content);
     }
@@ -392,71 +1305,100 @@ fn extract_from_egg_archive(path: &Path) -> PackageData {
     package_data
 }
 
-fn find_wheel_metadata_path<R: Read + std::io::Seek>(
-    archive: &mut ZipArchive<R>,
-) -> Option<String> {
-    for i in 0..archive.len() {
-        if let Ok(file) = archive.by_index_raw(i) {
-            let name = file.name();
-            if name.ends_with(".dist-info/METADATA") {
-                return Some(name.to_string());
-            }
-        }
-    }
-    None
+fn find_validated_zip_entry_by_suffix<'a>(
+    entries: &'a [ValidatedZipEntry],
+    suffix: &str,
+) -> Option<&'a ValidatedZipEntry> {
+    entries.iter().find(|entry| entry.name.ends_with(suffix))
 }
 
-fn find_egg_pkginfo_path<R: Read + std::io::Seek>(archive: &mut ZipArchive<R>) -> Option<String> {
-    for i in 0..archive.len() {
-        if let Ok(file) = archive.by_index_raw(i) {
-            let name = file.name();
-            if name.ends_with("EGG-INFO/PKG-INFO") || name.ends_with(".egg-info/PKG-INFO") {
-                return Some(name.to_string());
-            }
-        }
-    }
-    None
+fn find_validated_zip_entry_by_any_suffix<'a>(
+    entries: &'a [ValidatedZipEntry],
+    suffixes: &[&str],
+) -> Option<&'a ValidatedZipEntry> {
+    entries
+        .iter()
+        .find(|entry| suffixes.iter().any(|suffix| entry.name.ends_with(suffix)))
 }
 
-fn read_zip_entry<R: Read + std::io::Seek>(
+fn read_validated_zip_entry<R: Read + std::io::Seek>(
     archive: &mut ZipArchive<R>,
-    path: &str,
+    entry: &ValidatedZipEntry,
+    path: &Path,
+    archive_type: &str,
 ) -> Result<String, String> {
     let mut file = archive
-        .by_name(path)
-        .map_err(|e| format!("Failed to find entry {}: {}", path, e))?;
-    let mut content = String::new();
-    file.read_to_string(&mut content)
-        .map_err(|e| format!("Failed to read {}: {}", path, e))?;
-    Ok(content)
-}
+        .by_index(entry.index)
+        .map_err(|e| format!("Failed to find entry {}: {}", entry.name, e))?;
 
-fn find_wheel_record_path<R: Read + std::io::Seek>(archive: &mut ZipArchive<R>) -> Option<String> {
-    for i in 0..archive.len() {
-        if let Ok(file) = archive.by_index_raw(i) {
-            let name = file.name();
-            if name.ends_with(".dist-info/RECORD") {
-                return Some(name.to_string());
-            }
+    let compressed_size = file.compressed_size();
+    let uncompressed_size = file.size();
+
+    if compressed_size > 0 {
+        let ratio = uncompressed_size as f64 / compressed_size as f64;
+        if ratio > MAX_COMPRESSION_RATIO {
+            return Err(format!(
+                "Rejected suspicious compression ratio in {} {:?}: {:.2}:1",
+                archive_type, path, ratio
+            ));
         }
     }
-    None
+
+    if uncompressed_size > MAX_FILE_SIZE {
+        return Err(format!(
+            "Rejected oversized entry in {} {:?}: {} bytes",
+            archive_type, path, uncompressed_size
+        ));
+    }
+
+    read_limited_utf8(
+        &mut file,
+        MAX_FILE_SIZE,
+        &format!("{} entry {}", archive_type, entry.name),
+    )
 }
 
-fn find_egg_installed_files_path<R: Read + std::io::Seek>(
-    archive: &mut ZipArchive<R>,
-) -> Option<String> {
-    for i in 0..archive.len() {
-        if let Ok(file) = archive.by_index_raw(i) {
-            let name = file.name();
-            if name.ends_with("EGG-INFO/installed-files.txt")
-                || name.ends_with(".egg-info/installed-files.txt")
-            {
-                return Some(name.to_string());
-            }
+fn read_limited_utf8<R: Read>(
+    reader: &mut R,
+    max_bytes: u64,
+    context: &str,
+) -> Result<String, String> {
+    let mut limited = reader.take(max_bytes + 1);
+    let mut bytes = Vec::new();
+    limited
+        .read_to_end(&mut bytes)
+        .map_err(|e| format!("Failed to read {}: {}", context, e))?;
+
+    if bytes.len() as u64 > max_bytes {
+        return Err(format!(
+            "{} exceeded {} byte limit while reading",
+            context, max_bytes
+        ));
+    }
+
+    String::from_utf8(bytes).map_err(|e| format!("{} is not valid UTF-8: {}", context, e))
+}
+
+fn normalize_archive_entry_path(entry_path: &str) -> Option<String> {
+    let normalized = entry_path.replace('\\', "/");
+    if normalized.len() >= 3 {
+        let bytes = normalized.as_bytes();
+        if bytes[1] == b':' && bytes[2] == b'/' && bytes[0].is_ascii_alphabetic() {
+            return None;
         }
     }
-    None
+    let path = Path::new(&normalized);
+    let mut components = Vec::new();
+
+    for component in path.components() {
+        match component {
+            Component::Normal(segment) => components.push(segment.to_string_lossy().to_string()),
+            Component::CurDir => {}
+            Component::RootDir | Component::ParentDir | Component::Prefix(_) => return None,
+        }
+    }
+
+    (!components.is_empty()).then_some(components.join("/"))
 }
 
 /// Parses RECORD CSV format from wheel archives (PEP 427).
@@ -540,6 +1482,23 @@ pub fn parse_installed_files_txt(content: &str) -> Vec<FileReference> {
     content
         .lines()
         .map(|line| line.trim())
+        .filter(|line| !line.is_empty())
+        .map(|path| FileReference {
+            path: path.to_string(),
+            size: None,
+            sha1: None,
+            md5: None,
+            sha256: None,
+            sha512: None,
+            extra_data: None,
+        })
+        .collect()
+}
+
+pub fn parse_sources_txt(content: &str) -> Vec<FileReference> {
+    content
+        .lines()
+        .map(str::trim)
         .filter(|line| !line.is_empty())
         .map(|path| FileReference {
             path: path.to_string(),
@@ -717,14 +1676,29 @@ fn build_package_data_from_rfc822(
             "license_files".to_string(),
             serde_json::Value::Array(
                 license_files
-                    .into_iter()
+                    .iter()
+                    .cloned()
                     .map(serde_json::Value::String)
                     .collect(),
             ),
         );
     }
 
+    let file_references = license_files
+        .iter()
+        .map(|path| FileReference {
+            path: path.clone(),
+            size: None,
+            sha1: None,
+            md5: None,
+            sha256: None,
+            sha512: None,
+            extra_data: None,
+        })
+        .collect();
+
     let project_urls = get_header_all(&metadata.headers, "project-url");
+    let dependencies = extract_rfc822_dependencies(&metadata.headers);
     let (mut bug_tracking_url, mut code_view_url, mut vcs_url) = (None, None, None);
 
     if !project_urls.is_empty() {
@@ -823,11 +1797,11 @@ fn build_package_data_from_rfc822(
         extracted_license_statement,
         notice_text: None,
         source_packages: Vec::new(),
-        file_references: Vec::new(),
+        file_references,
         is_private: false,
         is_virtual: false,
         extra_data,
-        dependencies: Vec::new(),
+        dependencies,
         repository_homepage_url,
         repository_download_url,
         api_data_url,
@@ -959,6 +1933,19 @@ pub(crate) fn build_pypi_urls(
     )
 }
 
+fn build_pypi_purl_with_extension(
+    name: &str,
+    version: Option<&str>,
+    extension: &str,
+) -> Option<String> {
+    let mut package_url = PackageUrl::new(PythonParser::PACKAGE_TYPE.as_str(), name).ok()?;
+    if let Some(ver) = version {
+        package_url.with_version(ver).ok()?;
+    }
+    package_url.add_qualifier("extension", extension).ok()?;
+    Some(package_url.to_string())
+}
+
 fn extract_from_pyproject_toml(path: &Path) -> PackageData {
     let toml_content = match read_toml_file(path) {
         Ok(content) => content,
@@ -971,12 +1958,14 @@ fn extract_from_pyproject_toml(path: &Path) -> PackageData {
         }
     };
 
+    let tool_table = toml_content.get("tool").and_then(|v| v.as_table());
+
     // Handle both PEP 621 (project table) and poetry formats
     let project_table =
         if let Some(project) = toml_content.get(FIELD_PROJECT).and_then(|v| v.as_table()) {
             // Standard PEP 621 format with [project] table
             project.clone()
-        } else if let Some(tool) = toml_content.get("tool").and_then(|v| v.as_table()) {
+        } else if let Some(tool) = tool_table {
             if let Some(poetry) = tool.get("poetry").and_then(|v| v.as_table()) {
                 // Poetry format with [tool.poetry] table
                 poetry.clone()
@@ -1010,6 +1999,16 @@ fn extract_from_pyproject_toml(path: &Path) -> PackageData {
         .get(FIELD_VERSION)
         .and_then(|v| v.as_str())
         .map(String::from);
+    let classifiers = project_table
+        .get("classifiers")
+        .and_then(|value| value.as_array())
+        .map(|values| {
+            values
+                .iter()
+                .filter_map(|value| value.as_str().map(ToOwned::to_owned))
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
 
     // Extract license statement only - detection happens in separate engine
     let license_detections = Vec::new();
@@ -1020,7 +2019,8 @@ fn extract_from_pyproject_toml(path: &Path) -> PackageData {
     // URLs can be in different formats depending on the tool (poetry, flit, etc.)
     let (homepage_url, repository_url) = extract_urls(&project_table);
 
-    let (dependencies, optional_dependencies) = extract_dependencies(&project_table);
+    let (dependencies, optional_dependencies) = extract_dependencies(&project_table, &toml_content);
+    let extra_data = extract_pyproject_extra_data(&toml_content);
 
     // Create package URL
     let purl = name.as_ref().and_then(|n| {
@@ -1106,9 +2106,9 @@ fn extract_from_pyproject_toml(path: &Path) -> PackageData {
         notice_text: None,
         source_packages: Vec::new(),
         file_references: Vec::new(),
-        is_private: false,
+        is_private: has_private_classifier(&classifiers),
         is_virtual: false,
-        extra_data: None,
+        extra_data,
         dependencies: [dependencies, optional_dependencies].concat(),
         repository_homepage_url: None,
         repository_download_url: None,
@@ -1215,6 +2215,7 @@ fn extract_parties(project: &TomlMap<String, TomlValue>) -> Vec<Party> {
 
 fn extract_dependencies(
     project: &TomlMap<String, TomlValue>,
+    toml_content: &TomlValue,
 ) -> (Vec<Dependency>, Vec<Dependency>) {
     let mut dependencies = Vec::new();
     let mut optional_dependencies = Vec::new();
@@ -1259,20 +2260,20 @@ fn extract_dependencies(
     }
 
     // Handle Poetry dev-dependencies
-    if let Some(dev_deps_value) = project.get("dev-dependencies") {
+    if let Some(dev_deps_value) = project.get(FIELD_DEV_DEPENDENCIES) {
         match dev_deps_value {
             TomlValue::Array(arr) => {
                 optional_dependencies.extend(parse_dependency_array(
                     arr,
                     true,
-                    Some("dev-dependencies"),
+                    Some(FIELD_DEV_DEPENDENCIES),
                 ));
             }
             TomlValue::Table(table) => {
                 optional_dependencies.extend(parse_dependency_table(
                     table,
                     true,
-                    Some("dev-dependencies"),
+                    Some(FIELD_DEV_DEPENDENCIES),
                 ));
             }
             _ => {}
@@ -1304,7 +2305,87 @@ fn extract_dependencies(
         }
     }
 
+    if let Some(groups_table) = toml_content
+        .get(FIELD_DEPENDENCY_GROUPS)
+        .and_then(|value| value.as_table())
+    {
+        for (group_name, deps) in groups_table {
+            match deps {
+                TomlValue::Array(arr) => {
+                    optional_dependencies.extend(parse_dependency_array(
+                        arr,
+                        true,
+                        Some(group_name),
+                    ));
+                }
+                TomlValue::Table(table) => {
+                    optional_dependencies.extend(parse_dependency_table(
+                        table,
+                        true,
+                        Some(group_name),
+                    ));
+                }
+                _ => {}
+            }
+        }
+    }
+
+    if let Some(dev_deps_value) = toml_content
+        .get("tool")
+        .and_then(|value| value.as_table())
+        .and_then(|tool| tool.get("uv"))
+        .and_then(|value| value.as_table())
+        .and_then(|uv| uv.get(FIELD_DEV_DEPENDENCIES))
+    {
+        match dev_deps_value {
+            TomlValue::Array(arr) => {
+                optional_dependencies.extend(parse_dependency_array(arr, true, Some("dev")));
+            }
+            TomlValue::Table(table) => {
+                optional_dependencies.extend(parse_dependency_table(table, true, Some("dev")));
+            }
+            _ => {}
+        }
+    }
+
     (dependencies, optional_dependencies)
+}
+
+fn extract_pyproject_extra_data(toml_content: &TomlValue) -> Option<HashMap<String, JsonValue>> {
+    let mut extra_data = HashMap::new();
+
+    if let Some(tool_uv) = toml_content
+        .get("tool")
+        .and_then(|value| value.as_table())
+        .and_then(|tool| tool.get("uv"))
+    {
+        extra_data.insert("tool_uv".to_string(), toml_value_to_json(tool_uv));
+    }
+
+    if extra_data.is_empty() {
+        None
+    } else {
+        Some(extra_data)
+    }
+}
+
+fn toml_value_to_json(value: &TomlValue) -> JsonValue {
+    match value {
+        TomlValue::String(value) => JsonValue::String(value.clone()),
+        TomlValue::Integer(value) => JsonValue::String(value.to_string()),
+        TomlValue::Float(value) => JsonValue::String(value.to_string()),
+        TomlValue::Boolean(value) => JsonValue::Bool(*value),
+        TomlValue::Datetime(value) => JsonValue::String(value.to_string()),
+        TomlValue::Array(values) => {
+            JsonValue::Array(values.iter().map(toml_value_to_json).collect())
+        }
+        TomlValue::Table(values) => JsonValue::Object(
+            values
+                .iter()
+                .map(|(key, value)| (key.clone(), toml_value_to_json(value)))
+                .collect::<JsonMap<String, JsonValue>>(),
+        ),
+    }
 }
 
 fn parse_dependency_table(
@@ -1450,6 +2531,13 @@ impl LiteralEvaluator {
                 keywords,
                 ..
             }) => {
+                if keywords.is_empty()
+                    && let Some(name) = dotted_name(func.as_ref(), depth + 1)
+                    && matches!(name.as_str(), "OrderedDict" | "collections.OrderedDict")
+                {
+                    return self.evaluate_ordered_dict(args, depth + 1);
+                }
+
                 if !args.is_empty() {
                     return None;
                 }
@@ -1481,6 +2569,31 @@ impl LiteralEvaluator {
             ast::Constant::None => Some(Value::None),
             _ => None,
         }
+    }
+
+    fn evaluate_ordered_dict(&mut self, args: &[ast::Expr], depth: usize) -> Option<Value> {
+        if args.len() != 1 {
+            return None;
+        }
+
+        let items = match self.evaluate_expr(&args[0], depth)? {
+            Value::List(items) | Value::Tuple(items) => items,
+            _ => return None,
+        };
+
+        let mut dict = HashMap::new();
+        for item in items {
+            let Value::Tuple(values) = item else {
+                return None;
+            };
+            if values.len() != 2 {
+                return None;
+            }
+            let key = value_to_string(&values[0])?;
+            dict.insert(key, values[1].clone());
+        }
+
+        Some(Value::Dict(dict))
     }
 }
 
@@ -1521,6 +2634,8 @@ fn extract_from_setup_py(path: &Path) -> PackageData {
         package_data.version = extract_setup_value(&content, "version");
     }
 
+    fill_from_sibling_dunder_metadata(path, &content, &mut package_data);
+
     if package_data.purl.is_none() {
         package_data.purl = build_setup_py_purl(
             package_data.name.as_deref(),
@@ -1529,6 +2644,144 @@ fn extract_from_setup_py(path: &Path) -> PackageData {
     }
 
     package_data
+}
+
+fn fill_from_sibling_dunder_metadata(path: &Path, content: &str, package_data: &mut PackageData) {
+    if package_data.version.is_some()
+        && package_data.extracted_license_statement.is_some()
+        && package_data
+            .parties
+            .iter()
+            .any(|party| party.role.as_deref() == Some("author") && party.name.is_some())
+    {
+        return;
+    }
+
+    let Some(root) = path.parent() else {
+        return;
+    };
+
+    let dunder_metadata = collect_sibling_dunder_metadata(root, content);
+
+    if package_data.version.is_none() {
+        package_data.version = dunder_metadata.version;
+    }
+
+    if package_data.extracted_license_statement.is_none() {
+        package_data.extracted_license_statement = dunder_metadata.license;
+    }
+
+    let has_author = package_data
+        .parties
+        .iter()
+        .any(|party| party.role.as_deref() == Some("author") && party.name.is_some());
+
+    if !has_author && let Some(author) = dunder_metadata.author {
+        package_data.parties.push(Party {
+            r#type: Some("person".to_string()),
+            role: Some("author".to_string()),
+            name: Some(author),
+            email: None,
+            url: None,
+            organization: None,
+            organization_url: None,
+            timezone: None,
+        });
+    }
+}
+
+#[derive(Default)]
+struct DunderMetadata {
+    version: Option<String>,
+    author: Option<String>,
+    license: Option<String>,
+}
+
+fn collect_sibling_dunder_metadata(root: &Path, content: &str) -> DunderMetadata {
+    let statements = match ast::Suite::parse(content, "<setup.py>") {
+        Ok(statements) => statements,
+        Err(_) => return DunderMetadata::default(),
+    };
+
+    let version_re = Regex::new(r#"(?m)^\s*__version__\s*=\s*['\"]([^'\"]+)['\"]"#).ok();
+    let author_re = Regex::new(r#"(?m)^\s*__author__\s*=\s*['\"]([^'\"]+)['\"]"#).ok();
+    let license_re = Regex::new(r#"(?m)^\s*__license__\s*=\s*['\"]([^'\"]+)['\"]"#).ok();
+    let mut metadata = DunderMetadata::default();
+
+    for module in imported_dunder_modules(&statements) {
+        let Some(path) = resolve_imported_module_path(root, &module) else {
+            continue;
+        };
+        let Ok(module_content) = read_file_to_string(&path) else {
+            continue;
+        };
+
+        if metadata.version.is_none() {
+            metadata.version = version_re
+                .as_ref()
+                .and_then(|regex| regex.captures(&module_content))
+                .and_then(|captures| captures.get(1))
+                .map(|match_| match_.as_str().to_string());
+        }
+
+        if metadata.author.is_none() {
+            metadata.author = author_re
+                .as_ref()
+                .and_then(|regex| regex.captures(&module_content))
+                .and_then(|captures| captures.get(1))
+                .map(|match_| match_.as_str().to_string());
+        }
+
+        if metadata.license.is_none() {
+            metadata.license = license_re
+                .as_ref()
+                .and_then(|regex| regex.captures(&module_content))
+                .and_then(|captures| captures.get(1))
+                .map(|match_| match_.as_str().to_string());
+        }
+
+        if metadata.version.is_some() && metadata.author.is_some() && metadata.license.is_some() {
+            return metadata;
+        }
+    }
+
+    metadata
+}
+
+fn imported_dunder_modules(statements: &[ast::Stmt]) -> Vec<String> {
+    let mut modules = Vec::new();
+
+    for statement in statements {
+        let ast::Stmt::ImportFrom(ast::StmtImportFrom { module, names, .. }) = statement else {
+            continue;
+        };
+        let Some(module) = module.as_ref().map(|name| name.as_str()) else {
+            continue;
+        };
+        let imports_dunder = names.iter().any(|alias| {
+            matches!(
+                alias.name.as_str(),
+                "__version__" | "__author__" | "__license__"
+            )
+        });
+        if imports_dunder {
+            modules.push(module.to_string());
+        }
+    }
+
+    modules
+}
+
+fn resolve_imported_module_path(root: &Path, module: &str) -> Option<PathBuf> {
+    let relative = PathBuf::from_iter(module.split('.'));
+    let candidates = [
+        root.join(relative.with_extension("py")),
+        root.join(&relative).join("__init__.py"),
+        root.join("src").join(relative.with_extension("py")),
+        root.join("src").join(relative).join("__init__.py"),
+    ];
+
+    candidates.into_iter().find(|candidate| candidate.exists())
 }
 
 /// Extracts package metadata from setup.py using AST parsing (NO CODE EXECUTION).
@@ -1813,6 +3066,10 @@ fn build_setup_py_package_data(values: &HashMap<String, Value>) -> PackageData {
     let maintainer = get_value_string(values, "maintainer");
     let maintainer_email = get_value_string(values, "maintainer_email");
     let license = get_value_string(values, "license");
+    let classifiers = values
+        .get("classifiers")
+        .and_then(value_to_string_list)
+        .unwrap_or_default();
 
     let mut parties = Vec::new();
     if author.is_some() || author_email.is_some() {
@@ -1849,6 +3106,26 @@ fn build_setup_py_package_data(values: &HashMap<String, Value>) -> PackageData {
 
     let dependencies = build_setup_py_dependencies(values);
     let purl = build_setup_py_purl(name.as_deref(), version.as_deref());
+    let mut homepage_from_project_urls = None;
+    let (mut bug_tracking_url, mut code_view_url, mut vcs_url) = (None, None, None);
+    let mut extra_data = HashMap::new();
+
+    if let Some(parsed_project_urls) = values.get("project_urls").and_then(value_to_string_pairs) {
+        apply_project_url_mappings(
+            &parsed_project_urls,
+            &mut homepage_from_project_urls,
+            &mut bug_tracking_url,
+            &mut code_view_url,
+            &mut vcs_url,
+            &mut extra_data,
+        );
+    }
+
+    let extra_data = if extra_data.is_empty() {
+        None
+    } else {
+        Some(extra_data)
+    };
 
     PackageData {
         package_type: Some(PythonParser::PACKAGE_TYPE),
@@ -1862,16 +3139,16 @@ fn build_setup_py_package_data(values: &HashMap<String, Value>) -> PackageData {
         release_date: None,
         parties,
         keywords: Vec::new(),
-        homepage_url,
+        homepage_url: homepage_url.or(homepage_from_project_urls),
         download_url: None,
         size: None,
         sha1: None,
         md5: None,
         sha256: None,
         sha512: None,
-        bug_tracking_url: None,
-        code_view_url: None,
-        vcs_url: None,
+        bug_tracking_url,
+        code_view_url,
+        vcs_url,
         copyright: None,
         holder: None,
         declared_license_expression,
@@ -1884,9 +3161,9 @@ fn build_setup_py_package_data(values: &HashMap<String, Value>) -> PackageData {
         notice_text: None,
         source_packages: Vec::new(),
         file_references: Vec::new(),
-        is_private: false,
+        is_private: has_private_classifier(&classifiers),
         is_virtual: false,
-        extra_data: None,
+        extra_data,
         dependencies,
         repository_homepage_url: None,
         repository_download_url: None,
@@ -1962,6 +3239,231 @@ fn value_to_string_list(value: &Value) -> Option<Vec<String>> {
         }
         _ => None,
     }
+}
+
+fn value_to_string_pairs(value: &Value) -> Option<Vec<(String, String)>> {
+    let Value::Dict(dict) = value else {
+        return None;
+    };
+
+    let mut pairs: Vec<(String, String)> = dict
+        .iter()
+        .map(|(key, value)| Some((key.clone(), value_to_string(value)?)))
+        .collect::<Option<Vec<_>>>()?;
+    pairs.sort_by(|left, right| left.0.cmp(&right.0));
+    Some(pairs)
+}
+
+fn extract_rfc822_dependencies(headers: &HashMap<String, Vec<String>>) -> Vec<Dependency> {
+    let requires_dist = super::rfc822::get_header_all(headers, "requires-dist");
+    requires_dist
+        .iter()
+        .filter_map(|entry| build_rfc822_dependency(entry))
+        .collect()
+}
+
+fn build_rfc822_dependency(entry: &str) -> Option<Dependency> {
+    build_python_dependency(entry, "install", false, None)
+}
+
+fn build_python_dependency(
+    entry: &str,
+    default_scope: &str,
+    default_optional: bool,
+    marker_override: Option<&str>,
+) -> Option<Dependency> {
+    let (requirement_part, marker_part) = entry
+        .split_once(';')
+        .map(|(req, marker)| (req.trim(), Some(marker.trim())))
+        .unwrap_or((entry.trim(), None));
+
+    let name = extract_setup_cfg_dependency_name(requirement_part)?;
+    let requirement = normalize_rfc822_requirement(requirement_part);
+    let (scope, is_optional, marker, marker_data) = parse_rfc822_marker(
+        marker_part.or(marker_override),
+        default_scope,
+        default_optional,
+    );
+    let mut purl = PackageUrl::new(PythonParser::PACKAGE_TYPE.as_str(), &name).ok()?;
+
+    let is_pinned = requirement
+        .as_deref()
+        .is_some_and(|req| req.starts_with("==") || req.starts_with("==="));
+    if is_pinned
+        && let Some(version) = requirement
+            .as_deref()
+            .map(|req| req.trim_start_matches('='))
+    {
+        purl.with_version(version).ok()?;
+    }
+
+    let mut extra_data = HashMap::new();
+    extra_data.extend(marker_data);
+    if let Some(marker) = marker {
+        extra_data.insert("marker".to_string(), serde_json::Value::String(marker));
+    }
+
+    Some(Dependency {
+        purl: Some(purl.to_string()),
+        extracted_requirement: requirement,
+        scope: Some(scope),
+        is_runtime: Some(true),
+        is_optional: Some(is_optional),
+        is_pinned: Some(is_pinned),
+        is_direct: Some(true),
+        resolved_package: None,
+        extra_data: if extra_data.is_empty() {
+            None
+        } else {
+            Some(extra_data)
+        },
+    })
+}
+
+fn normalize_rfc822_requirement(requirement_part: &str) -> Option<String> {
+    let name = extract_setup_cfg_dependency_name(requirement_part)?;
+    let trimmed = requirement_part.trim();
+    let mut remainder = trimmed[name.len()..].trim();
+
+    if let Some(stripped) = remainder.strip_prefix('[')
+        && let Some(end_idx) = stripped.find(']')
+    {
+        remainder = stripped[end_idx + 1..].trim();
+    }
+
+    let remainder = remainder
+        .strip_prefix('(')
+        .and_then(|value| value.strip_suffix(')'))
+        .unwrap_or(remainder)
+        .trim();
+
+    if remainder.is_empty() {
+        return None;
+    }
+
+    let mut specifiers: Vec<String> = remainder
+        .split(',')
+        .map(|specifier| specifier.trim().replace(' ', ""))
+        .filter(|specifier| !specifier.is_empty())
+        .collect();
+    specifiers.sort();
+    Some(specifiers.join(","))
+}
+
+fn parse_rfc822_marker(
+    marker_part: Option<&str>,
+    default_scope: &str,
+    default_optional: bool,
+) -> (
+    String,
+    bool,
+    Option<String>,
+    HashMap<String, serde_json::Value>,
+) {
+    let Some(marker) = marker_part.filter(|marker| !marker.trim().is_empty()) else {
+        return (
+            default_scope.to_string(),
+            default_optional,
+            None,
+            HashMap::new(),
+        );
+    };
+
+    let extra_re = Regex::new(r#"extra\s*==\s*['\"]([^'\"]+)['\"]"#)
+        .expect("extra marker regex should compile");
+    let mut extra_data = HashMap::new();
+
+    if let Some(python_version) = extract_marker_field(marker, "python_version") {
+        extra_data.insert(
+            "python_version".to_string(),
+            serde_json::Value::String(python_version),
+        );
+    }
+    if let Some(sys_platform) = extract_marker_field(marker, "sys_platform") {
+        extra_data.insert(
+            "sys_platform".to_string(),
+            serde_json::Value::String(sys_platform),
+        );
+    }
+
+    if let Some(captures) = extra_re.captures(marker)
+        && let Some(scope) = captures.get(1)
+    {
+        return (
+            scope.as_str().to_string(),
+            true,
+            Some(marker.trim().to_string()),
+            extra_data,
+        );
+    }
+
+    (
+        default_scope.to_string(),
+        default_optional,
+        Some(marker.trim().to_string()),
+        extra_data,
+    )
+}
+
+fn extract_marker_field(marker: &str, field: &str) -> Option<String> {
+    let re = Regex::new(&format!(
+        r#"{}\s*(==|!=|<=|>=|<|>)\s*['\"]([^'\"]+)['\"]"#,
+        field
+    ))
+    .ok()?;
+    let captures = re.captures(marker)?;
+    let operator = captures.get(1)?.as_str();
+    let value = captures.get(2)?.as_str();
+    Some(format!("{} {}", operator, value))
+}
+
+fn parse_requires_txt(content: &str) -> Vec<Dependency> {
+    let mut dependencies = Vec::new();
+    let mut current_scope = "install".to_string();
+    let mut current_optional = false;
+    let mut current_marker: Option<String> = None;
+
+    for line in content.lines() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() || trimmed.starts_with('#') {
+            continue;
+        }
+
+        if trimmed.starts_with('[') && trimmed.ends_with(']') {
+            let inner = &trimmed[1..trimmed.len() - 1];
+            if let Some(rest) = inner.strip_prefix(':') {
+                current_scope = "install".to_string();
+                current_optional = false;
+                current_marker = Some(rest.trim().to_string());
+            } else if let Some((scope, marker)) = inner.split_once(':') {
+                current_scope = scope.trim().to_string();
+                current_optional = true;
+                current_marker = Some(marker.trim().to_string());
+            } else {
+                current_scope = inner.trim().to_string();
+                current_optional = true;
+                current_marker = None;
+            }
+            continue;
+        }
+
+        if let Some(dependency) = build_python_dependency(
+            trimmed,
+            &current_scope,
+            current_optional,
+            current_marker.as_deref(),
+        ) {
+            dependencies.push(dependency);
+        }
+    }
+
+    dependencies
+}
+
+fn has_private_classifier(classifiers: &[String]) -> bool {
+    classifiers
+        .iter()
+        .any(|classifier| classifier.eq_ignore_ascii_case("Private :: Do Not Upload"))
 }
 
 fn build_setup_py_purl(name: Option<&str>, version: Option<&str>) -> Option<String> {
@@ -2055,6 +3557,214 @@ fn package_data_to_resolved(pkg: &PackageData) -> crate::models::ResolvedPackage
         datasource_id: pkg.datasource_id,
         purl: pkg.purl.clone(),
     }
+}
+
+fn extract_from_pypi_json(path: &Path) -> PackageData {
+    let default = PackageData {
+        package_type: Some(PythonParser::PACKAGE_TYPE),
+        datasource_id: Some(DatasourceId::PypiJson),
+        ..Default::default()
+    };
+
+    let content = match read_file_to_string(path) {
+        Ok(content) => content,
+        Err(error) => {
+            warn!("Failed to read pypi.json at {:?}: {}", path, error);
+            return default;
+        }
+    };
+
+    let root: serde_json::Value = match serde_json::from_str(&content) {
+        Ok(value) => value,
+        Err(error) => {
+            warn!("Failed to parse pypi.json at {:?}: {}", path, error);
+            return default;
+        }
+    };
+
+    let Some(info) = root.get("info").and_then(|value| value.as_object()) else {
+        warn!("No info object found in pypi.json at {:?}", path);
+        return default;
+    };
+
+    let name = info
+        .get("name")
+        .and_then(|value| value.as_str())
+        .map(ToOwned::to_owned);
+    let version = info
+        .get("version")
+        .and_then(|value| value.as_str())
+        .map(ToOwned::to_owned);
+    let summary = info
+        .get("summary")
+        .and_then(|value| value.as_str())
+        .map(ToOwned::to_owned);
+    let description = info
+        .get("description")
+        .and_then(|value| value.as_str())
+        .filter(|value| !value.trim().is_empty())
+        .map(ToOwned::to_owned)
+        .or(summary);
+    let mut homepage_url = info
+        .get("home_page")
+        .and_then(|value| value.as_str())
+        .map(ToOwned::to_owned);
+    let author = info
+        .get("author")
+        .and_then(|value| value.as_str())
+        .filter(|value| !value.trim().is_empty())
+        .map(ToOwned::to_owned);
+    let author_email = info
+        .get("author_email")
+        .and_then(|value| value.as_str())
+        .filter(|value| !value.trim().is_empty())
+        .map(ToOwned::to_owned);
+    let license = info
+        .get("license")
+        .and_then(|value| value.as_str())
+        .filter(|value| !value.trim().is_empty())
+        .map(ToOwned::to_owned);
+    let keywords = parse_setup_cfg_keywords(
+        info.get("keywords")
+            .and_then(|value| value.as_str())
+            .map(ToOwned::to_owned),
+    );
+    let classifiers = info
+        .get("classifiers")
+        .and_then(|value| value.as_array())
+        .map(|values| {
+            values
+                .iter()
+                .filter_map(|value| value.as_str().map(ToOwned::to_owned))
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+
+    let mut parties = Vec::new();
+    if author.is_some() || author_email.is_some() {
+        parties.push(Party {
+            r#type: Some("person".to_string()),
+            role: Some("author".to_string()),
+            name: author,
+            email: author_email,
+            url: None,
+            organization: None,
+            organization_url: None,
+            timezone: None,
+        });
+    }
+
+    let mut bug_tracking_url = None;
+    let mut code_view_url = None;
+    let mut vcs_url = None;
+    let mut extra_data = HashMap::new();
+
+    let parsed_project_urls = info
+        .get("project_urls")
+        .and_then(|value| value.as_object())
+        .map(|map| {
+            let mut pairs: Vec<(String, String)> = map
+                .iter()
+                .filter_map(|(key, value)| Some((key.clone(), value.as_str()?.to_string())))
+                .collect();
+            pairs.sort_by(|left, right| left.0.cmp(&right.0));
+            pairs
+        })
+        .unwrap_or_default();
+
+    apply_project_url_mappings(
+        &parsed_project_urls,
+        &mut homepage_url,
+        &mut bug_tracking_url,
+        &mut code_view_url,
+        &mut vcs_url,
+        &mut extra_data,
+    );
+
+    let (download_url, size, sha256) = root
+        .get("urls")
+        .and_then(|value| value.as_array())
+        .map(|urls| select_pypi_json_artifact(urls))
+        .unwrap_or((None, None, None));
+
+    let (repository_homepage_url, repository_download_url, api_data_url, purl) =
+        build_pypi_urls(name.as_deref(), version.as_deref());
+
+    PackageData {
+        package_type: Some(PythonParser::PACKAGE_TYPE),
+        namespace: None,
+        name,
+        version,
+        qualifiers: None,
+        subpath: None,
+        primary_language: None,
+        description,
+        release_date: None,
+        parties,
+        keywords,
+        homepage_url: homepage_url.or(repository_homepage_url.clone()),
+        download_url,
+        size,
+        sha1: None,
+        md5: None,
+        sha256,
+        sha512: None,
+        bug_tracking_url,
+        code_view_url,
+        vcs_url,
+        copyright: None,
+        holder: None,
+        declared_license_expression: None,
+        declared_license_expression_spdx: None,
+        license_detections: Vec::new(),
+        other_license_expression: None,
+        other_license_expression_spdx: None,
+        other_license_detections: Vec::new(),
+        extracted_license_statement: license,
+        notice_text: None,
+        source_packages: Vec::new(),
+        file_references: Vec::new(),
+        is_private: has_private_classifier(&classifiers),
+        is_virtual: false,
+        extra_data: if extra_data.is_empty() {
+            None
+        } else {
+            Some(extra_data)
+        },
+        dependencies: Vec::new(),
+        repository_homepage_url,
+        repository_download_url,
+        api_data_url,
+        datasource_id: Some(DatasourceId::PypiJson),
+        purl,
+    }
+}
+
+fn select_pypi_json_artifact(
+    urls: &[serde_json::Value],
+) -> (Option<String>, Option<u64>, Option<String>) {
+    let selected = urls
+        .iter()
+        .find(|entry| entry.get("packagetype").and_then(|value| value.as_str()) == Some("sdist"))
+        .or_else(|| urls.first());
+
+    let Some(entry) = selected else {
+        return (None, None, None);
+    };
+
+    let download_url = entry
+        .get("url")
+        .and_then(|value| value.as_str())
+        .map(ToOwned::to_owned);
+    let size = entry.get("size").and_then(|value| value.as_u64());
+    let sha256 = entry
+        .get("digests")
+        .and_then(|value| value.as_object())
+        .and_then(|digests| digests.get("sha256"))
+        .and_then(|value| value.as_str())
+        .map(ToOwned::to_owned);
+
+    (download_url, size, sha256)
 }
 
 fn extract_from_pip_inspect(path: &Path) -> PackageData {
@@ -2328,10 +4038,20 @@ fn extract_from_setup_cfg(path: &Path) -> PackageData {
     let sections = parse_setup_cfg(&content);
     let name = get_ini_value(&sections, "metadata", "name");
     let version = get_ini_value(&sections, "metadata", "version");
+    let description = get_ini_value(&sections, "metadata", "description");
     let author = get_ini_value(&sections, "metadata", "author");
     let author_email = get_ini_value(&sections, "metadata", "author_email");
+    let maintainer = get_ini_value(&sections, "metadata", "maintainer");
+    let maintainer_email = get_ini_value(&sections, "metadata", "maintainer_email");
     let license = get_ini_value(&sections, "metadata", "license");
-    let homepage_url = get_ini_value(&sections, "metadata", "url");
+    let mut homepage_url = get_ini_value(&sections, "metadata", "url");
+    let classifiers = get_ini_values(&sections, "metadata", "classifiers");
+    let keywords = parse_setup_cfg_keywords(get_ini_value(&sections, "metadata", "keywords"));
+    let python_requires = get_ini_value(&sections, "options", "python_requires");
+    let parsed_project_urls =
+        parse_setup_cfg_project_urls(&get_ini_values(&sections, "metadata", "project_urls"));
+    let (mut bug_tracking_url, mut code_view_url, mut vcs_url) = (None, None, None);
+    let mut extra_data = HashMap::new();
 
     let mut parties = Vec::new();
     if author.is_some() || author_email.is_some() {
@@ -2347,6 +4067,19 @@ fn extract_from_setup_cfg(path: &Path) -> PackageData {
         });
     }
 
+    if maintainer.is_some() || maintainer_email.is_some() {
+        parties.push(Party {
+            r#type: Some("person".to_string()),
+            role: Some("maintainer".to_string()),
+            name: maintainer,
+            email: maintainer_email,
+            url: None,
+            organization: None,
+            organization_url: None,
+            timezone: None,
+        });
+    }
+
     // Extract license statement only - detection happens in separate engine
     let declared_license_expression = None;
     let declared_license_expression_spdx = None;
@@ -2354,6 +4087,28 @@ fn extract_from_setup_cfg(path: &Path) -> PackageData {
     let extracted_license_statement = license.clone();
 
     let dependencies = extract_setup_cfg_dependencies(&sections);
+
+    if let Some(value) = python_requires {
+        extra_data.insert(
+            "python_requires".to_string(),
+            serde_json::Value::String(value),
+        );
+    }
+
+    apply_project_url_mappings(
+        &parsed_project_urls,
+        &mut homepage_url,
+        &mut bug_tracking_url,
+        &mut code_view_url,
+        &mut vcs_url,
+        &mut extra_data,
+    );
+
+    let extra_data = if extra_data.is_empty() {
+        None
+    } else {
+        Some(extra_data)
+    };
 
     let purl = name.as_ref().and_then(|n| {
         let mut package_url = PackageUrl::new(PythonParser::PACKAGE_TYPE.as_str(), n).ok()?;
@@ -2371,10 +4126,10 @@ fn extract_from_setup_cfg(path: &Path) -> PackageData {
         qualifiers: None,
         subpath: None,
         primary_language: Some("Python".to_string()),
-        description: None,
+        description,
         release_date: None,
         parties,
-        keywords: Vec::new(),
+        keywords,
         homepage_url,
         download_url: None,
         size: None,
@@ -2382,9 +4137,9 @@ fn extract_from_setup_cfg(path: &Path) -> PackageData {
         md5: None,
         sha256: None,
         sha512: None,
-        bug_tracking_url: None,
-        code_view_url: None,
-        vcs_url: None,
+        bug_tracking_url,
+        code_view_url,
+        vcs_url,
         copyright: None,
         holder: None,
         declared_license_expression,
@@ -2397,15 +4152,103 @@ fn extract_from_setup_cfg(path: &Path) -> PackageData {
         notice_text: None,
         source_packages: Vec::new(),
         file_references: Vec::new(),
-        is_private: false,
+        is_private: has_private_classifier(&classifiers),
         is_virtual: false,
-        extra_data: None,
+        extra_data,
         dependencies,
         repository_homepage_url: None,
         repository_download_url: None,
         api_data_url: None,
         datasource_id: Some(DatasourceId::PypiSetupCfg),
         purl,
+    }
+}
+
+fn parse_setup_cfg_keywords(value: Option<String>) -> Vec<String> {
+    let Some(keywords) = value else {
+        return Vec::new();
+    };
+
+    keywords
+        .split(',')
+        .map(str::trim)
+        .filter(|keyword| !keyword.is_empty())
+        .map(ToOwned::to_owned)
+        .collect()
+}
+
+fn parse_setup_cfg_project_urls(entries: &[String]) -> Vec<(String, String)> {
+    entries
+        .iter()
+        .filter_map(|entry| {
+            let (label, url) = entry.split_once('=')?;
+            let label = label.trim();
+            let url = url.trim();
+            if label.is_empty() || url.is_empty() {
+                None
+            } else {
+                Some((label.to_string(), url.to_string()))
+            }
+        })
+        .collect()
+}
+
+fn apply_project_url_mappings(
+    parsed_urls: &[(String, String)],
+    homepage_url: &mut Option<String>,
+    bug_tracking_url: &mut Option<String>,
+    code_view_url: &mut Option<String>,
+    vcs_url: &mut Option<String>,
+    extra_data: &mut HashMap<String, serde_json::Value>,
+) {
+    for (label, url) in parsed_urls {
+        let label_lower = label.to_lowercase();
+
+        if bug_tracking_url.is_none()
+            && matches!(
+                label_lower.as_str(),
+                "tracker"
+                    | "bug reports"
+                    | "bug tracker"
+                    | "issues"
+                    | "issue tracker"
+                    | "github: issues"
+            )
+        {
+            *bug_tracking_url = Some(url.clone());
+        } else if code_view_url.is_none()
+            && matches!(label_lower.as_str(), "source" | "source code" | "code")
+        {
+            *code_view_url = Some(url.clone());
+        } else if vcs_url.is_none()
+            && matches!(
+                label_lower.as_str(),
+                "github" | "gitlab" | "github: repo" | "repository"
+            )
+        {
+            *vcs_url = Some(url.clone());
+        } else if homepage_url.is_none()
+            && matches!(label_lower.as_str(), "website" | "homepage" | "home")
+        {
+            *homepage_url = Some(url.clone());
+        } else if label_lower == "changelog" {
+            extra_data.insert(
+                "changelog_url".to_string(),
+                serde_json::Value::String(url.clone()),
+            );
+        }
+    }
+
+    let project_urls_json: serde_json::Map<String, serde_json::Value> = parsed_urls
+        .iter()
+        .map(|(label, url)| (label.clone(), serde_json::Value::String(url.clone())))
+        .collect();
+
+    if !project_urls_json.is_empty() {
+        extra_data.insert(
+            "project_urls".to_string(),
+            serde_json::Value::Object(project_urls_json),
+        );
     }
 }
 
@@ -2723,13 +4566,20 @@ fn default_package_data() -> PackageData {
 }
 
 crate::register_parser!(
-    "Python package manifests (pyproject.toml, setup.py, setup.cfg, PKG-INFO, METADATA, .whl, .egg)",
+    "Python package manifests (pyproject.toml, setup.py, setup.cfg, pypi.json, PKG-INFO, METADATA, pip cache origin.json, sdist archives, .whl, .egg)",
     &[
         "**/pyproject.toml",
         "**/setup.py",
         "**/setup.cfg",
+        "**/pypi.json",
         "**/PKG-INFO",
         "**/METADATA",
+        "**/origin.json",
+        "**/*.tar.gz",
+        "**/*.tgz",
+        "**/*.tar.bz2",
+        "**/*.tar.xz",
+        "**/*.zip",
         "**/*.whl",
         "**/*.egg"
     ],

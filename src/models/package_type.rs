@@ -28,7 +28,7 @@ use std::str::FromStr;
 /// # Examples
 ///
 /// ```ignore
-/// use scancode_rust::models::PackageType;
+/// use provenant::models::PackageType;
 ///
 /// let pt = PackageType::Npm;
 /// assert_eq!(pt.as_ref(), "npm");
@@ -38,6 +38,7 @@ use std::str::FromStr;
 #[serde(rename_all = "snake_case")]
 pub enum PackageType {
     About,
+    Alpm,
     Alpine,
     Android,
     AndroidLib,
@@ -58,13 +59,18 @@ pub enum PackageType {
     Cran,
     Dart,
     Deb,
+    Deno,
+    Docker,
     Dmg,
     Ear,
     Freebsd,
     Gem,
     Github,
     Golang,
+    Hackage,
     Haxe,
+    Helm,
+    Hex,
     Installshield,
     Ios,
     Iso,
@@ -75,6 +81,7 @@ pub enum PackageType {
     #[serde(rename = "linux-distro")]
     LinuxDistro,
     Maven,
+    Meson,
     Meteor,
     Mozilla,
     Npm,
@@ -86,11 +93,13 @@ pub enum PackageType {
     PnpmLock,
     Pubspec,
     Pypi,
+    Pixi,
     Readme,
     Rpm,
     Shar,
     Squashfs,
     Swift,
+    Vcpkg,
     War,
     #[serde(rename = "windows-update")]
     WindowsUpdate,
@@ -103,6 +112,7 @@ impl PackageType {
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::About => "about",
+            Self::Alpm => "alpm",
             Self::Alpine => "alpine",
             Self::Android => "android",
             Self::AndroidLib => "android_lib",
@@ -123,13 +133,18 @@ impl PackageType {
             Self::Cran => "cran",
             Self::Dart => "dart",
             Self::Deb => "deb",
+            Self::Deno => "deno",
+            Self::Docker => "docker",
             Self::Dmg => "dmg",
             Self::Ear => "ear",
             Self::Freebsd => "freebsd",
             Self::Gem => "gem",
             Self::Github => "github",
             Self::Golang => "golang",
+            Self::Hackage => "hackage",
             Self::Haxe => "haxe",
+            Self::Helm => "helm",
+            Self::Hex => "hex",
             Self::Installshield => "installshield",
             Self::Ios => "ios",
             Self::Iso => "iso",
@@ -138,6 +153,7 @@ impl PackageType {
             Self::JbossService => "jboss-service",
             Self::LinuxDistro => "linux-distro",
             Self::Maven => "maven",
+            Self::Meson => "meson",
             Self::Meteor => "meteor",
             Self::Mozilla => "mozilla",
             Self::Npm => "npm",
@@ -148,11 +164,13 @@ impl PackageType {
             Self::PnpmLock => "pnpm-lock",
             Self::Pubspec => "pubspec",
             Self::Pypi => "pypi",
+            Self::Pixi => "pixi",
             Self::Readme => "readme",
             Self::Rpm => "rpm",
             Self::Shar => "shar",
             Self::Squashfs => "squashfs",
             Self::Swift => "swift",
+            Self::Vcpkg => "vcpkg",
             Self::War => "war",
             Self::WindowsUpdate => "windows-update",
         }
@@ -203,6 +221,10 @@ mod tests {
         assert_eq!(PackageType::Npm.as_str(), "npm");
         assert_eq!(PackageType::Cargo.as_str(), "cargo");
         assert_eq!(PackageType::Pypi.as_str(), "pypi");
+        assert_eq!(PackageType::Alpm.as_str(), "alpm");
+        assert_eq!(PackageType::Vcpkg.as_str(), "vcpkg");
+        assert_eq!(PackageType::Hackage.as_str(), "hackage");
+        assert_eq!(PackageType::Hex.as_str(), "hex");
     }
 
     #[test]

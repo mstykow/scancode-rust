@@ -20,10 +20,16 @@
     "homepage_url": "https://crates.io/crates/constant_time_eq",
     "vcs_url": "https://github.com/cesarb/constant_time_eq",
     "extracted_license_statement": "CC0-1.0 OR MIT-0 OR Apache-2.0",
+    "file_references": [
+      {
+        "path": "README"
+      }
+    ],
     "extra_data": {
       "rust_version": "1.85.0",
       "rust_edition": "2024",
-      "documentation_url": "https://docs.rs/constant_time_eq"
+      "documentation_url": "https://docs.rs/constant_time_eq",
+      "readme_file": "README"
     },
     "dependencies": [
       {

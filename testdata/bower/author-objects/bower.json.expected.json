@@ -1,0 +1,53 @@
+[
+  {
+    "type": "bower",
+    "name": "blue-leaf",
+    "primary_language": "JavaScript",
+    "description": "Physics-like animations for pretty particles",
+    "parties": [
+      {
+        "type": "person",
+        "role": "author",
+        "name": "Betty Beta",
+        "email": "bbeta@example.com"
+      },
+      {
+        "type": "person",
+        "role": "author",
+        "name": "John Doe",
+        "email": "john@doe.com",
+        "url": "http://johndoe.com"
+      }
+    ],
+    "keywords": ["motion", "physics", "particles"],
+    "extracted_license_statement": "MIT AND Apache 2.0 AND BSD-3-Clause",
+    "is_private": true,
+    "dependencies": [
+      {
+        "purl": "pkg:bower/get-size",
+        "extracted_requirement": "~1.2.2",
+        "scope": "dependencies",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:bower/eventEmitter",
+        "extracted_requirement": "~4.2.11",
+        "scope": "dependencies",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:bower/qunit",
+        "extracted_requirement": "~1.16.0",
+        "scope": "devDependencies",
+        "is_runtime": false,
+        "is_optional": true,
+        "is_direct": true
+      }
+    ],
+    "datasource_id": "bower_json"
+  }
+]

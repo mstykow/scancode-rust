@@ -1,0 +1,6 @@
+FROM quay.io/pulp/pulp-base:latest
+
+LABEL org.opencontainers.image.title="Pulp OCI image" \
+      org.opencontainers.image.source="https://github.com/pulp/pulp-oci-images" \
+      org.opencontainers.image.url="https://pulpproject.org" \
+      org.opencontainers.image.version="latest"

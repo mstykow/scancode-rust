@@ -1,0 +1,136 @@
+[
+  {
+    "type": "npm",
+    "namespace": "",
+    "name": "basic-dependencies-test",
+    "primary_language": "JavaScript",
+    "parties": [],
+    "extra_data": {
+      "lockfileVersion": 1
+    },
+    "dependencies": [
+      {
+        "purl": "pkg:npm/js-tokens@4.0.0",
+        "extracted_requirement": "4.0.0",
+        "scope": "dependencies",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": false,
+        "resolved_package": {
+          "type": "npm",
+          "name": "js-tokens",
+          "version": "4.0.0",
+          "primary_language": "JavaScript",
+          "download_url": "https://registry.npmjs.org/js-tokens/-/js-tokens-4.0.0.tgz",
+          "sha512": "45d2547e5704ddc5332a232a420b02bb4e853eef5474824ed1b7986cf84737893a6a9809b627dca02b53f5b7313a9601b690f690233a49bce0e026aeb16fcf29",
+          "is_virtual": true,
+          "dependencies": [],
+          "datasource_id": "bun_lock"
+        }
+      },
+      {
+        "purl": "pkg:npm/lodash@4.17.21",
+        "extracted_requirement": "4.17.21",
+        "scope": "dependencies",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": true,
+        "resolved_package": {
+          "type": "npm",
+          "name": "lodash",
+          "version": "4.17.21",
+          "primary_language": "JavaScript",
+          "download_url": "https://registry.npmjs.org/lodash/-/lodash-4.17.21.tgz",
+          "sha512": "bf690311ee7b95e713ba568322e3533f2dd1cb880b189e99d4edef13592b81764daec43e2c54c61d5c558dc5cfb35ecb85b65519e74026ff17675b6f8f916f4a",
+          "is_virtual": true,
+          "dependencies": [],
+          "datasource_id": "bun_lock"
+        }
+      },
+      {
+        "purl": "pkg:npm/loose-envify@1.4.0",
+        "extracted_requirement": "1.4.0",
+        "scope": "dependencies",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": false,
+        "resolved_package": {
+          "type": "npm",
+          "name": "loose-envify",
+          "version": "1.4.0",
+          "primary_language": "JavaScript",
+          "download_url": "https://registry.npmjs.org/loose-envify/-/loose-envify-1.4.0.tgz",
+          "sha512": "972bb13c6aff59f86b95e9b608bfd472751cd7372a280226043cee918ed8e45ff242235d928ebe7d12debe5c351e03324b0edfeb5d54218e34f04b71452a0add",
+          "is_virtual": true,
+          "dependencies": [
+            {
+              "purl": "pkg:npm/js-tokens",
+              "extracted_requirement": "^3.0.0 || ^4.0.0",
+              "scope": "dependencies",
+              "is_runtime": true,
+              "is_optional": false,
+              "is_pinned": false,
+              "is_direct": false
+            }
+          ],
+          "datasource_id": "bun_lock"
+        }
+      },
+      {
+        "purl": "pkg:npm/react@18.2.0",
+        "extracted_requirement": "18.2.0",
+        "scope": "dependencies",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": true,
+        "resolved_package": {
+          "type": "npm",
+          "name": "react",
+          "version": "18.2.0",
+          "primary_language": "JavaScript",
+          "download_url": "https://registry.npmjs.org/react/-/react-18.2.0.tgz",
+          "sha512": "ff722331d6f62fd41b05d5a25b97b73f6fe7a70301694f661c24825333659f464261b71f4ec19b4c9ad4fe419e99d1f6216981da2a19fb3931b66aba834f5f19",
+          "is_virtual": true,
+          "dependencies": [
+            {
+              "purl": "pkg:npm/loose-envify",
+              "extracted_requirement": "^1.1.0",
+              "scope": "dependencies",
+              "is_runtime": true,
+              "is_optional": false,
+              "is_pinned": false,
+              "is_direct": false
+            }
+          ],
+          "datasource_id": "bun_lock"
+        }
+      },
+      {
+        "purl": "pkg:npm/typescript@5.0.2",
+        "extracted_requirement": "5.0.2",
+        "scope": "devDependencies",
+        "is_runtime": false,
+        "is_optional": true,
+        "is_pinned": true,
+        "is_direct": true,
+        "resolved_package": {
+          "type": "npm",
+          "name": "typescript",
+          "version": "5.0.2",
+          "primary_language": "JavaScript",
+          "download_url": "https://registry.npmjs.org/typescript/-/typescript-5.0.2.tgz",
+          "sha512": "c1539130118efc502cffef9b94635e01575b34ab48875adb04bd84c90d7e27d942949f772a288a7bc3e614855d5e11dccafe3848bf6882599f792b27768d2347",
+          "is_virtual": true,
+          "dependencies": [],
+          "datasource_id": "bun_lock"
+        }
+      }
+    ],
+    "datasource_id": "bun_lock",
+    "purl": "pkg:npm/basic-dependencies-test"
+  }
+]

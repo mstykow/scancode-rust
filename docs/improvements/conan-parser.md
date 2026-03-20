@@ -138,18 +138,10 @@ Only exact versions (without range operators) are marked as `is_pinned: true`.
 
 ## References
 
-### Python Reference
-
-- `reference/scancode-toolkit/src/packagedcode/conan.py` — Only handles conanfile.py
-
 ### Conan Documentation
 
 - [conanfile.txt reference](https://docs.conan.io/2/reference/conanfile_txt.html)
 - [conan.lock format](https://docs.conan.io/2/reference/commands/lock.html)
 - [Conan reference format](https://docs.conan.io/2/reference/conanfile/attributes.html#requires)
 
-## Status
-
-- ✅ **Implementation**: Complete — all three parsers production-ready
-- ✅ **Testing**: Unit tests covering all formats and edge cases
-- ✅ **Documentation**: Complete
+The implemented parser split is described in the sections above, with `conandata.yml` behavior documented separately in [conan-data-parser.md](conan-data-parser.md).

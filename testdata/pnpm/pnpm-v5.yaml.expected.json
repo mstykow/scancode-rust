@@ -1,0 +1,850 @@
+[
+  {
+    "type": "pnpm-lock",
+    "parties": [],
+    "extra_data": {},
+    "dependencies": [
+      {
+        "purl": "pkg:npm/%40babel/runtime@7.18.9",
+        "extracted_requirement": "7.18.9",
+        "scope": null,
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": false,
+        "resolved_package": {
+          "type": "npm",
+          "namespace": "@babel",
+          "name": "runtime",
+          "version": "7.18.9",
+          "primary_language": "JavaScript",
+          "sha512": "lkqXDcvlFT5rvEjiu6+QYO+1GXrEHRo2LOtS7E4GtX5ESIZOgepqsZBVIj6Pv+a6zqsya9VCgiK1KAK4BvJDAw==",
+          "is_virtual": true,
+          "dependencies": [
+            {
+              "purl": "pkg:npm/regenerator-runtime@0.13.9",
+              "extracted_requirement": "0.13.9",
+              "scope": null,
+              "is_runtime": true,
+              "is_optional": false,
+              "is_pinned": true,
+              "is_direct": false
+            }
+          ],
+          "datasource_id": "pnpm_lock_yaml"
+        }
+      },
+      {
+        "purl": "pkg:npm/%40headlessui/react@1.6.6",
+        "extracted_requirement": "1.6.6",
+        "scope": null,
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": false,
+        "resolved_package": {
+          "type": "npm",
+          "namespace": "@headlessui",
+          "name": "react",
+          "version": "1.6.6",
+          "primary_language": "JavaScript",
+          "sha512": "MFJtmj9Xh/hhBMhLccGbBoSk+sk61BlP6sJe4uQcVMtXZhCgGqd2GyIQzzmsdPdTEWGSF434CBi8mnhR6um46Q==",
+          "is_virtual": true,
+          "dependencies": [
+            {
+              "purl": "pkg:npm/react@18.2.0",
+              "extracted_requirement": "18.2.0",
+              "scope": null,
+              "is_runtime": true,
+              "is_optional": false,
+              "is_pinned": true,
+              "is_direct": false
+            },
+            {
+              "purl": "pkg:npm/react-dom@18.2.0_react%4018.2.0",
+              "extracted_requirement": "18.2.0_react@18.2.0",
+              "scope": null,
+              "is_runtime": true,
+              "is_optional": false,
+              "is_pinned": true,
+              "is_direct": false
+            },
+            {
+              "purl": "pkg:npm/react@%5E16%20%7C%7C%20%5E17%20%7C%7C%20%5E18",
+              "extracted_requirement": "^16 || ^17 || ^18",
+              "scope": "peer",
+              "is_runtime": true,
+              "is_optional": false,
+              "is_pinned": true,
+              "is_direct": false
+            },
+            {
+              "purl": "pkg:npm/react-dom@%5E16%20%7C%7C%20%5E17%20%7C%7C%20%5E18",
+              "extracted_requirement": "^16 || ^17 || ^18",
+              "scope": "peer",
+              "is_runtime": true,
+              "is_optional": false,
+              "is_pinned": true,
+              "is_direct": false
+            }
+          ],
+          "datasource_id": "pnpm_lock_yaml"
+        }
+      },
+      {
+        "purl": "pkg:npm/%40mdx-js/mdx@2.1.2",
+        "extracted_requirement": "2.1.2",
+        "scope": null,
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": false,
+        "resolved_package": {
+          "type": "npm",
+          "namespace": "@mdx-js",
+          "name": "mdx",
+          "version": "2.1.2",
+          "primary_language": "JavaScript",
+          "sha512": "ASN1GUH0gXsgJ2UD/Td7FzJo1SwFkkQ5V1i9at5o/ROra7brkyMcBsotsOWJWRzmXZaLw2uXWn4aN8B3PMNFMA==",
+          "is_virtual": true,
+          "dependencies": [
+            {
+              "purl": "pkg:npm/%40types/estree-jsx@0.0.1",
+              "extracted_requirement": "0.0.1",
+              "scope": null,
+              "is_runtime": true,
+              "is_optional": false,
+              "is_pinned": true,
+              "is_direct": false
+            },
+            {
+              "purl": "pkg:npm/%40types/mdx@2.0.2",
+              "extracted_requirement": "2.0.2",
+              "scope": null,
+              "is_runtime": true,
+              "is_optional": false,
+              "is_pinned": true,
+              "is_direct": false
+            },
+            {
+              "purl": "pkg:npm/astring@1.8.3",
+              "extracted_requirement": "1.8.3",
+              "scope": null,
+              "is_runtime": true,
+              "is_optional": false,
+              "is_pinned": true,
+              "is_direct": false
+            },
+            {
+              "purl": "pkg:npm/estree-util-build-jsx@2.2.0",
+              "extracted_requirement": "2.2.0",
+              "scope": null,
+              "is_runtime": true,
+              "is_optional": false,
+              "is_pinned": true,
+              "is_direct": false
+            },
+            {
+              "purl": "pkg:npm/estree-util-is-identifier-name@2.0.1",
+              "extracted_requirement": "2.0.1",
+              "scope": null,
+              "is_runtime": true,
+              "is_optional": false,
+              "is_pinned": true,
+              "is_direct": false
+            },
+            {
+              "purl": "pkg:npm/estree-walker@3.0.1",
+              "extracted_requirement": "3.0.1",
+              "scope": null,
+              "is_runtime": true,
+              "is_optional": false,
+              "is_pinned": true,
+              "is_direct": false
+            },
+            {
+              "purl": "pkg:npm/hast-util-to-estree@2.1.0",
+              "extracted_requirement": "2.1.0",
+              "scope": null,
+              "is_runtime": true,
+              "is_optional": false,
+              "is_pinned": true,
+              "is_direct": false
+            },
+            {
+              "purl": "pkg:npm/markdown-extensions@1.1.1",
+              "extracted_requirement": "1.1.1",
+              "scope": null,
+              "is_runtime": true,
+              "is_optional": false,
+              "is_pinned": true,
+              "is_direct": false
+            },
+            {
+              "purl": "pkg:npm/periscopic@3.0.4",
+              "extracted_requirement": "3.0.4",
+              "scope": null,
+              "is_runtime": true,
+              "is_optional": false,
+              "is_pinned": true,
+              "is_direct": false
+            },
+            {
+              "purl": "pkg:npm/remark-mdx@2.1.2",
+              "extracted_requirement": "2.1.2",
+              "scope": null,
+              "is_runtime": true,
+              "is_optional": false,
+              "is_pinned": true,
+              "is_direct": false
+            },
+            {
+              "purl": "pkg:npm/remark-parse@10.0.1",
+              "extracted_requirement": "10.0.1",
+              "scope": null,
+              "is_runtime": true,
+              "is_optional": false,
+              "is_pinned": true,
+              "is_direct": false
+            },
+            {
+              "purl": "pkg:npm/remark-rehype@10.1.0",
+              "extracted_requirement": "10.1.0",
+              "scope": null,
+              "is_runtime": true,
+              "is_optional": false,
+              "is_pinned": true,
+              "is_direct": false
+            },
+            {
+              "purl": "pkg:npm/unified@10.1.2",
+              "extracted_requirement": "10.1.2",
+              "scope": null,
+              "is_runtime": true,
+              "is_optional": false,
+              "is_pinned": true,
+              "is_direct": false
+            },
+            {
+              "purl": "pkg:npm/unist-util-position-from-estree@1.1.1",
+              "extracted_requirement": "1.1.1",
+              "scope": null,
+              "is_runtime": true,
+              "is_optional": false,
+              "is_pinned": true,
+              "is_direct": false
+            },
+            {
+              "purl": "pkg:npm/unist-util-stringify-position@3.0.2",
+              "extracted_requirement": "3.0.2",
+              "scope": null,
+              "is_runtime": true,
+              "is_optional": false,
+              "is_pinned": true,
+              "is_direct": false
+            },
+            {
+              "purl": "pkg:npm/unist-util-visit@4.1.0",
+              "extracted_requirement": "4.1.0",
+              "scope": null,
+              "is_runtime": true,
+              "is_optional": false,
+              "is_pinned": true,
+              "is_direct": false
+            },
+            {
+              "purl": "pkg:npm/vfile@5.3.4",
+              "extracted_requirement": "5.3.4",
+              "scope": null,
+              "is_runtime": true,
+              "is_optional": false,
+              "is_pinned": true,
+              "is_direct": false
+            }
+          ],
+          "datasource_id": "pnpm_lock_yaml"
+        }
+      },
+      {
+        "purl": "pkg:npm/%40mdx-js/react@2.1.2",
+        "extracted_requirement": "2.1.2",
+        "scope": null,
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": false,
+        "resolved_package": {
+          "type": "npm",
+          "namespace": "@mdx-js",
+          "name": "react",
+          "version": "2.1.2",
+          "primary_language": "JavaScript",
+          "sha512": "52e3DTJBrjsw3U51ZCdZ3N1IBaqnbzLIngCSXpKtiYiGr7PIqp3/P/+kym0MPTwBL/y9ZBmCieD8FyrXuEDrRw==",
+          "is_virtual": true,
+          "dependencies": [
+            {
+              "purl": "pkg:npm/%40types/mdx@2.0.2",
+              "extracted_requirement": "2.0.2",
+              "scope": null,
+              "is_runtime": true,
+              "is_optional": false,
+              "is_pinned": true,
+              "is_direct": false
+            },
+            {
+              "purl": "pkg:npm/%40types/react@18.0.17",
+              "extracted_requirement": "18.0.17",
+              "scope": null,
+              "is_runtime": true,
+              "is_optional": false,
+              "is_pinned": true,
+              "is_direct": false
+            },
+            {
+              "purl": "pkg:npm/react@18.2.0",
+              "extracted_requirement": "18.2.0",
+              "scope": null,
+              "is_runtime": true,
+              "is_optional": false,
+              "is_pinned": true,
+              "is_direct": false
+            },
+            {
+              "purl": "pkg:npm/react@%3E%3D16",
+              "extracted_requirement": ">=16",
+              "scope": "peer",
+              "is_runtime": true,
+              "is_optional": false,
+              "is_pinned": true,
+              "is_direct": false
+            }
+          ],
+          "datasource_id": "pnpm_lock_yaml"
+        }
+      },
+      {
+        "purl": "pkg:npm/%40napi-rs/simple-git-android-arm-eabi@0.1.8",
+        "extracted_requirement": "0.1.8",
+        "scope": "optional",
+        "is_runtime": true,
+        "is_optional": true,
+        "is_pinned": true,
+        "is_direct": false,
+        "resolved_package": {
+          "type": "npm",
+          "namespace": "@napi-rs",
+          "name": "simple-git-android-arm-eabi",
+          "version": "0.1.8",
+          "primary_language": "JavaScript",
+          "sha512": "JJCejHBB1G6O8nxjQLT4quWCcvLpC3oRdJJ9G3MFYSCoYS8i1bWCWeU+K7Br+xT+D6s1t9q8kNJAwJv9Ygpi0g==",
+          "is_virtual": true,
+          "dependencies": [],
+          "datasource_id": "pnpm_lock_yaml"
+        },
+        "extra_data": {
+          "requiresBuild": true,
+          "optional": true
+        }
+      },
+      {
+        "purl": "pkg:npm/%40napi-rs/simple-git-android-arm64@0.1.8",
+        "extracted_requirement": "0.1.8",
+        "scope": "optional",
+        "is_runtime": true,
+        "is_optional": true,
+        "is_pinned": true,
+        "is_direct": false,
+        "resolved_package": {
+          "type": "npm",
+          "namespace": "@napi-rs",
+          "name": "simple-git-android-arm64",
+          "version": "0.1.8",
+          "primary_language": "JavaScript",
+          "sha512": "mraHzwWBw3tdRetNOS5KnFSjvdAbNBnjFLA8I4PwTCPJj3Q4txrigcPp2d59cJ0TC51xpnPXnZjYdNwwSI9g6g==",
+          "is_virtual": true,
+          "dependencies": [],
+          "datasource_id": "pnpm_lock_yaml"
+        },
+        "extra_data": {
+          "optional": true,
+          "requiresBuild": true
+        }
+      },
+      {
+        "purl": "pkg:npm/%40napi-rs/simple-git-darwin-arm64@0.1.8",
+        "extracted_requirement": "0.1.8",
+        "scope": "optional",
+        "is_runtime": true,
+        "is_optional": true,
+        "is_pinned": true,
+        "is_direct": false,
+        "resolved_package": {
+          "type": "npm",
+          "namespace": "@napi-rs",
+          "name": "simple-git-darwin-arm64",
+          "version": "0.1.8",
+          "primary_language": "JavaScript",
+          "sha512": "ufy/36eI/j4UskEuvqSH7uXtp3oXeLDmjQCfKJz3u5Vx98KmOMKrqAm2H81AB2WOtCo5mqS6PbBeUXR8BJX8lQ==",
+          "is_virtual": true,
+          "dependencies": [],
+          "datasource_id": "pnpm_lock_yaml"
+        },
+        "extra_data": {
+          "requiresBuild": true,
+          "optional": true
+        }
+      },
+      {
+        "purl": "pkg:npm/%40napi-rs/simple-git-darwin-x64@0.1.8",
+        "extracted_requirement": "0.1.8",
+        "scope": "optional",
+        "is_runtime": true,
+        "is_optional": true,
+        "is_pinned": true,
+        "is_direct": false,
+        "resolved_package": {
+          "type": "npm",
+          "namespace": "@napi-rs",
+          "name": "simple-git-darwin-x64",
+          "version": "0.1.8",
+          "primary_language": "JavaScript",
+          "sha512": "Vb21U+v3tPJNl+8JtIHHT8HGe6WZ8o1Tq3f6p+Jx9Cz71zEbcIiB9FCEMY1knS/jwQEOuhhlI9Qk7d4HY+rprA==",
+          "is_virtual": true,
+          "dependencies": [],
+          "datasource_id": "pnpm_lock_yaml"
+        },
+        "extra_data": {
+          "requiresBuild": true,
+          "optional": true
+        }
+      },
+      {
+        "purl": "pkg:npm/nextra@2.0.0-alpha.56",
+        "extracted_requirement": "2.0.0-alpha.56",
+        "scope": null,
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": false,
+        "resolved_package": {
+          "type": "npm",
+          "name": "nextra",
+          "version": "2.0.0-alpha.56",
+          "primary_language": "JavaScript",
+          "sha512": "U6vFoUj4Oc+Px9WyNOUJWdta6j8B+dKtjbWvE1jCoz9wdAARtWxIZknIEMK62yt94zZeUjJg5KCzj1HBZc6UpQ==",
+          "is_virtual": true,
+          "dependencies": [
+            {
+              "purl": "pkg:npm/%40mdx-js/mdx@2.1.2",
+              "extracted_requirement": "2.1.2",
+              "scope": null,
+              "is_runtime": true,
+              "is_optional": false,
+              "is_pinned": true,
+              "is_direct": false
+            },
+            {
+              "purl": "pkg:npm/%40napi-rs/simple-git@0.1.8",
+              "extracted_requirement": "0.1.8",
+              "scope": null,
+              "is_runtime": true,
+              "is_optional": false,
+              "is_pinned": true,
+              "is_direct": false
+            },
+            {
+              "purl": "pkg:npm/github-slugger@1.4.0",
+              "extracted_requirement": "1.4.0",
+              "scope": null,
+              "is_runtime": true,
+              "is_optional": false,
+              "is_pinned": true,
+              "is_direct": false
+            },
+            {
+              "purl": "pkg:npm/graceful-fs@4.2.10",
+              "extracted_requirement": "4.2.10",
+              "scope": null,
+              "is_runtime": true,
+              "is_optional": false,
+              "is_pinned": true,
+              "is_direct": false
+            },
+            {
+              "purl": "pkg:npm/gray-matter@4.0.3",
+              "extracted_requirement": "4.0.3",
+              "scope": null,
+              "is_runtime": true,
+              "is_optional": false,
+              "is_pinned": true,
+              "is_direct": false
+            },
+            {
+              "purl": "pkg:npm/p-limit@4.0.0",
+              "extracted_requirement": "4.0.0",
+              "scope": null,
+              "is_runtime": true,
+              "is_optional": false,
+              "is_pinned": true,
+              "is_direct": false
+            },
+            {
+              "purl": "pkg:npm/react@18.2.0",
+              "extracted_requirement": "18.2.0",
+              "scope": null,
+              "is_runtime": true,
+              "is_optional": false,
+              "is_pinned": true,
+              "is_direct": false
+            },
+            {
+              "purl": "pkg:npm/rehype-pretty-code@0.1.0_shiki%400.10.1",
+              "extracted_requirement": "0.1.0_shiki@0.10.1",
+              "scope": null,
+              "is_runtime": true,
+              "is_optional": false,
+              "is_pinned": true,
+              "is_direct": false
+            },
+            {
+              "purl": "pkg:npm/remark-gfm@3.0.1",
+              "extracted_requirement": "3.0.1",
+              "scope": null,
+              "is_runtime": true,
+              "is_optional": false,
+              "is_pinned": true,
+              "is_direct": false
+            },
+            {
+              "purl": "pkg:npm/shiki@0.10.1",
+              "extracted_requirement": "0.10.1",
+              "scope": null,
+              "is_runtime": true,
+              "is_optional": false,
+              "is_pinned": true,
+              "is_direct": false
+            },
+            {
+              "purl": "pkg:npm/slash@3.0.0",
+              "extracted_requirement": "3.0.0",
+              "scope": null,
+              "is_runtime": true,
+              "is_optional": false,
+              "is_pinned": true,
+              "is_direct": false
+            },
+            {
+              "purl": "pkg:npm/react@%3E%3D16.13.1",
+              "extracted_requirement": ">=16.13.1",
+              "scope": "peer",
+              "is_runtime": true,
+              "is_optional": false,
+              "is_pinned": true,
+              "is_direct": false
+            }
+          ],
+          "datasource_id": "pnpm_lock_yaml"
+        }
+      },
+      {
+        "purl": "pkg:npm/react-is@16.13.1",
+        "extracted_requirement": "16.13.1",
+        "scope": null,
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": false,
+        "resolved_package": {
+          "type": "npm",
+          "name": "react-is",
+          "version": "16.13.1",
+          "primary_language": "JavaScript",
+          "sha512": "24e6ynE2H+OKt4kqsOvNd8kBpV65zoxbA4BVsEOB3ARVWQki/DHzaUoC5KuON/BiccDaCCTZBuOcfZs70kR8bQ==",
+          "is_virtual": true,
+          "dependencies": [],
+          "datasource_id": "pnpm_lock_yaml"
+        }
+      },
+      {
+        "purl": "pkg:npm/react-spring@9.5.5",
+        "extracted_requirement": "9.5.5",
+        "scope": null,
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": false,
+        "resolved_package": {
+          "type": "npm",
+          "name": "react-spring",
+          "version": "9.5.5",
+          "primary_language": "JavaScript",
+          "sha512": "vMGVd2yjgxWcRCzoLn9AD1d24+WpunHBRg5DoehcRdiBocaOH6qgle0xN9C5LPplXfv4yIpS5QWGN5MKrWxSZg==",
+          "is_virtual": true,
+          "dependencies": [
+            {
+              "purl": "pkg:npm/%40react-spring/core@9.5.5_react%4018.2.0",
+              "extracted_requirement": "9.5.5_react@18.2.0",
+              "scope": null,
+              "is_runtime": true,
+              "is_optional": false,
+              "is_pinned": true,
+              "is_direct": false
+            },
+            {
+              "purl": "pkg:npm/%40react-spring/konva@9.5.5_react%4018.2.0",
+              "extracted_requirement": "9.5.5_react@18.2.0",
+              "scope": null,
+              "is_runtime": true,
+              "is_optional": false,
+              "is_pinned": true,
+              "is_direct": false
+            },
+            {
+              "purl": "pkg:npm/%40react-spring/native@9.5.5_react%4018.2.0",
+              "extracted_requirement": "9.5.5_react@18.2.0",
+              "scope": null,
+              "is_runtime": true,
+              "is_optional": false,
+              "is_pinned": true,
+              "is_direct": false
+            },
+            {
+              "purl": "pkg:npm/%40react-spring/three@9.5.5_react%4018.2.0",
+              "extracted_requirement": "9.5.5_react@18.2.0",
+              "scope": null,
+              "is_runtime": true,
+              "is_optional": false,
+              "is_pinned": true,
+              "is_direct": false
+            },
+            {
+              "purl": "pkg:npm/%40react-spring/web@9.5.5_biqbaboplfbrettd7655fr4n2y",
+              "extracted_requirement": "9.5.5_biqbaboplfbrettd7655fr4n2y",
+              "scope": null,
+              "is_runtime": true,
+              "is_optional": false,
+              "is_pinned": true,
+              "is_direct": false
+            },
+            {
+              "purl": "pkg:npm/%40react-spring/zdog@9.5.5_biqbaboplfbrettd7655fr4n2y",
+              "extracted_requirement": "9.5.5_biqbaboplfbrettd7655fr4n2y",
+              "scope": null,
+              "is_runtime": true,
+              "is_optional": false,
+              "is_pinned": true,
+              "is_direct": false
+            },
+            {
+              "purl": "pkg:npm/react@18.2.0",
+              "extracted_requirement": "18.2.0",
+              "scope": null,
+              "is_runtime": true,
+              "is_optional": false,
+              "is_pinned": true,
+              "is_direct": false
+            },
+            {
+              "purl": "pkg:npm/react-dom@18.2.0_react%4018.2.0",
+              "extracted_requirement": "18.2.0_react@18.2.0",
+              "scope": null,
+              "is_runtime": true,
+              "is_optional": false,
+              "is_pinned": true,
+              "is_direct": false
+            },
+            {
+              "purl": "pkg:npm/react@%5E16.8.0%20%7C%7C%20%5E17.0.0%20%7C%7C%20%5E18.0.0",
+              "extracted_requirement": "^16.8.0 || ^17.0.0 || ^18.0.0",
+              "scope": "peer",
+              "is_runtime": true,
+              "is_optional": false,
+              "is_pinned": true,
+              "is_direct": false
+            },
+            {
+              "purl": "pkg:npm/react-dom@%5E16.8.0%20%7C%7C%20%5E17.0.0%20%7C%7C%20%5E18.0.0",
+              "extracted_requirement": "^16.8.0 || ^17.0.0 || ^18.0.0",
+              "scope": "peer",
+              "is_runtime": true,
+              "is_optional": false,
+              "is_pinned": true,
+              "is_direct": false
+            }
+          ],
+          "datasource_id": "pnpm_lock_yaml"
+        }
+      },
+      {
+        "purl": "pkg:npm/remark-gfm@3.0.1",
+        "extracted_requirement": "3.0.1",
+        "scope": null,
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": false,
+        "resolved_package": {
+          "type": "npm",
+          "name": "remark-gfm",
+          "version": "3.0.1",
+          "primary_language": "JavaScript",
+          "sha512": "lEFDoi2PICJyNrACFOfDD3JlLkuSbOa5Wd8EPt06HUdptv8Gn0bxYTdbU/XXQ3swAPkEaGxxPN9cbnMHvVu1Ig==",
+          "is_virtual": true,
+          "dependencies": [
+            {
+              "purl": "pkg:npm/%40types/mdast@3.0.10",
+              "extracted_requirement": "3.0.10",
+              "scope": null,
+              "is_runtime": true,
+              "is_optional": false,
+              "is_pinned": true,
+              "is_direct": false
+            },
+            {
+              "purl": "pkg:npm/mdast-util-gfm@2.0.1",
+              "extracted_requirement": "2.0.1",
+              "scope": null,
+              "is_runtime": true,
+              "is_optional": false,
+              "is_pinned": true,
+              "is_direct": false
+            },
+            {
+              "purl": "pkg:npm/micromark-extension-gfm@2.0.1",
+              "extracted_requirement": "2.0.1",
+              "scope": null,
+              "is_runtime": true,
+              "is_optional": false,
+              "is_pinned": true,
+              "is_direct": false
+            },
+            {
+              "purl": "pkg:npm/unified@10.1.2",
+              "extracted_requirement": "10.1.2",
+              "scope": null,
+              "is_runtime": true,
+              "is_optional": false,
+              "is_pinned": true,
+              "is_direct": false
+            }
+          ],
+          "datasource_id": "pnpm_lock_yaml"
+        }
+      },
+      {
+        "purl": "pkg:npm/styled-jsx@5.0.2",
+        "extracted_requirement": "5.0.2",
+        "scope": null,
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": false,
+        "resolved_package": {
+          "type": "npm",
+          "name": "styled-jsx",
+          "version": "5.0.2",
+          "primary_language": "JavaScript",
+          "sha512": "LqPQrbBh3egD57NBcHET4qcgshPks+yblyhPlH2GY8oaDgKs8SK4C3dBh3oSJjgzJ3G5t1SYEZGHkP+QEpX9EQ==",
+          "is_virtual": true,
+          "dependencies": [
+            {
+              "purl": "pkg:npm/react@18.2.0",
+              "extracted_requirement": "18.2.0",
+              "scope": null,
+              "is_runtime": true,
+              "is_optional": false,
+              "is_pinned": true,
+              "is_direct": false
+            },
+            {
+              "purl": "pkg:npm/%40babel/core@*",
+              "extracted_requirement": "*",
+              "scope": "peer",
+              "is_runtime": true,
+              "is_optional": false,
+              "is_pinned": true,
+              "is_direct": false
+            },
+            {
+              "purl": "pkg:npm/babel-plugin-macros@*",
+              "extracted_requirement": "*",
+              "scope": "peer",
+              "is_runtime": true,
+              "is_optional": false,
+              "is_pinned": true,
+              "is_direct": false
+            },
+            {
+              "purl": "pkg:npm/react@%3E%3D%2016.8.0%20%7C%7C%2017.x.x%20%7C%7C%20%5E18.0.0-0",
+              "extracted_requirement": ">= 16.8.0 || 17.x.x || ^18.0.0-0",
+              "scope": "peer",
+              "is_runtime": true,
+              "is_optional": false,
+              "is_pinned": true,
+              "is_direct": false
+            }
+          ],
+          "datasource_id": "pnpm_lock_yaml"
+        }
+      },
+      {
+        "purl": "pkg:npm/zustand@3.7.2",
+        "extracted_requirement": "3.7.2",
+        "scope": null,
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": false,
+        "resolved_package": {
+          "type": "npm",
+          "name": "zustand",
+          "version": "3.7.2",
+          "primary_language": "JavaScript",
+          "sha512": "PIJDIZKtokhof+9+60cpockVOq05sJzHCriyvaLBmEJixseQ1a5Kdov6fWZfWOu5SK9c+FhH1jU0tntLxRJYMA==",
+          "is_virtual": true,
+          "dependencies": [
+            {
+              "purl": "pkg:npm/react@18.2.0",
+              "extracted_requirement": "18.2.0",
+              "scope": null,
+              "is_runtime": true,
+              "is_optional": false,
+              "is_pinned": true,
+              "is_direct": false
+            },
+            {
+              "purl": "pkg:npm/react@%3E%3D16.8",
+              "extracted_requirement": ">=16.8",
+              "scope": "peer",
+              "is_runtime": true,
+              "is_optional": false,
+              "is_pinned": true,
+              "is_direct": false
+            }
+          ],
+          "datasource_id": "pnpm_lock_yaml"
+        }
+      },
+      {
+        "purl": "pkg:npm/zwitch@2.0.2",
+        "extracted_requirement": "2.0.2",
+        "scope": null,
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": false,
+        "resolved_package": {
+          "type": "npm",
+          "name": "zwitch",
+          "version": "2.0.2",
+          "primary_language": "JavaScript",
+          "sha512": "JZxotl7SxAJH0j7dN4pxsTV6ZLXoLdGME+PsjkL/DaBrVryK9kTGq06GfKrwcSOqypP+fdXGoCHE36b99fWVoA==",
+          "is_virtual": true,
+          "dependencies": [],
+          "datasource_id": "pnpm_lock_yaml"
+        }
+      }
+    ],
+    "datasource_id": "pnpm_lock_yaml"
+  }
+]

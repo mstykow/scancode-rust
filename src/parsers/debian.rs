@@ -37,9 +37,13 @@ use log::warn;
 use packageurl::PackageUrl;
 use regex::Regex;
 
-use crate::models::{DatasourceId, Dependency, FileReference, PackageData, PackageType, Party};
+use crate::models::{
+    DatasourceId, Dependency, FileReference, LicenseDetection, Match, PackageData, PackageType,
+    Party,
+};
 use crate::parsers::rfc822::{self, Rfc822Metadata};
 use crate::parsers::utils::{read_file_to_string, split_name_email};
+use crate::utils::spdx::combine_license_expressions;
 
 use super::PackageParser;
 
@@ -1266,20 +1270,25 @@ fn extract_package_name_from_path(path: &Path) -> Option<String> {
 }
 
 fn parse_copyright_file(content: &str, package_name: Option<&str>) -> PackageData {
-    let paragraphs = rfc822::parse_rfc822_paragraphs(content);
+    let paragraphs = parse_copyright_paragraphs_with_lines(content);
 
     let is_dep5 = paragraphs
         .first()
-        .and_then(|p| rfc822::get_header_first(&p.headers, "format"))
+        .and_then(|p| rfc822::get_header_first(&p.metadata.headers, "format"))
         .is_some();
 
     let namespace = Some("debian".to_string());
     let mut parties = Vec::new();
     let mut license_statements = Vec::new();
+    let mut primary_license_detection = None;
+    let mut header_license_detection = None;
+    let mut other_license_detections = Vec::new();
 
     if is_dep5 {
         for para in &paragraphs {
-            if let Some(copyright_text) = rfc822::get_header_first(&para.headers, "copyright") {
+            if let Some(copyright_text) =
+                rfc822::get_header_first(&para.metadata.headers, "copyright")
+            {
                 for holder in parse_copyright_holders(&copyright_text) {
                     if !holder.is_empty() {
                         parties.push(Party {
@@ -1296,14 +1305,34 @@ fn parse_copyright_file(content: &str, package_name: Option<&str>) -> PackageDat
                 }
             }
 
-            if let Some(license) = rfc822::get_header_first(&para.headers, "license") {
+            if let Some(license) = rfc822::get_header_first(&para.metadata.headers, "license") {
                 let license_name = license.lines().next().unwrap_or(&license).trim();
                 if !license_name.is_empty()
                     && !license_statements.contains(&license_name.to_string())
                 {
                     license_statements.push(license_name.to_string());
                 }
+
+                if let Some((matched_text, line_no)) = para.license_header_line.clone() {
+                    let detection =
+                        build_primary_license_detection(license_name, matched_text, line_no);
+                    let is_header_paragraph =
+                        rfc822::get_header_first(&para.metadata.headers, "format").is_some();
+                    if rfc822::get_header_first(&para.metadata.headers, "files").as_deref()
+                        == Some("*")
+                    {
+                        primary_license_detection = Some(detection);
+                    } else if is_header_paragraph {
+                        header_license_detection.get_or_insert(detection);
+                    } else {
+                        other_license_detections.push(detection);
+                    }
+                }
             }
+        }
+
+        if primary_license_detection.is_none() && header_license_detection.is_some() {
+            primary_license_detection = header_license_detection;
         }
     } else {
         let copyright_block = extract_unstructured_field(content, "Copyright:");
@@ -1336,15 +1365,176 @@ fn parse_copyright_file(content: &str, package_name: Option<&str>) -> PackageDat
         Some(license_statements.join(" AND "))
     };
 
+    let license_detections = primary_license_detection.into_iter().collect::<Vec<_>>();
+    let declared_license_expression = license_detections
+        .first()
+        .map(|detection| detection.license_expression.clone());
+    let declared_license_expression_spdx = license_detections
+        .first()
+        .map(|detection| detection.license_expression_spdx.clone());
+    let other_license_expression = combine_license_expressions(
+        other_license_detections
+            .iter()
+            .map(|detection| detection.license_expression.clone()),
+    );
+    let other_license_expression_spdx = combine_license_expressions(
+        other_license_detections
+            .iter()
+            .map(|detection| detection.license_expression_spdx.clone()),
+    );
+
     PackageData {
         datasource_id: Some(DatasourceId::DebianCopyright),
         package_type: Some(PACKAGE_TYPE),
         namespace: namespace.clone(),
         name: package_name.map(|s| s.to_string()),
         parties,
+        declared_license_expression,
+        declared_license_expression_spdx,
+        license_detections,
+        other_license_expression,
+        other_license_expression_spdx,
+        other_license_detections,
         extracted_license_statement,
         purl: package_name.and_then(|n| build_debian_purl(n, None, namespace.as_deref(), None)),
         ..Default::default()
+    }
+}
+
+#[derive(Debug)]
+struct CopyrightParagraph {
+    metadata: Rfc822Metadata,
+    license_header_line: Option<(String, usize)>,
+}
+
+fn parse_copyright_paragraphs_with_lines(content: &str) -> Vec<CopyrightParagraph> {
+    let mut paragraphs = Vec::new();
+    let mut current_lines = Vec::new();
+    let mut current_start_line = 1usize;
+
+    for (idx, line) in content.lines().enumerate() {
+        let line_no = idx + 1;
+        if line.is_empty() {
+            if !current_lines.is_empty() {
+                paragraphs.push(finalize_copyright_paragraph(
+                    std::mem::take(&mut current_lines),
+                    current_start_line,
+                ));
+            }
+            current_start_line = line_no + 1;
+        } else {
+            if current_lines.is_empty() {
+                current_start_line = line_no;
+            }
+            current_lines.push(line.to_string());
+        }
+    }
+
+    if !current_lines.is_empty() {
+        paragraphs.push(finalize_copyright_paragraph(
+            current_lines,
+            current_start_line,
+        ));
+    }
+
+    paragraphs
+}
+
+fn finalize_copyright_paragraph(raw_lines: Vec<String>, start_line: usize) -> CopyrightParagraph {
+    let mut headers: HashMap<String, Vec<String>> = HashMap::new();
+    let mut current_name: Option<String> = None;
+    let mut current_value = String::new();
+    let mut license_header_line = None;
+
+    for (idx, line) in raw_lines.iter().enumerate() {
+        if line.starts_with(' ') || line.starts_with('\t') {
+            if current_name.is_some() {
+                current_value.push('\n');
+                current_value.push_str(line);
+            }
+            continue;
+        }
+
+        if let Some(name) = current_name.take() {
+            add_copyright_header_value(&mut headers, &name, &current_value);
+            current_value.clear();
+        }
+
+        if let Some((name, value)) = line.split_once(':') {
+            let normalized_name = name.trim().to_ascii_lowercase();
+            if normalized_name == "license" && license_header_line.is_none() {
+                license_header_line = Some((line.trim_end().to_string(), start_line + idx));
+            }
+            current_name = Some(normalized_name);
+            current_value = value.trim_start().to_string();
+        }
+    }
+
+    if let Some(name) = current_name.take() {
+        add_copyright_header_value(&mut headers, &name, &current_value);
+    }
+
+    CopyrightParagraph {
+        metadata: Rfc822Metadata {
+            headers,
+            body: String::new(),
+        },
+        license_header_line,
+    }
+}
+
+fn add_copyright_header_value(headers: &mut HashMap<String, Vec<String>>, name: &str, value: &str) {
+    let entry = headers.entry(name.to_string()).or_default();
+    let trimmed = value.trim_end();
+    if !trimmed.is_empty() {
+        entry.push(trimmed.to_string());
+    }
+}
+
+fn build_primary_license_detection(
+    license_name: &str,
+    matched_text: String,
+    line_no: usize,
+) -> LicenseDetection {
+    let (license_expression, license_expression_spdx) = normalize_debian_license_name(license_name);
+
+    LicenseDetection {
+        license_expression: license_expression.clone(),
+        license_expression_spdx: license_expression_spdx.clone(),
+        matches: vec![Match {
+            license_expression,
+            license_expression_spdx,
+            from_file: None,
+            start_line: line_no,
+            end_line: line_no,
+            matcher: Some("1-spdx-id".to_string()),
+            score: 100.0,
+            matched_length: Some(license_name.split_whitespace().count()),
+            match_coverage: Some(100.0),
+            rule_relevance: Some(100),
+            rule_identifier: None,
+            rule_url: None,
+            matched_text: Some(matched_text),
+        }],
+        identifier: None,
+    }
+}
+
+fn normalize_debian_license_name(license_name: &str) -> (String, String) {
+    match license_name.trim() {
+        "GPL-2+" => ("gpl-2.0-plus".to_string(), "GPL-2.0-or-later".to_string()),
+        "GPL-2" => ("gpl-2.0".to_string(), "GPL-2.0-only".to_string()),
+        "LGPL-2+" => ("lgpl-2.0-plus".to_string(), "LGPL-2.0-or-later".to_string()),
+        "LGPL-2.1" => ("lgpl-2.1".to_string(), "LGPL-2.1-only".to_string()),
+        "LGPL-2.1+" => ("lgpl-2.1-plus".to_string(), "LGPL-2.1-or-later".to_string()),
+        "LGPL-3+" => ("lgpl-3.0-plus".to_string(), "LGPL-3.0-or-later".to_string()),
+        "MIT" => ("mit".to_string(), "MIT".to_string()),
+        "BSD-4-clause" => ("bsd-original-uc".to_string(), "BSD-4-Clause-UC".to_string()),
+        "public-domain" => (
+            "public-domain".to_string(),
+            "LicenseRef-provenant-public-domain".to_string(),
+        ),
+        other => (other.to_ascii_lowercase(), other.to_string()),
     }
 }
 
@@ -1438,17 +1628,20 @@ impl PackageParser for DebianDebParser {
 
 fn extract_deb_archive(path: &Path) -> Result<PackageData, String> {
     use flate2::read::GzDecoder;
+    use liblzma::read::XzDecoder;
     use std::io::{Cursor, Read};
 
     let file = std::fs::File::open(path).map_err(|e| format!("Failed to open .deb file: {}", e))?;
 
     let mut archive = ar::Archive::new(file);
+    let mut package: Option<PackageData> = None;
 
     while let Some(entry_result) = archive.next_entry() {
         let mut entry = entry_result.map_err(|e| format!("Failed to read ar entry: {}", e))?;
 
         let entry_name = std::str::from_utf8(entry.header().identifier())
             .map_err(|e| format!("Invalid entry name: {}", e))?;
+        let entry_name = entry_name.trim().to_string();
 
         if entry_name == "control.tar.gz" || entry_name.starts_with("control.tar") {
             let mut control_data = Vec::new();
@@ -1456,46 +1649,140 @@ fn extract_deb_archive(path: &Path) -> Result<PackageData, String> {
                 .read_to_end(&mut control_data)
                 .map_err(|e| format!("Failed to read control.tar.gz: {}", e))?;
 
-            let decoder = GzDecoder::new(Cursor::new(control_data));
-            let mut tar_archive = tar::Archive::new(decoder);
-
-            for tar_entry_result in tar_archive
-                .entries()
-                .map_err(|e| format!("Failed to read tar entries: {}", e))?
-            {
-                let mut tar_entry =
-                    tar_entry_result.map_err(|e| format!("Failed to read tar entry: {}", e))?;
-
-                let tar_path = tar_entry
-                    .path()
-                    .map_err(|e| format!("Failed to get tar path: {}", e))?;
-
-                if tar_path.ends_with("control") {
-                    let mut control_content = String::new();
-                    tar_entry
-                        .read_to_string(&mut control_content)
-                        .map_err(|e| format!("Failed to read control file: {}", e))?;
-
-                    let paragraphs = rfc822::parse_rfc822_paragraphs(&control_content);
-                    if paragraphs.is_empty() {
-                        return Err("No paragraphs in control file".to_string());
-                    }
-
-                    if let Some(package) =
-                        build_package_from_paragraph(&paragraphs[0], None, DatasourceId::DebianDeb)
-                    {
-                        return Ok(package);
-                    } else {
-                        return Err("Failed to parse control file".to_string());
-                    }
+            if entry_name.ends_with(".gz") {
+                let decoder = GzDecoder::new(Cursor::new(control_data));
+                if let Some(parsed_package) = parse_control_tar_archive(decoder)? {
+                    package = Some(parsed_package);
+                }
+            } else if entry_name.ends_with(".xz") {
+                let decoder = XzDecoder::new(Cursor::new(control_data));
+                if let Some(parsed_package) = parse_control_tar_archive(decoder)? {
+                    package = Some(parsed_package);
                 }
             }
+        } else if entry_name.starts_with("data.tar") {
+            let mut data = Vec::new();
+            entry
+                .read_to_end(&mut data)
+                .map_err(|e| format!("Failed to read data archive: {}", e))?;
 
-            return Err("control file not found in control.tar.gz".to_string());
+            let Some(current_package) = package.as_mut() else {
+                continue;
+            };
+
+            if entry_name.ends_with(".gz") {
+                let decoder = GzDecoder::new(Cursor::new(data));
+                merge_deb_data_archive(decoder, current_package)?;
+            } else if entry_name.ends_with(".xz") {
+                let decoder = XzDecoder::new(Cursor::new(data));
+                merge_deb_data_archive(decoder, current_package)?;
+            }
         }
     }
 
-    Err(".deb archive does not contain control.tar.gz".to_string())
+    package.ok_or_else(|| ".deb archive does not contain control.tar.* metadata".to_string())
+}
+
+fn parse_control_tar_archive<R: std::io::Read>(reader: R) -> Result<Option<PackageData>, String> {
+    use std::io::Read;
+
+    let mut tar_archive = tar::Archive::new(reader);
+
+    for tar_entry_result in tar_archive
+        .entries()
+        .map_err(|e| format!("Failed to read tar entries: {}", e))?
+    {
+        let mut tar_entry =
+            tar_entry_result.map_err(|e| format!("Failed to read tar entry: {}", e))?;
+
+        let tar_path = tar_entry
+            .path()
+            .map_err(|e| format!("Failed to get tar path: {}", e))?;
+
+        if tar_path.ends_with("control") {
+            let mut control_content = String::new();
+            tar_entry
+                .read_to_string(&mut control_content)
+                .map_err(|e| format!("Failed to read control file: {}", e))?;
+
+            let paragraphs = rfc822::parse_rfc822_paragraphs(&control_content);
+            if paragraphs.is_empty() {
+                return Err("No paragraphs in control file".to_string());
+            }
+
+            if let Some(package) =
+                build_package_from_paragraph(&paragraphs[0], None, DatasourceId::DebianDeb)
+            {
+                return Ok(Some(package));
+            }
+
+            return Err("Failed to parse control file".to_string());
+        }
+    }
+
+    Ok(None)
+}
+
+fn merge_deb_data_archive<R: std::io::Read>(
+    reader: R,
+    package: &mut PackageData,
+) -> Result<(), String> {
+    use std::io::Read;
+
+    let mut tar_archive = tar::Archive::new(reader);
+
+    for tar_entry_result in tar_archive
+        .entries()
+        .map_err(|e| format!("Failed to read data tar entries: {}", e))?
+    {
+        let mut tar_entry =
+            tar_entry_result.map_err(|e| format!("Failed to read data tar entry: {}", e))?;
+
+        let tar_path = tar_entry
+            .path()
+            .map_err(|e| format!("Failed to get data tar path: {}", e))?;
+        let tar_path_str = tar_path.to_string_lossy();
+
+        if tar_path_str.ends_with(&format!(
+            "/usr/share/doc/{}/copyright",
+            package.name.as_deref().unwrap_or_default()
+        )) || tar_path_str.ends_with(&format!(
+            "usr/share/doc/{}/copyright",
+            package.name.as_deref().unwrap_or_default()
+        )) {
+            let mut copyright_content = String::new();
+            tar_entry
+                .read_to_string(&mut copyright_content)
+                .map_err(|e| format!("Failed to read copyright file from data tar: {}", e))?;
+
+            let copyright_pkg = parse_copyright_file(&copyright_content, package.name.as_deref());
+            merge_debian_copyright_into_package(package, &copyright_pkg);
+            break;
+        }
+    }
+
+    Ok(())
+}
+
+fn merge_debian_copyright_into_package(target: &mut PackageData, copyright: &PackageData) {
+    if target.extracted_license_statement.is_none() {
+        target.extracted_license_statement = copyright.extracted_license_statement.clone();
+    }
+
+    for party in &copyright.parties {
+        if !target.parties.iter().any(|existing| {
+            existing.r#type == party.r#type
+                && existing.role == party.role
+                && existing.name == party.name
+                && existing.email == party.email
+                && existing.url == party.url
+                && existing.organization == party.organization
+                && existing.organization_url == party.organization_url
+                && existing.timezone == party.timezone
+        }) {
+            target.parties.push(party.clone());
+        }
+    }
 }
 
 fn parse_deb_filename(filename: &str) -> PackageData {
@@ -1719,7 +2006,131 @@ mod tests {
     use super::*;
     use crate::models::DatasourceId;
     use crate::models::PackageType;
+    use ar::{Builder as ArBuilder, Header as ArHeader};
+    use flate2::Compression;
+    use flate2::write::GzEncoder;
+    use liblzma::write::XzEncoder;
+    use std::io::Cursor;
     use std::path::PathBuf;
+    use tar::{Builder as TarBuilder, Header as TarHeader};
+    use tempfile::NamedTempFile;
+
+    fn create_synthetic_deb_with_control_tar_xz() -> NamedTempFile {
+        let mut control_tar = Vec::new();
+        {
+            let encoder = XzEncoder::new(&mut control_tar, 6);
+            let mut tar_builder = TarBuilder::new(encoder);
+
+            let control_content = b"Package: synthetic\nVersion: 1.2.3\nArchitecture: amd64\nDescription: Synthetic deb\nHomepage: https://example.com\n";
+            let mut header = TarHeader::new_gnu();
+            header
+                .set_path("control")
+                .expect("control tar path should be valid");
+            header.set_size(control_content.len() as u64);
+            header.set_mode(0o644);
+            header.set_cksum();
+            tar_builder
+                .append(&header, Cursor::new(control_content))
+                .expect("control file should be appended to tar.xz");
+            tar_builder.finish().expect("control tar.xz should finish");
+        }
+
+        let deb = NamedTempFile::new().expect("temp deb file should be created");
+        {
+            let mut builder = ArBuilder::new(
+                deb.reopen()
+                    .expect("temporary deb file should reopen for writing"),
+            );
+
+            let debian_binary = b"2.0\n";
+            let mut debian_binary_header =
+                ArHeader::new(b"debian-binary".to_vec(), debian_binary.len() as u64);
+            debian_binary_header.set_mode(0o100644);
+            builder
+                .append(&debian_binary_header, Cursor::new(debian_binary))
+                .expect("debian-binary entry should be appended");
+
+            let mut control_header =
+                ArHeader::new(b"control.tar.xz".to_vec(), control_tar.len() as u64);
+            control_header.set_mode(0o100644);
+            builder
+                .append(&control_header, Cursor::new(control_tar))
+                .expect("control.tar.xz entry should be appended");
+        }
+
+        deb
+    }
+
+    fn create_synthetic_deb_with_copyright() -> NamedTempFile {
+        let mut control_tar = Vec::new();
+        {
+            let encoder = GzEncoder::new(&mut control_tar, Compression::default());
+            let mut tar_builder = TarBuilder::new(encoder);
+
+            let control_content = b"Package: synthetic\nVersion: 9.9.9\nArchitecture: all\nDescription: Synthetic deb with copyright\n";
+            let mut header = TarHeader::new_gnu();
+            header
+                .set_path("control")
+                .expect("control tar path should be valid");
+            header.set_size(control_content.len() as u64);
+            header.set_mode(0o644);
+            header.set_cksum();
+            tar_builder
+                .append(&header, Cursor::new(control_content))
+                .expect("control file should be appended to tar.gz");
+            tar_builder.finish().expect("control tar.gz should finish");
+        }
+
+        let mut data_tar = Vec::new();
+        {
+            let encoder = GzEncoder::new(&mut data_tar, Compression::default());
+            let mut tar_builder = TarBuilder::new(encoder);
+
+            let copyright = b"Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/\nFiles: *\nCopyright: 2024 Example Org\nLicense: Apache-2.0\n Licensed under the Apache License, Version 2.0.\n";
+            let mut header = TarHeader::new_gnu();
+            header
+                .set_path("./usr/share/doc/synthetic/copyright")
+                .expect("copyright path should be valid");
+            header.set_size(copyright.len() as u64);
+            header.set_mode(0o644);
+            header.set_cksum();
+            tar_builder
+                .append(&header, Cursor::new(copyright))
+                .expect("copyright file should be appended to data tar");
+            tar_builder.finish().expect("data tar.gz should finish");
+        }
+
+        let deb = NamedTempFile::new().expect("temp deb file should be created");
+        {
+            let mut builder = ArBuilder::new(
+                deb.reopen()
+                    .expect("temporary deb file should reopen for writing"),
+            );
+
+            let debian_binary = b"2.0\n";
+            let mut debian_binary_header =
+                ArHeader::new(b"debian-binary".to_vec(), debian_binary.len() as u64);
+            debian_binary_header.set_mode(0o100644);
+            builder
+                .append(&debian_binary_header, Cursor::new(debian_binary))
+                .expect("debian-binary entry should be appended");
+
+            let mut control_header =
+                ArHeader::new(b"control.tar.gz".to_vec(), control_tar.len() as u64);
+            control_header.set_mode(0o100644);
+            builder
+                .append(&control_header, Cursor::new(control_tar))
+                .expect("control.tar.gz entry should be appended");
+
+            let mut data_header = ArHeader::new(b"data.tar.gz".to_vec(), data_tar.len() as u64);
+            data_header.set_mode(0o100644);
+            builder
+                .append(&data_header, Cursor::new(data_tar))
+                .expect("data.tar.gz entry should be appended");
+        }
+
+        deb
+    }
 
     // ====== Namespace detection ======
 
@@ -2718,6 +3129,196 @@ License: LGPL-2.1
     }
 
     #[test]
+    fn test_parse_copyright_primary_license_detection_from_bsdutils_fixture() {
+        let path = PathBuf::from(
+            "reference/scancode-toolkit/tests/packagedcode/data/debian/copyright/debian-slim-2021-04-07/usr/share/doc/bsdutils/copyright",
+        );
+        let pkg = DebianCopyrightParser::extract_first_package(&path);
+
+        assert_eq!(pkg.name, Some("bsdutils".to_string()));
+        let extracted = pkg
+            .extracted_license_statement
+            .as_deref()
+            .expect("license statement should exist");
+        assert!(extracted.contains("GPL-2+"));
+        assert!(!pkg.license_detections.is_empty());
+
+        let primary = &pkg.license_detections[0];
+        assert_eq!(
+            primary.matches[0].matched_text.as_deref(),
+            Some("License: GPL-2+")
+        );
+        assert_eq!(primary.matches[0].start_line, 47);
+        assert_eq!(primary.matches[0].end_line, 47);
+    }
+
+    #[test]
+    fn test_parse_copyright_emits_ordered_absolute_case_preserved_detections() {
+        let path = PathBuf::from("testdata/debian/copyright/copyright");
+        let pkg = DebianCopyrightParser::extract_first_package(&path);
+
+        assert_eq!(pkg.license_detections.len(), 1);
+        assert_eq!(pkg.other_license_detections.len(), 4);
+
+        let primary = &pkg.license_detections[0];
+        assert_eq!(
+            primary.matches[0].matched_text.as_deref(),
+            Some("License: LGPL-2.1")
+        );
+        assert_eq!(primary.matches[0].start_line, 11);
+
+        let ordered_lines: Vec<usize> = pkg
+            .other_license_detections
+            .iter()
+            .map(|detection| detection.matches[0].start_line)
+            .collect();
+        assert_eq!(ordered_lines, vec![15, 19, 23, 25]);
+
+        let ordered_texts: Vec<&str> = pkg
+            .other_license_detections
+            .iter()
+            .map(|detection| detection.matches[0].matched_text.as_deref().unwrap())
+            .collect();
+        assert_eq!(
+            ordered_texts,
+            vec![
+                "License: LGPL-2.1",
+                "License: LGPL-2.1",
+                "License: LGPL-2.1",
+                "License: LGPL-2.1",
+            ]
+        );
+    }
+
+    #[test]
+    fn test_parse_copyright_detects_bottom_standalone_license_paragraph() {
+        let path = PathBuf::from(
+            "reference/scancode-toolkit/tests/packagedcode/data/debian/copyright/debian-2019-11-15/main/c/clamav/stable_copyright",
+        );
+        let pkg = DebianCopyrightParser::extract_first_package(&path);
+
+        let zlib = pkg
+            .other_license_detections
+            .iter()
+            .find(|detection| detection.matches[0].matched_text.as_deref() == Some("License: Zlib"))
+            .expect("at least one Zlib license paragraph should be detected");
+        assert_eq!(
+            zlib.matches[0].matched_text.as_deref(),
+            Some("License: Zlib")
+        );
+
+        let last_zlib = pkg
+            .other_license_detections
+            .iter()
+            .rev()
+            .find(|detection| detection.matches[0].matched_text.as_deref() == Some("License: Zlib"))
+            .expect("bottom standalone Zlib license paragraph should be detected");
+        assert_eq!(last_zlib.matches[0].start_line, 732);
+        assert_eq!(last_zlib.matches[0].end_line, 732);
+    }
+
+    #[test]
+    fn test_parse_copyright_uses_header_paragraph_as_primary_when_files_star_is_blank() {
+        let path = PathBuf::from(
+            "reference/scancode-toolkit/tests/packagedcode/data/debian/copyright/crafted_for_tests/test_license_nameless",
+        );
+        let pkg = DebianCopyrightParser::extract_first_package(&path);
+
+        assert_eq!(pkg.license_detections.len(), 1);
+        let primary = &pkg.license_detections[0];
+        assert_eq!(
+            primary.matches[0].matched_text.as_deref(),
+            Some("License: LGPL-3+ or GPL-2+")
+        );
+        assert_eq!(primary.matches[0].start_line, 8);
+        assert_eq!(primary.matches[0].end_line, 8);
+
+        assert!(pkg.other_license_detections.iter().any(|detection| {
+            detection.matches[0].matched_text.as_deref() == Some("License: GPL-2+")
+        }));
+    }
+
+    #[test]
+    fn test_parse_copyright_prefers_files_star_primary_over_header_paragraph() {
+        let content = "Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/\nUpstream-Name: foo\nLicense: MIT\n\nFiles: *\nCopyright: 2024 Example\nLicense: GPL-2+\n";
+        let pkg = parse_copyright_file(content, Some("foo"));
+
+        assert_eq!(pkg.license_detections.len(), 1);
+        let primary = &pkg.license_detections[0];
+        assert_eq!(
+            primary.matches[0].matched_text.as_deref(),
+            Some("License: GPL-2+")
+        );
+        assert_eq!(primary.matches[0].start_line, 7);
+    }
+
+    #[test]
+    #[ignore = "performance probe for Debian copyright parsing"]
+    fn test_debian_copyright_perf_guardrail_large_dep5_fixtures() {
+        use std::hint::black_box;
+        use std::time::Instant;
+
+        let fixtures = [
+            (
+                "reference/scancode-toolkit/tests/packagedcode/data/debian/copyright/debian-slim-2021-04-07/usr/share/doc/bsdutils/copyright",
+                Some("bsdutils"),
+                47usize,
+            ),
+            (
+                "reference/scancode-toolkit/tests/packagedcode/data/debian/copyright/debian-2019-11-15/main/c/clamav/stable_copyright",
+                Some("clamav"),
+                47usize,
+            ),
+        ];
+
+        let iterations = 100usize;
+        let start = Instant::now();
+
+        for _ in 0..iterations {
+            for (path, package_name, expected_line) in fixtures {
+                let content =
+                    read_file_to_string(Path::new(path)).expect("fixture should be readable");
+                let pkg = black_box(parse_copyright_file(&content, package_name));
+                assert!(!pkg.license_detections.is_empty());
+                assert_eq!(
+                    pkg.license_detections[0].matches[0].start_line,
+                    expected_line
+                );
+            }
+        }
+
+        eprintln!(
+            "Debian copyright perf probe: parsed {} fixtures x {} iterations in {:?}",
+            fixtures.len(),
+            iterations,
+            start.elapsed()
+        );
+    }
+
+    #[test]
+    fn test_finalize_copyright_paragraph_matches_rfc822_headers_and_license_line() {
+        let raw_lines = vec![
+            "Files: *".to_string(),
+            "Copyright: 2024 Example Org".to_string(),
+            "License: Apache-2.0".to_string(),
+            " Licensed under the Apache License, Version 2.0.".to_string(),
+        ];
+
+        let paragraph = finalize_copyright_paragraph(raw_lines.clone(), 10);
+        let expected = rfc822::parse_rfc822_paragraphs(&raw_lines.join("\n"))
+            .into_iter()
+            .next()
+            .expect("reference RFC822 paragraph should parse");
+
+        assert_eq!(paragraph.metadata.headers, expected.headers);
+        assert_eq!(paragraph.metadata.body, expected.body);
+        assert_eq!(
+            paragraph.license_header_line,
+            Some(("License: Apache-2.0".to_string(), 12))
+        );
+    }
+
+    #[test]
     fn test_parse_copyright_unstructured() {
         let content = "This package was debianized by John Doe.
 
@@ -2804,6 +3405,35 @@ Copyright (C) 2015-2018 Example Corp";
 
         assert!(pkg.purl.as_ref().unwrap().contains("adduser"));
         assert!(pkg.purl.as_ref().unwrap().contains("3.112ubuntu1"));
+    }
+
+    #[test]
+    fn test_extract_deb_archive_with_control_tar_xz() {
+        let deb = create_synthetic_deb_with_control_tar_xz();
+
+        let pkg = DebianDebParser::extract_first_package(deb.path());
+
+        assert_eq!(pkg.name, Some("synthetic".to_string()));
+        assert_eq!(pkg.version, Some("1.2.3".to_string()));
+        assert_eq!(pkg.description, Some("Synthetic deb".to_string()));
+        assert_eq!(pkg.homepage_url, Some("https://example.com".to_string()));
+    }
+
+    #[test]
+    fn test_extract_deb_archive_collects_embedded_copyright_metadata() {
+        let deb = create_synthetic_deb_with_copyright();
+
+        let pkg = DebianDebParser::extract_first_package(deb.path());
+
+        assert_eq!(pkg.name, Some("synthetic".to_string()));
+        assert_eq!(
+            pkg.extracted_license_statement,
+            Some("Apache-2.0".to_string())
+        );
+        assert!(pkg.parties.iter().any(|party| {
+            party.role.as_deref() == Some("copyright-holder")
+                && party.name.as_deref() == Some("Example Org")
+        }));
     }
 
     #[test]

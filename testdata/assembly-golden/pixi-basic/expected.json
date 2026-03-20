@@ -1,0 +1,182 @@
+{
+  "packages": [
+    {
+      "type": "pixi",
+      "name": "pixi-demo",
+      "version": "1.2.3",
+      "primary_language": "TOML",
+      "description": "Example Pixi workspace",
+      "parties": [
+        {
+          "role": "author",
+          "name": "Jane Doe",
+          "email": "jane@example.com"
+        }
+      ],
+      "homepage_url": "https://example.com/pixi-demo",
+      "vcs_url": "https://github.com/example/pixi-demo",
+      "extracted_license_statement": "MIT",
+      "extra_data": {
+        "lock_version": 6,
+        "features": ["docs"],
+        "environments": {
+          "default": ["docs"]
+        },
+        "channels": ["conda-forge"],
+        "platforms": ["linux-64"],
+        "lock_environments": {
+          "default": {
+            "channels": [
+              {
+                "url": "https://conda.anaconda.org/conda-forge/"
+              }
+            ],
+            "indexes": ["https://pypi.org/simple"],
+            "packages": {
+              "linux-64": [
+                {
+                  "conda": "https://conda.anaconda.org/conda-forge/linux-64/python-3.12.7-h2628c8c_0_cpython.conda"
+                },
+                {
+                  "pypi": "https://files.pythonhosted.org/packages/example/requests-2.32.5-py3-none-any.whl"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "purl": "pkg:pixi/pixi-demo@1.2.3",
+      "package_uid": "pkg:pixi/pixi-demo@1.2.3?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "datafile_paths": ["pixi.lock", "pixi.toml"],
+      "datasource_ids": ["pixi_lock", "pixi_toml"]
+    }
+  ],
+  "dependencies": [
+    {
+      "purl": "pkg:conda/numpy@2.1.0",
+      "extracted_requirement": "2.1.0",
+      "scope": null,
+      "is_runtime": true,
+      "is_optional": false,
+      "is_pinned": true,
+      "is_direct": true,
+      "extra_data": {
+        "channel": "conda-forge"
+      },
+      "dependency_uid": "pkg:conda/numpy@2.1.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "for_package_uid": "pkg:pixi/pixi-demo@1.2.3?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "datafile_path": "pixi.toml",
+      "datasource_id": "pixi_toml"
+    },
+    {
+      "purl": "pkg:conda/python",
+      "extracted_requirement": "3.12.*",
+      "scope": null,
+      "is_runtime": true,
+      "is_optional": false,
+      "is_pinned": false,
+      "is_direct": true,
+      "dependency_uid": "pkg:conda/python?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "for_package_uid": "pkg:pixi/pixi-demo@1.2.3?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "datafile_path": "pixi.toml",
+      "datasource_id": "pixi_toml"
+    },
+    {
+      "purl": "pkg:conda/python@3.12.7",
+      "extracted_requirement": "3.12.7",
+      "scope": null,
+      "is_runtime": true,
+      "is_optional": false,
+      "is_pinned": true,
+      "extra_data": {
+        "source": "https://conda.anaconda.org/conda-forge/linux-64/python-3.12.7-h2628c8c_0_cpython.conda",
+        "sha256": "conda-hash",
+        "lock_references": [
+          {
+            "environment": "default",
+            "platform": "linux-64",
+            "kind": "conda",
+            "channels": [
+              {
+                "url": "https://conda.anaconda.org/conda-forge/"
+              }
+            ],
+            "indexes": ["https://pypi.org/simple"]
+          }
+        ],
+        "depends": ["openssl >=3.0"]
+      },
+      "dependency_uid": "pkg:conda/python@3.12.7?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "for_package_uid": "pkg:pixi/pixi-demo@1.2.3?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "datafile_path": "pixi.lock",
+      "datasource_id": "pixi_lock"
+    },
+    {
+      "purl": "pkg:conda/sphinx@8.2.3",
+      "extracted_requirement": "8.2.3",
+      "scope": "docs",
+      "is_runtime": true,
+      "is_optional": true,
+      "is_pinned": true,
+      "is_direct": true,
+      "dependency_uid": "pkg:conda/sphinx@8.2.3?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "for_package_uid": "pkg:pixi/pixi-demo@1.2.3?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "datafile_path": "pixi.toml",
+      "datasource_id": "pixi_toml"
+    },
+    {
+      "purl": "pkg:pypi/requests",
+      "extracted_requirement": ">=2.32,<3",
+      "scope": null,
+      "is_runtime": true,
+      "is_optional": false,
+      "is_pinned": false,
+      "is_direct": true,
+      "dependency_uid": "pkg:pypi/requests?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "for_package_uid": "pkg:pixi/pixi-demo@1.2.3?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "datafile_path": "pixi.toml",
+      "datasource_id": "pixi_toml"
+    },
+    {
+      "purl": "pkg:pypi/requests@2.32.5",
+      "extracted_requirement": "2.32.5",
+      "scope": null,
+      "is_runtime": true,
+      "is_optional": false,
+      "is_pinned": true,
+      "extra_data": {
+        "source": "https://files.pythonhosted.org/packages/example/requests-2.32.5-py3-none-any.whl",
+        "lock_references": [
+          {
+            "environment": "default",
+            "platform": "linux-64",
+            "kind": "pypi",
+            "channels": [
+              {
+                "url": "https://conda.anaconda.org/conda-forge/"
+              }
+            ],
+            "indexes": ["https://pypi.org/simple"]
+          }
+        ],
+        "requires_dist": ["urllib3>=2"],
+        "sha256": "pypi-hash",
+        "requires_python": ">=3.9"
+      },
+      "dependency_uid": "pkg:pypi/requests@2.32.5?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "for_package_uid": "pkg:pixi/pixi-demo@1.2.3?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "datafile_path": "pixi.lock",
+      "datasource_id": "pixi_lock"
+    }
+  ],
+  "files_with_packages": [
+    {
+      "path": "pixi.lock",
+      "for_packages": ["pkg:pixi/pixi-demo@1.2.3?uuid=fixed-uid-done-for-testing-5642512d1758"]
+    },
+    {
+      "path": "pixi.toml",
+      "for_packages": ["pkg:pixi/pixi-demo@1.2.3?uuid=fixed-uid-done-for-testing-5642512d1758"]
+    }
+  ]
+}

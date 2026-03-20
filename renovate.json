@@ -7,7 +7,15 @@
     ":semanticCommits",
     "helpers:pinGitHubActionDigests"
   ],
-  "ignorePaths": ["**/testdata/**", "**/test/**/*.xml", "**/test/**/*.json"],
+  "includePaths": [
+    "Cargo.toml",
+    "Cargo.lock",
+    "package.json",
+    "package-lock.json",
+    ".nvmrc",
+    "renovate.json",
+    ".github/workflows/**"
+  ],
   "addLabels": ["dependencies"],
   "automergeType": "branch",
   "platformAutomerge": true,

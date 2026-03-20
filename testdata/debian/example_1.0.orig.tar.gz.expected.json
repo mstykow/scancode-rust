@@ -1,0 +1,11 @@
+[
+  {
+    "type": "deb",
+    "namespace": "debian",
+    "name": "example",
+    "version": "1.0",
+    "parties": [],
+    "datasource_id": "debian_original_source_tarball",
+    "purl": "pkg:deb/debian/example@1.0"
+  }
+]

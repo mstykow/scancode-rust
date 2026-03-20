@@ -22,7 +22,7 @@ use strum::{EnumCount, EnumIter};
 /// # Examples
 ///
 /// ```ignore
-/// use scancode_rust::models::DatasourceId;
+/// use provenant::models::DatasourceId;
 ///
 /// let id = DatasourceId::NpmPackageJson;
 /// assert_eq!(id.as_ref(), "npm_package_json");
@@ -38,7 +38,13 @@ pub enum DatasourceId {
 
     // ── Alpine ──
     AlpineApkArchive,
+    AlpineApkbuild,
     AlpineInstalledDb,
+
+    // ── Arch Linux ──
+    ArchAurinfo,
+    ArchPkginfo,
+    ArchSrcinfo,
 
     // ── Android ──
     AndroidAarLibrary,
@@ -53,6 +59,7 @@ pub enum DatasourceId {
 
     // ── Bazel ──
     BazelBuild,
+    BazelModule,
 
     // ── Bower ──
     BowerJson,
@@ -64,6 +71,10 @@ pub enum DatasourceId {
     /// Matches Python reference value. More consistent name would be `buck_metadata`.
     #[serde(rename = "buck_metadata")]
     BuckMetadata,
+
+    // ── Bun ──
+    BunLock,
+    BunLockb,
 
     // ── Cargo/Rust ──
     CargoLock,
@@ -98,6 +109,10 @@ pub enum DatasourceId {
     CondaYaml,
     CondaMetaJson,
     CondaMetaYaml,
+
+    // ── Clojure ──
+    ClojureDepsEdn,
+    ClojureProjectClj,
 
     // ── CPAN/Perl ──
     CpanDistIni,
@@ -137,20 +152,42 @@ pub enum DatasourceId {
     DebianOriginalSourceTarball,
     DebianSourceControlDsc,
 
+    // ── Deno ──
+    DenoJson,
+    DenoLock,
+
+    // ── Docker ──
+    Dockerfile,
+
     // ── FreeBSD ──
     FreebsdCompactManifest,
 
     // ── Go ──
     Godeps,
     GoMod,
+    GoModGraph,
     GoSum,
+    GoWork,
+
+    // ── Haskell / Hackage ──
+    HackageCabal,
+    HackageCabalProject,
+    HackageStackYaml,
 
     // ── Gradle ──
     BuildGradle,
     GradleLockfile,
+    GradleModule,
 
     // ── Haxe ──
     HaxelibJson,
+
+    // ── Helm ──
+    HelmChartLock,
+    HelmChartYaml,
+
+    // ── Hex/Elixir ──
+    HexMixLock,
 
     // ── Java ──
     AntIvyXml,
@@ -167,6 +204,9 @@ pub enum DatasourceId {
     // ── Maven ──
     MavenPom,
     MavenPomProperties,
+    MesonBuild,
+
+    SbtBuildSbt,
 
     // ── Microsoft ──
     MicrosoftCabinet,
@@ -187,6 +227,9 @@ pub enum DatasourceId {
 
     // ── NuGet ──
     NugetCsproj,
+    NugetDepsJson,
+    NugetDirectoryBuildProps,
+    NugetDirectoryPackagesProps,
     NugetNupkg,
     NugetProjectJson,
     NugetProjectLockJson,
@@ -213,13 +256,19 @@ pub enum DatasourceId {
     Pipfile,
     PipfileLock,
     PipRequirements,
+    PixiLock,
+    PixiToml,
+    PypiPipOriginJson,
     PypiEgg,
     PypiInspectDeplock,
+    PypiJson,
     PypiPoetryLock,
+    PypiPylockToml,
     PypiPyprojectToml,
     PypiSdistPkginfo,
     PypiSetupCfg,
     PypiSetupPy,
+    PypiUvLock,
     PypiWheel,
     PypiWheelMetadata,
 
@@ -256,6 +305,9 @@ pub enum DatasourceId {
     SwiftPackageResolved,
     SwiftPackageShowDependencies,
 
+    // ── vcpkg ──
+    VcpkgJson,
+
     // ── Yarn ──
     YarnLock,
 
@@ -276,7 +328,13 @@ impl DatasourceId {
 
             // Alpine
             Self::AlpineApkArchive => "alpine_apk_archive",
+            Self::AlpineApkbuild => "alpine_apkbuild",
             Self::AlpineInstalledDb => "alpine_installed_db",
+
+            // Arch Linux
+            Self::ArchAurinfo => "arch_aurinfo",
+            Self::ArchPkginfo => "arch_pkginfo",
+            Self::ArchSrcinfo => "arch_srcinfo",
 
             // Android
             Self::AndroidAarLibrary => "android_aar_library",
@@ -324,6 +382,10 @@ impl DatasourceId {
             Self::CondaMetaJson => "conda_meta_json",
             Self::CondaMetaYaml => "conda_meta_yaml",
 
+            // Clojure
+            Self::ClojureDepsEdn => "clojure_deps_edn",
+            Self::ClojureProjectClj => "clojure_project_clj",
+
             // CPAN/Perl
             Self::CpanDistIni => "cpan_dist_ini",
             Self::CpanMakefile => "cpan_makefile",
@@ -351,6 +413,10 @@ impl DatasourceId {
             Self::DebianMd5SumsInExtractedDeb => "debian_md5sums_in_extracted_deb",
             Self::DebianOriginalSourceTarball => "debian_original_source_tarball",
             Self::DebianSourceControlDsc => "debian_source_control_dsc",
+            Self::DenoJson => "deno_json",
+            Self::DenoLock => "deno_lock",
+            Self::Dockerfile => "dockerfile",
+            Self::BazelModule => "bazel_module",
 
             // FreeBSD
             Self::FreebsdCompactManifest => "freebsd_compact_manifest",
@@ -358,14 +424,29 @@ impl DatasourceId {
             // Go
             Self::Godeps => "godeps",
             Self::GoMod => "go_mod",
+            Self::GoModGraph => "go_mod_graph",
             Self::GoSum => "go_sum",
+            Self::GoWork => "go_work",
+
+            // Haskell / Hackage
+            Self::HackageCabal => "hackage_cabal",
+            Self::HackageCabalProject => "hackage_cabal_project",
+            Self::HackageStackYaml => "hackage_stack_yaml",
 
             // Gradle
             Self::BuildGradle => "build_gradle",
             Self::GradleLockfile => "gradle_lockfile",
+            Self::GradleModule => "gradle_module",
 
             // Haxe
             Self::HaxelibJson => "haxelib_json",
+
+            // Helm
+            Self::HelmChartLock => "helm_chart_lock",
+            Self::HelmChartYaml => "helm_chart_yaml",
+
+            // Hex/Elixir
+            Self::HexMixLock => "hex_mix_lock",
 
             // Java
             Self::AntIvyXml => "ant_ivy_xml",
@@ -382,6 +463,8 @@ impl DatasourceId {
             // Maven
             Self::MavenPom => "maven_pom",
             Self::MavenPomProperties => "maven_pom_properties",
+            Self::MesonBuild => "meson_build",
+            Self::SbtBuildSbt => "sbt_build_sbt",
 
             // Microsoft
             Self::MicrosoftCabinet => "microsoft_cabinet",
@@ -397,11 +480,16 @@ impl DatasourceId {
             Self::MeteorPackage => "meteor_package",
 
             // npm
+            Self::BunLock => "bun_lock",
+            Self::BunLockb => "bun_lockb",
             Self::NpmPackageJson => "npm_package_json",
             Self::NpmPackageLockJson => "npm_package_lock_json",
 
             // NuGet
             Self::NugetCsproj => "nuget_csproj",
+            Self::NugetDepsJson => "nuget_deps_json",
+            Self::NugetDirectoryBuildProps => "nuget_directory_build_props",
+            Self::NugetDirectoryPackagesProps => "nuget_directory_packages_props",
             Self::NugetNupkg => "nuget_nupkg",
             Self::NugetProjectJson => "nuget_project_json",
             Self::NugetProjectLockJson => "nuget_project_lock_json",
@@ -426,13 +514,19 @@ impl DatasourceId {
             Self::Pipfile => "pipfile",
             Self::PipfileLock => "pipfile_lock",
             Self::PipRequirements => "pip_requirements",
+            Self::PixiLock => "pixi_lock",
+            Self::PixiToml => "pixi_toml",
+            Self::PypiPipOriginJson => "pypi_pip_origin_json",
             Self::PypiEgg => "pypi_egg",
             Self::PypiInspectDeplock => "pypi_inspect_deplock",
+            Self::PypiJson => "pypi_json",
             Self::PypiPoetryLock => "pypi_poetry_lock",
+            Self::PypiPylockToml => "pypi_pylock_toml",
             Self::PypiPyprojectToml => "pypi_pyproject_toml",
             Self::PypiSdistPkginfo => "pypi_sdist_pkginfo",
             Self::PypiSetupCfg => "pypi_setup_cfg",
             Self::PypiSetupPy => "pypi_setup_py",
+            Self::PypiUvLock => "pypi_uv_lock",
             Self::PypiWheel => "pypi_wheel",
             Self::PypiWheelMetadata => "pypi_wheel_metadata",
 
@@ -464,6 +558,9 @@ impl DatasourceId {
             Self::SwiftPackageManifestJson => "swift_package_manifest_json",
             Self::SwiftPackageResolved => "swift_package_resolved",
             Self::SwiftPackageShowDependencies => "swift_package_show_dependencies",
+
+            // vcpkg
+            Self::VcpkgJson => "vcpkg_json",
 
             // Yarn
             Self::YarnLock => "yarn_lock",
@@ -512,6 +609,7 @@ mod tests {
             DatasourceId::PypiPyprojectToml.as_str(),
             "pypi_pyproject_toml"
         );
+        assert_eq!(DatasourceId::HackageCabal.as_str(), "hackage_cabal");
     }
 
     #[test]

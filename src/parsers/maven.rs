@@ -397,6 +397,26 @@ fn build_maven_source_package(namespace: &str, name: &str, version: &str) -> Str
     build_maven_purl(namespace, name, Some(version), Some("sources"), None)
 }
 
+fn has_unresolved_template_coordinates(
+    namespace: Option<&str>,
+    name: Option<&str>,
+    version: Option<&str>,
+) -> bool {
+    const TEMPLATE_PLACEHOLDERS: &[&str] = &[
+        "${groupId}",
+        "${artifactId}",
+        "${version}",
+        "${package}",
+        "${packageName}",
+    ];
+
+    [namespace, name, version]
+        .into_iter()
+        .flatten()
+        .map(str::trim)
+        .any(|value| TEMPLATE_PLACEHOLDERS.contains(&value))
+}
+
 fn build_license_statement(licenses: &[MavenLicenseEntry]) -> Option<String> {
     let rendered_entries: Vec<String> = licenses
         .iter()
@@ -1489,6 +1509,15 @@ impl PackageParser for MavenParser {
             }
         }
 
+        if has_unresolved_template_coordinates(
+            package_data.namespace.as_deref(),
+            package_data.name.as_deref(),
+            package_data.version.as_deref(),
+        ) {
+            warn!("Skipping Maven template coordinates in {:?}", path);
+            return vec![default_package_data()];
+        }
+
         // Construct PURL from parsed data
         if let (Some(group_id), Some(artifact_id), Some(version)) = (
             &package_data.namespace,
@@ -2304,7 +2333,11 @@ pub(crate) fn extract_osgi_bundle_version(entry: &str) -> Option<String> {
 }
 
 fn default_package_data() -> PackageData {
-    PackageData::default()
+    PackageData {
+        package_type: Some(PackageType::Maven),
+        datasource_id: Some(DatasourceId::MavenPom),
+        ..Default::default()
+    }
 }
 
 #[cfg(test)]

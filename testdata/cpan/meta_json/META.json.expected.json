@@ -1,0 +1,95 @@
+[
+  {
+    "type": "cpan",
+    "name": "Example-Web-Toolkit",
+    "version": "1.042",
+    "primary_language": "Perl",
+    "description": "A modern Perl toolkit for web development",
+    "parties": [
+      {
+        "type": "person",
+        "role": "author",
+        "name": "John Doe",
+        "email": "john@example.com"
+      },
+      {
+        "type": "person",
+        "role": "author",
+        "name": "Jane Smith",
+        "email": "jane@example.com"
+      }
+    ],
+    "homepage_url": "https://example.com/web-toolkit",
+    "bug_tracking_url": "https://github.com/example/web-toolkit/issues",
+    "code_view_url": "https://github.com/example/web-toolkit",
+    "vcs_url": "https://github.com/example/web-toolkit.git",
+    "extracted_license_statement": "perl_5",
+    "dependencies": [
+      {
+        "purl": "pkg:cpan/Moose",
+        "extracted_requirement": "2.2011",
+        "scope": "runtime",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:cpan/HTTP::Tiny",
+        "extracted_requirement": "0.070",
+        "scope": "runtime",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:cpan/JSON::PP",
+        "extracted_requirement": "4.04",
+        "scope": "runtime",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:cpan/ExtUtils::MakeMaker",
+        "extracted_requirement": "7.24",
+        "scope": "build",
+        "is_runtime": false,
+        "is_optional": false,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:cpan/Module::Build",
+        "extracted_requirement": "0.4224",
+        "scope": "build",
+        "is_runtime": false,
+        "is_optional": false,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:cpan/Test::More",
+        "extracted_requirement": "0.98",
+        "scope": "test",
+        "is_runtime": false,
+        "is_optional": false,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:cpan/Test::Exception",
+        "extracted_requirement": "0.43",
+        "scope": "test",
+        "is_runtime": false,
+        "is_optional": false,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:cpan/ExtUtils::MakeMaker",
+        "extracted_requirement": "0",
+        "scope": "configure",
+        "is_runtime": false,
+        "is_optional": false,
+        "is_direct": true
+      }
+    ],
+    "datasource_id": "cpan_meta_json"
+  }
+]

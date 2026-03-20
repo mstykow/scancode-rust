@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <PackageId>Contoso.Utility</PackageId>
+    <Version>1.0.0</Version>
+    <Description>Useful utilities</Description>
+    <Authors>Jane Doe</Authors>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" />
+  </ItemGroup>
+</Project>

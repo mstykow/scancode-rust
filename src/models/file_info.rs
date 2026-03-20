@@ -1,5 +1,7 @@
 use derive_builder::Builder;
+use packageurl::PackageUrl;
 use serde::{Deserialize, Serialize};
+use std::str::FromStr;
 use uuid::Uuid;
 
 use super::DatasourceId;
@@ -65,6 +67,21 @@ pub struct FileInfo {
     #[builder(default)]
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub source_count: Option<usize>,
+    #[builder(default)]
+    #[serde(skip_serializing_if = "is_false", default)]
+    pub is_legal: bool,
+    #[builder(default)]
+    #[serde(skip_serializing_if = "is_false", default)]
+    pub is_manifest: bool,
+    #[builder(default)]
+    #[serde(skip_serializing_if = "is_false", default)]
+    pub is_readme: bool,
+    #[builder(default)]
+    #[serde(skip_serializing_if = "is_false", default)]
+    pub is_top_level: bool,
+    #[builder(default)]
+    #[serde(skip_serializing_if = "is_false", default)]
+    pub is_key_file: bool,
 }
 
 impl FileInfoBuilder {
@@ -172,6 +189,11 @@ impl FileInfo {
             scan_errors,
             is_source: None,
             source_count: None,
+            is_legal: false,
+            is_manifest: false,
+            is_readme: false,
+            is_top_level: false,
+            is_key_file: false,
         }
     }
 }
@@ -630,8 +652,12 @@ impl Package {
             };
         }
 
+        fill_if_empty!(package_type);
+        fill_if_empty!(name);
         fill_if_empty!(namespace);
         fill_if_empty!(version);
+        fill_if_empty!(qualifiers);
+        fill_if_empty!(subpath);
         fill_if_empty!(primary_language);
         fill_if_empty!(description);
         fill_if_empty!(release_date);
@@ -653,17 +679,34 @@ impl Package {
         fill_if_empty!(other_license_expression_spdx);
         fill_if_empty!(extracted_license_statement);
         fill_if_empty!(notice_text);
-        fill_if_empty!(extra_data);
+        match (&mut self.extra_data, &package_data.extra_data) {
+            (None, Some(extra_data)) => {
+                self.extra_data = Some(extra_data.clone());
+            }
+            (Some(existing), Some(incoming)) => {
+                for (key, value) in incoming {
+                    existing.entry(key.clone()).or_insert_with(|| value.clone());
+                }
+            }
+            _ => {}
+        }
         fill_if_empty!(repository_homepage_url);
         fill_if_empty!(repository_download_url);
         fill_if_empty!(api_data_url);
 
         for party in &package_data.parties {
-            if !self
-                .parties
-                .iter()
-                .any(|p| p.name == party.name && p.role == party.role)
-            {
+            if let Some(existing) = self.parties.iter_mut().find(|p| {
+                p.role == party.role
+                    && ((p.name.is_some() && p.name == party.name)
+                        || (p.email.is_some() && p.email == party.email))
+            }) {
+                if existing.name.is_none() {
+                    existing.name = party.name.clone();
+                }
+                if existing.email.is_none() {
+                    existing.email = party.email.clone();
+                }
+            } else {
                 self.parties.push(party.clone());
             }
         }
@@ -687,6 +730,83 @@ impl Package {
                 self.source_packages.push(source_pkg.clone());
             }
         }
+
+        self.refresh_identity();
+    }
+
+    fn refresh_identity(&mut self) {
+        let Some(next_purl) = self.build_current_purl() else {
+            return;
+        };
+
+        if self.purl.as_deref() != Some(next_purl.as_str()) || self.package_uid.is_empty() {
+            self.package_uid = build_package_uid(&next_purl);
+        }
+
+        self.purl = Some(next_purl);
+    }
+
+    fn build_current_purl(&self) -> Option<String> {
+        if let (Some(package_type), Some(name)) = (
+            self.package_type.as_ref(),
+            self.name
+                .as_deref()
+                .filter(|value| !value.trim().is_empty()),
+        ) {
+            let purl_type = match package_type {
+                PackageType::Deno => "generic",
+                _ => package_type.as_str(),
+            };
+
+            let mut purl = PackageUrl::new(purl_type, name).ok()?;
+
+            if let Some(namespace) = self
+                .namespace
+                .as_deref()
+                .filter(|value| !value.trim().is_empty())
+            {
+                purl.with_namespace(namespace).ok()?;
+            }
+
+            if let Some(version) = self
+                .version
+                .as_deref()
+                .filter(|value| !value.trim().is_empty())
+            {
+                purl.with_version(version).ok()?;
+            }
+
+            if let Some(qualifiers) = &self.qualifiers {
+                for (key, value) in qualifiers {
+                    purl.add_qualifier(key.as_str(), value.as_str()).ok()?;
+                }
+            }
+
+            if let Some(subpath) = self
+                .subpath
+                .as_deref()
+                .filter(|value| !value.trim().is_empty())
+            {
+                purl.with_subpath(subpath).ok()?;
+            }
+
+            return Some(purl.to_string());
+        }
+
+        let existing_purl = self.purl.as_deref()?;
+        let mut purl = PackageUrl::from_str(existing_purl).ok()?;
+
+        if let Some(version) = self
+            .version
+            .as_deref()
+            .filter(|value| !value.trim().is_empty())
+        {
+            purl.with_version(version).ok()?;
+        } else {
+            purl.without_version();
+        }
+
+        Some(purl.to_string())
     }
 }
 

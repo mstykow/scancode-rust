@@ -2,16 +2,17 @@
 
 ## Summary
 
-The Alpine parser in scancode-rust **fixes a critical bug** and **implements a missing feature** from the Python reference implementation:
+The Alpine parser in Provenant now combines existing beyond-parity improvements with the current Alpine enhancement batch:
 
 1. **🐛 Bug Fix**: SHA1 checksums correctly decoded (Python always returns `null`)
 2. **✨ New Feature**: Provider field extraction (Python explicitly ignores this field)
+3. **✨ New Feature**: Static APKBUILD recipe parsing with real local fixture coverage
+4. **🐛 Bug Fix**: Alpine commit metadata now produces `git+https://...` VCS URLs
+5. **🐛 Bug Fix / Proof**: Packages with no files are still detected and retained
 
 ## Improvement 1: SHA1 Checksum Decoding (Bug Fix)
 
 ### Python Implementation (Broken)
-
-**Location**: `reference/scancode-toolkit/src/packagedcode/alpine.py`
 
 **Code** (line 211):
 
@@ -33,8 +34,6 @@ def get_checksums(checksum_field):
 
 ### Our Rust Implementation (Fixed)
 
-**Location**: `src/parsers/alpine.rs`
-
 **Code**:
 
 ```rust
@@ -54,34 +53,9 @@ fn decode_checksum(checksum: &str) -> Option<String> {
 }
 ```
 
-### Verification
+### Coverage
 
-**Test Case**: Alpine installed database with 14 file references
-
-```rust
-#[test]
-fn test_parse_alpine_file_references() {
-    let result = AlpineInstalledParser::extract_package_data(
-        Path::new("testdata/alpine/alpine-installed-database")
-    );
-
-    let file_refs = result.file_references.unwrap();
-    assert_eq!(file_refs.len(), 14, "Should extract all 14 file references");
-
-    // Verify SHA1 checksums are correctly decoded
-    let sbin_apk = file_refs.iter()
-        .find(|fr| fr.path == Some("sbin/apk".to_string()))
-        .expect("Should find sbin/apk reference");
-
-    assert_eq!(
-        sbin_apk.sha1,
-        Some("435ff1cd6dc5e112df66d3f1ce2bcfb965984eddc0".to_string()),
-        "SHA1 should be decoded from Q1/xzW3F4RLfZtPxzivPuWWYTt3A="
-    );
-}
-```
-
-**Result**: ✅ All 14 file references extracted with correct SHA1 checksums
+Coverage verifies that installed-database file references retain decoded SHA1 checksums instead of collapsing to missing hash data.
 
 ### Impact
 
@@ -107,8 +81,6 @@ fn test_parse_alpine_file_references() {
 
 ### Python Implementation (TODO)
 
-**Location**: `reference/scancode-toolkit/src/packagedcode/alpine.py`
-
 **Code** (line 87-90):
 
 ```python
@@ -120,8 +92,6 @@ fn test_parse_alpine_file_references() {
 **Comment**: Python explicitly documents but ignores the `p:` provider field.
 
 ### Our Rust Implementation (Complete)
-
-**Location**: `src/parsers/alpine.rs`
 
 **Code**:
 
@@ -151,34 +121,9 @@ fn extract_providers(line: &str) -> Vec<String> {
 }
 ```
 
-### Verification
+### Coverage
 
-**Test Case**: Alpine package with provider field
-
-```rust
-#[test]
-fn test_parse_alpine_provider_field() {
-    let result = AlpineInstalledParser::extract_package_data(
-        Path::new("testdata/alpine/alpine-installed-database")
-    );
-
-    let providers = result.extra_data["providers"]
-        .as_array()
-        .expect("Should have providers array");
-
-    assert!(providers.len() > 0, "Should extract providers");
-
-    // Verify specific providers
-    let provider_strings: Vec<String> = providers.iter()
-        .map(|v| v.as_str().unwrap().to_string())
-        .collect();
-
-    assert!(provider_strings.contains(&"cmd:busybox".to_string()));
-    assert!(provider_strings.contains(&"/bin/sh".to_string()));
-}
-```
-
-**Result**: ✅ All provider fields extracted and stored
+Coverage verifies that provider metadata is preserved as structured package data rather than being silently ignored.
 
 ### Impact
 
@@ -196,6 +141,52 @@ fn test_parse_alpine_provider_field() {
 > "Ignored per-package fields that are documented but not used yet"
 
 **Our Decision**: Implement it anyway. It's documented in Alpine's format spec, and the data is valuable for SBOM completeness.
+
+## Improvement 3: APKBUILD Recipe Parsing
+
+### Python Implementation (Current)
+
+Current Python ScanCode already has an APKBUILD parser on `develop`, but the local Rust planning docs had drifted and still described it as a missing/stub surface.
+
+### Our Rust Implementation
+
+Rust now parses checked-in `APKBUILD` recipes statically, without executing shell code.
+
+Implemented coverage includes:
+
+- `pkgname`, `pkgver`, `pkgrel` → package identity and `pkgver-rpkgrel`
+- `pkgdesc`
+- `url`
+- `license`
+- `source`
+- `sha512sums`, `sha256sums`, `md5sums`
+- variable expansion for the upstream fixture forms we need now:
+  - `${pkgver//./-}`
+  - `${pkgver//./_}`
+  - `${var::8}`
+
+### Why This Matters
+
+This closes the most visible Alpine parser gap in Rust without violating the security-first parsing rule: we still do **not** execute shell or evaluate arbitrary shell functions.
+
+## Improvement 4: HTTPS VCS URL Generation
+
+Python `develop` already emits Alpine commit URLs as `git+https://...`, and Rust now matches that behavior for installed-db commit metadata.
+
+### Before
+
+- no `vcs_url` from Alpine installed-db commit field
+
+### After
+
+- `c:<commit>` now becomes:
+  - `git+https://git.alpinelinux.org/aports/commit/?id={commit}`
+
+## Improvement 5: Fileless Package Detection Proof
+
+The Alpine batch now explicitly proves that packages with no file references are still preserved as packages rather than being dropped.
+
+This matters for packages like `libc-utils` and for APKBUILD “dummy package” patterns such as `linux-firmware`’s `none()` subpackage.
 
 ## Implementation Notes
 
@@ -222,39 +213,15 @@ for line in content.lines() {
 }
 ```
 
-## Testing
+## Coverage
 
-### Unit Tests
-
-- `test_parse_alpine_file_references()` - Verifies SHA1 decoding (14 references)
-- `test_parse_alpine_provider_field()` - Verifies provider extraction
-
-### Golden Tests
-
-- Golden test coverage is maintained in the parser suite and CI.
-- For current pass/ignore status, rely on test runs rather than static counts in this document.
-
-### Test Data
-
-- Real Alpine installed database: `testdata/alpine/alpine-installed-database`
-- Covers: busybox, musl, alpine-baselayout packages
+Coverage includes SHA1 decoding, provider extraction, APKBUILD metadata parsing, raw matched-text preservation for `custom:multiple`, fileless package detection, HTTPS VCS URL synthesis, and golden coverage for both installed-database and APKBUILD inputs.
 
 ## References
-
-### Python Reference Issues
-
-- Bug: SHA1 checksum always returns `null`
-- TODO: Provider field marked as "not used yet"
 
 ### Alpine Documentation
 
 - [Alpine Package Format](https://wiki.alpinelinux.org/wiki/Apk_spec)
 - [Installed Database Format](https://wiki.alpinelinux.org/wiki/Apk_spec#Installed_Database_V2)
 
-### Our Implementation
-
-## Status
-
-- ✅ **SHA1 decoding**: Complete, validated, production-ready
-- ✅ **Provider extraction**: Complete, validated, production-ready
-- ✅ **Documentation**: Complete
+SHA1 decoding and provider extraction are both part of the parser behavior described above.

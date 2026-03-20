@@ -1,7 +1,7 @@
 # ADR 0004: Security-First Parsing
 
 **Status**: Accepted  
-**Authors**: scancode-rust team  
+**Authors**: Provenant team
 **Supersedes**: None
 
 ## Context
@@ -333,7 +333,7 @@ match ecosystem {
 | ------------------------------ | ------------------------ | ---------------- |
 | `exec()` in setup.py parsing   | Arbitrary code execution | AST parsing only |
 | Ruby `instance_eval`           | Code execution           | Regex parsing    |
-| Shell execution (APKBUILD)     | Command injection        | Not implemented  |
+| Shell execution (APKBUILD)     | Command injection        | Static parser    |
 | Groovy engine for Gradle       | Code execution           | Custom lexer     |
 | No DoS limits                  | Memory exhaustion        | Explicit limits  |
 | Incomplete zip bomb protection | DoS via decompression    | Full protection  |

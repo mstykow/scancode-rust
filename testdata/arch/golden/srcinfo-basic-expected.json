@@ -1,0 +1,41 @@
+[
+  {
+    "type": "alpm",
+    "namespace": "arch",
+    "name": "rust-basic",
+    "version": "1.0.0-1",
+    "description": "A basic Rust package",
+    "parties": [],
+    "homepage_url": "https://github.com/example/rust-basic",
+    "extracted_license_statement": "MIT",
+    "source_packages": ["pkg:alpm/arch/rust-basic@1.0.0-1?arch=x86_64"],
+    "extra_data": {
+      "makedepends": ["rust", "cargo"],
+      "sha256sums": ["SKIP"],
+      "arch": ["x86_64"],
+      "source": ["https://github.com/example/rust-basic/archive/1.0.0.tar.gz"]
+    },
+    "dependencies": [
+      {
+        "purl": "pkg:alpm/arch/rust",
+        "extracted_requirement": "rust",
+        "scope": "makedepends",
+        "is_runtime": false,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:alpm/arch/cargo",
+        "extracted_requirement": "cargo",
+        "scope": "makedepends",
+        "is_runtime": false,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true
+      }
+    ],
+    "datasource_id": "arch_srcinfo",
+    "purl": "pkg:alpm/arch/rust-basic@1.0.0-1?arch=x86_64"
+  }
+]

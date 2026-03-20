@@ -1,0 +1,28 @@
+[
+  {
+    "type": "deb",
+    "namespace": "debian",
+    "name": "base-files",
+    "version": "11.1+deb11u8",
+    "qualifiers": {
+      "arch": "amd64"
+    },
+    "description": "Debian base system miscellaneous files\n This package contains the basic filesystem hierarchy of a Debian system, and\n several important miscellaneous files, such as /etc/debian_version,\n /etc/host.conf, /etc/issue, /etc/issue.net, /etc/profile, and others,\n and the text of several common licenses in use on Debian systems.",
+    "parties": [
+      {
+        "type": "person",
+        "role": "maintainer",
+        "name": "Debian Base Packages Team",
+        "email": "debian-base@lists.debian.org"
+      }
+    ],
+    "keywords": ["admin"],
+    "homepage_url": "https://packages.debian.org/base-files",
+    "extra_data": {
+      "installed_size": 100,
+      "multi_arch": "foreign"
+    },
+    "datasource_id": "debian_distroless_installed_db",
+    "purl": "pkg:deb/debian/base-files@11.1%2Bdeb11u8?arch=amd64"
+  }
+]

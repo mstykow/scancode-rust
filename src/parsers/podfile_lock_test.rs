@@ -40,9 +40,9 @@ mod tests {
         let expecta = &pkg.dependencies[0];
         assert_eq!(expecta.purl.as_deref(), Some("pkg:cocoapods/Expecta@1.0.6"));
         assert_eq!(expecta.extracted_requirement.as_deref(), Some("1.0.6"));
-        assert_eq!(expecta.scope.as_deref(), Some("requires"));
-        assert_eq!(expecta.is_runtime, Some(false));
-        assert_eq!(expecta.is_optional, Some(true));
+        assert_eq!(expecta.scope.as_deref(), Some("dependencies"));
+        assert_eq!(expecta.is_runtime, None);
+        assert_eq!(expecta.is_optional, None);
         assert_eq!(expecta.is_pinned, Some(true));
         assert_eq!(expecta.is_direct, Some(true));
 
@@ -270,6 +270,9 @@ mod tests {
         let dep = &pkg.dependencies[0];
         assert_eq!(dep.purl.as_deref(), Some("pkg:cocoapods/Alamofire@5.4.3"));
         assert_eq!(dep.is_direct, Some(true));
+        assert_eq!(dep.scope.as_deref(), Some("dependencies"));
+        assert_eq!(dep.is_runtime, None);
+        assert_eq!(dep.is_optional, None);
 
         let extra = pkg.extra_data.as_ref().unwrap();
         assert_eq!(extra["cocoapods"], "1.11.0");
@@ -298,5 +301,19 @@ mod tests {
         let ohhttpstubs_core = &pkg.dependencies[4];
         let resolved = ohhttpstubs_core.resolved_package.as_ref().unwrap();
         assert!(resolved.sha1.is_none());
+    }
+
+    #[test]
+    fn test_lockfile_scope_is_dependencies_for_nested_resolved_dependencies() {
+        let path = PathBuf::from("testdata/cocoapods/podfile_lock/braintree_ios_Podfile.lock");
+        let pkg = PodfileLockParser::extract_first_package(&path);
+
+        let ohhttpstubs = &pkg.dependencies[3];
+        let resolved = ohhttpstubs.resolved_package.as_ref().unwrap();
+        let nested = &resolved.dependencies[0];
+
+        assert_eq!(nested.scope.as_deref(), Some("dependencies"));
+        assert_eq!(nested.is_runtime, None);
+        assert_eq!(nested.is_optional, None);
     }
 }

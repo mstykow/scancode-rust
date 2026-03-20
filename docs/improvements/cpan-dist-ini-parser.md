@@ -1,9 +1,5 @@
 # CpanDistIniParser: Full INI Parsing Implementation
 
-**Parser**: `CpanDistIniParser`  
-**File**: `src/parsers/cpan_dist_ini.rs`  
-**Python Reference**: `src/packagedcode/misc.py` (CpanDistIniHandler)
-
 ## Summary
 
 **✨ New Feature**: Python implementation is a stub with no parse method. Rust implementation provides full INI parsing and metadata extraction.
@@ -138,9 +134,9 @@ Test::More = 0.88
 - **License compliance**: License information for compliance tracking
 - **Build reproducibility**: Version constraints for all dependencies
 
-## Test Coverage
+## Coverage
 
-6 comprehensive test cases:
+Coverage includes:
 
 - Basic metadata extraction
 - Dependency parsing with scopes
@@ -151,6 +147,4 @@ Test::More = 0.88
 
 ## References
 
-- Python implementation: `reference/scancode-toolkit/src/packagedcode/misc.py`
-- Rust implementation: `src/parsers/cpan_dist_ini.rs`
 - Dist::Zilla spec: <https://metacpan.org/pod/Dist::Zilla::Tutorial>

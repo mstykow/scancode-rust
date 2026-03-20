@@ -1,0 +1,34 @@
+[
+  {
+    "type": "maven",
+    "namespace": "com.fallback",
+    "name": "fallback-name",
+    "version": "0.1.0",
+    "primary_language": "Scala",
+    "description": "Alias description",
+    "parties": [],
+    "homepage_url": "https://fallback.example.com/org",
+    "dependencies": [
+      {
+        "purl": "pkg:maven/com.nested/ignored@9.9.9",
+        "extracted_requirement": "9.9.9",
+        "scope": null,
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:maven/org.valid/artifact@1.0.0",
+        "extracted_requirement": "1.0.0",
+        "scope": null,
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": true
+      }
+    ],
+    "datasource_id": "sbt_build_sbt",
+    "purl": "pkg:maven/com.fallback/fallback-name@0.1.0"
+  }
+]

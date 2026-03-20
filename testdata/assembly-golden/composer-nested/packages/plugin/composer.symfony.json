@@ -1,0 +1,8 @@
+{
+  "name": "plugin/package",
+  "version": "2.0.0",
+  "description": "Nested plugin package",
+  "require": {
+    "psr/log": "^3.0"
+  }
+}

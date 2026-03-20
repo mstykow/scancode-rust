@@ -32,9 +32,7 @@ pub(crate) fn write_cyclonedx_xml(output: &Output, writer: &mut dyn Write) -> io
     xml.push_str(&xml_escape(timestamp));
     xml.push_str("</timestamp>\n");
     xml.push_str("    <tools>\n");
-    xml.push_str(
-        "      <tool><vendor>AboutCode.org</vendor><name>scancode-toolkit</name><version>",
-    );
+    xml.push_str("      <tool><vendor>Provenant</vendor><name>Provenant</name><version>");
     xml.push_str(env!("CARGO_PKG_VERSION"));
     xml.push_str("</version></tool>\n");
     xml.push_str("    </tools>\n");
@@ -238,7 +236,7 @@ fn build_cyclonedx_json(output: &Output) -> Value {
                 "timestamp": timestamp,
                 "tools": [
                     {
-                        "name": "scancode-toolkit",
+                        "name": "Provenant",
                         "version": env!("CARGO_PKG_VERSION")
                     }
                 ]
