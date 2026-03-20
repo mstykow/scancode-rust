@@ -3,12 +3,40 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
 use clap::Parser;
-use serde::Deserialize;
+use serde::{Deserialize, Deserializer};
 
 use provenant::golden_maintenance::{find_files_with_extension, run_prettier};
 
 const GOLDEN_DIR: &str = "testdata/license-golden/datadriven";
 const REFERENCE_DIR: &str = "reference/scancode-toolkit/tests/licensedcode/data/datadriven";
+
+fn deserialize_yes_no_bool<'de, D>(deserializer: D) -> Result<bool, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    use serde::de::Error;
+
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum YesNoOrBool {
+        String(String),
+        Bool(bool),
+    }
+
+    match YesNoOrBool::deserialize(deserializer)? {
+        YesNoOrBool::Bool(b) => Ok(b),
+        YesNoOrBool::String(s) => {
+            let lower = s.to_lowercase();
+            if lower == "yes" || lower == "true" || lower == "1" {
+                Ok(true)
+            } else if lower == "no" || lower == "false" || lower == "0" {
+                Ok(false)
+            } else {
+                Err(D::Error::custom(format!("invalid boolean value: {}", s)))
+            }
+        }
+    }
+}
 
 #[derive(Debug, Deserialize, Default)]
 struct LicenseTestYaml {
@@ -16,7 +44,7 @@ struct LicenseTestYaml {
     license_expressions: Vec<String>,
     #[serde(default)]
     notes: Option<String>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_yes_no_bool")]
     #[allow(dead_code)]
     expected_failure: bool,
 }
@@ -108,10 +136,10 @@ fn process_suite(
     for ours_yaml in yamls {
         let rel = ours_yaml.strip_prefix(&ours_root).unwrap_or(&ours_yaml);
 
-        if let Some(ref f) = args.filter {
-            if !rel.to_string_lossy().contains(f) {
-                continue;
-            }
+        if let Some(ref f) = args.filter
+            && !rel.to_string_lossy().contains(f)
+        {
+            continue;
         }
 
         let ref_yaml = ref_root.join(rel);
