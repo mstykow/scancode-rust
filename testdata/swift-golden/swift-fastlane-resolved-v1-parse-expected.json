@@ -41,10 +41,10 @@
         "purl": "pkg:swift/github.com/kareman/SwiftShell@5.1.0",
         "extracted_requirement": "5.1.0",
         "scope": "dependencies",
-        "is_runtime": true,
+        "is_runtime": null,
         "is_optional": false,
         "is_pinned": true,
-        "is_direct": true,
+        "is_direct": null,
         "resolved_package": {},
         "extra_data": {}
       },
@@ -52,10 +52,10 @@
         "purl": "pkg:swift/github.com/apple/swift-atomics@1.1.0",
         "extracted_requirement": "1.1.0",
         "scope": "dependencies",
-        "is_runtime": true,
+        "is_runtime": null,
         "is_optional": false,
         "is_pinned": true,
-        "is_direct": true,
+        "is_direct": null,
         "resolved_package": {},
         "extra_data": {}
       }

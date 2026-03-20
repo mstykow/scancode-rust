@@ -64,10 +64,17 @@ mod tests {
             Some("vers:swift/>=2.8.0|<3.0.0")
         );
         assert_eq!(turf.is_pinned, Some(false));
-        assert_eq!(turf.is_runtime, Some(true));
+        assert_eq!(turf.is_runtime, None);
         assert_eq!(turf.is_optional, Some(false));
         assert_eq!(turf.is_direct, Some(true));
         assert_eq!(turf.scope, Some("dependencies".to_string()));
+        assert_eq!(
+            turf.extra_data
+                .as_ref()
+                .and_then(|extra| extra.get("requirement_kind"))
+                .and_then(|v| v.as_str()),
+            Some("range")
+        );
 
         let core_maps = &data.dependencies[1];
         assert_eq!(
@@ -245,7 +252,7 @@ mod tests {
     }
 
     #[test]
-    fn test_dependency_without_source_control_is_skipped() {
+    fn test_file_system_dependency_is_preserved() {
         let temp_dir = TempDir::new().expect("Failed to create temp dir");
         let path = temp_dir.path().join("Package.swift.json");
         fs::write(
@@ -267,9 +274,30 @@ mod tests {
         .expect("Failed to write");
 
         let data = SwiftManifestJsonParser::extract_first_package(&path);
-        assert_eq!(data.dependencies.len(), 1);
+        assert_eq!(data.dependencies.len(), 2);
         assert_eq!(
             data.dependencies[0].purl.as_deref(),
+            Some("pkg:swift/local-pkg")
+        );
+        assert_eq!(data.dependencies[0].is_runtime, None);
+        assert_eq!(
+            data.dependencies[0]
+                .extra_data
+                .as_ref()
+                .and_then(|extra| extra.get("dependency_kind"))
+                .and_then(|v| v.as_str()),
+            Some("fileSystem")
+        );
+        assert_eq!(
+            data.dependencies[0]
+                .extra_data
+                .as_ref()
+                .and_then(|extra| extra.get("path"))
+                .and_then(|v| v.as_str()),
+            Some("/local")
+        );
+        assert_eq!(
+            data.dependencies[1].purl.as_deref(),
             Some("pkg:swift/github.com/org/repo@1.0.0")
         );
     }

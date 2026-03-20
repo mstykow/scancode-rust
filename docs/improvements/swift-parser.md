@@ -8,11 +8,12 @@
 
 Swift package metadata can come from several adjacent artifacts, including manifest-derived data, resolved files, and `swift-show-dependencies` output. Parser-level extraction alone was not enough because the important remaining behavior lives at scan and assembly time.
 
-Without Swift-specific precedence rules, scans could:
+Without Swift-specific precedence rules and intent boundaries, scans could:
 
 - miss the top-level package entirely
 - let dependency-oriented files overwrite manifest-owned root metadata
 - lose resolved version information when the richer graph surface is absent
+- flatten every resolved pin into a direct root dependency when only lockfile data is meant to enrich declared manifest intent
 - attach nested Swift resources to the wrong package root
 
 ## Rust improvement
@@ -26,7 +27,7 @@ Rust applies Swift-specific assembly rules with five durable behaviors:
    `swift-show-dependencies` data can replace or enrich the dependency graph without taking ownership of the root package metadata.
 
 3. **Resolved fallback when richer graph data is absent**
-   Resolved files can still improve dependency version fidelity when show-dependencies output is not present.
+   Resolved files can still improve dependency version fidelity when show-dependencies output is not present, but only by enriching manifest-known dependencies instead of re-declaring every pin as a direct root dependency.
 
 4. **Resolved-only package emission**
    Repositories that only contain resolved data still produce useful package-level results instead of disappearing from assembled output.
@@ -38,6 +39,7 @@ Rust applies Swift-specific assembly rules with five durable behaviors:
 
 - **Correct top-level package identity**: Swift scans emit the intended root package instead of deriving it from the wrong artifact
 - **Better dependency fidelity**: each Swift artifact contributes where it is strongest without corrupting adjacent metadata
+- **Less overstated intent**: manifest and lockfile artifacts stop claiming runtime/directness they cannot actually prove
 - **Safer package ownership**: nested Swift packages no longer inherit the wrong file assignments
 - **More useful partial scans**: resolved-only repositories still produce meaningful package results
 

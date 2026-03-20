@@ -138,7 +138,7 @@ fn build_dependency(dep: &SwiftDependency, is_direct: bool) -> Option<Dependency
         purl: Some(purl.clone()),
         extracted_requirement: version.clone(),
         scope: Some("dependencies".to_string()),
-        is_runtime: Some(false),
+        is_runtime: None,
         is_optional: Some(false),
         is_pinned: Some(version.is_some()),
         is_direct: Some(is_direct),
