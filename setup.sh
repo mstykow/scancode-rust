@@ -7,6 +7,9 @@
 # The license detection index is already embedded in the binary at:
 #   resources/license_detection/license_index_loader.msgpack.zst
 #
+# The resources/scancode-licenses submodule uses sparse checkout to fetch only
+# the license rules and licenses directories (~180MB vs ~500MB+ for full repo).
+#
 # You only need to run this script if you:
 # - Are building from source for the first time
 # - Want to install pre-commit hooks
@@ -17,7 +20,16 @@
 set -e
 
 echo "Initializing submodules..."
-git submodule update --init --depth=1
+git submodule update --init --filter=blob:none
+
+# Configure sparse checkout for license data submodule
+if [ -d "resources/scancode-licenses" ]; then
+    echo "Configuring sparse checkout for license data..."
+    cd resources/scancode-licenses
+    git sparse-checkout init --no-cone
+    git sparse-checkout set src/licensedcode/data/rules/ src/licensedcode/data/licenses/
+    cd ../..
+fi
 
 echo ""
 echo "Installing pre-commit hooks..."

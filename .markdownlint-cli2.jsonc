@@ -30,6 +30,7 @@
   "ignores": [
     "node_modules/**",
     "reference/**",
+    "resources/scancode-licenses/**",
     "testdata/**",
     "target/**",
     ".sisyphus/**",

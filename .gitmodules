@@ -1,3 +1,6 @@
 [submodule "reference/scancode-toolkit"]
 	path = reference/scancode-toolkit
 	url = git@github.com:aboutcode-org/scancode-toolkit.git
+[submodule "resources/scancode-licenses"]
+	path = resources/scancode-licenses
+	url = git@github.com:aboutcode-org/scancode-toolkit.git
