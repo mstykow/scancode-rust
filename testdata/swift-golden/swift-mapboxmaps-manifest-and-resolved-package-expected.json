@@ -65,7 +65,7 @@
   ],
   "dependencies": [
     {
-      "purl": "pkg:swift/mapbox-common-ios@24.4.0",
+      "purl": "pkg:swift/github.com/mapbox/mapbox-common-ios@24.4.0",
       "extracted_requirement": "24.4.0",
       "scope": "dependencies",
       "is_runtime": null,
@@ -74,13 +74,13 @@
       "is_direct": true,
       "resolved_package": {},
       "extra_data": {},
-      "dependency_uid": "pkg:swift/mapbox-common-ios@24.4.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "dependency_uid": "pkg:swift/github.com/mapbox/mapbox-common-ios@24.4.0?uuid=fixed-uid-done-for-testing-5642512d1758",
       "for_package_uid": "pkg:swift/MapboxMaps?uuid=fixed-uid-done-for-testing-5642512d1758",
       "datafile_path": "Package.swift.json",
       "datasource_id": "swift_package_manifest_json"
     },
     {
-      "purl": "pkg:swift/mapbox-core-maps-ios@11.4.0",
+      "purl": "pkg:swift/github.com/mapbox/mapbox-core-maps-ios@11.4.0",
       "extracted_requirement": "11.4.0",
       "scope": "dependencies",
       "is_runtime": null,
@@ -89,13 +89,13 @@
       "is_direct": true,
       "resolved_package": {},
       "extra_data": {},
-      "dependency_uid": "pkg:swift/mapbox-core-maps-ios@11.4.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "dependency_uid": "pkg:swift/github.com/mapbox/mapbox-core-maps-ios@11.4.0?uuid=fixed-uid-done-for-testing-5642512d1758",
       "for_package_uid": "pkg:swift/MapboxMaps?uuid=fixed-uid-done-for-testing-5642512d1758",
       "datafile_path": "Package.swift.json",
       "datasource_id": "swift_package_manifest_json"
     },
     {
-      "purl": "pkg:swift/turf-swift@2.8.0",
+      "purl": "pkg:swift/github.com/mapbox/turf-swift@2.8.0",
       "extracted_requirement": "2.8.0",
       "scope": "dependencies",
       "is_runtime": null,
@@ -104,7 +104,7 @@
       "is_direct": true,
       "resolved_package": {},
       "extra_data": {},
-      "dependency_uid": "pkg:swift/turf-swift@2.8.0?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "dependency_uid": "pkg:swift/github.com/mapbox/turf-swift@2.8.0?uuid=fixed-uid-done-for-testing-5642512d1758",
       "for_package_uid": "pkg:swift/MapboxMaps?uuid=fixed-uid-done-for-testing-5642512d1758",
       "datafile_path": "Package.swift.json",
       "datasource_id": "swift_package_manifest_json"
