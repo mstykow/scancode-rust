@@ -939,8 +939,7 @@ SOFTWARE."#;
 
         let index = engine.index();
         let text = std::fs::read_to_string(test_file).unwrap();
-        let query =
-            Query::from_extracted_text(&text, &index, false).expect("Query creation failed");
+        let query = Query::from_extracted_text(&text, index, false).expect("Query creation failed");
 
         eprintln!("Query token count: {}", query.tokens.len());
 

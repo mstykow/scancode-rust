@@ -605,7 +605,7 @@ mod tests {
             "Should have unknown-spdx rule loaded"
         );
 
-        let unknown_expr = find_matching_rule_for_expression(&index, "nonexistent-license-xyz");
+        let unknown_expr = find_matching_rule_for_expression(index, "nonexistent-license-xyz");
         assert!(
             unknown_expr.is_some(),
             "Unknown SPDX identifier should return some expression"
@@ -680,7 +680,7 @@ mod tests {
         let index = engine.index();
 
         let expression = "mit OR apache-2.0";
-        let result = find_matching_rule_for_expression(&index, expression);
+        let result = find_matching_rule_for_expression(index, expression);
         assert!(result.is_some(), "Should parse OR expression");
         let expr = result.unwrap();
         assert!(
@@ -701,7 +701,7 @@ mod tests {
         let index = engine.index();
 
         let expression = "gpl-2.0-only with classpath-exception-2.0";
-        let result = find_matching_rule_for_expression(&index, expression);
+        let result = find_matching_rule_for_expression(index, expression);
         assert!(result.is_some(), "Should parse WITH expression");
         let expr = result.unwrap();
         assert!(
@@ -724,7 +724,7 @@ mod tests {
         let index = engine.index();
 
         let expression = "epl-2.0 or apache-2.0 or gpl-2.0-only with classpath-exception-2.0";
-        let result = find_matching_rule_for_expression(&index, expression);
+        let result = find_matching_rule_for_expression(index, expression);
         assert!(result.is_some(), "Should parse complex expression");
         let expr = result.unwrap();
         assert!(
@@ -810,7 +810,7 @@ mod tests {
         let index = engine.index();
 
         let expression = "GPL-2.0+ BSD-2-Clause";
-        let result = find_matching_rule_for_expression(&index, expression);
+        let result = find_matching_rule_for_expression(index, expression);
         assert!(result.is_some(), "Should parse U-Boot bare list as OR");
         let expr = result.unwrap();
         assert!(
@@ -854,7 +854,7 @@ mod tests {
         let index = engine.index();
 
         let expression = "GPL-2.0+ BSD-2-Clause";
-        let result = find_matching_rule_for_expression(&index, expression);
+        let result = find_matching_rule_for_expression(index, expression);
         assert!(result.is_some());
         let expr = result.unwrap();
         assert!(
@@ -875,7 +875,7 @@ mod tests {
         let index = engine.index();
 
         let expression = "(GPL-2.0 OR MIT";
-        let result = find_matching_rule_for_expression(&index, expression);
+        let result = find_matching_rule_for_expression(index, expression);
         assert!(result.is_some());
         let expr = result.unwrap();
         assert!(
@@ -897,7 +897,7 @@ mod tests {
         let index = engine.index();
 
         let expression = "nonexistent-license-xyz";
-        let result = find_matching_rule_for_expression(&index, expression);
+        let result = find_matching_rule_for_expression(index, expression);
         assert!(result.is_some());
         let expr = result.unwrap();
         assert!(
@@ -930,7 +930,7 @@ mod tests {
         let index = engine.index();
 
         let expression = "LGPL-2.1+ The author added some notes";
-        let result = find_matching_rule_for_expression(&index, expression);
+        let result = find_matching_rule_for_expression(index, expression);
         assert!(result.is_some());
         let expr = result.unwrap();
         assert!(expr.contains("lgpl"), "Should contain LGPL, got: {}", expr);
