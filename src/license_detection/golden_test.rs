@@ -36,23 +36,17 @@ mod golden_tests {
     const GOLDEN_DIR: &str = "testdata/license-golden/datadriven";
 
     /// Shared engine instance - created once and reused across all tests
-    static TEST_ENGINE: Lazy<Option<LicenseDetectionEngine>> = Lazy::new(|| {
-        let data_path = PathBuf::from("reference/scancode-toolkit/src/licensedcode/data");
-        if !data_path.exists() {
-            eprintln!("Reference data not available at {:?}", data_path);
-            return None;
-        }
-        match LicenseDetectionEngine::from_directory(&data_path) {
+    static TEST_ENGINE: Lazy<Option<LicenseDetectionEngine>> =
+        Lazy::new(|| match LicenseDetectionEngine::from_embedded() {
             Ok(engine) => {
-                eprintln!("License detection engine initialized for tests");
+                eprintln!("License detection engine initialized from embedded artifact");
                 Some(engine)
             }
             Err(e) => {
-                eprintln!("Failed to create engine: {:?}", e);
+                eprintln!("Failed to create engine from embedded: {:?}", e);
                 None
             }
-        }
-    });
+        });
 
     /// Initialize engine once before any tests run
     static INIT: Once = Once::new();

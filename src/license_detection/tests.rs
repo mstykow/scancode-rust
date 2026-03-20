@@ -1,29 +1,6 @@
 use super::*;
 use std::path::PathBuf;
 
-fn get_reference_data_paths() -> Option<(PathBuf, PathBuf)> {
-    let rules_path = PathBuf::from("reference/scancode-toolkit/src/licensedcode/data/rules");
-    let licenses_path = PathBuf::from("reference/scancode-toolkit/src/licensedcode/data/licenses");
-    if rules_path.exists() && licenses_path.exists() {
-        Some((rules_path, licenses_path))
-    } else {
-        None
-    }
-}
-
-fn create_engine_from_reference() -> Option<LicenseDetectionEngine> {
-    let (rules_path, licenses_path) = get_reference_data_paths()?;
-    let loaded_rules = rules::load_loaded_rules_from_directory(&rules_path).ok()?;
-    let loaded_licenses = rules::load_loaded_licenses_from_directory(&licenses_path).ok()?;
-    let index = index::build_index_from_loaded(loaded_rules, loaded_licenses, false);
-    let spdx_mapping =
-        build_spdx_mapping(&index.licenses_by_key.values().cloned().collect::<Vec<_>>());
-    Some(LicenseDetectionEngine {
-        index: Arc::new(index),
-        spdx_mapping,
-    })
-}
-
 fn detect_fixture_matches(
     engine: &LicenseDetectionEngine,
     fixture_path: &str,
@@ -161,7 +138,8 @@ fn test_engine_from_embedded_initializes() {
 
 #[test]
 fn test_engine_from_embedded_matches_from_directory() {
-    let Some(engine_from_dir) = create_engine_from_reference() else {
+    let data_path = PathBuf::from("reference/scancode-toolkit/src/licensedcode/data");
+    let Some(engine_from_dir) = LicenseDetectionEngine::from_directory(&data_path).ok() else {
         eprintln!("Skipping test: reference directory not found");
         return;
     };
@@ -183,10 +161,7 @@ fn test_engine_from_embedded_matches_from_directory() {
 
 #[test]
 fn test_engine_new_with_reference_rules() {
-    let Some(engine) = create_engine_from_reference() else {
-        eprintln!("Skipping test: reference directory not found");
-        return;
-    };
+    let engine = LicenseDetectionEngine::from_embedded().unwrap();
 
     assert!(
         !engine.index().rules_by_rid.is_empty(),
@@ -212,10 +187,7 @@ fn test_engine_new_with_reference_rules() {
 
 #[test]
 fn test_engine_detect_mit_license() {
-    let Some(engine) = create_engine_from_reference() else {
-        eprintln!("Skipping test: reference directory not found");
-        return;
-    };
+    let engine = LicenseDetectionEngine::from_embedded().unwrap();
 
     let mit_text = r#"Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -262,10 +234,7 @@ SOFTWARE."#;
 
 #[test]
 fn test_engine_detect_empty_text() {
-    let Some(engine) = create_engine_from_reference() else {
-        eprintln!("Skipping test: reference directory not found");
-        return;
-    };
+    let engine = LicenseDetectionEngine::from_embedded().unwrap();
 
     let detections = engine
         .detect_with_kind("", false, false)
@@ -286,10 +255,7 @@ fn test_engine_detect_empty_text() {
 
 #[test]
 fn test_engine_detect_spdx_identifier() {
-    let Some(engine) = create_engine_from_reference() else {
-        eprintln!("Skipping test: reference directory not found");
-        return;
-    };
+    let engine = LicenseDetectionEngine::from_embedded().unwrap();
 
     let text = "SPDX-License-Identifier: MIT";
     let detections = engine
@@ -304,10 +270,7 @@ fn test_engine_detect_spdx_identifier() {
 
 #[test]
 fn test_engine_index_populated() {
-    let Some(engine) = create_engine_from_reference() else {
-        eprintln!("Skipping test: reference directory not found");
-        return;
-    };
+    let engine = LicenseDetectionEngine::from_embedded().unwrap();
     let index = engine.index();
 
     assert!(
@@ -348,10 +311,7 @@ fn test_engine_index_populated() {
 
 #[test]
 fn test_engine_automaton_functional() {
-    let Some(engine) = create_engine_from_reference() else {
-        eprintln!("Skipping test: reference directory not found");
-        return;
-    };
+    let engine = LicenseDetectionEngine::from_embedded().unwrap();
     let index = engine.index();
 
     if !index.rules_by_rid.is_empty() {
@@ -374,10 +334,7 @@ fn test_engine_automaton_functional() {
 
 #[test]
 fn test_engine_spdx_mapping() {
-    let Some(engine) = create_engine_from_reference() else {
-        eprintln!("Skipping test: reference directory not found");
-        return;
-    };
+    let engine = LicenseDetectionEngine::from_embedded().unwrap();
     let mapping = engine.spdx_mapping();
 
     let mit_spdx = mapping.scancode_to_spdx("mit");
@@ -391,10 +348,7 @@ fn test_engine_spdx_mapping() {
 
 #[test]
 fn test_engine_detect_no_license() {
-    let Some(engine) = create_engine_from_reference() else {
-        eprintln!("Skipping test: reference directory not found");
-        return;
-    };
+    let engine = LicenseDetectionEngine::from_embedded().unwrap();
 
     let text = "This is just some random text without any license information.";
     let detections = engine
@@ -408,10 +362,7 @@ fn test_engine_detect_no_license() {
 
 #[test]
 fn test_engine_detect_gpl_notice() {
-    let Some(engine) = create_engine_from_reference() else {
-        eprintln!("Skipping test: reference directory not found");
-        return;
-    };
+    let engine = LicenseDetectionEngine::from_embedded().unwrap();
 
     let text = "This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation.";
     let detections = engine
@@ -423,10 +374,7 @@ fn test_engine_detect_gpl_notice() {
 
 #[test]
 fn test_engine_detect_apache_notice() {
-    let Some(engine) = create_engine_from_reference() else {
-        eprintln!("Skipping test: reference directory not found");
-        return;
-    };
+    let engine = LicenseDetectionEngine::from_embedded().unwrap();
 
     let text = "Licensed under the Apache License, Version 2.0";
     let detections = engine
@@ -438,10 +386,7 @@ fn test_engine_detect_apache_notice() {
 
 #[test]
 fn test_engine_index_sets_by_rid() {
-    let Some(engine) = create_engine_from_reference() else {
-        eprintln!("Skipping test: reference directory not found");
-        return;
-    };
+    let engine = LicenseDetectionEngine::from_embedded().unwrap();
     let index = engine.index();
 
     for &rid in index.rid_by_hash.values().take(5) {
@@ -461,10 +406,7 @@ fn test_engine_index_sets_by_rid() {
 
 #[test]
 fn test_engine_index_msets_by_rid() {
-    let Some(engine) = create_engine_from_reference() else {
-        eprintln!("Skipping test: reference directory not found");
-        return;
-    };
+    let engine = LicenseDetectionEngine::from_embedded().unwrap();
     let index = engine.index();
 
     for &rid in index.rid_by_hash.values().take(5) {
@@ -484,10 +426,7 @@ fn test_engine_index_msets_by_rid() {
 
 #[test]
 fn test_engine_index_high_postings() {
-    let Some(engine) = create_engine_from_reference() else {
-        eprintln!("Skipping test: reference directory not found");
-        return;
-    };
+    let engine = LicenseDetectionEngine::from_embedded().unwrap();
     let index = engine.index();
 
     if !index.approx_matchable_rids.is_empty() {
@@ -501,10 +440,7 @@ fn test_engine_index_high_postings() {
 
 #[test]
 fn test_engine_matched_text_populated() {
-    let Some(engine) = create_engine_from_reference() else {
-        eprintln!("Skipping test: reference directory not found");
-        return;
-    };
+    let engine = LicenseDetectionEngine::from_embedded().unwrap();
 
     let text = "SPDX-License-Identifier: MIT";
     let detections = engine
@@ -532,10 +468,7 @@ fn test_engine_matched_text_populated() {
 
 #[test]
 fn test_detect_multiple_licenses_in_text() {
-    let Some(engine) = create_engine_from_reference() else {
-        eprintln!("Skipping test: reference directory not found");
-        return;
-    };
+    let engine = LicenseDetectionEngine::from_embedded().unwrap();
 
     let isc_text = r#"Permission to use, copy, modify, and/or distribute this software for any
 purpose with or without fee is hereby granted, provided that the above
@@ -579,10 +512,7 @@ Projects Agency (DARPA)."#;
 
 #[test]
 fn test_sudo_license_loaded_from_license_file() {
-    let Some(engine) = create_engine_from_reference() else {
-        eprintln!("Skipping test: reference directory not found");
-        return;
-    };
+    let engine = LicenseDetectionEngine::from_embedded().unwrap();
 
     let index = engine.index();
 
@@ -622,10 +552,7 @@ fn test_sudo_license_loaded_from_license_file() {
 
 #[test]
 fn test_spdx_simple() {
-    let Some(engine) = create_engine_from_reference() else {
-        eprintln!("Skipping test: reference directory not found");
-        return;
-    };
+    let engine = LicenseDetectionEngine::from_embedded().unwrap();
 
     let text = "SPDX-License-Identifier: MIT\nSome code here";
     let detections = engine
@@ -648,10 +575,7 @@ fn test_spdx_simple() {
 
 #[test]
 fn test_spdx_with_or() {
-    let Some(engine) = create_engine_from_reference() else {
-        eprintln!("Skipping test: reference directory not found");
-        return;
-    };
+    let engine = LicenseDetectionEngine::from_embedded().unwrap();
 
     let text = "SPDX-License-Identifier: MIT OR Apache-2.0";
     let detections = engine
@@ -666,10 +590,7 @@ fn test_spdx_with_or() {
 
 #[test]
 fn test_spdx_with_plus() {
-    let Some(engine) = create_engine_from_reference() else {
-        eprintln!("Skipping test: reference directory not found");
-        return;
-    };
+    let engine = LicenseDetectionEngine::from_embedded().unwrap();
 
     let text = "SPDX-License-Identifier: GPL-2.0+";
     let detections = engine
@@ -684,10 +605,7 @@ fn test_spdx_with_plus() {
 
 #[test]
 fn test_spdx_in_comment() {
-    let Some(engine) = create_engine_from_reference() else {
-        eprintln!("Skipping test: reference directory not found");
-        return;
-    };
+    let engine = LicenseDetectionEngine::from_embedded().unwrap();
 
     let text = "// SPDX-License-Identifier: MIT\n/* some code */";
     let detections = engine
@@ -702,10 +620,7 @@ fn test_spdx_in_comment() {
 
 #[test]
 fn test_spdx_lines_do_not_get_rediscovered_as_seq_false_positives() {
-    let Some(engine) = create_engine_from_reference() else {
-        eprintln!("Skipping test: reference directory not found");
-        return;
-    };
+    let engine = LicenseDetectionEngine::from_embedded().unwrap();
 
     let text = std::fs::read_to_string("testdata/license-golden/datadriven/external/spdx/uboot.c")
         .expect("Failed to read uboot.c SPDX fixture");
@@ -751,10 +666,7 @@ fn test_spdx_lines_do_not_get_rediscovered_as_seq_false_positives() {
 
 #[test]
 fn test_spdx_complex2_html_matches_expected_expression() {
-    let Some(engine) = create_engine_from_reference() else {
-        eprintln!("Skipping test: reference directory not found");
-        return;
-    };
+    let engine = LicenseDetectionEngine::from_embedded().unwrap();
 
     let text =
         std::fs::read_to_string("testdata/license-golden/datadriven/external/spdx/complex2.html")
@@ -780,10 +692,7 @@ fn test_spdx_complex2_html_matches_expected_expression() {
 
 #[test]
 fn test_png_h_detect_matches_match_python_raw_rules() {
-    let Some(engine) = create_engine_from_reference() else {
-        eprintln!("Skipping test: reference directory not found");
-        return;
-    };
+    let engine = LicenseDetectionEngine::from_embedded().unwrap();
 
     let matches = detect_fixture_matches(
         &engine,
@@ -819,10 +728,7 @@ fn test_png_h_detect_matches_match_python_raw_rules() {
 
 #[test]
 fn test_standard_ml_nj_and_x11_and_x11_opengroup_detect_matches_match_python_raw_rules() {
-    let Some(engine) = create_engine_from_reference() else {
-        eprintln!("Skipping test: reference directory not found");
-        return;
-    };
+    let engine = LicenseDetectionEngine::from_embedded().unwrap();
 
     let matches = detect_fixture_matches(
         &engine,
@@ -861,10 +767,7 @@ fn test_standard_ml_nj_and_x11_and_x11_opengroup_detect_matches_match_python_raw
 
 #[test]
 fn test_standard_ml_nj_and_x11_and_x11_opengroup_1_detect_matches_match_python_raw_rules() {
-    let Some(engine) = create_engine_from_reference() else {
-        eprintln!("Skipping test: reference directory not found");
-        return;
-    };
+    let engine = LicenseDetectionEngine::from_embedded().unwrap();
 
     let matches = detect_fixture_matches(
         &engine,
@@ -903,10 +806,7 @@ fn test_standard_ml_nj_and_x11_and_x11_opengroup_1_detect_matches_match_python_r
 
 #[test]
 fn test_x11_danse_detect_matches_match_python_raw_rules() {
-    let Some(engine) = create_engine_from_reference() else {
-        eprintln!("Skipping test: reference directory not found");
-        return;
-    };
+    let engine = LicenseDetectionEngine::from_embedded().unwrap();
 
     let matches = detect_fixture_matches(
         &engine,
@@ -948,10 +848,7 @@ fn test_x11_danse_detect_matches_match_python_raw_rules() {
 
 #[test]
 fn test_libevent_license_detect_matches_match_python_raw_rules() {
-    let Some(engine) = create_engine_from_reference() else {
-        eprintln!("Skipping test: reference directory not found");
-        return;
-    };
+    let engine = LicenseDetectionEngine::from_embedded().unwrap();
 
     let matches = detect_fixture_matches(
         &engine,
@@ -989,10 +886,7 @@ fn test_libevent_license_detect_matches_match_python_raw_rules() {
 
 #[test]
 fn test_zlib_txt_detect_matches_match_python_raw_rules() {
-    let Some(engine) = create_engine_from_reference() else {
-        eprintln!("Skipping test: reference directory not found");
-        return;
-    };
+    let engine = LicenseDetectionEngine::from_embedded().unwrap();
 
     let matches = detect_fixture_matches(
         &engine,
@@ -1030,10 +924,7 @@ fn test_zlib_txt_detect_matches_match_python_raw_rules() {
 
 #[test]
 fn test_aladdin_md5_and_not_rsa_md5_detect_matches_match_python_raw_signature() {
-    let Some(engine) = create_engine_from_reference() else {
-        eprintln!("Skipping test: reference directory not found");
-        return;
-    };
+    let engine = LicenseDetectionEngine::from_embedded().unwrap();
 
     let matches = detect_fixture_matches(
         &engine,
@@ -1087,10 +978,7 @@ fn test_aladdin_md5_and_not_rsa_md5_detect_matches_match_python_raw_signature() 
 
 #[test]
 fn test_notice_txt_detect_matches_match_python_raw_rules() {
-    let Some(engine) = create_engine_from_reference() else {
-        eprintln!("Skipping test: reference directory not found");
-        return;
-    };
+    let engine = LicenseDetectionEngine::from_embedded().unwrap();
 
     let matches = detect_fixture_matches(
         &engine,
@@ -1122,10 +1010,7 @@ fn test_notice_txt_detect_matches_match_python_raw_rules() {
 
 #[test]
 fn test_not_spdx_detect_matches_match_python_raw_rules() {
-    let Some(engine) = create_engine_from_reference() else {
-        eprintln!("Skipping test: reference directory not found");
-        return;
-    };
+    let engine = LicenseDetectionEngine::from_embedded().unwrap();
 
     let matches = detect_fixture_matches(
         &engine,
@@ -1164,10 +1049,7 @@ fn test_not_spdx_detect_matches_match_python_raw_rules() {
 
 #[test]
 fn test_gpl_2_0_plus_33_detect_matches_match_python_raw_expressions() {
-    let Some(engine) = create_engine_from_reference() else {
-        eprintln!("Skipping test: reference directory not found");
-        return;
-    };
+    let engine = LicenseDetectionEngine::from_embedded().unwrap();
 
     let matches = detect_fixture_matches(
         &engine,
@@ -1199,10 +1081,7 @@ fn test_gpl_2_0_plus_33_detect_matches_match_python_raw_expressions() {
 
 #[test]
 fn test_kde_licenses_detect_matches_match_python_raw_expressions() {
-    let Some(engine) = create_engine_from_reference() else {
-        eprintln!("Skipping test: reference directory not found");
-        return;
-    };
+    let engine = LicenseDetectionEngine::from_embedded().unwrap();
 
     let matches = detect_fixture_matches(
         &engine,
@@ -1238,10 +1117,7 @@ fn test_kde_licenses_detect_matches_match_python_raw_expressions() {
 
 #[test]
 fn test_d_zlib_and_gfdl_detect_matches_match_python_raw_expressions() {
-    let Some(engine) = create_engine_from_reference() else {
-        eprintln!("Skipping test: reference directory not found");
-        return;
-    };
+    let engine = LicenseDetectionEngine::from_embedded().unwrap();
 
     let matches = detect_fixture_matches(
         &engine,
@@ -1280,10 +1156,7 @@ fn test_d_zlib_and_gfdl_detect_matches_match_python_raw_expressions() {
 
 #[test]
 fn test_bsd_2_clause_and_imlib2_detect_matches_match_python_raw_rules() {
-    let Some(engine) = create_engine_from_reference() else {
-        eprintln!("Skipping test: reference directory not found");
-        return;
-    };
+    let engine = LicenseDetectionEngine::from_embedded().unwrap();
 
     let matches = detect_fixture_matches(
         &engine,
@@ -1311,10 +1184,7 @@ fn test_bsd_2_clause_and_imlib2_detect_matches_match_python_raw_rules() {
 
 #[test]
 fn test_bsd_3_clause_and_cc0_detect_matches_match_python_raw_rules() {
-    let Some(engine) = create_engine_from_reference() else {
-        eprintln!("Skipping test: reference directory not found");
-        return;
-    };
+    let engine = LicenseDetectionEngine::from_embedded().unwrap();
 
     let matches = detect_fixture_matches(
         &engine,
@@ -1342,10 +1212,7 @@ fn test_bsd_3_clause_and_cc0_detect_matches_match_python_raw_rules() {
 
 #[test]
 fn test_cecill_c_detect_matches_keep_spdx_and_long_notice() {
-    let Some(engine) = create_engine_from_reference() else {
-        eprintln!("Skipping test: reference directory not found");
-        return;
-    };
+    let engine = LicenseDetectionEngine::from_embedded().unwrap();
 
     let matches = detect_fixture_matches(
         &engine,
@@ -1370,10 +1237,7 @@ fn test_cecill_c_detect_matches_keep_spdx_and_long_notice() {
 
 #[test]
 fn test_xunit_sln_detect_matches_match_python_raw_rules() {
-    let Some(engine) = create_engine_from_reference() else {
-        eprintln!("Skipping test: reference directory not found");
-        return;
-    };
+    let engine = LicenseDetectionEngine::from_embedded().unwrap();
 
     let matches =
         detect_fixture_matches(&engine, "testdata/license-golden/datadriven/lic4/xunit.sln");
@@ -1387,10 +1251,7 @@ fn test_xunit_sln_detect_matches_match_python_raw_rules() {
 
 #[test]
 fn test_basename_elf_detect_matches_match_python_raw_rules() {
-    let Some(engine) = create_engine_from_reference() else {
-        eprintln!("Skipping test: reference directory not found");
-        return;
-    };
+    let engine = LicenseDetectionEngine::from_embedded().unwrap();
 
     let path = std::path::Path::new("testdata/license-golden/datadriven/lic2/basename.elf");
     let bytes = std::fs::read(path).expect("failed to read basename.elf fixture");
@@ -1415,10 +1276,7 @@ fn test_basename_elf_detect_matches_match_python_raw_rules() {
 
 #[test]
 fn test_faq_doctree_detect_matches_preserve_two_bsd_new_hits() {
-    let Some(engine) = create_engine_from_reference() else {
-        eprintln!("Skipping test: reference directory not found");
-        return;
-    };
+    let engine = LicenseDetectionEngine::from_embedded().unwrap();
 
     let path =
         std::path::Path::new("testdata/license-golden/datadriven/lic2/2189-bsd-bin/faq.doctree");
@@ -1460,10 +1318,7 @@ fn test_faq_doctree_detect_matches_preserve_two_bsd_new_hits() {
 
 #[test]
 fn test_complex_el_detect_matches_keep_python_lgpl_container() {
-    let Some(engine) = create_engine_from_reference() else {
-        eprintln!("Skipping test: reference directory not found");
-        return;
-    };
+    let engine = LicenseDetectionEngine::from_embedded().unwrap();
 
     let matches = detect_fixture_matches(
         &engine,
@@ -1498,10 +1353,7 @@ fn test_complex_el_detect_matches_keep_python_lgpl_container() {
 
 #[test]
 fn test_gpl_and_gpl_and_gpl_and_lgpl_detect_matches_match_python_raw_expressions() {
-    let Some(engine) = create_engine_from_reference() else {
-        eprintln!("Skipping test: reference directory not found");
-        return;
-    };
+    let engine = LicenseDetectionEngine::from_embedded().unwrap();
 
     let matches = detect_fixture_matches(
         &engine,
@@ -1534,10 +1386,7 @@ fn test_gpl_and_gpl_and_gpl_and_lgpl_detect_matches_match_python_raw_expressions
 
 #[test]
 fn test_android_sdk_preview_detect_matches_match_python_raw_rules() {
-    let Some(engine) = create_engine_from_reference() else {
-        eprintln!("Skipping test: reference directory not found");
-        return;
-    };
+    let engine = LicenseDetectionEngine::from_embedded().unwrap();
 
     let matches = detect_fixture_matches(
         &engine,
@@ -1584,10 +1433,7 @@ fn test_android_sdk_preview_detect_matches_match_python_raw_rules() {
 
 #[test]
 fn test_unknown_readme_detect_matches_unknown_mode_matches_python_raw_rules() {
-    let Some(engine) = create_engine_from_reference() else {
-        eprintln!("Skipping test: reference directory not found");
-        return;
-    };
+    let engine = LicenseDetectionEngine::from_embedded().unwrap();
 
     let matches = detect_fixture_matches_with_unknown_licenses(
         &engine,
@@ -1622,10 +1468,7 @@ fn test_unknown_readme_detect_matches_unknown_mode_matches_python_raw_rules() {
 
 #[test]
 fn test_unknown_cisco_detect_matches_unknown_mode_matches_python_raw_rules() {
-    let Some(engine) = create_engine_from_reference() else {
-        eprintln!("Skipping test: reference directory not found");
-        return;
-    };
+    let engine = LicenseDetectionEngine::from_embedded().unwrap();
 
     let matches = detect_fixture_matches_with_unknown_licenses(
         &engine,
@@ -1660,10 +1503,7 @@ fn test_unknown_cisco_detect_matches_unknown_mode_matches_python_raw_rules() {
 
 #[test]
 fn test_unknown_ucware_eula_detect_matches_unknown_mode_matches_python_raw_rules() {
-    let Some(engine) = create_engine_from_reference() else {
-        eprintln!("Skipping test: reference directory not found");
-        return;
-    };
+    let engine = LicenseDetectionEngine::from_embedded().unwrap();
 
     let matches = detect_fixture_matches_with_unknown_licenses(
         &engine,
@@ -1716,10 +1556,7 @@ fn test_unknown_ucware_eula_detect_matches_unknown_mode_matches_python_raw_rules
 
 #[test]
 fn test_unknown_citrix_detect_matches_unknown_mode_matches_python_raw_rules() {
-    let Some(engine) = create_engine_from_reference() else {
-        eprintln!("Skipping test: reference directory not found");
-        return;
-    };
+    let engine = LicenseDetectionEngine::from_embedded().unwrap();
 
     let matches = detect_fixture_matches_with_unknown_licenses(
         &engine,
@@ -1790,10 +1627,7 @@ fn test_unknown_citrix_detect_matches_unknown_mode_matches_python_raw_rules() {
 
 #[test]
 fn test_openssh_license_detect_matches_match_python_raw_rules() {
-    let Some(engine) = create_engine_from_reference() else {
-        eprintln!("Skipping test: reference directory not found");
-        return;
-    };
+    let engine = LicenseDetectionEngine::from_embedded().unwrap();
 
     let matches = detect_fixture_matches(
         &engine,
@@ -2186,10 +2020,7 @@ fn test_filter_redundant_low_coverage_composite_seq_wrappers_drops_tiny_composit
 
 #[test]
 fn test_spdx_complex_short_html_keeps_exact_unicode_matches_and_drops_seq_container() {
-    let Some(engine) = create_engine_from_reference() else {
-        eprintln!("Skipping test: reference directory not found");
-        return;
-    };
+    let engine = LicenseDetectionEngine::from_embedded().unwrap();
 
     let matches = detect_fixture_matches(
         &engine,
@@ -2244,10 +2075,7 @@ fn test_spdx_complex_short_html_keeps_exact_unicode_matches_and_drops_seq_contai
 
 #[test]
 fn test_spdx_complex_readme_detect_matches_keeps_nearby_embedded_matches() {
-    let Some(engine) = create_engine_from_reference() else {
-        eprintln!("Skipping test: reference directory not found");
-        return;
-    };
+    let engine = LicenseDetectionEngine::from_embedded().unwrap();
 
     let matches = detect_fixture_matches(
         &engine,
@@ -2287,10 +2115,7 @@ fn test_spdx_complex_readme_detect_matches_keeps_nearby_embedded_matches() {
 
 #[test]
 fn test_spdx_complex_readme_detect_matches_match_python_raw_signature() {
-    let Some(engine) = create_engine_from_reference() else {
-        eprintln!("Skipping test: reference directory not found");
-        return;
-    };
+    let engine = LicenseDetectionEngine::from_embedded().unwrap();
 
     let matches = detect_fixture_matches(
         &engine,
@@ -2436,10 +2261,7 @@ fn test_spdx_complex_readme_detect_matches_match_python_raw_signature() {
 
 #[test]
 fn test_eclipse_openj9_detect_matches_match_python_raw_signature() {
-    let Some(engine) = create_engine_from_reference() else {
-        eprintln!("Skipping test: reference directory not found");
-        return;
-    };
+    let engine = LicenseDetectionEngine::from_embedded().unwrap();
 
     let matches = detect_fixture_matches(
         &engine,
@@ -2494,10 +2316,7 @@ fn test_eclipse_openj9_detect_matches_match_python_raw_signature() {
 
 #[test]
 fn test_hash_exact_mit() {
-    let Some(engine) = create_engine_from_reference() else {
-        eprintln!("Skipping test: reference directory not found");
-        return;
-    };
+    let engine = LicenseDetectionEngine::from_embedded().unwrap();
 
     let mit_text = r#"Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -2514,10 +2333,7 @@ copies of the Software."#;
 
 #[test]
 fn test_seq_partial_license() {
-    let Some(engine) = create_engine_from_reference() else {
-        eprintln!("Skipping test: reference directory not found");
-        return;
-    };
+    let engine = LicenseDetectionEngine::from_embedded().unwrap();
 
     let partial_mit = r#"Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -2534,10 +2350,7 @@ copies of the Software."#;
 
 #[test]
 fn test_unknown_proprietary() {
-    let Some(engine) = create_engine_from_reference() else {
-        eprintln!("Skipping test: reference directory not found");
-        return;
-    };
+    let engine = LicenseDetectionEngine::from_embedded().unwrap();
 
     let text = "This software is proprietary and confidential. All rights reserved.";
     let detections = engine
@@ -2552,10 +2365,7 @@ fn test_unknown_proprietary() {
 
 #[test]
 fn test_no_token_boundary_false_positives() {
-    let Some(engine) = create_engine_from_reference() else {
-        eprintln!("Skipping test: reference directory not found");
-        return;
-    };
+    let engine = LicenseDetectionEngine::from_embedded().unwrap();
 
     let test_file =
         std::path::PathBuf::from("testdata/license-golden/datadriven/lic1/config.guess-gpl2.txt");
@@ -2586,10 +2396,7 @@ fn test_no_token_boundary_false_positives() {
 
 #[test]
 fn test_detect_mit_license_with_utf8_bom() {
-    let Some(engine) = create_engine_from_reference() else {
-        eprintln!("Skipping test: reference directory not found");
-        return;
-    };
+    let engine = LicenseDetectionEngine::from_embedded().unwrap();
 
     let mit_with_bom =
         "\u{FEFF}Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -2637,10 +2444,7 @@ SOFTWARE.";
 
 #[test]
 fn test_detect_spdx_identifier_with_utf8_bom() {
-    let Some(engine) = create_engine_from_reference() else {
-        eprintln!("Skipping test: reference directory not found");
-        return;
-    };
+    let engine = LicenseDetectionEngine::from_embedded().unwrap();
 
     let text = "\u{FEFF}SPDX-License-Identifier: MIT";
     let detections = engine

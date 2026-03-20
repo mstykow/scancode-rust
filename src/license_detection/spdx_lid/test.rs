@@ -541,22 +541,13 @@ mod tests {
 
     #[test]
     fn test_spdx_key_lookup_gpl_2_0_plus() {
-        let path =
-            std::path::Path::new("reference/scancode-toolkit/src/licensedcode/data/licenses");
-        if !path.exists() {
-            eprintln!("Skipping test: reference directory not found");
+        let Some(engine) = crate::license_detection::LicenseDetectionEngine::from_embedded().ok()
+        else {
+            eprintln!("Skipping test: embedded engine not available");
             return;
-        }
+        };
 
-        let licenses = crate::license_detection::rules::load_licenses_from_directory(path, false)
-            .expect("Failed to load licenses");
-        let rules = crate::license_detection::rules::load_rules_from_directory(
-            std::path::Path::new("reference/scancode-toolkit/src/licensedcode/data/rules"),
-            false,
-        )
-        .expect("Failed to load rules");
-
-        let index = crate::license_detection::index::build_index(rules, licenses);
+        let index = engine.index();
 
         assert!(
             !index.rid_by_spdx_key.is_empty(),
@@ -601,22 +592,13 @@ mod tests {
 
     #[test]
     fn test_unknown_spdx_identifier_fallback() {
-        let path =
-            std::path::Path::new("reference/scancode-toolkit/src/licensedcode/data/licenses");
-        if !path.exists() {
-            eprintln!("Skipping test: reference directory not found");
+        let Some(engine) = crate::license_detection::LicenseDetectionEngine::from_embedded().ok()
+        else {
+            eprintln!("Skipping test: embedded engine not available");
             return;
-        }
+        };
 
-        let licenses = crate::license_detection::rules::load_licenses_from_directory(path, false)
-            .expect("Failed to load licenses");
-        let rules = crate::license_detection::rules::load_rules_from_directory(
-            std::path::Path::new("reference/scancode-toolkit/src/licensedcode/data/rules"),
-            false,
-        )
-        .expect("Failed to load rules");
-
-        let index = crate::license_detection::index::build_index(rules, licenses);
+        let index = engine.index();
 
         assert!(
             index.unknown_spdx_rid.is_some(),
@@ -638,22 +620,13 @@ mod tests {
 
     #[test]
     fn test_deprecated_spdx_substitution() {
-        let path =
-            std::path::Path::new("reference/scancode-toolkit/src/licensedcode/data/licenses");
-        if !path.exists() {
-            eprintln!("Skipping test: reference directory not found");
+        let Some(engine) = crate::license_detection::LicenseDetectionEngine::from_embedded().ok()
+        else {
+            eprintln!("Skipping test: embedded engine not available");
             return;
-        }
+        };
 
-        let licenses = crate::license_detection::rules::load_licenses_from_directory(path, false)
-            .expect("Failed to load licenses");
-        let rules = crate::license_detection::rules::load_rules_from_directory(
-            std::path::Path::new("reference/scancode-toolkit/src/licensedcode/data/rules"),
-            false,
-        )
-        .expect("Failed to load rules");
-
-        let index = crate::license_detection::index::build_index(rules, licenses);
+        let index = engine.index();
 
         assert!(
             index.rid_by_spdx_key.contains_key("gpl-2.0-only"),
@@ -669,22 +642,13 @@ mod tests {
 
     #[test]
     fn test_primary_spdx_key_mapping() {
-        let path =
-            std::path::Path::new("reference/scancode-toolkit/src/licensedcode/data/licenses");
-        if !path.exists() {
-            eprintln!("Skipping test: reference directory not found");
+        let Some(engine) = crate::license_detection::LicenseDetectionEngine::from_embedded().ok()
+        else {
+            eprintln!("Skipping test: embedded engine not available");
             return;
-        }
+        };
 
-        let licenses = crate::license_detection::rules::load_licenses_from_directory(path, false)
-            .expect("Failed to load licenses");
-        let rules = crate::license_detection::rules::load_rules_from_directory(
-            std::path::Path::new("reference/scancode-toolkit/src/licensedcode/data/rules"),
-            false,
-        )
-        .expect("Failed to load rules");
-
-        let index = crate::license_detection::index::build_index(rules, licenses);
+        let index = engine.index();
 
         let test_cases = [
             ("mit", "mit"),
@@ -707,22 +671,13 @@ mod tests {
 
     #[test]
     fn test_spdx_expression_with_or_operator() {
-        let path =
-            std::path::Path::new("reference/scancode-toolkit/src/licensedcode/data/licenses");
-        if !path.exists() {
-            eprintln!("Skipping test: reference directory not found");
+        let Some(engine) = crate::license_detection::LicenseDetectionEngine::from_embedded().ok()
+        else {
+            eprintln!("Skipping test: embedded engine not available");
             return;
-        }
+        };
 
-        let licenses = crate::license_detection::rules::load_licenses_from_directory(path, false)
-            .expect("Failed to load licenses");
-        let rules = crate::license_detection::rules::load_rules_from_directory(
-            std::path::Path::new("reference/scancode-toolkit/src/licensedcode/data/rules"),
-            false,
-        )
-        .expect("Failed to load rules");
-
-        let index = crate::license_detection::index::build_index(rules, licenses);
+        let index = engine.index();
 
         let expression = "mit OR apache-2.0";
         let result = find_matching_rule_for_expression(&index, expression);
@@ -737,22 +692,13 @@ mod tests {
 
     #[test]
     fn test_spdx_expression_with_with_operator() {
-        let path =
-            std::path::Path::new("reference/scancode-toolkit/src/licensedcode/data/licenses");
-        if !path.exists() {
-            eprintln!("Skipping test: reference directory not found");
+        let Some(engine) = crate::license_detection::LicenseDetectionEngine::from_embedded().ok()
+        else {
+            eprintln!("Skipping test: embedded engine not available");
             return;
-        }
+        };
 
-        let licenses = crate::license_detection::rules::load_licenses_from_directory(path, false)
-            .expect("Failed to load licenses");
-        let rules = crate::license_detection::rules::load_rules_from_directory(
-            std::path::Path::new("reference/scancode-toolkit/src/licensedcode/data/rules"),
-            false,
-        )
-        .expect("Failed to load rules");
-
-        let index = crate::license_detection::index::build_index(rules, licenses);
+        let index = engine.index();
 
         let expression = "gpl-2.0-only with classpath-exception-2.0";
         let result = find_matching_rule_for_expression(&index, expression);
@@ -769,22 +715,13 @@ mod tests {
 
     #[test]
     fn test_spdx_expression_complex_or() {
-        let path =
-            std::path::Path::new("reference/scancode-toolkit/src/licensedcode/data/licenses");
-        if !path.exists() {
-            eprintln!("Skipping test: reference directory not found");
+        let Some(engine) = crate::license_detection::LicenseDetectionEngine::from_embedded().ok()
+        else {
+            eprintln!("Skipping test: embedded engine not available");
             return;
-        }
+        };
 
-        let licenses = crate::license_detection::rules::load_licenses_from_directory(path, false)
-            .expect("Failed to load licenses");
-        let rules = crate::license_detection::rules::load_rules_from_directory(
-            std::path::Path::new("reference/scancode-toolkit/src/licensedcode/data/rules"),
-            false,
-        )
-        .expect("Failed to load rules");
-
-        let index = crate::license_detection::index::build_index(rules, licenses);
+        let index = engine.index();
 
         let expression = "epl-2.0 or apache-2.0 or gpl-2.0-only with classpath-exception-2.0";
         let result = find_matching_rule_for_expression(&index, expression);
@@ -864,22 +801,13 @@ mod tests {
 
     #[test]
     fn test_uboot_bare_list_as_or() {
-        let path =
-            std::path::Path::new("reference/scancode-toolkit/src/licensedcode/data/licenses");
-        if !path.exists() {
-            eprintln!("Skipping test: reference directory not found");
+        let Some(engine) = crate::license_detection::LicenseDetectionEngine::from_embedded().ok()
+        else {
+            eprintln!("Skipping test: embedded engine not available");
             return;
-        }
+        };
 
-        let licenses = crate::license_detection::rules::load_licenses_from_directory(path, false)
-            .expect("Failed to load licenses");
-        let rules = crate::license_detection::rules::load_rules_from_directory(
-            std::path::Path::new("reference/scancode-toolkit/src/licensedcode/data/rules"),
-            false,
-        )
-        .expect("Failed to load rules");
-
-        let index = crate::license_detection::index::build_index(rules, licenses);
+        let index = engine.index();
 
         let expression = "GPL-2.0+ BSD-2-Clause";
         let result = find_matching_rule_for_expression(&index, expression);
@@ -917,22 +845,13 @@ mod tests {
 
     #[test]
     fn test_recovery_parsing_bare_list() {
-        let path =
-            std::path::Path::new("reference/scancode-toolkit/src/licensedcode/data/licenses");
-        if !path.exists() {
-            eprintln!("Skipping test: reference directory not found");
+        let Some(engine) = crate::license_detection::LicenseDetectionEngine::from_embedded().ok()
+        else {
+            eprintln!("Skipping test: embedded engine not available");
             return;
-        }
+        };
 
-        let licenses = crate::license_detection::rules::load_licenses_from_directory(path, false)
-            .expect("Failed to load licenses");
-        let rules = crate::license_detection::rules::load_rules_from_directory(
-            std::path::Path::new("reference/scancode-toolkit/src/licensedcode/data/rules"),
-            false,
-        )
-        .expect("Failed to load rules");
-
-        let index = crate::license_detection::index::build_index(rules, licenses);
+        let index = engine.index();
 
         let expression = "GPL-2.0+ BSD-2-Clause";
         let result = find_matching_rule_for_expression(&index, expression);
@@ -947,22 +866,13 @@ mod tests {
 
     #[test]
     fn test_recovery_parsing_malformed_parens() {
-        let path =
-            std::path::Path::new("reference/scancode-toolkit/src/licensedcode/data/licenses");
-        if !path.exists() {
-            eprintln!("Skipping test: reference directory not found");
+        let Some(engine) = crate::license_detection::LicenseDetectionEngine::from_embedded().ok()
+        else {
+            eprintln!("Skipping test: embedded engine not available");
             return;
-        }
+        };
 
-        let licenses = crate::license_detection::rules::load_licenses_from_directory(path, false)
-            .expect("Failed to load licenses");
-        let rules = crate::license_detection::rules::load_rules_from_directory(
-            std::path::Path::new("reference/scancode-toolkit/src/licensedcode/data/rules"),
-            false,
-        )
-        .expect("Failed to load rules");
-
-        let index = crate::license_detection::index::build_index(rules, licenses);
+        let index = engine.index();
 
         let expression = "(GPL-2.0 OR MIT";
         let result = find_matching_rule_for_expression(&index, expression);
@@ -978,22 +888,13 @@ mod tests {
 
     #[test]
     fn test_recovery_parsing_unknown_identifier() {
-        let path =
-            std::path::Path::new("reference/scancode-toolkit/src/licensedcode/data/licenses");
-        if !path.exists() {
-            eprintln!("Skipping test: reference directory not found");
+        let Some(engine) = crate::license_detection::LicenseDetectionEngine::from_embedded().ok()
+        else {
+            eprintln!("Skipping test: embedded engine not available");
             return;
-        }
+        };
 
-        let licenses = crate::license_detection::rules::load_licenses_from_directory(path, false)
-            .expect("Failed to load licenses");
-        let rules = crate::license_detection::rules::load_rules_from_directory(
-            std::path::Path::new("reference/scancode-toolkit/src/licensedcode/data/rules"),
-            false,
-        )
-        .expect("Failed to load rules");
-
-        let index = crate::license_detection::index::build_index(rules, licenses);
+        let index = engine.index();
 
         let expression = "nonexistent-license-xyz";
         let result = find_matching_rule_for_expression(&index, expression);
@@ -1020,22 +921,13 @@ mod tests {
 
     #[test]
     fn test_recovery_parsing_text_after_identifier() {
-        let path =
-            std::path::Path::new("reference/scancode-toolkit/src/licensedcode/data/licenses");
-        if !path.exists() {
-            eprintln!("Skipping test: reference directory not found");
+        let Some(engine) = crate::license_detection::LicenseDetectionEngine::from_embedded().ok()
+        else {
+            eprintln!("Skipping test: embedded engine not available");
             return;
-        }
+        };
 
-        let licenses = crate::license_detection::rules::load_licenses_from_directory(path, false)
-            .expect("Failed to load licenses");
-        let rules = crate::license_detection::rules::load_rules_from_directory(
-            std::path::Path::new("reference/scancode-toolkit/src/licensedcode/data/rules"),
-            false,
-        )
-        .expect("Failed to load rules");
-
-        let index = crate::license_detection::index::build_index(rules, licenses);
+        let index = engine.index();
 
         let expression = "LGPL-2.1+ The author added some notes";
         let result = find_matching_rule_for_expression(&index, expression);

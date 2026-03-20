@@ -707,15 +707,18 @@ Text."#;
 
 #[test]
 fn test_ibmpl_rule_loaded() {
-    let path = std::path::Path::new("reference/scancode-toolkit/src/licensedcode/data/rules");
-    if !path.exists() {
-        eprintln!("Skipping test: reference directory not found");
+    let Some(engine) = crate::license_detection::LicenseDetectionEngine::from_embedded().ok()
+    else {
+        eprintln!("Skipping test: embedded engine not available");
         return;
-    }
+    };
 
-    let rules = load_rules_from_directory(path, false).unwrap();
+    let index = engine.index();
 
-    let ibmpl_1 = rules.iter().find(|r| r.identifier == "ibmpl-1.0_1.RULE");
+    let ibmpl_1 = index
+        .rules_by_rid
+        .iter()
+        .find(|r| r.identifier == "ibmpl-1.0_1.RULE");
     assert!(ibmpl_1.is_some(), "ibmpl-1.0_1.RULE should be loaded");
 
     let rule = ibmpl_1.unwrap();
@@ -757,16 +760,11 @@ fn test_ibmpl_rule_tokens() {
 #[test]
 fn test_ibmpl_detection() {
     use crate::license_detection::LicenseDetectionEngine;
-    use std::path::PathBuf;
 
-    let data_path = PathBuf::from("reference/scancode-toolkit/src/licensedcode/data");
-    if !data_path.exists() {
-        eprintln!("Skipping test: reference directory not found");
+    let Some(engine) = LicenseDetectionEngine::from_embedded().ok() else {
+        eprintln!("Skipping test: embedded engine not available");
         return;
-    }
-
-    let engine =
-        LicenseDetectionEngine::from_directory(&data_path).expect("Failed to create engine");
+    };
 
     // Test with exact rule text
     let exact_text = "distributed under the IBM Public License (IPL).";

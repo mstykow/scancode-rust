@@ -373,37 +373,14 @@ mod test_cases {
     #[test]
     #[ignore = "Rust-specific enhancement: URL variant hash generation for http/https ignorable URLs. Python does not generate separate hashes for URL variants, so this test is not applicable for Python parity verification."]
     fn test_build_index_from_reference_rules() {
-        use std::path::Path;
+        use crate::license_detection::LicenseDetectionEngine;
 
-        let rules_path = Path::new("reference/scancode-toolkit/src/licensedcode/data/rules");
-        let licenses_path = Path::new("reference/scancode-toolkit/src/licensedcode/data/licenses");
-
-        if !rules_path.exists() || !licenses_path.exists() {
-            eprintln!("Skipping test: reference directories not found");
+        let Some(engine) = LicenseDetectionEngine::from_embedded().ok() else {
+            eprintln!("Skipping test: embedded engine not available");
             return;
-        }
-
-        let rules = crate::license_detection::rules::load_rules_from_directory(rules_path, false);
-        let licenses =
-            crate::license_detection::rules::load_licenses_from_directory(licenses_path, false);
-
-        let rules = match rules {
-            Ok(r) => r,
-            Err(e) => {
-                eprintln!("Skipping test: failed to load rules: {}", e);
-                return;
-            }
         };
 
-        let licenses = match licenses {
-            Ok(l) => l,
-            Err(e) => {
-                eprintln!("Skipping test: failed to load licenses: {}", e);
-                return;
-            }
-        };
-
-        let index = build_index(rules, licenses);
+        let index = engine.index();
 
         assert!(!index.rules_by_rid.is_empty(), "Should have rules loaded");
         assert!(!index.tids_by_rid.is_empty(), "Should have token IDs");
@@ -899,37 +876,14 @@ SOFTWARE."#;
     #[test]
     #[ignore = "Rust-specific enhancement: URL variant hash generation for http/https ignorable URLs. Python does not generate separate hashes for URL variants, so this test is not applicable for Python parity verification."]
     fn test_build_index_mit_or_boost_rule_variants() {
-        use std::path::Path;
+        use crate::license_detection::LicenseDetectionEngine;
 
-        let rules_path = Path::new("reference/scancode-toolkit/src/licensedcode/data/rules");
-        let licenses_path = Path::new("reference/scancode-toolkit/src/licensedcode/data/licenses");
-
-        if !rules_path.exists() || !licenses_path.exists() {
-            eprintln!("Skipping test: reference directories not found");
+        let Some(engine) = LicenseDetectionEngine::from_embedded().ok() else {
+            eprintln!("Skipping test: embedded engine not available");
             return;
-        }
-
-        let rules = crate::license_detection::rules::load_rules_from_directory(rules_path, false);
-        let licenses =
-            crate::license_detection::rules::load_licenses_from_directory(licenses_path, false);
-
-        let rules = match rules {
-            Ok(r) => r,
-            Err(e) => {
-                eprintln!("Skipping test: failed to load rules: {}", e);
-                return;
-            }
         };
 
-        let licenses = match licenses {
-            Ok(l) => l,
-            Err(e) => {
-                eprintln!("Skipping test: failed to load licenses: {}", e);
-                return;
-            }
-        };
-
-        let index = build_index(rules, licenses);
+        let index = engine.index();
 
         // Find the mit_or_boost-1.0_1.RULE
         let target_rid = index
@@ -964,6 +918,7 @@ SOFTWARE."#;
     #[test]
     #[ignore = "Rust-specific enhancement: URL variant hash generation for http/https ignorable URLs. Python does not generate separate hashes for URL variants, so this test is not applicable for Python parity verification."]
     fn test_sequence_matching_bsl_file() {
+        use crate::license_detection::LicenseDetectionEngine;
         use crate::license_detection::index::token_sets::{build_set_and_mset, tids_set_counter};
         use crate::license_detection::query::Query;
         use crate::license_detection::seq_match::HIGH_RESEMBLANCE_THRESHOLD;
@@ -977,21 +932,12 @@ SOFTWARE."#;
             return;
         }
 
-        let rules_path = Path::new("reference/scancode-toolkit/src/licensedcode/data/rules");
-        let licenses_path = Path::new("reference/scancode-toolkit/src/licensedcode/data/licenses");
-
-        if !rules_path.exists() || !licenses_path.exists() {
-            eprintln!("Skipping test: reference directories not found");
+        let Some(engine) = LicenseDetectionEngine::from_embedded().ok() else {
+            eprintln!("Skipping test: embedded engine not available");
             return;
-        }
+        };
 
-        let rules =
-            crate::license_detection::rules::load_rules_from_directory(rules_path, false).unwrap();
-        let licenses =
-            crate::license_detection::rules::load_licenses_from_directory(licenses_path, false)
-                .unwrap();
-        let index = build_index(rules, licenses);
-
+        let index = engine.index();
         let text = std::fs::read_to_string(test_file).unwrap();
         let query =
             Query::from_extracted_text(&text, &index, false).expect("Query creation failed");
@@ -1110,14 +1056,11 @@ SOFTWARE."#;
             return;
         }
 
-        let rules_path = Path::new("reference/scancode-toolkit/src/licensedcode/data");
-        if !rules_path.exists() {
-            eprintln!("Skipping test: reference directory not found");
+        let Some(engine) = LicenseDetectionEngine::from_embedded().ok() else {
+            eprintln!("Skipping test: embedded engine not available");
             return;
-        }
+        };
 
-        let engine =
-            LicenseDetectionEngine::from_directory(rules_path).expect("Engine creation failed");
         let text = std::fs::read_to_string(test_file).unwrap();
 
         let detections = engine

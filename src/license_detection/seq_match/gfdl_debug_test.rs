@@ -2,14 +2,12 @@
 
 #[cfg(test)]
 mod tests {
-    use crate::license_detection::models::MatcherKind;
     use crate::license_detection::LicenseDetectionEngine;
-    use std::path::PathBuf;
+    use crate::license_detection::models::MatcherKind;
 
     #[test]
     fn test_gfdl_1_1_selection() {
-        let rules_path = PathBuf::from("reference/scancode-toolkit/src/licensedcode/data");
-        let engine = LicenseDetectionEngine::from_directory(&rules_path).unwrap();
+        let engine = LicenseDetectionEngine::from_embedded().unwrap();
 
         let text = r#"Copyright (c) 2020 Go Gopher.
 Permission is granted to copy, distribute and/or
