@@ -60,34 +60,46 @@
         "purl": "pkg:swift/github.com/mapbox/turf-swift",
         "extracted_requirement": "vers:swift/>=2.8.0|<3.0.0",
         "scope": "dependencies",
-        "is_runtime": true,
+        "is_runtime": null,
         "is_optional": false,
         "is_pinned": false,
         "is_direct": true,
         "resolved_package": {},
-        "extra_data": {}
+        "extra_data": {
+          "dependency_kind": "sourceControl",
+          "location": "https://github.com/mapbox/turf-swift.git",
+          "requirement_kind": "range"
+        }
       },
       {
         "purl": "pkg:swift/github.com/mapbox/mapbox-core-maps-ios@11.4.0-rc.2",
         "extracted_requirement": "11.4.0-rc.2",
         "scope": "dependencies",
-        "is_runtime": true,
+        "is_runtime": null,
         "is_optional": false,
         "is_pinned": true,
         "is_direct": true,
         "resolved_package": {},
-        "extra_data": {}
+        "extra_data": {
+          "dependency_kind": "sourceControl",
+          "location": "https://github.com/mapbox/mapbox-core-maps-ios.git",
+          "requirement_kind": "exact"
+        }
       },
       {
         "purl": "pkg:swift/github.com/mapbox/mapbox-common-ios@24.4.0-rc.2",
         "extracted_requirement": "24.4.0-rc.2",
         "scope": "dependencies",
-        "is_runtime": true,
+        "is_runtime": null,
         "is_optional": false,
         "is_pinned": true,
         "is_direct": true,
         "resolved_package": {},
-        "extra_data": {}
+        "extra_data": {
+          "dependency_kind": "sourceControl",
+          "location": "https://github.com/mapbox/mapbox-common-ios.git",
+          "requirement_kind": "exact"
+        }
       }
     ],
     "repository_homepage_url": null,
