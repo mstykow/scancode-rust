@@ -1,7 +1,7 @@
 //! License metadata loaded from .LICENSE files.
 
 /// License metadata loaded from .LICENSE files.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct License {
     /// Unique lowercase ASCII identifier for this license
     pub key: String,

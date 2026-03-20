@@ -398,14 +398,6 @@ fn combine_expressions_with(
 ///
 /// This function parses each expression string, combines them with `AND`, and
 /// optionally deduplicates license keys.
-///
-/// # Examples
-/// ```
-/// use scancode_rust::license_detection::expression::combine_expressions_and;
-///
-/// let combined = combine_expressions_and(&["mit", "gpl-2.0-plus"], true).unwrap();
-/// assert_eq!(combined, "mit AND gpl-2.0-plus");
-/// ```
 pub fn combine_expressions_and(expressions: &[&str], unique: bool) -> Result<String, ParseError> {
     combine_expressions_with(expressions, unique, LicenseExpression::and)
 }

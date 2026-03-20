@@ -21,7 +21,7 @@ pub mod spdx_lid;
 pub mod spdx_mapping;
 #[cfg(test)]
 mod test_utils;
-mod tokenize;
+pub mod tokenize;
 pub mod unknown_match;
 
 use std::collections::HashSet;

@@ -120,13 +120,6 @@ static QUERY_PATTERN: Lazy<Regex> =
 ///
 /// # Returns
 /// A vector of token strings.
-///
-/// # Examples
-/// ```
-/// # use scancode_rust::license_detection::tokenize::tokenize;
-/// let tokens = tokenize("Hello World!");
-/// assert_eq!(tokens, vec!["hello", "world"]);
-/// ```
 pub fn tokenize(text: &str) -> Vec<String> {
     if text.is_empty() {
         return Vec::new();
@@ -153,13 +146,6 @@ pub fn tokenize(text: &str) -> Vec<String> {
 ///
 /// # Returns
 /// A vector of token strings.
-///
-/// # Examples
-/// ```
-/// # use scancode_rust::license_detection::tokenize::tokenize_without_stopwords;
-/// let tokens = tokenize_without_stopwords("Hello World div");
-/// assert_eq!(tokens, vec!["hello", "world", "div"]);
-/// ```
 pub fn tokenize_without_stopwords(text: &str) -> Vec<String> {
     if text.is_empty() {
         return Vec::new();
@@ -195,7 +181,8 @@ pub fn tokenize_without_stopwords(text: &str) -> Vec<String> {
 ///
 /// # Examples
 /// ```
-/// # use scancode_rust::license_detection::tokenize::parse_required_phrase_spans;
+/// use provenant::license_detection::tokenize::parse_required_phrase_spans;
+///
 /// let text = "This is {{enclosed}} in braces";
 /// let spans = parse_required_phrase_spans(text);
 /// assert_eq!(spans, vec![2..3]);

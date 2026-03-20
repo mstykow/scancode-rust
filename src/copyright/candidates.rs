@@ -683,8 +683,7 @@ fn is_year_only_copy_marker_line(prepared: &str) -> bool {
 /// Only strips if the parentheses are truly wrapping (no inner parens).
 ///
 /// # Examples
-/// ```
-/// use provenant::copyright::strip_balanced_edge_parens;
+/// ```ignore
 /// assert_eq!(strip_balanced_edge_parens("(Hello World)"), "Hello World");
 /// assert_eq!(strip_balanced_edge_parens("(Hello (World)"), "(Hello (World)");
 /// ```

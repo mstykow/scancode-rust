@@ -34,7 +34,7 @@ pub(super) enum Token {
 ///
 /// # Examples
 /// ```
-/// use scancode_rust::license_detection::expression::parse_expression;
+/// use provenant::license_detection::expression::parse_expression;
 ///
 /// let expr = parse_expression("MIT AND Apache-2.0").unwrap();
 /// ```

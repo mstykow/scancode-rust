@@ -26,13 +26,6 @@ pub const MATCH_AHO: MatcherKind = MatcherKind::Aho;
 ///
 /// # Returns
 /// Byte vector where each token is represented as 2 little-endian bytes
-///
-/// # Examples
-/// ```
-/// let tokens = tids(&[1u16, 2, 3]);
-/// let bytes = tokens_to_bytes(&tokens);
-/// assert_eq!(bytes, vec![1, 0, 2, 0, 3, 0]);
-/// ```
 fn tokens_to_bytes(tokens: &[TokenId]) -> Vec<u8> {
     tokens.iter().flat_map(|t| t.to_le_bytes()).collect()
 }

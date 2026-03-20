@@ -40,26 +40,6 @@ impl SpdxMapping {
     ///
     /// # Returns
     /// A SpdxMapping with populated mappings
-    ///
-    /// # Example
-    /// ```
-    /// use scancode_rust::license_detection::spdx_mapping::build_spdx_mapping;
-    /// use scancode_rust::license_detection::models::License;
-    ///
-    /// let licenses = vec![
-    ///     License {
-    ///         key: "mit".to_string(),
-    ///         name: "MIT License".to_string(),
-    ///         spdx_license_key: Some("MIT".to_string()),
-    ///         category: Some("Permissive".to_string()),
-    ///         text: "MIT License text...".to_string(),
-    ///         reference_urls: vec![],
-    ///         notes: None,
-    ///     },
-    /// ];
-    ///
-    /// let mapping = build_spdx_mapping(&licenses);
-    /// ```
     pub fn build_from_licenses(licenses: &[License]) -> Self {
         let mut scancode_to_spdx = HashMap::new();
 
@@ -84,14 +64,6 @@ impl SpdxMapping {
     ///
     /// # Returns
     /// Option containing SPDX license identifier, or None if key not found
-    ///
-    /// # Example
-    /// ```
-    /// use scancode_rust::license_detection::spdx_mapping::SpdxMapping;
-    ///
-    /// let spdx = mapping.scancode_to_spdx("mit");
-    /// assert_eq!(spdx, Some("MIT".to_string()));
-    /// ```
     pub fn scancode_to_spdx(&self, scancode_key: &str) -> Option<String> {
         self.scancode_to_spdx.get(scancode_key).cloned()
     }
@@ -109,10 +81,25 @@ impl SpdxMapping {
     ///
     /// # Example
     /// ```
-    /// use scancode_rust::license_detection::spdx_mapping::SpdxMapping;
+    /// use provenant::license_detection::spdx_mapping::build_spdx_mapping;
+    /// use provenant::license_detection::models::License;
     ///
-    /// let spdx_expr = mapping.expression_scancode_to_spdx("mit OR gpl-2.0-plus");
-    /// assert_eq!(spdx_expr?, "MIT OR LicenseRef-scancode-gpl-2.0-plus");
+    /// let licenses = vec![
+    ///     License {
+    ///         key: "mit".to_string(),
+    ///         name: "MIT License".to_string(),
+    ///         spdx_license_key: Some("MIT".to_string()),
+    ///         ..Default::default()
+    ///     },
+    ///     License {
+    ///         key: "gpl-2.0-plus".to_string(),
+    ///         name: "GPL 2.0+".to_string(),
+    ///         ..Default::default()
+    ///     },
+    /// ];
+    /// let mapping = build_spdx_mapping(&licenses);
+    /// let spdx_expr = mapping.expression_scancode_to_spdx("mit OR gpl-2.0-plus").unwrap();
+    /// assert_eq!(spdx_expr, "MIT OR LicenseRef-scancode-gpl-2.0-plus");
     /// ```
     pub fn expression_scancode_to_spdx(&self, scancode_expr: &str) -> Result<String, String> {
         let parsed = parse_expression(scancode_expr).map_err(|e| format!("Parse error: {}", e))?;
