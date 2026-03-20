@@ -5,7 +5,12 @@ use crate::output::OutputFormat;
 #[derive(Parser, Debug)]
 #[command(
     author,
-    version,
+    version = env!("CARGO_PKG_VERSION"),
+    long_version = concat!(
+        env!("CARGO_PKG_VERSION"),
+        "\n",
+        "License detection uses data from ScanCode Toolkit (CC-BY-4.0). See NOTICE."
+    ),
     about,
     long_about = None,
     group(
