@@ -509,11 +509,6 @@ fn extract_environment_dependencies(yaml: &Value) -> Vec<Dependency> {
 
 fn parse_environment_string_dependency(dep_str: &str) -> Option<Dependency> {
     let (namespace, channel_url, dep_without_ns) = parse_conda_channel_prefix(dep_str);
-
-    if let Ok(parsed_req) = dep_without_ns.parse::<pep508_rs::Requirement>() {
-        return create_pip_dependency(parsed_req, "dependencies", Some(dep_without_ns));
-    }
-
     create_conda_dependency(namespace, channel_url, dep_without_ns, "dependencies")
 }
 

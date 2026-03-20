@@ -46,6 +46,7 @@ Full INI parsing with comprehensive metadata extraction:
    - Runtime dependencies: `[Prereq]`
    - Test dependencies: `[Prereq / TestRequires]`
    - Build dependencies: `[Prereq / BuildRequires]`
+   - Configure dependencies: `[Prereq / ConfigureRequires]`
    - Extracts version requirements
    - Creates PURLs: `pkg:cpan/{module_name}`
 
@@ -133,6 +134,7 @@ Test::More = 0.88
 - **Author attribution**: Structured author information with email
 - **License compliance**: License information for compliance tracking
 - **Build reproducibility**: Version constraints for all dependencies
+- **Configure-time fidelity**: `ConfigureRequires` is preserved as configure-time, non-runtime dependency metadata instead of falling back to runtime
 
 ## Coverage
 
@@ -140,6 +142,7 @@ Coverage includes:
 
 - Basic metadata extraction
 - Dependency parsing with scopes
+- Configure-time dependency classification
 - Author email parsing
 - Minimal dist.ini handling
 - Author without email
