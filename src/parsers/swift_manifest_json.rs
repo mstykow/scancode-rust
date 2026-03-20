@@ -233,38 +233,102 @@ fn get_dependencies(dependencies: Option<&Value>) -> Vec<Dependency> {
     let mut dependent_packages = Vec::new();
 
     for dependency in deps_array {
-        let Some(source_control) = dependency.get("sourceControl").and_then(|v| v.as_array())
-        else {
-            continue;
-        };
+        if let Some(dep) = parse_manifest_dependency(dependency) {
+            dependent_packages.push(dep);
+        }
+    }
 
-        let Some(source) = source_control.first() else {
-            continue;
-        };
+    dependent_packages
+}
 
+fn parse_manifest_dependency(dependency: &Value) -> Option<Dependency> {
+    if let Some(source_control) = dependency.get("sourceControl").and_then(|v| v.as_array())
+        && let Some(source) = source_control.first()
+    {
         let identity = source
             .get("identity")
             .and_then(|v| v.as_str())
             .unwrap_or_default();
 
         let (namespace, dep_name) = extract_namespace_and_name(source, identity);
-        let (version, is_pinned) = extract_version_requirement(source);
+        let (version, is_pinned, requirement_kind) = extract_version_requirement(source);
         let purl = create_dependency_purl(&namespace, &dep_name, &version, is_pinned);
+        let mut extra_data = HashMap::from([
+            (
+                "dependency_kind".to_string(),
+                serde_json::Value::String("sourceControl".to_string()),
+            ),
+            (
+                "requirement_kind".to_string(),
+                serde_json::Value::String(requirement_kind.to_string()),
+            ),
+        ]);
+        if let Some(remote) = source
+            .get("location")
+            .and_then(|loc| loc.get("remote"))
+            .and_then(|remote| remote.as_array())
+            .and_then(|arr| arr.first())
+            .and_then(|first| first.get("urlString"))
+            .and_then(|v| v.as_str())
+        {
+            extra_data.insert(
+                "location".to_string(),
+                serde_json::Value::String(remote.to_string()),
+            );
+        }
 
-        dependent_packages.push(Dependency {
+        return Some(Dependency {
             purl: Some(purl),
             extracted_requirement: version,
             scope: Some("dependencies".to_string()),
-            is_runtime: Some(true),
+            is_runtime: None,
             is_optional: Some(false),
             is_pinned: Some(is_pinned),
             is_direct: Some(true),
             resolved_package: None,
-            extra_data: None,
+            extra_data: Some(extra_data),
         });
     }
 
-    dependent_packages
+    if let Some(file_system) = dependency.get("fileSystem").and_then(|v| v.as_array())
+        && let Some(source) = file_system.first()
+    {
+        let identity = source
+            .get("identity")
+            .and_then(|v| v.as_str())
+            .or_else(|| source.get("name").and_then(|v| v.as_str()))
+            .unwrap_or_default();
+        if identity.is_empty() {
+            return None;
+        }
+
+        let dep_name = identity.to_string();
+        let purl = create_dependency_purl(&None, &dep_name, &None, false);
+        let mut extra_data = HashMap::from([(
+            "dependency_kind".to_string(),
+            serde_json::Value::String("fileSystem".to_string()),
+        )]);
+        if let Some(path) = source.get("path").and_then(|v| v.as_str()) {
+            extra_data.insert(
+                "path".to_string(),
+                serde_json::Value::String(path.to_string()),
+            );
+        }
+
+        return Some(Dependency {
+            purl: Some(purl),
+            extracted_requirement: None,
+            scope: Some("dependencies".to_string()),
+            is_runtime: None,
+            is_optional: Some(false),
+            is_pinned: Some(false),
+            is_direct: Some(true),
+            resolved_package: None,
+            extra_data: Some(extra_data),
+        });
+    }
+
+    None
 }
 
 fn extract_namespace_and_name(source: &Value, identity: &str) -> (Option<String>, String) {
@@ -327,15 +391,15 @@ pub fn get_namespace_and_name(url: &str) -> (Option<String>, String) {
 /// - `range`: `[{"lowerBound": "1.0.0", "upperBound": "2.0.0"}]` -> version="vers:swift/>=1.0.0|<2.0.0", is_pinned=false
 /// - `branch`: `["main"]` -> version="main", is_pinned=false
 /// - `revision`: `["abc123"]` -> version="abc123", is_pinned=true
-fn extract_version_requirement(source: &Value) -> (Option<String>, bool) {
+fn extract_version_requirement(source: &Value) -> (Option<String>, bool, &'static str) {
     let Some(requirement) = source.get("requirement") else {
-        return (None, false);
+        return (None, false, "unknown");
     };
 
     if let Some(exact) = requirement.get("exact").and_then(|v| v.as_array())
         && let Some(version) = exact.first().and_then(|v| v.as_str())
     {
-        return (Some(version.to_string()), true);
+        return (Some(version.to_string()), true, "exact");
     }
 
     if let Some(range) = requirement.get("range").and_then(|v| v.as_array())
@@ -345,23 +409,23 @@ fn extract_version_requirement(source: &Value) -> (Option<String>, bool) {
         let upper = bound.get("upperBound").and_then(|v| v.as_str());
         if let (Some(lb), Some(ub)) = (lower, upper) {
             let vers = format!("vers:swift/>={lb}|<{ub}");
-            return (Some(vers), false);
+            return (Some(vers), false, "range");
         }
     }
 
     if let Some(branch) = requirement.get("branch").and_then(|v| v.as_array())
         && let Some(branch_name) = branch.first().and_then(|v| v.as_str())
     {
-        return (Some(branch_name.to_string()), false);
+        return (Some(branch_name.to_string()), false, "branch");
     }
 
     if let Some(revision) = requirement.get("revision").and_then(|v| v.as_array())
         && let Some(rev) = revision.first().and_then(|v| v.as_str())
     {
-        return (Some(rev.to_string()), true);
+        return (Some(rev.to_string()), true, "revision");
     }
 
-    (None, false)
+    (None, false, "unknown")
 }
 
 fn create_dependency_purl(

@@ -56,10 +56,10 @@ mod tests {
         );
         assert_eq!(dep0.extracted_requirement.as_deref(), Some("24.4.0"));
         assert_eq!(dep0.scope.as_deref(), Some("dependencies"));
-        assert_eq!(dep0.is_runtime, Some(true));
+        assert_eq!(dep0.is_runtime, None);
         assert_eq!(dep0.is_optional, Some(false));
         assert_eq!(dep0.is_pinned, Some(true));
-        assert_eq!(dep0.is_direct, Some(true));
+        assert_eq!(dep0.is_direct, None);
 
         let dep2 = &data.dependencies[2];
         assert_eq!(
@@ -84,8 +84,8 @@ mod tests {
         );
         assert_eq!(dep0.extracted_requirement.as_deref(), Some("5.1.0"));
         assert_eq!(dep0.is_pinned, Some(true));
-        assert_eq!(dep0.is_runtime, Some(true));
-        assert_eq!(dep0.is_direct, Some(true));
+        assert_eq!(dep0.is_runtime, None);
+        assert_eq!(dep0.is_direct, None);
 
         let dep1 = &data.dependencies[1];
         assert_eq!(
@@ -203,10 +203,10 @@ mod tests {
         let data = SwiftPackageResolvedParser::extract_first_package(&path);
 
         for dep in &data.dependencies {
-            assert_eq!(dep.is_runtime, Some(true));
+            assert_eq!(dep.is_runtime, None);
             assert_eq!(dep.is_optional, Some(false));
             assert_eq!(dep.is_pinned, Some(true));
-            assert_eq!(dep.is_direct, Some(true));
+            assert_eq!(dep.is_direct, None);
             assert_eq!(dep.scope.as_deref(), Some("dependencies"));
             assert!(dep.purl.is_some());
             assert!(dep.extracted_requirement.is_some());
