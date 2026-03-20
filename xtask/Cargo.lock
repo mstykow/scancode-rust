@@ -588,6 +588,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "deunicode"
+version = "1.6.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "abd57806937c9cc163efc8ea3910e00a62e2aeb0b8119f1793a978088f8f6b04"
+
+[[package]]
 name = "digest"
 version = "0.10.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1986,6 +1992,7 @@ dependencies = [
 name = "provenant-cli"
 version = "0.0.5"
 dependencies = [
+ "aho-corasick",
  "anyhow",
  "ar",
  "base64",
@@ -1996,9 +2003,11 @@ dependencies = [
  "content_inspector",
  "csv",
  "derive_builder",
+ "deunicode",
  "env_logger",
  "flate2",
  "glob",
+ "hex",
  "image",
  "include_dir",
  "indicatif",
@@ -2011,6 +2020,7 @@ dependencies = [
  "log",
  "md-5",
  "mime_guess",
+ "once_cell",
  "packageurl",
  "pdf-extract",
  "pep508_rs",
@@ -2034,7 +2044,9 @@ dependencies = [
  "toml",
  "unicode-normalization",
  "url",
+ "urlencoding",
  "uuid",
+ "xml-rs",
  "zip",
  "zstd",
 ]
@@ -2050,11 +2062,13 @@ dependencies = [
  "provenant-cli",
  "rayon",
  "regex",
+ "rmp-serde",
  "serde",
  "serde_json",
  "serde_yaml",
  "tempfile",
  "url",
+ "zstd",
 ]
 
 [[package]]
@@ -3388,6 +3402,21 @@ checksum = "32e45ad4206f6d2479085147f02bc2ef834ac85886624a23575ae137c8aa8156"
 dependencies = [
  "libc",
  "rustix",
+]
+
+[[package]]
+name = "xml"
+version = "1.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b8aa498d22c9bbaf482329839bc5620c46be275a19a812e9a22a2b07529a642a"
+
+[[package]]
+name = "xml-rs"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c3a56132a0d6ecbe77352edc10232f788fc4ceefefff4cab784a98e0e16b6b51"
+dependencies = [
+ "xml",
 ]
 
 [[package]]

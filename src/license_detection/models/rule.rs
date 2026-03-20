@@ -74,11 +74,6 @@ impl RuleKind {
         matches!(self, Self::Text)
     }
 
-    /// Returns true if this rule kind is Notice.
-    ///
-    /// Note: This method is kept for API completeness. License matches cannot
-    /// have Notice kind - only rules can.
-    #[allow(dead_code)]
     pub const fn is_license_notice(self) -> bool {
         matches!(self, Self::Notice)
     }
@@ -91,11 +86,6 @@ impl RuleKind {
         matches!(self, Self::Tag)
     }
 
-    /// Returns true if this rule kind is Intro.
-    ///
-    /// Note: This method is kept for API completeness. Used internally for
-    /// match filtering but not called on Rule objects directly in the binary.
-    #[allow(dead_code)]
     pub const fn is_license_intro(self) -> bool {
         matches!(self, Self::Intro)
     }

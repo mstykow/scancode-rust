@@ -404,19 +404,6 @@ pub fn parse_rule_to_loaded(path: &Path) -> Result<LoadedRule> {
     })
 }
 
-/// Parse a .RULE file into a `Rule` (backward-compatible).
-///
-/// This function parses the file and returns a runtime `Rule`.
-/// Deprecated entries are included - filtering is a build-stage concern.
-///
-/// Kept for backward compatibility and testing despite not being used in production code.
-/// The new pipeline uses `parse_rule_to_loaded` + `loaded_rule_to_rule` instead.
-#[allow(dead_code)]
-pub fn parse_rule_file(path: &Path) -> Result<Rule> {
-    let loaded = parse_rule_to_loaded(path)?;
-    Ok(loaded_rule_to_rule(loaded))
-}
-
 /// Parse a .LICENSE file into a `LoadedLicense` (loader-stage).
 ///
 /// This function parses the file and returns a `LoadedLicense` with normalized data.
@@ -498,19 +485,6 @@ pub fn parse_license_to_loaded(path: &Path) -> Result<LoadedLicense> {
         ignorable_urls: LoadedLicense::normalize_optional_list(fm.ignorable_urls.as_deref()),
         ignorable_emails: LoadedLicense::normalize_optional_list(fm.ignorable_emails.as_deref()),
     })
-}
-
-/// Parse a .LICENSE file into a `License` (backward-compatible).
-///
-/// This function parses the file and returns a runtime `License`.
-/// Deprecated entries are included - filtering is a build-stage concern.
-///
-/// Kept for backward compatibility and testing despite not being used in production code.
-/// The new pipeline uses `parse_license_to_loaded` + `loaded_license_to_license` instead.
-#[allow(dead_code)]
-pub fn parse_license_file(path: &Path) -> Result<License> {
-    let loaded = parse_license_to_loaded(path)?;
-    Ok(loaded_license_to_license(loaded))
 }
 
 /// Parse license file content into frontmatter and text sections.
@@ -724,6 +698,11 @@ mod tests {
     use std::fs;
     use tempfile::tempdir;
 
+    pub fn parse_rule_file(path: &Path) -> Result<Rule> {
+        let loaded = parse_rule_to_loaded(path)?;
+        Ok(loaded_rule_to_rule(loaded))
+    }
+
     #[test]
     fn test_parse_number_as_u8() {
         let num_int: serde_yaml::Number = serde_yaml::from_str("100").unwrap();
@@ -753,7 +732,9 @@ MIT License text here"#,
         )
         .unwrap();
 
-        let license = parse_license_file(&license_path).unwrap();
+        let license = parse_license_to_loaded(&license_path)
+            .map(loaded_license_to_license)
+            .unwrap();
         assert_eq!(license.key, "mit");
         assert_eq!(license.name, "MIT License");
         assert!(license.text.contains("MIT License text"));

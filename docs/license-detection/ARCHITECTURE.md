@@ -44,7 +44,7 @@ main.rs::init_license_engine()
             ↓
         Build LicenseIndex
             ↓
-    Arc<LicenseDetectionEngine> shared across scanner threads
+Arc<LicenseDetectionEngine> shared across scanner threads
 ```
 
 ---
@@ -94,7 +94,7 @@ When the ScanCode rules dataset is updated, regenerate the embedded artifact:
 ./setup.sh
 
 # Regenerate the artifact
-./scripts/update-license-loader-artifact.sh
+./scripts/update_license_loader_artifact.sh
 
 # Commit the updated artifact
 git add resources/license_detection/license_index_loader.msgpack.zst
@@ -196,36 +196,36 @@ INPUT: File text content
 ┌─────────────────────────────────────────────────────────────────────┐
 │ 2. MATCHING (Priority Order)                                        │
 │                                                                     │
-│  ┌─────────────────────────────────────────────────────────────┐   │
-│  │ 1a. HASH MATCH (1-hash)                                     │   │
-│  │     • SHA1 of token sequence → lookup in rid_by_hash        │   │
-│  │     • 100% confidence, immediate return if found            │   │
-│  └─────────────────────────────────────────────────────────────┘   │
-│  ┌─────────────────────────────────────────────────────────────┐   │
-│  │ 1b. SPDX-LID MATCH (1-spdx-id)                              │   │
-│  │     • Parse SPDX-License-Identifier tags                    │   │
-│  │     • Handle AND, OR, WITH expressions                      │   │
-│  └─────────────────────────────────────────────────────────────┘   │
-│  ┌─────────────────────────────────────────────────────────────┐   │
-│  │ 1c. AHO-CORASICK MATCH (2-aho)                              │   │
-│  │     • Multi-pattern exact matching via automaton            │   │
-│  │     • Find all overlapping matches                          │   │
-│  └─────────────────────────────────────────────────────────────┘   │
-│  ┌─────────────────────────────────────────────────────────────┐   │
-│  │ 2. NEAR-DUPLICATE MATCH                                     │   │
-│  │     • Set similarity >= 0.8 for whole query                 │   │
-│  │     • Sequence matching on top candidates                   │   │
-│  └─────────────────────────────────────────────────────────────┘   │
-│  ┌─────────────────────────────────────────────────────────────┐   │
-│  │ 3. SEQUENCE MATCH (3-seq)                                   │   │
-│  │     • Set-based candidate selection                         │   │
-│  │     • Sequence alignment for scoring                        │   │
-│  └─────────────────────────────────────────────────────────────┘   │
-│  ┌─────────────────────────────────────────────────────────────┐   │
-│  │ 4. QUERY RUN MATCH                                          │   │
-│  │     • Process segmented regions separately                  │   │
-│  │     • Skip already-matched regions                          │   │
-│  └─────────────────────────────────────────────────────────────┘   │
+│  ┌─────────────────────────────────────────────────────────────┐    │
+│  │ 1a. HASH MATCH (1-hash)                                     │    │
+│  │     • SHA1 of token sequence → lookup in rid_by_hash        │    │
+│  │     • 100% confidence, immediate return if found            │    │
+│  └─────────────────────────────────────────────────────────────┘    │
+│  ┌─────────────────────────────────────────────────────────────┐    │
+│  │ 1b. SPDX-LID MATCH (1-spdx-id)                              │    │
+│  │     • Parse SPDX-License-Identifier tags                    │    │
+│  │     • Handle AND, OR, WITH expressions                      │    │
+│  └─────────────────────────────────────────────────────────────┘    │
+│  ┌─────────────────────────────────────────────────────────────┐    │
+│  │ 1c. AHO-CORASICK MATCH (2-aho)                              │    │
+│  │     • Multi-pattern exact matching via automaton            │    │
+│  │     • Find all overlapping matches                          │    │
+│  └─────────────────────────────────────────────────────────────┘    │
+│  ┌─────────────────────────────────────────────────────────────┐    │
+│  │ 2. NEAR-DUPLICATE MATCH                                     │    │
+│  │     • Set similarity >= 0.8 for whole query                 │    │
+│  │     • Sequence matching on top candidates                   │    │
+│  └─────────────────────────────────────────────────────────────┘    │
+│  ┌─────────────────────────────────────────────────────────────┐    │
+│  │ 3. SEQUENCE MATCH (3-seq)                                   │    │
+│  │     • Set-based candidate selection                         │    │
+│  │     • Sequence alignment for scoring                        │    │
+│  └─────────────────────────────────────────────────────────────┘    │
+│  ┌─────────────────────────────────────────────────────────────┐    │
+│  │ 4. QUERY RUN MATCH                                          │    │
+│  │     • Process segmented regions separately                  │    │
+│  │     • Skip already-matched regions                          │    │
+│  └─────────────────────────────────────────────────────────────┘    │
 └─────────────────────────────────────────────────────────────────────┘
           │
           ▼

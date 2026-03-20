@@ -53,50 +53,50 @@ Provenant implements a multi-phase processing pipeline based on Python ScanCode'
 
 ```text
 ┌─────────────────────────────────────────────────────────────────┐
-│                    ScanCode Processing Pipeline                  │
+│                    ScanCode Processing Pipeline                 │
 ├─────────────────────────────────────────────────────────────────┤
-│                                                                  │
+│                                                                 │
 │  Phase 1: Pre-Scan                                              │
-│  ┌────────────────────────────────────────────────────────┐    │
+│  ┌────────────────────────────────────────────────────────┐     │
 │  │ • Archive extraction                                    │    │
 │  │ • File type detection                                   │    │
 │  │ • Pre-processing hooks                                  │    │
-│  └────────────────────────────────────────────────────────┘    │
-│                           │                                      │
-│                           ▼                                      │
+│  └────────────────────────────────────────────────────────┘     │
+│                           │                                     │
+│                           ▼                                     │
 │  Phase 2: Scanning                                              │
-│  ┌────────────────────────────────────────────────────────┐    │
-│  │ • Package manifest parsing (see SUPPORTED_FORMATS.md)   │    │
-│  │ • License text detection                                │    │
-│  │ • Copyright detection                                   │    │
-│  │ • Email/URL extraction                                  │    │
-│  └────────────────────────────────────────────────────────┘    │
-│                           │                                      │
-│                           ▼                                      │
+│  ┌────────────────────────────────────────────────────────┐     │
+│  │ • Package manifest parsing (see SUPPORTED_FORMATS.md)  |     │
+│  │ • License text detection                               |     │
+│  │ • Copyright detection                                  |     │
+│  │ • Email/URL extraction                                 |     │
+│  └────────────────────────────────────────────────────────┘     │
+│                           │                                     │
+│                           ▼                                     │
 │  Phase 3: Post-Processing                                       │
-│  ┌────────────────────────────────────────────────────────┐    │
-│  │ • Package assembly (sibling, nested, file-ref, workspace)│    │
-│  │ • Package consolidation/deduplication                   │    │
-│  │ • License/copyright summarization                       │    │
-│  │ • Tallies and facets                                    │    │
-│  │ • Classification                                        │    │
-│  └────────────────────────────────────────────────────────┘    │
-│                           │                                      │
-│                           ▼                                      │
+│  ┌──────────────────────────────────────────────────────────┐   |
+│  │ • Package assembly (sibling, nested, file-ref, workspace)│   │
+│  │ • Package consolidation/deduplication                    │   │
+│  │ • License/copyright summarization                        │   │
+│  │ • Tallies and facets                                     │   │
+│  │ • Classification                                         │   │
+│  └──────────────────────────────────────────────────────────┘   │
+│                           │                                     │
+│                           ▼                                     │
 │  Phase 4: Filtering                                             │
-│  ┌────────────────────────────────────────────────────────┐    │
-│  │ • License policy filtering                              │    │
-│  │ • Custom filter plugins                                 │    │
-│  └────────────────────────────────────────────────────────┘    │
-│                           │                                      │
-│                           ▼                                      │
+│  ┌────────────────────────────────────────────────────────┐     │
+│  │ • License policy filtering                             │     │
+│  │ • Custom filter plugins                                │     │
+│  └────────────────────────────────────────────────────────┘     │
+│                           │                                     │
+│                           ▼                                     │
 │  Phase 5: Output                                                │
-│  ┌────────────────────────────────────────────────────────┐    │
-│  │ • JSON output (ScanCode-compatible)                     │    │
-│  │ • SPDX, CycloneDX, CSV, YAML, HTML, JSONL              │    │
-│  │ • HTML app and custom templates                         │    │
-│  └────────────────────────────────────────────────────────┘    │
-│                                                                  │
+│  ┌────────────────────────────────────────────────────────┐     │
+│  │ • JSON output (ScanCode-compatible)                    │     │
+│  │ • SPDX, CycloneDX, CSV, YAML, HTML, JSONL              │     │
+│  │ • HTML app and custom templates                        │     │
+│  └────────────────────────────────────────────────────────┘     │
+│                                                                 │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -278,38 +278,38 @@ pub struct PackageData {
 
 ```text
 ┌────────────────────────────────────────────────────────────┐
-│                      Provenant                            │
+│                      Provenant                             │
 ├────────────────────────────────────────────────────────────┤
 │                                                            │
-│  1. File Discovery           2. Parser Selection          │
-│  ┌────────────────┐          ┌───────────────┐           │
-│  │ Walk directory │─────────>│ Match file    │           │
-│  │ Apply filters  │          │ to parser     │           │
-│  └────────────────┘          └───────┬───────┘           │
+│  1. File Discovery           2. Parser Selection           │
+│  ┌────────────────┐          ┌───────────────┐             │
+│  │ Walk directory │─────────>│ Match file    │             │
+│  │ Apply filters  │          │ to parser     │             │
+│  └────────────────┘          └───────┬───────┘             │
 │                                      │                     │
 │  3. Extraction                       v                     │
-│  ┌────────────────────────────────────────────┐           │
-│  │ PackageParser::extract_packages()           │           │
-│  │ ─ Read manifest                            │           │
-│  │ ─ Parse structure                          │           │
-│  │ ─ Extract metadata                         │           │
-│  │ ─ Return PackageData                       │           │
-│  └────────────────┬───────────────────────────┘           │
+│  ┌────────────────────────────────────────────┐            │
+│  │ PackageParser::extract_packages()          │            │
+│  │ ─ Read manifest                            │            │
+│  │ ─ Parse structure                          │            │
+│  │ ─ Extract metadata                         │            │
+│  │ ─ Return PackageData                       │            │
+│  └────────────────┬───────────────────────────┘            │
 │                   │                                        │
 │  4. Output        v                                        │
-│  ┌─────────────────────────────────────┐                  │
-│  │ Output format dispatch              │                  │
-│  │ ─ JSON / YAML / CSV / JSONL         │                  │
-│  │ ─ SPDX / CycloneDX / HTML / template│                  │
-│  └─────────────────────────────────────┘                  │
+│  ┌─────────────────────────────────────┐                   │
+│  │ Output format dispatch              │                   │
+│  │ ─ JSON / YAML / CSV / JSONL         │                   │
+│  │ ─ SPDX / CycloneDX / HTML / template│                   │
+│  └─────────────────────────────────────┘                   │
 │                                                            │
-│  Detection Engines (Integrated)                           │
-│  ┌───────────────────┐  ┌──────────────────┐             │
-│  │ License Detection │  │ Copyright        │             │
-│  │ ─ SPDX normalize  │  │ Detection        │             │
-│  │ ─ Confidence      │  │ ─ Holder extract │             │
-│  │ ─ Score threshold │  │ ─ Author extract │             │
-│  └───────────────────┘  └──────────────────┘             │
+│  Detection Engines (Integrated)                            │
+│  ┌───────────────────┐  ┌──────────────────┐               │
+│  │ License Detection │  │ Copyright        │               │
+│  │ ─ SPDX normalize  │  │ Detection        │               │
+│  │ ─ Confidence      │  │ ─ Holder extract │               │
+│  │ ─ Score threshold │  │ ─ Author extract │               │
+│  └───────────────────┘  └──────────────────┘               │
 └────────────────────────────────────────────────────────────┘
 ```
 
@@ -375,39 +375,39 @@ Assembly is configurable via the `--no-assemble` CLI flag. See `src/assembly/` f
 
 ```text
 ┌─────────────────────────────────────────────────────────┐
-│                  Security Layers                         │
+│                  Security Layers                        │
 ├─────────────────────────────────────────────────────────┤
-│                                                          │
+│                                                         │
 │  Layer 1: No Code Execution                             │
-│  ┌────────────────────────────────────────────────┐    │
-│  │ AST parsing only (setup.py, build.gradle)      │    │
-│  │ Never eval/exec/subprocess                      │    │
-│  │ Regex/token-based for DSLs                      │    │
-│  └────────────────────────────────────────────────┘    │
-│                                                          │
+│  ┌────────────────────────────────────────────────┐     │
+│  │ AST parsing only (setup.py, build.gradle)      │     │
+│  │ Never eval/exec/subprocess                     │     │
+│  │ Regex/token-based for DSLs                     │     │
+│  └────────────────────────────────────────────────┘     │
+│                                                         │
 │  Layer 2: Resource Limits                               │
-│  ┌────────────────────────────────────────────────┐    │
-│  │ File size: 100MB max                            │    │
-│  │ Recursion depth: 50 levels                      │    │
-│  │ Iterations: 100,000 max                         │    │
-│  │ String length: 10MB per field                   │    │
-│  └────────────────────────────────────────────────┘    │
-│                                                          │
+│  ┌────────────────────────────────────────────────┐     │
+│  │ File size: 100MB max                           │     │
+│  │ Recursion depth: 50 levels                     │     │
+│  │ Iterations: 100,000 max                        │     │
+│  │ String length: 10MB per field                  │     │
+│  └────────────────────────────────────────────────┘     │
+│                                                         │
 │  Layer 3: Archive Safety                                │
-│  ┌────────────────────────────────────────────────┐    │
-│  │ Uncompressed size: 1GB max                      │    │
-│  │ Compression ratio: 100:1 max (zip bomb detect)  │    │
-│  │ Path traversal: Block ../ patterns              │    │
-│  │ Temp cleanup: Automatic via TempDir             │    │
-│  └────────────────────────────────────────────────┘    │
-│                                                          │
+│  ┌────────────────────────────────────────────────┐     │
+│  │ Uncompressed size: 1GB max                     │     │
+│  │ Compression ratio: 100:1 max (zip bomb detect) │     │
+│  │ Path traversal: Block ../ patterns             │     │
+│  │ Temp cleanup: Automatic via TempDir            │     │
+│  └────────────────────────────────────────────────┘     │
+│                                                         │
 │  Layer 4: Input Validation                              │
-│  ┌────────────────────────────────────────────────┐    │
-│  │ Result<T, E> error handling                     │    │
-│  │ No .unwrap() in library code                    │    │
-│  │ Graceful degradation on errors                  │    │
-│  │ UTF-8 validation with lossy fallback            │    │
-│  └────────────────────────────────────────────────┘    │
+│  ┌────────────────────────────────────────────────┐     │
+│  │ Result<T, E> error handling                    │     │
+│  │ No .unwrap() in library code                   │     │
+│  │ Graceful degradation on errors                 │     │
+│  │ UTF-8 validation with lossy fallback           │     │
+│  └────────────────────────────────────────────────┘     │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -418,18 +418,18 @@ See [ADR 0004: Security-First Parsing](adr/0004-security-first-parsing.md) for c
 ### Four-Layer Test Pyramid
 
 ```text
-         /\
-        /  \    Integration Tests
-       /    \   ─ End-to-end scanner pipeline
-      /------\  ─ Full scan validation
-     /        \
-    / Golden   \ Golden Tests
-   /  Tests     \ ─ Compare with Python ScanCode output
-  /--------------\ ─ Real-world manifest files
- /                \
-/    Unit Tests    \ Unit Tests + Doctests
-/   + Doctests      \ ─ Parser functions, edge cases
-/____________________\ ─ API documentation examples
+          /\
+         /  \    Integration Tests
+        /    \   ─ End-to-end scanner pipeline
+       /------\  ─ Full scan validation
+      /        \
+     / Golden   \ Golden Tests
+    /  Tests     \ ─ Compare with Python ScanCode output
+   /--------------\ ─ Real-world manifest files
+  /                \
+ /   Unit Tests     \ Unit Tests + Doctests
+/  + Doctests        \ ─ Parser functions, edge cases
+/_____________________\ ─ API documentation examples
 ```
 
 **Four layers** (see [TESTING_STRATEGY.md](TESTING_STRATEGY.md) for full details):
@@ -447,7 +447,7 @@ See [ADR 0003: Golden Test Strategy](adr/0003-golden-test-strategy.md) for golde
 
 ```text
 ┌─────────────────────────────────────────────────────────┐
-│                 Documentation Sources                    │
+│                 Documentation Sources                   │
 └─────────────────────────────────────────────────────────┘
            │                    │                  │
            ▼                    ▼                  ▼
@@ -798,7 +798,7 @@ Maintainers can regenerate the embedded license artifact when the ScanCode rules
 ./setup.sh
 
 # Regenerate the artifact
-./scripts/update-license-loader-artifact.sh
+./scripts/update_license_loader_artifact.sh
 
 # Commit the updated artifact
 git add resources/license_detection/license_index_loader.msgpack.zst

@@ -26,3 +26,10 @@ If we revisit this area, we should evaluate whether `QueryRun` should own a real
 the empty-run case. That could make the composition more natural and reduce
 ad-hoc conversions, but it needs to be weighed against the current `end: Option<usize>`
 shape that also encodes emptiness.
+
+## Use Rule references in LicenseMatch
+
+In many places such as `LicenseMatch`, we store ids of rules as `usize` meaning we
+need to look them up in the `LicenseIndex` everytime we want to access some `Rule` data.
+Instead, it would likely be more appropriate to store a reference `&Rule` to the `Rule`.
+This will complicate the lifetimes but is conceptually the correct choice.

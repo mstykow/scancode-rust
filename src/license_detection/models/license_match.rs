@@ -6,8 +6,7 @@ use std::collections::HashSet;
 use std::fmt;
 use std::str::FromStr;
 
-use crate::license_detection::index::LicenseIndex;
-use crate::license_detection::models::{Rule, RuleKind};
+use crate::license_detection::models::RuleKind;
 
 fn default_rule_length() -> usize {
     0
@@ -235,7 +234,6 @@ struct SerializableLicenseMatch<'a> {
 /// is not passed to `from_match_flags` because match objects cannot have this
 /// flag (only rule objects can). This is correct behavior matching Python.
 #[derive(Deserialize)]
-#[allow(dead_code)]
 struct DeserializableLicenseMatch {
     #[serde(default)]
     license_expression: String,
@@ -267,6 +265,7 @@ struct DeserializableLicenseMatch {
     #[serde(default)]
     is_license_text: bool,
     #[serde(default)]
+    #[allow(dead_code)] // see comment above
     is_license_notice: bool,
     #[serde(default)]
     is_license_intro: bool,
@@ -411,18 +410,6 @@ impl Default for LicenseMatch {
 }
 
 impl LicenseMatch {
-    /// Returns the Rule object for this match from the index.
-    ///
-    /// Note: This method is kept for debugging and potential future use.
-    /// The match already contains all needed rule information as fields.
-    #[allow(dead_code)]
-    pub fn rule<'a>(&self, index: &'a LicenseIndex) -> Option<&'a Rule> {
-        let rule = index.rules_by_rid.get(self.rid)?;
-        (rule.identifier == self.rule_identifier
-            && rule.license_expression == self.license_expression)
-            .then_some(rule)
-    }
-
     pub fn matcher_order(&self) -> u8 {
         self.matcher.precedence()
     }

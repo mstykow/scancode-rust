@@ -558,7 +558,7 @@ pub static ASSEMBLERS: &[AssemblerConfig] = &[
 /// - Supplementary metadata files (not primary package definitions)
 ///
 /// This list serves as documentation; it is not used at runtime.
-#[allow(dead_code)] // used only in tests (test_every_datasource_id_is_accounted_for)
+#[cfg(test)]
 pub static UNASSEMBLED_DATASOURCE_IDS: &[DatasourceId] = &[
     // Non-package metadata
     DatasourceId::Readme,

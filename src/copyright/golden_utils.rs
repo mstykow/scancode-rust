@@ -4,6 +4,7 @@ use std::path::Path;
 
 use crate::utils::file::extract_text_for_detection;
 
+#[allow(dead_code)] // used by golden tests and update_copyright_golden.rs
 pub fn canonicalize_golden_value(s: &str) -> String {
     let s = s
         .replace(". ,", ".,")
@@ -12,6 +13,7 @@ pub fn canonicalize_golden_value(s: &str) -> String {
     s.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
+#[allow(dead_code)] // used by golden tests and update_copyright_golden.rs
 pub fn read_input_content(input_path: &Path) -> io::Result<String> {
     let bytes = fs::read(input_path)?;
     let ext = input_path

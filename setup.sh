@@ -44,7 +44,7 @@ cd ../..
 if [ "$CURRENT_COMMIT" != "$NEW_COMMIT" ]; then
     echo "✅ License data updated: ${CURRENT_COMMIT:0:7} → ${NEW_COMMIT:0:7}"
     echo "⚠️  Remember to update the embedded license loader artifact and commit the submodule update:"
-    echo "   ./scripts/update-license-loader-artifact.sh"
+    echo "   ./scripts/update_license_loader_artifact.sh"
     echo "   git add resources/licenses"
     echo "   git commit -m 'chore: update SPDX license data'"
 else

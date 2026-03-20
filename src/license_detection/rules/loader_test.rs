@@ -6,13 +6,15 @@
 //! - Various delimiter formats
 
 use super::*;
+use crate::license_detection::index::{loaded_license_to_license, loaded_rule_to_rule};
 use crate::license_detection::models::{License, Rule};
 use anyhow::Result;
 
 fn parse_license_from_str(content: &str, filename: &str) -> Result<License> {
     let temp_path = std::env::temp_dir().join(filename);
     std::fs::write(&temp_path, content)?;
-    let result = parse_license_file(&temp_path);
+    let loaded = parse_license_to_loaded(&temp_path)?;
+    let result = Ok(loaded_license_to_license(loaded));
     let _ = std::fs::remove_file(&temp_path);
     result
 }
@@ -20,9 +22,10 @@ fn parse_license_from_str(content: &str, filename: &str) -> Result<License> {
 fn parse_rule_from_str(content: &str, filename: &str) -> Result<Rule> {
     let temp_path = std::env::temp_dir().join(filename);
     std::fs::write(&temp_path, content)?;
-    let result = parse_rule_file(&temp_path);
+    let loaded = parse_rule_to_loaded(&temp_path)?;
+    let result = loaded_rule_to_rule(loaded);
     let _ = std::fs::remove_file(&temp_path);
-    result
+    Ok(result)
 }
 
 #[test]

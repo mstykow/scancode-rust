@@ -24,7 +24,6 @@ use crate::utils::spdx::combine_license_expressions;
 mod assembly;
 mod cache;
 mod cli;
-#[allow(dead_code, unused_imports)]
 mod copyright;
 mod finder;
 mod license_detection;
