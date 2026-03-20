@@ -9,11 +9,12 @@
 use super::*;
 use crate::license_detection::embedded::schema::{EmbeddedLoaderSnapshot, SCHEMA_VERSION};
 use crate::license_detection::models::{LoadedLicense, LoadedRule, RuleKind};
+use crate::license_detection::{SCANCODE_LICENSES_LICENSES_PATH, SCANCODE_LICENSES_RULES_PATH};
 use std::path::PathBuf;
 
 fn get_reference_data_paths() -> Option<(PathBuf, PathBuf)> {
-    let rules_path = PathBuf::from("reference/scancode-toolkit/src/licensedcode/data/rules");
-    let licenses_path = PathBuf::from("reference/scancode-toolkit/src/licensedcode/data/licenses");
+    let rules_path = PathBuf::from(SCANCODE_LICENSES_RULES_PATH);
+    let licenses_path = PathBuf::from(SCANCODE_LICENSES_LICENSES_PATH);
     if rules_path.exists() && licenses_path.exists() {
         Some((rules_path, licenses_path))
     } else {

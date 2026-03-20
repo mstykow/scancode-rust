@@ -722,6 +722,8 @@ Ongoing quality improvements:
 
 ## License Data Architecture
 
+For detailed documentation of the license detection pipeline, matching algorithms, and engine components, see [LICENSE_DETECTION_ARCHITECTURE.md](LICENSE_DETECTION_ARCHITECTURE.md).
+
 ### Self-Contained Binary
 
 The binary ships with a built-in license index embedded at compile time. This eliminates the need for external files during normal usage:

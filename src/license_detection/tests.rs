@@ -138,7 +138,7 @@ fn test_engine_from_embedded_initializes() {
 
 #[test]
 fn test_engine_from_embedded_matches_from_directory() {
-    let data_path = PathBuf::from("reference/scancode-toolkit/src/licensedcode/data");
+    let data_path = PathBuf::from(super::SCANCODE_LICENSES_DATA_PATH);
     let Some(engine_from_dir) = LicenseDetectionEngine::from_directory(&data_path).ok() else {
         eprintln!("Skipping test: reference directory not found");
         return;

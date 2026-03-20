@@ -45,10 +45,10 @@ fn main() -> Result<()> {
         PathBuf::from("resources/license_detection/license_index_loader.msgpack.zst")
     });
     let rules_dir = args.rules.unwrap_or_else(|| {
-        PathBuf::from("resources/scancode-licenses/src/licensedcode/data/rules")
+        PathBuf::from(provenant::license_detection::SCANCODE_LICENSES_RULES_PATH)
     });
     let licenses_dir = args.licenses.unwrap_or_else(|| {
-        PathBuf::from("resources/scancode-licenses/src/licensedcode/data/licenses")
+        PathBuf::from(provenant::license_detection::SCANCODE_LICENSES_LICENSES_PATH)
     });
 
     println!("Loading rules from: {}", rules_dir.display());

@@ -10,7 +10,7 @@ This guide provides essential information for AI coding agents working on the `P
 - **How-To Guides**: [`docs/HOW_TO_ADD_A_PARSER.md`](docs/HOW_TO_ADD_A_PARSER.md) - Step-by-step guide for adding new parsers
 - **Architectural Decision Records**: [`docs/adr/`](docs/adr/) - Why key decisions were made (5 ADRs)
 - **Beyond-Parity Features**: [`docs/improvements/`](docs/improvements/) - Where Rust exceeds Python (7 parsers documented)
-- **License Detection Architecture**: [`docs/license-detection/ARCHITECTURE.md`](docs/license-detection/ARCHITECTURE.md) - Current license detection architecture, embedded index flow, and maintainer workflow
+- **License Detection Architecture**: [`docs/LICENSE_DETECTION_ARCHITECTURE.md`](docs/LICENSE_DETECTION_ARCHITECTURE.md) - Current license detection architecture, embedded index flow, and maintainer workflow
 - **Supported Formats**: [`docs/SUPPORTED_FORMATS.md`](docs/SUPPORTED_FORMATS.md) - Auto-generated list of all supported package formats
 - **API Reference**: Run `cargo doc --open` - Complete API documentation
 - **This File**: Quick start, code style, common pitfalls

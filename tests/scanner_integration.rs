@@ -1,5 +1,5 @@
 use glob::Pattern;
-use provenant::license_detection::LicenseDetectionEngine;
+use provenant::license_detection::{LicenseDetectionEngine, SCANCODE_LICENSES_DATA_PATH};
 use provenant::models::PackageType;
 use provenant::parsers::list_parser_types;
 use provenant::progress::{ProgressMode, ScanProgress};
@@ -11,7 +11,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 fn create_license_detection_engine() -> Option<Arc<LicenseDetectionEngine>> {
-    let data_path = Path::new("reference/scancode-toolkit/src/licensedcode/data");
+    let data_path = Path::new(SCANCODE_LICENSES_DATA_PATH);
     if !data_path.exists() {
         eprintln!("Reference data not available at {:?}", data_path);
         return None;

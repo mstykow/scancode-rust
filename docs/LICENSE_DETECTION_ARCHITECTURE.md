@@ -21,7 +21,7 @@ The license detection system is a multi-phase, multi-strategy detection engine t
 
 ### Initialization Flow
 
-```
+```text
 main.rs::init_license_engine()
     │
     ├── No --license-rules-path specified (default)
@@ -184,7 +184,7 @@ Also includes `QueryRun` values created on demand from stored run ranges.
 
 ## Detection Pipeline
 
-```
+```text
 INPUT: File text content
         │
         ▼

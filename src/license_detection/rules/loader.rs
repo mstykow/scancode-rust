@@ -787,7 +787,7 @@ MIT License"#,
 
     #[test]
     fn test_load_licenses_from_reference() {
-        let path = Path::new("reference/scancode-toolkit/src/licensedcode/data/licenses");
+        let path = Path::new(crate::license_detection::SCANCODE_LICENSES_LICENSES_PATH);
         if !path.exists() {
             eprintln!("Skipping test: reference directory not found");
             return;
@@ -806,7 +806,7 @@ MIT License"#,
 
     #[test]
     fn test_load_rules_from_reference() {
-        let path = Path::new("reference/scancode-toolkit/src/licensedcode/data/rules");
+        let path = Path::new(crate::license_detection::SCANCODE_LICENSES_RULES_PATH);
         if !path.exists() {
             eprintln!("Skipping test: reference directory not found");
             return;
