@@ -8,12 +8,8 @@ node_modules/
 # Submodules (external code, do not format)
 reference/
 resources/licenses/
+testdata/
 
 # Generated files (if any)
 *.min.js
 *.min.json
-
-# Test data files with intentional syntax errors or non-standard formats
-testdata/copyright-golden/copyrights/misco2/package-author.json
-testdata/conda/meta-yaml/abeona/meta.yaml
-testdata/conda/meta-yaml/gcnvkernel/meta.yaml
