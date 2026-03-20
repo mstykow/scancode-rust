@@ -6,14 +6,11 @@ Golden tests compare parser output against expected results from the original Sc
 
 ## Coverage Status
 
-This fixture set covers representative `pubspec.lock` and `pubspec.yaml` inputs, but parser-only golden activation still depends on the surrounding license-detection integration boundary.
+These parser-only goldens are active and cover:
 
-## When to Unignore Tests
-
-These fixtures can move back into active parser-only golden use once:
-
-1. License detection engine is integrated
-2. `declared_license_expression` and `declared_license_expression_spdx` are populated
+- representative `pubspec.yaml` metadata extraction
+- `publish_to`, executables, environment handling, and manifest dependency descriptors
+- lockfile direct/dev/transitive classification and path-source preservation
 
 ## Test Data
 
