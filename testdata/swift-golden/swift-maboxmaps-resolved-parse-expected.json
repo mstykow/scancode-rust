@@ -41,10 +41,10 @@
         "purl": "pkg:swift/github.com/mapbox/mapbox-common-ios@24.4.0",
         "extracted_requirement": "24.4.0",
         "scope": "dependencies",
-        "is_runtime": true,
+        "is_runtime": null,
         "is_optional": false,
         "is_pinned": true,
-        "is_direct": true,
+        "is_direct": null,
         "resolved_package": {},
         "extra_data": {}
       },
@@ -52,10 +52,10 @@
         "purl": "pkg:swift/github.com/mapbox/mapbox-core-maps-ios@11.4.0",
         "extracted_requirement": "11.4.0",
         "scope": "dependencies",
-        "is_runtime": true,
+        "is_runtime": null,
         "is_optional": false,
         "is_pinned": true,
-        "is_direct": true,
+        "is_direct": null,
         "resolved_package": {},
         "extra_data": {}
       },
@@ -63,10 +63,10 @@
         "purl": "pkg:swift/github.com/mapbox/turf-swift@2.8.0",
         "extracted_requirement": "2.8.0",
         "scope": "dependencies",
-        "is_runtime": true,
+        "is_runtime": null,
         "is_optional": false,
         "is_pinned": true,
-        "is_direct": true,
+        "is_direct": null,
         "resolved_package": {},
         "extra_data": {}
       }
