@@ -20,6 +20,7 @@
 //! - Graceful error handling with `warn!()` logs
 //! - Supports both pub.dev and Git-hosted packages
 
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::fs;
 use std::path::Path;
 
@@ -47,8 +48,16 @@ const FIELD_ISSUE_TRACKER: &str = "issue_tracker";
 const FIELD_DOCUMENTATION: &str = "documentation";
 const FIELD_EXECUTABLES: &str = "executables";
 const FIELD_PUBLISH_TO: &str = "publish_to";
+const FIELD_ARCHIVE_URL: &str = "archive_url";
+const FIELD_PLATFORMS: &str = "platforms";
+const FIELD_FUNDING: &str = "funding";
+const FIELD_FALSE_SECRETS: &str = "false_secrets";
+const FIELD_SCREENSHOTS: &str = "screenshots";
+const FIELD_TOPICS: &str = "topics";
+const FIELD_IGNORED_ADVISORIES: &str = "ignored_advisories";
 const FIELD_PACKAGES: &str = "packages";
 const FIELD_SDKS: &str = "sdks";
+const FIELD_SDK: &str = "sdk";
 const FIELD_DEPENDENCY: &str = "dependency";
 const FIELD_SHA256: &str = "sha256";
 
@@ -63,7 +72,9 @@ impl PackageParser for PubspecYamlParser {
             Ok(content) => content,
             Err(e) => {
                 warn!("Failed to read pubspec.yaml at {:?}: {}", path, e);
-                return vec![default_package_data()];
+                let mut package_data = default_package_data();
+                package_data.datasource_id = Some(DatasourceId::PubspecYaml);
+                return vec![package_data];
             }
         };
 
@@ -86,7 +97,10 @@ impl PackageParser for PubspecLockParser {
             Ok(content) => content,
             Err(e) => {
                 warn!("Failed to read pubspec.lock at {:?}: {}", path, e);
-                return vec![default_package_data()];
+                let mut package_data =
+                    default_package_data_with_type(PubspecLockParser::PACKAGE_TYPE.as_str());
+                package_data.datasource_id = Some(DatasourceId::PubspecLock);
+                return vec![package_data];
             }
         };
 
@@ -110,6 +124,7 @@ fn parse_pubspec_yaml(yaml_content: &Value) -> PackageData {
     let homepage_url = extract_string_field(yaml_content, FIELD_HOMEPAGE);
     let raw_license = extract_string_field(yaml_content, FIELD_LICENSE);
     let vcs_url = extract_string_field(yaml_content, FIELD_REPOSITORY);
+    let archive_url = extract_string_field(yaml_content, FIELD_ARCHIVE_URL);
 
     let parties = extract_authors(yaml_content);
 
@@ -151,6 +166,7 @@ fn parse_pubspec_yaml(yaml_content: &Value) -> PackageData {
     .concat();
 
     let extra_data = build_extra_data(yaml_content);
+    let keywords = extract_string_list_field(yaml_content, FIELD_TOPICS);
 
     let purl = name
         .as_ref()
@@ -176,7 +192,7 @@ fn parse_pubspec_yaml(yaml_content: &Value) -> PackageData {
             (None, None, None)
         };
 
-    let download_url = repository_download_url.clone();
+    let download_url = archive_url.or_else(|| repository_download_url.clone());
 
     PackageData {
         package_type: Some(PubspecYamlParser::PACKAGE_TYPE),
@@ -189,7 +205,7 @@ fn parse_pubspec_yaml(yaml_content: &Value) -> PackageData {
         description,
         release_date: None,
         parties,
-        keywords: Vec::new(),
+        keywords,
         homepage_url,
         download_url,
         size: None,
@@ -212,7 +228,10 @@ fn parse_pubspec_yaml(yaml_content: &Value) -> PackageData {
         notice_text: None,
         source_packages: Vec::new(),
         file_references: Vec::new(),
-        is_private: false,
+        is_private: yaml_content
+            .get(FIELD_PUBLISH_TO)
+            .and_then(Value::as_str)
+            .is_some_and(|value| value.trim() == "none"),
         is_virtual: false,
         extra_data,
         dependencies,
@@ -253,11 +272,28 @@ fn extract_lock_dependencies(lock_data: &Value) -> Vec<Dependency> {
                 });
             }
         }
+    } else if let Some(version_str) = lock_data.get(FIELD_SDK).and_then(Value::as_str) {
+        let purl = build_dependency_purl("dart", None);
+        dependencies.push(Dependency {
+            purl,
+            extracted_requirement: Some(version_str.to_string()),
+            scope: Some("sdk".to_string()),
+            is_runtime: Some(true),
+            is_optional: Some(false),
+            is_pinned: Some(false),
+            is_direct: Some(true),
+            resolved_package: None,
+            extra_data: None,
+        });
     }
 
     let Some(packages) = lock_data.get(FIELD_PACKAGES).and_then(Value::as_mapping) else {
         return dependencies;
     };
+
+    let runtime_reachable =
+        reachable_lock_packages(packages, &["direct main", "direct overridden"]);
+    let dev_only_reachable = reachable_lock_packages(packages, &["direct dev"]);
 
     for (name_value, details_value) in packages {
         let name = match name_value.as_str() {
@@ -274,8 +310,12 @@ fn extract_lock_dependencies(lock_data: &Value) -> Vec<Dependency> {
         let dependency_kind = mapping_get(details, FIELD_DEPENDENCY)
             .and_then(Value::as_str)
             .map(|value| value.to_string());
-
-        let is_runtime = dependency_kind.as_deref() != Some("direct dev");
+        let (is_runtime, is_optional, is_direct) = classify_lock_dependency(
+            name,
+            dependency_kind.as_deref(),
+            &runtime_reachable,
+            &dev_only_reachable,
+        );
 
         let is_pinned = version
             .as_ref()
@@ -284,19 +324,24 @@ fn extract_lock_dependencies(lock_data: &Value) -> Vec<Dependency> {
         let purl = build_dependency_purl(name, version.as_deref());
         let sha256 = extract_sha256(details);
         let resolved_dependencies = extract_lock_package_dependencies(details);
-        let resolved_package =
-            build_resolved_package(name, &version, sha256, resolved_dependencies);
+        let resolved_package = build_resolved_package(
+            name,
+            &version,
+            sha256,
+            extract_lock_descriptor_extra_data(details),
+            resolved_dependencies,
+        );
 
         dependencies.push(Dependency {
             purl,
             extracted_requirement: version.clone(),
             scope: dependency_kind,
             is_runtime: Some(is_runtime),
-            is_optional: Some(false),
+            is_optional: Some(is_optional),
             is_pinned: Some(is_pinned),
-            is_direct: Some(true),
+            is_direct: Some(is_direct),
             resolved_package: Some(Box::new(resolved_package)),
-            extra_data: None,
+            extra_data: extract_lock_descriptor_extra_data(details),
         });
     }
 
@@ -363,6 +408,7 @@ fn build_resolved_package(
     name: &str,
     version: &Option<String>,
     sha256: Option<String>,
+    extra_data: Option<HashMap<String, serde_json::Value>>,
     dependencies: Vec<Dependency>,
 ) -> ResolvedPackage {
     ResolvedPackage {
@@ -377,7 +423,7 @@ fn build_resolved_package(
         sha512: None,
         md5: None,
         is_virtual: true,
-        extra_data: None,
+        extra_data,
         dependencies,
         repository_homepage_url: None,
         repository_download_url: None,
@@ -426,7 +472,7 @@ fn collect_dependencies(
             is_pinned: Some(is_pinned),
             is_direct: Some(true),
             resolved_package: None,
-            extra_data: None,
+            extra_data: extract_manifest_dependency_extra_data(requirement_value),
         });
     }
 
@@ -471,6 +517,8 @@ fn format_dependency_mapping(map: &Mapping) -> Option<String> {
             value.to_string()
         } else if let Some(value) = value.as_f64() {
             value.to_string()
+        } else if let Some(nested) = value.as_mapping() {
+            format_dependency_mapping(nested)?
         } else {
             continue;
         };
@@ -643,10 +691,139 @@ fn build_extra_data(
         );
     }
 
+    for field in [
+        FIELD_PLATFORMS,
+        FIELD_FUNDING,
+        FIELD_FALSE_SECRETS,
+        FIELD_SCREENSHOTS,
+        FIELD_TOPICS,
+        FIELD_IGNORED_ADVISORIES,
+    ] {
+        if let Some(value) = yaml_content.get(field)
+            && let Ok(json_value) = serde_json::to_value(value)
+        {
+            extra_data.insert(field.to_string(), json_value);
+        }
+    }
+
     if extra_data.is_empty() {
         None
     } else {
         Some(extra_data)
+    }
+}
+
+fn extract_string_list_field(yaml_content: &Value, field: &str) -> Vec<String> {
+    yaml_content
+        .get(field)
+        .and_then(Value::as_sequence)
+        .into_iter()
+        .flatten()
+        .filter_map(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(|value| value.to_string())
+        .collect()
+}
+
+fn extract_manifest_dependency_extra_data(
+    requirement_value: &Value,
+) -> Option<HashMap<String, serde_json::Value>> {
+    requirement_value
+        .as_mapping()
+        .and_then(|map| serde_json::to_value(map).ok())
+        .and_then(|json| json.as_object().cloned())
+        .map(|map| map.into_iter().collect())
+}
+
+fn extract_lock_descriptor_extra_data(
+    details: &Mapping,
+) -> Option<HashMap<String, serde_json::Value>> {
+    let mut extra = HashMap::new();
+
+    if let Some(source) = mapping_get(details, "source").and_then(Value::as_str) {
+        extra.insert(
+            "source".to_string(),
+            serde_json::Value::String(source.to_string()),
+        );
+    }
+
+    if let Some(description) = mapping_get(details, FIELD_DESCRIPTION)
+        && let Ok(json_value) = serde_json::to_value(description)
+    {
+        extra.insert("description".to_string(), json_value);
+    }
+
+    if let Some(kind) = mapping_get(details, FIELD_DEPENDENCY).and_then(Value::as_str) {
+        extra.insert(
+            FIELD_DEPENDENCY.to_string(),
+            serde_json::Value::String(kind.to_string()),
+        );
+    }
+
+    (!extra.is_empty()).then_some(extra)
+}
+
+fn reachable_lock_packages(packages: &Mapping, roots: &[&str]) -> HashSet<String> {
+    let mut reachable = HashSet::new();
+    let mut queue = VecDeque::new();
+
+    for (name_value, details_value) in packages {
+        let Some(name) = name_value.as_str() else {
+            continue;
+        };
+        let Some(details) = details_value.as_mapping() else {
+            continue;
+        };
+        let kind = mapping_get(details, FIELD_DEPENDENCY).and_then(Value::as_str);
+        if roots.contains(&kind.unwrap_or_default()) {
+            queue.push_back(name.to_string());
+        }
+    }
+
+    while let Some(current) = queue.pop_front() {
+        if !reachable.insert(current.clone()) {
+            continue;
+        }
+
+        let Some(details_value) = packages.get(Value::String(current.clone())) else {
+            continue;
+        };
+        let Some(details) = details_value.as_mapping() else {
+            continue;
+        };
+        let Some(dep_map) = mapping_get(details, FIELD_DEPENDENCIES).and_then(Value::as_mapping)
+        else {
+            continue;
+        };
+
+        for dep_name in dep_map.keys().filter_map(Value::as_str) {
+            queue.push_back(dep_name.to_string());
+        }
+    }
+
+    reachable
+}
+
+fn classify_lock_dependency(
+    name: &str,
+    dependency_kind: Option<&str>,
+    runtime_reachable: &HashSet<String>,
+    dev_only_reachable: &HashSet<String>,
+) -> (bool, bool, bool) {
+    match dependency_kind {
+        Some("direct main") | Some("direct overridden") => (true, false, true),
+        Some("direct dev") => (false, true, true),
+        Some("transitive") => {
+            if runtime_reachable.contains(name) {
+                (true, false, false)
+            } else if dev_only_reachable.contains(name) {
+                (false, true, false)
+            } else {
+                (true, false, false)
+            }
+        }
+        _ => (true, false, true),
     }
 }
 
