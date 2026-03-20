@@ -211,24 +211,27 @@ fn build_resolved_fallback_dependencies(
 ) -> Vec<Dependency> {
     let mut processed_dependencies = manifest_dependencies.to_vec();
 
-    for resolved_dependency in resolved_dependencies {
-        let Some((name, version)) = resolved_dependency_identity(resolved_dependency) else {
+    for dependency in &mut processed_dependencies {
+        let Some(name) = dependency_name(dependency) else {
             continue;
         };
 
-        processed_dependencies
-            .retain(|dependency| dependency_name(dependency).as_deref() != Some(&name));
-        processed_dependencies.push(Dependency {
-            purl: build_plain_swift_purl(&name, Some(&version)),
-            extracted_requirement: Some(version),
-            scope: Some("dependencies".to_string()),
-            is_runtime: Some(true),
-            is_optional: Some(false),
-            is_pinned: Some(true),
-            is_direct: Some(true),
-            resolved_package: None,
-            extra_data: None,
-        });
+        let Some(resolved_dependency) = resolved_dependencies
+            .iter()
+            .find(|resolved| dependency_name(resolved).as_deref() == Some(&name))
+        else {
+            continue;
+        };
+
+        if resolved_dependency.purl.is_some() {
+            dependency.purl = resolved_dependency.purl.clone();
+        }
+        if resolved_dependency.extracted_requirement.is_some() {
+            dependency.extracted_requirement = resolved_dependency.extracted_requirement.clone();
+        }
+        if resolved_dependency.is_pinned.is_some() {
+            dependency.is_pinned = resolved_dependency.is_pinned;
+        }
     }
 
     processed_dependencies
@@ -297,31 +300,11 @@ fn build_package_from_resolved_dependency(
     })
 }
 
-fn resolved_dependency_identity(dependency: &Dependency) -> Option<(String, String)> {
-    let purl = dependency.purl.as_deref()?;
-    let parsed = PackageUrl::from_str(purl).ok()?;
-    Some((
-        parsed.name().to_string(),
-        parsed
-            .version()
-            .map(|version| version.to_string())
-            .or_else(|| dependency.extracted_requirement.clone())?,
-    ))
-}
-
 fn dependency_name(dependency: &Dependency) -> Option<String> {
     let purl = dependency.purl.as_deref()?;
     PackageUrl::from_str(purl)
         .ok()
         .map(|parsed| parsed.name().to_string())
-}
-
-fn build_plain_swift_purl(name: &str, version: Option<&str>) -> Option<String> {
-    let mut purl = PackageUrl::new("swift", name).ok()?;
-    if let Some(version) = version {
-        purl.with_version(version).ok()?;
-    }
-    Some(purl.to_string())
 }
 
 fn assign_swift_resources(
@@ -453,7 +436,7 @@ mod tests {
                     purl: Some("pkg:swift/manifest-dep".to_string()),
                     extracted_requirement: None,
                     scope: Some("dependencies".to_string()),
-                    is_runtime: Some(true),
+                    is_runtime: None,
                     is_optional: Some(false),
                     is_pinned: Some(false),
                     is_direct: Some(true),
@@ -483,7 +466,7 @@ mod tests {
                     purl: Some("pkg:swift/github.com/example/showdep@1.2.3".to_string()),
                     extracted_requirement: Some("1.2.3".to_string()),
                     scope: Some("dependencies".to_string()),
-                    is_runtime: Some(false),
+                    is_runtime: None,
                     is_optional: Some(false),
                     is_pinned: Some(true),
                     is_direct: Some(true),
@@ -593,5 +576,57 @@ mod tests {
         assert_eq!(files[1].for_packages, vec!["pkg:swift/RootPkg?uuid=root"]);
         assert!(files[2].for_packages.is_empty());
         assert!(files[3].for_packages.is_empty());
+    }
+
+    #[test]
+    fn build_resolved_fallback_dependencies_only_enriches_manifest_known_deps() {
+        let manifest_dependencies = vec![Dependency {
+            purl: Some("pkg:swift/github.com/mapbox/turf-swift".to_string()),
+            extracted_requirement: Some("vers:swift/>=2.8.0|<3.0.0".to_string()),
+            scope: Some("dependencies".to_string()),
+            is_runtime: None,
+            is_optional: Some(false),
+            is_pinned: Some(false),
+            is_direct: Some(true),
+            resolved_package: None,
+            extra_data: None,
+        }];
+
+        let resolved_dependencies = vec![
+            Dependency {
+                purl: Some("pkg:swift/github.com/mapbox/turf-swift@2.8.0".to_string()),
+                extracted_requirement: Some("2.8.0".to_string()),
+                scope: Some("dependencies".to_string()),
+                is_runtime: None,
+                is_optional: Some(false),
+                is_pinned: Some(true),
+                is_direct: None,
+                resolved_package: None,
+                extra_data: None,
+            },
+            Dependency {
+                purl: Some("pkg:swift/github.com/mapbox/mapbox-common-ios@24.4.0".to_string()),
+                extracted_requirement: Some("24.4.0".to_string()),
+                scope: Some("dependencies".to_string()),
+                is_runtime: None,
+                is_optional: Some(false),
+                is_pinned: Some(true),
+                is_direct: None,
+                resolved_package: None,
+                extra_data: None,
+            },
+        ];
+
+        let processed =
+            build_resolved_fallback_dependencies(&manifest_dependencies, &resolved_dependencies);
+
+        assert_eq!(processed.len(), 1);
+        assert_eq!(
+            processed[0].purl.as_deref(),
+            Some("pkg:swift/github.com/mapbox/turf-swift@2.8.0")
+        );
+        assert_eq!(processed[0].extracted_requirement.as_deref(), Some("2.8.0"));
+        assert_eq!(processed[0].is_direct, Some(true));
+        assert_eq!(processed[0].is_runtime, None);
     }
 }
