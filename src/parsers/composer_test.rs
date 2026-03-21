@@ -280,6 +280,216 @@ mod tests {
     }
 
     #[test]
+    fn test_extract_spdx_license_id_into_declared_fields() {
+        let content = r#"
+{
+  "name": "acme/demo",
+  "license": "MIT"
+}
+"#;
+
+        let (_temp_dir, composer_path) = create_temp_file("composer.json", content);
+        let package_data = ComposerJsonParser::extract_first_package(&composer_path);
+
+        assert_eq!(
+            package_data.extracted_license_statement.as_deref(),
+            Some("MIT")
+        );
+        assert_eq!(
+            package_data.declared_license_expression.as_deref(),
+            Some("mit")
+        );
+        assert_eq!(
+            package_data.declared_license_expression_spdx.as_deref(),
+            Some("MIT")
+        );
+        assert_eq!(package_data.license_detections.len(), 1);
+
+        let detection = &package_data.license_detections[0];
+        assert_eq!(detection.license_expression, "mit");
+        assert_eq!(detection.license_expression_spdx, "MIT");
+        assert_eq!(detection.matches.len(), 1);
+        assert_eq!(detection.matches[0].matched_text.as_deref(), Some("MIT"));
+    }
+
+    #[test]
+    fn test_extract_spdx_license_expression_into_declared_fields() {
+        let content = r#"
+{
+  "name": "acme/demo",
+  "license": "MIT OR Apache-2.0"
+}
+"#;
+
+        let (_temp_dir, composer_path) = create_temp_file("composer.json", content);
+        let package_data = ComposerJsonParser::extract_first_package(&composer_path);
+
+        assert_eq!(
+            package_data.extracted_license_statement.as_deref(),
+            Some("MIT OR Apache-2.0")
+        );
+        assert_eq!(
+            package_data.declared_license_expression.as_deref(),
+            Some("mit OR apache-2.0")
+        );
+        assert_eq!(
+            package_data.declared_license_expression_spdx.as_deref(),
+            Some("MIT OR Apache-2.0")
+        );
+        assert_eq!(package_data.license_detections.len(), 1);
+    }
+
+    #[test]
+    fn test_extract_spdx_with_expression_into_declared_fields() {
+        let content = r#"
+{
+  "name": "acme/demo",
+  "license": "GPL-2.0-only WITH Classpath-exception-2.0"
+}
+"#;
+
+        let (_temp_dir, composer_path) = create_temp_file("composer.json", content);
+        let package_data = ComposerJsonParser::extract_first_package(&composer_path);
+
+        assert_eq!(
+            package_data.extracted_license_statement.as_deref(),
+            Some("GPL-2.0-only WITH Classpath-exception-2.0")
+        );
+        assert_eq!(
+            package_data.declared_license_expression.as_deref(),
+            Some("gpl-2.0 WITH classpath-exception-2.0")
+        );
+        assert_eq!(
+            package_data.declared_license_expression_spdx.as_deref(),
+            Some("GPL-2.0-only WITH Classpath-exception-2.0")
+        );
+        assert_eq!(package_data.license_detections.len(), 1);
+    }
+
+    #[test]
+    fn test_extract_spdx_license_list_into_declared_fields() {
+        let content = r#"
+{
+  "name": "acme/demo",
+  "license": ["MIT", "Apache-2.0"]
+}
+"#;
+
+        let (_temp_dir, composer_path) = create_temp_file("composer.json", content);
+        let package_data = ComposerJsonParser::extract_first_package(&composer_path);
+
+        assert_eq!(
+            package_data.extracted_license_statement.as_deref(),
+            Some("MIT OR Apache-2.0")
+        );
+        assert_eq!(
+            package_data.declared_license_expression.as_deref(),
+            Some("mit OR apache-2.0")
+        );
+        assert_eq!(
+            package_data.declared_license_expression_spdx.as_deref(),
+            Some("MIT OR Apache-2.0")
+        );
+        assert_eq!(package_data.license_detections.len(), 1);
+    }
+
+    #[test]
+    fn test_preserve_custom_license_as_extracted_only() {
+        let content = r#"
+{
+  "name": "acme/demo",
+  "license": "Acme Commercial License"
+}
+"#;
+
+        let (_temp_dir, composer_path) = create_temp_file("composer.json", content);
+        let package_data = ComposerJsonParser::extract_first_package(&composer_path);
+
+        assert_eq!(
+            package_data.extracted_license_statement.as_deref(),
+            Some("Acme Commercial License")
+        );
+        assert_eq!(package_data.declared_license_expression, None);
+        assert_eq!(package_data.declared_license_expression_spdx, None);
+        assert!(package_data.license_detections.is_empty());
+    }
+
+    #[test]
+    fn test_preserve_mixed_license_list_as_extracted_only() {
+        let content = r#"
+{
+  "name": "acme/demo",
+  "license": ["MIT", "Acme Commercial License"]
+}
+"#;
+
+        let (_temp_dir, composer_path) = create_temp_file("composer.json", content);
+        let package_data = ComposerJsonParser::extract_first_package(&composer_path);
+
+        assert_eq!(
+            package_data.extracted_license_statement.as_deref(),
+            Some("MIT OR Acme Commercial License")
+        );
+        assert_eq!(package_data.declared_license_expression, None);
+        assert_eq!(package_data.declared_license_expression_spdx, None);
+        assert!(package_data.license_detections.is_empty());
+    }
+
+    #[test]
+    fn test_normalize_proprietary_license() {
+        let content = r#"
+{
+  "name": "acme/demo",
+  "license": "proprietary"
+}
+"#;
+
+        let (_temp_dir, composer_path) = create_temp_file("composer.json", content);
+        let package_data = ComposerJsonParser::extract_first_package(&composer_path);
+
+        assert_eq!(
+            package_data.extracted_license_statement.as_deref(),
+            Some("proprietary")
+        );
+        assert_eq!(
+            package_data.declared_license_expression.as_deref(),
+            Some("proprietary-license")
+        );
+        assert_eq!(
+            package_data.declared_license_expression_spdx.as_deref(),
+            Some("LicenseRef-scancode-proprietary-license")
+        );
+        assert_eq!(package_data.license_detections.len(), 1);
+    }
+
+    #[test]
+    fn test_private_package_without_license_falls_back_to_proprietary() {
+        let content = r#"
+{
+  "description": "Private package without name or license"
+}
+"#;
+
+        let (_temp_dir, composer_path) = create_temp_file("composer.json", content);
+        let package_data = ComposerJsonParser::extract_first_package(&composer_path);
+
+        assert!(package_data.is_private);
+        assert_eq!(
+            package_data.extracted_license_statement.as_deref(),
+            Some("proprietary-license")
+        );
+        assert_eq!(
+            package_data.declared_license_expression.as_deref(),
+            Some("proprietary-license")
+        );
+        assert_eq!(
+            package_data.declared_license_expression_spdx.as_deref(),
+            Some("LicenseRef-scancode-proprietary-license")
+        );
+        assert_eq!(package_data.license_detections.len(), 1);
+    }
+
+    #[test]
     fn test_extract_large_composer_lock() {
         let mut packages = String::new();
         let mut packages_dev = String::new();

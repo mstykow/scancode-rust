@@ -20,12 +20,19 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
+use std::sync::LazyLock;
 
 use log::warn;
 use packageurl::PackageUrl;
 use serde_json::Value;
 
-use crate::models::{DatasourceId, Dependency, PackageData, PackageType, Party, ResolvedPackage};
+use crate::license_detection::LicenseDetectionEngine;
+use crate::license_detection::expression::{LicenseExpression, parse_expression};
+use crate::license_detection::index::LicenseIndex;
+use crate::models::{
+    DatasourceId, Dependency, LicenseDetection, Match, PackageData, PackageType, Party,
+    ResolvedPackage,
+};
 
 use super::PackageParser;
 
@@ -52,6 +59,19 @@ const FIELD_PACKAGES: &str = "packages";
 const FIELD_PACKAGES_DEV: &str = "packages-dev";
 const FIELD_SOURCE: &str = "source";
 const FIELD_DIST: &str = "dist";
+
+static COMPOSER_LICENSE_ENGINE: LazyLock<Option<LicenseDetectionEngine>> = LazyLock::new(|| {
+    match LicenseDetectionEngine::from_embedded() {
+        Ok(engine) => Some(engine),
+        Err(error) => {
+            warn!(
+                "Failed to initialize embedded license engine for Composer license normalization: {}",
+                error
+            );
+            None
+        }
+    }
+});
 
 /// Composer manifest parser for composer.json files.
 pub struct ComposerJsonParser;
@@ -96,12 +116,12 @@ impl PackageParser for ComposerJsonParser {
 
         let keywords = extract_keywords(&json_content);
 
-        let extracted_license_statement = extract_license_statement(&json_content);
-
-        // Extract license statement only - detection happens in separate engine
-        let declared_license_expression = None;
-        let declared_license_expression_spdx = None;
-        let license_detections = Vec::new();
+        let (
+            extracted_license_statement,
+            declared_license_expression,
+            declared_license_expression_spdx,
+            license_detections,
+        ) = extract_license_data(&json_content, is_private);
 
         let dependencies =
             extract_dependencies(&json_content, FIELD_REQUIRE, "require", true, false);
@@ -535,6 +555,258 @@ fn extract_license_statement(json_content: &Value) -> Option<String> {
         Some(licenses[0].clone())
     } else {
         Some(licenses.join(" OR "))
+    }
+}
+
+fn extract_license_data(
+    json_content: &Value,
+    is_private: bool,
+) -> (
+    Option<String>,
+    Option<String>,
+    Option<String>,
+    Vec<LicenseDetection>,
+) {
+    let extracted_license_statement = extract_license_statement(json_content)
+        .or_else(|| is_private.then(|| "proprietary-license".to_string()));
+    let (declared_license_expression, declared_license_expression_spdx, license_detections) =
+        normalize_composer_license_data(extracted_license_statement.as_deref());
+
+    (
+        extracted_license_statement,
+        declared_license_expression,
+        declared_license_expression_spdx,
+        license_detections,
+    )
+}
+
+fn normalize_composer_license_data(
+    extracted_license_statement: Option<&str>,
+) -> (Option<String>, Option<String>, Vec<LicenseDetection>) {
+    let Some(extracted_license_statement) = extracted_license_statement
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+    else {
+        return (None, None, Vec::new());
+    };
+
+    if extracted_license_statement.eq_ignore_ascii_case("proprietary") {
+        return build_declared_license_data(
+            "proprietary-license".to_string(),
+            "LicenseRef-scancode-proprietary-license".to_string(),
+            extracted_license_statement,
+        );
+    }
+
+    if extracted_license_statement.eq_ignore_ascii_case("proprietary-license") {
+        return build_declared_license_data(
+            "proprietary-license".to_string(),
+            "LicenseRef-scancode-proprietary-license".to_string(),
+            extracted_license_statement,
+        );
+    }
+
+    let Some(engine) = &*COMPOSER_LICENSE_ENGINE else {
+        return (None, None, Vec::new());
+    };
+
+    let Ok(parsed_expression) = parse_expression(extracted_license_statement) else {
+        return (None, None, Vec::new());
+    };
+
+    let Some((declared_ast, declared_spdx_ast)) =
+        normalize_spdx_expression(&parsed_expression, engine.index())
+    else {
+        return (None, None, Vec::new());
+    };
+
+    build_declared_license_data(
+        render_canonical_expression(&declared_ast),
+        render_canonical_expression(&declared_spdx_ast),
+        extracted_license_statement,
+    )
+}
+
+fn normalize_spdx_expression(
+    expression: &LicenseExpression,
+    index: &LicenseIndex,
+) -> Option<(LicenseExpression, LicenseExpression)> {
+    match expression {
+        LicenseExpression::License(key) => {
+            normalize_spdx_license_key(key, index).map(|(declared, spdx)| {
+                (
+                    LicenseExpression::License(declared),
+                    LicenseExpression::License(spdx),
+                )
+            })
+        }
+        LicenseExpression::LicenseRef(_) => None,
+        LicenseExpression::And { left, right } => {
+            let (left_declared, left_spdx) = normalize_spdx_expression(left, index)?;
+            let (right_declared, right_spdx) = normalize_spdx_expression(right, index)?;
+
+            Some((
+                LicenseExpression::And {
+                    left: Box::new(left_declared),
+                    right: Box::new(right_declared),
+                },
+                LicenseExpression::And {
+                    left: Box::new(left_spdx),
+                    right: Box::new(right_spdx),
+                },
+            ))
+        }
+        LicenseExpression::Or { left, right } => {
+            let (left_declared, left_spdx) = normalize_spdx_expression(left, index)?;
+            let (right_declared, right_spdx) = normalize_spdx_expression(right, index)?;
+
+            Some((
+                LicenseExpression::Or {
+                    left: Box::new(left_declared),
+                    right: Box::new(right_declared),
+                },
+                LicenseExpression::Or {
+                    left: Box::new(left_spdx),
+                    right: Box::new(right_spdx),
+                },
+            ))
+        }
+        LicenseExpression::With { left, right } => {
+            let (left_declared, left_spdx) = normalize_spdx_expression(left, index)?;
+            let (right_declared, right_spdx) = normalize_spdx_expression(right, index)?;
+
+            Some((
+                LicenseExpression::With {
+                    left: Box::new(left_declared),
+                    right: Box::new(right_declared),
+                },
+                LicenseExpression::With {
+                    left: Box::new(left_spdx),
+                    right: Box::new(right_spdx),
+                },
+            ))
+        }
+    }
+}
+
+fn normalize_spdx_license_key(key: &str, index: &LicenseIndex) -> Option<(String, String)> {
+    let rid = *index.rid_by_spdx_key.get(&key.to_lowercase())?;
+    let declared_license_expression = index.rules_by_rid[rid].license_expression.clone();
+    if declared_license_expression.contains("unknown-spdx") {
+        return None;
+    }
+
+    let declared_license_expression_spdx = index
+        .licenses_by_key
+        .get(&declared_license_expression)
+        .and_then(|license| license.spdx_license_key.clone())?;
+
+    Some((
+        declared_license_expression,
+        declared_license_expression_spdx,
+    ))
+}
+
+fn build_declared_license_data(
+    declared_license_expression: String,
+    declared_license_expression_spdx: String,
+    matched_text: &str,
+) -> (Option<String>, Option<String>, Vec<LicenseDetection>) {
+    let detection = LicenseDetection {
+        license_expression: declared_license_expression.clone(),
+        license_expression_spdx: declared_license_expression_spdx.clone(),
+        matches: vec![Match {
+            license_expression: declared_license_expression.clone(),
+            license_expression_spdx: declared_license_expression_spdx.clone(),
+            from_file: None,
+            start_line: 1,
+            end_line: 1,
+            matcher: Some("1-spdx-id".to_string()),
+            score: 100.0,
+            matched_length: Some(matched_text.split_whitespace().count()),
+            match_coverage: Some(100.0),
+            rule_relevance: Some(100),
+            rule_identifier: None,
+            rule_url: None,
+            matched_text: Some(matched_text.to_string()),
+        }],
+        identifier: None,
+    };
+
+    (
+        Some(declared_license_expression),
+        Some(declared_license_expression_spdx),
+        vec![detection],
+    )
+}
+
+#[derive(Clone, Copy)]
+enum BooleanOperator {
+    And,
+    Or,
+}
+
+fn render_canonical_expression(expression: &LicenseExpression) -> String {
+    match expression {
+        LicenseExpression::License(key) => key.clone(),
+        LicenseExpression::LicenseRef(key) => key.clone(),
+        LicenseExpression::With { left, right } => format!(
+            "{} WITH {}",
+            render_canonical_expression(left),
+            render_canonical_expression(right)
+        ),
+        LicenseExpression::And { .. } => {
+            render_flat_boolean_chain(expression, BooleanOperator::And)
+        }
+        LicenseExpression::Or { .. } => render_flat_boolean_chain(expression, BooleanOperator::Or),
+    }
+}
+
+fn render_flat_boolean_chain(expression: &LicenseExpression, operator: BooleanOperator) -> String {
+    let mut parts = Vec::new();
+    collect_boolean_chain(expression, operator, &mut parts);
+
+    let separator = match operator {
+        BooleanOperator::And => " AND ",
+        BooleanOperator::Or => " OR ",
+    };
+
+    parts
+        .into_iter()
+        .map(|part| render_boolean_operand(part, operator))
+        .collect::<Vec<_>>()
+        .join(separator)
+}
+
+fn collect_boolean_chain<'a>(
+    expression: &'a LicenseExpression,
+    operator: BooleanOperator,
+    parts: &mut Vec<&'a LicenseExpression>,
+) {
+    match (operator, expression) {
+        (BooleanOperator::And, LicenseExpression::And { left, right })
+        | (BooleanOperator::Or, LicenseExpression::Or { left, right }) => {
+            collect_boolean_chain(left, operator, parts);
+            collect_boolean_chain(right, operator, parts);
+        }
+        _ => parts.push(expression),
+    }
+}
+
+fn render_boolean_operand(
+    expression: &LicenseExpression,
+    parent_operator: BooleanOperator,
+) -> String {
+    match expression {
+        LicenseExpression::And { .. } => match parent_operator {
+            BooleanOperator::And => render_canonical_expression(expression),
+            BooleanOperator::Or => format!("({})", render_canonical_expression(expression)),
+        },
+        LicenseExpression::Or { .. } => match parent_operator {
+            BooleanOperator::Or => render_canonical_expression(expression),
+            BooleanOperator::And => format!("({})", render_canonical_expression(expression)),
+        },
+        _ => render_canonical_expression(expression),
     }
 }
 
