@@ -11,13 +11,26 @@ fn binary_path() -> String {
 
     let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     path.push("target");
-    path.push("debug");
-    path.push(if cfg!(windows) {
+
+    let binary_name = if cfg!(windows) {
         "provenant.exe"
     } else {
         "provenant"
-    });
-    path.to_string_lossy().to_string()
+    };
+
+    for profile in ["release", "debug"] {
+        let mut profile_path = path.clone();
+        profile_path.push(profile);
+        profile_path.push(binary_name);
+        if profile_path.exists() {
+            return profile_path.to_string_lossy().to_string();
+        }
+    }
+
+    panic!(
+        "Could not find provenant binary in target/release or target/debug. \
+         Run `cargo build` or `cargo build --release` first."
+    );
 }
 
 fn create_scan_fixture() -> (TempDir, String) {
