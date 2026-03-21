@@ -324,6 +324,7 @@ mod tests {
 - **Early filtering**: Exclusion patterns applied early during traversal
 - **Atomic progress**: Progress bar updates use atomic operations
 - **Release optimizations**: LTO enabled, single codegen unit, symbols stripped
+- **Benchmarking**: Run `./scripts/benchmark.sh` to measure performance on a standardized test repository. Use this after changes that could affect general performance. When committing performance-related changes, include the timing data in the commit message.
 
 ## Common Pitfalls
 
