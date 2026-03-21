@@ -118,8 +118,15 @@ mod tests {
         };
 
         index.rules_by_rid.push(rule.clone());
-        index.tids_by_rid.push(tokens);
+        index.tids_by_rid.push(tokens.clone());
         index.approx_matchable_rids.insert(rid);
+
+        // Also populate inverted index for high-value tokens
+        for &tid in &tokens {
+            if index.dictionary.token_kind(tid) == TokenKind::Legalese {
+                index.rids_by_high_tid.entry(tid).or_default().insert(rid);
+            }
+        }
 
         rid
     }

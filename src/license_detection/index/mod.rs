@@ -140,7 +140,12 @@ pub struct LicenseIndex {
     /// Only rules marked as approx-matchable participate in sequence matching.
     /// Other rules can only be matched exactly using the automaton.
     ///
+    /// Note: This field is kept for Python parity documentation and test usage.
+    /// The inverted index (`rids_by_high_tid`) now handles candidate filtering
+    /// more efficiently, making direct iteration over this set unnecessary.
+    ///
     /// Corresponds to Python: `self.approx_matchable_rids = set()` (line 234)
+    #[allow(dead_code)]
     pub approx_matchable_rids: HashSet<usize>,
 
     /// Mapping from ScanCode license key to License object.
@@ -178,6 +183,17 @@ pub struct LicenseIndex {
     ///
     /// Corresponds to Python: `get_unknown_spdx_symbol()` in cache.py
     pub unknown_spdx_rid: Option<usize>,
+
+    /// Inverted index mapping high-value token IDs to rule IDs.
+    ///
+    /// This enables fast candidate selection by only examining rules
+    /// that share at least one high-value (legalese) token with the query.
+    /// Without this index, candidate selection would iterate over all 37,000+
+    /// rules for every file, making license detection extremely slow.
+    ///
+    /// Only contains entries for tokens with ID < len_legalese (high-value tokens).
+    /// Rules not in approx_matchable_rids are excluded from this index.
+    pub rids_by_high_tid: HashMap<TokenId, HashSet<usize>>,
 }
 
 impl LicenseIndex {}
@@ -212,6 +228,7 @@ impl LicenseIndex {
             pattern_id_to_rid: Vec::new(),
             rid_by_spdx_key: HashMap::new(),
             unknown_spdx_rid: None,
+            rids_by_high_tid: HashMap::new(),
         }
     }
 
