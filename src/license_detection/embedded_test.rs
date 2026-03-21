@@ -10,7 +10,22 @@ use super::*;
 use crate::license_detection::embedded::schema::{EmbeddedLoaderSnapshot, SCHEMA_VERSION};
 use crate::license_detection::models::{LoadedLicense, LoadedRule, RuleKind};
 use crate::license_detection::{SCANCODE_LICENSES_LICENSES_PATH, SCANCODE_LICENSES_RULES_PATH};
+use once_cell::sync::Lazy;
 use std::path::PathBuf;
+use std::sync::Once;
+
+static TEST_ENGINE: Lazy<LicenseDetectionEngine> = Lazy::new(|| {
+    LicenseDetectionEngine::from_embedded().expect("Should initialize from embedded artifact")
+});
+
+static INIT: Once = Once::new();
+
+fn get_engine() -> &'static LicenseDetectionEngine {
+    INIT.call_once(|| {
+        let _ = &*TEST_ENGINE;
+    });
+    &TEST_ENGINE
+}
 
 fn get_reference_data_paths() -> Option<(PathBuf, PathBuf)> {
     let rules_path = PathBuf::from(SCANCODE_LICENSES_RULES_PATH);
@@ -72,8 +87,7 @@ mod engine_equivalence {
 
     #[test]
     fn test_from_embedded_initializes() {
-        let engine =
-            LicenseDetectionEngine::from_embedded().expect("Should initialize from embedded");
+        let engine = get_engine();
 
         assert!(
             !engine.index().rules_by_rid.is_empty(),
@@ -109,8 +123,7 @@ mod engine_equivalence {
             }
         };
 
-        let engine_from_embedded =
-            LicenseDetectionEngine::from_embedded().expect("Should initialize from embedded");
+        let engine_from_embedded = get_engine();
 
         assert_eq!(
             engine_from_dir.index().rules_by_rid.len(),
@@ -144,8 +157,7 @@ mod engine_equivalence {
             }
         };
 
-        let engine_from_embedded =
-            LicenseDetectionEngine::from_embedded().expect("Should initialize from embedded");
+        let engine_from_embedded = get_engine();
 
         let mut dir_keys: Vec<_> = engine_from_dir
             .index()
@@ -172,8 +184,7 @@ mod engine_equivalence {
             return;
         };
 
-        let engine_from_embedded =
-            LicenseDetectionEngine::from_embedded().expect("Should initialize from embedded");
+        let engine_from_embedded = get_engine();
 
         let mit_text = r#"Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -213,8 +224,7 @@ SOFTWARE."#;
             return;
         };
 
-        let engine_from_embedded =
-            LicenseDetectionEngine::from_embedded().expect("Should initialize from embedded");
+        let engine_from_embedded = get_engine();
 
         let apache_text = r#"Apache License
 Version 2.0, January 2004
@@ -526,8 +536,7 @@ mod packaging {
 
     #[test]
     fn test_embedded_artifact_is_loadable() {
-        let engine =
-            LicenseDetectionEngine::from_embedded().expect("Should load embedded artifact");
+        let engine = get_engine();
 
         assert!(
             !engine.index().rules_by_rid.is_empty(),
