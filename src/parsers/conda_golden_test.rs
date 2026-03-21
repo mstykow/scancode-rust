@@ -1,8 +1,8 @@
 #[cfg(test)]
 mod golden_tests {
-    use super::super::PackageParser;
-    use super::super::conda::{CondaEnvironmentYmlParser, CondaMetaYamlParser};
-    use super::super::conda_meta_json::CondaMetaJsonParser;
+    use crate::parsers::PackageParser;
+    use crate::parsers::conda::{CondaEnvironmentYmlParser, CondaMetaYamlParser};
+    use crate::parsers::conda_meta_json::CondaMetaJsonParser;
     use crate::test_utils::compare_package_data_parser_only;
     use std::path::PathBuf;
 

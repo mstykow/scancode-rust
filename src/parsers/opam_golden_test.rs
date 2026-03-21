@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod golden_tests {
-    use super::super::PackageParser;
-    use super::super::opam::OpamParser;
+    use crate::parsers::PackageParser;
+    use crate::parsers::opam::OpamParser;
     use crate::test_utils::compare_package_data_parser_only;
     use std::path::PathBuf;
 
