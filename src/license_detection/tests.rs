@@ -708,7 +708,7 @@ fn test_png_h_detect_matches_match_python_raw_rules() {
     let engine = get_engine();
 
     let matches = detect_fixture_matches(
-        &engine,
+        engine,
         "testdata/license-golden/datadriven/external/slic-tests/png.h",
     );
 
@@ -744,7 +744,7 @@ fn test_standard_ml_nj_and_x11_and_x11_opengroup_detect_matches_match_python_raw
     let engine = get_engine();
 
     let matches = detect_fixture_matches(
-        &engine,
+        engine,
         "testdata/license-golden/datadriven/lic4/standard-ml-nj_and_x11_and_x11-opengroup.txt",
     );
 
@@ -783,7 +783,7 @@ fn test_standard_ml_nj_and_x11_and_x11_opengroup_1_detect_matches_match_python_r
     let engine = get_engine();
 
     let matches = detect_fixture_matches(
-        &engine,
+        engine,
         "testdata/license-golden/datadriven/lic4/standard-ml-nj_and_x11_and_x11-opengroup_1.txt",
     );
 
@@ -822,7 +822,7 @@ fn test_x11_danse_detect_matches_match_python_raw_rules() {
     let engine = get_engine();
 
     let matches = detect_fixture_matches(
-        &engine,
+        engine,
         "testdata/license-golden/datadriven/lic4/x11_danse.txt",
     );
 
@@ -864,7 +864,7 @@ fn test_libevent_license_detect_matches_match_python_raw_rules() {
     let engine = get_engine();
 
     let matches = detect_fixture_matches(
-        &engine,
+        engine,
         "testdata/license-golden/datadriven/lic3/libevent.LICENSE",
     );
 
@@ -902,7 +902,7 @@ fn test_zlib_txt_detect_matches_match_python_raw_rules() {
     let engine = get_engine();
 
     let matches = detect_fixture_matches(
-        &engine,
+        engine,
         "testdata/license-golden/datadriven/external/OS-Licenses-master/zlib.txt",
     );
 
@@ -940,7 +940,7 @@ fn test_aladdin_md5_and_not_rsa_md5_detect_matches_match_python_raw_signature() 
     let engine = get_engine();
 
     let matches = detect_fixture_matches(
-        &engine,
+        engine,
         "testdata/license-golden/datadriven/lic2/aladdin-md5_and_not_rsa-md5.txt",
     );
 
@@ -994,7 +994,7 @@ fn test_notice_txt_detect_matches_match_python_raw_rules() {
     let engine = get_engine();
 
     let matches = detect_fixture_matches(
-        &engine,
+        engine,
         "testdata/license-golden/datadriven/external/slic-tests/2/NOTICE.txt",
     );
 
@@ -1026,7 +1026,7 @@ fn test_not_spdx_detect_matches_match_python_raw_rules() {
     let engine = get_engine();
 
     let matches = detect_fixture_matches(
-        &engine,
+        engine,
         "testdata/license-golden/datadriven/external/spdx/not-spdx",
     );
 
@@ -1065,7 +1065,7 @@ fn test_gpl_2_0_plus_33_detect_matches_match_python_raw_expressions() {
     let engine = get_engine();
 
     let matches = detect_fixture_matches(
-        &engine,
+        engine,
         "testdata/license-golden/datadriven/lic1/gpl-2.0-plus_33.txt",
     );
 
@@ -1097,7 +1097,7 @@ fn test_kde_licenses_detect_matches_match_python_raw_expressions() {
     let engine = get_engine();
 
     let matches = detect_fixture_matches(
-        &engine,
+        engine,
         "testdata/license-golden/datadriven/lic4/kde_licenses_test.txt",
     );
 
@@ -1133,7 +1133,7 @@ fn test_d_zlib_and_gfdl_detect_matches_match_python_raw_expressions() {
     let engine = get_engine();
 
     let matches = detect_fixture_matches(
-        &engine,
+        engine,
         "testdata/license-golden/datadriven/lic1/d-zlib_and_gfdl-1.2_and_gpl_and_gpl_and_other.txt",
     );
 
@@ -1172,7 +1172,7 @@ fn test_bsd_2_clause_and_imlib2_detect_matches_match_python_raw_rules() {
     let engine = get_engine();
 
     let matches = detect_fixture_matches(
-        &engine,
+        engine,
         "testdata/license-golden/datadriven/external/fossology-tests/BSD/BSD-2-Clause_AND_Imlib2.txt",
     );
 
@@ -1200,7 +1200,7 @@ fn test_bsd_3_clause_and_cc0_detect_matches_match_python_raw_rules() {
     let engine = get_engine();
 
     let matches = detect_fixture_matches(
-        &engine,
+        engine,
         "testdata/license-golden/datadriven/external/fossology-tests/BSD/BSD-3-Clause_AND_CC0-1.0.txt",
     );
 
@@ -1228,7 +1228,7 @@ fn test_cecill_c_detect_matches_keep_spdx_and_long_notice() {
     let engine = get_engine();
 
     let matches = detect_fixture_matches(
-        &engine,
+        engine,
         "testdata/license-golden/datadriven/external/atarashi/CECILL-C.c",
     );
 
@@ -1253,7 +1253,7 @@ fn test_xunit_sln_detect_matches_match_python_raw_rules() {
     let engine = get_engine();
 
     let matches =
-        detect_fixture_matches(&engine, "testdata/license-golden/datadriven/lic4/xunit.sln");
+        detect_fixture_matches(engine, "testdata/license-golden/datadriven/lic4/xunit.sln");
 
     assert!(
         matches.is_empty(),
@@ -1333,10 +1333,8 @@ fn test_faq_doctree_detect_matches_preserve_two_bsd_new_hits() {
 fn test_complex_el_detect_matches_keep_python_lgpl_container() {
     let engine = get_engine();
 
-    let matches = detect_fixture_matches(
-        &engine,
-        "testdata/license-golden/datadriven/lic1/complex.el",
-    );
+    let matches =
+        detect_fixture_matches(engine, "testdata/license-golden/datadriven/lic1/complex.el");
 
     assert!(
         matches.iter().any(|m| {
@@ -1369,7 +1367,7 @@ fn test_gpl_and_gpl_and_gpl_and_lgpl_detect_matches_match_python_raw_expressions
     let engine = get_engine();
 
     let matches = detect_fixture_matches(
-        &engine,
+        engine,
         "testdata/license-golden/datadriven/lic1/gpl_and_gpl_and_gpl_and_lgpl-2.0_and_other.txt",
     );
 
@@ -1402,7 +1400,7 @@ fn test_android_sdk_preview_detect_matches_match_python_raw_rules() {
     let engine = get_engine();
 
     let matches = detect_fixture_matches(
-        &engine,
+        engine,
         "testdata/license-golden/datadriven/lic2/android-sdk-preview-2015.html",
     );
 
@@ -1449,7 +1447,7 @@ fn test_unknown_readme_detect_matches_unknown_mode_matches_python_raw_rules() {
     let engine = get_engine();
 
     let matches = detect_fixture_matches_with_unknown_licenses(
-        &engine,
+        engine,
         "testdata/license-golden/datadriven/unknown/README.md",
         true,
     );
@@ -1484,7 +1482,7 @@ fn test_unknown_cisco_detect_matches_unknown_mode_matches_python_raw_rules() {
     let engine = get_engine();
 
     let matches = detect_fixture_matches_with_unknown_licenses(
-        &engine,
+        engine,
         "testdata/license-golden/datadriven/unknown/cisco.txt",
         true,
     );
@@ -1519,7 +1517,7 @@ fn test_unknown_ucware_eula_detect_matches_unknown_mode_matches_python_raw_rules
     let engine = get_engine();
 
     let matches = detect_fixture_matches_with_unknown_licenses(
-        &engine,
+        engine,
         "testdata/license-golden/datadriven/unknown/ucware-eula.txt",
         true,
     );
@@ -1572,7 +1570,7 @@ fn test_unknown_citrix_detect_matches_unknown_mode_matches_python_raw_rules() {
     let engine = get_engine();
 
     let matches = detect_fixture_matches_with_unknown_licenses(
-        &engine,
+        engine,
         "testdata/license-golden/datadriven/unknown/citrix.txt",
         true,
     );
@@ -1643,7 +1641,7 @@ fn test_openssh_license_detect_matches_match_python_raw_rules() {
     let engine = get_engine();
 
     let matches = detect_fixture_matches(
-        &engine,
+        engine,
         "testdata/license-golden/datadriven/lic4/openssh.LICENSE",
     );
 
@@ -2036,7 +2034,7 @@ fn test_spdx_complex_short_html_keeps_exact_unicode_matches_and_drops_seq_contai
     let engine = get_engine();
 
     let matches = detect_fixture_matches(
-        &engine,
+        engine,
         "testdata/license-golden/datadriven/external/spdx/complex-short.html",
     );
     let expressions: Vec<_> = matches
@@ -2091,7 +2089,7 @@ fn test_spdx_complex_readme_detect_matches_keeps_nearby_embedded_matches() {
     let engine = get_engine();
 
     let matches = detect_fixture_matches(
-        &engine,
+        engine,
         "testdata/license-golden/datadriven/external/spdx/complex-readme.txt",
     );
     let expressions: Vec<&str> = matches
@@ -2131,7 +2129,7 @@ fn test_spdx_complex_readme_detect_matches_match_python_raw_signature() {
     let engine = get_engine();
 
     let matches = detect_fixture_matches(
-        &engine,
+        engine,
         "testdata/license-golden/datadriven/external/spdx/complex-readme.txt",
     );
     let composite_seq_expression = "((epl-2.0 OR apache-2.0) OR (gpl-2.0 WITH classpath-exception-2.0 AND gpl-2.0 WITH openjdk-exception)) AND unicode AND public-domain AND mit AND zlib AND zlib";
@@ -2277,7 +2275,7 @@ fn test_eclipse_openj9_detect_matches_match_python_raw_signature() {
     let engine = get_engine();
 
     let matches = detect_fixture_matches(
-        &engine,
+        engine,
         "testdata/license-golden/datadriven/lic1/eclipse-openj9.LICENSE",
     );
 
