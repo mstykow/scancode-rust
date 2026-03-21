@@ -56,13 +56,19 @@ jobs:
         include:
           - shard: copyright
             filter: "copyright::golden_test::tests::"
+            profile: release
           - shard: assembly
             filter: "assembly::assembly_golden_test::"
+            profile: debug
           - shard: finder
             filter: "finder::golden_test::tests::"
+            profile: debug
           - shard: license-detection
             filter: "license_detection::golden_test::golden_tests::"
+            profile: release
           - shard: parsers
+            filter: "parsers::golden_test::"
+            profile: debug
     steps:
       - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
         with:
@@ -74,46 +80,19 @@ jobs:
       - name: Set up Rust cache
         uses: Swatinem/rust-cache@v2
         with:
-          shared-key: golden-tests-release
+          shared-key: golden-tests-${{ matrix.profile }}
 
       - name: Run golden test shard
         shell: bash
         run: |
           set -euo pipefail
-          if [[ "${{ matrix.shard }}" == "parsers" ]]; then
-            cargo test --lib --release --verbose --features golden-tests --no-run
-
-            test_binary=""
-            while IFS= read -r candidate; do
-              if [[ -f "$candidate" && -x "$candidate" ]]; then
-                test_binary="$candidate"
-                break
-              fi
-            done < <(ls -t target/release/deps/provenant-* 2>/dev/null)
-
-            if [[ -z "$test_binary" ]]; then
-              echo "Could not determine parser golden test binary path" >&2
-              exit 1
-            fi
-
-            shopt -s nullglob
-            parser_files=(src/parsers/*_golden_test.rs)
-            if (( ${#parser_files[@]} == 0 )); then
-              echo "No parser golden test modules found"
-              exit 1
-            fi
-
-            for parser_file in "${parser_files[@]}"; do
-              module_name="${parser_file#src/parsers/}"
-              module_name="${module_name%.rs}"
-              filter="parsers::${module_name}::"
-              echo "Running golden filter: $filter"
-              "$test_binary" "$filter"
-            done
-          else
-            echo "Running golden filter: ${{ matrix.filter }}"
-            cargo test --lib --release --verbose --features golden-tests "${{ matrix.filter }}"
+          cargo_args=(test --lib --verbose --features golden-tests "${{ matrix.filter }}")
+          if [[ "${{ matrix.profile }}" == "release" ]]; then
+            cargo_args=(test --lib --release --verbose --features golden-tests "${{ matrix.filter }}")
           fi
+
+          echo "Running golden filter: ${{ matrix.filter }} (${{ matrix.profile }})"
+          cargo "${cargo_args[@]}"
 
   docs-quality:
     name: Documentation Quality
