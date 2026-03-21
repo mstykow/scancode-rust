@@ -1,0 +1,39 @@
+[
+  {
+    "type": "nix",
+    "name": "lock-demo",
+    "primary_language": "JSON",
+    "parties": [],
+    "datasource_id": "nix_flake_lock",
+    "purl": "pkg:nix/lock-demo",
+    "dependencies": [
+      {
+        "purl": "pkg:nix/crate2nix@ghi789",
+        "extracted_requirement": "github:nix-community/crate2nix",
+        "scope": "inputs",
+        "is_runtime": false,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:nix/flake-utils@def456",
+        "extracted_requirement": "github:numtide/flake-utils",
+        "scope": "inputs",
+        "is_runtime": false,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:nix/nixpkgs@abc123",
+        "extracted_requirement": "github:NixOS/nixpkgs",
+        "scope": "inputs",
+        "is_runtime": false,
+        "is_optional": false,
+        "is_pinned": true,
+        "is_direct": true
+      }
+    ]
+  }
+]

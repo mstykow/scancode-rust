@@ -204,6 +204,16 @@ pub static ASSEMBLERS: &[AssemblerConfig] = &[
         sibling_file_patterns: &["pixi.toml", "pixi.lock"],
         mode: AssemblyMode::SiblingMerge,
     },
+    AssemblerConfig {
+        datasource_ids: &[DatasourceId::NixFlakeNix, DatasourceId::NixFlakeLock],
+        sibling_file_patterns: &["flake.nix", "flake.lock"],
+        mode: AssemblyMode::SiblingMerge,
+    },
+    AssemblerConfig {
+        datasource_ids: &[DatasourceId::NixDefaultNix],
+        sibling_file_patterns: &["default.nix"],
+        mode: AssemblyMode::OnePerPackageData,
+    },
     // Helm chart ecosystem
     AssemblerConfig {
         datasource_ids: &[DatasourceId::HelmChartYaml, DatasourceId::HelmChartLock],

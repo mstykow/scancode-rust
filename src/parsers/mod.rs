@@ -191,6 +191,11 @@ mod microsoft_update_manifest_test;
 mod misc;
 #[cfg(test)]
 mod misc_test;
+mod nix;
+#[cfg(all(test, feature = "golden-tests"))]
+mod nix_golden_test;
+#[cfg(test)]
+mod nix_test;
 mod npm;
 #[cfg(all(test, feature = "golden-tests"))]
 mod npm_golden_test;
@@ -454,6 +459,7 @@ pub use self::misc::{
     JavaWarRecognizer, JavaWarWebXmlRecognizer, MeteorPackageRecognizer, MozillaXpiRecognizer,
     NsisRecognizer, SharArchiveRecognizer, SquashfsRecognizer,
 };
+pub use self::nix::{NixDefaultParser, NixFlakeLockParser, NixFlakeParser};
 pub use self::npm::NpmParser;
 pub use self::npm_lock::NpmLockParser;
 pub use self::npm_workspace::NpmWorkspaceParser;
@@ -626,6 +632,9 @@ register_package_handlers! {
         MavenParser,
         MesonParser,
         MicrosoftUpdateManifestParser,
+        NixDefaultParser,
+        NixFlakeLockParser,
+        NixFlakeParser,
         NpmLockParser,
         NpmParser,
         NpmWorkspaceParser,

@@ -1,0 +1,40 @@
+[
+  {
+    "type": "nix",
+    "name": "flake-demo",
+    "primary_language": "Nix",
+    "description": "Demo flake package",
+    "parties": [],
+    "datasource_id": "nix_flake_nix",
+    "purl": "pkg:nix/flake-demo",
+    "dependencies": [
+      {
+        "purl": "pkg:nix/flake-utils",
+        "extracted_requirement": "github:numtide/flake-utils",
+        "scope": "inputs",
+        "is_runtime": false,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:nix/nixpkgs",
+        "extracted_requirement": "github:NixOS/nixpkgs/nixos-24.11",
+        "scope": "inputs",
+        "is_runtime": false,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:nix/rust-overlay",
+        "extracted_requirement": "github:oxalica/rust-overlay",
+        "scope": "inputs",
+        "is_runtime": false,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true
+      }
+    ]
+  }
+]

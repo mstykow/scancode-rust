@@ -1,0 +1,40 @@
+[
+  {
+    "type": "nix",
+    "name": "demo",
+    "version": "1.2.3",
+    "primary_language": "Nix",
+    "description": "Demo package",
+    "parties": [],
+    "homepage_url": "https://example.com/demo",
+    "extracted_license_statement": "licenses.mit",
+    "datasource_id": "nix_default_nix",
+    "purl": "pkg:nix/demo@1.2.3",
+    "dependencies": [
+      {
+        "purl": "pkg:nix/pkg-config",
+        "scope": "nativeBuildInputs",
+        "is_runtime": false,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:nix/openssl",
+        "scope": "buildInputs",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true
+      },
+      {
+        "purl": "pkg:nix/zlib",
+        "scope": "buildInputs",
+        "is_runtime": true,
+        "is_optional": false,
+        "is_pinned": false,
+        "is_direct": true
+      }
+    ]
+  }
+]
