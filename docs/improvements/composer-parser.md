@@ -8,6 +8,7 @@ Rust now goes beyond the current Python ScanCode Composer handling in several co
 2. assigns ordinary files under Composer package roots to the correct package, including nested Composer packages
 3. keeps lockfile extraction lightweight by emitting one synthetic lock package plus dependency objects, while avoiding unnecessary array cloning on large `composer.lock` files
 4. enriches manifest-level provenance and party typing beyond the earlier lock-only focus
+5. normalizes trustworthy `composer.json` license metadata into declared license fields while preserving the raw manifest statement
 
 ## Python Status
 
@@ -17,6 +18,7 @@ Rust now goes beyond the current Python ScanCode Composer handling in several co
   - nested Composer package/file assignment gaps
   - missing support for alternate Composer file names
 - Python also maps manifest `source` and `dist` metadata but Rust previously left those fields empty for `composer.json`.
+- Upstream Composer handling also treats manifest `license` as expression-oriented package metadata and promotes recognized SPDX-style values into declared license fields.
 
 ## Rust Improvements
 
@@ -53,6 +55,21 @@ Rust now goes beyond the current Python ScanCode Composer handling in several co
   - `download_url` from manifest `dist`
   - `Party.type = person` for authors and vendor parties
 
+### Declared license normalization
+
+- Rust now keeps a parser-level declared-license statement in `extracted_license_statement` and promotes parseable SPDX-style Composer metadata into:
+  - `declared_license_expression`
+  - `declared_license_expression_spdx`
+  - `license_detections`
+- For string inputs, the extracted statement matches the manifest value directly. For Composer array inputs, the parser preserves the declared choice semantics by joining entries into a deterministic `OR` statement string.
+- This covers:
+  - single SPDX identifiers such as `MIT`
+  - SPDX expression strings such as `MIT OR Apache-2.0`
+  - Composer array form, normalized as disjunctive `OR`
+  - the documented Composer `proprietary` special case
+- For private Composer manifests that omit both `name` and `license`, Rust now matches upstream ScanCode’s proprietary fallback behavior.
+- Non-SPDX custom strings remain preserved as raw extracted manifest text instead of being over-normalized into misleading declared values.
+
 ## Coverage
 
-Coverage spans alternate Composer filenames, nested file assignment, lockfile handling, and richer manifest provenance behavior.
+Coverage spans alternate Composer filenames, nested file assignment, lockfile handling, richer manifest provenance behavior, SPDX license normalization, and a parser golden for Composer manifest declared-license output.
