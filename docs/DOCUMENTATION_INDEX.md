@@ -25,11 +25,14 @@ This index helps you find the right documentation for your needs.
 
 ## For Maintainers
 
+- **[RELEASING.md](RELEASING.md)** - Release prerequisites, workflow, and verification steps
+
 ### Document Organization
 
 ```text
 docs/
 ├── ARCHITECTURE.md                    # Evergreen: System design
+├── RELEASING.md                       # Evergreen: Maintainer release process
 ├── HOW_TO_ADD_A_PARSER.md            # Evergreen: Parser guide
 ├── TESTING_STRATEGY.md                # Evergreen: Testing philosophy
 ├── SUPPORTED_FORMATS.md               # Evergreen: Auto-generated format list
@@ -65,11 +68,15 @@ docs/
 **...track implementation quality and behavior**
 → [TESTING_STRATEGY.md](TESTING_STRATEGY.md)
 
+**...cut a release**
+→ [RELEASING.md](RELEASING.md)
+
 ## Document Lifecycle
 
 ### Evergreen Documents (Permanent)
 
 - **ARCHITECTURE.md** - Updated as architecture evolves
+- **RELEASING.md** - Updated as the release workflow changes
 - **HOW_TO_ADD_A_PARSER.md** - Updated as parser patterns change
 - **TESTING_STRATEGY.md** - Updated as testing approach evolves
 - **SUPPORTED_FORMATS.md** - Auto-generated, always current

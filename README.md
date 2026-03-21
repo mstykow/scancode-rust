@@ -154,12 +154,6 @@ cargo test
 
 If you use the repository's documentation and hook tooling, install the versions required by `package.json` and the project's pre-commit configuration.
 
-## Publishing a Release, Maintainers Only
-
-Maintainers should use the repository release tooling in the project root and monitor the [GitHub Actions workflow](https://github.com/mstykow/provenant/actions) for completion.
-
-> **Registry note**: the published crate name is `provenant-cli`, while the installed binary and product name remain `provenant` / Provenant.
-
 ## Credits
 
 `Provenant` is an independent Rust rewrite of [ScanCode Toolkit](https://github.com/aboutcode-org/scancode-toolkit). It uses the upstream ScanCode Toolkit project by nexB Inc. and the AboutCode community as a reference for compatibility, behavior, and parity validation. We are grateful to nexB Inc. and the AboutCode community for the reference implementation and the extensive license and copyright research behind it. See [`NOTICE`](NOTICE) for preserved upstream attribution notices applicable to materials included in this repository and to distributions that include ScanCode-derived data.
