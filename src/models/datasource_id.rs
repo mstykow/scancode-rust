@@ -221,6 +221,10 @@ pub enum DatasourceId {
     // ── Meteor ──
     MeteorPackage,
 
+    NixDefaultNix,
+    NixFlakeLock,
+    NixFlakeNix,
+
     // ── npm ──
     NpmPackageJson,
     NpmPackageLockJson,
@@ -478,6 +482,10 @@ impl DatasourceId {
 
             // Meteor
             Self::MeteorPackage => "meteor_package",
+
+            Self::NixDefaultNix => "nix_default_nix",
+            Self::NixFlakeLock => "nix_flake_lock",
+            Self::NixFlakeNix => "nix_flake_nix",
 
             // npm
             Self::BunLock => "bun_lock",

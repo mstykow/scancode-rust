@@ -1184,6 +1184,96 @@ mod tests {
     }
 
     #[test]
+    fn test_assemble_nix_flake_merges_lockfile_while_default_nix_stays_standalone() {
+        let mut files = vec![
+            create_test_file_info(
+                "repo/flake.nix",
+                DatasourceId::NixFlakeNix,
+                Some("pkg:nix/demo-flake"),
+                Some("demo-flake"),
+                None,
+                vec![],
+            ),
+            create_test_file_info(
+                "repo/flake.lock",
+                DatasourceId::NixFlakeLock,
+                Some("pkg:nix/demo-flake"),
+                Some("demo-flake"),
+                None,
+                vec![create_test_dependency(
+                    "pkg:nix/nixpkgs@abc123",
+                    Some("github:NixOS/nixpkgs"),
+                    None,
+                )],
+            ),
+            create_test_file_info(
+                "repo/default.nix",
+                DatasourceId::NixDefaultNix,
+                Some("pkg:nix/demo-derivation@1.0.0"),
+                Some("demo-derivation"),
+                Some("1.0.0"),
+                vec![],
+            ),
+        ];
+
+        let result = assemble(&mut files);
+
+        assert_eq!(result.packages.len(), 2);
+
+        let flake_package = result
+            .packages
+            .iter()
+            .find(|package| package.name.as_deref() == Some("demo-flake"))
+            .expect("missing flake package");
+        assert_eq!(flake_package.datafile_paths.len(), 2);
+        assert!(
+            flake_package
+                .datafile_paths
+                .contains(&"repo/flake.nix".to_string())
+        );
+        assert!(
+            flake_package
+                .datafile_paths
+                .contains(&"repo/flake.lock".to_string())
+        );
+        assert!(
+            flake_package
+                .datasource_ids
+                .contains(&DatasourceId::NixFlakeNix)
+        );
+        assert!(
+            flake_package
+                .datasource_ids
+                .contains(&DatasourceId::NixFlakeLock)
+        );
+
+        let default_package = result
+            .packages
+            .iter()
+            .find(|package| package.name.as_deref() == Some("demo-derivation"))
+            .expect("missing default.nix package");
+        assert_eq!(default_package.datafile_paths, vec!["repo/default.nix"]);
+        assert_eq!(
+            default_package.datasource_ids,
+            vec![DatasourceId::NixDefaultNix]
+        );
+
+        assert_eq!(result.dependencies.len(), 1);
+        assert_eq!(result.dependencies[0].datafile_path, "repo/flake.lock");
+        assert_eq!(
+            result.dependencies[0].for_package_uid.as_deref(),
+            Some(flake_package.package_uid.as_str())
+        );
+
+        assert_eq!(files[0].for_packages.len(), 1);
+        assert_eq!(files[1].for_packages.len(), 1);
+        assert_eq!(files[2].for_packages.len(), 1);
+        assert_eq!(files[0].for_packages[0], flake_package.package_uid);
+        assert_eq!(files[1].for_packages[0], flake_package.package_uid);
+        assert_eq!(files[2].for_packages[0], default_package.package_uid);
+    }
+
+    #[test]
     fn test_assemble_npm_package_json_skips_lockfile_with_same_name_different_version() {
         let mut files = vec![
             create_test_file_info(
