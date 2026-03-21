@@ -291,14 +291,36 @@ pub fn compute_candidates_with_msets(
     }
 
     let (query_set, query_mset) = build_set_and_mset(&query_token_ids);
+
+    // Build the set of high-value tokens in the query
+    let query_high_set: HashSet<TokenId> = query_set
+        .iter()
+        .filter(|tid| tid.as_usize() < index.len_legalese)
+        .copied()
+        .collect();
+
+    if query_high_set.is_empty() {
+        return Vec::new();
+    }
+
+    // Use inverted index to find candidate rules that share high-value tokens
+    let candidate_rids: HashSet<usize> = query_high_set
+        .iter()
+        .filter_map(|tid| index.rids_by_high_tid.get(tid))
+        .flat_map(|rids| rids.iter().copied())
+        .collect();
+
+    if candidate_rids.is_empty() {
+        return Vec::new();
+    }
+
     let mut step1_candidates: Vec<(ScoresVector, ScoresVector, usize, Rule, HashSet<TokenId>)> =
         Vec::new();
 
-    for (rid, rule) in index.rules_by_rid.iter().enumerate() {
-        if !index.approx_matchable_rids.contains(&rid) {
+    for rid in candidate_rids {
+        let Some(rule) = index.rules_by_rid.get(rid) else {
             continue;
-        }
-
+        };
         let Some(rule_set) = index.sets_by_rid.get(&rid) else {
             continue;
         };
