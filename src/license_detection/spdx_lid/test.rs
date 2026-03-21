@@ -307,7 +307,10 @@ mod tests {
 
     #[test]
     fn test_spdx_lid_match_simple() {
-        let mut index = create_test_index(&[("mit", 0), ("license", 1)], 1);
+        let mut index = create_test_index(
+            &[("spdx", 0), ("license", 1), ("identifier", 2), ("mit", 3)],
+            3,
+        );
         index.rules_by_rid.push(create_mock_rule_simple("mit", 100));
         index
             .rules_by_rid
@@ -327,7 +330,10 @@ mod tests {
 
     #[test]
     fn test_spdx_lid_match_case_insensitive() {
-        let mut index = create_test_index(&[("mit", 0)], 1);
+        let mut index = create_test_index(
+            &[("spdx", 0), ("license", 1), ("identifier", 2), ("mit", 3)],
+            3,
+        );
         index.rules_by_rid.push(create_mock_rule_simple("mit", 90));
 
         let text = "SPDX-License-Identifier: mit";
@@ -340,7 +346,17 @@ mod tests {
 
     #[test]
     fn test_spdx_lid_match_multiple() {
-        let mut index = create_test_index(&[("mit", 0), ("license", 1)], 1);
+        let mut index = create_test_index(
+            &[
+                ("spdx", 0),
+                ("license", 1),
+                ("identifier", 2),
+                ("mit", 3),
+                ("apache", 4),
+                ("2.0", 5),
+            ],
+            3,
+        );
         index.rules_by_rid.push(create_mock_rule_simple("mit", 100));
         index
             .rules_by_rid
@@ -366,7 +382,10 @@ mod tests {
 
     #[test]
     fn test_spdx_lid_match_score_from_relevance() {
-        let mut index = create_test_index(&[("mit", 0)], 1);
+        let mut index = create_test_index(
+            &[("spdx", 0), ("license", 1), ("identifier", 2), ("mit", 3)],
+            3,
+        );
         index.rules_by_rid.push(create_mock_rule_simple("mit", 80));
 
         let text = "SPDX-License-Identifier: MIT";
