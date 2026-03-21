@@ -2,7 +2,7 @@
 
 use crate::license_detection::index::LicenseIndex;
 use crate::license_detection::index::dictionary::{KnownToken, QueryToken, TokenId, TokenKind};
-use crate::license_detection::tokenize::{STOPWORDS, tokenize_without_stopwords};
+use crate::license_detection::tokenize::tokenize_as_ids;
 use std::collections::{HashMap, HashSet};
 
 /// A span representing a range of token positions.
@@ -168,6 +168,66 @@ impl<'a> Query<'a> {
     const BINARY_LINE_THRESHOLD: usize = 50;
     const MAX_TOKEN_PER_LINE: usize = 25;
 
+    fn compute_spdx_offset(
+        tokens: &[QueryToken],
+        dictionary: &crate::license_detection::index::dictionary::TokenDictionary,
+    ) -> Option<usize> {
+        let get_known_id = |i: usize| -> Option<TokenId> {
+            match tokens.get(i)? {
+                QueryToken::Known(known) => Some(known.id),
+                _ => None,
+            }
+        };
+
+        let spdx_id = dictionary.get("spdx")?;
+        let license_id = dictionary.get("license")?;
+        let identifier_id = dictionary.get("identifier")?;
+        let licence_id = dictionary.get("licence");
+
+        let licenses_id = dictionary.get("licenses");
+        let nuget_id = dictionary.get("nuget");
+        let org_id = dictionary.get("org");
+
+        let is_spdx_prefix = |ids: [Option<TokenId>; 3]| -> bool {
+            ids.iter().all(|id| id.is_some())
+                && ids[0] == Some(spdx_id)
+                && (ids[1] == Some(license_id) || ids[1] == licence_id)
+                && ids[2] == Some(identifier_id)
+        };
+
+        let is_nuget_prefix = |ids: [Option<TokenId>; 3]| -> bool {
+            licenses_id.is_some()
+                && nuget_id.is_some()
+                && org_id.is_some()
+                && ids[0] == licenses_id
+                && ids[1] == Some(nuget_id.unwrap())
+                && ids[2] == Some(org_id.unwrap())
+        };
+
+        if tokens.len() >= 3 {
+            let first_three = [get_known_id(0), get_known_id(1), get_known_id(2)];
+            if is_spdx_prefix(first_three) || is_nuget_prefix(first_three) {
+                return Some(0);
+            }
+        }
+
+        if tokens.len() >= 4 {
+            let second_three = [get_known_id(1), get_known_id(2), get_known_id(3)];
+            if is_spdx_prefix(second_three) || is_nuget_prefix(second_three) {
+                return Some(1);
+            }
+        }
+
+        if tokens.len() >= 5 {
+            let third_three = [get_known_id(2), get_known_id(3), get_known_id(4)];
+            if is_spdx_prefix(third_three) || is_nuget_prefix(third_three) {
+                return Some(2);
+            }
+        }
+
+        None
+    }
+
     pub fn from_extracted_text(
         text: &str,
         index: &'a LicenseIndex,
@@ -204,8 +264,6 @@ impl<'a> Query<'a> {
         };
         let has_long_lines = Self::detect_long_lines(text);
 
-        let stopwords_set = &*STOPWORDS;
-
         let mut tokens = Vec::new();
         let mut line_by_pos = Vec::new();
         let mut unknowns_by_pos: HashMap<Option<i32>, usize> = HashMap::new();
@@ -225,18 +283,16 @@ impl<'a> Query<'a> {
 
             let mut line_first_known_pos = None;
 
-            for token in tokenize_without_stopwords(line_trimmed) {
-                match if stopwords_set.contains(token.as_str()) {
-                    QueryToken::Stopword
-                } else {
-                    index.dictionary.classify_query_token(&token)
-                } {
+            let line_query_tokens = tokenize_as_ids(line_trimmed, &index.dictionary);
+
+            for query_token in &line_query_tokens {
+                match query_token {
                     QueryToken::Known(known_token) => {
                         known_pos += 1;
                         started = true;
                         tokens.push(known_token.id);
                         line_by_pos.push(current_line);
-                        line_tokens.push(Some(known_token));
+                        line_tokens.push(Some(*known_token));
 
                         if line_first_known_pos.is_none() {
                             line_first_known_pos = Some(known_pos);
@@ -265,56 +321,13 @@ impl<'a> Query<'a> {
 
             let line_last_known_pos = known_pos;
 
-            let tokens_lower: Vec<String> = tokenize_without_stopwords(line_trimmed)
-                .into_iter()
-                .map(|t| t.to_lowercase())
-                .collect();
-
-            let spdx_start_offset = if tokens_lower.len() >= 3 {
-                let first_three: Vec<&str> =
-                    tokens_lower.iter().take(3).map(|s| s.as_str()).collect();
-                let is_spdx_prefix = first_three == ["spdx", "license", "identifier"]
-                    || first_three == ["spdx", "licence", "identifier"]
-                    || first_three == ["licenses", "nuget", "org"];
-                if is_spdx_prefix {
-                    Some(0)
-                } else if tokens_lower.len() >= 4 {
-                    let second_three: Vec<&str> = tokens_lower
-                        .iter()
-                        .skip(1)
-                        .take(3)
-                        .map(|s| s.as_str())
-                        .collect();
-                    let is_spdx_second = second_three == ["spdx", "license", "identifier"]
-                        || second_three == ["spdx", "licence", "identifier"]
-                        || second_three == ["licenses", "nuget", "org"];
-                    if is_spdx_second {
-                        Some(1)
-                    } else if tokens_lower.len() >= 5 {
-                        let third_three: Vec<&str> = tokens_lower
-                            .iter()
-                            .skip(2)
-                            .take(3)
-                            .map(|s| s.as_str())
-                            .collect();
-                        let is_spdx_third = third_three == ["spdx", "license", "identifier"]
-                            || third_three == ["spdx", "licence", "identifier"]
-                            || third_three == ["licenses", "nuget", "org"];
-                        if is_spdx_third { Some(2) } else { None }
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                }
-            } else {
-                None
-            };
+            let spdx_start_offset =
+                Self::compute_spdx_offset(&line_query_tokens, &index.dictionary);
 
             if let Some(offset) = spdx_start_offset
                 && let Some(line_first_known_pos) = line_first_known_pos
             {
-                let spdx_start_known_pos = line_first_known_pos + offset;
+                let spdx_start_known_pos = line_first_known_pos + offset as i32;
                 if spdx_start_known_pos <= line_last_known_pos {
                     let spdx_start = spdx_start_known_pos as usize;
                     let spdx_end = (line_last_known_pos + 1) as usize;
@@ -400,7 +413,7 @@ impl<'a> Query<'a> {
     /// Corresponds to Python: `typecode.get_type().is_text_with_long_lines` usage
     fn detect_long_lines(text: &str) -> bool {
         text.lines()
-            .any(|line| tokenize_without_stopwords(line).len() > 25)
+            .any(|line| crate::license_detection::tokenize::count_tokens(line) > 25)
     }
 
     fn break_long_lines(lines: &[Vec<Option<KnownToken>>]) -> Vec<Vec<Option<KnownToken>>> {

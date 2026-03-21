@@ -3,6 +3,7 @@
 //! Tokenization converts text into a sequence of tokens that can be matched
 //! against license rules. This module implements ScanCode-compatible tokenization.
 
+use crate::license_detection::index::dictionary::{QueryToken, TokenDictionary};
 use once_cell::sync::Lazy;
 use regex::Regex;
 use std::collections::HashSet;
@@ -164,6 +165,59 @@ pub fn tokenize_without_stopwords(text: &str) -> Vec<String> {
     }
 
     tokens
+}
+
+/// Tokenizes text and returns QueryTokens directly, avoiding string allocation.
+///
+/// This is the primary tokenization function for query processing.
+/// Tokens are classified against the dictionary immediately:
+/// - Known tokens → QueryToken::Known(KnownToken)
+/// - Unknown tokens → QueryToken::Unknown
+/// - Stopwords → QueryToken::Stopword
+///
+/// # Returns
+/// A vector of QueryTokens (no string allocation).
+pub fn tokenize_as_ids(text: &str, dictionary: &TokenDictionary) -> Vec<QueryToken> {
+    if text.is_empty() {
+        return Vec::new();
+    }
+
+    let mut tokens = Vec::new();
+    let stopwords_set = &*STOPWORDS;
+
+    let lowercase_text = text.to_lowercase();
+
+    for cap in QUERY_PATTERN.find_iter(&lowercase_text) {
+        let token = cap.as_str();
+        if token.is_empty() {
+            continue;
+        }
+
+        if stopwords_set.contains(token) {
+            tokens.push(QueryToken::Stopword);
+        } else {
+            tokens.push(dictionary.classify_query_token(token));
+        }
+    }
+
+    tokens
+}
+
+/// Count tokens in text without allocating strings.
+///
+/// Used for line length detection without memory overhead.
+pub fn count_tokens(text: &str) -> usize {
+    if text.is_empty() {
+        return 0;
+    }
+
+    let lowercase_text = text.to_lowercase();
+    let stopwords_set = &*STOPWORDS;
+
+    QUERY_PATTERN
+        .find_iter(&lowercase_text)
+        .filter(|m| !m.as_str().is_empty() && !stopwords_set.contains(m.as_str()))
+        .count()
 }
 
 /// Parse {{...}} required phrase markers from rule text.
