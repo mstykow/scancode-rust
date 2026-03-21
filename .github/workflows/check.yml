@@ -40,7 +40,7 @@ jobs:
         run: cargo check --all --verbose
 
       - name: Run unit/integration/doc tests
-        run: cargo test --all --verbose
+        run: cargo test --all --release --verbose
 
       - name: Check for unused dependencies
         run: ./scripts/check_unused_deps.sh
