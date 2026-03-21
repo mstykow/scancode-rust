@@ -51,7 +51,6 @@ mod tests {
 
     use tempfile::TempDir;
 
-    use crate::askalono::{ScanStrategy, Store};
     use crate::models::FileType;
     use crate::progress::{ProgressMode, ScanProgress};
 
@@ -64,11 +63,6 @@ mod tests {
         assert!(options.detect_copyrights);
     }
 
-    fn scan_strategy_without_licenses() -> ScanStrategy<'static> {
-        let store = Box::leak(Box::new(Store::new()));
-        ScanStrategy::new(store)
-    }
-
     fn scan_single_file(
         file_name: &str,
         content: &str,
@@ -79,8 +73,7 @@ mod tests {
         fs::write(&file_path, content).expect("write test file");
 
         let progress = Arc::new(ScanProgress::new(ProgressMode::Quiet));
-        let strategy = scan_strategy_without_licenses();
-        let result = process_with_options(temp_dir.path(), 0, progress, &[], &strategy, options)
+        let result = process_with_options(temp_dir.path(), 0, progress, &[], None, false, options)
             .expect("scan should succeed");
 
         result

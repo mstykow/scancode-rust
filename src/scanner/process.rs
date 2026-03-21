@@ -1,15 +1,18 @@
-use std::fs;
-use std::path::Path;
-use std::sync::Arc;
-use std::time::{Duration, Instant};
-
+use crate::license_detection::LicenseDetectionEngine;
+use crate::parsers::try_parse_file;
+use crate::utils::hash::{calculate_md5, calculate_sha1, calculate_sha256};
+use crate::utils::language::detect_language;
+use crate::utils::text::{is_source, remove_verbatim_escape_sequences};
 use anyhow::Error;
 use glob::Pattern;
 use log::warn;
 use mime_guess::from_path;
 use rayon::prelude::*;
+use std::fs::{self};
+use std::path::Path;
+use std::sync::Arc;
+use std::time::{Duration, Instant};
 
-use crate::askalono::{ScanStrategy, TextData};
 use crate::cache::{CachedScanFindings, read_cached_findings, write_cached_findings};
 use crate::copyright::{
     self, AuthorDetection, CopyrightDetection, CopyrightDetectionOptions, HolderDetection,
@@ -19,14 +22,11 @@ use crate::models::{
     Author, Copyright, FileInfo, FileInfoBuilder, FileType, Holder, LicenseDetection, Match,
     OutputEmail, OutputURL,
 };
-use crate::parsers::try_parse_file;
 use crate::progress::ScanProgress;
 use crate::scanner::{ProcessResult, TextDetectionOptions};
 use crate::utils::file::{
     ExtractedTextKind, extract_text_for_detection, get_creation_date, is_path_excluded,
 };
-use crate::utils::hash::{calculate_md5, calculate_sha1, calculate_sha256};
-use crate::utils::language::detect_language;
 
 const PEM_CERTIFICATE_HEADERS: &[(&str, &str)] = &[
     ("-----BEGIN CERTIFICATE-----", "-----END CERTIFICATE-----"),
@@ -45,14 +45,16 @@ pub fn process<P: AsRef<Path>>(
     max_depth: usize,
     progress: Arc<ScanProgress>,
     exclude_patterns: &[Pattern],
-    scan_strategy: &ScanStrategy,
+    license_engine: Option<Arc<LicenseDetectionEngine>>,
+    include_text: bool,
 ) -> Result<ProcessResult, Error> {
     process_with_options(
         path,
         max_depth,
         progress,
         exclude_patterns,
-        scan_strategy,
+        license_engine,
+        include_text,
         &TextDetectionOptions::default(),
     )
 }
@@ -62,7 +64,8 @@ pub fn process_with_options<P: AsRef<Path>>(
     max_depth: usize,
     progress: Arc<ScanProgress>,
     exclude_patterns: &[Pattern],
-    scan_strategy: &ScanStrategy,
+    license_engine: Option<Arc<LicenseDetectionEngine>>,
+    include_text: bool,
     text_options: &TextDetectionOptions,
 ) -> Result<ProcessResult, Error> {
     let depth_limit = depth_limit_from_cli(max_depth);
@@ -71,7 +74,8 @@ pub fn process_with_options<P: AsRef<Path>>(
         depth_limit,
         progress,
         exclude_patterns,
-        scan_strategy,
+        license_engine,
+        include_text,
         text_options,
     )
 }
@@ -89,7 +93,8 @@ fn process_with_options_internal(
     depth_limit: Option<usize>,
     progress: Arc<ScanProgress>,
     exclude_patterns: &[Pattern],
-    scan_strategy: &ScanStrategy,
+    license_engine: Option<Arc<LicenseDetectionEngine>>,
+    include_text: bool,
     text_options: &TextDetectionOptions,
 ) -> Result<ProcessResult, Error> {
     if is_path_excluded(path, exclude_patterns) {
@@ -129,7 +134,13 @@ fn process_with_options_internal(
         &mut file_entries
             .par_iter()
             .map(|(path, metadata)| {
-                let file_entry = process_file(path, metadata, scan_strategy, text_options);
+                let file_entry = process_file(
+                    path,
+                    metadata,
+                    license_engine.clone(),
+                    include_text,
+                    text_options,
+                );
                 progress.file_completed(path, metadata.len(), &file_entry.scan_errors);
                 file_entry
             })
@@ -152,7 +163,8 @@ fn process_with_options_internal(
                 next_depth_limit,
                 progress.clone(),
                 exclude_patterns,
-                scan_strategy,
+                license_engine.clone(),
+                include_text,
                 text_options,
             ) {
                 Ok(mut result) => {
@@ -173,7 +185,8 @@ fn process_with_options_internal(
 fn process_file(
     path: &Path,
     metadata: &fs::Metadata,
-    scan_strategy: &ScanStrategy,
+    license_engine: Option<Arc<LicenseDetectionEngine>>,
+    include_text: bool,
     text_options: &TextDetectionOptions,
 ) -> FileInfo {
     let mut scan_errors: Vec<String> = vec![];
@@ -181,9 +194,13 @@ fn process_file(
 
     let started = Instant::now();
 
-    if let Err(e) =
-        extract_information_from_content(&mut file_info_builder, path, scan_strategy, text_options)
-    {
+    if let Err(e) = extract_information_from_content(
+        &mut file_info_builder,
+        path,
+        license_engine,
+        include_text,
+        text_options,
+    ) {
         scan_errors.push(e.to_string());
     };
 
@@ -248,7 +265,8 @@ fn process_file(
 fn extract_information_from_content(
     file_info_builder: &mut FileInfoBuilder,
     path: &Path,
-    scan_strategy: &ScanStrategy,
+    license_engine: Option<Arc<LicenseDetectionEngine>>,
+    include_text: bool,
     text_options: &TextDetectionOptions,
 ) -> Result<(), Error> {
     let started = Instant::now();
@@ -340,8 +358,28 @@ fn extract_information_from_content(
             text_options.timeout_seconds
         )));
     }
+    // Handle source map files specially
+    let text_content_for_license_detection = if crate::utils::sourcemap::is_sourcemap(path) {
+        if let Some(sourcemap_content) =
+            crate::utils::sourcemap::extract_sourcemap_content(&text_content)
+        {
+            sourcemap_content
+        } else {
+            text_content
+        }
+    } else if is_source(path) {
+        remove_verbatim_escape_sequences(&text_content)
+    } else {
+        text_content
+    };
 
-    extract_license_information(file_info_builder, text_content, scan_strategy)
+    extract_license_information(
+        file_info_builder,
+        text_content_for_license_detection,
+        license_engine,
+        include_text,
+        from_binary_strings,
+    )
 }
 
 fn is_timeout_exceeded(started: Instant, timeout_seconds: f64) -> bool {
@@ -580,48 +618,79 @@ fn extract_email_url_information(
 fn extract_license_information(
     file_info_builder: &mut FileInfoBuilder,
     text_content: String,
-    scan_strategy: &ScanStrategy,
+    license_engine: Option<Arc<LicenseDetectionEngine>>,
+    include_text: bool,
+    from_binary_strings: bool,
 ) -> Result<(), Error> {
-    if text_content.is_empty() || !scan_strategy.store_has_licenses() {
+    let Some(engine) = license_engine else {
         return Ok(());
+    };
+
+    match engine.detect_with_kind(&text_content, false, from_binary_strings) {
+        Ok(detections) => {
+            let model_detections: Vec<LicenseDetection> = detections
+                .into_iter()
+                .filter_map(|d| convert_detection_to_model(d, include_text))
+                .collect();
+
+            if !model_detections.is_empty() {
+                let expressions: Vec<String> = model_detections
+                    .iter()
+                    .filter(|d| !d.license_expression_spdx.is_empty())
+                    .map(|d| d.license_expression_spdx.clone())
+                    .collect();
+
+                if !expressions.is_empty() {
+                    let combined = crate::utils::spdx::combine_license_expressions(expressions);
+                    if let Some(expr) = combined {
+                        file_info_builder.license_expression(Some(expr));
+                    }
+                }
+            }
+
+            file_info_builder.license_detections(model_detections);
+        }
+        Err(e) => {
+            warn!("License detection failed: {}", e);
+        }
     }
 
-    let license_result = scan_strategy.scan(&TextData::from(text_content.as_str()))?;
-    let license_expr = license_result.license.map(|x| x.name.to_string());
-
-    let license_detections = license_result
-        .containing
-        .iter()
-        .map(|detection| {
-            let license_lower = detection.license.name.to_lowercase();
-            LicenseDetection {
-                license_expression: license_lower.clone(),
-                license_expression_spdx: detection.license.name.to_string(),
-                matches: vec![Match {
-                    license_expression: license_lower.clone(),
-                    license_expression_spdx: detection.license.name.to_string(),
-                    from_file: None,
-                    score: detection.score as f64,
-                    start_line: detection.line_range.0,
-                    end_line: detection.line_range.1,
-                    matcher: Some("2-aho".to_string()),
-                    matched_length: None,
-                    match_coverage: None,
-                    rule_relevance: None,
-                    rule_identifier: None,
-                    rule_url: None,
-                    matched_text: None,
-                }],
-                identifier: None,
-            }
-        })
-        .collect::<Vec<_>>();
-
-    file_info_builder
-        .license_expression(license_expr)
-        .license_detections(license_detections);
-
     Ok(())
+}
+
+fn convert_detection_to_model(
+    detection: crate::license_detection::LicenseDetection,
+    include_text: bool,
+) -> Option<LicenseDetection> {
+    let license_expression = detection.license_expression?;
+    let license_expression_spdx = detection.license_expression_spdx.unwrap_or_default();
+
+    let matches: Vec<Match> = detection
+        .matches
+        .into_iter()
+        .map(|m| Match {
+            license_expression: m.license_expression,
+            license_expression_spdx: m.license_expression_spdx.unwrap_or_default(),
+            from_file: m.from_file,
+            start_line: m.start_line,
+            end_line: m.end_line,
+            matcher: Some(m.matcher.to_string()),
+            score: m.score as f64,
+            matched_length: Some(m.matched_length),
+            match_coverage: Some(m.match_coverage as f64),
+            rule_relevance: Some(m.rule_relevance as usize),
+            rule_identifier: Some(m.rule_identifier),
+            rule_url: Some(m.rule_url),
+            matched_text: if include_text { m.matched_text } else { None },
+        })
+        .collect();
+
+    Some(LicenseDetection {
+        license_expression,
+        license_expression_spdx,
+        matches,
+        identifier: detection.identifier,
+    })
 }
 
 fn should_skip_text_detection(path: &Path, buffer: &[u8]) -> bool {

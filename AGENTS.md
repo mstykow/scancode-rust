@@ -10,6 +10,7 @@ This guide provides essential information for AI coding agents working on the `P
 - **How-To Guides**: [`docs/HOW_TO_ADD_A_PARSER.md`](docs/HOW_TO_ADD_A_PARSER.md) - Step-by-step guide for adding new parsers
 - **Architectural Decision Records**: [`docs/adr/`](docs/adr/) - Why key decisions were made (5 ADRs)
 - **Beyond-Parity Features**: [`docs/improvements/`](docs/improvements/) - Where Rust exceeds Python (7 parsers documented)
+- **License Detection Architecture**: [`docs/LICENSE_DETECTION_ARCHITECTURE.md`](docs/LICENSE_DETECTION_ARCHITECTURE.md) - Current license detection architecture, embedded index flow, and maintainer workflow
 - **Supported Formats**: [`docs/SUPPORTED_FORMATS.md`](docs/SUPPORTED_FORMATS.md) - Auto-generated list of all supported package formats
 - **API Reference**: Run `cargo doc --open` - Complete API documentation
 - **This File**: Quick start, code style, common pitfalls
@@ -64,7 +65,7 @@ cargo build --release         # Optimized build
 cargo test                    # Run all tests (excludes golden tests)
 cargo test <test_name>        # Run specific test (e.g., test_extract_from_testdata)
 cargo test --lib              # Test library code only (faster)
-cargo test --features golden-tests  # Include golden tests (slower, compares against Python ScanCode)
+cargo test --release --features golden-tests  # Local golden tests: always use --release
 
 # Code Quality
 cargo fmt                     # Format code
@@ -92,6 +93,18 @@ cargo test parsers::npm_test::tests::test_extract_from_testdata
 cargo test parsers::npm_test::tests::test_is_match
 cargo test test_is_match       # Runs all tests with "test_is_match" in name
 ```
+
+## Running Golden Tests
+
+For local/manual golden test runs, always use `--release` unless explicitly instructed otherwise. Debug golden test runs are far too slow for normal agent work.
+
+To count failing golden test cases:
+
+```bash
+cargo test --release -q --features golden-tests --lib license_detection::golden_test 2>&1 | tee /tmp/golden_tests.log | grep "failed, 0 skipped" | sed 's/.*, \([0-9]*\) failed,.*/\1/' | paste -sd+ | bc
+```
+
+Running golden tests is expensive, so file-based caching should be used for more complex, incremental analysis.
 
 ## Project Architecture
 
@@ -212,6 +225,12 @@ pub fn extract_package_data(path: &Path) -> PackageData {
     }
 }
 ```
+
+### Dead Code
+
+- **Never use `#[allow(dead_code)]`** except when explicitly requested by the user
+- **Dead functions indicate a problem**: Either they became unused by accident (find where they should be used) or they are unnecessary (remove them)
+- **All code should serve a purpose**: Unused code is technical debt and should be cleaned up
 
 ## Adding a New Package Parser
 
@@ -653,4 +672,4 @@ The assembler:
 - **Output format**: ScanCode Toolkit-compatible JSON with `OUTPUT_FORMAT_VERSION`
 - **License detection**: Uses SPDX license data, threshold of 0.9 confidence
 - **Exclusion patterns**: Supports glob patterns (e.g., `*.git*`, `node_modules/*`)
-- **Git submodules**: Two submodules - `resources/licenses/` (SPDX data) and `reference/scancode-toolkit/` (original Python codebase for reference)
+- **Git submodules**: `reference/scancode-toolkit/` - Full Python codebase for reference (includes license rules/licenses)

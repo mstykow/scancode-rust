@@ -1,0 +1,14 @@
+license_expressions:
+  - bsd-new AND other-permissive
+  - openssh
+  - gary-s-brown
+  - bsd-new
+  - other-permissive
+  - other-permissive
+  - ssh-keyscan
+  - public-domain
+  - public-domain-disclaimer
+  - bsd-original-uc
+  - bsd-original-uc
+  - bsd-simplified
+  - bsd-simplified

@@ -1,0 +1,28 @@
+GNU General Public License version 2
+
+
+
+Resource,sha1,simhash1,filetype,filesize,filedate,folder_fingerprint,release_version,release_download_urls,component_homepage,component_url_info,component_name,release_confirmed_license,component_organization,release_asserted_license
+# Index-Version: 2
+# Resource-Count: 782
+/struts-core/1.3.5/struts-core-1.3.5-javadoc.jar,239399d59a147f20d3c5e4b550e0f73fd511d0cc,24576:dPElXDv36Vh6Z12J5P3YlA8j4kp3D1JaYwdGIGIrEc+FLnv:1ElX73scZsnP3YlCwREYwdUIr/Mv,"zip archive data, at least v1.0 to extract",1134957,2009-11-14,,1.3.5,"http://mirrors.ibiblio.org/pub/mirrors/maven2/org/apache/struts/struts-core/1.3.5/struts-core-1.3.5-javadoc.jar
+http://mirrors.ibiblio.org/pub/mirrors/maven2/org/apache/struts/struts-core/1.3.5/struts-core-1.3.5.jar
+http://mirrors.ibiblio.org/pub/mirrors/maven2/org/apache/struts/struts-core/1.3.5/struts-core-1.3.5-sources.jar",http://struts.apache.org,https://db.dejacode.org/admin/repository/component/struts-core,Struts Core,,,
+/struts-core/1.3.5/struts-core-1.3.5-javadoc.jar-djcx/allclasses-frame.html,96bd8c0df29d7da16e2bf3eab7900c16e2564f93,384:7LUfkiREy2avm3OZvsCW2Y5yYr8BRC7RNm:7LUCOZ5Q7RNm,html language text,21791,2006-08-06,,1.3.5,"http://mirrors.ibiblio.org/pub/mirrors/maven2/org/apache/struts/struts-core/1.3.5/struts-core-1.3.5-javadoc.jar
+http://mirrors.ibiblio.org/pub/mirrors/maven2/org/apache/struts/struts-core/1.3.5/struts-core-1.3.5.jar
+http://mirrors.ibiblio.org/pub/mirrors/maven2/org/apache/struts/struts-core/1.3.5/struts-core-1.3.5-sources.jar",http://struts.apache.org,https://db.dejacode.org/admin/repository/component/struts-core,Struts Core,,,
+/struts-core/1.3.5/struts-core-1.3.5-javadoc.jar-djcx/allclasses-noframe.html,4d9cb05b3042417f504af799eb869f08939c2f80,384:7LUrp00QmPiC2zln6DdXrnKUT1rBBICG2gs:7LUQn6JhG2gs,html language text,19111,2006-08-06,,1.3.5,"http://mirrors.ibiblio.org/pub/mirrors/maven2/org/apache/struts/struts-core/1.3.5/struts-core-1.3.5-javadoc.jar
+http://mirrors.ibiblio.org/pub/mirrors/maven2/org/apache/struts/struts-core/1.3.5/struts-core-1.3.5.jar
+http://mirrors.ibiblio.org/pub/mirrors/maven2/org/apache/struts/struts-core/1.3.5/struts-core-1.3.5-sources.jar",http://struts.apache.org,https://db.dejacode.org/admin/repository/component/struts-core,Struts Core,,,
+/struts-core/1.3.5/struts-core-1.3.5-javadoc.jar-djcx/constant-values.html,7aefbaeeef2c9485efffda2f030099d68ecf802d,768:7JFjcy6fC6a1Wu9nce5jUpXd8Sf1VfFAQ/Y8EGNWFKWFeeLdohb+FjIy6B:7b43fFAQ/Y8EGNWFKWFeeLdohbiy,html language text,51472,2006-08-06,,1.3.5,"http://mirrors.ibiblio.org/pub/mirrors/maven2/org/apache/struts/struts-core/1.3.5/struts-core-1.3.5-javadoc.jar
+http://mirrors.ibiblio.org/pub/mirrors/maven2/org/apache/struts/struts-core/1.3.5/struts-core-1.3.5.jar
+http://mirrors.ibiblio.org/pub/mirrors/maven2/org/apache/struts/struts-core/1.3.5/struts-core-1.3.5-sources.jar",http://struts.apache.org,https://db.dejacode.org/admin/repository/component/struts-core,Struts Core,,,
+/struts-core/1.3.5/struts-core-1.3.5-javadoc.jar-djcx/deprecated-list.html,e849bc7a51bb619c80e72f83444749f40c5c6039,96:7+mTaVteMSjyBSSoSp7Yt+k4kMkH7yrJ7ukONiSbDTp51w1eiMuEdZNCZqvuGlcA:7+mTy0MSjyBP/E0k4kMkH2rJ7ukONi0T,html language text,6049,2006-08-06,,1.3.5,"http://mirrors.ibiblio.org/pub/mirrors/maven2/org/apache/struts/struts-core/1.3.5/struts-core-1.3.5-javadoc.jar
+http://mirrors.ibiblio.org/pub/mirrors/maven2/org/apache/struts/struts-core/1.3.5/struts-core-1.3.5.jar
+http://mirrors.ibiblio.org/pub/mirrors/maven2/org/apache/struts/struts-core/1.3.5/struts-core-1.3.5-sources.jar",http://struts.apache.org,https://db.dejacode.org/admin/repository/component/struts-core,Struts Core,,,
+/struts-core/1.3.5/struts-core-1.3.5-javadoc.jar-djcx/files,5184027f46092bebd758815af0e2c58f25455662,48:54llCFyncVAV6js8a1ugTwyZlxLSVqp2V6VnVDVyVvVGVhqVaV/VATVeV8V35Vn0:Ne3YapMrViPAmse15vfY7c2wqzpNiB,ascii text,13389,2006-08-06,,1.3.5,"http://mirrors.ibiblio.org/pub/mirrors/maven2/org/apache/struts/struts-core/1.3.5/struts-core-1.3.5-javadoc.jar
+http://mirrors.ibiblio.org/pub/mirrors/maven2/org/apache/struts/struts-core/1.3.5/struts-core-1.3.5.jar
+http://mirrors.ibiblio.org/pub/mirrors/maven2/org/apache/struts/struts-core/1.3.5/struts-core-1.3.5-sources.jar",http://struts.apache.org,https://db.dejacode.org/admin/repository/component/struts-core,Struts Core,,,
+/struts-core/1.3.5/struts-core-1.3.5-javadoc.jar-djcx/help-doc.html,8c69430793ee598ab5e6e9c48d02aaae1d3a5a52,192:7+mb40MSjyBP/E0k4kMkH2nAeORJ7uC3p51w1eEq5Vc2DPZ2dFDMXOMMSjyHP/E2:75FjcWP6PqE2DPZ2dFDMXJFjIWP6Pqy,html language text,10006,2006-08-06,,1.3.5,"http://mirrors.ibiblio.org/pub/mirrors/maven2/org/apache/struts/struts-core/1.3.5/struts-core-1.3.5-javadoc.jar
+http://mirrors.ibiblio.org/pub/mirrors/maven2/org/apache/struts/struts-core/1.3.5/struts-core-1.3.5.jar
+http://mirrors.ibiblio.org/pub/mirrors/maven2/org/apache/struts/struts-core/1.3.5/struts-core-1.3.5-sources.jar",http://struts.apache.org,https://db.dejacode.org/admin/repository/component/struts-core,Struts Core,,,

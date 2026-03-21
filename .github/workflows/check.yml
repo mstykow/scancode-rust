@@ -60,6 +60,8 @@ jobs:
             filter: "assembly::assembly_golden_test::"
           - shard: finder
             filter: "finder::golden_test::tests::"
+          - shard: license-detection
+            filter: "license_detection::golden_test::golden_tests::"
           - shard: parsers
     steps:
       - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
@@ -72,14 +74,14 @@ jobs:
       - name: Set up Rust cache
         uses: Swatinem/rust-cache@v2
         with:
-          shared-key: golden-tests
+          shared-key: golden-tests-release
 
       - name: Run golden test shard
         shell: bash
         run: |
           set -euo pipefail
           if [[ "${{ matrix.shard }}" == "parsers" ]]; then
-            cargo test --lib --verbose --features golden-tests --no-run
+            cargo test --lib --release --verbose --features golden-tests --no-run
 
             test_binary=""
             while IFS= read -r candidate; do
@@ -87,7 +89,7 @@ jobs:
                 test_binary="$candidate"
                 break
               fi
-            done < <(ls -t target/debug/deps/provenant-* 2>/dev/null)
+            done < <(ls -t target/release/deps/provenant-* 2>/dev/null)
 
             if [[ -z "$test_binary" ]]; then
               echo "Could not determine parser golden test binary path" >&2
@@ -110,7 +112,7 @@ jobs:
             done
           else
             echo "Running golden filter: ${{ matrix.filter }}"
-            cargo test --lib --verbose --features golden-tests "${{ matrix.filter }}"
+            cargo test --lib --release --verbose --features golden-tests "${{ matrix.filter }}"
           fi
 
   docs-quality:

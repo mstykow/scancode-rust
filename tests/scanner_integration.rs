@@ -1,5 +1,5 @@
 use glob::Pattern;
-use provenant::askalono::{ScanStrategy, Store};
+use provenant::license_detection::{LicenseDetectionEngine, SCANCODE_LICENSES_DATA_PATH};
 use provenant::models::PackageType;
 use provenant::parsers::list_parser_types;
 use provenant::progress::{ProgressMode, ScanProgress};
@@ -10,17 +10,22 @@ use std::fs;
 use std::path::Path;
 use std::sync::Arc;
 
-/// Helper to create a minimal Store for testing
-/// This creates an empty store - tests don't need actual license data
-fn create_test_store() -> Store {
-    Store::new()
-}
-
-/// Helper to create a ScanStrategy for testing
-fn create_test_strategy(store: &Store) -> ScanStrategy<'_> {
-    ScanStrategy::new(store)
-        .optimize(false)
-        .confidence_threshold(0.9)
+fn create_license_detection_engine() -> Option<Arc<LicenseDetectionEngine>> {
+    let data_path = Path::new(SCANCODE_LICENSES_DATA_PATH);
+    if !data_path.exists() {
+        eprintln!("Reference data not available at {:?}", data_path);
+        return None;
+    }
+    match LicenseDetectionEngine::from_directory(data_path) {
+        Ok(engine) => {
+            eprintln!("License detection engine initialized for tests");
+            Some(Arc::new(engine))
+        }
+        Err(e) => {
+            eprintln!("Failed to create engine: {:?}", e);
+            None
+        }
+    }
 }
 
 fn hidden_progress() -> Arc<ScanProgress> {
@@ -240,11 +245,9 @@ fn test_scanner_discovers_all_registered_parsers() {
     let test_dir = "testdata/integration/multi-parser";
     let progress = hidden_progress();
     let patterns: Vec<Pattern> = vec![];
-    let store = create_test_store();
-    let strategy = create_test_strategy(&store);
 
     let result =
-        process(test_dir, 50, progress, &patterns, &strategy).expect("Scan should succeed");
+        process(test_dir, 50, progress, &patterns, None, false).expect("Scan should succeed");
 
     // Should find 3 files with package data (npm, python, cargo)
     let package_files: Vec<_> = result
@@ -281,11 +284,9 @@ fn test_full_output_format_structure() {
     let test_dir = "testdata/integration/multi-parser";
     let progress = hidden_progress();
     let patterns: Vec<Pattern> = vec![];
-    let store = create_test_store();
-    let strategy = create_test_strategy(&store);
 
     let result =
-        process(test_dir, 50, progress, &patterns, &strategy).expect("Scan should succeed");
+        process(test_dir, 50, progress, &patterns, None, false).expect("Scan should succeed");
 
     // Verify basic structure
     assert!(!result.files.is_empty(), "Should have files in result");
@@ -343,10 +344,8 @@ fn test_scanner_handles_empty_directory() {
 
     let progress = hidden_progress();
     let patterns: Vec<Pattern> = vec![];
-    let store = create_test_store();
-    let strategy = create_test_strategy(&store);
 
-    let result = process(test_path, 50, progress, &patterns, &strategy)
+    let result = process(test_path, 50, progress, &patterns, None, false)
         .expect("Scan should succeed on empty directory");
 
     // Should have no files (only the directory entry might be present)
@@ -371,11 +370,9 @@ fn test_scanner_handles_parse_errors_gracefully() {
 
     let progress = hidden_progress();
     let patterns: Vec<Pattern> = vec![];
-    let store = create_test_store();
-    let strategy = create_test_strategy(&store);
 
     // Scan should complete without crashing
-    let result = process(test_path, 50, progress, &patterns, &strategy)
+    let result = process(test_path, 50, progress, &patterns, None, false)
         .expect("Scan should not crash on malformed files");
 
     // Should find the file
@@ -399,11 +396,9 @@ fn test_exclusion_patterns_filter_correctly() {
     let progress = hidden_progress();
 
     let patterns: Vec<Pattern> = vec![Pattern::new("*.toml").expect("Invalid pattern")];
-    let store = create_test_store();
-    let strategy = create_test_strategy(&store);
 
     let result =
-        process(test_dir, 50, progress, &patterns, &strategy).expect("Scan should succeed");
+        process(test_dir, 50, progress, &patterns, None, false).expect("Scan should succeed");
 
     // Should not find any .toml files
     let toml_files: Vec<_> = result
@@ -434,6 +429,7 @@ fn test_max_depth_limits_traversal() {
     use std::fs;
     use tempfile::TempDir;
 
+    let engine = create_license_detection_engine();
     let temp_dir = TempDir::new().expect("Failed to create temp dir");
     let test_path = temp_dir.path();
 
@@ -447,19 +443,17 @@ fn test_max_depth_limits_traversal() {
 
     let progress = hidden_progress();
     let patterns: Vec<Pattern> = vec![];
-    let store = create_test_store();
-    let strategy = create_test_strategy(&store);
 
     // Scan with max_depth=1 (should not reach level2)
     let result =
-        process(test_path, 1, progress, &patterns, &strategy).expect("Scan should succeed");
+        process(test_path, 1, progress, &patterns, None, false).expect("Scan should succeed");
 
     // Should not find the deep package.json
     let has_deep_json = result.files.iter().any(|f| f.name == "package.json");
     assert!(!has_deep_json, "Should not find package.json at depth > 1");
 
     let unlimited_progress = hidden_progress();
-    let unlimited_result = process(test_path, 0, unlimited_progress, &patterns, &strategy)
+    let unlimited_result = process(test_path, 0, unlimited_progress, &patterns, engine, false)
         .expect("Scan with unlimited depth should succeed");
     let has_deep_json_unlimited = unlimited_result
         .files
@@ -531,8 +525,7 @@ fn test_scanner_detects_emails_and_urls_when_enabled() {
 
     let progress = hidden_progress();
     let patterns: Vec<Pattern> = vec![];
-    let store = create_test_store();
-    let strategy = create_test_strategy(&store);
+    let engine = create_license_detection_engine();
     let options = TextDetectionOptions {
         detect_copyrights: true,
         detect_emails: true,
@@ -543,7 +536,7 @@ fn test_scanner_detects_emails_and_urls_when_enabled() {
         scan_cache_dir: None,
     };
 
-    let result = process_with_options(test_path, 10, progress, &patterns, &strategy, &options)
+    let result = process_with_options(test_path, 10, progress, &patterns, engine, false, &options)
         .expect("Scan should succeed");
 
     let file = result
@@ -575,8 +568,7 @@ fn test_scanner_detects_copyrights_in_latin1_text() {
 
     let progress = hidden_progress();
     let patterns: Vec<Pattern> = vec![];
-    let store = create_test_store();
-    let strategy = create_test_strategy(&store);
+    let engine = create_license_detection_engine();
     let options = TextDetectionOptions {
         detect_copyrights: true,
         detect_emails: false,
@@ -587,7 +579,7 @@ fn test_scanner_detects_copyrights_in_latin1_text() {
         scan_cache_dir: None,
     };
 
-    let result = process_with_options(test_path, 10, progress, &patterns, &strategy, &options)
+    let result = process_with_options(test_path, 10, progress, &patterns, engine, false, &options)
         .expect("Scan should succeed");
 
     let file = result
@@ -622,8 +614,7 @@ fn test_scanner_detects_copyrights_in_pdf_text() {
 
     let progress = hidden_progress();
     let patterns: Vec<Pattern> = vec![];
-    let store = create_test_store();
-    let strategy = create_test_strategy(&store);
+    let engine = create_license_detection_engine();
     let options = TextDetectionOptions {
         detect_copyrights: true,
         detect_emails: false,
@@ -634,7 +625,7 @@ fn test_scanner_detects_copyrights_in_pdf_text() {
         scan_cache_dir: None,
     };
 
-    let result = process_with_options(test_path, 10, progress, &patterns, &strategy, &options)
+    let result = process_with_options(test_path, 10, progress, &patterns, engine, false, &options)
         .expect("Scan should succeed");
 
     let file = result
@@ -682,8 +673,7 @@ fn test_scanner_detects_emails_and_urls_in_pdf_text() {
 
     let progress = hidden_progress();
     let patterns: Vec<Pattern> = vec![];
-    let store = create_test_store();
-    let strategy = create_test_strategy(&store);
+    let engine = create_license_detection_engine();
     let options = TextDetectionOptions {
         detect_copyrights: false,
         detect_emails: true,
@@ -694,7 +684,7 @@ fn test_scanner_detects_emails_and_urls_in_pdf_text() {
         scan_cache_dir: None,
     };
 
-    let result = process_with_options(test_path, 10, progress, &patterns, &strategy, &options)
+    let result = process_with_options(test_path, 10, progress, &patterns, engine, false, &options)
         .expect("Scan should succeed");
 
     let file = result
@@ -744,8 +734,7 @@ fn test_scanner_detects_copyrights_in_supported_image_exif_containers() {
 
     let progress = hidden_progress();
     let patterns: Vec<Pattern> = vec![];
-    let store = create_test_store();
-    let strategy = create_test_strategy(&store);
+    let engine = create_license_detection_engine();
     let options = TextDetectionOptions {
         detect_copyrights: true,
         detect_emails: false,
@@ -756,7 +745,7 @@ fn test_scanner_detects_copyrights_in_supported_image_exif_containers() {
         scan_cache_dir: None,
     };
 
-    let result = process_with_options(test_path, 10, progress, &patterns, &strategy, &options)
+    let result = process_with_options(test_path, 10, progress, &patterns, engine, false, &options)
         .expect("Scan should succeed");
 
     for extension in ["png", "jpg", "tiff", "webp"] {
@@ -820,8 +809,7 @@ fn test_scanner_detects_emails_and_urls_in_xmp_metadata() {
 
     let progress = hidden_progress();
     let patterns: Vec<Pattern> = vec![];
-    let store = create_test_store();
-    let strategy = create_test_strategy(&store);
+    let engine = create_license_detection_engine();
     let options = TextDetectionOptions {
         detect_copyrights: false,
         detect_emails: true,
@@ -832,7 +820,7 @@ fn test_scanner_detects_emails_and_urls_in_xmp_metadata() {
         scan_cache_dir: None,
     };
 
-    let result = process_with_options(test_path, 10, progress, &patterns, &strategy, &options)
+    let result = process_with_options(test_path, 10, progress, &patterns, engine, false, &options)
         .expect("Scan should succeed");
 
     let file = result
@@ -898,8 +886,7 @@ fn test_scanner_detects_urls_in_additional_xmp_fields() {
 
     let progress = hidden_progress();
     let patterns: Vec<Pattern> = vec![];
-    let store = create_test_store();
-    let strategy = create_test_strategy(&store);
+    let engine = create_license_detection_engine();
     let options = TextDetectionOptions {
         detect_copyrights: false,
         detect_emails: true,
@@ -910,7 +897,7 @@ fn test_scanner_detects_urls_in_additional_xmp_fields() {
         scan_cache_dir: None,
     };
 
-    let result = process_with_options(test_path, 10, progress, &patterns, &strategy, &options)
+    let result = process_with_options(test_path, 10, progress, &patterns, engine, false, &options)
         .expect("Scan should succeed");
 
     let file = result
@@ -961,8 +948,7 @@ fn test_scanner_detects_emails_in_exif_user_comment() {
 
     let progress = hidden_progress();
     let patterns: Vec<Pattern> = vec![];
-    let store = create_test_store();
-    let strategy = create_test_strategy(&store);
+    let engine = create_license_detection_engine();
     let options = TextDetectionOptions {
         detect_copyrights: false,
         detect_emails: true,
@@ -973,7 +959,7 @@ fn test_scanner_detects_emails_in_exif_user_comment() {
         scan_cache_dir: None,
     };
 
-    let result = process_with_options(test_path, 10, progress, &patterns, &strategy, &options)
+    let result = process_with_options(test_path, 10, progress, &patterns, engine, false, &options)
         .expect("Scan should succeed");
 
     let file = result
@@ -1014,8 +1000,7 @@ fn test_scanner_ignores_non_clue_image_metadata() {
 
     let progress = hidden_progress();
     let patterns: Vec<Pattern> = vec![];
-    let store = create_test_store();
-    let strategy = create_test_strategy(&store);
+    let engine = create_license_detection_engine();
     let options = TextDetectionOptions {
         detect_copyrights: true,
         detect_emails: true,
@@ -1026,7 +1011,7 @@ fn test_scanner_ignores_non_clue_image_metadata() {
         scan_cache_dir: None,
     };
 
-    let result = process_with_options(test_path, 10, progress, &patterns, &strategy, &options)
+    let result = process_with_options(test_path, 10, progress, &patterns, engine, false, &options)
         .expect("Scan should succeed");
 
     let file = result
@@ -1059,8 +1044,7 @@ fn test_scanner_ignores_xml_namespace_garbage_in_copyright_detection() {
 
     let progress = hidden_progress();
     let patterns: Vec<Pattern> = vec![];
-    let store = create_test_store();
-    let strategy = create_test_strategy(&store);
+    let engine = create_license_detection_engine();
     let options = TextDetectionOptions {
         detect_copyrights: true,
         detect_emails: false,
@@ -1071,7 +1055,7 @@ fn test_scanner_ignores_xml_namespace_garbage_in_copyright_detection() {
         scan_cache_dir: None,
     };
 
-    let result = process_with_options(test_path, 10, progress, &patterns, &strategy, &options)
+    let result = process_with_options(test_path, 10, progress, &patterns, engine, false, &options)
         .expect("Scan should succeed");
 
     let file = result
@@ -1116,8 +1100,7 @@ fn test_scanner_detects_copyrights_in_windows_dll_strings() {
 
     let progress = hidden_progress();
     let patterns: Vec<Pattern> = vec![];
-    let store = create_test_store();
-    let strategy = create_test_strategy(&store);
+    let engine = create_license_detection_engine();
     let options = TextDetectionOptions {
         detect_copyrights: true,
         detect_emails: false,
@@ -1128,7 +1111,7 @@ fn test_scanner_detects_copyrights_in_windows_dll_strings() {
         scan_cache_dir: None,
     };
 
-    let result = process_with_options(test_path, 10, progress, &patterns, &strategy, &options)
+    let result = process_with_options(test_path, 10, progress, &patterns, engine, false, &options)
         .expect("Scan should succeed");
 
     let file = result
@@ -1163,8 +1146,7 @@ fn test_scanner_avoids_false_positive_copyrights_in_executable_strings() {
 
     let progress = hidden_progress();
     let patterns: Vec<Pattern> = vec![];
-    let store = create_test_store();
-    let strategy = create_test_strategy(&store);
+    let engine = create_license_detection_engine();
     let options = TextDetectionOptions {
         detect_copyrights: true,
         detect_emails: false,
@@ -1175,7 +1157,7 @@ fn test_scanner_avoids_false_positive_copyrights_in_executable_strings() {
         scan_cache_dir: None,
     };
 
-    let result = process_with_options(test_path, 10, progress, &patterns, &strategy, &options)
+    let result = process_with_options(test_path, 10, progress, &patterns, engine, false, &options)
         .expect("Scan should succeed");
 
     let file = result
@@ -1217,8 +1199,7 @@ fn test_scanner_respects_email_url_thresholds() {
 
     let progress = hidden_progress();
     let patterns: Vec<Pattern> = vec![];
-    let store = create_test_store();
-    let strategy = create_test_strategy(&store);
+    let engine = create_license_detection_engine();
     let options = TextDetectionOptions {
         detect_copyrights: true,
         detect_emails: true,
@@ -1229,7 +1210,7 @@ fn test_scanner_respects_email_url_thresholds() {
         scan_cache_dir: None,
     };
 
-    let result = process_with_options(test_path, 10, progress, &patterns, &strategy, &options)
+    let result = process_with_options(test_path, 10, progress, &patterns, engine, false, &options)
         .expect("Scan should succeed");
 
     let file = result
@@ -1263,8 +1244,6 @@ fn test_scanner_persists_scan_result_cache_entries() {
 
     let progress = hidden_progress();
     let patterns: Vec<Pattern> = vec![];
-    let store = create_test_store();
-    let strategy = create_test_strategy(&store);
     let options = TextDetectionOptions {
         detect_copyrights: true,
         detect_emails: true,
@@ -1280,7 +1259,8 @@ fn test_scanner_persists_scan_result_cache_entries() {
         10,
         Arc::clone(&progress),
         &patterns,
-        &strategy,
+        None,
+        false,
         &options,
     )
     .expect("First scan should succeed");
@@ -1301,7 +1281,7 @@ fn test_scanner_persists_scan_result_cache_entries() {
         .join(format!("{sha256}.msgpack.zst"));
     assert!(cache_path.exists(), "Expected scan cache entry to exist");
 
-    let second = process_with_options(test_path, 10, progress, &patterns, &strategy, &options)
+    let second = process_with_options(test_path, 10, progress, &patterns, None, false, &options)
         .expect("Second scan should succeed");
     let second_file = second
         .files

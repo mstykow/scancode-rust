@@ -1,0 +1,265 @@
+//! Rule metadata loaded from .LICENSE and .RULE files.
+
+use std::collections::HashMap;
+use std::ops::Range;
+
+use serde::{Deserialize, Serialize};
+
+use crate::license_detection::index::dictionary::TokenId;
+
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Default, Serialize, Deserialize,
+)]
+pub enum RuleKind {
+    #[default]
+    None,
+    Text,
+    Notice,
+    Reference,
+    Tag,
+    Intro,
+    Clue,
+}
+
+impl RuleKind {
+    pub fn from_rule_flags(
+        is_license_text: bool,
+        is_license_notice: bool,
+        is_license_reference: bool,
+        is_license_tag: bool,
+        is_license_intro: bool,
+        is_license_clue: bool,
+    ) -> Result<Self, &'static str> {
+        let mut active = None;
+
+        for (enabled, kind) in [
+            (is_license_text, Self::Text),
+            (is_license_notice, Self::Notice),
+            (is_license_reference, Self::Reference),
+            (is_license_tag, Self::Tag),
+            (is_license_intro, Self::Intro),
+            (is_license_clue, Self::Clue),
+        ] {
+            if !enabled {
+                continue;
+            }
+
+            if active.replace(kind).is_some() {
+                return Err("rule has multiple rule kinds set");
+            }
+        }
+
+        Ok(active.unwrap_or(Self::None))
+    }
+
+    pub fn from_match_flags(
+        is_license_text: bool,
+        is_license_reference: bool,
+        is_license_tag: bool,
+        is_license_intro: bool,
+        is_license_clue: bool,
+    ) -> Result<Self, &'static str> {
+        Self::from_rule_flags(
+            is_license_text,
+            false,
+            is_license_reference,
+            is_license_tag,
+            is_license_intro,
+            is_license_clue,
+        )
+        .map_err(|_| "license match has multiple rule kinds set")
+    }
+
+    pub const fn is_license_text(self) -> bool {
+        matches!(self, Self::Text)
+    }
+
+    pub const fn is_license_notice(self) -> bool {
+        matches!(self, Self::Notice)
+    }
+
+    pub const fn is_license_reference(self) -> bool {
+        matches!(self, Self::Reference)
+    }
+
+    pub const fn is_license_tag(self) -> bool {
+        matches!(self, Self::Tag)
+    }
+
+    pub const fn is_license_intro(self) -> bool {
+        matches!(self, Self::Intro)
+    }
+
+    pub const fn is_license_clue(self) -> bool {
+        matches!(self, Self::Clue)
+    }
+}
+
+/// Rule metadata loaded from .LICENSE and .RULE files.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Rule {
+    /// Unique identifier for this rule (e.g., "mit.LICENSE", "gpl-2.0_12.RULE")
+    /// Used for sorting to match Python's attr.s field order.
+    /// This is the primary sort key after rid (which is None at sort time in Python).
+    pub identifier: String,
+
+    /// License expression string using SPDX syntax and ScanCode license keys
+    pub license_expression: String,
+
+    /// Pattern text to match
+    pub text: String,
+
+    /// Token IDs for the text (assigned during indexing)
+    pub tokens: Vec<TokenId>,
+
+    /// Classification of this rule.
+    pub rule_kind: RuleKind,
+
+    /// True if exact matches to this rule are false positives
+    pub is_false_positive: bool,
+
+    /// True if this rule text is a required phrase.
+    /// A required phrase is an essential section of the rule text which must be
+    /// present in the case of partial matches.
+    pub is_required_phrase: bool,
+
+    /// True if this rule was created from a license file (not a .RULE file)
+    pub is_from_license: bool,
+
+    /// Relevance score 0-100 (100 is most relevant)
+    pub relevance: u8,
+
+    /// Minimum match coverage percentage (0-100) if specified
+    pub minimum_coverage: Option<u8>,
+
+    /// True if minimum_coverage was explicitly stored in source frontmatter
+    pub has_stored_minimum_coverage: bool,
+
+    /// Tokens must appear in order if true
+    pub is_continuous: bool,
+
+    /// Token position spans for required phrases parsed from {{...}} markers.
+    /// Each span represents positions in the rule text that MUST be matched.
+    pub required_phrase_spans: Vec<Range<usize>>,
+
+    /// Mapping from token position to count of stopwords at that position.
+    /// Used for required phrase validation.
+    pub stopwords_by_pos: HashMap<usize, usize>,
+
+    /// Filenames where this rule should be considered
+    pub referenced_filenames: Option<Vec<String>>,
+
+    /// URLs that should be ignored when found in this rule text
+    pub ignorable_urls: Option<Vec<String>>,
+
+    /// Emails that should be ignored when found in this rule text
+    pub ignorable_emails: Option<Vec<String>>,
+
+    /// Copyrights that should be ignored when found in this rule text
+    pub ignorable_copyrights: Option<Vec<String>>,
+
+    /// Holder names that should be ignored when found in this rule text
+    pub ignorable_holders: Option<Vec<String>>,
+
+    /// Author names that should be ignored when found in this rule text
+    pub ignorable_authors: Option<Vec<String>>,
+
+    /// Programming language for the rule if specified
+    pub language: Option<String>,
+
+    /// Free text notes
+    pub notes: Option<String>,
+
+    /// Count of unique token IDs in the rule (computed during indexing)
+    pub length_unique: usize,
+
+    /// Count of unique legalese token IDs (tokens with ID < len_legalese)
+    pub high_length_unique: usize,
+
+    /// Total count of legalese token occurrences (with duplicates)
+    pub high_length: usize,
+
+    /// Minimum matched length threshold (occurrences-based)
+    pub min_matched_length: usize,
+
+    /// Minimum high-value token matched length threshold (occurrences-based)
+    pub min_high_matched_length: usize,
+
+    /// Minimum matched length threshold (unique tokens)
+    pub min_matched_length_unique: usize,
+
+    /// Minimum high-value token matched length threshold (unique tokens)
+    pub min_high_matched_length_unique: usize,
+
+    /// True if rule length < SMALL_RULE (15 tokens)
+    pub is_small: bool,
+
+    /// True if rule length < TINY_RULE (6 tokens)
+    pub is_tiny: bool,
+
+    /// True if the rule's first token is "license", "licence", or "licensed"
+    pub starts_with_license: bool,
+
+    /// True if the rule's last token is "license", "licence", or "licensed"
+    pub ends_with_license: bool,
+
+    /// Whether this rule is deprecated
+    pub is_deprecated: bool,
+
+    /// SPDX license identifier if available
+    pub spdx_license_key: Option<String>,
+
+    /// Alternative SPDX license identifiers (aliases)
+    pub other_spdx_license_keys: Vec<String>,
+}
+
+impl PartialOrd for Rule {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for Rule {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.identifier.cmp(&other.identifier)
+    }
+}
+
+impl Rule {
+    pub const fn kind(&self) -> RuleKind {
+        self.rule_kind
+    }
+
+    pub const fn is_license_text(&self) -> bool {
+        self.rule_kind.is_license_text()
+    }
+
+    /// Returns true if this rule is a license notice pattern.
+    ///
+    /// Note: This method is kept for API completeness and potential future use.
+    /// License matches cannot have `is_license_notice` - only rules can.
+    #[allow(dead_code)]
+    pub const fn is_license_notice(&self) -> bool {
+        self.rule_kind.is_license_notice()
+    }
+
+    pub const fn is_license_reference(&self) -> bool {
+        self.rule_kind.is_license_reference()
+    }
+
+    pub const fn is_license_tag(&self) -> bool {
+        self.rule_kind.is_license_tag()
+    }
+
+    /// Returns true if this rule is a license introduction pattern.
+    ///
+    /// Note: This method is kept for API completeness and potential future use.
+    #[allow(dead_code)]
+    pub const fn is_license_intro(&self) -> bool {
+        self.rule_kind.is_license_intro()
+    }
+
+    pub const fn is_license_clue(&self) -> bool {
+        self.rule_kind.is_license_clue()
+    }
+}

@@ -1,0 +1,3 @@
+license_expressions:
+  - adobe-eula AND gpl-1.0-plus
+notes: GPL is for the Debian packaging

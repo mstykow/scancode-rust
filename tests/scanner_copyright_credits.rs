@@ -1,5 +1,4 @@
 use glob::Pattern;
-use provenant::askalono::{ScanStrategy, Store};
 use provenant::progress::{ProgressMode, ScanProgress};
 use provenant::{FileType, TextDetectionOptions, process_with_options};
 use serde::Deserialize;
@@ -18,10 +17,6 @@ fn hidden_progress() -> Arc<ScanProgress> {
     Arc::new(ScanProgress::new(ProgressMode::Quiet))
 }
 
-fn create_test_strategy(store: &Store) -> ScanStrategy<'_> {
-    ScanStrategy::new(store)
-}
-
 #[test]
 fn scanner_matches_structured_credits_fixture() {
     let fixture_dir = PathBuf::from("testdata/scanner-copyright/credits");
@@ -35,8 +30,6 @@ fn scanner_matches_structured_credits_fixture() {
 
     let progress = hidden_progress();
     let patterns: Vec<Pattern> = vec![];
-    let store = Store::new();
-    let strategy = create_test_strategy(&store);
     let options = TextDetectionOptions {
         detect_copyrights: true,
         detect_emails: false,
@@ -47,7 +40,7 @@ fn scanner_matches_structured_credits_fixture() {
         scan_cache_dir: None,
     };
 
-    let result = process_with_options(&fixture_dir, 0, progress, &patterns, &strategy, &options)
+    let result = process_with_options(&fixture_dir, 0, progress, &patterns, None, false, &options)
         .expect("scan should succeed");
 
     let scanned = result

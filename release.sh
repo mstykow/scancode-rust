@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Release script that handles sparse checkout workaround for cargo-release
+# Release script that updates license data before releasing
 # Usage: ./release.sh <patch|minor|major> [--execute]
 
 set -e
@@ -24,39 +24,35 @@ fi
 echo "📦 Preparing for $RELEASE_TYPE release..."
 
 # Update license data to latest before releasing
-echo "📥 Updating SPDX license data to latest version..."
-if [ ! -e "resources/licenses/.git" ]; then
+echo "📥 Updating license rules/licenses to latest version..."
+if [ ! -e "reference/scancode-toolkit/.git" ]; then
     echo "⚠️  Submodule not initialized. Run ./setup.sh first."
     exit 1
 fi
 
-cd resources/licenses
+cd reference/scancode-toolkit
 CURRENT_COMMIT=$(git rev-parse HEAD)
-git fetch origin main --depth=1
-# Suppress "detached HEAD" warning - this is expected for submodules
-git -c advice.detachedHead=false checkout origin/main
+git fetch origin develop --depth=1
+git -c advice.detachedHead=false checkout origin/develop
 NEW_COMMIT=$(git rev-parse HEAD)
 cd ../..
 
 if [ "$CURRENT_COMMIT" != "$NEW_COMMIT" ]; then
     echo "✅ License data updated: $CURRENT_COMMIT → $NEW_COMMIT"
+    echo "🔧 Regenerating embedded license loader artifact..."
+    cargo run --manifest-path xtask/Cargo.toml --bin generate-license-loader-artifact
+    
     if [ -n "$EXECUTE_FLAG" ]; then
-        git add resources/licenses
-        git commit -m "chore: update SPDX license data to latest"
+        git add reference/scancode-toolkit resources/license_detection/license_index_loader.msgpack.zst
+        git commit -m "chore: update license rules/licenses to latest"
         echo "✅ Committed license data update"
     else
         echo "ℹ️  License data would be updated (dry-run mode)"
-        git restore resources/licenses
+        git restore reference/scancode-toolkit resources/license_detection/license_index_loader.msgpack.zst
     fi
 else
     echo "✅ License data already up to date"
 fi
-
-# Temporarily disable sparse checkout to avoid cargo-release false positive
-echo "🔧 Temporarily disabling sparse checkout..."
-cd resources/licenses
-git sparse-checkout disable
-cd ../..
 
 # Run cargo-release
 echo "🚀 Running cargo-release $RELEASE_TYPE..."
@@ -67,13 +63,6 @@ else
 fi
 
 RELEASE_EXIT_CODE=$?
-
-# Re-enable sparse checkout
-echo "🔧 Re-enabling sparse checkout..."
-cd resources/licenses
-git sparse-checkout init --cone
-git sparse-checkout set json/details
-cd ../..
 
 if [ $RELEASE_EXIT_CODE -eq 0 ]; then
     echo "✅ Release completed successfully!"

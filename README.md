@@ -20,6 +20,7 @@ For architecture, supported formats, testing, and contributor guidance, start wi
 
 ## Features
 
+- Single, self-contained binary
 - Parallel scanning with native concurrency
 - ScanCode-compatible JSON output and broad output-format support
 - Broad package-manifest and lockfile coverage across many ecosystems
@@ -61,6 +62,8 @@ cargo build --release
 ```
 
 Cargo places the compiled binary under `target/release/`.
+
+> **Note**: The binary includes a built-in license index. The `reference/scancode-toolkit/` submodule is only needed for developers updating the embedded license data or using custom license rules.
 
 ## Usage
 

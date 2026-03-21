@@ -53,50 +53,50 @@ Provenant implements a multi-phase processing pipeline based on Python ScanCode'
 
 ```text
 ┌─────────────────────────────────────────────────────────────────┐
-│                    ScanCode Processing Pipeline                  │
+│                    ScanCode Processing Pipeline                 │
 ├─────────────────────────────────────────────────────────────────┤
-│                                                                  │
+│                                                                 │
 │  Phase 1: Pre-Scan                                              │
-│  ┌────────────────────────────────────────────────────────┐    │
+│  ┌────────────────────────────────────────────────────────┐     │
 │  │ • Archive extraction                                    │    │
 │  │ • File type detection                                   │    │
 │  │ • Pre-processing hooks                                  │    │
-│  └────────────────────────────────────────────────────────┘    │
-│                           │                                      │
-│                           ▼                                      │
+│  └────────────────────────────────────────────────────────┘     │
+│                           │                                     │
+│                           ▼                                     │
 │  Phase 2: Scanning                                              │
-│  ┌────────────────────────────────────────────────────────┐    │
-│  │ • Package manifest parsing (see SUPPORTED_FORMATS.md)   │    │
-│  │ • License text detection                                │    │
-│  │ • Copyright detection                                   │    │
-│  │ • Email/URL extraction                                  │    │
-│  └────────────────────────────────────────────────────────┘    │
-│                           │                                      │
-│                           ▼                                      │
+│  ┌────────────────────────────────────────────────────────┐     │
+│  │ • Package manifest parsing (see SUPPORTED_FORMATS.md)  |     │
+│  │ • License text detection                               |     │
+│  │ • Copyright detection                                  |     │
+│  │ • Email/URL extraction                                 |     │
+│  └────────────────────────────────────────────────────────┘     │
+│                           │                                     │
+│                           ▼                                     │
 │  Phase 3: Post-Processing                                       │
-│  ┌────────────────────────────────────────────────────────┐    │
-│  │ • Package assembly (sibling, nested, file-ref, workspace)│    │
-│  │ • Package consolidation/deduplication                   │    │
-│  │ • License/copyright summarization                       │    │
-│  │ • Tallies and facets                                    │    │
-│  │ • Classification                                        │    │
-│  └────────────────────────────────────────────────────────┘    │
-│                           │                                      │
-│                           ▼                                      │
+│  ┌──────────────────────────────────────────────────────────┐   |
+│  │ • Package assembly (sibling, nested, file-ref, workspace)│   │
+│  │ • Package consolidation/deduplication                    │   │
+│  │ • License/copyright summarization                        │   │
+│  │ • Tallies and facets                                     │   │
+│  │ • Classification                                         │   │
+│  └──────────────────────────────────────────────────────────┘   │
+│                           │                                     │
+│                           ▼                                     │
 │  Phase 4: Filtering                                             │
-│  ┌────────────────────────────────────────────────────────┐    │
-│  │ • License policy filtering                              │    │
-│  │ • Custom filter plugins                                 │    │
-│  └────────────────────────────────────────────────────────┘    │
-│                           │                                      │
-│                           ▼                                      │
+│  ┌────────────────────────────────────────────────────────┐     │
+│  │ • License policy filtering                             │     │
+│  │ • Custom filter plugins                                │     │
+│  └────────────────────────────────────────────────────────┘     │
+│                           │                                     │
+│                           ▼                                     │
 │  Phase 5: Output                                                │
-│  ┌────────────────────────────────────────────────────────┐    │
-│  │ • JSON output (ScanCode-compatible)                     │    │
-│  │ • SPDX, CycloneDX, CSV, YAML, HTML, JSONL              │    │
-│  │ • HTML app and custom templates                         │    │
-│  └────────────────────────────────────────────────────────┘    │
-│                                                                  │
+│  ┌────────────────────────────────────────────────────────┐     │
+│  │ • JSON output (ScanCode-compatible)                    │     │
+│  │ • SPDX, CycloneDX, CSV, YAML, HTML, JSONL              │     │
+│  │ • HTML app and custom templates                        │     │
+│  └────────────────────────────────────────────────────────┘     │
+│                                                                 │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -278,38 +278,38 @@ pub struct PackageData {
 
 ```text
 ┌────────────────────────────────────────────────────────────┐
-│                      Provenant                            │
+│                      Provenant                             │
 ├────────────────────────────────────────────────────────────┤
 │                                                            │
-│  1. File Discovery           2. Parser Selection          │
-│  ┌────────────────┐          ┌───────────────┐           │
-│  │ Walk directory │─────────>│ Match file    │           │
-│  │ Apply filters  │          │ to parser     │           │
-│  └────────────────┘          └───────┬───────┘           │
+│  1. File Discovery           2. Parser Selection           │
+│  ┌────────────────┐          ┌───────────────┐             │
+│  │ Walk directory │─────────>│ Match file    │             │
+│  │ Apply filters  │          │ to parser     │             │
+│  └────────────────┘          └───────┬───────┘             │
 │                                      │                     │
 │  3. Extraction                       v                     │
-│  ┌────────────────────────────────────────────┐           │
-│  │ PackageParser::extract_packages()           │           │
-│  │ ─ Read manifest                            │           │
-│  │ ─ Parse structure                          │           │
-│  │ ─ Extract metadata                         │           │
-│  │ ─ Return PackageData                       │           │
-│  └────────────────┬───────────────────────────┘           │
+│  ┌────────────────────────────────────────────┐            │
+│  │ PackageParser::extract_packages()          │            │
+│  │ ─ Read manifest                            │            │
+│  │ ─ Parse structure                          │            │
+│  │ ─ Extract metadata                         │            │
+│  │ ─ Return PackageData                       │            │
+│  └────────────────┬───────────────────────────┘            │
 │                   │                                        │
 │  4. Output        v                                        │
-│  ┌─────────────────────────────────────┐                  │
-│  │ Output format dispatch              │                  │
-│  │ ─ JSON / YAML / CSV / JSONL         │                  │
-│  │ ─ SPDX / CycloneDX / HTML / template│                  │
-│  └─────────────────────────────────────┘                  │
+│  ┌─────────────────────────────────────┐                   │
+│  │ Output format dispatch              │                   │
+│  │ ─ JSON / YAML / CSV / JSONL         │                   │
+│  │ ─ SPDX / CycloneDX / HTML / template│                   │
+│  └─────────────────────────────────────┘                   │
 │                                                            │
-│  Detection Engines (Integrated)                           │
-│  ┌───────────────────┐  ┌──────────────────┐             │
-│  │ License Detection │  │ Copyright        │             │
-│  │ ─ SPDX normalize  │  │ Detection        │             │
-│  │ ─ Confidence      │  │ ─ Holder extract │             │
-│  │ ─ Score threshold │  │ ─ Author extract │             │
-│  └───────────────────┘  └──────────────────┘             │
+│  Detection Engines (Integrated)                            │
+│  ┌───────────────────┐  ┌──────────────────┐               │
+│  │ License Detection │  │ Copyright        │               │
+│  │ ─ SPDX normalize  │  │ Detection        │               │
+│  │ ─ Confidence      │  │ ─ Holder extract │               │
+│  │ ─ Score threshold │  │ ─ Author extract │               │
+│  └───────────────────┘  └──────────────────┘               │
 └────────────────────────────────────────────────────────────┘
 ```
 
@@ -375,39 +375,39 @@ Assembly is configurable via the `--no-assemble` CLI flag. See `src/assembly/` f
 
 ```text
 ┌─────────────────────────────────────────────────────────┐
-│                  Security Layers                         │
+│                  Security Layers                        │
 ├─────────────────────────────────────────────────────────┤
-│                                                          │
+│                                                         │
 │  Layer 1: No Code Execution                             │
-│  ┌────────────────────────────────────────────────┐    │
-│  │ AST parsing only (setup.py, build.gradle)      │    │
-│  │ Never eval/exec/subprocess                      │    │
-│  │ Regex/token-based for DSLs                      │    │
-│  └────────────────────────────────────────────────┘    │
-│                                                          │
+│  ┌────────────────────────────────────────────────┐     │
+│  │ AST parsing only (setup.py, build.gradle)      │     │
+│  │ Never eval/exec/subprocess                     │     │
+│  │ Regex/token-based for DSLs                     │     │
+│  └────────────────────────────────────────────────┘     │
+│                                                         │
 │  Layer 2: Resource Limits                               │
-│  ┌────────────────────────────────────────────────┐    │
-│  │ File size: 100MB max                            │    │
-│  │ Recursion depth: 50 levels                      │    │
-│  │ Iterations: 100,000 max                         │    │
-│  │ String length: 10MB per field                   │    │
-│  └────────────────────────────────────────────────┘    │
-│                                                          │
+│  ┌────────────────────────────────────────────────┐     │
+│  │ File size: 100MB max                           │     │
+│  │ Recursion depth: 50 levels                     │     │
+│  │ Iterations: 100,000 max                        │     │
+│  │ String length: 10MB per field                  │     │
+│  └────────────────────────────────────────────────┘     │
+│                                                         │
 │  Layer 3: Archive Safety                                │
-│  ┌────────────────────────────────────────────────┐    │
-│  │ Uncompressed size: 1GB max                      │    │
-│  │ Compression ratio: 100:1 max (zip bomb detect)  │    │
-│  │ Path traversal: Block ../ patterns              │    │
-│  │ Temp cleanup: Automatic via TempDir             │    │
-│  └────────────────────────────────────────────────┘    │
-│                                                          │
+│  ┌────────────────────────────────────────────────┐     │
+│  │ Uncompressed size: 1GB max                     │     │
+│  │ Compression ratio: 100:1 max (zip bomb detect) │     │
+│  │ Path traversal: Block ../ patterns             │     │
+│  │ Temp cleanup: Automatic via TempDir            │     │
+│  └────────────────────────────────────────────────┘     │
+│                                                         │
 │  Layer 4: Input Validation                              │
-│  ┌────────────────────────────────────────────────┐    │
-│  │ Result<T, E> error handling                     │    │
-│  │ No .unwrap() in library code                    │    │
-│  │ Graceful degradation on errors                  │    │
-│  │ UTF-8 validation with lossy fallback            │    │
-│  └────────────────────────────────────────────────┘    │
+│  ┌────────────────────────────────────────────────┐     │
+│  │ Result<T, E> error handling                    │     │
+│  │ No .unwrap() in library code                   │     │
+│  │ Graceful degradation on errors                 │     │
+│  │ UTF-8 validation with lossy fallback           │     │
+│  └────────────────────────────────────────────────┘     │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -418,18 +418,18 @@ See [ADR 0004: Security-First Parsing](adr/0004-security-first-parsing.md) for c
 ### Four-Layer Test Pyramid
 
 ```text
-         /\
-        /  \    Integration Tests
-       /    \   ─ End-to-end scanner pipeline
-      /------\  ─ Full scan validation
-     /        \
-    / Golden   \ Golden Tests
-   /  Tests     \ ─ Compare with Python ScanCode output
-  /--------------\ ─ Real-world manifest files
- /                \
-/    Unit Tests    \ Unit Tests + Doctests
-/   + Doctests      \ ─ Parser functions, edge cases
-/____________________\ ─ API documentation examples
+          /\
+         /  \    Integration Tests
+        /    \   ─ End-to-end scanner pipeline
+       /------\  ─ Full scan validation
+      /        \
+     / Golden   \ Golden Tests
+    /  Tests     \ ─ Compare with Python ScanCode output
+   /--------------\ ─ Real-world manifest files
+  /                \
+ /   Unit Tests     \ Unit Tests + Doctests
+/  + Doctests        \ ─ Parser functions, edge cases
+/_____________________\ ─ API documentation examples
 ```
 
 **Four layers** (see [TESTING_STRATEGY.md](TESTING_STRATEGY.md) for full details):
@@ -447,7 +447,7 @@ See [ADR 0003: Golden Test Strategy](adr/0003-golden-test-strategy.md) for golde
 
 ```text
 ┌─────────────────────────────────────────────────────────┐
-│                 Documentation Sources                    │
+│                 Documentation Sources                   │
 └─────────────────────────────────────────────────────────┘
            │                    │                  │
            ▼                    ▼                  ▼
@@ -722,54 +722,100 @@ Ongoing quality improvements:
 
 ## License Data Architecture
 
-### How License Detection Works
+For detailed documentation of the license detection pipeline, matching algorithms, and engine components, see [LICENSE_DETECTION_ARCHITECTURE.md](LICENSE_DETECTION_ARCHITECTURE.md).
 
-The project is in a transition period between legacy askalono startup on `main` and the target ScanCode-compatible runtime rule-loading model in `feat-add-license-parsing`.
+### Self-Contained Binary
 
-**Current mainline behavior (`main`):**
+The binary ships with a built-in license index embedded at compile time. This eliminates the need for external files during normal usage:
 
-1. License detection startup still initializes askalono from embedded SPDX JSON details.
-2. `setup.sh` updates the SPDX data submodule used by current embedded-license workflows.
+- **Embedded artifact**: `resources/license_detection/license_index_loader.msgpack.zst`
+- **Format**: MessagePack-serialized, zstd-compressed loader data
+- **Contents**: Parsed and normalized `LoadedRule` and `LoadedLicense` values from the ScanCode rules dataset
 
-**Target model (post-merge of `feat-add-license-parsing`):**
+### Loader/Build Stage Separation
 
-1. **Source of truth**: ScanCode `.LICENSE` and `.RULE` datasets from the `reference/scancode-toolkit` submodule.
-2. **Load mode**: Rules are loaded at runtime by `LicenseDetectionEngine` and compiled into `LicenseIndex` structures.
-3. **Performance path**: Rebuild on cold start; load from validated index snapshot cache on warm start.
+The license detection system uses a two-stage loading process:
 
-Target-model implications:
-
-- **For users**: license detection correctness aligns with ScanCode rule data and can be updated by refreshing rule datasets.
-- **For developers**: rule data availability and fingerprinting are first-class runtime concerns.
-- **For packaging**: cache snapshots are rebuildable artifacts; rules remain the canonical source.
-
-### Updating the License Data
-
-**For Releases:** Keep the active rule/license dataset in sync with upstream data for the currently shipped engine path, and ensure snapshot cache invalidation fingerprints update with dataset/version changes.
-
-**For Development:**
-
-To initialize or update the latest reference license/rule definitions in the submodule:
-
-```sh
-./setup.sh                  # Initialize/update license data to latest
-cargo build --release       # Rebuild with updated data
+```text
+┌─────────────────────────────────────────────────────────────────┐
+│                    License Index Loading                        │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  Loader Stage (Embedded Artifact)                               │
+│  ┌────────────────────────────────────────────────────────┐     │
+│  │ • Deserialize LoadedRule and LoadedLicense values      │     │
+│  │ • Already normalized (text trimmed, defaults applied)  │     │
+│  │ • Single-file transformations complete                 │     │
+│  │ • No filesystem access needed                          │     │
+│  └────────────────────────────────────────────────────────┘     │
+│                           │                                     │
+│                           ▼                                     │
+│  Build Stage (Runtime)                                          │
+│  ┌────────────────────────────────────────────────────────┐     │
+│  │ • Convert LoadedRule → runtime Rule                    │     │
+│  │ • Convert LoadedLicense → runtime License              │     │
+│  │ • Apply deprecated filtering policy                    │     │
+│  │ • Synthesize license-derived rules                     │     │
+│  │ • Build LicenseIndex (token dict, automatons, maps)    │     │
+│  │ • Build SpdxMapping                                    │     │
+│  └────────────────────────────────────────────────────────┘     │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-The script will show if the license data was updated. If so, commit the change:
+**Loader-stage responsibilities** (file-local transformations):
 
-```sh
-git add resources/licenses
-git commit -m "chore: update SPDX license data"
+- Text trimming and normalization
+- Derive `identifier` from filename
+- Derive `rule_kind` from source booleans
+- URL merging for licenses
+- Fallback/default handling
+
+**Build-stage responsibilities** (cross-file policies):
+
+- Deprecated filtering (`with_deprecated: bool`)
+- License-derived rule synthesis
+- Tokenization and dictionary building
+- Aho-Corasick automaton construction
+- SPDX key mapping
+
+### Engine Initialization
+
+```rust
+// Default: Use embedded artifact
+let engine = LicenseDetectionEngine::from_embedded()?;
+
+// Custom rules: Load from directory
+let engine = LicenseDetectionEngine::from_directory(&rules_path)?;
 ```
 
-The `setup.sh` script currently:
+The CLI uses `from_embedded()` by default. Use `--license-rules-path` to load from a custom directory instead.
 
-- Initializes the submodule with shallow clone (`--depth=1`)
-- Configures sparse checkout to only include `json/details/` (saves ~90% disk space)
-- Updates to the latest upstream version
+### Regenerating the Embedded Artifact
 
-Longer-term (target runtime-rule-loading model), rule data remains the canonical source and index snapshots are rebuildable cache artifacts.
+Maintainers can regenerate the embedded license artifact when the ScanCode rules dataset is updated:
+
+```sh
+# Initialize the reference submodule (if not already)
+./setup.sh
+
+# Regenerate the artifact
+./scripts/update_license_loader_artifact.sh
+
+# Commit the updated artifact
+git add resources/license_detection/license_index_loader.msgpack.zst
+git commit -m "chore: update embedded license data"
+```
+
+### Reference Dataset (Optional)
+
+The `reference/scancode-toolkit/` submodule is **optional for end users**. It's only needed for:
+
+1. **Developers updating embedded data**: Regenerating the license loader artifact
+2. **Custom license rules**: Using `--license-rules-path` to load custom rule sets
+3. **Parity testing**: Comparing Rust behavior against Python reference
+
+Normal builds work without the submodule because the embedded artifact is checked into the repository.
 
 ## Related Documentation
 

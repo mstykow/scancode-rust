@@ -27,7 +27,6 @@ mod types;
 #[cfg(all(test, feature = "golden-tests"))]
 mod golden_test;
 
-pub use candidates::strip_balanced_edge_parens;
 pub use credits::{detect_credits_authors, is_credits_file};
 pub use types::{AuthorDetection, CopyrightDetection, HolderDetection};
 
@@ -53,6 +52,7 @@ impl Default for CopyrightDetectionOptions {
 /// Detect copyrights, holders, and authors in the given text content.
 ///
 /// Returns a tuple of (copyrights, holders, authors).
+#[allow(dead_code)] // used in tests and update_copyright_golden.rs
 pub fn detect_copyrights(
     content: &str,
 ) -> (

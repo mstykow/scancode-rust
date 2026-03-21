@@ -1,20 +1,17 @@
 use anyhow::{Result, anyhow};
-use askalono::ScanStrategy;
 use chrono::Utc;
 use clap::Parser;
 use glob::Pattern;
-use include_dir::{Dir, include_dir};
 use serde::Deserialize;
-use serde_json::{Value, from_str};
 use std::collections::{HashMap, HashSet};
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use crate::askalono::{Store, TextData};
 use crate::cache::{CACHE_DIR_ENV_VAR, CacheConfig};
 use crate::cli::Cli;
+use crate::license_detection::LicenseDetectionEngine;
 use crate::models::{
     ExtraData, FileInfo, FileType, Header, LicenseClarityScore, OUTPUT_FORMAT_VERSION, Output,
     Package, Summary, SystemEnvironment, TallyEntry,
@@ -24,13 +21,12 @@ use crate::progress::{ProgressMode, ScanProgress};
 use crate::scanner::{TextDetectionOptions, count_with_size, process, process_with_options};
 use crate::utils::spdx::combine_license_expressions;
 
-mod askalono;
 mod assembly;
 mod cache;
 mod cli;
-#[allow(dead_code, unused_imports)]
 mod copyright;
 mod finder;
+mod license_detection;
 mod models;
 mod output;
 mod parsers;
@@ -40,8 +36,6 @@ mod utils;
 
 #[cfg(test)]
 mod test_utils;
-
-const LICENSE_DETECTION_THRESHOLD: f32 = 0.9;
 
 fn main() -> std::io::Result<()> {
     if let Err(err) = run() {
@@ -53,6 +47,12 @@ fn main() -> std::io::Result<()> {
 
 fn run() -> Result<()> {
     let cli = Cli::parse();
+
+    if cli.show_attribution {
+        print!("{}", include_str!("../NOTICE"));
+        return Ok(());
+    }
+
     let start_time = Utc::now();
     let progress = Arc::new(ScanProgress::new(progress_mode_from_cli(&cli)));
     progress.set_processes(resolve_thread_count(cli.processes));
@@ -144,12 +144,9 @@ fn run() -> Result<()> {
             ));
         }
 
-        progress.start_spdx_load();
-        let store = load_license_database()?;
-        progress.finish_spdx_load();
-        let strategy = ScanStrategy::new(&store)
-            .optimize(true)
-            .confidence_threshold(LICENSE_DETECTION_THRESHOLD);
+        progress.start_license_detection_engine_creation();
+        let license_engine = init_license_engine(&cli.license_rules_path)?;
+        progress.finish_license_detection_engine_creation();
 
         let text_options = TextDetectionOptions {
             detect_copyrights: cli.copyright,
@@ -175,7 +172,8 @@ fn run() -> Result<()> {
                     cli.max_depth,
                     Arc::clone(&progress),
                     &exclude_patterns,
-                    &strategy,
+                    Some(license_engine.clone()),
+                    cli.include_text,
                 )
             })?
         } else {
@@ -185,7 +183,8 @@ fn run() -> Result<()> {
                     cli.max_depth,
                     Arc::clone(&progress),
                     &exclude_patterns,
-                    &strategy,
+                    Some(license_engine.clone()),
+                    cli.include_text,
                     &text_options,
                 )
             })?
@@ -301,6 +300,10 @@ fn validate_scan_option_compatibility(cli: &Cli) -> Result<()> {
         return Err(anyhow!(
             "When using --from-json, file scan options like --copyright/--email/--url are not allowed"
         ));
+    }
+
+    if !cli.from_json && cli.dir_path.is_empty() {
+        return Err(anyhow!("Directory path is required for scan operations"));
     }
 
     if !cli.from_json && cli.dir_path.len() != 1 {
@@ -662,33 +665,30 @@ fn apply_mark_source(files: &mut [crate::models::FileInfo]) {
     }
 }
 
-const LICENSES_DIR: Dir = include_dir!("resources/licenses/json/details");
-
-fn load_license_database() -> Result<Store> {
-    let mut store = Store::new();
-
-    for file in LICENSES_DIR.files() {
-        let string_content = file
-            .contents_utf8()
-            .ok_or_else(|| anyhow!("Failed to read file as UTF-8"))?;
-        let value: Value = from_str(string_content)?;
-
-        if value["isDeprecatedLicenseId"].as_bool().unwrap_or(false) {
-            continue;
+fn init_license_engine(rules_path: &Option<String>) -> Result<Arc<LicenseDetectionEngine>> {
+    match rules_path {
+        Some(p) => {
+            let path = PathBuf::from(p);
+            if !path.exists() {
+                return Err(anyhow!("License rules path does not exist: {:?}", path));
+            }
+            let engine = LicenseDetectionEngine::from_directory(&path)?;
+            println!(
+                "License detection engine initialized with {} rules from {:?}",
+                engine.index().rules_by_rid.len(),
+                path
+            );
+            Ok(Arc::new(engine))
         }
-
-        let name = value["licenseId"]
-            .as_str()
-            .ok_or_else(|| anyhow!("Missing license ID"))?
-            .to_string();
-        let text = value["licenseText"]
-            .as_str()
-            .ok_or_else(|| anyhow!("Missing license text"))?;
-
-        store.add_license(name, TextData::new(text));
+        None => {
+            let engine = LicenseDetectionEngine::from_embedded()?;
+            println!(
+                "License detection engine initialized with {} rules from embedded artifact",
+                engine.index().rules_by_rid.len()
+            );
+            Ok(Arc::new(engine))
+        }
     }
-
-    Ok(store)
 }
 
 fn create_output(

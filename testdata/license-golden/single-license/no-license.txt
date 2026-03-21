@@ -1,0 +1,2 @@
+This is just some regular code without any license information.
+It does not contain any SPDX identifiers or license text.

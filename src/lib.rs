@@ -13,6 +13,7 @@
 //! High-level crate organization:
 //!
 //! - [`scanner`] orchestrates traversal, filtering, and scan execution
+//! - [`license_detection`] extracts license information from files
 //! - [`parsers`] extracts package metadata from ecosystem-specific inputs
 //! - [`copyright`] and [`finder`] extract text clues such as copyrights, emails, and URLs
 //! - [`output`] renders ScanCode-compatible and SBOM-oriented output formats
@@ -23,13 +24,13 @@
 //! rustdoc stays intentionally concise so fast-changing project details have a
 //! single source of truth outside this file.
 
-pub mod askalono;
 pub mod assembly;
 pub mod cache;
 pub mod cli;
 pub mod copyright;
 pub mod finder;
 pub mod golden_maintenance;
+pub mod license_detection;
 pub mod models;
 pub mod output;
 pub mod parsers;

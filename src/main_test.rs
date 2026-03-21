@@ -10,7 +10,6 @@ use serde_json::json;
 use std::fs;
 use std::sync::Arc;
 
-use crate::askalono::{ScanStrategy, Store};
 use crate::assembly;
 use crate::progress::{ProgressMode, ScanProgress};
 use crate::scanner::TextDetectionOptions;
@@ -90,15 +89,14 @@ fn dir(path: &str) -> FileInfo {
 }
 
 fn about_scan_and_assemble(path: &Path) -> assembly::AssemblyResult {
-    let store = Box::leak(Box::new(Store::new()));
-    let strategy = ScanStrategy::new(store);
     let progress = Arc::new(ScanProgress::new(ProgressMode::Quiet));
     let result = crate::scanner::process_with_options(
         path,
         0,
         progress,
         &[],
-        &strategy,
+        None,
+        false,
         &TextDetectionOptions::default(),
     )
     .expect("about scan should succeed");
@@ -108,15 +106,14 @@ fn about_scan_and_assemble(path: &Path) -> assembly::AssemblyResult {
 }
 
 fn swift_scan_and_assemble(path: &Path) -> Value {
-    let store = Box::leak(Box::new(Store::new()));
-    let strategy = ScanStrategy::new(store);
     let progress = Arc::new(ScanProgress::new(ProgressMode::Quiet));
     let result = crate::scanner::process_with_options(
         path,
         0,
         progress,
         &[],
-        &strategy,
+        None,
+        false,
         &TextDetectionOptions::default(),
     )
     .expect("swift scan should succeed");
@@ -153,15 +150,14 @@ fn swift_scan_and_assemble(path: &Path) -> Value {
 }
 
 fn docker_scan_and_assemble(path: &Path) -> (Vec<FileInfo>, assembly::AssemblyResult) {
-    let store = Box::leak(Box::new(Store::new()));
-    let strategy = ScanStrategy::new(store);
     let progress = Arc::new(ScanProgress::new(ProgressMode::Quiet));
     let result = crate::scanner::process_with_options(
         path,
         0,
         progress,
         &[],
-        &strategy,
+        None,
+        false,
         &TextDetectionOptions::default(),
     )
     .expect("docker scan should succeed");
@@ -172,15 +168,14 @@ fn docker_scan_and_assemble(path: &Path) -> (Vec<FileInfo>, assembly::AssemblyRe
 }
 
 fn python_scan_and_assemble(path: &Path) -> (Vec<FileInfo>, assembly::AssemblyResult) {
-    let store = Box::leak(Box::new(Store::new()));
-    let strategy = ScanStrategy::new(store);
     let progress = Arc::new(ScanProgress::new(ProgressMode::Quiet));
     let result = crate::scanner::process_with_options(
         path,
         0,
         progress,
         &[],
-        &strategy,
+        None,
+        false,
         &TextDetectionOptions::default(),
     )
     .expect("python scan should succeed");
@@ -193,15 +188,14 @@ fn python_scan_and_assemble(path: &Path) -> (Vec<FileInfo>, assembly::AssemblyRe
 fn debian_scan_and_assemble_with_keyfiles(
     path: &Path,
 ) -> (Vec<FileInfo>, assembly::AssemblyResult) {
-    let store = Box::leak(Box::new(Store::new()));
-    let strategy = ScanStrategy::new(store);
     let progress = Arc::new(ScanProgress::new(ProgressMode::Quiet));
     let result = crate::scanner::process_with_options(
         path,
         0,
         progress,
         &[],
-        &strategy,
+        None,
+        false,
         &TextDetectionOptions::default(),
     )
     .expect("debian scan should succeed");

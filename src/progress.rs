@@ -136,13 +136,13 @@ impl ScanProgress {
         stats.excluded_count = excluded;
     }
 
-    pub fn start_spdx_load(&self) {
-        self.start_phase("spdx_load");
+    pub fn start_license_detection_engine_creation(&self) {
+        self.start_phase("license_detection_engine_creation");
         self.message("Loading SPDX data, this may take a while...");
     }
 
-    pub fn finish_spdx_load(&self) {
-        self.finish_phase("spdx_load");
+    pub fn finish_license_detection_engine_creation(&self) {
+        self.finish_phase("license_detection_engine_creation");
     }
 
     pub fn start_scan(&self, total_files: usize) {
