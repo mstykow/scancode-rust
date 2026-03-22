@@ -3239,49 +3239,6 @@ License: LGPL-2.1
     }
 
     #[test]
-    #[ignore = "performance probe for Debian copyright parsing"]
-    fn test_debian_copyright_perf_guardrail_large_dep5_fixtures() {
-        use std::hint::black_box;
-        use std::time::Instant;
-
-        let fixtures = [
-            (
-                "reference/scancode-toolkit/tests/packagedcode/data/debian/copyright/debian-slim-2021-04-07/usr/share/doc/bsdutils/copyright",
-                Some("bsdutils"),
-                47usize,
-            ),
-            (
-                "reference/scancode-toolkit/tests/packagedcode/data/debian/copyright/debian-2019-11-15/main/c/clamav/stable_copyright",
-                Some("clamav"),
-                47usize,
-            ),
-        ];
-
-        let iterations = 100usize;
-        let start = Instant::now();
-
-        for _ in 0..iterations {
-            for (path, package_name, expected_line) in fixtures {
-                let content =
-                    read_file_to_string(Path::new(path)).expect("fixture should be readable");
-                let pkg = black_box(parse_copyright_file(&content, package_name));
-                assert!(!pkg.license_detections.is_empty());
-                assert_eq!(
-                    pkg.license_detections[0].matches[0].start_line,
-                    expected_line
-                );
-            }
-        }
-
-        eprintln!(
-            "Debian copyright perf probe: parsed {} fixtures x {} iterations in {:?}",
-            fixtures.len(),
-            iterations,
-            start.elapsed()
-        );
-    }
-
-    #[test]
     fn test_finalize_copyright_paragraph_matches_rfc822_headers_and_license_line() {
         let raw_lines = vec![
             "Files: *".to_string(),
