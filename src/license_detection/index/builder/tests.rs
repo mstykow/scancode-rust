@@ -807,7 +807,6 @@ SOFTWARE."#;
     }
 
     #[test]
-    #[ignore = "Rust-specific enhancement: URL variant hash generation for http/https ignorable URLs. Python does not generate separate hashes for URL variants, so this test is not applicable for Python parity verification."]
     fn test_generate_url_variants_https_to_http() {
         let text = "See https://www.boost.org/LICENSE_1_0.txt for details";
         let ignorable_urls = Some(vec!["https://www.boost.org/LICENSE_1_0.txt".to_string()]);
@@ -819,7 +818,6 @@ SOFTWARE."#;
     }
 
     #[test]
-    #[ignore = "Rust-specific enhancement: URL variant hash generation for http/https ignorable URLs. Python does not generate separate hashes for URL variants, so this test is not applicable for Python parity verification."]
     fn test_generate_url_variants_http_to_https() {
         let text = "See http://www.boost.org/LICENSE_1_0.txt for details";
         let ignorable_urls = Some(vec!["http://www.boost.org/LICENSE_1_0.txt".to_string()]);
@@ -831,7 +829,6 @@ SOFTWARE."#;
     }
 
     #[test]
-    #[ignore = "Rust-specific enhancement: URL variant hash generation for http/https ignorable URLs. Python does not generate separate hashes for URL variants, so this test is not applicable for Python parity verification."]
     fn test_generate_url_variants_none() {
         let text = "Some text without URLs";
         let variants = generate_url_variants(text, &None);
@@ -839,7 +836,6 @@ SOFTWARE."#;
     }
 
     #[test]
-    #[ignore = "Rust-specific enhancement: URL variant hash generation for http/https ignorable URLs. Python does not generate separate hashes for URL variants, so this test is not applicable for Python parity verification."]
     fn test_generate_url_variants_empty() {
         let text = "Some text";
         let variants = generate_url_variants(text, &Some(vec![]));
@@ -847,7 +843,6 @@ SOFTWARE."#;
     }
 
     #[test]
-    #[ignore = "Rust-specific enhancement: URL variant hash generation for http/https ignorable URLs. Python does not generate separate hashes for URL variants, so this test is not applicable for Python parity verification."]
     fn test_build_index_mit_or_boost_rule_variants() {
         use crate::license_detection::LicenseDetectionEngine;
 
@@ -889,7 +884,6 @@ SOFTWARE."#;
     }
 
     #[test]
-    #[ignore = "Rust-specific enhancement: URL variant hash generation for http/https ignorable URLs. Python does not generate separate hashes for URL variants, so this test is not applicable for Python parity verification."]
     fn test_sequence_matching_bsl_file() {
         use crate::license_detection::LicenseDetectionEngine;
         use crate::license_detection::index::token_sets::{build_set_and_mset, tids_set_counter};
@@ -1015,7 +1009,6 @@ SOFTWARE."#;
     }
 
     #[test]
-    #[ignore = "Rust-specific enhancement: URL variant hash generation for http/https ignorable URLs. Python does not generate separate hashes for URL variants, so this test is not applicable for Python parity verification."]
     fn test_full_detection_bsl_file() {
         use crate::license_detection::LicenseDetectionEngine;
         use std::path::Path;
