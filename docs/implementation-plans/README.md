@@ -25,8 +25,8 @@ implementation-plans/
 - **[ASSEMBLY_PLAN.md](package-detection/ASSEMBLY_PLAN.md)** - Package assembly roadmap
   - Status: 🟢 Complete — All phases done (sibling merge, nested merge, workspace assembly, file reference resolution)
 
-- **[PARSER_ENHANCEMENT_PLAN.md](package-detection/PARSER_ENHANCEMENT_PLAN.md)** - Cross-cutting parser enhancement and shared declared-license normalization plan
-  - Status: 🟡 Active — tracks the shared parser-side declared-license normalization workstream, while preserving the completed ecosystem-by-ecosystem campaign as historical reference
+- **[PARSER_ENHANCEMENT_PLAN.md](package-detection/PARSER_ENHANCEMENT_PLAN.md)** - Cross-cutting parser enhancement and shared declared-license normalization record
+  - Status: 🟢 Complete — the shared parser-side declared-license normalization rollout is implemented, and the document is now kept as completed historical/reference documentation
 
 ### Text Detection (`text-detection/`)
 
