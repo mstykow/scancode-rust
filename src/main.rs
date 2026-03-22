@@ -888,26 +888,6 @@ fn promote_package_metadata_from_key_files(files: &[FileInfo], packages: &mut [P
             continue;
         }
 
-        if package.declared_license_expression_spdx.is_none() {
-            let expressions = key_files
-                .iter()
-                .filter_map(|file| file_declared_license_expression(file));
-            if let Some(combined) = combine_license_expressions(expressions) {
-                package.declared_license_expression_spdx = Some(combined.clone());
-                if package.declared_license_expression.is_none() {
-                    package.declared_license_expression = Some(combined.to_ascii_lowercase());
-                }
-            }
-        }
-
-        if package.license_detections.is_empty() {
-            for file in &key_files {
-                package
-                    .license_detections
-                    .extend(file.license_detections.clone());
-            }
-        }
-
         if package.copyright.is_none() {
             package.copyright = key_files
                 .iter()
