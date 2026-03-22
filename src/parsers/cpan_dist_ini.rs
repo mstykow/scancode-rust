@@ -21,6 +21,10 @@ use serde_json::json;
 use crate::models::{DatasourceId, Dependency, PackageData, PackageType, Party};
 
 use super::PackageParser;
+use super::license_normalization::{
+    DeclaredLicenseMatchMetadata, NormalizedDeclaredLicense, build_declared_license_data,
+    empty_declared_license_data, normalize_declared_license_key, normalize_spdx_expression,
+};
 
 const PACKAGE_TYPE: PackageType = PackageType::Cpan;
 
@@ -57,7 +61,20 @@ pub(crate) fn parse_dist_ini(content: &str) -> PackageData {
     let name = root_fields.get("name").map(|s| s.replace('-', "::"));
     let version = root_fields.get("version").cloned();
     let description = root_fields.get("abstract").cloned();
-    let declared_license_expression = root_fields.get("license").cloned();
+    let extracted_license_statement = root_fields.get("license").cloned();
+    let (declared_license_expression, declared_license_expression_spdx, license_detections) =
+        extracted_license_statement
+            .as_deref()
+            .and_then(normalize_cpan_dist_ini_license)
+            .map(|normalized| {
+                build_declared_license_data(
+                    normalized,
+                    DeclaredLicenseMatchMetadata::single_line(
+                        extracted_license_statement.as_deref().unwrap_or_default(),
+                    ),
+                )
+            })
+            .unwrap_or_else(empty_declared_license_data);
     let copyright_holder = root_fields.get("copyright_holder").cloned();
 
     let parties = parse_author(&root_fields);
@@ -78,6 +95,9 @@ pub(crate) fn parse_dist_ini(content: &str) -> PackageData {
         version,
         description,
         declared_license_expression,
+        declared_license_expression_spdx,
+        license_detections,
+        extracted_license_statement,
         parties,
         dependencies,
         extra_data: if extra_data.is_empty() {
@@ -88,6 +108,16 @@ pub(crate) fn parse_dist_ini(content: &str) -> PackageData {
         datasource_id: Some(DatasourceId::CpanDistIni),
         primary_language: Some("Perl".to_string()),
         ..Default::default()
+    }
+}
+
+fn normalize_cpan_dist_ini_license(value: &str) -> Option<NormalizedDeclaredLicense> {
+    match value.trim() {
+        "Perl_5" => Some(NormalizedDeclaredLicense::new(
+            "gpl-1.0-plus OR artistic-perl-1.0",
+            "GPL-1.0-or-later OR Artistic-1.0-Perl",
+        )),
+        other => normalize_spdx_expression(other).or_else(|| normalize_declared_license_key(other)),
     }
 }
 

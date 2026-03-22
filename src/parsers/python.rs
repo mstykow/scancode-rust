@@ -55,6 +55,7 @@ use toml::map::Map as TomlMap;
 use zip::ZipArchive;
 
 use super::PackageParser;
+use super::license_normalization::normalize_spdx_declared_license;
 
 // Field constants for pyproject.toml
 const FIELD_PROJECT: &str = "project";
@@ -1614,6 +1615,7 @@ fn build_package_data_from_rfc822(
     let author = get_header_first(&metadata.headers, "author");
     let author_email = get_header_first(&metadata.headers, "author-email");
     let license = get_header_first(&metadata.headers, "license");
+    let license_expression = get_header_first(&metadata.headers, "license-expression");
     let download_url = get_header_first(&metadata.headers, "download-url");
     let platform = get_header_first(&metadata.headers, "platform");
     let requires_python = get_header_first(&metadata.headers, "requires-python");
@@ -1643,13 +1645,12 @@ fn build_package_data_from_rfc822(
     }
 
     let (keywords, license_classifiers) = split_classifiers(&classifiers);
-    // Extract license statement only - detection happens in separate engine
-    let license_detections = Vec::new();
-    let declared_license_expression = None;
-    let declared_license_expression_spdx = None;
+    let (declared_license_expression, declared_license_expression_spdx, license_detections) =
+        normalize_spdx_declared_license(license_expression.as_deref());
 
-    let extracted_license_statement =
-        build_extracted_license_statement(license.as_deref(), &license_classifiers);
+    let extracted_license_statement = license_expression
+        .clone()
+        .or_else(|| build_extracted_license_statement(license.as_deref(), &license_classifiers));
 
     let mut extra_data = HashMap::new();
     if let Some(platform_value) = platform
@@ -2010,11 +2011,9 @@ fn extract_from_pyproject_toml(path: &Path) -> PackageData {
         })
         .unwrap_or_default();
 
-    // Extract license statement only - detection happens in separate engine
-    let license_detections = Vec::new();
     let extracted_license_statement = extract_raw_license_string(&project_table);
-    let declared_license_expression = None;
-    let declared_license_expression_spdx = None;
+    let (declared_license_expression, declared_license_expression_spdx, license_detections) =
+        normalize_spdx_declared_license(extract_license_expression_candidate(&project_table));
 
     // URLs can be in different formats depending on the tool (poetry, flit, etc.)
     let (homepage_url, repository_url) = extract_urls(&project_table);
@@ -2135,6 +2134,16 @@ fn extract_raw_license_string(project: &TomlMap<String, TomlValue>) -> Option<St
                 }),
             _ => None,
         })
+}
+
+fn extract_license_expression_candidate(project: &TomlMap<String, TomlValue>) -> Option<&str> {
+    match project.get(FIELD_LICENSE) {
+        Some(TomlValue::String(license_str)) => Some(license_str.as_str()),
+        Some(TomlValue::Table(license_table)) => license_table
+            .get("expression")
+            .and_then(|value| value.as_str()),
+        _ => None,
+    }
 }
 
 fn extract_urls(project: &TomlMap<String, TomlValue>) -> (Option<String>, Option<String>) {

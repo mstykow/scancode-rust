@@ -162,9 +162,15 @@ numpy = ">=1.20.0"
             Some("https://example.com".to_string())
         );
 
-        assert_eq!(package_data.declared_license_expression, None);
-        assert_eq!(package_data.declared_license_expression_spdx, None);
-        assert_eq!(package_data.license_detections.len(), 0);
+        assert_eq!(
+            package_data.declared_license_expression.as_deref(),
+            Some("mit")
+        );
+        assert_eq!(
+            package_data.declared_license_expression_spdx.as_deref(),
+            Some("MIT")
+        );
+        assert_eq!(package_data.license_detections.len(), 1);
         assert!(package_data.extracted_license_statement.is_some());
 
         // Check purl
@@ -187,9 +193,15 @@ numpy = ">=1.20.0"
             Some("https://example.com".to_string())
         );
 
-        assert_eq!(package_data.declared_license_expression, None);
-        assert_eq!(package_data.declared_license_expression_spdx, None);
-        assert_eq!(package_data.license_detections.len(), 0);
+        assert_eq!(
+            package_data.declared_license_expression.as_deref(),
+            Some("mit")
+        );
+        assert_eq!(
+            package_data.declared_license_expression_spdx.as_deref(),
+            Some("MIT")
+        );
+        assert_eq!(package_data.license_detections.len(), 1);
         assert!(package_data.extracted_license_statement.is_some());
 
         // Check purl
@@ -691,6 +703,34 @@ pip - The Python Package Installer
             urls.get("Changelog").and_then(|v| v.as_str()),
             Some("https://pip.pypa.io/en/stable/news/")
         );
+    }
+
+    #[test]
+    fn test_extract_license_expression_from_metadata() {
+        let content = r#"Metadata-Version: 2.4
+Name: pip
+Version: 24.0
+License-Expression: MIT OR Apache-2.0
+
+Example metadata.
+"#;
+
+        let (_temp_file, file_path) = create_temp_file(content, "METADATA");
+        let package_data = PythonParser::extract_first_package(&file_path);
+
+        assert_eq!(
+            package_data.extracted_license_statement.as_deref(),
+            Some("MIT OR Apache-2.0")
+        );
+        assert_eq!(
+            package_data.declared_license_expression.as_deref(),
+            Some("mit OR apache-2.0")
+        );
+        assert_eq!(
+            package_data.declared_license_expression_spdx.as_deref(),
+            Some("MIT OR Apache-2.0")
+        );
+        assert_eq!(package_data.license_detections.len(), 1);
     }
 
     #[test]

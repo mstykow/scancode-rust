@@ -1,20 +1,409 @@
 # Package Parser Enhancement Plan
 
-> **Status**: 🟢 Complete — living historical record of the completed parser enhancement campaign
-> **Updated**: March 12, 2026
-> **Dependencies**: [PARSER_PLAN.md](PARSER_PLAN.md), [ASSEMBLY_PLAN.md](ASSEMBLY_PLAN.md), [HOW_TO_ADD_A_PARSER.md](../../HOW_TO_ADD_A_PARSER.md), [TESTING_STRATEGY.md](../../TESTING_STRATEGY.md)
+> **Status**: 🟡 Active — cross-cutting plan for consistent shared parser-side license normalization, with the completed ecosystem campaign preserved below as historical reference
+> **Updated**: March 22, 2026
+> **Dependencies**: [PARSER_PLAN.md](PARSER_PLAN.md), [ASSEMBLY_PLAN.md](ASSEMBLY_PLAN.md), [HOW_TO_ADD_A_PARSER.md](../../HOW_TO_ADD_A_PARSER.md), [TESTING_STRATEGY.md](../../TESTING_STRATEGY.md), [LICENSE_DETECTION_ARCHITECTURE.md](../../LICENSE_DETECTION_ARCHITECTURE.md), [ADR 0002](../../adr/0002-extraction-vs-detection.md)
 
 ## Purpose
 
-This document is a historical record of the completed package-parser enhancement campaign. It is kept for maintainers who want the issue inventory, sequencing rationale, validation expectations, and PR mapping that were used while the ecosystem-by-ecosystem effort was active.
+This document now has two roles:
+
+1. an **active implementation plan** for making parser-side declared-license handling consistent across the whole parser surface, and
+2. a **historical record** of the completed ecosystem-by-ecosystem parser enhancement campaign.
+
+The active work here is intentionally cross-cutting. It is not another ecosystem batch; it is the plan for deciding when parsers should keep raw license metadata only, when they should normalize trustworthy declared metadata, and how all parser-side normalization should share one implementation path instead of continuing to drift parser-by-parser.
 
 ## Current Role
 
-This file is no longer an active workboard.
+- Active parser coverage status still lives in [PARSER_PLAN.md](../../implementation-plans/package-detection/PARSER_PLAN.md).
+- The top sections of this file now track the **shared parser license normalization** workstream.
+- The original ecosystem campaign notes remain below as historical implementation guidance and evidence.
 
-- All parser-enhancement ecosystem rows in this campaign were completed.
-- Active parser coverage status now lives in [PARSER_PLAN.md](../../implementation-plans/package-detection/PARSER_PLAN.md).
-- The sections below are preserved as living historical implementation notes rather than instructions for new work.
+## Active Workstream: Shared Parser License Normalization
+
+### Why this is now necessary
+
+Current repo guidance and current parser behavior no longer line up cleanly:
+
+- [ARCHITECTURE.md](../../ARCHITECTURE.md) says parsers should extract raw license data only and should never populate declared license fields.
+- [HOW_TO_ADD_A_PARSER.md](../../HOW_TO_ADD_A_PARSER.md) repeats that parsers should not normalize licenses.
+- [ADR 0002](../../adr/0002-extraction-vs-detection.md) formally treats parser-side normalization and `license_detections` as forbidden.
+- Actual parser code already diverges from that rule in multiple places:
+  - `src/parsers/composer.rs` now uses the embedded license index for declared-license normalization.
+  - `src/parsers/alpine.rs` and `src/parsers/debian.rs` normalize known license forms and synthesize parser-side detections.
+  - `src/parsers/gradle.rs` promotes recognizable declared license metadata into declared fields.
+  - `src/parsers/cpan_dist_ini.rs` writes a manifest `license` field directly into `declared_license_expression`.
+- Many other parsers still follow the older extraction-only model and keep only `extracted_license_statement`, even when the manifest field is often trustworthy enough to normalize.
+
+The result is inconsistency in behavior, duplicated normalization logic, inconsistent synthetic detection shapes, and growing doc/code drift.
+
+### Goals
+
+- define one durable contract for **parser-side declared-license handling** that applies across all parser families
+- keep parser-side declared metadata normalization clearly separate from **full text license detection**
+- replace ad hoc parser-level normalization logic with one shared implementation path
+- ensure every parser falls into one explicit end state: shared normalization, raw-only by design, or no parser-side license surface
+- make parser tests, parser goldens, and downstream SBOM/output behavior more predictable
+
+### Non-goals
+
+- do **not** run full fuzzy license text matching inside parsers
+- do **not** move scanner/content license detection into package parsers
+- do **not** broaden parser work into copyright/email detection
+- do **not** force normalization of ambiguous free-text, URL-only, or file-hint-only metadata just to fill fields
+- do **not** mix this work with unrelated assembly or parser-parity refactors unless a specific parser needs minimal supporting changes
+
+## Proposed Contract
+
+### 1. Keep the raw statement first
+
+If a parser sees a license-related manifest field, it should still preserve the raw package-declared evidence in `extracted_license_statement` or equivalent parser-owned metadata.
+
+### 2. Parser-side normalization is allowed, but only for trustworthy declared metadata
+
+Parsers may populate:
+
+- `declared_license_expression`
+- `declared_license_expression_spdx`
+- `license_detections`
+
+only when the parser input is a **declared package license field with bounded, trustworthy semantics**.
+
+This includes cases such as:
+
+- explicit SPDX-expression fields
+- SPDX-ID arrays with documented disjunctive semantics
+- small ecosystem-specific alias sets that can be mapped deterministically
+- explicit declared-license fields whose semantics are already expression-like
+
+This does **not** include:
+
+- prose license summaries
+- arbitrary custom license names
+- license URLs with no trustworthy identifier semantics
+- file-path hints such as `SEE LICENSE IN ...`
+- mixed arrays where some elements are trustworthy SPDX-like values and others are not
+
+### 3. All-or-nothing normalization
+
+Parser-side declared normalization should be conservative:
+
+- if the full declared value can be normalized reliably, populate declared fields
+- if only part of the value is trustworthy, keep the raw statement only
+- do not emit partial declared expressions from mixed trustworthy/untrustworthy input
+
+### 4. Parser-side detections are deterministic declared-metadata records, not text matches
+
+When parsers emit `license_detections`, those records should come from a shared helper and represent **declared metadata normalization**, not file-text matching.
+
+This plan intentionally separates parser-side detections from scanner/content detections:
+
+- parser-side detections should be lightweight, deterministic, and derived from manifest metadata only
+- scanner/content detections continue to use the full `LicenseDetectionEngine` matching pipeline over text-bearing files
+
+As part of this work, introduce a distinct parser-side matcher label (for example `parser-declared-license`) instead of reusing text-oriented matcher names such as `1-spdx-id`.
+
+### 5. Every parser must land in one explicit end state
+
+Every parser family must be classified into one of these outcomes:
+
+1. **Shared normalized** — uses the common helper for trustworthy declared metadata
+2. **Shared normalized with ecosystem adapter** — uses the common helper plus a bounded alias adapter
+3. **Raw-only by design** — preserves extracted statement(s) only because the source metadata is too ambiguous or weak
+4. **No parser-side license surface** — no meaningful declared license metadata exists at parse time
+
+No parser should keep a one-off, undocumented middle state indefinitely.
+
+### 6. Keep declared and discovered licenses separate
+
+This plan adopts the same high-level split used by ScanCode, ClearlyDefined, and ORT:
+
+- **declared** licenses come from package metadata, manifests, and other bounded package-declared sources
+- **discovered** licenses come from file-content scanning
+
+Parser-side shared normalization should operate only on the **declared** side.
+
+If Provenant later adds ScanCode-style fallback or backfill behavior from sibling `LICENSE`/`README` files or file detections, that should live in a **separate enrichment/reconciliation stage** with explicit provenance, not in the parser helper itself.
+
+### 7. Follow official ecosystem semantics where they exist
+
+The shared helper should treat manifest semantics as schema-driven, not parser-local folklore.
+
+Examples already supported by official ecosystem docs include:
+
+- SPDX-expression-style fields in Cargo
+- SPDX-expression strings and explicit escape hatches such as `UNLICENSED` / `SEE LICENSE IN ...` in npm
+- string-or-array declared license semantics in Composer, including `proprietary`
+- explicit SPDX-expression fields in modern Python packaging metadata
+
+When an ecosystem has official declared-license rules, the shared helper should encode those rules once and reuse them everywhere that ecosystem appears.
+
+## Current Parser Landscape
+
+The current codebase already falls into these broad cohorts:
+
+### A. Shared-helper-backed parser-side normalization (implemented in this campaign)
+
+- `src/parsers/composer.rs`
+- `src/parsers/alpine.rs`
+- `src/parsers/debian.rs`
+- `src/parsers/gradle.rs`
+- `src/parsers/cpan_dist_ini.rs`
+- `src/parsers/cargo.rs`
+- `src/parsers/npm.rs`
+- `src/parsers/about.rs`
+- explicit-expression Python surfaces in `src/parsers/python.rs`
+
+These parsers now use the shared helper or shared detection shape for trustworthy declared-license metadata.
+
+### B. Raw-only extraction despite trustworthy or partially trustworthy inputs
+
+Representative examples:
+
+- `src/parsers/ruby.rs`
+- `src/parsers/rpm_specfile.rs`
+- `src/parsers/maven.rs`
+- `src/parsers/nuget.rs`
+- `src/parsers/vcpkg.rs`
+- `src/parsers/nix.rs`
+- `src/parsers/dart.rs`
+- `src/parsers/bower.rs`
+- `src/parsers/chef.rs`
+- `src/parsers/hackage.rs`
+- `src/parsers/haxe.rs`
+- `src/parsers/opam.rs`
+- `src/parsers/podspec.rs`
+- `src/parsers/podspec_json.rs`
+
+These are the remaining parser families that still need either explicit raw-only justification or a future adapter-backed migration.
+
+### D. Parsers with no meaningful parser-side declared-license target
+
+Lockfile-only and non-license-bearing formats should generally remain scanner/content-detection only unless future parser work adds a trustworthy declared metadata field.
+
+Examples likely to remain in this category include many lockfiles, workspace metadata files, infrastructure manifests, and recognizers that do not expose package-declared license expressions at parse time.
+
+### Audited parser-family end states after this campaign slice
+
+| Parser family                                                                    | Current end state                  |
+| -------------------------------------------------------------------------------- | ---------------------------------- |
+| About                                                                            | shared-normalized                  |
+| Alpine                                                                           | shared-normalized-with-adapter     |
+| Cargo                                                                            | shared-normalized                  |
+| Composer                                                                         | shared-normalized-with-adapter     |
+| CPAN dist.ini                                                                    | shared-normalized-with-adapter     |
+| Debian                                                                           | shared-normalized-with-adapter     |
+| Gradle manifest license blocks                                                   | shared-normalized-with-adapter     |
+| npm `package.json` string license                                                | shared-normalized                  |
+| Python `pyproject.toml` SPDX-style `license` / RFC822 `License-Expression`       | shared-normalized                  |
+| Ruby gemspec / gem metadata licenses                                             | raw-only by design in current code |
+| RPM specfile `License:`                                                          | raw-only by design in current code |
+| Maven `<license>` metadata                                                       | raw-only by design in current code |
+| NuGet license/file/licenseUrl hints                                              | raw-only by design in current code |
+| Bower / Dart / Chef / Hackage / Haxe / Opam / Podspec / Podspec JSON / vcpkg     | raw-only by design in current code |
+| Lockfiles, workspace metadata, and recognizers without declared license surfaces | no parser-side license surface     |
+
+## Shared Implementation Design
+
+### New shared module
+
+Add a dedicated helper module for parser-side declared-license handling, for example:
+
+- `src/parsers/license_normalization.rs`
+
+This helper should be the only place that:
+
+- loads or accesses the embedded declared-license normalization state
+- parses SPDX-style expressions for parser metadata
+- canonicalizes ScanCode-style and SPDX-style output pairs
+- builds deterministic parser-side `LicenseDetection` records
+- exposes bounded ecosystem adapter hooks for alias-based normalization
+
+### Core API surface
+
+The shared module should expose a small API along these lines:
+
+- normalize one declared string value
+- normalize a list of declared values with explicit list semantics (`OR`, `AND`, or ecosystem-defined custom)
+- normalize a bounded alias through an ecosystem adapter table
+- build the shared parser-side detection payload from a normalized result
+
+The returned normalized result should include:
+
+- extracted/raw statement to preserve
+- `declared_license_expression`
+- `declared_license_expression_spdx`
+- `license_detections`
+- explicit outcome/reason metadata for tests and future debugging
+
+### Detection engine usage policy
+
+The parser helper may use the embedded license index / expression parser for **declared metadata normalization only**.
+
+It should not invoke broad text scanning or fuzzy match flows. The helper should behave more like a deterministic declared-metadata resolver than a full content detector.
+
+### Separation from later enrichment
+
+The shared parser helper is only for normalizing **declared** package metadata.
+
+If the project later adds package-level backfill from sibling legal files or file detections, that should be implemented as a separate post-parse enrichment step with its own provenance markers and tests. It should never silently overwrite a valid manifest-derived declared license.
+
+### Ecosystem adapters
+
+The shared layer should support bounded adapters for ecosystems that need more than raw SPDX parsing:
+
+- Debian short names / DEP-5 conventions
+- Alpine alias handling and special values such as `custom:multiple`
+- Gradle literal name/URL heuristics where the manifest is not already a formal expression field
+- future ecosystem-specific small alias tables where the semantics are well documented and bounded
+
+Adapters should transform inputs into a shared normalization request rather than constructing declared fields manually.
+
+## Repository-Wide Rollout Plan
+
+### Phase 0 — Contract alignment and documentation
+
+Before broad code migration:
+
+- amend or supersede [ADR 0002](../../adr/0002-extraction-vs-detection.md) so it reflects the new bounded parser-side normalization contract
+- update [ARCHITECTURE.md](../../ARCHITECTURE.md) and [HOW_TO_ADD_A_PARSER.md](../../HOW_TO_ADD_A_PARSER.md)
+- document the distinction between:
+  - parser-side declared-license normalization
+  - scanner/content license detection
+  - optional future backfill/reconciliation from sibling files or file detections
+
+This is required first; otherwise the codebase will continue to drift against its own documented rules.
+
+### Phase 1 — Build the shared normalization core
+
+- extract the Composer expression/index logic into the shared helper
+- define a dedicated parser-side matcher label for synthetic detections
+- add a common normalized result type and test helpers
+- add unit tests for:
+  - single SPDX IDs
+  - SPDX expressions with `AND`, `OR`, `WITH`, and parentheses
+  - list semantics
+  - proprietary/custom/unlicensed sentinels where policy allows them
+  - mixed trustworthy/untrustworthy inputs
+
+### Phase 2 — Migrate existing parser-side normalizers first
+
+Migrate the current exception set onto the shared path before expanding to more parsers:
+
+- Composer
+- Alpine
+- Debian
+- Gradle
+- CPAN Dist::Zilla `dist.ini`
+
+The goal is to eliminate duplicate declared-license construction logic before new parser families are added.
+
+### Phase 3 — Roll out to explicit-expression parsers
+
+Add shared normalization to parsers whose manifest fields are strongest and most obviously expression-like:
+
+- Cargo
+- npm
+- ABOUT
+- Python surfaces that already expose explicit expression fields
+
+For this phase, keep the policy conservative: normalize only fields whose schema or de facto semantics are clearly expression-oriented.
+
+### Phase 4 — Roll out bounded alias and mixed-trust parsers
+
+Audit and migrate parser families that need adapter logic or more policy care:
+
+- Ruby
+- RPM specfile
+- SBT and other bounded literal build-manifest parsers
+- FreeBSD / distro-style manifest parsers with documented declared-license fields
+- any Python, CPAN, or package-manager surfaces that mix expression-like fields with prose or URLs
+
+Each parser in this phase must first be classified as either shared-normalized, raw-only by design, or no parser-side license surface.
+
+### Phase 5 — Audit all remaining parsers and lock in explicit no-op states
+
+For every remaining parser family in [PARSER_PLAN.md](PARSER_PLAN.md):
+
+- confirm whether a trustworthy parser-side declared-license field exists
+- if yes, choose shared normalization or raw-only by design and document why
+- if no, explicitly record the parser as “no parser-side license surface”
+
+The deliverable for this phase is an audited matrix that covers every production parser family, not just the ecosystems that receive code changes.
+
+### Phase 6 — Downstream hardening and cleanup
+
+- align parser goldens with the new declared-license contract
+- add or refresh output-level coverage where declared package licenses feed CycloneDX/SPDX/summary behavior
+- reconcile improvement docs that currently overclaim or underclaim parser-side license behavior
+- remove old parser-local helper code that duplicates the shared path
+
+## Per-Parser Decision Checklist
+
+Every parser family should be reviewed with the same checklist before code changes:
+
+1. Does the parser expose a declared license field at all?
+2. Is that field explicitly expression-like, bounded, or schema-backed?
+3. Are list semantics documented (`OR`, `AND`, custom, unknown)?
+4. Are there ecosystem aliases that can be mapped deterministically?
+5. Are there non-expression forms in the same field (URLs, prose, file hints, mixed arrays)?
+6. Should this parser populate declared fields, preserve raw only, or remain parser-license-neutral?
+7. Is parser-level golden coverage meaningful for this surface?
+8. Does this parser need assembly or scan-level coverage because normalized declared license data affects downstream output or merging?
+
+No parser should skip this checklist just because another parser in the same ecosystem family already normalizes something.
+
+## Testing and Validation Strategy
+
+### Shared helper validation
+
+- dedicated unit tests for normalization core and adapter behavior
+- exact regression tests for ambiguous/mixed inputs to prevent over-normalization
+- LSP/typecheck and clippy coverage on the shared helper module
+
+### Parser-level validation
+
+For each parser migrated to the shared path:
+
+- add a focused failing regression test first
+- add parser goldens when parser-level output shape changes are meaningful
+- keep assembly goldens separate unless package grouping/ownership also changes
+
+### Repo-level validation
+
+At minimum, each rollout PR should rerun:
+
+```bash
+cargo fmt --all
+```
+
+```bash
+cargo clippy --all-targets --all-features -- -D warnings
+```
+
+```bash
+npm run check:docs
+```
+
+And then the targeted parser / golden / downstream output tests affected by the migrated cohort.
+
+## Definition of Done
+
+This workstream is complete when all of the following are true:
+
+- the architecture docs and ADRs describe the same parser-side license contract the code actually follows
+- one shared parser-side normalization helper exists and is the default path for all parser-side normalization
+- existing one-off parser normalization logic is either migrated or intentionally retained behind documented adapters
+- every production parser family has an explicit end-state classification
+- parser-side synthetic detection records use a dedicated matcher identity instead of reusing text-matching labels
+- parser tests and parser goldens cover the normalized and raw-only branches that matter
+- improvement docs and implementation plans no longer contradict current parser behavior
+
+---
+
+## Historical Campaign Record
+
+The sections below are preserved from the completed ecosystem-by-ecosystem parser enhancement campaign.
 
 ## Ground Rules
 

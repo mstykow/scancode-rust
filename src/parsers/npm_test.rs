@@ -47,9 +47,15 @@ mod tests {
             )
         );
 
-        assert_eq!(package_data.declared_license_expression, None);
-        assert_eq!(package_data.declared_license_expression_spdx, None);
-        assert_eq!(package_data.license_detections.len(), 0);
+        assert_eq!(
+            package_data.declared_license_expression.as_deref(),
+            Some("mit")
+        );
+        assert_eq!(
+            package_data.declared_license_expression_spdx.as_deref(),
+            Some("MIT")
+        );
+        assert_eq!(package_data.license_detections.len(), 1);
         assert!(package_data.extracted_license_statement.is_some());
 
         // Check purl
@@ -102,9 +108,15 @@ mod tests {
             )
         );
 
-        assert_eq!(package_data.declared_license_expression, None);
-        assert_eq!(package_data.declared_license_expression_spdx, None);
-        assert_eq!(package_data.license_detections.len(), 0);
+        assert_eq!(
+            package_data.declared_license_expression.as_deref(),
+            Some("mit")
+        );
+        assert_eq!(
+            package_data.declared_license_expression_spdx.as_deref(),
+            Some("MIT")
+        );
+        assert_eq!(package_data.license_detections.len(), 1);
         assert!(package_data.extracted_license_statement.is_some());
 
         // Check purl - should be pkg:npm/%40example/test-package@1.0.0 without namespace
@@ -160,9 +172,15 @@ mod tests {
             Some("https://registry.npmjs.org/test-package/-/test-package-1.0.0.tgz".to_string())
         );
 
-        assert_eq!(package_data.declared_license_expression, None);
-        assert_eq!(package_data.declared_license_expression_spdx, None);
-        assert_eq!(package_data.license_detections.len(), 0);
+        assert_eq!(
+            package_data.declared_license_expression.as_deref(),
+            Some("mit")
+        );
+        assert_eq!(
+            package_data.declared_license_expression_spdx.as_deref(),
+            Some("MIT")
+        );
+        assert_eq!(package_data.license_detections.len(), 1);
         assert!(package_data.extracted_license_statement.is_some());
 
         // Check purl

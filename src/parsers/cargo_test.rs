@@ -40,9 +40,15 @@ mod tests {
         );
         assert_eq!(package_data.download_url, None);
 
-        assert_eq!(package_data.declared_license_expression, None);
-        assert_eq!(package_data.declared_license_expression_spdx, None);
-        assert_eq!(package_data.license_detections.len(), 0);
+        assert_eq!(
+            package_data.declared_license_expression.as_deref(),
+            Some("mit OR apache-2.0")
+        );
+        assert_eq!(
+            package_data.declared_license_expression_spdx.as_deref(),
+            Some("MIT OR Apache-2.0")
+        );
+        assert_eq!(package_data.license_detections.len(), 1);
         assert_eq!(
             package_data.extracted_license_statement,
             Some("MIT OR Apache-2.0".to_string())
@@ -97,9 +103,15 @@ authors = ["Test User <test@example.com>"]
         );
         assert_eq!(package_data.download_url, None);
 
-        assert_eq!(package_data.declared_license_expression, None);
-        assert_eq!(package_data.declared_license_expression_spdx, None);
-        assert_eq!(package_data.license_detections.len(), 0);
+        assert_eq!(
+            package_data.declared_license_expression.as_deref(),
+            Some("mit")
+        );
+        assert_eq!(
+            package_data.declared_license_expression_spdx.as_deref(),
+            Some("MIT")
+        );
+        assert_eq!(package_data.license_detections.len(), 1);
         assert_eq!(
             package_data.extracted_license_statement,
             Some("MIT".to_string())

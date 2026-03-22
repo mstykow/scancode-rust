@@ -20,6 +20,26 @@
     ],
     "homepage_url": "https://github.com/rust-lang/rustup.rs",
     "vcs_url": "https://github.com/rust-lang/rustup.rs",
+    "declared_license_expression": "mit OR apache-2.0",
+    "declared_license_expression_spdx": "MIT OR Apache-2.0",
+    "license_detections": [
+      {
+        "license_expression": "mit OR apache-2.0",
+        "license_expression_spdx": "MIT OR Apache-2.0",
+        "matches": [
+          {
+            "license_expression": "mit OR apache-2.0",
+            "license_expression_spdx": "MIT OR Apache-2.0",
+            "from_file": null,
+            "score": 100.0
+          }
+        ],
+        "identifier": null
+      }
+    ],
+    "other_license_expression": null,
+    "other_license_expression_spdx": null,
+    "other_license_detections": [],
     "extracted_license_statement": "MIT OR Apache-2.0",
     "file_references": [
       {

@@ -39,7 +39,16 @@ abstract = Dancer2 plugin for Minion job queue
             pkg.description.as_deref(),
             Some("Dancer2 plugin for Minion job queue")
         );
-        assert_eq!(pkg.declared_license_expression.as_deref(), Some("Perl_5"));
+        assert_eq!(
+            pkg.declared_license_expression.as_deref(),
+            Some("gpl-1.0-plus OR artistic-perl-1.0")
+        );
+        assert_eq!(
+            pkg.declared_license_expression_spdx.as_deref(),
+            Some("GPL-1.0-or-later OR Artistic-1.0-Perl")
+        );
+        assert_eq!(pkg.extracted_license_statement.as_deref(), Some("Perl_5"));
+        assert_eq!(pkg.license_detections.len(), 1);
         assert_eq!(pkg.primary_language.as_deref(), Some("Perl"));
         assert_eq!(pkg.datasource_id, Some(DatasourceId::CpanDistIni));
 

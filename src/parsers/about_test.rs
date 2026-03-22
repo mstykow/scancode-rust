@@ -51,6 +51,12 @@ mod tests {
             Some("Copyright (c) 2010 ActiveState Software Inc.".to_string())
         );
         assert_eq!(result.extracted_license_statement, Some("mit".to_string()));
+        assert_eq!(result.declared_license_expression, Some("mit".to_string()));
+        assert_eq!(
+            result.declared_license_expression_spdx,
+            Some("MIT".to_string())
+        );
+        assert_eq!(result.license_detections.len(), 1);
         assert_eq!(
             result.download_url,
             Some("https://pypi.python.org/packages/56/eb/810e700ed1349edde4cbdc1b2a21e28cdf115f9faf263f6bbf8447c1abf3/appdirs-1.4.3-py2.py3-none-any.whl#md5=9ed4b51c9611775c3078b3831072e153".to_string())

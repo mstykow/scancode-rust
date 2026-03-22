@@ -31,6 +31,11 @@ use serde_json::json;
 use crate::models::{DatasourceId, Dependency, PackageData, PackageType};
 use crate::parsers::PackageParser;
 
+use super::license_normalization::{
+    DeclaredLicenseMatchMetadata, build_declared_license_data, empty_declared_license_data,
+    normalize_spdx_expression,
+};
+
 /// Parses Gradle build files (build.gradle, build.gradle.kts).
 ///
 /// Extracts dependencies from Gradle build scripts using a custom
@@ -88,6 +93,7 @@ impl PackageParser for GradleParser {
             extracted_license_statement,
             declared_license_expression,
             declared_license_expression_spdx,
+            license_detections,
         ) = extract_gradle_license_metadata(&tokens);
 
         vec![PackageData {
@@ -116,7 +122,7 @@ impl PackageParser for GradleParser {
             holder: None,
             declared_license_expression,
             declared_license_expression_spdx,
-            license_detections: Vec::new(),
+            license_detections,
             other_license_expression: None,
             other_license_expression_spdx: None,
             other_license_detections: Vec::new(),
@@ -1067,7 +1073,12 @@ fn strip_quotes(value: &str) -> &str {
 
 fn extract_gradle_license_metadata(
     tokens: &[Tok],
-) -> (Option<String>, Option<String>, Option<String>) {
+) -> (
+    Option<String>,
+    Option<String>,
+    Option<String>,
+    Vec<crate::models::LicenseDetection>,
+) {
     let mut i = 0;
     while i < tokens.len() {
         if let Tok::Ident(name) = &tokens[i]
@@ -1080,9 +1091,20 @@ fn extract_gradle_license_metadata(
             if let Some((license_name, license_url)) = parse_license_block(inner) {
                 let extracted =
                     format_gradle_license_statement(&license_name, license_url.as_deref());
-                let declared =
+                let declared_candidate =
                     derive_gradle_license_expression(&license_name, license_url.as_deref());
-                return (extracted, declared.clone(), declared);
+                if let Some(declared_candidate) = declared_candidate
+                    && let Some(normalized) = normalize_spdx_expression(&declared_candidate)
+                {
+                    let matched_text = extracted.as_deref().unwrap_or(&declared_candidate);
+                    let (declared, declared_spdx, detections) = build_declared_license_data(
+                        normalized,
+                        DeclaredLicenseMatchMetadata::single_line(matched_text),
+                    );
+                    return (extracted, declared, declared_spdx, detections);
+                }
+
+                return (extracted, None, None, empty_declared_license_data().2);
             }
             i = block_end + 1;
             continue;
@@ -1090,7 +1112,7 @@ fn extract_gradle_license_metadata(
         i += 1;
     }
 
-    (None, None, None)
+    (None, None, None, Vec::new())
 }
 
 fn parse_license_block(tokens: &[Tok]) -> Option<(String, Option<String>)> {

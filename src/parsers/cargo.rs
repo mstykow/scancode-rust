@@ -28,6 +28,7 @@ use std::path::Path;
 use toml::Value;
 
 use super::PackageParser;
+use super::license_normalization::normalize_spdx_declared_license;
 
 const FIELD_PACKAGE: &str = "package";
 const FIELD_NAME: &str = "name";
@@ -78,14 +79,12 @@ impl PackageParser for CargoParser {
             .and_then(|v| v.as_str())
             .map(String::from);
 
-        // Extract license statement only - detection happens in separate engine
-        let license_detections = Vec::new();
         let raw_license = package
             .and_then(|p| p.get(FIELD_LICENSE))
             .and_then(|v| v.as_str())
             .map(String::from);
-        let declared_license_expression = None;
-        let declared_license_expression_spdx = None;
+        let (declared_license_expression, declared_license_expression_spdx, license_detections) =
+            normalize_spdx_declared_license(raw_license.as_deref());
 
         let extracted_license_statement = raw_license.clone();
 
