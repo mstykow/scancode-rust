@@ -104,8 +104,8 @@ extracted_license_statement = "MIT"
 ### Benefits
 
 1. **Clear Separation of Concerns**
-   - Parsers are simpler and focused on one task
-   - Detection engines can be tested independently
+   - Parsers stay focused on manifest/package metadata
+   - File-content detection engines can be tested independently
    - Easier to understand and maintain
 
 2. **Better Testing**
@@ -114,14 +114,14 @@ extracted_license_statement = "MIT"
    - Verify detection accuracy independently
 
 3. **Consistency**
-   - All parsers follow same pattern (no special cases)
-   - License normalization uses same algorithm
-   - Copyright detection uses same grammar
+   - Trustworthy declared-license normalization uses one shared parser-side path
+   - File-content license detection stays on the runtime detection pipeline
+   - Copyright detection uses the separate copyright pipeline
 
 4. **Performance Optimization**
-   - Detection can be parallelized separately
-   - Can skip detection if only metadata needed
-   - Cache detection results across files
+   - Content detection can be parallelized separately
+   - Manifest-only scans can still surface normalized declared package licenses
+   - Detection results can be cached across files
 
 5. **Feature Parity**
    - Matches Python's separation (licensedcode/, cluecode/)
@@ -135,15 +135,15 @@ extracted_license_statement = "MIT"
    - Slight complexity in orchestration
    - Acceptable: mirrors Python architecture
 
-2. **Delayed License Normalization**
-   - Can't provide normalized SPDX in first pass
-   - Must process detection stage separately
-   - Acceptable: more accurate results worth the wait
+2. **Bounded Parser Special Cases**
+   - Parsers now have one intentional exception to pure extraction: trustworthy declared-license normalization
+   - This adds a small amount of parser-side policy surface
+   - Acceptable: it preserves clean declared-vs-discovered provenance while improving package metadata quality early
 
-3. **Transition Period During Engine Migration**
-   - `main` may still reflect legacy implementation details while `feat-add-license-parsing` introduces `LicenseDetectionEngine`
-   - Some plan/docs references can lag until migration lands fully on default branch
-   - Acceptable: the extraction-vs-detection boundary remains stable across both implementations
+3. **Dual Provenance Paths**
+   - Declared metadata and discovered file-content detections now have distinct normalization paths
+   - That requires documentation to stay explicit about which path populated which fields
+   - Acceptable: the boundary is clearer and closer to real package-scanning semantics
 
 ## Alternatives Considered
 

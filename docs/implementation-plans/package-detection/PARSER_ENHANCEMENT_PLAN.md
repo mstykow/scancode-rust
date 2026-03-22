@@ -1,6 +1,6 @@
 # Package Parser Enhancement Plan
 
-> **Status**: 🟡 Active — cross-cutting plan for consistent shared parser-side license normalization, with the completed ecosystem campaign preserved below as historical reference
+> **Status**: 🟢 Complete — completed cross-cutting rollout for shared parser-side declared-license normalization, with the completed ecosystem campaign preserved below as historical reference
 > **Updated**: March 22, 2026
 > **Dependencies**: [PARSER_PLAN.md](PARSER_PLAN.md), [ASSEMBLY_PLAN.md](ASSEMBLY_PLAN.md), [HOW_TO_ADD_A_PARSER.md](../../HOW_TO_ADD_A_PARSER.md), [TESTING_STRATEGY.md](../../TESTING_STRATEGY.md), [LICENSE_DETECTION_ARCHITECTURE.md](../../LICENSE_DETECTION_ARCHITECTURE.md), [ADR 0002](../../adr/0002-extraction-vs-detection.md)
 
@@ -8,18 +8,18 @@
 
 This document now has two roles:
 
-1. an **active implementation plan** for making parser-side declared-license handling consistent across the whole parser surface, and
+1. a **completed implementation record** for the shared parser-side declared-license normalization rollout, and
 2. a **historical record** of the completed ecosystem-by-ecosystem parser enhancement campaign.
 
-The active work here is intentionally cross-cutting. It is not another ecosystem batch; it is the plan for deciding when parsers should keep raw license metadata only, when they should normalize trustworthy declared metadata, and how all parser-side normalization should share one implementation path instead of continuing to drift parser-by-parser.
+This cross-cutting work was intentionally not another ecosystem batch. It defined when parsers should keep raw license metadata only, when they should normalize trustworthy declared metadata, and how parser-side normalization should share one implementation path instead of drifting parser-by-parser.
 
 ## Current Role
 
 - Active parser coverage status still lives in [PARSER_PLAN.md](../../implementation-plans/package-detection/PARSER_PLAN.md).
-- The top sections of this file now track the **shared parser license normalization** workstream.
+- The top sections of this file now summarize the **completed shared parser license normalization** rollout and the resulting parser-family end states.
 - The original ecosystem campaign notes remain below as historical implementation guidance and evidence.
 
-## Active Workstream: Shared Parser License Normalization
+## Completed Workstream: Shared Parser License Normalization
 
 ### Why this is now necessary
 
@@ -175,7 +175,7 @@ Representative examples:
 - `src/parsers/podspec.rs`
 - `src/parsers/podspec_json.rs`
 
-These are the remaining parser families that still need either explicit raw-only justification or a future adapter-backed migration.
+These are the parser families intentionally left raw-only in the completed rollout because their current license metadata remains ambiguous, mixed-trust, or otherwise outside the bounded shared-normalization contract. Any future adapter work here would be a new follow-on initiative, not unfinished work from this plan.
 
 ### D. Parsers with no meaningful parser-side declared-license target
 

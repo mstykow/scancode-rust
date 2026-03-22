@@ -2,7 +2,7 @@
 
 ## Summary
 
-**✨ New Feature**: Python implementation is a stub with no parse method. Rust implementation provides full INI parsing and metadata extraction.
+**✨ New Feature + 🔍 Enhanced**: Python implementation is a stub with no parse method. Rust implementation provides full INI parsing, dependency extraction, and declared-license normalization for Dist::Zilla metadata.
 
 ## Python Limitation
 
@@ -42,7 +42,11 @@ Full INI parsing with comprehensive metadata extraction:
    - `copyright_holder`
    - `copyright_year`
 
-4. **Dependencies** (from `[Prereq]` sections):
+4. **Declared license normalization**:
+   - `license = Perl_5` preserves the raw statement in `extracted_license_statement`
+   - Rust also emits SPDX-aware declared-license fields and parser-side detections for the Dist::Zilla license value
+
+5. **Dependencies** (from `[Prereq]` sections):
    - Runtime dependencies: `[Prereq]`
    - Test dependencies: `[Prereq / TestRequires]`
    - Build dependencies: `[Prereq / BuildRequires]`
@@ -57,8 +61,9 @@ The parser:
 1. Parses INI structure into root fields and sections
 2. Converts hyphenated package names to Perl namespace format (`Foo-Bar` → `Foo::Bar`)
 3. Extracts author information with email parsing (`Name <email@example.com>`)
-4. Processes `[Prereq]` sections to extract dependencies with scope detection
-5. Stores copyright metadata in `extra_data`
+4. Normalizes known Dist::Zilla license values into declared license fields
+5. Processes `[Prereq]` sections to extract dependencies with scope detection
+6. Stores copyright metadata in `extra_data`
 
 ### Real-World Example
 
@@ -92,7 +97,8 @@ Test::More = 0.88
   "name": "Dancer2::Plugin::Minion",
   "version": "1.0.0",
   "description": "Dancer2 plugin for Minion job queue",
-  "declared_license_expression": "Perl_5",
+  "declared_license_expression": "gpl-1.0-plus OR artistic-perl-1.0",
+  "declared_license_expression_spdx": "GPL-1.0-or-later OR Artistic-1.0-Perl",
   "parties": [
     {
       "role": "author",
@@ -132,7 +138,7 @@ Test::More = 0.88
 - **SBOM completeness**: Full package metadata instead of just file detection
 - **Dependency tracking**: Complete dependency graph with scopes
 - **Author attribution**: Structured author information with email
-- **License compliance**: License information for compliance tracking
+- **License compliance**: Dist::Zilla license metadata is preserved as raw evidence plus SPDX-aware declared output
 - **Build reproducibility**: Version constraints for all dependencies
 - **Configure-time fidelity**: `ConfigureRequires` is preserved as configure-time, non-runtime dependency metadata instead of falling back to runtime
 
@@ -142,6 +148,7 @@ Coverage includes:
 
 - Basic metadata extraction
 - Dependency parsing with scopes
+- Dist::Zilla license normalization into declared SPDX-aware fields
 - Configure-time dependency classification
 - Author email parsing
 - Minimal dist.ini handling
