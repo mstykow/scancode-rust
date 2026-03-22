@@ -81,6 +81,7 @@ fn prepare_rule_text(text: &str) -> String {
         .join("\n")
 }
 
+#[cfg(test)]
 pub(crate) fn generate_url_variants(
     text: &str,
     ignorable_urls: &Option<Vec<String>>,
@@ -385,11 +386,6 @@ pub fn build_index(rules: Vec<Rule>, licenses: Vec<License>) -> LicenseIndex {
         }
 
         rid_by_hash.insert(rule_hash, rid);
-        for variant_hash in
-            compute_url_variant_hashes(&rule.text, &rule.ignorable_urls, &mut dictionary)
-        {
-            rid_by_hash.insert(variant_hash, rid);
-        }
 
         // Match Python indexing order: approx-matchable membership is decided
         // before compute_thresholds() later derives final is_small/is_tiny flags.
@@ -513,24 +509,6 @@ pub fn build_index(rules: Vec<Rule>, licenses: Vec<License>) -> LicenseIndex {
         unknown_spdx_rid,
         rids_by_high_tid,
     }
-}
-
-fn compute_url_variant_hashes(
-    text: &str,
-    ignorable_urls: &Option<Vec<String>>,
-    dictionary: &mut TokenDictionary,
-) -> Vec<[u8; 20]> {
-    generate_url_variants(text, ignorable_urls)
-        .into_iter()
-        .map(|variant| {
-            let (variant_tokens, _) = tokenize_with_stopwords(&variant);
-            let variant_token_ids: Vec<TokenId> = variant_tokens
-                .iter()
-                .map(|token| dictionary.intern(token).id)
-                .collect();
-            compute_hash(&variant_token_ids)
-        })
-        .collect()
 }
 
 /// Convert a `LoadedRule` to a runtime `Rule`.
