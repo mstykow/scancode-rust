@@ -684,7 +684,7 @@ fn classify_key_files_marks_nested_ruby_license_from_file_references() {
 }
 
 #[test]
-fn promote_package_metadata_and_summary_from_key_files() {
+fn key_file_license_clues_feed_summary_without_mutating_package_license_provenance() {
     let uid = "pkg:gem/inspec-bin@6.8.2?uuid=test";
     let mut metadata_file = file("inspec-6.8.2/metadata.gz-extract");
     metadata_file.for_packages.push(uid.to_string());
@@ -745,10 +745,9 @@ fn promote_package_metadata_and_summary_from_key_files() {
     let summary = compute_summary(&files, &packages).expect("summary exists");
 
     assert_eq!(packages[0].holder.as_deref(), Some("Chef Software Inc."));
-    assert_eq!(
-        packages[0].declared_license_expression_spdx.as_deref(),
-        Some("Apache-2.0")
-    );
+    assert!(packages[0].declared_license_expression.is_none());
+    assert!(packages[0].declared_license_expression_spdx.is_none());
+    assert!(packages[0].license_detections.is_empty());
     assert_eq!(
         summary.declared_license_expression.as_deref(),
         Some("apache-2.0")
@@ -763,20 +762,41 @@ fn promote_package_metadata_and_summary_from_key_files() {
 }
 
 #[test]
-fn manifest_declared_license_contributes_to_summary_and_package_promotion() {
-    let uid = "pkg:gem/demo@1.0.0?uuid=test";
+fn manifest_declared_license_survives_into_package_and_summary() {
     let mut gemspec = file("demo/demo.gemspec");
-    gemspec.for_packages.push(uid.to_string());
     gemspec.package_data = vec![crate::models::PackageData {
         package_type: Some(PackageType::Gem),
         datasource_id: Some(DatasourceId::Gemspec),
         declared_license_expression: Some("mit".to_string()),
         declared_license_expression_spdx: Some("MIT".to_string()),
+        license_detections: vec![crate::models::LicenseDetection {
+            license_expression: "mit".to_string(),
+            license_expression_spdx: "MIT".to_string(),
+            matches: vec![Match {
+                license_expression: "mit".to_string(),
+                license_expression_spdx: "MIT".to_string(),
+                from_file: Some("demo/demo.gemspec".to_string()),
+                start_line: 1,
+                end_line: 1,
+                matcher: None,
+                score: 100.0,
+                matched_length: None,
+                match_coverage: None,
+                rule_relevance: None,
+                rule_identifier: None,
+                rule_url: None,
+                matched_text: None,
+            }],
+            identifier: None,
+        }],
         ..Default::default()
     }];
 
+    let package =
+        Package::from_package_data(&gemspec.package_data[0], "demo/demo.gemspec".to_string());
+    gemspec.for_packages.push(package.package_uid.clone());
     let mut files = vec![gemspec];
-    let mut packages = vec![package(uid, "demo/demo.gemspec")];
+    let mut packages = vec![package];
 
     classify_key_files(&mut files, &packages);
     promote_package_metadata_from_key_files(&files, &mut packages);
@@ -787,6 +807,11 @@ fn manifest_declared_license_contributes_to_summary_and_package_promotion() {
     assert_eq!(
         packages[0].declared_license_expression_spdx.as_deref(),
         Some("MIT")
+    );
+    assert_eq!(packages[0].license_detections.len(), 1);
+    assert_eq!(
+        packages[0].license_detections[0].license_expression_spdx,
+        "MIT"
     );
     assert_eq!(summary.declared_license_expression.as_deref(), Some("mit"));
     assert_eq!(summary.license_clarity_score.unwrap().score, 80);
@@ -881,6 +906,188 @@ fn compute_summary_without_license_evidence_has_no_clarity_score() {
     assert_eq!(summary.declared_holder.as_deref(), Some("Example Corp."));
     assert_eq!(summary.primary_language.as_deref(), Some("Ruby"));
     assert!(summary.license_clarity_score.is_none());
+}
+
+#[test]
+fn compute_tallies_counts_file_findings_and_missing_values() {
+    let mut mit_file = file("project/src/lib.rs");
+    mit_file.programming_language = Some("Rust".to_string());
+    mit_file.license_expression = Some("mit".to_string());
+    mit_file.license_detections = vec![crate::models::LicenseDetection {
+        license_expression: "mit".to_string(),
+        license_expression_spdx: "MIT".to_string(),
+        matches: vec![Match {
+            license_expression: "mit".to_string(),
+            license_expression_spdx: "MIT".to_string(),
+            from_file: Some("project/src/lib.rs".to_string()),
+            start_line: 1,
+            end_line: 1,
+            matcher: None,
+            score: 100.0,
+            matched_length: None,
+            match_coverage: None,
+            rule_relevance: None,
+            rule_identifier: None,
+            rule_url: None,
+            matched_text: None,
+        }],
+        identifier: None,
+    }];
+    mit_file.copyrights = vec![Copyright {
+        copyright: "Copyright (c) Example Corp.".to_string(),
+        start_line: 1,
+        end_line: 1,
+    }];
+    mit_file.holders = vec![Holder {
+        holder: "Example Corp.".to_string(),
+        start_line: 1,
+        end_line: 1,
+    }];
+    mit_file.authors = vec![Author {
+        author: "Alice".to_string(),
+        start_line: 1,
+        end_line: 1,
+    }];
+
+    let mut dual_license_file = file("project/src/main.c");
+    dual_license_file.programming_language = Some("C".to_string());
+    dual_license_file.license_expression = Some("apache-2.0 AND mit".to_string());
+    dual_license_file.license_detections = vec![
+        crate::models::LicenseDetection {
+            license_expression: "apache-2.0".to_string(),
+            license_expression_spdx: "Apache-2.0".to_string(),
+            matches: vec![Match {
+                license_expression: "apache-2.0".to_string(),
+                license_expression_spdx: "Apache-2.0".to_string(),
+                from_file: Some("project/src/main.c".to_string()),
+                start_line: 1,
+                end_line: 1,
+                matcher: None,
+                score: 100.0,
+                matched_length: None,
+                match_coverage: None,
+                rule_relevance: None,
+                rule_identifier: None,
+                rule_url: None,
+                matched_text: None,
+            }],
+            identifier: None,
+        },
+        crate::models::LicenseDetection {
+            license_expression: "mit".to_string(),
+            license_expression_spdx: "MIT".to_string(),
+            matches: vec![Match {
+                license_expression: "mit".to_string(),
+                license_expression_spdx: "MIT".to_string(),
+                from_file: Some("project/src/main.c".to_string()),
+                start_line: 2,
+                end_line: 2,
+                matcher: None,
+                score: 100.0,
+                matched_length: None,
+                match_coverage: None,
+                rule_relevance: None,
+                rule_identifier: None,
+                rule_url: None,
+                matched_text: None,
+            }],
+            identifier: None,
+        },
+    ];
+    dual_license_file.copyrights = vec![Copyright {
+        copyright: "Copyright (c) Example Corp.".to_string(),
+        start_line: 1,
+        end_line: 1,
+    }];
+    dual_license_file.holders = vec![Holder {
+        holder: "Example Corp.".to_string(),
+        start_line: 1,
+        end_line: 1,
+    }];
+    dual_license_file.authors = vec![Author {
+        author: "Bob".to_string(),
+        start_line: 1,
+        end_line: 1,
+    }];
+
+    let empty_file = file("project/README.md");
+
+    let tallies =
+        compute_tallies(&[mit_file, dual_license_file, empty_file]).expect("tallies exist");
+
+    assert_eq!(
+        tallies.detected_license_expression,
+        vec![
+            TallyEntry {
+                value: None,
+                count: 1,
+            },
+            TallyEntry {
+                value: Some("apache-2.0 AND mit".to_string()),
+                count: 1,
+            },
+            TallyEntry {
+                value: Some("mit".to_string()),
+                count: 1,
+            },
+        ]
+    );
+    assert_eq!(
+        tallies.copyrights,
+        vec![
+            TallyEntry {
+                value: Some("Copyright (c) Example Corp.".to_string()),
+                count: 2,
+            },
+            TallyEntry {
+                value: None,
+                count: 1,
+            },
+        ]
+    );
+    assert_eq!(
+        tallies.holders,
+        vec![
+            TallyEntry {
+                value: Some("Example Corp.".to_string()),
+                count: 2,
+            },
+            TallyEntry {
+                value: None,
+                count: 1,
+            },
+        ]
+    );
+    assert_eq!(
+        tallies.authors,
+        vec![
+            TallyEntry {
+                value: None,
+                count: 1,
+            },
+            TallyEntry {
+                value: Some("Alice".to_string()),
+                count: 1,
+            },
+            TallyEntry {
+                value: Some("Bob".to_string()),
+                count: 1,
+            },
+        ]
+    );
+    assert_eq!(
+        tallies.programming_language,
+        vec![
+            TallyEntry {
+                value: Some("C".to_string()),
+                count: 1,
+            },
+            TallyEntry {
+                value: Some("Rust".to_string()),
+                count: 1,
+            },
+        ]
+    );
 }
 
 #[test]
