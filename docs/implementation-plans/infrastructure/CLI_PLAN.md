@@ -60,22 +60,43 @@ This plan tracks progress toward a **drop-in replacement CLI surface**.
 
 ### Scan Option Flags (pending)
 
-| Parameter         | Blocked By                |
-| ----------------- | ------------------------- |
-| `--license`       | LICENSE_DETECTION_PLAN.md |
-| `--license-score` | LICENSE_DETECTION_PLAN.md |
-| `--license-text`  | LICENSE_DETECTION_PLAN.md |
-| `--classify`      | SUMMARIZATION_PLAN.md     |
-| `--summary`       | SUMMARIZATION_PLAN.md     |
+| Parameter                   | Blocked By                                                                     |
+| --------------------------- | ------------------------------------------------------------------------------ |
+| `--license`                 | [`LICENSE_DETECTION_ARCHITECTURE.md`](../../LICENSE_DETECTION_ARCHITECTURE.md) |
+| `--license-score`           | [`LICENSE_DETECTION_ARCHITECTURE.md`](../../LICENSE_DETECTION_ARCHITECTURE.md) |
+| `--license-text`            | [`LICENSE_DETECTION_ARCHITECTURE.md`](../../LICENSE_DETECTION_ARCHITECTURE.md) |
+| `--classify`                | [`SUMMARIZATION_PLAN.md`](../post-processing/SUMMARIZATION_PLAN.md)            |
+| `--facet <facet>=<pattern>` | [`SUMMARIZATION_PLAN.md`](../post-processing/SUMMARIZATION_PLAN.md)            |
+| `--generated`               | [`SUMMARIZATION_PLAN.md`](../post-processing/SUMMARIZATION_PLAN.md)            |
+| `--summary`                 | [`SUMMARIZATION_PLAN.md`](../post-processing/SUMMARIZATION_PLAN.md)            |
+
+Runtime dependency notes:
+
+- `--summary` requires `--classify` for parity-compatible behavior.
+- `--facet <facet>=<pattern>` defines per-facet glob rules; files not matched by any facet default to `core` in the reference implementation.
 
 ### Post-Scan Flags (pending)
 
-| Parameter                 | Blocked By                |
-| ------------------------- | ------------------------- |
-| `--consolidate`           | CONSOLIDATION_PLAN.md     |
-| `--is-license-text`       | LICENSE_DETECTION_PLAN.md |
-| `--license-clarity-score` | LICENSE_DETECTION_PLAN.md |
-| `--summary-key-files`     | SUMMARIZATION_PLAN.md     |
+| Parameter                 | Blocked By                                                                     |
+| ------------------------- | ------------------------------------------------------------------------------ |
+| `--is-license-text`       | [`LICENSE_DETECTION_ARCHITECTURE.md`](../../LICENSE_DETECTION_ARCHITECTURE.md) |
+| `--license-clarity-score` | [`SUMMARIZATION_PLAN.md`](../post-processing/SUMMARIZATION_PLAN.md)            |
+| `--tallies`               | [`SUMMARIZATION_PLAN.md`](../post-processing/SUMMARIZATION_PLAN.md)            |
+| `--tallies-with-details`  | [`SUMMARIZATION_PLAN.md`](../post-processing/SUMMARIZATION_PLAN.md)            |
+| `--tallies-key-files`     | [`SUMMARIZATION_PLAN.md`](../post-processing/SUMMARIZATION_PLAN.md)            |
+| `--tallies-by-facet`      | [`SUMMARIZATION_PLAN.md`](../post-processing/SUMMARIZATION_PLAN.md)            |
+
+Runtime dependency notes:
+
+- `--license-clarity-score` requires `--classify` for parity-compatible behavior.
+- `--tallies-key-files` requires `--classify` and `--tallies`.
+- `--tallies-by-facet` requires `--facet <facet>=<pattern>` and `--tallies`.
+
+### Explicitly Deferred / Not Planned
+
+| Parameter       | Decision                                                                                                                       |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `--consolidate` | Intentionally not planned for current Provenant scope; see [`CONSOLIDATION_PLAN.md`](../post-processing/CONSOLIDATION_PLAN.md) |
 
 ### Input/Output Control (implemented)
 
@@ -110,6 +131,7 @@ This plan tracks progress toward a **drop-in replacement CLI surface**.
 ## Differences from Python (current intentional)
 
 - No plugin runtime architecture (compile-time wiring instead)
+- `--consolidate` is intentionally not planned because it is compatibility-oriented and upstream-deprecated
 - Thread pool via rayon instead of multiprocessing
 - JSON output structure matches Python (`OUTPUT_FORMAT_VERSION`)
 - `--no-cache` is not a parity requirement (upstream removed it); if retained, it is Rust-specific

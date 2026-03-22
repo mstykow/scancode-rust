@@ -37,7 +37,7 @@ Enhanced progress reporting during scans: multi-phase progress bars, ETA, throug
 
 **Out of Scope:**
 
-- Plugin system for custom progress reporters (deferred to plugin system plan)
+- Runtime plugin system for custom progress reporters (intentionally deferred; see plugin system plan)
 - Streaming JSON output during scan (deferred to output formats plan)
 - Per-scanner timing (we have a monolithic pipeline, not a plugin-based one)
 - Remote progress reporting (webhooks, etc.)
@@ -239,7 +239,7 @@ pub verbose: bool,
 
 **Decision**: Use a concrete `ScanProgress` struct rather than a `trait ProgressReporter`.
 
-**Rationale**: We don't have a plugin system, and the progress reporting has exactly one consumer (the CLI). A trait would add abstraction without benefit. If a plugin system is added later, we can extract a trait then.
+**Rationale**: We do not plan to build a runtime plugin system in current Provenant scope, and the progress reporting has exactly one consumer (the CLI). A trait would add abstraction without benefit. If that product decision ever changes, we can extract a trait then.
 
 #### D6: Move `env_logger` to Regular Dependencies
 

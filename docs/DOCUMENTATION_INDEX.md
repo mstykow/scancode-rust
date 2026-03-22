@@ -12,6 +12,7 @@ This index helps you find the right documentation for your needs.
 ### Getting Started
 
 - **[ARCHITECTURE.md](ARCHITECTURE.md)** - System design and components
+- **[LICENSE_DETECTION_ARCHITECTURE.md](LICENSE_DETECTION_ARCHITECTURE.md)** - Detailed license-detection engine architecture and rule-loading flow
 - **[HOW_TO_ADD_A_PARSER.md](HOW_TO_ADD_A_PARSER.md)** - Step-by-step parser implementation guide
 - **[TESTING_STRATEGY.md](TESTING_STRATEGY.md)** - Four-layer testing approach
 
@@ -32,6 +33,7 @@ This index helps you find the right documentation for your needs.
 ```text
 docs/
 ├── ARCHITECTURE.md                    # Evergreen: System design
+├── LICENSE_DETECTION_ARCHITECTURE.md  # Evergreen: License-detection subsystem
 ├── RELEASING.md                       # Evergreen: Maintainer release process
 ├── HOW_TO_ADD_A_PARSER.md            # Evergreen: Parser guide
 ├── TESTING_STRATEGY.md                # Evergreen: Testing philosophy
@@ -49,6 +51,9 @@ docs/
 
 **...understand the overall architecture**
 → [ARCHITECTURE.md](ARCHITECTURE.md)
+
+**...understand license detection internals**
+→ [LICENSE_DETECTION_ARCHITECTURE.md](LICENSE_DETECTION_ARCHITECTURE.md)
 
 **...add a new package parser**
 → [HOW_TO_ADD_A_PARSER.md](HOW_TO_ADD_A_PARSER.md)
@@ -76,6 +81,7 @@ docs/
 ### Evergreen Documents (Permanent)
 
 - **ARCHITECTURE.md** - Updated as architecture evolves
+- **LICENSE_DETECTION_ARCHITECTURE.md** - Updated as the license-detection subsystem evolves
 - **RELEASING.md** - Updated as the release workflow changes
 - **HOW_TO_ADD_A_PARSER.md** - Updated as parser patterns change
 - **TESTING_STRATEGY.md** - Updated as testing approach evolves

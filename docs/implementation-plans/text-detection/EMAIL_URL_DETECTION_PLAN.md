@@ -611,6 +611,6 @@ Compare output against Python ScanCode reference:
 
 - **Architecture**: [`docs/ARCHITECTURE.md`](../../ARCHITECTURE.md) — Scanner pipeline, email/URL detection section
 - **Copyright Detection**: [`COPYRIGHT_DETECTION_PLAN.md`](COPYRIGHT_DETECTION_PLAN.md) — Related text detection feature
-- **License Detection**: [`LICENSE_DETECTION_PLAN.md`](LICENSE_DETECTION_PLAN.md) — Related text detection feature
+- **License Detection Architecture**: [`docs/LICENSE_DETECTION_ARCHITECTURE.md`](../../LICENSE_DETECTION_ARCHITECTURE.md) — Implemented license-detection engine and related text-detection context
 - **Testing Strategy**: [`docs/TESTING_STRATEGY.md`](../../TESTING_STRATEGY.md) — Testing approach
 - **Python Reference**: `reference/scancode-toolkit/src/cluecode/finder.py` — Original implementation

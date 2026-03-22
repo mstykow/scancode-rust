@@ -1,13 +1,61 @@
-# Summarization & Analysis Implementation Plan
+# Summary, Tallies & Analysis Implementation Plan
 
 > **Status**: 🟡 In Progress — foundational summary and key-file infrastructure is implemented; broader tallies/facets/generated-code parity remains open
 > **Priority**: P2 - Medium Priority (Post-Processing Feature)
 > **Estimated Effort**: 3-4 weeks
-> **Dependencies**: LICENSE_DETECTION_PLAN.md, COPYRIGHT_DETECTION_PLAN.md, ASSEMBLY_PLAN.md
+> **Dependencies**: [LICENSE_DETECTION_ARCHITECTURE.md](../../LICENSE_DETECTION_ARCHITECTURE.md), [COPYRIGHT_DETECTION_PLAN.md](../text-detection/COPYRIGHT_DETECTION_PLAN.md), [ASSEMBLY_PLAN.md](../package-detection/ASSEMBLY_PLAN.md)
 
 ## Overview
 
-Post-scan analysis and summarization features that aggregate findings across files to provide high-level insights: license tallies, copyright statistics, license clarity scoring, file classification, and facets.
+This plan covers the remaining ScanCode-compatible **summary and tally surface**: codebase summary output, codebase/file/directory tallies, license clarity scoring, key-file classification, facets, and generated-code detection.
+
+These features are the main post-processing value layer that turns raw file/package findings into project-level answers users actually consume: what the project is primarily licensed under, which files are key licensing files, how clear the licensing story is, and which licenses/copyrights/packages dominate the scan.
+
+Upstream implements these behaviors across multiple plugins (`--summary`, `--tallies`, `--license-clarity-score`, `--classify`, `--facet`, `--generated`). Provenant tracks them in one plan because they share the same data flow and should be implemented against one coherent summary model.
+
+## Recommendation
+
+**Implement summarization next.**
+
+Why:
+
+- It is the broader, non-deprecated parity surface in ScanCode.
+- Provenant already ships meaningful foundations for it.
+- It unlocks multiple pending CLI options and user-facing outputs.
+- Consolidation has now been intentionally deferred as a compatibility-only feature, so summarization is the clear remaining post-processing priority.
+
+The practical order should be:
+
+1. shared provenance cleanup in `src/main.rs` so key-file enrichment stops implicitly redefining package declared-license fields
+2. summarization parity work (summary, tallies, clarity, classify/facet/generated support)
+
+## Why This Feature Is Justified
+
+For a drop-in ScanCode replacement, summarization is **not optional**.
+
+- Official ScanCode docs still present `--summary`, `--tallies`, `--license-clarity-score`, `--classify`, `--facet`, and `--generated` as active user-facing features.
+- These are the main project-level reporting features used for triage, dashboards, compliance review, and quick human interpretation of a scan.
+- Provenant already has a partial summary foundation, so finishing this area yields high parity value for relatively low architectural risk.
+
+## Upstream Parity Targets
+
+The current parity target is the actual reference implementation and test surface, not every stale name in upstream docs.
+
+### Must-match upstream behavior
+
+- `--classify`
+- `--facet`
+- `--generated`
+- `--license-clarity-score`
+- `--summary`
+- `--tallies`
+- `--tallies-with-details`
+- `--tallies-key-files`
+- `--tallies-by-facet`
+
+### Naming caveat
+
+Upstream documentation still mentions names such as `--summary-key-files`, `--summary-by-facet`, and `--summary-with-details` in some places, but the live implementation and active plugin/test surface use the `--tallies-*` family. Provenant should target the real implemented CLI surface and, if helpful, document the upstream doc drift rather than reproducing it as a separate feature set.
 
 ## Architectural Boundary
 
@@ -25,14 +73,15 @@ Summarization is a **consumer**, not a normalizer.
 
 ### What This Covers
 
-- **License Tallies**: Count and categorize licenses across codebase
+- **Scan Summary**: Top-level project summary output (`declared_license_expression`, holder/language summaries, other values)
+- **License Tallies**: Count and categorize licenses across the codebase
 - **Copyright Tallies**: Aggregate copyright holders and statements
 - **Package Tallies**: Count packages by ecosystem
-- **License Clarity Score**: Calculate license clarity metrics
-- **File Classification**: Classify files by type (source, test, doc, data, etc.)
-- **Facet Assignment**: Tag files with facets (core, dev, test, doc, etc.)
+- **License Clarity Score**: Calculate project-level license clarity metrics
+- **Key-File Classification**: Mark likely licensing/manifest/readme files for summary logic and user inspection
+- **Facet Assignment**: Tag files with facets (`core`, `dev`, `tests`, `docs`, `data`, `examples`)
 - **Generated Code Detection**: Identify auto-generated files
-- **Scan Summary**: High-level scan statistics
+- **Detailed Tallies**: File- and directory-level tallies where upstream exposes them via `--tallies-with-details`
 
 ### What This Doesn't Cover
 
@@ -46,13 +95,22 @@ Summarization is a **consumer**, not a normalizer.
 
 **Key Components**:
 
-- `tallies.py` - License, copyright, package tallies
+- `tallies.py` - License, copyright, package, author, holder, and language tallies
 - `score.py` - License clarity scoring
-- `classify_plugin.py` - File classification
-- `facet.py` - Facet assignment
+- `classify_plugin.py` - `--classify` plugin and key-file flags
+- `classify.py` - File classification rules
+- `facet.py` - `--facet` behavior and facet partitioning
 - `generated.py` - Generated code detection
-- `summarizer.py` - Scan summary generation
+- `summarizer.py` - `--summary` generation and reuse of tallies/clarity logic
 - `copyright_tallies.py` - Copyright statistics
+
+### Upstream Value Surface
+
+- `--summary` gives users a top-level project view instead of forcing file-by-file interpretation.
+- `--tallies` and `--tallies-with-details` support reporting, dashboards, and inventory analysis.
+- `--tallies-key-files` narrows reporting to the files most likely to represent project-level licensing intent.
+- `--tallies-by-facet` separates shipping code from tests/docs/examples.
+- `--license-clarity-score` gives a triage-friendly confidence signal for how clearly licensing is stated.
 
 ## Current State in Rust
 
@@ -74,10 +132,14 @@ Summarization is a **consumer**, not a normalizer.
 - ❌ License tallies
 - ❌ Copyright tallies
 - ❌ Package tallies
+- ❌ Author/holder/language tally parity beyond current summary slices
 - ❌ Full Python-parity license clarity scoring heuristics
-- ❌ Broader file classification beyond current key-file/source slices
+- ❌ Full ScanCode `--classify` parity (including remaining classification nuances)
 - ❌ Facet assignment
 - ❌ Generated code detection
+- ❌ `--tallies-with-details` file/directory output parity
+- ❌ `--tallies-key-files` and `--tallies-by-facet` parity
+- ❌ CLI gating for summary/tally/classify/facet/generated options
 - ❌ Comprehensive scan summary parity
 
 ### Already handled elsewhere
@@ -94,31 +156,35 @@ Summarization is a **consumer**, not a normalizer.
 
 ## Implementation Phases
 
-1. **Phase 1**: File classification and key-file tagging foundations ✅
-2. **Phase 2**: Package/file metadata promotion foundations ✅
-3. **Phase 3**: Initial summary model/output structure ✅
-4. **Phase 4**: Initial non-license-dependent summary fields ✅
-5. **Phase 5**: License tallies over existing declared/discovered evidence
-6. **Phase 6**: Copyright tallies
-7. **Phase 7**: Package tallies
-8. **Phase 8**: Full license clarity parity
-9. **Phase 9**: Facets and generated-code detection
-10. **Phase 10**: Comprehensive scan summary parity
+1. **Phase 0**: Shared provenance cleanup so package declared-license fields are no longer implicitly redefined from key-file evidence.
+2. **Phase 1**: File classification and key-file tagging foundations ✅
+3. **Phase 2**: Package/file metadata promotion foundations ✅
+4. **Phase 3**: Initial summary model/output structure ✅
+5. **Phase 4**: Initial non-license-dependent summary fields ✅
+6. **Phase 5**: Core codebase tallies (`--tallies`) over existing declared/discovered evidence.
+7. **Phase 6**: Detailed tally variants (`--tallies-with-details`, `--tallies-key-files`, `--tallies-by-facet`).
+8. **Phase 7**: Full license clarity parity.
+9. **Phase 8**: Facets and generated-code detection parity.
+10. **Phase 9**: Comprehensive `--summary` parity over the completed tally/clarity/classification inputs.
+11. **Phase 10**: CLI parity wiring for the remaining summary/tally/classify/facet/generated options and regression coverage.
 
 ## Success Criteria
 
-- [ ] Generates accurate tallies for licenses, copyrights, packages
-- [ ] Calculates license clarity score matching Python
-- [ ] Classifies files correctly beyond current key-file/source slices
-- [ ] Detects generated code
-- [ ] Golden tests pass
+- [ ] Generates accurate codebase tallies for licenses, copyrights, packages, holders, authors, and languages where upstream does
+- [ ] Produces `--summary` output compatible with the ScanCode reference for covered scenarios
+- [ ] Calculates license clarity score matching Python semantics
+- [ ] Classifies key files and broader file categories compatibly with ScanCode
+- [ ] Supports facet-driven and key-file-driven tally variants
+- [ ] Detects generated code with documented heuristic behavior
+- [ ] Exposes the corresponding CLI options with parity-compatible semantics
+- [ ] Golden and integration tests pass
 
 ## Related Documents
 
-- **Implementation**: `LICENSE_DETECTION_PLAN.md` (prerequisite)
-- **Implementation**: `COPYRIGHT_DETECTION_PLAN.md` (prerequisite)
-- **Implementation**: `../package-detection/ASSEMBLY_PLAN.md` (prerequisite)
-- **Evergreen**: `ARCHITECTURE.md` (post-processing pipeline)
+- **Evergreen**: [`docs/LICENSE_DETECTION_ARCHITECTURE.md`](../../LICENSE_DETECTION_ARCHITECTURE.md) — implemented license-detection engine and match pipeline
+- **Implementation**: [`COPYRIGHT_DETECTION_PLAN.md`](../text-detection/COPYRIGHT_DETECTION_PLAN.md) — prerequisite
+- **Implementation**: [`ASSEMBLY_PLAN.md`](../package-detection/ASSEMBLY_PLAN.md) — prerequisite
+- **Evergreen**: [`docs/ARCHITECTURE.md`](../../ARCHITECTURE.md) — broader processing pipeline
 
 ## Notes
 
@@ -126,5 +192,6 @@ Summarization is a **consumer**, not a normalizer.
 - Full parity for tallies and Python-style scoring still depends on richer discovered-license/copyright coverage and clearer package-vs-file provenance.
 - The recent parser-side declared-license normalization work reduces one gap for summarization consumers, but it does not remove the need for summary tallies, facets, generated-code detection, or scan-level aggregation.
 - The current `src/main.rs` key-file promotion of package declared-license fields should be treated as a follow-up cleanup item, not as the final package-license architecture.
-- Can be implemented incrementally (one tally type at a time)
-- License clarity score is a key metric for compliance teams
+- This plan intentionally groups some upstream pre-scan/scan/post-scan features together because they converge on one post-processing summary surface in Provenant.
+- Implement incrementally, but preserve the user-visible dependency chain: classification/facets/generated feed tallies and clarity; tallies and clarity feed full summary parity.
+- License clarity score is a key metric for compliance teams.

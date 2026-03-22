@@ -78,17 +78,16 @@ Provenant implements a multi-phase processing pipeline based on Python ScanCode'
 │  Phase 3: Post-Processing                                       │
 │  ┌──────────────────────────────────────────────────────────┐   |
 │  │ • Package assembly (sibling, nested, file-ref, workspace)│   │
-│  │ • Package consolidation/deduplication                    │   │
+│  │ • Summary, tallies, classification, facets              │   │
 │  │ • License/copyright summarization                        │   │
-│  │ • Tallies and facets                                     │   │
-│  │ • Classification                                         │   │
+│  │ • Generated-code and key-file analysis                   │   │
 │  └──────────────────────────────────────────────────────────┘   │
 │                           │                                     │
 │                           ▼                                     │
 │  Phase 4: Filtering                                             │
 │  ┌────────────────────────────────────────────────────────┐     │
 │  │ • License policy filtering                             │     │
-│  │ • Custom filter plugins                                │     │
+│  │ • Policy/filtering rules                               │     │
 │  └────────────────────────────────────────────────────────┘     │
 │                           │                                     │
 │                           ▼                                     │
@@ -112,7 +111,7 @@ Provenant implements a multi-phase processing pipeline based on Python ScanCode'
 - **Post-Processing**: Summarization, tallies, classification
 - **Output**: JSON, SPDX (TV/RDF), CycloneDX (JSON/XML), CSV, YAML, JSON Lines, HTML, HTML app, custom templates
 - **Testing Infrastructure**: Unit tests, doctests, golden tests, integration tests
-- **Infrastructure**: Plugin system, caching, enhanced progress tracking
+- **Infrastructure**: Caching, enhanced progress tracking, static integration points
 
 ### Implementation Status
 
@@ -626,11 +625,11 @@ Module location: `src/finder/`
 
 ### Post-Processing Pipeline
 
-**Package Consolidation**:
+**Compatibility-Oriented Consolidation (Deferred)**:
 
-- Package deduplication across scan results
-- Dependency graph resolution
-- Transitive dependency handling
+- Legacy-compatible grouped package/resource view from ScanCode's `--consolidate`
+- Not part of the current Provenant roadmap
+- Retained only as a documented future compatibility decision, not as active architecture
 
 **Summarization**:
 
@@ -666,10 +665,9 @@ Module location: `src/finder/`
 
 **Plugin System**:
 
-- Extensible plugin architecture
-- Custom scan plugins
-- Custom output formats
-- Third-party integrations
+- No runtime plugin system is planned in current Provenant scope
+- Compile-time integration points are preferred over a public plugin ABI
+- Revisit only if concrete extension needs justify the complexity
 
 **Caching**:
 

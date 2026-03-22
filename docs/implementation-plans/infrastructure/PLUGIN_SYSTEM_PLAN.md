@@ -1,13 +1,32 @@
 # Plugin System Implementation Plan
 
-> **Status**: 🔴 Placeholder - Not Started
-> **Priority**: P3 - Low Priority (Extensibility Feature)
+> **Status**: ⚪ Deferred / Not Planned — retained as an explicit non-goal for current Provenant scope
+> **Priority**: Deferred (optional infrastructure, not on current roadmap)
 > **Estimated Effort**: 3-4 weeks
 > **Dependencies**: None (infrastructure feature)
 
 ## Overview
 
 Extensible plugin architecture allowing third-party plugins for custom parsers, output formats, and post-processing logic. Enables users to extend Provenant without modifying core code.
+
+## Recommendation
+
+**Do not build a runtime plugin system for the current Provenant roadmap.**
+
+Why:
+
+- It is optional infrastructure rather than a core parity requirement.
+- Provenant is intentionally favoring compile-time integration over runtime plugin loading.
+- Rust ABI and dynamic loading constraints make this disproportionately expensive for current user value.
+- No near-term product plan depends on third-party runtime plugins.
+
+This document is retained as a decision record and future reference if extension needs materially change.
+
+## Current Product Decision
+
+- **Not planned** for the current Provenant roadmap.
+- Prefer internal trait extraction or static registration over a public runtime plugin ABI.
+- Revisit only if a concrete extension ecosystem or user demand emerges.
 
 ## Scope
 
@@ -77,6 +96,8 @@ Extensible plugin architecture allowing third-party plugins for custom parsers, 
 
 ## Implementation Phases (TBD)
 
+> These phases are retained only as future reference if this decision changes.
+
 1. **Phase 1**: Define plugin trait hierarchy
 2. **Phase 2**: Implement plugin manager
 3. **Phase 3**: Add plugin discovery mechanism
@@ -86,6 +107,8 @@ Extensible plugin architecture allowing third-party plugins for custom parsers, 
 
 ## Success Criteria
 
+> These success criteria apply only if the feature is reactivated.
+
 - [ ] Third-party plugins can be loaded
 - [ ] Plugins can register CLI options
 - [ ] Plugins can extend scanner functionality
@@ -94,13 +117,12 @@ Extensible plugin architecture allowing third-party plugins for custom parsers, 
 
 ## Related Documents
 
-- **Evergreen**: `ARCHITECTURE.md` (plugin architecture)
+- **Evergreen**: [`ARCHITECTURE.md`](../../ARCHITECTURE.md) — current architecture documents static integration points and the absence of a planned runtime plugin system
 - **ADR**: TBD - Plugin loading strategy
 
 ## Notes
 
-- Plugin system is a "nice-to-have" not a "must-have"
+- Plugin system is intentionally deferred; it is a "nice-to-have" not a "must-have"
 - Rust's lack of stable ABI makes this more complex than Python
-- Consider starting with compile-time plugins (Cargo features) for simplicity
-- Dynamic loading can be added later if needed
-- WebAssembly plugins are an interesting future direction
+- If this decision is ever revisited, compile-time integration remains the lowest-risk starting point
+- Dynamic loading or WebAssembly should be treated as future re-evaluation topics, not as accepted backlog items

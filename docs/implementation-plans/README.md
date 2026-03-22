@@ -1,6 +1,6 @@
 # Implementation Plans
 
-This directory contains **temporary planning documents** for porting Python ScanCode features to Rust. These are working documents that track implementation progress and will be archived once features are complete.
+This directory contains **temporary planning documents** for porting Python ScanCode features to Rust. These are working documents that track implementation progress and will be archived once features are complete. When a feature ships and a permanent architecture/reference document becomes the canonical maintainer guide, this index links to that evergreen document instead of restoring a retired plan. Some documents are also kept as explicit product-scope records when Provenant intentionally chooses not to implement an upstream feature.
 
 ## Directory Structure
 
@@ -17,6 +17,23 @@ implementation-plans/
 
 ## Active Plans
 
+### Post-Processing (`post-processing/`)
+
+- **[SUMMARIZATION_PLAN.md](post-processing/SUMMARIZATION_PLAN.md)** - License/copyright tallies, facets, classification
+  - Status: 🟡 Active — foundational key-file tagging, package metadata promotion, and initial summary output are implemented; remaining tallies, clarity parity, facets, generated-code detection, and broader summary parity are tracked in [SUMMARIZATION_PLAN.md](post-processing/SUMMARIZATION_PLAN.md)
+
+### Infrastructure (`infrastructure/`)
+
+- **[CLI_PLAN.md](infrastructure/CLI_PLAN.md)** - Command-line interface parameter parity
+  - Status: 🟡 Active — implemented and pending CLI parity items are tracked in [CLI_PLAN.md](infrastructure/CLI_PLAN.md)
+
+- **[CACHING_PLAN.md](infrastructure/CACHING_PLAN.md)** - Scan result caching and incremental scanning
+  - Status: 🟡 Active — cache CLI/runtime integration is tracked in [CACHING_PLAN.md](infrastructure/CACHING_PLAN.md)
+
+## Complete / Reference Documents
+
+These topics are implemented. Some remain as completed historical plans, while others now point at their evergreen maintainer reference.
+
 ### Package Detection (`package-detection/`)
 
 - **[PARSER_PLAN.md](package-detection/PARSER_PLAN.md)** - Individual file format parser implementations
@@ -30,6 +47,9 @@ implementation-plans/
 
 ### Text Detection (`text-detection/`)
 
+- **[LICENSE_DETECTION_ARCHITECTURE.md](../LICENSE_DETECTION_ARCHITECTURE.md)** - Evergreen architecture reference for the implemented license-detection engine
+  - Status: 🟢 Complete — the temporary license-detection plan was retired after implementation; the canonical maintainer reference now lives in [LICENSE_DETECTION_ARCHITECTURE.md](../LICENSE_DETECTION_ARCHITECTURE.md)
+
 - **[COPYRIGHT_DETECTION_PLAN.md](text-detection/COPYRIGHT_DETECTION_PLAN.md)** - Copyright statement extraction
   - Status: 🟢 Complete — scanner/runtime ingestion now covers decoded non-UTF text, PDF text, and binary printable strings; Rust also adds supported-image EXIF/XMP metadata as a beyond-parity clue source, and intentional divergences are tracked in the plan
 
@@ -37,12 +57,6 @@ implementation-plans/
   - Status: 🟢 Complete — scanner/runtime ingestion now covers decoded non-UTF text, PDF text, and binary printable strings; Rust also adds supported-image EXIF/XMP metadata as a beyond-parity clue source, and intentional divergences are tracked in the plan
 
 ### Infrastructure (`infrastructure/`)
-
-- **[CLI_PLAN.md](infrastructure/CLI_PLAN.md)** - Command-line interface parameter parity
-  - Status: 🟡 Active — implemented and pending CLI parity items are tracked in [CLI_PLAN.md](infrastructure/CLI_PLAN.md)
-
-- **[CACHING_PLAN.md](infrastructure/CACHING_PLAN.md)** - Scan result caching and incremental scanning
-  - Status: 🟡 Active — cache CLI/runtime integration is tracked in [CACHING_PLAN.md](infrastructure/CACHING_PLAN.md)
 
 - **[PROGRESS_TRACKING_PLAN.md](infrastructure/PROGRESS_TRACKING_PLAN.md)** - Enhanced progress reporting
   - Status: 🟢 Implemented — progress manager, mode handling, summary/reporting, and integration tests are tracked in the plan document
@@ -55,28 +69,23 @@ implementation-plans/
 - **[PARITY_SCORECARD.md](output/PARITY_SCORECARD.md)** - Format-by-format parity contract and fixture coverage
   - Status: 🟢 Maintained as the canonical output parity contract and verification checklist
 
-## Placeholder Plans (To Be Fleshed Out)
+## Deferred / Not Planned
 
-These represent major architectural components not yet implemented. Each will be expanded into a detailed implementation plan when work begins.
-
-### Text Detection (`text-detection/`)
-
-- **[LICENSE_DETECTION_PLAN.md](text-detection/LICENSE_DETECTION_PLAN.md)** - License text detection and matching (transition placeholder)
-  - Priority: P0 - Critical; active engine direction is the runtime ScanCode rule-loading architecture tracked in `feat-add-license-parsing`
+These documents are retained as explicit product-scope decisions. They describe upstream functionality and possible implementation paths, but they are intentionally not on the current Provenant roadmap.
 
 ### Post-Processing (`post-processing/`)
 
-- **[SUMMARIZATION_PLAN.md](post-processing/SUMMARIZATION_PLAN.md)** - License/copyright tallies, facets, classification
-  - Priority: P2 - Medium, Effort: 3-4 weeks
-
-- **[CONSOLIDATION_PLAN.md](post-processing/CONSOLIDATION_PLAN.md)** - Resource grouping by origin, package enrichment with discovered licenses/copyrights
-  - Priority: P2 - Medium, Effort: 2-3 weeks
-  - Dependencies: License detection, copyright detection, package assembly
+- **[CONSOLIDATION_PLAN.md](post-processing/CONSOLIDATION_PLAN.md)** - Legacy-compatible resource/package grouping view
+  - Status: ⚪ Deferred — intentionally not planned because it is compatibility-oriented, upstream-deprecated, and not required for Provenant's latest-functionality goal
 
 ### Infrastructure (`infrastructure/`)
 
-- **[PLUGIN_SYSTEM_PLAN.md](infrastructure/PLUGIN_SYSTEM_PLAN.md)** - Extensible plugin architecture
-  - Priority: P3 - Low, Effort: 3-4 weeks
+- **[PLUGIN_SYSTEM_PLAN.md](infrastructure/PLUGIN_SYSTEM_PLAN.md)** - Runtime/extensible plugin architecture
+  - Status: ⚪ Deferred — intentionally not planned because Provenant is favoring compile-time integration over runtime plugin loading
+
+## Placeholder Plans (Still High-Level)
+
+These remain intentionally high-level until implementation work begins.
 
 ## Document Lifecycle
 
@@ -84,6 +93,7 @@ These represent major architectural components not yet implemented. Each will be
 2. **Planning** - Detailed analysis, design decisions, implementation phases
 3. **Active** - Work in progress, updated with status
 4. **Complete** - Feature implemented, document retained as completed living documentation or archived if it no longer has ongoing maintainer value
+5. **Deferred / Not Planned** - Explicitly out of current product scope; retained as a decision record and future reference
 
 ### Documentation Style for Plan Status
 
@@ -97,12 +107,13 @@ These represent major architectural components not yet implemented. Each will be
 These implementation plans are **temporary** and complement the **evergreen**
 documentation in [`docs/`](../):
 
-| Evergreen (Permanent)    | Implementation Plans (Temporary)            |
-| ------------------------ | ------------------------------------------- |
-| `ARCHITECTURE.md`        | Component-specific implementation plans     |
-| `HOW_TO_ADD_A_PARSER.md` | `PARSER_PLAN.md`                            |
-| `TESTING_STRATEGY.md`    | Test plans within implementation docs       |
-| `adr/`                   | Design decisions made during implementation |
-| `improvements/`          | Beyond-parity features documented here      |
+| Evergreen (Permanent)               | Implementation Plans (Temporary)                  |
+| ----------------------------------- | ------------------------------------------------- |
+| `ARCHITECTURE.md`                   | Component-specific implementation plans           |
+| `LICENSE_DETECTION_ARCHITECTURE.md` | Implemented license-detection subsystem reference |
+| `HOW_TO_ADD_A_PARSER.md`            | `PARSER_PLAN.md`                                  |
+| `TESTING_STRATEGY.md`               | Test plans within implementation docs             |
+| `adr/`                              | Design decisions made during implementation       |
+| `improvements/`                     | Beyond-parity features documented here            |
 
-Once a feature is complete, relevant architectural decisions move to ADRs, and the implementation plan is archived.
+Once a feature is complete, relevant architectural decisions move to ADRs, and the implementation plan is archived or redirected to the evergreen document that now owns the topic.

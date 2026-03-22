@@ -526,7 +526,7 @@ Core bucket closure is complete. Remaining work is optional and quality-oriented
 - **Architecture**: [`docs/ARCHITECTURE.md`](../../ARCHITECTURE.md) — Scanner pipeline, copyright detection section
 - **Improvements**: [`docs/improvements/copyright-detection.md`](../../improvements/copyright-detection.md) — Beyond-parity improvements over Python
 - **Email/URL Detection**: [`EMAIL_URL_DETECTION_PLAN.md`](EMAIL_URL_DETECTION_PLAN.md) — Related text extraction
-- **License Detection**: [`LICENSE_DETECTION_PLAN.md`](LICENSE_DETECTION_PLAN.md) — Similar pattern matching approach
+- **License Detection Architecture**: [`docs/LICENSE_DETECTION_ARCHITECTURE.md`](../../LICENSE_DETECTION_ARCHITECTURE.md) — Implemented license-detection engine and related matching approach
 - **Testing Strategy**: [`docs/TESTING_STRATEGY.md`](../../TESTING_STRATEGY.md) — Testing approach
 - **Python Reference**: `reference/scancode-toolkit/src/cluecode/copyrights.py` — Original implementation
 

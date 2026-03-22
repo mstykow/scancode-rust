@@ -153,12 +153,12 @@ When ExtractCode extracts archives, it creates directories with a `-extract` suf
 
 ### What Python's "Consolidation" Does (NOT Assembly)
 
-Consolidation is a **separate post-scan plugin** (`plugin_consolidate.py`), not part of assembly. It:
+Consolidation is a **separate post-scan plugin** (`plugin_consolidate.py`), not part of assembly. In Provenant it is currently an intentionally deferred compatibility feature. Upstream consolidation:
 
 - Groups resources by package or copyright holder
 - Creates `ConsolidatedPackage` and `ConsolidatedComponent` objects
 - Combines declared licenses with discovered licenses in files
-- This is tracked separately in [CONSOLIDATION_PLAN.md](../post-processing/CONSOLIDATION_PLAN.md)
+- This is documented separately in [CONSOLIDATION_PLAN.md](../post-processing/CONSOLIDATION_PLAN.md) as an intentionally deferred compatibility feature
 
 ---
 
@@ -253,7 +253,7 @@ File Enumeration → Parser Selection → Package Extraction → Assembly Phase 
 
 ## Related Documents
 
-- **Post-assembly**: [CONSOLIDATION_PLAN.md](../post-processing/CONSOLIDATION_PLAN.md) — Resource grouping and package enrichment (separate concern)
+- **Post-assembly**: [CONSOLIDATION_PLAN.md](../post-processing/CONSOLIDATION_PLAN.md) — Resource grouping and package enrichment (separate concern; intentionally deferred)
 - **Parsers**: [PARSER_PLAN.md](PARSER_PLAN.md) — Parser implementations (prerequisite)
 - **Evergreen**: [ARCHITECTURE.md](../../ARCHITECTURE.md) — Scanner pipeline architecture
 - **Evergreen**: [TESTING_STRATEGY.md](../../TESTING_STRATEGY.md) — Golden test methodology
