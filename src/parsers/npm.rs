@@ -27,6 +27,7 @@ use std::fs;
 use std::path::Path;
 
 use super::PackageParser;
+use super::license_normalization::normalize_spdx_declared_license;
 
 const FIELD_NAME: &str = "name";
 const FIELD_VERSION: &str = "version";
@@ -85,10 +86,8 @@ impl PackageParser for NpmParser {
         let description = extract_description(&json);
 
         let extracted_license_statement = extract_license_statement(&json);
-        // Extract license statement only - detection happens in separate engine
-        let declared_license_expression = None;
-        let declared_license_expression_spdx = None;
-        let license_detections = Vec::new();
+        let (declared_license_expression, declared_license_expression_spdx, license_detections) =
+            normalize_spdx_declared_license(extract_declared_license_candidate(&json).as_deref());
         let peer_dependencies_meta = extract_peer_dependencies_meta(&json);
         let dependencies = extract_dependencies(&json, false);
         let dev_dependencies = extract_dependencies(&json, true);
@@ -340,6 +339,14 @@ fn extract_license_statement(json: &Value) -> Option<String> {
     } else {
         Some(format!("{}\n", statements.join("\n")))
     }
+}
+
+fn extract_declared_license_candidate(json: &Value) -> Option<String> {
+    json.get(FIELD_LICENSE)
+        .and_then(|value| value.as_str())
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_string)
 }
 
 /// Extracts the repository URL from the repository field.

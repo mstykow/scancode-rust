@@ -38,14 +38,17 @@ use packageurl::PackageUrl;
 use regex::Regex;
 
 use crate::models::{
-    DatasourceId, Dependency, FileReference, LicenseDetection, Match, PackageData, PackageType,
-    Party,
+    DatasourceId, Dependency, FileReference, LicenseDetection, PackageData, PackageType, Party,
 };
 use crate::parsers::rfc822::{self, Rfc822Metadata};
 use crate::parsers::utils::{read_file_to_string, split_name_email};
 use crate::utils::spdx::combine_license_expressions;
 
 use super::PackageParser;
+use super::license_normalization::{
+    DeclaredLicenseMatchMetadata, NormalizedDeclaredLicense, build_declared_license_detection,
+    normalize_declared_license_key,
+};
 
 const PACKAGE_TYPE: PackageType = PackageType::Deb;
 
@@ -1496,45 +1499,28 @@ fn build_primary_license_detection(
     matched_text: String,
     line_no: usize,
 ) -> LicenseDetection {
-    let (license_expression, license_expression_spdx) = normalize_debian_license_name(license_name);
+    let normalized = normalize_debian_license_name(license_name);
 
-    LicenseDetection {
-        license_expression: license_expression.clone(),
-        license_expression_spdx: license_expression_spdx.clone(),
-        matches: vec![Match {
-            license_expression,
-            license_expression_spdx,
-            from_file: None,
-            start_line: line_no,
-            end_line: line_no,
-            matcher: Some("1-spdx-id".to_string()),
-            score: 100.0,
-            matched_length: Some(license_name.split_whitespace().count()),
-            match_coverage: Some(100.0),
-            rule_relevance: Some(100),
-            rule_identifier: None,
-            rule_url: None,
-            matched_text: Some(matched_text),
-        }],
-        identifier: None,
-    }
+    build_declared_license_detection(
+        &normalized,
+        DeclaredLicenseMatchMetadata::new(&matched_text, line_no, line_no),
+    )
 }
 
-fn normalize_debian_license_name(license_name: &str) -> (String, String) {
+fn normalize_debian_license_name(license_name: &str) -> NormalizedDeclaredLicense {
     match license_name.trim() {
-        "GPL-2+" => ("gpl-2.0-plus".to_string(), "GPL-2.0-or-later".to_string()),
-        "GPL-2" => ("gpl-2.0".to_string(), "GPL-2.0-only".to_string()),
-        "LGPL-2+" => ("lgpl-2.0-plus".to_string(), "LGPL-2.0-or-later".to_string()),
-        "LGPL-2.1" => ("lgpl-2.1".to_string(), "LGPL-2.1-only".to_string()),
-        "LGPL-2.1+" => ("lgpl-2.1-plus".to_string(), "LGPL-2.1-or-later".to_string()),
-        "LGPL-3+" => ("lgpl-3.0-plus".to_string(), "LGPL-3.0-or-later".to_string()),
-        "MIT" => ("mit".to_string(), "MIT".to_string()),
-        "BSD-4-clause" => ("bsd-original-uc".to_string(), "BSD-4-Clause-UC".to_string()),
-        "public-domain" => (
-            "public-domain".to_string(),
-            "LicenseRef-provenant-public-domain".to_string(),
-        ),
-        other => (other.to_ascii_lowercase(), other.to_string()),
+        "GPL-2+" => NormalizedDeclaredLicense::new("gpl-2.0-plus", "GPL-2.0-or-later"),
+        "GPL-2" => NormalizedDeclaredLicense::new("gpl-2.0", "GPL-2.0-only"),
+        "LGPL-2+" => NormalizedDeclaredLicense::new("lgpl-2.0-plus", "LGPL-2.0-or-later"),
+        "LGPL-2.1" => NormalizedDeclaredLicense::new("lgpl-2.1", "LGPL-2.1-only"),
+        "LGPL-2.1+" => NormalizedDeclaredLicense::new("lgpl-2.1-plus", "LGPL-2.1-or-later"),
+        "LGPL-3+" => NormalizedDeclaredLicense::new("lgpl-3.0-plus", "LGPL-3.0-or-later"),
+        "BSD-4-clause" => NormalizedDeclaredLicense::new("bsd-original-uc", "BSD-4-Clause-UC"),
+        "public-domain" => {
+            NormalizedDeclaredLicense::new("public-domain", "LicenseRef-provenant-public-domain")
+        }
+        other => normalize_declared_license_key(other)
+            .unwrap_or_else(|| NormalizedDeclaredLicense::new(other.to_ascii_lowercase(), other)),
     }
 }
 

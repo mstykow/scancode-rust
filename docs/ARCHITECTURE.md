@@ -34,14 +34,16 @@ See [ADR 0004: Security-First Parsing](adr/0004-security-first-parsing.md) for d
 
 **Critical separation of concerns:**
 
-- **Parsers extract** raw data from manifests
-- **Detection engines** (future) normalize and analyze
+- **Parsers extract** raw data from manifests and may normalize **trustworthy declared package-license metadata**
+- **Detection engines** normalize and analyze **file-content license text** and broader detection inputs
 
-Parsers NEVER:
+Parsers still MUST NOT:
 
-- Normalize licenses to SPDX (detection engine's job)
+- Run broad fuzzy license-text matching over file content
 - Extract copyright holders from file content (detection engine's job)
-- Populate `declared_license_expression` (detection engine's job)
+- Backfill package declared licenses from sibling files or file detections silently
+
+Parsers MAY populate `declared_license_expression`, `declared_license_expression_spdx`, and deterministic parser-side `license_detections` when the source field is a bounded, trustworthy declared-license surface such as an SPDX-expression-compatible manifest field.
 
 See [ADR 0002: Extraction vs Detection Separation](adr/0002-extraction-vs-detection.md) for details.
 

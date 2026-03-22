@@ -24,12 +24,16 @@ use std::path::Path;
 use log::warn;
 
 use crate::models::{
-    DatasourceId, Dependency, FileReference, LicenseDetection, Match, PackageData, PackageType,
-    Party,
+    DatasourceId, Dependency, FileReference, LicenseDetection, PackageData, PackageType, Party,
 };
 use crate::parsers::utils::{read_file_to_string, split_name_email};
 
 use super::PackageParser;
+use super::license_normalization::{
+    DeclaredLicenseMatchMetadata, NormalizedDeclaredLicense, build_declared_license_data,
+    build_declared_license_data_from_pair, combine_normalized_licenses,
+    empty_declared_license_data, normalize_declared_license_key,
+};
 
 const PACKAGE_TYPE: PackageType = PackageType::Alpine;
 
@@ -511,67 +515,49 @@ fn build_alpine_license_data(
     extracted: Option<&str>,
 ) -> (Option<String>, Option<String>, Vec<LicenseDetection>) {
     let Some(extracted) = extracted.map(str::trim).filter(|s| !s.is_empty()) else {
-        return (None, None, Vec::new());
+        return empty_declared_license_data();
     };
 
-    let (declared, declared_spdx) = if extracted == "custom:multiple" {
-        (
-            Some("unknown-license-reference".to_string()),
-            Some("LicenseRef-provenant-unknown-license-reference".to_string()),
-        )
-    } else {
-        let parts: Vec<&str> = extracted
-            .split_whitespace()
-            .filter(|part| *part != "AND")
-            .collect();
-        let declared_parts: Vec<String> = parts
-            .iter()
-            .map(|part| match *part {
-                "MIT" => "mit".to_string(),
-                "ICU" => "x11".to_string(),
-                "Unicode-TOU" => "unicode-tou".to_string(),
-                "Ruby" => "ruby".to_string(),
-                "BSD-2-Clause" => "bsd-simplified".to_string(),
-                "BSD-3-Clause" => "bsd-new".to_string(),
-                other => other.to_ascii_lowercase(),
-            })
-            .collect();
-        let spdx_parts: Vec<String> = parts.iter().map(|part| part.to_string()).collect();
-        (
-            combine_license_expressions_in_order(declared_parts),
-            combine_license_expressions_in_order(spdx_parts),
-        )
+    if extracted == "custom:multiple" {
+        return build_declared_license_data_from_pair(
+            "unknown-license-reference",
+            "LicenseRef-provenant-unknown-license-reference",
+            DeclaredLicenseMatchMetadata::single_line(extracted),
+        );
+    }
+
+    let normalized_tokens = extracted
+        .split_whitespace()
+        .filter(|part| *part != "AND")
+        .map(normalize_alpine_license_token)
+        .collect::<Option<Vec<_>>>();
+
+    let Some(normalized_tokens) = normalized_tokens else {
+        return empty_declared_license_data();
     };
 
-    let Some(declared_expr) = declared.clone() else {
-        return (None, None, Vec::new());
-    };
-    let Some(declared_spdx_expr) = declared_spdx.clone() else {
-        return (declared, declared_spdx, Vec::new());
+    let Some(combined) = combine_normalized_licenses(normalized_tokens, " AND ") else {
+        return empty_declared_license_data();
     };
 
-    let detection = LicenseDetection {
-        license_expression: declared_expr.clone(),
-        license_expression_spdx: declared_spdx_expr.clone(),
-        matches: vec![Match {
-            license_expression: declared_expr,
-            license_expression_spdx: declared_spdx_expr,
-            from_file: None,
-            start_line: 1,
-            end_line: 1,
-            matcher: Some("1-spdx-id".to_string()),
-            score: 100.0,
-            matched_length: Some(extracted.split_whitespace().count()),
-            match_coverage: Some(100.0),
-            rule_relevance: Some(100),
-            rule_identifier: None,
-            rule_url: None,
-            matched_text: Some(extracted.to_string()),
-        }],
-        identifier: None,
-    };
+    build_declared_license_data(
+        combined,
+        DeclaredLicenseMatchMetadata::single_line(extracted),
+    )
+}
 
-    (declared, declared_spdx, vec![detection])
+fn normalize_alpine_license_token(token: &str) -> Option<NormalizedDeclaredLicense> {
+    match token {
+        "ICU" => Some(NormalizedDeclaredLicense::new("x11", "ICU")),
+        "Unicode-TOU" => Some(NormalizedDeclaredLicense::new("unicode-tou", "Unicode-TOU")),
+        "Ruby" => Some(NormalizedDeclaredLicense::new("ruby", "Ruby")),
+        "BSD-2-Clause" => Some(NormalizedDeclaredLicense::new(
+            "bsd-simplified",
+            "BSD-2-Clause",
+        )),
+        "BSD-3-Clause" => Some(NormalizedDeclaredLicense::new("bsd-new", "BSD-3-Clause")),
+        other => normalize_declared_license_key(other),
+    }
 }
 
 fn parse_apkbuild_dependencies(variables: &HashMap<String, String>) -> Vec<Dependency> {
@@ -619,15 +605,6 @@ fn parse_apkbuild_dependencies(variables: &HashMap<String, String>) -> Vec<Depen
     }
 
     dependencies
-}
-
-fn combine_license_expressions_in_order(expressions: Vec<String>) -> Option<String> {
-    let expressions: Vec<String> = expressions.into_iter().filter(|e| !e.is_empty()).collect();
-    if expressions.is_empty() {
-        None
-    } else {
-        Some(expressions.join(" AND "))
-    }
 }
 
 fn extract_file_references(raw_text: &str) -> Vec<FileReference> {

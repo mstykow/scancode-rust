@@ -22,6 +22,26 @@
     ],
     "homepage_url": "https://clap.rs/",
     "vcs_url": "https://github.com/clap-rs/clap",
+    "declared_license_expression": "mit",
+    "declared_license_expression_spdx": "MIT",
+    "license_detections": [
+      {
+        "license_expression": "mit",
+        "license_expression_spdx": "MIT",
+        "matches": [
+          {
+            "license_expression": "mit",
+            "license_expression_spdx": "MIT",
+            "from_file": null,
+            "score": 100.0
+          }
+        ],
+        "identifier": null
+      }
+    ],
+    "other_license_expression": null,
+    "other_license_expression_spdx": null,
+    "other_license_detections": [],
     "extracted_license_statement": "MIT",
     "file_references": [
       {

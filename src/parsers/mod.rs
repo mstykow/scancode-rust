@@ -108,6 +108,7 @@ mod helm_test;
 mod hex_lock;
 #[cfg(test)]
 mod hex_lock_test;
+mod license_normalization;
 mod maven;
 #[cfg(test)]
 mod maven_test;

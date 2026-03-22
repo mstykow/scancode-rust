@@ -36,9 +36,23 @@
     "vcs_url": "git+https://github.com/gionkunz/chartist-js.git",
     "copyright": null,
     "holder": null,
-    "declared_license_expression": null,
-    "declared_license_expression_spdx": null,
-    "license_detections": [],
+    "declared_license_expression": "mit OR wtfpl",
+    "declared_license_expression_spdx": "MIT OR WTFPL",
+    "license_detections": [
+      {
+        "license_expression": "mit OR wtfpl",
+        "license_expression_spdx": "MIT OR WTFPL",
+        "matches": [
+          {
+            "license_expression": "mit OR wtfpl",
+            "license_expression_spdx": "MIT OR WTFPL",
+            "from_file": null,
+            "score": 100.0
+          }
+        ],
+        "identifier": null
+      }
+    ],
     "other_license_expression": null,
     "other_license_expression_spdx": null,
     "other_license_detections": [],

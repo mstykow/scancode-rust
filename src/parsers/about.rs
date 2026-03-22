@@ -31,6 +31,7 @@ use std::str::FromStr;
 use url::Url;
 
 use super::PackageParser;
+use super::license_normalization::normalize_spdx_declared_license;
 
 const FIELD_TYPE: &str = "type";
 const FIELD_PURL: &str = "purl";
@@ -173,6 +174,8 @@ impl PackageParser for AboutFileParser {
             .get(FIELD_LICENSE_EXPRESSION)
             .and_then(|v| v.as_str())
             .map(String::from);
+        let (declared_license_expression, declared_license_expression_spdx, license_detections) =
+            normalize_spdx_declared_license(extracted_license_statement.as_deref());
 
         let vcs_url = yaml
             .get(Value::String("vcs_url".to_string()))
@@ -239,9 +242,9 @@ impl PackageParser for AboutFileParser {
             vcs_url,
             copyright,
             holder: None,
-            declared_license_expression: None,
-            declared_license_expression_spdx: None,
-            license_detections: Vec::new(),
+            declared_license_expression,
+            declared_license_expression_spdx,
+            license_detections,
             other_license_expression: None,
             other_license_expression_spdx: None,
             other_license_detections: Vec::new(),

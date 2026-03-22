@@ -254,8 +254,11 @@ crate::register_parser!(
 - ❌ Execute code (use AST parsing)
 - ❌ Panic on errors
 - ❌ Use `.unwrap()` in library code
-- ❌ Normalize licenses (extraction only)
+- ❌ Run broad file-content license detection in parser code
+- ❌ Normalize ambiguous prose/URL/file-hint license metadata into declared expressions
 - ❌ Detect copyrights (separate pipeline stage)
+
+Parser-side declared-license normalization is allowed only for **trustworthy declared metadata** (for example, SPDX-expression-compatible manifest fields) and should use the shared parser license-normalization helper rather than one-off parser logic.
 
 ## Step 3: Add Comprehensive Tests
 
