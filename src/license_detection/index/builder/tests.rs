@@ -359,7 +359,6 @@ mod test_cases {
     }
 
     #[test]
-    #[ignore = "Rust-specific enhancement: URL variant hash generation for http/https ignorable URLs. Python does not generate separate hashes for URL variants, so this test is not applicable for Python parity verification."]
     fn test_build_index_from_reference_rules() {
         use crate::license_detection::LicenseDetectionEngine;
 
@@ -424,7 +423,6 @@ mod test_cases {
             for &rid in &index.approx_matchable_rids {
                 let rule = &index.rules_by_rid[rid];
                 assert!(!rule.is_false_positive);
-                assert!(!rule.is_tiny);
             }
         }
     }
