@@ -9,6 +9,18 @@
 
 Post-scan analysis and summarization features that aggregate findings across files to provide high-level insights: license tallies, copyright statistics, license clarity scoring, file classification, and facets.
 
+## Architectural Boundary
+
+Summarization is a **consumer**, not a normalizer.
+
+- **Parsers** should already provide manifest-derived declared package-license data when the source field is trustworthy enough to normalize.
+- **Summarization** should read package-declared metadata plus discovered file/resource evidence and turn them into:
+  - tallies
+  - clarity scoring
+  - scan-level summary expressions
+  - classification/facets
+- **Summarization should not become the primary place that decides a package's declared license**.
+
 ## Scope
 
 ### What This Covers
@@ -68,13 +80,19 @@ Post-scan analysis and summarization features that aggregate findings across fil
 - ❌ Generated code detection
 - ❌ Comprehensive scan summary parity
 
+### Already handled elsewhere
+
+- ✅ Parser-side normalization of trustworthy declared package-license metadata
+- ✅ Initial summary consumption of package/key-file declared license data
+- ✅ Initial package metadata promotion from key files
+
 ## Implementation Phases
 
 1. **Phase 1**: File classification and key-file tagging foundations ✅
 2. **Phase 2**: Package/file metadata promotion foundations ✅
 3. **Phase 3**: Initial summary model/output structure ✅
 4. **Phase 4**: Initial non-license-dependent summary fields ✅
-5. **Phase 5**: License tallies
+5. **Phase 5**: License tallies over existing declared/discovered evidence
 6. **Phase 6**: Copyright tallies
 7. **Phase 7**: Package tallies
 8. **Phase 8**: Full license clarity parity
@@ -99,6 +117,7 @@ Post-scan analysis and summarization features that aggregate findings across fil
 ## Notes
 
 - Some summarization foundations can land before full detector parity (for example key-file tagging, package metadata promotion, initial summary fields, and primary-language/holder derivation).
-- Full parity for tallies and Python-style scoring still depends on richer detector/post-processing coverage.
+- Full parity for tallies and Python-style scoring still depends on richer discovered-license/copyright coverage and clearer package-vs-file provenance.
+- The recent parser-side declared-license normalization work reduces one gap for summarization consumers, but it does not remove the need for summary tallies, facets, generated-code detection, or scan-level aggregation.
 - Can be implemented incrementally (one tally type at a time)
 - License clarity score is a key metric for compliance teams

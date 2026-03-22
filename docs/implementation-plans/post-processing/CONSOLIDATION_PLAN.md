@@ -14,6 +14,17 @@ Consolidation is an opt-in post-scan plugin (`--consolidate`) that groups scanne
 
 This is **not** package deduplication. It's about combining package metadata with scan findings.
 
+## Architectural Boundary
+
+Consolidation is **not** the place to decide a package's declared license.
+
+- **Parsers** own `extracted_license_statement` and, for trustworthy manifest fields, may also populate:
+  - `declared_license_expression`
+  - `declared_license_expression_spdx`
+  - parser-origin `license_detections`
+- **Consolidation** should enrich packages with **discovered** license/copyright evidence from assigned files.
+- **Consolidation must not silently overwrite manifest-derived declared license fields**. If it derives additional package-level license conclusions from file evidence, those should remain explicitly modeled as enriched/discovered data rather than replacing declared package metadata.
+
 ## Scope
 
 ### What This Covers
@@ -52,6 +63,12 @@ This is **not** package deduplication. It's about combining package metadata wit
 
 **Note**: Python has a deprecation warning on this plugin. Verify whether it's still maintained upstream before porting.
 
+**Important reference nuance**:
+
+- In Python ScanCode, package declared-license fields are typically populated earlier on `PackageData` / `Package`, before consolidation.
+- Consolidation then consumes those package-declared fields as the package's **core** license and adds file-discovered evidence as **other** or consolidated evidence.
+- Provenant should keep that same high-level separation even if the exact implementation is cleaner and more explicit than the reference.
+
 ## Current State in Rust
 
 ### Implemented
@@ -60,20 +77,26 @@ This is **not** package deduplication. It's about combining package metadata wit
 - ✅ PURL generation
 - ✅ Output format structure
 
-### Missing (all blocked on license + copyright detection)
+### Missing
 
-- ❌ License detection (prerequisite — no license data to consolidate yet)
-- ❌ Copyright detection (prerequisite — no copyright data to consolidate yet)
+- ❌ Rich discovered license data integration for package/file enrichment
+- ❌ Copyright detection integration for package/file enrichment
 - ❌ Consolidation logic
 - ❌ `--consolidate` CLI flag
 
+### Already handled elsewhere
+
+- ✅ Parser-side normalization of trustworthy declared package-license metadata
+- ✅ Package assembly and `for_packages` linking
+- ✅ Initial key-file promotion and summary foundations
+
 ## Implementation Phases (TBD)
 
-Blocked until license and copyright detection are implemented.
+Blocked until richer discovered license/copyright data is available for package/file enrichment.
 
 ## Success Criteria
 
-- [ ] Enriches packages with discovered license/copyright data from their files
+- [ ] Enriches packages with discovered license/copyright data from their files without overwriting manifest-derived declared license fields
 - [ ] Groups orphan resources by copyright holder
 - [ ] Generates simplified combined license expressions
 - [ ] `consolidated_to` links resources to their consolidation group
@@ -89,5 +112,6 @@ Blocked until license and copyright detection are implemented.
 ## Notes
 
 - Opt-in feature (`--consolidate`), not enabled by default
-- Requires license + copyright + package scans to all be active
+- Requires package scans plus discovered license/copyright data from the file-scanning pipeline
+- Should treat parser-declared package license data as the package's "core" license input, not as something consolidation itself computes
 - Python has a deprecation warning on this plugin — check upstream status before investing effort
