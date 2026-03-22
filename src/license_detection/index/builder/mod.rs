@@ -82,7 +82,10 @@ fn prepare_rule_text(text: &str) -> String {
 }
 
 #[cfg(test)]
-pub fn generate_url_variants(text: &str, ignorable_urls: &Option<Vec<String>>) -> Vec<String> {
+pub(crate) fn generate_url_variants(
+    text: &str,
+    ignorable_urls: &Option<Vec<String>>,
+) -> Vec<String> {
     let Some(urls) = ignorable_urls else {
         return vec![];
     };
