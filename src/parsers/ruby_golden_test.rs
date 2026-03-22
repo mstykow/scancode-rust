@@ -36,7 +36,6 @@ mod golden_tests {
     }
 
     #[test]
-    #[ignore = "Golden fixture drift: current parser keeps only the shorter gemspec description text"]
     fn test_golden_oj_gemspec() {
         let test_file = PathBuf::from("testdata/ruby-golden/oj-gemspec/oj.gemspec");
         let expected_file = PathBuf::from("testdata/ruby-golden/oj-gemspec/oj.gemspec.expected");
@@ -50,7 +49,6 @@ mod golden_tests {
     }
 
     #[test]
-    #[ignore = "Golden fixture drift: parser trims author-name whitespace differently than fixture"]
     fn test_golden_rubocop_gemspec() {
         let test_file = PathBuf::from("testdata/ruby-golden/rubocop-gemspec/rubocop.gemspec");
         let expected_file =
