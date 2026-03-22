@@ -684,7 +684,7 @@ fn classify_key_files_marks_nested_ruby_license_from_file_references() {
 }
 
 #[test]
-fn promote_package_metadata_and_summary_from_key_files() {
+fn key_file_license_clues_feed_summary_without_mutating_package_license_provenance() {
     let uid = "pkg:gem/inspec-bin@6.8.2?uuid=test";
     let mut metadata_file = file("inspec-6.8.2/metadata.gz-extract");
     metadata_file.for_packages.push(uid.to_string());
@@ -745,10 +745,9 @@ fn promote_package_metadata_and_summary_from_key_files() {
     let summary = compute_summary(&files, &packages).expect("summary exists");
 
     assert_eq!(packages[0].holder.as_deref(), Some("Chef Software Inc."));
-    assert_eq!(
-        packages[0].declared_license_expression_spdx.as_deref(),
-        Some("Apache-2.0")
-    );
+    assert!(packages[0].declared_license_expression.is_none());
+    assert!(packages[0].declared_license_expression_spdx.is_none());
+    assert!(packages[0].license_detections.is_empty());
     assert_eq!(
         summary.declared_license_expression.as_deref(),
         Some("apache-2.0")
@@ -763,20 +762,41 @@ fn promote_package_metadata_and_summary_from_key_files() {
 }
 
 #[test]
-fn manifest_declared_license_contributes_to_summary_and_package_promotion() {
-    let uid = "pkg:gem/demo@1.0.0?uuid=test";
+fn manifest_declared_license_survives_into_package_and_summary() {
     let mut gemspec = file("demo/demo.gemspec");
-    gemspec.for_packages.push(uid.to_string());
     gemspec.package_data = vec![crate::models::PackageData {
         package_type: Some(PackageType::Gem),
         datasource_id: Some(DatasourceId::Gemspec),
         declared_license_expression: Some("mit".to_string()),
         declared_license_expression_spdx: Some("MIT".to_string()),
+        license_detections: vec![crate::models::LicenseDetection {
+            license_expression: "mit".to_string(),
+            license_expression_spdx: "MIT".to_string(),
+            matches: vec![Match {
+                license_expression: "mit".to_string(),
+                license_expression_spdx: "MIT".to_string(),
+                from_file: Some("demo/demo.gemspec".to_string()),
+                start_line: 1,
+                end_line: 1,
+                matcher: None,
+                score: 100.0,
+                matched_length: None,
+                match_coverage: None,
+                rule_relevance: None,
+                rule_identifier: None,
+                rule_url: None,
+                matched_text: None,
+            }],
+            identifier: None,
+        }],
         ..Default::default()
     }];
 
+    let package =
+        Package::from_package_data(&gemspec.package_data[0], "demo/demo.gemspec".to_string());
+    gemspec.for_packages.push(package.package_uid.clone());
     let mut files = vec![gemspec];
-    let mut packages = vec![package(uid, "demo/demo.gemspec")];
+    let mut packages = vec![package];
 
     classify_key_files(&mut files, &packages);
     promote_package_metadata_from_key_files(&files, &mut packages);
@@ -787,6 +807,11 @@ fn manifest_declared_license_contributes_to_summary_and_package_promotion() {
     assert_eq!(
         packages[0].declared_license_expression_spdx.as_deref(),
         Some("MIT")
+    );
+    assert_eq!(packages[0].license_detections.len(), 1);
+    assert_eq!(
+        packages[0].license_detections[0].license_expression_spdx,
+        "MIT"
     );
     assert_eq!(summary.declared_license_expression.as_deref(), Some("mit"));
     assert_eq!(summary.license_clarity_score.unwrap().score, 80);
