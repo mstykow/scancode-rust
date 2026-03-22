@@ -112,7 +112,6 @@ mod test_cases {
     }
 
     #[test]
-    #[ignore = "Rust-specific enhancement: URL variant hash generation for http/https ignorable URLs. Python does not generate separate hashes for URL variants, so this test is not applicable for Python parity verification."]
     fn test_build_index_empty() {
         let index = build_index(vec![], vec![]);
         assert!(index.rules_by_rid.is_empty());
@@ -123,7 +122,6 @@ mod test_cases {
     }
 
     #[test]
-    #[ignore = "Rust-specific enhancement: URL variant hash generation for http/https ignorable URLs. Python does not generate separate hashes for URL variants, so this test is not applicable for Python parity verification."]
     fn test_build_index_single_rule() {
         let mut rule = create_test_rule("MIT License", false);
         rule.identifier = "test.RULE".to_string();
@@ -147,7 +145,6 @@ mod test_cases {
     }
 
     #[test]
-    #[ignore = "Rust-specific enhancement: URL variant hash generation for http/https ignorable URLs. Python does not generate separate hashes for URL variants, so this test is not applicable for Python parity verification."]
     fn test_build_index_false_positive() {
         let mut rule = create_test_rule("MIT License", true);
         rule.identifier = "fp.RULE".to_string();
@@ -187,7 +184,6 @@ mod test_cases {
     }
 
     #[test]
-    #[ignore = "Rust-specific enhancement: URL variant hash generation for http/https ignorable URLs. Python does not generate separate hashes for URL variants, so this test is not applicable for Python parity verification."]
     fn test_build_index_sets_and_msets() {
         let mut rule = create_test_rule("MIT License copyright permission", false);
         rule.identifier = "sets.RULE".to_string();
@@ -201,7 +197,6 @@ mod test_cases {
     }
 
     #[test]
-    #[ignore = "Rust-specific enhancement: URL variant hash generation for http/https ignorable URLs. Python does not generate separate hashes for URL variants, so this test is not applicable for Python parity verification."]
     fn test_build_index_high_postings() {
         let mut rule =
             create_test_rule("licensed copyrighted permission granted authorized", false);
@@ -217,7 +212,6 @@ mod test_cases {
     }
 
     #[test]
-    #[ignore = "Rust-specific enhancement: URL variant hash generation for http/https ignorable URLs. Python does not generate separate hashes for URL variants, so this test is not applicable for Python parity verification."]
     fn test_build_index_digit_only_tokens() {
         let rules = vec![create_test_rule("version 123 456 789 test", false)];
         let index = build_index(rules, vec![]);
@@ -230,7 +224,6 @@ mod test_cases {
     }
 
     #[test]
-    #[ignore = "Rust-specific enhancement: URL variant hash generation for http/https ignorable URLs. Python does not generate separate hashes for URL variants, so this test is not applicable for Python parity verification."]
     fn test_compute_is_approx_matchable() {
         let mut rule = create_test_rule("test", false);
         rule.is_tiny = false;
@@ -263,7 +256,6 @@ mod test_cases {
     }
 
     #[test]
-    #[ignore = "Rust-specific enhancement: URL variant hash generation for http/https ignorable URLs. Python does not generate separate hashes for URL variants, so this test is not applicable for Python parity verification."]
     fn test_is_good_tokens_ngram() {
         let tokens = vec![
             "hello".to_string(),
@@ -295,7 +287,6 @@ mod test_cases {
     }
 
     #[test]
-    #[ignore = "Rust-specific enhancement: URL variant hash generation for http/https ignorable URLs. Python does not generate separate hashes for URL variants, so this test is not applicable for Python parity verification."]
     fn test_tokens_to_bytes() {
         let tokens = vec![tid(1), tid(2), tid(3)];
         let bytes = tokens_to_bytes(&tokens);
@@ -309,7 +300,6 @@ mod test_cases {
     }
 
     #[test]
-    #[ignore = "Rust-specific enhancement: URL variant hash generation for http/https ignorable URLs. Python does not generate separate hashes for URL variants, so this test is not applicable for Python parity verification."]
     fn test_ngrams() {
         let items = vec![1, 2, 3, 4, 5];
         let ngrams_result = ngrams(&items, 3);
@@ -324,7 +314,6 @@ mod test_cases {
     }
 
     #[test]
-    #[ignore = "Rust-specific enhancement: URL variant hash generation for http/https ignorable URLs. Python does not generate separate hashes for URL variants, so this test is not applicable for Python parity verification."]
     fn test_build_index_multiple_rules() {
         let mut rule1 = create_test_rule("MIT License", false);
         rule1.identifier = "mit.RULE".to_string();
@@ -348,7 +337,6 @@ mod test_cases {
     }
 
     #[test]
-    #[ignore = "Rust-specific enhancement: URL variant hash generation for http/https ignorable URLs. Python does not generate separate hashes for URL variants, so this test is not applicable for Python parity verification."]
     fn test_build_index_licenses() {
         let mut rule = create_test_rule("MIT License", false);
         rule.identifier = "mit.RULE".to_string();
@@ -442,7 +430,6 @@ mod test_cases {
     }
 
     #[test]
-    #[ignore = "Rust-specific enhancement: URL variant hash generation for http/https ignorable URLs. Python does not generate separate hashes for URL variants, so this test is not applicable for Python parity verification."]
     fn test_build_index_automaton_functional() {
         let mut rule1 = create_test_rule("MIT License copyright permission", false);
         rule1.identifier = "auto1.RULE".to_string();
@@ -468,7 +455,6 @@ mod test_cases {
     }
 
     #[test]
-    #[ignore = "Rust-specific enhancement: URL variant hash generation for http/https ignorable URLs. Python does not generate separate hashes for URL variants, so this test is not applicable for Python parity verification."]
     fn test_build_index_rule_thresholds_computed() {
         let rule_text = "Permission is hereby granted free of charge to any person obtaining a copy of this software and associated documentation files the MIT License";
         let mut rule = create_test_rule(rule_text, false);
@@ -492,7 +478,6 @@ mod test_cases {
     }
 
     #[test]
-    #[ignore = "Rust-specific enhancement: URL variant hash generation for http/https ignorable URLs. Python does not generate separate hashes for URL variants, so this test is not applicable for Python parity verification."]
     fn test_build_index_approx_matchable_classification() {
         let mut regular_rule = create_test_rule(
             "Permission is hereby granted free of charge to any person obtaining a copy",
@@ -550,7 +535,6 @@ mod test_cases {
     }
 
     #[test]
-    #[ignore = "Rust-specific enhancement: URL variant hash generation for http/https ignorable URLs. Python does not generate separate hashes for URL variants, so this test is not applicable for Python parity verification."]
     fn test_build_index_high_postings_populated() {
         let mut rule = create_test_rule(
             "licensed copyrighted permission granted authorized distributed modification sublicense",
@@ -608,7 +592,6 @@ mod test_cases {
     }
 
     #[test]
-    #[ignore = "Rust-specific enhancement: URL variant hash generation for http/https ignorable URLs. Python does not generate separate hashes for URL variants, so this test is not applicable for Python parity verification."]
     fn test_build_index_unknown_automaton() {
         let long_rule_text = "Permission is hereby granted free of charge to any person obtaining a copy of this software and associated documentation files the MIT License terms conditions";
         let rules = vec![create_test_rule(long_rule_text, false)];
@@ -622,7 +605,6 @@ mod test_cases {
     }
 
     #[test]
-    #[ignore = "Rust-specific enhancement: URL variant hash generation for http/https ignorable URLs. Python does not generate separate hashes for URL variants, so this test is not applicable for Python parity verification."]
     fn test_build_index_with_actual_mit_license() {
         let mit_text = r#"Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -684,7 +666,6 @@ SOFTWARE."#;
     }
 
     #[test]
-    #[ignore = "Rust-specific enhancement: URL variant hash generation for http/https ignorable URLs. Python does not generate separate hashes for URL variants, so this test is not applicable for Python parity verification."]
     fn test_build_index_empty_license_text() {
         let mut license = create_test_license("empty", "Empty License");
         license.text = String::new();
@@ -702,7 +683,6 @@ SOFTWARE."#;
     }
 
     #[test]
-    #[ignore = "Rust-specific enhancement: URL variant hash generation for http/https ignorable URLs. Python does not generate separate hashes for URL variants, so this test is not applicable for Python parity verification."]
     fn test_build_index_rules_sorted_by_identifier() {
         let mut rule_z = create_test_rule("Z rule text", false);
         rule_z.identifier = "z_rule.RULE".to_string();
@@ -729,7 +709,6 @@ SOFTWARE."#;
     }
 
     #[test]
-    #[ignore = "Rust-specific enhancement: URL variant hash generation for http/https ignorable URLs. Python does not generate separate hashes for URL variants, so this test is not applicable for Python parity verification."]
     fn test_build_index_duplicate_keys_licenses() {
         let license1 = create_test_license("mit", "MIT License 1");
         let license2 = create_test_license("mit", "MIT License 2");
@@ -750,7 +729,6 @@ SOFTWARE."#;
     }
 
     #[test]
-    #[ignore = "Rust-specific enhancement: URL variant hash generation for http/https ignorable URLs. Python does not generate separate hashes for URL variants, so this test is not applicable for Python parity verification."]
     fn test_build_index_find_by_expression() {
         let mut rule1 = create_test_rule("MIT text", false);
         rule1.identifier = "rule1.RULE".to_string();
@@ -775,7 +753,6 @@ SOFTWARE."#;
     }
 
     #[test]
-    #[ignore = "Rust-specific enhancement: URL variant hash generation for http/https ignorable URLs. Python does not generate separate hashes for URL variants, so this test is not applicable for Python parity verification."]
     fn test_build_index_weak_rule_no_approx_matchable() {
         let mut weak_rule = create_test_rule("hello world foo bar baz", false);
         weak_rule.identifier = "weak.RULE".to_string();
@@ -796,7 +773,6 @@ SOFTWARE."#;
     }
 
     #[test]
-    #[ignore = "Rust-specific enhancement: URL variant hash generation for http/https ignorable URLs. Python does not generate separate hashes for URL variants, so this test is not applicable for Python parity verification."]
     fn test_build_index_continuous_rule_not_approx_matchable() {
         let mut continuous_rule =
             create_test_rule("licensed copyrighted permission granted authorized", false);
@@ -814,7 +790,6 @@ SOFTWARE."#;
     }
 
     #[test]
-    #[ignore = "Rust-specific enhancement: URL variant hash generation for http/https ignorable URLs. Python does not generate separate hashes for URL variants, so this test is not applicable for Python parity verification."]
     fn test_build_index_required_phrase_not_approx_matchable() {
         let mut required_phrase = create_test_rule(
             "licensed copyrighted permission granted authorized distributed",
