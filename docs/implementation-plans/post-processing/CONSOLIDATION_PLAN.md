@@ -90,6 +90,12 @@ Consolidation is **not** the place to decide a package's declared license.
 - ✅ Package assembly and `for_packages` linking
 - ✅ Initial key-file promotion and summary foundations
 
+### Concrete follow-up before/alongside consolidation
+
+- Revisit the current key-file promotion path in `src/main.rs`.
+- Today `promote_package_metadata_from_key_files(...)` can backfill package `declared_license_expression*` and `license_detections` from key files when package fields are empty.
+- Before full consolidation lands, narrow this behavior so file-derived package enrichment uses explicit enriched/discovered provenance instead of mutating manifest-derived declared package fields implicitly.
+
 ## Implementation Phases (TBD)
 
 Blocked until richer discovered license/copyright data is available for package/file enrichment.
@@ -114,4 +120,5 @@ Blocked until richer discovered license/copyright data is available for package/
 - Opt-in feature (`--consolidate`), not enabled by default
 - Requires package scans plus discovered license/copyright data from the file-scanning pipeline
 - Should treat parser-declared package license data as the package's "core" license input, not as something consolidation itself computes
+- The current `src/main.rs` key-file promotion behavior is a temporary bridge and should be narrowed as part of the package-enrichment architecture cleanup.
 - Python has a deprecation warning on this plugin — check upstream status before investing effort

@@ -86,6 +86,12 @@ Summarization is a **consumer**, not a normalizer.
 - ✅ Initial summary consumption of package/key-file declared license data
 - ✅ Initial package metadata promotion from key files
 
+### Concrete follow-up before deeper summary parity work
+
+- Revisit the current key-file promotion path in `src/main.rs`.
+- Today `promote_package_metadata_from_key_files(...)` can backfill package `declared_license_expression*` and `license_detections` from key files when package fields are empty.
+- Summarization should continue consuming declared/discovered facts, but this package-field mutation should move toward explicit enriched/discovered provenance instead of implicitly redefining a package's declared license.
+
 ## Implementation Phases
 
 1. **Phase 1**: File classification and key-file tagging foundations ✅
@@ -119,5 +125,6 @@ Summarization is a **consumer**, not a normalizer.
 - Some summarization foundations can land before full detector parity (for example key-file tagging, package metadata promotion, initial summary fields, and primary-language/holder derivation).
 - Full parity for tallies and Python-style scoring still depends on richer discovered-license/copyright coverage and clearer package-vs-file provenance.
 - The recent parser-side declared-license normalization work reduces one gap for summarization consumers, but it does not remove the need for summary tallies, facets, generated-code detection, or scan-level aggregation.
+- The current `src/main.rs` key-file promotion of package declared-license fields should be treated as a follow-up cleanup item, not as the final package-license architecture.
 - Can be implemented incrementally (one tally type at a time)
 - License clarity score is a key metric for compliance teams
