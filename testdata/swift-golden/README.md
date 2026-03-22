@@ -85,15 +85,9 @@ Location: `../../reference/scancode-toolkit/src/packagedcode/swift.py`
 
 The Rust implementation achieves full feature parity with the Python reference while providing performance and safety improvements.
 
-## License Detection Blockers
+## Parser-Only License Comparison Boundary
 
-**All golden tests may have mismatches in license-related fields** because:
-
-- License detection engine is not yet implemented in Rust version
-- Fields affected: `declared_license_expression`, `declared_license_expression_spdx`, `license_detections`
-- **This is expected** and not a parser limitation
-
-The test comparator (`compare_package_data_parser_only`) automatically skips license detection fields during comparison, focusing on package and dependency extraction accuracy.
+Swift parser goldens still use the shared parser-only comparator, which relaxes some license-related fields and nested match metadata. In practice, these fixtures are still aimed at package and dependency extraction accuracy rather than full declared-license contract enforcement.
 
 ## Test Data Structure
 

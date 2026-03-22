@@ -6,7 +6,7 @@ Golden tests compare parser output against expected results from the original Sc
 
 ## Coverage Summary
 
-This fixture set covers representative gemspec metadata, required-file constant resolution, Gemfile source provenance, Gemfile.lock Git and path metadata, and the current parser-only boundary where some cases still depend on license-detection integration.
+This fixture set covers representative gemspec metadata, required-file constant resolution, Gemfile source provenance, Gemfile.lock Git and path metadata, and the current parser-only boundary where two ignored gemspec fixtures still track unrelated golden drift.
 
 ## Intentional Improvements Over Python ScanCode
 

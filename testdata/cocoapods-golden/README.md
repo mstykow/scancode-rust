@@ -184,15 +184,9 @@ Key insights:
 - Python has similar limitations on complex Ruby expressions
 - Rust implementation achieves feature parity on parseable content
 
-## License Detection Blockers
+## Parser-Only License Comparison Boundary
 
-**All golden tests may have mismatches in license-related fields** because:
-
-- License detection engine is not yet implemented in Rust version
-- Fields affected: `declared_license_expression`, `declared_license_expression_spdx`, `license_detections`
-- **This is expected** and not a parser limitation
-
-The test comparator (`compare_package_data_parser_only`) automatically skips license detection fields.
+CocoaPods parser goldens still use the shared parser-only comparator, which relaxes some license-related fields and nested match metadata. These fixtures therefore remain focused on parser extraction behavior rather than full declared-license assertion coverage.
 
 ## Current Batch-Specific Notes
 
