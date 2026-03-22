@@ -869,15 +869,15 @@ SOFTWARE."#;
             let has_https = rule.text.contains("https://");
             eprintln!("Rule text has https://: {}", has_https);
 
-            // Count how many hashes point to this rule
-            let hash_count = index.rid_by_hash.values().filter(|&&r| r == rid).count();
-            eprintln!("Number of hashes for this rule: {}", hash_count);
+            let variants = generate_url_variants(&rule.text, &rule.ignorable_urls);
+            eprintln!("Generated URL variants: {}", variants.len());
 
-            // Should have at least 2 hashes (original + http variant)
-            assert!(
-                hash_count >= 2,
-                "Rule should have hash for both https and http variants"
+            assert_eq!(
+                variants.len(),
+                1,
+                "Rule should generate one scheme-flipped variant"
             );
+            assert!(variants[0].contains("http://www.boost.org/LICENSE_1_0.txt"));
         } else {
             eprintln!("Rule mit_or_boost-1.0_1.RULE not found");
         }
