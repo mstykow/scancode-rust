@@ -174,11 +174,29 @@ pub struct Cli {
     #[arg(long)]
     pub classify: bool,
 
+    #[arg(long, requires = "classify")]
+    pub summary: bool,
+
+    #[arg(long = "license-clarity-score", requires = "classify")]
+    pub license_clarity_score: bool,
+
+    #[arg(long)]
+    pub tallies: bool,
+
+    #[arg(long = "tallies-key-files", requires_all = ["tallies", "classify"])]
+    pub tallies_key_files: bool,
+
+    #[arg(long = "tallies-with-details")]
+    pub tallies_with_details: bool,
+
     #[arg(long = "facet", value_name = "<facet>=<pattern>")]
     pub facet: Vec<String>,
 
-    #[arg(long = "tallies-by-facet", requires = "facet")]
+    #[arg(long = "tallies-by-facet", requires_all = ["facet", "tallies"])]
     pub tallies_by_facet: bool,
+
+    #[arg(long)]
+    pub generated: bool,
 
     /// Scan input for licenses
     #[arg(short = 'l', long)]
@@ -469,6 +487,7 @@ mod tests {
             "--json-pp",
             "scan.json",
             "--classify",
+            "--tallies",
             "--facet",
             "dev=*.c",
             "--facet",
@@ -479,6 +498,7 @@ mod tests {
         .expect("cli parse should succeed");
 
         assert!(parsed.classify);
+        assert!(parsed.tallies);
         assert_eq!(parsed.facet, vec!["dev=*.c", "tests=*/tests/*"]);
         assert!(parsed.tallies_by_facet);
     }
@@ -494,6 +514,58 @@ mod tests {
         ]);
 
         assert!(parsed.is_err());
+    }
+
+    #[test]
+    fn test_summary_requires_classify() {
+        let parsed = Cli::try_parse_from([
+            "provenant",
+            "--json-pp",
+            "scan.json",
+            "--summary",
+            "samples",
+        ]);
+
+        assert!(parsed.is_err());
+    }
+
+    #[test]
+    fn test_tallies_key_files_requires_tallies_and_classify() {
+        let parsed = Cli::try_parse_from([
+            "provenant",
+            "--json-pp",
+            "scan.json",
+            "--tallies-key-files",
+            "samples",
+        ]);
+
+        assert!(parsed.is_err());
+    }
+
+    #[test]
+    fn test_parses_summary_tallies_and_generated_flags() {
+        let parsed = Cli::try_parse_from([
+            "provenant",
+            "--json-pp",
+            "scan.json",
+            "--classify",
+            "--summary",
+            "--license-clarity-score",
+            "--tallies",
+            "--tallies-key-files",
+            "--tallies-with-details",
+            "--generated",
+            "samples",
+        ])
+        .expect("cli parse should succeed");
+
+        assert!(parsed.classify);
+        assert!(parsed.summary);
+        assert!(parsed.license_clarity_score);
+        assert!(parsed.tallies);
+        assert!(parsed.tallies_key_files);
+        assert!(parsed.tallies_with_details);
+        assert!(parsed.generated);
     }
 
     #[test]

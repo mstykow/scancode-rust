@@ -263,7 +263,14 @@ fn run() -> Result<()> {
             license_rule_references: preloaded_license_rule_references,
             options: CreateOutputOptions {
                 facet_rules: &facet_rules,
+                include_summary: cli.summary,
+                include_license_clarity_score: cli.license_clarity_score,
+                include_tallies: cli.tallies,
+                include_tallies_of_key_files: cli.tallies_key_files,
+                include_tallies_with_details: cli.tallies_with_details,
                 include_tallies_by_facet: cli.tallies_by_facet,
+                include_generated: cli.generated,
+                scanned_root: cli.dir_path.first().map(Path::new),
             },
         },
     );
@@ -295,9 +302,9 @@ fn run() -> Result<()> {
 }
 
 fn validate_scan_option_compatibility(cli: &Cli) -> Result<()> {
-    if cli.from_json && (cli.copyright || cli.email || cli.url) {
+    if cli.from_json && (cli.copyright || cli.email || cli.url || cli.generated) {
         return Err(anyhow!(
-            "When using --from-json, file scan options like --copyright/--email/--url are not allowed"
+            "When using --from-json, file scan options like --copyright/--email/--url/--generated are not allowed"
         ));
     }
 
@@ -589,7 +596,14 @@ struct JsonScanInput {
 
 struct CreateOutputOptions<'a> {
     facet_rules: &'a [FacetRule],
+    include_summary: bool,
+    include_license_clarity_score: bool,
+    include_tallies: bool,
+    include_tallies_of_key_files: bool,
+    include_tallies_with_details: bool,
     include_tallies_by_facet: bool,
+    include_generated: bool,
+    scanned_root: Option<&'a Path>,
 }
 
 struct CreateOutputContext<'a> {
@@ -766,13 +780,48 @@ fn create_output(
         mut packages,
         dependencies,
     } = context.assembly_result;
-    classify_key_files(&mut files, &packages);
+    if context.options.include_generated {
+        mark_generated_files(&mut files, context.options.scanned_root);
+    } else {
+        clear_generated_flags(&mut files);
+    }
+    if context.options.include_summary
+        || context.options.include_license_clarity_score
+        || context.options.include_tallies_of_key_files
+    {
+        classify_key_files(&mut files, &packages);
+    }
     promote_package_metadata_from_key_files(&files, &mut packages);
     assign_facets(&mut files, context.options.facet_rules);
-    compute_detailed_tallies(&mut files);
-    let summary = compute_summary(&files, &packages);
-    let tallies = compute_tallies(&files);
-    let tallies_of_key_files = compute_key_file_tallies(&files);
+    let needs_detailed_tallies =
+        context.options.include_tallies_with_details || context.options.include_tallies_by_facet;
+    if needs_detailed_tallies {
+        compute_detailed_tallies(&mut files);
+    } else {
+        clear_resource_tallies(&mut files);
+    }
+    let summary =
+        if context.options.include_summary || context.options.include_license_clarity_score {
+            compute_summary_with_options(
+                &files,
+                &packages,
+                context.options.include_summary,
+                context.options.include_license_clarity_score || context.options.include_summary,
+            )
+        } else {
+            None
+        };
+    let tallies = if context.options.include_tallies || context.options.include_tallies_with_details
+    {
+        compute_tallies(&files)
+    } else {
+        None
+    };
+    let tallies_of_key_files = if context.options.include_tallies_of_key_files {
+        compute_key_file_tallies(&files)
+    } else {
+        None
+    };
     let tallies_by_facet = if context.options.include_tallies_by_facet {
         compute_tallies_by_facet(&files)
     } else {
@@ -1089,7 +1138,17 @@ fn promote_package_metadata_from_key_files(files: &[FileInfo], packages: &mut [P
     }
 }
 
+#[cfg(test)]
 fn compute_summary(files: &[FileInfo], packages: &[Package]) -> Option<Summary> {
+    compute_summary_with_options(files, packages, true, true)
+}
+
+fn compute_summary_with_options(
+    files: &[FileInfo],
+    packages: &[Package],
+    include_summary_fields: bool,
+    include_license_clarity_score: bool,
+) -> Option<Summary> {
     let key_files: Vec<&FileInfo> = files.iter().filter(|file| file.is_key_file).collect();
     let declared_holders = compute_declared_holders(files, packages);
     let declared_holder = (!declared_holders.is_empty()).then(|| declared_holders.join(", "));
@@ -1097,7 +1156,9 @@ fn compute_summary(files: &[FileInfo], packages: &[Package]) -> Option<Summary> 
     let other_languages = compute_other_languages(files, packages, primary_language.as_deref());
     let tallies = compute_tallies(files).unwrap_or_default();
 
-    if key_files.is_empty()
+    if !include_summary_fields
+        && !include_license_clarity_score
+        && key_files.is_empty()
         && declared_holder.is_none()
         && primary_language.is_none()
         && other_languages.is_empty()
@@ -1160,7 +1221,7 @@ fn compute_summary(files: &[FileInfo], packages: &[Package]) -> Option<Summary> 
         score = score.saturating_sub(20);
     }
 
-    let license_clarity_score = if declared_license || has_license_text || declared_copyrights {
+    let license_clarity_score = if include_license_clarity_score {
         Some(LicenseClarityScore {
             score,
             declared_license,
@@ -1177,12 +1238,103 @@ fn compute_summary(files: &[FileInfo], packages: &[Package]) -> Option<Summary> 
     Some(Summary {
         declared_license_expression,
         license_clarity_score,
-        declared_holder,
-        primary_language,
-        other_license_expressions,
-        other_holders,
-        other_languages,
+        declared_holder: include_summary_fields.then_some(declared_holder).flatten(),
+        primary_language: include_summary_fields.then_some(primary_language).flatten(),
+        other_license_expressions: if include_summary_fields {
+            other_license_expressions
+        } else {
+            vec![]
+        },
+        other_holders: if include_summary_fields {
+            other_holders
+        } else {
+            vec![]
+        },
+        other_languages: if include_summary_fields {
+            other_languages
+        } else {
+            vec![]
+        },
     })
+}
+
+const GENERATED_KEYWORDS_LOWERED: &[&str] = &[
+    "generated by",
+    "auto-generated",
+    "automatically generated",
+    "do not edit this file",
+    "it is machine generated",
+    "automatically created by",
+    "this code is generated",
+    "generated by cython",
+    "this file was automatically generated by",
+    "this file is generated by",
+    "generated file, do not edit",
+    "this is an autogenerated file",
+    "generated by the protocol buffer compiler",
+    "generated code -- do not edit",
+    "makefile.in generated by automake",
+    "generated automatically by aclocal",
+    "generated by gnu autoconf",
+    "this file was automatically generated",
+];
+
+fn mark_generated_files(files: &mut [FileInfo], scanned_root: Option<&Path>) {
+    for file in files.iter_mut() {
+        if file.file_type != FileType::File {
+            file.is_generated = Some(false);
+            continue;
+        }
+
+        file.is_generated =
+            Some(generated_file_hint_exists(&file.path, scanned_root).unwrap_or(false));
+    }
+}
+
+fn clear_generated_flags(files: &mut [FileInfo]) {
+    for file in files {
+        file.is_generated = None;
+    }
+}
+
+fn clear_resource_tallies(files: &mut [FileInfo]) {
+    for file in files {
+        file.tallies = None;
+    }
+}
+
+fn generated_file_hint_exists(path: &str, scanned_root: Option<&Path>) -> Result<bool> {
+    let path = resolve_generated_scan_path(path, scanned_root)?;
+    let content = fs::read(&path)?;
+    let text = String::from_utf8_lossy(&content);
+
+    for line in text.lines().take(150) {
+        let lowered = line.trim().to_ascii_lowercase();
+        if GENERATED_KEYWORDS_LOWERED
+            .iter()
+            .any(|keyword| lowered.contains(keyword))
+        {
+            return Ok(true);
+        }
+    }
+
+    Ok(false)
+}
+
+fn resolve_generated_scan_path(path: &str, scanned_root: Option<&Path>) -> Result<PathBuf> {
+    let relative_path = PathBuf::from(path);
+    let candidates = [
+        scanned_root.map(|root| root.join(&relative_path)),
+        Some(relative_path.clone()),
+    ];
+
+    for candidate in candidates.into_iter().flatten() {
+        if candidate.is_file() {
+            return Ok(candidate);
+        }
+    }
+
+    Err(anyhow!("Generated detection path not found: {}", path))
 }
 
 fn package_declared_license_expression(packages: &[Package]) -> Option<String> {
