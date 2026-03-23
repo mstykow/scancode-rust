@@ -91,11 +91,11 @@ Runtime dependency notes:
 
 ### Partially Implemented Post-Processing Flags
 
-| Parameter                   | Notes                                                                                                                                                        |
-| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `--classify`                | Accepted as a compatibility flag; current runtime already computes key-file classification, but full ScanCode classify parity remains open                   |
-| `--facet <facet>=<pattern>` | Implemented with six-facet validation, repeatable rules, multi-facet matching, and default-to-`core` file assignment                                         |
-| `--tallies-by-facet`        | Implemented top-level `tallies_by_facet` output; currently requires `--facet` definitions and reuses existing tally output rather than full tally CLI gating |
+| Parameter                   | Notes                                                                                                                                                                                |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `--classify`                | Accepted as a compatibility flag; current runtime computes key-file classification plus top-level/community classification substrate, but full ScanCode classify parity remains open |
+| `--facet <facet>=<pattern>` | Implemented with six-facet validation, repeatable rules, multi-facet matching, and default-to-`core` file assignment                                                                 |
+| `--tallies-by-facet`        | Implemented top-level `tallies_by_facet` output; currently requires `--facet` definitions and reuses existing tally output rather than full tally CLI gating                         |
 
 ### Explicitly Deferred / Not Planned
 
