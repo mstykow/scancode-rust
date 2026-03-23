@@ -1,6 +1,6 @@
 # Summary, Tallies & Analysis Implementation Plan
 
-> **Status**: 🟡 In Progress — shared provenance cleanup, core top-level tallies, key-file-only tallies, detailed per-resource tallies, file facets, and top-level by-facet tallies are implemented; package tallies, generated-code parity, and broader summary parity remain open
+> **Status**: 🟡 In Progress — shared provenance cleanup, the full current tally stack, file facets/by-facet tallies, package-preferred summary origin, and the first real license-clarity penalties are implemented; package tallies, generated-code parity, and broader summary/score parity remain open
 > **Priority**: P2 - Medium Priority (Post-Processing Feature)
 > **Estimated Effort**: 3-4 weeks
 > **Dependencies**: [LICENSE_DETECTION_ARCHITECTURE.md](../../LICENSE_DETECTION_ARCHITECTURE.md), [COPYRIGHT_DETECTION_PLAN.md](../text-detection/COPYRIGHT_DETECTION_PLAN.md), [ASSEMBLY_PLAN.md](../package-detection/ASSEMBLY_PLAN.md)
@@ -138,6 +138,17 @@ Summarization is a **consumer**, not a normalizer.
   - `declared_holder`
   - `primary_language`
   - `other_languages`
+- ✅ Package-preferred summary origin data for:
+  - `declared_license_expression`
+  - `declared_holder`
+  - `primary_language`
+- ✅ Initial summary parity rollups for:
+  - `other_license_expressions`
+  - `other_holders`
+- ✅ Initial license-clarity penalties for:
+  - ambiguous compound licensing (`-10`)
+  - conflicting lower-level license categories (`-20`)
+- ✅ Broader classify substrate for top-level/community file handling on normal root-prefixed scans
 
 ### Missing
 
@@ -169,9 +180,9 @@ Summarization is a **consumer**, not a normalizer.
 5. **Phase 4**: Initial non-license-dependent summary fields ✅
 6. **Phase 5**: Core codebase tallies (`--tallies`) over existing declared/discovered evidence. ✅ for top-level `detected_license_expression`, `copyrights`, `holders`, `authors`, and `programming_language`; package tallies remain open.
 7. **Phase 6**: Detailed tally variants (`--tallies-with-details`, `--tallies-key-files`, `--tallies-by-facet`). 🟡 Top-level `tallies_of_key_files`, per-resource `files[*].tallies`, and top-level `tallies_by_facet` are implemented; package tallies and some CLI gating remain open.
-8. **Phase 7**: Full license clarity parity.
+8. **Phase 7**: Full license clarity parity. 🟡 Implemented: declared-license/identification/text/copyright scoring plus ambiguity/conflict penalties. Remaining work: ScanCode-quality license match filtering and any residual category/precedence edge cases.
 9. **Phase 8**: Generated-code detection parity plus remaining classify/facet parity gaps.
-10. **Phase 9**: Comprehensive `--summary` parity over the completed tally/clarity/classification inputs.
+10. **Phase 9**: Comprehensive `--summary` parity over the completed tally/clarity/classification inputs. 🟡 Implemented: package-preferred origin fields plus `other_license_expressions`/`other_holders`. Remaining work: broader package-precedence and edge-case parity from upstream summary fixtures.
 11. **Phase 10**: CLI parity wiring for the remaining summary/tally/classify/facet/generated options and regression coverage.
 
 ## Success Criteria
