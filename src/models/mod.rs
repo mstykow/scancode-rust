@@ -14,6 +14,6 @@ pub use package_type::PackageType;
 #[cfg(test)]
 pub use file_info::build_package_uid;
 pub use output::{
-    ExtraData, Header, LicenseClarityScore, LicenseReference, LicenseRuleReference,
+    ExtraData, FacetTallies, Header, LicenseClarityScore, LicenseReference, LicenseRuleReference,
     OUTPUT_FORMAT_VERSION, Output, Summary, SystemEnvironment, Tallies, TallyEntry,
 };

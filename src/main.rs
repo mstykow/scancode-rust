@@ -13,8 +13,8 @@ use crate::cache::{CACHE_DIR_ENV_VAR, CacheConfig};
 use crate::cli::Cli;
 use crate::license_detection::LicenseDetectionEngine;
 use crate::models::{
-    ExtraData, FileInfo, FileType, Header, LicenseClarityScore, OUTPUT_FORMAT_VERSION, Output,
-    Package, Summary, SystemEnvironment, Tallies, TallyEntry,
+    ExtraData, FacetTallies, FileInfo, FileType, Header, LicenseClarityScore,
+    OUTPUT_FORMAT_VERSION, Output, Package, Summary, SystemEnvironment, Tallies, TallyEntry,
 };
 use crate::output::{OutputWriteConfig, write_output_file};
 use crate::progress::{ProgressMode, ScanProgress};
@@ -60,6 +60,7 @@ fn run() -> Result<()> {
     progress.init_logging_bridge();
 
     validate_scan_option_compatibility(&cli)?;
+    let facet_rules = build_facet_rules(&cli.facet)?;
 
     let exclude_patterns = compile_exclude_patterns(&cli.exclude);
     let include_patterns = compile_include_patterns(&cli.include);
@@ -263,10 +264,16 @@ fn run() -> Result<()> {
         start_time,
         end_time,
         scan_result,
-        total_dirs,
-        assembly_result,
-        preloaded_license_references,
-        preloaded_license_rule_references,
+        CreateOutputContext {
+            total_dirs,
+            assembly_result,
+            license_references: preloaded_license_references,
+            license_rule_references: preloaded_license_rule_references,
+            options: CreateOutputOptions {
+                facet_rules: &facet_rules,
+                include_tallies_by_facet: cli.tallies_by_facet,
+            },
+        },
     );
 
     progress.start_output();
@@ -309,6 +316,12 @@ fn validate_scan_option_compatibility(cli: &Cli) -> Result<()> {
     if !cli.from_json && cli.dir_path.len() != 1 {
         return Err(anyhow!(
             "Directory scan mode currently supports exactly one input path"
+        ));
+    }
+
+    if cli.tallies_by_facet && cli.facet.is_empty() {
+        return Err(anyhow!(
+            "--tallies-by-facet requires at least one --facet <facet>=<pattern> definition"
         ));
     }
 
@@ -574,6 +587,19 @@ struct JsonScanInput {
     excluded_count: usize,
 }
 
+struct CreateOutputOptions<'a> {
+    facet_rules: &'a [FacetRule],
+    include_tallies_by_facet: bool,
+}
+
+struct CreateOutputContext<'a> {
+    total_dirs: usize,
+    assembly_result: assembly::AssemblyResult,
+    license_references: Vec<crate::models::LicenseReference>,
+    license_rule_references: Vec<crate::models::LicenseRuleReference>,
+    options: CreateOutputOptions<'a>,
+}
+
 fn load_scan_from_json(path: &str) -> Result<JsonScanInput> {
     let input_path = Path::new(path);
     if !input_path.is_file() {
@@ -695,16 +721,13 @@ fn create_output(
     start_time: chrono::DateTime<Utc>,
     end_time: chrono::DateTime<Utc>,
     scan_result: scanner::ProcessResult,
-    total_dirs: usize,
-    assembly_result: assembly::AssemblyResult,
-    license_references: Vec<crate::models::LicenseReference>,
-    license_rule_references: Vec<crate::models::LicenseRuleReference>,
+    context: CreateOutputContext<'_>,
 ) -> Output {
     let duration = (end_time - start_time).num_nanoseconds().unwrap_or(0) as f64 / 1_000_000_000.0;
 
     let extra_data = ExtraData {
         files_count: scan_result.files.len(),
-        directories_count: total_dirs,
+        directories_count: context.total_dirs,
         excluded_count: scan_result.excluded_count,
         system_environment: SystemEnvironment {
             operating_system: sys_info::os_type().ok(),
@@ -739,18 +762,28 @@ fn create_output(
         .collect();
 
     let mut files = scan_result.files;
-    let mut packages = assembly_result.packages;
+    let assembly::AssemblyResult {
+        mut packages,
+        dependencies,
+    } = context.assembly_result;
     classify_key_files(&mut files, &packages);
     promote_package_metadata_from_key_files(&files, &mut packages);
+    assign_facets(&mut files, context.options.facet_rules);
     compute_detailed_tallies(&mut files);
     let summary = compute_summary(&files, &packages);
     let tallies = compute_tallies(&files);
     let tallies_of_key_files = compute_key_file_tallies(&files);
+    let tallies_by_facet = if context.options.include_tallies_by_facet {
+        compute_tallies_by_facet(&files)
+    } else {
+        None
+    };
 
     Output {
         summary,
         tallies,
         tallies_of_key_files,
+        tallies_by_facet,
         headers: vec![Header {
             start_timestamp: start_time.to_rfc3339(),
             end_timestamp: end_time.to_rfc3339(),
@@ -760,10 +793,10 @@ fn create_output(
             output_format_version: OUTPUT_FORMAT_VERSION.to_string(),
         }],
         packages,
-        dependencies: assembly_result.dependencies,
+        dependencies,
         files,
-        license_references,
-        license_rule_references,
+        license_references: context.license_references,
+        license_rule_references: context.license_rule_references,
     }
 }
 
@@ -880,6 +913,97 @@ fn is_legal_filename(basename: &str) -> bool {
 
 fn is_manifest_filename(basename: &str) -> bool {
     basename.ends_with(".gemspec") || basename == "gemfile" || basename == "gemfile.lock"
+}
+
+const FACETS: [&str; 6] = ["core", "dev", "tests", "docs", "data", "examples"];
+
+#[derive(Clone)]
+struct FacetRule {
+    facet: String,
+    pattern: Pattern,
+}
+
+fn build_facet_rules(facets: &[String]) -> Result<Vec<FacetRule>> {
+    let mut rules = Vec::new();
+
+    for facet_def in facets {
+        let Some((raw_facet, raw_pattern)) = facet_def.split_once('=') else {
+            return Err(anyhow!(
+                "Invalid --facet option: missing <pattern> in \"{}\"",
+                facet_def
+            ));
+        };
+
+        let facet = raw_facet.trim().to_ascii_lowercase();
+        let pattern_text = raw_pattern.trim();
+
+        if facet.is_empty() {
+            return Err(anyhow!(
+                "Invalid --facet option: missing <facet> in \"{}\"",
+                facet_def
+            ));
+        }
+
+        if pattern_text.is_empty() {
+            return Err(anyhow!(
+                "Invalid --facet option: missing <pattern> in \"{}\"",
+                facet_def
+            ));
+        }
+
+        if !FACETS.contains(&facet.as_str()) {
+            return Err(anyhow!(
+                "Invalid --facet option: unknown <facet> in \"{}\". Valid values are: {}",
+                facet_def,
+                FACETS.join(", ")
+            ));
+        }
+
+        let pattern = Pattern::new(pattern_text).map_err(|err| {
+            anyhow!(
+                "Invalid --facet option: bad glob pattern in \"{}\": {}",
+                facet_def,
+                err
+            )
+        })?;
+
+        if !rules
+            .iter()
+            .any(|rule: &FacetRule| rule.facet == facet && rule.pattern.as_str() == pattern_text)
+        {
+            rules.push(FacetRule { facet, pattern });
+        }
+    }
+
+    Ok(rules)
+}
+
+fn assign_facets(files: &mut [FileInfo], facet_rules: &[FacetRule]) {
+    if facet_rules.is_empty() {
+        return;
+    }
+
+    for file in files.iter_mut() {
+        if file.file_type != FileType::File {
+            file.facets.clear();
+            continue;
+        }
+
+        let mut facets: Vec<String> = facet_rules
+            .iter()
+            .filter(|rule| rule.pattern.matches(&file.path) || rule.pattern.matches(&file.name))
+            .map(|rule| rule.facet.clone())
+            .collect();
+
+        facets.sort();
+        facets.dedup();
+
+        file.facets = if facets.is_empty() {
+            vec![FACETS[0].to_string()]
+        } else {
+            facets
+        };
+    }
 }
 
 fn promote_package_metadata_from_key_files(files: &[FileInfo], packages: &mut [Package]) {
@@ -1036,6 +1160,50 @@ fn compute_key_file_tallies(files: &[FileInfo]) -> Option<Tallies> {
     (!tallies.is_empty()).then_some(tallies)
 }
 
+fn compute_tallies_by_facet(files: &[FileInfo]) -> Option<Vec<FacetTallies>> {
+    let mut buckets: HashMap<&'static str, Tallies> = FACETS
+        .iter()
+        .map(|facet| (*facet, Tallies::default()))
+        .collect();
+
+    for file in files.iter().filter(|file| file.file_type == FileType::File) {
+        if file.facets.is_empty() {
+            continue;
+        }
+
+        let Some(file_tallies) = file.tallies.as_ref() else {
+            continue;
+        };
+
+        for facet in &file.facets {
+            let Some(bucket) = buckets.get_mut(facet.as_str()) else {
+                continue;
+            };
+            merge_non_null_tally_entries(
+                &mut bucket.detected_license_expression,
+                &file_tallies.detected_license_expression,
+            );
+            merge_non_null_tally_entries(&mut bucket.copyrights, &file_tallies.copyrights);
+            merge_non_null_tally_entries(&mut bucket.holders, &file_tallies.holders);
+            merge_non_null_tally_entries(&mut bucket.authors, &file_tallies.authors);
+            merge_non_null_tally_entries(
+                &mut bucket.programming_language,
+                &file_tallies.programming_language,
+            );
+        }
+    }
+
+    Some(
+        FACETS
+            .iter()
+            .map(|facet| FacetTallies {
+                facet: (*facet).to_string(),
+                tallies: buckets.remove(facet).unwrap_or_default(),
+            })
+            .collect(),
+    )
+}
+
 fn compute_detailed_tallies(files: &mut [FileInfo]) {
     let mut children_by_parent: HashMap<String, Vec<usize>> = HashMap::new();
     let known_paths: HashSet<String> = files.iter().map(|file| file.path.clone()).collect();
@@ -1147,6 +1315,23 @@ fn merge_tally_entries(counts: &mut HashMap<Option<String>, usize>, entries: &[T
     for entry in entries {
         *counts.entry(entry.value.clone()).or_insert(0) += entry.count;
     }
+}
+
+fn merge_non_null_tally_entries(destination: &mut Vec<TallyEntry>, entries: &[TallyEntry]) {
+    let mut counts: HashMap<Option<String>, usize> = destination
+        .iter()
+        .cloned()
+        .map(|entry| (entry.value, entry.count))
+        .collect();
+
+    for entry in entries.iter().filter(|entry| entry.value.is_some()) {
+        *counts.entry(entry.value.clone()).or_insert(0) += entry.count;
+    }
+
+    *destination = build_tally_entries(counts)
+        .into_iter()
+        .filter(|entry| entry.value.is_some())
+        .collect();
 }
 
 fn tally_file_values<F>(
