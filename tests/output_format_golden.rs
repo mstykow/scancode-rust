@@ -1,7 +1,7 @@
 use provenant::models::{
-    Copyright, DatasourceId, ExtraData, FileInfo, FileType, Header, Holder, Output, Package,
-    PackageData, PackageType, Party, ResolvedPackage, SystemEnvironment, Tallies, TallyEntry,
-    TopLevelDependency,
+    Copyright, DatasourceId, ExtraData, FacetTallies, FileInfo, FileType, Header, Holder, Output,
+    Package, PackageData, PackageType, Party, ResolvedPackage, SystemEnvironment, Tallies,
+    TallyEntry, TopLevelDependency,
 };
 use provenant::{OutputFormat, OutputWriteConfig, OutputWriter, writer_for_format};
 use regex::Regex;
@@ -202,6 +202,61 @@ fn test_json_contract_includes_detailed_tallies_for_files_and_directories() {
     assert_eq!(empty["tallies"], serde_json::json!({}));
     assert_eq!(
         file["tallies"]["detected_license_expression"][0]["value"],
+        "mit"
+    );
+}
+
+#[test]
+fn test_json_contract_includes_facets_and_tallies_by_facet() {
+    let mut core_file =
+        sample_plain_text_file("README", "README", "", "scan/README", 10, "abc", vec![]);
+    core_file.facets = vec!["docs".to_string()];
+    core_file.tallies = Some(Tallies {
+        detected_license_expression: vec![TallyEntry {
+            value: Some("mit".to_string()),
+            count: 1,
+        }],
+        copyrights: vec![],
+        holders: vec![],
+        authors: vec![],
+        programming_language: vec![],
+    });
+
+    let output = Output {
+        summary: None,
+        tallies: None,
+        tallies_of_key_files: None,
+        tallies_by_facet: Some(vec![FacetTallies {
+            facet: "docs".to_string(),
+            tallies: Tallies {
+                detected_license_expression: vec![TallyEntry {
+                    value: Some("mit".to_string()),
+                    count: 1,
+                }],
+                copyrights: vec![],
+                holders: vec![],
+                authors: vec![],
+                programming_language: vec![],
+            },
+        }]),
+        headers: vec![sample_header(1, 0)],
+        packages: vec![],
+        dependencies: vec![],
+        files: vec![core_file],
+        license_references: vec![],
+        license_rule_references: vec![],
+    };
+
+    let mut bytes = Vec::new();
+    writer_for_format(OutputFormat::Json)
+        .write(&output, &mut bytes, &OutputWriteConfig::default())
+        .expect("json output should be generated");
+    let value: Value = serde_json::from_slice(&bytes).expect("json should parse");
+
+    assert_eq!(value["files"][0]["facets"][0], "docs");
+    assert_eq!(value["tallies_by_facet"][0]["facet"], "docs");
+    assert_eq!(
+        value["tallies_by_facet"][0]["tallies"]["detected_license_expression"][0]["value"],
         "mit"
     );
 }
@@ -1525,6 +1580,7 @@ fn sample_output_with_sections(
         summary: None,
         tallies: None,
         tallies_of_key_files: None,
+        tallies_by_facet: None,
         headers: vec![sample_header(files_count, directories_count)],
         packages,
         dependencies,
@@ -1835,6 +1891,7 @@ fn empty_output() -> Output {
         summary: None,
         tallies: None,
         tallies_of_key_files: None,
+        tallies_by_facet: None,
         headers: vec![],
         packages: vec![],
         dependencies: vec![],

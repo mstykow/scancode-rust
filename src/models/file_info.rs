@@ -84,6 +84,9 @@ pub struct FileInfo {
     #[serde(skip_serializing_if = "is_false", default)]
     pub is_key_file: bool,
     #[builder(default)]
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub facets: Vec<String>,
+    #[builder(default)]
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub tallies: Option<Tallies>,
 }
@@ -198,6 +201,7 @@ impl FileInfo {
             is_readme: false,
             is_top_level: false,
             is_key_file: false,
+            facets: vec![],
             tallies: None,
         }
     }
