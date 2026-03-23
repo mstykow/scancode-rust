@@ -500,11 +500,14 @@ pub(crate) fn filter_invalid_matches_to_single_word_gibberish(
             if let Some(rule) = index.rules_by_rid.get(rid)
                 && rule.length_unique == 1
                 && (rule.is_license_reference() || rule.is_license_clue())
-                && let Some(matched_text) = &m.matched_text
             {
+                let matched_text = match &m.matched_text {
+                    Some(text) => text.clone(),
+                    None => query.matched_text(m.start_line, m.end_line),
+                };
                 let max_diff = if rule.relevance >= 80 { 1 } else { 0 };
 
-                if !is_valid_short_match(matched_text, &rule.text, max_diff) {
+                if !is_valid_short_match(&matched_text, &rule.text, max_diff) {
                     return false;
                 }
             }

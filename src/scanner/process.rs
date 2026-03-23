@@ -515,7 +515,7 @@ fn extract_license_information(
         Ok(detections) => {
             let model_detections: Vec<LicenseDetection> = detections
                 .into_iter()
-                .filter_map(|d| convert_detection_to_model(d, include_text))
+                .filter_map(|d| convert_detection_to_model(d, include_text, &text_content))
                 .collect();
 
             if !model_detections.is_empty() {
@@ -546,6 +546,7 @@ fn extract_license_information(
 fn convert_detection_to_model(
     detection: crate::license_detection::LicenseDetection,
     include_text: bool,
+    text_content: &str,
 ) -> Option<LicenseDetection> {
     let license_expression = detection.license_expression?;
     let license_expression_spdx = detection.license_expression_spdx.unwrap_or_default();
@@ -553,20 +554,33 @@ fn convert_detection_to_model(
     let matches: Vec<Match> = detection
         .matches
         .into_iter()
-        .map(|m| Match {
-            license_expression: m.license_expression,
-            license_expression_spdx: m.license_expression_spdx.unwrap_or_default(),
-            from_file: m.from_file,
-            start_line: m.start_line,
-            end_line: m.end_line,
-            matcher: Some(m.matcher.to_string()),
-            score: m.score as f64,
-            matched_length: Some(m.matched_length),
-            match_coverage: Some(m.match_coverage as f64),
-            rule_relevance: Some(m.rule_relevance as usize),
-            rule_identifier: Some(m.rule_identifier),
-            rule_url: Some(m.rule_url),
-            matched_text: if include_text { m.matched_text } else { None },
+        .map(|m| {
+            let matched_text = if include_text {
+                m.matched_text.or_else(|| {
+                    Some(crate::license_detection::query::matched_text_from_text(
+                        text_content,
+                        m.start_line,
+                        m.end_line,
+                    ))
+                })
+            } else {
+                None
+            };
+            Match {
+                license_expression: m.license_expression,
+                license_expression_spdx: m.license_expression_spdx.unwrap_or_default(),
+                from_file: m.from_file,
+                start_line: m.start_line,
+                end_line: m.end_line,
+                matcher: Some(m.matcher.to_string()),
+                score: m.score as f64,
+                matched_length: Some(m.matched_length),
+                match_coverage: Some(m.match_coverage as f64),
+                rule_relevance: Some(m.rule_relevance as usize),
+                rule_identifier: Some(m.rule_identifier),
+                rule_url: Some(m.rule_url),
+                matched_text,
+            }
         })
         .collect();
 

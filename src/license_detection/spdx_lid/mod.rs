@@ -285,8 +285,6 @@ pub fn spdx_lid_match(index: &LicenseIndex, query: &Query) -> Vec<LicenseMatch> 
             let start_line = query.line_for_pos(*start_token).unwrap_or(1);
             let end_line = query.line_for_pos(*end_token).unwrap_or(start_line);
 
-            let matched_text = query.matched_text(start_line, end_line);
-
             let (rid, rule_relevance, rule_identifier, rule_length, referenced_filenames) = index
                 .rid_by_spdx_key
                 .get(&license_expression)
@@ -335,7 +333,7 @@ pub fn spdx_lid_match(index: &LicenseIndex, query: &Query) -> Vec<LicenseMatch> 
                 rid,
                 rule_identifier,
                 rule_url: String::new(),
-                matched_text: Some(matched_text),
+                matched_text: None,
                 referenced_filenames,
                 rule_kind: crate::license_detection::models::RuleKind::Tag,
                 is_from_license: false,

@@ -79,8 +79,6 @@ pub fn hash_match(index: &LicenseIndex, query_run: &QueryRun) -> Vec<LicenseMatc
             start_line
         };
 
-        let matched_text = query_run.matched_text(start_line, end_line);
-
         let license_match = LicenseMatch {
             license_expression: rule.license_expression.clone(),
             license_expression_spdx: None,
@@ -98,7 +96,7 @@ pub fn hash_match(index: &LicenseIndex, query_run: &QueryRun) -> Vec<LicenseMatc
             rid,
             rule_identifier: rule.identifier.clone(),
             rule_url: String::new(),
-            matched_text: Some(matched_text),
+            matched_text: None,
             referenced_filenames: rule.referenced_filenames.clone(),
             rule_kind: rule.kind(),
             is_from_license: rule.is_from_license,

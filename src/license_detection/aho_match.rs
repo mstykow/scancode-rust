@@ -157,8 +157,6 @@ pub fn aho_match_with_extra_matchables(
             1.0
         };
 
-        let matched_text = query_run.matched_text(start_line, end_line);
-
         let qspan_positions: Vec<usize> = (qstart..qend).collect();
         let ispan_positions: Vec<usize> = (0..matched_length).collect();
         let hispan_positions: Vec<usize> = (0..matched_length)
@@ -182,7 +180,7 @@ pub fn aho_match_with_extra_matchables(
             rid,
             rule_identifier: rule.identifier.clone(),
             rule_url: String::new(),
-            matched_text: Some(matched_text),
+            matched_text: None,
             referenced_filenames: rule.referenced_filenames.clone(),
             rule_kind: rule.kind(),
             is_from_license: rule.is_from_license,

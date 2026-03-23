@@ -455,17 +455,6 @@ mod tests {
     }
 
     #[test]
-    fn test_query_run_matched_text() {
-        let index = create_query_test_index();
-        let text = "line1\nlicense\nline3";
-        let query = build_query(text, &index).unwrap();
-        let run = QueryRun::new(&query, 0, Some(0));
-
-        let matched = run.matched_text(2, 2);
-        assert_eq!(matched, "license");
-    }
-
-    #[test]
     fn test_query_detect_long_lines() {
         let index = create_query_test_index();
         let tokens: Vec<String> = (0..30).map(|i| format!("word{}", i)).collect();
