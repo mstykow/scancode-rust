@@ -12,6 +12,7 @@ use std::sync::Arc;
 use crate::cache::{CACHE_DIR_ENV_VAR, CacheConfig};
 use crate::cli::Cli;
 use crate::license_detection::LicenseDetectionEngine;
+use crate::license_detection::expression::combine_expressions_and;
 use crate::models::{
     ExtraData, FacetTallies, FileInfo, FileType, Header, LicenseClarityScore, Match,
     OUTPUT_FORMAT_VERSION, Output, Package, Summary, SystemEnvironment, Tallies, TallyEntry,
@@ -864,6 +865,9 @@ fn classify_key_files(files: &mut [FileInfo], packages: &[Package]) {
                 .is_some_and(|refs| refs.contains(file.path.as_str()))
         });
         let is_root_top_level = file.for_packages.iter().any(|uid| {
+            if file.file_type == FileType::File && !file.package_data.is_empty() {
+                return false;
+            }
             package_roots
                 .get(uid)
                 .and_then(|root| path.strip_prefix(root).ok())
@@ -872,7 +876,7 @@ fn classify_key_files(files: &mut [FileInfo], packages: &[Package]) {
         let is_package_data_top_level = if file.file_type == FileType::Directory {
             package_data_top_level_dirs.contains(file.path.as_str())
         } else {
-            !file.package_data.is_empty()
+            (!file.package_data.is_empty() && is_score_manifest(file))
                 || path
                     .parent()
                     .and_then(|parent| parent.to_str())
@@ -905,6 +909,9 @@ fn build_package_data_top_level_dirs(files: &[FileInfo]) -> HashSet<String> {
         .filter(|file| file.file_type == FileType::File && !file.package_data.is_empty())
     {
         let path = Path::new(&file.path);
+        if path.components().count() <= 2 {
+            continue;
+        }
         for ancestor in path.ancestors().skip(1) {
             let Some(ancestor_str) = ancestor.to_str() else {
                 continue;
@@ -1264,9 +1271,11 @@ fn compute_summary_with_options(
     let declared_license_expression = package_declared_license_expression
         .clone()
         .or_else(|| score_declared_license_expression.clone());
+    let canonical_license_tallies =
+        canonicalize_license_tally_entries(&tallies.detected_license_expression);
     let other_license_expressions = remove_tally_value(
         declared_license_expression.as_deref(),
-        &tallies.detected_license_expression,
+        &canonical_license_tallies,
     );
     let other_holders = if declared_holders.is_empty() {
         vec![]
@@ -1388,13 +1397,13 @@ fn package_declared_license_expression(packages: &[Package]) -> Option<String> {
             .iter()
             .filter_map(|package| package.declared_license_expression.clone()),
     )
-    .map(|expr| expr.to_ascii_lowercase())
+    .map(|expr| canonicalize_summary_expression(&expr))
 }
 
 fn compute_license_score(files: &[FileInfo]) -> (Option<String>, LicenseClarityScore) {
     let key_files: Vec<&FileInfo> = files
         .iter()
-        .filter(|file| file.file_type == FileType::File && file.is_key_file)
+        .filter(|file| file.file_type == FileType::File && is_score_key_file(file))
         .collect();
     let non_key_files: Vec<&FileInfo> = files
         .iter()
@@ -1403,7 +1412,7 @@ fn compute_license_score(files: &[FileInfo]) -> (Option<String>, LicenseClarityS
 
     let key_file_expressions: Vec<String> = key_files
         .iter()
-        .filter_map(|file| file.license_expression.clone())
+        .filter_map(|file| summary_license_expression(file))
         .collect();
     let primary_declared_license = get_primary_license(&key_file_expressions);
 
@@ -1417,9 +1426,7 @@ fn compute_license_score(files: &[FileInfo]) -> (Option<String>, LicenseClarityS
             .flat_map(|file| file.license_detections.iter())
             .flat_map(|detection| detection.matches.iter())
             .any(is_good_match),
-        has_license_text: key_files
-            .iter()
-            .any(|file| file.is_legal && !file.license_detections.is_empty()),
+        has_license_text: key_files.iter().any(|file| key_file_has_license_text(file)),
         declared_copyrights: key_files.iter().any(|file| !file.copyrights.is_empty()),
         conflicting_license_categories: false,
         ambiguous_compound_licensing: primary_declared_license.is_none(),
@@ -1443,8 +1450,9 @@ fn compute_license_score(files: &[FileInfo]) -> (Option<String>, LicenseClarityS
         .is_some_and(is_permissive_expression)
         && non_key_files
             .iter()
-            .filter_map(|file| file.license_expression.as_deref())
-            .any(is_conflicting_expression);
+            .filter_map(|file| summary_license_expression(file))
+            .map(|expr| expr.to_ascii_lowercase())
+            .any(|expr| is_conflicting_expression(&expr));
 
     if scoring.conflicting_license_categories {
         scoring.score = scoring.score.saturating_sub(20);
@@ -1453,10 +1461,12 @@ fn compute_license_score(files: &[FileInfo]) -> (Option<String>, LicenseClarityS
         scoring.score = scoring.score.saturating_sub(10);
     }
 
-    let declared_license_expression = primary_declared_license.or_else(|| {
-        combine_license_expressions(unique(&key_file_expressions))
-            .map(|expr| expr.to_ascii_lowercase())
-    });
+    let declared_license_expression = primary_declared_license
+        .map(|expr| canonicalize_summary_expression(&expr))
+        .or_else(|| {
+            combine_license_expressions(unique(&key_file_expressions))
+                .map(|expr| canonicalize_summary_expression(&expr))
+        });
 
     (declared_license_expression, scoring)
 }
@@ -1467,6 +1477,31 @@ fn is_good_match(license_match: &Match) -> bool {
         (Some(coverage), Some(relevance)) => score >= 80.0 && coverage >= 80.0 && relevance >= 80,
         _ => score >= 80.0,
     }
+}
+
+fn is_score_key_file(file: &FileInfo) -> bool {
+    if !file.is_key_file {
+        return false;
+    }
+
+    if file.is_manifest {
+        return is_score_manifest(file);
+    }
+
+    true
+}
+
+fn is_score_manifest(file: &FileInfo) -> bool {
+    let path = file.path.to_ascii_lowercase();
+    path == "cargo.toml"
+        || path.ends_with("/cargo.toml")
+        || path.ends_with("/pom.xml")
+        || path.ends_with("/pom.properties")
+        || path == "manifest.mf"
+        || path.ends_with("/manifest.mf")
+        || path == "metadata.gz-extract"
+        || path.ends_with("/metadata.gz-extract")
+        || path.ends_with(".gemspec")
 }
 
 fn unique(values: &[String]) -> Vec<String> {
@@ -1557,6 +1592,56 @@ fn remove_tally_values(values: &[String], tallies: &[TallyEntry]) -> Vec<TallyEn
         })
         .cloned()
         .collect()
+}
+
+fn canonicalize_license_tally_entries(tallies: &[TallyEntry]) -> Vec<TallyEntry> {
+    let mut counts: HashMap<Option<String>, usize> = HashMap::new();
+
+    for entry in tallies {
+        let value = entry.value.as_deref().map(canonicalize_summary_expression);
+        *counts.entry(value).or_insert(0) += entry.count;
+    }
+
+    build_tally_entries(counts)
+}
+
+fn canonicalize_summary_expression(expression: &str) -> String {
+    combine_expressions_and(&[expression], true).unwrap_or_else(|_| expression.to_ascii_lowercase())
+}
+
+fn summary_license_expression(file: &FileInfo) -> Option<String> {
+    let detection_expressions = unique(
+        &file
+            .license_detections
+            .iter()
+            .map(|detection| detection.license_expression.clone())
+            .collect::<Vec<_>>(),
+    );
+
+    if !detection_expressions.is_empty() {
+        return if detection_expressions.len() == 1 {
+            detection_expressions
+                .into_iter()
+                .next()
+                .map(|expr| canonicalize_summary_expression(&expr))
+        } else {
+            combine_license_expressions(detection_expressions)
+                .map(|expr| canonicalize_summary_expression(&expr))
+        };
+    }
+
+    file.license_expression
+        .as_deref()
+        .map(canonicalize_summary_expression)
+}
+
+fn key_file_has_license_text(file: &FileInfo) -> bool {
+    file.license_detections
+        .iter()
+        .flat_map(|detection| detection.matches.iter())
+        .any(|m| {
+            m.matched_length.unwrap_or_default() > 1 || m.match_coverage.unwrap_or_default() > 1.0
+        })
 }
 
 fn is_permissive_expression(expression: &str) -> bool {
@@ -1841,7 +1926,7 @@ where
 }
 
 fn detected_license_values(file: &FileInfo) -> Vec<String> {
-    file.license_expression.clone().into_iter().collect()
+    summary_license_expression(file).into_iter().collect()
 }
 
 fn copyright_values(file: &FileInfo) -> Vec<String> {
