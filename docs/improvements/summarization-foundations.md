@@ -14,7 +14,9 @@ This incremental layer adds:
 6. per-resource `files[*].tallies` output for file- and directory-level rollups of those same tally families
 7. file-level `facets` assignment using the ScanCode facet set
 8. top-level `tallies_by_facet` output over the same tally families
-9. initial non-license-dependent summary fields such as `declared_holder`, `primary_language`, and `other_languages`
+9. package-preferred summary origin fields plus `other_license_expressions` / `other_holders`
+10. initial non-license-dependent summary fields such as `declared_holder`, `primary_language`, and `other_languages`
+11. initial license-clarity penalties for ambiguous compound licensing and conflicting lower-level license categories
 
 ## Why This Matters
 
@@ -77,6 +79,17 @@ Each file and directory output record can now include a `tallies` block. File ta
 ### File facets and by-facet tallies
 
 Files can now be assigned ScanCode-compatible facets (`core`, `dev`, `tests`, `docs`, `data`, `examples`), and top-level output can aggregate the existing tally families into ordered `tallies_by_facet` buckets.
+
+### Package-preferred summary origin and `other_*` rollups
+
+Summary output now prefers package-declared origin fields when they are available and keeps the remaining file-derived values in `other_license_expressions` and `other_holders`.
+
+### Initial license-clarity penalties
+
+License clarity scoring now includes the first real negative adjustments:
+
+- `-10` for ambiguous compound licensing across key files
+- `-20` for conflicting lower-level license categories beneath a permissive declared license
 
 ### Initial non-license-dependent summary fields
 
