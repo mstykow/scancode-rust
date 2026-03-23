@@ -853,25 +853,36 @@ fn classify_key_files(files: &mut [FileInfo], packages: &[Package]) {
     let package_roots = build_package_roots(packages);
     let package_file_references = build_package_file_reference_map(files);
     let scan_roots = build_scan_roots(files);
+    let package_data_top_level_dirs = build_package_data_top_level_dirs(files);
 
     for file in files.iter_mut() {
         let path = Path::new(&file.path);
-        file.is_top_level = if file.for_packages.is_empty() {
-            is_scan_top_level(path, &scan_roots)
+        let is_scan_root_top_level = is_scan_top_level(path, &scan_roots);
+        let is_referenced = file.for_packages.iter().any(|uid| {
+            package_file_references
+                .get(uid)
+                .is_some_and(|refs| refs.contains(file.path.as_str()))
+        });
+        let is_root_top_level = file.for_packages.iter().any(|uid| {
+            package_roots
+                .get(uid)
+                .and_then(|root| path.strip_prefix(root).ok())
+                .is_some_and(|relative| relative.components().count() == 1)
+        });
+        let is_package_data_top_level = if file.file_type == FileType::Directory {
+            package_data_top_level_dirs.contains(file.path.as_str())
         } else {
-            let is_referenced = file.for_packages.iter().any(|uid| {
-                package_file_references
-                    .get(uid)
-                    .is_some_and(|refs| refs.contains(file.path.as_str()))
-            });
-            let is_root_top_level = file.for_packages.iter().any(|uid| {
-                package_roots
-                    .get(uid)
-                    .and_then(|root| path.strip_prefix(root).ok())
-                    .is_some_and(|relative| relative.components().count() == 1)
-            });
-            is_referenced || is_root_top_level
+            !file.package_data.is_empty()
+                || path
+                    .parent()
+                    .and_then(|parent| parent.to_str())
+                    .is_some_and(|parent| package_data_top_level_dirs.contains(parent))
         };
+
+        file.is_top_level = is_scan_root_top_level
+            || is_referenced
+            || is_root_top_level
+            || is_package_data_top_level;
 
         if file.file_type != FileType::File {
             continue;
@@ -884,6 +895,28 @@ fn classify_key_files(files: &mut [FileInfo], packages: &[Package]) {
         file.is_key_file =
             file.is_top_level && (file.is_legal || file.is_manifest || file.is_readme);
     }
+}
+
+fn build_package_data_top_level_dirs(files: &[FileInfo]) -> HashSet<String> {
+    let mut top_level_dirs = HashSet::new();
+
+    for file in files
+        .iter()
+        .filter(|file| file.file_type == FileType::File && !file.package_data.is_empty())
+    {
+        let path = Path::new(&file.path);
+        for ancestor in path.ancestors().skip(1) {
+            let Some(ancestor_str) = ancestor.to_str() else {
+                continue;
+            };
+            if ancestor_str.is_empty() {
+                continue;
+            }
+            top_level_dirs.insert(ancestor_str.to_string());
+        }
+    }
+
+    top_level_dirs
 }
 
 fn build_package_roots(packages: &[Package]) -> HashMap<String, PathBuf> {
@@ -925,18 +958,21 @@ fn package_root(package: &Package) -> Option<PathBuf> {
 }
 
 fn build_scan_roots(files: &[FileInfo]) -> Vec<PathBuf> {
-    let known_paths: HashSet<&str> = files.iter().map(|file| file.path.as_str()).collect();
+    let mut roots = Vec::new();
 
-    files
-        .iter()
-        .map(|file| PathBuf::from(&file.path))
-        .filter(|path| {
-            path.parent()
-                .and_then(|parent| parent.to_str())
-                .filter(|parent| !parent.is_empty())
-                .is_none_or(|parent| !known_paths.contains(parent))
-        })
-        .collect()
+    for file in files {
+        let mut components = Path::new(&file.path).components();
+        let Some(first) = components.next() else {
+            continue;
+        };
+
+        let root = PathBuf::from(first.as_os_str());
+        if !roots.contains(&root) {
+            roots.push(root);
+        }
+    }
+
+    roots
 }
 
 fn is_scan_top_level(path: &Path, scan_roots: &[PathBuf]) -> bool {

@@ -926,6 +926,95 @@ fn classify_key_files_matches_scan_code_cli_fixture_patterns() {
 }
 
 #[test]
+fn classify_key_files_marks_package_data_ancestry_like_with_package_data_fixture() {
+    let uid = "pkg:maven/org.jboss.logging/jboss-logging@3.4.2.Final?uuid=test";
+
+    let mut manifest_mf = file("jar/META-INF/MANIFEST.MF");
+    manifest_mf.for_packages.push(uid.to_string());
+    manifest_mf.package_data = vec![crate::models::PackageData::default()];
+
+    let mut license = file("jar/META-INF/LICENSE.txt");
+    license.for_packages.push(uid.to_string());
+
+    let mut pom_properties =
+        file("jar/META-INF/maven/org.jboss.logging/jboss-logging/pom.properties");
+    pom_properties.for_packages.push(uid.to_string());
+    pom_properties.package_data = vec![crate::models::PackageData::default()];
+
+    let mut pom_xml = file("jar/META-INF/maven/org.jboss.logging/jboss-logging/pom.xml");
+    pom_xml.for_packages.push(uid.to_string());
+    pom_xml.package_data = vec![crate::models::PackageData::default()];
+
+    let mut source = file("jar/org/jboss/logging/AbstractLoggerProvider.java");
+    source.for_packages.push(uid.to_string());
+
+    let mut files = vec![
+        dir("jar"),
+        dir("jar/META-INF"),
+        license,
+        manifest_mf,
+        dir("jar/META-INF/maven"),
+        dir("jar/META-INF/maven/org.jboss.logging"),
+        dir("jar/META-INF/maven/org.jboss.logging/jboss-logging"),
+        pom_properties,
+        pom_xml,
+        dir("jar/org"),
+        dir("jar/org/jboss"),
+        dir("jar/org/jboss/logging"),
+        source,
+    ];
+
+    let package = Package {
+        package_uid: uid.to_string(),
+        datafile_paths: vec![
+            "jar/META-INF/maven/org.jboss.logging/jboss-logging/pom.xml".to_string(),
+        ],
+        ..package(
+            uid,
+            "jar/META-INF/maven/org.jboss.logging/jboss-logging/pom.xml",
+        )
+    };
+
+    classify_key_files(&mut files, &[package]);
+
+    assert!(files[0].is_top_level);
+    assert!(!files[0].is_key_file);
+
+    assert!(files[1].is_top_level);
+    assert!(!files[1].is_key_file);
+
+    assert!(files[2].is_legal);
+    assert!(files[2].is_top_level);
+    assert!(files[2].is_key_file);
+
+    assert!(files[3].is_manifest);
+    assert!(files[3].is_top_level);
+    assert!(files[3].is_key_file);
+
+    assert!(files[4].is_top_level);
+    assert!(!files[4].is_key_file);
+    assert!(files[5].is_top_level);
+    assert!(!files[5].is_key_file);
+    assert!(files[6].is_top_level);
+    assert!(!files[6].is_key_file);
+
+    assert!(files[7].is_manifest);
+    assert!(files[7].is_top_level);
+    assert!(files[7].is_key_file);
+
+    assert!(files[8].is_manifest);
+    assert!(files[8].is_top_level);
+    assert!(files[8].is_key_file);
+
+    assert!(files[9].is_top_level);
+    assert!(!files[9].is_key_file);
+    assert!(!files[10].is_top_level);
+    assert!(!files[11].is_top_level);
+    assert!(!files[12].is_top_level);
+    assert!(!files[12].is_key_file);
+}
+
+#[test]
 fn compute_summary_uses_root_prefixed_top_level_key_files() {
     let mut files = vec![dir("project"), file("project/LICENSE")];
     files[1].license_expression = Some("mit".to_string());
