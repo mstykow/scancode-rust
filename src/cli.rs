@@ -171,6 +171,15 @@ pub struct Cli {
     #[arg(long)]
     pub mark_source: bool,
 
+    #[arg(long)]
+    pub classify: bool,
+
+    #[arg(long = "facet", value_name = "<facet>=<pattern>")]
+    pub facet: Vec<String>,
+
+    #[arg(long = "tallies-by-facet", requires = "facet")]
+    pub tallies_by_facet: bool,
+
     /// Scan input for licenses
     #[arg(short = 'l', long)]
     pub license: bool,
@@ -201,7 +210,11 @@ pub struct Cli {
 
 fn default_processes() -> i32 {
     let cpus = std::thread::available_parallelism().map_or(1, |n| n.get());
-    if cpus > 1 { (cpus - 1) as i32 } else { 1 }
+    if cpus > 1 {
+        (cpus - 1) as i32
+    } else {
+        1
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -447,6 +460,40 @@ mod tests {
         assert!(parsed.from_json);
         assert_eq!(parsed.dir_path, vec!["sample-scan.json"]);
         assert!(parsed.mark_source);
+    }
+
+    #[test]
+    fn test_parses_classify_facet_and_tallies_by_facet() {
+        let parsed = Cli::try_parse_from([
+            "provenant",
+            "--json-pp",
+            "scan.json",
+            "--classify",
+            "--facet",
+            "dev=*.c",
+            "--facet",
+            "tests=*/tests/*",
+            "--tallies-by-facet",
+            "samples",
+        ])
+        .expect("cli parse should succeed");
+
+        assert!(parsed.classify);
+        assert_eq!(parsed.facet, vec!["dev=*.c", "tests=*/tests/*"]);
+        assert!(parsed.tallies_by_facet);
+    }
+
+    #[test]
+    fn test_tallies_by_facet_requires_facet_definitions() {
+        let parsed = Cli::try_parse_from([
+            "provenant",
+            "--json-pp",
+            "scan.json",
+            "--tallies-by-facet",
+            "samples",
+        ]);
+
+        assert!(parsed.is_err());
     }
 
     #[test]

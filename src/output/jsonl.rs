@@ -24,6 +24,10 @@ pub(crate) fn write_json_lines(output: &Output, writer: &mut dyn Write) -> io::R
         )?;
     }
 
+    if let Some(tallies_by_facet) = &output.tallies_by_facet {
+        write_jsonl_line(writer, &json!({ "tallies_by_facet": tallies_by_facet }))?;
+    }
+
     if !output.packages.is_empty() {
         write_jsonl_line(writer, &json!({ "packages": output.packages }))?;
     }
