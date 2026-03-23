@@ -4,14 +4,16 @@ use std::sync::LazyLock;
 use regex::Regex;
 
 use super::normalize_whitespace;
+use crate::copyright::line_tracking::PreparedLineCache;
 use crate::copyright::refiner::refine_author;
 use crate::copyright::types::{AuthorDetection, CopyrightDetection, HolderDetection};
 
 pub(super) fn extract_multiline_written_by_author_blocks(
-    content: &str,
+    raw_lines: &[&str],
+    prepared_cache: &mut PreparedLineCache<'_>,
     authors: &mut Vec<AuthorDetection>,
 ) {
-    if content.is_empty() {
+    if raw_lines.is_empty() {
         return;
     }
 
@@ -26,12 +28,13 @@ pub(super) fn extract_multiline_written_by_author_blocks(
         .unwrap()
     });
 
-    let lines: Vec<&str> = content.lines().collect();
     let mut seen: HashSet<String> = authors.iter().map(|a| a.author.clone()).collect();
 
-    for (idx, raw) in lines.iter().enumerate() {
+    for (idx, _raw) in raw_lines.iter().enumerate() {
         let ln = idx + 1;
-        let prepared = crate::copyright::prepare::prepare_text_line(raw);
+        let Some(prepared) = prepared_cache.get(ln) else {
+            continue;
+        };
         let line = prepared.trim();
         if line.is_empty() {
             continue;
@@ -74,9 +77,12 @@ pub(super) fn extract_multiline_written_by_author_blocks(
     }
 
     let mut i = 0;
-    while i < lines.len() {
+    while i < raw_lines.len() {
         let ln = i + 1;
-        let prepared = crate::copyright::prepare::prepare_text_line(lines[i]);
+        let Some(prepared) = prepared_cache.get_by_index(i) else {
+            i += 1;
+            continue;
+        };
         let line = prepared.trim();
         let lower = line.to_ascii_lowercase();
 
@@ -97,9 +103,11 @@ pub(super) fn extract_multiline_written_by_author_blocks(
         block_lines.push((ln, line.to_string()));
 
         let mut j = i + 1;
-        while j < lines.len() {
+        while j < raw_lines.len() {
             let next_ln = j + 1;
-            let next_prepared = crate::copyright::prepare::prepare_text_line(lines[j]);
+            let Some(next_prepared) = prepared_cache.get_by_index(j) else {
+                break;
+            };
             let next_line = next_prepared.trim();
             if next_line.is_empty() {
                 break;
@@ -208,10 +216,11 @@ pub(super) fn extract_module_author_macros(
 }
 
 pub(super) fn extract_was_developed_by_author_blocks(
-    content: &str,
+    raw_lines: &[&str],
+    prepared_cache: &mut PreparedLineCache<'_>,
     authors: &mut Vec<AuthorDetection>,
 ) {
-    if content.is_empty() {
+    if raw_lines.is_empty() {
         return;
     }
 
@@ -220,13 +229,15 @@ pub(super) fn extract_was_developed_by_author_blocks(
     static WITH_PARTICIPATION_RE: LazyLock<Regex> =
         LazyLock::new(|| Regex::new(r"(?i)\bwith\s+participation\b").unwrap());
 
-    let lines: Vec<&str> = content.lines().collect();
     let mut seen: HashSet<String> = authors.iter().map(|a| a.author.clone()).collect();
 
     let mut i = 0;
-    while i < lines.len() {
+    while i < raw_lines.len() {
         let ln = i + 1;
-        let prepared = crate::copyright::prepare::prepare_text_line(lines[i]);
+        let Some(prepared) = prepared_cache.get_by_index(i) else {
+            i += 1;
+            continue;
+        };
         let line = prepared.trim();
         if line.is_empty() {
             i += 1;
@@ -247,9 +258,11 @@ pub(super) fn extract_was_developed_by_author_blocks(
 
         let mut end_ln = ln;
         let mut j = i + 1;
-        while j < lines.len() {
+        while j < raw_lines.len() {
             let next_ln = j + 1;
-            let next_prepared = crate::copyright::prepare::prepare_text_line(lines[j]);
+            let Some(next_prepared) = prepared_cache.get_by_index(j) else {
+                break;
+            };
             let next_line = next_prepared.trim();
             if next_line.is_empty() {
                 break;
@@ -304,8 +317,12 @@ pub(super) fn extract_was_developed_by_author_blocks(
     }
 }
 
-pub(super) fn extract_author_colon_blocks(content: &str, authors: &mut Vec<AuthorDetection>) {
-    if content.is_empty() {
+pub(super) fn extract_author_colon_blocks(
+    raw_lines: &[&str],
+    prepared_cache: &mut PreparedLineCache<'_>,
+    authors: &mut Vec<AuthorDetection>,
+) {
+    if raw_lines.is_empty() {
         return;
     }
 
@@ -316,20 +333,24 @@ pub(super) fn extract_author_colon_blocks(content: &str, authors: &mut Vec<Autho
         Regex::new(r"(?i)^copyright\s+\(c\)\s*(?:\d{4}(?:\s*,\s*\d{4})*|\d{4}-\d{4})\s*$").unwrap()
     });
 
-    let lines: Vec<&str> = content.lines().collect();
     let mut seen: HashSet<String> = authors.iter().map(|a| a.author.clone()).collect();
 
     let mut i = 0;
-    while i < lines.len() {
+    while i < raw_lines.len() {
         let ln = i + 1;
-        let prepared = crate::copyright::prepare::prepare_text_line(lines[i]);
-        let line = prepared.trim().trim_start_matches('*').trim_start();
+        let line = match prepared_cache.get_by_index(i) {
+            Some(p) => p.trim().trim_start_matches('*').trim_start().to_string(),
+            None => {
+                i += 1;
+                continue;
+            }
+        };
         if line.is_empty() {
             i += 1;
             continue;
         }
 
-        let Some(cap) = AUTHOR_COLON_RE.captures(line) else {
+        let Some(cap) = AUTHOR_COLON_RE.captures(&line) else {
             i += 1;
             continue;
         };
@@ -338,12 +359,14 @@ pub(super) fn extract_author_colon_blocks(content: &str, authors: &mut Vec<Autho
         let mut prev_idx = i;
         while prev_idx > 0 {
             prev_idx -= 1;
-            let prev_prepared = crate::copyright::prepare::prepare_text_line(lines[prev_idx]);
-            let prev = prev_prepared.trim();
+            let prev = match prepared_cache.get_by_index(prev_idx) {
+                Some(p) => p.trim().to_string(),
+                None => break,
+            };
             if prev.is_empty() {
                 continue;
             }
-            if YEAR_ONLY_COPY_RE.is_match(prev) {
+            if YEAR_ONLY_COPY_RE.is_match(&prev) {
                 skip = true;
             }
             break;
@@ -371,8 +394,10 @@ pub(super) fn extract_author_colon_blocks(content: &str, authors: &mut Vec<Autho
         let mut segments: Vec<String> = vec![tail.to_string()];
         let mut j = i + 1;
         let mut added = 0usize;
-        while j < lines.len() {
-            let next_prepared = crate::copyright::prepare::prepare_text_line(lines[j]);
+        while j < raw_lines.len() {
+            let Some(next_prepared) = prepared_cache.get_by_index(j) else {
+                break;
+            };
             let next_line = next_prepared.trim().trim_start_matches('*').trim_start();
             if next_line.is_empty() {
                 break;
@@ -465,10 +490,11 @@ pub(super) fn extract_author_colon_blocks(content: &str, authors: &mut Vec<Autho
 }
 
 pub(super) fn extract_code_written_by_author_blocks(
-    content: &str,
+    raw_lines: &[&str],
+    prepared_cache: &mut PreparedLineCache<'_>,
     authors: &mut Vec<AuthorDetection>,
 ) {
-    if content.is_empty() {
+    if raw_lines.is_empty() {
         return;
     }
 
@@ -480,13 +506,15 @@ pub(super) fn extract_code_written_by_author_blocks(
         Regex::new(r"(?is)(?P<prefix>.+?\bDonald\s+wrote\s+the\s+SMC\s+91c92\s+code)\b").unwrap()
     });
 
-    let lines: Vec<&str> = content.lines().collect();
     let mut seen: HashSet<String> = authors.iter().map(|a| a.author.clone()).collect();
 
     let mut i = 0;
-    while i < lines.len() {
+    while i < raw_lines.len() {
         let ln = i + 1;
-        let prepared = crate::copyright::prepare::prepare_text_line(lines[i]);
+        let Some(prepared) = prepared_cache.get_by_index(i) else {
+            i += 1;
+            continue;
+        };
         let line = prepared.trim();
         if line.is_empty() {
             i += 1;
@@ -499,8 +527,10 @@ pub(super) fn extract_code_written_by_author_blocks(
 
         let mut combined = line.to_string();
         let mut j = i + 1;
-        while j < lines.len() {
-            let next_prepared = crate::copyright::prepare::prepare_text_line(lines[j]);
+        while j < raw_lines.len() {
+            let Some(next_prepared) = prepared_cache.get_by_index(j) else {
+                break;
+            };
             let next = next_prepared.trim();
             if next.is_empty() {
                 break;
@@ -551,7 +581,8 @@ pub(super) fn extract_code_written_by_author_blocks(
 }
 
 pub(super) fn extract_developed_and_created_by_authors(
-    content: &str,
+    raw_lines: &[&str],
+    prepared_cache: &mut PreparedLineCache<'_>,
     authors: &mut Vec<AuthorDetection>,
 ) {
     static PREFIX_RE: LazyLock<Regex> =
@@ -561,7 +592,6 @@ pub(super) fn extract_developed_and_created_by_authors(
         Regex::new(r"(?i)\bon\s+free\s+and\s+open\s+source\s+software\b.*$").unwrap()
     });
 
-    let raw_lines: Vec<&str> = content.lines().collect();
     if raw_lines.is_empty() {
         return;
     }
@@ -569,7 +599,9 @@ pub(super) fn extract_developed_and_created_by_authors(
     let mut seen: HashSet<String> = authors.iter().map(|a| a.author.clone()).collect();
 
     for start_idx in 0..raw_lines.len() {
-        let prepared0 = crate::copyright::prepare::prepare_text_line(raw_lines[start_idx]);
+        let Some(prepared0) = prepared_cache.get_by_index(start_idx) else {
+            continue;
+        };
         if !PREFIX_RE.is_match(prepared0.trim()) {
             continue;
         }
@@ -577,8 +609,10 @@ pub(super) fn extract_developed_and_created_by_authors(
         let mut parts: Vec<String> = Vec::new();
         let mut end_idx = start_idx;
 
-        for (idx, raw) in raw_lines.iter().enumerate().skip(start_idx) {
-            let prepared = crate::copyright::prepare::prepare_text_line(raw);
+        for idx in start_idx..raw_lines.len() {
+            let Some(prepared) = prepared_cache.get_by_index(idx) else {
+                break;
+            };
             let line = prepared.trim();
             if line.is_empty() {
                 break;
@@ -628,7 +662,8 @@ pub(super) fn extract_developed_and_created_by_authors(
 }
 
 pub(super) fn extract_with_additional_hacking_by_authors(
-    content: &str,
+    raw_lines: &[&str],
+    prepared_cache: &mut PreparedLineCache<'_>,
     authors: &mut Vec<AuthorDetection>,
 ) {
     static RE: LazyLock<Regex> = LazyLock::new(|| {
@@ -637,9 +672,11 @@ pub(super) fn extract_with_additional_hacking_by_authors(
 
     let mut seen: HashSet<String> = authors.iter().map(|a| a.author.clone()).collect();
 
-    for (idx, raw) in content.lines().enumerate() {
+    for idx in 0..raw_lines.len() {
         let ln = idx + 1;
-        let prepared = crate::copyright::prepare::prepare_text_line(raw);
+        let Some(prepared) = prepared_cache.get_by_index(idx) else {
+            continue;
+        };
         let line = prepared.trim();
         if line.is_empty() {
             continue;
@@ -664,27 +701,28 @@ pub(super) fn extract_with_additional_hacking_by_authors(
 }
 
 pub(super) fn merge_metadata_author_and_email_lines(
-    content: &str,
+    raw_lines: &[&str],
+    prepared_cache: &mut PreparedLineCache<'_>,
     authors: &mut Vec<AuthorDetection>,
 ) {
-    let raw_lines: Vec<&str> = content.lines().collect();
-    let prepared_lines: Vec<String> = raw_lines
-        .iter()
-        .map(|l| crate::copyright::prepare::prepare_text_line(l))
-        .collect();
+    let has_metadata = raw_lines.iter().enumerate().any(|(idx, _)| {
+        prepared_cache
+            .get_by_index(idx)
+            .is_some_and(|l| l.trim_start().starts_with("Metadata-Version:"))
+    });
 
-    if !prepared_lines
-        .iter()
-        .any(|l| l.trim_start().starts_with("Metadata-Version:"))
-    {
+    if !has_metadata {
         return;
     }
 
     let mut seen: HashSet<String> = authors.iter().map(|a| a.author.clone()).collect();
 
-    for idx in 0..prepared_lines.len() {
+    for idx in 0..raw_lines.len() {
         let author_ln = idx + 1;
-        let author_line = prepared_lines[idx].trim();
+        let author_line = match prepared_cache.get_by_index(idx) {
+            Some(p) => p.trim().to_string(),
+            None => continue,
+        };
         if author_line.is_empty() {
             continue;
         }
@@ -699,9 +737,12 @@ pub(super) fn merge_metadata_author_and_email_lines(
             continue;
         }
 
-        for (j, email_line_prepared) in prepared_lines.iter().enumerate().skip(idx + 1) {
+        for j in (idx + 1)..raw_lines.len() {
             let email_ln = j + 1;
-            let email_line = email_line_prepared.trim();
+            let email_line = match prepared_cache.get_by_index(j) {
+                Some(p) => p.trim().to_string(),
+                None => break,
+            };
             if email_line.is_empty() {
                 break;
             }
@@ -749,8 +790,12 @@ pub(super) fn merge_metadata_author_and_email_lines(
     }
 }
 
-pub(super) fn extract_debian_maintainer_authors(content: &str, authors: &mut Vec<AuthorDetection>) {
-    if content.is_empty() {
+pub(super) fn extract_debian_maintainer_authors(
+    raw_lines: &[&str],
+    prepared_cache: &mut PreparedLineCache<'_>,
+    authors: &mut Vec<AuthorDetection>,
+) {
+    if raw_lines.is_empty() {
         return;
     }
 
@@ -769,9 +814,11 @@ pub(super) fn extract_debian_maintainer_authors(content: &str, authors: &mut Vec
 
     let mut seen: HashSet<String> = authors.iter().map(|a| a.author.clone()).collect();
 
-    for (idx, raw) in content.lines().enumerate() {
+    for idx in 0..raw_lines.len() {
         let ln = idx + 1;
-        let prepared = crate::copyright::prepare::prepare_text_line(raw);
+        let Some(prepared) = prepared_cache.get_by_index(idx) else {
+            continue;
+        };
         let line = prepared.trim();
         if line.is_empty() {
             continue;
@@ -806,8 +853,12 @@ pub(super) fn extract_debian_maintainer_authors(content: &str, authors: &mut Vec
     }
 }
 
-pub(super) fn extract_created_by_project_author(content: &str, authors: &mut Vec<AuthorDetection>) {
-    if content.is_empty() {
+pub(super) fn extract_created_by_project_author(
+    raw_lines: &[&str],
+    prepared_cache: &mut PreparedLineCache<'_>,
+    authors: &mut Vec<AuthorDetection>,
+) {
+    if raw_lines.is_empty() {
         return;
     }
 
@@ -816,9 +867,11 @@ pub(super) fn extract_created_by_project_author(content: &str, authors: &mut Vec
 
     let mut seen: HashSet<String> = authors.iter().map(|a| a.author.clone()).collect();
 
-    for (idx, raw) in content.lines().enumerate() {
+    for idx in 0..raw_lines.len() {
         let ln = idx + 1;
-        let prepared = crate::copyright::prepare::prepare_text_line(raw);
+        let Some(prepared) = prepared_cache.get_by_index(idx) else {
+            continue;
+        };
         if CREATED_BY_PROJECT_RE.is_match(prepared.trim()) {
             let author = "the Project".to_string();
             if seen.insert(author.clone()) {
@@ -833,8 +886,12 @@ pub(super) fn extract_created_by_project_author(content: &str, authors: &mut Vec
     }
 }
 
-pub(super) fn extract_created_by_authors(content: &str, authors: &mut Vec<AuthorDetection>) {
-    if content.is_empty() {
+pub(super) fn extract_created_by_authors(
+    raw_lines: &[&str],
+    prepared_cache: &mut PreparedLineCache<'_>,
+    authors: &mut Vec<AuthorDetection>,
+) {
+    if raw_lines.is_empty() {
         return;
     }
 
@@ -843,9 +900,11 @@ pub(super) fn extract_created_by_authors(content: &str, authors: &mut Vec<Author
 
     let mut seen: HashSet<String> = authors.iter().map(|a| a.author.clone()).collect();
 
-    for (idx, raw) in content.lines().enumerate() {
+    for idx in 0..raw_lines.len() {
         let ln = idx + 1;
-        let prepared = crate::copyright::prepare::prepare_text_line(raw);
+        let Some(prepared) = prepared_cache.get_by_index(idx) else {
+            continue;
+        };
         let line = prepared.trim();
         if line.is_empty() {
             continue;
@@ -882,10 +941,11 @@ pub(super) fn extract_created_by_authors(content: &str, authors: &mut Vec<Author
 }
 
 pub(super) fn extract_written_by_comma_and_copyright_authors(
-    content: &str,
+    raw_lines: &[&str],
+    prepared_cache: &mut PreparedLineCache<'_>,
     authors: &mut Vec<AuthorDetection>,
 ) {
-    if content.is_empty() {
+    if raw_lines.is_empty() {
         return;
     }
 
@@ -895,9 +955,11 @@ pub(super) fn extract_written_by_comma_and_copyright_authors(
 
     let mut seen: HashSet<String> = authors.iter().map(|a| a.author.clone()).collect();
 
-    for (idx, raw) in content.lines().enumerate() {
+    for idx in 0..raw_lines.len() {
         let ln = idx + 1;
-        let prepared = crate::copyright::prepare::prepare_text_line(raw);
+        let Some(prepared) = prepared_cache.get_by_index(idx) else {
+            continue;
+        };
         let line = prepared.trim();
         if line.is_empty() {
             continue;
@@ -923,10 +985,11 @@ pub(super) fn extract_written_by_comma_and_copyright_authors(
 }
 
 pub(super) fn extract_developed_by_sentence_authors(
-    content: &str,
+    raw_lines: &[&str],
+    prepared_cache: &mut PreparedLineCache<'_>,
     authors: &mut Vec<AuthorDetection>,
 ) {
-    if content.is_empty() {
+    if raw_lines.is_empty() {
         return;
     }
 
@@ -935,9 +998,11 @@ pub(super) fn extract_developed_by_sentence_authors(
 
     let mut seen: HashSet<String> = authors.iter().map(|a| a.author.clone()).collect();
 
-    for (idx, raw) in content.lines().enumerate() {
+    for idx in 0..raw_lines.len() {
         let ln = idx + 1;
-        let prepared = crate::copyright::prepare::prepare_text_line(raw);
+        let Some(prepared) = prepared_cache.get_by_index(idx) else {
+            continue;
+        };
         let line = prepared.trim();
         if line.is_empty() {
             continue;
@@ -982,10 +1047,11 @@ pub(super) fn extract_developed_by_sentence_authors(
 }
 
 pub(super) fn extract_developed_by_phrase_authors(
-    content: &str,
+    raw_lines: &[&str],
+    prepared_cache: &mut PreparedLineCache<'_>,
     authors: &mut Vec<AuthorDetection>,
 ) {
-    if content.is_empty() {
+    if raw_lines.is_empty() {
         return;
     }
 
@@ -995,9 +1061,11 @@ pub(super) fn extract_developed_by_phrase_authors(
 
     let mut seen: HashSet<String> = authors.iter().map(|a| a.author.clone()).collect();
 
-    for (idx, raw) in content.lines().enumerate() {
+    for idx in 0..raw_lines.len() {
         let ln = idx + 1;
-        let prepared = crate::copyright::prepare::prepare_text_line(raw);
+        let Some(prepared) = prepared_cache.get_by_index(idx) else {
+            continue;
+        };
         let line = prepared.trim();
         if line.is_empty() {
             continue;
@@ -1029,8 +1097,12 @@ pub(super) fn extract_developed_by_phrase_authors(
     }
 }
 
-pub(super) fn extract_maintained_by_authors(content: &str, authors: &mut Vec<AuthorDetection>) {
-    if content.is_empty() {
+pub(super) fn extract_maintained_by_authors(
+    raw_lines: &[&str],
+    prepared_cache: &mut PreparedLineCache<'_>,
+    authors: &mut Vec<AuthorDetection>,
+) {
+    if raw_lines.is_empty() {
         return;
     }
 
@@ -1040,9 +1112,11 @@ pub(super) fn extract_maintained_by_authors(content: &str, authors: &mut Vec<Aut
 
     let mut seen: HashSet<String> = authors.iter().map(|a| a.author.clone()).collect();
 
-    for (idx, raw) in content.lines().enumerate() {
+    for idx in 0..raw_lines.len() {
         let ln = idx + 1;
-        let prepared = crate::copyright::prepare::prepare_text_line(raw);
+        let Some(prepared) = prepared_cache.get_by_index(idx) else {
+            continue;
+        };
         let line = prepared.trim();
         if line.is_empty() {
             continue;
@@ -1069,8 +1143,12 @@ pub(super) fn extract_maintained_by_authors(content: &str, authors: &mut Vec<Aut
     }
 }
 
-pub(super) fn extract_converted_to_by_authors(content: &str, authors: &mut Vec<AuthorDetection>) {
-    if content.is_empty() {
+pub(super) fn extract_converted_to_by_authors(
+    raw_lines: &[&str],
+    prepared_cache: &mut PreparedLineCache<'_>,
+    authors: &mut Vec<AuthorDetection>,
+) {
+    if raw_lines.is_empty() {
         return;
     }
 
@@ -1084,9 +1162,11 @@ pub(super) fn extract_converted_to_by_authors(content: &str, authors: &mut Vec<A
 
     let mut seen: HashSet<String> = authors.iter().map(|a| a.author.clone()).collect();
 
-    for (idx, raw) in content.lines().enumerate() {
+    for idx in 0..raw_lines.len() {
         let ln = idx + 1;
-        let prepared = crate::copyright::prepare::prepare_text_line(raw);
+        let Some(prepared) = prepared_cache.get_by_index(idx) else {
+            continue;
+        };
         let line = prepared.trim().trim_start_matches('*').trim_start();
         if line.is_empty() {
             continue;
@@ -1138,10 +1218,11 @@ pub(super) fn extract_converted_to_by_authors(content: &str, authors: &mut Vec<A
 }
 
 pub(super) fn extract_various_bugfixes_and_enhancements_by_authors(
-    content: &str,
+    raw_lines: &[&str],
+    prepared_cache: &mut PreparedLineCache<'_>,
     authors: &mut Vec<AuthorDetection>,
 ) {
-    if content.is_empty() {
+    if raw_lines.is_empty() {
         return;
     }
 
@@ -1151,9 +1232,11 @@ pub(super) fn extract_various_bugfixes_and_enhancements_by_authors(
 
     let mut seen: HashSet<String> = authors.iter().map(|a| a.author.clone()).collect();
 
-    for (idx, raw) in content.lines().enumerate() {
+    for idx in 0..raw_lines.len() {
         let ln = idx + 1;
-        let prepared = crate::copyright::prepare::prepare_text_line(raw);
+        let Some(prepared) = prepared_cache.get_by_index(idx) else {
+            continue;
+        };
         let line = prepared.trim().trim_start_matches('*').trim_start();
         if line.is_empty() {
             continue;
@@ -1316,7 +1399,8 @@ pub(super) fn drop_comedi_ds_status_devices_authors(
 }
 
 pub(super) fn drop_written_by_authors_preceded_by_copyright(
-    content: &str,
+    raw_lines: &[&str],
+    prepared_cache: &mut PreparedLineCache<'_>,
     authors: &mut Vec<AuthorDetection>,
 ) {
     if authors.is_empty() {
@@ -1328,25 +1412,28 @@ pub(super) fn drop_written_by_authors_preceded_by_copyright(
     static COPYRIGHT_HINT_RE: LazyLock<Regex> =
         LazyLock::new(|| Regex::new(r"(?i)\bcopyright\b|\(c\)").unwrap());
 
-    let lines: Vec<&str> = content.lines().collect();
-    if lines.len() < 2 {
+    if raw_lines.len() < 2 {
         return;
     }
 
     let mut to_drop: HashSet<String> = HashSet::new();
-    for i in 1..lines.len() {
-        let prepared = crate::copyright::prepare::prepare_text_line(lines[i]);
-        let line = prepared.trim();
-        let Some(cap) = WRITTEN_BY_RE.captures(line) else {
+    for i in 1..raw_lines.len() {
+        let line = match prepared_cache.get_by_index(i) {
+            Some(p) => p.trim().to_string(),
+            None => continue,
+        };
+        let Some(cap) = WRITTEN_BY_RE.captures(&line) else {
             continue;
         };
         let who = cap.name("who").map(|m| m.as_str()).unwrap_or("").trim();
         if who.is_empty() {
             continue;
         }
-        let prev_prepared = crate::copyright::prepare::prepare_text_line(lines[i - 1]);
-        let prev = prev_prepared.trim();
-        if !COPYRIGHT_HINT_RE.is_match(prev) {
+        let prev = match prepared_cache.get_by_index(i - 1) {
+            Some(p) => p.trim().to_string(),
+            None => continue,
+        };
+        if !COPYRIGHT_HINT_RE.is_match(&prev) {
             continue;
         }
         if let Some(author) = refine_author(who) {
@@ -1361,13 +1448,15 @@ pub(super) fn drop_written_by_authors_preceded_by_copyright(
 }
 
 pub(super) fn extract_dense_name_email_author_lists(
-    content: &str,
+    raw_lines: &[&str],
+    prepared_cache: &mut PreparedLineCache<'_>,
     authors: &mut Vec<AuthorDetection>,
 ) {
-    if content.is_empty() {
+    if raw_lines.is_empty() {
         return;
     }
 
+    let content = raw_lines.join("\n");
     let lower = content.to_ascii_lowercase();
     if lower.contains("copyright") || lower.contains("(c)") {
         return;
@@ -1378,8 +1467,10 @@ pub(super) fn extract_dense_name_email_author_lists(
     });
 
     let mut non_empty_lines: Vec<(usize, String)> = Vec::new();
-    for (idx, raw) in content.lines().enumerate() {
-        let prepared = crate::copyright::prepare::prepare_text_line(raw);
+    for idx in 0..raw_lines.len() {
+        let Some(prepared) = prepared_cache.get_by_index(idx) else {
+            continue;
+        };
         let line = prepared.trim();
         if line.is_empty() {
             continue;

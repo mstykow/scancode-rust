@@ -17,8 +17,20 @@ impl<'a> PreparedLineCache<'a> {
         self.raw_lines.len()
     }
 
+    pub(super) fn is_empty(&self) -> bool {
+        self.raw_lines.is_empty()
+    }
+
+    pub(super) fn len(&self) -> usize {
+        self.raw_lines.len()
+    }
+
     pub(super) fn get(&mut self, line_number: usize) -> Option<&str> {
         let idx = line_number.checked_sub(1)?;
+        self.get_by_index(idx)
+    }
+
+    pub(super) fn get_by_index(&mut self, idx: usize) -> Option<&str> {
         if idx >= self.raw_lines.len() {
             return None;
         }
