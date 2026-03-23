@@ -9,11 +9,10 @@ use crate::copyright::refiner::refine_author;
 use crate::copyright::types::{AuthorDetection, CopyrightDetection, HolderDetection};
 
 pub(super) fn extract_multiline_written_by_author_blocks(
-    raw_lines: &[&str],
     prepared_cache: &mut PreparedLineCache<'_>,
     authors: &mut Vec<AuthorDetection>,
 ) {
-    if raw_lines.is_empty() {
+    if prepared_cache.is_empty() {
         return;
     }
 
@@ -30,9 +29,9 @@ pub(super) fn extract_multiline_written_by_author_blocks(
 
     let mut seen: HashSet<String> = authors.iter().map(|a| a.author.clone()).collect();
 
-    for (idx, _raw) in raw_lines.iter().enumerate() {
+    for idx in 0..prepared_cache.len() {
         let ln = idx + 1;
-        let Some(prepared) = prepared_cache.get(ln) else {
+        let Some(prepared) = prepared_cache.get_by_index(idx) else {
             continue;
         };
         let line = prepared.trim();
@@ -77,7 +76,7 @@ pub(super) fn extract_multiline_written_by_author_blocks(
     }
 
     let mut i = 0;
-    while i < raw_lines.len() {
+    while i < prepared_cache.len() {
         let ln = i + 1;
         let Some(prepared) = prepared_cache.get_by_index(i) else {
             i += 1;
@@ -103,7 +102,7 @@ pub(super) fn extract_multiline_written_by_author_blocks(
         block_lines.push((ln, line.to_string()));
 
         let mut j = i + 1;
-        while j < raw_lines.len() {
+        while j < prepared_cache.len() {
             let next_ln = j + 1;
             let Some(next_prepared) = prepared_cache.get_by_index(j) else {
                 break;
@@ -216,11 +215,10 @@ pub(super) fn extract_module_author_macros(
 }
 
 pub(super) fn extract_was_developed_by_author_blocks(
-    raw_lines: &[&str],
     prepared_cache: &mut PreparedLineCache<'_>,
     authors: &mut Vec<AuthorDetection>,
 ) {
-    if raw_lines.is_empty() {
+    if prepared_cache.is_empty() {
         return;
     }
 
@@ -232,7 +230,7 @@ pub(super) fn extract_was_developed_by_author_blocks(
     let mut seen: HashSet<String> = authors.iter().map(|a| a.author.clone()).collect();
 
     let mut i = 0;
-    while i < raw_lines.len() {
+    while i < prepared_cache.len() {
         let ln = i + 1;
         let Some(prepared) = prepared_cache.get_by_index(i) else {
             i += 1;
@@ -258,7 +256,7 @@ pub(super) fn extract_was_developed_by_author_blocks(
 
         let mut end_ln = ln;
         let mut j = i + 1;
-        while j < raw_lines.len() {
+        while j < prepared_cache.len() {
             let next_ln = j + 1;
             let Some(next_prepared) = prepared_cache.get_by_index(j) else {
                 break;
@@ -318,11 +316,10 @@ pub(super) fn extract_was_developed_by_author_blocks(
 }
 
 pub(super) fn extract_author_colon_blocks(
-    raw_lines: &[&str],
     prepared_cache: &mut PreparedLineCache<'_>,
     authors: &mut Vec<AuthorDetection>,
 ) {
-    if raw_lines.is_empty() {
+    if prepared_cache.is_empty() {
         return;
     }
 
@@ -336,7 +333,7 @@ pub(super) fn extract_author_colon_blocks(
     let mut seen: HashSet<String> = authors.iter().map(|a| a.author.clone()).collect();
 
     let mut i = 0;
-    while i < raw_lines.len() {
+    while i < prepared_cache.len() {
         let ln = i + 1;
         let line = match prepared_cache.get_by_index(i) {
             Some(p) => p.trim().trim_start_matches('*').trim_start().to_string(),
@@ -394,7 +391,7 @@ pub(super) fn extract_author_colon_blocks(
         let mut segments: Vec<String> = vec![tail.to_string()];
         let mut j = i + 1;
         let mut added = 0usize;
-        while j < raw_lines.len() {
+        while j < prepared_cache.len() {
             let Some(next_prepared) = prepared_cache.get_by_index(j) else {
                 break;
             };
@@ -490,11 +487,10 @@ pub(super) fn extract_author_colon_blocks(
 }
 
 pub(super) fn extract_code_written_by_author_blocks(
-    raw_lines: &[&str],
     prepared_cache: &mut PreparedLineCache<'_>,
     authors: &mut Vec<AuthorDetection>,
 ) {
-    if raw_lines.is_empty() {
+    if prepared_cache.is_empty() {
         return;
     }
 
@@ -509,7 +505,7 @@ pub(super) fn extract_code_written_by_author_blocks(
     let mut seen: HashSet<String> = authors.iter().map(|a| a.author.clone()).collect();
 
     let mut i = 0;
-    while i < raw_lines.len() {
+    while i < prepared_cache.len() {
         let ln = i + 1;
         let Some(prepared) = prepared_cache.get_by_index(i) else {
             i += 1;
@@ -527,7 +523,7 @@ pub(super) fn extract_code_written_by_author_blocks(
 
         let mut combined = line.to_string();
         let mut j = i + 1;
-        while j < raw_lines.len() {
+        while j < prepared_cache.len() {
             let Some(next_prepared) = prepared_cache.get_by_index(j) else {
                 break;
             };
@@ -581,7 +577,6 @@ pub(super) fn extract_code_written_by_author_blocks(
 }
 
 pub(super) fn extract_developed_and_created_by_authors(
-    raw_lines: &[&str],
     prepared_cache: &mut PreparedLineCache<'_>,
     authors: &mut Vec<AuthorDetection>,
 ) {
@@ -592,13 +587,13 @@ pub(super) fn extract_developed_and_created_by_authors(
         Regex::new(r"(?i)\bon\s+free\s+and\s+open\s+source\s+software\b.*$").unwrap()
     });
 
-    if raw_lines.is_empty() {
+    if prepared_cache.is_empty() {
         return;
     }
 
     let mut seen: HashSet<String> = authors.iter().map(|a| a.author.clone()).collect();
 
-    for start_idx in 0..raw_lines.len() {
+    for start_idx in 0..prepared_cache.len() {
         let Some(prepared0) = prepared_cache.get_by_index(start_idx) else {
             continue;
         };
@@ -609,7 +604,7 @@ pub(super) fn extract_developed_and_created_by_authors(
         let mut parts: Vec<String> = Vec::new();
         let mut end_idx = start_idx;
 
-        for idx in start_idx..raw_lines.len() {
+        for idx in start_idx..prepared_cache.len() {
             let Some(prepared) = prepared_cache.get_by_index(idx) else {
                 break;
             };
@@ -662,7 +657,6 @@ pub(super) fn extract_developed_and_created_by_authors(
 }
 
 pub(super) fn extract_with_additional_hacking_by_authors(
-    raw_lines: &[&str],
     prepared_cache: &mut PreparedLineCache<'_>,
     authors: &mut Vec<AuthorDetection>,
 ) {
@@ -672,7 +666,7 @@ pub(super) fn extract_with_additional_hacking_by_authors(
 
     let mut seen: HashSet<String> = authors.iter().map(|a| a.author.clone()).collect();
 
-    for idx in 0..raw_lines.len() {
+    for idx in 0..prepared_cache.len() {
         let ln = idx + 1;
         let Some(prepared) = prepared_cache.get_by_index(idx) else {
             continue;
@@ -701,11 +695,10 @@ pub(super) fn extract_with_additional_hacking_by_authors(
 }
 
 pub(super) fn merge_metadata_author_and_email_lines(
-    raw_lines: &[&str],
     prepared_cache: &mut PreparedLineCache<'_>,
     authors: &mut Vec<AuthorDetection>,
 ) {
-    let has_metadata = raw_lines.iter().enumerate().any(|(idx, _)| {
+    let has_metadata = (0..prepared_cache.len()).any(|idx| {
         prepared_cache
             .get_by_index(idx)
             .is_some_and(|l| l.trim_start().starts_with("Metadata-Version:"))
@@ -717,7 +710,7 @@ pub(super) fn merge_metadata_author_and_email_lines(
 
     let mut seen: HashSet<String> = authors.iter().map(|a| a.author.clone()).collect();
 
-    for idx in 0..raw_lines.len() {
+    for idx in 0..prepared_cache.len() {
         let author_ln = idx + 1;
         let author_line = match prepared_cache.get_by_index(idx) {
             Some(p) => p.trim().to_string(),
@@ -737,7 +730,7 @@ pub(super) fn merge_metadata_author_and_email_lines(
             continue;
         }
 
-        for j in (idx + 1)..raw_lines.len() {
+        for j in (idx + 1)..prepared_cache.len() {
             let email_ln = j + 1;
             let email_line = match prepared_cache.get_by_index(j) {
                 Some(p) => p.trim().to_string(),
@@ -791,11 +784,10 @@ pub(super) fn merge_metadata_author_and_email_lines(
 }
 
 pub(super) fn extract_debian_maintainer_authors(
-    raw_lines: &[&str],
     prepared_cache: &mut PreparedLineCache<'_>,
     authors: &mut Vec<AuthorDetection>,
 ) {
-    if raw_lines.is_empty() {
+    if prepared_cache.is_empty() {
         return;
     }
 
@@ -814,7 +806,7 @@ pub(super) fn extract_debian_maintainer_authors(
 
     let mut seen: HashSet<String> = authors.iter().map(|a| a.author.clone()).collect();
 
-    for idx in 0..raw_lines.len() {
+    for idx in 0..prepared_cache.len() {
         let ln = idx + 1;
         let Some(prepared) = prepared_cache.get_by_index(idx) else {
             continue;
@@ -854,11 +846,10 @@ pub(super) fn extract_debian_maintainer_authors(
 }
 
 pub(super) fn extract_created_by_project_author(
-    raw_lines: &[&str],
     prepared_cache: &mut PreparedLineCache<'_>,
     authors: &mut Vec<AuthorDetection>,
 ) {
-    if raw_lines.is_empty() {
+    if prepared_cache.is_empty() {
         return;
     }
 
@@ -867,7 +858,7 @@ pub(super) fn extract_created_by_project_author(
 
     let mut seen: HashSet<String> = authors.iter().map(|a| a.author.clone()).collect();
 
-    for idx in 0..raw_lines.len() {
+    for idx in 0..prepared_cache.len() {
         let ln = idx + 1;
         let Some(prepared) = prepared_cache.get_by_index(idx) else {
             continue;
@@ -887,11 +878,10 @@ pub(super) fn extract_created_by_project_author(
 }
 
 pub(super) fn extract_created_by_authors(
-    raw_lines: &[&str],
     prepared_cache: &mut PreparedLineCache<'_>,
     authors: &mut Vec<AuthorDetection>,
 ) {
-    if raw_lines.is_empty() {
+    if prepared_cache.is_empty() {
         return;
     }
 
@@ -900,7 +890,7 @@ pub(super) fn extract_created_by_authors(
 
     let mut seen: HashSet<String> = authors.iter().map(|a| a.author.clone()).collect();
 
-    for idx in 0..raw_lines.len() {
+    for idx in 0..prepared_cache.len() {
         let ln = idx + 1;
         let Some(prepared) = prepared_cache.get_by_index(idx) else {
             continue;
@@ -941,11 +931,10 @@ pub(super) fn extract_created_by_authors(
 }
 
 pub(super) fn extract_written_by_comma_and_copyright_authors(
-    raw_lines: &[&str],
     prepared_cache: &mut PreparedLineCache<'_>,
     authors: &mut Vec<AuthorDetection>,
 ) {
-    if raw_lines.is_empty() {
+    if prepared_cache.is_empty() {
         return;
     }
 
@@ -955,7 +944,7 @@ pub(super) fn extract_written_by_comma_and_copyright_authors(
 
     let mut seen: HashSet<String> = authors.iter().map(|a| a.author.clone()).collect();
 
-    for idx in 0..raw_lines.len() {
+    for idx in 0..prepared_cache.len() {
         let ln = idx + 1;
         let Some(prepared) = prepared_cache.get_by_index(idx) else {
             continue;
@@ -985,11 +974,10 @@ pub(super) fn extract_written_by_comma_and_copyright_authors(
 }
 
 pub(super) fn extract_developed_by_sentence_authors(
-    raw_lines: &[&str],
     prepared_cache: &mut PreparedLineCache<'_>,
     authors: &mut Vec<AuthorDetection>,
 ) {
-    if raw_lines.is_empty() {
+    if prepared_cache.is_empty() {
         return;
     }
 
@@ -998,7 +986,7 @@ pub(super) fn extract_developed_by_sentence_authors(
 
     let mut seen: HashSet<String> = authors.iter().map(|a| a.author.clone()).collect();
 
-    for idx in 0..raw_lines.len() {
+    for idx in 0..prepared_cache.len() {
         let ln = idx + 1;
         let Some(prepared) = prepared_cache.get_by_index(idx) else {
             continue;
@@ -1047,11 +1035,10 @@ pub(super) fn extract_developed_by_sentence_authors(
 }
 
 pub(super) fn extract_developed_by_phrase_authors(
-    raw_lines: &[&str],
     prepared_cache: &mut PreparedLineCache<'_>,
     authors: &mut Vec<AuthorDetection>,
 ) {
-    if raw_lines.is_empty() {
+    if prepared_cache.is_empty() {
         return;
     }
 
@@ -1061,7 +1048,7 @@ pub(super) fn extract_developed_by_phrase_authors(
 
     let mut seen: HashSet<String> = authors.iter().map(|a| a.author.clone()).collect();
 
-    for idx in 0..raw_lines.len() {
+    for idx in 0..prepared_cache.len() {
         let ln = idx + 1;
         let Some(prepared) = prepared_cache.get_by_index(idx) else {
             continue;
@@ -1098,11 +1085,10 @@ pub(super) fn extract_developed_by_phrase_authors(
 }
 
 pub(super) fn extract_maintained_by_authors(
-    raw_lines: &[&str],
     prepared_cache: &mut PreparedLineCache<'_>,
     authors: &mut Vec<AuthorDetection>,
 ) {
-    if raw_lines.is_empty() {
+    if prepared_cache.is_empty() {
         return;
     }
 
@@ -1112,7 +1098,7 @@ pub(super) fn extract_maintained_by_authors(
 
     let mut seen: HashSet<String> = authors.iter().map(|a| a.author.clone()).collect();
 
-    for idx in 0..raw_lines.len() {
+    for idx in 0..prepared_cache.len() {
         let ln = idx + 1;
         let Some(prepared) = prepared_cache.get_by_index(idx) else {
             continue;
@@ -1144,11 +1130,10 @@ pub(super) fn extract_maintained_by_authors(
 }
 
 pub(super) fn extract_converted_to_by_authors(
-    raw_lines: &[&str],
     prepared_cache: &mut PreparedLineCache<'_>,
     authors: &mut Vec<AuthorDetection>,
 ) {
-    if raw_lines.is_empty() {
+    if prepared_cache.is_empty() {
         return;
     }
 
@@ -1162,7 +1147,7 @@ pub(super) fn extract_converted_to_by_authors(
 
     let mut seen: HashSet<String> = authors.iter().map(|a| a.author.clone()).collect();
 
-    for idx in 0..raw_lines.len() {
+    for idx in 0..prepared_cache.len() {
         let ln = idx + 1;
         let Some(prepared) = prepared_cache.get_by_index(idx) else {
             continue;
@@ -1218,11 +1203,10 @@ pub(super) fn extract_converted_to_by_authors(
 }
 
 pub(super) fn extract_various_bugfixes_and_enhancements_by_authors(
-    raw_lines: &[&str],
     prepared_cache: &mut PreparedLineCache<'_>,
     authors: &mut Vec<AuthorDetection>,
 ) {
-    if raw_lines.is_empty() {
+    if prepared_cache.is_empty() {
         return;
     }
 
@@ -1232,7 +1216,7 @@ pub(super) fn extract_various_bugfixes_and_enhancements_by_authors(
 
     let mut seen: HashSet<String> = authors.iter().map(|a| a.author.clone()).collect();
 
-    for idx in 0..raw_lines.len() {
+    for idx in 0..prepared_cache.len() {
         let ln = idx + 1;
         let Some(prepared) = prepared_cache.get_by_index(idx) else {
             continue;
@@ -1399,7 +1383,6 @@ pub(super) fn drop_comedi_ds_status_devices_authors(
 }
 
 pub(super) fn drop_written_by_authors_preceded_by_copyright(
-    raw_lines: &[&str],
     prepared_cache: &mut PreparedLineCache<'_>,
     authors: &mut Vec<AuthorDetection>,
 ) {
@@ -1412,12 +1395,12 @@ pub(super) fn drop_written_by_authors_preceded_by_copyright(
     static COPYRIGHT_HINT_RE: LazyLock<Regex> =
         LazyLock::new(|| Regex::new(r"(?i)\bcopyright\b|\(c\)").unwrap());
 
-    if raw_lines.len() < 2 {
+    if prepared_cache.len() < 2 {
         return;
     }
 
     let mut to_drop: HashSet<String> = HashSet::new();
-    for i in 1..raw_lines.len() {
+    for i in 1..prepared_cache.len() {
         let line = match prepared_cache.get_by_index(i) {
             Some(p) => p.trim().to_string(),
             None => continue,
@@ -1448,11 +1431,10 @@ pub(super) fn drop_written_by_authors_preceded_by_copyright(
 }
 
 pub(super) fn extract_dense_name_email_author_lists(
-    raw_lines: &[&str],
     prepared_cache: &mut PreparedLineCache<'_>,
     authors: &mut Vec<AuthorDetection>,
 ) {
-    if raw_lines.is_empty() {
+    if prepared_cache.is_empty() {
         return;
     }
 
@@ -1465,7 +1447,7 @@ pub(super) fn extract_dense_name_email_author_lists(
     });
 
     let mut non_empty_lines: Vec<(usize, String)> = Vec::new();
-    for idx in 0..raw_lines.len() {
+    for idx in 0..prepared_cache.len() {
         let Some(prepared) = prepared_cache.get_by_index(idx) else {
             continue;
         };

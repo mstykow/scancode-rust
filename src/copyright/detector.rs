@@ -292,7 +292,6 @@ pub fn detect_copyrights_from_text_with_deadline(
 
     primary_phase::run_phase_primary_extractions(
         content,
-        &raw_lines,
         &groups,
         &line_number_index,
         &mut prepared_cache,
@@ -584,12 +583,11 @@ fn drop_year_only_copyrights_shadowed_by_previous_software_copyright_line(
 }
 
 fn merge_multiline_person_year_copyright_continuations(
-    raw_lines: &[&str],
     prepared_cache: &mut PreparedLineCache<'_>,
     copyrights: &mut Vec<CopyrightDetection>,
     holders: &mut Vec<HolderDetection>,
 ) {
-    if raw_lines.len() < 2 {
+    if prepared_cache.len() < 2 {
         return;
     }
 
@@ -623,7 +621,7 @@ fn merge_multiline_person_year_copyright_continuations(
         trimmed.to_string()
     }
 
-    for i in 0..raw_lines.len().saturating_sub(1) {
+    for i in 0..prepared_cache.len().saturating_sub(1) {
         let ln1 = i + 1;
         let ln2 = i + 2;
         let Some(l1) = prepared_cache.get(ln1).map(|s| s.to_string()) else {
@@ -1272,11 +1270,10 @@ fn add_karlsruhe_university_short_variants(
 }
 
 fn add_intel_and_sun_non_portions_variants(
-    raw_lines: &[&str],
     prepared_cache: &mut PreparedLineCache<'_>,
     copyrights: &mut Vec<CopyrightDetection>,
 ) {
-    if raw_lines.is_empty() || copyrights.is_empty() {
+    if prepared_cache.is_empty() || copyrights.is_empty() {
         return;
     }
 
@@ -1619,12 +1616,11 @@ fn add_at_affiliation_short_variants(
 }
 
 fn add_missing_copyrights_for_holder_lines_with_emails(
-    raw_lines: &[&str],
     prepared_cache: &mut PreparedLineCache<'_>,
     copyrights: &mut Vec<CopyrightDetection>,
     holders: &[HolderDetection],
 ) {
-    if raw_lines.is_empty() || holders.is_empty() {
+    if prepared_cache.is_empty() || holders.is_empty() {
         return;
     }
 
@@ -1646,23 +1642,12 @@ fn add_missing_copyrights_for_holder_lines_with_emails(
             continue;
         }
         let ln = h.start_line;
-        if ln == 0 || ln > raw_lines.len() {
+        if ln == 0 || ln > prepared_cache.len() {
             continue;
         }
         if copyright_lines.contains(&ln) {
             continue;
         }
-        let raw = raw_lines[ln - 1];
-        if !raw.to_ascii_lowercase().contains("copyright") {
-            continue;
-        }
-        if !raw.contains('@') {
-            continue;
-        }
-        if !raw.chars().any(|c| c.is_ascii_digit()) {
-            continue;
-        }
-
         let Some(prepared) = prepared_cache.get(ln) else {
             continue;
         };
@@ -1670,6 +1655,16 @@ fn add_missing_copyrights_for_holder_lines_with_emails(
         if prepared.is_empty() {
             continue;
         }
+        if !prepared.to_ascii_lowercase().contains("copyright") {
+            continue;
+        }
+        if !prepared.contains('@') {
+            continue;
+        }
+        if !prepared.chars().any(|c| c.is_ascii_digit()) {
+            continue;
+        }
+
         let Some(refined) = refine_copyright(prepared) else {
             continue;
         };
@@ -1776,9 +1771,9 @@ fn strip_lone_obfuscated_angle_email_user_tokens(
         if out.is_empty() { None } else { Some(out) }
     }
 
-    for (idx, raw) in raw_lines.iter().enumerate() {
+    for (idx, raw_line) in raw_lines.iter().enumerate() {
         let ln = idx + 1;
-        let Some(cap) = ANGLE_OBF_RE.captures(raw) else {
+        let Some(cap) = ANGLE_OBF_RE.captures(raw_line) else {
             continue;
         };
         let user = cap.name("user").map(|m| m.as_str()).unwrap_or("").trim();
@@ -1825,17 +1820,14 @@ fn strip_lone_obfuscated_angle_email_user_tokens(
 }
 
 fn add_at_domain_variants_for_short_net_angle_emails(
-    raw_lines: &[&str],
+    prepared_cache: &mut PreparedLineCache<'_>,
     copyrights: &mut Vec<CopyrightDetection>,
 ) {
     if copyrights.is_empty() {
         return;
     }
 
-    if !raw_lines
-        .iter()
-        .any(|l| l.to_ascii_lowercase().contains("pipe read code from"))
-    {
+    if !prepared_cache.contains_ci("pipe read code from") {
         return;
     }
 
@@ -2155,11 +2147,10 @@ fn drop_shadowed_email_org_location_suffixes_same_span(
 }
 
 fn add_pipe_read_parenthetical_variants(
-    raw_lines: &[&str],
     prepared_cache: &mut PreparedLineCache<'_>,
     copyrights: &mut Vec<CopyrightDetection>,
 ) {
-    if raw_lines.len() < 2 || copyrights.is_empty() {
+    if prepared_cache.len() < 2 || copyrights.is_empty() {
         return;
     }
 
@@ -2171,7 +2162,7 @@ fn add_pipe_read_parenthetical_variants(
         .map(|c| (c.start_line, c.end_line, c.copyright.clone()))
         .collect();
 
-    for i in 0..raw_lines.len().saturating_sub(1) {
+    for i in 0..prepared_cache.len().saturating_sub(1) {
         let ln1 = i + 1;
         let ln2 = i + 2;
         let Some(l1) = prepared_cache.get(ln1).map(|s| s.trim().to_string()) else {
@@ -2205,11 +2196,10 @@ fn add_pipe_read_parenthetical_variants(
 }
 
 fn add_from_url_parenthetical_copyright_variants(
-    raw_lines: &[&str],
     prepared_cache: &mut PreparedLineCache<'_>,
     copyrights: &mut Vec<CopyrightDetection>,
 ) {
-    if raw_lines.is_empty() {
+    if prepared_cache.is_empty() {
         return;
     }
 
@@ -2221,9 +2211,9 @@ fn add_from_url_parenthetical_copyright_variants(
         .map(|c| (c.start_line, c.end_line, c.copyright.clone()))
         .collect();
 
-    for i in 0..raw_lines.len() {
+    for i in 0..prepared_cache.len() {
         let ln = i + 1;
-        let Some(line) = prepared_cache.get(ln).map(|s| s.trim().to_string()) else {
+        let Some(line) = prepared_cache.get_by_index(i).map(|s| s.trim().to_string()) else {
             continue;
         };
         if line.is_empty() {
@@ -2668,12 +2658,11 @@ fn expand_year_only_copyrights_with_read_the_suffix(
 }
 
 fn merge_multiline_obfuscated_name_year_copyright_pairs(
-    raw_lines: &[&str],
     prepared_cache: &mut PreparedLineCache<'_>,
     copyrights: &mut Vec<CopyrightDetection>,
     holders: &mut Vec<HolderDetection>,
 ) {
-    if raw_lines.is_empty() {
+    if prepared_cache.is_empty() {
         return;
     }
 
@@ -2686,12 +2675,11 @@ fn merge_multiline_obfuscated_name_year_copyright_pairs(
             .unwrap()
     });
 
-    for (i, raw1) in raw_lines
-        .iter()
-        .enumerate()
-        .take(raw_lines.len().saturating_sub(1))
-    {
-        if !(raw1.contains("Copyright") || raw1.contains("copyright")) {
+    for i in 0..prepared_cache.len().saturating_sub(1) {
+        let Some(prepared) = prepared_cache.get_by_index(i) else {
+            continue;
+        };
+        if !(prepared.contains("Copyright") || prepared.contains("copyright")) {
             continue;
         }
 
@@ -2863,11 +2851,10 @@ fn extend_copyrights_with_following_all_rights_reserved_line(
 }
 
 fn add_modify_suffix_holders(
-    raw_lines: &[&str],
     prepared_cache: &mut PreparedLineCache<'_>,
     holders: &mut Vec<HolderDetection>,
 ) {
-    if raw_lines.is_empty() || holders.is_empty() {
+    if prepared_cache.is_empty() || holders.is_empty() {
         return;
     }
 
@@ -3523,12 +3510,11 @@ fn strip_inc_suffix_from_holders_for_today_year_copyrights(
 }
 
 fn extend_copyrights_with_authors_blocks(
-    raw_lines: &[&str],
     prepared_cache: &mut PreparedLineCache<'_>,
     copyrights: &mut [CopyrightDetection],
     holders: &mut Vec<HolderDetection>,
 ) {
-    if raw_lines.len() < 3 {
+    if prepared_cache.len() < 3 {
         return;
     }
 
@@ -3539,7 +3525,7 @@ fn extend_copyrights_with_authors_blocks(
     static STRIP_ANGLE_RE: LazyLock<Regex> =
         LazyLock::new(|| Regex::new(r"\s*<[^>]*>\s*").unwrap());
 
-    for i in 0..raw_lines.len().saturating_sub(2) {
+    for i in 0..prepared_cache.len().saturating_sub(2) {
         let base_prepared = match prepared_cache.get_by_index(i) {
             Some(p) => p.trim().to_string(),
             None => continue,
@@ -3724,8 +3710,8 @@ fn apply_openoffice_org_report_builder_bin_normalizations(
     }
 }
 
-fn extract_midline_c_year_holder_with_leading_acronym_from_raw_lines(
-    raw_lines: &[&str],
+fn extract_midline_c_year_holder_with_leading_acronym(
+    prepared_cache: &mut PreparedLineCache<'_>,
     copyrights: &mut Vec<CopyrightDetection>,
     holders: &mut Vec<HolderDetection>,
 ) {
@@ -3743,9 +3729,12 @@ fn extract_midline_c_year_holder_with_leading_acronym_from_raw_lines(
         .unwrap()
     });
 
-    for (idx, raw) in raw_lines.iter().enumerate() {
+    for idx in 0..prepared_cache.len() {
         let ln = idx + 1;
-        let trimmed = raw.trim();
+        let Some(prepared) = prepared_cache.get_by_index(idx) else {
+            continue;
+        };
+        let trimmed = prepared.trim();
 
         let lower = trimmed.to_ascii_lowercase();
         if !lower.contains("fix") {
@@ -4466,7 +4455,6 @@ fn drop_from_source_attribution_copyrights(
 }
 
 fn merge_freebird_c_inc_urls(
-    raw_lines: &[&str],
     prepared_cache: &mut PreparedLineCache<'_>,
     copyrights: &mut Vec<CopyrightDetection>,
     holders: &mut Vec<HolderDetection>,
@@ -4481,7 +4469,7 @@ fn merge_freebird_c_inc_urls(
     let mut seen_c: HashSet<String> = copyrights.iter().map(|c| c.copyright.clone()).collect();
     let mut seen_h: HashSet<String> = holders.iter().map(|h| h.holder.clone()).collect();
 
-    for i in 0..raw_lines.len() {
+    for i in 0..prepared_cache.len() {
         let ln = i + 1;
         let Some(prepared) = prepared_cache.get_by_index(i) else {
             continue;
@@ -4497,7 +4485,7 @@ fn merge_freebird_c_inc_urls(
 
         let mut url: Option<String> = None;
         let mut j = i + 1;
-        while j < raw_lines.len() {
+        while j < prepared_cache.len() {
             let next = match prepared_cache.get_by_index(j) {
                 Some(p) => p.trim().to_string(),
                 None => break,
@@ -4547,7 +4535,6 @@ fn merge_freebird_c_inc_urls(
 }
 
 fn merge_debugging390_best_viewed_suffix(
-    raw_lines: &[&str],
     prepared_cache: &mut PreparedLineCache<'_>,
     copyrights: &mut Vec<CopyrightDetection>,
     holders: &mut Vec<HolderDetection>,
@@ -4560,7 +4547,7 @@ fn merge_debugging390_best_viewed_suffix(
         Regex::new(r"(?i)^copyright\s*\(c\)\s*2000-2001\s+(?P<who>IBM\b.+)$").unwrap()
     });
 
-    for i in 0..raw_lines.len().saturating_sub(1) {
+    for i in 0..prepared_cache.len().saturating_sub(1) {
         let ln = i + 1;
         let p1 = match prepared_cache.get_by_index(i) {
             Some(p) => p.trim().to_string(),
@@ -4613,7 +4600,6 @@ fn merge_debugging390_best_viewed_suffix(
 }
 
 fn merge_fsf_gdb_notice_lines(
-    raw_lines: &[&str],
     prepared_cache: &mut PreparedLineCache<'_>,
     copyrights: &mut Vec<CopyrightDetection>,
     holders: &mut Vec<HolderDetection>,
@@ -4622,7 +4608,7 @@ fn merge_fsf_gdb_notice_lines(
         return;
     }
 
-    for i in 0..raw_lines.len().saturating_sub(1) {
+    for i in 0..prepared_cache.len().saturating_sub(1) {
         let ln = i + 1;
         let p1 = match prepared_cache.get_by_index(i) {
             Some(p) => p.trim().to_string(),
@@ -4670,7 +4656,6 @@ fn merge_fsf_gdb_notice_lines(
 }
 
 fn merge_axis_ethereal_suffix(
-    raw_lines: &[&str],
     prepared_cache: &mut PreparedLineCache<'_>,
     copyrights: &mut Vec<CopyrightDetection>,
     holders: &mut Vec<HolderDetection>,
@@ -4679,7 +4664,7 @@ fn merge_axis_ethereal_suffix(
         return;
     }
 
-    for i in 0..raw_lines.len().saturating_sub(1) {
+    for i in 0..prepared_cache.len().saturating_sub(1) {
         let ln = i + 1;
         let p1 = match prepared_cache.get_by_index(i) {
             Some(p) => p.trim().to_string(),
@@ -4723,7 +4708,6 @@ fn merge_axis_ethereal_suffix(
 }
 
 fn merge_kirkwood_converted_to(
-    raw_lines: &[&str],
     prepared_cache: &mut PreparedLineCache<'_>,
     copyrights: &mut Vec<CopyrightDetection>,
     holders: &mut Vec<HolderDetection>,
@@ -4739,7 +4723,7 @@ fn merge_kirkwood_converted_to(
     let mut seen_c: HashSet<String> = copyrights.iter().map(|c| c.copyright.clone()).collect();
     let mut seen_h: HashSet<String> = holders.iter().map(|h| h.holder.clone()).collect();
 
-    for i in 0..raw_lines.len().saturating_sub(1) {
+    for i in 0..prepared_cache.len().saturating_sub(1) {
         let ln = i + 1;
         let p1 = match prepared_cache.get_by_index(i) {
             Some(p) => p.trim().to_string(),
@@ -4879,14 +4863,13 @@ fn drop_combined_period_holders(holders: &mut Vec<HolderDetection>) {
 }
 
 fn extract_line_ending_copyright_then_by_holder(
-    raw_lines: &[&str],
     prepared_cache: &mut PreparedLineCache<'_>,
     copyrights: &mut Vec<CopyrightDetection>,
     holders: &mut Vec<HolderDetection>,
 ) {
     let mut existing: HashSet<String> = copyrights.iter().map(|c| c.copyright.clone()).collect();
 
-    for idx in 0..raw_lines.len() {
+    for idx in 0..prepared_cache.len() {
         let ln = idx + 1;
         let prepared = match prepared_cache.get_by_index(idx) {
             Some(p) => p.trim().to_string(),
@@ -4907,7 +4890,7 @@ fn extract_line_ending_copyright_then_by_holder(
         }
 
         let mut j = idx + 1;
-        while j < raw_lines.len() {
+        while j < prepared_cache.len() {
             let next_ln = j + 1;
             let next_prepared = match prepared_cache.get_by_index(j) {
                 Some(p) => p.trim().to_string(),
@@ -5316,13 +5299,12 @@ fn drop_created_by_camelcase_identifier_authors(
 }
 
 fn merge_implemented_by_lines(
-    raw_lines: &[&str],
     prepared_cache: &mut PreparedLineCache<'_>,
     copyrights: &mut Vec<CopyrightDetection>,
     holders: &mut Vec<HolderDetection>,
     authors: &mut Vec<AuthorDetection>,
 ) {
-    if raw_lines.is_empty() {
+    if prepared_cache.is_empty() {
         return;
     }
     if !prepared_cache.contains_ci("implemented by") {
@@ -5339,7 +5321,7 @@ fn merge_implemented_by_lines(
 
     let mut merged: Vec<(usize, String, String, HashSet<String>)> = Vec::new();
 
-    for i in 0..raw_lines.len().saturating_sub(1) {
+    for i in 0..prepared_cache.len().saturating_sub(1) {
         let ln = i + 1;
         let line = match prepared_cache.get_by_index(i) {
             Some(p) => p.trim().trim_start_matches('*').trim_start().to_string(),
@@ -5426,13 +5408,12 @@ fn merge_implemented_by_lines(
 }
 
 fn split_written_by_copyrights_into_holder_prefixed_clauses(
-    raw_lines: &[&str],
     prepared_cache: &mut PreparedLineCache<'_>,
     copyrights: &mut Vec<CopyrightDetection>,
     holders: &mut Vec<HolderDetection>,
     authors: &mut Vec<AuthorDetection>,
 ) {
-    if raw_lines.is_empty() {
+    if prepared_cache.is_empty() {
         return;
     }
 
@@ -5444,7 +5425,7 @@ fn split_written_by_copyrights_into_holder_prefixed_clauses(
     });
 
     let mut added_any = false;
-    for idx in 0..raw_lines.len() {
+    for idx in 0..prepared_cache.len() {
         let ln = idx + 1;
         let Some(prepared) = prepared_cache.get_by_index(idx) else {
             continue;
@@ -5493,7 +5474,6 @@ fn split_written_by_copyrights_into_holder_prefixed_clauses(
 }
 
 fn fix_shm_inline_copyrights(
-    raw_lines: &[&str],
     prepared_cache: &mut PreparedLineCache<'_>,
     copyrights: &mut Vec<CopyrightDetection>,
     holders: &mut Vec<HolderDetection>,
@@ -5513,14 +5493,14 @@ fn fix_shm_inline_copyrights(
     let mut seen_c: HashSet<String> = copyrights.iter().map(|c| c.copyright.clone()).collect();
     let mut seen_h: HashSet<String> = holders.iter().map(|h| h.holder.clone()).collect();
 
-    for (idx, raw) in raw_lines.iter().enumerate() {
-        if !raw.contains("/proc/sysvipc/shm") {
-            continue;
-        }
+    for idx in 0..prepared_cache.len() {
         let ln = idx + 1;
         let Some(prepared) = prepared_cache.get_by_index(idx) else {
             continue;
         };
+        if !prepared.contains("/proc/sysvipc/shm") {
+            continue;
+        }
         let line = prepared.trim();
         let Some(cap) = INLINE_RE.captures(line) else {
             continue;
@@ -5819,19 +5799,18 @@ fn split_embedded_copyright_detections(
 }
 
 fn extend_bare_c_year_detections_to_line_end_for_multi_c_lines(
-    raw_lines: &[&str],
     prepared_cache: &mut PreparedLineCache<'_>,
     copyrights: &mut [CopyrightDetection],
     holders: &mut Vec<HolderDetection>,
 ) {
-    if raw_lines.is_empty() || copyrights.is_empty() {
+    if prepared_cache.is_empty() || copyrights.is_empty() {
         return;
     }
 
     static C_YEAR_RE: LazyLock<Regex> =
         LazyLock::new(|| Regex::new(r"(?i)\(c\)\s*(?P<year>(?:19\d{2}|20\d{2}))\b").unwrap());
 
-    for idx in 0..raw_lines.len() {
+    for idx in 0..prepared_cache.len() {
         let ln = idx + 1;
         let Some(prepared) = prepared_cache.get_by_index(idx) else {
             continue;
@@ -6183,7 +6162,6 @@ fn extract_html_meta_name_copyright_content(
 }
 
 fn extract_added_the_copyright_year_for_lines(
-    raw_lines: &[&str],
     prepared_cache: &mut PreparedLineCache<'_>,
     copyrights: &mut Vec<CopyrightDetection>,
     holders: &mut Vec<HolderDetection>,
@@ -6201,7 +6179,7 @@ fn extract_added_the_copyright_year_for_lines(
         .map(|h| (h.holder.clone(), h.start_line))
         .collect();
 
-    for idx in 0..raw_lines.len() {
+    for idx in 0..prepared_cache.len() {
         let ln = idx + 1;
         let Some(prepared) = prepared_cache.get_by_index(idx) else {
             continue;
@@ -6865,7 +6843,6 @@ fn extract_copyright_years_by_name_paren_email_lines(
 }
 
 fn extract_copyright_years_by_name_then_paren_email_next_line(
-    raw_lines: &[&str],
     prepared_cache: &mut PreparedLineCache<'_>,
     copyrights: &mut Vec<CopyrightDetection>,
     holders: &mut Vec<HolderDetection>,
@@ -6885,7 +6862,7 @@ fn extract_copyright_years_by_name_then_paren_email_next_line(
         .collect();
     let mut seen_holders: HashSet<String> = holders.iter().map(|h| h.holder.clone()).collect();
 
-    for idx in 0..raw_lines.len() {
+    for idx in 0..prepared_cache.len() {
         let ln = idx + 1;
         let prepared = match prepared_cache.get_by_index(idx) {
             Some(p) => p.trim().to_string(),
@@ -6919,7 +6896,7 @@ fn extract_copyright_years_by_name_then_paren_email_next_line(
         }
 
         let mut j = idx + 1;
-        while j < raw_lines.len() {
+        while j < prepared_cache.len() {
             let next_ln = j + 1;
             let next_trimmed = match prepared_cache.get_by_index(j) {
                 Some(p) => p.trim().to_string(),
@@ -7415,12 +7392,11 @@ fn extract_copyright_c_years_holder_lines(
 }
 
 fn extract_three_digit_copyright_year_lines(
-    raw_lines: &[&str],
     prepared_cache: &mut PreparedLineCache<'_>,
     copyrights: &mut Vec<CopyrightDetection>,
     holders: &mut Vec<HolderDetection>,
 ) {
-    if raw_lines.is_empty() {
+    if prepared_cache.is_empty() {
         return;
     }
 
@@ -7437,7 +7413,7 @@ fn extract_three_digit_copyright_year_lines(
         .map(|h| (h.start_line, h.holder.clone()))
         .collect();
 
-    for idx in 0..raw_lines.len() {
+    for idx in 0..prepared_cache.len() {
         let ln = idx + 1;
         let Some(prepared) = prepared_cache.get_by_index(idx) else {
             continue;
@@ -7483,17 +7459,16 @@ fn extract_three_digit_copyright_year_lines(
 }
 
 fn extract_copyrighted_by_lines(
-    raw_lines: &[&str],
     prepared_cache: &mut PreparedLineCache<'_>,
     copyrights: &mut Vec<CopyrightDetection>,
     holders: &mut Vec<HolderDetection>,
 ) {
-    if raw_lines.is_empty() {
+    if prepared_cache.is_empty() {
         return;
     }
 
     static COPYRIGHTED_BY_RE: LazyLock<Regex> = LazyLock::new(|| {
-        Regex::new(r"(?i)\bcopyrighted\s+by\s+(?P<who>(?-i:[\p{Lu}][^\.,;\)]+))").unwrap()
+        Regex::new(r"(?i)\bcopyrighted\s+by\s+(?P<who>(?-i:[\p{Lu}][^\.\,\;\)]+))").unwrap()
     });
 
     let mut seen_cr: HashSet<(usize, String)> = copyrights
@@ -7505,7 +7480,7 @@ fn extract_copyrighted_by_lines(
         .map(|h| (h.start_line, h.holder.clone()))
         .collect();
 
-    for idx in 0..raw_lines.len() {
+    for idx in 0..prepared_cache.len() {
         let ln = idx + 1;
         let Some(prepared) = prepared_cache.get_by_index(idx) else {
             continue;
@@ -7555,12 +7530,11 @@ fn extract_copyrighted_by_lines(
 }
 
 fn extract_c_word_year_lines(
-    raw_lines: &[&str],
     prepared_cache: &mut PreparedLineCache<'_>,
     copyrights: &mut Vec<CopyrightDetection>,
     holders: &mut Vec<HolderDetection>,
 ) {
-    if raw_lines.is_empty() {
+    if prepared_cache.is_empty() {
         return;
     }
 
@@ -7577,7 +7551,7 @@ fn extract_c_word_year_lines(
         .map(|h| (h.start_line, h.holder.clone()))
         .collect();
 
-    for idx in 0..raw_lines.len() {
+    for idx in 0..prepared_cache.len() {
         let ln = idx + 1;
         let Some(prepared) = prepared_cache.get_by_index(idx) else {
             continue;
@@ -8618,7 +8592,6 @@ fn strip_trailing_c_year_suffix_from_comma_and_others(copyrights: &mut [Copyrigh
 }
 
 fn extract_name_before_rewrited_by_copyrights(
-    raw_lines: &[&str],
     prepared_cache: &mut PreparedLineCache<'_>,
     copyrights: &mut Vec<CopyrightDetection>,
     holders: &mut Vec<HolderDetection>,
@@ -8636,7 +8609,7 @@ fn extract_name_before_rewrited_by_copyrights(
         .unwrap()
     });
 
-    if raw_lines.len() < 2 {
+    if prepared_cache.len() < 2 {
         return;
     }
 
@@ -8644,7 +8617,7 @@ fn extract_name_before_rewrited_by_copyrights(
         copyrights.iter().map(|c| c.copyright.clone()).collect();
     let mut seen_holders: HashSet<String> = holders.iter().map(|h| h.holder.clone()).collect();
 
-    for idx in 0..raw_lines.len().saturating_sub(1) {
+    for idx in 0..prepared_cache.len().saturating_sub(1) {
         let ln1 = idx + 1;
         let ln2 = idx + 2;
 
@@ -8712,7 +8685,6 @@ fn extract_name_before_rewrited_by_copyrights(
 }
 
 fn extract_developed_at_software_copyrights(
-    raw_lines: &[&str],
     prepared_cache: &mut PreparedLineCache<'_>,
     copyrights: &mut Vec<CopyrightDetection>,
     holders: &mut Vec<HolderDetection>,
@@ -8724,7 +8696,7 @@ fn extract_developed_at_software_copyrights(
         .unwrap()
     });
 
-    if raw_lines.is_empty() {
+    if prepared_cache.is_empty() {
         return;
     }
 
@@ -8732,7 +8704,7 @@ fn extract_developed_at_software_copyrights(
         copyrights.iter().map(|c| c.copyright.clone()).collect();
     let mut seen_holders: HashSet<String> = holders.iter().map(|h| h.holder.clone()).collect();
 
-    for idx in 0..raw_lines.len() {
+    for idx in 0..prepared_cache.len() {
         let ln = idx + 1;
         let prepared = match prepared_cache.get_by_index(idx) {
             Some(p) => p.to_string(),
@@ -8774,7 +8746,6 @@ fn extract_developed_at_software_copyrights(
 }
 
 fn extract_confidential_proprietary_copyrights(
-    raw_lines: &[&str],
     prepared_cache: &mut PreparedLineCache<'_>,
     copyrights: &mut Vec<CopyrightDetection>,
     holders: &mut Vec<HolderDetection>,
@@ -8804,7 +8775,7 @@ fn extract_confidential_proprietary_copyrights(
         .unwrap()
     });
 
-    if raw_lines.is_empty() {
+    if prepared_cache.is_empty() {
         return;
     }
 
@@ -8812,7 +8783,7 @@ fn extract_confidential_proprietary_copyrights(
         copyrights.iter().map(|c| c.copyright.clone()).collect();
     let mut seen_holders: HashSet<String> = holders.iter().map(|h| h.holder.clone()).collect();
 
-    for idx in 0..raw_lines.len() {
+    for idx in 0..prepared_cache.len() {
         let ln = idx + 1;
         let line = match prepared_cache.get_by_index(idx) {
             Some(p) => p.trim().to_string(),
