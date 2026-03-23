@@ -12,6 +12,8 @@ pub struct Output {
     pub tallies: Option<Tallies>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tallies_of_key_files: Option<Tallies>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tallies_by_facet: Option<Vec<FacetTallies>>,
     pub headers: Vec<Header>,
     pub packages: Vec<Package>,
     pub dependencies: Vec<TopLevelDependency>,
@@ -74,6 +76,12 @@ impl Tallies {
             && self.authors.is_empty()
             && self.programming_language.is_empty()
     }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+pub struct FacetTallies {
+    pub facet: String,
+    pub tallies: Tallies,
 }
 
 #[derive(Serialize, Deserialize, Debug)]

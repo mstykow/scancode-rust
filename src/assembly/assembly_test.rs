@@ -54,6 +54,7 @@ mod tests {
             is_readme: false,
             is_top_level: false,
             is_key_file: false,
+            facets: vec![],
             tallies: None,
         }
     }
@@ -2722,6 +2723,7 @@ mod tests {
             is_readme: false,
             is_top_level: false,
             is_key_file: false,
+            facets: vec![],
             tallies: None,
         }];
 
