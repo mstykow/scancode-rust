@@ -671,6 +671,7 @@ fn process_directory(path: &Path, metadata: &fs::Metadata) -> FileInfo {
         is_readme: false,
         is_top_level: false,
         is_key_file: false,
+        is_community: false,
         facets: vec![],
         tallies: None,
     }

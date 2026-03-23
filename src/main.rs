@@ -803,9 +803,10 @@ fn create_output(
 fn classify_key_files(files: &mut [FileInfo], packages: &[Package]) {
     let package_roots = build_package_roots(packages);
     let package_file_references = build_package_file_reference_map(files);
+    let scan_roots = build_scan_roots(files);
 
     for file in files.iter_mut() {
-        if file.file_type != FileType::File || file.for_packages.is_empty() {
+        if file.file_type != FileType::File {
             continue;
         }
 
@@ -819,8 +820,17 @@ fn classify_key_files(files: &mut [FileInfo], packages: &[Package]) {
         file.is_legal = is_legal_filename(&basename);
         file.is_readme = basename.starts_with("readme");
         file.is_manifest = !file.package_data.is_empty() || is_manifest_filename(&basename);
+        file.is_community = is_community_filename(&basename);
 
         let path = Path::new(&file.path);
+
+        if file.for_packages.is_empty() {
+            file.is_top_level = is_scan_top_level(path, &scan_roots);
+            file.is_key_file =
+                file.is_top_level && (file.is_legal || file.is_manifest || file.is_readme);
+            continue;
+        }
+
         let is_referenced = file.for_packages.iter().any(|uid| {
             package_file_references
                 .get(uid)
@@ -877,6 +887,35 @@ fn package_root(package: &Package) -> Option<PathBuf> {
     None
 }
 
+fn build_scan_roots(files: &[FileInfo]) -> Vec<PathBuf> {
+    let known_paths: HashSet<&str> = files.iter().map(|file| file.path.as_str()).collect();
+
+    files
+        .iter()
+        .map(|file| PathBuf::from(&file.path))
+        .filter(|path| {
+            path.parent()
+                .and_then(|parent| parent.to_str())
+                .filter(|parent| !parent.is_empty())
+                .is_none_or(|parent| !known_paths.contains(parent))
+        })
+        .collect()
+}
+
+fn is_scan_top_level(path: &Path, scan_roots: &[PathBuf]) -> bool {
+    if path.components().count() == 1 {
+        return true;
+    }
+
+    scan_roots.iter().any(|root| {
+        path == root
+            || path
+                .strip_prefix(root)
+                .ok()
+                .is_some_and(|relative| relative.components().count() == 1)
+    })
+}
+
 fn build_package_file_reference_map(files: &[FileInfo]) -> HashMap<String, HashSet<String>> {
     let mut mapping: HashMap<String, HashSet<String>> = HashMap::new();
 
@@ -913,6 +952,21 @@ fn is_legal_filename(basename: &str) -> bool {
 
 fn is_manifest_filename(basename: &str) -> bool {
     basename.ends_with(".gemspec") || basename == "gemfile" || basename == "gemfile.lock"
+}
+
+fn is_community_filename(basename: &str) -> bool {
+    let normalized = basename.replace(['_', '-'], "");
+    [
+        "changelog",
+        "roadmap",
+        "contributing",
+        "codeofconduct",
+        "authors",
+        "security",
+        "funding",
+    ]
+    .iter()
+    .any(|prefix| normalized.starts_with(prefix) || normalized.ends_with(prefix))
 }
 
 const FACETS: [&str; 6] = ["core", "dev", "tests", "docs", "data", "examples"];
@@ -1037,9 +1091,11 @@ fn promote_package_metadata_from_key_files(files: &[FileInfo], packages: &mut [P
 
 fn compute_summary(files: &[FileInfo], packages: &[Package]) -> Option<Summary> {
     let key_files: Vec<&FileInfo> = files.iter().filter(|file| file.is_key_file).collect();
-    let declared_holder = compute_declared_holder(files, packages);
+    let declared_holders = compute_declared_holders(files, packages);
+    let declared_holder = (!declared_holders.is_empty()).then(|| declared_holders.join(", "));
     let primary_language = compute_primary_language(files, packages);
     let other_languages = compute_other_languages(files, packages, primary_language.as_deref());
+    let tallies = compute_tallies(files).unwrap_or_default();
 
     if key_files.is_empty()
         && declared_holder.is_none()
@@ -1049,24 +1105,40 @@ fn compute_summary(files: &[FileInfo], packages: &[Package]) -> Option<Summary> 
         return None;
     }
 
-    let declared_expressions: Vec<String> = key_files
+    let key_file_expressions: Vec<String> = key_files
         .iter()
         .filter_map(|file| file_declared_license_expression(file))
         .collect();
-    let declared_license_expression =
-        combine_license_expressions(declared_expressions.iter().cloned())
-            .map(|expr| expr.to_ascii_lowercase());
-
-    let declared_license = key_files.iter().any(|file| {
-        file_declared_license_expression(file).is_some() || !file.license_detections.is_empty()
+    let package_declared_license_expression = package_declared_license_expression(packages);
+    let declared_license_expression = package_declared_license_expression.clone().or_else(|| {
+        combine_license_expressions(key_file_expressions.iter().cloned())
+            .map(|expr| expr.to_ascii_lowercase())
     });
+    let other_license_expressions = remove_tally_value(
+        declared_license_expression.as_deref(),
+        &tallies.detected_license_expression,
+    );
+    let other_holders = remove_tally_values(&declared_holders, &tallies.holders);
+
+    let declared_license = declared_license_expression.is_some()
+        || key_files.iter().any(|file| {
+            file_declared_license_expression(file).is_some() || !file.license_detections.is_empty()
+        });
     let identification_precision = declared_license;
     let has_license_text = key_files
         .iter()
         .any(|file| file.is_legal && !file.license_detections.is_empty());
     let declared_copyrights = key_files.iter().any(|file| !file.copyrights.is_empty());
-    let ambiguous_compound_licensing =
-        declared_expressions.iter().collect::<HashSet<_>>().len() > 1;
+    let ambiguous_compound_licensing = package_declared_license_expression.is_none()
+        && key_file_expressions.iter().collect::<HashSet<_>>().len() > 1;
+    let conflicting_license_categories = declared_license_expression
+        .as_deref()
+        .is_some_and(is_permissive_expression)
+        && files
+            .iter()
+            .filter(|file| file.file_type == FileType::File && !file.is_key_file)
+            .filter_map(|file| file.license_expression.as_deref())
+            .any(is_conflicting_expression);
 
     let mut score: usize = 0;
     if declared_license {
@@ -1084,6 +1156,9 @@ fn compute_summary(files: &[FileInfo], packages: &[Package]) -> Option<Summary> 
     if ambiguous_compound_licensing {
         score = score.saturating_sub(10);
     }
+    if conflicting_license_categories {
+        score = score.saturating_sub(20);
+    }
 
     let license_clarity_score = if declared_license || has_license_text || declared_copyrights {
         Some(LicenseClarityScore {
@@ -1092,7 +1167,7 @@ fn compute_summary(files: &[FileInfo], packages: &[Package]) -> Option<Summary> 
             identification_precision,
             has_license_text,
             declared_copyrights,
-            conflicting_license_categories: false,
+            conflicting_license_categories,
             ambiguous_compound_licensing,
         })
     } else {
@@ -1104,8 +1179,53 @@ fn compute_summary(files: &[FileInfo], packages: &[Package]) -> Option<Summary> 
         license_clarity_score,
         declared_holder,
         primary_language,
+        other_license_expressions,
+        other_holders,
         other_languages,
     })
+}
+
+fn package_declared_license_expression(packages: &[Package]) -> Option<String> {
+    combine_license_expressions(
+        packages
+            .iter()
+            .filter_map(|package| package.declared_license_expression.clone()),
+    )
+    .map(|expr| expr.to_ascii_lowercase())
+}
+
+fn remove_tally_value(value: Option<&str>, tallies: &[TallyEntry]) -> Vec<TallyEntry> {
+    tallies
+        .iter()
+        .filter(|entry| entry.value.is_some() && entry.value.as_deref() != value)
+        .cloned()
+        .collect()
+}
+
+fn remove_tally_values(values: &[String], tallies: &[TallyEntry]) -> Vec<TallyEntry> {
+    tallies
+        .iter()
+        .filter(|entry| {
+            entry.value.is_some()
+                && !entry
+                    .value
+                    .as_ref()
+                    .is_some_and(|value| values.contains(value))
+        })
+        .cloned()
+        .collect()
+}
+
+fn is_permissive_expression(expression: &str) -> bool {
+    ["apache", "mit", "bsd", "zlib", "isc", "cc0", "boost"]
+        .iter()
+        .any(|needle| expression.contains(needle))
+}
+
+fn is_conflicting_expression(expression: &str) -> bool {
+    ["gpl", "agpl", "lgpl", "copyleft", "proprietary"]
+        .iter()
+        .any(|needle| expression.contains(needle))
 }
 
 fn compute_tallies(files: &[FileInfo]) -> Option<Tallies> {
@@ -1421,7 +1541,7 @@ fn build_tally_entries(counts: HashMap<Option<String>, usize>) -> Vec<TallyEntry
     tallies
 }
 
-fn compute_declared_holder(files: &[FileInfo], packages: &[Package]) -> Option<String> {
+fn compute_declared_holders(files: &[FileInfo], packages: &[Package]) -> Vec<String> {
     let mut counts: HashMap<String, usize> = HashMap::new();
 
     for holder in packages
@@ -1429,6 +1549,26 @@ fn compute_declared_holder(files: &[FileInfo], packages: &[Package]) -> Option<S
         .filter_map(|package| package.holder.as_ref())
     {
         *counts.entry(holder.clone()).or_insert(0) += 1;
+    }
+
+    let mut package_datafile_holders = Vec::new();
+
+    if counts.is_empty() {
+        for package in packages {
+            for datafile_path in &package.datafile_paths {
+                if let Some(file) = files.iter().find(|file| file.path == *datafile_path) {
+                    for holder in &file.holders {
+                        if !package_datafile_holders.contains(&holder.holder) {
+                            package_datafile_holders.push(holder.holder.clone());
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if !package_datafile_holders.is_empty() {
+        return package_datafile_holders;
     }
 
     if counts.is_empty() {
@@ -1446,6 +1586,8 @@ fn compute_declared_holder(files: &[FileInfo], packages: &[Package]) -> Option<S
         .into_iter()
         .max_by(|left, right| left.1.cmp(&right.1).then_with(|| right.0.cmp(&left.0)))
         .map(|(holder, _)| holder)
+        .into_iter()
+        .collect()
 }
 
 fn compute_primary_language(files: &[FileInfo], packages: &[Package]) -> Option<String> {
