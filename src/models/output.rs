@@ -53,7 +53,6 @@ pub struct LicenseClarityScore {
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct TallyEntry {
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub value: Option<String>,
     pub count: usize,
 }
