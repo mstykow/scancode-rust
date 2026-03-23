@@ -136,6 +136,7 @@ mod tests {
                 is_top_level: false,
                 is_key_file: false,
                 is_community: false,
+                is_generated: None,
                 facets: vec![],
                 tallies: None,
             };
