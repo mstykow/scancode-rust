@@ -13,7 +13,7 @@ use crate::cache::{CACHE_DIR_ENV_VAR, CacheConfig};
 use crate::cli::Cli;
 use crate::license_detection::LicenseDetectionEngine;
 use crate::models::{
-    ExtraData, FacetTallies, FileInfo, FileType, Header, LicenseClarityScore,
+    ExtraData, FacetTallies, FileInfo, FileType, Header, LicenseClarityScore, Match,
     OUTPUT_FORMAT_VERSION, Output, Package, Summary, SystemEnvironment, Tallies, TallyEntry,
 };
 use crate::output::{OutputWriteConfig, write_output_file};
@@ -1149,16 +1149,16 @@ fn compute_summary_with_options(
     include_summary_fields: bool,
     include_license_clarity_score: bool,
 ) -> Option<Summary> {
-    let key_files: Vec<&FileInfo> = files.iter().filter(|file| file.is_key_file).collect();
     let declared_holders = compute_declared_holders(files, packages);
     let declared_holder = (!declared_holders.is_empty()).then(|| declared_holders.join(", "));
     let primary_language = compute_primary_language(files, packages);
     let other_languages = compute_other_languages(files, packages, primary_language.as_deref());
     let tallies = compute_tallies(files).unwrap_or_default();
+    let (score_declared_license_expression, score_clarity) = compute_license_score(files);
 
     if !include_summary_fields
         && !include_license_clarity_score
-        && key_files.is_empty()
+        && score_declared_license_expression.is_none()
         && declared_holder.is_none()
         && primary_language.is_none()
         && other_languages.is_empty()
@@ -1166,71 +1166,22 @@ fn compute_summary_with_options(
         return None;
     }
 
-    let key_file_expressions: Vec<String> = key_files
-        .iter()
-        .filter_map(|file| file_declared_license_expression(file))
-        .collect();
-    let package_declared_license_expression = package_declared_license_expression(packages);
-    let declared_license_expression = package_declared_license_expression.clone().or_else(|| {
-        combine_license_expressions(key_file_expressions.iter().cloned())
-            .map(|expr| expr.to_ascii_lowercase())
-    });
+    let package_declared_license_expression = if include_summary_fields {
+        package_declared_license_expression(packages)
+    } else {
+        None
+    };
+    let declared_license_expression = package_declared_license_expression
+        .clone()
+        .or_else(|| score_declared_license_expression.clone());
     let other_license_expressions = remove_tally_value(
         declared_license_expression.as_deref(),
         &tallies.detected_license_expression,
     );
     let other_holders = remove_tally_values(&declared_holders, &tallies.holders);
 
-    let declared_license = declared_license_expression.is_some()
-        || key_files.iter().any(|file| {
-            file_declared_license_expression(file).is_some() || !file.license_detections.is_empty()
-        });
-    let identification_precision = declared_license;
-    let has_license_text = key_files
-        .iter()
-        .any(|file| file.is_legal && !file.license_detections.is_empty());
-    let declared_copyrights = key_files.iter().any(|file| !file.copyrights.is_empty());
-    let ambiguous_compound_licensing = package_declared_license_expression.is_none()
-        && key_file_expressions.iter().collect::<HashSet<_>>().len() > 1;
-    let conflicting_license_categories = declared_license_expression
-        .as_deref()
-        .is_some_and(is_permissive_expression)
-        && files
-            .iter()
-            .filter(|file| file.file_type == FileType::File && !file.is_key_file)
-            .filter_map(|file| file.license_expression.as_deref())
-            .any(is_conflicting_expression);
-
-    let mut score: usize = 0;
-    if declared_license {
-        score += 40;
-    }
-    if identification_precision {
-        score += 40;
-    }
-    if has_license_text {
-        score += 10;
-    }
-    if declared_copyrights {
-        score += 10;
-    }
-    if ambiguous_compound_licensing {
-        score = score.saturating_sub(10);
-    }
-    if conflicting_license_categories {
-        score = score.saturating_sub(20);
-    }
-
     let license_clarity_score = if include_license_clarity_score {
-        Some(LicenseClarityScore {
-            score,
-            declared_license,
-            identification_precision,
-            has_license_text,
-            declared_copyrights,
-            conflicting_license_categories,
-            ambiguous_compound_licensing,
-        })
+        Some(score_clarity)
     } else {
         None
     };
@@ -1346,6 +1297,153 @@ fn package_declared_license_expression(packages: &[Package]) -> Option<String> {
     .map(|expr| expr.to_ascii_lowercase())
 }
 
+fn compute_license_score(files: &[FileInfo]) -> (Option<String>, LicenseClarityScore) {
+    let key_files: Vec<&FileInfo> = files
+        .iter()
+        .filter(|file| file.file_type == FileType::File && file.is_key_file)
+        .collect();
+    let non_key_files: Vec<&FileInfo> = files
+        .iter()
+        .filter(|file| file.file_type == FileType::File && !file.is_key_file)
+        .collect();
+
+    let key_file_expressions: Vec<String> = key_files
+        .iter()
+        .filter_map(|file| file.license_expression.clone())
+        .collect();
+    let primary_declared_license = get_primary_license(&key_file_expressions);
+
+    let mut scoring = LicenseClarityScore {
+        score: 0,
+        declared_license: key_files
+            .iter()
+            .any(|file| !file.license_detections.is_empty()),
+        identification_precision: key_files
+            .iter()
+            .flat_map(|file| file.license_detections.iter())
+            .flat_map(|detection| detection.matches.iter())
+            .any(is_good_match),
+        has_license_text: key_files
+            .iter()
+            .any(|file| file.is_legal && !file.license_detections.is_empty()),
+        declared_copyrights: key_files.iter().any(|file| !file.copyrights.is_empty()),
+        conflicting_license_categories: false,
+        ambiguous_compound_licensing: primary_declared_license.is_none(),
+    };
+
+    if scoring.declared_license {
+        scoring.score += 40;
+    }
+    if scoring.identification_precision {
+        scoring.score += 40;
+    }
+    if scoring.has_license_text {
+        scoring.score += 10;
+    }
+    if scoring.declared_copyrights {
+        scoring.score += 10;
+    }
+
+    scoring.conflicting_license_categories = primary_declared_license
+        .as_deref()
+        .is_some_and(is_permissive_expression)
+        && non_key_files
+            .iter()
+            .filter_map(|file| file.license_expression.as_deref())
+            .any(is_conflicting_expression);
+
+    if scoring.conflicting_license_categories {
+        scoring.score = scoring.score.saturating_sub(20);
+    }
+    if scoring.ambiguous_compound_licensing {
+        scoring.score = scoring.score.saturating_sub(10);
+    }
+
+    let declared_license_expression = primary_declared_license.or_else(|| {
+        combine_license_expressions(unique(&key_file_expressions))
+            .map(|expr| expr.to_ascii_lowercase())
+    });
+
+    (declared_license_expression, scoring)
+}
+
+fn is_good_match(license_match: &Match) -> bool {
+    let score = license_match.score;
+    match (license_match.match_coverage, license_match.rule_relevance) {
+        (Some(coverage), Some(relevance)) => score >= 80.0 && coverage >= 80.0 && relevance >= 80,
+        _ => score >= 80.0,
+    }
+}
+
+fn unique(values: &[String]) -> Vec<String> {
+    let mut seen = HashSet::new();
+    let mut unique_values = Vec::new();
+
+    for value in values {
+        if seen.insert(value.clone()) {
+            unique_values.push(value.clone());
+        }
+    }
+
+    unique_values
+}
+
+fn get_primary_license(declared_license_expressions: &[String]) -> Option<String> {
+    let unique_declared_license_expressions = unique(declared_license_expressions);
+    if unique_declared_license_expressions.len() == 1 {
+        return unique_declared_license_expressions.into_iter().next();
+    }
+
+    let (unique_joined_expressions, single_expressions) =
+        group_license_expressions(&unique_declared_license_expressions);
+
+    if unique_joined_expressions.len() == 1 {
+        let joined_expression = unique_joined_expressions[0].clone();
+        let joined_upper = joined_expression.to_ascii_uppercase();
+        let all_other_expressions_accounted_for = unique_declared_license_expressions
+            .iter()
+            .filter(|expression| *expression != &joined_expression)
+            .all(|expression| joined_upper.contains(expression.to_ascii_uppercase().as_str()));
+
+        if all_other_expressions_accounted_for {
+            return Some(joined_expression);
+        }
+    }
+
+    if unique_joined_expressions.is_empty() {
+        return (single_expressions.len() == 1).then(|| single_expressions[0].clone());
+    }
+
+    None
+}
+
+fn group_license_expressions(expressions: &[String]) -> (Vec<String>, Vec<String>) {
+    let mut joined = Vec::new();
+    let mut single = Vec::new();
+
+    for expression in expressions {
+        let upper = expression.to_ascii_uppercase();
+        if upper.contains(" AND ") || upper.contains(" OR ") || upper.contains(" WITH ") {
+            joined.push(expression.clone());
+        } else {
+            single.push(expression.clone());
+        }
+    }
+
+    if joined.len() <= 1 {
+        return (joined, single);
+    }
+
+    let mut unique_joined = Vec::new();
+    for expression in joined {
+        if !unique_joined.contains(&expression) {
+            unique_joined.push(expression);
+        }
+    }
+
+    (unique_joined, single)
+}
+
 fn remove_tally_value(value: Option<&str>, tallies: &[TallyEntry]) -> Vec<TallyEntry> {
     tallies
         .iter()
@@ -1358,11 +1456,10 @@ fn remove_tally_values(values: &[String], tallies: &[TallyEntry]) -> Vec<TallyEn
     tallies
         .iter()
         .filter(|entry| {
-            entry.value.is_some()
-                && !entry
-                    .value
-                    .as_ref()
-                    .is_some_and(|value| values.contains(value))
+            !entry
+                .value
+                .as_ref()
+                .is_some_and(|value| values.contains(value))
         })
         .cloned()
         .collect()
@@ -1808,17 +1905,6 @@ fn compute_other_languages(
             .then_with(|| left.value.cmp(&right.value))
     });
     tallies
-}
-
-fn file_declared_license_expression(file: &FileInfo) -> Option<String> {
-    file.license_expression.clone().or_else(|| {
-        file.package_data.iter().find_map(|pkg| {
-            pkg.declared_license_expression_spdx
-                .clone()
-                .or_else(|| pkg.declared_license_expression.clone())
-                .or_else(|| pkg.get_license_expression())
-        })
-    })
 }
 
 #[cfg(test)]
