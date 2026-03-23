@@ -1711,6 +1711,282 @@ fn compute_summary_serializes_empty_declared_holder_when_none_found() {
 }
 
 #[test]
+fn compute_summary_joins_multiple_holders_from_single_top_level_license_file() {
+    let mut license = file("codebase/jetty.LICENSE");
+    license.is_key_file = true;
+    license.is_legal = true;
+    license.is_top_level = true;
+    license.license_expression = Some("jetty".to_string());
+    license.license_detections = vec![crate::models::LicenseDetection {
+        license_expression: "jetty".to_string(),
+        license_expression_spdx: "LicenseRef-scancode-jetty".to_string(),
+        matches: vec![Match {
+            license_expression: "jetty".to_string(),
+            license_expression_spdx: "LicenseRef-scancode-jetty".to_string(),
+            from_file: Some("codebase/jetty.LICENSE".to_string()),
+            start_line: 1,
+            end_line: 132,
+            matcher: Some("1-hash".to_string()),
+            score: 100.0,
+            matched_length: Some(996),
+            match_coverage: Some(100.0),
+            rule_relevance: Some(100),
+            rule_identifier: None,
+            rule_url: None,
+            matched_text: None,
+        }],
+        identifier: None,
+    }];
+    license.copyrights = vec![Copyright {
+        copyright: "Copyright Mort Bay and Sun Microsystems.".to_string(),
+        start_line: 1,
+        end_line: 1,
+    }];
+    license.holders = vec![
+        Holder {
+            holder: "Mort Bay Consulting Pty. Ltd. (Australia) and others".to_string(),
+            start_line: 1,
+            end_line: 1,
+        },
+        Holder {
+            holder: "Sun Microsystems".to_string(),
+            start_line: 2,
+            end_line: 2,
+        },
+    ];
+
+    let summary = compute_summary(&[license], &[]).expect("summary exists");
+
+    assert_eq!(
+        summary.declared_holder.as_deref(),
+        Some("Mort Bay Consulting Pty. Ltd. (Australia) and others, Sun Microsystems")
+    );
+}
+
+#[test]
+fn compute_score_mode_without_license_text_returns_zero_with_copyright_only() {
+    let mut package = package("pkg:npm/demo?uuid=test", "no_license_text/package.json");
+    package.declared_license_expression = Some("mit".to_string());
+
+    let mut package_json = file("no_license_text/package.json");
+    package_json.is_manifest = true;
+    package_json.is_key_file = true;
+    package_json.is_top_level = true;
+    package_json.for_packages = vec![package.package_uid.clone()];
+    package_json.copyrights = vec![Copyright {
+        copyright: "Copyright Example Corp.".to_string(),
+        start_line: 1,
+        end_line: 1,
+    }];
+
+    let summary = compute_summary_with_options(&[package_json], &[package], false, true)
+        .expect("score-only summary exists");
+    let score = summary.license_clarity_score.expect("clarity exists");
+
+    assert!(summary.declared_license_expression.is_none());
+    assert_eq!(score.score, 0);
+    assert!(!score.declared_license);
+    assert!(!score.identification_precision);
+    assert!(!score.has_license_text);
+    assert!(score.declared_copyrights);
+    assert!(score.ambiguous_compound_licensing);
+}
+
+#[test]
+fn compute_score_mode_without_license_or_copyright_returns_zero() {
+    let package = package(
+        "pkg:npm/demo?uuid=test",
+        "no_license_or_copyright/package.json",
+    );
+
+    let mut package_json = file("no_license_or_copyright/package.json");
+    package_json.is_manifest = true;
+    package_json.is_key_file = true;
+    package_json.is_top_level = true;
+    package_json.for_packages = vec![package.package_uid.clone()];
+
+    let summary = compute_summary_with_options(&[package_json], &[package], false, true)
+        .expect("score-only summary exists");
+    let score = summary.license_clarity_score.expect("clarity exists");
+
+    assert!(summary.declared_license_expression.is_none());
+    assert_eq!(score.score, 0);
+    assert!(!score.declared_license);
+    assert!(!score.identification_precision);
+    assert!(!score.has_license_text);
+    assert!(!score.declared_copyrights);
+    assert!(score.ambiguous_compound_licensing);
+}
+
+#[test]
+fn compute_score_mode_uses_single_joined_expression_without_ambiguity() {
+    let mut cargo = file("no_license_ambiguity/Cargo.toml");
+    cargo.is_manifest = true;
+    cargo.is_key_file = true;
+    cargo.is_top_level = true;
+    cargo.license_expression = Some("mit OR apache-2.0".to_string());
+    cargo.license_detections = vec![crate::models::LicenseDetection {
+        license_expression: "mit OR apache-2.0".to_string(),
+        license_expression_spdx: "MIT OR Apache-2.0".to_string(),
+        matches: vec![Match {
+            license_expression: "mit OR apache-2.0".to_string(),
+            license_expression_spdx: "MIT OR Apache-2.0".to_string(),
+            from_file: Some("no_license_ambiguity/Cargo.toml".to_string()),
+            start_line: 1,
+            end_line: 1,
+            matcher: Some("1-hash".to_string()),
+            score: 100.0,
+            matched_length: Some(5),
+            match_coverage: Some(100.0),
+            rule_relevance: Some(100),
+            rule_identifier: None,
+            rule_url: None,
+            matched_text: None,
+        }],
+        identifier: None,
+    }];
+    cargo.copyrights = vec![Copyright {
+        copyright: "Copyright The Rand Project Developers.".to_string(),
+        start_line: 1,
+        end_line: 1,
+    }];
+
+    let mut apache = file("no_license_ambiguity/LICENSE-APACHE");
+    apache.is_legal = true;
+    apache.is_key_file = true;
+    apache.is_top_level = true;
+    apache.license_expression = Some("apache-2.0".to_string());
+    apache.license_detections = vec![crate::models::LicenseDetection {
+        license_expression: "apache-2.0".to_string(),
+        license_expression_spdx: "Apache-2.0".to_string(),
+        matches: vec![Match {
+            license_expression: "apache-2.0".to_string(),
+            license_expression_spdx: "Apache-2.0".to_string(),
+            from_file: Some("no_license_ambiguity/LICENSE-APACHE".to_string()),
+            start_line: 1,
+            end_line: 176,
+            matcher: Some("1-hash".to_string()),
+            score: 100.0,
+            matched_length: Some(1410),
+            match_coverage: Some(100.0),
+            rule_relevance: Some(100),
+            rule_identifier: None,
+            rule_url: None,
+            matched_text: None,
+        }],
+        identifier: None,
+    }];
+
+    let mut mit = file("no_license_ambiguity/LICENSE-MIT");
+    mit.is_legal = true;
+    mit.is_key_file = true;
+    mit.is_top_level = true;
+    mit.license_expression = Some("mit".to_string());
+    mit.license_detections = vec![crate::models::LicenseDetection {
+        license_expression: "mit".to_string(),
+        license_expression_spdx: "MIT".to_string(),
+        matches: vec![Match {
+            license_expression: "mit".to_string(),
+            license_expression_spdx: "MIT".to_string(),
+            from_file: Some("no_license_ambiguity/LICENSE-MIT".to_string()),
+            start_line: 1,
+            end_line: 18,
+            matcher: Some("1-hash".to_string()),
+            score: 100.0,
+            matched_length: Some(161),
+            match_coverage: Some(100.0),
+            rule_relevance: Some(100),
+            rule_identifier: None,
+            rule_url: None,
+            matched_text: None,
+        }],
+        identifier: None,
+    }];
+
+    let summary = compute_summary_with_options(&[cargo, apache, mit], &[], false, true)
+        .expect("score-only summary exists");
+    let score = summary.license_clarity_score.expect("clarity exists");
+
+    assert_eq!(
+        summary.declared_license_expression.as_deref(),
+        Some("mit OR apache-2.0")
+    );
+    assert_eq!(score.score, 100);
+    assert!(!score.ambiguous_compound_licensing);
+}
+
+#[test]
+fn compute_score_mode_scores_nested_manifest_key_file_without_copyright() {
+    let mut pom = file("jar/META-INF/maven/org.jboss.logging/jboss-logging/pom.xml");
+    pom.is_manifest = true;
+    pom.is_key_file = true;
+    pom.is_top_level = true;
+    pom.license_expression = Some("apache-2.0".to_string());
+    pom.license_detections = vec![crate::models::LicenseDetection {
+        license_expression: "apache-2.0".to_string(),
+        license_expression_spdx: "Apache-2.0".to_string(),
+        matches: vec![Match {
+            license_expression: "apache-2.0".to_string(),
+            license_expression_spdx: "Apache-2.0".to_string(),
+            from_file: Some(
+                "jar/META-INF/maven/org.jboss.logging/jboss-logging/pom.xml".to_string(),
+            ),
+            start_line: 1,
+            end_line: 2,
+            matcher: Some("1-hash".to_string()),
+            score: 100.0,
+            matched_length: Some(16),
+            match_coverage: Some(100.0),
+            rule_relevance: Some(100),
+            rule_identifier: None,
+            rule_url: None,
+            matched_text: None,
+        }],
+        identifier: None,
+    }];
+
+    let mut license = file("jar/META-INF/LICENSE.txt");
+    license.is_legal = true;
+    license.is_key_file = true;
+    license.is_top_level = true;
+    license.license_expression = Some("apache-2.0".to_string());
+    license.license_detections = vec![crate::models::LicenseDetection {
+        license_expression: "apache-2.0".to_string(),
+        license_expression_spdx: "Apache-2.0".to_string(),
+        matches: vec![Match {
+            license_expression: "apache-2.0".to_string(),
+            license_expression_spdx: "Apache-2.0".to_string(),
+            from_file: Some("jar/META-INF/LICENSE.txt".to_string()),
+            start_line: 1,
+            end_line: 176,
+            matcher: Some("1-hash".to_string()),
+            score: 100.0,
+            matched_length: Some(1410),
+            match_coverage: Some(100.0),
+            rule_relevance: Some(100),
+            rule_identifier: None,
+            rule_url: None,
+            matched_text: None,
+        }],
+        identifier: None,
+    }];
+
+    let summary = compute_summary_with_options(&[pom, license], &[], false, true)
+        .expect("score-only summary exists");
+    let score = summary.license_clarity_score.expect("clarity exists");
+
+    assert_eq!(
+        summary.declared_license_expression.as_deref(),
+        Some("apache-2.0")
+    );
+    assert_eq!(score.score, 90);
+    assert!(score.declared_license);
+    assert!(score.identification_precision);
+    assert!(score.has_license_text);
+    assert!(!score.declared_copyrights);
+}
+
+#[test]
 fn compute_summary_without_license_evidence_has_no_clarity_score() {
     let uid = "pkg:gem/demo@1.0.0?uuid=test";
     let mut root_package = package(uid, "demo/demo.gemspec");
