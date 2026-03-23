@@ -22,6 +22,8 @@ This incremental layer adds:
 14. joined-expression primary-license resolution for active summary/score fixtures
 15. score-only mode using key-file resource evidence instead of package-only origin data
 16. package-datafile holder fallback and null-preserving `other_holders` parity
+17. empty declared-holder output when no holder can be established
+18. primary-language fallback from tallied sources when top-level packages disagree
 
 ## Why This Matters
 
@@ -111,6 +113,8 @@ The current branch also closes several active upstream fixture gaps:
 - joined license expressions can become the primary declared license without being treated as ambiguous when they subsume the single-license files beneath them
 - score-only mode no longer borrows package-declared origin data that belongs to full summary mode
 - summary holder selection now keeps null `other_holders` buckets while still removing the declared holders themselves
+- summary now emits an empty declared-holder string when no holder can be established
+- summary falls back to the tallied primary language when top-level packages disagree on language
 
 ### Initial non-license-dependent summary fields
 
