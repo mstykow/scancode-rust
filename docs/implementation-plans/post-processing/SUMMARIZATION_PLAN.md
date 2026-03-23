@@ -174,6 +174,7 @@ Summarization is a **consumer**, not a normalizer.
   - `is_legal` / `is_readme` checks using both file name and base name
   - path-suffix manifest detection across the wider ScanCode manifest set
   - package-data files still treated as manifests when present
+  - package-data ancestry now promotes manifest/legal siblings and ancestor directories into the top-level package view where the active `with_package_data` fixture expects it
 
 ### Missing
 
@@ -205,7 +206,7 @@ Summarization is a **consumer**, not a normalizer.
 6. **Phase 5**: Core codebase tallies (`--tallies`) over existing declared/discovered evidence. ✅ for top-level `detected_license_expression`, `copyrights`, `holders`, `authors`, and `programming_language`; package tallies remain open.
 7. **Phase 6**: Detailed tally variants (`--tallies-with-details`, `--tallies-key-files`, `--tallies-by-facet`). 🟡 Top-level `tallies_of_key_files`, per-resource `files[*].tallies`, and top-level `tallies_by_facet` are implemented; package tallies and some CLI gating remain open.
 8. **Phase 7**: Full license clarity parity. 🟡 Implemented: declared-license/identification/text/copyright scoring, joined-expression primary-license resolution, ambiguity/conflict penalties, no-license-\* score cases, and the active jar-style nested-manifest score fixture. Remaining work: ScanCode-quality license match filtering and the residual score edge cases.
-9. **Phase 8**: Generated-code detection parity plus remaining classify/facet parity gaps. 🟡 Implemented: file-level `is_generated` detection from conspicuous header clues plus the main active classify fixture parity around legal/readme/manifest/community/top-level semantics. Remaining work: heuristic breadth and any residual classify gaps.
+9. **Phase 8**: Generated-code detection parity plus remaining classify/facet parity gaps. 🟡 Implemented: file-level `is_generated` detection from conspicuous header clues plus the main active classify fixture parity around legal/readme/manifest/community/top-level semantics, including package-data-backed top-level ancestry. Remaining work: heuristic breadth and any residual classify gaps.
 10. **Phase 9**: Comprehensive `--summary` parity over the completed tally/clarity/classification inputs. 🟡 Implemented: package-preferred origin fields, `other_license_expressions`/`other_holders`, package-datafile holder fallback, empty declared-holder parity, tallied-language fallback when packages disagree, and the main active ambiguity/holder fixtures. Remaining work: broader package-precedence and the residual summary edge-case fixtures.
 11. **Phase 10**: CLI parity wiring for the remaining summary/tally/classify/facet/generated options and regression coverage. 🟡 Implemented: `--summary`, `--license-clarity-score`, `--tallies`, `--tallies-key-files`, `--tallies-with-details`, and `--generated` gating. Remaining work: package-tally CLI surface and broader compatibility edge cases.
 
