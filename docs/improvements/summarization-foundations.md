@@ -19,6 +19,9 @@ This incremental layer adds:
 11. initial license-clarity penalties for ambiguous compound licensing and conflicting lower-level license categories
 12. generated-file detection via ScanCode-style conspicuous header clues
 13. CLI gating for `--summary`, `--license-clarity-score`, `--tallies`, `--tallies-key-files`, `--tallies-with-details`, and `--generated`
+14. joined-expression primary-license resolution for active summary/score fixtures
+15. score-only mode using key-file resource evidence instead of package-only origin data
+16. package-datafile holder fallback and null-preserving `other_holders` parity
 
 ## Why This Matters
 
@@ -100,6 +103,14 @@ Files can now be marked `is_generated` when their leading lines contain conspicu
 ### Summary/tally CLI gating
 
 The summary pipeline no longer emits every available post-processing section unconditionally. The current branch now gates `summary`, `license_clarity_score`, `tallies`, `tallies_of_key_files`, detailed per-resource `tallies`, and generated-file detection behind the corresponding CLI flags.
+
+### Active summary/score parity edge cases
+
+The current branch also closes several active upstream fixture gaps:
+
+- joined license expressions can become the primary declared license without being treated as ambiguous when they subsume the single-license files beneath them
+- score-only mode no longer borrows package-declared origin data that belongs to full summary mode
+- summary holder selection now keeps null `other_holders` buckets while still removing the declared holders themselves
 
 ### Initial non-license-dependent summary fields
 
