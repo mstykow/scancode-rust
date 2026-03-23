@@ -48,8 +48,6 @@ This plan tracks progress toward a **drop-in replacement CLI surface**.
 | `-c, --copyright`          | Copyright/holder/author detection toggle                                                                          |
 | `-e, --email`              | Enable email detection                                                                                            |
 | `-u, --url`                | Enable URL detection                                                                                              |
-| `-l, --license`            | License detection toggle                                                                                          |
-| `--include-text`           | Include matched text in license output (requires `--license`)                                                     |
 | `--no-assemble`            | Rust-specific                                                                                                     |
 | `--max-email`              | Threshold (default 50, requires `--email`)                                                                        |
 | `--max-url`                | Threshold (default 50, requires `--url`)                                                                          |
@@ -62,14 +60,12 @@ This plan tracks progress toward a **drop-in replacement CLI surface**.
 
 ### Scan Option Flags (pending)
 
-| Parameter                   | Blocked By                                                                     |
-| --------------------------- | ------------------------------------------------------------------------------ |
-| `--license-score`           | [`LICENSE_DETECTION_ARCHITECTURE.md`](../../LICENSE_DETECTION_ARCHITECTURE.md) |
-| `--license-text`            | [`LICENSE_DETECTION_ARCHITECTURE.md`](../../LICENSE_DETECTION_ARCHITECTURE.md) |
-| `--classify`                | [`SUMMARIZATION_PLAN.md`](../post-processing/SUMMARIZATION_PLAN.md)            |
-| `--facet <facet>=<pattern>` | [`SUMMARIZATION_PLAN.md`](../post-processing/SUMMARIZATION_PLAN.md)            |
-| `--generated`               | [`SUMMARIZATION_PLAN.md`](../post-processing/SUMMARIZATION_PLAN.md)            |
-| `--summary`                 | [`SUMMARIZATION_PLAN.md`](../post-processing/SUMMARIZATION_PLAN.md)            |
+| Parameter         | Blocked By                                                                     |
+| ----------------- | ------------------------------------------------------------------------------ |
+| `--license`       | [`LICENSE_DETECTION_ARCHITECTURE.md`](../../LICENSE_DETECTION_ARCHITECTURE.md) |
+| `--license-score` | [`LICENSE_DETECTION_ARCHITECTURE.md`](../../LICENSE_DETECTION_ARCHITECTURE.md) |
+| `--license-text`  | [`LICENSE_DETECTION_ARCHITECTURE.md`](../../LICENSE_DETECTION_ARCHITECTURE.md) |
+| `--classify`      | [`SUMMARIZATION_PLAN.md`](../post-processing/SUMMARIZATION_PLAN.md)            |
 
 Runtime dependency notes:
 
@@ -78,20 +74,29 @@ Runtime dependency notes:
 
 ### Post-Scan Flags (pending)
 
-| Parameter                 | Blocked By                                                                     |
-| ------------------------- | ------------------------------------------------------------------------------ |
-| `--is-license-text`       | [`LICENSE_DETECTION_ARCHITECTURE.md`](../../LICENSE_DETECTION_ARCHITECTURE.md) |
-| `--license-clarity-score` | [`SUMMARIZATION_PLAN.md`](../post-processing/SUMMARIZATION_PLAN.md)            |
-| `--tallies`               | [`SUMMARIZATION_PLAN.md`](../post-processing/SUMMARIZATION_PLAN.md)            |
-| `--tallies-with-details`  | [`SUMMARIZATION_PLAN.md`](../post-processing/SUMMARIZATION_PLAN.md)            |
-| `--tallies-key-files`     | [`SUMMARIZATION_PLAN.md`](../post-processing/SUMMARIZATION_PLAN.md)            |
-| `--tallies-by-facet`      | [`SUMMARIZATION_PLAN.md`](../post-processing/SUMMARIZATION_PLAN.md)            |
+| Parameter           | Blocked By                                                                     |
+| ------------------- | ------------------------------------------------------------------------------ |
+| `--is-license-text` | [`LICENSE_DETECTION_ARCHITECTURE.md`](../../LICENSE_DETECTION_ARCHITECTURE.md) |
+| `--is-generated`    | [`SUMMARIZATION_PLAN.md`](../post-processing/SUMMARIZATION_PLAN.md)            |
 
 Runtime dependency notes:
 
 - `--license-clarity-score` requires `--classify` for parity-compatible behavior.
 - `--tallies-key-files` requires `--classify` and `--tallies`.
-- `--tallies-by-facet` requires `--facet <facet>=<pattern>` and `--tallies`.
+
+### Partially Implemented Post-Processing Flags
+
+| Parameter                   | Notes                                                                                                                                                                                   |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--classify`                | Accepted as a compatibility flag; current runtime computes key-file classification plus top-level/community classification substrate, but full ScanCode classify parity remains open    |
+| `--summary`                 | Implemented top-level summary output gating; current runtime includes package-preferred origin, `other_*` rollups, and initial clarity scoring, but broader summary parity remains open |
+| `--license-clarity-score`   | Implemented gating plus initial clarity penalties; fuller match-quality heuristics and edge-case parity remain open                                                                     |
+| `--tallies`                 | Implemented top-level tally gating over the current five tally families                                                                                                                 |
+| `--tallies-with-details`    | Implemented per-resource `files[*].tallies` gating for files and directories                                                                                                            |
+| `--tallies-key-files`       | Implemented top-level `tallies_of_key_files` gating over classified key files                                                                                                           |
+| `--facet <facet>=<pattern>` | Implemented with six-facet validation, repeatable rules, multi-facet matching, and default-to-`core` file assignment                                                                    |
+| `--tallies-by-facet`        | Implemented top-level `tallies_by_facet` output; currently requires `--facet` definitions and reuses existing tally output rather than full tally CLI gating                            |
+| `--generated`               | Implemented file-level `is_generated` detection from conspicuous header clues                                                                                                           |
 
 ### Explicitly Deferred / Not Planned
 
@@ -101,12 +106,12 @@ Runtime dependency notes:
 
 ### Input/Output Control (implemented)
 
-| Parameter         | Notes                                                                        |
-| ----------------- | ---------------------------------------------------------------------------- |
-| `--from-json`     | Load from previous scan JSON input(s); disallows `--copyright/--email/--url` |
-| `--include`       | Include patterns                                                             |
-| `--mark-source`   | Mark source files                                                            |
-| `--only-findings` | Filter output                                                                |
+| Parameter         | Notes                                                                                    |
+| ----------------- | ---------------------------------------------------------------------------------------- |
+| `--from-json`     | Load from previous scan JSON input(s); disallows `--copyright/--email/--url/--generated` |
+| `--include`       | Include patterns                                                                         |
+| `--mark-source`   | Mark source files                                                                        |
+| `--only-findings` | Filter output                                                                            |
 
 ### Cache Control (partial)
 
