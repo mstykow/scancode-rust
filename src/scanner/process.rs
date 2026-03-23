@@ -4,7 +4,6 @@ use crate::utils::hash::{calculate_md5, calculate_sha1, calculate_sha256};
 use crate::utils::language::detect_language;
 use crate::utils::text::{is_source, remove_verbatim_escape_sequences};
 use anyhow::Error;
-use glob::Pattern;
 use log::warn;
 use mime_guess::from_path;
 use rayon::prelude::*;
@@ -23,10 +22,9 @@ use crate::models::{
     OutputEmail, OutputURL,
 };
 use crate::progress::ScanProgress;
+use crate::scanner::collect::CollectedPaths;
 use crate::scanner::{ProcessResult, TextDetectionOptions};
-use crate::utils::file::{
-    ExtractedTextKind, extract_text_for_detection, get_creation_date, is_path_excluded,
-};
+use crate::utils::file::{ExtractedTextKind, extract_text_for_detection, get_creation_date};
 
 const PEM_CERTIFICATE_HEADERS: &[(&str, &str)] = &[
     ("-----BEGIN CERTIFICATE-----", "-----END CERTIFICATE-----"),
@@ -36,150 +34,37 @@ const PEM_CERTIFICATE_HEADERS: &[(&str, &str)] = &[
     ),
 ];
 
-/// Scan a directory tree and produce [`ProcessResult`] entries.
-///
-/// This traverses files/directories up to `max_depth`, applies exclusion
-/// patterns, extracts metadata, and performs license/copyright parsing.
-pub fn process<P: AsRef<Path>>(
-    path: P,
-    max_depth: usize,
+pub fn process_collected(
+    collected: &CollectedPaths,
     progress: Arc<ScanProgress>,
-    exclude_patterns: &[Pattern],
-    license_engine: Option<Arc<LicenseDetectionEngine>>,
-    include_text: bool,
-) -> Result<ProcessResult, Error> {
-    process_with_options(
-        path,
-        max_depth,
-        progress,
-        exclude_patterns,
-        license_engine,
-        include_text,
-        &TextDetectionOptions::default(),
-    )
-}
-
-pub fn process_with_options<P: AsRef<Path>>(
-    path: P,
-    max_depth: usize,
-    progress: Arc<ScanProgress>,
-    exclude_patterns: &[Pattern],
     license_engine: Option<Arc<LicenseDetectionEngine>>,
     include_text: bool,
     text_options: &TextDetectionOptions,
-) -> Result<ProcessResult, Error> {
-    let depth_limit = depth_limit_from_cli(max_depth);
-    process_with_options_internal(
-        path.as_ref(),
-        depth_limit,
-        progress,
-        exclude_patterns,
-        license_engine,
-        include_text,
-        text_options,
-    )
-}
-
-fn depth_limit_from_cli(max_depth: usize) -> Option<usize> {
-    if max_depth == 0 {
-        None
-    } else {
-        Some(max_depth)
-    }
-}
-
-fn process_with_options_internal(
-    path: &Path,
-    depth_limit: Option<usize>,
-    progress: Arc<ScanProgress>,
-    exclude_patterns: &[Pattern],
-    license_engine: Option<Arc<LicenseDetectionEngine>>,
-    include_text: bool,
-    text_options: &TextDetectionOptions,
-) -> Result<ProcessResult, Error> {
-    if is_path_excluded(path, exclude_patterns) {
-        return Ok(ProcessResult {
-            files: Vec::new(),
-            excluded_count: 1,
-        });
-    }
-
-    let mut all_files = Vec::new();
-    let mut total_excluded = 0;
-
-    // Read directory entries and group by exclusion status and type
-    let entries: Vec<_> = fs::read_dir(path)?.filter_map(Result::ok).collect();
-
-    let mut file_entries = Vec::new();
-    let mut dir_entries = Vec::new();
-
-    for entry in entries {
-        let path = entry.path();
-
-        // Check exclusion only once per path
-        if is_path_excluded(&path, exclude_patterns) {
-            total_excluded += 1;
-            continue;
-        }
-
-        match fs::metadata(&path) {
-            Ok(metadata) if metadata.is_file() => file_entries.push((path, metadata)),
-            Ok(metadata) if path.is_dir() => dir_entries.push((path, metadata)),
-            _ => continue,
-        }
-    }
-
-    // Process files in parallel
-    all_files.append(
-        &mut file_entries
-            .par_iter()
-            .map(|(path, metadata)| {
-                let file_entry = process_file(
-                    path,
-                    metadata,
-                    license_engine.clone(),
-                    include_text,
-                    text_options,
-                );
-                progress.file_completed(path, metadata.len(), &file_entry.scan_errors);
-                file_entry
-            })
-            .collect(),
-    );
-
-    // Process directories
-    for (path, metadata) in dir_entries {
-        all_files.push(process_directory(&path, &metadata));
-
-        let should_recurse = match depth_limit {
-            None => true,
-            Some(remaining_depth) => remaining_depth > 0,
-        };
-
-        if should_recurse {
-            let next_depth_limit = depth_limit.map(|remaining_depth| remaining_depth - 1);
-            match process_with_options_internal(
-                &path,
-                next_depth_limit,
-                progress.clone(),
-                exclude_patterns,
+) -> ProcessResult {
+    let mut all_files: Vec<FileInfo> = collected
+        .files
+        .par_iter()
+        .map(|(path, metadata)| {
+            let file_entry = process_file(
+                path,
+                metadata,
                 license_engine.clone(),
                 include_text,
                 text_options,
-            ) {
-                Ok(mut result) => {
-                    all_files.append(&mut result.files);
-                    total_excluded += result.excluded_count;
-                }
-                Err(e) => progress.record_runtime_error(&path, &e.to_string()),
-            }
-        }
+            );
+            progress.file_completed(path, metadata.len(), &file_entry.scan_errors);
+            file_entry
+        })
+        .collect();
+
+    for (path, metadata) in &collected.directories {
+        all_files.push(process_directory(path, metadata));
     }
 
-    Ok(ProcessResult {
+    ProcessResult {
         files: all_files,
-        excluded_count: total_excluded,
-    })
+        excluded_count: collected.excluded_count,
+    }
 }
 
 fn process_file(

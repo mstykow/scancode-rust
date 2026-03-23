@@ -1,6 +1,6 @@
 use glob::Pattern;
 use provenant::progress::{ProgressMode, ScanProgress};
-use provenant::{FileType, TextDetectionOptions, process_with_options};
+use provenant::{FileType, TextDetectionOptions, collect_paths, process_collected};
 use serde::Deserialize;
 use std::fs;
 use std::path::PathBuf;
@@ -40,8 +40,8 @@ fn scanner_matches_structured_credits_fixture() {
         scan_cache_dir: None,
     };
 
-    let result = process_with_options(&fixture_dir, 0, progress, &patterns, None, false, &options)
-        .expect("scan should succeed");
+    let collected = collect_paths(&fixture_dir, 0, &patterns);
+    let result = process_collected(&collected, progress, None, false, &options);
 
     let scanned = result
         .files

@@ -1,18 +1,12 @@
-mod count;
+mod collect;
 mod process;
 
 use std::path::PathBuf;
 
 use crate::models::FileInfo;
 
-/// Aggregated result of scanning a directory tree.
-///
-/// Includes discovered file entries and the count of paths skipped by
-/// exclusion patterns.
 pub struct ProcessResult {
-    /// File and directory entries produced by the scan.
     pub files: Vec<FileInfo>,
-    /// Number of excluded paths encountered during traversal.
     pub excluded_count: usize,
 }
 
@@ -41,8 +35,9 @@ impl Default for TextDetectionOptions {
     }
 }
 
-pub use self::count::count_with_size;
-pub use self::process::{process, process_with_options};
+#[allow(unused_imports)]
+pub use self::collect::{CollectedPaths, collect_paths};
+pub use self::process::process_collected;
 
 #[cfg(test)]
 mod tests {
@@ -54,8 +49,7 @@ mod tests {
     use crate::models::FileType;
     use crate::progress::{ProgressMode, ScanProgress};
 
-    use super::TextDetectionOptions;
-    use super::process_with_options;
+    use super::{TextDetectionOptions, collect_paths, process_collected};
 
     #[test]
     fn default_options_keep_copyright_detection_enabled() {
@@ -73,8 +67,8 @@ mod tests {
         fs::write(&file_path, content).expect("write test file");
 
         let progress = Arc::new(ScanProgress::new(ProgressMode::Quiet));
-        let result = process_with_options(temp_dir.path(), 0, progress, &[], None, false, options)
-            .expect("scan should succeed");
+        let collected = collect_paths(temp_dir.path(), 0, &[]);
+        let result = process_collected(&collected, progress, None, false, options);
 
         result
             .files
