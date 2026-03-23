@@ -6,7 +6,8 @@
 //!
 //! The main entry points are:
 //!
-//! - [`process`] and [`process_with_options`] to scan a directory tree
+//! - [`collect_paths`] to discover files in a directory tree
+//! - [`process_collected`] to scan collected files in parallel
 //! - [`OutputFormat`], [`OutputWriter`], and [`write_output_file`] to serialize scan results
 //! - [`parsers`] and [`models`] for lower-level package parsing and result inspection
 //!
@@ -48,5 +49,5 @@ pub use output::{
 pub use parsers::{NpmParser, PackageParser};
 pub use progress::{ProgressMode, ScanProgress};
 pub use scanner::{
-    ProcessResult, TextDetectionOptions, count_with_size, process, process_with_options,
+    CollectedPaths, ProcessResult, TextDetectionOptions, collect_paths, process_collected,
 };

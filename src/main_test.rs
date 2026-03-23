@@ -12,7 +12,7 @@ use std::sync::Arc;
 
 use crate::assembly;
 use crate::progress::{ProgressMode, ScanProgress};
-use crate::scanner::TextDetectionOptions;
+use crate::scanner::{TextDetectionOptions, collect_paths, process_collected};
 
 fn file(path: &str) -> FileInfo {
     FileInfo::new(
@@ -90,16 +90,14 @@ fn dir(path: &str) -> FileInfo {
 
 fn about_scan_and_assemble(path: &Path) -> assembly::AssemblyResult {
     let progress = Arc::new(ScanProgress::new(ProgressMode::Quiet));
-    let result = crate::scanner::process_with_options(
-        path,
-        0,
+    let collected = collect_paths(path, 0, &[]);
+    let result = process_collected(
+        &collected,
         progress,
-        &[],
         None,
         false,
         &TextDetectionOptions::default(),
-    )
-    .expect("about scan should succeed");
+    );
 
     let mut files = result.files;
     assembly::assemble(&mut files)
@@ -107,16 +105,14 @@ fn about_scan_and_assemble(path: &Path) -> assembly::AssemblyResult {
 
 fn swift_scan_and_assemble(path: &Path) -> Value {
     let progress = Arc::new(ScanProgress::new(ProgressMode::Quiet));
-    let result = crate::scanner::process_with_options(
-        path,
-        0,
+    let collected = collect_paths(path, 0, &[]);
+    let result = process_collected(
+        &collected,
         progress,
-        &[],
         None,
         false,
         &TextDetectionOptions::default(),
-    )
-    .expect("swift scan should succeed");
+    );
 
     let mut files = result.files;
     normalize_paths(
@@ -151,16 +147,14 @@ fn swift_scan_and_assemble(path: &Path) -> Value {
 
 fn docker_scan_and_assemble(path: &Path) -> (Vec<FileInfo>, assembly::AssemblyResult) {
     let progress = Arc::new(ScanProgress::new(ProgressMode::Quiet));
-    let result = crate::scanner::process_with_options(
-        path,
-        0,
+    let collected = collect_paths(path, 0, &[]);
+    let result = process_collected(
+        &collected,
         progress,
-        &[],
         None,
         false,
         &TextDetectionOptions::default(),
-    )
-    .expect("docker scan should succeed");
+    );
 
     let mut files = result.files;
     let assembly_result = assembly::assemble(&mut files);
@@ -169,16 +163,14 @@ fn docker_scan_and_assemble(path: &Path) -> (Vec<FileInfo>, assembly::AssemblyRe
 
 fn python_scan_and_assemble(path: &Path) -> (Vec<FileInfo>, assembly::AssemblyResult) {
     let progress = Arc::new(ScanProgress::new(ProgressMode::Quiet));
-    let result = crate::scanner::process_with_options(
-        path,
-        0,
+    let collected = collect_paths(path, 0, &[]);
+    let result = process_collected(
+        &collected,
         progress,
-        &[],
         None,
         false,
         &TextDetectionOptions::default(),
-    )
-    .expect("python scan should succeed");
+    );
 
     let mut files = result.files;
     let assembly_result = assembly::assemble(&mut files);
@@ -189,16 +181,14 @@ fn debian_scan_and_assemble_with_keyfiles(
     path: &Path,
 ) -> (Vec<FileInfo>, assembly::AssemblyResult) {
     let progress = Arc::new(ScanProgress::new(ProgressMode::Quiet));
-    let result = crate::scanner::process_with_options(
-        path,
-        0,
+    let collected = collect_paths(path, 0, &[]);
+    let result = process_collected(
+        &collected,
         progress,
-        &[],
         None,
         false,
         &TextDetectionOptions::default(),
-    )
-    .expect("debian scan should succeed");
+    );
 
     let mut files = result.files;
     let assembly_result = assembly::assemble(&mut files);

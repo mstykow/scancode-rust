@@ -18,7 +18,7 @@ use crate::models::{
 };
 use crate::output::{OutputWriteConfig, write_output_file};
 use crate::progress::{ProgressMode, ScanProgress};
-use crate::scanner::{TextDetectionOptions, count_with_size, process, process_with_options};
+use crate::scanner::{TextDetectionOptions, collect_paths, process_collected};
 use crate::utils::spdx::combine_license_expressions;
 
 mod assembly;
@@ -134,8 +134,15 @@ fn run() -> Result<()> {
 
         let cache_config = prepare_cache_for_scan(scan_path, &cli)?;
 
-        let (total_files, total_dirs, excluded_count, total_size) =
-            count_with_size(scan_path, cli.max_depth, &exclude_patterns)?;
+        progress.start_discovery();
+        let collected = collect_paths(scan_path, cli.max_depth, &exclude_patterns);
+        let total_files = collected.file_count();
+        let total_dirs = collected.directory_count();
+        let total_size = collected.total_file_bytes;
+        let excluded_count = collected.excluded_count;
+        for (path, err) in &collected.collection_errors {
+            progress.record_runtime_error(path, err);
+        }
         progress.finish_discovery(total_files, total_dirs, total_size, excluded_count);
         if !cli.quiet {
             progress.output_written(&format!(
@@ -157,38 +164,18 @@ fn run() -> Result<()> {
             timeout_seconds: cli.timeout,
             scan_cache_dir: Some(cache_config.scan_results_dir()),
         };
-        let default_text_options = TextDetectionOptions::default();
 
         let thread_count = resolve_thread_count(cli.processes);
         progress.start_scan(total_files);
-        let mut result = if !text_options.detect_emails
-            && !text_options.detect_urls
-            && text_options.detect_copyrights == default_text_options.detect_copyrights
-            && text_options.timeout_seconds == default_text_options.timeout_seconds
-        {
-            run_with_thread_pool(thread_count, || {
-                process(
-                    scan_path,
-                    cli.max_depth,
-                    Arc::clone(&progress),
-                    &exclude_patterns,
-                    Some(license_engine.clone()),
-                    cli.include_text,
-                )
-            })?
-        } else {
-            run_with_thread_pool(thread_count, || {
-                process_with_options(
-                    scan_path,
-                    cli.max_depth,
-                    Arc::clone(&progress),
-                    &exclude_patterns,
-                    Some(license_engine.clone()),
-                    cli.include_text,
-                    &text_options,
-                )
-            })?
-        };
+        let mut result = run_with_thread_pool(thread_count, || {
+            Ok(process_collected(
+                &collected,
+                Arc::clone(&progress),
+                Some(license_engine.clone()),
+                cli.include_text,
+                &text_options,
+            ))
+        })?;
 
         result.excluded_count = excluded_count;
         progress.finish_scan();

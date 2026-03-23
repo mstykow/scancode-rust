@@ -5,7 +5,7 @@ use provenant::parsers::list_parser_types;
 use provenant::progress::{ProgressMode, ScanProgress};
 use provenant::utils::file::{ExtractedTextKind, extract_text_for_detection};
 use provenant::utils::hash::calculate_sha256;
-use provenant::{FileType, TextDetectionOptions, process, process_with_options};
+use provenant::{FileType, TextDetectionOptions, collect_paths, process_collected};
 use std::fs;
 use std::path::Path;
 use std::sync::Arc;
@@ -30,6 +30,25 @@ fn create_license_detection_engine() -> Option<Arc<LicenseDetectionEngine>> {
 
 fn hidden_progress() -> Arc<ScanProgress> {
     Arc::new(ScanProgress::new(ProgressMode::Quiet))
+}
+
+fn scan<P: AsRef<Path>>(
+    path: P,
+    max_depth: usize,
+    patterns: &[Pattern],
+    license_engine: Option<Arc<LicenseDetectionEngine>>,
+    include_text: bool,
+    options: Option<&TextDetectionOptions>,
+) -> provenant::scanner::ProcessResult {
+    let progress = hidden_progress();
+    let collected = collect_paths(path.as_ref(), max_depth, patterns);
+    process_collected(
+        &collected,
+        progress,
+        license_engine,
+        include_text,
+        options.unwrap_or(&TextDetectionOptions::default()),
+    )
 }
 
 fn build_text_pdf(lines: &[&str]) -> Vec<u8> {
@@ -243,11 +262,9 @@ fn png_crc32(bytes: &[u8]) -> u32 {
 #[test]
 fn test_scanner_discovers_all_registered_parsers() {
     let test_dir = "testdata/integration/multi-parser";
-    let progress = hidden_progress();
     let patterns: Vec<Pattern> = vec![];
 
-    let result =
-        process(test_dir, 50, progress, &patterns, None, false).expect("Scan should succeed");
+    let result = scan(test_dir, 50, &patterns, None, false, None);
 
     // Should find 3 files with package data (npm, python, cargo)
     let package_files: Vec<_> = result
@@ -282,11 +299,9 @@ fn test_scanner_discovers_all_registered_parsers() {
 #[test]
 fn test_full_output_format_structure() {
     let test_dir = "testdata/integration/multi-parser";
-    let progress = hidden_progress();
     let patterns: Vec<Pattern> = vec![];
 
-    let result =
-        process(test_dir, 50, progress, &patterns, None, false).expect("Scan should succeed");
+    let result = scan(test_dir, 50, &patterns, None, false, None);
 
     // Verify basic structure
     assert!(!result.files.is_empty(), "Should have files in result");
@@ -342,11 +357,9 @@ fn test_scanner_handles_empty_directory() {
     let temp_dir = TempDir::new().expect("Failed to create temp dir");
     let test_path = temp_dir.path();
 
-    let progress = hidden_progress();
     let patterns: Vec<Pattern> = vec![];
 
-    let result = process(test_path, 50, progress, &patterns, None, false)
-        .expect("Scan should succeed on empty directory");
+    let result = scan(test_path, 50, &patterns, None, false, None);
 
     // Should have no files (only the directory entry might be present)
     let file_count = result
@@ -368,12 +381,10 @@ fn test_scanner_handles_parse_errors_gracefully() {
     let malformed_json = test_path.join("package.json");
     fs::write(&malformed_json, "{ this is not valid json }").expect("Failed to write test file");
 
-    let progress = hidden_progress();
     let patterns: Vec<Pattern> = vec![];
 
     // Scan should complete without crashing
-    let result = process(test_path, 50, progress, &patterns, None, false)
-        .expect("Scan should not crash on malformed files");
+    let result = scan(test_path, 50, &patterns, None, false, None);
 
     // Should find the file
     let json_file = result
@@ -393,12 +404,10 @@ fn test_scanner_handles_parse_errors_gracefully() {
 #[test]
 fn test_exclusion_patterns_filter_correctly() {
     let test_dir = "testdata/integration/multi-parser";
-    let progress = hidden_progress();
 
     let patterns: Vec<Pattern> = vec![Pattern::new("*.toml").expect("Invalid pattern")];
 
-    let result =
-        process(test_dir, 50, progress, &patterns, None, false).expect("Scan should succeed");
+    let result = scan(test_dir, 50, &patterns, None, false, None);
 
     // Should not find any .toml files
     let toml_files: Vec<_> = result
@@ -441,20 +450,16 @@ fn test_max_depth_limits_traversal() {
     fs::write(&deep_file, r#"{"name": "deep", "version": "1.0.0"}"#)
         .expect("Failed to write test file");
 
-    let progress = hidden_progress();
     let patterns: Vec<Pattern> = vec![];
 
     // Scan with max_depth=1 (should not reach level2)
-    let result =
-        process(test_path, 1, progress, &patterns, None, false).expect("Scan should succeed");
+    let result = scan(test_path, 1, &patterns, None, false, None);
 
     // Should not find the deep package.json
     let has_deep_json = result.files.iter().any(|f| f.name == "package.json");
     assert!(!has_deep_json, "Should not find package.json at depth > 1");
 
-    let unlimited_progress = hidden_progress();
-    let unlimited_result = process(test_path, 0, unlimited_progress, &patterns, engine, false)
-        .expect("Scan with unlimited depth should succeed");
+    let unlimited_result = scan(test_path, 0, &patterns, engine, false, None);
     let has_deep_json_unlimited = unlimited_result
         .files
         .iter()
@@ -523,7 +528,6 @@ fn test_scanner_detects_emails_and_urls_when_enabled() {
     )
     .expect("Failed to write test file");
 
-    let progress = hidden_progress();
     let patterns: Vec<Pattern> = vec![];
     let engine = create_license_detection_engine();
     let options = TextDetectionOptions {
@@ -536,8 +540,7 @@ fn test_scanner_detects_emails_and_urls_when_enabled() {
         scan_cache_dir: None,
     };
 
-    let result = process_with_options(test_path, 10, progress, &patterns, engine, false, &options)
-        .expect("Scan should succeed");
+    let result = scan(test_path, 10, &patterns, engine, false, Some(&options));
 
     let file = result
         .files
@@ -566,7 +569,6 @@ fn test_scanner_detects_copyrights_in_latin1_text() {
     let content = b"Copyright 2024 Fran\xe7ois M\xfcller\n";
     fs::write(&content_path, content).expect("Failed to write Latin-1 test file");
 
-    let progress = hidden_progress();
     let patterns: Vec<Pattern> = vec![];
     let engine = create_license_detection_engine();
     let options = TextDetectionOptions {
@@ -579,8 +581,7 @@ fn test_scanner_detects_copyrights_in_latin1_text() {
         scan_cache_dir: None,
     };
 
-    let result = process_with_options(test_path, 10, progress, &patterns, engine, false, &options)
-        .expect("Scan should succeed");
+    let result = scan(test_path, 10, &patterns, engine, false, Some(&options));
 
     let file = result
         .files
@@ -612,7 +613,6 @@ fn test_scanner_detects_copyrights_in_pdf_text() {
     let pdf = build_text_pdf(&["Copyright 2024 Example Corp.", "All rights reserved."]);
     fs::write(&content_path, pdf).expect("Failed to write PDF fixture");
 
-    let progress = hidden_progress();
     let patterns: Vec<Pattern> = vec![];
     let engine = create_license_detection_engine();
     let options = TextDetectionOptions {
@@ -625,8 +625,7 @@ fn test_scanner_detects_copyrights_in_pdf_text() {
         scan_cache_dir: None,
     };
 
-    let result = process_with_options(test_path, 10, progress, &patterns, engine, false, &options)
-        .expect("Scan should succeed");
+    let result = scan(test_path, 10, &patterns, engine, false, Some(&options));
 
     let file = result
         .files
@@ -671,7 +670,6 @@ fn test_scanner_detects_emails_and_urls_in_pdf_text() {
         extracted_text
     );
 
-    let progress = hidden_progress();
     let patterns: Vec<Pattern> = vec![];
     let engine = create_license_detection_engine();
     let options = TextDetectionOptions {
@@ -684,8 +682,7 @@ fn test_scanner_detects_emails_and_urls_in_pdf_text() {
         scan_cache_dir: None,
     };
 
-    let result = process_with_options(test_path, 10, progress, &patterns, engine, false, &options)
-        .expect("Scan should succeed");
+    let result = scan(test_path, 10, &patterns, engine, false, Some(&options));
 
     let file = result
         .files
@@ -732,7 +729,6 @@ fn test_scanner_detects_copyrights_in_supported_image_exif_containers() {
         );
     }
 
-    let progress = hidden_progress();
     let patterns: Vec<Pattern> = vec![];
     let engine = create_license_detection_engine();
     let options = TextDetectionOptions {
@@ -745,8 +741,7 @@ fn test_scanner_detects_copyrights_in_supported_image_exif_containers() {
         scan_cache_dir: None,
     };
 
-    let result = process_with_options(test_path, 10, progress, &patterns, engine, false, &options)
-        .expect("Scan should succeed");
+    let result = scan(test_path, 10, &patterns, engine, false, Some(&options));
 
     for extension in ["png", "jpg", "tiff", "webp"] {
         let suffix = format!("photo.{extension}");
@@ -807,7 +802,6 @@ fn test_scanner_detects_emails_and_urls_in_xmp_metadata() {
         extracted_text
     );
 
-    let progress = hidden_progress();
     let patterns: Vec<Pattern> = vec![];
     let engine = create_license_detection_engine();
     let options = TextDetectionOptions {
@@ -820,8 +814,7 @@ fn test_scanner_detects_emails_and_urls_in_xmp_metadata() {
         scan_cache_dir: None,
     };
 
-    let result = process_with_options(test_path, 10, progress, &patterns, engine, false, &options)
-        .expect("Scan should succeed");
+    let result = scan(test_path, 10, &patterns, engine, false, Some(&options));
 
     let file = result
         .files
@@ -884,7 +877,6 @@ fn test_scanner_detects_urls_in_additional_xmp_fields() {
         extracted_text
     );
 
-    let progress = hidden_progress();
     let patterns: Vec<Pattern> = vec![];
     let engine = create_license_detection_engine();
     let options = TextDetectionOptions {
@@ -897,8 +889,7 @@ fn test_scanner_detects_urls_in_additional_xmp_fields() {
         scan_cache_dir: None,
     };
 
-    let result = process_with_options(test_path, 10, progress, &patterns, engine, false, &options)
-        .expect("Scan should succeed");
+    let result = scan(test_path, 10, &patterns, engine, false, Some(&options));
 
     let file = result
         .files
@@ -946,7 +937,6 @@ fn test_scanner_detects_emails_in_exif_user_comment() {
         extracted_text
     );
 
-    let progress = hidden_progress();
     let patterns: Vec<Pattern> = vec![];
     let engine = create_license_detection_engine();
     let options = TextDetectionOptions {
@@ -959,8 +949,7 @@ fn test_scanner_detects_emails_in_exif_user_comment() {
         scan_cache_dir: None,
     };
 
-    let result = process_with_options(test_path, 10, progress, &patterns, engine, false, &options)
-        .expect("Scan should succeed");
+    let result = scan(test_path, 10, &patterns, engine, false, Some(&options));
 
     let file = result
         .files
@@ -998,7 +987,6 @@ fn test_scanner_ignores_non_clue_image_metadata() {
         extracted_text
     );
 
-    let progress = hidden_progress();
     let patterns: Vec<Pattern> = vec![];
     let engine = create_license_detection_engine();
     let options = TextDetectionOptions {
@@ -1011,8 +999,7 @@ fn test_scanner_ignores_non_clue_image_metadata() {
         scan_cache_dir: None,
     };
 
-    let result = process_with_options(test_path, 10, progress, &patterns, engine, false, &options)
-        .expect("Scan should succeed");
+    let result = scan(test_path, 10, &patterns, engine, false, Some(&options));
 
     let file = result
         .files
@@ -1042,7 +1029,6 @@ fn test_scanner_ignores_xml_namespace_garbage_in_copyright_detection() {
     let content_path = test_path.join("view_layout.xml");
     fs::copy(fixture, &content_path).expect("Failed to copy XML fixture");
 
-    let progress = hidden_progress();
     let patterns: Vec<Pattern> = vec![];
     let engine = create_license_detection_engine();
     let options = TextDetectionOptions {
@@ -1055,8 +1041,7 @@ fn test_scanner_ignores_xml_namespace_garbage_in_copyright_detection() {
         scan_cache_dir: None,
     };
 
-    let result = process_with_options(test_path, 10, progress, &patterns, engine, false, &options)
-        .expect("Scan should succeed");
+    let result = scan(test_path, 10, &patterns, engine, false, Some(&options));
 
     let file = result
         .files
@@ -1098,7 +1083,6 @@ fn test_scanner_detects_copyrights_in_windows_dll_strings() {
     let content_path = test_path.join("windows.dll");
     fs::copy(fixture, &content_path).expect("Failed to copy DLL fixture");
 
-    let progress = hidden_progress();
     let patterns: Vec<Pattern> = vec![];
     let engine = create_license_detection_engine();
     let options = TextDetectionOptions {
@@ -1111,8 +1095,7 @@ fn test_scanner_detects_copyrights_in_windows_dll_strings() {
         scan_cache_dir: None,
     };
 
-    let result = process_with_options(test_path, 10, progress, &patterns, engine, false, &options)
-        .expect("Scan should succeed");
+    let result = scan(test_path, 10, &patterns, engine, false, Some(&options));
 
     let file = result
         .files
@@ -1144,7 +1127,6 @@ fn test_scanner_avoids_false_positive_copyrights_in_executable_strings() {
     let content_path = test_path.join("test_nsis.exe");
     fs::copy(fixture, &content_path).expect("Failed to copy executable fixture");
 
-    let progress = hidden_progress();
     let patterns: Vec<Pattern> = vec![];
     let engine = create_license_detection_engine();
     let options = TextDetectionOptions {
@@ -1157,8 +1139,7 @@ fn test_scanner_avoids_false_positive_copyrights_in_executable_strings() {
         scan_cache_dir: None,
     };
 
-    let result = process_with_options(test_path, 10, progress, &patterns, engine, false, &options)
-        .expect("Scan should succeed");
+    let result = scan(test_path, 10, &patterns, engine, false, Some(&options));
 
     let file = result
         .files
@@ -1197,7 +1178,6 @@ fn test_scanner_respects_email_url_thresholds() {
     )
     .expect("Failed to write test file");
 
-    let progress = hidden_progress();
     let patterns: Vec<Pattern> = vec![];
     let engine = create_license_detection_engine();
     let options = TextDetectionOptions {
@@ -1210,8 +1190,7 @@ fn test_scanner_respects_email_url_thresholds() {
         scan_cache_dir: None,
     };
 
-    let result = process_with_options(test_path, 10, progress, &patterns, engine, false, &options)
-        .expect("Scan should succeed");
+    let result = scan(test_path, 10, &patterns, engine, false, Some(&options));
 
     let file = result
         .files
@@ -1242,7 +1221,6 @@ fn test_scanner_persists_scan_result_cache_entries() {
     )
     .expect("Failed to write test file");
 
-    let progress = hidden_progress();
     let patterns: Vec<Pattern> = vec![];
     let options = TextDetectionOptions {
         detect_copyrights: true,
@@ -1254,16 +1232,7 @@ fn test_scanner_persists_scan_result_cache_entries() {
         scan_cache_dir: Some(cache_dir.clone()),
     };
 
-    let first = process_with_options(
-        test_path,
-        10,
-        Arc::clone(&progress),
-        &patterns,
-        None,
-        false,
-        &options,
-    )
-    .expect("First scan should succeed");
+    let first = scan(test_path, 10, &patterns, None, false, Some(&options));
 
     let first_file = first
         .files
@@ -1281,8 +1250,7 @@ fn test_scanner_persists_scan_result_cache_entries() {
         .join(format!("{sha256}.msgpack.zst"));
     assert!(cache_path.exists(), "Expected scan cache entry to exist");
 
-    let second = process_with_options(test_path, 10, progress, &patterns, None, false, &options)
-        .expect("Second scan should succeed");
+    let second = scan(test_path, 10, &patterns, None, false, Some(&options));
     let second_file = second
         .files
         .iter()
