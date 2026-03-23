@@ -1152,7 +1152,7 @@ fn compute_summary_with_options(
     let declared_holders = compute_declared_holders(files, packages);
     let declared_holder = (!declared_holders.is_empty()).then(|| declared_holders.join(", "));
     let primary_language = compute_primary_language(files, packages);
-    let other_languages = compute_other_languages(files, packages, primary_language.as_deref());
+    let other_languages = compute_other_languages(files, primary_language.as_deref());
     let tallies = compute_tallies(files).unwrap_or_default();
     let (score_declared_license_expression, score_clarity) = compute_license_score(files);
 
@@ -1178,7 +1178,11 @@ fn compute_summary_with_options(
         declared_license_expression.as_deref(),
         &tallies.detected_license_expression,
     );
-    let other_holders = remove_tally_values(&declared_holders, &tallies.holders);
+    let other_holders = if declared_holders.is_empty() {
+        vec![]
+    } else {
+        remove_tally_values(&declared_holders, &tallies.holders)
+    };
 
     let license_clarity_score = if include_license_clarity_score {
         Some(score_clarity)
@@ -1189,7 +1193,7 @@ fn compute_summary_with_options(
     Some(Summary {
         declared_license_expression,
         license_clarity_score,
-        declared_holder: include_summary_fields.then_some(declared_holder).flatten(),
+        declared_holder: include_summary_fields.then(|| declared_holder.unwrap_or_default()),
         primary_language: include_summary_fields.then_some(primary_language).flatten(),
         other_license_expressions: if include_summary_fields {
             other_license_expressions
@@ -1840,23 +1844,26 @@ fn compute_declared_holders(files: &[FileInfo], packages: &[Package]) -> Vec<Str
 }
 
 fn compute_primary_language(files: &[FileInfo], packages: &[Package]) -> Option<String> {
-    let mut counts: HashMap<String, usize> = HashMap::new();
+    let package_languages = unique(
+        &packages
+            .iter()
+            .filter_map(|package| package.primary_language.as_ref())
+            .cloned()
+            .collect::<Vec<_>>(),
+    );
 
-    for language in packages
-        .iter()
-        .filter_map(|package| package.primary_language.as_ref())
-    {
-        *counts.entry(language.clone()).or_insert(0) += 1;
+    if package_languages.len() == 1 {
+        return package_languages.into_iter().next();
     }
 
-    if counts.is_empty() {
-        for language in files
-            .iter()
-            .filter(|file| file.is_source.unwrap_or(false))
-            .filter_map(|file| file.programming_language.as_ref())
-        {
-            *counts.entry(language.clone()).or_insert(0) += 1;
-        }
+    let mut counts: HashMap<String, usize> = HashMap::new();
+
+    for language in files
+        .iter()
+        .filter(|file| file.is_source.unwrap_or(false))
+        .filter_map(|file| file.programming_language.as_ref())
+    {
+        *counts.entry(language.clone()).or_insert(0) += 1;
     }
 
     counts
@@ -1865,28 +1872,15 @@ fn compute_primary_language(files: &[FileInfo], packages: &[Package]) -> Option<
         .map(|(language, _)| language)
 }
 
-fn compute_other_languages(
-    files: &[FileInfo],
-    packages: &[Package],
-    primary_language: Option<&str>,
-) -> Vec<TallyEntry> {
+fn compute_other_languages(files: &[FileInfo], primary_language: Option<&str>) -> Vec<TallyEntry> {
     let mut counts: HashMap<String, usize> = HashMap::new();
 
-    for language in packages
+    for language in files
         .iter()
-        .filter_map(|package| package.primary_language.as_ref())
+        .filter(|file| file.is_source.unwrap_or(false))
+        .filter_map(|file| file.programming_language.as_ref())
     {
         *counts.entry(language.clone()).or_insert(0) += 1;
-    }
-
-    if counts.is_empty() {
-        for language in files
-            .iter()
-            .filter(|file| file.is_source.unwrap_or(false))
-            .filter_map(|file| file.programming_language.as_ref())
-        {
-            *counts.entry(language.clone()).or_insert(0) += 1;
-        }
     }
 
     let mut tallies: Vec<TallyEntry> = counts
