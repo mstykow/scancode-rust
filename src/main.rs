@@ -855,44 +855,32 @@ fn classify_key_files(files: &mut [FileInfo], packages: &[Package]) {
     let scan_roots = build_scan_roots(files);
 
     for file in files.iter_mut() {
+        let path = Path::new(&file.path);
+        file.is_top_level = if file.for_packages.is_empty() {
+            is_scan_top_level(path, &scan_roots)
+        } else {
+            let is_referenced = file.for_packages.iter().any(|uid| {
+                package_file_references
+                    .get(uid)
+                    .is_some_and(|refs| refs.contains(file.path.as_str()))
+            });
+            let is_root_top_level = file.for_packages.iter().any(|uid| {
+                package_roots
+                    .get(uid)
+                    .and_then(|root| path.strip_prefix(root).ok())
+                    .is_some_and(|relative| relative.components().count() == 1)
+            });
+            is_referenced || is_root_top_level
+        };
+
         if file.file_type != FileType::File {
             continue;
         }
 
-        let basename = file
-            .path
-            .rsplit('/')
-            .next()
-            .unwrap_or(file.path.as_str())
-            .to_ascii_lowercase();
-
-        file.is_legal = is_legal_filename(&basename);
-        file.is_readme = basename.starts_with("readme");
-        file.is_manifest = !file.package_data.is_empty() || is_manifest_filename(&basename);
-        file.is_community = is_community_filename(&basename);
-
-        let path = Path::new(&file.path);
-
-        if file.for_packages.is_empty() {
-            file.is_top_level = is_scan_top_level(path, &scan_roots);
-            file.is_key_file =
-                file.is_top_level && (file.is_legal || file.is_manifest || file.is_readme);
-            continue;
-        }
-
-        let is_referenced = file.for_packages.iter().any(|uid| {
-            package_file_references
-                .get(uid)
-                .is_some_and(|refs| refs.contains(file.path.as_str()))
-        });
-        let is_root_top_level = file.for_packages.iter().any(|uid| {
-            package_roots
-                .get(uid)
-                .and_then(|root| path.strip_prefix(root).ok())
-                .is_some_and(|relative| relative.components().count() == 1)
-        });
-
-        file.is_top_level = is_referenced || is_root_top_level;
+        file.is_legal = is_legal_file(file);
+        file.is_readme = is_readme_file(file);
+        file.is_manifest = !file.package_data.is_empty() || is_manifest_file(&file.path);
+        file.is_community = is_community_file(file);
         file.is_key_file =
             file.is_top_level && (file.is_legal || file.is_manifest || file.is_readme);
     }
@@ -986,25 +974,87 @@ fn build_package_file_reference_map(files: &[FileInfo]) -> HashMap<String, HashS
     mapping
 }
 
-fn is_legal_filename(basename: &str) -> bool {
-    basename == "license"
-        || basename.starts_with("license.")
-        || basename == "licence"
-        || basename.starts_with("licence.")
-        || basename == "copyright"
-        || basename.starts_with("copyright.")
-        || basename == "copying"
-        || basename.starts_with("copying.")
-        || basename == "notice"
-        || basename.starts_with("notice.")
+const LEGAL_STARTS_ENDS: &[&str] = &[
+    "copying",
+    "copyright",
+    "copyrights",
+    "copyleft",
+    "notice",
+    "license",
+    "licenses",
+    "licence",
+    "licences",
+    "licensing",
+    "licencing",
+    "legal",
+    "eula",
+    "agreement",
+    "patent",
+    "patents",
+];
+
+const MANIFEST_ENDS: &[&str] = &[
+    ".about",
+    "/bower.json",
+    "/project.clj",
+    ".podspec",
+    "/composer.json",
+    "/description",
+    "/elm-package.json",
+    "/+compact_manifest",
+    "+manifest",
+    ".gemspec",
+    "/metadata",
+    "/metadata.gz-extract",
+    "/build.gradle",
+    ".cabal",
+    "/haxelib.json",
+    "/package.json",
+    ".nuspec",
+    ".pod",
+    "/meta.yml",
+    "/dist.ini",
+    "/pipfile",
+    "/setup.cfg",
+    "/setup.py",
+    "/pkg-info",
+    "/pyproject.toml",
+    ".spec",
+    "/cargo.toml",
+    ".spdx",
+    "/dependencies",
+    "debian/copyright",
+    "meta-inf/manifest.mf",
+];
+
+fn name_or_base_name_matches(file: &FileInfo, patterns: &[&str]) -> bool {
+    let name = file.name.to_ascii_lowercase();
+    let base_name = file.base_name.to_ascii_lowercase();
+
+    patterns.iter().any(|pattern| {
+        name.starts_with(pattern)
+            || name.ends_with(pattern)
+            || base_name.starts_with(pattern)
+            || base_name.ends_with(pattern)
+    })
 }
 
-fn is_manifest_filename(basename: &str) -> bool {
-    basename.ends_with(".gemspec") || basename == "gemfile" || basename == "gemfile.lock"
+fn is_legal_file(file: &FileInfo) -> bool {
+    name_or_base_name_matches(file, LEGAL_STARTS_ENDS)
 }
 
-fn is_community_filename(basename: &str) -> bool {
-    let normalized = basename.replace(['_', '-'], "");
+fn is_manifest_file(path: &str) -> bool {
+    let lowered = path.to_ascii_lowercase();
+    MANIFEST_ENDS.iter().any(|ending| lowered.ends_with(ending))
+}
+
+fn is_readme_file(file: &FileInfo) -> bool {
+    name_or_base_name_matches(file, &["readme"])
+}
+
+fn is_community_file(file: &FileInfo) -> bool {
+    let clean = |s: &str| s.replace(['_', '-'], "").to_ascii_lowercase();
+    let candidates = [clean(&file.name), clean(&file.base_name)];
     [
         "changelog",
         "roadmap",
@@ -1015,7 +1065,11 @@ fn is_community_filename(basename: &str) -> bool {
         "funding",
     ]
     .iter()
-    .any(|prefix| normalized.starts_with(prefix) || normalized.ends_with(prefix))
+    .any(|prefix| {
+        candidates
+            .iter()
+            .any(|candidate| candidate.starts_with(prefix) || candidate.ends_with(prefix))
+    })
 }
 
 const FACETS: [&str; 6] = ["core", "dev", "tests", "docs", "data", "examples"];
