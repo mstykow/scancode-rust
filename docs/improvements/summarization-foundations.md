@@ -115,6 +115,10 @@ The current branch also closes several active upstream fixture gaps:
 - summary holder selection now keeps null `other_holders` buckets while still removing the declared holders themselves
 - summary now emits an empty declared-holder string when no holder can be established
 - summary falls back to the tallied primary language when top-level packages disagree on language
+- multiple holders detected in a single top-level key file are now joined into the declared holder output
+- `no_license_text` and `no_license_or_copyright` now match the active zero-score fixture behavior
+- a single joined declaration such as `MIT OR Apache-2.0` no longer triggers false ambiguity in score mode
+- nested manifest-style key files now participate in the active jar score fixture behavior
 
 ### Active classify parity fixture coverage
 
