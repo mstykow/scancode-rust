@@ -130,7 +130,7 @@ pub struct Query<'a> {
     pub index: &'a LicenseIndex,
 }
 
-fn matched_text_from_text(text: &str, start_line: usize, end_line: usize) -> String {
+pub fn matched_text_from_text(text: &str, start_line: usize, end_line: usize) -> String {
     if start_line == 0 || end_line == 0 || start_line > end_line {
         return String::new();
     }
@@ -582,7 +582,6 @@ impl<'a> Query<'a> {
 #[derive(Debug, Clone)]
 struct WholeQueryRunSnapshot<'a> {
     index: &'a LicenseIndex,
-    text: String,
     tokens: Vec<TokenId>,
     line_by_pos: Vec<usize>,
     high_matchables: HashSet<usize>,
@@ -633,7 +632,6 @@ impl<'a> QueryRun<'a> {
             query: None,
             whole_query_snapshot: Some(WholeQueryRunSnapshot {
                 index: query.index,
-                text: query.text.clone(),
                 tokens: query.tokens.clone(),
                 line_by_pos: query.line_by_pos.clone(),
                 high_matchables: query.high_matchables.clone(),
@@ -665,18 +663,6 @@ impl<'a> QueryRun<'a> {
                 .as_ref()
                 .expect("snapshot-backed whole query run should have snapshot data")
                 .line_by_pos
-        }
-    }
-
-    fn source_text(&self) -> &str {
-        if let Some(query) = self.query {
-            &query.text
-        } else {
-            &self
-                .whole_query_snapshot
-                .as_ref()
-                .expect("snapshot-backed whole query run should have snapshot data")
-                .text
         }
     }
 
@@ -859,20 +845,6 @@ impl<'a> QueryRun<'a> {
             .filter(|&&pos| live_span.contains(pos))
             .copied()
             .collect()
-    }
-
-    /// Extract matched text for a given line range.
-    ///
-    /// This delegates to the underlying Query's matched_text method.
-    ///
-    /// # Arguments
-    /// * `start_line` - Starting line number (1-indexed)
-    /// * `end_line` - Ending line number (1-indexed)
-    ///
-    /// # Returns
-    /// The matched text, or empty string if lines are out of range
-    pub fn matched_text(&self, start_line: usize, end_line: usize) -> String {
-        matched_text_from_text(self.source_text(), start_line, end_line)
     }
 }
 

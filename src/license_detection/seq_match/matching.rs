@@ -305,8 +305,6 @@ pub fn seq_match_with_candidates(
 
                     let score = match_coverage * candidate.rule.relevance as f32 / 100.0;
 
-                    let matched_text = query_run.matched_text(start_line, end_line);
-
                     let license_match = LicenseMatch {
                         license_expression: candidate.rule.license_expression.clone(),
                         license_expression_spdx: None,
@@ -324,7 +322,7 @@ pub fn seq_match_with_candidates(
                         rid,
                         rule_identifier: candidate.rule.identifier.clone(),
                         rule_url: String::new(),
-                        matched_text: Some(matched_text),
+                        matched_text: None,
                         referenced_filenames: candidate.rule.referenced_filenames.clone(),
                         rule_kind: candidate.rule.kind(),
                         is_from_license: candidate.rule.is_from_license,

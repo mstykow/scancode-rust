@@ -280,12 +280,17 @@ mod tests {
             "Match should end on line 2 (where license tokens are), not line 3"
         );
 
+        // matched_text is computed lazily at output time, not during matching
         assert!(
-            first_match
-                .matched_text
-                .as_ref()
-                .is_some_and(|t| t.contains("license")),
-            "Matched text should contain 'license'"
+            first_match.matched_text.is_none(),
+            "matched_text should be None during matching (computed lazily at output)"
+        );
+
+        // Verify we can compute it from the query
+        let matched_text = query.matched_text(first_match.start_line, first_match.end_line);
+        assert!(
+            matched_text.contains("license"),
+            "Computed matched text should contain 'license'"
         );
     }
 

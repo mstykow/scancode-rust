@@ -256,7 +256,6 @@ fn create_unknown_match_from_qspan(
     let synthetic_rule_text =
         build_unknown_rule_text(query, &qspan_positions, start_line, end_line);
     let rule_identifier = build_unknown_rule_identifier(&synthetic_rule_text);
-    let matched_text = query.matched_text(start_line, end_line);
 
     let ngram_count = qspan.len();
 
@@ -279,7 +278,7 @@ fn create_unknown_match_from_qspan(
         rule_relevance: 50,
         rule_identifier,
         rule_url: String::new(),
-        matched_text: Some(matched_text),
+        matched_text: None,
         referenced_filenames: None,
         rule_kind: crate::license_detection::models::RuleKind::None,
         is_from_license: false,

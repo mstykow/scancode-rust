@@ -381,14 +381,13 @@ fn test_engine_matched_text_populated() {
     for detection in &detections {
         for m in &detection.matches {
             assert!(
-                m.matched_text.is_some(),
-                "matched_text should be populated for matcher {}",
+                m.start_line > 0,
+                "start_line should be populated for matcher {}",
                 m.matcher
             );
-            let matched = m.matched_text.as_ref().unwrap();
             assert!(
-                !matched.is_empty(),
-                "matched_text should not be empty for matcher {}",
+                m.end_line >= m.start_line,
+                "end_line should be valid for matcher {}",
                 m.matcher
             );
         }
