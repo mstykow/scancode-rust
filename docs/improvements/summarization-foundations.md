@@ -116,6 +116,14 @@ The current branch also closes several active upstream fixture gaps:
 - summary now emits an empty declared-holder string when no holder can be established
 - summary falls back to the tallied primary language when top-level packages disagree on language
 
+### Active classify parity fixture coverage
+
+The current branch also closes the main active classify fixture gaps:
+
+- `is_legal` and `is_readme` now consider both `name` and `base_name`
+- manifest detection now uses the wider ScanCode path-suffix manifest set
+- root directories and their direct children now participate in `is_top_level` the same way the active classify fixture expects
+
 ### Initial non-license-dependent summary fields
 
 The current incremental layer now computes:

@@ -877,6 +877,55 @@ fn classify_key_files_marks_top_level_community_files_without_package_links() {
 }
 
 #[test]
+fn classify_key_files_matches_scan_code_cli_fixture_patterns() {
+    let mut haxelib = file("cli/haxelib.json");
+    haxelib.package_data = vec![crate::models::PackageData {
+        package_type: Some(PackageType::Haxe),
+        ..Default::default()
+    }];
+
+    let mut files = vec![
+        dir("cli"),
+        file("cli/LICENCING.readme"),
+        file("cli/README.first"),
+        haxelib,
+        dir("cli/not-top"),
+        file("cli/not-top/composer.json"),
+        file("cli/not-top/README.second"),
+    ];
+
+    classify_key_files(&mut files, &[]);
+
+    assert!(files[0].is_top_level);
+    assert!(!files[0].is_key_file);
+
+    assert!(files[1].is_legal);
+    assert!(files[1].is_readme);
+    assert!(files[1].is_top_level);
+    assert!(files[1].is_key_file);
+
+    assert!(!files[2].is_legal);
+    assert!(files[2].is_readme);
+    assert!(files[2].is_top_level);
+    assert!(files[2].is_key_file);
+
+    assert!(files[3].is_manifest);
+    assert!(files[3].is_top_level);
+    assert!(files[3].is_key_file);
+
+    assert!(files[4].is_top_level);
+    assert!(!files[4].is_key_file);
+
+    assert!(files[5].is_manifest);
+    assert!(!files[5].is_top_level);
+    assert!(!files[5].is_key_file);
+
+    assert!(files[6].is_readme);
+    assert!(!files[6].is_top_level);
+    assert!(!files[6].is_key_file);
+}
+
+#[test]
 fn compute_summary_uses_root_prefixed_top_level_key_files() {
     let mut files = vec![dir("project"), file("project/LICENSE")];
     files[1].license_expression = Some("mit".to_string());
