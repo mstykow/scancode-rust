@@ -48,6 +48,8 @@ This plan tracks progress toward a **drop-in replacement CLI surface**.
 | `-c, --copyright`          | Copyright/holder/author detection toggle                                                                          |
 | `-e, --email`              | Enable email detection                                                                                            |
 | `-u, --url`                | Enable URL detection                                                                                              |
+| `-l, --license`            | License detection toggle                                                                                          |
+| `--include-text`           | Include matched text in license output (requires `--license`)                                                     |
 | `--no-assemble`            | Rust-specific                                                                                                     |
 | `--max-email`              | Threshold (default 50, requires `--email`)                                                                        |
 | `--max-url`                | Threshold (default 50, requires `--url`)                                                                          |
@@ -62,7 +64,6 @@ This plan tracks progress toward a **drop-in replacement CLI surface**.
 
 | Parameter                   | Blocked By                                                                     |
 | --------------------------- | ------------------------------------------------------------------------------ |
-| `--license`                 | [`LICENSE_DETECTION_ARCHITECTURE.md`](../../LICENSE_DETECTION_ARCHITECTURE.md) |
 | `--license-score`           | [`LICENSE_DETECTION_ARCHITECTURE.md`](../../LICENSE_DETECTION_ARCHITECTURE.md) |
 | `--license-text`            | [`LICENSE_DETECTION_ARCHITECTURE.md`](../../LICENSE_DETECTION_ARCHITECTURE.md) |
 | `--classify`                | [`SUMMARIZATION_PLAN.md`](../post-processing/SUMMARIZATION_PLAN.md)            |
