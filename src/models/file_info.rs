@@ -64,6 +64,9 @@ pub struct FileInfo {
     pub scan_errors: Vec<String>,
     #[builder(default)]
     #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub is_generated: Option<bool>,
+    #[builder(default)]
+    #[serde(skip_serializing_if = "Option::is_none", default)]
     pub is_source: Option<bool>,
     #[builder(default)]
     #[serde(skip_serializing_if = "Option::is_none", default)]
@@ -197,6 +200,7 @@ impl FileInfo {
             urls,
             for_packages,
             scan_errors,
+            is_generated: None,
             is_source: None,
             source_count: None,
             is_legal: false,
