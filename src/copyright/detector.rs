@@ -4471,12 +4471,10 @@ fn merge_freebird_c_inc_urls(
     copyrights: &mut Vec<CopyrightDetection>,
     holders: &mut Vec<HolderDetection>,
 ) {
-    let content = raw_lines.join("\n");
-    let lower = content.to_ascii_lowercase();
-    if !lower.contains("(c)") || !lower.contains("inc") {
+    if !prepared_cache.contains_ci("(c)") || !prepared_cache.contains_ci("inc") {
         return;
     }
-    if !lower.contains("coventive") && !lower.contains("legend") {
+    if !prepared_cache.contains_ci("coventive") && !prepared_cache.contains_ci("legend") {
         return;
     }
 
@@ -4554,8 +4552,7 @@ fn merge_debugging390_best_viewed_suffix(
     copyrights: &mut Vec<CopyrightDetection>,
     holders: &mut Vec<HolderDetection>,
 ) {
-    let content = raw_lines.join("\n");
-    if !content.contains("Best viewed") {
+    if !prepared_cache.contains_ci("Best viewed") {
         return;
     }
 
@@ -4621,8 +4618,7 @@ fn merge_fsf_gdb_notice_lines(
     copyrights: &mut Vec<CopyrightDetection>,
     holders: &mut Vec<HolderDetection>,
 ) {
-    let content = raw_lines.join("\n");
-    if !content.contains("GDB is free software") {
+    if !prepared_cache.contains_ci("GDB is free software") {
         return;
     }
 
@@ -4679,8 +4675,7 @@ fn merge_axis_ethereal_suffix(
     copyrights: &mut Vec<CopyrightDetection>,
     holders: &mut Vec<HolderDetection>,
 ) {
-    let content = raw_lines.join("\n");
-    if !content.contains("Axis Communications") {
+    if !prepared_cache.contains_ci("Axis Communications") {
         return;
     }
 
@@ -4733,8 +4728,7 @@ fn merge_kirkwood_converted_to(
     copyrights: &mut Vec<CopyrightDetection>,
     holders: &mut Vec<HolderDetection>,
 ) {
-    let content = raw_lines.join("\n");
-    if !content.contains("Kirkwood") || !content.to_ascii_lowercase().contains("converted") {
+    if !prepared_cache.contains_ci("Kirkwood") || !prepared_cache.contains_ci("converted") {
         return;
     }
 
@@ -5331,8 +5325,7 @@ fn merge_implemented_by_lines(
     if raw_lines.is_empty() {
         return;
     }
-    let content = raw_lines.join("\n");
-    if !content.to_ascii_lowercase().contains("implemented by") {
+    if !prepared_cache.contains_ci("implemented by") {
         return;
     }
 
@@ -5505,15 +5498,10 @@ fn fix_shm_inline_copyrights(
     copyrights: &mut Vec<CopyrightDetection>,
     holders: &mut Vec<HolderDetection>,
 ) {
-    let content = raw_lines.join("\n");
-    let lower = content.to_ascii_lowercase();
-    if !lower.contains("/proc/sysvipc/shm support") {
-        return;
-    }
-    if !lower.contains("(c) 1999") {
-        return;
-    }
-    if !lower.contains("dragos@iname.com") {
+    if !prepared_cache.contains_ci("/proc/sysvipc/shm support")
+        || !prepared_cache.contains_ci("(c) 1999")
+        || !prepared_cache.contains_ci("dragos@iname.com")
+    {
         return;
     }
 
@@ -8791,8 +8779,7 @@ fn extract_confidential_proprietary_copyrights(
     copyrights: &mut Vec<CopyrightDetection>,
     holders: &mut Vec<HolderDetection>,
 ) {
-    let content = raw_lines.join("\n");
-    if !content.to_ascii_lowercase().contains("confidential") {
+    if !prepared_cache.contains_ci("confidential") {
         return;
     }
 

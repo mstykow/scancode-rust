@@ -40,6 +40,18 @@ impl<'a> PreparedLineCache<'a> {
         }
         self.prepared[idx].as_deref()
     }
+
+    pub(super) fn contains_ci(&self, pattern: &str) -> bool {
+        let pattern_bytes = pattern.as_bytes();
+        if pattern_bytes.is_empty() {
+            return true;
+        }
+        self.raw_lines.iter().any(|line| {
+            line.as_bytes()
+                .windows(pattern_bytes.len())
+                .any(|w| w.eq_ignore_ascii_case(pattern_bytes))
+        })
+    }
 }
 
 pub(super) struct LineNumberIndex {

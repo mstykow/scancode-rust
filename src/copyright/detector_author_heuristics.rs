@@ -1456,9 +1456,7 @@ pub(super) fn extract_dense_name_email_author_lists(
         return;
     }
 
-    let content = raw_lines.join("\n");
-    let lower = content.to_ascii_lowercase();
-    if lower.contains("copyright") || lower.contains("(c)") {
+    if prepared_cache.contains_ci("copyright") || prepared_cache.contains_ci("(c)") {
         return;
     }
 
