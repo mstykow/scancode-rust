@@ -127,6 +127,7 @@ The current branch also closes the main active classify fixture gaps:
 - `is_legal` and `is_readme` now consider both `name` and `base_name`
 - manifest detection now uses the wider ScanCode path-suffix manifest set
 - root directories and their direct children now participate in `is_top_level` the same way the active classify fixture expects
+- package-data-bearing manifests now promote their ancestor directories and nearby key siblings into the top-level package view expected by the active `with_package_data` fixture
 
 ### Initial non-license-dependent summary fields
 
