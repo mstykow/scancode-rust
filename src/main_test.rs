@@ -751,7 +751,7 @@ fn key_file_license_clues_feed_summary_without_mutating_package_license_provenan
     assert!(packages[0].license_detections.is_empty());
     assert_eq!(
         summary.declared_license_expression.as_deref(),
-        Some("apache-2.0")
+        Some("Apache-2.0")
     );
     let score = summary.license_clarity_score.expect("score exists");
     assert_eq!(score.score, 100);
@@ -796,6 +796,27 @@ fn manifest_declared_license_survives_into_package_and_summary() {
     let package =
         Package::from_package_data(&gemspec.package_data[0], "demo/demo.gemspec".to_string());
     gemspec.for_packages.push(package.package_uid.clone());
+    gemspec.license_expression = Some("mit".to_string());
+    gemspec.license_detections = vec![crate::models::LicenseDetection {
+        license_expression: "mit".to_string(),
+        license_expression_spdx: "MIT".to_string(),
+        matches: vec![Match {
+            license_expression: "mit".to_string(),
+            license_expression_spdx: "MIT".to_string(),
+            from_file: Some("demo/demo.gemspec".to_string()),
+            start_line: 1,
+            end_line: 1,
+            matcher: Some("1-spdx-id".to_string()),
+            score: 100.0,
+            matched_length: Some(1),
+            match_coverage: Some(100.0),
+            rule_relevance: Some(100),
+            rule_identifier: None,
+            rule_url: None,
+            matched_text: None,
+        }],
+        identifier: None,
+    }];
     let mut files = vec![gemspec];
     let mut packages = vec![package];
 
@@ -1023,11 +1044,12 @@ fn compute_summary_prefers_package_origin_info_and_preserves_other_tallies() {
 }
 
 #[test]
-fn compute_summary_penalizes_ambiguity_and_conflicting_non_key_licenses() {
+fn compute_summary_resolves_joined_primary_license_without_ambiguity() {
     let mut readme = file("codebase/README.txt");
     readme.is_key_file = true;
     readme.is_readme = true;
     readme.is_top_level = true;
+    readme.license_expression = Some("apache-2.0 AND (apache-2.0 OR mit)".to_string());
     readme.copyrights = vec![Copyright {
         copyright: "Copyright Example Corp.".to_string(),
         start_line: 1,
@@ -1086,6 +1108,61 @@ fn compute_summary_penalizes_ambiguity_and_conflicting_non_key_licenses() {
         identifier: None,
     }];
 
+    let files = vec![readme, apache, mit];
+    let summary = compute_summary(&files, &[]).expect("summary exists");
+    let score = summary.license_clarity_score.expect("clarity exists");
+
+    assert_eq!(
+        summary.declared_license_expression.as_deref(),
+        Some("apache-2.0 AND (apache-2.0 OR mit)")
+    );
+    assert_eq!(score.score, 100);
+    assert!(score.declared_license);
+    assert!(score.identification_precision);
+    assert!(score.has_license_text);
+    assert!(score.declared_copyrights);
+    assert!(!score.ambiguous_compound_licensing);
+    assert!(!score.conflicting_license_categories);
+}
+
+#[test]
+fn compute_summary_penalizes_conflicting_non_key_licenses_without_false_ambiguity() {
+    let mut readme = file("codebase/README.txt");
+    readme.is_key_file = true;
+    readme.is_readme = true;
+    readme.is_top_level = true;
+    readme.copyrights = vec![Copyright {
+        copyright: "Copyright Example Corp.".to_string(),
+        start_line: 1,
+        end_line: 1,
+    }];
+
+    let mut mit = file("codebase/mit.LICENSE");
+    mit.is_key_file = true;
+    mit.is_legal = true;
+    mit.is_top_level = true;
+    mit.license_expression = Some("mit".to_string());
+    mit.license_detections = vec![crate::models::LicenseDetection {
+        license_expression: "mit".to_string(),
+        license_expression_spdx: "MIT".to_string(),
+        matches: vec![Match {
+            license_expression: "mit".to_string(),
+            license_expression_spdx: "MIT".to_string(),
+            from_file: Some("codebase/mit.LICENSE".to_string()),
+            start_line: 1,
+            end_line: 1,
+            matcher: Some("1-hash".to_string()),
+            score: 100.0,
+            matched_length: Some(10),
+            match_coverage: Some(100.0),
+            rule_relevance: Some(100),
+            rule_identifier: None,
+            rule_url: None,
+            matched_text: None,
+        }],
+        identifier: None,
+    }];
+
     let mut non_key_gpl = file("codebase/tests/test_a.py");
     non_key_gpl.license_expression = Some("gpl-2.0-only".to_string());
     non_key_gpl.license_detections = vec![crate::models::LicenseDetection {
@@ -1109,20 +1186,17 @@ fn compute_summary_penalizes_ambiguity_and_conflicting_non_key_licenses() {
         identifier: None,
     }];
 
-    let files = vec![readme, apache, mit, non_key_gpl];
+    let files = vec![readme, mit, non_key_gpl];
     let summary = compute_summary(&files, &[]).expect("summary exists");
     let score = summary.license_clarity_score.expect("clarity exists");
 
-    assert_eq!(
-        summary.declared_license_expression.as_deref(),
-        Some("apache-2.0 and mit")
-    );
-    assert_eq!(score.score, 70);
+    assert_eq!(summary.declared_license_expression.as_deref(), Some("mit"));
+    assert_eq!(score.score, 80);
     assert!(score.declared_license);
     assert!(score.identification_precision);
     assert!(score.has_license_text);
     assert!(score.declared_copyrights);
-    assert!(score.ambiguous_compound_licensing);
+    assert!(!score.ambiguous_compound_licensing);
     assert!(score.conflicting_license_categories);
 }
 
@@ -1216,25 +1290,80 @@ fn compute_summary_excludes_null_other_license_expressions() {
 }
 
 #[test]
-fn compute_summary_excludes_null_other_holders() {
+fn compute_summary_keeps_null_other_holders_and_removes_declared_holder_only() {
     let mut readme = file("project/README.md");
     readme.is_key_file = true;
     readme.is_readme = true;
     readme.is_top_level = true;
-
-    let mut authors = file("project/AUTHORS");
-    authors.is_key_file = true;
-    authors.is_top_level = true;
-    authors.is_community = true;
-    authors.holders = vec![Holder {
+    readme.holders = vec![Holder {
         holder: "Example Corp.".to_string(),
         start_line: 1,
         end_line: 1,
     }];
 
-    let summary = compute_summary(&[readme, authors], &[]).expect("summary exists");
+    let mut authors = file("project/AUTHORS");
+    authors.is_community = true;
+    authors.holders = vec![Holder {
+        holder: "Demo Corp.".to_string(),
+        start_line: 1,
+        end_line: 1,
+    }];
 
+    let mut license = file("project/LICENSE");
+    license.is_key_file = true;
+    license.is_legal = true;
+    license.is_top_level = true;
+
+    let summary = compute_summary(&[readme, authors, license], &[]).expect("summary exists");
+
+    assert_eq!(summary.declared_holder.as_deref(), Some("Example Corp."));
+    assert_eq!(
+        summary.other_holders,
+        vec![
+            TallyEntry {
+                value: None,
+                count: 1,
+            },
+            TallyEntry {
+                value: Some("Demo Corp.".to_string()),
+                count: 1,
+            },
+        ]
+    );
+}
+
+#[test]
+fn compute_score_mode_ignores_package_declared_license_without_key_file_license_evidence() {
+    let mut package = package("pkg:npm/demo?uuid=test", "project/package.json");
+    package.declared_license_expression = Some("mit".to_string());
+
+    let mut package_json = file("project/package.json");
+    package_json.is_manifest = true;
+    package_json.is_key_file = true;
+    package_json.is_top_level = true;
+    package_json.for_packages = vec![package.package_uid.clone()];
+    package_json.copyrights = vec![Copyright {
+        copyright: "Copyright Example Corp.".to_string(),
+        start_line: 1,
+        end_line: 1,
+    }];
+
+    let summary = compute_summary_with_options(&[package_json], &[package], false, true)
+        .expect("score-only summary exists");
+
+    assert!(summary.declared_holder.is_none());
+    assert!(summary.primary_language.is_none());
+    assert!(summary.other_license_expressions.is_empty());
     assert!(summary.other_holders.is_empty());
+    assert!(summary.other_languages.is_empty());
+    assert!(summary.declared_license_expression.is_none());
+    let score = summary.license_clarity_score.expect("clarity exists");
+    assert_eq!(score.score, 0);
+    assert!(!score.declared_license);
+    assert!(!score.identification_precision);
+    assert!(!score.has_license_text);
+    assert!(score.declared_copyrights);
+    assert!(score.ambiguous_compound_licensing);
 }
 
 #[test]
