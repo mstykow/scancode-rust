@@ -33,6 +33,10 @@ pub struct Summary {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub primary_language: Option<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub other_license_expressions: Vec<TallyEntry>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub other_holders: Vec<TallyEntry>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub other_languages: Vec<TallyEntry>,
 }
 
