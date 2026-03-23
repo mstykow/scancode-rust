@@ -60,15 +60,14 @@ This plan tracks progress toward a **drop-in replacement CLI surface**.
 
 ### Scan Option Flags (pending)
 
-| Parameter                   | Blocked By                                                                     |
-| --------------------------- | ------------------------------------------------------------------------------ |
-| `--license`                 | [`LICENSE_DETECTION_ARCHITECTURE.md`](../../LICENSE_DETECTION_ARCHITECTURE.md) |
-| `--license-score`           | [`LICENSE_DETECTION_ARCHITECTURE.md`](../../LICENSE_DETECTION_ARCHITECTURE.md) |
-| `--license-text`            | [`LICENSE_DETECTION_ARCHITECTURE.md`](../../LICENSE_DETECTION_ARCHITECTURE.md) |
-| `--classify`                | [`SUMMARIZATION_PLAN.md`](../post-processing/SUMMARIZATION_PLAN.md)            |
-| `--facet <facet>=<pattern>` | [`SUMMARIZATION_PLAN.md`](../post-processing/SUMMARIZATION_PLAN.md)            |
-| `--generated`               | [`SUMMARIZATION_PLAN.md`](../post-processing/SUMMARIZATION_PLAN.md)            |
-| `--summary`                 | [`SUMMARIZATION_PLAN.md`](../post-processing/SUMMARIZATION_PLAN.md)            |
+| Parameter         | Blocked By                                                                     |
+| ----------------- | ------------------------------------------------------------------------------ |
+| `--license`       | [`LICENSE_DETECTION_ARCHITECTURE.md`](../../LICENSE_DETECTION_ARCHITECTURE.md) |
+| `--license-score` | [`LICENSE_DETECTION_ARCHITECTURE.md`](../../LICENSE_DETECTION_ARCHITECTURE.md) |
+| `--license-text`  | [`LICENSE_DETECTION_ARCHITECTURE.md`](../../LICENSE_DETECTION_ARCHITECTURE.md) |
+| `--classify`      | [`SUMMARIZATION_PLAN.md`](../post-processing/SUMMARIZATION_PLAN.md)            |
+| `--generated`     | [`SUMMARIZATION_PLAN.md`](../post-processing/SUMMARIZATION_PLAN.md)            |
+| `--summary`       | [`SUMMARIZATION_PLAN.md`](../post-processing/SUMMARIZATION_PLAN.md)            |
 
 Runtime dependency notes:
 
@@ -84,13 +83,19 @@ Runtime dependency notes:
 | `--tallies`               | [`SUMMARIZATION_PLAN.md`](../post-processing/SUMMARIZATION_PLAN.md)            |
 | `--tallies-with-details`  | [`SUMMARIZATION_PLAN.md`](../post-processing/SUMMARIZATION_PLAN.md)            |
 | `--tallies-key-files`     | [`SUMMARIZATION_PLAN.md`](../post-processing/SUMMARIZATION_PLAN.md)            |
-| `--tallies-by-facet`      | [`SUMMARIZATION_PLAN.md`](../post-processing/SUMMARIZATION_PLAN.md)            |
 
 Runtime dependency notes:
 
 - `--license-clarity-score` requires `--classify` for parity-compatible behavior.
 - `--tallies-key-files` requires `--classify` and `--tallies`.
-- `--tallies-by-facet` requires `--facet <facet>=<pattern>` and `--tallies`.
+
+### Partially Implemented Post-Processing Flags
+
+| Parameter                   | Notes                                                                                                                                                        |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `--classify`                | Accepted as a compatibility flag; current runtime already computes key-file classification, but full ScanCode classify parity remains open                   |
+| `--facet <facet>=<pattern>` | Implemented with six-facet validation, repeatable rules, multi-facet matching, and default-to-`core` file assignment                                         |
+| `--tallies-by-facet`        | Implemented top-level `tallies_by_facet` output; currently requires `--facet` definitions and reuses existing tally output rather than full tally CLI gating |
 
 ### Explicitly Deferred / Not Planned
 

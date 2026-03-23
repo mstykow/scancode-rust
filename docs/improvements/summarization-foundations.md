@@ -12,7 +12,9 @@ This incremental layer adds:
 4. top-level codebase `tallies` output for detected license expressions, copyrights, holders, authors, and programming languages
 5. top-level `tallies_of_key_files` output for key-file-only aggregation of those same tally families
 6. per-resource `files[*].tallies` output for file- and directory-level rollups of those same tally families
-7. initial non-license-dependent summary fields such as `declared_holder`, `primary_language`, and `other_languages`
+7. file-level `facets` assignment using the ScanCode facet set
+8. top-level `tallies_by_facet` output over the same tally families
+9. initial non-license-dependent summary fields such as `declared_holder`, `primary_language`, and `other_languages`
 
 ## Why This Matters
 
@@ -72,6 +74,10 @@ Top-level output now also supports `tallies_of_key_files`, which re-aggregates t
 
 Each file and directory output record can now include a `tallies` block. File tallies reflect direct findings, while directory tallies roll up child resources bottom-up.
 
+### File facets and by-facet tallies
+
+Files can now be assigned ScanCode-compatible facets (`core`, `dev`, `tests`, `docs`, `data`, `examples`), and top-level output can aggregate the existing tally families into ordered `tallies_by_facet` buckets.
+
 ### Initial non-license-dependent summary fields
 
 The current incremental layer now computes:
@@ -89,9 +95,7 @@ This does **not** mean Rust now matches Python `summarycode` completely.
 Still open:
 
 - package tallies
-- `tallies_by_facet`
 - full `license_clarity_score` heuristic parity
-- facets
 - generated code detection
 - broader summary output parity
 
