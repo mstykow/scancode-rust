@@ -8,10 +8,11 @@ use regex::Regex;
 use serde_json::Value;
 use serde_json::json;
 use std::fs;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 use tempfile::tempdir;
 
 use crate::assembly;
+use crate::license_detection::LicenseDetectionEngine;
 use crate::progress::{ProgressMode, ScanProgress};
 use crate::scanner::TextDetectionOptions;
 
@@ -311,6 +312,91 @@ fn compare_scan_json_values(actual: &Value, expected: &Value, path: &str) -> Res
             serde_json::to_string(actual).unwrap_or_default(),
             serde_json::to_string(expected).unwrap_or_default()
         )),
+    }
+}
+
+fn test_license_engine() -> Arc<LicenseDetectionEngine> {
+    static ENGINE: OnceLock<Arc<LicenseDetectionEngine>> = OnceLock::new();
+    ENGINE
+        .get_or_init(|| {
+            Arc::new(
+                LicenseDetectionEngine::from_embedded()
+                    .expect("embedded license engine should initialize"),
+            )
+        })
+        .clone()
+}
+
+fn normalize_package_datafile_paths(packages: &mut [Package], scan_root: &Path) {
+    for package in packages {
+        for path in &mut package.datafile_paths {
+            if let Some(stripped) = strip_root_prefix(Path::new(path), scan_root) {
+                *path = stripped.to_string_lossy().to_string();
+            }
+        }
+    }
+}
+
+fn compute_fixture_summary(fixture_dir: &str, include_summary: bool, include_score: bool) -> Value {
+    let fixture_root = Path::new(fixture_dir);
+    let progress = Arc::new(ScanProgress::new(ProgressMode::Quiet));
+    let scan_result = crate::scanner::process_with_options(
+        fixture_root,
+        0,
+        progress,
+        &[],
+        Some(test_license_engine()),
+        false,
+        &TextDetectionOptions::default(),
+    )
+    .expect("fixture scan should succeed");
+
+    let mut files = scan_result.files;
+    normalize_paths(
+        &mut files,
+        fixture_root.to_str().expect("fixture path should be UTF-8"),
+        true,
+        false,
+    );
+    let assembly_result = assembly::assemble(&mut files);
+    let mut packages = assembly_result.packages;
+    normalize_package_datafile_paths(&mut packages, fixture_root);
+
+    classify_key_files(&mut files, &packages);
+    promote_package_metadata_from_key_files(&files, &mut packages);
+
+    serde_json::to_value(
+        compute_summary_with_options(&files, &packages, include_summary, include_score)
+            .expect("fixture summary should exist"),
+    )
+    .expect("fixture summary should serialize")
+}
+
+fn assert_summary_fixture_matches_expected(
+    fixture_dir: &str,
+    expected_file: &str,
+    include_summary: bool,
+    include_score: bool,
+) {
+    let actual_summary = compute_fixture_summary(fixture_dir, include_summary, include_score);
+    let expected: Value = serde_json::from_str(
+        &fs::read_to_string(expected_file).expect("expected summary fixture should be readable"),
+    )
+    .expect("expected summary fixture should parse");
+    let expected_summary = expected
+        .get("summary")
+        .expect("expected fixture should contain summary")
+        .clone();
+
+    if let Err(error) = compare_scan_json_values(&actual_summary, &expected_summary, "summary") {
+        panic!(
+            "Summary fixture mismatch for {} vs {}: {}\nactual summary: {}\nexpected summary: {}",
+            fixture_dir,
+            expected_file,
+            error,
+            serde_json::to_string_pretty(&actual_summary).unwrap_or_default(),
+            serde_json::to_string_pretty(&expected_summary).unwrap_or_default()
+        );
     }
 }
 
@@ -660,9 +746,9 @@ fn classify_key_files_marks_nested_ruby_license_from_file_references() {
             end_line: 20,
             matcher: None,
             score: 100.0,
-            matched_length: None,
-            match_coverage: None,
-            rule_relevance: None,
+            matched_length: Some(161),
+            match_coverage: Some(100.0),
+            rule_relevance: Some(100),
             rule_identifier: None,
             rule_url: None,
             matched_text: None,
@@ -718,9 +804,9 @@ fn key_file_license_clues_feed_summary_without_mutating_package_license_provenan
             end_line: 20,
             matcher: None,
             score: 100.0,
-            matched_length: None,
-            match_coverage: None,
-            rule_relevance: None,
+            matched_length: Some(161),
+            match_coverage: Some(100.0),
+            rule_relevance: Some(100),
             rule_identifier: None,
             rule_url: None,
             matched_text: None,
@@ -751,7 +837,7 @@ fn key_file_license_clues_feed_summary_without_mutating_package_license_provenan
     assert!(packages[0].license_detections.is_empty());
     assert_eq!(
         summary.declared_license_expression.as_deref(),
-        Some("Apache-2.0")
+        Some("apache-2.0")
     );
     let score = summary.license_clarity_score.expect("score exists");
     assert_eq!(score.score, 100);
@@ -836,7 +922,7 @@ fn manifest_declared_license_survives_into_package_and_summary() {
         "MIT"
     );
     assert_eq!(summary.declared_license_expression.as_deref(), Some("mit"));
-    assert_eq!(summary.license_clarity_score.unwrap().score, 80);
+    assert_eq!(summary.license_clarity_score.unwrap().score, 90);
 }
 
 #[test]
@@ -1503,7 +1589,7 @@ fn compute_score_mode_ignores_package_declared_license_without_key_file_license_
     assert!(!score.declared_license);
     assert!(!score.identification_precision);
     assert!(!score.has_license_text);
-    assert!(score.declared_copyrights);
+    assert!(!score.declared_copyrights);
     assert!(score.ambiguous_compound_licensing);
 }
 
@@ -1752,7 +1838,7 @@ fn compute_summary_uses_tallied_primary_language_when_top_level_packages_disagre
 
     assert_eq!(
         summary.declared_license_expression.as_deref(),
-        Some("apache-2.0 and mit")
+        Some("apache-2.0 AND mit")
     );
     assert_eq!(summary.primary_language.as_deref(), Some("Python"));
     assert_eq!(summary.other_languages.len(), 1);
@@ -1797,6 +1883,40 @@ fn compute_summary_serializes_empty_declared_holder_when_none_found() {
 
     assert_eq!(summary.declared_holder.as_deref(), Some(""));
     assert!(summary.other_holders.is_empty());
+}
+
+#[test]
+fn active_score_fixtures_match_expected_summary_blocks() {
+    let fixtures = [
+        (
+            "reference/scancode-toolkit/tests/summarycode/data/score/basic",
+            "reference/scancode-toolkit/tests/summarycode/data/score/basic-expected.json",
+        ),
+        (
+            "reference/scancode-toolkit/tests/summarycode/data/score/no_license_text",
+            "reference/scancode-toolkit/tests/summarycode/data/score/no_license_text-expected.json",
+        ),
+        (
+            "reference/scancode-toolkit/tests/summarycode/data/score/no_license_or_copyright",
+            "reference/scancode-toolkit/tests/summarycode/data/score/no_license_or_copyright-expected.json",
+        ),
+        (
+            "reference/scancode-toolkit/tests/summarycode/data/score/no_license_ambiguity",
+            "reference/scancode-toolkit/tests/summarycode/data/score/no_license_ambiguity-expected.json",
+        ),
+        (
+            "reference/scancode-toolkit/tests/summarycode/data/score/inconsistent_licenses_copyleft",
+            "reference/scancode-toolkit/tests/summarycode/data/score/inconsistent_licenses_copyleft-expected.json",
+        ),
+        (
+            "reference/scancode-toolkit/tests/summarycode/data/score/jar",
+            "reference/scancode-toolkit/tests/summarycode/data/score/jar-expected.json",
+        ),
+    ];
+
+    for (fixture_dir, expected_file) in fixtures {
+        assert_summary_fixture_matches_expected(fixture_dir, expected_file, false, true);
+    }
 }
 
 #[test]
@@ -1877,7 +1997,7 @@ fn compute_score_mode_without_license_text_returns_zero_with_copyright_only() {
     assert!(!score.declared_license);
     assert!(!score.identification_precision);
     assert!(!score.has_license_text);
-    assert!(score.declared_copyrights);
+    assert!(!score.declared_copyrights);
     assert!(score.ambiguous_compound_licensing);
 }
 
