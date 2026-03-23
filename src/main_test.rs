@@ -936,14 +936,17 @@ fn compute_summary_uses_package_holder_and_primary_language() {
     let mut other = package("pkg:pypi/demo?uuid=test2", "demo/setup.py");
     other.package_type = Some(PackageType::Pypi);
     other.purl = Some("pkg:pypi/demo".to_string());
-    other.primary_language = Some("Python".to_string());
     other.holder = None;
 
     let mut extra_ruby = package("pkg:gem/demo-extra@1.0.0?uuid=test3", "demo/extra.gemspec");
     extra_ruby.name = Some("demo-extra".to_string());
     extra_ruby.purl = Some("pkg:gem/demo-extra@1.0.0".to_string());
 
-    let files = vec![];
+    let mut python = file("demo/helper.py");
+    python.programming_language = Some("Python".to_string());
+    python.is_source = Some(true);
+
+    let files = vec![python];
     let summary =
         compute_summary(&files, &[root_package, other, extra_ruby]).expect("summary exists");
 
@@ -1583,6 +1586,79 @@ fn compute_summary_uses_source_file_languages_when_packages_lack_them() {
     assert_eq!(summary.primary_language.as_deref(), Some("Ruby"));
     assert_eq!(summary.other_languages.len(), 1);
     assert_eq!(summary.other_languages[0].value.as_deref(), Some("Python"));
+}
+
+#[test]
+fn compute_summary_uses_tallied_primary_language_when_top_level_packages_disagree() {
+    let mut cargo = package("pkg:cargo/codebase?uuid=test1", "codebase/cargo.toml");
+    cargo.primary_language = Some("Rust".to_string());
+    cargo.declared_license_expression = Some("mit".to_string());
+
+    let mut pypi = package("pkg:pypi/codebase?uuid=test2", "codebase/PKG-INFO");
+    pypi.primary_language = Some("Python".to_string());
+    pypi.declared_license_expression = Some("apache-2.0".to_string());
+
+    let mut py1 = file("codebase/a.py");
+    py1.is_source = Some(true);
+    py1.programming_language = Some("Python".to_string());
+
+    let mut py2 = file("codebase/b.py");
+    py2.is_source = Some(true);
+    py2.programming_language = Some("Python".to_string());
+
+    let mut rs = file("codebase/lib.rs");
+    rs.is_source = Some(true);
+    rs.programming_language = Some("Rust".to_string());
+
+    let summary = compute_summary(&[py1, py2, rs], &[cargo, pypi]).expect("summary exists");
+
+    assert_eq!(
+        summary.declared_license_expression.as_deref(),
+        Some("apache-2.0 and mit")
+    );
+    assert_eq!(summary.primary_language.as_deref(), Some("Python"));
+    assert_eq!(summary.other_languages.len(), 1);
+    assert_eq!(summary.other_languages[0].value.as_deref(), Some("Rust"));
+    assert_eq!(summary.other_languages[0].count, 1);
+}
+
+#[test]
+fn compute_summary_serializes_empty_declared_holder_when_none_found() {
+    let mut package = package("pkg:pypi/pip?uuid=test", "pip-22.0.4/PKG-INFO");
+    package.primary_language = Some("Python".to_string());
+    package.declared_license_expression = Some("mit".to_string());
+
+    let mut pkg_info = file("pip-22.0.4/PKG-INFO");
+    pkg_info.is_manifest = true;
+    pkg_info.is_key_file = true;
+    pkg_info.is_top_level = true;
+    pkg_info.for_packages = vec![package.package_uid.clone()];
+    pkg_info.license_expression = Some("mit".to_string());
+    pkg_info.license_detections = vec![crate::models::LicenseDetection {
+        license_expression: "mit".to_string(),
+        license_expression_spdx: "MIT".to_string(),
+        matches: vec![Match {
+            license_expression: "mit".to_string(),
+            license_expression_spdx: "MIT".to_string(),
+            from_file: Some("pip-22.0.4/PKG-INFO".to_string()),
+            start_line: 1,
+            end_line: 1,
+            matcher: Some("1-spdx-id".to_string()),
+            score: 100.0,
+            matched_length: Some(1),
+            match_coverage: Some(100.0),
+            rule_relevance: Some(100),
+            rule_identifier: None,
+            rule_url: None,
+            matched_text: None,
+        }],
+        identifier: None,
+    }];
+
+    let summary = compute_summary(&[pkg_info], &[package]).expect("summary exists");
+
+    assert_eq!(summary.declared_holder.as_deref(), Some(""));
+    assert!(summary.other_holders.is_empty());
 }
 
 #[test]

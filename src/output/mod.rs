@@ -272,10 +272,16 @@ mod tests {
                 value: Some("mit".to_string()),
                 count: 1,
             }],
-            other_holders: vec![crate::models::TallyEntry {
-                value: Some("Other Corp.".to_string()),
-                count: 1,
-            }],
+            other_holders: vec![
+                crate::models::TallyEntry {
+                    value: None,
+                    count: 2,
+                },
+                crate::models::TallyEntry {
+                    value: Some("Other Corp.".to_string()),
+                    count: 1,
+                },
+            ],
             other_languages: vec![crate::models::TallyEntry {
                 value: Some("Python".to_string()),
                 count: 2,
@@ -304,7 +310,8 @@ mod tests {
             value["summary"]["other_license_expressions"][0]["value"],
             "mit"
         );
-        assert_eq!(value["summary"]["other_holders"][0]["value"], "Other Corp.");
+        assert!(value["summary"]["other_holders"][0]["value"].is_null());
+        assert_eq!(value["summary"]["other_holders"][1]["value"], "Other Corp.");
         assert_eq!(value["summary"]["other_languages"][0]["value"], "Python");
         assert_eq!(value["files"][0]["is_key_file"], true);
     }
