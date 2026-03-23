@@ -1,6 +1,6 @@
 # Summary, Tallies & Analysis Implementation Plan
 
-> **Status**: 🟡 In Progress — shared provenance cleanup, the full current tally stack, file facets/by-facet tallies, package-preferred summary origin, generated-file detection, initial summary/tally CLI gating, and a broader active summary/score parity subset are implemented; package tallies and residual summary/score edge-case parity remain open
+> **Status**: 🟡 In Progress — shared provenance cleanup, the full current tally stack, file facets/by-facet tallies, package-preferred summary origin, generated-file detection, initial summary/tally CLI gating, and a broad active summary/score parity subset are implemented; package tallies and only the residual summary/score edge cases remain open
 > **Priority**: P2 - Medium Priority (Post-Processing Feature)
 > **Estimated Effort**: 3-4 weeks
 > **Dependencies**: [LICENSE_DETECTION_ARCHITECTURE.md](../../LICENSE_DETECTION_ARCHITECTURE.md), [COPYRIGHT_DETECTION_PLAN.md](../text-detection/COPYRIGHT_DETECTION_PLAN.md), [ASSEMBLY_PLAN.md](../package-detection/ASSEMBLY_PLAN.md)
@@ -163,6 +163,8 @@ Summarization is a **consumer**, not a normalizer.
   - package-datafile holder fallback ahead of global key-file holder fallback
   - `other_holders` retaining null buckets while pruning only declared holders
   - top-level/community classification on normal root-prefixed scans feeding summary/score correctly
+  - empty declared-holder output when no holder can be established
+  - primary-language fallback from tallied sources when top-level packages disagree
 
 ### Missing
 
@@ -193,9 +195,9 @@ Summarization is a **consumer**, not a normalizer.
 5. **Phase 4**: Initial non-license-dependent summary fields ✅
 6. **Phase 5**: Core codebase tallies (`--tallies`) over existing declared/discovered evidence. ✅ for top-level `detected_license_expression`, `copyrights`, `holders`, `authors`, and `programming_language`; package tallies remain open.
 7. **Phase 6**: Detailed tally variants (`--tallies-with-details`, `--tallies-key-files`, `--tallies-by-facet`). 🟡 Top-level `tallies_of_key_files`, per-resource `files[*].tallies`, and top-level `tallies_by_facet` are implemented; package tallies and some CLI gating remain open.
-8. **Phase 7**: Full license clarity parity. 🟡 Implemented: declared-license/identification/text/copyright scoring, joined-expression primary-license resolution, and ambiguity/conflict penalties. Remaining work: ScanCode-quality license match filtering and residual score edge cases.
+8. **Phase 7**: Full license clarity parity. 🟡 Implemented: declared-license/identification/text/copyright scoring, joined-expression primary-license resolution, and ambiguity/conflict penalties. Remaining work: ScanCode-quality license match filtering and the remaining score edge cases.
 9. **Phase 8**: Generated-code detection parity plus remaining classify/facet parity gaps. 🟡 Implemented: file-level `is_generated` detection from conspicuous header clues. Remaining work: heuristic breadth and any residual classify gaps.
-10. **Phase 9**: Comprehensive `--summary` parity over the completed tally/clarity/classification inputs. 🟡 Implemented: package-preferred origin fields, `other_license_expressions`/`other_holders`, package-datafile holder fallback, and the main active ambiguity/holder fixtures. Remaining work: broader package-precedence and residual summary edge-case parity from upstream fixtures.
+10. **Phase 9**: Comprehensive `--summary` parity over the completed tally/clarity/classification inputs. 🟡 Implemented: package-preferred origin fields, `other_license_expressions`/`other_holders`, package-datafile holder fallback, empty declared-holder parity, tallied-language fallback when packages disagree, and the main active ambiguity/holder fixtures. Remaining work: broader package-precedence and the residual summary edge-case fixtures.
 11. **Phase 10**: CLI parity wiring for the remaining summary/tally/classify/facet/generated options and regression coverage. 🟡 Implemented: `--summary`, `--license-clarity-score`, `--tallies`, `--tallies-key-files`, `--tallies-with-details`, and `--generated` gating. Remaining work: package-tally CLI surface and broader compatibility edge cases.
 
 ## Success Criteria
