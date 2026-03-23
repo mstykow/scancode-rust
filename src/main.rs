@@ -1879,13 +1879,20 @@ fn compute_declared_holders(files: &[FileInfo], packages: &[Package]) -> Vec<Str
     }
 
     if counts.is_empty() {
+        let mut key_file_holders = Vec::new();
         for holder in files
             .iter()
             .filter(|file| file.is_key_file)
             .flat_map(|file| file.holders.iter())
             .map(|holder| holder.holder.clone())
         {
-            *counts.entry(holder).or_insert(0) += 1;
+            if !key_file_holders.contains(&holder) {
+                key_file_holders.push(holder);
+            }
+        }
+
+        if !key_file_holders.is_empty() {
+            return key_file_holders;
         }
     }
 
