@@ -20,7 +20,7 @@ implementation-plans/
 ### Post-Processing (`post-processing/`)
 
 - **[SUMMARIZATION_PLAN.md](post-processing/SUMMARIZATION_PLAN.md)** - License/copyright tallies, facets, classification
-  - Status: 🟡 Active — key-file tagging, shared provenance cleanup, the current tally stack, file facets/by-facet tallies, package-preferred summary origin, generated-file detection, a broader active summary/score parity subset, and the main active classify fixture parity including package-data top-level ancestry are implemented; remaining package tally work and only the residual summary/score/classify edge cases are tracked in [SUMMARIZATION_PLAN.md](post-processing/SUMMARIZATION_PLAN.md)
+  - Status: 🟡 Active — key-file tagging, shared provenance cleanup, the current tally stack, file facets/by-facet tallies, package-preferred summary origin, generated-file detection, complete active `score/` fixture parity, and the main active classify fixture parity including package-data top-level ancestry are implemented; remaining package tally work and only the residual summary/classify edge cases are tracked in [SUMMARIZATION_PLAN.md](post-processing/SUMMARIZATION_PLAN.md)
 
 ### Infrastructure (`infrastructure/`)
 

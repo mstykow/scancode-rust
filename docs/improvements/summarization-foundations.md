@@ -120,6 +120,8 @@ The current branch also closes several active upstream fixture gaps:
 - a single joined declaration such as `MIT OR Apache-2.0` no longer triggers false ambiguity in score mode
 - nested manifest-style key files now participate in the active jar score fixture behavior
 
+Taken together, these close the active emitted ScanCode `score/` fixture surface (`basic`, `no_license_text`, `no_license_or_copyright`, `no_license_ambiguity`, `inconsistent_licenses_copyleft`, and `jar`) without claiming dormant or untested heuristic parity beyond those fixtures.
+
 ### Active classify parity fixture coverage
 
 The current branch also closes the main active classify fixture gaps:
