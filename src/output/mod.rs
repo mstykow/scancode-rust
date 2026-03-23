@@ -425,6 +425,45 @@ mod tests {
     }
 
     #[test]
+    fn test_json_and_json_lines_writers_include_facets_and_tallies_by_facet() {
+        let mut output = sample_output();
+        output.files[0].facets = vec!["core".to_string(), "docs".to_string()];
+        output.tallies_by_facet = Some(vec![crate::models::FacetTallies {
+            facet: "core".to_string(),
+            tallies: crate::models::Tallies {
+                detected_license_expression: vec![crate::models::TallyEntry {
+                    value: Some("mit".to_string()),
+                    count: 1,
+                }],
+                copyrights: vec![],
+                holders: vec![],
+                authors: vec![],
+                programming_language: vec![],
+            },
+        }]);
+
+        let mut json_bytes = Vec::new();
+        writer_for_format(OutputFormat::Json)
+            .write(&output, &mut json_bytes, &OutputWriteConfig::default())
+            .expect("json write should succeed");
+        let json_value: Value =
+            serde_json::from_slice(&json_bytes).expect("json output should parse");
+        assert_eq!(json_value["files"][0]["facets"][0], "core");
+        assert_eq!(json_value["tallies_by_facet"][0]["facet"], "core");
+
+        let mut jsonl_bytes = Vec::new();
+        writer_for_format(OutputFormat::JsonLines)
+            .write(&output, &mut jsonl_bytes, &OutputWriteConfig::default())
+            .expect("json-lines write should succeed");
+        let rendered = String::from_utf8(jsonl_bytes).expect("json-lines should be utf-8");
+        assert!(
+            rendered
+                .lines()
+                .any(|line| line.contains("\"tallies_by_facet\""))
+        );
+    }
+
+    #[test]
     fn test_cyclonedx_xml_writer_outputs_xml() {
         let output = sample_output();
         let mut bytes = Vec::new();
@@ -505,6 +544,7 @@ mod tests {
             summary: None,
             tallies: None,
             tallies_of_key_files: None,
+            tallies_by_facet: None,
             headers: vec![],
             packages: vec![],
             dependencies: vec![],
@@ -535,6 +575,7 @@ mod tests {
             summary: None,
             tallies: None,
             tallies_of_key_files: None,
+            tallies_by_facet: None,
             headers: vec![],
             packages: vec![],
             dependencies: vec![],
@@ -631,6 +672,7 @@ mod tests {
             summary: None,
             tallies: None,
             tallies_of_key_files: None,
+            tallies_by_facet: None,
             headers: vec![Header {
                 start_timestamp: "2026-01-01T00:00:00Z".to_string(),
                 end_timestamp: "2026-01-01T00:00:01Z".to_string(),
