@@ -87,7 +87,7 @@ Commonly used options include:
 - `--exclude/--ignore`, `--include`, `--max-depth`, `--processes`
 - `--cache-dir`, `--cache-clear`, `--from-json`, `--no-assemble`
 - `--filter-clues`, `--only-findings`, `--mark-source`
-- `--copyright`, `--email`, `--url`
+- `--license`, `--copyright`, `--email`, `--url`
 
 ### Example
 

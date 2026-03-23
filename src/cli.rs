@@ -155,11 +155,11 @@ pub struct Cli {
 
     /// Path to license rules directory containing .LICENSE and .RULE files.
     /// If not specified, uses the built-in embedded license index.
-    #[arg(long, value_name = "PATH")]
+    #[arg(long, value_name = "PATH", requires = "license")]
     pub license_rules_path: Option<String>,
 
     /// Include matched text in license detection output
-    #[arg(long)]
+    #[arg(long, requires = "license")]
     pub include_text: bool,
 
     #[arg(long)]
@@ -170,6 +170,10 @@ pub struct Cli {
 
     #[arg(long)]
     pub mark_source: bool,
+
+    /// Scan input for licenses
+    #[arg(short = 'l', long)]
+    pub license: bool,
 
     #[arg(short = 'c', long)]
     pub copyright: bool,
@@ -457,6 +461,40 @@ mod tests {
         .expect("cli parse should succeed");
 
         assert!(parsed.copyright);
+    }
+
+    #[test]
+    fn test_parses_license_flag() {
+        let parsed = Cli::try_parse_from([
+            "provenant",
+            "--json-pp",
+            "scan.json",
+            "--license",
+            "samples",
+        ])
+        .expect("cli parse should succeed");
+
+        assert!(parsed.license);
+    }
+
+    #[test]
+    fn test_license_short_flag() {
+        let parsed = Cli::try_parse_from(["provenant", "--json-pp", "scan.json", "-l", "samples"])
+            .expect("cli parse should succeed");
+
+        assert!(parsed.license);
+    }
+
+    #[test]
+    fn test_include_text_requires_license() {
+        let result = Cli::try_parse_from([
+            "provenant",
+            "--json-pp",
+            "scan.json",
+            "--include-text",
+            "samples",
+        ]);
+        assert!(result.is_err());
     }
 
     #[test]

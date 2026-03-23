@@ -151,9 +151,14 @@ fn run() -> Result<()> {
             ));
         }
 
-        progress.start_license_detection_engine_creation();
-        let license_engine = init_license_engine(&cli.license_rules_path)?;
-        progress.finish_license_detection_engine_creation();
+        let license_engine = if cli.license {
+            progress.start_license_detection_engine_creation();
+            let engine = init_license_engine(&cli.license_rules_path)?;
+            progress.finish_license_detection_engine_creation();
+            Some(engine)
+        } else {
+            None
+        };
 
         let text_options = TextDetectionOptions {
             detect_copyrights: cli.copyright,
@@ -171,7 +176,7 @@ fn run() -> Result<()> {
             Ok(process_collected(
                 &collected,
                 Arc::clone(&progress),
-                Some(license_engine.clone()),
+                license_engine.clone(),
                 cli.include_text,
                 &text_options,
             ))
