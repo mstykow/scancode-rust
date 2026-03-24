@@ -60,7 +60,7 @@ mod golden_tests {
     #[test]
     fn test_golden_anonapi_wheel_metadata() {
         let test_file = PathBuf::from(
-            "reference/scancode-toolkit/tests/packagedcode/data/pypi/unpacked_wheel/metadata-2.1/with_sources/anonapi-0.0.19.dist-info/METADATA",
+            "testdata/python/golden/metadata-fixtures/unpacked_wheel/metadata-2.1/with_sources/anonapi-0.0.19.dist-info/METADATA",
         );
         let expected_file =
             PathBuf::from("testdata/python/golden/anonapi-wheel-metadata-expected.json");
@@ -76,7 +76,7 @@ mod golden_tests {
     #[test]
     fn test_golden_anonapi_sdist_pkginfo() {
         let test_file = PathBuf::from(
-            "reference/scancode-toolkit/tests/packagedcode/data/pypi/unpacked_sdist/metadata-1.2/anonapi-0.0.19/PKG-INFO",
+            "testdata/python/golden/metadata-fixtures/unpacked_sdist/metadata-1.2/anonapi-0.0.19/PKG-INFO",
         );
         let expected_file =
             PathBuf::from("testdata/python/golden/anonapi-sdist-pkginfo-expected.json");
