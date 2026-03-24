@@ -111,13 +111,21 @@ fn is_redundant_same_expression_seq_container(
         return false;
     }
 
-    let mut contained: Vec<&LicenseMatch> = candidate_contained_matches
+    let container_qspan_set: HashSet<usize> = container.qspan().into_iter().collect();
+
+    let mut contained: Vec<(&LicenseMatch, Vec<usize>)> = candidate_contained_matches
         .iter()
-        .filter(|m| {
-            m.matcher == MatcherKind::Aho
+        .filter_map(|m| {
+            if m.matcher == MatcherKind::Aho
                 && has_full_match_coverage(m)
                 && m.license_expression == container.license_expression
-                && (container.qcontains(m) || container.qoverlap(m) > 0)
+                && (container.qcontains_with_set(m, &container_qspan_set)
+                    || container.qoverlap_with_set(m, &container_qspan_set) > 0)
+            {
+                Some((m, m.qspan()))
+            } else {
+                None
+            }
         })
         .collect();
 
@@ -125,28 +133,34 @@ fn is_redundant_same_expression_seq_container(
         return false;
     }
 
-    let material_children = contained.iter().filter(|m| m.matched_length > 1).count();
+    let material_children = contained
+        .iter()
+        .filter(|(m, _)| m.matched_length > 1)
+        .count();
     if material_children < 2 {
         return false;
     }
 
-    contained.sort_by_key(|m| m.qspan_bounds());
+    contained.sort_by_key(|(m, _)| m.qspan_bounds());
 
-    let container_qspan: HashSet<usize> = container.qspan().into_iter().collect();
     let mut child_union = HashSet::new();
-    for child in &contained {
-        child_union.extend(child.qspan());
+    for (_, qspan) in &contained {
+        child_union.extend(qspan.iter().copied());
     }
 
-    let container_only_positions: HashSet<usize> =
-        container_qspan.difference(&child_union).copied().collect();
-    let child_only_positions: HashSet<usize> =
-        child_union.difference(&container_qspan).copied().collect();
+    let container_only_positions: HashSet<usize> = container_qspan_set
+        .difference(&child_union)
+        .copied()
+        .collect();
+    let child_only_positions: HashSet<usize> = child_union
+        .difference(&container_qspan_set)
+        .copied()
+        .collect();
 
     let mut bridge_positions = HashSet::new();
     for pair in contained.windows(2) {
-        let (_, previous_end) = pair[0].qspan_bounds();
-        let (next_start, _) = pair[1].qspan_bounds();
+        let (_, previous_end) = pair[0].0.qspan_bounds();
+        let (next_start, _) = pair[1].0.qspan_bounds();
 
         if next_start < previous_end {
             return false;
@@ -172,12 +186,12 @@ fn is_redundant_same_expression_seq_container(
     {
         let earliest_child = contained
             .iter()
-            .map(|m| m.qspan_bounds().0)
+            .map(|(m, _)| m.qspan_bounds().0)
             .min()
             .unwrap_or(usize::MAX);
         let latest_child = contained
             .iter()
-            .map(|m| m.qspan_bounds().1.saturating_sub(1))
+            .map(|(m, _)| m.qspan_bounds().1.saturating_sub(1))
             .max()
             .unwrap_or(0);
 
@@ -222,13 +236,21 @@ fn is_redundant_low_coverage_composite_seq_wrapper(
         return false;
     }
 
-    let children: Vec<&LicenseMatch> = candidate_contained_matches
+    let container_qspan_set: HashSet<usize> = container.qspan().into_iter().collect();
+
+    let children: Vec<(&LicenseMatch, Vec<usize>)> = candidate_contained_matches
         .iter()
-        .filter(|m| {
-            m.matcher == aho_match::MATCH_AHO
+        .filter_map(|m| {
+            if m.matcher == aho_match::MATCH_AHO
                 && has_full_match_coverage(m)
                 && m.license_expression != container.license_expression
-                && (container.qcontains(m) || container.qoverlap(m) > 0)
+                && (container.qcontains_with_set(m, &container_qspan_set)
+                    || container.qoverlap_with_set(m, &container_qspan_set) > 0)
+            {
+                Some((m, m.qspan()))
+            } else {
+                None
+            }
         })
         .collect();
 
@@ -238,30 +260,33 @@ fn is_redundant_low_coverage_composite_seq_wrapper(
 
     let unique_expressions: HashSet<&str> = children
         .iter()
-        .map(|m| m.license_expression.as_str())
+        .map(|(m, _)| m.license_expression.as_str())
         .collect();
     if unique_expressions.len() < 2 {
         return false;
     }
 
-    let container_qspan: HashSet<usize> = container.qspan().into_iter().collect();
     let mut child_union = HashSet::new();
-    for child in &children {
-        child_union.extend(child.qspan());
+    for (_, qspan) in &children {
+        child_union.extend(qspan.iter().copied());
     }
 
-    let container_only_positions: HashSet<usize> =
-        container_qspan.difference(&child_union).copied().collect();
-    let child_only_positions: HashSet<usize> =
-        child_union.difference(&container_qspan).copied().collect();
+    let container_only_positions: HashSet<usize> = container_qspan_set
+        .difference(&child_union)
+        .copied()
+        .collect();
+    let child_only_positions: HashSet<usize> = child_union
+        .difference(&container_qspan_set)
+        .copied()
+        .collect();
 
     let mut sorted_children = children;
-    sorted_children.sort_by_key(|m| m.qspan_bounds());
+    sorted_children.sort_by_key(|(m, _)| m.qspan_bounds());
 
     let mut bridge_positions = HashSet::new();
     for pair in sorted_children.windows(2) {
-        let (_, previous_end) = pair[0].qspan_bounds();
-        let (next_start, _) = pair[1].qspan_bounds();
+        let (_, previous_end) = pair[0].0.qspan_bounds();
+        let (next_start, _) = pair[1].0.qspan_bounds();
         bridge_positions.extend(previous_end..next_start);
     }
 
