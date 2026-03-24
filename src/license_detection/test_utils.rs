@@ -3,6 +3,7 @@
 //! This module provides common helper functions used across multiple test modules
 //! to reduce code duplication and ensure consistent test setup.
 
+use bit_set::BitSet;
 use std::collections::{HashMap, HashSet};
 
 use crate::license_detection::index::LicenseIndex;
@@ -166,7 +167,7 @@ pub fn create_mock_query_with_tokens<'a>(tokens: &[u16], index: &'a LicenseIndex
         stopwords_by_pos: HashMap::new(),
         shorts_and_digits_pos: HashSet::new(),
         high_matchables: (0..token_count).collect(),
-        low_matchables: HashSet::new(),
+        low_matchables: BitSet::new(),
         is_binary: false,
         query_run_ranges: Vec::new(),
         spdx_lines: Vec::new(),

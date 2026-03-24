@@ -24,6 +24,7 @@ mod test_utils;
 pub mod tokenize;
 pub mod unknown_match;
 
+use bit_set::BitSet;
 use std::collections::HashSet;
 use std::path::Path;
 use std::sync::Arc;
@@ -288,7 +289,7 @@ fn filter_redundant_low_coverage_composite_seq_wrappers(
 fn subtract_spdx_match_qspans(
     query: &mut Query<'_>,
     matched_qspans: &mut Vec<query::PositionSpan>,
-    aho_extra_matchables: &mut HashSet<usize>,
+    aho_extra_matchables: &mut BitSet,
     spdx_matches: &[LicenseMatch],
 ) {
     for m in spdx_matches {
@@ -296,7 +297,9 @@ fn subtract_spdx_match_qspans(
             continue;
         };
 
-        aho_extra_matchables.extend(span.positions());
+        for pos in span.iter() {
+            aho_extra_matchables.insert(pos);
+        }
         query.subtract(&span);
 
         if (m.match_coverage * 100.0).round() / 100.0 == 100.0 {
@@ -494,7 +497,7 @@ impl LicenseDetectionEngine {
 
         let mut all_matches = Vec::new();
         let mut candidate_contained_matches = Vec::new();
-        let mut aho_extra_matchables = HashSet::new();
+        let mut aho_extra_matchables = BitSet::new();
         let mut matched_qspans: Vec<query::PositionSpan> = Vec::new();
 
         // Phase 1a: Hash matching
@@ -654,7 +657,7 @@ impl LicenseDetectionEngine {
 
         let mut all_matches = Vec::new();
         let mut candidate_contained_matches = Vec::new();
-        let mut aho_extra_matchables = HashSet::new();
+        let mut aho_extra_matchables = BitSet::new();
         let mut matched_qspans: Vec<query::PositionSpan> = Vec::new();
 
         // Phase 1a: Hash matching

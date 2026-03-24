@@ -7,7 +7,7 @@
 //! Based on the Python ScanCode Toolkit implementation at:
 //! reference/scancode-toolkit/src/licensedcode/match_aho.py
 
-use std::collections::HashSet;
+use bit_set::BitSet;
 
 use crate::license_detection::index::LicenseIndex;
 use crate::license_detection::index::dictionary::{TokenId, TokenKind};
@@ -70,7 +70,7 @@ pub fn aho_match(index: &LicenseIndex, query_run: &QueryRun) -> Vec<LicenseMatch
 pub fn aho_match_with_extra_matchables(
     index: &LicenseIndex,
     query_run: &QueryRun,
-    extra_matchable_positions: Option<&HashSet<usize>>,
+    extra_matchable_positions: Option<&BitSet>,
 ) -> Vec<LicenseMatch> {
     let mut matches = Vec::new();
 
@@ -99,9 +99,9 @@ pub fn aho_match_with_extra_matchables(
         let qend = qbegin + byte_pos_to_token_pos(byte_end);
 
         let is_entirely_matchable = if let Some(extra_matchables) = extra_matchable_positions {
-            (qstart..qend).all(|pos| matchables.contains(&pos) || extra_matchables.contains(&pos))
+            (qstart..qend).all(|pos| matchables.contains(pos) || extra_matchables.contains(pos))
         } else {
-            (qstart..qend).all(|pos| matchables.contains(&pos))
+            (qstart..qend).all(|pos| matchables.contains(pos))
         };
 
         if !is_entirely_matchable {
@@ -208,9 +208,9 @@ pub fn aho_match_with_extra_matchables(
                 }
 
                 let uses_extra =
-                    (m.start_token..m.end_token).any(|pos| extra_matchables.contains(&pos));
+                    (m.start_token..m.end_token).any(|pos| extra_matchables.contains(pos));
                 let uses_live = (m.start_token..m.end_token)
-                    .any(|pos| live_matchables.contains(&pos) && !extra_matchables.contains(&pos));
+                    .any(|pos| live_matchables.contains(pos) && !extra_matchables.contains(pos));
 
                 if !(uses_extra && uses_live) {
                     return true;
@@ -224,7 +224,7 @@ pub fn aho_match_with_extra_matchables(
                         && inner.start_token >= m.start_token
                         && inner.end_token <= m.end_token
                         && (inner.start_token..inner.end_token)
-                            .all(|pos| extra_matchables.contains(&pos))
+                            .all(|pos| extra_matchables.contains(pos))
                 })
             })
             .map(|(_, m)| m.clone())
@@ -328,7 +328,7 @@ mod tests {
             stopwords_by_pos: std::collections::HashMap::new(),
             shorts_and_digits_pos: std::collections::HashSet::new(),
             high_matchables: (0..2).collect(),
-            low_matchables: std::collections::HashSet::new(),
+            low_matchables: BitSet::new(),
             is_binary: false,
             query_run_ranges: Vec::new(),
             spdx_lines: Vec::new(),
@@ -370,7 +370,7 @@ mod tests {
             stopwords_by_pos: std::collections::HashMap::new(),
             shorts_and_digits_pos: std::collections::HashSet::new(),
             high_matchables: (0..3).collect(),
-            low_matchables: std::collections::HashSet::new(),
+            low_matchables: BitSet::new(),
             is_binary: false,
             query_run_ranges: Vec::new(),
             spdx_lines: Vec::new(),
@@ -416,7 +416,7 @@ mod tests {
             stopwords_by_pos: std::collections::HashMap::new(),
             shorts_and_digits_pos: std::collections::HashSet::new(),
             high_matchables: (0..4).collect(),
-            low_matchables: std::collections::HashSet::new(),
+            low_matchables: BitSet::new(),
             is_binary: false,
             query_run_ranges: Vec::new(),
             spdx_lines: Vec::new(),
@@ -457,8 +457,8 @@ mod tests {
             unknowns_by_pos: std::collections::HashMap::new(),
             stopwords_by_pos: std::collections::HashMap::new(),
             shorts_and_digits_pos: std::collections::HashSet::new(),
-            high_matchables: std::collections::HashSet::new(),
-            low_matchables: std::collections::HashSet::new(),
+            high_matchables: BitSet::new(),
+            low_matchables: BitSet::new(),
             is_binary: false,
             query_run_ranges: Vec::new(),
             spdx_lines: Vec::new(),
@@ -499,7 +499,7 @@ mod tests {
             stopwords_by_pos: std::collections::HashMap::new(),
             shorts_and_digits_pos: std::collections::HashSet::new(),
             high_matchables: [0usize, 2].into_iter().collect(),
-            low_matchables: std::collections::HashSet::new(),
+            low_matchables: BitSet::new(),
             is_binary: false,
             query_run_ranges: Vec::new(),
             spdx_lines: Vec::new(),
@@ -510,7 +510,7 @@ mod tests {
 
         assert!(aho_match(run.get_index(), &run).is_empty());
 
-        let extra_matchables: HashSet<usize> = [1usize].into_iter().collect();
+        let extra_matchables: BitSet = [1usize].into_iter().collect();
         let matches =
             aho_match_with_extra_matchables(run.get_index(), &run, Some(&extra_matchables));
 
@@ -555,7 +555,7 @@ mod tests {
             stopwords_by_pos: std::collections::HashMap::new(),
             shorts_and_digits_pos: std::collections::HashSet::new(),
             high_matchables: [2usize].into_iter().collect(),
-            low_matchables: std::collections::HashSet::new(),
+            low_matchables: BitSet::new(),
             is_binary: false,
             query_run_ranges: Vec::new(),
             spdx_lines: Vec::new(),
@@ -563,7 +563,7 @@ mod tests {
         };
 
         let run = query.whole_query_run();
-        let extra_matchables: HashSet<usize> = [0usize, 1].into_iter().collect();
+        let extra_matchables: BitSet = [0usize, 1].into_iter().collect();
         let matches =
             aho_match_with_extra_matchables(run.get_index(), &run, Some(&extra_matchables));
 
@@ -599,7 +599,7 @@ mod tests {
             stopwords_by_pos: std::collections::HashMap::new(),
             shorts_and_digits_pos: std::collections::HashSet::new(),
             high_matchables: (0..2).collect(),
-            low_matchables: std::collections::HashSet::new(),
+            low_matchables: BitSet::new(),
             is_binary: false,
             query_run_ranges: Vec::new(),
             spdx_lines: Vec::new(),
@@ -651,7 +651,7 @@ mod tests {
             stopwords_by_pos: std::collections::HashMap::new(),
             shorts_and_digits_pos: std::collections::HashSet::new(),
             high_matchables: (0..3).collect(),
-            low_matchables: std::collections::HashSet::new(),
+            low_matchables: BitSet::new(),
             is_binary: false,
             query_run_ranges: Vec::new(),
             spdx_lines: Vec::new(),
@@ -688,8 +688,8 @@ mod tests {
             unknowns_by_pos: std::collections::HashMap::new(),
             stopwords_by_pos: std::collections::HashMap::new(),
             shorts_and_digits_pos: std::collections::HashSet::new(),
-            high_matchables: std::collections::HashSet::new(),
-            low_matchables: std::collections::HashSet::new(),
+            high_matchables: BitSet::new(),
+            low_matchables: BitSet::new(),
             is_binary: false,
             query_run_ranges: Vec::new(),
             spdx_lines: Vec::new(),
@@ -733,7 +733,7 @@ mod tests {
             stopwords_by_pos: std::collections::HashMap::new(),
             shorts_and_digits_pos: std::collections::HashSet::new(),
             high_matchables: (0..1000).collect(),
-            low_matchables: std::collections::HashSet::new(),
+            low_matchables: BitSet::new(),
             is_binary: false,
             query_run_ranges: Vec::new(),
             spdx_lines: Vec::new(),
@@ -778,7 +778,7 @@ mod tests {
             stopwords_by_pos: std::collections::HashMap::new(),
             shorts_and_digits_pos: std::collections::HashSet::new(),
             high_matchables: (0..5).collect(),
-            low_matchables: std::collections::HashSet::new(),
+            low_matchables: BitSet::new(),
             is_binary: false,
             query_run_ranges: Vec::new(),
             spdx_lines: Vec::new(),
@@ -835,7 +835,7 @@ mod tests {
             stopwords_by_pos: std::collections::HashMap::new(),
             shorts_and_digits_pos: std::collections::HashSet::new(),
             high_matchables: (0..2).collect(),
-            low_matchables: std::collections::HashSet::new(),
+            low_matchables: BitSet::new(),
             is_binary: false,
             query_run_ranges: Vec::new(),
             spdx_lines: Vec::new(),
@@ -884,7 +884,7 @@ mod tests {
             stopwords_by_pos: std::collections::HashMap::new(),
             shorts_and_digits_pos: std::collections::HashSet::new(),
             high_matchables: (0..5).collect(),
-            low_matchables: std::collections::HashSet::new(),
+            low_matchables: BitSet::new(),
             is_binary: false,
             query_run_ranges: Vec::new(),
             spdx_lines: Vec::new(),

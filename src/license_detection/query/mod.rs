@@ -3,6 +3,8 @@
 use crate::license_detection::index::LicenseIndex;
 use crate::license_detection::index::dictionary::{KnownToken, QueryToken, TokenId, TokenKind};
 use crate::license_detection::tokenize::tokenize_as_ids;
+use bit_set::BitSet;
+use std::cell::{OnceCell, RefCell};
 use std::collections::{HashMap, HashSet};
 
 /// A span representing a range of token positions.
@@ -21,19 +23,16 @@ pub struct PositionSpan {
 }
 
 impl PositionSpan {
-    /// Create a new span from start and end positions (inclusive).
     pub fn new(start: usize, end: usize) -> Self {
         Self { start, end }
     }
 
-    /// Check if this span contains a position.
     pub fn contains(&self, pos: usize) -> bool {
         self.start <= pos && pos <= self.end
     }
 
-    /// Get all positions in this span as a HashSet.
-    pub fn positions(&self) -> HashSet<usize> {
-        (self.start..=self.end).collect()
+    pub fn iter(&self) -> impl Iterator<Item = usize> + '_ {
+        self.start..=self.end
     }
 }
 
@@ -97,14 +96,14 @@ pub struct Query<'a> {
     /// These are tokens with ID < len_legalese.
     ///
     /// Corresponds to Python: `self.high_matchables` (line 293)
-    pub high_matchables: HashSet<usize>,
+    pub high_matchables: BitSet,
 
     /// Low-value matchable token positions (non-legalese tokens)
     ///
     /// These are tokens with ID >= len_legalese.
     ///
     /// Corresponds to Python: `self.low_matchables` (line 294)
-    pub low_matchables: HashSet<usize>,
+    pub low_matchables: BitSet,
 
     /// True if the query is detected as binary content
     ///
@@ -339,14 +338,14 @@ impl<'a> Query<'a> {
             current_line += 1;
         }
 
-        let high_matchables: HashSet<usize> = tokens
+        let high_matchables: BitSet = tokens
             .iter()
             .enumerate()
             .filter(|(_pos, tid)| index.dictionary.token_kind(**tid) == TokenKind::Legalese)
             .map(|(pos, _tid)| pos)
             .collect();
 
-        let low_matchables: HashSet<usize> = tokens
+        let low_matchables: BitSet = tokens
             .iter()
             .enumerate()
             .filter(|(_pos, tid)| index.dictionary.token_kind(**tid) == TokenKind::Regular)
@@ -548,17 +547,10 @@ impl<'a> Query<'a> {
     ///
     /// Corresponds to Python: `subtract()` method (lines 328-334)
     pub fn subtract(&mut self, span: &PositionSpan) {
-        let positions = span.positions();
-        self.high_matchables = self
-            .high_matchables
-            .difference(&positions)
-            .copied()
-            .collect();
-        self.low_matchables = self
-            .low_matchables
-            .difference(&positions)
-            .copied()
-            .collect();
+        for pos in span.iter() {
+            self.high_matchables.remove(pos);
+            self.low_matchables.remove(pos);
+        }
     }
 
     /// Extract matched text for a given line range.
@@ -584,8 +576,8 @@ struct WholeQueryRunSnapshot<'a> {
     index: &'a LicenseIndex,
     tokens: Vec<TokenId>,
     line_by_pos: Vec<usize>,
-    high_matchables: HashSet<usize>,
-    low_matchables: HashSet<usize>,
+    high_matchables: BitSet,
+    low_matchables: BitSet,
 }
 
 /// A query run is a slice of query tokens identified by a start and end positions.
@@ -601,6 +593,9 @@ pub struct QueryRun<'a> {
     whole_query_snapshot: Option<WholeQueryRunSnapshot<'a>>,
     pub start: usize,
     pub end: Option<usize>,
+    cached_high_matchables: OnceCell<BitSet>,
+    cached_low_matchables: OnceCell<BitSet>,
+    combined_matchables: RefCell<Option<BitSet>>,
 }
 
 impl<'a> QueryRun<'a> {
@@ -618,6 +613,9 @@ impl<'a> QueryRun<'a> {
             whole_query_snapshot: None,
             start,
             end,
+            cached_high_matchables: OnceCell::new(),
+            cached_low_matchables: OnceCell::new(),
+            combined_matchables: RefCell::new(None),
         }
     }
 
@@ -639,6 +637,9 @@ impl<'a> QueryRun<'a> {
             }),
             start: 0,
             end,
+            cached_high_matchables: OnceCell::new(),
+            cached_low_matchables: OnceCell::new(),
+            combined_matchables: RefCell::new(None),
         }
     }
 
@@ -666,7 +667,7 @@ impl<'a> QueryRun<'a> {
         }
     }
 
-    fn source_high_matchables(&self) -> &HashSet<usize> {
+    fn source_high_matchables(&self) -> &BitSet {
         if let Some(query) = self.query {
             &query.high_matchables
         } else {
@@ -678,7 +679,7 @@ impl<'a> QueryRun<'a> {
         }
     }
 
-    fn source_low_matchables(&self) -> &HashSet<usize> {
+    fn source_low_matchables(&self) -> &BitSet {
         if let Some(query) = self.query {
             &query.low_matchables
         } else {
@@ -767,50 +768,40 @@ impl<'a> QueryRun<'a> {
 
         let mut matchable_set = matchables;
         for span in exclude_positions {
-            let span_positions = span.positions();
-            matchable_set = matchable_set.difference(&span_positions).copied().collect();
+            for pos in span.iter() {
+                matchable_set.remove(pos);
+            }
         }
 
         !matchable_set.is_empty()
     }
 
-    /// Get all matchable token positions for this query run.
-    ///
-    /// # Arguments
-    /// * `include_low` - If true, include low-value tokens
-    ///
-    /// Corresponds to Python: `matchables` property (lines 820-825)
-    pub fn matchables(&self, include_low: bool) -> HashSet<usize> {
+    pub fn matchables(&self, include_low: bool) -> BitSet {
         if include_low {
-            self.low_matchables()
+            if let Some(ref cached) = *self.combined_matchables.borrow() {
+                return cached.clone();
+            }
+            let combined: BitSet = self
+                .low_matchables()
                 .union(&self.high_matchables())
-                .copied()
-                .collect()
+                .collect();
+            *self.combined_matchables.borrow_mut() = Some(combined.clone());
+            combined
         } else {
             self.high_matchables()
         }
     }
 
-    /// Get an iterator over matchable tokens.
-    ///
-    /// Returns -1 for positions with non-matchable tokens.
-    /// Returns empty if there are no high matchable tokens.
-    ///
-    /// Corresponds to Python: `matchable_tokens()` method (lines 827-837)
     pub fn matchable_tokens(&self) -> Vec<i32> {
         let high_matchables = self.high_matchables();
         if high_matchables.is_empty() {
             return Vec::new();
         }
 
-        // Use ALL matchables (high + low), not just high matchables.
-        // This is critical for Phase 2 (near-duplicate detection) to find
-        // combined rules like "cddl-1.0 OR gpl-2.0-glassfish".
-        // Python: `self.matchables` includes both high and low.
         let matchables = self.matchables(true);
         self.tokens_with_pos()
             .map(|(pos, tid)| {
-                if matchables.contains(&pos) {
+                if matchables.contains(pos) {
                     tid.raw() as i32
                 } else {
                     -1
@@ -819,32 +810,34 @@ impl<'a> QueryRun<'a> {
             .collect()
     }
 
-    /// Get high-value matchable token positions.
-    ///
-    /// High-value tokens are legalese (token ID < len_legalese).
-    ///
-    /// Corresponds to Python: `high_matchables` property (lines 851-861)
-    pub fn high_matchables(&self) -> HashSet<usize> {
-        let live_span = PositionSpan::new(self.start, self.end.unwrap_or(usize::MAX));
-        self.source_high_matchables()
-            .iter()
-            .filter(|&&pos| live_span.contains(pos))
-            .copied()
-            .collect()
+    pub fn high_matchables(&self) -> BitSet {
+        self.cached_high_matchables
+            .get_or_init(|| {
+                let start = self.start;
+                let end = self.end;
+                let source = self.source_high_matchables();
+                let live_span = PositionSpan::new(start, end.unwrap_or(usize::MAX));
+                source
+                    .iter()
+                    .filter(|&pos| live_span.contains(pos))
+                    .collect()
+            })
+            .clone()
     }
 
-    /// Get low-value matchable token positions.
-    ///
-    /// Low-value tokens are non-legalese.
-    ///
-    /// Corresponds to Python: `low_matchables` property (lines 839-849)
-    pub fn low_matchables(&self) -> HashSet<usize> {
-        let live_span = PositionSpan::new(self.start, self.end.unwrap_or(usize::MAX));
-        self.source_low_matchables()
-            .iter()
-            .filter(|&&pos| live_span.contains(pos))
-            .copied()
-            .collect()
+    pub fn low_matchables(&self) -> BitSet {
+        self.cached_low_matchables
+            .get_or_init(|| {
+                let start = self.start;
+                let end = self.end;
+                let source = self.source_low_matchables();
+                let live_span = PositionSpan::new(start, end.unwrap_or(usize::MAX));
+                source
+                    .iter()
+                    .filter(|&pos| live_span.contains(pos))
+                    .collect()
+            })
+            .clone()
     }
 }
 
