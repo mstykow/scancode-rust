@@ -1878,6 +1878,24 @@ fn summary_holder_from_copyright(copyright: &str) -> Option<String> {
     (!cleaned.is_empty()).then(|| cleaned.to_string())
 }
 
+fn clean_legal_holder_candidate(holder: &str) -> Option<String> {
+    let cleaned = holder.trim();
+    if cleaned.is_empty()
+        || cleaned.contains("option either")
+        || cleaned.starts_with("messages,")
+        || cleaned.starts_with("together with instructions")
+    {
+        return None;
+    }
+
+    let cleaned = cleaned
+        .strip_suffix(". Individual")
+        .unwrap_or(cleaned)
+        .trim();
+
+    (!cleaned.is_empty()).then(|| cleaned.to_string())
+}
+
 fn summary_license_expression(file: &FileInfo) -> Option<String> {
     let detection_expressions = unique(
         &file
@@ -1957,7 +1975,7 @@ fn compute_summary_tallies(files: &[FileInfo], packages: &[Package]) -> Option<T
                 .iter()
                 .any(|package_data| package_data.datasource_id == Some(DatasourceId::PypiSetupCfg))
         },
-        detected_license_values,
+        summary_detected_license_values,
         true,
     );
     let copyrights = tally_file_values(files, copyright_values, true);
@@ -2271,18 +2289,42 @@ fn detected_license_values(file: &FileInfo) -> Vec<String> {
         .collect();
 
     if detection_expressions.is_empty() {
-        return Vec::new();
+        return file
+            .license_expression
+            .as_deref()
+            .map(canonicalize_summary_expression)
+            .into_iter()
+            .collect();
     }
 
     let unique_detection_expressions = unique(&detection_expressions);
 
     if unique_detection_expressions.len() == 1 {
-        return detection_expressions;
+        return unique_detection_expressions;
     }
 
     combine_license_expressions(unique_detection_expressions)
         .into_iter()
         .collect()
+}
+
+fn summary_detected_license_values(file: &FileInfo) -> Vec<String> {
+    let detection_expressions: Vec<String> = file
+        .license_detections
+        .iter()
+        .map(|detection| canonicalize_summary_expression(&detection.license_expression))
+        .collect();
+
+    if detection_expressions.is_empty() {
+        return file
+            .license_expression
+            .as_deref()
+            .map(canonicalize_summary_expression)
+            .into_iter()
+            .collect();
+    }
+
+    detection_expressions
 }
 
 fn copyright_values(file: &FileInfo) -> Vec<String> {
@@ -2293,10 +2335,6 @@ fn copyright_values(file: &FileInfo) -> Vec<String> {
 }
 
 fn holder_values(file: &FileInfo) -> Vec<String> {
-    if file.is_legal || !(file.is_key_file || file.is_community) {
-        return Vec::new();
-    }
-
     file.holders
         .iter()
         .map(|holder| holder.holder.clone())
@@ -2412,10 +2450,24 @@ fn compute_declared_holders(files: &[FileInfo], packages: &[Package]) -> Vec<Str
             for holder in files
                 .iter()
                 .filter(|file| file.is_key_file && file.is_legal)
-                .flat_map(|file| file.copyrights.iter())
-                .filter_map(|copyright| {
-                    summary_holder_from_copyright(&copyright.copyright)
+                .flat_map(|file| {
+                    let explicit_holders: Vec<String> = file
+                        .holders
+                        .iter()
+                        .filter_map(|holder| clean_legal_holder_candidate(&holder.holder))
                         .map(|holder| canonicalize_summary_holder_display(&holder))
+                        .collect();
+                    if explicit_holders.is_empty() {
+                        file.copyrights
+                            .iter()
+                            .filter_map(|copyright| {
+                                summary_holder_from_copyright(&copyright.copyright)
+                                    .map(|holder| canonicalize_summary_holder_display(&holder))
+                            })
+                            .collect::<Vec<_>>()
+                    } else {
+                        explicit_holders
+                    }
                 })
             {
                 if !legal_key_file_holders.contains(&holder) {
@@ -2441,8 +2493,7 @@ fn compute_primary_language(files: &[FileInfo], packages: &[Package]) -> Option<
     let package_languages = unique(
         &summary_origin_packages(packages, files)
             .into_iter()
-            .filter_map(|package| package.primary_language.as_ref())
-            .cloned()
+            .filter_map(summary_origin_package_primary_language)
             .collect::<Vec<_>>(),
     );
 
@@ -2464,6 +2515,16 @@ fn compute_primary_language(files: &[FileInfo], packages: &[Package]) -> Option<
         .into_iter()
         .max_by(|left, right| left.1.cmp(&right.1).then_with(|| right.0.cmp(&left.0)))
         .map(|(language, _)| language)
+}
+
+fn summary_origin_package_primary_language(package: &Package) -> Option<String> {
+    package
+        .primary_language
+        .clone()
+        .or_else(|| match package.package_type {
+            Some(crate::models::PackageType::Pypi) => Some("Python".to_string()),
+            _ => None,
+        })
 }
 
 fn summary_origin_packages<'a>(packages: &'a [Package], files: &[FileInfo]) -> Vec<&'a Package> {

@@ -2078,7 +2078,7 @@ fn extract_from_pyproject_toml(path: &Path) -> PackageData {
         version,
         qualifiers: None,
         subpath: None,
-        primary_language: Some("Python".to_string()),
+        primary_language: None,
         description: None,
         release_date: None,
         parties: extract_parties(&project_table),
@@ -4085,8 +4085,9 @@ fn extract_from_setup_cfg(path: &Path) -> PackageData {
         });
     }
 
-    let (declared_license_expression, declared_license_expression_spdx, license_detections) =
-        normalize_spdx_declared_license(license.as_deref());
+    let declared_license_expression = None;
+    let declared_license_expression_spdx = None;
+    let license_detections = Vec::new();
     let extracted_license_statement = license.clone();
 
     let dependencies = extract_setup_cfg_dependencies(&sections);
