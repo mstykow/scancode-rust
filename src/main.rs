@@ -12,9 +12,11 @@ use std::sync::Arc;
 use crate::cache::{CACHE_DIR_ENV_VAR, CacheConfig};
 use crate::cli::Cli;
 use crate::license_detection::LicenseDetectionEngine;
-use crate::license_detection::expression::combine_expressions_and;
+use crate::license_detection::expression::{
+    combine_expressions_and, expression_to_string, parse_expression, simplify_expression,
+};
 use crate::models::{
-    ExtraData, FacetTallies, FileInfo, FileType, Header, LicenseClarityScore, Match,
+    DatasourceId, ExtraData, FacetTallies, FileInfo, FileType, Header, LicenseClarityScore, Match,
     OUTPUT_FORMAT_VERSION, Output, Package, Summary, SystemEnvironment, Tallies, TallyEntry,
 };
 use crate::output::{OutputWriteConfig, write_output_file};
@@ -876,7 +878,7 @@ fn classify_key_files(files: &mut [FileInfo], packages: &[Package]) {
         let is_package_data_top_level = if file.file_type == FileType::Directory {
             package_data_top_level_dirs.contains(file.path.as_str())
         } else {
-            (!file.package_data.is_empty() && is_score_manifest(file))
+            (!file.package_data.is_empty() && file.is_manifest)
                 || path
                     .parent()
                     .and_then(|parent| parent.to_str())
@@ -966,21 +968,67 @@ fn package_root(package: &Package) -> Option<PathBuf> {
 }
 
 fn build_scan_roots(files: &[FileInfo]) -> Vec<PathBuf> {
-    let mut roots = Vec::new();
+    let parent_dirs: Vec<PathBuf> = files
+        .iter()
+        .filter(|file| file.file_type == FileType::File)
+        .map(|file| {
+            Path::new(&file.path)
+                .parent()
+                .unwrap_or_else(|| Path::new(""))
+        })
+        .map(Path::to_path_buf)
+        .collect();
 
-    for file in files {
-        let mut components = Path::new(&file.path).components();
-        let Some(first) = components.next() else {
-            continue;
-        };
+    let mut roots: Vec<PathBuf> = if parent_dirs.iter().any(|path| path.as_os_str().is_empty()) {
+        vec![PathBuf::new()]
+    } else {
+        lowest_common_parent_path(&parent_dirs)
+            .into_iter()
+            .collect()
+    };
 
-        let root = PathBuf::from(first.as_os_str());
-        if !roots.contains(&root) {
-            roots.push(root);
+    if roots.is_empty() {
+        for file in files {
+            let mut components = Path::new(&file.path).components();
+            let Some(first) = components.next() else {
+                continue;
+            };
+
+            let root = PathBuf::from(first.as_os_str());
+            if !roots.contains(&root) {
+                roots.push(root);
+            }
         }
     }
 
     roots
+}
+
+fn lowest_common_parent_path(paths: &[PathBuf]) -> Option<PathBuf> {
+    let mut paths_iter = paths.iter();
+    let first = paths_iter.next()?;
+    let mut common_components: Vec<_> = first.components().collect();
+
+    for path in paths_iter {
+        let current_components: Vec<_> = path.components().collect();
+        let shared_len = common_components
+            .iter()
+            .zip(current_components.iter())
+            .take_while(|(left, right)| left == right)
+            .count();
+        common_components.truncate(shared_len);
+        if common_components.is_empty() {
+            break;
+        }
+    }
+
+    (!common_components.is_empty()).then(|| {
+        let mut common_path = PathBuf::new();
+        for component in common_components {
+            common_path.push(component.as_os_str());
+        }
+        common_path
+    })
 }
 
 fn is_scan_top_level(path: &Path, scan_roots: &[PathBuf]) -> bool {
@@ -990,6 +1038,7 @@ fn is_scan_top_level(path: &Path, scan_roots: &[PathBuf]) -> bool {
 
     scan_roots.iter().any(|root| {
         path == root
+            || root.starts_with(path)
             || path
                 .strip_prefix(root)
                 .ok()
@@ -1227,11 +1276,16 @@ fn promote_package_metadata_from_key_files(files: &[FileInfo], packages: &mut [P
         }
 
         if package.holder.is_none() {
-            package.holder = key_files
-                .iter()
-                .flat_map(|file| file.holders.iter())
-                .map(|holder| holder.holder.clone())
-                .next();
+            let promoted_holders = unique(
+                &key_files
+                    .iter()
+                    .flat_map(|file| file.holders.iter())
+                    .map(|holder| holder.holder.clone())
+                    .collect::<Vec<_>>(),
+            );
+            if promoted_holders.len() == 1 {
+                package.holder = promoted_holders.into_iter().next();
+            }
         }
     }
 }
@@ -1247,12 +1301,14 @@ fn compute_summary_with_options(
     include_summary_fields: bool,
     include_license_clarity_score: bool,
 ) -> Option<Summary> {
+    let top_level_package_uids = top_level_package_uids(packages, files);
     let declared_holders = compute_declared_holders(files, packages);
     let declared_holder = (!declared_holders.is_empty()).then(|| declared_holders.join(", "));
     let primary_language = compute_primary_language(files, packages);
     let other_languages = compute_other_languages(files, primary_language.as_deref());
-    let tallies = compute_tallies(files).unwrap_or_default();
-    let (score_declared_license_expression, score_clarity) = compute_license_score(files);
+    let tallies = compute_summary_tallies(files, packages).unwrap_or_default();
+    let (score_declared_license_expression, score_clarity) =
+        compute_license_score(files, packages, &top_level_package_uids);
 
     if !include_summary_fields
         && !include_license_clarity_score
@@ -1265,26 +1321,62 @@ fn compute_summary_with_options(
     }
 
     let package_declared_license_expression = if include_summary_fields {
-        package_declared_license_expression(packages)
+        package_declared_license_expression(packages, files, &top_level_package_uids)
     } else {
         None
     };
     let declared_license_expression = package_declared_license_expression
         .clone()
         .or_else(|| score_declared_license_expression.clone());
-    let canonical_license_tallies =
-        canonicalize_license_tally_entries(&tallies.detected_license_expression);
     let other_license_expressions = remove_tally_value(
         declared_license_expression.as_deref(),
-        &canonical_license_tallies,
+        &tallies.detected_license_expression,
     );
-    let other_holders = if declared_holders.is_empty() {
-        vec![]
+    let mut other_holders = if declared_holders.is_empty() {
+        tallies.holders.clone()
     } else {
         remove_tally_values(&declared_holders, &tallies.holders)
     };
+    if packages.is_empty()
+        && !declared_holders.is_empty()
+        && files.iter().any(|file| {
+            file.is_top_level && file.is_key_file && file.is_legal && !file.copyrights.is_empty()
+        })
+    {
+        other_holders.retain(|entry| entry.value.is_some());
+        if files
+            .iter()
+            .filter(|file| file.file_type == FileType::File)
+            .all(|file| !file.is_key_file || file.is_legal || file.holders.is_empty())
+        {
+            other_holders.clear();
+        }
+    }
+    if declared_holders.is_empty() && other_holders.iter().all(|entry| entry.value.is_none()) {
+        other_holders.clear();
+    }
+    if !packages.is_empty() && declared_holders.is_empty() {
+        other_holders.clear();
+    }
 
     let license_clarity_score = if include_license_clarity_score {
+        let mut score_clarity = score_clarity;
+        if !score_clarity.declared_copyrights
+            && ((!declared_holders.is_empty()
+                && files.iter().any(|file| {
+                    file.is_top_level
+                        && file.is_key_file
+                        && file.is_legal
+                        && !file.copyrights.is_empty()
+                }))
+                || (packages.is_empty()
+                    && files.iter().any(|file| {
+                        file.is_key_file && file.is_legal && !file.copyrights.is_empty()
+                    })))
+        {
+            score_clarity.declared_copyrights = true;
+            score_clarity.score += 10;
+        }
         Some(score_clarity)
     } else {
         None
@@ -1400,23 +1492,51 @@ fn resolve_generated_scan_path(path: &str, scanned_root: Option<&Path>) -> Resul
     Err(anyhow!("Generated detection path not found: {}", path))
 }
 
-fn package_declared_license_expression(packages: &[Package]) -> Option<String> {
+fn package_declared_license_expression(
+    packages: &[Package],
+    files: &[FileInfo],
+    top_level_package_uids: &HashSet<String>,
+) -> Option<String> {
     combine_license_expressions(
         packages
             .iter()
-            .filter_map(|package| package.declared_license_expression.clone()),
+            .filter(|package| top_level_package_uids.contains(&package.package_uid))
+            .filter_map(|package| {
+                package.declared_license_expression.clone().or_else(|| {
+                    package.datafile_paths.iter().find_map(|datafile_path| {
+                        files
+                            .iter()
+                            .find(|file| file.path == *datafile_path)
+                            .and_then(|file| file.license_expression.clone())
+                    })
+                })
+            }),
     )
     .map(|expr| canonicalize_summary_expression(&expr))
 }
 
-fn compute_license_score(files: &[FileInfo]) -> (Option<String>, LicenseClarityScore) {
+fn compute_license_score(
+    files: &[FileInfo],
+    packages: &[Package],
+    top_level_package_uids: &HashSet<String>,
+) -> (Option<String>, LicenseClarityScore) {
+    let nested_package_roots = nested_summary_package_roots(packages, files);
     let key_files: Vec<&FileInfo> = files
         .iter()
-        .filter(|file| file.file_type == FileType::File && is_score_key_file(file))
+        .filter(|file| is_summary_score_key_file(file, &nested_package_roots))
+        .filter(|file| {
+            file.for_packages.is_empty()
+                || top_level_package_uids.is_empty()
+                || file
+                    .for_packages
+                    .iter()
+                    .any(|uid| top_level_package_uids.contains(uid))
+        })
         .collect();
     let non_key_files: Vec<&FileInfo> = files
         .iter()
-        .filter(|file| file.file_type == FileType::File && !file.is_key_file)
+        .filter(|file| file.file_type == FileType::File)
+        .filter(|file| !is_summary_score_key_file(file, &nested_package_roots))
         .collect();
 
     let key_file_expressions: Vec<String> = key_files
@@ -1436,7 +1556,9 @@ fn compute_license_score(files: &[FileInfo]) -> (Option<String>, LicenseClarityS
             .flat_map(|detection| detection.matches.iter())
             .any(is_good_match),
         has_license_text: key_files.iter().any(|file| key_file_has_license_text(file)),
-        declared_copyrights: key_files.iter().any(|file| !file.copyrights.is_empty()),
+        declared_copyrights: key_files
+            .iter()
+            .any(|file| !file.is_legal && !file.copyrights.is_empty()),
         conflicting_license_categories: false,
         ambiguous_compound_licensing: primary_declared_license.is_none(),
     };
@@ -1454,7 +1576,14 @@ fn compute_license_score(files: &[FileInfo]) -> (Option<String>, LicenseClarityS
         scoring.score += 10;
     }
 
-    scoring.conflicting_license_categories = primary_declared_license
+    let declared_license_expression = primary_declared_license
+        .map(|expr| canonicalize_summary_expression(&expr))
+        .or_else(|| {
+            combine_license_expressions(unique(&key_file_expressions))
+                .map(|expr| canonicalize_summary_expression(&expr))
+        });
+
+    scoring.conflicting_license_categories = declared_license_expression
         .as_deref()
         .is_some_and(is_permissive_expression)
         && non_key_files
@@ -1470,18 +1599,15 @@ fn compute_license_score(files: &[FileInfo]) -> (Option<String>, LicenseClarityS
         scoring.score = scoring.score.saturating_sub(10);
     }
 
-    let declared_license_expression = primary_declared_license
-        .map(|expr| canonicalize_summary_expression(&expr))
-        .or_else(|| {
-            combine_license_expressions(unique(&key_file_expressions))
-                .map(|expr| canonicalize_summary_expression(&expr))
-        });
-
     (declared_license_expression, scoring)
 }
 
 fn is_good_match(license_match: &Match) -> bool {
-    let score = license_match.score;
+    let score = if license_match.score <= 1.0 {
+        license_match.score * 100.0
+    } else {
+        license_match.score
+    };
     match (license_match.match_coverage, license_match.rule_relevance) {
         (Some(coverage), Some(relevance)) => score >= 80.0 && coverage >= 80.0 && relevance >= 80,
         _ => score >= 80.0,
@@ -1585,37 +1711,153 @@ fn group_license_expressions(expressions: &[String]) -> (Vec<String>, Vec<String
 fn remove_tally_value(value: Option<&str>, tallies: &[TallyEntry]) -> Vec<TallyEntry> {
     tallies
         .iter()
-        .filter(|entry| entry.value.is_some() && entry.value.as_deref() != value)
-        .cloned()
-        .collect()
-}
-
-fn remove_tally_values(values: &[String], tallies: &[TallyEntry]) -> Vec<TallyEntry> {
-    tallies
-        .iter()
         .filter(|entry| {
             !entry
                 .value
-                .as_ref()
-                .is_some_and(|value| values.contains(value))
+                .as_deref()
+                .is_some_and(|entry_value| is_redundant_declared_license_tally(entry_value, value))
         })
         .cloned()
         .collect()
 }
 
-fn canonicalize_license_tally_entries(tallies: &[TallyEntry]) -> Vec<TallyEntry> {
-    let mut counts: HashMap<Option<String>, usize> = HashMap::new();
+fn is_redundant_declared_license_tally(entry_value: &str, declared_value: Option<&str>) -> bool {
+    let Some(declared_value) = declared_value else {
+        return false;
+    };
 
-    for entry in tallies {
-        let value = entry.value.as_deref().map(canonicalize_summary_expression);
-        *counts.entry(value).or_insert(0) += entry.count;
+    if entry_value == declared_value {
+        return true;
     }
 
-    build_tally_entries(counts)
+    if declared_value.contains(" AND ")
+        || declared_value.contains(" OR ")
+        || declared_value.contains(" WITH ")
+    {
+        return false;
+    }
+
+    let normalized_declared = declared_value.trim().to_ascii_lowercase();
+    let parts: Vec<String> = entry_value
+        .replace(['(', ')'], " ")
+        .split_whitespace()
+        .filter(|part| !matches!(part.to_ascii_uppercase().as_str(), "AND" | "OR" | "WITH"))
+        .map(|part| part.to_ascii_lowercase())
+        .collect();
+
+    !parts.is_empty() && parts.iter().all(|part| part == &normalized_declared)
+}
+
+fn remove_tally_values(values: &[String], tallies: &[TallyEntry]) -> Vec<TallyEntry> {
+    let normalized_values: HashSet<String> = values
+        .iter()
+        .map(|value| normalize_summary_holder_value(value))
+        .collect();
+
+    tallies
+        .iter()
+        .filter(|entry| {
+            !entry.value.as_ref().is_some_and(|value| {
+                values.contains(value)
+                    || normalized_values.contains(&normalize_summary_holder_value(value))
+            })
+        })
+        .cloned()
+        .collect()
 }
 
 fn canonicalize_summary_expression(expression: &str) -> String {
-    combine_expressions_and(&[expression], true).unwrap_or_else(|_| expression.to_ascii_lowercase())
+    let canonical = parse_expression(expression)
+        .map(|parsed| expression_to_string(&simplify_expression(&parsed)))
+        .or_else(|_| combine_expressions_and(&[expression], true))
+        .unwrap_or_else(|_| expression.to_ascii_lowercase());
+
+    if canonical.contains(" AND ") && !canonical.contains(" OR ") && !canonical.contains(" WITH ") {
+        canonical
+            .replace(['(', ')'], "")
+            .split_whitespace()
+            .collect::<Vec<_>>()
+            .join(" ")
+    } else {
+        canonical
+    }
+}
+
+fn normalize_summary_holder_value(value: &str) -> String {
+    let normalized = canonicalize_summary_holder_display(value)
+        .trim_end_matches(['.', ',', ';', ':'])
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .to_ascii_lowercase();
+
+    let key: String = normalized
+        .chars()
+        .filter(|ch| ch.is_ascii_alphanumeric())
+        .collect();
+
+    match key.as_str() {
+        "google" | "googlellc" | "googleinc" => "google".to_string(),
+        "microsoft" | "microsoftcorp" | "microsoftinc" | "microsoftcorporation" => {
+            "microsoft".to_string()
+        }
+        _ => normalized,
+    }
+}
+
+fn canonicalize_summary_holder_display(value: &str) -> String {
+    let normalized = value.split_whitespace().collect::<Vec<_>>().join(" ");
+
+    let key: String = normalized
+        .chars()
+        .filter(|ch| ch.is_ascii_alphanumeric())
+        .collect::<String>()
+        .to_ascii_lowercase();
+
+    match key.as_str() {
+        "google" | "googlellc" | "googleinc" => "Google".to_string(),
+        "microsoft" | "microsoftcorp" | "microsoftinc" | "microsoftcorporation" => {
+            "Microsoft".to_string()
+        }
+        "sunmicrosystems" | "sunmicrosystemsinc" => "Sun Microsystems".to_string(),
+        _ => normalized,
+    }
+}
+
+fn summary_holder_from_copyright(copyright: &str) -> Option<String> {
+    let mut value = copyright.trim();
+    if value.is_empty() {
+        return None;
+    }
+
+    if value.len() >= "copyright".len()
+        && value[.."copyright".len()].eq_ignore_ascii_case("copyright")
+    {
+        value = value["copyright".len()..].trim_start();
+    }
+
+    if let Some(stripped) = value.strip_prefix("(c)") {
+        value = stripped.trim_start();
+    }
+    if let Some(stripped) = value.strip_prefix('©') {
+        value = stripped.trim_start();
+    }
+
+    let cleaned = value.trim_matches(|ch: char| ch.is_whitespace() || ch == '.' || ch == ',');
+    if cleaned.is_empty() {
+        return None;
+    }
+
+    if cleaned.starts_with("Holders ") || cleaned.contains("option either") {
+        return None;
+    }
+
+    let cleaned = cleaned
+        .strip_suffix(". Individual")
+        .unwrap_or(cleaned)
+        .trim();
+
+    (!cleaned.is_empty()).then(|| cleaned.to_string())
 }
 
 fn summary_license_expression(file: &FileInfo) -> Option<String> {
@@ -1669,6 +1911,75 @@ fn compute_tallies(files: &[FileInfo]) -> Option<Tallies> {
     let detected_license_expression = tally_file_values(files, detected_license_values, true);
     let copyrights = tally_file_values(files, copyright_values, true);
     let holders = tally_file_values(files, holder_values, true);
+    let authors = tally_file_values(files, author_values, true);
+    let programming_language = tally_file_values(files, programming_language_values, false);
+
+    let tallies = Tallies {
+        detected_license_expression,
+        copyrights,
+        holders,
+        authors,
+        programming_language,
+    };
+
+    (!tallies.is_empty()).then_some(tallies)
+}
+
+fn compute_summary_tallies(files: &[FileInfo], packages: &[Package]) -> Option<Tallies> {
+    let summary_origin_package_uids: HashSet<String> = summary_origin_packages(packages, files)
+        .into_iter()
+        .map(|package| package.package_uid.clone())
+        .collect();
+    let nested_package_roots = nested_summary_package_roots(packages, files);
+    let detected_license_expression = tally_file_values_filtered(
+        files,
+        |file| {
+            !file
+                .package_data
+                .iter()
+                .any(|package_data| package_data.datasource_id == Some(DatasourceId::PypiSetupCfg))
+        },
+        detected_license_values,
+        true,
+    );
+    let copyrights = tally_file_values(files, copyright_values, true);
+    let holders = if packages.is_empty() {
+        tally_file_values(
+            files,
+            |file| {
+                file.holders
+                    .iter()
+                    .map(|holder| holder.holder.clone())
+                    .collect()
+            },
+            true,
+        )
+    } else {
+        tally_file_values_filtered(
+            files,
+            |file| {
+                file.is_community
+                    || (file.is_top_level
+                        && file.is_key_file
+                        && !nested_package_roots
+                            .iter()
+                            .any(|root| Path::new(&file.path).starts_with(root))
+                        && (file.for_packages.is_empty()
+                            || summary_origin_package_uids.is_empty()
+                            || file
+                                .for_packages
+                                .iter()
+                                .any(|uid| summary_origin_package_uids.contains(uid))))
+            },
+            |file| {
+                file.holders
+                    .iter()
+                    .map(|holder| holder.holder.clone())
+                    .collect()
+            },
+            true,
+        )
+    };
     let authors = tally_file_values(files, author_values, true);
     let programming_language = tally_file_values(files, programming_language_values, false);
 
@@ -1935,7 +2246,25 @@ where
 }
 
 fn detected_license_values(file: &FileInfo) -> Vec<String> {
-    summary_license_expression(file).into_iter().collect()
+    let detection_expressions: Vec<String> = file
+        .license_detections
+        .iter()
+        .map(|detection| canonicalize_summary_expression(&detection.license_expression))
+        .collect();
+
+    if detection_expressions.is_empty() {
+        return Vec::new();
+    }
+
+    let unique_detection_expressions = unique(&detection_expressions);
+
+    if unique_detection_expressions.len() == 1 {
+        return detection_expressions;
+    }
+
+    combine_license_expressions(unique_detection_expressions)
+        .into_iter()
+        .collect()
 }
 
 fn copyright_values(file: &FileInfo) -> Vec<String> {
@@ -1946,6 +2275,10 @@ fn copyright_values(file: &FileInfo) -> Vec<String> {
 }
 
 fn holder_values(file: &FileInfo) -> Vec<String> {
+    if file.is_legal || !(file.is_key_file || file.is_community) {
+        return Vec::new();
+    }
+
     file.holders
         .iter()
         .map(|holder| holder.holder.clone())
@@ -1985,7 +2318,9 @@ fn compute_declared_holders(files: &[FileInfo], packages: &[Package]) -> Vec<Str
         .iter()
         .filter_map(|package| package.holder.as_ref())
     {
-        *counts.entry(holder.clone()).or_insert(0) += 1;
+        *counts
+            .entry(canonicalize_summary_holder_display(holder))
+            .or_insert(0) += 1;
     }
 
     let mut package_datafile_holders = Vec::new();
@@ -1994,9 +2329,13 @@ fn compute_declared_holders(files: &[FileInfo], packages: &[Package]) -> Vec<Str
         for package in packages {
             for datafile_path in &package.datafile_paths {
                 if let Some(file) = files.iter().find(|file| file.path == *datafile_path) {
+                    if file.is_legal {
+                        continue;
+                    }
                     for holder in &file.holders {
-                        if !package_datafile_holders.contains(&holder.holder) {
-                            package_datafile_holders.push(holder.holder.clone());
+                        let canonical_holder = canonicalize_summary_holder_display(&holder.holder);
+                        if !package_datafile_holders.contains(&canonical_holder) {
+                            package_datafile_holders.push(canonical_holder);
                         }
                     }
                 }
@@ -2012,17 +2351,63 @@ fn compute_declared_holders(files: &[FileInfo], packages: &[Package]) -> Vec<Str
         let mut key_file_holders = Vec::new();
         for holder in files
             .iter()
-            .filter(|file| file.is_key_file)
+            .filter(|file| file.is_key_file && !file.is_legal)
             .flat_map(|file| file.holders.iter())
-            .map(|holder| holder.holder.clone())
+            .map(|holder| canonicalize_summary_holder_display(&holder.holder))
         {
             if !key_file_holders.contains(&holder) {
                 key_file_holders.push(holder);
             }
         }
 
+        let mut codebase_holder_counts: HashMap<String, usize> = HashMap::new();
+        for holder in files
+            .iter()
+            .flat_map(|file| file.holders.iter())
+            .map(|holder| canonicalize_summary_holder_display(&holder.holder))
+        {
+            *codebase_holder_counts.entry(holder).or_insert(0) += 1;
+        }
+
+        let highest_count = key_file_holders
+            .iter()
+            .filter_map(|holder| codebase_holder_counts.get(holder).copied())
+            .max();
+
+        if let Some(highest_count) = highest_count {
+            let highest_key_file_holders: Vec<String> = key_file_holders
+                .iter()
+                .filter(|holder| codebase_holder_counts.get(*holder) == Some(&highest_count))
+                .cloned()
+                .collect();
+            if !highest_key_file_holders.is_empty() {
+                return highest_key_file_holders;
+            }
+        }
+
         if !key_file_holders.is_empty() {
             return key_file_holders;
+        }
+
+        if packages.is_empty() {
+            let mut legal_key_file_holders = Vec::new();
+            for holder in files
+                .iter()
+                .filter(|file| file.is_key_file && file.is_legal)
+                .flat_map(|file| file.copyrights.iter())
+                .filter_map(|copyright| {
+                    summary_holder_from_copyright(&copyright.copyright)
+                        .map(|holder| canonicalize_summary_holder_display(&holder))
+                })
+            {
+                if !legal_key_file_holders.contains(&holder) {
+                    legal_key_file_holders.push(holder);
+                }
+            }
+
+            if !legal_key_file_holders.is_empty() {
+                return legal_key_file_holders;
+            }
         }
     }
 
@@ -2036,8 +2421,8 @@ fn compute_declared_holders(files: &[FileInfo], packages: &[Package]) -> Vec<Str
 
 fn compute_primary_language(files: &[FileInfo], packages: &[Package]) -> Option<String> {
     let package_languages = unique(
-        &packages
-            .iter()
+        &summary_origin_packages(packages, files)
+            .into_iter()
             .filter_map(|package| package.primary_language.as_ref())
             .cloned()
             .collect::<Vec<_>>(),
@@ -2051,8 +2436,8 @@ fn compute_primary_language(files: &[FileInfo], packages: &[Package]) -> Option<
 
     for language in files
         .iter()
-        .filter(|file| file.is_source.unwrap_or(false))
         .filter_map(|file| file.programming_language.as_ref())
+        .filter(|language| language.as_str() != "Text")
     {
         *counts.entry(language.clone()).or_insert(0) += 1;
     }
@@ -2063,13 +2448,131 @@ fn compute_primary_language(files: &[FileInfo], packages: &[Package]) -> Option<
         .map(|(language, _)| language)
 }
 
+fn summary_origin_packages<'a>(packages: &'a [Package], files: &[FileInfo]) -> Vec<&'a Package> {
+    if packages.is_empty() {
+        return Vec::new();
+    }
+
+    let top_level_roots = top_level_summary_package_roots(packages);
+    if top_level_roots.is_empty() {
+        return packages.iter().collect();
+    }
+
+    let top_level_packages: Vec<&Package> = packages
+        .iter()
+        .filter(|package| {
+            package_root(package)
+                .as_ref()
+                .is_some_and(|root| top_level_roots.iter().any(|top_level| top_level == root))
+        })
+        .collect();
+
+    if top_level_packages.is_empty() && !files.is_empty() {
+        return packages.iter().collect();
+    }
+
+    top_level_packages
+}
+
+fn top_level_package_uids(packages: &[Package], files: &[FileInfo]) -> HashSet<String> {
+    let top_level_packages = summary_origin_packages(packages, files);
+    let key_package_uids: HashSet<String> = top_level_packages
+        .iter()
+        .filter(|package| {
+            package.datafile_paths.iter().any(|datafile_path| {
+                files.iter().any(|file| {
+                    file.path == *datafile_path
+                        && file.file_type == FileType::File
+                        && file.is_top_level
+                        && file.is_key_file
+                })
+            })
+        })
+        .map(|package| package.package_uid.clone())
+        .collect();
+
+    if key_package_uids.is_empty() {
+        top_level_packages
+            .into_iter()
+            .map(|package| package.package_uid.clone())
+            .collect()
+    } else {
+        key_package_uids
+    }
+}
+
+fn top_level_summary_package_roots(packages: &[Package]) -> Vec<PathBuf> {
+    let mut roots: Vec<PathBuf> = packages.iter().filter_map(package_root).collect();
+    roots.sort_by(|left, right| {
+        left.components()
+            .count()
+            .cmp(&right.components().count())
+            .then_with(|| left.cmp(right))
+    });
+    roots.dedup();
+
+    let mut top_level_roots = Vec::new();
+    for root in roots {
+        if top_level_roots
+            .iter()
+            .any(|top_level| root.starts_with(top_level))
+        {
+            continue;
+        }
+        top_level_roots.push(root);
+    }
+
+    top_level_roots
+}
+
+fn nested_summary_package_roots(packages: &[Package], files: &[FileInfo]) -> Vec<PathBuf> {
+    let top_level_roots = top_level_summary_package_roots(packages);
+    let mut nested_roots: Vec<PathBuf> = packages
+        .iter()
+        .filter_map(package_root)
+        .filter(|root| {
+            top_level_roots
+                .iter()
+                .any(|top_level| root != top_level && root.starts_with(top_level))
+        })
+        .collect();
+
+    nested_roots.extend(
+        files
+            .iter()
+            .filter(|file| {
+                file.file_type == FileType::File && file.is_manifest && !file.is_top_level
+            })
+            .map(|file| {
+                Path::new(&file.path)
+                    .parent()
+                    .unwrap_or_else(|| Path::new(&file.path))
+            })
+            .map(Path::to_path_buf),
+    );
+
+    nested_roots.sort();
+    nested_roots.dedup();
+    nested_roots
+}
+
+fn is_summary_score_key_file(file: &FileInfo, nested_package_roots: &[PathBuf]) -> bool {
+    file.file_type == FileType::File
+        && file.is_top_level
+        && is_score_key_file(file)
+        && !nested_package_roots
+            .iter()
+            .any(|root| Path::new(&file.path).starts_with(root))
+}
+
 fn compute_other_languages(files: &[FileInfo], primary_language: Option<&str>) -> Vec<TallyEntry> {
     let mut counts: HashMap<String, usize> = HashMap::new();
 
     for language in files
         .iter()
-        .filter(|file| file.is_source.unwrap_or(false))
+        .filter(|file| file.file_type == FileType::File && !file.is_key_file)
         .filter_map(|file| file.programming_language.as_ref())
+        .filter(|language| language.as_str() != "Text")
     {
         *counts.entry(language.clone()).or_insert(0) += 1;
     }

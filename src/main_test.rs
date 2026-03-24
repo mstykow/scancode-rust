@@ -4,12 +4,14 @@ use crate::models::{
     OutputURL, Package, PackageType, Tallies, TallyEntry,
 };
 use clap::Parser;
+use flate2::read::GzDecoder;
 use regex::Regex;
 use serde_json::Value;
 use serde_json::json;
 use std::fs;
 use std::sync::{Arc, OnceLock};
-use tempfile::tempdir;
+use tar::Archive;
+use tempfile::{TempDir, tempdir};
 
 use crate::assembly;
 use crate::license_detection::LicenseDetectionEngine;
@@ -327,10 +329,109 @@ fn normalize_package_datafile_paths(packages: &mut [Package], scan_root: &Path) 
     }
 }
 
+struct FixtureScanRoot {
+    scan_root: PathBuf,
+    normalize_root: PathBuf,
+    _temp_dir: Option<TempDir>,
+}
+
+fn fixture_exclude_patterns() -> Vec<Pattern> {
+    [".provenant-cache/*", "**/.provenant-cache/*"]
+        .into_iter()
+        .map(|pattern| Pattern::new(pattern).expect("fixture exclude pattern should be valid"))
+        .collect()
+}
+
+fn extract_archive_fixture(archive_path: &Path) -> FixtureScanRoot {
+    let temp_dir = tempdir().expect("tempdir should be created");
+    let extracted_root = temp_dir.path().join(
+        archive_path
+            .file_name()
+            .expect("archive fixture should have a file name"),
+    );
+
+    fs::create_dir_all(&extracted_root).expect("archive fixture extraction root should be created");
+
+    let archive_file =
+        fs::File::open(archive_path).expect("archive fixture should be readable for extraction");
+    let decoder = GzDecoder::new(archive_file);
+    let mut archive = Archive::new(decoder);
+    archive
+        .unpack(&extracted_root)
+        .expect("archive fixture should extract successfully");
+
+    FixtureScanRoot {
+        scan_root: extracted_root,
+        normalize_root: temp_dir.path().to_path_buf(),
+        _temp_dir: Some(temp_dir),
+    }
+}
+
+fn resolve_fixture_scan_root(fixture_root: &Path) -> FixtureScanRoot {
+    if !fixture_root.exists()
+        && let Some(file_name) = fixture_root.file_name().and_then(|name| name.to_str())
+    {
+        let archive_path = fixture_root.with_file_name(format!("{file_name}.tar.gz"));
+        if archive_path.is_file() {
+            return extract_archive_fixture(&archive_path);
+        }
+    }
+
+    let codebase_root = fixture_root.join("codebase");
+    if codebase_root.is_dir() {
+        return FixtureScanRoot {
+            scan_root: codebase_root,
+            normalize_root: fixture_root.to_path_buf(),
+            _temp_dir: None,
+        };
+    }
+
+    let project_entries: Vec<PathBuf> = std::fs::read_dir(fixture_root)
+        .ok()
+        .into_iter()
+        .flat_map(|entries| entries.flatten())
+        .map(|entry| entry.path())
+        .filter(|path| {
+            path.is_dir()
+                || path
+                    .file_name()
+                    .and_then(|name| name.to_str())
+                    .is_some_and(|name| !name.ends_with(".expected.json"))
+        })
+        .collect();
+
+    if project_entries.len() == 1 {
+        let project_entry = &project_entries[0];
+        if project_entry.is_dir() {
+            return FixtureScanRoot {
+                scan_root: project_entry.clone(),
+                normalize_root: fixture_root.to_path_buf(),
+                _temp_dir: None,
+            };
+        }
+
+        if project_entry
+            .file_name()
+            .and_then(|name| name.to_str())
+            .is_some_and(|name| name.ends_with(".tar.gz"))
+        {
+            return extract_archive_fixture(project_entry);
+        }
+    }
+
+    FixtureScanRoot {
+        scan_root: fixture_root.to_path_buf(),
+        normalize_root: fixture_root.to_path_buf(),
+        _temp_dir: None,
+    }
+}
+
 fn compute_fixture_summary(fixture_dir: &str, include_summary: bool, include_score: bool) -> Value {
     let fixture_root = Path::new(fixture_dir);
+    let resolved_scan_root = resolve_fixture_scan_root(fixture_root);
     let progress = Arc::new(ScanProgress::new(ProgressMode::Quiet));
-    let collected = collect_paths(fixture_root, 0, &[]);
+    let exclude_patterns = fixture_exclude_patterns();
+    let collected = collect_paths(&resolved_scan_root.scan_root, 0, &exclude_patterns);
     let scan_result = process_collected(
         &collected,
         progress,
@@ -342,13 +443,16 @@ fn compute_fixture_summary(fixture_dir: &str, include_summary: bool, include_sco
     let mut files = scan_result.files;
     normalize_paths(
         &mut files,
-        fixture_root.to_str().expect("fixture path should be UTF-8"),
+        resolved_scan_root
+            .normalize_root
+            .to_str()
+            .expect("fixture path should be UTF-8"),
         true,
         false,
     );
     let assembly_result = assembly::assemble(&mut files);
     let mut packages = assembly_result.packages;
-    normalize_package_datafile_paths(&mut packages, fixture_root);
+    normalize_package_datafile_paths(&mut packages, &resolved_scan_root.normalize_root);
 
     classify_key_files(&mut files, &packages);
     promote_package_metadata_from_key_files(&files, &mut packages);
@@ -1319,6 +1423,34 @@ fn compute_summary_uses_root_prefixed_top_level_key_files() {
 }
 
 #[test]
+fn classify_key_files_uses_lowest_common_parent_for_archive_like_tree() {
+    let mut files = vec![
+        dir("archive.tar.gz"),
+        dir("archive.tar.gz/project"),
+        dir("archive.tar.gz/project/sub"),
+        dir("archive.tar.gz/project/sub/src"),
+        file("archive.tar.gz/project/sub/COPYING"),
+        file("archive.tar.gz/project/sub/src/main.c"),
+    ];
+
+    classify_key_files(&mut files, &[]);
+
+    let copying = files
+        .iter()
+        .find(|file| file.path == "archive.tar.gz/project/sub/COPYING")
+        .expect("COPYING should exist");
+    let source = files
+        .iter()
+        .find(|file| file.path == "archive.tar.gz/project/sub/src/main.c")
+        .expect("source file should exist");
+
+    assert!(copying.is_top_level);
+    assert!(copying.is_key_file);
+    assert!(!source.is_top_level);
+    assert!(!source.is_key_file);
+}
+
+#[test]
 fn compute_summary_uses_package_holder_and_primary_language() {
     let uid = "pkg:gem/demo@1.0.0?uuid=test";
     let mut root_package = package(uid, "demo/demo.gemspec");
@@ -1647,7 +1779,7 @@ fn compute_summary_uses_package_datafile_holders_before_global_holder_fallback()
 }
 
 #[test]
-fn compute_summary_excludes_null_other_license_expressions() {
+fn compute_summary_keeps_null_other_license_expressions_when_declared_expression_exists() {
     let mut readme = file("project/README.md");
     readme.is_key_file = true;
     readme.is_readme = true;
@@ -1681,7 +1813,13 @@ fn compute_summary_excludes_null_other_license_expressions() {
 
     let summary = compute_summary(&[readme, mit], &[]).expect("summary exists");
 
-    assert!(summary.other_license_expressions.is_empty());
+    assert_eq!(
+        summary.other_license_expressions,
+        vec![TallyEntry {
+            value: None,
+            count: 1,
+        }]
+    );
 }
 
 #[test]
@@ -1724,6 +1862,70 @@ fn compute_summary_keeps_null_other_holders_and_removes_declared_holder_only() {
                 count: 1,
             },
         ]
+    );
+}
+
+#[test]
+fn compute_summary_keeps_holder_tallies_when_no_declared_holder_exists() {
+    let mut source_one = file("project/src/main.c");
+    source_one.holders = vec![Holder {
+        holder: "Members of the Gmerlin project".to_string(),
+        start_line: 1,
+        end_line: 1,
+    }];
+
+    let mut source_two = file("project/src/helper.c");
+    source_two.holders = vec![Holder {
+        holder: "Members of the Gmerlin project".to_string(),
+        start_line: 1,
+        end_line: 1,
+    }];
+
+    let summary = compute_summary(&[source_one, source_two], &[]).expect("summary exists");
+
+    assert_eq!(summary.declared_holder.as_deref(), Some(""));
+    assert_eq!(
+        summary.other_holders,
+        vec![TallyEntry {
+            value: Some("Members of the Gmerlin project".to_string()),
+            count: 2,
+        }]
+    );
+}
+
+#[test]
+fn compute_summary_removes_punctuation_only_holder_variants_from_other_holders() {
+    let mut readme = file("project/README.md");
+    readme.is_key_file = true;
+    readme.is_readme = true;
+    readme.is_top_level = true;
+    readme.holders = vec![Holder {
+        holder: "Example Corp.".to_string(),
+        start_line: 1,
+        end_line: 1,
+    }];
+
+    let mut notice = file("project/NOTICE");
+    notice.holders = vec![Holder {
+        holder: "Example Corp".to_string(),
+        start_line: 1,
+        end_line: 1,
+    }];
+
+    let mut license = file("project/LICENSE");
+    license.is_key_file = true;
+    license.is_legal = true;
+    license.is_top_level = true;
+
+    let summary = compute_summary(&[readme, notice, license], &[]).expect("summary exists");
+
+    assert_eq!(summary.declared_holder.as_deref(), Some("Example Corp."));
+    assert_eq!(
+        summary.other_holders,
+        vec![TallyEntry {
+            value: None,
+            count: 1,
+        }]
     );
 }
 
