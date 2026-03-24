@@ -136,10 +136,11 @@ fn run() -> Result<()> {
             .ok_or_else(|| anyhow!("No directory input path provided"))?;
 
         let cache_config = prepare_cache_for_scan(scan_path, &cli)?;
-        let exclude_patterns = compile_exclude_patterns(&cli.exclude, cache_config.root_dir());
+        let collection_exclude_patterns =
+            build_collection_exclude_patterns(Path::new(scan_path), &cache_config, &cli.exclude);
 
         progress.start_discovery();
-        let collected = collect_paths(scan_path, cli.max_depth, &exclude_patterns);
+        let collected = collect_paths(scan_path, cli.max_depth, &collection_exclude_patterns);
         let total_files = collected.file_count();
         let total_dirs = collected.directory_count();
         let total_size = collected.total_file_bytes;
@@ -346,19 +347,36 @@ fn prepare_cache_for_scan(scan_path: &str, cli: &Cli) -> Result<CacheConfig> {
     Ok(config)
 }
 
-fn compile_exclude_patterns(patterns: &[String], cache_dir: &Path) -> Vec<Pattern> {
-    let mut compiled: Vec<Pattern> = patterns
-        .iter()
-        .filter_map(|pattern| Pattern::new(pattern).ok())
-        .collect();
+fn build_collection_exclude_patterns(
+    scan_root: &Path,
+    cache_config: &CacheConfig,
+    user_patterns: &[String],
+) -> Vec<Pattern> {
+    let mut patterns = compile_exclude_patterns(user_patterns);
+    let cache_root = cache_config.root_dir();
 
-    if let Some(cache_name) = cache_dir.file_name().and_then(|n| n.to_str())
-        && let Ok(cache_pattern) = Pattern::new(&format!("*{cache_name}*"))
+    if let Ok(relative_cache_root) = cache_root.strip_prefix(scan_root)
+        && !relative_cache_root.as_os_str().is_empty()
     {
-        compiled.push(cache_pattern);
+        for path in [cache_root.to_path_buf(), relative_cache_root.to_path_buf()] {
+            let normalized = path.to_string_lossy().replace('\\', "/");
+            let escaped = Pattern::escape(&normalized);
+            for pattern in [escaped.clone(), format!("{escaped}/**")] {
+                if let Ok(pattern) = Pattern::new(&pattern) {
+                    patterns.push(pattern);
+                }
+            }
+        }
     }
 
-    compiled
+    patterns
+}
+
+fn compile_exclude_patterns(patterns: &[String]) -> Vec<Pattern> {
+    patterns
+        .iter()
+        .filter_map(|pattern| Pattern::new(pattern).ok())
+        .collect()
 }
 
 fn compile_include_patterns(patterns: &[String]) -> Vec<Pattern> {

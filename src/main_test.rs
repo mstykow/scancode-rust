@@ -14,6 +14,7 @@ use tar::Archive;
 use tempfile::{TempDir, tempdir};
 
 use crate::assembly;
+use crate::cache::DEFAULT_CACHE_DIR_NAME;
 use crate::license_detection::LicenseDetectionEngine;
 use crate::progress::{ProgressMode, ScanProgress};
 use crate::scanner::{TextDetectionOptions, collect_paths, process_collected};
@@ -336,10 +337,13 @@ struct FixtureScanRoot {
 }
 
 fn fixture_exclude_patterns() -> Vec<Pattern> {
-    [".provenant-cache/*", "**/.provenant-cache/*"]
-        .into_iter()
-        .map(|pattern| Pattern::new(pattern).expect("fixture exclude pattern should be valid"))
-        .collect()
+    [
+        format!("{DEFAULT_CACHE_DIR_NAME}/*"),
+        format!("**/{DEFAULT_CACHE_DIR_NAME}/*"),
+    ]
+    .into_iter()
+    .map(|pattern| Pattern::new(&pattern).expect("fixture exclude pattern should be valid"))
+    .collect()
 }
 
 fn extract_archive_fixture(archive_path: &Path) -> FixtureScanRoot {
@@ -3670,7 +3674,7 @@ fn prepare_cache_for_scan_defaults_to_scan_root_cache_directory() {
     let config = prepare_cache_for_scan(scan_root.to_str().expect("utf-8 path"), &cli)
         .expect("cache preparation should succeed");
 
-    assert_eq!(config.root_dir(), scan_root.join(".provenant-cache"));
+    assert_eq!(config.root_dir(), scan_root.join(DEFAULT_CACHE_DIR_NAME));
     assert!(config.index_dir().exists());
     assert!(config.scan_results_dir().exists());
 }
@@ -3704,4 +3708,78 @@ fn prepare_cache_for_scan_respects_cache_dir_and_cache_clear() {
     assert!(!stale_file.exists());
     assert!(config.index_dir().exists());
     assert!(config.scan_results_dir().exists());
+}
+
+#[test]
+fn build_collection_exclude_patterns_skips_default_cache_dir() {
+    let temp_dir = tempfile::TempDir::new().expect("create temp dir");
+    let scan_root = temp_dir.path().join("scan");
+    fs::create_dir_all(scan_root.join("src")).expect("create src dir");
+    fs::create_dir_all(scan_root.join(DEFAULT_CACHE_DIR_NAME).join("index"))
+        .expect("create cache dir");
+    fs::write(scan_root.join("src").join("main.rs"), "fn main() {}").expect("write source file");
+    fs::write(
+        scan_root
+            .join(DEFAULT_CACHE_DIR_NAME)
+            .join("index")
+            .join("stale.txt"),
+        "cached",
+    )
+    .expect("write cache file");
+
+    let config = crate::cache::CacheConfig::from_scan_root(&scan_root);
+    let exclude_patterns = build_collection_exclude_patterns(&scan_root, &config, &[]);
+    let collected = collect_paths(&scan_root, 0, &exclude_patterns);
+
+    assert!(
+        collected
+            .files
+            .iter()
+            .all(|(path, _)| !path.starts_with(config.root_dir()))
+    );
+    assert!(collected.excluded_count >= 1);
+}
+
+#[test]
+fn build_collection_exclude_patterns_skips_explicit_in_tree_cache_dir() {
+    let temp_dir = tempfile::TempDir::new().expect("create temp dir");
+    let scan_root = temp_dir.path().join("scan");
+    let explicit_cache_dir = scan_root.join("custom-cache");
+    fs::create_dir_all(scan_root.join("docs")).expect("create docs dir");
+    fs::create_dir_all(explicit_cache_dir.join("scan-results")).expect("create cache dir");
+    fs::write(scan_root.join("docs").join("README.md"), "hello").expect("write normal file");
+    fs::write(
+        explicit_cache_dir
+            .join("scan-results")
+            .join("entry.msgpack.zst"),
+        "cached",
+    )
+    .expect("write cache file");
+
+    let config = crate::cache::CacheConfig::new(explicit_cache_dir.clone());
+    let exclude_patterns = build_collection_exclude_patterns(&scan_root, &config, &[]);
+    let collected = collect_paths(&scan_root, 0, &exclude_patterns);
+
+    assert!(
+        collected
+            .files
+            .iter()
+            .all(|(path, _)| !path.starts_with(&explicit_cache_dir))
+    );
+    assert!(collected.excluded_count >= 1);
+}
+
+#[test]
+fn build_collection_exclude_patterns_does_not_exclude_scan_root_when_cache_root_matches_it() {
+    let temp_dir = tempfile::TempDir::new().expect("create temp dir");
+    let scan_root = temp_dir.path().join("scan");
+    fs::create_dir_all(scan_root.join("src")).expect("create src dir");
+    fs::write(scan_root.join("src").join("main.rs"), "fn main() {}").expect("write source file");
+
+    let config = crate::cache::CacheConfig::new(scan_root.clone());
+    let exclude_patterns = build_collection_exclude_patterns(&scan_root, &config, &[]);
+    let collected = collect_paths(&scan_root, 0, &exclude_patterns);
+
+    assert_eq!(collected.file_count(), 1);
+    assert_eq!(collected.excluded_count, 0);
 }
