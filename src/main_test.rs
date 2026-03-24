@@ -1264,6 +1264,68 @@ fn active_classify_with_package_data_fixture_matches_expected_output() {
 }
 
 #[test]
+fn active_summary_fixtures_match_expected_summary_blocks() {
+    let fixtures = [
+        (
+            "reference/scancode-toolkit/tests/summarycode/data/summary/without_package_data",
+            "reference/scancode-toolkit/tests/summarycode/data/summary/without_package_data/without_package_data.expected.json",
+        ),
+        (
+            "reference/scancode-toolkit/tests/summarycode/data/summary/with_package_data",
+            "reference/scancode-toolkit/tests/summarycode/data/summary/with_package_data/with_package_data.expected.json",
+        ),
+        (
+            "reference/scancode-toolkit/tests/summarycode/data/summary/use_holder_from_package_resource",
+            "reference/scancode-toolkit/tests/summarycode/data/summary/use_holder_from_package_resource/use_holder_from_package_resource.expected.json",
+        ),
+        (
+            "reference/scancode-toolkit/tests/summarycode/data/summary/summary_without_holder",
+            "reference/scancode-toolkit/tests/summarycode/data/summary/summary_without_holder/summary-without-holder-pypi.expected.json",
+        ),
+        (
+            "reference/scancode-toolkit/tests/summarycode/data/summary/single_file",
+            "reference/scancode-toolkit/tests/summarycode/data/summary/single_file/single_file.expected.json",
+        ),
+        (
+            "reference/scancode-toolkit/tests/summarycode/data/summary/multiple_package_data",
+            "reference/scancode-toolkit/tests/summarycode/data/summary/multiple_package_data/multiple_package_data.expected.json",
+        ),
+        (
+            "reference/scancode-toolkit/tests/summarycode/data/summary/license_ambiguity/unambiguous",
+            "reference/scancode-toolkit/tests/summarycode/data/summary/license_ambiguity/unambiguous.expected.json",
+        ),
+        (
+            "reference/scancode-toolkit/tests/summarycode/data/summary/license_ambiguity/ambiguous",
+            "reference/scancode-toolkit/tests/summarycode/data/summary/license_ambiguity/ambiguous.expected.json",
+        ),
+        (
+            "reference/scancode-toolkit/tests/summarycode/data/summary/holders/combined_holders",
+            "reference/scancode-toolkit/tests/summarycode/data/summary/holders/combined_holders.expected.json",
+        ),
+        (
+            "reference/scancode-toolkit/tests/summarycode/data/summary/holders/clear_holder",
+            "reference/scancode-toolkit/tests/summarycode/data/summary/holders/clear_holder.expected.json",
+        ),
+        (
+            "reference/scancode-toolkit/tests/summarycode/data/summary/conflicting_license_categories",
+            "reference/scancode-toolkit/tests/summarycode/data/summary/conflicting_license_categories/conflicting_license_categories.expected.json",
+        ),
+        (
+            "reference/scancode-toolkit/tests/summarycode/data/summary/end-2-end/bug-1141",
+            "reference/scancode-toolkit/tests/summarycode/data/summary/end-2-end/bug-1141.expected.json",
+        ),
+        (
+            "reference/scancode-toolkit/tests/summarycode/data/summary/embedded_packages/bunkerweb",
+            "reference/scancode-toolkit/tests/summarycode/data/summary/embedded_packages/bunkerweb.expected.json",
+        ),
+    ];
+
+    for (fixture_dir, expected_file) in fixtures {
+        assert_summary_fixture_matches_expected(fixture_dir, expected_file, true, true);
+    }
+}
+
+#[test]
 fn compute_summary_uses_root_prefixed_top_level_key_files() {
     let mut files = vec![dir("project"), file("project/LICENSE")];
     files[1].license_expression = Some("mit".to_string());
