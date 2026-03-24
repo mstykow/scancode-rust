@@ -1199,47 +1199,6 @@ fn classify_key_files_marks_package_data_ancestry_like_with_package_data_fixture
 }
 
 #[test]
-#[ignore]
-fn debug_classify_cli_fixture_top_level() {
-    let fixture_root = Path::new("testdata/summarycode-golden/classify/cli");
-    let progress = Arc::new(ScanProgress::new(ProgressMode::Quiet));
-    let collected = collect_paths(fixture_root, 0, &[]);
-    let scan_result = process_collected(
-        &collected,
-        progress,
-        Some(test_license_engine()),
-        false,
-        &TextDetectionOptions::default(),
-    );
-
-    let mut files = scan_result.files;
-    let normalize_root = fixture_root.parent().unwrap();
-    normalize_paths(&mut files, normalize_root.to_str().unwrap(), true, false);
-    files.push(dir("cli"));
-
-    let roots = build_scan_roots(&files);
-    eprintln!("roots={:?}", roots);
-    let sample = Path::new("cli/not-top/composer.json");
-    eprintln!(
-        "sample rel count={} top={} strip_count={}",
-        sample.components().count(),
-        is_scan_top_level(sample, &roots),
-        sample
-            .strip_prefix(Path::new("cli"))
-            .unwrap()
-            .components()
-            .count()
-    );
-    classify_key_files(&mut files, &[]);
-    for file in &files {
-        eprintln!(
-            "{} type={:?} top={} key={}",
-            file.path, file.file_type, file.is_top_level, file.is_key_file
-        );
-    }
-}
-
-#[test]
 fn active_classify_cli_fixture_matches_expected_output() {
     assert_classify_fixture_matches_expected(
         "testdata/summarycode-golden/classify/cli",
