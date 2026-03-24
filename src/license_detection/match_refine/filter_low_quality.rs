@@ -3,7 +3,7 @@
 //! This module contains functions for filtering matches based on quality criteria
 //! like density, coverage, length, and required phrases.
 
-use std::collections::HashSet;
+use bit_set::BitSet;
 
 use crate::license_detection::index::LicenseIndex;
 use crate::license_detection::models::{LicenseMatch, MatcherKind};
@@ -182,7 +182,7 @@ pub(crate) fn filter_matches_missing_required_phrases(
         }
 
         let ispan = m.ispan();
-        let ispan_set: HashSet<usize> = ispan.iter().copied().collect();
+        let ispan_set: BitSet = ispan.iter().copied().collect();
         let qspan = m.qspan();
 
         if is_continuous {
@@ -201,13 +201,13 @@ pub(crate) fn filter_matches_missing_required_phrases(
                     }
                 }
 
-                let qkey_span_set: HashSet<usize> = qkey_span.iter().copied().collect();
+                let qkey_span_set: BitSet = qkey_span.iter().copied().collect();
                 let qkey_span_end = qkey_span.last().copied();
 
                 let has_same_stopwords = {
                     let mut ok = true;
                     for (&qpos, &ipos) in qspan.iter().zip(ispan.iter()) {
-                        if !qkey_span_set.contains(&qpos) || Some(qpos) == qkey_span_end {
+                        if !qkey_span_set.contains(qpos) || Some(qpos) == qkey_span_end {
                             continue;
                         }
 
@@ -237,7 +237,7 @@ pub(crate) fn filter_matches_missing_required_phrases(
 
         let all_contained = ikey_spans
             .iter()
-            .all(|span| (span.start..span.end).all(|pos| ispan_set.contains(&pos)));
+            .all(|span| (span.start..span.end).all(|pos| ispan_set.contains(pos)));
 
         if !all_contained {
             discarded.push(m.clone());
@@ -283,13 +283,13 @@ pub(crate) fn filter_matches_missing_required_phrases(
                 }
             }
 
-            let qkey_span_set: HashSet<usize> = qkey_span.iter().copied().collect();
+            let qkey_span_set: BitSet = qkey_span.iter().copied().collect();
             let qkey_span_end = qkey_span.last().copied();
 
             let has_same_stopwords = {
                 let mut ok = true;
                 for (&qpos, &ipos) in qspan.iter().zip(ispan.iter()) {
-                    if !qkey_span_set.contains(&qpos) || Some(qpos) == qkey_span_end {
+                    if !qkey_span_set.contains(qpos) || Some(qpos) == qkey_span_end {
                         continue;
                     }
 
