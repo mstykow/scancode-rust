@@ -4,7 +4,7 @@
 //! to reduce code duplication and ensure consistent test setup.
 
 use bit_set::BitSet;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use crate::license_detection::index::LicenseIndex;
 use crate::license_detection::index::dictionary::{TokenDictionary, TokenId};
@@ -165,7 +165,7 @@ pub fn create_mock_query_with_tokens<'a>(tokens: &[u16], index: &'a LicenseIndex
         line_by_pos,
         unknowns_by_pos: HashMap::new(),
         stopwords_by_pos: HashMap::new(),
-        shorts_and_digits_pos: HashSet::new(),
+        shorts_and_digits_pos: BitSet::new(),
         high_matchables: (0..token_count).collect(),
         low_matchables: BitSet::new(),
         is_binary: false,

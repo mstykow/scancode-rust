@@ -358,7 +358,7 @@ pub(crate) fn filter_matches_to_spurious_single_token(
                 .copied()
                 .unwrap_or(0)
                 + (qstart.saturating_sub(unknown_count)..qstart)
-                    .filter(|p| query.shorts_and_digits_pos.contains(p))
+                    .filter(|p| query.shorts_and_digits_pos.contains(*p))
                     .count();
 
             if before < unknown_count {
@@ -371,7 +371,7 @@ pub(crate) fn filter_matches_to_spurious_single_token(
                 .copied()
                 .unwrap_or(0)
                 + (qstart + 1..qstart + 1 + unknown_count)
-                    .filter(|p| query.shorts_and_digits_pos.contains(p))
+                    .filter(|p| query.shorts_and_digits_pos.contains(*p))
                     .count();
 
             if after >= unknown_count {

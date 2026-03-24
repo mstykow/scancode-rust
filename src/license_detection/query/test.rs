@@ -139,7 +139,7 @@ mod tests {
 
         for pos in 0..query.tokens.len().min(3) {
             assert!(
-                query.shorts_and_digits_pos.contains(&pos),
+                query.shorts_and_digits_pos.contains(pos),
                 "Position {} should be short",
                 pos
             );
@@ -155,9 +155,9 @@ mod tests {
         let text = "123 456 license";
         let query = build_query(text, &index).unwrap();
 
-        assert!(query.shorts_and_digits_pos.contains(&0));
-        assert!(query.shorts_and_digits_pos.contains(&1));
-        assert!(!query.shorts_and_digits_pos.contains(&2));
+        assert!(query.shorts_and_digits_pos.contains(0));
+        assert!(query.shorts_and_digits_pos.contains(1));
+        assert!(!query.shorts_and_digits_pos.contains(2));
     }
 
     #[test]

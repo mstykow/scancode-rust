@@ -5,7 +5,7 @@ use crate::license_detection::index::dictionary::{KnownToken, QueryToken, TokenI
 use crate::license_detection::tokenize::tokenize_as_ids;
 use bit_set::BitSet;
 use std::cell::{OnceCell, RefCell};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 /// A span representing a range of token positions.
 ///
@@ -89,7 +89,7 @@ pub struct Query<'a> {
     /// These tokens have special handling in matching.
     ///
     /// Corresponds to Python: `self.shorts_and_digits_pos = set()` (line 249)
-    pub shorts_and_digits_pos: HashSet<usize>,
+    pub shorts_and_digits_pos: BitSet,
 
     /// High-value matchable token positions (legalese tokens)
     ///
@@ -267,7 +267,7 @@ impl<'a> Query<'a> {
         let mut line_by_pos = Vec::new();
         let mut unknowns_by_pos: HashMap<Option<i32>, usize> = HashMap::new();
         let mut stopwords_by_pos: HashMap<Option<i32>, usize> = HashMap::new();
-        let mut shorts_and_digits_pos = HashSet::new();
+        let mut shorts_and_digits_pos = BitSet::new();
         let mut spdx_lines: Vec<(String, usize, usize)> = Vec::new();
 
         let mut known_pos = -1i32;

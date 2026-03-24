@@ -586,7 +586,7 @@ mod tests {
 
     #[test]
     fn test_qdensity_contiguous() {
-        use std::collections::{HashMap, HashSet};
+        use std::collections::HashMap;
         let index = create_test_index();
         let match_result = create_license_match();
         let query = crate::license_detection::query::Query {
@@ -595,7 +595,7 @@ mod tests {
             line_by_pos: vec![],
             unknowns_by_pos: HashMap::new(),
             stopwords_by_pos: HashMap::new(),
-            shorts_and_digits_pos: HashSet::new(),
+            shorts_and_digits_pos: bit_set::BitSet::new(),
             high_matchables: bit_set::BitSet::new(),
             low_matchables: bit_set::BitSet::new(),
             is_binary: false,
@@ -608,7 +608,7 @@ mod tests {
 
     #[test]
     fn test_qdensity_sparse() {
-        use std::collections::{HashMap, HashSet};
+        use std::collections::HashMap;
         let index = create_test_index();
         let mut match_result = create_license_match();
         match_result.matched_token_positions = Some(vec![0, 10]);
@@ -618,7 +618,7 @@ mod tests {
             line_by_pos: vec![],
             unknowns_by_pos: HashMap::new(),
             stopwords_by_pos: HashMap::new(),
-            shorts_and_digits_pos: HashSet::new(),
+            shorts_and_digits_pos: bit_set::BitSet::new(),
             high_matchables: bit_set::BitSet::new(),
             low_matchables: bit_set::BitSet::new(),
             is_binary: false,
@@ -632,7 +632,7 @@ mod tests {
 
     #[test]
     fn test_qdensity_zero() {
-        use std::collections::{HashMap, HashSet};
+        use std::collections::HashMap;
         let index = create_test_index();
         let mut match_result = create_license_match();
         match_result.start_token = 0;
@@ -643,7 +643,7 @@ mod tests {
             line_by_pos: vec![],
             unknowns_by_pos: HashMap::new(),
             stopwords_by_pos: HashMap::new(),
-            shorts_and_digits_pos: HashSet::new(),
+            shorts_and_digits_pos: bit_set::BitSet::new(),
             high_matchables: bit_set::BitSet::new(),
             low_matchables: bit_set::BitSet::new(),
             is_binary: false,
@@ -656,7 +656,7 @@ mod tests {
 
     #[test]
     fn test_qdensity_with_unknowns() {
-        use std::collections::{HashMap, HashSet};
+        use std::collections::HashMap;
         let index = create_test_index();
         let mut match_result = create_license_match();
         match_result.start_token = 0;
@@ -671,7 +671,7 @@ mod tests {
             line_by_pos: vec![],
             unknowns_by_pos,
             stopwords_by_pos: HashMap::new(),
-            shorts_and_digits_pos: HashSet::new(),
+            shorts_and_digits_pos: bit_set::BitSet::new(),
             high_matchables: bit_set::BitSet::new(),
             low_matchables: bit_set::BitSet::new(),
             is_binary: false,
@@ -685,7 +685,7 @@ mod tests {
 
     #[test]
     fn test_qmagnitude_non_contiguous() {
-        use std::collections::{HashMap, HashSet};
+        use std::collections::HashMap;
         let index = create_test_index();
         let mut match_result = create_license_match();
         match_result.qspan_positions = Some(vec![0, 5, 10]);
@@ -698,7 +698,7 @@ mod tests {
             line_by_pos: vec![],
             unknowns_by_pos,
             stopwords_by_pos: HashMap::new(),
-            shorts_and_digits_pos: HashSet::new(),
+            shorts_and_digits_pos: bit_set::BitSet::new(),
             high_matchables: bit_set::BitSet::new(),
             low_matchables: bit_set::BitSet::new(),
             is_binary: false,
@@ -712,7 +712,7 @@ mod tests {
 
     #[test]
     fn test_qmagnitude_excludes_end_position() {
-        use std::collections::{HashMap, HashSet};
+        use std::collections::HashMap;
         let index = create_test_index();
         let mut match_result = create_license_match();
         match_result.qspan_positions = Some(vec![0, 5, 10]);
@@ -724,7 +724,7 @@ mod tests {
             line_by_pos: vec![],
             unknowns_by_pos,
             stopwords_by_pos: HashMap::new(),
-            shorts_and_digits_pos: HashSet::new(),
+            shorts_and_digits_pos: bit_set::BitSet::new(),
             high_matchables: bit_set::BitSet::new(),
             low_matchables: bit_set::BitSet::new(),
             is_binary: false,
