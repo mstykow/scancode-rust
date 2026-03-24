@@ -593,6 +593,14 @@ impl LicenseMatch {
         self.start_token <= other.start_token && self.end_token >= other.end_token
     }
 
+    pub fn qcontains_with_set(&self, other: &LicenseMatch, self_set: &HashSet<usize>) -> bool {
+        if let Some(other_positions) = &other.qspan_positions {
+            return other_positions.iter().all(|p| self_set.contains(p));
+        }
+
+        (other.start_token..other.end_token).all(|p| self_set.contains(&p))
+    }
+
     pub fn qoverlap(&self, other: &LicenseMatch) -> usize {
         if let (Some(self_positions), Some(other_positions)) =
             (&self.qspan_positions, &other.qspan_positions)
@@ -630,6 +638,19 @@ impl LicenseMatch {
         let start = self.start_token.max(other.start_token);
         let end = self.end_token.min(other.end_token);
         end.saturating_sub(start)
+    }
+
+    pub fn qoverlap_with_set(&self, other: &LicenseMatch, self_set: &HashSet<usize>) -> usize {
+        if let Some(other_positions) = &other.qspan_positions {
+            return other_positions
+                .iter()
+                .filter(|p| self_set.contains(p))
+                .count();
+        }
+
+        (other.start_token..other.end_token)
+            .filter(|p| self_set.contains(p))
+            .count()
     }
 
     pub fn qspan_overlap(&self, other: &LicenseMatch) -> usize {
