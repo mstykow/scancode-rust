@@ -53,11 +53,7 @@ mod tests {
     }
 
     fn query_matchables(query: &Query<'_>) -> HashSet<usize> {
-        query
-            .low_matchables
-            .union(&query.high_matchables)
-            .copied()
-            .collect()
+        query.low_matchables.union(&query.high_matchables).collect()
     }
 
     fn query_matched(query: &Query<'_>) -> HashSet<usize> {
@@ -314,9 +310,9 @@ mod tests {
 
         let high = run.high_matchables();
         assert_eq!(high.len(), 3);
-        assert!(query.high_matchables.contains(&0));
-        assert!(query.high_matchables.contains(&1));
-        assert!(query.high_matchables.contains(&2));
+        assert!(query.high_matchables.contains(0));
+        assert!(query.high_matchables.contains(1));
+        assert!(query.high_matchables.contains(2));
     }
 
     #[test]
@@ -327,7 +323,7 @@ mod tests {
         let run = QueryRun::new(&query, 0, Some(2));
 
         let low = run.low_matchables();
-        assert!(low.contains(&1));
+        assert!(low.contains(1));
     }
 
     #[test]
@@ -396,9 +392,9 @@ mod tests {
         let span = PositionSpan::new(0, 1);
         query.subtract(&span);
 
-        assert!(!query.high_matchables.contains(&0));
-        assert!(!query.high_matchables.contains(&1));
-        assert!(query.high_matchables.contains(&2));
+        assert!(!query.high_matchables.contains(0));
+        assert!(!query.high_matchables.contains(1));
+        assert!(query.high_matchables.contains(2));
     }
 
     #[test]
@@ -558,9 +554,9 @@ mod tests {
         let run = QueryRun::new(&query, 1, None);
 
         let high_set = run.high_matchables();
-        assert!(high_set.contains(&1));
-        assert!(high_set.contains(&2));
-        assert!(!high_set.contains(&0));
+        assert!(high_set.contains(1));
+        assert!(high_set.contains(2));
+        assert!(!high_set.contains(0));
     }
 
     #[test]
@@ -625,9 +621,9 @@ mod tests {
 
         let high = run.high_matchables();
         assert_eq!(high.len(), 2);
-        assert!(high.contains(&1));
-        assert!(high.contains(&2));
-        assert!(!high.contains(&0));
+        assert!(high.contains(1));
+        assert!(high.contains(2));
+        assert!(!high.contains(0));
 
         let low = run.low_matchables();
         assert!(low.is_empty());
@@ -848,15 +844,15 @@ mod tests {
         let index = create_query_test_index();
         let mut query = build_query("license copyright permission", &index).unwrap();
 
-        assert!(query.high_matchables.contains(&0));
-        assert!(query.high_matchables.contains(&1));
+        assert!(query.high_matchables.contains(0));
+        assert!(query.high_matchables.contains(1));
 
         let span = PositionSpan::new(0, 1);
         query.subtract(&span);
 
-        assert!(!query.high_matchables.contains(&0));
-        assert!(!query.high_matchables.contains(&1));
-        assert!(query.high_matchables.contains(&2));
+        assert!(!query.high_matchables.contains(0));
+        assert!(!query.high_matchables.contains(1));
+        assert!(query.high_matchables.contains(2));
     }
 
     #[test]
@@ -879,16 +875,16 @@ mod tests {
         let index = create_query_test_index();
         let mut query = build_query("license copyright license copyright", &index).unwrap();
 
-        assert!(query.high_matchables.contains(&0));
-        assert!(query.high_matchables.contains(&1));
+        assert!(query.high_matchables.contains(0));
+        assert!(query.high_matchables.contains(1));
 
         let near_dupe_span = PositionSpan::new(0, 1);
         query.subtract(&near_dupe_span);
 
-        assert!(!query.high_matchables.contains(&0));
-        assert!(!query.high_matchables.contains(&1));
-        assert!(query.high_matchables.contains(&2));
-        assert!(query.high_matchables.contains(&3));
+        assert!(!query.high_matchables.contains(0));
+        assert!(!query.high_matchables.contains(1));
+        assert!(query.high_matchables.contains(2));
+        assert!(query.high_matchables.contains(3));
     }
 
     #[test]
@@ -899,9 +895,9 @@ mod tests {
         let whole_run = query.whole_query_run();
         let before_subtraction = whole_run.high_matchables();
         assert_eq!(before_subtraction.len(), 3);
-        assert!(before_subtraction.contains(&0));
-        assert!(before_subtraction.contains(&1));
-        assert!(before_subtraction.contains(&2));
+        assert!(before_subtraction.contains(0));
+        assert!(before_subtraction.contains(1));
+        assert!(before_subtraction.contains(2));
 
         query.subtract(&PositionSpan::new(0, 1));
 
@@ -911,8 +907,8 @@ mod tests {
         let live_run = query.query_runs().into_iter().next().unwrap();
         let live_matchables = live_run.high_matchables();
         assert_eq!(live_matchables.len(), 1);
-        assert!(live_matchables.contains(&2));
-        assert!(!live_matchables.contains(&0));
-        assert!(!live_matchables.contains(&1));
+        assert!(live_matchables.contains(2));
+        assert!(!live_matchables.contains(0));
+        assert!(!live_matchables.contains(1));
     }
 }

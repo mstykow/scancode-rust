@@ -4,7 +4,8 @@ use crate::license_detection::index::LicenseIndex;
 use crate::license_detection::index::dictionary::TokenId;
 use crate::license_detection::models::LicenseMatch;
 use crate::license_detection::query::QueryRun;
-use std::collections::{HashMap, HashSet};
+use bit_set::BitSet;
+use std::collections::HashMap;
 
 use super::{Candidate, MATCH_SEQ};
 
@@ -39,7 +40,7 @@ pub(super) fn find_longest_match(
     rule_hi: usize,
     high_postings: &HashMap<TokenId, Vec<usize>>,
     len_legalese: usize,
-    matchables: &HashSet<usize>,
+    matchables: &BitSet,
 ) -> (usize, usize, usize) {
     let mut best_i = query_lo;
     let mut best_j = rule_lo;
@@ -52,7 +53,7 @@ pub(super) fn find_longest_match(
         let cur_a = query_tokens[i];
 
         if cur_a.as_usize() < len_legalese
-            && matchables.contains(&i)
+            && matchables.contains(i)
             && let Some(positions) = high_postings.get(&cur_a)
         {
             for &j in positions {
@@ -85,7 +86,7 @@ pub(super) fn find_longest_match(
         while best_i > query_lo
             && best_j > rule_lo
             && query_tokens[best_i - 1] == rule_tokens[best_j - 1]
-            && matchables.contains(&(best_i - 1))
+            && matchables.contains(best_i - 1)
         {
             best_i -= 1;
             best_j -= 1;
@@ -95,7 +96,7 @@ pub(super) fn find_longest_match(
         while best_i + best_size < query_hi
             && best_j + best_size < rule_hi
             && query_tokens[best_i + best_size] == rule_tokens[best_j + best_size]
-            && matchables.contains(&(best_i + best_size))
+            && matchables.contains(best_i + best_size)
         {
             best_size += 1;
         }
@@ -131,7 +132,7 @@ pub(super) fn match_blocks(
     query_end: usize,
     high_postings: &HashMap<TokenId, Vec<usize>>,
     len_legalese: usize,
-    matchables: &HashSet<usize>,
+    matchables: &BitSet,
 ) -> Vec<(usize, usize, usize)> {
     if query_tokens.is_empty() || rule_tokens.is_empty() {
         return Vec::new();
@@ -235,7 +236,7 @@ pub fn seq_match_with_candidates(
             let qbegin = 0usize;
             let qfinish = query_tokens.len().saturating_sub(1);
 
-            let matchables: HashSet<usize> = query_run
+            let matchables: BitSet = query_run
                 .matchables(true)
                 .into_iter()
                 .map(|pos| pos - query_run.start)
@@ -244,7 +245,7 @@ pub fn seq_match_with_candidates(
             let mut qstart = qbegin;
 
             while qstart <= qfinish {
-                let has_remaining_matchables = matchables.iter().any(|&pos| pos >= qstart);
+                let has_remaining_matchables = matchables.iter().any(|pos| pos >= qstart);
                 if !has_remaining_matchables {
                     break;
                 }
@@ -366,7 +367,7 @@ mod tests {
         high_postings.insert(tid(2), vec![2]);
         high_postings.insert(tid(3), vec![3]);
 
-        let matchables: HashSet<usize> = (0..query_tokens.len()).collect();
+        let matchables: BitSet = (0..query_tokens.len()).collect();
 
         let result = find_longest_match(
             &query_tokens,
@@ -393,7 +394,7 @@ mod tests {
         high_postings.insert(tid(2), vec![2]);
         high_postings.insert(tid(3), vec![3]);
 
-        let matchables: HashSet<usize> = (0..query_tokens.len()).collect();
+        let matchables: BitSet = (0..query_tokens.len()).collect();
 
         let result = find_longest_match(
             &query_tokens,
@@ -426,7 +427,7 @@ mod tests {
         high_postings.insert(tid(0), vec![0]);
         high_postings.insert(tid(2), vec![2]);
 
-        let matchables: HashSet<usize> = (0..query_tokens.len()).collect();
+        let matchables: BitSet = (0..query_tokens.len()).collect();
 
         let result = find_longest_match(
             &query_tokens,
@@ -452,7 +453,7 @@ mod tests {
         let rule_tokens = tids(&[0, 1, 2]);
         let high_postings: HashMap<TokenId, Vec<usize>> = HashMap::new();
 
-        let matchables: HashSet<usize> = (0..query_tokens.len()).collect();
+        let matchables: BitSet = (0..query_tokens.len()).collect();
 
         let result = find_longest_match(
             &query_tokens,
@@ -482,7 +483,7 @@ mod tests {
         high_postings.insert(tid(1), vec![1]);
         high_postings.insert(tid(2), vec![2]);
 
-        let matchables: HashSet<usize> = (0..query_tokens.len()).collect();
+        let matchables: BitSet = (0..query_tokens.len()).collect();
 
         let result = find_longest_match(
             &query_tokens,
@@ -512,7 +513,7 @@ mod tests {
         high_postings.insert(tid(1), vec![1]);
         high_postings.insert(tid(2), vec![2]);
 
-        let matchables: HashSet<usize> = [0, 2].into_iter().collect();
+        let matchables: BitSet = [0, 2].into_iter().collect();
 
         let result = find_longest_match(
             &query_tokens,
@@ -542,7 +543,7 @@ mod tests {
         high_postings.insert(tid(2), vec![2]);
         high_postings.insert(tid(3), vec![3]);
 
-        let matchables: HashSet<usize> = (0..query_tokens.len()).collect();
+        let matchables: BitSet = (0..query_tokens.len()).collect();
 
         let blocks = match_blocks(
             &query_tokens,
@@ -567,7 +568,7 @@ mod tests {
             high_postings.entry(tid).or_default().push(i);
         }
 
-        let matchables: HashSet<usize> = (0..query_tokens.len()).collect();
+        let matchables: BitSet = (0..query_tokens.len()).collect();
 
         let blocks = match_blocks(
             &query_tokens,
@@ -593,7 +594,7 @@ mod tests {
         let rule_tokens = tids(&[0, 1, 2]);
         let high_postings: HashMap<TokenId, Vec<usize>> = HashMap::new();
 
-        let matchables: HashSet<usize> = (0..query_tokens.len()).collect();
+        let matchables: BitSet = (0..query_tokens.len()).collect();
 
         let blocks = match_blocks(
             &query_tokens,
@@ -613,7 +614,7 @@ mod tests {
         let query_tokens = tids(&[]);
         let rule_tokens = tids(&[0, 1, 2]);
         let high_postings: HashMap<TokenId, Vec<usize>> = HashMap::new();
-        let matchables: HashSet<usize> = HashSet::new();
+        let matchables: BitSet = BitSet::new();
 
         let blocks = match_blocks(
             &query_tokens,
@@ -638,7 +639,7 @@ mod tests {
         high_postings.insert(tid(2), vec![2]);
         high_postings.insert(tid(3), vec![3]);
 
-        let matchables: HashSet<usize> = (0..query_tokens.len()).collect();
+        let matchables: BitSet = (0..query_tokens.len()).collect();
 
         let blocks = match_blocks(
             &query_tokens,
@@ -662,7 +663,7 @@ mod tests {
         let query_tokens = tids(&[0, 1, 2]);
         let rule_tokens = tids(&[]);
         let high_postings: HashMap<TokenId, Vec<usize>> = HashMap::new();
-        let matchables: HashSet<usize> = (0..query_tokens.len()).collect();
+        let matchables: BitSet = (0..query_tokens.len()).collect();
 
         let blocks = match_blocks(
             &query_tokens,
@@ -687,7 +688,7 @@ mod tests {
         high_postings.insert(tid(2), vec![2]);
         high_postings.insert(tid(3), vec![3]);
 
-        let matchables: HashSet<usize> = (0..query_tokens.len()).collect();
+        let matchables: BitSet = (0..query_tokens.len()).collect();
 
         let blocks = match_blocks(
             &query_tokens,
@@ -715,7 +716,7 @@ mod tests {
         high_postings.insert(tid(1), vec![1]);
         high_postings.insert(tid(2), vec![2]);
 
-        let matchables: HashSet<usize> = (0..query_tokens.len()).collect();
+        let matchables: BitSet = (0..query_tokens.len()).collect();
 
         let blocks = match_blocks(
             &query_tokens,
@@ -756,7 +757,7 @@ mod tests {
         high_postings.insert(tid(1), vec![1]);
         high_postings.insert(tid(2), vec![2]);
 
-        let matchables: HashSet<usize> = (0..query_tokens.len()).collect();
+        let matchables: BitSet = (0..query_tokens.len()).collect();
 
         let blocks = match_blocks(
             &query_tokens,
@@ -784,7 +785,7 @@ mod tests {
         high_postings.insert(tid(1), vec![1]);
         high_postings.insert(tid(2), vec![2]);
 
-        let matchables: HashSet<usize> = [0, 1, 2].into_iter().collect();
+        let matchables: BitSet = [0, 1, 2].into_iter().collect();
 
         let blocks = match_blocks(
             &query_tokens,
