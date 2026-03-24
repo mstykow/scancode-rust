@@ -4,6 +4,7 @@ use crate::license_detection::index::LicenseIndex;
 use crate::license_detection::index::dictionary::{KnownToken, QueryToken, TokenId, TokenKind};
 use crate::license_detection::tokenize::tokenize_as_ids;
 use bit_set::BitSet;
+use std::cell::OnceCell;
 use std::collections::{HashMap, HashSet};
 
 /// A span representing a range of token positions.
@@ -596,6 +597,8 @@ pub struct QueryRun<'a> {
     whole_query_snapshot: Option<WholeQueryRunSnapshot<'a>>,
     pub start: usize,
     pub end: Option<usize>,
+    cached_high_matchables: OnceCell<BitSet>,
+    cached_low_matchables: OnceCell<BitSet>,
 }
 
 impl<'a> QueryRun<'a> {
@@ -613,6 +616,8 @@ impl<'a> QueryRun<'a> {
             whole_query_snapshot: None,
             start,
             end,
+            cached_high_matchables: OnceCell::new(),
+            cached_low_matchables: OnceCell::new(),
         }
     }
 
@@ -634,6 +639,8 @@ impl<'a> QueryRun<'a> {
             }),
             start: 0,
             end,
+            cached_high_matchables: OnceCell::new(),
+            cached_low_matchables: OnceCell::new(),
         }
     }
 
@@ -799,19 +806,33 @@ impl<'a> QueryRun<'a> {
     }
 
     pub fn high_matchables(&self) -> BitSet {
-        let live_span = PositionSpan::new(self.start, self.end.unwrap_or(usize::MAX));
-        self.source_high_matchables()
-            .iter()
-            .filter(|&pos| live_span.contains(pos))
-            .collect()
+        self.cached_high_matchables
+            .get_or_init(|| {
+                let start = self.start;
+                let end = self.end;
+                let source = self.source_high_matchables();
+                let live_span = PositionSpan::new(start, end.unwrap_or(usize::MAX));
+                source
+                    .iter()
+                    .filter(|&pos| live_span.contains(pos))
+                    .collect()
+            })
+            .clone()
     }
 
     pub fn low_matchables(&self) -> BitSet {
-        let live_span = PositionSpan::new(self.start, self.end.unwrap_or(usize::MAX));
-        self.source_low_matchables()
-            .iter()
-            .filter(|&pos| live_span.contains(pos))
-            .collect()
+        self.cached_low_matchables
+            .get_or_init(|| {
+                let start = self.start;
+                let end = self.end;
+                let source = self.source_low_matchables();
+                let live_span = PositionSpan::new(start, end.unwrap_or(usize::MAX));
+                source
+                    .iter()
+                    .filter(|&pos| live_span.contains(pos))
+                    .collect()
+            })
+            .clone()
     }
 }
 
