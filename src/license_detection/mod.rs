@@ -111,7 +111,7 @@ fn is_redundant_same_expression_seq_container(
         return false;
     }
 
-    let container_qspan_set: HashSet<usize> = container.qspan().into_iter().collect();
+    let container_qspan_set: BitSet = container.qspan_bitset();
 
     let mut contained: Vec<(&LicenseMatch, Vec<usize>)> = candidate_contained_matches
         .iter()
@@ -143,21 +143,17 @@ fn is_redundant_same_expression_seq_container(
 
     contained.sort_by_key(|(m, _)| m.qspan_bounds());
 
-    let mut child_union = HashSet::new();
+    let mut child_union = BitSet::new();
     for (_, qspan) in &contained {
-        child_union.extend(qspan.iter().copied());
+        for &pos in qspan {
+            child_union.insert(pos);
+        }
     }
 
-    let container_only_positions: HashSet<usize> = container_qspan_set
-        .difference(&child_union)
-        .copied()
-        .collect();
-    let child_only_positions: HashSet<usize> = child_union
-        .difference(&container_qspan_set)
-        .copied()
-        .collect();
+    let container_only_positions: BitSet = container_qspan_set.difference(&child_union).collect();
+    let child_only_positions: BitSet = child_union.difference(&container_qspan_set).collect();
 
-    let mut bridge_positions = HashSet::new();
+    let mut bridge_positions = BitSet::new();
     for pair in contained.windows(2) {
         let (_, previous_end) = pair[0].0.qspan_bounds();
         let (next_start, _) = pair[1].0.qspan_bounds();
@@ -166,7 +162,9 @@ fn is_redundant_same_expression_seq_container(
             return false;
         }
 
-        bridge_positions.extend(previous_end..next_start);
+        for pos in previous_end..next_start {
+            bridge_positions.insert(pos);
+        }
     }
 
     let container_only_boundary_positions = container_only_positions
@@ -197,10 +195,10 @@ fn is_redundant_same_expression_seq_container(
 
         let is_one_sided_boundary = container_only_positions
             .iter()
-            .all(|pos| *pos < earliest_child)
+            .all(|pos| pos < earliest_child)
             || container_only_positions
                 .iter()
-                .all(|pos| *pos > latest_child);
+                .all(|pos| pos > latest_child);
 
         if is_one_sided_boundary {
             return false;
@@ -236,7 +234,7 @@ fn is_redundant_low_coverage_composite_seq_wrapper(
         return false;
     }
 
-    let container_qspan_set: HashSet<usize> = container.qspan().into_iter().collect();
+    let container_qspan_set: BitSet = container.qspan_bitset();
 
     let children: Vec<(&LicenseMatch, Vec<usize>)> = candidate_contained_matches
         .iter()
@@ -266,28 +264,26 @@ fn is_redundant_low_coverage_composite_seq_wrapper(
         return false;
     }
 
-    let mut child_union = HashSet::new();
+    let mut child_union = BitSet::new();
     for (_, qspan) in &children {
-        child_union.extend(qspan.iter().copied());
+        for &pos in qspan {
+            child_union.insert(pos);
+        }
     }
 
-    let container_only_positions: HashSet<usize> = container_qspan_set
-        .difference(&child_union)
-        .copied()
-        .collect();
-    let child_only_positions: HashSet<usize> = child_union
-        .difference(&container_qspan_set)
-        .copied()
-        .collect();
+    let container_only_positions: BitSet = container_qspan_set.difference(&child_union).collect();
+    let child_only_positions: BitSet = child_union.difference(&container_qspan_set).collect();
 
     let mut sorted_children = children;
     sorted_children.sort_by_key(|(m, _)| m.qspan_bounds());
 
-    let mut bridge_positions = HashSet::new();
+    let mut bridge_positions = BitSet::new();
     for pair in sorted_children.windows(2) {
         let (_, previous_end) = pair[0].0.qspan_bounds();
         let (next_start, _) = pair[1].0.qspan_bounds();
-        bridge_positions.extend(previous_end..next_start);
+        for pos in previous_end..next_start {
+            bridge_positions.insert(pos);
+        }
     }
 
     let container_only_boundary_positions = container_only_positions
