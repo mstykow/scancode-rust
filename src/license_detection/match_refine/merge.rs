@@ -3,10 +3,9 @@
 //! This module contains functions for merging overlapping and adjacent matches,
 //! updating match scores, and filtering license references.
 
-use std::collections::HashSet;
-
 use crate::license_detection::models::LicenseMatch;
 use crate::license_detection::query::Query;
+use crate::license_detection::sorted_vec::{merge_sorted_dedup, sorted_eq};
 
 const MAX_DIST: usize = 50;
 
@@ -19,21 +18,23 @@ fn combine_matches(a: &LicenseMatch, b: &LicenseMatch) -> LicenseMatch {
 
     let mut merged = a.clone();
 
-    let mut qspan: HashSet<usize> = a.qspan().into_iter().collect();
-    qspan.extend(b.qspan());
-    let mut qspan_vec: Vec<usize> = qspan.into_iter().collect();
-    qspan_vec.sort();
+    let mut qspan_a = a.qspan();
+    let mut qspan_b = b.qspan();
+    qspan_a.sort_unstable();
+    qspan_b.sort_unstable();
+    let qspan_vec = merge_sorted_dedup(&qspan_a, &qspan_b);
 
-    let mut ispan: HashSet<usize> = a.ispan().into_iter().collect();
-    ispan.extend(b.ispan());
-    let mut ispan_vec: Vec<usize> = ispan.into_iter().collect();
-    ispan_vec.sort();
+    let mut ispan_a = a.ispan();
+    let mut ispan_b = b.ispan();
+    ispan_a.sort_unstable();
+    ispan_b.sort_unstable();
+    let ispan_vec = merge_sorted_dedup(&ispan_a, &ispan_b);
 
-    let a_hispan: HashSet<usize> = a.hispan().into_iter().collect();
-    let b_hispan: HashSet<usize> = b.hispan().into_iter().collect();
-    let combined_hispan: HashSet<usize> = a_hispan.union(&b_hispan).copied().collect();
-    let mut hispan_vec: Vec<usize> = combined_hispan.into_iter().collect();
-    hispan_vec.sort();
+    let mut hispan_a = a.hispan();
+    let mut hispan_b = b.hispan();
+    hispan_a.sort_unstable();
+    hispan_b.sort_unstable();
+    let hispan_vec = merge_sorted_dedup(&hispan_a, &hispan_b);
     let hilen = hispan_vec.len();
 
     merged.start_token = *qspan_vec.first().unwrap_or(&a.start_token);
@@ -127,12 +128,17 @@ pub fn merge_overlapping_matches(matches: &[LicenseMatch]) -> Vec<LicenseMatch> 
                     break;
                 }
 
-                let current_qspan: HashSet<usize> = current.qspan().into_iter().collect();
-                let next_qspan: HashSet<usize> = next.qspan().into_iter().collect();
-                let current_ispan: HashSet<usize> = current.ispan().into_iter().collect();
-                let next_ispan: HashSet<usize> = next.ispan().into_iter().collect();
+                let mut current_qspan = current.qspan();
+                let mut next_qspan = next.qspan();
+                let mut current_ispan = current.ispan();
+                let mut next_ispan = next.ispan();
+                current_qspan.sort_unstable();
+                next_qspan.sort_unstable();
+                current_ispan.sort_unstable();
+                next_ispan.sort_unstable();
 
-                if current_qspan == next_qspan && current_ispan == next_ispan {
+                if sorted_eq(&current_qspan, &next_qspan) && sorted_eq(&current_ispan, &next_ispan)
+                {
                     rule_matches.remove(j);
                     continue;
                 }
