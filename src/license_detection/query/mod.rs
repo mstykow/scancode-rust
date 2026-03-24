@@ -4,7 +4,7 @@ use crate::license_detection::index::LicenseIndex;
 use crate::license_detection::index::dictionary::{KnownToken, QueryToken, TokenId, TokenKind};
 use crate::license_detection::tokenize::tokenize_as_ids;
 use bit_set::BitSet;
-use std::cell::OnceCell;
+use std::cell::{OnceCell, RefCell};
 use std::collections::{HashMap, HashSet};
 
 /// A span representing a range of token positions.
@@ -599,6 +599,7 @@ pub struct QueryRun<'a> {
     pub end: Option<usize>,
     cached_high_matchables: OnceCell<BitSet>,
     cached_low_matchables: OnceCell<BitSet>,
+    combined_matchables: RefCell<Option<BitSet>>,
 }
 
 impl<'a> QueryRun<'a> {
@@ -618,6 +619,7 @@ impl<'a> QueryRun<'a> {
             end,
             cached_high_matchables: OnceCell::new(),
             cached_low_matchables: OnceCell::new(),
+            combined_matchables: RefCell::new(None),
         }
     }
 
@@ -641,6 +643,7 @@ impl<'a> QueryRun<'a> {
             end,
             cached_high_matchables: OnceCell::new(),
             cached_low_matchables: OnceCell::new(),
+            combined_matchables: RefCell::new(None),
         }
     }
 
@@ -779,9 +782,15 @@ impl<'a> QueryRun<'a> {
 
     pub fn matchables(&self, include_low: bool) -> BitSet {
         if include_low {
-            self.low_matchables()
+            if let Some(ref cached) = *self.combined_matchables.borrow() {
+                return cached.clone();
+            }
+            let combined: BitSet = self
+                .low_matchables()
                 .union(&self.high_matchables())
-                .collect()
+                .collect();
+            *self.combined_matchables.borrow_mut() = Some(combined.clone());
+            combined
         } else {
             self.high_matchables()
         }
