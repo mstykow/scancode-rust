@@ -31,10 +31,6 @@ impl PositionSpan {
         self.start <= pos && pos <= self.end
     }
 
-    pub fn positions(&self) -> BitSet {
-        (self.start..=self.end).collect()
-    }
-
     pub fn iter(&self) -> impl Iterator<Item = usize> + '_ {
         self.start..=self.end
     }

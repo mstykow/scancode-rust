@@ -297,7 +297,9 @@ fn subtract_spdx_match_qspans(
             continue;
         };
 
-        aho_extra_matchables.union_with(&span.positions());
+        for pos in span.iter() {
+            aho_extra_matchables.insert(pos);
+        }
         query.subtract(&span);
 
         if (m.match_coverage * 100.0).round() / 100.0 == 100.0 {
