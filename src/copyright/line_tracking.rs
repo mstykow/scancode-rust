@@ -17,8 +17,20 @@ impl<'a> PreparedLineCache<'a> {
         self.raw_lines.len()
     }
 
+    pub(super) fn is_empty(&self) -> bool {
+        self.raw_lines.is_empty()
+    }
+
+    pub(super) fn len(&self) -> usize {
+        self.raw_lines.len()
+    }
+
     pub(super) fn get(&mut self, line_number: usize) -> Option<&str> {
         let idx = line_number.checked_sub(1)?;
+        self.get_by_index(idx)
+    }
+
+    pub(super) fn get_by_index(&mut self, idx: usize) -> Option<&str> {
         if idx >= self.raw_lines.len() {
             return None;
         }
@@ -27,6 +39,18 @@ impl<'a> PreparedLineCache<'a> {
             self.prepared[idx] = Some(prepare_text_line(raw));
         }
         self.prepared[idx].as_deref()
+    }
+
+    pub(super) fn contains_ci(&self, pattern: &str) -> bool {
+        let pattern_bytes = pattern.as_bytes();
+        if pattern_bytes.is_empty() {
+            return true;
+        }
+        self.raw_lines.iter().any(|line| {
+            line.as_bytes()
+                .windows(pattern_bytes.len())
+                .any(|w| w.eq_ignore_ascii_case(pattern_bytes))
+        })
     }
 }
 
