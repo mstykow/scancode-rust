@@ -228,11 +228,7 @@ pub struct Cli {
 
 fn default_processes() -> i32 {
     let cpus = std::thread::available_parallelism().map_or(1, |n| n.get());
-    if cpus > 1 {
-        (cpus - 1) as i32
-    } else {
-        1
-    }
+    if cpus > 1 { (cpus - 1) as i32 } else { 1 }
 }
 
 #[derive(Debug, Clone)]

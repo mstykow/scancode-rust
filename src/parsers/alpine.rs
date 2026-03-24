@@ -1176,9 +1176,7 @@ p:so:libtest.so.1
 
     #[test]
     fn test_parse_apkbuild_icu_reference() {
-        let path = PathBuf::from(
-            "reference/scancode-toolkit/tests/packagedcode/data/alpine/apkbuild/alpine14/main/icu/APKBUILD",
-        );
+        let path = PathBuf::from("testdata/alpine-fixtures/apkbuild/alpine14/main/icu/APKBUILD");
         let pkg = AlpineApkbuildParser::extract_first_package(&path);
 
         assert_eq!(pkg.datasource_id, Some(DatasourceId::AlpineApkbuild));
@@ -1226,7 +1224,7 @@ p:so:libtest.so.1
     #[test]
     fn test_parse_apkbuild_custom_multiple_license_uses_raw_matched_text() {
         let path = PathBuf::from(
-            "reference/scancode-toolkit/tests/packagedcode/data/alpine/apkbuild/alpine13/main/linux-firmware/APKBUILD",
+            "testdata/alpine-fixtures/apkbuild/alpine13/main/linux-firmware/APKBUILD",
         );
         let pkg = AlpineApkbuildParser::extract_first_package(&path);
 
@@ -1250,9 +1248,7 @@ p:so:libtest.so.1
 
     #[test]
     fn test_parse_alpine_no_files_package_still_detected() {
-        let path = PathBuf::from(
-            "reference/scancode-toolkit/tests/packagedcode/data/alpine/full-installed/installed",
-        );
+        let path = PathBuf::from("testdata/alpine-fixtures/full-installed/installed");
         let content = std::fs::read_to_string(&path).expect("read installed db fixture");
         let packages = parse_alpine_installed_db(&content);
         let libc_utils = packages

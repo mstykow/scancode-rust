@@ -1032,7 +1032,7 @@ Test package description.
     #[test]
     fn test_extract_metadata_requires_dist_from_anonapi_wheel() {
         let path = PathBuf::from(
-            "reference/scancode-toolkit/tests/packagedcode/data/pypi/unpacked_wheel/metadata-2.1/with_sources/anonapi-0.0.19.dist-info/METADATA",
+            "testdata/python/golden/metadata-fixtures/unpacked_wheel/metadata-2.1/with_sources/anonapi-0.0.19.dist-info/METADATA",
         );
         let package_data = PythonParser::extract_first_package(&path);
 
@@ -1050,7 +1050,7 @@ Test package description.
     #[test]
     fn test_extract_pkg_info_recovers_anonapi_sdist_requires_txt_dependency() {
         let path = PathBuf::from(
-            "reference/scancode-toolkit/tests/packagedcode/data/pypi/unpacked_sdist/metadata-1.2/anonapi-0.0.19/PKG-INFO",
+            "testdata/python/golden/metadata-fixtures/unpacked_sdist/metadata-1.2/anonapi-0.0.19/PKG-INFO",
         );
         let package_data = PythonParser::extract_first_package(&path);
 
@@ -1065,7 +1065,7 @@ Test package description.
     #[test]
     fn test_extract_metadata_requires_dist_jinja2_extras() {
         let path = PathBuf::from(
-            "reference/scancode-toolkit/tests/packagedcode/data/pypi/unpacked_wheel/metadata-2.0/Jinja2-2.10.dist-info/METADATA",
+            "testdata/python/golden/metadata-fixtures/unpacked_wheel/metadata-2.0/Jinja2-2.10.dist-info/METADATA",
         );
         let package_data = PythonParser::extract_first_package(&path);
 
@@ -1091,7 +1091,7 @@ Test package description.
     #[test]
     fn test_extract_metadata_requires_dist_urllib3_markers() {
         let path = PathBuf::from(
-            "reference/scancode-toolkit/tests/packagedcode/data/pypi/unpacked_wheel/metadata-2.0/urllib3-1.26.4.dist-info/METADATA",
+            "testdata/python/golden/metadata-fixtures/unpacked_wheel/metadata-2.0/urllib3-1.26.4.dist-info/METADATA",
         );
         let package_data = PythonParser::extract_first_package(&path);
 
@@ -1135,9 +1135,7 @@ Test package description.
 
     #[test]
     fn test_extract_pkg_info_requires_dist_extras() {
-        let path = PathBuf::from(
-            "reference/scancode-toolkit/tests/packagedcode/data/pypi/metadata/v20/PKG-INFO",
-        );
+        let path = PathBuf::from("testdata/python/golden/metadata-fixtures/metadata/v20/PKG-INFO");
         let package_data = PythonParser::extract_first_package(&path);
 
         let srv_dep = package_data

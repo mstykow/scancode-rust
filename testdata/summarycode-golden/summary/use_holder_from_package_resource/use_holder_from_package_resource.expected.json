@@ -1,0 +1,422 @@
+{
+  "summary": {
+    "declared_license_expression": "apache-2.0",
+    "license_clarity_score": {
+      "score": 0,
+      "declared_license": false,
+      "identification_precision": false,
+      "has_license_text": false,
+      "declared_copyrights": true,
+      "conflicting_license_categories": false,
+      "ambiguous_compound_licensing": true
+    },
+    "declared_holder": "Google, Fraunhofer FKIE",
+    "primary_language": "Python",
+    "other_license_expressions": [
+      {
+        "value": null,
+        "count": 1
+      }
+    ],
+    "other_holders": [
+      {
+        "value": "Example Corporation",
+        "count": 1
+      }
+    ],
+    "other_languages": []
+  },
+  "packages": [
+    {
+      "type": "pypi",
+      "namespace": null,
+      "name": "atheris",
+      "version": null,
+      "qualifiers": {},
+      "subpath": null,
+      "primary_language": "Python",
+      "description": "A coverage-guided fuzzer for Python and Python extensions.",
+      "release_date": null,
+      "parties": [
+        {
+          "type": "person",
+          "role": "author",
+          "name": "Bitshift",
+          "email": "atheris@google.com",
+          "url": null
+        }
+      ],
+      "keywords": [],
+      "homepage_url": "https://github.com/google/atheris/",
+      "download_url": null,
+      "size": null,
+      "sha1": null,
+      "md5": null,
+      "sha256": null,
+      "sha512": null,
+      "bug_tracking_url": null,
+      "code_view_url": null,
+      "vcs_url": null,
+      "copyright": null,
+      "holder": null,
+      "declared_license_expression": "apache-2.0",
+      "declared_license_expression_spdx": "Apache-2.0",
+      "license_detections": [
+        {
+          "license_expression": "apache-2.0",
+          "license_expression_spdx": "Apache-2.0",
+          "matches": [
+            {
+              "license_expression": "apache-2.0",
+              "license_expression_spdx": "Apache-2.0",
+              "from_file": "codebase/setup.py",
+              "start_line": 4,
+              "end_line": 14,
+              "matcher": "2-aho",
+              "score": 100.0,
+              "matched_length": 85,
+              "match_coverage": 100.0,
+              "rule_relevance": 100,
+              "rule_identifier": "apache-2.0_7.RULE",
+              "rule_url": "https://github.com/nexB/scancode-toolkit/tree/develop/src/licensedcode/data/rules/apache-2.0_7.RULE"
+            }
+          ],
+          "identifier": "apache_2_0-c4e30bcd-ccfd-bbc3-d2f1-196ab911e47d"
+        }
+      ],
+      "other_license_expression": null,
+      "other_license_expression_spdx": null,
+      "other_license_detections": [],
+      "extracted_license_statement": null,
+      "notice_text": null,
+      "source_packages": [],
+      "is_private": false,
+      "is_virtual": false,
+      "extra_data": {},
+      "repository_homepage_url": "https://pypi.org/project/atheris",
+      "repository_download_url": null,
+      "api_data_url": "https://pypi.org/pypi/atheris/json",
+      "package_uid": "pkg:pypi/atheris?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "datafile_paths": [
+        "codebase/setup.py"
+      ],
+      "datasource_ids": [
+        "pypi_setup_py"
+      ],
+      "purl": "pkg:pypi/atheris"
+    }
+  ],
+  "dependencies": [
+    {
+      "purl": "pkg:pypi/pybind11",
+      "extracted_requirement": ">=2.5.0",
+      "scope": "setup",
+      "is_runtime": true,
+      "is_optional": false,
+      "is_pinned": false,
+      "is_direct": true,
+      "resolved_package": {},
+      "extra_data": {},
+      "dependency_uid": "pkg:pypi/pybind11?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "for_package_uid": "pkg:pypi/atheris?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "datafile_path": "codebase/setup.py",
+      "datasource_id": "pypi_setup_py"
+    }
+  ],
+  "license_detections": [
+    {
+      "identifier": "apache_2_0-c4e30bcd-ccfd-bbc3-d2f1-196ab911e47d",
+      "license_expression": "apache-2.0",
+      "license_expression_spdx": "Apache-2.0",
+      "detection_count": 2,
+      "reference_matches": [
+        {
+          "license_expression": "apache-2.0",
+          "license_expression_spdx": "Apache-2.0",
+          "from_file": "codebase/setup.py",
+          "start_line": 4,
+          "end_line": 14,
+          "matcher": "2-aho",
+          "score": 100.0,
+          "matched_length": 85,
+          "match_coverage": 100.0,
+          "rule_relevance": 100,
+          "rule_identifier": "apache-2.0_7.RULE",
+          "rule_url": "https://github.com/nexB/scancode-toolkit/tree/develop/src/licensedcode/data/rules/apache-2.0_7.RULE"
+        }
+      ]
+    }
+  ],
+  "files": [
+    {
+      "path": "codebase",
+      "type": "directory",
+      "name": "codebase",
+      "base_name": "codebase",
+      "extension": "",
+      "size": 0,
+      "sha1": null,
+      "md5": null,
+      "sha256": null,
+      "sha1_git": null,
+      "mime_type": null,
+      "file_type": null,
+      "programming_language": null,
+      "is_binary": false,
+      "is_text": false,
+      "is_archive": false,
+      "is_media": false,
+      "is_source": false,
+      "is_script": false,
+      "is_legal": false,
+      "is_manifest": false,
+      "is_readme": false,
+      "is_top_level": true,
+      "is_key_file": false,
+      "is_community": false,
+      "package_data": [],
+      "for_packages": [],
+      "detected_license_expression": null,
+      "detected_license_expression_spdx": null,
+      "license_detections": [],
+      "license_clues": [],
+      "percentage_of_license_text": 0,
+      "copyrights": [],
+      "holders": [],
+      "authors": [],
+      "files_count": 2,
+      "dirs_count": 0,
+      "size_count": 1215,
+      "scan_errors": []
+    },
+    {
+      "path": "codebase/README.txt",
+      "type": "file",
+      "name": "README.txt",
+      "base_name": "README",
+      "extension": ".txt",
+      "size": 33,
+      "sha1": "49c764d8447393378fcd13c8ab69c807a3ce67e9",
+      "md5": "d5a15a5aab582d924dddd5a87a5fdca1",
+      "sha256": "44bbf9c92da0a4ae21795690dc8b9ae553f57b5b3d7a9d6ce794869a7e0542c3",
+      "sha1_git": "f9a8e97d116925a7ab46f67bc7d455d05edcce88",
+      "mime_type": "text/plain",
+      "file_type": "ASCII text, with no line terminators",
+      "programming_language": null,
+      "is_binary": false,
+      "is_text": true,
+      "is_archive": false,
+      "is_media": false,
+      "is_source": false,
+      "is_script": false,
+      "is_legal": false,
+      "is_manifest": false,
+      "is_readme": true,
+      "is_top_level": true,
+      "is_key_file": true,
+      "is_community": false,
+      "package_data": [],
+      "for_packages": [
+        "pkg:pypi/atheris?uuid=fixed-uid-done-for-testing-5642512d1758"
+      ],
+      "detected_license_expression": null,
+      "detected_license_expression_spdx": null,
+      "license_detections": [],
+      "license_clues": [],
+      "percentage_of_license_text": 0,
+      "copyrights": [
+        {
+          "copyright": "Copyright (c) Example Corporation",
+          "start_line": 1,
+          "end_line": 1
+        }
+      ],
+      "holders": [
+        {
+          "holder": "Example Corporation",
+          "start_line": 1,
+          "end_line": 1
+        }
+      ],
+      "authors": [],
+      "files_count": 0,
+      "dirs_count": 0,
+      "size_count": 0,
+      "scan_errors": []
+    },
+    {
+      "path": "codebase/setup.py",
+      "type": "file",
+      "name": "setup.py",
+      "base_name": "setup",
+      "extension": ".py",
+      "size": 1182,
+      "sha1": "ca26ea89aab5d6ac910fe4e092cd7c8857e62322",
+      "md5": "2761f0e079fcd2b07af5088c4712f8f0",
+      "sha256": "a047b71004e6b070d174d260b95dca5930a6ce51948e66afec25692c157408c5",
+      "sha1_git": "18da29d15e3841a44c17c47711535f8dcc08661d",
+      "mime_type": "text/plain",
+      "file_type": "ASCII text",
+      "programming_language": "Python",
+      "is_binary": false,
+      "is_text": true,
+      "is_archive": false,
+      "is_media": false,
+      "is_source": true,
+      "is_script": false,
+      "is_legal": false,
+      "is_manifest": false,
+      "is_readme": false,
+      "is_top_level": false,
+      "is_key_file": false,
+      "is_community": false,
+      "package_data": [
+        {
+          "type": "pypi",
+          "namespace": null,
+          "name": "atheris",
+          "version": null,
+          "qualifiers": {},
+          "subpath": null,
+          "primary_language": "Python",
+          "description": "A coverage-guided fuzzer for Python and Python extensions.",
+          "release_date": null,
+          "parties": [
+            {
+              "type": "person",
+              "role": "author",
+              "name": "Bitshift",
+              "email": "atheris@google.com",
+              "url": null
+            }
+          ],
+          "keywords": [],
+          "homepage_url": "https://github.com/google/atheris/",
+          "download_url": null,
+          "size": null,
+          "sha1": null,
+          "md5": null,
+          "sha256": null,
+          "sha512": null,
+          "bug_tracking_url": null,
+          "code_view_url": null,
+          "vcs_url": null,
+          "copyright": null,
+          "holder": null,
+          "declared_license_expression": "apache-2.0",
+          "declared_license_expression_spdx": "Apache-2.0",
+          "license_detections": [
+            {
+              "license_expression": "apache-2.0",
+              "license_expression_spdx": "Apache-2.0",
+              "matches": [
+                {
+                  "license_expression": "apache-2.0",
+                  "license_expression_spdx": "Apache-2.0",
+                  "from_file": "codebase/setup.py",
+                  "start_line": 4,
+                  "end_line": 14,
+                  "matcher": "2-aho",
+                  "score": 100.0,
+                  "matched_length": 85,
+                  "match_coverage": 100.0,
+                  "rule_relevance": 100,
+                  "rule_identifier": "apache-2.0_7.RULE",
+                  "rule_url": "https://github.com/nexB/scancode-toolkit/tree/develop/src/licensedcode/data/rules/apache-2.0_7.RULE"
+                }
+              ],
+              "identifier": "apache_2_0-c4e30bcd-ccfd-bbc3-d2f1-196ab911e47d"
+            }
+          ],
+          "other_license_expression": null,
+          "other_license_expression_spdx": null,
+          "other_license_detections": [],
+          "extracted_license_statement": null,
+          "notice_text": null,
+          "source_packages": [],
+          "file_references": [],
+          "is_private": false,
+          "is_virtual": false,
+          "extra_data": {},
+          "dependencies": [
+            {
+              "purl": "pkg:pypi/pybind11",
+              "extracted_requirement": ">=2.5.0",
+              "scope": "setup",
+              "is_runtime": true,
+              "is_optional": false,
+              "is_pinned": false,
+              "is_direct": true,
+              "resolved_package": {},
+              "extra_data": {}
+            }
+          ],
+          "repository_homepage_url": "https://pypi.org/project/atheris",
+          "repository_download_url": null,
+          "api_data_url": "https://pypi.org/pypi/atheris/json",
+          "datasource_id": "pypi_setup_py",
+          "purl": "pkg:pypi/atheris"
+        }
+      ],
+      "for_packages": [
+        "pkg:pypi/atheris?uuid=fixed-uid-done-for-testing-5642512d1758"
+      ],
+      "detected_license_expression": "apache-2.0",
+      "detected_license_expression_spdx": "Apache-2.0",
+      "license_detections": [
+        {
+          "license_expression": "apache-2.0",
+          "license_expression_spdx": "Apache-2.0",
+          "matches": [
+            {
+              "license_expression": "apache-2.0",
+              "license_expression_spdx": "Apache-2.0",
+              "from_file": "codebase/setup.py",
+              "start_line": 4,
+              "end_line": 14,
+              "matcher": "2-aho",
+              "score": 100.0,
+              "matched_length": 85,
+              "match_coverage": 100.0,
+              "rule_relevance": 100,
+              "rule_identifier": "apache-2.0_7.RULE",
+              "rule_url": "https://github.com/nexB/scancode-toolkit/tree/develop/src/licensedcode/data/rules/apache-2.0_7.RULE"
+            }
+          ],
+          "identifier": "apache_2_0-c4e30bcd-ccfd-bbc3-d2f1-196ab911e47d"
+        }
+      ],
+      "license_clues": [],
+      "percentage_of_license_text": 53.12,
+      "copyrights": [
+        {
+          "copyright": "Copyright 2020 Google LLC",
+          "start_line": 1,
+          "end_line": 1
+        },
+        {
+          "copyright": "Copyright 2021 Fraunhofer FKIE",
+          "start_line": 2,
+          "end_line": 2
+        }
+      ],
+      "holders": [
+        {
+          "holder": "Google LLC",
+          "start_line": 1,
+          "end_line": 1
+        },
+        {
+          "holder": "Fraunhofer FKIE",
+          "start_line": 2,
+          "end_line": 2
+        }
+      ],
+      "authors": [],
+      "files_count": 0,
+      "dirs_count": 0,
+      "size_count": 0,
+      "scan_errors": []
+    }
+  ]
+}

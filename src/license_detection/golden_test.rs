@@ -5,7 +5,8 @@
 //!
 //! ## Test Data
 //!
-//! Test data is copied from `reference/scancode-toolkit/tests/licensedcode/data/datadriven/`:
+//! Test data in `testdata/license-golden/` was originally copied from the
+//! ScanCode datadriven fixture corpus:
 //! - `lic1/` - ~291 test cases
 //! - `lic2/` - ~340 test cases  
 //! - `lic3/` - ~292 test cases

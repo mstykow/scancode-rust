@@ -3117,7 +3117,7 @@ License: LGPL-2.1
     #[test]
     fn test_parse_copyright_primary_license_detection_from_bsdutils_fixture() {
         let path = PathBuf::from(
-            "reference/scancode-toolkit/tests/packagedcode/data/debian/copyright/debian-slim-2021-04-07/usr/share/doc/bsdutils/copyright",
+            "testdata/debian-fixtures/debian-slim-2021-04-07/usr/share/doc/bsdutils/copyright",
         );
         let pkg = DebianCopyrightParser::extract_first_package(&path);
 
@@ -3179,7 +3179,7 @@ License: LGPL-2.1
     #[test]
     fn test_parse_copyright_detects_bottom_standalone_license_paragraph() {
         let path = PathBuf::from(
-            "reference/scancode-toolkit/tests/packagedcode/data/debian/copyright/debian-2019-11-15/main/c/clamav/stable_copyright",
+            "testdata/debian-fixtures/debian-2019-11-15/main/c/clamav/stable_copyright",
         );
         let pkg = DebianCopyrightParser::extract_first_package(&path);
 
@@ -3205,9 +3205,8 @@ License: LGPL-2.1
 
     #[test]
     fn test_parse_copyright_uses_header_paragraph_as_primary_when_files_star_is_blank() {
-        let path = PathBuf::from(
-            "reference/scancode-toolkit/tests/packagedcode/data/debian/copyright/crafted_for_tests/test_license_nameless",
-        );
+        let path =
+            PathBuf::from("testdata/debian-fixtures/crafted_for_tests/test_license_nameless");
         let pkg = DebianCopyrightParser::extract_first_package(&path);
 
         assert_eq!(pkg.license_detections.len(), 1);

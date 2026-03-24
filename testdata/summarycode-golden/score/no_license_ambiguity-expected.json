@@ -1,0 +1,1105 @@
+{
+  "summary": {
+    "declared_license_expression": "mit OR apache-2.0",
+    "license_clarity_score": {
+      "score": 100,
+      "declared_license": true,
+      "identification_precision": true,
+      "has_license_text": true,
+      "declared_copyrights": true,
+      "conflicting_license_categories": false,
+      "ambiguous_compound_licensing": false
+    }
+  },
+  "packages": [
+    {
+      "type": "cargo",
+      "namespace": null,
+      "name": "rand",
+      "version": "0.8.5",
+      "qualifiers": {},
+      "subpath": null,
+      "primary_language": "Rust",
+      "description": "Random number generators and other randomness functionality.",
+      "release_date": null,
+      "parties": [
+        {
+          "type": "person",
+          "role": "author",
+          "name": "The Rand Project Developers",
+          "email": null,
+          "url": null
+        },
+        {
+          "type": "person",
+          "role": "author",
+          "name": "The Rust Project Developers",
+          "email": null,
+          "url": null
+        }
+      ],
+      "keywords": [
+        "random",
+        "rng",
+        "algorithms",
+        "no-std"
+      ],
+      "homepage_url": "https://rust-random.github.io/book",
+      "download_url": null,
+      "size": null,
+      "sha1": null,
+      "md5": null,
+      "sha256": null,
+      "sha512": null,
+      "bug_tracking_url": null,
+      "code_view_url": null,
+      "vcs_url": "https://github.com/rust-random/rand",
+      "copyright": null,
+      "holder": null,
+      "declared_license_expression": "mit OR apache-2.0",
+      "declared_license_expression_spdx": "MIT OR Apache-2.0",
+      "license_detections": [
+        {
+          "license_expression": "mit OR apache-2.0",
+          "license_expression_spdx": "MIT OR Apache-2.0",
+          "matches": [
+            {
+              "license_expression": "mit OR apache-2.0",
+              "license_expression_spdx": "MIT OR Apache-2.0",
+              "from_file": "no_license_ambiguity/Cargo.toml",
+              "start_line": 1,
+              "end_line": 1,
+              "matcher": "1-hash",
+              "score": 100.0,
+              "matched_length": 5,
+              "match_coverage": 100.0,
+              "rule_relevance": 100,
+              "rule_identifier": "mit_or_apache-2.0_15.RULE",
+              "rule_url": "https://github.com/nexB/scancode-toolkit/tree/develop/src/licensedcode/data/rules/mit_or_apache-2.0_15.RULE",
+              "matched_text": "MIT OR Apache-2.0"
+            }
+          ],
+          "identifier": "mit_or_apache_2_0-480eec53-1a80-0150-7c7e-39cf79c9f3a8"
+        }
+      ],
+      "other_license_expression": null,
+      "other_license_expression_spdx": null,
+      "other_license_detections": [],
+      "extracted_license_statement": "MIT OR Apache-2.0",
+      "notice_text": null,
+      "source_packages": [],
+      "is_private": false,
+      "is_virtual": false,
+      "extra_data": {
+        "workspace": {
+          "members": [
+            "rand_core",
+            "rand_distr",
+            "rand_chacha",
+            "rand_pcg"
+          ]
+        },
+        "documentation_url": "https://docs.rs/rand",
+        "rust_edition": "2018"
+      },
+      "repository_homepage_url": "https://crates.io/crates/rand",
+      "repository_download_url": "https://crates.io/api/v1/crates/rand/0.8.5/download",
+      "api_data_url": "https://crates.io/api/v1/crates/rand",
+      "package_uid": "pkg:cargo/rand@0.8.5?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "datafile_paths": [
+        "no_license_ambiguity/Cargo.toml"
+      ],
+      "datasource_ids": [
+        "cargo_toml"
+      ],
+      "purl": "pkg:cargo/rand@0.8.5"
+    }
+  ],
+  "dependencies": [
+    {
+      "purl": "pkg:cargo/rand_core",
+      "extracted_requirement": "0.6.0",
+      "scope": "dependencies",
+      "is_runtime": true,
+      "is_optional": false,
+      "is_pinned": false,
+      "is_direct": true,
+      "resolved_package": {},
+      "extra_data": {
+        "path": "rand_core",
+        "version": "0.6.0"
+      },
+      "dependency_uid": "pkg:cargo/rand_core?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "for_package_uid": "pkg:cargo/rand@0.8.5?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "datafile_path": "no_license_ambiguity/Cargo.toml",
+      "datasource_id": "cargo_toml"
+    },
+    {
+      "purl": "pkg:cargo/log",
+      "extracted_requirement": "0.4.4",
+      "scope": "dependencies",
+      "is_runtime": true,
+      "is_optional": true,
+      "is_pinned": false,
+      "is_direct": true,
+      "resolved_package": {},
+      "extra_data": {
+        "version": "0.4.4"
+      },
+      "dependency_uid": "pkg:cargo/log?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "for_package_uid": "pkg:cargo/rand@0.8.5?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "datafile_path": "no_license_ambiguity/Cargo.toml",
+      "datasource_id": "cargo_toml"
+    },
+    {
+      "purl": "pkg:cargo/serde",
+      "extracted_requirement": "1.0.103",
+      "scope": "dependencies",
+      "is_runtime": true,
+      "is_optional": true,
+      "is_pinned": false,
+      "is_direct": true,
+      "resolved_package": {},
+      "extra_data": {
+        "version": "1.0.103",
+        "features": [
+          "derive"
+        ]
+      },
+      "dependency_uid": "pkg:cargo/serde?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "for_package_uid": "pkg:cargo/rand@0.8.5?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "datafile_path": "no_license_ambiguity/Cargo.toml",
+      "datasource_id": "cargo_toml"
+    },
+    {
+      "purl": "pkg:cargo/rand_chacha",
+      "extracted_requirement": "0.3.0",
+      "scope": "dependencies",
+      "is_runtime": true,
+      "is_optional": true,
+      "is_pinned": false,
+      "is_direct": true,
+      "resolved_package": {},
+      "extra_data": {
+        "path": "rand_chacha",
+        "version": "0.3.0",
+        "default-features": false
+      },
+      "dependency_uid": "pkg:cargo/rand_chacha?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "for_package_uid": "pkg:cargo/rand@0.8.5?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "datafile_path": "no_license_ambiguity/Cargo.toml",
+      "datasource_id": "cargo_toml"
+    },
+    {
+      "purl": "pkg:cargo/packed_simd",
+      "extracted_requirement": "0.3.7",
+      "scope": "dependencies",
+      "is_runtime": true,
+      "is_optional": true,
+      "is_pinned": false,
+      "is_direct": true,
+      "resolved_package": {},
+      "extra_data": {
+        "package": "packed_simd_2",
+        "version": "0.3.7",
+        "features": [
+          "into_bits"
+        ]
+      },
+      "dependency_uid": "pkg:cargo/packed_simd?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "for_package_uid": "pkg:cargo/rand@0.8.5?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "datafile_path": "no_license_ambiguity/Cargo.toml",
+      "datasource_id": "cargo_toml"
+    },
+    {
+      "purl": "pkg:cargo/rand_pcg",
+      "extracted_requirement": "0.3.0",
+      "scope": "dev-dependencies",
+      "is_runtime": false,
+      "is_optional": false,
+      "is_pinned": false,
+      "is_direct": true,
+      "resolved_package": {},
+      "extra_data": {
+        "path": "rand_pcg",
+        "version": "0.3.0"
+      },
+      "dependency_uid": "pkg:cargo/rand_pcg?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "for_package_uid": "pkg:cargo/rand@0.8.5?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "datafile_path": "no_license_ambiguity/Cargo.toml",
+      "datasource_id": "cargo_toml"
+    },
+    {
+      "purl": "pkg:cargo/bincode",
+      "extracted_requirement": "1.2.1",
+      "scope": "dev-dependencies",
+      "is_runtime": false,
+      "is_optional": false,
+      "is_pinned": false,
+      "is_direct": true,
+      "resolved_package": {},
+      "extra_data": {},
+      "dependency_uid": "pkg:cargo/bincode?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "for_package_uid": "pkg:cargo/rand@0.8.5?uuid=fixed-uid-done-for-testing-5642512d1758",
+      "datafile_path": "no_license_ambiguity/Cargo.toml",
+      "datasource_id": "cargo_toml"
+    }
+  ],
+  "license_detections": [
+    {
+      "identifier": "apache_2_0-e3938c59-cc73-037c-3372-e20c26c25f48",
+      "license_expression": "apache-2.0",
+      "license_expression_spdx": "Apache-2.0",
+      "detection_count": 1,
+      "reference_matches": [
+        {
+          "license_expression": "apache-2.0",
+          "license_expression_spdx": "Apache-2.0",
+          "from_file": "no_license_ambiguity/LICENSE-APACHE",
+          "start_line": 1,
+          "end_line": 176,
+          "matcher": "1-hash",
+          "score": 100.0,
+          "matched_length": 1410,
+          "match_coverage": 100.0,
+          "rule_relevance": 100,
+          "rule_identifier": "apache-2.0_875.RULE",
+          "rule_url": "https://github.com/nexB/scancode-toolkit/tree/develop/src/licensedcode/data/rules/apache-2.0_875.RULE"
+        }
+      ]
+    },
+    {
+      "identifier": "mit-cacd5c0c-204a-85c2-affc-e4c125b2492a",
+      "license_expression": "mit",
+      "license_expression_spdx": "MIT",
+      "detection_count": 1,
+      "reference_matches": [
+        {
+          "license_expression": "mit",
+          "license_expression_spdx": "MIT",
+          "from_file": "no_license_ambiguity/LICENSE-MIT",
+          "start_line": 4,
+          "end_line": 26,
+          "matcher": "2-aho",
+          "score": 100.0,
+          "matched_length": 161,
+          "match_coverage": 100.0,
+          "rule_relevance": 100,
+          "rule_identifier": "mit.LICENSE",
+          "rule_url": "https://github.com/nexB/scancode-toolkit/tree/develop/src/licensedcode/data/licenses/mit.LICENSE"
+        }
+      ]
+    },
+    {
+      "identifier": "mit_or_apache_2_0-480eec53-1a80-0150-7c7e-39cf79c9f3a8",
+      "license_expression": "mit OR apache-2.0",
+      "license_expression_spdx": "MIT OR Apache-2.0",
+      "detection_count": 1,
+      "reference_matches": [
+        {
+          "license_expression": "mit OR apache-2.0",
+          "license_expression_spdx": "MIT OR Apache-2.0",
+          "from_file": "no_license_ambiguity/Cargo.toml",
+          "start_line": 1,
+          "end_line": 1,
+          "matcher": "1-hash",
+          "score": 100.0,
+          "matched_length": 5,
+          "match_coverage": 100.0,
+          "rule_relevance": 100,
+          "rule_identifier": "mit_or_apache-2.0_15.RULE",
+          "rule_url": "https://github.com/nexB/scancode-toolkit/tree/develop/src/licensedcode/data/rules/mit_or_apache-2.0_15.RULE"
+        }
+      ]
+    },
+    {
+      "identifier": "mit_or_apache_2_0-719f8427-422e-8023-c20e-9f8dd0af13b9",
+      "license_expression": "mit OR apache-2.0",
+      "license_expression_spdx": "MIT OR Apache-2.0",
+      "detection_count": 1,
+      "reference_matches": [
+        {
+          "license_expression": "mit OR apache-2.0",
+          "license_expression_spdx": "MIT OR Apache-2.0",
+          "from_file": "no_license_ambiguity/Cargo.toml",
+          "start_line": 5,
+          "end_line": 5,
+          "matcher": "2-aho",
+          "score": 100.0,
+          "matched_length": 6,
+          "match_coverage": 100.0,
+          "rule_relevance": 100,
+          "rule_identifier": "mit_or_apache-2.0_14.RULE",
+          "rule_url": "https://github.com/nexB/scancode-toolkit/tree/develop/src/licensedcode/data/rules/mit_or_apache-2.0_14.RULE"
+        }
+      ]
+    },
+    {
+      "identifier": "mit_or_apache_2_0-a43a1e15-1968-4de7-fe27-2129ebf57d54",
+      "license_expression": "mit OR apache-2.0",
+      "license_expression_spdx": "MIT OR Apache-2.0",
+      "detection_count": 1,
+      "reference_matches": [
+        {
+          "license_expression": "mit OR apache-2.0",
+          "license_expression_spdx": "MIT OR Apache-2.0",
+          "from_file": "no_license_ambiguity/COPYRIGHT",
+          "start_line": 1,
+          "end_line": 12,
+          "matcher": "3-seq",
+          "score": 97.78,
+          "matched_length": 88,
+          "match_coverage": 100.0,
+          "rule_relevance": 100,
+          "rule_identifier": "mit_or_apache-2.0_38.RULE",
+          "rule_url": "https://github.com/nexB/scancode-toolkit/tree/develop/src/licensedcode/data/rules/mit_or_apache-2.0_38.RULE"
+        }
+      ]
+    },
+    {
+      "identifier": "mit_or_apache_2_0-d9d84ae7-113e-249f-5302-6054bdbcdadb",
+      "license_expression": "mit OR apache-2.0",
+      "license_expression_spdx": "MIT OR Apache-2.0",
+      "detection_count": 1,
+      "reference_matches": [
+        {
+          "license_expression": "mit OR apache-2.0",
+          "license_expression_spdx": "MIT OR Apache-2.0",
+          "from_file": "no_license_ambiguity/README.md",
+          "start_line": 152,
+          "end_line": 158,
+          "matcher": "3-seq",
+          "score": 97.06,
+          "matched_length": 33,
+          "match_coverage": 100.0,
+          "rule_relevance": 100,
+          "rule_identifier": "mit_or_apache-2.0_33.RULE",
+          "rule_url": "https://github.com/nexB/scancode-toolkit/tree/develop/src/licensedcode/data/rules/mit_or_apache-2.0_33.RULE"
+        }
+      ]
+    }
+  ],
+  "files": [
+    {
+      "path": "no_license_ambiguity",
+      "type": "directory",
+      "name": "no_license_ambiguity",
+      "base_name": "no_license_ambiguity",
+      "extension": "",
+      "size": 0,
+      "sha1": null,
+      "md5": null,
+      "sha256": null,
+      "sha1_git": null,
+      "mime_type": null,
+      "file_type": null,
+      "programming_language": null,
+      "is_binary": false,
+      "is_text": false,
+      "is_archive": false,
+      "is_media": false,
+      "is_source": false,
+      "is_script": false,
+      "is_legal": false,
+      "is_manifest": false,
+      "is_readme": false,
+      "is_top_level": true,
+      "is_key_file": false,
+      "is_community": false,
+      "package_data": [],
+      "for_packages": [],
+      "detected_license_expression": null,
+      "detected_license_expression_spdx": null,
+      "license_detections": [],
+      "license_clues": [],
+      "percentage_of_license_text": 0,
+      "copyrights": [],
+      "holders": [],
+      "authors": [],
+      "files_count": 8,
+      "dirs_count": 0,
+      "size_count": 49781,
+      "scan_errors": []
+    },
+    {
+      "path": "no_license_ambiguity/CHANGELOG.md",
+      "type": "file",
+      "name": "CHANGELOG.md",
+      "base_name": "CHANGELOG",
+      "extension": ".md",
+      "size": 24563,
+      "sha1": "75dd1de7e3572b2480378f4a47d99d4140f405a0",
+      "md5": "e9d08921db4b1c78b3ea9d6d7f8bcd82",
+      "sha256": "76b505678de234d2eef751593feec6d9debb76c20d45564a9f23c9e9783dbc63",
+      "sha1_git": "b0872af6d398436da28f2f8a9fa053d4d8fe7a02",
+      "mime_type": "text/plain",
+      "file_type": "ASCII text",
+      "programming_language": null,
+      "is_binary": false,
+      "is_text": true,
+      "is_archive": false,
+      "is_media": false,
+      "is_source": false,
+      "is_script": false,
+      "is_legal": false,
+      "is_manifest": false,
+      "is_readme": false,
+      "is_top_level": true,
+      "is_key_file": false,
+      "is_community": true,
+      "package_data": [],
+      "for_packages": [],
+      "detected_license_expression": null,
+      "detected_license_expression_spdx": null,
+      "license_detections": [],
+      "license_clues": [],
+      "percentage_of_license_text": 0,
+      "copyrights": [],
+      "holders": [],
+      "authors": [],
+      "files_count": 0,
+      "dirs_count": 0,
+      "size_count": 0,
+      "scan_errors": []
+    },
+    {
+      "path": "no_license_ambiguity/COPYRIGHT",
+      "type": "file",
+      "name": "COPYRIGHT",
+      "base_name": "COPYRIGHT",
+      "extension": "",
+      "size": 569,
+      "sha1": "f14afa20edce530124d39cd56312c7781c19b267",
+      "md5": "86438b2332d07437f7ddc2fe9fe4edd2",
+      "sha256": "90eb64f0279b0d9432accfa6023ff803bc4965212383697eee27a0f426d5f8d5",
+      "sha1_git": "468d907caf99fb0cc0dcbb3c322cbb69f740ffd1",
+      "mime_type": "text/plain",
+      "file_type": "ASCII text",
+      "programming_language": "verilog",
+      "is_binary": false,
+      "is_text": true,
+      "is_archive": false,
+      "is_media": false,
+      "is_source": true,
+      "is_script": false,
+      "is_legal": true,
+      "is_manifest": false,
+      "is_readme": false,
+      "is_top_level": true,
+      "is_key_file": true,
+      "is_community": false,
+      "package_data": [],
+      "for_packages": [],
+      "detected_license_expression": "mit OR apache-2.0",
+      "detected_license_expression_spdx": "MIT OR Apache-2.0",
+      "license_detections": [
+        {
+          "license_expression": "mit OR apache-2.0",
+          "license_expression_spdx": "MIT OR Apache-2.0",
+          "matches": [
+            {
+              "license_expression": "mit OR apache-2.0",
+              "license_expression_spdx": "MIT OR Apache-2.0",
+              "from_file": "no_license_ambiguity/COPYRIGHT",
+              "start_line": 1,
+              "end_line": 12,
+              "matcher": "3-seq",
+              "score": 97.78,
+              "matched_length": 88,
+              "match_coverage": 100.0,
+              "rule_relevance": 100,
+              "rule_identifier": "mit_or_apache-2.0_38.RULE",
+              "rule_url": "https://github.com/nexB/scancode-toolkit/tree/develop/src/licensedcode/data/rules/mit_or_apache-2.0_38.RULE"
+            }
+          ],
+          "identifier": "mit_or_apache_2_0-a43a1e15-1968-4de7-fe27-2129ebf57d54"
+        }
+      ],
+      "license_clues": [],
+      "percentage_of_license_text": 97.78,
+      "copyrights": [],
+      "holders": [],
+      "authors": [],
+      "files_count": 0,
+      "dirs_count": 0,
+      "size_count": 0,
+      "scan_errors": []
+    },
+    {
+      "path": "no_license_ambiguity/Cargo.toml",
+      "type": "file",
+      "name": "Cargo.toml",
+      "base_name": "Cargo",
+      "extension": ".toml",
+      "size": 2551,
+      "sha1": "ddec880a9a8eb327d188032cb12236b7197a9db4",
+      "md5": "12bc948aef936e0dc81ef8dc269c442f",
+      "sha256": "a6138a417208be3f9a5adb3f84fb4cc4e25a8b29e3106c456e324f82a854654a",
+      "sha1_git": "98ba373c68f8be6a8a1327b61b510379f70d8c37",
+      "mime_type": "text/plain",
+      "file_type": "UTF-8 Unicode text",
+      "programming_language": null,
+      "is_binary": false,
+      "is_text": true,
+      "is_archive": false,
+      "is_media": false,
+      "is_source": false,
+      "is_script": false,
+      "is_legal": false,
+      "is_manifest": false,
+      "is_readme": false,
+      "is_top_level": false,
+      "is_key_file": false,
+      "is_community": false,
+      "package_data": [
+        {
+          "type": "cargo",
+          "namespace": null,
+          "name": "rand",
+          "version": "0.8.5",
+          "qualifiers": {},
+          "subpath": null,
+          "primary_language": "Rust",
+          "description": "Random number generators and other randomness functionality.",
+          "release_date": null,
+          "parties": [
+            {
+              "type": "person",
+              "role": "author",
+              "name": "The Rand Project Developers",
+              "email": null,
+              "url": null
+            },
+            {
+              "type": "person",
+              "role": "author",
+              "name": "The Rust Project Developers",
+              "email": null,
+              "url": null
+            }
+          ],
+          "keywords": [
+            "random",
+            "rng",
+            "algorithms",
+            "no-std"
+          ],
+          "homepage_url": "https://rust-random.github.io/book",
+          "download_url": null,
+          "size": null,
+          "sha1": null,
+          "md5": null,
+          "sha256": null,
+          "sha512": null,
+          "bug_tracking_url": null,
+          "code_view_url": null,
+          "vcs_url": "https://github.com/rust-random/rand",
+          "copyright": null,
+          "holder": null,
+          "declared_license_expression": "mit OR apache-2.0",
+          "declared_license_expression_spdx": "MIT OR Apache-2.0",
+          "license_detections": [
+            {
+              "license_expression": "mit OR apache-2.0",
+              "license_expression_spdx": "MIT OR Apache-2.0",
+              "matches": [
+                {
+                  "license_expression": "mit OR apache-2.0",
+                  "license_expression_spdx": "MIT OR Apache-2.0",
+                  "from_file": "no_license_ambiguity/Cargo.toml",
+                  "start_line": 1,
+                  "end_line": 1,
+                  "matcher": "1-hash",
+                  "score": 100.0,
+                  "matched_length": 5,
+                  "match_coverage": 100.0,
+                  "rule_relevance": 100,
+                  "rule_identifier": "mit_or_apache-2.0_15.RULE",
+                  "rule_url": "https://github.com/nexB/scancode-toolkit/tree/develop/src/licensedcode/data/rules/mit_or_apache-2.0_15.RULE",
+                  "matched_text": "MIT OR Apache-2.0"
+                }
+              ],
+              "identifier": "mit_or_apache_2_0-480eec53-1a80-0150-7c7e-39cf79c9f3a8"
+            }
+          ],
+          "other_license_expression": null,
+          "other_license_expression_spdx": null,
+          "other_license_detections": [],
+          "extracted_license_statement": "MIT OR Apache-2.0",
+          "notice_text": null,
+          "source_packages": [],
+          "file_references": [],
+          "is_private": false,
+          "is_virtual": false,
+          "extra_data": {
+            "workspace": {
+              "members": [
+                "rand_core",
+                "rand_distr",
+                "rand_chacha",
+                "rand_pcg"
+              ]
+            },
+            "documentation_url": "https://docs.rs/rand",
+            "rust_edition": "2018"
+          },
+          "dependencies": [
+            {
+              "purl": "pkg:cargo/rand_core",
+              "extracted_requirement": "0.6.0",
+              "scope": "dependencies",
+              "is_runtime": true,
+              "is_optional": false,
+              "is_pinned": false,
+              "is_direct": true,
+              "resolved_package": {},
+              "extra_data": {
+                "path": "rand_core",
+                "version": "0.6.0"
+              }
+            },
+            {
+              "purl": "pkg:cargo/log",
+              "extracted_requirement": "0.4.4",
+              "scope": "dependencies",
+              "is_runtime": true,
+              "is_optional": true,
+              "is_pinned": false,
+              "is_direct": true,
+              "resolved_package": {},
+              "extra_data": {
+                "version": "0.4.4"
+              }
+            },
+            {
+              "purl": "pkg:cargo/serde",
+              "extracted_requirement": "1.0.103",
+              "scope": "dependencies",
+              "is_runtime": true,
+              "is_optional": true,
+              "is_pinned": false,
+              "is_direct": true,
+              "resolved_package": {},
+              "extra_data": {
+                "version": "1.0.103",
+                "features": [
+                  "derive"
+                ]
+              }
+            },
+            {
+              "purl": "pkg:cargo/rand_chacha",
+              "extracted_requirement": "0.3.0",
+              "scope": "dependencies",
+              "is_runtime": true,
+              "is_optional": true,
+              "is_pinned": false,
+              "is_direct": true,
+              "resolved_package": {},
+              "extra_data": {
+                "path": "rand_chacha",
+                "version": "0.3.0",
+                "default-features": false
+              }
+            },
+            {
+              "purl": "pkg:cargo/packed_simd",
+              "extracted_requirement": "0.3.7",
+              "scope": "dependencies",
+              "is_runtime": true,
+              "is_optional": true,
+              "is_pinned": false,
+              "is_direct": true,
+              "resolved_package": {},
+              "extra_data": {
+                "package": "packed_simd_2",
+                "version": "0.3.7",
+                "features": [
+                  "into_bits"
+                ]
+              }
+            },
+            {
+              "purl": "pkg:cargo/rand_pcg",
+              "extracted_requirement": "0.3.0",
+              "scope": "dev-dependencies",
+              "is_runtime": false,
+              "is_optional": false,
+              "is_pinned": false,
+              "is_direct": true,
+              "resolved_package": {},
+              "extra_data": {
+                "path": "rand_pcg",
+                "version": "0.3.0"
+              }
+            },
+            {
+              "purl": "pkg:cargo/bincode",
+              "extracted_requirement": "1.2.1",
+              "scope": "dev-dependencies",
+              "is_runtime": false,
+              "is_optional": false,
+              "is_pinned": false,
+              "is_direct": true,
+              "resolved_package": {},
+              "extra_data": {}
+            }
+          ],
+          "repository_homepage_url": "https://crates.io/crates/rand",
+          "repository_download_url": "https://crates.io/api/v1/crates/rand/0.8.5/download",
+          "api_data_url": "https://crates.io/api/v1/crates/rand",
+          "datasource_id": "cargo_toml",
+          "purl": "pkg:cargo/rand@0.8.5"
+        }
+      ],
+      "for_packages": [
+        "pkg:cargo/rand@0.8.5?uuid=fixed-uid-done-for-testing-5642512d1758"
+      ],
+      "detected_license_expression": "mit OR apache-2.0",
+      "detected_license_expression_spdx": "MIT OR Apache-2.0",
+      "license_detections": [
+        {
+          "license_expression": "mit OR apache-2.0",
+          "license_expression_spdx": "MIT OR Apache-2.0",
+          "matches": [
+            {
+              "license_expression": "mit OR apache-2.0",
+              "license_expression_spdx": "MIT OR Apache-2.0",
+              "from_file": "no_license_ambiguity/Cargo.toml",
+              "start_line": 5,
+              "end_line": 5,
+              "matcher": "2-aho",
+              "score": 100.0,
+              "matched_length": 6,
+              "match_coverage": 100.0,
+              "rule_relevance": 100,
+              "rule_identifier": "mit_or_apache-2.0_14.RULE",
+              "rule_url": "https://github.com/nexB/scancode-toolkit/tree/develop/src/licensedcode/data/rules/mit_or_apache-2.0_14.RULE"
+            }
+          ],
+          "identifier": "mit_or_apache_2_0-719f8427-422e-8023-c20e-9f8dd0af13b9"
+        }
+      ],
+      "license_clues": [],
+      "percentage_of_license_text": 1.76,
+      "copyrights": [
+        {
+          "copyright": "COPYRIGHT package.metadata.docs.rs",
+          "start_line": 17,
+          "end_line": 19
+        }
+      ],
+      "holders": [
+        {
+          "holder": "package.metadata.docs.rs",
+          "start_line": 19,
+          "end_line": 19
+        }
+      ],
+      "authors": [
+        {
+          "author": "The Rand Project Developers The Rust Project Developers",
+          "start_line": 4,
+          "end_line": 4
+        }
+      ],
+      "files_count": 0,
+      "dirs_count": 0,
+      "size_count": 0,
+      "scan_errors": []
+    },
+    {
+      "path": "no_license_ambiguity/LICENSE-APACHE",
+      "type": "file",
+      "name": "LICENSE-APACHE",
+      "base_name": "LICENSE-APACHE",
+      "extension": "",
+      "size": 9724,
+      "sha1": "4632a631b427f005d97734ea8c6a44090fec5cd9",
+      "md5": "e7b6e9594d2e90bfdc5eac35ff6486fa",
+      "sha256": "35242e7a83f69875e6edeff02291e688c97caafe2f8902e4e19b49d3e78b4cab",
+      "sha1_git": "494ad3bfdfe44d1a2a1e20553308ba59574fb969",
+      "mime_type": "text/plain",
+      "file_type": "ASCII text",
+      "programming_language": null,
+      "is_binary": false,
+      "is_text": true,
+      "is_archive": false,
+      "is_media": false,
+      "is_source": false,
+      "is_script": false,
+      "is_legal": true,
+      "is_manifest": false,
+      "is_readme": false,
+      "is_top_level": true,
+      "is_key_file": true,
+      "is_community": false,
+      "package_data": [],
+      "for_packages": [],
+      "detected_license_expression": "apache-2.0",
+      "detected_license_expression_spdx": "Apache-2.0",
+      "license_detections": [
+        {
+          "license_expression": "apache-2.0",
+          "license_expression_spdx": "Apache-2.0",
+          "matches": [
+            {
+              "license_expression": "apache-2.0",
+              "license_expression_spdx": "Apache-2.0",
+              "from_file": "no_license_ambiguity/LICENSE-APACHE",
+              "start_line": 1,
+              "end_line": 176,
+              "matcher": "1-hash",
+              "score": 100.0,
+              "matched_length": 1410,
+              "match_coverage": 100.0,
+              "rule_relevance": 100,
+              "rule_identifier": "apache-2.0_875.RULE",
+              "rule_url": "https://github.com/nexB/scancode-toolkit/tree/develop/src/licensedcode/data/rules/apache-2.0_875.RULE"
+            }
+          ],
+          "identifier": "apache_2_0-e3938c59-cc73-037c-3372-e20c26c25f48"
+        }
+      ],
+      "license_clues": [],
+      "percentage_of_license_text": 100.0,
+      "copyrights": [],
+      "holders": [],
+      "authors": [],
+      "files_count": 0,
+      "dirs_count": 0,
+      "size_count": 0,
+      "scan_errors": []
+    },
+    {
+      "path": "no_license_ambiguity/LICENSE-MIT",
+      "type": "file",
+      "name": "LICENSE-MIT",
+      "base_name": "LICENSE-MIT",
+      "extension": "",
+      "size": 1117,
+      "sha1": "d74ad13f1402c35008f22bc588a6b8199ed164d3",
+      "md5": "08cf50287469d314ddbee33f572260a7",
+      "sha256": "209fbbe0ad52d9235e37badf9cadfe4dbdc87203179c0899e738b39ade42177b",
+      "sha1_git": "d93b5baf341d9813bb48a51f42a7e8e4af89ec52",
+      "mime_type": "text/plain",
+      "file_type": "ASCII text",
+      "programming_language": null,
+      "is_binary": false,
+      "is_text": true,
+      "is_archive": false,
+      "is_media": false,
+      "is_source": false,
+      "is_script": false,
+      "is_legal": true,
+      "is_manifest": false,
+      "is_readme": false,
+      "is_top_level": true,
+      "is_key_file": true,
+      "is_community": false,
+      "package_data": [],
+      "for_packages": [],
+      "detected_license_expression": "mit",
+      "detected_license_expression_spdx": "MIT",
+      "license_detections": [
+        {
+          "license_expression": "mit",
+          "license_expression_spdx": "MIT",
+          "matches": [
+            {
+              "license_expression": "mit",
+              "license_expression_spdx": "MIT",
+              "from_file": "no_license_ambiguity/LICENSE-MIT",
+              "start_line": 4,
+              "end_line": 26,
+              "matcher": "2-aho",
+              "score": 100.0,
+              "matched_length": 161,
+              "match_coverage": 100.0,
+              "rule_relevance": 100,
+              "rule_identifier": "mit.LICENSE",
+              "rule_url": "https://github.com/nexB/scancode-toolkit/tree/develop/src/licensedcode/data/licenses/mit.LICENSE"
+            }
+          ],
+          "identifier": "mit-cacd5c0c-204a-85c2-affc-e4c125b2492a"
+        }
+      ],
+      "license_clues": [],
+      "percentage_of_license_text": 92.0,
+      "copyrights": [
+        {
+          "copyright": "Copyright 2018 Developers of the Rand project",
+          "start_line": 1,
+          "end_line": 1
+        },
+        {
+          "copyright": "Copyright (c) 2014 The Rust Project Developers",
+          "start_line": 2,
+          "end_line": 2
+        }
+      ],
+      "holders": [
+        {
+          "holder": "Developers of the Rand project",
+          "start_line": 1,
+          "end_line": 1
+        },
+        {
+          "holder": "The Rust Project Developers",
+          "start_line": 2,
+          "end_line": 2
+        }
+      ],
+      "authors": [],
+      "files_count": 0,
+      "dirs_count": 0,
+      "size_count": 0,
+      "scan_errors": []
+    },
+    {
+      "path": "no_license_ambiguity/README.md",
+      "type": "file",
+      "name": "README.md",
+      "base_name": "README",
+      "extension": ".md",
+      "size": 7582,
+      "sha1": "d81ebab9f6c8e3233abf01734beca5419fe353ac",
+      "md5": "e73df191f1b77901adab1471b758a8bc",
+      "sha256": "ddb5a1fa9442c6cab92a3510365937e729f839c94b97e75d3f0430bf3a4dd2bd",
+      "sha1_git": "44c2e4d518ed308e2ae69aa1e888c5dc0e7c0551",
+      "mime_type": "text/plain",
+      "file_type": "UTF-8 Unicode text",
+      "programming_language": null,
+      "is_binary": false,
+      "is_text": true,
+      "is_archive": false,
+      "is_media": false,
+      "is_source": false,
+      "is_script": false,
+      "is_legal": false,
+      "is_manifest": false,
+      "is_readme": true,
+      "is_top_level": true,
+      "is_key_file": true,
+      "is_community": false,
+      "package_data": [],
+      "for_packages": [],
+      "detected_license_expression": "mit OR apache-2.0",
+      "detected_license_expression_spdx": "MIT OR Apache-2.0",
+      "license_detections": [
+        {
+          "license_expression": "mit OR apache-2.0",
+          "license_expression_spdx": "MIT OR Apache-2.0",
+          "matches": [
+            {
+              "license_expression": "mit OR apache-2.0",
+              "license_expression_spdx": "MIT OR Apache-2.0",
+              "from_file": "no_license_ambiguity/README.md",
+              "start_line": 152,
+              "end_line": 158,
+              "matcher": "3-seq",
+              "score": 97.06,
+              "matched_length": 33,
+              "match_coverage": 100.0,
+              "rule_relevance": 100,
+              "rule_identifier": "mit_or_apache-2.0_33.RULE",
+              "rule_url": "https://github.com/nexB/scancode-toolkit/tree/develop/src/licensedcode/data/rules/mit_or_apache-2.0_33.RULE"
+            }
+          ],
+          "identifier": "mit_or_apache_2_0-d9d84ae7-113e-249f-5302-6054bdbcdadb"
+        }
+      ],
+      "license_clues": [],
+      "percentage_of_license_text": 2.93,
+      "copyrights": [],
+      "holders": [],
+      "authors": [],
+      "files_count": 0,
+      "dirs_count": 0,
+      "size_count": 0,
+      "scan_errors": []
+    },
+    {
+      "path": "no_license_ambiguity/SECURITY.md",
+      "type": "file",
+      "name": "SECURITY.md",
+      "base_name": "SECURITY",
+      "extension": ".md",
+      "size": 2812,
+      "sha1": "99b2240e1aadbc88a2fa2ca65e673b9c46bea285",
+      "md5": "bd20c9d8351a8630c3d4e45afc638491",
+      "sha256": "52e7a012004e078273ede84e6cb6778d6f98c3c69078edf625f4bae08306e74d",
+      "sha1_git": "a31b4e23fd32e404cfad0ddc96560db9d596e9db",
+      "mime_type": "text/plain",
+      "file_type": "ASCII text",
+      "programming_language": null,
+      "is_binary": false,
+      "is_text": true,
+      "is_archive": false,
+      "is_media": false,
+      "is_source": false,
+      "is_script": false,
+      "is_legal": false,
+      "is_manifest": false,
+      "is_readme": false,
+      "is_top_level": true,
+      "is_key_file": false,
+      "is_community": true,
+      "package_data": [],
+      "for_packages": [],
+      "detected_license_expression": null,
+      "detected_license_expression_spdx": null,
+      "license_detections": [],
+      "license_clues": [],
+      "percentage_of_license_text": 0,
+      "copyrights": [],
+      "holders": [],
+      "authors": [],
+      "files_count": 0,
+      "dirs_count": 0,
+      "size_count": 0,
+      "scan_errors": []
+    },
+    {
+      "path": "no_license_ambiguity/rustfmt.toml",
+      "type": "file",
+      "name": "rustfmt.toml",
+      "base_name": "rustfmt",
+      "extension": ".toml",
+      "size": 863,
+      "sha1": "60527abf5f69306d1e5d5b339afdea200368e081",
+      "md5": "a0a23df0aa695c6b43ea91942ac7df1d",
+      "sha256": "a582a93dc6492d36daae52df7800e369887ba0984d68d98f70b99ca870fed268",
+      "sha1_git": "6a2d9d4821546564e1600864f929753f99461611",
+      "mime_type": "text/plain",
+      "file_type": "ASCII text",
+      "programming_language": null,
+      "is_binary": false,
+      "is_text": true,
+      "is_archive": false,
+      "is_media": false,
+      "is_source": false,
+      "is_script": false,
+      "is_legal": false,
+      "is_manifest": false,
+      "is_readme": false,
+      "is_top_level": true,
+      "is_key_file": false,
+      "is_community": false,
+      "package_data": [],
+      "for_packages": [],
+      "detected_license_expression": null,
+      "detected_license_expression_spdx": null,
+      "license_detections": [],
+      "license_clues": [],
+      "percentage_of_license_text": 0,
+      "copyrights": [],
+      "holders": [],
+      "authors": [],
+      "files_count": 0,
+      "dirs_count": 0,
+      "size_count": 0,
+      "scan_errors": []
+    }
+  ]
+}

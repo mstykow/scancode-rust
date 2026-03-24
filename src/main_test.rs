@@ -330,16 +330,14 @@ fn normalize_package_datafile_paths(packages: &mut [Package], scan_root: &Path) 
 fn compute_fixture_summary(fixture_dir: &str, include_summary: bool, include_score: bool) -> Value {
     let fixture_root = Path::new(fixture_dir);
     let progress = Arc::new(ScanProgress::new(ProgressMode::Quiet));
-    let scan_result = crate::scanner::process_with_options(
-        fixture_root,
-        0,
+    let collected = collect_paths(fixture_root, 0, &[]);
+    let scan_result = process_collected(
+        &collected,
         progress,
-        &[],
         Some(test_license_engine()),
         false,
         &TextDetectionOptions::default(),
-    )
-    .expect("fixture scan should succeed");
+    );
 
     let mut files = scan_result.files;
     normalize_paths(
@@ -429,16 +427,14 @@ fn assert_classify_fixture_matches_expected(
 ) {
     let fixture_root = Path::new(fixture_dir);
     let progress = Arc::new(ScanProgress::new(ProgressMode::Quiet));
-    let scan_result = crate::scanner::process_with_options(
-        fixture_root,
-        0,
+    let collected = collect_paths(fixture_root, 0, &[]);
+    let scan_result = process_collected(
+        &collected,
         progress,
-        &[],
         Some(test_license_engine()),
         false,
         &TextDetectionOptions::default(),
-    )
-    .expect("classify fixture scan should succeed");
+    );
 
     let mut files = scan_result.files;
     let normalize_root = if normalize_against_parent {
@@ -1205,18 +1201,16 @@ fn classify_key_files_marks_package_data_ancestry_like_with_package_data_fixture
 #[test]
 #[ignore]
 fn debug_classify_cli_fixture_top_level() {
-    let fixture_root = Path::new("reference/scancode-toolkit/tests/summarycode/data/classify/cli");
+    let fixture_root = Path::new("testdata/summarycode-golden/classify/cli");
     let progress = Arc::new(ScanProgress::new(ProgressMode::Quiet));
-    let scan_result = crate::scanner::process_with_options(
-        fixture_root,
-        0,
+    let collected = collect_paths(fixture_root, 0, &[]);
+    let scan_result = process_collected(
+        &collected,
         progress,
-        &[],
         Some(test_license_engine()),
         false,
         &TextDetectionOptions::default(),
-    )
-    .expect("classify fixture scan should succeed");
+    );
 
     let mut files = scan_result.files;
     let normalize_root = fixture_root.parent().unwrap();
@@ -1248,8 +1242,8 @@ fn debug_classify_cli_fixture_top_level() {
 #[test]
 fn active_classify_cli_fixture_matches_expected_output() {
     assert_classify_fixture_matches_expected(
-        "reference/scancode-toolkit/tests/summarycode/data/classify/cli",
-        "reference/scancode-toolkit/tests/summarycode/data/classify/cli.expected.json",
+        "testdata/summarycode-golden/classify/cli",
+        "testdata/summarycode-golden/classify/cli.expected.json",
         true,
     );
 }
@@ -1257,8 +1251,8 @@ fn active_classify_cli_fixture_matches_expected_output() {
 #[test]
 fn active_classify_with_package_data_fixture_matches_expected_output() {
     assert_classify_fixture_matches_expected(
-        "reference/scancode-toolkit/tests/summarycode/data/score/jar",
-        "reference/scancode-toolkit/tests/summarycode/data/classify/with_package_data.expected.json",
+        "testdata/summarycode-golden/score/jar",
+        "testdata/summarycode-golden/classify/with_package_data.expected.json",
         false,
     );
 }
@@ -1267,56 +1261,56 @@ fn active_classify_with_package_data_fixture_matches_expected_output() {
 fn active_summary_fixtures_match_expected_summary_blocks() {
     let fixtures = [
         (
-            "reference/scancode-toolkit/tests/summarycode/data/summary/without_package_data",
-            "reference/scancode-toolkit/tests/summarycode/data/summary/without_package_data/without_package_data.expected.json",
+            "testdata/summarycode-golden/summary/without_package_data",
+            "testdata/summarycode-golden/summary/without_package_data/without_package_data.expected.json",
         ),
         (
-            "reference/scancode-toolkit/tests/summarycode/data/summary/with_package_data",
-            "reference/scancode-toolkit/tests/summarycode/data/summary/with_package_data/with_package_data.expected.json",
+            "testdata/summarycode-golden/summary/with_package_data",
+            "testdata/summarycode-golden/summary/with_package_data/with_package_data.expected.json",
         ),
         (
-            "reference/scancode-toolkit/tests/summarycode/data/summary/use_holder_from_package_resource",
-            "reference/scancode-toolkit/tests/summarycode/data/summary/use_holder_from_package_resource/use_holder_from_package_resource.expected.json",
+            "testdata/summarycode-golden/summary/use_holder_from_package_resource",
+            "testdata/summarycode-golden/summary/use_holder_from_package_resource/use_holder_from_package_resource.expected.json",
         ),
         (
-            "reference/scancode-toolkit/tests/summarycode/data/summary/summary_without_holder",
-            "reference/scancode-toolkit/tests/summarycode/data/summary/summary_without_holder/summary-without-holder-pypi.expected.json",
+            "testdata/summarycode-golden/summary/summary_without_holder",
+            "testdata/summarycode-golden/summary/summary_without_holder/summary-without-holder-pypi.expected.json",
         ),
         (
-            "reference/scancode-toolkit/tests/summarycode/data/summary/single_file",
-            "reference/scancode-toolkit/tests/summarycode/data/summary/single_file/single_file.expected.json",
+            "testdata/summarycode-golden/summary/single_file",
+            "testdata/summarycode-golden/summary/single_file/single_file.expected.json",
         ),
         (
-            "reference/scancode-toolkit/tests/summarycode/data/summary/multiple_package_data",
-            "reference/scancode-toolkit/tests/summarycode/data/summary/multiple_package_data/multiple_package_data.expected.json",
+            "testdata/summarycode-golden/summary/multiple_package_data",
+            "testdata/summarycode-golden/summary/multiple_package_data/multiple_package_data.expected.json",
         ),
         (
-            "reference/scancode-toolkit/tests/summarycode/data/summary/license_ambiguity/unambiguous",
-            "reference/scancode-toolkit/tests/summarycode/data/summary/license_ambiguity/unambiguous.expected.json",
+            "testdata/summarycode-golden/summary/license_ambiguity/unambiguous",
+            "testdata/summarycode-golden/summary/license_ambiguity/unambiguous.expected.json",
         ),
         (
-            "reference/scancode-toolkit/tests/summarycode/data/summary/license_ambiguity/ambiguous",
-            "reference/scancode-toolkit/tests/summarycode/data/summary/license_ambiguity/ambiguous.expected.json",
+            "testdata/summarycode-golden/summary/license_ambiguity/ambiguous",
+            "testdata/summarycode-golden/summary/license_ambiguity/ambiguous.expected.json",
         ),
         (
-            "reference/scancode-toolkit/tests/summarycode/data/summary/holders/combined_holders",
-            "reference/scancode-toolkit/tests/summarycode/data/summary/holders/combined_holders.expected.json",
+            "testdata/summarycode-golden/summary/holders/combined_holders",
+            "testdata/summarycode-golden/summary/holders/combined_holders.expected.json",
         ),
         (
-            "reference/scancode-toolkit/tests/summarycode/data/summary/holders/clear_holder",
-            "reference/scancode-toolkit/tests/summarycode/data/summary/holders/clear_holder.expected.json",
+            "testdata/summarycode-golden/summary/holders/clear_holder",
+            "testdata/summarycode-golden/summary/holders/clear_holder.expected.json",
         ),
         (
-            "reference/scancode-toolkit/tests/summarycode/data/summary/conflicting_license_categories",
-            "reference/scancode-toolkit/tests/summarycode/data/summary/conflicting_license_categories/conflicting_license_categories.expected.json",
+            "testdata/summarycode-golden/summary/conflicting_license_categories",
+            "testdata/summarycode-golden/summary/conflicting_license_categories/conflicting_license_categories.expected.json",
         ),
         (
-            "reference/scancode-toolkit/tests/summarycode/data/summary/end-2-end/bug-1141",
-            "reference/scancode-toolkit/tests/summarycode/data/summary/end-2-end/bug-1141.expected.json",
+            "testdata/summarycode-golden/summary/end-2-end/bug-1141",
+            "testdata/summarycode-golden/summary/end-2-end/bug-1141.expected.json",
         ),
         (
-            "reference/scancode-toolkit/tests/summarycode/data/summary/embedded_packages/bunkerweb",
-            "reference/scancode-toolkit/tests/summarycode/data/summary/embedded_packages/bunkerweb.expected.json",
+            "testdata/summarycode-golden/summary/embedded_packages/bunkerweb",
+            "testdata/summarycode-golden/summary/embedded_packages/bunkerweb.expected.json",
         ),
     ];
 
@@ -1850,7 +1844,7 @@ fn mark_generated_files_detects_known_generated_header() {
 
 #[test]
 fn generated_hint_samples_match_scancode_expectations() {
-    let root = Path::new("reference/scancode-toolkit/tests/summarycode/data/generated");
+    let root = Path::new("testdata/summarycode-golden/generated");
     let samples = [
         (
             root.join("simple/generated_1.java"),
@@ -1902,19 +1896,17 @@ fn generated_hint_samples_match_scancode_expectations() {
 
 #[test]
 fn generated_cli_fixture_matches_expected_file_flags() {
-    let generated_root = Path::new("reference/scancode-toolkit/tests/summarycode/data/generated");
+    let generated_root = Path::new("testdata/summarycode-golden/generated");
     let fixture_root = generated_root.join("simple");
     let progress = Arc::new(ScanProgress::new(ProgressMode::Quiet));
-    let mut files = crate::scanner::process_with_options(
-        &fixture_root,
-        0,
+    let collected = collect_paths(&fixture_root, 0, &[]);
+    let mut files = process_collected(
+        &collected,
         progress,
-        &[],
         None,
         false,
         &TextDetectionOptions::default(),
     )
-    .expect("generated fixture scan should succeed")
     .files;
 
     files.push(dir("simple"));
@@ -1941,10 +1933,8 @@ fn generated_cli_fixture_matches_expected_file_flags() {
             .collect::<Vec<_>>()
     });
     let expected: Value = serde_json::from_str(
-        &fs::read_to_string(
-            "reference/scancode-toolkit/tests/summarycode/data/generated/cli.expected.json",
-        )
-        .expect("expected generated cli fixture should be readable"),
+        &fs::read_to_string("testdata/summarycode-golden/generated/cli.expected.json")
+            .expect("expected generated cli fixture should be readable"),
     )
     .expect("expected generated cli fixture should parse");
 
@@ -2219,28 +2209,28 @@ fn compute_summary_serializes_empty_declared_holder_when_none_found() {
 fn active_score_fixtures_match_expected_summary_blocks() {
     let fixtures = [
         (
-            "reference/scancode-toolkit/tests/summarycode/data/score/basic",
-            "reference/scancode-toolkit/tests/summarycode/data/score/basic-expected.json",
+            "testdata/summarycode-golden/score/basic",
+            "testdata/summarycode-golden/score/basic-expected.json",
         ),
         (
-            "reference/scancode-toolkit/tests/summarycode/data/score/no_license_text",
-            "reference/scancode-toolkit/tests/summarycode/data/score/no_license_text-expected.json",
+            "testdata/summarycode-golden/score/no_license_text",
+            "testdata/summarycode-golden/score/no_license_text-expected.json",
         ),
         (
-            "reference/scancode-toolkit/tests/summarycode/data/score/no_license_or_copyright",
-            "reference/scancode-toolkit/tests/summarycode/data/score/no_license_or_copyright-expected.json",
+            "testdata/summarycode-golden/score/no_license_or_copyright",
+            "testdata/summarycode-golden/score/no_license_or_copyright-expected.json",
         ),
         (
-            "reference/scancode-toolkit/tests/summarycode/data/score/no_license_ambiguity",
-            "reference/scancode-toolkit/tests/summarycode/data/score/no_license_ambiguity-expected.json",
+            "testdata/summarycode-golden/score/no_license_ambiguity",
+            "testdata/summarycode-golden/score/no_license_ambiguity-expected.json",
         ),
         (
-            "reference/scancode-toolkit/tests/summarycode/data/score/inconsistent_licenses_copyleft",
-            "reference/scancode-toolkit/tests/summarycode/data/score/inconsistent_licenses_copyleft-expected.json",
+            "testdata/summarycode-golden/score/inconsistent_licenses_copyleft",
+            "testdata/summarycode-golden/score/inconsistent_licenses_copyleft-expected.json",
         ),
         (
-            "reference/scancode-toolkit/tests/summarycode/data/score/jar",
-            "reference/scancode-toolkit/tests/summarycode/data/score/jar-expected.json",
+            "testdata/summarycode-golden/score/jar",
+            "testdata/summarycode-golden/score/jar-expected.json",
         ),
     ];
 
