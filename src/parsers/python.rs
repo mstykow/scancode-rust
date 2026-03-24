@@ -2078,7 +2078,7 @@ fn extract_from_pyproject_toml(path: &Path) -> PackageData {
         version,
         qualifiers: None,
         subpath: None,
-        primary_language: None,
+        primary_language: Some("Python".to_string()),
         description: None,
         release_date: None,
         parties: extract_parties(&project_table),
@@ -3107,10 +3107,8 @@ fn build_setup_py_package_data(values: &HashMap<String, Value>) -> PackageData {
         });
     }
 
-    // Extract license statement only - detection happens in separate engine
-    let declared_license_expression = None;
-    let declared_license_expression_spdx = None;
-    let license_detections = Vec::new();
+    let (declared_license_expression, declared_license_expression_spdx, license_detections) =
+        normalize_spdx_declared_license(license.as_deref());
     let extracted_license_statement = license.clone();
 
     let dependencies = build_setup_py_dependencies(values);
@@ -3143,7 +3141,7 @@ fn build_setup_py_package_data(values: &HashMap<String, Value>) -> PackageData {
         version,
         qualifiers: None,
         subpath: None,
-        primary_language: None,
+        primary_language: Some("Python".to_string()),
         description,
         release_date: None,
         parties,
@@ -3489,10 +3487,8 @@ fn extract_from_setup_py_regex(content: &str) -> PackageData {
     let version = extract_setup_value(content, "version");
     let license_expression = extract_setup_value(content, "license");
 
-    // Extract license statement only - detection happens in separate engine
-    let declared_license_expression = None;
-    let declared_license_expression_spdx = None;
-    let license_detections = Vec::new();
+    let (declared_license_expression, declared_license_expression_spdx, license_detections) =
+        normalize_spdx_declared_license(license_expression.as_deref());
     let extracted_license_statement = license_expression.clone();
 
     let dependencies = extract_setup_py_dependencies(content);
@@ -3506,7 +3502,7 @@ fn extract_from_setup_py_regex(content: &str) -> PackageData {
         version,
         qualifiers: None,
         subpath: None,
-        primary_language: None,
+        primary_language: Some("Python".to_string()),
         description: None,
         release_date: None,
         parties: Vec::new(),
@@ -4089,10 +4085,8 @@ fn extract_from_setup_cfg(path: &Path) -> PackageData {
         });
     }
 
-    // Extract license statement only - detection happens in separate engine
-    let declared_license_expression = None;
-    let declared_license_expression_spdx = None;
-    let license_detections = Vec::new();
+    let (declared_license_expression, declared_license_expression_spdx, license_detections) =
+        normalize_spdx_declared_license(license.as_deref());
     let extracted_license_statement = license.clone();
 
     let dependencies = extract_setup_cfg_dependencies(&sections);

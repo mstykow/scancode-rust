@@ -13,7 +13,9 @@ mod parse;
 mod simplify;
 
 pub use parse::parse_expression;
-pub use simplify::{combine_expressions_and, expression_to_string, licensing_contains};
+pub use simplify::{
+    combine_expressions_and, expression_to_string, licensing_contains, simplify_expression,
+};
 
 /// Error type for license expression parsing.
 #[derive(Debug, Clone, PartialEq)]
