@@ -3526,9 +3526,9 @@ fn extend_copyrights_with_authors_blocks(
         LazyLock::new(|| Regex::new(r"\s*<[^>]*>\s*").unwrap());
 
     for i in 0..prepared_cache.len().saturating_sub(2) {
-        let base_prepared = match prepared_cache.get_by_index(i) {
-            Some(p) => p.trim().to_string(),
-            None => continue,
+        let Some(base_prepared) = prepared_cache.get_by_index(i).map(|p| p.trim().to_string())
+        else {
+            continue;
         };
         if base_prepared.is_empty() {
             continue;
@@ -3541,17 +3541,21 @@ fn extend_copyrights_with_authors_blocks(
             continue;
         }
 
-        let header_prepared = match prepared_cache.get_by_index(i + 1) {
-            Some(p) => p.trim().to_string(),
-            None => continue,
+        let Some(header_prepared) = prepared_cache
+            .get_by_index(i + 1)
+            .map(|p| p.trim().to_string())
+        else {
+            continue;
         };
         if !AUTHORS_HEADER_RE.is_match(&header_prepared) {
             continue;
         }
 
-        let author_prepared = match prepared_cache.get_by_index(i + 2) {
-            Some(p) => p.trim().to_string(),
-            None => continue,
+        let Some(author_prepared) = prepared_cache
+            .get_by_index(i + 2)
+            .map(|p| p.trim().to_string())
+        else {
+            continue;
         };
         let mut author = author_prepared;
         if author.is_empty() {
@@ -4486,9 +4490,8 @@ fn merge_freebird_c_inc_urls(
         let mut url: Option<String> = None;
         let mut j = i + 1;
         while j < prepared_cache.len() {
-            let next = match prepared_cache.get_by_index(j) {
-                Some(p) => p.trim().to_string(),
-                None => break,
+            let Some(next) = prepared_cache.get_by_index(j).map(|p| p.trim().to_string()) else {
+                break;
             };
             if next.is_empty() {
                 j += 1;
@@ -4549,9 +4552,8 @@ fn merge_debugging390_best_viewed_suffix(
 
     for i in 0..prepared_cache.len().saturating_sub(1) {
         let ln = i + 1;
-        let p1 = match prepared_cache.get_by_index(i) {
-            Some(p) => p.trim().to_string(),
-            None => continue,
+        let Some(p1) = prepared_cache.get_by_index(i).map(|p| p.trim().to_string()) else {
+            continue;
         };
         let Some(cap) = IBM_RE.captures(&p1) else {
             continue;
@@ -4560,9 +4562,8 @@ fn merge_debugging390_best_viewed_suffix(
         if who.is_empty() {
             continue;
         }
-        let p2 = match prepared_cache.get_by_index(i + 1) {
-            Some(p) => p,
-            None => continue,
+        let Some(p2) = prepared_cache.get_by_index(i + 1) else {
+            continue;
         };
         if !p2.trim_start().starts_with("Best") {
             continue;
@@ -4610,16 +4611,17 @@ fn merge_fsf_gdb_notice_lines(
 
     for i in 0..prepared_cache.len().saturating_sub(1) {
         let ln = i + 1;
-        let p1 = match prepared_cache.get_by_index(i) {
-            Some(p) => p.trim().to_string(),
-            None => continue,
+        let Some(p1) = prepared_cache.get_by_index(i).map(|p| p.trim().to_string()) else {
+            continue;
         };
         if !p1.starts_with("Copyright 1998 Free Software Foundation") {
             continue;
         }
-        let p2 = match prepared_cache.get_by_index(i + 1) {
-            Some(p) => p.trim().to_string(),
-            None => continue,
+        let Some(p2) = prepared_cache
+            .get_by_index(i + 1)
+            .map(|p| p.trim().to_string())
+        else {
+            continue;
         };
         if !p2.starts_with("GDB is free software") {
             continue;
@@ -4666,16 +4668,17 @@ fn merge_axis_ethereal_suffix(
 
     for i in 0..prepared_cache.len().saturating_sub(1) {
         let ln = i + 1;
-        let p1 = match prepared_cache.get_by_index(i) {
-            Some(p) => p.trim().to_string(),
-            None => continue,
+        let Some(p1) = prepared_cache.get_by_index(i).map(|p| p.trim().to_string()) else {
+            continue;
         };
         if p1 != "Copyright 2000, Axis Communications AB" {
             continue;
         }
-        let p2 = match prepared_cache.get_by_index(i + 1) {
-            Some(p) => p.trim().to_string(),
-            None => continue,
+        let Some(p2) = prepared_cache
+            .get_by_index(i + 1)
+            .map(|p| p.trim().to_string())
+        else {
+            continue;
         };
         if !p2.starts_with("Ethereal") {
             continue;
@@ -4725,9 +4728,8 @@ fn merge_kirkwood_converted_to(
 
     for i in 0..prepared_cache.len().saturating_sub(1) {
         let ln = i + 1;
-        let p1 = match prepared_cache.get_by_index(i) {
-            Some(p) => p.trim().to_string(),
-            None => continue,
+        let Some(p1) = prepared_cache.get_by_index(i).map(|p| p.trim().to_string()) else {
+            continue;
         };
         let Some(cap) = EMBEDDED_RE.captures(&p1) else {
             continue;
@@ -4737,9 +4739,11 @@ fn merge_kirkwood_converted_to(
         if year.is_empty() || who.is_empty() {
             continue;
         }
-        let p2 = match prepared_cache.get_by_index(i + 1) {
-            Some(p) => p.trim().trim_start_matches('*').trim_start().to_string(),
-            None => continue,
+        let Some(p2) = prepared_cache
+            .get_by_index(i + 1)
+            .map(|p| p.trim().trim_start_matches('*').trim_start().to_string())
+        else {
+            continue;
         };
         if !p2.to_ascii_lowercase().starts_with("converted to") {
             continue;
@@ -4871,9 +4875,11 @@ fn extract_line_ending_copyright_then_by_holder(
 
     for idx in 0..prepared_cache.len() {
         let ln = idx + 1;
-        let prepared = match prepared_cache.get_by_index(idx) {
-            Some(p) => p.trim().to_string(),
-            None => continue,
+        let Some(prepared) = prepared_cache
+            .get_by_index(idx)
+            .map(|p| p.trim().to_string())
+        else {
+            continue;
         };
         if prepared.is_empty() {
             continue;
@@ -4892,9 +4898,9 @@ fn extract_line_ending_copyright_then_by_holder(
         let mut j = idx + 1;
         while j < prepared_cache.len() {
             let next_ln = j + 1;
-            let next_prepared = match prepared_cache.get_by_index(j) {
-                Some(p) => p.trim().to_string(),
-                None => break,
+            let Some(next_prepared) = prepared_cache.get_by_index(j).map(|p| p.trim().to_string())
+            else {
+                break;
             };
             if next_prepared.is_empty() {
                 j += 1;
@@ -5186,12 +5192,9 @@ fn extract_following_authors_holders(
     let mut i = 0;
     while i < raw_lines.len() {
         let ln = i + 1;
-        let header = match prepared_cache.get_by_index(i) {
-            Some(p) => p.trim().to_string(),
-            None => {
-                i += 1;
-                continue;
-            }
+        let Some(header) = prepared_cache.get_by_index(i).map(|p| p.trim().to_string()) else {
+            i += 1;
+            continue;
         };
         if header.is_empty() {
             i += 1;
@@ -5323,9 +5326,11 @@ fn merge_implemented_by_lines(
 
     for i in 0..prepared_cache.len().saturating_sub(1) {
         let ln = i + 1;
-        let line = match prepared_cache.get_by_index(i) {
-            Some(p) => p.trim().trim_start_matches('*').trim_start().to_string(),
-            None => continue,
+        let Some(line) = prepared_cache
+            .get_by_index(i)
+            .map(|p| p.trim().trim_start_matches('*').trim_start().to_string())
+        else {
+            continue;
         };
         let Some(cap) = COPY_RE.captures(&line) else {
             continue;
@@ -5336,9 +5341,11 @@ fn merge_implemented_by_lines(
             continue;
         }
 
-        let next = match prepared_cache.get_by_index(i + 1) {
-            Some(p) => p.trim().trim_start_matches('*').trim_start().to_string(),
-            None => continue,
+        let Some(next) = prepared_cache
+            .get_by_index(i + 1)
+            .map(|p| p.trim().trim_start_matches('*').trim_start().to_string())
+        else {
+            continue;
         };
         let Some(cap2) = IMPLEMENTED_RE.captures(&next) else {
             continue;
@@ -6864,9 +6871,11 @@ fn extract_copyright_years_by_name_then_paren_email_next_line(
 
     for idx in 0..prepared_cache.len() {
         let ln = idx + 1;
-        let prepared = match prepared_cache.get_by_index(idx) {
-            Some(p) => p.trim().to_string(),
-            None => continue,
+        let Some(prepared) = prepared_cache
+            .get_by_index(idx)
+            .map(|p| p.trim().to_string())
+        else {
+            continue;
         };
         let Some(cap) = COPY_YEARS_BY_NAME_RE.captures(&prepared) else {
             continue;
@@ -6898,9 +6907,9 @@ fn extract_copyright_years_by_name_then_paren_email_next_line(
         let mut j = idx + 1;
         while j < prepared_cache.len() {
             let next_ln = j + 1;
-            let next_trimmed = match prepared_cache.get_by_index(j) {
-                Some(p) => p.trim().to_string(),
-                None => break,
+            let Some(next_trimmed) = prepared_cache.get_by_index(j).map(|p| p.trim().to_string())
+            else {
+                break;
             };
             if next_trimmed.is_empty() {
                 j += 1;
@@ -8621,13 +8630,17 @@ fn extract_name_before_rewrited_by_copyrights(
         let ln1 = idx + 1;
         let ln2 = idx + 2;
 
-        let l1 = match prepared_cache.get_by_index(idx) {
-            Some(p) => p.trim().to_string(),
-            None => continue,
+        let Some(l1) = prepared_cache
+            .get_by_index(idx)
+            .map(|p| p.trim().to_string())
+        else {
+            continue;
         };
-        let l2 = match prepared_cache.get_by_index(idx + 1) {
-            Some(p) => p.trim().to_string(),
-            None => continue,
+        let Some(l2) = prepared_cache
+            .get_by_index(idx + 1)
+            .map(|p| p.trim().to_string())
+        else {
+            continue;
         };
         if l1.is_empty() || l2.is_empty() {
             continue;
@@ -8706,9 +8719,8 @@ fn extract_developed_at_software_copyrights(
 
     for idx in 0..prepared_cache.len() {
         let ln = idx + 1;
-        let prepared = match prepared_cache.get_by_index(idx) {
-            Some(p) => p.to_string(),
-            None => continue,
+        let Some(prepared) = prepared_cache.get_by_index(idx).map(|p| p.to_string()) else {
+            continue;
         };
         let mut candidates: Vec<(usize, String)> = vec![(ln, prepared.clone())];
         if let Some(next) = prepared_cache.get_by_index(idx + 1)
@@ -8785,9 +8797,11 @@ fn extract_confidential_proprietary_copyrights(
 
     for idx in 0..prepared_cache.len() {
         let ln = idx + 1;
-        let line = match prepared_cache.get_by_index(idx) {
-            Some(p) => p.trim().to_string(),
-            None => continue,
+        let Some(line) = prepared_cache
+            .get_by_index(idx)
+            .map(|p| p.trim().to_string())
+        else {
+            continue;
         };
         if line.is_empty() {
             continue;
@@ -8830,12 +8844,12 @@ fn extract_confidential_proprietary_copyrights(
             if year.is_empty() || tag.is_empty() {
                 continue;
             }
-            let next_clean = match prepared_cache.get_by_index(idx + 1) {
-                Some(p) => p
-                    .trim()
+            let Some(next_clean) = prepared_cache.get_by_index(idx + 1).map(|p| {
+                p.trim()
                     .trim_start_matches(|c: char| !c.is_ascii_alphanumeric())
-                    .to_string(),
-                None => continue,
+                    .to_string()
+            }) else {
+                continue;
             };
             if !next_clean.is_empty() && CONFIDENTIAL_RE.is_match(&next_clean) {
                 let cr_raw = format!("COPYRIGHT {year} {tag} {next_clean}");
@@ -8867,12 +8881,12 @@ fn extract_confidential_proprietary_copyrights(
             if year.is_empty() || base_holder.is_empty() {
                 continue;
             }
-            let next_clean = match prepared_cache.get_by_index(idx + 1) {
-                Some(p) => p
-                    .trim()
+            let Some(next_clean) = prepared_cache.get_by_index(idx + 1).map(|p| {
+                p.trim()
                     .trim_start_matches(|c: char| !c.is_ascii_alphanumeric())
-                    .to_string(),
-                None => continue,
+                    .to_string()
+            }) else {
+                continue;
             };
             if !next_clean.is_empty() && CONFIDENTIAL_RE.is_match(&next_clean) {
                 let cr_raw = format!("Copyright {year} (c), {base_holder} - {next_clean}");

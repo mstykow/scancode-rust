@@ -335,12 +335,12 @@ pub(super) fn extract_author_colon_blocks(
     let mut i = 0;
     while i < prepared_cache.len() {
         let ln = i + 1;
-        let line = match prepared_cache.get_by_index(i) {
-            Some(p) => p.trim().trim_start_matches('*').trim_start().to_string(),
-            None => {
-                i += 1;
-                continue;
-            }
+        let Some(line) = prepared_cache
+            .get_by_index(i)
+            .map(|p| p.trim().trim_start_matches('*').trim_start().to_string())
+        else {
+            i += 1;
+            continue;
         };
         if line.is_empty() {
             i += 1;
@@ -356,9 +356,11 @@ pub(super) fn extract_author_colon_blocks(
         let mut prev_idx = i;
         while prev_idx > 0 {
             prev_idx -= 1;
-            let prev = match prepared_cache.get_by_index(prev_idx) {
-                Some(p) => p.trim().to_string(),
-                None => break,
+            let Some(prev) = prepared_cache
+                .get_by_index(prev_idx)
+                .map(|p| p.trim().to_string())
+            else {
+                break;
             };
             if prev.is_empty() {
                 continue;
@@ -712,9 +714,11 @@ pub(super) fn merge_metadata_author_and_email_lines(
 
     for idx in 0..prepared_cache.len() {
         let author_ln = idx + 1;
-        let author_line = match prepared_cache.get_by_index(idx) {
-            Some(p) => p.trim().to_string(),
-            None => continue,
+        let Some(author_line) = prepared_cache
+            .get_by_index(idx)
+            .map(|p| p.trim().to_string())
+        else {
+            continue;
         };
         if author_line.is_empty() {
             continue;
@@ -732,9 +736,9 @@ pub(super) fn merge_metadata_author_and_email_lines(
 
         for j in (idx + 1)..prepared_cache.len() {
             let email_ln = j + 1;
-            let email_line = match prepared_cache.get_by_index(j) {
-                Some(p) => p.trim().to_string(),
-                None => break,
+            let Some(email_line) = prepared_cache.get_by_index(j).map(|p| p.trim().to_string())
+            else {
+                break;
             };
             if email_line.is_empty() {
                 break;
@@ -1401,9 +1405,8 @@ pub(super) fn drop_written_by_authors_preceded_by_copyright(
 
     let mut to_drop: HashSet<String> = HashSet::new();
     for i in 1..prepared_cache.len() {
-        let line = match prepared_cache.get_by_index(i) {
-            Some(p) => p.trim().to_string(),
-            None => continue,
+        let Some(line) = prepared_cache.get_by_index(i).map(|p| p.trim().to_string()) else {
+            continue;
         };
         let Some(cap) = WRITTEN_BY_RE.captures(&line) else {
             continue;
@@ -1412,9 +1415,11 @@ pub(super) fn drop_written_by_authors_preceded_by_copyright(
         if who.is_empty() {
             continue;
         }
-        let prev = match prepared_cache.get_by_index(i - 1) {
-            Some(p) => p.trim().to_string(),
-            None => continue,
+        let Some(prev) = prepared_cache
+            .get_by_index(i - 1)
+            .map(|p| p.trim().to_string())
+        else {
+            continue;
         };
         if !COPYRIGHT_HINT_RE.is_match(&prev) {
             continue;
