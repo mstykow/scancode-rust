@@ -115,6 +115,15 @@ pub struct LicenseIndex {
     /// Corresponds to Python: `self.msets_by_rid = []` (line 213)
     pub msets_by_rid: HashMap<usize, HashMap<TokenId, usize>>,
 
+    /// High-value token sets per rule for early candidate rejection.
+    ///
+    /// Maps rule IDs to sets containing only high-value (legalese) token IDs.
+    /// This is a subset of `sets_by_rid` for faster intersection computation
+    /// and early rejection of candidates that won't pass the high-token threshold.
+    ///
+    /// Precomputed during index building to avoid redundant filtering at runtime.
+    pub high_sets_by_rid: HashMap<usize, HashSet<TokenId>>,
+
     /// Inverted index of high-value token positions per rule.
     ///
     /// Maps rule IDs to a mapping from high-value token IDs to their positions
@@ -221,6 +230,7 @@ impl LicenseIndex {
                 .expect("Failed to create empty automaton"),
             sets_by_rid: HashMap::new(),
             msets_by_rid: HashMap::new(),
+            high_sets_by_rid: HashMap::new(),
             high_postings_by_rid: HashMap::new(),
             false_positive_rids: HashSet::new(),
             approx_matchable_rids: HashSet::new(),

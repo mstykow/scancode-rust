@@ -317,6 +317,7 @@ pub fn build_index(rules: Vec<Rule>, licenses: Vec<License>) -> LicenseIndex {
     let mut tids_by_rid: Vec<Vec<TokenId>> = Vec::with_capacity(rules.len());
     let mut sets_by_rid: HashMap<usize, HashSet<TokenId>> = HashMap::new();
     let mut msets_by_rid: HashMap<usize, HashMap<TokenId, usize>> = HashMap::new();
+    let mut high_sets_by_rid: HashMap<usize, HashSet<TokenId>> = HashMap::new();
     let mut high_postings_by_rid: HashMap<usize, HashMap<TokenId, Vec<usize>>> = HashMap::new();
     let mut false_positive_rids: HashSet<usize> = HashSet::new();
     let mut approx_matchable_rids: HashSet<usize> = HashSet::new();
@@ -425,6 +426,10 @@ pub fn build_index(rules: Vec<Rule>, licenses: Vec<License>) -> LicenseIndex {
         let tids_set_high = high_tids_set_subset(&tids_set, &dictionary);
         let mset_high = high_multiset_subset(&mset, &dictionary);
 
+        if !tids_set_high.is_empty() {
+            high_sets_by_rid.insert(rid, tids_set_high.clone());
+        }
+
         // Build inverted index: map high-value tokens to rules containing them
         if approx_matchable_rids.contains(&rid) {
             for &tid in &tids_set_high {
@@ -500,6 +505,7 @@ pub fn build_index(rules: Vec<Rule>, licenses: Vec<License>) -> LicenseIndex {
         unknown_automaton,
         sets_by_rid,
         msets_by_rid,
+        high_sets_by_rid,
         high_postings_by_rid,
         false_positive_rids,
         approx_matchable_rids,

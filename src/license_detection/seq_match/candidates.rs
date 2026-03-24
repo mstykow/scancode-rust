@@ -3,7 +3,7 @@
 use crate::license_detection::index::LicenseIndex;
 use crate::license_detection::index::dictionary::TokenId;
 use crate::license_detection::index::token_sets::{
-    build_set_and_mset, high_multiset_subset, high_tids_set_subset, tids_set_counter,
+    build_set_and_mset, high_multiset_subset, tids_set_counter,
 };
 use crate::license_detection::models::Rule;
 use crate::license_detection::query::QueryRun;
@@ -324,23 +324,29 @@ pub fn compute_candidates_with_msets(
         let Some(rule_set) = index.sets_by_rid.get(&rid) else {
             continue;
         };
-        let Some(_rule_mset) = index.msets_by_rid.get(&rid) else {
+        let Some(rule_high_set) = index.high_sets_by_rid.get(&rid) else {
             continue;
         };
 
-        let intersection: HashSet<TokenId> = query_set.intersection(rule_set).copied().collect();
-        if intersection.is_empty() {
+        // STEP 1: Compute HIGH intersection first (smaller sets, faster)
+        // Check size without allocation for early rejection
+        let high_intersection_size = query_high_set.intersection(rule_high_set).count();
+        if high_intersection_size < rule.min_high_matched_length_unique {
             continue;
         }
 
-        let high_set_intersection = high_tids_set_subset(&intersection, &index.dictionary);
+        // Allocate the high intersection (passed threshold check)
+        let high_set_intersection: HashSet<TokenId> = query_high_set
+            .intersection(rule_high_set)
+            .copied()
+            .collect();
         if high_set_intersection.is_empty() {
             continue;
         }
 
-        // Check high token threshold (this is separate from matched_length!)
-        let high_matched_length = tids_set_counter(&high_set_intersection);
-        if high_matched_length < rule.min_high_matched_length_unique {
+        // STEP 2: Only now compute FULL intersection (fewer candidates reach here)
+        let intersection: HashSet<TokenId> = query_set.intersection(rule_set).copied().collect();
+        if intersection.is_empty() {
             continue;
         }
 
