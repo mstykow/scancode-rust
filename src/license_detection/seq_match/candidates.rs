@@ -7,6 +7,7 @@ use crate::license_detection::index::token_sets::{
 };
 use crate::license_detection::models::Rule;
 use crate::license_detection::query::QueryRun;
+use bit_set::BitSet;
 use std::collections::{HashMap, HashSet};
 
 use super::HIGH_RESEMBLANCE_THRESHOLD;
@@ -304,11 +305,12 @@ pub fn compute_candidates_with_msets(
     }
 
     // Use inverted index to find candidate rules that share high-value tokens
-    let candidate_rids: HashSet<usize> = query_high_set
-        .iter()
-        .filter_map(|tid| index.rids_by_high_tid.get(tid))
-        .flat_map(|rids| rids.iter().copied())
-        .collect();
+    let mut candidate_rids = BitSet::new();
+    for tid in query_high_set.iter() {
+        if let Some(rids) = index.rids_by_high_tid.get(tid) {
+            candidate_rids.union_with(rids);
+        }
+    }
 
     if candidate_rids.is_empty() {
         return Vec::new();
@@ -317,7 +319,7 @@ pub fn compute_candidates_with_msets(
     let mut step1_candidates: Vec<(ScoresVector, ScoresVector, usize, Rule, HashSet<TokenId>)> =
         Vec::new();
 
-    for rid in candidate_rids {
+    for rid in candidate_rids.iter() {
         let Some(rule) = index.rules_by_rid.get(rid) else {
             continue;
         };

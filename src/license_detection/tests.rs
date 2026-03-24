@@ -360,8 +360,8 @@ fn test_engine_index_high_postings() {
 
     if !index.approx_matchable_rids.is_empty() {
         let some_approx_rid = index.approx_matchable_rids.iter().next().unwrap();
-        if index.high_postings_by_rid.contains_key(some_approx_rid) {
-            let postings = &index.high_postings_by_rid[some_approx_rid];
+        if index.high_postings_by_rid.contains_key(&some_approx_rid) {
+            let postings = &index.high_postings_by_rid[&some_approx_rid];
             assert!(!postings.is_empty(), "High postings should have entries");
         }
     }

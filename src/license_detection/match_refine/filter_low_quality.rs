@@ -397,7 +397,7 @@ pub(crate) fn filter_false_positive_matches(
 
     for m in matches {
         let rid = m.rid;
-        if index.false_positive_rids.contains(&rid) {
+        if index.false_positive_rids.contains(rid) {
             continue;
         }
 

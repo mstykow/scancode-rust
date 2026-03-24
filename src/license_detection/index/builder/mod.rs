@@ -7,6 +7,7 @@
 //! reference/scancode-toolkit/src/licensedcode/index.py (lines 381-577)
 
 use aho_corasick::AhoCorasickBuilder;
+use bit_set::BitSet;
 use std::collections::{HashMap, HashSet};
 
 use crate::license_detection::hash_match::compute_hash;
@@ -318,9 +319,9 @@ pub fn build_index(rules: Vec<Rule>, licenses: Vec<License>) -> LicenseIndex {
     let mut sets_by_rid: HashMap<usize, HashSet<TokenId>> = HashMap::new();
     let mut msets_by_rid: HashMap<usize, HashMap<TokenId, usize>> = HashMap::new();
     let mut high_postings_by_rid: HashMap<usize, HashMap<TokenId, Vec<usize>>> = HashMap::new();
-    let mut false_positive_rids: HashSet<usize> = HashSet::new();
-    let mut approx_matchable_rids: HashSet<usize> = HashSet::new();
-    let mut rids_by_high_tid: HashMap<TokenId, HashSet<usize>> = HashMap::new();
+    let mut false_positive_rids: BitSet = BitSet::new();
+    let mut approx_matchable_rids: BitSet = BitSet::new();
+    let mut rids_by_high_tid: HashMap<TokenId, BitSet> = HashMap::new();
 
     let mut rules_automaton_patterns: Vec<Vec<u8>> = Vec::with_capacity(rules.len());
     let mut pattern_id_to_rid: Vec<usize> = Vec::with_capacity(rules.len());
@@ -426,7 +427,7 @@ pub fn build_index(rules: Vec<Rule>, licenses: Vec<License>) -> LicenseIndex {
         let mset_high = high_multiset_subset(&mset, &dictionary);
 
         // Build inverted index: map high-value tokens to rules containing them
-        if approx_matchable_rids.contains(&rid) {
+        if approx_matchable_rids.contains(rid) {
             for &tid in &tids_set_high {
                 rids_by_high_tid.entry(tid).or_default().insert(rid);
             }

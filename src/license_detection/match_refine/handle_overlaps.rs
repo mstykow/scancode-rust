@@ -99,7 +99,7 @@ pub fn filter_contained_matches(
 }
 
 fn is_false_positive(m: &LicenseMatch, index: &LicenseIndex) -> bool {
-    index.false_positive_rids.contains(&m.rid)
+    index.false_positive_rids.contains(m.rid)
 }
 
 fn licensing_contains_match(current: &LicenseMatch, other: &LicenseMatch) -> bool {

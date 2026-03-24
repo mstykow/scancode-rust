@@ -92,7 +92,7 @@ pub fn split_weak_matches(
     let mut weak = Vec::new();
 
     for m in matches {
-        let is_false_positive = index.false_positive_rids.contains(&m.rid);
+        let is_false_positive = index.false_positive_rids.contains(m.rid);
         let is_weak = (!is_false_positive && m.has_unknown())
             || (m.matcher == MatcherKind::Seq && m.len() <= SMALL_RULE && m.match_coverage <= 25.0);
 

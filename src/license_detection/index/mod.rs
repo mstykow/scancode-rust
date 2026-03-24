@@ -13,6 +13,7 @@ pub use builder::{
 
 use crate::license_detection::index::dictionary::{TokenDictionary, TokenId};
 use aho_corasick::AhoCorasick;
+use bit_set::BitSet;
 use std::collections::{HashMap, HashSet};
 
 /// Type alias for Aho-Corasick automaton.
@@ -133,7 +134,7 @@ pub struct LicenseIndex {
     /// filtering to subtract spurious matches.
     ///
     /// Corresponds to Python: `self.false_positive_rids = set()` (line 230)
-    pub false_positive_rids: HashSet<usize>,
+    pub false_positive_rids: BitSet,
 
     /// Set of rule IDs that can be matched approximately.
     ///
@@ -146,7 +147,7 @@ pub struct LicenseIndex {
     ///
     /// Corresponds to Python: `self.approx_matchable_rids = set()` (line 234)
     #[allow(dead_code)]
-    pub approx_matchable_rids: HashSet<usize>,
+    pub approx_matchable_rids: BitSet,
 
     /// Mapping from ScanCode license key to License object.
     ///
@@ -193,7 +194,7 @@ pub struct LicenseIndex {
     ///
     /// Only contains entries for tokens with ID < len_legalese (high-value tokens).
     /// Rules not in approx_matchable_rids are excluded from this index.
-    pub rids_by_high_tid: HashMap<TokenId, HashSet<usize>>,
+    pub rids_by_high_tid: HashMap<TokenId, BitSet>,
 }
 
 impl LicenseIndex {}
@@ -222,8 +223,8 @@ impl LicenseIndex {
             sets_by_rid: HashMap::new(),
             msets_by_rid: HashMap::new(),
             high_postings_by_rid: HashMap::new(),
-            false_positive_rids: HashSet::new(),
-            approx_matchable_rids: HashSet::new(),
+            false_positive_rids: BitSet::new(),
+            approx_matchable_rids: BitSet::new(),
             licenses_by_key: HashMap::new(),
             pattern_id_to_rid: Vec::new(),
             rid_by_spdx_key: HashMap::new(),
