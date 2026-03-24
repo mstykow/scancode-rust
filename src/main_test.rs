@@ -400,6 +400,108 @@ fn assert_summary_fixture_matches_expected(
     }
 }
 
+fn project_classify_fields(value: &Value) -> Value {
+    let bool_or_false =
+        |file: &Value, key: &str| file.get(key).cloned().unwrap_or(Value::Bool(false));
+
+    let files = value
+        .get("files")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+
+    json!({
+        "files": files
+            .into_iter()
+            .map(|file| {
+                json!({
+                    "path": file.get("path").cloned().unwrap_or(Value::Null),
+                    "type": file.get("type").cloned().unwrap_or(Value::Null),
+                    "name": file.get("name").cloned().unwrap_or(Value::Null),
+                    "base_name": file.get("base_name").cloned().unwrap_or(Value::Null),
+                    "extension": file.get("extension").cloned().unwrap_or(Value::Null),
+                    "is_legal": bool_or_false(&file, "is_legal"),
+                    "is_manifest": bool_or_false(&file, "is_manifest"),
+                    "is_readme": bool_or_false(&file, "is_readme"),
+                    "is_top_level": bool_or_false(&file, "is_top_level"),
+                    "is_key_file": bool_or_false(&file, "is_key_file"),
+                    "is_community": bool_or_false(&file, "is_community"),
+                })
+            })
+            .collect::<Vec<_>>()
+    })
+}
+
+fn assert_classify_fixture_matches_expected(
+    fixture_dir: &str,
+    expected_file: &str,
+    normalize_against_parent: bool,
+) {
+    let fixture_root = Path::new(fixture_dir);
+    let progress = Arc::new(ScanProgress::new(ProgressMode::Quiet));
+    let scan_result = crate::scanner::process_with_options(
+        fixture_root,
+        0,
+        progress,
+        &[],
+        Some(test_license_engine()),
+        false,
+        &TextDetectionOptions::default(),
+    )
+    .expect("classify fixture scan should succeed");
+
+    let mut files = scan_result.files;
+    let normalize_root = if normalize_against_parent {
+        fixture_root.parent().expect("fixture should have parent")
+    } else {
+        fixture_root.parent().unwrap_or(fixture_root)
+    };
+    normalize_paths(
+        &mut files,
+        normalize_root
+            .to_str()
+            .expect("fixture path should be UTF-8"),
+        true,
+        false,
+    );
+
+    if normalize_against_parent {
+        let dir_name = fixture_root
+            .file_name()
+            .and_then(|name| name.to_str())
+            .expect("fixture dir should have utf-8 file name");
+        files.push(dir(dir_name));
+    } else if let Some(dir_name) = fixture_root.file_name().and_then(|name| name.to_str()) {
+        files.push(dir(dir_name));
+    }
+
+    let assembly_result = assembly::assemble(&mut files);
+    classify_key_files(&mut files, &assembly_result.packages);
+
+    let actual = project_classify_fields(&json!({ "files": files }));
+    let expected: Value = serde_json::from_str(
+        &fs::read_to_string(expected_file).expect("expected classify fixture should be readable"),
+    )
+    .expect("expected classify fixture should parse");
+    let expected = project_classify_fields(&expected);
+
+    let mut actual_normalized = actual;
+    let mut expected_normalized = expected;
+    normalize_scan_json(&mut actual_normalized, None);
+    normalize_scan_json(&mut expected_normalized, None);
+
+    if let Err(error) = compare_scan_json_values(&actual_normalized, &expected_normalized, "") {
+        panic!(
+            "Classify fixture mismatch for {} vs {}: {}\nactual={}\nexpected={}",
+            fixture_dir,
+            expected_file,
+            error,
+            serde_json::to_string_pretty(&actual_normalized).unwrap_or_default(),
+            serde_json::to_string_pretty(&expected_normalized).unwrap_or_default()
+        );
+    }
+}
+
 fn normalize_scan_json(value: &mut Value, parent_key: Option<&str>) {
     match value {
         Value::Array(values) => {
@@ -1111,6 +1213,67 @@ fn classify_key_files_marks_package_data_ancestry_like_with_package_data_fixture
 }
 
 #[test]
+#[ignore]
+fn debug_classify_cli_fixture_top_level() {
+    let fixture_root = Path::new("reference/scancode-toolkit/tests/summarycode/data/classify/cli");
+    let progress = Arc::new(ScanProgress::new(ProgressMode::Quiet));
+    let scan_result = crate::scanner::process_with_options(
+        fixture_root,
+        0,
+        progress,
+        &[],
+        Some(test_license_engine()),
+        false,
+        &TextDetectionOptions::default(),
+    )
+    .expect("classify fixture scan should succeed");
+
+    let mut files = scan_result.files;
+    let normalize_root = fixture_root.parent().unwrap();
+    normalize_paths(&mut files, normalize_root.to_str().unwrap(), true, false);
+    files.push(dir("cli"));
+
+    let roots = build_scan_roots(&files);
+    eprintln!("roots={:?}", roots);
+    let sample = Path::new("cli/not-top/composer.json");
+    eprintln!(
+        "sample rel count={} top={} strip_count={}",
+        sample.components().count(),
+        is_scan_top_level(sample, &roots),
+        sample
+            .strip_prefix(Path::new("cli"))
+            .unwrap()
+            .components()
+            .count()
+    );
+    classify_key_files(&mut files, &[]);
+    for file in &files {
+        eprintln!(
+            "{} type={:?} top={} key={}",
+            file.path, file.file_type, file.is_top_level, file.is_key_file
+        );
+    }
+}
+
+#[test]
+fn active_classify_cli_fixture_matches_expected_output() {
+    assert_classify_fixture_matches_expected(
+        "reference/scancode-toolkit/tests/summarycode/data/classify/cli",
+        "reference/scancode-toolkit/tests/summarycode/data/classify/cli.expected.json",
+        true,
+    );
+}
+
+#[test]
+fn active_classify_with_package_data_fixture_matches_expected_output() {
+    assert_classify_fixture_matches_expected(
+        "reference/scancode-toolkit/tests/summarycode/data/score/jar",
+        "reference/scancode-toolkit/tests/summarycode/data/classify/with_package_data.expected.json",
+        false,
+    );
+}
+
+#[test]
 fn compute_summary_uses_root_prefixed_top_level_key_files() {
     let mut files = vec![dir("project"), file("project/LICENSE")];
     files[1].license_expression = Some("mit".to_string());
@@ -1631,6 +1794,121 @@ fn mark_generated_files_detects_known_generated_header() {
     assert_eq!(files[0].is_generated, Some(false));
     assert_eq!(files[1].is_generated, Some(true));
     assert_eq!(files[2].is_generated, Some(false));
+}
+
+#[test]
+fn generated_hint_samples_match_scancode_expectations() {
+    let root = Path::new("reference/scancode-toolkit/tests/summarycode/data/generated");
+    let samples = [
+        (
+            root.join("simple/generated_1.java"),
+            vec![
+                "// this file was generated by the javatm architecture for xml binding(jaxb) reference implementation".to_string(),
+                "// generated on: 2011.08.01 at 11:35:59 am cest".to_string(),
+            ],
+        ),
+        (
+            root.join("simple/generated_2.java"),
+            vec!["* this class was generated by the jax-ws ri.".to_string()],
+        ),
+        (
+            root.join("simple/generated_3.java"),
+            vec![
+                "// this file was generated by the javatm architecture for xml binding(jaxb) reference implementation".to_string(),
+                "// generated on: 2013.11.15 at 04:17:00 pm cet".to_string(),
+            ],
+        ),
+        (
+            root.join("simple/generated_4.java"),
+            vec!["/* this class was automatically generated".to_string()],
+        ),
+        (
+            root.join("simple/generated_5.java"),
+            vec![
+                "* <p>the following schema fragment specifies the expected content contained within this class.".to_string(),
+            ],
+        ),
+        (
+            root.join("simple/generated_6.c"),
+            vec!["/* do not edit this file - it is machine generated */".to_string()],
+        ),
+        (
+            root.join("simple/configure"),
+            vec!["# generated by gnu autoconf 2.64 for apache couchdb 1.0.1.".to_string()],
+        ),
+        (
+            root.join("jspc/web.xml"),
+            vec!["<!--automatically created by apache jakarta tomcat jspc.".to_string()],
+        ),
+    ];
+
+    for (path, expected) in samples {
+        let actual = generated_code_hints(&path).unwrap();
+        assert_eq!(actual, expected, "path={}", path.display());
+    }
+}
+
+#[test]
+fn generated_cli_fixture_matches_expected_file_flags() {
+    let generated_root = Path::new("reference/scancode-toolkit/tests/summarycode/data/generated");
+    let fixture_root = generated_root.join("simple");
+    let progress = Arc::new(ScanProgress::new(ProgressMode::Quiet));
+    let mut files = crate::scanner::process_with_options(
+        &fixture_root,
+        0,
+        progress,
+        &[],
+        None,
+        false,
+        &TextDetectionOptions::default(),
+    )
+    .expect("generated fixture scan should succeed")
+    .files;
+
+    files.push(dir("simple"));
+
+    normalize_paths(
+        &mut files,
+        generated_root
+            .to_str()
+            .expect("fixture path should be UTF-8"),
+        true,
+        false,
+    );
+    mark_generated_files(&mut files, Some(generated_root));
+
+    let actual = json!({
+        "files": files
+            .into_iter()
+            .map(|file| json!({
+                "path": file.path,
+                "type": file.file_type,
+                "is_generated": file.is_generated,
+                "scan_errors": file.scan_errors,
+            }))
+            .collect::<Vec<_>>()
+    });
+    let expected: Value = serde_json::from_str(
+        &fs::read_to_string(
+            "reference/scancode-toolkit/tests/summarycode/data/generated/cli.expected.json",
+        )
+        .expect("expected generated cli fixture should be readable"),
+    )
+    .expect("expected generated cli fixture should parse");
+
+    let mut actual_normalized = actual;
+    let mut expected_normalized = expected;
+    normalize_scan_json(&mut actual_normalized, None);
+    normalize_scan_json(&mut expected_normalized, None);
+
+    if let Err(error) = compare_scan_json_values(&actual_normalized, &expected_normalized, "") {
+        panic!(
+            "Generated CLI fixture mismatch: {}\nactual={}\nexpected={}",
+            error,
+            serde_json::to_string_pretty(&actual_normalized).unwrap_or_default(),
+            serde_json::to_string_pretty(&expected_normalized).unwrap_or_default()
+        );
+    }
 }
 
 #[test]

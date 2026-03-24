@@ -131,6 +131,20 @@ The current branch also closes the main active classify fixture gaps:
 - root directories and their direct children now participate in `is_top_level` the same way the active classify fixture expects
 - package-data-bearing manifests now promote their ancestor directories and nearby key siblings into the top-level package view expected by the active `with_package_data` fixture
 
+### Active generated fixture parity complete
+
+The current branch also closes the active emitted ScanCode `generated/` fixture surface:
+
+- `generated/simple/generated_1.java`
+- `generated/simple/generated_2.java`
+- `generated/simple/generated_3.java`
+- `generated/simple/generated_4.java`
+- `generated/simple/generated_5.java`
+- `generated/simple/generated_6.c`
+- `generated/simple/configure`
+- `generated/jspc/web.xml`
+- `generated/cli.expected.json`
+
 ### Initial non-license-dependent summary fields
 
 The current incremental layer now computes:
