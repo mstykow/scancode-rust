@@ -159,7 +159,7 @@ fn write_snapshot_payload_to_temp(
         .map_err(CacheIoError::Io)?;
 
     {
-        let mut encoder = zstd::Encoder::new(&mut temp_file, 21).map_err(CacheIoError::Io)?;
+        let mut encoder = zstd::Encoder::new(&mut temp_file, 3).map_err(CacheIoError::Io)?;
         encoder
             .write_all(&encoded_envelope)
             .map_err(CacheIoError::Io)?;
