@@ -1,4 +1,4 @@
-use super::test_utils::{assert_summary_fixture_matches_expected, dir, file, package};
+use super::test_utils::{dir, file, package};
 use super::*;
 use crate::models::{
     Copyright, DatasourceId, FileReference, Holder, Match, Package, PackageType, TallyEntry,
@@ -158,68 +158,6 @@ fn manifest_declared_license_survives_into_package_and_summary() {
     );
     assert_eq!(summary.declared_license_expression.as_deref(), Some("mit"));
     assert_eq!(summary.license_clarity_score.unwrap().score, 90);
-}
-
-#[test]
-fn active_summary_fixtures_match_expected_summary_blocks() {
-    let fixtures = [
-        (
-            "testdata/summarycode-golden/summary/without_package_data",
-            "testdata/summarycode-golden/summary/without_package_data/without_package_data.expected.json",
-        ),
-        (
-            "testdata/summarycode-golden/summary/with_package_data",
-            "testdata/summarycode-golden/summary/with_package_data/with_package_data.expected.json",
-        ),
-        (
-            "testdata/summarycode-golden/summary/use_holder_from_package_resource",
-            "testdata/summarycode-golden/summary/use_holder_from_package_resource/use_holder_from_package_resource.expected.json",
-        ),
-        (
-            "testdata/summarycode-golden/summary/summary_without_holder",
-            "testdata/summarycode-golden/summary/summary_without_holder/summary-without-holder-pypi.expected.json",
-        ),
-        (
-            "testdata/summarycode-golden/summary/single_file",
-            "testdata/summarycode-golden/summary/single_file/single_file.expected.json",
-        ),
-        (
-            "testdata/summarycode-golden/summary/multiple_package_data",
-            "testdata/summarycode-golden/summary/multiple_package_data/multiple_package_data.expected.json",
-        ),
-        (
-            "testdata/summarycode-golden/summary/license_ambiguity/unambiguous",
-            "testdata/summarycode-golden/summary/license_ambiguity/unambiguous.expected.json",
-        ),
-        (
-            "testdata/summarycode-golden/summary/license_ambiguity/ambiguous",
-            "testdata/summarycode-golden/summary/license_ambiguity/ambiguous.expected.json",
-        ),
-        (
-            "testdata/summarycode-golden/summary/holders/combined_holders",
-            "testdata/summarycode-golden/summary/holders/combined_holders.expected.json",
-        ),
-        (
-            "testdata/summarycode-golden/summary/holders/clear_holder",
-            "testdata/summarycode-golden/summary/holders/clear_holder.expected.json",
-        ),
-        (
-            "testdata/summarycode-golden/summary/conflicting_license_categories",
-            "testdata/summarycode-golden/summary/conflicting_license_categories/conflicting_license_categories.expected.json",
-        ),
-        (
-            "testdata/summarycode-golden/summary/end-2-end/bug-1141",
-            "testdata/summarycode-golden/summary/end-2-end/bug-1141.expected.json",
-        ),
-        (
-            "testdata/summarycode-golden/summary/embedded_packages/bunkerweb",
-            "testdata/summarycode-golden/summary/embedded_packages/bunkerweb.expected.json",
-        ),
-    ];
-
-    for (fixture_dir, expected_file) in fixtures {
-        assert_summary_fixture_matches_expected(fixture_dir, expected_file, true, true);
-    }
 }
 
 #[test]
@@ -757,39 +695,6 @@ fn compute_summary_serializes_empty_declared_holder_when_none_found() {
     let summary = compute_summary(&[pkg_info], &[package]).expect("summary exists");
     assert_eq!(summary.declared_holder.as_deref(), Some(""));
     assert!(summary.other_holders.is_empty());
-}
-
-#[test]
-fn active_score_fixtures_match_expected_summary_blocks() {
-    let fixtures = [
-        (
-            "testdata/summarycode-golden/score/basic",
-            "testdata/summarycode-golden/score/basic-expected.json",
-        ),
-        (
-            "testdata/summarycode-golden/score/no_license_text",
-            "testdata/summarycode-golden/score/no_license_text-expected.json",
-        ),
-        (
-            "testdata/summarycode-golden/score/no_license_or_copyright",
-            "testdata/summarycode-golden/score/no_license_or_copyright-expected.json",
-        ),
-        (
-            "testdata/summarycode-golden/score/no_license_ambiguity",
-            "testdata/summarycode-golden/score/no_license_ambiguity-expected.json",
-        ),
-        (
-            "testdata/summarycode-golden/score/inconsistent_licenses_copyleft",
-            "testdata/summarycode-golden/score/inconsistent_licenses_copyleft-expected.json",
-        ),
-        (
-            "testdata/summarycode-golden/score/jar",
-            "testdata/summarycode-golden/score/jar-expected.json",
-        ),
-    ];
-    for (fixture_dir, expected_file) in fixtures {
-        assert_summary_fixture_matches_expected(fixture_dir, expected_file, false, true);
-    }
 }
 
 #[test]

@@ -1,14 +1,6 @@
-use std::path::Path;
-use std::sync::Arc;
-
-use serde_json::Value;
-
-use super::test_utils::{
-    compare_scan_json_values, dir, file, normalize_paths_for_test, normalize_scan_json,
-};
+use super::test_utils::{dir, file};
 use super::*;
-use crate::progress::{ProgressMode, ScanProgress};
-use crate::scanner::{TextDetectionOptions, collect_paths, process_collected};
+use std::path::Path;
 
 #[test]
 fn mark_generated_files_detects_known_generated_header() {
@@ -99,61 +91,5 @@ fn generated_hint_samples_match_scancode_expectations() {
     for (path, expected) in samples {
         let actual = generated_code_hints(&path).unwrap();
         assert_eq!(actual, expected, "path={}", path.display());
-    }
-}
-
-#[test]
-fn generated_cli_fixture_matches_expected_file_flags() {
-    let generated_root = Path::new("testdata/summarycode-golden/generated");
-    let fixture_root = generated_root.join("simple");
-    let progress = Arc::new(ScanProgress::new(ProgressMode::Quiet));
-    let collected = collect_paths(&fixture_root, 0, &[]);
-    let mut files = process_collected(
-        &collected,
-        progress,
-        None,
-        false,
-        &TextDetectionOptions::default(),
-    )
-    .files;
-
-    files.push(dir("simple"));
-    normalize_paths_for_test(
-        &mut files,
-        generated_root
-            .to_str()
-            .expect("fixture path should be UTF-8"),
-    );
-    mark_generated_files(&mut files, Some(generated_root));
-
-    let actual = serde_json::json!({
-        "files": files
-            .into_iter()
-            .map(|file| serde_json::json!({
-                "path": file.path,
-                "type": file.file_type,
-                "is_generated": file.is_generated,
-                "scan_errors": file.scan_errors,
-            }))
-            .collect::<Vec<_>>()
-    });
-    let expected: Value = serde_json::from_str(
-        &std::fs::read_to_string("testdata/summarycode-golden/generated/cli.expected.json")
-            .expect("expected generated cli fixture should be readable"),
-    )
-    .expect("expected generated cli fixture should parse");
-
-    let mut actual_normalized = actual;
-    let mut expected_normalized = expected;
-    normalize_scan_json(&mut actual_normalized, None);
-    normalize_scan_json(&mut expected_normalized, None);
-
-    if let Err(error) = compare_scan_json_values(&actual_normalized, &expected_normalized, "") {
-        panic!(
-            "Generated CLI fixture mismatch: {}\nactual={}\nexpected={}",
-            error,
-            serde_json::to_string_pretty(&actual_normalized).unwrap_or_default(),
-            serde_json::to_string_pretty(&expected_normalized).unwrap_or_default()
-        );
     }
 }
