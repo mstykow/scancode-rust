@@ -41,7 +41,7 @@ mod tests {
     use crate::license_detection::models::Rule;
     use crate::license_detection::query::Query;
     use crate::license_detection::test_utils::create_test_index;
-    use std::collections::HashMap;
+    use std::collections::{HashMap, HashSet};
 
     pub(super) fn create_seq_match_test_index() -> LicenseIndex {
         create_test_index(
@@ -64,8 +64,17 @@ mod tests {
             .collect();
 
         let (set, mset) = build_set_and_mset(&tokens);
-        let _ = index.sets_by_rid.insert(rid, set);
+        let _ = index.sets_by_rid.insert(rid, set.clone());
         let _ = index.msets_by_rid.insert(rid, mset);
+
+        let high_set: HashSet<TokenId> = set
+            .iter()
+            .filter(|&&tid| index.dictionary.token_kind(tid) == TokenKind::Legalese)
+            .copied()
+            .collect();
+        if !high_set.is_empty() {
+            let _ = index.high_sets_by_rid.insert(rid, high_set);
+        }
 
         let mut high_postings: HashMap<TokenId, Vec<usize>> = HashMap::new();
         for (pos, &tid) in tokens.iter().enumerate() {
