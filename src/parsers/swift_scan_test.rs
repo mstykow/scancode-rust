@@ -7,9 +7,9 @@ mod tests {
     use regex::Regex;
     use serde_json::{Value, json};
 
+    use super::super::scan_pipeline_test_utils::strip_root_paths;
     use crate::assembly;
     use crate::progress::{ProgressMode, ScanProgress};
-    use crate::scan_result_shaping::normalize_paths;
     use crate::scanner::{TextDetectionOptions, collect_paths, process_collected};
 
     fn normalize_test_uuids(json_str: &str) -> String {
@@ -167,12 +167,7 @@ mod tests {
         );
 
         let mut files = result.files;
-        normalize_paths(
-            &mut files,
-            path.to_str().expect("swift fixture path should be UTF-8"),
-            true,
-            false,
-        );
+        strip_root_paths(&mut files, path);
         let assembly_result = assembly::assemble(&mut files);
 
         files.sort_by(|left, right| left.path.cmp(&right.path));
