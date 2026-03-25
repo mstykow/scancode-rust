@@ -1,7 +1,11 @@
 mod about;
 #[cfg(test)]
+mod about_scan_test;
+#[cfg(test)]
 mod about_test;
 mod alpine;
+#[cfg(test)]
+mod alpine_scan_test;
 mod arch;
 #[cfg(test)]
 mod arch_test;
@@ -60,6 +64,8 @@ mod cpan_makefile_pl;
 #[cfg(test)]
 mod cpan_makefile_pl_test;
 #[cfg(test)]
+mod cpan_scan_test;
+#[cfg(test)]
 mod cpan_test;
 mod cran;
 #[cfg(test)]
@@ -69,6 +75,8 @@ mod dart;
 mod dart_test;
 mod debian;
 #[cfg(test)]
+mod debian_scan_test;
+#[cfg(test)]
 mod debian_test;
 mod deno;
 mod deno_lock;
@@ -77,6 +85,8 @@ mod deno_lock_test;
 #[cfg(test)]
 mod deno_test;
 mod docker;
+#[cfg(test)]
+mod docker_scan_test;
 #[cfg(test)]
 mod docker_test;
 mod freebsd;
@@ -94,6 +104,8 @@ mod gradle_lock;
 #[cfg(test)]
 mod gradle_lock_test;
 mod gradle_module;
+#[cfg(test)]
+mod gradle_module_scan_test;
 #[cfg(test)]
 mod gradle_module_test;
 mod hackage;
@@ -172,6 +184,8 @@ mod pylock_toml;
 mod pylock_toml_test;
 mod python;
 #[cfg(test)]
+mod python_scan_test;
+#[cfg(test)]
 mod python_test;
 mod readme;
 #[cfg(test)]
@@ -181,6 +195,8 @@ mod requirements_txt;
 mod requirements_txt_test;
 pub(crate) mod rfc822;
 mod rpm_db;
+#[cfg(test)]
+mod rpm_db_scan_test;
 mod rpm_license_files;
 #[cfg(test)]
 mod rpm_license_files_test;
@@ -198,12 +214,16 @@ mod ruby_test;
 mod sbt;
 #[cfg(test)]
 mod sbt_test;
+#[cfg(test)]
+mod scan_pipeline_test_utils;
 mod swift_manifest_json;
 #[cfg(test)]
 mod swift_manifest_json_test;
 mod swift_resolved;
 #[cfg(test)]
 mod swift_resolved_test;
+#[cfg(test)]
+mod swift_scan_test;
 mod swift_show_dependencies;
 #[cfg(test)]
 mod swift_show_dependencies_test;

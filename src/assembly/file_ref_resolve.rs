@@ -4,10 +4,26 @@ use std::str::FromStr;
 
 use crate::models::{DatasourceId, FileInfo, Package, TopLevelDependency};
 use packageurl::PackageUrl;
+use strum::EnumIter;
 
 struct DbPathConfig {
     datasource_ids: &'static [DatasourceId],
     path_suffix: &'static str,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, EnumIter)]
+enum FileReferenceResolverKind {
+    About,
+    AttachedManifest,
+    CondaMeta,
+    InstalledDb,
+    PythonMetadata,
+    RelativeToDatafileParent,
+}
+
+struct FileReferenceResolverConfig {
+    datasource_ids: &'static [DatasourceId],
+    kind: FileReferenceResolverKind,
 }
 
 const DB_PATH_CONFIGS: &[DbPathConfig] = &[
@@ -54,6 +70,42 @@ const DEBIAN_INSTALLED_SUPPLEMENTAL_DATASOURCE_IDS: &[DatasourceId] = &[
     DatasourceId::DebianInstalledMd5Sums,
 ];
 
+const INSTALLED_DB_DATASOURCE_IDS: &[DatasourceId] = &[
+    DatasourceId::AlpineInstalledDb,
+    DatasourceId::RpmInstalledDatabaseBdb,
+    DatasourceId::RpmInstalledDatabaseNdb,
+    DatasourceId::RpmInstalledDatabaseSqlite,
+    DatasourceId::DebianInstalledStatusDb,
+    DatasourceId::DebianDistrolessInstalledDb,
+];
+
+const FILE_REFERENCE_RESOLVER_CONFIGS: &[FileReferenceResolverConfig] = &[
+    FileReferenceResolverConfig {
+        datasource_ids: &[DatasourceId::AboutFile],
+        kind: FileReferenceResolverKind::About,
+    },
+    FileReferenceResolverConfig {
+        datasource_ids: &[DatasourceId::CpanManifest],
+        kind: FileReferenceResolverKind::AttachedManifest,
+    },
+    FileReferenceResolverConfig {
+        datasource_ids: &[DatasourceId::CondaMetaJson],
+        kind: FileReferenceResolverKind::CondaMeta,
+    },
+    FileReferenceResolverConfig {
+        datasource_ids: INSTALLED_DB_DATASOURCE_IDS,
+        kind: FileReferenceResolverKind::InstalledDb,
+    },
+    FileReferenceResolverConfig {
+        datasource_ids: PYTHON_METADATA_DATASOURCE_IDS,
+        kind: FileReferenceResolverKind::PythonMetadata,
+    },
+    FileReferenceResolverConfig {
+        datasource_ids: &[DatasourceId::GradleModule],
+        kind: FileReferenceResolverKind::RelativeToDatafileParent,
+    },
+];
+
 struct PythonMetadataResolution {
     base_path: String,
     allowed_root: String,
@@ -67,222 +119,312 @@ pub fn resolve_file_references(
     let path_index = build_path_index(&*files);
 
     for package in packages.iter_mut() {
-        if package.datasource_ids.contains(&DatasourceId::AboutFile)
-            && let Some(datafile_path) = package.datafile_paths.first()
-        {
-            let root = Path::new(datafile_path)
-                .parent()
-                .map(|p| p.to_string_lossy().to_string())
-                .unwrap_or_default();
-
-            let file_references = collect_file_references(
-                files,
-                &path_index,
-                datafile_path,
-                &package.datasource_ids,
-                &[DatasourceId::AboutFile],
-                package.purl.as_deref(),
-            );
-
-            let mut missing_refs = Vec::new();
-            for file_ref in &file_references {
-                let resolved_path = if root.is_empty() {
-                    file_ref.path.clone()
-                } else {
-                    format!("{}/{}", root, file_ref.path.trim_start_matches('/'))
-                };
-                if let Some(&file_idx) = path_index.get(&resolved_path) {
-                    let package_uid = package.package_uid.clone();
-                    if !files[file_idx].for_packages.contains(&package_uid) {
-                        files[file_idx].for_packages.push(package_uid);
-                    }
-                } else {
-                    missing_refs.push(file_ref.path.clone());
-                }
-            }
-
-            if !missing_refs.is_empty() {
-                missing_refs.sort();
-                let missing_refs_json: Vec<serde_json::Value> = missing_refs
-                    .into_iter()
-                    .map(|path| serde_json::json!({"path": path}))
-                    .collect();
-
-                let extra_data = package.extra_data.get_or_insert_with(HashMap::new);
-                extra_data.insert(
-                    "missing_file_references".to_string(),
-                    serde_json::Value::Array(missing_refs_json),
-                );
-            }
+        let Some(config) = find_file_reference_resolver(files, package) else {
             continue;
-        }
+        };
 
-        if is_conda_meta_package(package)
-            && let Some(conda_meta_path) = package
-                .datafile_paths
-                .iter()
-                .find(|path| path.contains(CONDA_META_PATH_SEGMENT))
-            && let Some(root) = compute_conda_root(Some(conda_meta_path.as_str()))
-        {
-            let file_references = collect_file_references(
-                files,
-                &path_index,
-                conda_meta_path,
-                &package.datasource_ids,
-                &[DatasourceId::CondaMetaJson],
-                package.purl.as_deref(),
-            );
-
-            let mut missing_refs = Vec::new();
-            for file_ref in &file_references {
-                let resolved_path = format!("{}{}", root, file_ref.path.trim_start_matches('/'));
-                if let Some(&file_idx) = path_index.get(&resolved_path) {
-                    let package_uid = package.package_uid.clone();
-                    if !files[file_idx].for_packages.contains(&package_uid) {
-                        files[file_idx].for_packages.push(package_uid);
-                    }
-                } else {
-                    missing_refs.push(file_ref.path.clone());
-                }
-            }
-
-            if !missing_refs.is_empty() {
-                missing_refs.sort();
-                let missing_refs_json: Vec<serde_json::Value> = missing_refs
-                    .into_iter()
-                    .map(|path| serde_json::json!({"path": path}))
-                    .collect();
-
-                let extra_data = package.extra_data.get_or_insert_with(HashMap::new);
-                extra_data.insert(
-                    "missing_file_references".to_string(),
-                    serde_json::Value::Array(missing_refs_json),
+        match config.kind {
+            FileReferenceResolverKind::About
+            | FileReferenceResolverKind::RelativeToDatafileParent => {
+                resolve_relative_to_datafile_parent(
+                    files,
+                    &path_index,
+                    package,
+                    config.datasource_ids,
                 );
             }
-            continue;
-        }
-
-        if let Some(config) = find_db_config(package) {
-            let datafile_path = match package.datafile_paths.first() {
-                Some(path) => path,
-                None => continue,
-            };
-
-            let root = compute_root(datafile_path, config.path_suffix);
-
-            let mut file_references = collect_file_references(
-                files,
-                &path_index,
-                datafile_path,
-                &package.datasource_ids,
-                config.datasource_ids,
-                package.purl.as_deref(),
-            );
-
-            if is_debian_installed_package(package) {
-                merge_file_references(
-                    &mut file_references,
-                    collect_debian_installed_file_references(files, package),
+            FileReferenceResolverKind::AttachedManifest => {
+                resolve_attached_manifest_file_references(
+                    files,
+                    &path_index,
+                    package,
+                    config.datasource_ids[0],
                 );
             }
-
-            let mut missing_refs = Vec::new();
-
-            for file_ref in &file_references {
-                let ref_path = file_ref.path.trim_start_matches('/');
-                let resolved_path = if root.is_empty() {
-                    ref_path.to_string()
-                } else {
-                    format!("{}{}", root, ref_path)
-                };
-
-                if let Some(&file_idx) = path_index.get(&resolved_path) {
-                    let package_uid = package.package_uid.clone();
-                    if !files[file_idx].for_packages.contains(&package_uid) {
-                        files[file_idx].for_packages.push(package_uid);
-                    }
-                } else {
-                    missing_refs.push(file_ref.path.clone());
-                }
+            FileReferenceResolverKind::CondaMeta => {
+                resolve_conda_file_references(files, &path_index, package);
             }
-
-            if !missing_refs.is_empty() {
-                missing_refs.sort();
-                let missing_refs_json: Vec<serde_json::Value> = missing_refs
-                    .into_iter()
-                    .map(|path| serde_json::json!({"path": path}))
-                    .collect();
-
-                let extra_data = package.extra_data.get_or_insert_with(HashMap::new);
-                extra_data.insert(
-                    "missing_file_references".to_string(),
-                    serde_json::Value::Array(missing_refs_json),
-                );
+            FileReferenceResolverKind::InstalledDb => {
+                resolve_installed_db_file_references(files, &path_index, package, dependencies);
             }
-
-            if is_rpm_package(package)
-                && let Some(namespace) = resolve_rpm_namespace(files, &path_index, &root)
-            {
-                apply_rpm_namespace(files, package, dependencies, &namespace);
-            }
-            continue;
-        }
-
-        if let Some(python_resolution) = find_python_metadata_root(package) {
-            let datafile_path = match package
-                .datafile_paths
-                .iter()
-                .find(|path| is_python_metadata_layout(path))
-            {
-                Some(path) => path,
-                None => continue,
-            };
-
-            let file_references = collect_file_references(
-                files,
-                &path_index,
-                datafile_path,
-                &package.datasource_ids,
-                PYTHON_METADATA_DATASOURCE_IDS,
-                package.purl.as_deref(),
-            );
-
-            let mut missing_refs = Vec::new();
-            for file_ref in &file_references {
-                let Some(resolved_path) = normalize_relative_path(
-                    &python_resolution.base_path,
-                    &python_resolution.allowed_root,
-                    &file_ref.path,
-                ) else {
-                    missing_refs.push(file_ref.path.clone());
-                    continue;
-                };
-
-                if let Some(&file_idx) = path_index.get(&resolved_path) {
-                    let package_uid = package.package_uid.clone();
-                    if !files[file_idx].for_packages.contains(&package_uid) {
-                        files[file_idx].for_packages.push(package_uid);
-                    }
-                } else {
-                    missing_refs.push(file_ref.path.clone());
-                }
-            }
-
-            if !missing_refs.is_empty() {
-                missing_refs.sort();
-                let missing_refs_json: Vec<serde_json::Value> = missing_refs
-                    .into_iter()
-                    .map(|path| serde_json::json!({"path": path}))
-                    .collect();
-
-                let extra_data = package.extra_data.get_or_insert_with(HashMap::new);
-                extra_data.insert(
-                    "missing_file_references".to_string(),
-                    serde_json::Value::Array(missing_refs_json),
-                );
+            FileReferenceResolverKind::PythonMetadata => {
+                resolve_python_metadata_file_references(files, &path_index, package);
             }
         }
     }
+}
+
+fn resolve_relative_to_datafile_parent(
+    files: &mut [FileInfo],
+    path_index: &HashMap<String, usize>,
+    package: &mut Package,
+    datasource_ids: &[DatasourceId],
+) {
+    let Some(datafile_path) = package.datafile_paths.first() else {
+        return;
+    };
+    let root = Path::new(datafile_path)
+        .parent()
+        .map(|p| p.to_string_lossy().to_string())
+        .unwrap_or_default();
+
+    let file_references = collect_file_references(
+        files,
+        path_index,
+        datafile_path,
+        &package.datasource_ids,
+        datasource_ids,
+        package.purl.as_deref(),
+    );
+
+    let mut missing_refs = Vec::new();
+    for file_ref in &file_references {
+        let resolved_path = if root.is_empty() {
+            file_ref.path.clone()
+        } else {
+            format!("{}/{}", root, file_ref.path.trim_start_matches('/'))
+        };
+        if let Some(&file_idx) = path_index.get(&resolved_path) {
+            let package_uid = package.package_uid.clone();
+            if !files[file_idx].for_packages.contains(&package_uid) {
+                files[file_idx].for_packages.push(package_uid);
+            }
+        } else {
+            missing_refs.push(file_ref.path.clone());
+        }
+    }
+
+    record_missing_file_references(package, missing_refs);
+}
+
+fn resolve_attached_manifest_file_references(
+    files: &mut [FileInfo],
+    path_index: &HashMap<String, usize>,
+    package: &mut Package,
+    datasource_id: DatasourceId,
+) {
+    let Some((datafile_path, file_references)) =
+        find_attached_manifest_file_references(files, package, datasource_id)
+    else {
+        return;
+    };
+
+    let root = Path::new(datafile_path)
+        .parent()
+        .map(|p| p.to_string_lossy().to_string())
+        .unwrap_or_default();
+
+    let mut missing_refs = Vec::new();
+    for file_ref in &file_references {
+        let resolved_path = if root.is_empty() {
+            file_ref.path.clone()
+        } else {
+            format!("{}/{}", root, file_ref.path.trim_start_matches('/'))
+        };
+
+        if let Some(&file_idx) = path_index.get(&resolved_path) {
+            let package_uid = package.package_uid.clone();
+            if !files[file_idx].for_packages.contains(&package_uid) {
+                files[file_idx].for_packages.push(package_uid);
+            }
+        } else {
+            missing_refs.push(file_ref.path.clone());
+        }
+    }
+
+    record_missing_file_references(package, missing_refs);
+}
+
+fn resolve_conda_file_references(
+    files: &mut [FileInfo],
+    path_index: &HashMap<String, usize>,
+    package: &mut Package,
+) {
+    let Some(conda_meta_path) = package
+        .datafile_paths
+        .iter()
+        .find(|path| path.contains(CONDA_META_PATH_SEGMENT))
+    else {
+        return;
+    };
+    let Some(root) = compute_conda_root(Some(conda_meta_path.as_str())) else {
+        return;
+    };
+
+    let file_references = collect_file_references(
+        files,
+        path_index,
+        conda_meta_path,
+        &package.datasource_ids,
+        &[DatasourceId::CondaMetaJson],
+        package.purl.as_deref(),
+    );
+
+    let mut missing_refs = Vec::new();
+    for file_ref in &file_references {
+        let resolved_path = format!("{}{}", root, file_ref.path.trim_start_matches('/'));
+        if let Some(&file_idx) = path_index.get(&resolved_path) {
+            let package_uid = package.package_uid.clone();
+            if !files[file_idx].for_packages.contains(&package_uid) {
+                files[file_idx].for_packages.push(package_uid);
+            }
+        } else {
+            missing_refs.push(file_ref.path.clone());
+        }
+    }
+
+    record_missing_file_references(package, missing_refs);
+}
+
+fn resolve_installed_db_file_references(
+    files: &mut [FileInfo],
+    path_index: &HashMap<String, usize>,
+    package: &mut Package,
+    dependencies: &mut [TopLevelDependency],
+) {
+    let Some(config) = find_db_config(package) else {
+        return;
+    };
+    let Some(datafile_path) = package.datafile_paths.first() else {
+        return;
+    };
+
+    let root = compute_root(datafile_path, config.path_suffix);
+
+    let mut file_references = collect_file_references(
+        files,
+        path_index,
+        datafile_path,
+        &package.datasource_ids,
+        config.datasource_ids,
+        package.purl.as_deref(),
+    );
+
+    if is_debian_installed_package(package) {
+        merge_file_references(
+            &mut file_references,
+            collect_debian_installed_file_references(files, package),
+        );
+    }
+
+    let mut missing_refs = Vec::new();
+    for file_ref in &file_references {
+        let ref_path = file_ref.path.trim_start_matches('/');
+        let resolved_path = if root.is_empty() {
+            ref_path.to_string()
+        } else {
+            format!("{}{}", root, ref_path)
+        };
+
+        if let Some(&file_idx) = path_index.get(&resolved_path) {
+            let package_uid = package.package_uid.clone();
+            if !files[file_idx].for_packages.contains(&package_uid) {
+                files[file_idx].for_packages.push(package_uid);
+            }
+        } else {
+            missing_refs.push(file_ref.path.clone());
+        }
+    }
+
+    record_missing_file_references(package, missing_refs);
+
+    if is_rpm_package(package)
+        && let Some(namespace) = resolve_rpm_namespace(files, path_index, &root)
+    {
+        apply_rpm_namespace(files, package, dependencies, &namespace);
+    }
+}
+
+fn resolve_python_metadata_file_references(
+    files: &mut [FileInfo],
+    path_index: &HashMap<String, usize>,
+    package: &mut Package,
+) {
+    let Some(python_resolution) = find_python_metadata_root(package) else {
+        return;
+    };
+    let Some(datafile_path) = package
+        .datafile_paths
+        .iter()
+        .find(|path| is_python_metadata_layout(path))
+    else {
+        return;
+    };
+
+    let file_references = collect_file_references(
+        files,
+        path_index,
+        datafile_path,
+        &package.datasource_ids,
+        PYTHON_METADATA_DATASOURCE_IDS,
+        package.purl.as_deref(),
+    );
+
+    let mut missing_refs = Vec::new();
+    for file_ref in &file_references {
+        let Some(resolved_path) = normalize_relative_path(
+            &python_resolution.base_path,
+            &python_resolution.allowed_root,
+            &file_ref.path,
+        ) else {
+            missing_refs.push(file_ref.path.clone());
+            continue;
+        };
+
+        if let Some(&file_idx) = path_index.get(&resolved_path) {
+            let package_uid = package.package_uid.clone();
+            if !files[file_idx].for_packages.contains(&package_uid) {
+                files[file_idx].for_packages.push(package_uid);
+            }
+        } else {
+            missing_refs.push(file_ref.path.clone());
+        }
+    }
+
+    record_missing_file_references(package, missing_refs);
+}
+
+fn record_missing_file_references(package: &mut Package, mut missing_refs: Vec<String>) {
+    if missing_refs.is_empty() {
+        return;
+    }
+
+    missing_refs.sort();
+    let missing_refs_json: Vec<serde_json::Value> = missing_refs
+        .into_iter()
+        .map(|path| serde_json::json!({"path": path}))
+        .collect();
+
+    let extra_data = package.extra_data.get_or_insert_with(HashMap::new);
+    extra_data.insert(
+        "missing_file_references".to_string(),
+        serde_json::Value::Array(missing_refs_json),
+    );
+}
+
+fn find_file_reference_resolver(
+    files: &[FileInfo],
+    package: &Package,
+) -> Option<&'static FileReferenceResolverConfig> {
+    FILE_REFERENCE_RESOLVER_CONFIGS
+        .iter()
+        .find(|config| match config.kind {
+            FileReferenceResolverKind::AttachedManifest => {
+                config.datasource_ids.iter().any(|datasource_id| {
+                    files.iter().any(|file| {
+                        file.for_packages.contains(&package.package_uid)
+                            && file
+                                .package_data
+                                .iter()
+                                .any(|pkg_data| pkg_data.datasource_id == Some(*datasource_id))
+                    })
+                })
+            }
+            _ => config
+                .datasource_ids
+                .iter()
+                .any(|datasource_id| package.datasource_ids.contains(datasource_id)),
+        })
 }
 
 fn is_python_metadata_layout(path: &str) -> bool {
@@ -358,12 +500,6 @@ fn normalize_relative_path(base: &str, allowed_root: &str, relative: &str) -> Op
     } else {
         None
     }
-}
-
-fn is_conda_meta_package(package: &Package) -> bool {
-    package
-        .datasource_ids
-        .contains(&DatasourceId::CondaMetaJson)
 }
 
 fn compute_conda_root(datafile_path: Option<&str>) -> Option<String> {
@@ -585,6 +721,26 @@ fn collect_debian_installed_file_references(
     refs
 }
 
+fn find_attached_manifest_file_references<'a>(
+    files: &'a [FileInfo],
+    package: &Package,
+    datasource_id: DatasourceId,
+) -> Option<(&'a str, Vec<crate::models::FileReference>)> {
+    for file in files {
+        if !file.for_packages.contains(&package.package_uid) {
+            continue;
+        }
+
+        for pkg_data in &file.package_data {
+            if pkg_data.datasource_id == Some(datasource_id) {
+                return Some((&file.path, pkg_data.file_references.clone()));
+            }
+        }
+    }
+
+    None
+}
+
 fn debian_installed_namespace_matches(
     supplemental_namespace: &Option<String>,
     package_namespace: &Option<String>,
@@ -760,6 +916,55 @@ fn apply_rpm_namespace(
 mod tests {
     use super::*;
     use crate::models::{FileReference, FileType, PackageData, PackageType};
+    use strum::IntoEnumIterator;
+
+    #[test]
+    fn test_every_file_reference_resolver_kind_is_registered_once() {
+        let registered: std::collections::HashSet<FileReferenceResolverKind> =
+            FILE_REFERENCE_RESOLVER_CONFIGS
+                .iter()
+                .map(|config| config.kind)
+                .collect();
+
+        let missing: Vec<_> = FileReferenceResolverKind::iter()
+            .filter(|kind| !registered.contains(kind))
+            .collect();
+
+        assert!(
+            missing.is_empty(),
+            "File-reference resolver kinds not registered: {missing:?}"
+        );
+
+        for kind in FileReferenceResolverKind::iter() {
+            let count = FILE_REFERENCE_RESOLVER_CONFIGS
+                .iter()
+                .filter(|config| config.kind == kind)
+                .count();
+            assert_eq!(
+                count, 1,
+                "File-reference resolver kind {kind:?} should be registered exactly once"
+            );
+        }
+    }
+
+    #[test]
+    fn test_file_reference_resolver_datasource_ids_are_unique() {
+        let mut seen = std::collections::HashSet::new();
+        let mut duplicates = Vec::new();
+
+        for config in FILE_REFERENCE_RESOLVER_CONFIGS {
+            for datasource_id in config.datasource_ids {
+                if !seen.insert(*datasource_id) {
+                    duplicates.push(*datasource_id);
+                }
+            }
+        }
+
+        assert!(
+            duplicates.is_empty(),
+            "Datasource IDs registered in multiple file-reference resolvers: {duplicates:?}"
+        );
+    }
 
     #[test]
     fn test_find_root_from_path() {

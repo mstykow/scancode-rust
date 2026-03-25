@@ -24,8 +24,14 @@ The Python reference does not currently provide merged Gradle `.module` support,
 
 Rust parses published Gradle module metadata directly and preserves artifact, dependency, constraint, and variant information that build-script parsing alone cannot recover reliably.
 
+The scanner now also resolves non-documentation artifact `file_references` from `.module` metadata
+back onto scanned sibling files. In practice, that means a scanned `.jar` or `.aar` sitting next
+to the `.module` file can be assigned to the assembled package via `for_packages`, rather than only
+existing as unattached package metadata.
+
 ## Impact
 
 - Better JVM dependency visibility for published Gradle metadata
 - Better artifact provenance than build-script parsing alone
+- Better package-to-file assignment for scanned published artifacts referenced by `.module` metadata
 - Better coverage of modern Gradle-native publication semantics

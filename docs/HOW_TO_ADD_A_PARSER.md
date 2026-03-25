@@ -338,6 +338,7 @@ mod tests {
 - [ ] Malformed input handled gracefully
 - [ ] Edge cases (empty, minimal, complex)
 - [ ] Golden fixtures added for representative parser outputs
+- [ ] Ecosystem-level scan/assembly fixture tests added when scanner wiring or assembly behavior is critical
 
 ### Integration Test Verification
 
@@ -356,6 +357,45 @@ The `test_all_parsers_are_registered_and_exported` test will verify your parser 
 3. Accessible to the scanner
 
 **If this test fails**, it means you forgot to add your parser to the `register_package_handlers!` macro in Step 4.2.
+
+### Ecosystem-Level Scan/Assembly Tests (Add When They Protect Real Behavior)
+
+Unit tests and parser golden tests are the baseline. Some ecosystems also benefit from a small
+number of **fixture-backed scanner/assembly tests** that exercise the higher-level flow:
+
+1. file discovery via the scanner
+2. parser extraction
+3. package/file-reference assignment
+4. assembly behavior when relevant
+
+These tests are valuable when parser correctness depends on more than parsing a single file in
+isolation.
+
+**Good candidates**:
+
+- installed metadata that must attach referenced files correctly (`RECORD`, `installed-files.txt`,
+  Debian `status.d` + `.list` / `.md5sums` sidecars)
+- ecosystems with multiple competing metadata surfaces where scanner/assembly ordering matters
+- archive or extracted layouts where normalized paths or file references affect final behavior
+- intentionally unassembled formats whose scanner behavior must stay stable
+
+**Recommended location**: keep these tests near the owning ecosystem under `src/parsers/` in a
+dedicated file such as `src/parsers/<ecosystem>_scan_test.rs`.
+
+If your parser emits meaningful `PackageData.file_references`, treat one of these scan tests as
+effectively required. Parser unit tests can prove that references were extracted; only a
+scanner/assembly test proves that those references are actually resolved back onto scanned files via
+final `for_packages` links.
+
+This keeps them distinct from:
+
+- parser unit tests in `src/parsers/<ecosystem>_test.rs`
+- parser golden tests in `src/parsers/<ecosystem>_golden_test.rs`
+- top-level scanner integration tests in `tests/scanner_integration.rs`, which should stay focused
+  on cross-parser/system behavior rather than ecosystem-specific fixtures
+
+**Rule of thumb**: add this layer only when it protects scanner/assembly behavior that unit and
+golden parser tests would miss.
 
 ## Step 4: Register the Parser
 
@@ -528,6 +568,25 @@ Even when your parser does **not** need manifest/lockfile merging, you still nee
 
 This is enforced by the `assembly::assemblers::tests::test_every_datasource_id_is_accounted_for` test. If you skip this step, CI fails even if your parser logic and parser tests are correct.
 
+### Register File-Reference Resolution Ownership (When Applicable)
+
+Some parsers emit `PackageData.file_references` that should later be resolved back onto scanned
+files and attached to the assembled package via `FileInfo.for_packages`.
+
+If your parser emits meaningful file references, you must do **both** of the following:
+
+1. **Register the ownership path in assembly**:
+   - either add the datasource to the declarative resolver registry in
+     `src/assembly/file_ref_resolve.rs`
+   - or handle it in another explicit post-assembly pass such as a dedicated
+     `*_resource_assign.rs` / merger step
+
+2. **Add a parser-adjacent scan test** in `src/parsers/<ecosystem>_scan_test.rs` proving the final
+   behavior on real scanned files.
+
+Without this, it is easy to end up in a partial state where the parser extracts file references but
+the scanner output never links those files back to the package.
+
 ### Check if Assembly is Needed
 
 Does your ecosystem have:
@@ -624,6 +683,7 @@ Create test fixtures in `testdata/assembly-golden/<ecosystem>-basic/`:
 
 - [ ] Datasource classified in `src/assembly/assemblers.rs` (`ASSEMBLERS` or `UNASSEMBLED_DATASOURCE_IDS`)
 - [ ] Assembler config added to `src/assembly/assemblers.rs` when assembly is needed
+- [ ] If parser emits meaningful `file_references`, its resolution ownership is registered in `src/assembly/file_ref_resolve.rs` or another explicit post-assembly pass
 - [ ] `datasource_ids` match parser `datasource_id` values
 - [ ] `sibling_file_patterns` match actual filenames
 - [ ] Test fixtures created in `testdata/assembly-golden/<ecosystem>-basic/`
@@ -954,6 +1014,7 @@ Before submitting your parser:
 - [ ] `register_parser!` macro added at end of parser file
 - [ ] Integration test passes: `cargo test test_all_parsers_are_registered_and_exported`
 - [ ] Datasource classified in `ASSEMBLERS` or `UNASSEMBLED_DATASOURCE_IDS`
+- [ ] If parser emits meaningful `file_references`, final `for_packages` assignment is proven by a parser-adjacent `*_scan_test.rs`
 - [ ] Pre-commit hooks pass
 - [ ] SUPPORTED_FORMATS.md auto-updated
 
