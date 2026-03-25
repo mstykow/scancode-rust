@@ -167,6 +167,7 @@ fn run() -> Result<()> {
 
         let text_options = TextDetectionOptions {
             detect_copyrights: cli.copyright,
+            detect_generated: cli.generated,
             detect_emails: cli.email,
             detect_urls: cli.url,
             max_emails: cli.max_email,
@@ -309,6 +310,12 @@ fn validate_scan_option_compatibility(cli: &Cli) -> Result<()> {
     if cli.from_json && (cli.copyright || cli.email || cli.url || cli.generated) {
         return Err(anyhow!(
             "When using --from-json, file scan options like --copyright/--email/--url/--generated are not allowed"
+        ));
+    }
+
+    if cli.from_json && (cli.strip_root || cli.full_root) {
+        return Err(anyhow!(
+            "When using --from-json, --strip-root and --full-root are not supported because the original scan root is unavailable"
         ));
     }
 

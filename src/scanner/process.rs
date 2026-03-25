@@ -25,6 +25,7 @@ use crate::progress::ScanProgress;
 use crate::scanner::collect::CollectedPaths;
 use crate::scanner::{ProcessResult, TextDetectionOptions};
 use crate::utils::file::{ExtractedTextKind, extract_text_for_detection, get_creation_date};
+use crate::utils::generated::generated_code_hints_from_bytes;
 
 const PEM_CERTIFICATE_HEADERS: &[(&str, &str)] = &[
     ("-----BEGIN CERTIFICATE-----", "-----END CERTIFICATE-----"),
@@ -79,14 +80,16 @@ fn process_file(
 
     let started = Instant::now();
 
-    if let Err(e) = extract_information_from_content(
+    let mut generated_flag = None;
+    match extract_information_from_content(
         &mut file_info_builder,
         path,
         license_engine,
         include_text,
         text_options,
     ) {
-        scan_errors.push(e.to_string());
+        Ok(is_generated) => generated_flag = is_generated,
+        Err(e) => scan_errors.push(e.to_string()),
     };
 
     if is_timeout_exceeded(started, text_options.timeout_seconds) {
@@ -128,6 +131,10 @@ fn process_file(
         file_info.is_source = Some(false);
     }
 
+    if text_options.detect_generated {
+        file_info.is_generated = Some(generated_flag.unwrap_or(false));
+    }
+
     if let (Some(scan_results_dir), Some(sha256)) = (
         text_options.scan_cache_dir.as_deref(),
         file_info.sha256.as_deref(),
@@ -153,7 +160,7 @@ fn extract_information_from_content(
     license_engine: Option<Arc<LicenseDetectionEngine>>,
     include_text: bool,
     text_options: &TextDetectionOptions,
-) -> Result<(), Error> {
+) -> Result<Option<bool>, Error> {
     let started = Instant::now();
     let buffer = fs::read(path)?;
 
@@ -165,6 +172,9 @@ fn extract_information_from_content(
     }
 
     let sha256 = calculate_sha256(&buffer);
+    let is_generated = text_options
+        .detect_generated
+        .then(|| !generated_code_hints_from_bytes(&buffer).is_empty());
 
     file_info_builder
         .sha1(Some(calculate_sha1(&buffer)))
@@ -173,7 +183,7 @@ fn extract_information_from_content(
         .programming_language(Some(detect_language(path, &buffer)));
 
     if should_skip_text_detection(path, &buffer) {
-        return Ok(());
+        return Ok(is_generated);
     }
 
     if let Some(scan_results_dir) = text_options.scan_cache_dir.as_deref() {
@@ -190,7 +200,7 @@ fn extract_information_from_content(
                     .emails(findings.emails)
                     .urls(findings.urls)
                     .programming_language(findings.programming_language);
-                return Ok(());
+                return Ok(is_generated);
             }
             Ok(None) => {}
             Err(err) => {
@@ -223,7 +233,7 @@ fn extract_information_from_content(
     }
 
     if text_content.is_empty() {
-        return Ok(());
+        return Ok(is_generated);
     }
 
     if text_options.detect_copyrights {
@@ -264,7 +274,9 @@ fn extract_information_from_content(
         license_engine,
         include_text,
         from_binary_strings,
-    )
+    )?;
+
+    Ok(is_generated)
 }
 
 fn is_timeout_exceeded(started: Instant, timeout_seconds: f64) -> bool {

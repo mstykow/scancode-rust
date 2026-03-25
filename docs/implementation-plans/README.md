@@ -22,6 +22,9 @@ implementation-plans/
 - **[SUMMARIZATION_PLAN.md](post-processing/SUMMARIZATION_PLAN.md)** - License/copyright tallies, facets, classification
   - Status: 🟡 Active — key-file tagging, shared provenance cleanup, the current tally stack, file facets/by-facet tallies, package-preferred summary origin, complete active `score/` fixture parity, and complete active generated/classify fixture parity are implemented; remaining package tally work and only the residual summary edge cases are tracked in [SUMMARIZATION_PLAN.md](post-processing/SUMMARIZATION_PLAN.md)
 
+- **[SCAN_RESULT_SHAPING_PLAN.md](post-processing/SCAN_RESULT_SHAPING_PLAN.md)** - Include/filter/root/source output shaping
+  - Status: 🟡 Active — the core shaping pipeline is implemented in `src/scan_result_shaping.rs`; the plan now records scope, ordering, and remaining compatibility/performance watch items
+
 ### Infrastructure (`infrastructure/`)
 
 - **[CLI_PLAN.md](infrastructure/CLI_PLAN.md)** - Command-line interface parameter parity

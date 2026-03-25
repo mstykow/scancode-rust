@@ -3,7 +3,8 @@ use chrono::Utc;
 use super::test_utils::{dir, file};
 use super::*;
 use crate::assembly;
-use crate::models::{Match, Tallies};
+use crate::models::{Copyright, Holder, Match, Package, Tallies};
+use crate::scan_result_shaping::normalize_paths;
 
 #[test]
 fn create_output_gates_summary_tallies_and_generated_sections() {
@@ -124,5 +125,251 @@ fn create_output_gates_summary_tallies_and_generated_sections() {
             .iter()
             .find(|file| file.path == license_rel)
             .is_some_and(|file| file.is_generated == Some(true) && file.tallies.is_some())
+    );
+}
+
+#[test]
+fn create_output_score_only_keeps_clarity_without_full_summary_fields() {
+    let start = Utc::now();
+    let end = start;
+    let mut license = file("project/LICENSE");
+    license.license_expression = Some("mit".to_string());
+    license.license_detections = vec![crate::models::LicenseDetection {
+        license_expression: "mit".to_string(),
+        license_expression_spdx: "MIT".to_string(),
+        matches: vec![Match {
+            license_expression: "mit".to_string(),
+            license_expression_spdx: "MIT".to_string(),
+            from_file: Some("project/LICENSE".to_string()),
+            start_line: 1,
+            end_line: 1,
+            matcher: Some("1-hash".to_string()),
+            score: 100.0,
+            matched_length: Some(10),
+            match_coverage: Some(100.0),
+            rule_relevance: Some(100),
+            rule_identifier: None,
+            rule_url: None,
+            matched_text: None,
+        }],
+        identifier: None,
+    }];
+
+    let output = create_output(
+        start,
+        end,
+        crate::scanner::ProcessResult {
+            files: vec![dir("project"), license],
+            excluded_count: 0,
+        },
+        CreateOutputContext {
+            total_dirs: 1,
+            assembly_result: assembly::AssemblyResult {
+                packages: vec![],
+                dependencies: vec![],
+            },
+            license_references: vec![],
+            license_rule_references: vec![],
+            options: CreateOutputOptions {
+                facet_rules: &[],
+                include_tallies_by_facet: false,
+                include_summary: false,
+                include_license_clarity_score: true,
+                include_tallies: false,
+                include_tallies_with_details: false,
+                include_tallies_of_key_files: false,
+                include_generated: false,
+                scanned_root: None,
+            },
+        },
+    );
+
+    let summary = output.summary.expect("score-only summary exists");
+    assert_eq!(summary.declared_license_expression.as_deref(), Some("mit"));
+    assert!(summary.license_clarity_score.is_some());
+    assert!(summary.declared_holder.is_none());
+    assert!(summary.primary_language.is_none());
+    assert!(summary.other_license_expressions.is_empty());
+    assert!(summary.other_holders.is_empty());
+    assert!(summary.other_languages.is_empty());
+}
+
+#[test]
+fn create_output_tallies_by_facet_does_not_leak_resource_tallies() {
+    let start = Utc::now();
+    let end = start;
+    let mut source = file("project/src/lib.rs");
+    source.programming_language = Some("Rust".to_string());
+
+    let facet_defs = ["dev=*.rs".to_string()];
+    let facet_rules = build_facet_rules(&facet_defs).expect("facet rules compile");
+
+    let output = create_output(
+        start,
+        end,
+        crate::scanner::ProcessResult {
+            files: vec![dir("project"), dir("project/src"), source],
+            excluded_count: 0,
+        },
+        CreateOutputContext {
+            total_dirs: 2,
+            assembly_result: assembly::AssemblyResult {
+                packages: vec![],
+                dependencies: vec![],
+            },
+            license_references: vec![],
+            license_rule_references: vec![],
+            options: CreateOutputOptions {
+                facet_rules: &facet_rules,
+                include_tallies_by_facet: true,
+                include_summary: false,
+                include_license_clarity_score: false,
+                include_tallies: false,
+                include_tallies_with_details: false,
+                include_tallies_of_key_files: false,
+                include_generated: false,
+                scanned_root: None,
+            },
+        },
+    );
+
+    assert!(output.tallies_by_facet.is_some());
+    assert!(output.files.iter().all(|file| file.tallies.is_none()));
+}
+
+#[test]
+fn create_output_promotes_package_metadata_without_summary_flags() {
+    let start = Utc::now();
+    let end = start;
+    let package_uid = "pkg:npm/demo?uuid=test".to_string();
+    let mut license = file("project/LICENSE");
+    license.for_packages = vec![package_uid.clone()];
+    license.copyrights = vec![Copyright {
+        copyright: "Copyright Example Corp.".to_string(),
+        start_line: 1,
+        end_line: 1,
+    }];
+    license.holders = vec![Holder {
+        holder: "Example Corp.".to_string(),
+        start_line: 1,
+        end_line: 1,
+    }];
+    let package = Package {
+        package_uid,
+        datafile_paths: vec!["project/package.json".to_string()],
+        ..super::test_utils::package("pkg:npm/demo?uuid=test", "project/package.json")
+    };
+
+    let output = create_output(
+        start,
+        end,
+        crate::scanner::ProcessResult {
+            files: vec![dir("project"), license],
+            excluded_count: 0,
+        },
+        CreateOutputContext {
+            total_dirs: 1,
+            assembly_result: assembly::AssemblyResult {
+                packages: vec![package],
+                dependencies: vec![],
+            },
+            license_references: vec![],
+            license_rule_references: vec![],
+            options: CreateOutputOptions {
+                facet_rules: &[],
+                include_tallies_by_facet: false,
+                include_summary: false,
+                include_license_clarity_score: false,
+                include_tallies: false,
+                include_tallies_with_details: false,
+                include_tallies_of_key_files: false,
+                include_generated: false,
+                scanned_root: None,
+            },
+        },
+    );
+
+    assert_eq!(output.packages[0].holder.as_deref(), Some("Example Corp."));
+    assert_eq!(
+        output.packages[0].copyright.as_deref(),
+        Some("Copyright Example Corp.")
+    );
+}
+
+#[test]
+fn create_output_summary_still_resolves_after_strip_root_normalization() {
+    let start = Utc::now();
+    let end = start;
+    let temp = tempfile::tempdir().expect("tempdir should be created");
+    let root = temp.path().join("project");
+    let manifest_path = root.join("demo.gemspec");
+    std::fs::create_dir_all(&root).expect("root should exist");
+
+    let mut manifest = file(manifest_path.to_str().unwrap());
+    manifest.package_data = vec![crate::models::PackageData {
+        package_type: Some(crate::models::PackageType::Gem),
+        datasource_id: Some(crate::models::DatasourceId::Gemspec),
+        declared_license_expression: Some("mit".to_string()),
+        declared_license_expression_spdx: Some("MIT".to_string()),
+        purl: Some("pkg:gem/demo@1.0.0".to_string()),
+        ..Default::default()
+    }];
+    manifest.license_expression = Some("mit".to_string());
+    manifest.license_detections = vec![crate::models::LicenseDetection {
+        license_expression: "mit".to_string(),
+        license_expression_spdx: "MIT".to_string(),
+        matches: vec![Match {
+            license_expression: "mit".to_string(),
+            license_expression_spdx: "MIT".to_string(),
+            from_file: Some("project/demo.gemspec".to_string()),
+            start_line: 1,
+            end_line: 1,
+            matcher: Some("1-spdx-id".to_string()),
+            score: 100.0,
+            matched_length: Some(1),
+            match_coverage: Some(100.0),
+            rule_relevance: Some(100),
+            rule_identifier: None,
+            rule_url: None,
+            matched_text: None,
+        }],
+        identifier: None,
+    }];
+
+    let mut files = vec![dir(root.to_str().unwrap()), manifest];
+    normalize_paths(&mut files, root.to_str().unwrap(), true, false);
+    let assembly_result = assembly::assemble(&mut files);
+
+    let output = create_output(
+        start,
+        end,
+        crate::scanner::ProcessResult {
+            files,
+            excluded_count: 0,
+        },
+        CreateOutputContext {
+            total_dirs: 1,
+            assembly_result,
+            license_references: vec![],
+            license_rule_references: vec![],
+            options: CreateOutputOptions {
+                facet_rules: &[],
+                include_tallies_by_facet: false,
+                include_summary: true,
+                include_license_clarity_score: false,
+                include_tallies: false,
+                include_tallies_with_details: false,
+                include_tallies_of_key_files: false,
+                include_generated: false,
+                scanned_root: None,
+            },
+        },
+    );
+
+    assert_eq!(
+        output
+            .summary
+            .and_then(|summary| summary.declared_license_expression),
+        Some("mit".to_string())
     );
 }

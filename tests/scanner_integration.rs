@@ -532,6 +532,7 @@ fn test_scanner_detects_emails_and_urls_when_enabled() {
     let engine = create_license_detection_engine();
     let options = TextDetectionOptions {
         detect_copyrights: true,
+        detect_generated: false,
         detect_emails: true,
         detect_urls: true,
         max_emails: 50,
@@ -573,6 +574,7 @@ fn test_scanner_detects_copyrights_in_latin1_text() {
     let engine = create_license_detection_engine();
     let options = TextDetectionOptions {
         detect_copyrights: true,
+        detect_generated: false,
         detect_emails: false,
         detect_urls: false,
         max_emails: 50,
@@ -617,6 +619,7 @@ fn test_scanner_detects_copyrights_in_pdf_text() {
     let engine = create_license_detection_engine();
     let options = TextDetectionOptions {
         detect_copyrights: true,
+        detect_generated: false,
         detect_emails: false,
         detect_urls: false,
         max_emails: 50,
@@ -674,6 +677,7 @@ fn test_scanner_detects_emails_and_urls_in_pdf_text() {
     let engine = create_license_detection_engine();
     let options = TextDetectionOptions {
         detect_copyrights: false,
+        detect_generated: false,
         detect_emails: true,
         detect_urls: true,
         max_emails: 50,
@@ -733,6 +737,7 @@ fn test_scanner_detects_copyrights_in_supported_image_exif_containers() {
     let engine = create_license_detection_engine();
     let options = TextDetectionOptions {
         detect_copyrights: true,
+        detect_generated: false,
         detect_emails: false,
         detect_urls: false,
         max_emails: 50,
@@ -806,6 +811,7 @@ fn test_scanner_detects_emails_and_urls_in_xmp_metadata() {
     let engine = create_license_detection_engine();
     let options = TextDetectionOptions {
         detect_copyrights: false,
+        detect_generated: false,
         detect_emails: true,
         detect_urls: true,
         max_emails: 50,
@@ -881,6 +887,7 @@ fn test_scanner_detects_urls_in_additional_xmp_fields() {
     let engine = create_license_detection_engine();
     let options = TextDetectionOptions {
         detect_copyrights: false,
+        detect_generated: false,
         detect_emails: true,
         detect_urls: true,
         max_emails: 50,
@@ -941,6 +948,7 @@ fn test_scanner_detects_emails_in_exif_user_comment() {
     let engine = create_license_detection_engine();
     let options = TextDetectionOptions {
         detect_copyrights: false,
+        detect_generated: false,
         detect_emails: true,
         detect_urls: false,
         max_emails: 50,
@@ -991,6 +999,7 @@ fn test_scanner_ignores_non_clue_image_metadata() {
     let engine = create_license_detection_engine();
     let options = TextDetectionOptions {
         detect_copyrights: true,
+        detect_generated: false,
         detect_emails: true,
         detect_urls: true,
         max_emails: 50,
@@ -1033,6 +1042,7 @@ fn test_scanner_ignores_xml_namespace_garbage_in_copyright_detection() {
     let engine = create_license_detection_engine();
     let options = TextDetectionOptions {
         detect_copyrights: true,
+        detect_generated: false,
         detect_emails: false,
         detect_urls: false,
         max_emails: 50,
@@ -1087,6 +1097,7 @@ fn test_scanner_detects_copyrights_in_windows_dll_strings() {
     let engine = create_license_detection_engine();
     let options = TextDetectionOptions {
         detect_copyrights: true,
+        detect_generated: false,
         detect_emails: false,
         detect_urls: false,
         max_emails: 50,
@@ -1131,6 +1142,7 @@ fn test_scanner_avoids_false_positive_copyrights_in_executable_strings() {
     let engine = create_license_detection_engine();
     let options = TextDetectionOptions {
         detect_copyrights: true,
+        detect_generated: false,
         detect_emails: false,
         detect_urls: false,
         max_emails: 50,
@@ -1182,6 +1194,7 @@ fn test_scanner_respects_email_url_thresholds() {
     let engine = create_license_detection_engine();
     let options = TextDetectionOptions {
         detect_copyrights: true,
+        detect_generated: false,
         detect_emails: true,
         detect_urls: true,
         max_emails: 2,
@@ -1224,6 +1237,7 @@ fn test_scanner_persists_scan_result_cache_entries() {
     let patterns: Vec<Pattern> = vec![];
     let options = TextDetectionOptions {
         detect_copyrights: true,
+        detect_generated: false,
         detect_emails: true,
         detect_urls: true,
         max_emails: 50,
