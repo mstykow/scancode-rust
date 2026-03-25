@@ -1,0 +1,602 @@
+use std::fs;
+use std::path::{Path, PathBuf};
+use std::sync::{Arc, OnceLock};
+
+use flate2::read::GzDecoder;
+use glob::Pattern;
+use serde_json::{Value, json};
+use tar::Archive;
+use tempfile::{TempDir, tempdir};
+
+use super::*;
+use crate::assembly;
+use crate::cache::DEFAULT_CACHE_DIR_NAME;
+use crate::license_detection::LicenseDetectionEngine;
+use crate::models::{FileInfo, FileType, Package, PackageType};
+use crate::progress::{ProgressMode, ScanProgress};
+use crate::scan_result_shaping::normalize_paths;
+use crate::scanner::{TextDetectionOptions, collect_paths, process_collected};
+
+pub(crate) fn file(path: &str) -> FileInfo {
+    FileInfo::new(
+        Path::new(path)
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or_default()
+            .to_string(),
+        Path::new(path)
+            .file_stem()
+            .and_then(|n| n.to_str())
+            .unwrap_or_default()
+            .to_string(),
+        Path::new(path)
+            .extension()
+            .and_then(|n| n.to_str())
+            .map(|ext| format!(".{ext}"))
+            .unwrap_or_default(),
+        path.to_string(),
+        FileType::File,
+        None,
+        1,
+        None,
+        None,
+        None,
+        None,
+        None,
+        Vec::new(),
+        None,
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+    )
+}
+
+pub(crate) fn dir(path: &str) -> FileInfo {
+    FileInfo::new(
+        Path::new(path)
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or_default()
+            .to_string(),
+        Path::new(path)
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or_default()
+            .to_string(),
+        String::new(),
+        path.to_string(),
+        FileType::Directory,
+        None,
+        0,
+        None,
+        None,
+        None,
+        None,
+        None,
+        Vec::new(),
+        None,
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+    )
+}
+
+pub(crate) fn package(uid: &str, path: &str) -> Package {
+    Package {
+        package_type: Some(PackageType::Gem),
+        namespace: None,
+        name: Some("inspec-bin".to_string()),
+        version: Some("6.8.2".to_string()),
+        qualifiers: None,
+        subpath: None,
+        primary_language: Some("Ruby".to_string()),
+        description: None,
+        release_date: None,
+        parties: vec![],
+        keywords: vec![],
+        homepage_url: None,
+        download_url: None,
+        size: None,
+        sha1: None,
+        md5: None,
+        sha256: None,
+        sha512: None,
+        bug_tracking_url: None,
+        code_view_url: None,
+        vcs_url: None,
+        copyright: None,
+        holder: None,
+        declared_license_expression: None,
+        declared_license_expression_spdx: None,
+        license_detections: vec![],
+        other_license_expression: None,
+        other_license_expression_spdx: None,
+        other_license_detections: vec![],
+        extracted_license_statement: None,
+        notice_text: None,
+        source_packages: vec![],
+        is_private: false,
+        is_virtual: false,
+        extra_data: None,
+        repository_homepage_url: None,
+        repository_download_url: None,
+        api_data_url: None,
+        datasource_ids: vec![DatasourceId::GemArchiveExtracted],
+        purl: Some("pkg:gem/inspec-bin@6.8.2".to_string()),
+        package_uid: uid.to_string(),
+        datafile_paths: vec![path.to_string()],
+    }
+}
+
+pub(crate) fn test_license_engine() -> Arc<LicenseDetectionEngine> {
+    static ENGINE: OnceLock<Arc<LicenseDetectionEngine>> = OnceLock::new();
+    ENGINE
+        .get_or_init(|| {
+            Arc::new(
+                LicenseDetectionEngine::from_embedded()
+                    .expect("embedded license engine should initialize"),
+            )
+        })
+        .clone()
+}
+
+pub(crate) struct FixtureScanRoot {
+    pub(crate) scan_root: PathBuf,
+    pub(crate) normalize_root: PathBuf,
+    _temp_dir: Option<TempDir>,
+}
+
+pub(crate) fn compare_scan_json_values(
+    actual: &Value,
+    expected: &Value,
+    path: &str,
+) -> Result<(), String> {
+    if path.ends_with("package_data") {
+        return Ok(());
+    }
+
+    match (actual, expected) {
+        (Value::Null, Value::Null) => Ok(()),
+        (Value::Bool(a), Value::Bool(e)) if a == e => Ok(()),
+        (Value::Number(a), Value::Number(e)) if a == e => Ok(()),
+        (Value::String(a), Value::String(e)) if a == e => Ok(()),
+        (Value::Array(a), Value::Array(e)) => {
+            if a.len() != e.len() {
+                return Err(format!(
+                    "Array length mismatch at {}: actual={}, expected={}",
+                    path,
+                    a.len(),
+                    e.len()
+                ));
+            }
+
+            for (index, (actual_item, expected_item)) in a.iter().zip(e.iter()).enumerate() {
+                let item_path = if path.is_empty() {
+                    format!("[{}]", index)
+                } else {
+                    format!("{}[{}]", path, index)
+                };
+                compare_scan_json_values(actual_item, expected_item, &item_path)?;
+            }
+
+            Ok(())
+        }
+        (Value::Object(a), Value::Object(e)) => {
+            if path.ends_with("resolved_package") && e.is_empty() {
+                return Ok(());
+            }
+
+            for key in e.keys() {
+                if !a.contains_key(key) {
+                    match e.get(key) {
+                        Some(Value::Null) => continue,
+                        Some(Value::Bool(false)) => continue,
+                        Some(Value::Array(values)) if values.is_empty() => continue,
+                        Some(Value::Object(values)) if values.is_empty() => continue,
+                        _ => {
+                            let field_path = if path.is_empty() {
+                                key.to_string()
+                            } else {
+                                format!("{}.{}", path, key)
+                            };
+                            return Err(format!("Missing key in actual: {}", field_path));
+                        }
+                    }
+                }
+            }
+
+            for key in a.keys() {
+                if !e.contains_key(key) {
+                    if path.ends_with("extra_data") {
+                        continue;
+                    }
+
+                    match a.get(key) {
+                        Some(Value::Null) => continue,
+                        Some(Value::Bool(false)) => continue,
+                        Some(Value::Array(values)) if values.is_empty() => continue,
+                        Some(Value::Object(values)) if values.is_empty() => continue,
+                        _ => {
+                            let field_path = if path.is_empty() {
+                                key.to_string()
+                            } else {
+                                format!("{}.{}", path, key)
+                            };
+                            return Err(format!("Extra key in actual: {}", field_path));
+                        }
+                    }
+                }
+            }
+
+            for key in a.keys() {
+                if let (Some(actual_val), Some(expected_val)) = (a.get(key), e.get(key)) {
+                    let field_path = if path.is_empty() {
+                        key.to_string()
+                    } else {
+                        format!("{}.{}", path, key)
+                    };
+                    compare_scan_json_values(actual_val, expected_val, &field_path)?;
+                }
+            }
+
+            Ok(())
+        }
+        _ => Err(format!(
+            "Type or value mismatch at {}: actual={}, expected={}",
+            path,
+            serde_json::to_string(actual).unwrap_or_default(),
+            serde_json::to_string(expected).unwrap_or_default()
+        )),
+    }
+}
+
+pub(crate) fn normalize_scan_json(value: &mut Value, parent_key: Option<&str>) {
+    match value {
+        Value::Array(values) => {
+            for item in values.iter_mut() {
+                normalize_scan_json(item, parent_key);
+            }
+
+            if parent_key.is_some_and(|key| {
+                matches!(
+                    key,
+                    "packages"
+                        | "dependencies"
+                        | "files"
+                        | "package_data"
+                        | "datafile_paths"
+                        | "datasource_ids"
+                        | "for_packages"
+                )
+            }) {
+                values.sort_by_cached_key(|item| serde_json::to_string(item).unwrap_or_default());
+            }
+        }
+        Value::Object(map) => {
+            for (key, item) in map.iter_mut() {
+                normalize_scan_json(item, Some(key));
+            }
+        }
+        _ => {}
+    }
+}
+
+pub(crate) fn fixture_exclude_patterns() -> Vec<Pattern> {
+    [
+        format!("{DEFAULT_CACHE_DIR_NAME}/*"),
+        format!("**/{DEFAULT_CACHE_DIR_NAME}/*"),
+    ]
+    .into_iter()
+    .map(|pattern| Pattern::new(&pattern).expect("fixture exclude pattern should be valid"))
+    .collect()
+}
+
+pub(crate) fn extract_archive_fixture(archive_path: &Path) -> FixtureScanRoot {
+    let temp_dir = tempdir().expect("tempdir should be created");
+    let extracted_root = temp_dir.path().join(
+        archive_path
+            .file_name()
+            .expect("archive fixture should have a file name"),
+    );
+
+    fs::create_dir_all(&extracted_root).expect("archive fixture extraction root should be created");
+
+    let archive_file =
+        fs::File::open(archive_path).expect("archive fixture should be readable for extraction");
+    let decoder = GzDecoder::new(archive_file);
+    let mut archive = Archive::new(decoder);
+    archive
+        .unpack(&extracted_root)
+        .expect("archive fixture should extract successfully");
+
+    FixtureScanRoot {
+        scan_root: extracted_root,
+        normalize_root: temp_dir.path().to_path_buf(),
+        _temp_dir: Some(temp_dir),
+    }
+}
+
+pub(crate) fn resolve_fixture_scan_root(fixture_root: &Path) -> FixtureScanRoot {
+    if !fixture_root.exists()
+        && let Some(file_name) = fixture_root.file_name().and_then(|name| name.to_str())
+    {
+        let archive_path = fixture_root.with_file_name(format!("{file_name}.tar.gz"));
+        if archive_path.is_file() {
+            return extract_archive_fixture(&archive_path);
+        }
+    }
+
+    let codebase_root = fixture_root.join("codebase");
+    if codebase_root.is_dir() {
+        return FixtureScanRoot {
+            scan_root: codebase_root,
+            normalize_root: fixture_root.to_path_buf(),
+            _temp_dir: None,
+        };
+    }
+
+    let project_entries: Vec<PathBuf> = std::fs::read_dir(fixture_root)
+        .ok()
+        .into_iter()
+        .flat_map(|entries| entries.flatten())
+        .map(|entry| entry.path())
+        .filter(|path| {
+            path.is_dir()
+                || path
+                    .file_name()
+                    .and_then(|name| name.to_str())
+                    .is_some_and(|name| !name.ends_with(".expected.json"))
+        })
+        .collect();
+
+    if project_entries.len() == 1 {
+        let project_entry = &project_entries[0];
+        if project_entry.is_dir() {
+            return FixtureScanRoot {
+                scan_root: project_entry.clone(),
+                normalize_root: fixture_root.to_path_buf(),
+                _temp_dir: None,
+            };
+        }
+
+        if project_entry
+            .file_name()
+            .and_then(|name| name.to_str())
+            .is_some_and(|name| name.ends_with(".tar.gz"))
+        {
+            return extract_archive_fixture(project_entry);
+        }
+    }
+
+    FixtureScanRoot {
+        scan_root: fixture_root.to_path_buf(),
+        normalize_root: fixture_root.to_path_buf(),
+        _temp_dir: None,
+    }
+}
+
+pub(crate) fn strip_root_prefix_for_test(path: &Path, root: &Path) -> Option<PathBuf> {
+    if let Ok(stripped) = path.strip_prefix(root)
+        && !stripped.as_os_str().is_empty()
+    {
+        return Some(stripped.to_path_buf());
+    }
+
+    let canonical_path = path.canonicalize().ok()?;
+    let canonical_root = root.canonicalize().ok()?;
+    let stripped = canonical_path.strip_prefix(canonical_root).ok()?;
+    if stripped.as_os_str().is_empty() {
+        None
+    } else {
+        Some(stripped.to_path_buf())
+    }
+}
+
+pub(crate) fn normalize_paths_for_test(files: &mut [FileInfo], scan_root: &str) {
+    normalize_paths(files, scan_root, true, false);
+}
+
+pub(crate) fn normalize_package_datafile_paths(packages: &mut [Package], scan_root: &Path) {
+    for package in packages {
+        for path in &mut package.datafile_paths {
+            if let Some(stripped) = strip_root_prefix_for_test(Path::new(path), scan_root) {
+                *path = stripped.to_string_lossy().to_string();
+            }
+        }
+    }
+}
+
+pub(crate) fn compute_fixture_summary(
+    fixture_dir: &str,
+    include_summary: bool,
+    include_score: bool,
+) -> Value {
+    let fixture_root = Path::new(fixture_dir);
+    let resolved_scan_root = resolve_fixture_scan_root(fixture_root);
+    let progress = Arc::new(ScanProgress::new(ProgressMode::Quiet));
+    let exclude_patterns = fixture_exclude_patterns();
+    let collected = collect_paths(&resolved_scan_root.scan_root, 0, &exclude_patterns);
+    let scan_result = process_collected(
+        &collected,
+        progress,
+        Some(test_license_engine()),
+        false,
+        &TextDetectionOptions::default(),
+    );
+
+    let mut files = scan_result.files;
+    normalize_paths_for_test(
+        &mut files,
+        resolved_scan_root
+            .normalize_root
+            .to_str()
+            .expect("fixture path should be UTF-8"),
+    );
+    let assembly_result = assembly::assemble(&mut files);
+    let mut packages = assembly_result.packages;
+    normalize_package_datafile_paths(&mut packages, &resolved_scan_root.normalize_root);
+
+    classify_key_files(&mut files, &packages);
+    promote_package_metadata_from_key_files(&files, &mut packages);
+
+    serde_json::to_value(
+        compute_summary_with_options(&files, &packages, include_summary, include_score)
+            .expect("fixture summary should exist"),
+    )
+    .expect("fixture summary should serialize")
+}
+
+pub(crate) fn assert_summary_fixture_matches_expected(
+    fixture_dir: &str,
+    expected_file: &str,
+    include_summary: bool,
+    include_score: bool,
+) {
+    let actual_summary = compute_fixture_summary(fixture_dir, include_summary, include_score);
+    let expected: Value = serde_json::from_str(
+        &fs::read_to_string(expected_file).expect("expected summary fixture should be readable"),
+    )
+    .expect("expected summary fixture should parse");
+    let expected_summary = expected
+        .get("summary")
+        .expect("expected fixture should contain summary")
+        .clone();
+
+    if let Err(error) = compare_scan_json_values(&actual_summary, &expected_summary, "summary") {
+        panic!(
+            "Summary fixture mismatch for {} vs {}: {}\nactual summary: {}\nexpected summary: {}",
+            fixture_dir,
+            expected_file,
+            error,
+            serde_json::to_string_pretty(&actual_summary).unwrap_or_default(),
+            serde_json::to_string_pretty(&expected_summary).unwrap_or_default()
+        );
+    }
+}
+
+pub(crate) fn project_classify_fields(value: &Value) -> Value {
+    let bool_or_false =
+        |file: &Value, key: &str| file.get(key).cloned().unwrap_or(Value::Bool(false));
+
+    let files = value
+        .get("files")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+
+    json!({
+        "files": files
+            .into_iter()
+            .map(|file| {
+                json!({
+                    "path": file.get("path").cloned().unwrap_or(Value::Null),
+                    "type": file.get("type").cloned().unwrap_or(Value::Null),
+                    "name": file.get("name").cloned().unwrap_or(Value::Null),
+                    "base_name": file.get("base_name").cloned().unwrap_or(Value::Null),
+                    "extension": file.get("extension").cloned().unwrap_or(Value::Null),
+                    "is_legal": bool_or_false(&file, "is_legal"),
+                    "is_manifest": bool_or_false(&file, "is_manifest"),
+                    "is_readme": bool_or_false(&file, "is_readme"),
+                    "is_top_level": bool_or_false(&file, "is_top_level"),
+                    "is_key_file": bool_or_false(&file, "is_key_file"),
+                    "is_community": bool_or_false(&file, "is_community"),
+                })
+            })
+            .collect::<Vec<_>>()
+    })
+}
+
+pub(crate) fn assert_classify_fixture_matches_expected(
+    fixture_dir: &str,
+    expected_file: &str,
+    normalize_against_parent: bool,
+) {
+    let fixture_root = Path::new(fixture_dir);
+    let progress = Arc::new(ScanProgress::new(ProgressMode::Quiet));
+    let collected = collect_paths(fixture_root, 0, &[]);
+    let scan_result = process_collected(
+        &collected,
+        progress,
+        Some(test_license_engine()),
+        false,
+        &TextDetectionOptions::default(),
+    );
+
+    let mut files = scan_result.files;
+    let normalize_root = if normalize_against_parent {
+        fixture_root.parent().expect("fixture should have parent")
+    } else {
+        fixture_root.parent().unwrap_or(fixture_root)
+    };
+    normalize_paths_for_test(
+        &mut files,
+        normalize_root
+            .to_str()
+            .expect("fixture path should be UTF-8"),
+    );
+
+    if normalize_against_parent {
+        let dir_name = fixture_root
+            .file_name()
+            .and_then(|name| name.to_str())
+            .expect("fixture dir should have utf-8 file name");
+        files.push(dir(dir_name));
+    } else if let Some(dir_name) = fixture_root.file_name().and_then(|name| name.to_str()) {
+        files.push(dir(dir_name));
+    }
+
+    let assembly_result = assembly::assemble(&mut files);
+    classify_key_files(&mut files, &assembly_result.packages);
+
+    let actual = project_classify_fields(&json!({ "files": files }));
+    let expected: Value = serde_json::from_str(
+        &fs::read_to_string(expected_file).expect("expected classify fixture should be readable"),
+    )
+    .expect("expected classify fixture should parse");
+    let expected = project_classify_fields(&expected);
+
+    let mut actual_normalized = actual;
+    let mut expected_normalized = expected;
+    normalize_scan_json(&mut actual_normalized, None);
+    normalize_scan_json(&mut expected_normalized, None);
+
+    if let Err(error) = compare_scan_json_values(&actual_normalized, &expected_normalized, "") {
+        panic!(
+            "Classify fixture mismatch for {} vs {}: {}\nactual={}\nexpected={}",
+            fixture_dir,
+            expected_file,
+            error,
+            serde_json::to_string_pretty(&actual_normalized).unwrap_or_default(),
+            serde_json::to_string_pretty(&expected_normalized).unwrap_or_default()
+        );
+    }
+}
+
+pub(crate) fn scan_and_assemble_with_keyfiles(
+    path: &Path,
+) -> (Vec<FileInfo>, assembly::AssemblyResult) {
+    let progress = Arc::new(ScanProgress::new(ProgressMode::Quiet));
+    let collected = collect_paths(path, 0, &[]);
+    let result = process_collected(
+        &collected,
+        progress,
+        None,
+        false,
+        &TextDetectionOptions::default(),
+    );
+
+    let mut files = result.files;
+    let assembly_result = assembly::assemble(&mut files);
+    classify_key_files(&mut files, &assembly_result.packages);
+    (files, assembly_result)
+}

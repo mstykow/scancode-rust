@@ -186,6 +186,22 @@ fn test_golden_debian_control() {
 
 **Why This Matters**: Unit tests verify components work; integration tests verify they work together correctly.
 
+### Ecosystem-Local Scanner/Assembly Tests
+
+In addition to the top-level integration suite, some parsers benefit from a small number of
+ecosystem-local scanner/assembly tests under `src/parsers/*_scan_test.rs`.
+
+These are appropriate when behavior depends on scanner wiring or assembly/file-reference handling,
+for example:
+
+- installed metadata linking files back to the assembled package
+- archive/extracted layouts where normalized paths matter
+- intentionally unassembled formats whose scanner behavior must stay stable
+
+These are **not** a replacement for `tests/scanner_integration.rs`. The top-level integration suite
+should stay cross-parser and system-oriented, while ecosystem-local scan tests stay close to the
+owning parser behavior they protect.
+
 **Example**:
 
 ```rust
