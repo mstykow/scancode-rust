@@ -62,6 +62,20 @@ fn validate_scan_option_compatibility_rejects_scan_flags_with_from_json() {
 }
 
 #[test]
+fn validate_scan_option_compatibility_rejects_package_with_from_json() {
+    let cli = crate::cli::Cli::try_parse_from([
+        "provenant",
+        "--json-pp",
+        "scan.json",
+        "--from-json",
+        "--package",
+        "sample-scan.json",
+    ])
+    .unwrap();
+    assert!(validate_scan_option_compatibility(&cli).is_err());
+}
+
+#[test]
 fn validate_scan_option_compatibility_rejects_generated_with_from_json() {
     let cli = crate::cli::Cli::try_parse_from([
         "provenant",
@@ -128,6 +142,77 @@ fn validate_scan_option_compatibility_allows_multiple_inputs_with_from_json() {
     ])
     .unwrap();
     assert!(validate_scan_option_compatibility(&cli).is_ok());
+}
+
+#[test]
+fn from_json_with_no_assemble_preserves_preloaded_package_sections() {
+    let temp_path = std::env::temp_dir().join("provenant-from-json-with-packages-test.json");
+    let content = json!({
+        "files": [],
+        "packages": [
+            {
+                "package_uid": "pkg:npm/demo@1.0.0",
+                "type": "npm",
+                "name": "demo",
+                "version": "1.0.0",
+                "parties": [],
+                "datafile_paths": ["package.json"],
+                "datasource_ids": ["npm_package_json"]
+            }
+        ],
+        "dependencies": [
+            {
+                "purl": "pkg:npm/dep@2.0.0",
+                "scope": "dependencies",
+                "is_runtime": true,
+                "is_optional": false,
+                "is_pinned": true,
+                "dependency_uid": "pkg:npm/dep@2.0.0?uuid=test",
+                "for_package_uid": "pkg:npm/demo@1.0.0",
+                "datafile_path": "package.json",
+                "datasource_id": "npm_package_json"
+            }
+        ],
+        "license_references": [],
+        "license_rule_references": []
+    });
+    fs::write(&temp_path, content.to_string()).expect("write json fixture");
+
+    let parsed = load_scan_from_json(temp_path.to_str().expect("utf-8 path"))
+        .expect("from-json loading should succeed");
+
+    let preloaded = assembly::AssemblyResult {
+        packages: parsed.packages,
+        dependencies: parsed.dependencies,
+    };
+
+    let cli = crate::cli::Cli::try_parse_from([
+        "provenant",
+        "--json-pp",
+        "scan.json",
+        "--from-json",
+        "--no-assemble",
+        temp_path.to_str().expect("utf-8 path"),
+    ])
+    .expect("cli parse should succeed");
+
+    let assembly_result = if cli.from_json
+        && (!preloaded.packages.is_empty() || !preloaded.dependencies.is_empty())
+    {
+        preloaded
+    } else if cli.no_assemble {
+        assembly::AssemblyResult {
+            packages: Vec::new(),
+            dependencies: Vec::new(),
+        }
+    } else {
+        unreachable!("test only covers from-json preload precedence")
+    };
+
+    assert_eq!(assembly_result.packages.len(), 1);
+    assert_eq!(assembly_result.dependencies.len(), 1);
+
+    let _ = fs::remove_file(temp_path);
 }
 
 #[test]

@@ -149,6 +149,10 @@ pub struct Cli {
     #[arg(long)]
     pub from_json: bool,
 
+    /// Scan input for application package and dependency manifests, lockfiles and related data
+    #[arg(short = 'p', long)]
+    pub package: bool,
+
     /// Disable package assembly (merging related manifest/lockfiles into packages)
     #[arg(long)]
     pub no_assemble: bool,
@@ -576,6 +580,36 @@ mod tests {
         .expect("cli parse should succeed");
 
         assert!(parsed.copyright);
+    }
+
+    #[test]
+    fn test_package_flag_defaults_to_disabled() {
+        let parsed = Cli::try_parse_from(["provenant", "--json-pp", "scan.json", "samples"])
+            .expect("cli parse should succeed");
+
+        assert!(!parsed.package);
+    }
+
+    #[test]
+    fn test_parses_package_flag() {
+        let parsed = Cli::try_parse_from([
+            "provenant",
+            "--json-pp",
+            "scan.json",
+            "--package",
+            "samples",
+        ])
+        .expect("cli parse should succeed");
+
+        assert!(parsed.package);
+    }
+
+    #[test]
+    fn test_package_short_flag() {
+        let parsed = Cli::try_parse_from(["provenant", "--json-pp", "scan.json", "-p", "samples"])
+            .expect("cli parse should succeed");
+
+        assert!(parsed.package);
     }
 
     #[test]

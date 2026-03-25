@@ -12,6 +12,7 @@ pub struct ProcessResult {
 
 #[derive(Debug, Clone)]
 pub struct TextDetectionOptions {
+    pub detect_packages: bool,
     pub detect_copyrights: bool,
     pub detect_generated: bool,
     pub detect_emails: bool,
@@ -25,6 +26,7 @@ pub struct TextDetectionOptions {
 impl Default for TextDetectionOptions {
     fn default() -> Self {
         Self {
+            detect_packages: false,
             detect_copyrights: true,
             detect_generated: false,
             detect_emails: false,
@@ -56,6 +58,7 @@ mod tests {
     #[test]
     fn default_options_keep_copyright_detection_enabled() {
         let options = TextDetectionOptions::default();
+        assert!(!options.detect_packages);
         assert!(options.detect_copyrights);
     }
 
@@ -84,6 +87,7 @@ mod tests {
     #[test]
     fn scanner_reports_repeated_email_occurrences() {
         let options = TextDetectionOptions {
+            detect_packages: false,
             detect_copyrights: false,
             detect_generated: false,
             detect_emails: true,
@@ -120,6 +124,7 @@ mod tests {
     #[test]
     fn scanner_skips_pem_certificate_text_detection() {
         let options = TextDetectionOptions {
+            detect_packages: false,
             detect_copyrights: true,
             detect_generated: false,
             detect_emails: true,
@@ -170,6 +175,7 @@ mod tests {
     #[test]
     fn scanner_detects_structured_credits_authors() {
         let options = TextDetectionOptions {
+            detect_packages: false,
             detect_copyrights: true,
             detect_generated: false,
             detect_emails: false,
@@ -207,6 +213,7 @@ mod tests {
     #[test]
     fn scanner_sets_generated_flag_when_enabled() {
         let options = TextDetectionOptions {
+            detect_packages: false,
             detect_copyrights: false,
             detect_generated: true,
             detect_emails: false,
@@ -223,5 +230,58 @@ mod tests {
         );
 
         assert_eq!(scanned.is_generated, Some(true));
+    }
+
+    #[test]
+    fn scanner_skips_package_parsing_when_disabled() {
+        let options = TextDetectionOptions {
+            detect_packages: false,
+            detect_copyrights: false,
+            detect_generated: false,
+            detect_emails: false,
+            detect_urls: false,
+            max_emails: 50,
+            max_urls: 50,
+            timeout_seconds: 120.0,
+            scan_cache_dir: None,
+        };
+        let scanned = scan_single_file(
+            "package.json",
+            r#"{"name":"demo","version":"1.0.0"}"#,
+            &options,
+        );
+
+        assert!(
+            scanned.package_data.is_empty(),
+            "package_data: {:#?}",
+            scanned.package_data
+        );
+    }
+
+    #[test]
+    fn scanner_parses_package_manifests_when_enabled() {
+        let options = TextDetectionOptions {
+            detect_packages: true,
+            detect_copyrights: false,
+            detect_generated: false,
+            detect_emails: false,
+            detect_urls: false,
+            max_emails: 50,
+            max_urls: 50,
+            timeout_seconds: 120.0,
+            scan_cache_dir: None,
+        };
+        let scanned = scan_single_file(
+            "package.json",
+            r#"{"name":"demo","version":"1.0.0"}"#,
+            &options,
+        );
+
+        assert_eq!(
+            scanned.package_data.len(),
+            1,
+            "package_data: {:#?}",
+            scanned.package_data
+        );
     }
 }

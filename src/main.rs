@@ -166,6 +166,7 @@ fn run() -> Result<()> {
         };
 
         let text_options = TextDetectionOptions {
+            detect_packages: cli.package,
             detect_copyrights: cli.copyright,
             detect_generated: cli.generated,
             detect_emails: cli.email,
@@ -237,17 +238,17 @@ fn run() -> Result<()> {
         .iter()
         .map(|file| file.package_data.len())
         .sum();
-    let assembly_result = if cli.no_assemble {
-        assembly::AssemblyResult {
-            packages: Vec::new(),
-            dependencies: Vec::new(),
-        }
-    } else if cli.from_json
+    let assembly_result = if cli.from_json
         && (!preloaded_assembly.packages.is_empty() || !preloaded_assembly.dependencies.is_empty())
     {
         progress.start_assembly();
         progress.finish_assembly(preloaded_assembly.packages.len(), manifests_seen);
         preloaded_assembly
+    } else if cli.no_assemble {
+        assembly::AssemblyResult {
+            packages: Vec::new(),
+            dependencies: Vec::new(),
+        }
     } else {
         progress.start_assembly();
         let assembled = assembly::assemble(&mut scan_result.files);
@@ -307,9 +308,9 @@ fn run() -> Result<()> {
 }
 
 fn validate_scan_option_compatibility(cli: &Cli) -> Result<()> {
-    if cli.from_json && (cli.copyright || cli.email || cli.url || cli.generated) {
+    if cli.from_json && (cli.package || cli.copyright || cli.email || cli.url || cli.generated) {
         return Err(anyhow!(
-            "When using --from-json, file scan options like --copyright/--email/--url/--generated are not allowed"
+            "When using --from-json, file scan options like --package/--copyright/--email/--url/--generated are not allowed"
         ));
     }
 
@@ -419,7 +420,10 @@ fn progress_mode_from_cli(cli: &Cli) -> ProgressMode {
 }
 
 fn configured_scan_names(cli: &Cli) -> String {
-    let mut names = vec!["licenses", "packages"];
+    let mut names = vec!["licenses"];
+    if cli.package {
+        names.push("packages");
+    }
     if cli.copyright {
         names.push("copyrights");
     }

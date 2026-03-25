@@ -211,7 +211,9 @@ fn extract_information_from_content(
 
     // Package parsing and text-based detection (copyright, license) are independent.
     // Python ScanCode runs all enabled plugins on every file, so we do the same.
-    if let Some(package_data) = try_parse_file(path) {
+    if text_options.detect_packages
+        && let Some(package_data) = try_parse_file(path)
+    {
         file_info_builder.package_data(package_data);
     }
 
@@ -287,7 +289,8 @@ fn is_timeout_exceeded(started: Instant, timeout_seconds: f64) -> bool {
 
 fn scan_cache_fingerprint(text_options: &TextDetectionOptions) -> String {
     format!(
-        "copyrights={};emails={};urls={};max_emails={};max_urls={};timeout={:.6}",
+        "packages={};copyrights={};emails={};urls={};max_emails={};max_urls={};timeout={:.6}",
+        text_options.detect_packages,
         text_options.detect_copyrights,
         text_options.detect_emails,
         text_options.detect_urls,

@@ -17,40 +17,41 @@ This plan tracks progress toward a **drop-in replacement CLI surface**.
 
 ### Implemented (drop-in-oriented core)
 
-| Parameter                  | Notes                                                                                                             |
-| -------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| `<dir_path>`               | Positional argument                                                                                               |
-| `--json <FILE>`            | Compact JSON output                                                                                               |
-| `--json-pp <FILE>`         | Pretty JSON output                                                                                                |
-| `--json-lines <FILE>`      | JSON Lines output                                                                                                 |
-| `--yaml <FILE>`            | YAML output                                                                                                       |
-| `--csv <FILE>`             | CSV output (deprecated upstream but supported)                                                                    |
-| `--html <FILE>`            | HTML report output                                                                                                |
-| `--spdx-tv <FILE>`         | SPDX Tag/Value output                                                                                             |
-| `--spdx-rdf <FILE>`        | SPDX RDF/XML output                                                                                               |
-| `--cyclonedx <FILE>`       | CycloneDX JSON output                                                                                             |
-| `--cyclonedx-xml <FILE>`   | CycloneDX XML output                                                                                              |
-| `--custom-output <FILE>`   | Custom template output file                                                                                       |
-| `--custom-template <FILE>` | Required with `--custom-output`                                                                                   |
-| `-m, --max-depth`          | Default: 0 (no depth limit)                                                                                       |
-| `-n, --processes`          | Compatible with `0` and `-1` values                                                                               |
-| `--timeout`                | Per-file timeout option                                                                                           |
-| `-q, --quiet`              | Quiet mode                                                                                                        |
-| `-v, --verbose`            | Verbose path mode                                                                                                 |
-| `--strip-root`             | Relative path normalization                                                                                       |
-| `--full-root`              | Absolute path reporting                                                                                           |
-| `--exclude` / `--ignore`   | Glob patterns (`--ignore` for ScanCode parity)                                                                    |
-| `--from-json`              | Load previous JSON scan(s) from positional input (`<dir_path>...`); incompatible with `--copyright/--email/--url` |
-| `--include`                | Include path patterns                                                                                             |
-| `--mark-source`            | Mark source-heavy files/directories                                                                               |
-| `--only-findings`          | Filter output to files with findings                                                                              |
-| `--filter-clues`           | Filter redundant clues                                                                                            |
-| `-c, --copyright`          | Copyright/holder/author detection toggle                                                                          |
-| `-e, --email`              | Enable email detection                                                                                            |
-| `-u, --url`                | Enable URL detection                                                                                              |
-| `--no-assemble`            | Rust-specific                                                                                                     |
-| `--max-email`              | Threshold (default 50, requires `--email`)                                                                        |
-| `--max-url`                | Threshold (default 50, requires `--url`)                                                                          |
+| Parameter                  | Notes                                                                                                                                   |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `<dir_path>`               | Positional argument                                                                                                                     |
+| `--json <FILE>`            | Compact JSON output                                                                                                                     |
+| `--json-pp <FILE>`         | Pretty JSON output                                                                                                                      |
+| `--json-lines <FILE>`      | JSON Lines output                                                                                                                       |
+| `--yaml <FILE>`            | YAML output                                                                                                                             |
+| `--csv <FILE>`             | CSV output (deprecated upstream but supported)                                                                                          |
+| `--html <FILE>`            | HTML report output                                                                                                                      |
+| `--spdx-tv <FILE>`         | SPDX Tag/Value output                                                                                                                   |
+| `--spdx-rdf <FILE>`        | SPDX RDF/XML output                                                                                                                     |
+| `--cyclonedx <FILE>`       | CycloneDX JSON output                                                                                                                   |
+| `--cyclonedx-xml <FILE>`   | CycloneDX XML output                                                                                                                    |
+| `--custom-output <FILE>`   | Custom template output file                                                                                                             |
+| `--custom-template <FILE>` | Required with `--custom-output`                                                                                                         |
+| `-m, --max-depth`          | Default: 0 (no depth limit)                                                                                                             |
+| `-n, --processes`          | Compatible with `0` and `-1` values                                                                                                     |
+| `--timeout`                | Per-file timeout option                                                                                                                 |
+| `-q, --quiet`              | Quiet mode                                                                                                                              |
+| `-v, --verbose`            | Verbose path mode                                                                                                                       |
+| `--strip-root`             | Relative path normalization                                                                                                             |
+| `--full-root`              | Absolute path reporting                                                                                                                 |
+| `--exclude` / `--ignore`   | Glob patterns (`--ignore` for ScanCode parity)                                                                                          |
+| `--from-json`              | Load previous JSON scan(s) from positional input (`<dir_path>...`); incompatible with `--package/--copyright/--email/--url/--generated` |
+| `--include`                | Include path patterns                                                                                                                   |
+| `--mark-source`            | Mark source-heavy files/directories                                                                                                     |
+| `--only-findings`          | Filter output to files with findings                                                                                                    |
+| `--filter-clues`           | Filter redundant clues                                                                                                                  |
+| `-c, --copyright`          | Copyright/holder/author detection toggle                                                                                                |
+| `-e, --email`              | Enable email detection                                                                                                                  |
+| `-p, --package`            | Enable package manifest, lockfile, and related package-data scanning                                                                    |
+| `-u, --url`                | Enable URL detection                                                                                                                    |
+| `--no-assemble`            | Rust-specific                                                                                                                           |
+| `--max-email`              | Threshold (default 50, requires `--email`)                                                                                              |
+| `--max-url`                | Threshold (default 50, requires `--url`)                                                                                                |
 
 ### Core Parameters (partial)
 
@@ -106,12 +107,12 @@ Runtime dependency notes:
 
 ### Input/Output Control (implemented)
 
-| Parameter         | Notes                                                                                    |
-| ----------------- | ---------------------------------------------------------------------------------------- |
-| `--from-json`     | Load from previous scan JSON input(s); disallows `--copyright/--email/--url/--generated` |
-| `--include`       | Include patterns                                                                         |
-| `--mark-source`   | Mark source files                                                                        |
-| `--only-findings` | Filter output                                                                            |
+| Parameter         | Notes                                                                                              |
+| ----------------- | -------------------------------------------------------------------------------------------------- |
+| `--from-json`     | Load from previous scan JSON input(s); disallows `--package/--copyright/--email/--url/--generated` |
+| `--include`       | Include patterns                                                                                   |
+| `--mark-source`   | Mark source files                                                                                  |
+| `--only-findings` | Filter output                                                                                      |
 
 ### Cache Control (partial)
 
@@ -131,7 +132,7 @@ Runtime dependency notes:
    ScanCode option names and argument shape (especially output options).
 3. **Avoid parallel output-spec APIs** — do not expose a second primary output
    selection mechanism that diverges from ScanCode usage.
-4. **`--package` always on** — package scanning runs by default (no flag needed).
+4. **`--package` is opt-in** — package manifest detection is disabled by default to match ScanCode.
 5. **`--no-assemble` is Rust-specific** — Python always assembles.
 
 ## Differences from Python (current intentional)
