@@ -1,5 +1,6 @@
 //! License match result from a matching strategy.
 
+use bit_set::BitSet;
 use serde::de::Error as _;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
@@ -593,12 +594,12 @@ impl LicenseMatch {
         self.start_token <= other.start_token && self.end_token >= other.end_token
     }
 
-    pub fn qcontains_with_set(&self, other: &LicenseMatch, self_set: &HashSet<usize>) -> bool {
+    pub fn qcontains_with_set(&self, other: &LicenseMatch, self_set: &BitSet) -> bool {
         if let Some(other_positions) = &other.qspan_positions {
-            return other_positions.iter().all(|p| self_set.contains(p));
+            return other_positions.iter().all(|p| self_set.contains(*p));
         }
 
-        (other.start_token..other.end_token).all(|p| self_set.contains(&p))
+        (other.start_token..other.end_token).all(|p| self_set.contains(p))
     }
 
     pub fn qoverlap(&self, other: &LicenseMatch) -> usize {
@@ -640,16 +641,16 @@ impl LicenseMatch {
         end.saturating_sub(start)
     }
 
-    pub fn qoverlap_with_set(&self, other: &LicenseMatch, self_set: &HashSet<usize>) -> usize {
+    pub fn qoverlap_with_set(&self, other: &LicenseMatch, self_set: &BitSet) -> usize {
         if let Some(other_positions) = &other.qspan_positions {
             return other_positions
                 .iter()
-                .filter(|p| self_set.contains(p))
+                .filter(|p| self_set.contains(**p))
                 .count();
         }
 
         (other.start_token..other.end_token)
-            .filter(|p| self_set.contains(p))
+            .filter(|p| self_set.contains(*p))
             .count()
     }
 
@@ -692,6 +693,22 @@ impl LicenseMatch {
             positions.clone()
         } else {
             (self.start_token..self.end_token).collect()
+        }
+    }
+
+    pub fn qspan_bitset(&self) -> BitSet {
+        if let Some(positions) = &self.qspan_positions {
+            let mut bitset = BitSet::new();
+            for &pos in positions {
+                bitset.insert(pos);
+            }
+            bitset
+        } else {
+            let mut bitset = BitSet::new();
+            for pos in self.start_token..self.end_token {
+                bitset.insert(pos);
+            }
+            bitset
         }
     }
 
