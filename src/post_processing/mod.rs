@@ -37,6 +37,7 @@ mod test_utils;
 
 pub(crate) struct CreateOutputOptions<'a> {
     pub(crate) facet_rules: &'a [FacetRule],
+    pub(crate) include_classify: bool,
     pub(crate) include_summary: bool,
     pub(crate) include_license_clarity_score: bool,
     pub(crate) include_tallies: bool,
@@ -126,7 +127,8 @@ pub(crate) fn create_output(
         mut packages,
         dependencies,
     } = context.assembly_result;
-    let needs_classification = context.options.include_summary
+    let needs_classification = context.options.include_classify
+        || context.options.include_summary
         || context.options.include_license_clarity_score
         || context.options.include_tallies_of_key_files;
     let classification_context = (needs_classification || !packages.is_empty())
@@ -1727,15 +1729,7 @@ fn detected_license_values(file: &FileInfo) -> Vec<String> {
             .collect();
     }
 
-    let unique_detection_expressions = unique(&detection_expressions);
-
-    if unique_detection_expressions.len() == 1 {
-        return unique_detection_expressions;
-    }
-
-    combine_license_expressions(unique_detection_expressions)
-        .into_iter()
-        .collect()
+    detection_expressions
 }
 
 fn summary_detected_license_values(file: &FileInfo) -> Vec<String> {
@@ -1758,28 +1752,74 @@ fn summary_detected_license_values(file: &FileInfo) -> Vec<String> {
 }
 
 fn copyright_values(file: &FileInfo) -> Vec<String> {
+    if is_legal_file(file) {
+        return Vec::new();
+    }
+
     file.copyrights
         .iter()
-        .map(|copyright| copyright.copyright.clone())
+        .map(|copyright| normalize_tally_copyright_value(&copyright.copyright))
         .collect()
 }
 
 fn holder_values(file: &FileInfo) -> Vec<String> {
+    if is_legal_file(file) {
+        return Vec::new();
+    }
+
     file.holders
         .iter()
-        .map(|holder| holder.holder.clone())
+        .map(|holder| normalize_tally_holder_value(&holder.holder))
         .collect()
 }
 
 fn author_values(file: &FileInfo) -> Vec<String> {
+    if is_legal_file(file)
+        || is_readme_file(file)
+        || file.programming_language.as_deref() == Some("C/C++ Header")
+    {
+        return Vec::new();
+    }
+
     file.authors
         .iter()
+        .filter(|author| author.author.chars().any(|ch| ch.is_ascii_uppercase()))
         .map(|author| author.author.clone())
         .collect()
 }
 
 fn programming_language_values(file: &FileInfo) -> Vec<String> {
-    file.programming_language.clone().into_iter().collect()
+    file.programming_language
+        .as_deref()
+        .filter(|language| !matches!(*language, "Text" | "JSON"))
+        .map(str::to_string)
+        .into_iter()
+        .collect()
+}
+
+fn normalize_tally_copyright_value(value: &str) -> String {
+    let trimmed = value
+        .trim()
+        .trim_end_matches(" as indicated by the @authors tag");
+
+    if let Some(rest) = trimmed.strip_prefix("Copyright ")
+        && let Some((yearish, remainder)) = rest.split_once(',')
+        && !yearish.is_empty()
+        && yearish
+            .chars()
+            .all(|ch| ch.is_ascii_digit() || ch == ' ' || ch == ',' || ch == '-')
+    {
+        return format!("Copyright {}", remainder.trim());
+    }
+
+    trimmed.to_string()
+}
+
+fn normalize_tally_holder_value(value: &str) -> String {
+    value
+        .trim()
+        .trim_end_matches(" as indicated by the @authors tag")
+        .to_string()
 }
 
 fn build_tally_entries(counts: HashMap<Option<String>, usize>) -> Vec<TallyEntry> {

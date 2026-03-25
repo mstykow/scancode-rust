@@ -44,6 +44,7 @@ fn create_output_gates_summary_tallies_and_generated_sections() {
             license_rule_references: vec![],
             options: CreateOutputOptions {
                 facet_rules: &[],
+                include_classify: false,
                 include_tallies_by_facet: false,
                 include_summary: false,
                 include_license_clarity_score: false,
@@ -105,6 +106,7 @@ fn create_output_gates_summary_tallies_and_generated_sections() {
             license_rule_references: vec![],
             options: CreateOutputOptions {
                 facet_rules: &[],
+                include_classify: false,
                 include_tallies_by_facet: false,
                 include_summary: true,
                 include_license_clarity_score: true,
@@ -172,6 +174,7 @@ fn create_output_score_only_keeps_clarity_without_full_summary_fields() {
             license_rule_references: vec![],
             options: CreateOutputOptions {
                 facet_rules: &[],
+                include_classify: false,
                 include_tallies_by_facet: false,
                 include_summary: false,
                 include_license_clarity_score: true,
@@ -221,6 +224,7 @@ fn create_output_tallies_by_facet_does_not_leak_resource_tallies() {
             license_rule_references: vec![],
             options: CreateOutputOptions {
                 facet_rules: &facet_rules,
+                include_classify: false,
                 include_tallies_by_facet: true,
                 include_summary: false,
                 include_license_clarity_score: false,
@@ -277,6 +281,7 @@ fn create_output_promotes_package_metadata_without_summary_flags() {
             license_rule_references: vec![],
             options: CreateOutputOptions {
                 facet_rules: &[],
+                include_classify: false,
                 include_tallies_by_facet: false,
                 include_summary: false,
                 include_license_clarity_score: false,
@@ -354,6 +359,7 @@ fn create_output_summary_still_resolves_after_strip_root_normalization() {
             license_rule_references: vec![],
             options: CreateOutputOptions {
                 facet_rules: &[],
+                include_classify: false,
                 include_tallies_by_facet: false,
                 include_summary: true,
                 include_license_clarity_score: false,
@@ -372,4 +378,50 @@ fn create_output_summary_still_resolves_after_strip_root_normalization() {
             .and_then(|summary| summary.declared_license_expression),
         Some("mit".to_string())
     );
+}
+
+#[test]
+fn create_output_classify_only_sets_key_file_flags() {
+    let start = Utc::now();
+    let end = start;
+
+    let output = create_output(
+        start,
+        end,
+        crate::scanner::ProcessResult {
+            files: vec![dir("project"), file("project/README.md")],
+            excluded_count: 0,
+        },
+        CreateOutputContext {
+            total_dirs: 1,
+            assembly_result: assembly::AssemblyResult {
+                packages: vec![],
+                dependencies: vec![],
+            },
+            license_references: vec![],
+            license_rule_references: vec![],
+            options: CreateOutputOptions {
+                facet_rules: &[],
+                include_classify: true,
+                include_tallies_by_facet: false,
+                include_summary: false,
+                include_license_clarity_score: false,
+                include_tallies: false,
+                include_tallies_with_details: false,
+                include_tallies_of_key_files: false,
+                include_generated: false,
+                scanned_root: None,
+            },
+        },
+    );
+
+    let readme = output
+        .files
+        .iter()
+        .find(|file| file.path == "project/README.md")
+        .expect("README should exist");
+
+    assert!(readme.is_readme);
+    assert!(readme.is_top_level);
+    assert!(readme.is_key_file);
 }

@@ -8,6 +8,8 @@ use std::sync::Arc;
 use std::sync::OnceLock;
 
 #[cfg(feature = "golden-tests")]
+use chrono::Utc;
+#[cfg(feature = "golden-tests")]
 use flate2::read::GzDecoder;
 #[cfg(feature = "golden-tests")]
 use glob::Pattern;
@@ -311,7 +313,9 @@ pub(crate) fn normalize_scan_json(value: &mut Value, parent_key: Option<&str>) {
 #[cfg(feature = "golden-tests")]
 pub(crate) fn fixture_exclude_patterns() -> Vec<Pattern> {
     [
+        DEFAULT_CACHE_DIR_NAME.to_string(),
         format!("{DEFAULT_CACHE_DIR_NAME}/*"),
+        format!("**/{DEFAULT_CACHE_DIR_NAME}"),
         format!("**/{DEFAULT_CACHE_DIR_NAME}/*"),
     ]
     .into_iter()
@@ -375,7 +379,7 @@ pub(crate) fn resolve_fixture_scan_root(fixture_root: &Path) -> FixtureScanRoot 
                 || path
                     .file_name()
                     .and_then(|name| name.to_str())
-                    .is_some_and(|name| !name.ends_with(".expected.json"))
+                    .is_some_and(|name| !name.contains(".expected"))
         })
         .collect();
 
@@ -437,6 +441,89 @@ pub(crate) fn normalize_package_datafile_paths(packages: &mut [Package], scan_ro
             }
         }
     }
+}
+
+#[cfg(feature = "golden-tests")]
+pub(crate) struct FixtureOutputOptions<'a> {
+    pub(crate) facet_defs: &'a [String],
+    pub(crate) include_classify: bool,
+    pub(crate) include_summary: bool,
+    pub(crate) include_license_clarity_score: bool,
+    pub(crate) include_tallies: bool,
+    pub(crate) include_tallies_of_key_files: bool,
+    pub(crate) include_tallies_with_details: bool,
+    pub(crate) include_tallies_by_facet: bool,
+    pub(crate) include_generated: bool,
+}
+
+#[cfg(feature = "golden-tests")]
+pub(crate) fn compute_fixture_output(
+    fixture_dir: &str,
+    options: FixtureOutputOptions<'_>,
+) -> Value {
+    let fixture_root = Path::new(fixture_dir);
+    let resolved_scan_root = resolve_fixture_scan_root(fixture_root);
+    let progress = Arc::new(ScanProgress::new(ProgressMode::Quiet));
+    let exclude_patterns = fixture_exclude_patterns();
+    let collected = collect_paths(&resolved_scan_root.scan_root, 0, &exclude_patterns);
+    let facet_rules = build_facet_rules(options.facet_defs).expect("facet rules should compile");
+    let scan_result = process_collected(
+        &collected,
+        progress,
+        Some(test_license_engine()),
+        false,
+        &TextDetectionOptions {
+            detect_generated: options.include_generated,
+            ..TextDetectionOptions::default()
+        },
+    );
+
+    let mut files = scan_result.files;
+    normalize_paths_for_test(
+        &mut files,
+        resolved_scan_root
+            .normalize_root
+            .to_str()
+            .expect("fixture path should be UTF-8"),
+    );
+    if let Some(root_name) = resolved_scan_root
+        .scan_root
+        .file_name()
+        .and_then(|name| name.to_str())
+        .filter(|name| !name.is_empty())
+        && !files.iter().any(|file| file.path == root_name)
+    {
+        files.push(dir(root_name));
+    }
+    let assembly_result = assembly::assemble(&mut files);
+
+    serde_json::to_value(create_output(
+        Utc::now(),
+        Utc::now(),
+        crate::scanner::ProcessResult {
+            excluded_count: scan_result.excluded_count,
+            files,
+        },
+        CreateOutputContext {
+            total_dirs: collected.directories.len(),
+            assembly_result,
+            license_references: vec![],
+            license_rule_references: vec![],
+            options: CreateOutputOptions {
+                facet_rules: &facet_rules,
+                include_classify: options.include_classify,
+                include_summary: options.include_summary,
+                include_license_clarity_score: options.include_license_clarity_score,
+                include_tallies: options.include_tallies,
+                include_tallies_of_key_files: options.include_tallies_of_key_files,
+                include_tallies_with_details: options.include_tallies_with_details,
+                include_tallies_by_facet: options.include_tallies_by_facet,
+                include_generated: options.include_generated,
+                scanned_root: Some(&resolved_scan_root.scan_root),
+            },
+        },
+    ))
+    .expect("fixture output should serialize")
 }
 
 #[cfg(feature = "golden-tests")]
@@ -545,6 +632,134 @@ pub(crate) fn project_classify_fields(value: &Value) -> Value {
             })
             .collect::<Vec<_>>()
     })
+}
+
+#[cfg(feature = "golden-tests")]
+pub(crate) fn project_tally_fields(value: &Value) -> Value {
+    let files = value
+        .get("files")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+
+    json!({
+        "tallies": value.get("tallies").cloned().unwrap_or(Value::Null),
+        "tallies_of_key_files": value.get("tallies_of_key_files").cloned().unwrap_or(Value::Null),
+        "tallies_by_facet": value.get("tallies_by_facet").cloned().unwrap_or(Value::Null),
+        "files": files
+            .into_iter()
+            .map(|file| {
+                json!({
+                    "path": file.get("path").cloned().unwrap_or(Value::Null),
+                    "type": file.get("type").cloned().unwrap_or(Value::Null),
+                    "is_legal": file.get("is_legal").cloned().unwrap_or(Value::Bool(false)),
+                    "is_manifest": file.get("is_manifest").cloned().unwrap_or(Value::Bool(false)),
+                    "is_readme": file.get("is_readme").cloned().unwrap_or(Value::Bool(false)),
+                    "is_top_level": file.get("is_top_level").cloned().unwrap_or(Value::Bool(false)),
+                    "is_key_file": file.get("is_key_file").cloned().unwrap_or(Value::Bool(false)),
+                    "is_community": file.get("is_community").cloned().unwrap_or(Value::Bool(false)),
+                    "facets": file.get("facets").cloned().unwrap_or_else(|| json!([])),
+                    "tallies": file.get("tallies").cloned().unwrap_or(Value::Null),
+                })
+            })
+            .collect::<Vec<_>>()
+    })
+}
+
+#[cfg(feature = "golden-tests")]
+pub(crate) fn project_facet_fields(value: &Value) -> Value {
+    let files = value
+        .get("files")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+
+    json!({
+        "files": files
+            .into_iter()
+            .map(|file| {
+                json!({
+                    "path": file.get("path").cloned().unwrap_or(Value::Null),
+                    "type": file.get("type").cloned().unwrap_or(Value::Null),
+                    "facets": file.get("facets").cloned().unwrap_or_else(|| json!([])),
+                    "scan_errors": file.get("scan_errors").cloned().unwrap_or_else(|| json!([])),
+                })
+            })
+            .collect::<Vec<_>>()
+    })
+}
+
+#[cfg(feature = "golden-tests")]
+pub(crate) fn assert_facet_fixture_matches_expected(
+    fixture_dir: &str,
+    expected_file: &str,
+    facet_defs: &[String],
+) {
+    let actual = project_facet_fields(&compute_fixture_output(
+        fixture_dir,
+        FixtureOutputOptions {
+            facet_defs,
+            include_classify: false,
+            include_summary: false,
+            include_license_clarity_score: false,
+            include_tallies: false,
+            include_tallies_of_key_files: false,
+            include_tallies_with_details: false,
+            include_tallies_by_facet: false,
+            include_generated: false,
+        },
+    ));
+    let expected: Value = serde_json::from_str(
+        &fs::read_to_string(expected_file).expect("expected facet fixture should be readable"),
+    )
+    .expect("expected facet fixture should parse");
+    let expected = project_facet_fields(&expected);
+
+    let mut actual_normalized = actual;
+    let mut expected_normalized = expected;
+    normalize_scan_json(&mut actual_normalized, None);
+    normalize_scan_json(&mut expected_normalized, None);
+
+    if let Err(error) = compare_scan_json_values(&actual_normalized, &expected_normalized, "") {
+        panic!(
+            "Facet fixture mismatch for {} vs {}: {}\nactual={}\nexpected={}",
+            fixture_dir,
+            expected_file,
+            error,
+            serde_json::to_string_pretty(&actual_normalized).unwrap_or_default(),
+            serde_json::to_string_pretty(&expected_normalized).unwrap_or_default()
+        );
+    }
+}
+
+#[cfg(feature = "golden-tests")]
+pub(crate) fn assert_tally_fixture_matches_expected(
+    fixture_dir: &str,
+    expected_file: &str,
+    options: FixtureOutputOptions<'_>,
+) {
+    let actual = project_tally_fields(&compute_fixture_output(fixture_dir, options));
+    let expected: Value = serde_json::from_str(
+        &fs::read_to_string(expected_file).expect("expected tally fixture should be readable"),
+    )
+    .expect("expected tally fixture should parse");
+    let expected = project_tally_fields(&expected);
+
+    let mut actual_normalized = actual;
+    let mut expected_normalized = expected;
+    normalize_scan_json(&mut actual_normalized, None);
+    normalize_scan_json(&mut expected_normalized, None);
+
+    if let Err(error) = compare_scan_json_values(&actual_normalized, &expected_normalized, "") {
+        panic!(
+            "Tally fixture mismatch for {} vs {}: {}\nactual={}\nexpected={}",
+            fixture_dir,
+            expected_file,
+            error,
+            serde_json::to_string_pretty(&actual_normalized).unwrap_or_default(),
+            serde_json::to_string_pretty(&expected_normalized).unwrap_or_default()
+        );
+    }
 }
 
 #[cfg(feature = "golden-tests")]

@@ -6,8 +6,10 @@ mod tests {
 
     use super::super::mark_generated_files;
     use super::super::test_utils::{
-        assert_classify_fixture_matches_expected, assert_summary_fixture_matches_expected,
-        compare_scan_json_values, dir, normalize_paths_for_test, normalize_scan_json,
+        FixtureOutputOptions, assert_classify_fixture_matches_expected,
+        assert_facet_fixture_matches_expected, assert_summary_fixture_matches_expected,
+        assert_tally_fixture_matches_expected, compare_scan_json_values, dir,
+        normalize_paths_for_test, normalize_scan_json,
     };
     use crate::progress::{ProgressMode, ScanProgress};
     use crate::scanner::{TextDetectionOptions, collect_paths, process_collected};
@@ -180,5 +182,110 @@ mod tests {
                 serde_json::to_string_pretty(&expected_normalized).unwrap_or_default()
             );
         }
+    }
+
+    #[test]
+    #[ignore = "blocked on license/copyright/language detector parity outside post-processing"]
+    fn test_golden_tallies_full_fixture_matches_expected_output() {
+        assert_tally_fixture_matches_expected(
+            "testdata/summarycode-golden/tallies/full_tallies",
+            "testdata/summarycode-golden/tallies/full_tallies/tallies.expected.json",
+            FixtureOutputOptions {
+                facet_defs: &[],
+                include_classify: false,
+                include_summary: false,
+                include_license_clarity_score: false,
+                include_tallies: true,
+                include_tallies_of_key_files: false,
+                include_tallies_with_details: false,
+                include_tallies_by_facet: false,
+                include_generated: false,
+            },
+        );
+    }
+
+    #[test]
+    #[ignore = "blocked on license/copyright/language detector parity outside post-processing"]
+    fn test_golden_tallies_with_details_fixture_matches_expected_output() {
+        assert_tally_fixture_matches_expected(
+            "testdata/summarycode-golden/tallies/full_tallies",
+            "testdata/summarycode-golden/tallies/full_tallies/tallies_details.expected.json",
+            FixtureOutputOptions {
+                facet_defs: &[],
+                include_classify: false,
+                include_summary: false,
+                include_license_clarity_score: false,
+                include_tallies: false,
+                include_tallies_of_key_files: false,
+                include_tallies_with_details: true,
+                include_tallies_by_facet: false,
+                include_generated: false,
+            },
+        );
+    }
+
+    #[test]
+    #[ignore = "blocked on license/copyright/language detector parity outside post-processing"]
+    fn test_golden_tallies_key_files_fixture_matches_expected_output() {
+        assert_tally_fixture_matches_expected(
+            "testdata/summarycode-golden/tallies/full_tallies",
+            "testdata/summarycode-golden/tallies/full_tallies/tallies_key_files.expected.json",
+            FixtureOutputOptions {
+                facet_defs: &[],
+                include_classify: true,
+                include_summary: false,
+                include_license_clarity_score: false,
+                include_tallies: true,
+                include_tallies_of_key_files: true,
+                include_tallies_with_details: false,
+                include_tallies_by_facet: false,
+                include_generated: false,
+            },
+        );
+    }
+
+    #[test]
+    #[ignore = "blocked on license/copyright/language detector parity outside post-processing"]
+    fn test_golden_tallies_by_facet_fixture_matches_expected_output() {
+        let facet_defs = vec![
+            "dev=*.java".to_string(),
+            "dev=*.cs".to_string(),
+            "dev=*ada*".to_string(),
+            "data=*.S".to_string(),
+            "tests=*infback9*".to_string(),
+            "docs=*README".to_string(),
+        ];
+
+        assert_tally_fixture_matches_expected(
+            "testdata/summarycode-golden/tallies/full_tallies",
+            "testdata/summarycode-golden/tallies/full_tallies/tallies_by_facet.expected.json",
+            FixtureOutputOptions {
+                facet_defs: &facet_defs,
+                include_classify: false,
+                include_summary: false,
+                include_license_clarity_score: false,
+                include_tallies: true,
+                include_tallies_of_key_files: false,
+                include_tallies_with_details: false,
+                include_tallies_by_facet: true,
+                include_generated: false,
+            },
+        );
+    }
+
+    #[test]
+    fn test_golden_facet_cli_fixture_matches_expected_output() {
+        let facet_defs = vec![
+            "dev=*.c".to_string(),
+            "tests=*/tests/*".to_string(),
+            "data=*.json".to_string(),
+            "docs=*/docs/*".to_string(),
+        ];
+
+        assert_facet_fixture_matches_expected(
+            "testdata/summarycode-golden/facet",
+            "testdata/summarycode-golden/facet/cli.expected.json",
+            &facet_defs,
+        );
     }
 }

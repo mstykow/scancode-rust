@@ -7,8 +7,10 @@ The runtime tests in this repository must read fixture data only from `testdata/
 Current copied suites:
 
 - `classify/`
+- `facet/`
 - `generated/`
 - `score/`
 - `summary/`
+- `tallies/`
 
 Original source: `reference/scancode-toolkit/tests/summarycode/data/`
