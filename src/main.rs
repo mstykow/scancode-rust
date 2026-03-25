@@ -269,6 +269,7 @@ fn run() -> Result<()> {
             license_rule_references: preloaded_license_rule_references,
             options: CreateOutputOptions {
                 facet_rules: &facet_rules,
+                include_classify: cli.classify,
                 include_summary: cli.summary,
                 include_license_clarity_score: cli.license_clarity_score,
                 include_tallies: cli.tallies,

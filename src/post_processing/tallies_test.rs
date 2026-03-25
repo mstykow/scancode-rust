@@ -6,6 +6,7 @@ use crate::models::{Author, Copyright, Holder, Match, TallyEntry};
 fn compute_tallies_counts_file_findings_and_missing_values() {
     let mut mit_file = file("project/src/lib.rs");
     mit_file.programming_language = Some("Rust".to_string());
+    mit_file.is_source = Some(true);
     mit_file.license_expression = Some("mit".to_string());
     mit_file.license_detections = vec![crate::models::LicenseDetection {
         license_expression: "mit".to_string(),
@@ -45,6 +46,7 @@ fn compute_tallies_counts_file_findings_and_missing_values() {
 
     let mut dual_license_file = file("project/src/main.c");
     dual_license_file.programming_language = Some("C".to_string());
+    dual_license_file.is_source = Some(true);
     dual_license_file.license_expression = Some("apache-2.0 AND mit".to_string());
     dual_license_file.license_detections = vec![
         crate::models::LicenseDetection {
@@ -109,6 +111,11 @@ fn compute_tallies_counts_file_findings_and_missing_values() {
         compute_tallies(&[mit_file, dual_license_file, empty_file]).expect("tallies exist");
 
     assert_eq!(tallies.detected_license_expression.len(), 3);
+    assert_eq!(
+        tallies.detected_license_expression[0].value.as_deref(),
+        Some("mit")
+    );
+    assert_eq!(tallies.detected_license_expression[0].count, 2);
     assert_eq!(tallies.copyrights[0].count, 2);
     assert_eq!(tallies.holders[0].count, 2);
     assert_eq!(tallies.authors.len(), 3);
@@ -163,12 +170,127 @@ fn compute_key_file_tallies_only_counts_key_files_and_drops_missing_values() {
         tallies.detected_license_expression[0].value.as_deref(),
         Some("apache-2.0")
     );
-    assert_eq!(tallies.copyrights[0].count, 1);
-    assert_eq!(tallies.holders[0].count, 1);
-    assert_eq!(tallies.authors[0].value.as_deref(), Some("Alice"));
+    assert!(tallies.copyrights.is_empty());
+    assert!(tallies.holders.is_empty());
+    assert!(tallies.authors.is_empty());
     assert_eq!(
-        tallies.programming_language[0].value.as_deref(),
-        Some("Markdown")
+        tallies.programming_language,
+        vec![TallyEntry {
+            value: Some("Markdown".to_string()),
+            count: 1
+        }]
+    );
+}
+
+#[test]
+fn compute_tallies_ignores_legal_file_copyright_holder_and_author_noise() {
+    let mut legal = file("project/LICENSE");
+    legal.is_legal = true;
+    legal.copyrights = vec![Copyright {
+        copyright: "copyright and related or neighboring rights".to_string(),
+        start_line: 1,
+        end_line: 1,
+    }];
+    legal.holders = vec![Holder {
+        holder: "Related Rights".to_string(),
+        start_line: 1,
+        end_line: 1,
+    }];
+    legal.authors = vec![Author {
+        author: "be liable for".to_string(),
+        start_line: 1,
+        end_line: 1,
+    }];
+
+    let tallies = compute_tallies(&[legal]).expect("tallies exist");
+
+    assert_eq!(
+        tallies.copyrights,
+        vec![TallyEntry {
+            value: None,
+            count: 1
+        }]
+    );
+    assert_eq!(
+        tallies.holders,
+        vec![TallyEntry {
+            value: None,
+            count: 1
+        }]
+    );
+    assert_eq!(
+        tallies.authors,
+        vec![TallyEntry {
+            value: None,
+            count: 1
+        }]
+    );
+}
+
+#[test]
+fn compute_key_file_tallies_excludes_legal_file_copyrights_holders_and_languages() {
+    let mut legal = file("project/LICENSE");
+    legal.is_key_file = true;
+    legal.is_legal = true;
+    legal.programming_language = Some("Text".to_string());
+    legal.copyrights = vec![Copyright {
+        copyright: "copyright and related or neighboring rights".to_string(),
+        start_line: 1,
+        end_line: 1,
+    }];
+    legal.holders = vec![Holder {
+        holder: "Related Rights".to_string(),
+        start_line: 1,
+        end_line: 1,
+    }];
+
+    assert!(compute_key_file_tallies(&[legal]).is_none());
+}
+
+#[test]
+fn compute_tallies_normalizes_jboss_style_copyright_and_holder_values() {
+    let mut source = file("project/src/lib.java");
+    source.copyrights = vec![Copyright {
+        copyright: "Copyright 2005, JBoss Inc., and individual contributors as indicated by the @authors tag".to_string(),
+        start_line: 1,
+        end_line: 1,
+    }];
+    source.holders = vec![Holder {
+        holder: "JBoss Inc., and individual contributors as indicated by the @authors tag"
+            .to_string(),
+        start_line: 1,
+        end_line: 1,
+    }];
+
+    let tallies = compute_tallies(&[source]).expect("tallies exist");
+
+    assert_eq!(
+        tallies.copyrights[0].value.as_deref(),
+        Some("Copyright JBoss Inc., and individual contributors")
+    );
+    assert_eq!(
+        tallies.holders[0].value.as_deref(),
+        Some("JBoss Inc., and individual contributors")
+    );
+}
+
+#[test]
+fn compute_tallies_filters_lowercase_author_noise() {
+    let mut source = file("project/src/lib.java");
+    source.authors = vec![Author {
+        author: "be liable for".to_string(),
+        start_line: 1,
+        end_line: 1,
+    }];
+
+    let tallies = compute_tallies(&[source]).expect("tallies exist");
+
+    assert_eq!(
+        tallies.authors,
+        vec![TallyEntry {
+            value: None,
+            count: 1
+        }]
     );
 }
 
