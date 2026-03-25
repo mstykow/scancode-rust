@@ -7,9 +7,9 @@ mod tests {
     use super::super::mark_generated_files;
     use super::super::test_utils::{
         FixtureOutputOptions, assert_classify_fixture_matches_expected,
-        assert_facet_fixture_matches_expected, assert_summary_fixture_matches_expected,
-        assert_tally_fixture_matches_expected, compare_scan_json_values, dir,
-        normalize_paths_for_test, normalize_scan_json,
+        assert_facet_fixture_matches_expected, assert_package_fixture_matches_expected,
+        assert_summary_fixture_matches_expected, assert_tally_fixture_matches_expected,
+        compare_scan_json_values, dir, normalize_paths_for_test, normalize_scan_json,
     };
     use crate::progress::{ProgressMode, ScanProgress};
     use crate::scanner::{TextDetectionOptions, collect_paths, process_collected};
@@ -286,6 +286,15 @@ mod tests {
             "testdata/summarycode-golden/facet",
             "testdata/summarycode-golden/facet/cli.expected.json",
             &facet_defs,
+        );
+    }
+
+    #[test]
+    #[ignore = "blocked on broader package parser parity outside post-processing"]
+    fn test_golden_package_fixture_matches_expected_output() {
+        assert_package_fixture_matches_expected(
+            "testdata/summarycode-golden/tallies/packages",
+            "testdata/summarycode-golden/tallies/packages/expected.json",
         );
     }
 }

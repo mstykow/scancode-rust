@@ -473,6 +473,7 @@ pub(crate) fn compute_fixture_output(
         Some(test_license_engine()),
         false,
         &TextDetectionOptions {
+            detect_packages: true,
             detect_generated: options.include_generated,
             ..TextDetectionOptions::default()
         },
@@ -687,6 +688,93 @@ pub(crate) fn project_facet_fields(value: &Value) -> Value {
             })
             .collect::<Vec<_>>()
     })
+}
+
+#[cfg(feature = "golden-tests")]
+pub(crate) fn project_package_fields(value: &Value) -> Value {
+    let packages = value
+        .get("packages")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    let dependencies = value
+        .get("dependencies")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+
+    json!({
+        "packages": packages
+            .into_iter()
+            .map(|package| {
+                json!({
+                    "type": package.get("type").cloned().unwrap_or(Value::Null),
+                    "namespace": package.get("namespace").cloned().unwrap_or(Value::Null),
+                    "name": package.get("name").cloned().unwrap_or(Value::Null),
+                    "version": package.get("version").cloned().unwrap_or(Value::Null),
+                    "purl": package.get("purl").cloned().unwrap_or(Value::Null),
+                    "declared_license_expression": package.get("declared_license_expression").cloned().unwrap_or(Value::Null),
+                    "datafile_paths": package.get("datafile_paths").cloned().unwrap_or_else(|| json!([])),
+                    "datasource_ids": package.get("datasource_ids").cloned().unwrap_or_else(|| json!([])),
+                })
+            })
+            .collect::<Vec<_>>(),
+        "dependencies": dependencies
+            .into_iter()
+            .map(|dependency| {
+                json!({
+                    "purl": dependency.get("purl").cloned().unwrap_or(Value::Null),
+                    "extracted_requirement": dependency.get("extracted_requirement").cloned().unwrap_or(Value::Null),
+                    "scope": dependency.get("scope").cloned().unwrap_or(Value::Null),
+                    "is_runtime": dependency.get("is_runtime").cloned().unwrap_or(Value::Null),
+                    "is_optional": dependency.get("is_optional").cloned().unwrap_or(Value::Null),
+                    "is_pinned": dependency.get("is_pinned").cloned().unwrap_or(Value::Null),
+                    "is_direct": dependency.get("is_direct").cloned().unwrap_or(Value::Null),
+                    "datafile_path": dependency.get("datafile_path").cloned().unwrap_or(Value::Null),
+                    "datasource_id": dependency.get("datasource_id").cloned().unwrap_or(Value::Null),
+                })
+            })
+            .collect::<Vec<_>>()
+    })
+}
+
+#[cfg(feature = "golden-tests")]
+pub(crate) fn assert_package_fixture_matches_expected(fixture_dir: &str, expected_file: &str) {
+    let actual = project_package_fields(&compute_fixture_output(
+        fixture_dir,
+        FixtureOutputOptions {
+            facet_defs: &[],
+            include_classify: false,
+            include_summary: false,
+            include_license_clarity_score: false,
+            include_tallies: false,
+            include_tallies_of_key_files: false,
+            include_tallies_with_details: false,
+            include_tallies_by_facet: false,
+            include_generated: false,
+        },
+    ));
+    let expected: Value = serde_json::from_str(
+        &fs::read_to_string(expected_file).expect("expected package fixture should be readable"),
+    )
+    .expect("expected package fixture should parse");
+    let expected = project_package_fields(&expected);
+
+    let mut actual_normalized = actual;
+    let mut expected_normalized = expected;
+    normalize_scan_json(&mut actual_normalized, None);
+    normalize_scan_json(&mut expected_normalized, None);
+
+    if let Err(error) = compare_scan_json_values(&actual_normalized, &expected_normalized, "") {
+        panic!(
+            "Package fixture mismatch for {} vs {}: {}\nactual={}\nexpected={}",
+            fixture_dir,
+            expected_file,
+            error,
+            serde_json::to_string_pretty(&actual_normalized).unwrap_or_default(),
+            serde_json::to_string_pretty(&expected_normalized).unwrap_or_default()
+        );
+    }
 }
 
 #[cfg(feature = "golden-tests")]
