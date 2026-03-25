@@ -1,4 +1,5 @@
 pub mod file;
+pub mod generated;
 pub mod hash;
 pub mod language;
 pub mod magic;

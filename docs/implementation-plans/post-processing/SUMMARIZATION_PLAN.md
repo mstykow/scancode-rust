@@ -1,6 +1,6 @@
 # Summary, Tallies & Analysis Implementation Plan
 
-> **Status**: 🟡 In Progress — shared provenance cleanup, the full current tally stack, file facets/by-facet tallies, package-preferred summary origin, complete active `score/` fixture parity, and complete active generated/classify fixture parity are implemented; package tallies and only the residual summary edge cases remain open
+> **Status**: 🟡 In Progress — shared provenance cleanup, the full current tally stack, file facets/by-facet tallies, package-preferred summary origin, complete active `score/` fixture parity, and complete active generated/classify fixture parity are implemented; package tallies, a few summary edge cases, and the remaining performance hardening work stay open here
 > **Priority**: P2 - Medium Priority (Post-Processing Feature)
 > **Estimated Effort**: 3-4 weeks
 > **Dependencies**: [LICENSE_DETECTION_ARCHITECTURE.md](../../LICENSE_DETECTION_ARCHITECTURE.md), [COPYRIGHT_DETECTION_PLAN.md](../text-detection/COPYRIGHT_DETECTION_PLAN.md), [ASSEMBLY_PLAN.md](../package-detection/ASSEMBLY_PLAN.md)
@@ -13,16 +13,19 @@ These features are the main post-processing value layer that turns raw file/pack
 
 Upstream implements these behaviors across multiple plugins (`--summary`, `--tallies`, `--license-clarity-score`, `--classify`, `--facet`, `--generated`). Provenant tracks them in one plan because they share the same data flow and should be implemented against one coherent summary model.
 
+This plan does **not** own the separate output-shaping layer (`--include`, `--only-findings`, `--strip-root`, `--full-root`, `--mark-source`, `--filter-clues`). That work now has its own sibling plan in [`SCAN_RESULT_SHAPING_PLAN.md`](SCAN_RESULT_SHAPING_PLAN.md).
+
 ## Recommendation
 
-**Implement summarization next.**
+**Finish the summary/tally pipeline with performance-first constraints.**
 
 Why:
 
 - It is the broader, non-deprecated parity surface in ScanCode.
 - Provenant already ships meaningful foundations for it.
 - It unlocks multiple pending CLI options and user-facing outputs.
-- Consolidation has now been intentionally deferred as a compatibility-only feature, so summarization is the clear remaining post-processing priority.
+- Consolidation has now been intentionally deferred as a compatibility-only feature, so summarization is the clear remaining summary-oriented post-processing priority.
+- Classify/facet/generated remain in scope here because they are not independent reporting features in Provenant; they are input stages for summary, tallies, and clarity.
 
 The practical order should be:
 
@@ -69,6 +72,16 @@ Summarization is a **consumer**, not a normalizer.
   - classification/facets
 - **Summarization should not become the primary place that decides a package's declared license**.
 
+### Performance boundary
+
+Summarization must also remain a **reducer**, not a second scanner.
+
+- Do not re-persist or re-materialize the whole resource tree the way Python `summarycode` does with repeated `resource.save(...)` / `codebase.save_resource(...)` passes.
+- Do not re-expand already-counted tallies back into discrete `[value] * count` lists only to count them again.
+- Do not repeatedly convert nested package/resource mappings back into heavyweight objects during post-processing.
+- Prefer in-place mutation of the already-built Rust `Vec<FileInfo>` / `Vec<Package>` plus one-time indexes for package↔file joins.
+- Treat extra file reads as an explicit cost center. Today generated-code detection rereads files from disk; any future post-processing feature should justify similar rescans rather than silently adding them.
+
 ## Scope
 
 ### What This Covers
@@ -87,7 +100,9 @@ Summarization is a **consumer**, not a normalizer.
 
 - License policy evaluation (separate feature)
 - Package consolidation (covered by `CONSOLIDATION_PLAN.md` in this directory)
+- Scan-result/output shaping such as `--include`, `--only-findings`, root normalization, `--mark-source`, and clue deduplication (covered by [`SCAN_RESULT_SHAPING_PLAN.md`](SCAN_RESULT_SHAPING_PLAN.md))
 - Output formatting (covered by OUTPUT_FORMATS_PLAN.md)
+- Review-oriented `--todo` workflow parity from Python `summarycode/todo.py` — intentionally out of current Provenant scope because it is a manual-review surface, not a core scan-summary requirement
 
 ## Python Reference Implementation
 
@@ -111,6 +126,18 @@ Summarization is a **consumer**, not a normalizer.
 - `--tallies-key-files` narrows reporting to the files most likely to represent project-level licensing intent.
 - `--tallies-by-facet` separates shipping code from tests/docs/examples.
 - `--license-clarity-score` gives a triage-friendly confidence signal for how clearly licensing is stated.
+
+## Python Performance Pitfalls to Avoid
+
+The Python reference is a useful behavior spec, but its `summarycode` architecture is also a warning sign:
+
+- it performs multiple whole-codebase passes for classify, summary, score, tallies, key-file tallies, by-facet tallies, and review workflows
+- it persists per-resource mutations during aggregation (`resource.save(...)`, `codebase.save_resource(...)`)
+- it re-expands tallies into repeated value lists (`[value] * count`) and then recounts them
+- it repeatedly converts nested mappings back into objects (`Package.from_dict(...)`, `LicenseMatchFromResult.from_dicts(...)`, `resource.to_dict(...)`)
+- `--tallies-with-details` amplifies the cost by materializing tallies on every file and directory
+
+Provenant should match the useful behavior surface without inheriting those structural costs.
 
 ## Current State in Rust
 
@@ -176,6 +203,52 @@ Summarization is a **consumer**, not a normalizer.
   - package-data files still treated as manifests when present
   - package-data ancestry now promotes manifest/legal siblings and ancestor directories into the top-level package view where the active `with_package_data` fixture expects it
 
+### Current performance profile
+
+Implemented Rust behavior is already materially leaner than Python:
+
+- ✅ post-processing operates on in-memory `Vec<FileInfo>` / `Vec<Package>` instead of persisting every resource after each step
+- ✅ top-level tallies aggregate counts directly in `HashMap<Option<String>, usize>` rather than re-expanding counted values
+- ✅ detailed tallies are bottom-up over already-present file/directory nodes
+- ✅ package metadata promotion no longer mutates declared-license provenance from key-file evidence
+
+The remaining hot spots are localized and should stay explicit in this plan:
+
+- ⚠️ `mark_generated_files()` rereads file contents from disk after scanning
+- ⚠️ `assign_facets()` is roughly `O(files × facet_rules)`
+- ⚠️ `promote_package_metadata_from_key_files()` currently scans files for each package
+- ⚠️ summary helpers such as `package_declared_license_expression()`, `compute_declared_holders()`, and `top_level_package_uids()` still perform repeated package↔file lookups that should eventually move to prebuilt indexes if profiling justifies it
+
+### Immediate hardening backlog before more parity work
+
+Before expanding the feature surface further, the current branch should harden these known hot paths:
+
+1. **Stop computing directory tallies for facet-only output**
+   - `create_output()` currently routes `--tallies-by-facet` through full `compute_detailed_tallies()` even though `compute_tallies_by_facet()` only consumes file-level `file.tallies`.
+   - Split file-only tally preparation from full file+directory detailed tallies.
+
+2. **Precompute package↔file lookup indexes once per output build**
+   - Replace repeated `files.iter().find(...)` / `files.iter().any(...)` and package × file scans in:
+     - `promote_package_metadata_from_key_files()`
+     - `package_declared_license_expression()`
+     - `compute_declared_holders()`
+     - `top_level_package_uids()`
+   - Build indexes only after classification/facet assignment has finalized the file annotations these helpers depend on.
+
+3. **Remove generated-file rereads from the post-processing path**
+   - `mark_generated_files()` currently performs a second filesystem pass via `fs::read`.
+   - Move generated-file hint extraction into scan-time data capture, or preserve just enough scan-time data to avoid reopening every file during `create_output()`.
+
+4. **Rewrite by-facet tally aggregation to accumulate counts directly**
+   - `compute_tallies_by_facet()` currently pays extra churn through repeated `merge_non_null_tally_entries()` map/vector rebuilding.
+   - Accumulate per-facet counts in maps and materialize sorted vectors once at the end.
+
+5. **Add a dedicated release-mode post-processing benchmark/regression harness**
+   - Current repo benchmarking does not exercise summary/tallies/generated/facet-heavy output builds.
+   - Add a small, repeatable benchmark path for `create_output()` option combinations so later parity work cannot silently reintroduce Python-style overhead.
+
+These hardening steps should come before larger new parity work because they remove guaranteed redundant work from the current branch without changing the high-level architecture.
+
 ### Missing
 
 - ❌ Package tallies
@@ -183,6 +256,8 @@ Summarization is a **consumer**, not a normalizer.
 - ❌ Full ScanCode `--classify` parity (including remaining classification nuances)
 - ❌ Remaining CLI gating/compatibility edge cases for summary/tally/classify/facet/generated options
 - ❌ Comprehensive scan summary parity
+- ❌ Explicit performance hardening for repeated package↔file summary joins and generated-file rereads
+- ❌ Dedicated post-processing benchmark/regression harness for summary/tally/generated/facet-heavy output builds
 
 ### Already handled elsewhere
 
@@ -209,6 +284,7 @@ Summarization is a **consumer**, not a normalizer.
 9. **Phase 8**: Generated-code detection parity plus remaining classify/facet parity gaps. ✅ Complete for the active emitted ScanCode generated/classify fixture surface, including generated hint samples and CLI output (`generated/simple`, `generated/jspc`, `generated/cli.expected.json`) plus active classify fixtures (`cli.expected.json`, `with_package_data.expected.json`).
 10. **Phase 9**: Comprehensive `--summary` parity over the completed tally/clarity/classification inputs. 🟡 Implemented: package-preferred origin fields, `other_license_expressions`/`other_holders`, package-datafile holder fallback, empty declared-holder parity, tallied-language fallback when packages disagree, and the main active ambiguity/holder fixtures. Remaining work: broader package-precedence and the residual summary edge-case fixtures.
 11. **Phase 10**: CLI parity wiring for the remaining summary/tally/classify/facet/generated options and regression coverage. 🟡 Implemented: `--summary`, `--license-clarity-score`, `--tallies`, `--tallies-key-files`, `--tallies-with-details`, and `--generated` gating. Remaining work: package-tally CLI surface and broader compatibility edge cases.
+12. **Phase 11**: Performance hardening. 🟡 Keep the current in-place design, avoid Python-style recount/copy patterns, and introduce prebuilt package↔file indexes or scanner-fed generated-file hints where profiling shows real cost.
 
 ## Success Criteria
 
@@ -219,6 +295,7 @@ Summarization is a **consumer**, not a normalizer.
 - [ ] Supports facet-driven and key-file-driven tally variants
 - [ ] Detects generated code with documented heuristic behavior
 - [ ] Exposes the corresponding CLI options with parity-compatible semantics
+- [ ] Preserves the current in-place/count-based architecture and avoids Python-style repeated-walk/recount/copy regressions
 - [ ] Golden and integration tests pass
 
 ## Related Documents
@@ -236,3 +313,4 @@ Summarization is a **consumer**, not a normalizer.
 - This plan intentionally groups some upstream pre-scan/scan/post-scan features together because they converge on one post-processing summary surface in Provenant.
 - Implement incrementally, but preserve the user-visible dependency chain: classification/facets/generated feed tallies and clarity; tallies and clarity feed full summary parity.
 - License clarity score is a key metric for compliance teams.
+- Python's `--todo` workflow is intentionally not being tracked here; if Provenant ever needs a review/TODO surface, it should start as a separate scoped plan rather than being folded into summary/tallies work.

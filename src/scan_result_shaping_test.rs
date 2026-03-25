@@ -1,5 +1,5 @@
 use super::*;
-use crate::models::{Author, Copyright, FileInfo, FileType, OutputEmail, OutputURL};
+use crate::models::{Author, Copyright, FileInfo, FileReference, FileType, OutputEmail, OutputURL};
 use glob::Pattern;
 use std::collections::HashSet;
 use std::path::Path;
@@ -162,10 +162,123 @@ fn filter_redundant_clues_dedupes_exact_duplicates() {
 }
 
 #[test]
+fn filter_redundant_clues_keeps_distinct_line_ranges_and_dedupes_copyrights_and_holders() {
+    let mut files = vec![file("project/a.txt")];
+    files[0].copyrights = vec![
+        Copyright {
+            copyright: "Copyright Example".to_string(),
+            start_line: 1,
+            end_line: 1,
+        },
+        Copyright {
+            copyright: "Copyright Example".to_string(),
+            start_line: 1,
+            end_line: 1,
+        },
+    ];
+    files[0].holders = vec![
+        crate::models::Holder {
+            holder: "Example Corp".to_string(),
+            start_line: 2,
+            end_line: 2,
+        },
+        crate::models::Holder {
+            holder: "Example Corp".to_string(),
+            start_line: 3,
+            end_line: 3,
+        },
+    ];
+
+    filter_redundant_clues(&mut files);
+
+    assert_eq!(files[0].copyrights.len(), 1);
+    assert_eq!(files[0].holders.len(), 2);
+}
+
+#[test]
 fn normalize_paths_strip_root_removes_scan_root_prefix() {
     let mut files = vec![file("project/src/main.rs")];
     normalize_paths(&mut files, "project", true, false);
     assert_eq!(files[0].path, "src/main.rs");
+}
+
+#[test]
+fn normalize_paths_full_root_keeps_absolute_paths() {
+    let temp = tempfile::tempdir().expect("tempdir should be created");
+    let file_path = temp.path().join("src").join("main.rs");
+    std::fs::create_dir_all(file_path.parent().unwrap()).expect("parent dir should exist");
+    std::fs::write(&file_path, "fn main() {}\n").expect("file should be written");
+
+    let mut files = vec![file(file_path.to_str().unwrap())];
+    normalize_paths(&mut files, temp.path().to_str().unwrap(), false, true);
+
+    assert_eq!(
+        files[0].path,
+        file_path
+            .canonicalize()
+            .unwrap()
+            .to_string_lossy()
+            .to_string()
+    );
+}
+
+#[test]
+fn normalize_paths_updates_package_file_references_too() {
+    let temp = tempfile::tempdir().expect("tempdir should be created");
+    let root = temp.path().join("project");
+    let referenced = root.join("src").join("main.rs");
+    std::fs::create_dir_all(referenced.parent().unwrap()).expect("parent dir should exist");
+    std::fs::write(&referenced, "fn main() {}\n").expect("file should be written");
+
+    let mut manifest = file(root.join("package.json").to_str().unwrap());
+    manifest.package_data = vec![crate::models::PackageData {
+        file_references: vec![FileReference {
+            path: referenced.to_string_lossy().to_string(),
+            size: None,
+            sha1: None,
+            md5: None,
+            sha256: None,
+            sha512: None,
+            extra_data: None,
+        }],
+        ..Default::default()
+    }];
+
+    let mut files = vec![manifest];
+    normalize_paths(&mut files, root.to_str().unwrap(), true, false);
+
+    assert_eq!(files[0].path, "package.json");
+    assert_eq!(
+        files[0].package_data[0].file_references[0].path,
+        "src/main.rs"
+    );
+}
+
+#[test]
+fn only_findings_keeps_all_supported_finding_types() {
+    let mut files = vec![
+        dir("project"),
+        file("project/license.txt"),
+        file("project/pkg.json"),
+        file("project/error.txt"),
+        file("project/empty.txt"),
+    ];
+    files[1].license_detections = vec![crate::models::LicenseDetection {
+        license_expression: "mit".to_string(),
+        license_expression_spdx: "MIT".to_string(),
+        matches: vec![],
+        identifier: None,
+    }];
+    files[2].package_data = vec![crate::models::PackageData::default()];
+    files[3].scan_errors = vec!["boom".to_string()];
+
+    apply_only_findings_filter(&mut files);
+
+    let paths: HashSet<_> = files.into_iter().map(|f| f.path).collect();
+    assert!(paths.contains("project/license.txt"));
+    assert!(paths.contains("project/pkg.json"));
+    assert!(paths.contains("project/error.txt"));
+    assert!(!paths.contains("project/empty.txt"));
 }
 
 #[test]
@@ -221,4 +334,32 @@ fn mark_source_ignores_go_test_only_files_for_directory_threshold() {
         .expect("module dir exists");
     assert_eq!(module_dir.is_source, Some(true));
     assert_eq!(module_dir.source_count, Some(2));
+}
+
+#[test]
+fn mark_source_propagates_counts_through_nested_directories() {
+    let mut files = vec![
+        dir("project"),
+        dir("project/src"),
+        dir("project/src/nested"),
+        file("project/src/nested/a.rs"),
+        file("project/src/nested/b.rs"),
+    ];
+    files[3].programming_language = Some("Rust".to_string());
+    files[4].programming_language = Some("Rust".to_string());
+
+    apply_mark_source(&mut files);
+
+    let root = files.iter().find(|f| f.path == "project").unwrap();
+    let src = files.iter().find(|f| f.path == "project/src").unwrap();
+    let nested = files
+        .iter()
+        .find(|f| f.path == "project/src/nested")
+        .unwrap();
+    assert_eq!(root.is_source, Some(true));
+    assert_eq!(root.source_count, Some(2));
+    assert_eq!(src.is_source, Some(true));
+    assert_eq!(src.source_count, Some(2));
+    assert_eq!(nested.is_source, Some(true));
+    assert_eq!(nested.source_count, Some(2));
 }

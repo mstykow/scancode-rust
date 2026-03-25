@@ -32,6 +32,7 @@ fn scanner_matches_structured_credits_fixture() {
     let patterns: Vec<Pattern> = vec![];
     let options = TextDetectionOptions {
         detect_copyrights: true,
+        detect_generated: false,
         detect_emails: false,
         detect_urls: false,
         max_emails: 50,

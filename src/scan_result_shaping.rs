@@ -131,28 +131,51 @@ pub(crate) fn normalize_paths(
     full_root: bool,
 ) {
     for entry in files.iter_mut() {
-        let current_path = PathBuf::from(&entry.path);
-
-        if full_root {
-            let absolute_candidate = if current_path.is_absolute() {
-                current_path.clone()
-            } else {
-                env::current_dir()
-                    .map(|cwd| cwd.join(&current_path))
-                    .unwrap_or(current_path.clone())
-            };
-            let absolute = absolute_candidate
-                .canonicalize()
-                .unwrap_or(absolute_candidate);
-            entry.path = absolute.to_string_lossy().to_string();
-            continue;
+        if let Some(normalized_path) =
+            normalize_path_value(&entry.path, scan_root, strip_root, full_root)
+        {
+            entry.path = normalized_path;
         }
 
-        if strip_root && let Some(stripped) = strip_root_prefix(&current_path, Path::new(scan_root))
-        {
-            entry.path = stripped.to_string_lossy().to_string();
+        for package_data in &mut entry.package_data {
+            for file_reference in &mut package_data.file_references {
+                if let Some(normalized_path) =
+                    normalize_path_value(&file_reference.path, scan_root, strip_root, full_root)
+                {
+                    file_reference.path = normalized_path;
+                }
+            }
         }
     }
+}
+
+fn normalize_path_value(
+    path: &str,
+    scan_root: &str,
+    strip_root: bool,
+    full_root: bool,
+) -> Option<String> {
+    let current_path = PathBuf::from(path);
+
+    if full_root {
+        let absolute_candidate = if current_path.is_absolute() {
+            current_path.clone()
+        } else {
+            env::current_dir()
+                .map(|cwd| cwd.join(&current_path))
+                .unwrap_or(current_path.clone())
+        };
+        let absolute = absolute_candidate
+            .canonicalize()
+            .unwrap_or(absolute_candidate);
+        return Some(absolute.to_string_lossy().to_string());
+    }
+
+    if strip_root && let Some(stripped) = strip_root_prefix(&current_path, Path::new(scan_root)) {
+        return Some(stripped.to_string_lossy().to_string());
+    }
+
+    None
 }
 
 fn strip_root_prefix(path: &Path, root: &Path) -> Option<PathBuf> {

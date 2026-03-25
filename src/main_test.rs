@@ -76,6 +76,34 @@ fn validate_scan_option_compatibility_rejects_generated_with_from_json() {
 }
 
 #[test]
+fn validate_scan_option_compatibility_rejects_strip_root_with_from_json() {
+    let cli = crate::cli::Cli::try_parse_from([
+        "provenant",
+        "--json-pp",
+        "scan.json",
+        "--from-json",
+        "--strip-root",
+        "sample-scan.json",
+    ])
+    .unwrap();
+    assert!(validate_scan_option_compatibility(&cli).is_err());
+}
+
+#[test]
+fn validate_scan_option_compatibility_rejects_full_root_with_from_json() {
+    let cli = crate::cli::Cli::try_parse_from([
+        "provenant",
+        "--json-pp",
+        "scan.json",
+        "--from-json",
+        "--full-root",
+        "sample-scan.json",
+    ])
+    .unwrap();
+    assert!(validate_scan_option_compatibility(&cli).is_err());
+}
+
+#[test]
 fn validate_scan_option_compatibility_allows_scan_flags_without_from_json() {
     let cli = crate::cli::Cli::try_parse_from([
         "provenant",

@@ -1,6 +1,5 @@
 use std::collections::{HashMap, HashSet};
 use std::env;
-use std::fs;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Result, anyhow};
@@ -16,6 +15,7 @@ use crate::models::{
     OUTPUT_FORMAT_VERSION, Output, Package, Summary, SystemEnvironment, Tallies, TallyEntry,
 };
 use crate::scanner;
+use crate::utils::generated::generated_code_hints;
 use crate::utils::spdx::combine_license_expressions;
 
 #[cfg(test)]
@@ -53,6 +53,29 @@ pub(crate) struct CreateOutputContext<'a> {
     pub(crate) license_references: Vec<crate::models::LicenseReference>,
     pub(crate) license_rule_references: Vec<crate::models::LicenseRuleReference>,
     pub(crate) options: CreateOutputOptions<'a>,
+}
+
+struct ClassificationContext {
+    package_roots: HashMap<String, PathBuf>,
+    package_file_references: HashMap<String, HashSet<String>>,
+    scan_roots: Vec<PathBuf>,
+    package_data_top_level_dirs: HashSet<String>,
+}
+
+#[derive(Default)]
+struct OutputIndexes {
+    first_file_index_by_path: HashMap<String, usize>,
+    key_file_indices_by_package_uid: HashMap<String, Vec<usize>>,
+}
+
+#[derive(Clone, Copy)]
+struct FileClassification {
+    is_legal: bool,
+    is_manifest: bool,
+    is_readme: bool,
+    is_top_level: bool,
+    is_key_file: bool,
+    is_community: bool,
 }
 
 pub(crate) fn create_output(
@@ -103,23 +126,32 @@ pub(crate) fn create_output(
         mut packages,
         dependencies,
     } = context.assembly_result;
+    let needs_classification = context.options.include_summary
+        || context.options.include_license_clarity_score
+        || context.options.include_tallies_of_key_files;
+    let classification_context = (needs_classification || !packages.is_empty())
+        .then(|| build_classification_context(&files, &packages));
+
     if context.options.include_generated {
         mark_generated_files(&mut files, context.options.scanned_root);
     } else {
         clear_generated_flags(&mut files);
     }
-    if context.options.include_summary
-        || context.options.include_license_clarity_score
-        || context.options.include_tallies_of_key_files
-    {
-        classify_key_files(&mut files, &packages);
+    if needs_classification && let Some(classification_context) = classification_context.as_ref() {
+        apply_file_classification(&mut files, classification_context);
     }
-    promote_package_metadata_from_key_files(&files, &mut packages);
+    let output_indexes = build_output_indexes(
+        &files,
+        classification_context.as_ref(),
+        !needs_classification,
+    );
+
+    promote_package_metadata_from_key_files(&files, &mut packages, &output_indexes);
     assign_facets(&mut files, context.options.facet_rules);
-    let needs_detailed_tallies =
-        context.options.include_tallies_with_details || context.options.include_tallies_by_facet;
-    if needs_detailed_tallies {
+    if context.options.include_tallies_with_details {
         compute_detailed_tallies(&mut files);
+    } else if context.options.include_tallies_by_facet {
+        compute_file_tallies(&mut files);
     } else {
         clear_resource_tallies(&mut files);
     }
@@ -128,6 +160,7 @@ pub(crate) fn create_output(
             compute_summary_with_options(
                 &files,
                 &packages,
+                &output_indexes,
                 context.options.include_summary,
                 context.options.include_license_clarity_score || context.options.include_summary,
             )
@@ -150,6 +183,9 @@ pub(crate) fn create_output(
     } else {
         None
     };
+    if !context.options.include_tallies_with_details {
+        clear_resource_tallies(&mut files);
+    }
 
     Output {
         summary,
@@ -172,55 +208,125 @@ pub(crate) fn create_output(
     }
 }
 
-fn classify_key_files(files: &mut [FileInfo], packages: &[Package]) {
-    let package_roots = build_package_roots(packages);
-    let package_file_references = build_package_file_reference_map(files);
-    let scan_roots = build_scan_roots(files);
-    let package_data_top_level_dirs = build_package_data_top_level_dirs(files);
+fn build_classification_context(files: &[FileInfo], packages: &[Package]) -> ClassificationContext {
+    ClassificationContext {
+        package_roots: build_package_roots(packages),
+        package_file_references: build_package_file_reference_map(files),
+        scan_roots: build_scan_roots(files),
+        package_data_top_level_dirs: build_package_data_top_level_dirs(files),
+    }
+}
 
-    for file in files.iter_mut() {
-        let path = Path::new(&file.path);
-        let is_scan_root_top_level = is_scan_top_level(path, &scan_roots);
-        let is_referenced = file.for_packages.iter().any(|uid| {
-            package_file_references
-                .get(uid)
-                .is_some_and(|refs| refs.contains(file.path.as_str()))
-        });
-        let is_root_top_level = file.for_packages.iter().any(|uid| {
-            if file.file_type == FileType::File && !file.package_data.is_empty() {
-                return false;
-            }
-            package_roots
-                .get(uid)
-                .and_then(|root| path.strip_prefix(root).ok())
-                .is_some_and(|relative| relative.components().count() == 1)
-        });
-        let is_package_data_top_level = if file.file_type == FileType::Directory {
-            package_data_top_level_dirs.contains(file.path.as_str())
-        } else {
-            (!file.package_data.is_empty() && file.is_manifest)
-                || path
-                    .parent()
-                    .and_then(|parent| parent.to_str())
-                    .is_some_and(|parent| package_data_top_level_dirs.contains(parent))
-        };
-
-        file.is_top_level = is_scan_root_top_level
-            || is_referenced
-            || is_root_top_level
-            || is_package_data_top_level;
-
-        if file.file_type != FileType::File {
-            continue;
+fn classify_file(
+    file: &FileInfo,
+    classification_context: &ClassificationContext,
+) -> FileClassification {
+    let path = Path::new(&file.path);
+    let is_manifest = file.file_type == FileType::File
+        && (!file.package_data.is_empty() || is_manifest_file(&file.path));
+    let is_scan_root_top_level = is_scan_top_level(path, &classification_context.scan_roots);
+    let is_referenced = file.for_packages.iter().any(|uid| {
+        classification_context
+            .package_file_references
+            .get(uid)
+            .is_some_and(|refs| refs.contains(file.path.as_str()))
+    });
+    let is_root_top_level = file.for_packages.iter().any(|uid| {
+        if file.file_type == FileType::File && !file.package_data.is_empty() {
+            return false;
         }
 
-        file.is_legal = is_legal_file(file);
-        file.is_readme = is_readme_file(file);
-        file.is_manifest = !file.package_data.is_empty() || is_manifest_file(&file.path);
-        file.is_community = is_community_file(file);
-        file.is_key_file =
-            file.is_top_level && (file.is_legal || file.is_manifest || file.is_readme);
+        classification_context
+            .package_roots
+            .get(uid)
+            .and_then(|root| path.strip_prefix(root).ok())
+            .is_some_and(|relative| relative.components().count() == 1)
+    });
+    let is_package_data_top_level = if file.file_type == FileType::Directory {
+        classification_context
+            .package_data_top_level_dirs
+            .contains(file.path.as_str())
+    } else {
+        (!file.package_data.is_empty() && !file.for_packages.is_empty() && is_manifest)
+            || path
+                .parent()
+                .and_then(|parent| parent.to_str())
+                .is_some_and(|parent| {
+                    classification_context
+                        .package_data_top_level_dirs
+                        .contains(parent)
+                })
+    };
+    let is_top_level =
+        is_scan_root_top_level || is_referenced || is_root_top_level || is_package_data_top_level;
+    let is_legal = file.file_type == FileType::File && is_legal_file(file);
+    let is_readme = file.file_type == FileType::File && is_readme_file(file);
+    let is_community = file.file_type == FileType::File && is_community_file(file);
+    let is_key_file =
+        file.file_type == FileType::File && is_top_level && (is_legal || is_manifest || is_readme);
+
+    FileClassification {
+        is_legal,
+        is_manifest,
+        is_readme,
+        is_top_level,
+        is_key_file,
+        is_community,
     }
+}
+
+fn apply_file_classification(
+    files: &mut [FileInfo],
+    classification_context: &ClassificationContext,
+) {
+    for file in files.iter_mut() {
+        let classification = classify_file(file, classification_context);
+        file.is_legal = classification.is_legal;
+        file.is_manifest = classification.is_manifest;
+        file.is_readme = classification.is_readme;
+        file.is_top_level = classification.is_top_level;
+        file.is_key_file = classification.is_key_file;
+        file.is_community = classification.is_community;
+    }
+}
+
+#[cfg(test)]
+fn classify_key_files(files: &mut [FileInfo], packages: &[Package]) {
+    let classification_context = build_classification_context(files, packages);
+    apply_file_classification(files, &classification_context);
+}
+
+fn build_output_indexes(
+    files: &[FileInfo],
+    classification_context: Option<&ClassificationContext>,
+    use_fallback_key_classification: bool,
+) -> OutputIndexes {
+    let mut indexes = OutputIndexes::default();
+
+    for (idx, file) in files.iter().enumerate() {
+        indexes
+            .first_file_index_by_path
+            .entry(file.path.clone())
+            .or_insert(idx);
+
+        let is_key_file = if use_fallback_key_classification {
+            classification_context.is_some_and(|context| classify_file(file, context).is_key_file)
+        } else {
+            file.is_key_file
+        };
+
+        if is_key_file {
+            for package_uid in &file.for_packages {
+                indexes
+                    .key_file_indices_by_package_uid
+                    .entry(package_uid.clone())
+                    .or_default()
+                    .push(idx);
+            }
+        }
+    }
+
+    indexes
 }
 
 fn build_package_data_top_level_dirs(files: &[FileInfo]) -> HashSet<String> {
@@ -576,20 +682,23 @@ fn assign_facets(files: &mut [FileInfo], facet_rules: &[FacetRule]) {
     }
 }
 
-fn promote_package_metadata_from_key_files(files: &[FileInfo], packages: &mut [Package]) {
+fn promote_package_metadata_from_key_files(
+    files: &[FileInfo],
+    packages: &mut [Package],
+    indexes: &OutputIndexes,
+) {
     for package in packages.iter_mut() {
-        let key_files: Vec<&FileInfo> = files
-            .iter()
-            .filter(|file| file.is_key_file && file.for_packages.contains(&package.package_uid))
-            .collect();
-
-        if key_files.is_empty() {
+        let Some(key_file_indices) = indexes
+            .key_file_indices_by_package_uid
+            .get(&package.package_uid)
+        else {
             continue;
-        }
+        };
 
         if package.copyright.is_none() {
-            package.copyright = key_files
+            package.copyright = key_file_indices
                 .iter()
+                .filter_map(|index| files.get(*index))
                 .flat_map(|file| file.copyrights.iter())
                 .map(|copyright| copyright.copyright.clone())
                 .next();
@@ -597,8 +706,9 @@ fn promote_package_metadata_from_key_files(files: &[FileInfo], packages: &mut [P
 
         if package.holder.is_none() {
             let promoted_holders = unique(
-                &key_files
+                &key_file_indices
                     .iter()
+                    .filter_map(|index| files.get(*index))
                     .flat_map(|file| file.holders.iter())
                     .map(|holder| holder.holder.clone())
                     .collect::<Vec<_>>(),
@@ -612,23 +722,42 @@ fn promote_package_metadata_from_key_files(files: &[FileInfo], packages: &mut [P
 
 #[cfg(test)]
 fn compute_summary(files: &[FileInfo], packages: &[Package]) -> Option<Summary> {
-    compute_summary_with_options(files, packages, true, true)
+    let indexes = build_output_indexes(files, None, false);
+    compute_summary_with_options(files, packages, &indexes, true, true)
 }
 
 fn compute_summary_with_options(
     files: &[FileInfo],
     packages: &[Package],
+    indexes: &OutputIndexes,
     include_summary_fields: bool,
     include_license_clarity_score: bool,
 ) -> Option<Summary> {
-    let top_level_package_uids = top_level_package_uids(packages, files);
-    let declared_holders = compute_declared_holders(files, packages);
-    let declared_holder = (!declared_holders.is_empty()).then(|| declared_holders.join(", "));
-    let primary_language = compute_primary_language(files, packages);
-    let other_languages = compute_other_languages(files, primary_language.as_deref());
-    let tallies = compute_summary_tallies(files, packages).unwrap_or_default();
+    let top_level_package_uids = top_level_package_uids(packages, files, indexes);
+    let declared_holders = compute_declared_holders(files, packages, indexes);
     let (score_declared_license_expression, score_clarity) =
         compute_license_score(files, packages, &top_level_package_uids);
+
+    let declared_holder = if include_summary_fields && !declared_holders.is_empty() {
+        Some(declared_holders.join(", "))
+    } else {
+        None
+    };
+    let primary_language = if include_summary_fields {
+        compute_primary_language(files, packages)
+    } else {
+        None
+    };
+    let other_languages = if include_summary_fields {
+        compute_other_languages(files, primary_language.as_deref())
+    } else {
+        Vec::new()
+    };
+    let tallies = if include_summary_fields {
+        compute_summary_tallies(files, packages).unwrap_or_default()
+    } else {
+        Tallies::default()
+    };
 
     if !include_summary_fields
         && !include_license_clarity_score
@@ -641,7 +770,7 @@ fn compute_summary_with_options(
     }
 
     let package_declared_license_expression = if include_summary_fields {
-        package_declared_license_expression(packages, files, &top_level_package_uids)
+        package_declared_license_expression(packages, files, indexes, &top_level_package_uids)
     } else {
         None
     };
@@ -725,30 +854,6 @@ fn compute_summary_with_options(
     })
 }
 
-const GENERATED_KEYWORDS_LOWERED: &[&str] = &[
-    "generated by",
-    "auto-generated",
-    "automatically generated",
-    "generated on",
-    "last generated on",
-    "do not edit this file",
-    "it is machine generated",
-    "automatically created by",
-    "following schema fragment specifies the",
-    "this code is generated",
-    "generated by cython",
-    "this file was automatically generated by",
-    "this file is generated by",
-    "generated file, do not edit",
-    "this is an autogenerated file",
-    "generated by the protocol buffer compiler",
-    "generated code -- do not edit",
-    "makefile.in generated by automake",
-    "generated automatically by aclocal",
-    "generated by gnu autoconf",
-    "this file was automatically generated",
-];
-
 fn mark_generated_files(files: &mut [FileInfo], scanned_root: Option<&Path>) {
     for file in files.iter_mut() {
         if file.file_type != FileType::File {
@@ -756,8 +861,10 @@ fn mark_generated_files(files: &mut [FileInfo], scanned_root: Option<&Path>) {
             continue;
         }
 
-        file.is_generated =
-            Some(generated_file_hint_exists(&file.path, scanned_root).unwrap_or(false));
+        if file.is_generated.is_none() {
+            file.is_generated =
+                Some(generated_file_hint_exists(&file.path, scanned_root).unwrap_or(false));
+        }
     }
 }
 
@@ -776,24 +883,6 @@ fn clear_resource_tallies(files: &mut [FileInfo]) {
 fn generated_file_hint_exists(path: &str, scanned_root: Option<&Path>) -> Result<bool> {
     let path = resolve_generated_scan_path(path, scanned_root)?;
     Ok(!generated_code_hints(&path)?.is_empty())
-}
-
-fn generated_code_hints(path: &Path) -> Result<Vec<String>> {
-    let content = fs::read(path)?;
-    let text = String::from_utf8_lossy(&content);
-    let mut hints = Vec::new();
-
-    for line in text.lines().take(150) {
-        let lowered = line.trim().to_ascii_lowercase();
-        if GENERATED_KEYWORDS_LOWERED
-            .iter()
-            .any(|keyword| lowered.contains(keyword))
-        {
-            hints.push(lowered.chars().take(100).collect());
-        }
-    }
-
-    Ok(hints)
 }
 
 fn resolve_generated_scan_path(path: &str, scanned_root: Option<&Path>) -> Result<PathBuf> {
@@ -815,6 +904,7 @@ fn resolve_generated_scan_path(path: &str, scanned_root: Option<&Path>) -> Resul
 fn package_declared_license_expression(
     packages: &[Package],
     files: &[FileInfo],
+    indexes: &OutputIndexes,
     top_level_package_uids: &HashSet<String>,
 ) -> Option<String> {
     combine_license_expressions(
@@ -824,15 +914,26 @@ fn package_declared_license_expression(
             .filter_map(|package| {
                 package.declared_license_expression.clone().or_else(|| {
                     package.datafile_paths.iter().find_map(|datafile_path| {
-                        files
-                            .iter()
-                            .find(|file| file.path == *datafile_path)
+                        indexes
+                            .first_file_index_by_path
+                            .get(datafile_path)
+                            .and_then(|index| files.get(*index))
                             .and_then(|file| file.license_expression.clone())
                     })
                 })
             }),
     )
     .map(|expr| canonicalize_summary_expression(&expr))
+}
+
+fn compute_file_tallies(files: &mut [FileInfo]) {
+    for file in files.iter_mut() {
+        if file.file_type == FileType::File {
+            file.tallies = Some(compute_direct_file_tallies(file));
+        } else {
+            file.tallies = None;
+        }
+    }
 }
 
 fn compute_license_score(
@@ -1367,9 +1468,9 @@ fn compute_key_file_tallies(files: &[FileInfo]) -> Option<Tallies> {
 }
 
 fn compute_tallies_by_facet(files: &[FileInfo]) -> Option<Vec<FacetTallies>> {
-    let mut buckets: HashMap<&'static str, Tallies> = FACETS
+    let mut buckets: HashMap<&'static str, TallyAccumulator> = FACETS
         .iter()
-        .map(|facet| (*facet, Tallies::default()))
+        .map(|facet| (*facet, TallyAccumulator::default()))
         .collect();
 
     for file in files.iter().filter(|file| file.file_type == FileType::File) {
@@ -1385,17 +1486,11 @@ fn compute_tallies_by_facet(files: &[FileInfo]) -> Option<Vec<FacetTallies>> {
             let Some(bucket) = buckets.get_mut(facet.as_str()) else {
                 continue;
             };
-            merge_non_null_tally_entries(
-                &mut bucket.detected_license_expression,
-                &file_tallies.detected_license_expression,
-            );
-            merge_non_null_tally_entries(&mut bucket.copyrights, &file_tallies.copyrights);
-            merge_non_null_tally_entries(&mut bucket.holders, &file_tallies.holders);
-            merge_non_null_tally_entries(&mut bucket.authors, &file_tallies.authors);
-            merge_non_null_tally_entries(
-                &mut bucket.programming_language,
-                &file_tallies.programming_language,
-            );
+            bucket.merge_license_expressions(&file_tallies.detected_license_expression);
+            bucket.merge_copyrights(&file_tallies.copyrights);
+            bucket.merge_holders(&file_tallies.holders);
+            bucket.merge_authors(&file_tallies.authors);
+            bucket.merge_programming_languages(&file_tallies.programming_language);
         }
     }
 
@@ -1404,10 +1499,51 @@ fn compute_tallies_by_facet(files: &[FileInfo]) -> Option<Vec<FacetTallies>> {
             .iter()
             .map(|facet| FacetTallies {
                 facet: (*facet).to_string(),
-                tallies: buckets.remove(facet).unwrap_or_default(),
+                tallies: buckets.remove(facet).unwrap_or_default().into_tallies(),
             })
             .collect(),
     )
+}
+
+#[derive(Default)]
+struct TallyAccumulator {
+    detected_license_expression: HashMap<Option<String>, usize>,
+    copyrights: HashMap<Option<String>, usize>,
+    holders: HashMap<Option<String>, usize>,
+    authors: HashMap<Option<String>, usize>,
+    programming_language: HashMap<Option<String>, usize>,
+}
+
+impl TallyAccumulator {
+    fn merge_license_expressions(&mut self, entries: &[TallyEntry]) {
+        merge_non_null_entries_into_counts(&mut self.detected_license_expression, entries);
+    }
+
+    fn merge_copyrights(&mut self, entries: &[TallyEntry]) {
+        merge_non_null_entries_into_counts(&mut self.copyrights, entries);
+    }
+
+    fn merge_holders(&mut self, entries: &[TallyEntry]) {
+        merge_non_null_entries_into_counts(&mut self.holders, entries);
+    }
+
+    fn merge_authors(&mut self, entries: &[TallyEntry]) {
+        merge_non_null_entries_into_counts(&mut self.authors, entries);
+    }
+
+    fn merge_programming_languages(&mut self, entries: &[TallyEntry]) {
+        merge_non_null_entries_into_counts(&mut self.programming_language, entries);
+    }
+
+    fn into_tallies(self) -> Tallies {
+        Tallies {
+            detected_license_expression: build_tally_entries(self.detected_license_expression),
+            copyrights: build_tally_entries(self.copyrights),
+            holders: build_tally_entries(self.holders),
+            authors: build_tally_entries(self.authors),
+            programming_language: build_tally_entries(self.programming_language),
+        }
+    }
 }
 
 fn compute_detailed_tallies(files: &mut [FileInfo]) {
@@ -1523,21 +1659,13 @@ fn merge_tally_entries(counts: &mut HashMap<Option<String>, usize>, entries: &[T
     }
 }
 
-fn merge_non_null_tally_entries(destination: &mut Vec<TallyEntry>, entries: &[TallyEntry]) {
-    let mut counts: HashMap<Option<String>, usize> = destination
-        .iter()
-        .cloned()
-        .map(|entry| (entry.value, entry.count))
-        .collect();
-
+fn merge_non_null_entries_into_counts(
+    destination: &mut HashMap<Option<String>, usize>,
+    entries: &[TallyEntry],
+) {
     for entry in entries.iter().filter(|entry| entry.value.is_some()) {
-        *counts.entry(entry.value.clone()).or_insert(0) += entry.count;
+        *destination.entry(entry.value.clone()).or_insert(0) += entry.count;
     }
-
-    *destination = build_tally_entries(counts)
-        .into_iter()
-        .filter(|entry| entry.value.is_some())
-        .collect();
 }
 
 fn tally_file_values<F>(
@@ -1669,7 +1797,11 @@ fn build_tally_entries(counts: HashMap<Option<String>, usize>) -> Vec<TallyEntry
     tallies
 }
 
-fn compute_declared_holders(files: &[FileInfo], packages: &[Package]) -> Vec<String> {
+fn compute_declared_holders(
+    files: &[FileInfo],
+    packages: &[Package],
+    indexes: &OutputIndexes,
+) -> Vec<String> {
     let mut counts: HashMap<String, usize> = HashMap::new();
 
     for holder in packages
@@ -1686,7 +1818,11 @@ fn compute_declared_holders(files: &[FileInfo], packages: &[Package]) -> Vec<Str
     if counts.is_empty() {
         for package in packages {
             for datafile_path in &package.datafile_paths {
-                if let Some(file) = files.iter().find(|file| file.path == *datafile_path) {
+                if let Some(file) = indexes
+                    .first_file_index_by_path
+                    .get(datafile_path)
+                    .and_then(|index| files.get(*index))
+                {
                     if file.is_legal {
                         continue;
                     }
@@ -1855,18 +1991,23 @@ fn summary_origin_packages<'a>(packages: &'a [Package], files: &[FileInfo]) -> V
     top_level_packages
 }
 
-fn top_level_package_uids(packages: &[Package], files: &[FileInfo]) -> HashSet<String> {
+fn top_level_package_uids(
+    packages: &[Package],
+    files: &[FileInfo],
+    indexes: &OutputIndexes,
+) -> HashSet<String> {
     let top_level_packages = summary_origin_packages(packages, files);
     let key_package_uids: HashSet<String> = top_level_packages
         .iter()
         .filter(|package| {
             package.datafile_paths.iter().any(|datafile_path| {
-                files.iter().any(|file| {
-                    file.path == *datafile_path
-                        && file.file_type == FileType::File
-                        && file.is_top_level
-                        && file.is_key_file
-                })
+                indexes
+                    .first_file_index_by_path
+                    .get(datafile_path)
+                    .and_then(|index| files.get(*index))
+                    .is_some_and(|file| {
+                        file.file_type == FileType::File && file.is_top_level && file.is_key_file
+                    })
             })
         })
         .map(|package| package.package_uid.clone())

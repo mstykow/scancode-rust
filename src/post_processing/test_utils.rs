@@ -470,11 +470,13 @@ pub(crate) fn compute_fixture_summary(
     let mut packages = assembly_result.packages;
     normalize_package_datafile_paths(&mut packages, &resolved_scan_root.normalize_root);
 
-    classify_key_files(&mut files, &packages);
-    promote_package_metadata_from_key_files(&files, &mut packages);
+    let classification_context = build_classification_context(&files, &packages);
+    apply_file_classification(&mut files, &classification_context);
+    let indexes = build_output_indexes(&files, Some(&classification_context), false);
+    promote_package_metadata_from_key_files(&files, &mut packages, &indexes);
 
     serde_json::to_value(
-        compute_summary_with_options(&files, &packages, include_summary, include_score)
+        compute_summary_with_options(&files, &packages, &indexes, include_summary, include_score)
             .expect("fixture summary should exist"),
     )
     .expect("fixture summary should serialize")
