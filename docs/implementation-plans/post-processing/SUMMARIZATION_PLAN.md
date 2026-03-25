@@ -223,7 +223,7 @@ The remaining hot spots are localized and should stay explicit in this plan:
 ### Missing
 
 - ❌ Residual summary package-precedence and edge-case parity
-- ❌ Remaining CLI/tally compatibility follow-up around the localized `tallies/` corpus
+- ❌ Remaining localized `tallies/` follow-up is now package-aware fixture parity and detector/parser-driven `full_tallies` gaps, not missing `--package` CLI wiring
 - ❌ Detector-dependent `full_tallies` parity outside the reducer layer (missing per-file license/language/copyright normalization inputs)
 
 ### Already handled elsewhere
