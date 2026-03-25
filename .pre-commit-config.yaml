@@ -17,7 +17,7 @@ repos:
 
       - id: generate-supported-formats
         name: Generate docs/SUPPORTED_FORMATS.md
-        entry: bash -c 'cargo run --quiet --manifest-path xtask/Cargo.toml --bin generate-supported-formats && git add docs/SUPPORTED_FORMATS.md'
+        entry: bash -c 'cargo run --quiet --locked --manifest-path xtask/Cargo.toml --bin generate-supported-formats && git add docs/SUPPORTED_FORMATS.md'
         language: system
         pass_filenames: false
         files: ^src/parsers/.*\.rs$

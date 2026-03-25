@@ -30,6 +30,9 @@ jobs:
       - name: Set up Rust cache
         uses: Swatinem/rust-cache@v2
 
+      - name: Check xtask lockfile sync and supported formats
+        run: cargo run --quiet --locked --manifest-path xtask/Cargo.toml --bin generate-supported-formats -- --check
+
       - name: Check formatting
         run: cargo fmt --all -- --check
 
